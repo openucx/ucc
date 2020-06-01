@@ -21,7 +21,7 @@
  * resources associated  with the library. The library handle cannot be passed
  * from one library instance to another.
  */
-typedef struct ucc_lib_info_t*       ucc_lib_h;
+typedef struct ucc_lib_info*       ucc_lib_h;
 
 /**
  * @ingroup UCC_CONTEXT_DT

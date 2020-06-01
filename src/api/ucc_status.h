@@ -31,6 +31,7 @@ typedef enum {
     UCC_ERR_INVALID_PARAM               =   -3,
     UCC_ERR_NO_MEMORY                   =   -4,
     UCC_ERR_NO_RESOURCE                 =   -5,
+    UCC_ERR_NO_MESSAGE                  =   -6,
     UCC_ERR_LAST                        = -100,
 } ucc_status_t;
 
