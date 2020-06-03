@@ -2,7 +2,7 @@
 # Copyright (C) Mellanox Technologies Ltd. 2001-2020.  ALL RIGHTS RESERVED.
 #
 
-SUBDIRS = core
+SUBDIRS = core team_lib
 
 
 lib_LTLIBRARIES  = libucc.la
@@ -19,13 +19,13 @@ nobase_dist_libucc_la_HEADERS = \
 	api/ucc_status.h
 
 noinst_HEADERS =      \
-	team_lib/ucc_tl.h \
-	utils/ucc_log.h
+	team_lib/ucc_tl.h
 
 libucc_la_SOURCES =
 
 libucc_la_LIBADD = \
-	core/libucc_core.la
+	core/libucc_core.la \
+	team_lib/libucc_tl.la
 
 libucc_ladir = $(includedir)
 

@@ -5,7 +5,6 @@
 #include "utils/ucc_log.h"
 #include <team_lib/ucc_tl.h>
 
-extern ucc_lib_t ucc_static_lib;
 static ucs_config_field_t ucc_lib_config_table[] = {
     {NULL}
 };
@@ -14,54 +13,99 @@ UCS_CONFIG_REGISTER_TABLE(ucc_lib_config_table, "UCC", NULL, ucc_lib_config_t)
 
 #define CHECK_LIB_CONFIG_CAP(_cap, _CAP_FIELD) do{                       \
         if ((params->field_mask & UCC_LIB_PARAM_FIELD_ ## _CAP_FIELD) && \
-            !(params-> _cap & tl->params. _cap)) {                       \
+            !(params-> _cap & tl_iface->params. _cap)) {                 \
             ucc_info("Disqualifying team %s due to %s cap",              \
-                     tl->name, UCS_PP_QUOTE(_CAP_FIELD));                \
+                     tl_iface->name, UCS_PP_QUOTE(_CAP_FIELD));          \
             continue;                                                    \
         }                                                                \
     } while(0)
 
 
-static void ucc_lib_filter(const ucc_lib_params_t *params, ucc_lib_t *lib)
+static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *params,
+                                          const ucc_lib_config_t *config,
+                                          ucc_lib_t *lib)
 {
+    int n_tls = ucc_lib_data.n_tls_loaded;
+    ucc_tl_iface_t *tl_iface;
+    ucc_team_lib_t *tl_lib;
+    ucc_tl_lib_config_t *tl_config;
+    ucc_status_t status;
     int i;
-    int n_libs = ucc_static_lib.n_libs_opened;
-    lib->libs = (ucc_team_lib_t**)malloc(sizeof(ucc_team_lib_t*)*n_libs);
+
+    lib->libs = (ucc_team_lib_t**)malloc(sizeof(ucc_team_lib_t*)*n_tls);
+    if (!lib->libs) {
+        status = UCC_ERR_NO_MEMORY;
+        goto error;
+    }
+
     lib->n_libs_opened = 0;
-    for (i=0; i<n_libs; i++) {
-        ucc_team_lib_t *tl = ucc_static_lib.libs[i];
+    for (i=0; i<n_tls; i++) {
+        tl_iface = ucc_lib_data.tl_ifaces[i];
         CHECK_LIB_CONFIG_CAP(reproducible, REPRODUCIBLE);
         CHECK_LIB_CONFIG_CAP(thread_mode,  THREAD_MODE);
         CHECK_LIB_CONFIG_CAP(coll_types,   COLL_TYPES);
-        lib->libs[lib->n_libs_opened++] = tl;
+        tl_config  = malloc(tl_iface->tl_lib_config.size);
+        ucs_config_parser_fill_opts(tl_config, tl_iface->tl_lib_config.table,
+                                    config->full_prefix, tl_iface->tl_lib_config.prefix, 0);
+        status = tl_iface->init(params, config, tl_config, &tl_lib);
+
+        if (UCS_OK != status) {
+            ucs_config_parser_release_opts(tl_config, tl_iface->tl_lib_config.table);
+            ucc_error("lib_init failed for TL: %s\n", tl_iface->name);
+            goto error;
+        }
+        tl_lib->log_component = tl_config->log_component;
+        tl_lib->priority = (-1 == tl_config->priority) ?
+            tl_iface->priority : tl_config->priority;
+        ucs_config_parser_release_opts(tl_config, tl_iface->tl_lib_config.table);
+        lib->libs[lib->n_libs_opened++] = tl_lib;
+        ucc_info("lib_prefix \"%s\": initialized tl \"%s\" priority %d\n",
+                 config->full_prefix, tl_iface->name, tl_lib->priority);
     }
+    return UCS_OK;
+
+error:
+    if (lib->libs) free(lib->libs);
+    return status;
 }
 
 ucc_status_t ucc_lib_init(const ucc_lib_params_t *params,
                           const ucc_lib_config_t *config,
                           ucc_lib_h *ucc_lib)
 {
+    ucs_status_t status;
     ucc_lib_t *lib;
 
-    if (ucc_static_lib.n_libs_opened == 0) {
+    if (ucc_lib_data.n_tls_loaded == 0) {
         return UCC_ERR_NO_MESSAGE;
     }
 
     lib = malloc(sizeof(*lib));
-    if (lib == NULL) {
-        return UCC_ERR_NO_MEMORY;
+    if (!lib) {
+        status = UCC_ERR_NO_MEMORY;
+        goto error;
     }
 
-    ucc_lib_filter(params, lib);
+    status = ucc_lib_init_filtered(params, config, lib);
+    if (UCS_OK != status) {
+        goto error;
+    }
+
     if (lib->n_libs_opened == 0) {
         ucc_error("UCC lib init: no plugins left after filtering by params\n");
-        return UCC_ERR_NO_MESSAGE;
+        status = UCC_ERR_NO_MESSAGE;
+        goto error;
     }
 
     *ucc_lib = lib;
     //TODO: move to appropriate place
     //ucs_config_parser_warn_unused_env_vars_once("UCC_");
     return UCC_OK;
+
+error:
+    *ucc_lib = NULL;
+    if (lib) free(lib);
+    return status;
 }
 
 ucc_status_t ucc_lib_config_read(const char *env_prefix,
@@ -69,20 +113,26 @@ ucc_status_t ucc_lib_config_read(const char *env_prefix,
                                  ucc_lib_config_t **config_p){
     ucc_lib_config_t *config;
     ucc_status_t status;
-    char full_prefix[128] = "UCC_";
+    int full_prefix_len;
+    const char* base_prefix = "UCC_";
 
     config = malloc(sizeof(*config));
     if (config == NULL) {
         status = UCC_ERR_NO_MEMORY;
         goto err;
     }
-
-    if ((env_prefix != NULL) && (strlen(env_prefix) > 0)) {
-        snprintf(full_prefix, sizeof(full_prefix), "%s_%s", env_prefix, "UCC_");
+    full_prefix_len = strlen(base_prefix)  +
+        (env_prefix ? strlen(env_prefix) : 0) + 2;
+    config->full_prefix = malloc(full_prefix_len);
+    if (env_prefix) {
+        snprintf(config->full_prefix, full_prefix_len,
+                 "%s_%s", env_prefix, base_prefix);
+    } else {
+        strcpy(config->full_prefix, base_prefix);
     }
 
-    status = ucs_config_parser_fill_opts(config, ucc_lib_config_table, full_prefix,
-                                         NULL, 0);
+    status = ucs_config_parser_fill_opts(config, ucc_lib_config_table,
+                                         config->full_prefix, NULL, 0);
     if (status != UCS_OK) {
         goto err_free;
     }
@@ -98,6 +148,7 @@ err:
 
 void ucc_lib_config_release(ucc_lib_config_t *config)
 {
+    free(config->full_prefix);
     free(config);
 }
 
@@ -108,10 +159,14 @@ void ucc_lib_config_print(const ucc_lib_config_t *config, FILE *stream,
                                  NULL, "UCC_", print_flags);
 }
 
-void ucc_lib_cleanup(ucc_lib_h lib_p)
+void ucc_lib_cleanup(ucc_lib_t *lib)
 {
-    if (lib_p->libs) {
-        free(lib_p->libs);
+    int i;
+    assert(lib->n_libs_opened > 0);
+    assert(lib->libs);
+    for (i=0; i<lib->n_libs_opened; i++) {
+        lib->libs[i]->iface->cleanup(lib->libs[i]);
     }
-    free(lib_p);
+    free(lib->libs);
+    free(lib);
 }

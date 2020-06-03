@@ -94,5 +94,8 @@ AC_CONFIG_FILES([
                  Makefile
                  src/Makefile
                  src/core/Makefile
+                 src/team_lib/Makefile
+                 src/team_lib/basic/Makefile
+                 test/Makefile
                  ])
 AC_OUTPUT

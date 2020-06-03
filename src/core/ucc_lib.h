@@ -11,13 +11,23 @@
 
 typedef struct ucc_lib_config {
     const char *tls;
+    char *full_prefix;
 } ucc_lib_config_t;
 
 typedef struct ucc_team_lib ucc_team_lib_t;
+typedef struct ucc_tl_iface ucc_tl_iface_t;
+
 typedef struct ucc_lib {
     int            n_libs_opened;
-    int            libs_array_size;
+    char           *full_prefix;
     ucc_team_lib_t **libs;
 } ucc_lib_t;
 
+struct ucc_static_lib_data {
+    int n_tls_loaded;
+    ucc_tl_iface_t **tl_ifaces;
+};
+extern struct ucc_static_lib_data ucc_lib_data;
+
 #endif
+
