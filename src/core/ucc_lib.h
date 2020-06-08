@@ -10,8 +10,8 @@
 #include <api/ucc.h>
 
 typedef struct ucc_lib_config {
-    const char *tls;
-    char *full_prefix;
+    char                     *full_prefix;
+    ucs_config_names_array_t tls;
 } ucc_lib_config_t;
 
 typedef struct ucc_team_lib ucc_team_lib_t;

@@ -6,6 +6,11 @@
 #include <team_lib/ucc_tl.h>
 
 static ucs_config_field_t ucc_lib_config_table[] = {
+    {"TLS", "all",
+     "Comma separated list of TeamLibrarieS to be used",
+     ucs_offsetof(ucc_lib_config_t, tls),
+     UCS_CONFIG_TYPE_STRING_ARRAY},
+
     {NULL}
 };
 
@@ -20,6 +25,38 @@ UCS_CONFIG_REGISTER_TABLE(ucc_lib_config_table, "UCC", NULL, ucc_lib_config_t)
         }                                                                \
     } while(0)
 
+static inline ucc_status_t ucc_tl_is_loaded(char *tl_name)
+{
+    int i;
+    for (i=0; i<ucc_lib_data.n_tls_loaded; i++) {
+        if (0 == strncmp(tl_name, ucc_lib_data.tl_ifaces[i]->name,
+                         strlen(tl_name))) {
+            return UCC_OK;
+        }
+    }
+    return UCC_ERR_NO_MESSAGE;
+}
+
+static inline ucc_status_t ucc_lib_config_tls_check(ucc_lib_t *lib,
+                                                    ucs_config_names_array_t *tls)
+{
+    int i;
+    if (tls->count == 0) {
+        return UCC_ERR_NO_MESSAGE;
+    }
+    if (tls->count == 1 && 0 == strcmp(tls->names[0], "all")) {
+        return UCC_OK;
+    }
+    for (i=0; i<tls->count; i++) {
+        if (UCS_OK != ucc_tl_is_loaded(tls->names[i])) {
+            ucc_error("Required TL: \"%s\" (ucc_team_lib_%s.so) is not available\n",
+                      tls->names[i], tls->names[i]);
+            return UCC_ERR_NO_MESSAGE;
+        }
+    }
+    return UCC_OK;
+}
+
 
 static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *params,
                                           const ucc_lib_config_t *config,
@@ -30,17 +67,22 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *params,
     ucc_team_lib_t *tl_lib;
     ucc_tl_lib_config_t *tl_config;
     ucc_status_t status;
-    int i;
+    int i, need_tl_name_check;
 
     lib->libs = (ucc_team_lib_t**)malloc(sizeof(ucc_team_lib_t*)*n_tls);
     if (!lib->libs) {
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
-
+    assert(config->tls.count >= 1);
+    need_tl_name_check = (0 != strcmp(config->tls.names[0], "all"));
     lib->n_libs_opened = 0;
     for (i=0; i<n_tls; i++) {
         tl_iface = ucc_lib_data.tl_ifaces[i];
+        if (need_tl_name_check &&
+            -1 == ucs_config_names_search(config->tls, tl_iface->name)) {
+            continue;
+        }
         CHECK_LIB_CONFIG_CAP(reproducible, REPRODUCIBLE);
         CHECK_LIB_CONFIG_CAP(thread_mode,  THREAD_MODE);
         CHECK_LIB_CONFIG_CAP(coll_types,   COLL_TYPES);
@@ -86,6 +128,11 @@ ucc_status_t ucc_lib_init(const ucc_lib_params_t *params,
         goto error;
     }
 
+    status = ucc_lib_config_tls_check(lib, &config->tls);
+    if (UCS_OK != status) {
+        ucc_error("Unsupported \"UCC_TLS\" value\n");
+        goto error;
+    }
     status = ucc_lib_init_filtered(params, (const ucc_lib_config_t*)config, lib);
     if (UCS_OK != status) {
         goto error;
@@ -136,7 +183,6 @@ ucc_status_t ucc_lib_config_read(const char *env_prefix,
     if (status != UCS_OK) {
         goto err_free;
     }
-
     *config_p = config;
     return UCC_OK;
 

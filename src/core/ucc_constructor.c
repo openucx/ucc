@@ -65,13 +65,23 @@ static ucc_status_t ucc_tl_load(const char *so_path,
     if (!handle) {
         ucc_error("Failed to load UCC Team library: %s\n. "
                   "Check UCC_TEAM_LIB_PATH or LD_LIBRARY_PATH\n", so_path);
-        *tl_iface = NULL;
-        return UCC_ERR_NO_MESSAGE;
+        goto error;
     }
     iface = (ucc_tl_iface_t*)dlsym(handle, team_lib_struct);
+    if (!iface) {
+        ucc_error("Failed to get tl iface %s from %s object\n",
+                  team_lib_struct, so_path);
+        goto iface_error;
+    }
     iface->dl_handle = handle;
     (*tl_iface) = iface;
     return UCC_OK;
+
+iface_error:
+    dlclose(handle);
+error:
+    *tl_iface = NULL;
+    return UCC_ERR_NO_MESSAGE;
 }
 
 static void load_team_lib_plugins(void)

@@ -97,9 +97,7 @@ ucc_status_t ucc_context_config_read(ucc_lib_t *lib,
         status = UCC_ERR_NO_MEMORY;
         goto err_configs;
     }
-
     config->n_tl_cfg = 0;
-    //TODO parse UCC_TLS set in config
     for(i = 0; i < lib->n_libs_opened; i++) {
         assert(NULL != lib->libs[i]->iface->tl_context_config.table);
         config->configs[i] = (ucc_tl_context_config_t*)
