@@ -12,4 +12,6 @@ libucc_core_la_SOURCES = \
 	ucc_lib.c         \
 	ucc_lib.h         \
 	ucc_global_opts.c \
-	ucc_global_opts.h
+	ucc_global_opts.h \
+	ucc_context.c     \
+	ucc_context.h

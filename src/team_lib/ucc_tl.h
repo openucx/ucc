@@ -8,6 +8,8 @@
 
 #include "config.h"
 #include "api/ucc.h"
+#include "core/ucc_lib.h"
+#include "core/ucc_context.h"
 #include <ucs/config/types.h>
 #include <ucs/debug/log_def.h>
 #include <ucs/config/parser.h>
@@ -15,6 +17,8 @@
 #include <string.h>
 
 typedef struct ucc_team_lib ucc_team_lib_t;
+typedef struct ucc_tl_iface ucc_tl_iface_t;
+typedef struct ucc_tl_context ucc_tl_context_t;
 
 typedef struct ucc_tl_lib_config {
     /* Log level above which log messages will be printed */
@@ -25,6 +29,8 @@ typedef struct ucc_tl_lib_config {
 extern ucs_config_field_t ucc_tl_lib_config_table[];
 
 typedef struct ucc_tl_context_config {
+    ucc_tl_iface_t *iface;
+    ucc_team_lib_t *tl_lib;
 } ucc_tl_context_config_t;
 extern ucs_config_field_t ucc_tl_context_config_table[];
 
@@ -40,6 +46,11 @@ typedef struct ucc_tl_iface {
                                            const ucc_tl_lib_config_t *tl_config,
                                            ucc_team_lib_t **tl_lib);
     void                           (*cleanup)(ucc_team_lib_t *tl_lib);
+    ucc_status_t                   (*context_create)(ucc_team_lib_t *tl_lib,
+                                                     const ucc_context_params_t *params,
+                                                     const ucc_tl_context_config_t *config,
+                                                     ucc_tl_context_t **tl_context);
+    void                           (*context_destroy)(ucc_tl_context_t *tl_context);
 } ucc_tl_iface_t;
 
 typedef struct ucc_team_lib {
@@ -47,5 +58,9 @@ typedef struct ucc_team_lib {
     ucs_log_component_config_t log_component;
     int                        priority;
 } ucc_team_lib_t;
+
+typedef struct ucc_tl_context {
+    ucc_team_lib_t *tl_lib;
+} ucc_tl_context_t;
 
 #endif

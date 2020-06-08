@@ -70,7 +70,7 @@ error:
 }
 
 ucc_status_t ucc_lib_init(const ucc_lib_params_t *params,
-                          const ucc_lib_config_t *config,
+                          const ucc_lib_config_h config,
                           ucc_lib_h *ucc_lib)
 {
     ucs_status_t status;
@@ -86,7 +86,7 @@ ucc_status_t ucc_lib_init(const ucc_lib_params_t *params,
         goto error;
     }
 
-    status = ucc_lib_init_filtered(params, config, lib);
+    status = ucc_lib_init_filtered(params, (const ucc_lib_config_t*)config, lib);
     if (UCS_OK != status) {
         goto error;
     }

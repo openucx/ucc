@@ -102,7 +102,7 @@ typedef struct ucc_lib_params {
  */
 
 ucc_status_t ucc_lib_config_read(const char *env_prefix, const char *filename,
-                                   ucc_lib_config_t **config_p);
+                                 ucc_lib_config_h *config_p);
 
 /**
  * @ingroup UCC_CONFIG
@@ -115,7 +115,7 @@ ucc_status_t ucc_lib_config_read(const char *env_prefix, const char *filename,
  *                            @ref ucc_lib_config_t "ucc_lib_config_t".
  */
 
-void ucc_lib_config_release(ucc_lib_config_t *config);
+void ucc_lib_config_release(ucc_lib_config_h config);
 
 /**
  * @ingroup UCC_LIB
@@ -131,7 +131,7 @@ void ucc_lib_config_release(ucc_lib_config_t *config);
  * @return Error code
  */
 ucc_status_t ucc_lib_init(const ucc_lib_params_t *params,
-                          const ucc_lib_config_t *config,
+                          const ucc_lib_config_h config,
                           ucc_lib_h *lib_p);
 
 /**
@@ -144,6 +144,47 @@ ucc_status_t ucc_lib_init(const ucc_lib_params_t *params,
  *                     "UCC library".
  */
 void ucc_lib_cleanup(ucc_lib_h lib_p);
+
+enum xccl_context_params_field {
+    XCCL_CONTEXT_PARAM_FIELD_CONTEXT_TYPE   = UCS_BIT(0),
+    XCCL_CONTEXT_PARAM_FIELD_COLL_SYNC_TYPE = UCS_BIT(1),
+    XCCL_CONTEXT_PARAM_FIELD_OOB            = UCS_BIT(2),
+};
+
+typedef enum {
+    UCC_NO_SYNC_COLLECTIVES = 0,
+    UCC_SYNC_COLLECTIVES
+} ucc_coll_sync_type_t;
+
+typedef enum {
+    UCC_CONTEXT_EXCLUSIVE = 0 ,
+    UCC_CONTEXT_SHARED
+} ucc_context_type_t;
+
+typedef struct ucc_context_params {
+    uint64_t             field_mask;
+    ucc_coll_sync_type_t coll_sync_type;
+    ucc_context_type_t   context_type;
+//    ucc_oob_collectives_t      oob;
+} ucc_context_params_t;
+
+ucc_status_t ucc_context_config_read(ucc_lib_h lib,
+                                     ucc_context_config_h *config_p);
+
+ucc_status_t ucc_context_config_modify(ucc_context_config_h config,
+                                       const char *name, const char *value);
+
+void ucc_context_config_release(ucc_context_config_h config);
+
+
+ucc_status_t ucc_context_create(ucc_lib_h lib,
+                                const ucc_context_params_t *params,
+                                const ucc_context_config_h config,
+                                ucc_context_h *context);
+
+ucc_status_t ucc_context_progress(ucc_context_h context);
+
+void ucc_context_destroy(ucc_context_h context);
 
 END_C_DECLS
 

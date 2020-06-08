@@ -5,6 +5,7 @@
 */
 #include "config.h"
 #include "ucc_tl_basic.h"
+#include "ucc_basic_context.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -73,5 +74,7 @@ ucc_tl_basic_iface_t ucc_team_lib_basic = {
     },
     .super.init                  = ucc_basic_lib_init,
     .super.cleanup               = ucc_basic_lib_cleanup,
+    .super.context_create        = ucc_basic_context_create,
+    .super.context_destroy       = ucc_basic_context_destroy,
 };
 

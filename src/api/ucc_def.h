@@ -24,5 +24,7 @@ typedef struct ucc_lib* ucc_lib_h;
  * application is responsible to release the descriptor using
  * @ref ucc_lib_config_release "ucc_lib_config_release" routine.
  */
-typedef struct ucc_lib_config ucc_lib_config_t;
+typedef struct ucc_lib_config*     ucc_lib_config_h;
+typedef struct ucc_context_config* ucc_context_config_h;
+typedef struct ucc_context*        ucc_context_h;
 #endif
