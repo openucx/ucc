@@ -11,7 +11,9 @@ sources = \
 	ucc_tl_basic.h \
 	ucc_basic_lib.c \
 	ucc_basic_context.h \
-	ucc_basic_context.c
+	ucc_basic_context.c \
+	ucc_basic_team.h \
+	ucc_basic_team.c
 
 component_noinst =
 component_install = ucc_team_lib_basic.la

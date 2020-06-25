@@ -6,6 +6,7 @@
 #include "config.h"
 #include "ucc_tl_basic.h"
 #include "ucc_basic_context.h"
+#include "ucc_basic_team.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -38,6 +39,8 @@ static ucc_status_t ucc_basic_lib_init(const ucc_lib_params_t *params,
                                        ucc_team_lib_t **tl_lib) {
     ucc_tl_basic_t *tl_basic;
     ucc_status_t status;
+    ucc_tl_basic_lib_config_t *cfg = ucs_derived_of(tl_config,
+                                                    ucc_tl_basic_lib_config_t);
     tl_basic = (ucc_tl_basic_t*)malloc(sizeof(*tl_basic));
     if (!tl_basic) {
         status = UCC_ERR_NO_MESSAGE;
@@ -76,5 +79,8 @@ ucc_tl_basic_iface_t ucc_team_lib_basic = {
     .super.cleanup               = ucc_basic_lib_cleanup,
     .super.context_create        = ucc_basic_context_create,
     .super.context_destroy       = ucc_basic_context_destroy,
+    .super.team_create_post      = ucc_basic_team_create_post,
+    .super.team_create_test      = ucc_basic_team_create_test,
+    .super.team_destroy          = ucc_basic_team_destroy,
 };
 

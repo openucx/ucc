@@ -16,9 +16,10 @@
 #include <assert.h>
 #include <string.h>
 
-typedef struct ucc_team_lib ucc_team_lib_t;
-typedef struct ucc_tl_iface ucc_tl_iface_t;
+typedef struct ucc_team_lib   ucc_team_lib_t;
+typedef struct ucc_tl_iface   ucc_tl_iface_t;
 typedef struct ucc_tl_context ucc_tl_context_t;
+typedef struct ucc_tl_team    ucc_tl_team_t;
 
 typedef struct ucc_tl_lib_config {
     /* Log level above which log messages will be printed */
@@ -51,6 +52,12 @@ typedef struct ucc_tl_iface {
                                                      const ucc_tl_context_config_t *config,
                                                      ucc_tl_context_t **tl_context);
     void                           (*context_destroy)(ucc_tl_context_t *tl_context);
+    ucc_status_t                   (*team_create_post)(ucc_tl_context_t **tl_ctxs,
+                                                       uint32_t n_ctxs,
+                                                       ucc_team_params_t *params,
+                                                       ucc_tl_team_t **team);
+    ucc_status_t                   (*team_create_test)(ucc_tl_team_t *tneam_ctx);
+    ucc_status_t                   (*team_destroy)(ucc_tl_team_t *team);
 } ucc_tl_iface_t;
 
 typedef struct ucc_team_lib {
@@ -62,5 +69,9 @@ typedef struct ucc_team_lib {
 typedef struct ucc_tl_context {
     ucc_team_lib_t *tl_lib;
 } ucc_tl_context_t;
+
+typedef struct ucc_tl_team {
+    ucc_tl_iface_t  *iface;
+} ucc_tl_team_t;
 
 #endif
