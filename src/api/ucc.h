@@ -186,6 +186,66 @@ ucc_status_t ucc_context_progress(ucc_context_h context);
 
 void ucc_context_destroy(ucc_context_h context);
 
+enum ucc_team_params_field {
+    UCC_TEAM_PARAM_FIELD_ORDERING   = UCS_BIT(0),
+    UCC_TEAM_PARAM_FIELD_EP         = UCS_BIT(1),
+    UCC_TEAM_PARAM_FIELD_EP_RANGE   = UCS_BIT(2),
+    UCC_TEAM_PARAM_FIELD_SYNC_TYPE  = UCS_BIT(3),
+    UCC_TEAM_PARAM_FIELD_OOB        = UCS_BIT(4),
+    UCC_TEAM_PARAM_FIELD_MEM_PARAMS = UCS_BIT(5)
+};
+
+typedef enum {
+    UCC_COLLECTIVE_POST_ORDERED   = 0,
+    UCC_COLLECTIVE_POST_UNORDERED = 1
+} ucc_post_ordering_t;
+
+enum ucc_mem_constraints_t {
+    UCC_MEM_SYMMETRIC  = UCS_BIT(0),
+    UCC_MEM_PERSISTENT = UCS_BIT(1),
+    UCC_MEM_ALIGN32    = UCS_BIT(2),
+    UCC_MEM_ALIGN64    = UCS_BIT(3),
+    UCC_MEM_ALIGN128   = UCS_BIT(4),
+};
+
+typedef enum {
+    REMOTE_ATOMICS,
+    REMOTE_COUNTERS
+} ucc_mem_hints_t;
+
+typedef struct ucc_mem_map_params {
+    void            *address;
+    size_t          len;
+    ucc_mem_hints_t hints;
+    uint64_t        constraints;
+} ucc_mem_map_params_t;
+
+typedef struct ucc_team_oob_coll {
+    int          (*allgather)(void *src_buf, void *recv_buf, size_t size,
+                              void *allgather_info,  void **request);
+    ucc_status_t (*req_test)(void *request);
+    ucc_status_t (*req_free)(void *request);
+    uint32_t     participants;
+    void         *coll_info;
+}  ucc_team_oob_coll_t;
+
+typedef struct ucc_team_params {
+    uint64_t               field_mask;
+    ucc_post_ordering_t    ordering;
+    uint64_t               oustanding_coll;
+    uint64_t               ep;
+    ucc_coll_sync_type_t   sync_type;
+    ucc_team_oob_coll_t    oob;
+    ucc_mem_map_params_t   mem_params;
+} ucc_team_params_t;
+
+ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts,
+                                  ucc_team_params_t *params, ucc_team_h *team);
+
+ucc_status_t ucc_team_create_test(ucc_team_h team);
+
+void ucc_team_destroy(ucc_team_h team);
+
 END_C_DECLS
 
 #endif
