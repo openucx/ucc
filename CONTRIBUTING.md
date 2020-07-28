@@ -1,6 +1,6 @@
 # Contributing to UCC
 
-- [Legal](#legal)
+## Legal
 
 All code contributions are submitted via pull requests at the UCF project on
 Github. All commits containing contributions are made in accordance with either
