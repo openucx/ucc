@@ -20,3 +20,10 @@ UCC is a collective communication operations API and library that is flexible, c
 * Flexible synchronous model 
 * Repetitive collective operations (init once and invoke multiple times)
 * Hardware collectives are a first-class citizen
+
+## Contributing
+Thanks for your interest in contributing to UCC, please see our technical and
+legal guidelines in the [contributing](contributing.md) file.
+
+## License
+UCC is BSD-style licensed, as found in the [LICENSE](license) file.
