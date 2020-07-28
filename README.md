@@ -26,4 +26,4 @@ Thanks for your interest in contributing to UCC, please see our technical and
 legal guidelines in the [contributing](CONTRIBUTING.md) file.
 
 ## License
-UCC is BSD-style licensed, as found in the [LICENSE](license) file.
+UCC is BSD-style licensed, as found in the [LICENSE](LICENSE) file.
