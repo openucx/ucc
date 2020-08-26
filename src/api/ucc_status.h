@@ -28,8 +28,10 @@ typedef enum {
     UCC_ERR_INVALID_PARAM               =   5,
     UCC_ERR_NO_MEMORY                   =   6,
     UCC_ERR_NO_RESOURCE                 =   7,
-
     UCC_ERR_LAST                        = -100,
 } ucc_status_t;
+
+
+const char *ucc_status_string(ucc_status_t status);
 
 #endif
