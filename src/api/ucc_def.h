@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 /**
- * @ingroup UCC_LIBRARY
+ * @ingroup UCC_LIB_INIT_DT
  * @brief UCC library handle
  *
  * The ucc library handle is an opaque handle created by the library. It
@@ -24,7 +24,7 @@
 typedef struct ucc_lib_info_t       ucc_lib_h;
 
 /**
- * @ingroup UCC_CONTEXT
+ * @ingroup UCC_CONTEXT_DT
  * @brief UCC context
  *
  * The UCC context is an opaque handle to abstract the network resources for
@@ -37,7 +37,7 @@ typedef struct ucc_lib_info_t       ucc_lib_h;
 typedef struct ucc_context*         ucc_context_h;
 
 /**
- * @ingroup UCC_TEAM
+ * @ingroup UCC_TEAM_DT
  * @brief UCC team handle
  *
  * The UCC team handle is an opaque handle created by the library. It abstracts
@@ -49,7 +49,7 @@ typedef struct ucc_context*         ucc_context_h;
 typedef struct ucc_team*            ucc_team_h;
 
 /**
- * @ingroup UCC_COLLECTIVE
+ * @ingroup UCC_COLLECTIVES_DT
  * @brief UCC collective request handle
  *
  * The UCC request handle is an opaque handle created by the library during the
@@ -68,27 +68,41 @@ typedef struct ucc_coll_req*        ucc_coll_req_h;
  */
 typedef struct ucc_mem_handle*      ucc_mem_h;
 
+/**
+ * @ingroup UCC_LIB_INIT_DT
+ *
+ * @brief UCC library configuration handle
+ */
 typedef struct ucc_lib_config           ucc_lib_config_h;
 
+/**
+ * @ingroup UCC_CONTEXT_DT
+ *
+ * @brief UCC library configuration handle
+ */
 typedef struct ucc_context_config       ucc_context_config_h;
 
-typedef struct ucc_context_oob_coll {
-    int             (*allgather)(void *src_buf, void *recv_buf, size_t size,
-                                 void *allgather_info,  void **request);
-    ucc_status_t    (*req_test)(void *request);
-    ucc_status_t    (*req_free)(void *request);
-    uint32_t 	    participants;
-    void            *coll_info;
-}  ucc_context_oob_coll_t;
 
+/**
+ * @ingroup UCC_COLLECTIVES_DT
+ * @brief Count datatype to support both small (32 bit) and large counts (64 bit)
+ */
 typedef uint64_t ucc_count_t;
 
+/**
+ * @ingroup UCC_COLLECTIVES_DT
+ * @brief Datatype to support both small (32 bit) and large address offsets (64 bit)
+ */
 typedef uint64_t ucc_aint_t;
 
 /* Reflects the definition in UCS - The i-th bit */
 #define UCC_BIT(i)               (1ul << (i))
 
 /* Reflects the definition in UCS */
+/**
+ * @ingroup UCC_UTILS
+ * @brief Print configurations
+ */
 typedef enum {
     UCS_CONFIG_PRINT_CONFIG        = UCC_BIT(0),
     UCS_CONFIG_PRINT_HEADER        = UCC_BIT(1),
@@ -96,6 +110,10 @@ typedef enum {
     UCS_CONFIG_PRINT_HIDDEN        = UCC_BIT(3)
 } ucc_config_print_flags_t;
 
+/**
+ * @ingroup UCC_COLLECTIVES_DT
+ * @brief Datatype for collective tags
+ */
 typedef uint16_t ucc_coll_id_t ;
 
 #endif

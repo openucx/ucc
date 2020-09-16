@@ -11,6 +11,7 @@
 
 
 /**
+ * @ingroup UCC_UTILS
  * @brief Status codes for the UCC operations
  */
 
@@ -31,6 +32,10 @@ typedef enum {
     UCC_ERR_LAST                        = -100,
 } ucc_status_t;
 
+/**
+ * @ingroup UCC_UTILS
+ * @brief Routine to convert status code to string
+ */
 
 const char *ucc_status_string(ucc_status_t status);
 
