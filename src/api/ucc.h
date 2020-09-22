@@ -575,7 +575,8 @@ typedef enum {
 enum ucc_context_params_field {
     UCC_CONTEXT_PARAM_FIELD_TYPE                   = UCC_BIT(0),
     UCC_CONTEXT_PARAM_FIELD_COLL_SYNC_TYPE         = UCC_BIT(1),
-    UCC_CONTEXT_PARAM_FIELD_COLL_OOB               = UCC_BIT(2)
+    UCC_CONTEXT_PARAM_FIELD_COLL_OOB               = UCC_BIT(2),
+    UCC_CONTEXT_PARAM_FIELD_ID                     = UCC_BIT(3)
 };
 
 /**
@@ -584,7 +585,9 @@ enum ucc_context_params_field {
  */
 enum ucc_context_attr_field {
     UCC_CONTEXT_ATTR_FIELD_TYPE                   = UCC_BIT(0),
-    UCC_CONTEXT_ATTR_FIELD_COLL_SYNC_TYPE         = UCC_BIT(1)
+    UCC_CONTEXT_ATTR_FIELD_COLL_SYNC_TYPE         = UCC_BIT(1),
+    UCC_CONTEXT_ATTR_FIELD_CONTEXT_ADDR           = UCC_BIT(2),
+    UCC_CONTEXT_ATTR_FIELD_CONTEXT_ADDR_LEN       = UCC_BIT(3)
 };
 
 /**
@@ -628,6 +631,7 @@ typedef struct ucc_context_params {
     ucc_context_type_t      ctx_type;
     ucc_coll_sync_type_t    sync_type;
     ucc_context_oob_coll_t  oob;
+    uint64_t                ctx_id;
 } ucc_context_params_t;
 
 /**
@@ -653,6 +657,8 @@ typedef struct ucc_context_attr {
     uint64_t                mask;
     ucc_context_type_t      ctx_type;
     ucc_coll_sync_type_t    sync_type;
+    ucc_context_addr_t      ctx_addr;
+    ucc_context_addr_len_t  ctx_addr_len;
 } ucc_context_attr_t;
 
 /**
@@ -826,10 +832,14 @@ enum ucc_team_params_field {
     UCC_TEAM_PARAM_FIELD_POST_ORDERING          = UCC_BIT(0),
     UCC_TEAM_PARAM_FIELD_OUTSTANDING_CALLS      = UCC_BIT(1),
     UCC_TEAM_PARAM_FIELD_EP                     = UCC_BIT(2),
-    UCC_TEAM_PARAM_FIELD_EP_TYPE                = UCC_BIT(3),
-    UCC_TEAM_PARAM_FIELD_SYNC_TYPE              = UCC_BIT(4),
-    UCC_TEAM_PARAM_FIELD_OOB                    = UCC_BIT(5),
-    UCC_TEAM_PARAM_FIELD_MEM_PARAMS             = UCC_BIT(6)
+    UCC_TEAM_PARAM_FIELD_EP_LIST                = UCC_BIT(3),
+    UCC_TEAM_PARAM_FIELD_EP_TYPE                = UCC_BIT(4),
+    UCC_TEAM_PARAM_FIELD_TEAM_SIZE              = UCC_BIT(5),
+    UCC_TEAM_PARAM_FIELD_SYNC_TYPE              = UCC_BIT(6),
+    UCC_TEAM_PARAM_FIELD_OOB                    = UCC_BIT(7),
+    UCC_TEAM_PARAM_FIELD_P2P_CONN               = UCC_BIT(8),
+    UCC_TEAM_PARAM_FIELD_MEM_PARAMS             = UCC_BIT(9),
+    UCC_TEAM_PARAM_FIELD_EP_MAP                 = UCC_BIT(10)
 };
 
 /**
@@ -881,6 +891,18 @@ typedef struct ucc_mem_map_params {
  *
  *  @ingroup UCC_TEAM_DT
  */
+typedef struct ucc_team_p2p_conn {
+    int             (*conn_info_lookup)(void *conn_ctx, uint64_t ep, ucc_p2p_conn_t **conn_info, void *request);
+    int             (*conn_info_release)(ucc_p2p_conn_t *conn_info);
+    void            *conn_ctx;
+    ucc_status_t    (*req_test)(void *request);
+    ucc_status_t    (*req_free)(void *request);
+} ucc_team_p2p_conn;
+
+/**
+ *
+ *  @ingroup UCC_TEAM_DT
+ */
 typedef struct  ucc_team_oob_coll {
     int             (*allgather)(void *src_buf, void *recv_buf, size_t size,
                                  void *allgather_info,  void **request);
@@ -911,6 +933,59 @@ typedef enum {
 /**
  *
  *  @ingroup UCC_TEAM_DT
+ */
+struct ucc_ep_map_strided {
+    uint64_t    start;
+    uint64_t    stride;
+};
+
+/**
+ *
+ *  @ingroup UCC_TEAM_DT
+ */
+struct ucc_ep_map_array {
+    void    *map;
+    size_t  elem_size; /*!< 4 if array is int, 8 if e.g. uint64_t */
+};
+
+/**
+ *
+ *  @ingroup UCC_TEAM_DT
+ */
+struct ucc_ep_map_cb {
+    uint64_t   (*cb)(uint64_t ep, void *cb_ctx);
+    void       *cb_ctx;
+};
+
+/**
+ *
+ *  @ingroup UCC_TEAM_DT
+ */
+typedef enum {
+    UCC_EP_MAP_FULL     = 1, /*!< The ep range of the team  spans all eps from a context*/
+    UCC_EP_MAP_STRIDED  = 2, /*!< The ep range of the team can be described by the 2 values: start, stride.*/
+    UCC_EP_MAP_ARRAY    = 3, /*!< The ep range is given as an array of intergers that map the ep in the team to
+                                       the team_context rank. */
+    UCC_EP_MAP_CB       = 4, /*!< The ep range mapping is defined as callback provided by the UCC user. */
+} ucc_ep_map_type_t;
+
+/**
+ *
+ *  @ingroup UCC_TEAM_DT
+ */
+typedef struct ucc_ep_map_t {
+    ucc_ep_map_type_t type;
+    uint64_t          ep_num; /*!< number of eps mapped to ctx */
+    union {
+        struct ucc_ep_map_strided strided;
+        struct ucc_ep_map_array   array;
+        struct ucc_ep_map_cb      cb;
+    };
+} ucc_ep_map_t;
+
+/**
+ *
+ *  @ingroup UCC_TEAM_DT
  *
  *  @brief Structure representing the parameters to customize the team
  *
@@ -935,10 +1010,14 @@ typedef struct ucc_team_params {
     ucc_post_ordering_t     ordering;
     uint64_t                outstanding_colls;
     uint64_t                ep;
+    uint64_t                *ep_list;
     ucc_ep_range_type_t     ep_range;
+    uint64_t                team_size;
     ucc_coll_sync_type_t    sync_type;
     ucc_team_oob_coll_t     oob;
+    ucc_team_p2p_conn       p2p_conn;
     ucc_mem_map_params_t    mem_params;
+    ucc_ep_map_t            ep_map;
 } ucc_team_params_t;
 
 /**

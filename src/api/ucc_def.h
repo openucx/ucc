@@ -116,6 +116,20 @@ typedef enum {
  */
 typedef uint16_t ucc_coll_id_t ;
 
+/**
+ * @ingroup UCC_TEAM_DT
+ */
+typedef void *ucc_p2p_conn_t;
+
+/**
+ * @ingroup UCC_TEAM_DT
+ */
+typedef void *ucc_context_addr_t;
+
+/**
+ * @ingroup UCC_TEAM_DT
+ */
+typedef void *ucc_context_addr_len_t;
 #endif
 
 
