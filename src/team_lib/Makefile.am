@@ -7,7 +7,7 @@
 # $HEADER$
 #
 
-SUBDIRS = basic
+SUBDIRS = basic dbg
 
 noinst_LTLIBRARIES  = libucc_tl.la
 
