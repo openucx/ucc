@@ -5,10 +5,10 @@
 */
 
 #include "config.h"
-#include <ucc_team.h>
 #include <stdlib.h>
 #include <stdio.h>
-
+#include "ucc_team.h"
+#include "utils/ucc_log.h"
 static int compare_teams_by_priority(const void* t1, const void* t2)
 {
     const ucc_tl_team_t** team1 = (const ucc_tl_team_t**)t1;
@@ -37,7 +37,7 @@ static inline void fill_tl_contexts_array(ucc_context_t **contexts,
 
 ucc_status_t ucc_team_create_post(ucc_context_t **contexts,
                                   uint32_t n_ctx,
-                                  ucc_team_params_t *params,
+                                  const ucc_team_params_t *params,
                                   ucc_team_t **ucc_team)
 {
     int i;
@@ -46,7 +46,7 @@ ucc_status_t ucc_team_create_post(ucc_context_t **contexts,
     ucc_tl_context_t *tl_ctx;
     ucc_status_t status;
     ucc_tl_context_t **tl_ctxs;
-    ucc_lib_t *lib;
+    ucc_lib_info_t *lib;
     uint32_t n_tl_ctx;
 
     *ucc_team = NULL;
@@ -79,7 +79,7 @@ ucc_status_t ucc_team_create_post(ucc_context_t **contexts,
     }
     memcpy(team->contexts, contexts, n_ctx*sizeof(ucc_context_t*));
 
-    tl_ctxs = (ucc_tl_context_t**)(n_ctx*sizeof(ucc_tl_context_t*));
+    tl_ctxs = (ucc_tl_context_t**)malloc(n_ctx*sizeof(ucc_tl_context_t*));
     if (!tl_ctxs) {
         ucc_error("failed to allocate tl_ctxs array");
         status = UCC_ERR_NO_MEMORY;
@@ -95,6 +95,8 @@ ucc_status_t ucc_team_create_post(ucc_context_t **contexts,
                 team_create_post(tl_ctxs, n_tl_ctx, params,
                                  &team->tl_teams[team->n_tl_teams]);
             if (UCC_OK == status) {
+                team->tl_teams[team->n_tl_teams]->iface = lib->libs[i]->iface;
+                team->tl_teams[team->n_tl_teams]->tl_lib = lib->libs[i];
                 team->n_tl_teams++;
             }
             ucc_info("tl team %s create_post status: %d", lib->libs[i]->iface->name, status);
@@ -108,7 +110,7 @@ ucc_status_t ucc_team_create_post(ucc_context_t **contexts,
         goto error_tl_ctxs;
     }
 
-    team->status = UCC_IN_PROGRESS;
+    team->status = UCC_INPROGRESS;
     *ucc_team = team;
     return UCC_OK;
 
@@ -124,9 +126,9 @@ ucc_status_t ucc_team_create_test(ucc_team_t *team)
 {
     int i, c;
     for (i=0; i<team->n_tl_teams; i++) {
-        if (UCC_IN_PROGRESS ==
+        if (UCC_INPROGRESS ==
             team->tl_teams[i]->iface->team_create_test(team->tl_teams[i])) {
-            return UCC_IN_PROGRESS;
+            return UCC_INPROGRESS;
         }
     }
     qsort(team->tl_teams, team->n_tl_teams, sizeof(ucc_tl_team_t*),

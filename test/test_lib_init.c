@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
     ucc_lib_h lib;
     ucc_status_t status;
     ucc_lib_params_t params = {
-        .field_mask = 0,
+        .mask = 0,
     };
 
     status = ucc_lib_config_read("TEST", NULL, &config);

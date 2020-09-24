@@ -13,11 +13,11 @@ int main(int argc, char **argv) {
     ucc_context_h ucc_ctx;
     ucc_status_t status;
     ucc_context_params_t ctx_params = {
-        .field_mask = 0,
+        .mask = 0,
     };
 
     ucc_lib_params_t params = {
-        .field_mask = 0,
+        .mask = 0,
     };
 
     status = ucc_lib_config_read("TEST", NULL, &config);
@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
 
     ucc_lib_config_release(config);
 
-    status = ucc_context_config_read(lib, &ctx_config);
+    status = ucc_context_config_read(lib, NULL, &ctx_config);
     if (UCC_OK != status) {
         goto error;
     }

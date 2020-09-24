@@ -8,19 +8,19 @@
 
 #include <api/ucc.h>
 
-typedef struct ucc_lib ucc_lib_t;
+typedef struct ucc_lib_info ucc_lib_info_t;
 typedef struct ucc_tl_context ucc_tl_context_t;
 typedef struct ucc_tl_context_config ucc_tl_context_config_t;
 
 typedef struct ucc_context {
-    ucc_lib_t             *lib;
+    ucc_lib_info_t        *lib;
     ucc_context_params_t  params;
     ucc_tl_context_t      **tl_ctx;
     int                   n_tl_ctx;
 } ucc_context_t;
 
 typedef struct ucc_context_config {
-    ucc_lib_t               *lib;
+    ucc_lib_info_t          *lib;
     ucc_tl_context_config_t **configs;
     int                     n_tl_cfg;
 } ucc_context_config_t;

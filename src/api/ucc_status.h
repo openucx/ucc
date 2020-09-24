@@ -1,31 +1,43 @@
-/*
-* Copyright (C) Mellanox Technologies Ltd. 2001-2020.  ALL RIGHTS RESERVED.
-*
-* See file LICENSE for terms.
-*/
+/**
+ * @file ucc_status.h
+ * @date 2020
+ * @copyright Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ *
+ * See file LICENSE for terms.
+ */
 
 #ifndef UCC_STATUS_H_
 #define UCC_STATUS_H_
 
+
+/**
+ * @ingroup UCC_UTILS
+ * @brief Status codes for the UCC operations
+ */
+
 typedef enum {
     /* Operation completed successfully */
-    UCC_OK                         =   0,
+    UCC_OK                              =   0,
 
-    /* Operation is queued and still in progress */
-    UCC_IN_PROGRESS                =   1,
+    /* Operation is posted and is in progress */
+    UCC_INPROGRESS                      =   1,
 
-    /* Failure codes */
-    UCC_ERR_NO_MESSAGE             =  -1,
-    UCC_ERR_NO_RESOURCE            =  -2,
-    UCC_ERR_NO_MEMORY              =  -4,
-    UCC_ERR_INVALID_PARAM          =  -5,
-    UCC_ERR_UNREACHABLE            =  -6,
-    UCC_ERR_NOT_IMPLEMENTED        =  -8,
-    UCC_ERR_MESSAGE_TRUNCATED      =  -9,
-    UCC_ERR_NO_PROGRESS            = -10,
-    UCC_ERR_BUFFER_TOO_SMALL       = -11,
-    UCC_ERR_NO_ELEM                = -12,
-    UCC_ERR_UNSUPPORTED            = -22,
-    UCC_ERR_LAST                   = -100
+    /* Operation initialized but not posted */
+    UCC_OPERATION_INITIALIZED           =   2,
+    UCC_ERR_OP_NOT_SUPPORTED            =   3,
+    UCC_ERR_NOT_IMPLEMENTED             =   4,
+    UCC_ERR_INVALID_PARAM               =   5,
+    UCC_ERR_NO_MEMORY                   =   6,
+    UCC_ERR_NO_RESOURCE                 =   7,
+    UCC_ERR_NO_MESSAGE                  =   8,
+    UCC_ERR_LAST                        = -100,
 } ucc_status_t;
+
+/**
+ * @ingroup UCC_UTILS
+ * @brief Routine to convert status code to string
+ */
+
+const char *ucc_status_string(ucc_status_t status);
+
 #endif

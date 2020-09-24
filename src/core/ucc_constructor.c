@@ -21,7 +21,6 @@
 #include <glob.h>
 #include <unistd.h>
 #include "utils/ucc_log.h"
-#include "ucc_global_opts.h"
 #include "ucc_lib.h"
 #include "team_lib/ucc_tl.h"
 

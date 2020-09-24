@@ -10,6 +10,9 @@
 #include <ucc_context.h>
 #include "team_lib/ucc_tl.h"
 
+/* TODO compute from ucc_coll_type_t */
+#define UCC_COLL_LAST 10
+
 #define UCC_CHECK_TEAM(_team)                                                    \
     do {                                                                         \
         if (_team->status != UCC_OK) {                                           \

@@ -78,7 +78,8 @@ void ucc_context_destroy(ucc_context_h context)
     free(context);
 }
 
-ucc_status_t ucc_context_config_read(ucc_lib_t *lib,
+ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib,
+                                     const char *filename,
                                      ucc_context_config_t **config_p)
 {
     int               i;
@@ -106,7 +107,6 @@ ucc_status_t ucc_context_config_read(ucc_lib_t *lib,
             status = UCC_ERR_NO_MEMORY;
             goto err_config_i;
         }
-
         status = ucs_config_parser_fill_opts(config->configs[config->n_tl_cfg],
                                              lib->libs[i]->iface->tl_context_config.table,
                                              lib->full_prefix,

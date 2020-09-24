@@ -3,7 +3,7 @@
 #include <ucs/debug/log_def.h>
 #include <ucs/config/parser.h>
 #include "utils/ucc_log.h"
-#include <team_lib/ucc_tl.h>
+#include "team_lib/ucc_tl.h"
 
 static ucs_config_field_t ucc_lib_config_table[] = {
     {"TLS", "all",
@@ -17,7 +17,7 @@ static ucs_config_field_t ucc_lib_config_table[] = {
 UCS_CONFIG_REGISTER_TABLE(ucc_lib_config_table, "UCC", NULL, ucc_lib_config_t)
 
 #define CHECK_LIB_CONFIG_CAP(_cap, _CAP_FIELD) do{                       \
-        if ((params->field_mask & UCC_LIB_PARAM_FIELD_ ## _CAP_FIELD) && \
+        if ((params->mask & UCC_LIB_PARAM_FIELD_ ## _CAP_FIELD) &&       \
             !(params-> _cap & tl_iface->params. _cap)) {                 \
             ucc_info("Disqualifying team %s due to %s cap",              \
                      tl_iface->name, UCS_PP_QUOTE(_CAP_FIELD));          \
@@ -37,7 +37,7 @@ static inline ucc_status_t ucc_tl_is_loaded(char *tl_name)
     return UCC_ERR_NO_MESSAGE;
 }
 
-static inline ucc_status_t ucc_lib_config_tls_check(ucc_lib_t *lib,
+static inline ucc_status_t ucc_lib_config_tls_check(ucc_lib_info_t *lib,
                                                     ucs_config_names_array_t *tls)
 {
     int i;
@@ -60,7 +60,7 @@ static inline ucc_status_t ucc_lib_config_tls_check(ucc_lib_t *lib,
 
 static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *params,
                                           const ucc_lib_config_t *config,
-                                          ucc_lib_t *lib)
+                                          ucc_lib_info_t *lib)
 {
     int n_tls = ucc_lib_data.n_tls_loaded;
     ucc_tl_iface_t *tl_iface;
@@ -83,7 +83,6 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *params,
             -1 == ucs_config_names_search(config->tls, tl_iface->name)) {
             continue;
         }
-        CHECK_LIB_CONFIG_CAP(reproducible, REPRODUCIBLE);
         CHECK_LIB_CONFIG_CAP(thread_mode,  THREAD_MODE);
         CHECK_LIB_CONFIG_CAP(coll_types,   COLL_TYPES);
         tl_config  = malloc(tl_iface->tl_lib_config.size);
@@ -97,6 +96,8 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *params,
             goto error;
         }
         tl_lib->log_component = tl_config->log_component;
+        snprintf(tl_lib->log_component.name, strlen(tl_iface->tl_lib_config.prefix),
+                 "%s", tl_iface->tl_lib_config.prefix);
         tl_lib->priority = (-1 == tl_config->priority) ?
             tl_iface->priority : tl_config->priority;
         ucs_config_parser_release_opts(tl_config, tl_iface->tl_lib_config.table);
@@ -116,7 +117,7 @@ ucc_status_t ucc_lib_init(const ucc_lib_params_t *params,
                           ucc_lib_h *ucc_lib)
 {
     ucs_status_t status;
-    ucc_lib_t *lib;
+    ucc_lib_info_t *lib;
 
     if (ucc_lib_data.n_tls_loaded == 0) {
         return UCC_ERR_NO_MESSAGE;
@@ -127,6 +128,7 @@ ucc_status_t ucc_lib_init(const ucc_lib_params_t *params,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
+    lib->full_prefix= strdup(config->full_prefix);
 
     status = ucc_lib_config_tls_check(lib, &config->tls);
     if (UCS_OK != status) {
@@ -198,14 +200,14 @@ void ucc_lib_config_release(ucc_lib_config_t *config)
     free(config);
 }
 
-void ucc_lib_config_print(const ucc_lib_config_t *config, FILE *stream,
-                          const char *title, ucs_config_print_flags_t print_flags)
+void ucc_lib_config_print(const ucc_lib_config_h config, FILE *stream,
+                          const char *title, ucc_config_print_flags_t print_flags)
 {
     ucs_config_parser_print_opts(stream, title, config, ucc_lib_config_table,
                                  NULL, "UCC_", print_flags);
 }
 
-void ucc_lib_cleanup(ucc_lib_t *lib)
+void ucc_lib_cleanup(ucc_lib_info_t *lib)
 {
     int i;
     assert(lib->n_libs_opened > 0);
