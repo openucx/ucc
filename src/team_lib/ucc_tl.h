@@ -54,7 +54,7 @@ typedef struct ucc_tl_iface {
     void                           (*context_destroy)(ucc_tl_context_t *tl_context);
     ucc_status_t                   (*team_create_post)(ucc_tl_context_t **tl_ctxs,
                                                        uint32_t n_ctxs,
-                                                       ucc_team_params_t *params,
+                                                       const ucc_team_params_t *params,
                                                        ucc_tl_team_t **team);
     ucc_status_t                   (*team_create_test)(ucc_tl_team_t *tneam_ctx);
     ucc_status_t                   (*team_destroy)(ucc_tl_team_t *team);
@@ -72,6 +72,32 @@ typedef struct ucc_tl_context {
 
 typedef struct ucc_tl_team {
     ucc_tl_iface_t  *iface;
+    ucc_team_lib_t  *tl_lib;
 } ucc_tl_team_t;
+
+#define UCC_TL_LOG(_log_component, _level, _fmt, ...) do {             \
+        ucs_log_component(_level, &_log_component, _fmt, ## __VA_ARGS__); \
+    } while (0)
+
+#define ucc_tl_error(_lib, _fmt, ...)        \
+    UCC_TL_LOG(_lib->log_component, UCS_LOG_LEVEL_ERROR, _fmt, ## __VA_ARGS__)
+#define ucc_tl_warn(_lib, _fmt, ...)         \
+    UCC_TL_LOG(_lib->log_component, UCS_LOG_LEVEL_WARN, _fmt,  ## __VA_ARGS__)
+#define ucc_tl_info(_lib, _fmt, ...)         \
+    UCC_TL_LOG(_lib->log_component, UCS_LOG_LEVEL_INFO, _fmt, ## __VA_ARGS__)
+#define ucc_tl_debug(_lib, _fmt, ...)        \
+    UCC_TL_LOG(_lib->log_component, UCS_LOG_LEVEL_DEBUG, _fmt, ##  __VA_ARGS__)
+#define ucc_tl_trace(_lib, _fmt, ...)        \
+    UCC_TL_LOG(_lib->log_component, UCS_LOG_LEVEL_TRACE, _fmt, ## __VA_ARGS__)
+#define ucc_tl_trace_req(_lib, _fmt, ...)    \
+    UCC_TL_LOG(_lib->log_component, UCS_LOG_LEVEL_TRACE_REQ, _fmt, ## __VA_ARGS__)
+#define ucc_tl_trace_data(_lib, _fmt, ...)   \
+    UCC_TL_LOG(_lib->log_component, UCS_LOG_LEVEL_TRACE_DATA, _fmt, ## __VA_ARGS__)
+#define ucc_tl_trace_async(_lib, _fmt, ...)  \
+    UCC_TL_LOG(_lib->log_component, UCS_LOG_LEVEL_TRACE_ASYNC, _fmt, ## __VA_ARGS__)
+#define ucc_tl_trace_func(_lib, _fmt, ...)   \
+    UCC_TL_LOG(_lib->log_component, UCS_LOG_LEVEL_TRACE_FUNC, "%s(" _fmt ")", __FUNCTION__, ## __VA_ARGS__)
+#define ucc_tl_trace_poll(_lib, _fmt, ...)   \
+    UCC_TL_LOG(_lib->log_component, UCS_LOG_LEVEL_TRACE_POLL, _fmt, ## __VA_ARGS__)
 
 #endif
