@@ -21,7 +21,7 @@
  * resources associated  with the library. The library handle cannot be passed
  * from one library instance to another.
  */
-typedef struct ucc_lib_info_t       ucc_lib_h;
+typedef struct ucc_lib_info_t*       ucc_lib_h;
 
 /**
  * @ingroup UCC_CONTEXT_DT
@@ -73,14 +73,14 @@ typedef struct ucc_mem_handle*      ucc_mem_h;
  *
  * @brief UCC library configuration handle
  */
-typedef struct ucc_lib_config           ucc_lib_config_h;
+typedef struct ucc_lib_config*           ucc_lib_config_h;
 
 /**
  * @ingroup UCC_CONTEXT_DT
  *
- * @brief UCC library configuration handle
+ * @brief UCC context configuration handle
  */
-typedef struct ucc_context_config       ucc_context_config_h;
+typedef struct ucc_context_config*       ucc_context_config_h;
 
 
 /**
@@ -104,10 +104,10 @@ typedef uint64_t ucc_aint_t;
  * @brief Print configurations
  */
 typedef enum {
-    UCS_CONFIG_PRINT_CONFIG        = UCC_BIT(0),
-    UCS_CONFIG_PRINT_HEADER        = UCC_BIT(1),
-    UCS_CONFIG_PRINT_DOC           = UCC_BIT(2),
-    UCS_CONFIG_PRINT_HIDDEN        = UCC_BIT(3)
+    UCC_CONFIG_PRINT_CONFIG        = UCC_BIT(0),
+    UCC_CONFIG_PRINT_HEADER        = UCC_BIT(1),
+    UCC_CONFIG_PRINT_DOC           = UCC_BIT(2),
+    UCC_CONFIG_PRINT_HIDDEN        = UCC_BIT(3)
 } ucc_config_print_flags_t;
 
 /**

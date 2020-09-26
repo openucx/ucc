@@ -15,11 +15,12 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-/** @mainpage Unified Collective Communications (UCC) Library Specification
+/** Unified Collective Communications (UCC) Library Specification
  *
  *  UCC is a collective communication operations API and library that is
  *  flexible, complete, and feature-rich for current and emerging programming
  *  models and runtimes.
+ *
  *
  */
 
@@ -28,6 +29,7 @@
   * @{
   * Library initialization parameters and data-structures
   * @}
+  *
   */
 
 /**
@@ -150,16 +152,16 @@ typedef enum {
  *
  */
 typedef enum {
-    UCC_BARRIER            = UCC_BIT(0),
-    UCC_BCAST              = UCC_BIT(1),
-    UCC_ALLREDUCE          = UCC_BIT(2),
-    UCC_REDUCE             = UCC_BIT(3),
-    UCC_ALLTOALL           = UCC_BIT(4),
-    UCC_ALLGATHER          = UCC_BIT(5),
-    UCC_GATHER             = UCC_BIT(6),
-    UCC_SCATTER            = UCC_BIT(7),
-    UCC_FANIN              = UCC_BIT(8),
-    UCC_FANOUT             = UCC_BIT(9)
+    UCC_COLL_TYPE_BARRIER            = UCC_BIT(0),
+    UCC_COLL_TYPE_BCAST              = UCC_BIT(1),
+    UCC_COLL_TYPE_ALLREDUCE          = UCC_BIT(2),
+    UCC_COLL_TYPE_REDUCE             = UCC_BIT(3),
+    UCC_COLL_TYPE_ALLTOALL           = UCC_BIT(4),
+    UCC_COLL_TYPE_ALLGATHER          = UCC_BIT(5),
+    UCC_COLL_TYPE_GATHER             = UCC_BIT(6),
+    UCC_COLL_TYPE_SCATTER            = UCC_BIT(7),
+    UCC_COLL_TYPE_FANIN              = UCC_BIT(8),
+    UCC_COLL_TYPE_FANOUT             = UCC_BIT(9)
 } ucc_coll_type_t;
 
 /**
@@ -280,7 +282,7 @@ typedef enum {
  *  @endparblock
  */
 typedef void(*ucc_reduction_dtype_mapper_t)(void *invec, void *inoutvec,
-                                         ucc_count_t *count, ucc_datatype_t dtype);
+                                            ucc_count_t *count, ucc_datatype_t dtype);
 
 /**
  * @brief UCC library initialization parameters
@@ -600,7 +602,7 @@ typedef struct ucc_context_oob_coll {
                                  void *allgather_info,  void **request);
     ucc_status_t    (*req_test)(void *request);
     ucc_status_t    (*req_free)(void *request);
-    uint32_t 	    participants;
+    uint32_t        participants;
     void            *coll_info;
 }  ucc_context_oob_coll_t;
 
@@ -1055,9 +1057,10 @@ typedef struct ucc_team_attr {
  *
  *  @brief The routine is a method to create the team.
  *
- *  @param  [in]  context           Communication context abstracting the resources
- *  @param  [in]  team_params       User defined configurations for the team
- *  @param  [out] new_team          Team handle
+ *  @param  [in]  contexts           Communication contexts abstracting the resources
+ *  @param  [in]  num_contexts       Number of contexts passed for the create operation
+ *  @param  [in]  team_params        User defined configurations for the team
+ *  @param  [out] new_team           Team handle
  *
  *  @parblock
  *
@@ -1078,7 +1081,8 @@ typedef struct ucc_team_attr {
  *
  *  @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_team_create_post(ucc_context_h context,
+ucc_status_t ucc_team_create_post(ucc_context_h *contexts,
+                                  uint32_t num_contexts,
                                   const ucc_team_params_t *team_params,
                                   ucc_team_h *new_team);
 
