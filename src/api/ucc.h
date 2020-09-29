@@ -1165,7 +1165,7 @@ ucc_status_t ucc_team_get_attr(ucc_team_h team,
  *  @param [in]    parent_team    Parent team handle from which a new team handle is created
  *  @param [in]    included       Boolean variable indicating whether the
  *                                process/thread participates in the newly created team
- *  @param [out]    new_team      Pointer to the new team handle
+ *  @param [out]   new_team       Pointer to the new team handle
  *
  *  @parblock
  *

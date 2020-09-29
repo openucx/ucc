@@ -24,11 +24,13 @@ typedef enum {
 
     /* Operation initialized but not posted */
     UCC_OPERATION_INITIALIZED           =   2,
-    UCC_ERR_OP_NOT_SUPPORTED            =   3,
-    UCC_ERR_NOT_IMPLEMENTED             =   4,
-    UCC_ERR_INVALID_PARAM               =   5,
-    UCC_ERR_NO_MEMORY                   =   6,
-    UCC_ERR_NO_RESOURCE                 =   7,
+
+    /* Error status codes */
+    UCC_ERR_OP_NOT_SUPPORTED            =   -1,
+    UCC_ERR_NOT_IMPLEMENTED             =   -2,
+    UCC_ERR_INVALID_PARAM               =   -3,
+    UCC_ERR_NO_MEMORY                   =   -4,
+    UCC_ERR_NO_RESOURCE                 =   -5,
     UCC_ERR_LAST                        = -100,
 } ucc_status_t;
 
