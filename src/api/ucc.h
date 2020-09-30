@@ -13,7 +13,6 @@
 #include <api/ucc_version.h>
 #include <api/ucc_status.h>
 #include <stdio.h>
-#include <stdbool.h>
 
 /** Unified Collective Communications (UCC) Library Specification
  *
@@ -1163,8 +1162,10 @@ ucc_status_t ucc_team_get_attr(ucc_team_h team,
  *
  *  @param [in]    my_ep          Endpoint of the process/thread calling the split operation
  *  @param [in]    parent_team    Parent team handle from which a new team handle is created
- *  @param [in]    included       Boolean variable indicating whether the
- *                                process/thread participates in the newly created team
+ *  @param [in]    included       Variable indicating whether a
+ *                                process/thread participates in the newly created team;
+ *                                value 1 indicates the participation and value 0 indicates
+ *                                otherwise
  *  @param [out]   new_team       Pointer to the new team handle
  *
  *  @parblock
@@ -1182,7 +1183,7 @@ ucc_status_t ucc_team_get_attr(ucc_team_h team,
  *
  *  @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_team_create_from_parent(uint64_t my_ep, bool included,
+ucc_status_t ucc_team_create_from_parent(uint64_t my_ep, uint32_t included,
                                          ucc_team_h parent_team,
                                          ucc_team_h *new_team);
 
