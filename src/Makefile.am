@@ -19,7 +19,7 @@ nobase_dist_libucc_la_HEADERS = \
 	api/ucc_status.h
 
 noinst_HEADERS =      \
-	team_lib/ucc_tl.h \
+	ccm/ucc_ccm.h \
 	utils/ucc_log.h
 
 libucc_la_SOURCES =

@@ -19,8 +19,8 @@ typedef struct ucc_config {
     /* Log level above which log messages will be printed*/
     ucs_log_component_config_t log_component;
 
-    /* Team libraries path */
-    char                       *team_lib_path;
+    /* Coll component libraries path */
+    char                       *ccm_path;
 } ucc_config_t;
 
 extern ucc_config_t ucc_lib_global_config;

@@ -2,7 +2,7 @@
 
 ucc_config_t ucc_lib_global_config = {
     .log_component = {UCS_LOG_LEVEL_WARN, "UCC"},
-    .team_lib_path = ""
+    .ccm_path = ""
 };
 
 ucs_config_field_t ucc_lib_global_config_table[] = {
@@ -13,9 +13,9 @@ ucs_config_field_t ucc_lib_global_config_table[] = {
      ucs_offsetof(ucc_config_t, log_component),
      UCS_CONFIG_TYPE_LOG_COMP},
 
-    {"TEAM_LIB_PATH", "",
+    {"COMPONENT_PATH", "",
      "Specifies team libraries location",
-     ucs_offsetof(ucc_config_t, team_lib_path),
+     ucs_offsetof(ucc_config_t, ccm_path),
      UCS_CONFIG_TYPE_STRING},
 
     NULL

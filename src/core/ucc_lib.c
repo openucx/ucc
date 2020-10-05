@@ -3,12 +3,12 @@
 #include <ucs/debug/log_def.h>
 #include <ucs/config/parser.h>
 #include "utils/ucc_log.h"
-#include "team_lib/ucc_tl.h"
+#include "ccm/ucc_ccm.h"
 
 static ucs_config_field_t ucc_lib_config_table[] = {
-    {"TLS", "all",
-     "Comma separated list of TeamLibrarieS to be used",
-     ucs_offsetof(ucc_lib_config_t, tls),
+    {"COLL_COMPONENTS", "all",
+     "Comma separated list of coll components to be used",
+     ucs_offsetof(ucc_lib_config_t, ccms),
      UCS_CONFIG_TYPE_STRING_ARRAY},
 
     {NULL}
@@ -18,39 +18,39 @@ UCS_CONFIG_REGISTER_TABLE(ucc_lib_config_table, "UCC", NULL, ucc_lib_config_t)
 
 #define CHECK_LIB_CONFIG_CAP(_cap, _CAP_FIELD) do{                       \
         if ((params->mask & UCC_LIB_PARAM_FIELD_ ## _CAP_FIELD) &&       \
-            !(params-> _cap & tl_iface->params. _cap)) {                 \
-            ucc_info("Disqualifying team %s due to %s cap",              \
-                     tl_iface->name, UCS_PP_QUOTE(_CAP_FIELD));          \
+            !(params-> _cap & ccm_iface->params. _cap)) {                \
+            ucc_info("Disqualifying component %s due to %s cap",         \
+                     ccm_iface->name, UCS_PP_QUOTE(_CAP_FIELD));         \
             continue;                                                    \
         }                                                                \
     } while(0)
 
-static inline ucc_status_t ucc_tl_is_loaded(char *tl_name)
+static inline ucc_status_t ucc_component_is_loaded(char *ccm_name)
 {
     int i;
-    for (i=0; i<ucc_lib_data.n_tls_loaded; i++) {
-        if (0 == strncmp(tl_name, ucc_lib_data.tl_ifaces[i]->name,
-                         strlen(tl_name))) {
+    for (i=0; i<ucc_lib_data.n_ccms_loaded; i++) {
+        if (0 == strncmp(ccm_name, ucc_lib_data.ccm_ifaces[i]->name,
+                         strlen(ccm_name))) {
             return UCC_OK;
         }
     }
     return UCC_ERR_NO_MESSAGE;
 }
 
-static inline ucc_status_t ucc_lib_config_tls_check(ucc_lib_info_t *lib,
-                                                    ucs_config_names_array_t *tls)
+static inline ucc_status_t ucc_lib_config_components_check(ucc_lib_info_t *lib,
+                                                           ucs_config_names_array_t *ccms)
 {
     int i;
-    if (tls->count == 0) {
+    if (ccms->count == 0) {
         return UCC_ERR_NO_MESSAGE;
     }
-    if (tls->count == 1 && 0 == strcmp(tls->names[0], "all")) {
+    if (ccms->count == 1 && 0 == strcmp(ccms->names[0], "all")) {
         return UCC_OK;
     }
-    for (i=0; i<tls->count; i++) {
-        if (UCS_OK != ucc_tl_is_loaded(tls->names[i])) {
-            ucc_error("Required TL: \"%s\" (ucc_team_lib_%s.so) is not available\n",
-                      tls->names[i], tls->names[i]);
+    for (i=0; i<ccms->count; i++) {
+        if (UCS_OK != ucc_component_is_loaded(ccms->names[i])) {
+            ucc_error("Required TL: \"%s\" (ucc_ccm_%s.so) is not available\n",
+                      ccms->names[i], ccms->names[i]);
             return UCC_ERR_NO_MESSAGE;
         }
     }
@@ -62,48 +62,48 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *params,
                                           const ucc_lib_config_t *config,
                                           ucc_lib_info_t *lib)
 {
-    int n_tls = ucc_lib_data.n_tls_loaded;
-    ucc_tl_iface_t *tl_iface;
-    ucc_team_lib_t *tl_lib;
-    ucc_tl_lib_config_t *tl_config;
+    int n_ccms = ucc_lib_data.n_ccms_loaded;
+    ucc_ccm_iface_t *ccm_iface;
+    ucc_ccm_lib_t   *ccm_lib;
+    ucc_ccm_lib_config_t *ccm_config;
     ucc_status_t status;
-    int i, need_tl_name_check;
+    int i, need_ccm_name_check;
 
-    lib->libs = (ucc_team_lib_t**)malloc(sizeof(ucc_team_lib_t*)*n_tls);
+    lib->libs = (ucc_ccm_lib_t**)malloc(sizeof(ucc_ccm_lib_t*)*n_ccms);
     if (!lib->libs) {
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
-    assert(config->tls.count >= 1);
-    need_tl_name_check = (0 != strcmp(config->tls.names[0], "all"));
+    assert(config->ccms.count >= 1);
+    need_ccm_name_check = (0 != strcmp(config->ccms.names[0], "all"));
     lib->n_libs_opened = 0;
-    for (i=0; i<n_tls; i++) {
-        tl_iface = ucc_lib_data.tl_ifaces[i];
-        if (need_tl_name_check &&
-            -1 == ucs_config_names_search(config->tls, tl_iface->name)) {
+    for (i=0; i<n_ccms; i++) {
+        ccm_iface = ucc_lib_data.ccm_ifaces[i];
+        if (need_ccm_name_check &&
+            -1 == ucs_config_names_search(config->ccms, ccm_iface->name)) {
             continue;
         }
         CHECK_LIB_CONFIG_CAP(thread_mode,  THREAD_MODE);
         CHECK_LIB_CONFIG_CAP(coll_types,   COLL_TYPES);
-        tl_config  = malloc(tl_iface->tl_lib_config.size);
-        ucs_config_parser_fill_opts(tl_config, tl_iface->tl_lib_config.table,
-                                    config->full_prefix, tl_iface->tl_lib_config.prefix, 0);
-        status = tl_iface->init(params, config, tl_config, &tl_lib);
+        ccm_config  = malloc(ccm_iface->ccm_lib_config.size);
+        ucs_config_parser_fill_opts(ccm_config, ccm_iface->ccm_lib_config.table,
+                                    config->full_prefix, ccm_iface->ccm_lib_config.prefix, 0);
+        status = ccm_iface->init(params, config, ccm_config, &ccm_lib);
 
         if (UCS_OK != status) {
-            ucs_config_parser_release_opts(tl_config, tl_iface->tl_lib_config.table);
-            ucc_error("lib_init failed for TL: %s\n", tl_iface->name);
+            ucs_config_parser_release_opts(ccm_config, ccm_iface->ccm_lib_config.table);
+            ucc_error("lib_init failed for component: %s\n", ccm_iface->name);
             goto error;
         }
-        tl_lib->log_component = tl_config->log_component;
-        snprintf(tl_lib->log_component.name, strlen(tl_iface->tl_lib_config.prefix),
-                 "%s", tl_iface->tl_lib_config.prefix);
-        tl_lib->priority = (-1 == tl_config->priority) ?
-            tl_iface->priority : tl_config->priority;
-        ucs_config_parser_release_opts(tl_config, tl_iface->tl_lib_config.table);
-        lib->libs[lib->n_libs_opened++] = tl_lib;
-        ucc_info("lib_prefix \"%s\": initialized tl \"%s\" priority %d\n",
-                 config->full_prefix, tl_iface->name, tl_lib->priority);
+        ccm_lib->log_component = ccm_config->log_component;
+        snprintf(ccm_lib->log_component.name, strlen(ccm_iface->ccm_lib_config.prefix),
+                 "%s", ccm_iface->ccm_lib_config.prefix);
+        ccm_lib->priority = (-1 == ccm_config->priority) ?
+            ccm_iface->priority : ccm_config->priority;
+        ucs_config_parser_release_opts(ccm_config, ccm_iface->ccm_lib_config.table);
+        lib->libs[lib->n_libs_opened++] = ccm_lib;
+        ucc_info("lib_prefix \"%s\": initialized component \"%s\" priority %d\n",
+                 config->full_prefix, ccm_iface->name, ccm_lib->priority);
     }
     return UCS_OK;
 
@@ -119,7 +119,7 @@ ucc_status_t ucc_lib_init(const ucc_lib_params_t *params,
     ucs_status_t status;
     ucc_lib_info_t *lib;
 
-    if (ucc_lib_data.n_tls_loaded == 0) {
+    if (ucc_lib_data.n_ccms_loaded == 0) {
         return UCC_ERR_NO_MESSAGE;
     }
 
@@ -130,9 +130,9 @@ ucc_status_t ucc_lib_init(const ucc_lib_params_t *params,
     }
     lib->full_prefix= strdup(config->full_prefix);
 
-    status = ucc_lib_config_tls_check(lib, &config->tls);
+    status = ucc_lib_config_components_check(lib, &config->ccms);
     if (UCS_OK != status) {
-        ucc_error("Unsupported \"UCC_TLS\" value\n");
+        ucc_error("Unsupported \"UCC_COLL_COMPONENTS\" value\n");
         goto error;
     }
     status = ucc_lib_init_filtered(params, (const ucc_lib_config_t*)config, lib);

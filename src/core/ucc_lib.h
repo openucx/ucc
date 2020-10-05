@@ -11,21 +11,21 @@
 #include <ucs/config/types.h>
 typedef struct ucc_lib_config {
     char                     *full_prefix;
-    ucs_config_names_array_t tls;
+    ucs_config_names_array_t ccms;
 } ucc_lib_config_t;
 
-typedef struct ucc_team_lib ucc_team_lib_t;
-typedef struct ucc_tl_iface ucc_tl_iface_t;
+typedef struct ucc_ccm_lib ucc_ccm_lib_t;
+typedef struct ucc_ccm_iface ucc_ccm_iface_t;
 
 typedef struct ucc_lib_info {
-    int            n_libs_opened;
-    char           *full_prefix;
-    ucc_team_lib_t **libs;
+    int           n_libs_opened;
+    char          *full_prefix;
+    ucc_ccm_lib_t **libs;
 } ucc_lib_info_t;
 
 struct ucc_static_lib_data {
-    int n_tls_loaded;
-    ucc_tl_iface_t **tl_ifaces;
+    int             n_ccms_loaded;
+    ucc_ccm_iface_t **ccm_ifaces;
 };
 extern struct ucc_static_lib_data ucc_lib_data;
 
