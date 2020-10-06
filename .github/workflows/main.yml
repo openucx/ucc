@@ -1,0 +1,24 @@
+name: CI
+
+on: [push, pull_request]
+
+env:
+  HPCX_PKG_NAME: hpcx-v2.7.0-gcc-MLNX_OFED_LINUX-5.0-1.0.0.0-ubuntu18.04-x86_64
+  HPCX_PKG_LINK: http://www.mellanox.com/downloads/hpc/hpc-x/v2.7
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Get HPCX
+      run: wget "${HPCX_PKG_LINK}/${HPCX_PKG_NAME}.tbz" -P /tmp
+    - name: Unpack HPCX
+      run: cd /tmp && tar xjf "${HPCX_PKG_NAME}.tbz"
+    - uses: actions/checkout@v1
+    - name: Build
+      run: |
+        source /tmp/${HPCX_PKG_NAME}/hpcx-init.sh; hpcx_load
+        ./autogen.sh
+        ./configure --prefix=$PWD/install --with-ucx=${HPCX_UCX_DIR}
+        make -j`nproc` install
