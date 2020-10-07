@@ -3,17 +3,18 @@
 * See file LICENSE for terms.
 */
 
-#ifndef UCC_TL_H_
-#define UCC_TL_H_
+#ifndef UCC_CCM_H_
+#define UCC_CCM_H_
 
-#include "config.h"
-#include "api/ucc.h"
-#include "core/ucc_lib.h"
 #include <ucs/config/types.h>
 #include <ucs/debug/log_def.h>
 #include <ucs/config/parser.h>
 #include <assert.h>
 #include <string.h>
+#include "config.h"
+#include "api/ucc.h"
+#include "core/ucc_lib.h"
+#include "utils/ucc_component.h"
 
 typedef struct ucc_ccm_lib     ucc_ccm_lib_t;
 typedef struct ucc_ccm_iface   ucc_ccm_iface_t;
@@ -35,10 +36,10 @@ typedef struct ucc_ccm_context_config {
 extern ucs_config_field_t ucc_ccm_context_config_table[];
 
 typedef struct ucc_ccm_iface {
+    ucc_component_iface_t          super;
     char*                          name;
     int                            priority;
     ucc_lib_params_t               params;
-    void*                          dl_handle;
     ucs_config_global_list_entry_t ccm_lib_config;
     ucs_config_global_list_entry_t ccm_context_config;
     ucc_status_t                   (*init)(const ucc_lib_params_t *params,

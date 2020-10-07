@@ -18,11 +18,13 @@ nobase_dist_libucc_la_HEADERS = \
 	api/ucc_version.h           \
 	api/ucc_status.h
 
-noinst_HEADERS =      \
-	ccm/ucc_ccm.h \
-	utils/ucc_log.h
+noinst_HEADERS =          \
+	ccm/ucc_ccm.h         \
+	utils/ucc_log.h       \
+	utils/ucc_component.h
 
-libucc_la_SOURCES =
+libucc_la_SOURCES = \
+	utils/ucc_component.c
 
 libucc_la_LIBADD = \
 	core/libucc_core.la

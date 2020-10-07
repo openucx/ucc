@@ -135,7 +135,7 @@ AC_MSG_RESULT([UCX support: $ucx_happy])
 
 includes="-I${UCC_TOP_SRCDIR}/src -I${UCC_TOP_SRCDIR}/src/core"
 CPPFLAGS="$UCS_CPPFLAGS $CPPFLAGS $includes -std=gnu11"
-LDFLAGS="$LDFLAGS $UCS_LDFLAGS"
+LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
 
 AC_CONFIG_FILES([
                  Makefile
