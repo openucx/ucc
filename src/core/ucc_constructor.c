@@ -7,24 +7,33 @@
 #include "config.h"
 #include "ucc_global_opts.h"
 #include "utils/ucc_malloc.h"
+#include "utils/ucc_component.h"
+
 #include <link.h>
 #include <dlfcn.h>
 #include <string.h>
+
+#define UCC_LIB_SO_NAME "libucc.so"
+#define UCC_COMPONENT_LIBDIR "ucc"
+#define UCC_COMPONENT_LIBDIR_LEN strlen("ucc")
 
 static int callback(struct dl_phdr_info *info, size_t size, void *data)
 {
     char *str;
     char *component_path;
-    if (NULL != (str = strstr(info->dlpi_name, "libucc.so"))) {
+    if (NULL != (str = strstr(info->dlpi_name, UCC_LIB_SO_NAME))) {
         int pos        = (int)(str - info->dlpi_name);
-        component_path = (char *)ucc_malloc(pos + 8);
+        component_path = (char *)ucc_malloc(pos + UCC_COMPONENT_LIBDIR_LEN + 1,
+                                            "component_path");
         if (!component_path) {
             //TODO add ucc_error(msg) when logging as added
             return -1;
         }
-        ucc_strncpy_safe(component_path, info->dlpi_name, pos);
+        /* copying up to pos+1 due to ucs_strncpy_safe implementation specifics:
+           it'll always write '\0' to the end position of the dest string. */
+        ucc_strncpy_safe(component_path, info->dlpi_name, pos + 1);
         component_path[pos] = '\0';
-        strcat(component_path, "ucc");
+        strcat(component_path, UCC_COMPONENT_LIBDIR);
         ucc_global_config.component_path =
             ucc_global_config.component_path_default = component_path;
     }
@@ -52,6 +61,18 @@ ucc_status_t ucc_constructor(void)
         if (strlen(ucc_global_config.component_path) == 0) {
             get_default_lib_path();
         }
+    }
+
+    if (!ucc_global_config.component_path) {
+        //TODO
+        //ucc_error, "Failed to get ucc library path. set UCC_COMPONENT_PATH.\n");
+        return UCC_ERR_NO_MESSAGE;
+    }
+    if (UCC_OK != ucc_components_load("cl", &ucc_global_config.cl_framework)) {
+        //TODO
+        //ucc_error, "no CL components were found in the UCC_COMPONENT_PATH: %s\n",
+        //ucc_global_config.component_path);
+        return UCC_ERR_NO_MESSAGE;
     }
     return UCC_OK;
 }
