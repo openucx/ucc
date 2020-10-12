@@ -474,6 +474,20 @@ ucc_status_t ucc_lib_config_modify(ucc_lib_config_h *config, const char *name,
 
 
 /**
+ *  @ingroup UCC_LIB_INTERNAL
+ *
+ *  @brief The @ref ucc_init_version is an internal routine that checks
+ *  compatibility with a particular UCC API version.
+ *  @ref ucc_init should be used to create the UCC library handle.
+ */
+ucc_status_t ucc_init_version(unsigned api_major_version,
+                              unsigned api_minor_version,
+                              const ucc_lib_params_t *params,
+                              const ucc_lib_config_h *config,
+                              ucc_lib_h *lib_p);
+
+
+/**
  *  @ingroup UCC_LIB
  *
  *  @brief The @ref ucc_init initializes the UCC library.
@@ -500,12 +514,15 @@ ucc_status_t ucc_lib_config_modify(ucc_lib_config_h *config, const char *name,
  *  @endparblock
  *
  *  @return Error code as defined by ucc_status_t
- *
  */
-
 ucc_status_t ucc_init(const ucc_lib_params_t *params,
                       const ucc_lib_config_h *config,
-                      ucc_lib_h *lib_p);
+                      ucc_lib_h *lib_p)
+{
+    return ucc_init_version(UCC_API_MAJOR, UCC_API_MINOR, params, config,
+                            lib_p);
+}
+
 
 /**
  *  @ingroup UCC_LIB
