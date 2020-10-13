@@ -73,6 +73,7 @@ CPPFLAGS="$CPPFLAGS $includes -std=gnu11"
 AC_CONFIG_FILES([
                  Makefile
                  src/Makefile
+                 src/api/ucc_version.h
                  ])
 
 #
