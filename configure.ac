@@ -21,6 +21,10 @@ define([ucc_git_sha], esyscmd([sh -c "git rev-parse --short HEAD"]))
 define([libucc_so_version], 1:0:0)
 
 AC_INIT([ucc], [ucc_ver_major.ucc_ver_minor])
+: ${CPPFLAGS=""}
+: ${CFLAGS=""}
+: ${CXXFLAGS=""}
+
 AC_USE_SYSTEM_EXTENSIONS
 AC_GNU_SOURCE
 AC_CONFIG_HEADERS([config.h])
@@ -68,18 +72,11 @@ AC_PROG_LIBTOOL
 AC_HEADER_STDC
 CFLAGS="$CFLAGS_save"
 
-includes="-I${UCC_TOP_SRCDIR}/src"
-CPPFLAGS="$CPPFLAGS $includes -std=gnu11"
-AC_CONFIG_FILES([
-                 Makefile
-                 src/Makefile
-                 src/api/ucc_version.h
-                 ])
-
 #
 # Additional m4 files
 #
 m4_include([config/m4/ax_prog_doxygen.m4])
+m4_include([config/m4/ucx.m4])
 
 AC_ARG_WITH([docs_only],
         AS_HELP_STRING([--with-docs-only],
@@ -118,4 +115,32 @@ AS_IF([test "x$with_docs_only" = xyes],
     ]) # Docs only
 
 
+AC_ARG_ENABLE([debug],
+              AS_HELP_STRING([--enable-debug], [Enable extra debugging code (default is NO).]),
+              [], [enable_debug=no])
+
+if test $enable_debug = yes; then
+	AC_DEFINE([ENABLE_DEBUG], [1], [Enable debugging code])
+	CFLAGS="$CFLAGS -O0 -g3"
+	AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_TRACE_POLL], [Highest log level])
+else
+	AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_INFO], [Highest log level])
+	CFLAGS="$CFLAGS -O3 -DNDEBUG"
+fi
+
+CHECK_UCX
+AC_MSG_RESULT([UCX support: $ucx_happy])
+if test $ucx_happy != "yes"; then
+   AC_MSG_ERROR([UCX is not available])
+fi
+
+includes="-I${UCC_TOP_SRCDIR}/src"
+CPPFLAGS="$UCS_CPPFLAGS $CPPFLAGS $includes -std=gnu11"
+LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
+
+AC_CONFIG_FILES([
+                 Makefile
+                 src/Makefile
+                 src/api/ucc_version.h                 
+                 ])
 AC_OUTPUT

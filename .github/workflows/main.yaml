@@ -2,6 +2,9 @@ name: CI
 
 on: [push, pull_request]
 
+env:
+  OPEN_UCX_LINK: https://github.com/openucx/ucx
+  OPEN_UCX_BRANCH: v1.9.x
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -10,9 +13,16 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends doxygen doxygen-latex
+    - name: Get UCX
+      run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
+    - name: Build UCX
+      run: |
+        cd /tmp/ucx && ./autogen.sh
+        ./contrib/configure-release --without-java --disable-numa --prefix $PWD/install
+        make -j install
     - uses: actions/checkout@v1
     - name: Build UCC
       run: |
         ./autogen.sh
-        ./configure --prefix=$PWD/install
-        make install
+        ./configure --prefix=$PWD/install --with-ucx=/tmp/ucx/install
+        make -j`nproc` install
