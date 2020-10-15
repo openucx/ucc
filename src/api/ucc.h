@@ -2,6 +2,7 @@
  * @file ucc.h
  * @date 2020
  * @copyright Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * @copyright Copyright (C) Huawei Technologies Co., Ltd. 2020.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -268,6 +269,7 @@ typedef enum {
  *  @param [in]  inoutvec       The input elements to be reduced and output of the reduction
  *  @param [in]  count          The number of elements of type "dtype" to be reduced
  *  @param [in]  dtype          Datatype passed to the reduction operation
+ *  @param [in]  op             Operation type passed to the reduction operation
  *
  *
  *  @parblock
@@ -281,7 +283,8 @@ typedef enum {
  *  @endparblock
  */
 typedef void(*ucc_reduction_dtype_mapper_t)(void *invec, void *inoutvec,
-                                            ucc_count_t *count, ucc_datatype_t dtype);
+                                            ucc_count_t *count, ucc_datatype_t dtype,
+                                            ucc_reduction_op_t op);
 
 /**
  * @brief UCC library initialization parameters
@@ -915,7 +918,7 @@ typedef struct ucc_team_p2p_conn {
     void            *conn_ctx;
     ucc_status_t    (*req_test)(void *request);
     ucc_status_t    (*req_free)(void *request);
-} ucc_team_p2p_conn;
+} ucc_team_p2p_conn_t;
 
 /**
  *
@@ -1033,7 +1036,7 @@ typedef struct ucc_team_params {
     uint64_t                team_size;
     ucc_coll_sync_type_t    sync_type;
     ucc_team_oob_coll_t     oob;
-    ucc_team_p2p_conn       p2p_conn;
+    ucc_team_p2p_conn_t     p2p_conn;
     ucc_mem_map_params_t    mem_params;
     ucc_ep_map_t            ep_map;
 } ucc_team_params_t;
