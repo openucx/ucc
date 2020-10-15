@@ -8,8 +8,9 @@
 #  include "config.h"
 #endif
 
-#include <api/ucc.h>
-#include <api/ucc_status.h>
+#include "ucc_global_opts.h"
+#include "api/ucc.h"
+#include "api/ucc_status.h"
 
 ucc_status_t ucc_init_version(unsigned api_major_version,
                               unsigned api_minor_version,
