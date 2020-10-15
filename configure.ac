@@ -141,6 +141,7 @@ LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
 AC_CONFIG_FILES([
                  Makefile
                  src/Makefile
-                 src/api/ucc_version.h                 
+                 src/cl/ucg/Makefile
+                 src/api/ucc_version.h
                  ])
 AC_OUTPUT

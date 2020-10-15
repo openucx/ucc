@@ -8,6 +8,7 @@ UCX_MIN_REQUIRED_MAJOR=1
 UCX_MIN_REQUIRED_MINOR=9
 AS_IF([test "x$ucx_checked" != "xyes"],[
     ucx_happy="no"
+    ucg_happy="no"
 
     AC_ARG_WITH([ucx],
             [AS_HELP_STRING([--with-ucx=(DIR)], [Enable the use of UCX (default is guess).])],
@@ -57,6 +58,20 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
             ucx_happy="no"
         ])
 
+        AC_CHECK_HEADERS([ucg/api/ucg.h],
+        [
+            AC_CHECK_LIB([ucg], [ucg_cleanup],
+            [
+                ucg_happy="yes"
+            ],
+            [
+                ucg_happy="no"
+            ], [-lucg])
+        ],
+        [
+            ucg_happy="no"
+        ])
+
         AS_IF([test "x$ucx_happy" = "xyes"],
         [
             AS_IF([test "x$check_ucx_dir" != "x"],
@@ -80,7 +95,17 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
                 AC_SUBST(UCS_LDFLAGS, "-L$check_ucx_libdir")
             ])
 
-            AC_SUBST(UCX_LIBADD, "-lucp -lucs -lucm")
+            AS_IF([test "x$ucg_happy" = "xyes"],
+            [
+                ucg_major=$(cat $check_ucx_dir/include/ucg/api/ucg_version.h | grep -Po "UCG_API_MAJOR\s+\K\d+")
+                ucg_minor=$(cat $check_ucx_dir/include/ucg/api/ucg_version.h | grep -Po "UCG_API_MINOR\s+\K\d+")
+                AC_MSG_RESULT([Detected UCG version: ${ucg_major}.${ucg_minor}])
+                AC_SUBST(UCX_LIBADD, "-lucg -lucp -lucs -lucm")
+            ],
+            [
+                AC_SUBST(UCX_LIBADD, "-lucp -lucs -lucm")
+            ])
+
             AC_SUBST(UCS_LIBADD, "-lucs")
         ],
         [
