@@ -15,7 +15,16 @@ nobase_dist_libucc_la_HEADERS = \
 	api/ucc_version.h           \
 	api/ucc_status.h            
 
-libucc_la_SOURCES = core/ucc_lib.c 
+noinst_HEADERS =             \
+	core/ucc_global_opts.h   \
+	utils/ucc_compiler_def.h \
+	utils/ucc_log.h          \
+	utils/ucc_parser.h
+
+libucc_la_SOURCES =        \
+	core/ucc_lib.c         \
+	core/ucc_constructor.c \
+	core/ucc_global_opts.c
 
 libucc_ladir = $(includedir)
 

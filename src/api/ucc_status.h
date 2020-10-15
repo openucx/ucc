@@ -17,13 +17,11 @@
 
 typedef enum {
     /* Operation completed successfully */
-    UCC_OK                              =   0,
+    UCC_OK                              =    0,
 
-    /* Operation is posted and is in progress */
-    UCC_INPROGRESS                      =   1,
+    UCC_INPROGRESS                      =    1, /*!< Operation is posted and is in progress */
 
-    /* Operation initialized but not posted */
-    UCC_OPERATION_INITIALIZED           =   2,
+    UCC_OPERATION_INITIALIZED           =    2, /*!< Operation initialized but not posted */
 
     /* Error status codes */
     UCC_ERR_OP_NOT_SUPPORTED            =   -1,
@@ -31,6 +29,7 @@ typedef enum {
     UCC_ERR_INVALID_PARAM               =   -3,
     UCC_ERR_NO_MEMORY                   =   -4,
     UCC_ERR_NO_RESOURCE                 =   -5,
+    UCC_ERR_NO_MESSAGE                  =   -6, /*!< General purpose return code without specific error */
     UCC_ERR_LAST                        = -100,
 } ucc_status_t;
 
