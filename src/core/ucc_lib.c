@@ -4,9 +4,7 @@
  * See file LICENSE for terms.
  */
 
-#ifdef HAVE_CONFIG_H
-#  include "config.h"
-#endif
+#include "config.h"
 
 #include "ucc_global_opts.h"
 #include "api/ucc.h"
