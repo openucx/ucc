@@ -79,7 +79,12 @@ CFLAGS="$CFLAGS_save"
 # Additional m4 files
 #
 m4_include([config/m4/ax_prog_doxygen.m4])
+m4_include([config/m4/compiler.m4])
+m4_include([config/m4/gtest.m4])
+m4_include([config/m4/sysdep.m4])
 m4_include([config/m4/ucx.m4])
+
+m4_include([test/gtest/configure.m4])
 
 AC_ARG_WITH([docs_only],
         AS_HELP_STRING([--with-docs-only],

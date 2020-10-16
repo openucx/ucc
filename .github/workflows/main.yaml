@@ -24,8 +24,9 @@ jobs:
     - name: Build UCC
       run: |
         ./autogen.sh
-        ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install
+        ./configure --prefix=/tmp/ucc/install --enable-gtest --with-ucx=/tmp/ucx/install
         make -j`nproc` install
+        make gtest
     - name: Run ucc_info
       run: |
         /tmp/ucc/install/bin/ucc_info -vc
