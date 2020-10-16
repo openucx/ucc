@@ -8,6 +8,7 @@
 #include "ucc_global_opts.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_component.h"
+#include "utils/ucc_log.h"
 
 #include <link.h>
 #include <dlfcn.h>
@@ -26,7 +27,8 @@ static int callback(struct dl_phdr_info *info, size_t size, void *data)
         component_path = (char *)ucc_malloc(pos + UCC_COMPONENT_LIBDIR_LEN + 1,
                                             "component_path");
         if (!component_path) {
-            //TODO add ucc_error(msg) when logging as added
+            ucc_error("failed to allocate %d bytes for component_path",
+                      pos + UCC_COMPONENT_LIBDIR_LEN + 1);
             return -1;
         }
         /* copying up to pos+1 due to ucs_strncpy_safe implementation specifics:
@@ -55,7 +57,7 @@ ucc_status_t ucc_constructor(void)
         status = ucc_config_parser_fill_opts(
             &ucc_global_config, ucc_global_config_table, "UCC_", NULL, 1);
         if (UCC_OK != status) {
-            //TODO add ucc_error(msg) when logging is added
+            ucc_error("failed to parse global options");
             return status;
         }
         if (strlen(ucc_global_config.component_path) == 0) {
@@ -64,15 +66,14 @@ ucc_status_t ucc_constructor(void)
     }
 
     if (!ucc_global_config.component_path) {
-        //TODO
-        //ucc_error, "Failed to get ucc library path. set UCC_COMPONENT_PATH.\n");
-        return UCC_ERR_NO_MESSAGE;
+        ucc_error("failed to get ucc components path");
+        return UCC_ERR_NOT_FOUND;
     }
-    if (UCC_OK != ucc_components_load("cl", &ucc_global_config.cl_framework)) {
-        //TODO
-        //ucc_error, "no CL components were found in the UCC_COMPONENT_PATH: %s\n",
-        //ucc_global_config.component_path);
-        return UCC_ERR_NO_MESSAGE;
+    status = ucc_components_load("cl", &ucc_global_config.cl_framework);
+    if (UCC_OK != status) {
+        ucc_error("no CL components were found in the UCC_COMPONENT_PATH: %s",
+                  ucc_global_config.component_path);
+        return status;
     }
     return UCC_OK;
 }
