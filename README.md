@@ -1,7 +1,6 @@
 # Unified Collective Communications (UCC)
 
-
-![UCC Logo](docs/images/ucc_logo.png)
+<img src="docs/images/ucc_logo.png" width="75%" height="75%">
 
 UCC is a collective communication operations API and library that is flexible, complete, and feature-rich for current and emerging programming models and runtimes.
 
