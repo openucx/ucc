@@ -7,7 +7,7 @@ UCC is a collective communication operations API and library that is flexible, c
 
 - [Design Goals](#design-goals)
 - [API](#api)
-- [Installation](#installation)
+- [Building](#compiling-and-installing)
 - [Community](#community)
 - [Contributing](#contributing)
 - [License](#license)
@@ -27,3 +27,31 @@ legal guidelines in the [contributing](CONTRIBUTING.md) file.
 
 ## License
 UCC is BSD-style licensed, as found in the [LICENSE](LICENSE) file.
+
+## Required packages
+
+* [UCX](https://github.com/openucx/ucx)
+   * UCC uses utilities provided by UCX's UCS component
+   
+* Doxygen
+   * UCC uses Doxygen for generating API documentation
+
+## Compiling and Installing
+
+### Developer's Build 
+```sh
+$./autogen.sh
+
+$./configure --prefix=<ucc-install-path> --with-ucx==<ucx-install-path>
+
+$make 
+```
+
+### Build Documentation 
+```sh
+$./autogen.sh
+
+$./configure --with-docs
+
+$make docs
+```
