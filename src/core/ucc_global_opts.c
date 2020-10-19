@@ -1,6 +1,5 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
- *
  * See file LICENSE for terms.
  */
 
@@ -25,6 +24,8 @@ ucc_config_field_t ucc_global_config_table[] = {
     {"COMPONENT_PATH", "", "Specifies dynamic components location",
      ucc_offsetof(ucc_global_config_t, component_path), UCC_CONFIG_TYPE_STRING},
 
-    NULL};
+    {NULL}
+};
+
 UCC_CONFIG_REGISTER_TABLE(ucc_global_config_table, "UCC global", NULL,
                           ucc_global_config)

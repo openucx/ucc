@@ -135,7 +135,7 @@ if test $ucx_happy != "yes"; then
 fi
 
 includes="-I${UCC_TOP_SRCDIR}/src"
-CPPFLAGS="$UCS_CPPFLAGS $CPPFLAGS $includes -std=gnu11"
+CPPFLAGS="$UCS_CPPFLAGS $CPPFLAGS $includes -std=gnu11 -Wall -Werror"
 LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
 
 AC_CONFIG_FILES([

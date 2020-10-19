@@ -1,6 +1,5 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
- *
  * See file LICENSE for terms.
  */
 
@@ -12,7 +11,6 @@
 
 #include <link.h>
 #include <dlfcn.h>
-#include <string.h>
 
 #define UCC_LIB_SO_NAME "libucc.so"
 #define UCC_COMPONENT_LIBDIR "ucc"
@@ -27,7 +25,7 @@ static int callback(struct dl_phdr_info *info, size_t size, void *data)
         component_path = (char *)ucc_malloc(pos + UCC_COMPONENT_LIBDIR_LEN + 1,
                                             "component_path");
         if (!component_path) {
-            ucc_error("failed to allocate %d bytes for component_path",
+            ucc_error("failed to allocate %zd bytes for component_path",
                       pos + UCC_COMPONENT_LIBDIR_LEN + 1);
             return -1;
         }
