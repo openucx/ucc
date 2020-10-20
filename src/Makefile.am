@@ -1,6 +1,9 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+# Copyright (c) Huawei Technologies Co., Ltd. 2020.  ALL RIGHTS RESERVED.
 #
+
+SUBDIRS = cl/ucg
 
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =
