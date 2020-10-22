@@ -515,9 +515,9 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
  *
  *  @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_init(const ucc_lib_params_t *params,
-                      const ucc_lib_config_h *config,
-                      ucc_lib_h *lib_p)
+static inline ucc_status_t ucc_init(const ucc_lib_params_t *params,
+                                    const ucc_lib_config_h *config,
+                                    ucc_lib_h *lib_p)
 {
     return ucc_init_version(UCC_API_MAJOR, UCC_API_MINOR, params, config,
                             lib_p);

@@ -7,6 +7,7 @@
 #define UCC_MALLOC_H_
 
 #include "config.h"
+#include <stdlib.h>
 
 #define ucc_malloc(_s, ...) malloc(_s)
 #define ucc_calloc(_n, _s, ...) calloc(_n, _s)

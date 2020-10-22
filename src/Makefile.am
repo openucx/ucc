@@ -19,12 +19,14 @@ noinst_HEADERS =             \
 	core/ucc_global_opts.h   \
 	utils/ucc_compiler_def.h \
 	utils/ucc_log.h          \
-	utils/ucc_parser.h
+	utils/ucc_parser.h       \
+	utils/ucc_component.h
 
 libucc_la_SOURCES =        \
 	core/ucc_lib.c         \
 	core/ucc_constructor.c \
-	core/ucc_global_opts.c
+	core/ucc_global_opts.c \
+	utils/ucc_component.c
 
 libucc_ladir = $(includedir)
 
