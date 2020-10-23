@@ -79,7 +79,8 @@ ucc_status_t ucc_constructor(void)
 
 __attribute__((destructor)) static void ucc_destructor(void)
 {
-    if (ucc_global_config.component_path_default) {
-        ucc_free(ucc_global_config.component_path_default);
+    if (ucc_global_config.initialized) {
+        ucc_config_parser_release_opts(&ucc_global_config,
+                                       ucc_global_config_table);
     }
 }

@@ -31,4 +31,10 @@ ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,
     return ucs_status_to_ucc_status(status);
 }
 
+static inline void
+ucc_config_parser_release_opts(void *opts, ucc_config_field_t *fields)
+{
+    ucs_config_parser_release_opts(opts, fields);
+}
+
 #endif
