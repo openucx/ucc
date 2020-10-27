@@ -12,6 +12,7 @@
 
 define([ucc_ver_major], 1)
 define([ucc_ver_minor], 0)
+define([ucc_ver_patch], 0)
 define([ucc_ver_micro], esyscmd([sh -c "git rev-list HEAD | wc -l | sed -e 's/ *//g' | xargs -n1 printf"]))
 define([ucc_git_sha], esyscmd([sh -c "git rev-parse --short HEAD"]))
 
@@ -52,12 +53,14 @@ RPM_RELEASE=1
 MAJOR_VERSION=ucc_ver_major
 MINOR_VERSION=ucc_ver_minor
 MICRO_VERSION=ucc_ver_micro
+PATCH_VERSION=ucc_ver_micro
 UCC_GIT_SHA=ucc_git_sha
 VERSION=$MAJOR_VERSION.$MINOR_VERSION.$MICRO_VERSION
 SOVERSION=libucc_so_version
 AC_SUBST(MAJOR_VERSION)
 AC_SUBST(MINOR_VERSION)
 AC_SUBST(MICRO_VERSION)
+AC_SUBST(PATCH_VERSION)
 AC_SUBST(RPM_RELEASE)
 AC_SUBST(SOVERSION)
 AC_SUBST(UCC_GIT_SHA)
@@ -143,5 +146,6 @@ AC_CONFIG_FILES([
                  src/Makefile
                  src/api/ucc_version.h
                  tools/info/Makefile
+                 src/core/ucc_version.c
                  ])
 AC_OUTPUT

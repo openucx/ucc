@@ -25,6 +25,22 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
                               const ucc_lib_config_h *config,
                               ucc_lib_h *lib_p)
 {
+    unsigned major_version, minor_version, release_number;
+    ucc_status_t status;
+
+    if (UCC_OK != (status = ucc_constructor())) {
+        return status;
+    }
+
+    ucc_get_version(&major_version, &minor_version, &release_number);
+
+    if ((api_major_version != major_version) ||
+        ((api_major_version == major_version) && (api_minor_version > minor_version))) {
+        ucc_warn("UCC version is incompatible, required: %d.%d, actual: %d.%d.%d",
+                  api_major_version, api_minor_version,
+                  major_version, minor_version, release_number);
+    }
+
     return UCC_ERR_NOT_IMPLEMENTED;
 }
 

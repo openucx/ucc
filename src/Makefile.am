@@ -28,6 +28,7 @@ libucc_la_SOURCES =        \
 	core/ucc_lib.c         \
 	core/ucc_constructor.c \
 	core/ucc_global_opts.c \
+	core/ucc_version.c     \
 	utils/ucc_component.c
 
 libucc_ladir = $(includedir)

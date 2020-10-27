@@ -15,5 +15,10 @@ typedef struct ucc_lib_config {
     ucc_config_names_array_t cls;
 } ucc_lib_config_t;
 
+void ucc_get_version(unsigned *major_version, unsigned *minor_version,
+                     unsigned *release_number);
+
+const char *ucc_get_version_string(void);
+
 #endif
 
