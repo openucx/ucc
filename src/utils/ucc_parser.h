@@ -17,12 +17,15 @@
 #include <ucs/config/types.h>
 #include <ucs/config/parser.h>
 
-typedef ucs_config_field_t ucc_config_field_t;
-typedef ucs_config_names_array_t ucc_config_names_array_t;
+typedef ucs_config_field_t             ucc_config_field_t;
+typedef ucs_config_names_array_t       ucc_config_names_array_t;
+typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 
-#define UCC_CONFIG_TYPE_LOG_COMP UCS_CONFIG_TYPE_LOG_COMP
-#define UCC_CONFIG_REGISTER_TABLE UCS_CONFIG_REGISTER_TABLE
-#define UCC_CONFIG_TYPE_STRING UCS_CONFIG_TYPE_STRING
+#define ucc_config_names_search      ucs_config_names_search
+#define UCC_CONFIG_TYPE_LOG_COMP     UCS_CONFIG_TYPE_LOG_COMP
+#define UCC_CONFIG_REGISTER_TABLE    UCS_CONFIG_REGISTER_TABLE
+#define UCC_CONFIG_TYPE_STRING       UCS_CONFIG_TYPE_STRING
+#define UCC_CONFIG_TYPE_INT          UCS_CONFIG_TYPE_INT
 #define UCC_CONFIG_TYPE_STRING_ARRAY UCS_CONFIG_TYPE_STRING_ARRAY
 
 static inline ucc_status_t
