@@ -10,10 +10,13 @@
 #include "api/ucc_status.h"
 #include <ucs/type/status.h>
 #include <ucs/sys/string.h>
+#include <ucs/debug/log_def.h>
 
 #define ucc_offsetof ucs_offsetof
 #define ucc_container_of ucs_container_of
 #define ucc_strncpy_safe ucs_strncpy_safe
+
+typedef ucs_log_component_config_t ucc_log_component_config_t;
 
 static inline ucc_status_t ucs_status_to_ucc_status(ucs_status_t status)
 {
