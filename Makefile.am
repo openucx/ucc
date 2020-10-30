@@ -2,7 +2,9 @@
 # Copyright (c) 2020 Mellanox Technologies.  All rights reserved.
 # $HEADER$
 #
-SUBDIRS = src
+SUBDIRS = \
+       src \
+       tools/info
 
 include $(srcdir)/docs/doxygen/doxygen.am
 
