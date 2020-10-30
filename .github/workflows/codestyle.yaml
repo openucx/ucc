@@ -2,11 +2,20 @@ name: Codestyle
 
 on: [pull_request]
 
+env:
+  GIT_CF: https://llvm.org/svn/llvm-project/cfe/trunk/tools/clang-format/git-clang-format
 jobs:
-  check-commit-title:
+  check-codestyle:
     runs-on: ubuntu-latest
-    name: Check commit title
+    name: Check code style
     steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common
+        sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+        sudo wget -O /usr/bin/git-clang-format $GIT_CF
+        sudo chmod +x /usr/bin/git-clang-format
     - name: Checking out repository
       uses: actions/checkout@v2
       with:
@@ -54,4 +63,16 @@ jobs:
         if [ $ok -ne 1 ]
         then
           exit 1
+        fi
+    - name: Check code format
+      run: |
+        set -eE
+        echo "Commit ${{ github.event.pull_request.base.sha }}"
+        diff=`git clang-format --style=file --diff ${{ github.event.pull_request.base.sha }}`
+        if [ "$diff" = "no modified files to format" ] || [ "$diff" = "clang-format did not modify any files" ]
+        then
+          echo "Format check PASS"
+        else
+          echo "Please check code format:"
+          echo "$diff"
         fi
