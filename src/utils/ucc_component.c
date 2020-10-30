@@ -1,6 +1,5 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
- *
  * See file LICENSE for terms.
  */
 #include "config.h"
@@ -16,24 +15,32 @@
 #include <dlfcn.h>
 #include <glob.h>
 #include <unistd.h>
-#include <string.h>
 #include <assert.h>
+
+#define IFACE_NAME_LEN (UCC_MAX_FRAMEWORK_NAME_LEN + UCC_MAX_COMPONENT_NAME_LEN)
 
 static ucc_status_t ucc_component_load_one(const char *so_path,
                                            const char *framework_pattern,
                                            ucc_component_iface_t **c_iface)
 {
-    char                  *error, iface_struct[128];
+    char                  *error, iface_struct[IFACE_NAME_LEN];
     void                  *handle;
     ucc_component_iface_t *iface;
-    int                    pos;
+    size_t                 basename_start, iface_struct_name_len;
 
-    pos = (int)(strstr(so_path, framework_pattern) - so_path);
-    if (pos < 0) {
+    basename_start =
+        ((ptrdiff_t)strstr(so_path, framework_pattern) - (ptrdiff_t)so_path);
+    if (basename_start < 0) {
         return UCC_ERR_NO_MESSAGE;
     }
-    strncpy(iface_struct, so_path + pos, strlen(so_path) - pos - 3);
-    iface_struct[strlen(so_path) - pos - 3] = '\0';
+    /* The name of the iface stract matches the basename of .so component
+       object. basename_start - the starting position of the component name
+       in the full .so path. The name_len is also decreased by 3 to remove 
+       ".so" extension from the name;
+     */
+    iface_struct_name_len = strlen(so_path) - basename_start - 3;
+    ucc_strncpy_safe(iface_struct, so_path + basename_start,
+                     iface_struct_name_len + 1);
 
     handle = dlopen(so_path, RTLD_LAZY);
     if (!handle) {
@@ -76,11 +83,12 @@ ucc_status_t ucc_components_load(const char *framework_name,
 
     if (strlen(framework_name) == 0 ||
         strlen(framework_name) > UCC_MAX_FRAMEWORK_NAME_LEN) {
-        ucc_error("unsupported framework_name length: %s, len %d",
+        ucc_error("unsupported framework_name length: %s, len %zd",
                   framework_name, strlen(framework_name));
         return UCC_ERR_INVALID_PARAM;
     }
-    sprintf(framework_pattern, "ucc_%s_", framework_name);
+    ucc_snprintf_safe(framework_pattern, sizeof(framework_pattern), "ucc_%s_",
+                      framework_name);
 
     pattern_size =
         strlen(ucc_global_config.component_path) + strlen(framework_name) + 16;
@@ -90,8 +98,8 @@ ucc_status_t ucc_components_load(const char *framework_name,
                   pattern_size);
         return UCC_ERR_NO_MEMORY;
     }
-    sprintf(full_pattern, "%s/ucc_%s_*.so", ucc_global_config.component_path,
-            framework_name);
+    ucc_snprintf_safe(full_pattern, pattern_size, "%s/ucc_%s_*.so",
+                      ucc_global_config.component_path, framework_name);
     glob(full_pattern, 0, NULL, &globbuf);
     free(full_pattern);
     n_loaded          = 0;

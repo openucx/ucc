@@ -469,7 +469,7 @@ void ucc_lib_config_print(const ucc_lib_config_h config, FILE *stream,
  *  @return Error code as defined by ucc_status_t
  */
 
-ucc_status_t ucc_lib_config_modify(ucc_lib_config_h *config, const char *name,
+ucc_status_t ucc_lib_config_modify(ucc_lib_config_h config, const char *name,
                                    const char *value);
 
 

@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
@@ -12,9 +12,10 @@
 #include <ucs/sys/string.h>
 #include <ucs/debug/log_def.h>
 
-#define ucc_offsetof ucs_offsetof
-#define ucc_container_of ucs_container_of
-#define ucc_strncpy_safe ucs_strncpy_safe
+#define ucc_offsetof      ucs_offsetof
+#define ucc_container_of  ucs_container_of
+#define ucc_strncpy_safe  ucs_strncpy_safe
+#define ucc_snprintf_safe snprintf
 
 typedef ucs_log_component_config_t ucc_log_component_config_t;
 

@@ -1,7 +1,7 @@
-/*
-* Copyright (C) Mellanox Technologies Ltd. 2001-2020.  ALL RIGHTS RESERVED.
-* See file LICENSE for terms.
-*/
+/**
+ * Copyright (C) Mellanox Technologies Ltd. 2001-2020.  ALL RIGHTS RESERVED.
+ * See file LICENSE for terms.
+ */
 
 #ifndef UCC_COMPONENT_H_
 #define UCC_COMPONENT_H_
@@ -10,6 +10,7 @@
 #include <api/ucc.h>
 
 #define UCC_MAX_FRAMEWORK_NAME_LEN 64
+#define UCC_MAX_COMPONENT_NAME_LEN 64
 
 typedef struct ucc_component_iface {
     void *dl_handle;

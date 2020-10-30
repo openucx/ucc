@@ -17,6 +17,7 @@ nobase_dist_libucc_la_HEADERS = \
 
 noinst_HEADERS =             \
 	core/ucc_global_opts.h   \
+	core/ucc_lib.h           \
 	utils/ucc_compiler_def.h \
 	utils/ucc_log.h          \
 	utils/ucc_parser.h       \
