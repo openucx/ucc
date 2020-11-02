@@ -14,6 +14,8 @@
 #include <api/ucc_status.h>
 #include <stdio.h>
 
+BEGIN_C_DECLS
+
 /** Unified Collective Communications (UCC) Library Specification
  *
  *  UCC is a collective communication operations API and library that is
@@ -1516,4 +1518,6 @@ ucc_status_t ucc_collective_test(ucc_coll_req_h request);
  *  @return Error code as defined by ucc_status_t
  */
 ucc_status_t ucc_collective_finalize(ucc_coll_req_h request);
+
+END_C_DECLS
 #endif

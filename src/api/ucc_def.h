@@ -12,6 +12,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+# define BEGIN_C_DECLS  extern "C" {
+# define END_C_DECLS    }
+#else
+# define BEGIN_C_DECLS
+# define END_C_DECLS
+#endif
+
 /**
  * @ingroup UCC_LIB_INIT_DT
  * @brief UCC library handle
