@@ -21,7 +21,8 @@ noinst_HEADERS =             \
 	utils/ucc_compiler_def.h \
 	utils/ucc_log.h          \
 	utils/ucc_parser.h       \
-	utils/ucc_component.h
+	utils/ucc_component.h    \
+	utils/ucc_datastruct.h
 
 libucc_la_SOURCES =        \
 	core/ucc_lib.c         \

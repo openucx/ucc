@@ -8,7 +8,8 @@
 
 #include "config.h"
 #include "api/ucc_status.h"
-#include "ucc_compiler_def.h"
+#include "utils/ucc_datastruct.h"
+#include "utils/ucc_compiler_def.h"
 
 #include <ucs/config/parser.h>
 #include <ucs/sys/preprocessor.h>
@@ -49,14 +50,11 @@ ucc_config_parser_set_value(void *opts, ucc_config_field_t *fields,
     return ucs_status_to_ucc_status(status);
 }
 
-static inline void ucc_config_parser_print_opts(FILE *stream, const char *title,
-                                                const void *opts,
-                                                ucc_config_field_t *fields,
-                                                const char *table_prefix,
-                                                const char *prefix,
-                                                ucc_config_print_flags_t flags)
+static inline ucs_config_print_flags_t
+ucc_print_flags_to_ucs_print_flags(ucc_config_print_flags_t flags)
 {
     ucs_config_print_flags_t ucs_flags = 0;
+
     if (flags & UCC_CONFIG_PRINT_CONFIG) {
         ucs_flags |= UCS_CONFIG_PRINT_CONFIG;
     }
@@ -69,7 +67,33 @@ static inline void ucc_config_parser_print_opts(FILE *stream, const char *title,
     if (flags & UCC_CONFIG_PRINT_HIDDEN) {
         ucs_flags |= UCS_CONFIG_PRINT_HIDDEN;
     }
+
+    return ucs_flags;
+}
+
+static inline void ucc_config_parser_print_opts(FILE *stream, const char *title,
+                                                const void *opts,
+                                                ucc_config_field_t *fields,
+                                                const char *table_prefix,
+                                                const char *prefix,
+                                                ucc_config_print_flags_t flags)
+{
+    ucs_config_print_flags_t ucs_flags;
+
+    ucs_flags = ucc_print_flags_to_ucs_print_flags(flags);
     ucs_config_parser_print_opts(stream, title, opts, fields, table_prefix,
                                  prefix, ucs_flags);
 }
+
+static inline void
+ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
+                                 ucc_config_print_flags_t flags,
+                                 ucc_list_link_t *config_list)
+{
+    ucs_config_print_flags_t ucs_flags;
+
+    ucs_flags = ucc_print_flags_to_ucs_print_flags(flags);
+    ucs_config_parser_print_all_opts(stream, prefix, ucs_flags, config_list);
+}
+
 #endif
