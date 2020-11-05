@@ -19,7 +19,10 @@ static void usage()
     printf("  -v Show version information\n");
     printf("  -b Show build configuration\n");
     printf("  -c Show UCC configuration\n");
+    printf("  -a Show also hidden configuration\n");
+    printf("  -f Display fully decorated output\n");
     printf("  -h Show this help message\n");
+
     printf("\n");
 }
 extern ucc_list_link_t ucc_config_global_list;
@@ -32,10 +35,18 @@ int main(int argc, char **argv)
 
     print_flags = (ucc_config_print_flags_t)0;
     print_opts  = 0;
-    while ((c = getopt(argc, argv, "vbch")) != -1) {
+    while ((c = getopt(argc, argv, "vbcafh")) != -1) {
         switch (c) {
+        case 'f':
+            print_flags |= UCC_CONFIG_PRINT_CONFIG |
+                           UCC_CONFIG_PRINT_HEADER |
+                           UCC_CONFIG_PRINT_DOC;
+            break;
         case 'c':
             print_flags |= UCC_CONFIG_PRINT_CONFIG;
+            break;
+        case 'a':
+            print_flags |= UCC_CONFIG_PRINT_HIDDEN;
             break;
         case 'v':
             print_opts |= PRINT_VERSION;
