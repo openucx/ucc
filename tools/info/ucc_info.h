@@ -10,9 +10,12 @@
 #include "api/ucc.h"
 
 enum {
-    PRINT_VERSION = UCC_BIT(0),
+    PRINT_VERSION      = UCC_BIT(0),
+    PRINT_BUILD_CONFIG = UCC_BIT(1),
 };
 
 void print_version();
+
+void print_build_config();
 
 #endif

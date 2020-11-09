@@ -5,6 +5,9 @@
 
 #include "ucc_global_opts.h"
 #include "utils/ucc_compiler_def.h"
+#include "utils/ucc_datastruct.h"
+
+UCC_LIST_HEAD(ucc_config_global_list);
 
 ucc_global_config_t ucc_global_config = {
     .log_component  = {UCC_LOG_LEVEL_WARN, "UCC"},
@@ -28,4 +31,4 @@ ucc_config_field_t ucc_global_config_table[] = {
 };
 
 UCC_CONFIG_REGISTER_TABLE(ucc_global_config_table, "UCC global", NULL,
-                          ucc_global_config)
+                          ucc_global_config, &ucc_config_global_list)

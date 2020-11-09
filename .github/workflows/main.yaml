@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
-  OPEN_UCX_BRANCH: v1.9.x
+  OPEN_UCX_BRANCH: master
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -24,5 +24,8 @@ jobs:
     - name: Build UCC
       run: |
         ./autogen.sh
-        ./configure --prefix=$PWD/install --with-ucx=/tmp/ucx/install
+        ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install
         make -j`nproc` install
+    - name: Run ucc_info
+      run: |
+        /tmp/ucc/install/bin/ucc_info -vc
