@@ -22,3 +22,9 @@ ucc_config_field_t ucc_cl_lib_config_table[] = {
 
     {NULL}
 };
+
+const char *ucc_cl_names[] = {
+    [UCC_CL_BASIC] = "basic",
+    [UCC_CL_ALL]   = "all",
+    [UCC_CL_LAST]  = NULL
+};

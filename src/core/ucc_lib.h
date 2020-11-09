@@ -8,12 +8,16 @@
 
 #include "config.h"
 #include "api/ucc.h"
+#include "cl/ucc_cl_type.h"
 #include "utils/ucc_parser.h"
 
 typedef struct ucc_cl_lib ucc_cl_lib_t;
 typedef struct ucc_lib_config {
     char                    *full_prefix;
-    ucc_config_names_array_t cls;
+    struct {
+        ucc_cl_type_t *types;
+        unsigned       count;
+    } cls;
 } ucc_lib_config_t;
 
 typedef struct ucc_lib_info {

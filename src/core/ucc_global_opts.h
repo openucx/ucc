@@ -27,5 +27,6 @@ extern ucc_global_config_t ucc_global_config;
 extern ucc_config_field_t  ucc_global_config_table[];
 
 ucc_status_t ucc_constructor(void);
+extern ucs_list_link_t ucc_config_global_list;
 
 #endif

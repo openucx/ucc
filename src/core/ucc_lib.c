@@ -14,17 +14,22 @@
 #include "utils/ucc_math.h"
 #include "cl/ucc_cl.h"
 
+UCS_CONFIG_DEFINE_ARRAY(cl_types, sizeof(ucc_cl_type_t),
+                        UCS_CONFIG_TYPE_ENUM(ucc_cl_names));
+
 static ucc_config_field_t ucc_lib_config_table[] = {
     {"CLS", "all", "Comma separated list of CL components to be used",
-     ucc_offsetof(ucc_lib_config_t, cls), UCC_CONFIG_TYPE_STRING_ARRAY},
+     ucc_offsetof(ucc_lib_config_t, cls), UCC_CONFIG_TYPE_ARRAY(cl_types)},
 
     {NULL}
 };
 
-UCC_CONFIG_REGISTER_TABLE(ucc_lib_config_table, "UCC", NULL, ucc_lib_config_t)
+UCC_CONFIG_REGISTER_TABLE(ucc_lib_config_table, "UCC", NULL, ucc_lib_config_t,
+                          &ucc_config_global_list)
 
-static inline ucc_status_t ucc_cl_component_is_loaded(const char *cl_name)
+static inline ucc_status_t ucc_cl_component_is_loaded(ucc_cl_type_t cl_type)
 {
+    const char *cl_name = ucc_cl_names[cl_type];
     if (NULL == ucc_get_component(&ucc_global_config.cl_framework, cl_name)) {
         return UCC_ERR_NOT_FOUND;
     } else {
@@ -32,25 +37,15 @@ static inline ucc_status_t ucc_cl_component_is_loaded(const char *cl_name)
     }
 }
 
-static inline ucc_status_t
-ucc_lib_config_cl_components_check(ucc_lib_info_t *lib,
-                                   ucc_config_names_array_t *cls)
+static inline int ucc_cl_requested(const ucc_lib_config_t *cfg, int cl_type)
 {
     int i;
-    if (cls->count == 0) {
-        return UCC_ERR_NO_MESSAGE;
-    }
-    if (cls->count == 1 && 0 == strcmp(cls->names[0], "all")) {
-        return UCC_OK;
-    }
-    for (i = 0; i < cls->count; i++) {
-        if (UCC_OK != ucc_cl_component_is_loaded(cls->names[i])) {
-            ucc_error("Required TL: \"%s\" (ucc_cl_%s.so) is not available\n",
-                      cls->names[i], cls->names[i]);
-            return UCC_ERR_NO_MESSAGE;
+    for (i = 0; i < cfg->cls.count; i++) {
+        if (cfg->cls.types[i] == cl_type) {
+            return 1;
         }
     }
-    return UCC_OK;
+    return 0;
 }
 
 /* Core logic for the selection of CL components:
@@ -88,7 +83,7 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *user_params,
         params.thread_mode = UCC_THREAD_SINGLE;
     }
     ucc_assert(config->cls.count >= 1);
-    specific_cls_requested = (-1 == ucc_config_names_search(config->cls, "all"));
+    specific_cls_requested = (0 == ucc_cl_requested(config, UCC_CL_ALL));
     lib->n_libs_opened     = 0;
     for (i = 0; i < n_cls; i++) {
         cl_iface = ucc_derived_of(ucc_global_config.cl_framework.components[i],
@@ -96,7 +91,7 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *user_params,
         /* User requested specific list of CLs and current cl_iface is not part
            of the list: skip it. */
         if (specific_cls_requested &&
-            -1 == ucc_config_names_search(config->cls, cl_iface->super.name)) {
+            0 == ucc_cl_requested(config, cl_iface->type)) {
             continue;
         }
         if (params.thread_mode > cl_iface->attr.thread_mode) {

@@ -27,6 +27,7 @@ typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 #define UCC_CONFIG_TYPE_STRING       UCS_CONFIG_TYPE_STRING
 #define UCC_CONFIG_TYPE_INT          UCS_CONFIG_TYPE_INT
 #define UCC_CONFIG_TYPE_STRING_ARRAY UCS_CONFIG_TYPE_STRING_ARRAY
+#define UCC_CONFIG_TYPE_ARRAY        UCS_CONFIG_TYPE_ARRAY
 
 static inline ucc_status_t
 ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,

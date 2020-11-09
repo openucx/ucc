@@ -11,6 +11,7 @@
 
 #include "api/ucc.h"
 #include "core/ucc_lib.h"
+#include "ucc_cl_type.h"
 #include "utils/ucc_component.h"
 #include "utils/ucc_parser.h"
 
@@ -28,6 +29,7 @@ extern ucc_config_field_t ucc_cl_lib_config_table[];
 
 typedef struct ucc_cl_iface {
     ucc_component_iface_t          super;
+    ucc_cl_type_t                  type;
     int                            priority;
     ucc_lib_attr_t                 attr;
     ucc_config_global_list_entry_t cl_lib_config;
