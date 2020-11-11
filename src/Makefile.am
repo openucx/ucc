@@ -1,6 +1,7 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
 #
+SUBDIRS = cl/basic
 
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =
@@ -24,7 +25,8 @@ noinst_HEADERS =             \
 	utils/ucc_component.h    \
 	utils/ucc_datastruct.h   \
 	utils/ucc_math.h         \
-	cl/ucc_cl.h
+	cl/ucc_cl.h              \
+	cl/ucc_cl_log.h
 
 libucc_la_SOURCES =        \
 	core/ucc_lib.c         \
