@@ -57,7 +57,7 @@ ucc_config_parser_set_value(void *opts, ucc_config_field_t *fields,
 static inline ucs_config_print_flags_t
 ucc_print_flags_to_ucs_print_flags(ucc_config_print_flags_t flags)
 {
-    ucs_config_print_flags_t ucs_flags = 0;
+    int ucs_flags = 0;
 
     if (flags & UCC_CONFIG_PRINT_CONFIG) {
         ucs_flags |= UCS_CONFIG_PRINT_CONFIG;
@@ -72,7 +72,7 @@ ucc_print_flags_to_ucs_print_flags(ucc_config_print_flags_t flags)
         ucs_flags |= UCS_CONFIG_PRINT_HIDDEN;
     }
 
-    return ucs_flags;
+    return (ucs_config_print_flags_t)ucs_flags;
 }
 
 static inline void ucc_config_parser_print_opts(FILE *stream, const char *title,

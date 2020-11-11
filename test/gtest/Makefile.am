@@ -63,11 +63,8 @@ gtest_CXXFLAGS = \
 
 gtest_SOURCES = \
 	common/gtest-all.cc \
-	common/main.cc \
-	common/test_gtest_cmn.cc \
-	common/test_helpers.cc \
 	common/test_obj_size.cc \
-	common/test_watchdog.cc \
+	common/main.cc \
 	common/test.cc \
 	\
 	tl/tl_test.cc
@@ -75,8 +72,7 @@ gtest_SOURCES = \
 noinst_HEADERS = \
 	common/gtest.h \
 	common/test.h \
-	common/test_helpers.h \
-	common/tap.h
+	common/test_helpers.h
 
 .PHONY: test test gdb valgrind fix_rpath ucc
 

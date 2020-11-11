@@ -1,5 +1,6 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2001-2019.  ALL RIGHTS RESERVED.
+# Copyright (C) Huawei Technologies Co., Ltd. 2020.  All rights reserved.
 #
 # See file LICENSE for terms.
 #

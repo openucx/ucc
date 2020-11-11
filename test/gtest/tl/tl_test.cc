@@ -7,4 +7,4 @@
 
 class test_tl : public ucc::test {};
 
-UCS_TEST_F(test_tl, dummy_test) { }
+UCC_TEST_F(test_tl, dummy_test) { }

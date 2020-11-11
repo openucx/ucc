@@ -5,8 +5,8 @@
  * See file LICENSE for terms.
  */
 
-#ifndef UCS_TEST_BASE_H
-#define UCS_TEST_BASE_H
+#ifndef UCC_TEST_BASE_H
+#define UCC_TEST_BASE_H
 
 /* gcc 4.3.4 compilation */
 #ifndef UINT8_MAX
@@ -19,12 +19,6 @@
 
 #include "test_helpers.h"
 
-/*
-#include <ucs/debug/log.h>
-#include <ucs/sys/preprocessor.h>
-#include <ucs/config/parser.h>
-*/
-
 #include <core/ucc_global_opts.h>
 
 #include <map>
@@ -34,40 +28,40 @@
 namespace ucc {
 
 /* These 10 definitions were grabbed from UCX's log_def.h ... consider importing */
-#define UCS_MAX_LOG_HANDLERS (32)
+#define UCC_MAX_LOG_HANDLERS (32)
 
 /**
  * Logging levels.
  */
 typedef enum {
-    UCS_LOG_LEVEL_FATAL,        /* Immediate termination */
-    UCS_LOG_LEVEL_ERROR,        /* Error is returned to the user */
-    UCS_LOG_LEVEL_WARN,         /* Something's wrong, but we continue */
-    UCS_LOG_LEVEL_DIAG,         /* Diagnostics, silent adjustments or internal error handling */
-    UCS_LOG_LEVEL_INFO,         /* Information */
-    UCS_LOG_LEVEL_DEBUG,        /* Low-volume debugging */
-    UCS_LOG_LEVEL_TRACE,        /* High-volume debugging */
-    UCS_LOG_LEVEL_TRACE_REQ,    /* Every send/receive request */
-    UCS_LOG_LEVEL_TRACE_DATA,   /* Data sent/received on the transport */
-    UCS_LOG_LEVEL_TRACE_ASYNC,  /* Asynchronous progress engine */
-    UCS_LOG_LEVEL_TRACE_FUNC,   /* Function calls */
-    UCS_LOG_LEVEL_TRACE_POLL,   /* Polling functions */
-    UCS_LOG_LEVEL_LAST,
-    UCS_LOG_LEVEL_PRINT         /* Temporary output */
-} ucs_log_level_t;
+    UCC_LOG_LEVEL_FATAL,        /* Immediate termination */
+    UCC_LOG_LEVEL_ERROR,        /* Error is returned to the user */
+    UCC_LOG_LEVEL_WARN,         /* Something's wrong, but we continue */
+    UCC_LOG_LEVEL_DIAG,         /* Diagnostics, silent adjustments or internal error handling */
+    UCC_LOG_LEVEL_INFO,         /* Information */
+    UCC_LOG_LEVEL_DEBUG,        /* Low-volume debugging */
+    UCC_LOG_LEVEL_TRACE,        /* High-volume debugging */
+    UCC_LOG_LEVEL_TRACE_REQ,    /* Every send/receive request */
+    UCC_LOG_LEVEL_TRACE_DATA,   /* Data sent/received on the transport */
+    UCC_LOG_LEVEL_TRACE_ASYNC,  /* Asynchronous progress engine */
+    UCC_LOG_LEVEL_TRACE_FUNC,   /* Function calls */
+    UCC_LOG_LEVEL_TRACE_POLL,   /* Polling functions */
+    UCC_LOG_LEVEL_LAST,
+    UCC_LOG_LEVEL_PRINT         /* Temporary output */
+} ucc_log_level_t;
 
 /**
  * Logging component.
  */
-typedef struct ucs_log_component_config {
-    ucs_log_level_t log_level;
+typedef struct ucc_log_component_config {
+    ucc_log_level_t log_level;
     char            name[16];
-} ucs_log_component_config_t;
+} ucc_log_component_config_t;
 
 typedef enum {
-    UCS_LOG_FUNC_RC_STOP,
-    UCS_LOG_FUNC_RC_CONTINUE
-} ucs_log_func_rc_t;
+    UCC_LOG_FUNC_RC_STOP,
+    UCC_LOG_FUNC_RC_CONTINUE
+} ucc_log_func_rc_t;
 
 /**
  * Function type for handling log messages.
@@ -80,34 +74,34 @@ typedef enum {
  * @param message   Log message - format string.
  * @param ap        Log message format parameters.
  *
- * @return UCS_LOG_FUNC_RC_CONTINUE - continue to next log handler.
- *         UCS_LOG_FUNC_RC_STOP     - don't continue.
+ * @return UCC_LOG_FUNC_RC_CONTINUE - continue to next log handler.
+ *         UCC_LOG_FUNC_RC_STOP     - don't continue.
  */
-typedef ucs_log_func_rc_t (*ucs_log_func_t)(const char *file, unsigned line,
-                                            const char *function, ucs_log_level_t level,
-                                            const ucs_log_component_config_t *comp_conf,
+typedef ucc_log_func_rc_t (*ucc_log_func_t)(const char *file, unsigned line,
+                                            const char *function, ucc_log_level_t level,
+                                            const ucc_log_component_config_t *comp_conf,
                                             const char *message, va_list ap);
 
-static unsigned ucs_log_handlers_count = 0;
-static ucs_log_func_t ucs_log_handlers[UCS_MAX_LOG_HANDLERS];
+static unsigned ucc_log_handlers_count = 0;
+static ucc_log_func_t ucc_log_handlers[UCC_MAX_LOG_HANDLERS];
 
-static inline void ucs_log_push_handler(ucs_log_func_t handler)
+static inline void ucc_log_push_handler(ucc_log_func_t handler)
 {
-    if (ucs_log_handlers_count < UCS_MAX_LOG_HANDLERS) {
-        ucs_log_handlers[ucs_log_handlers_count++] = handler;
+    if (ucc_log_handlers_count < UCC_MAX_LOG_HANDLERS) {
+        ucc_log_handlers[ucc_log_handlers_count++] = handler;
     }
 }
 
-static inline void ucs_log_pop_handler()
+static inline void ucc_log_pop_handler()
 {
-    if (ucs_log_handlers_count > 0) {
-        --ucs_log_handlers_count;
+    if (ucc_log_handlers_count > 0) {
+        --ucc_log_handlers_count;
     }
 }
 
-static inline unsigned ucs_log_num_handlers()
+static inline unsigned ucc_log_num_handlers()
 {
-    return ucs_log_handlers_count;
+    return ucc_log_handlers_count;
 }
 
 /**
@@ -125,27 +119,14 @@ public:
     test_base();
     virtual ~test_base();
 
-    void set_num_threads(unsigned num_threads);
-    unsigned num_threads() const;
-
-/* TODO: uncomment when config-related functions are added to UCC core
-    void get_config(const std::string& name, std::string& value,
-                            size_t max);
-    virtual void set_config(const std::string& config_str);
-    virtual void modify_config(const std::string& name, const std::string& value,
-                               modify_config_mode_t mode = FAIL_IF_NOT_EXIST);
-    virtual void push_config();
-    virtual void pop_config();
-*/
-
 protected:
     class scoped_log_handler {
     public:
-        scoped_log_handler(ucs_log_func_t handler) {
-            ucs_log_push_handler(handler);
+        scoped_log_handler(ucc_log_func_t handler) {
+            ucc_log_push_handler(handler);
         }
         ~scoped_log_handler() {
-            ucs_log_pop_handler();
+            ucc_log_pop_handler();
         }
     };
 
@@ -168,28 +149,28 @@ protected:
 
     virtual void test_body() = 0;
 
-    static ucs_log_func_rc_t
+    static ucc_log_func_rc_t
     count_warns_logger(const char *file, unsigned line, const char *function,
-                       ucs_log_level_t level,
-                       const ucs_log_component_config_t *comp_conf,
+                       ucc_log_level_t level,
+                       const ucc_log_component_config_t *comp_conf,
                        const char *message, va_list ap);
 
-    static ucs_log_func_rc_t
+    static ucc_log_func_rc_t
     hide_errors_logger(const char *file, unsigned line, const char *function,
-                       ucs_log_level_t level,
-                       const ucs_log_component_config_t *comp_conf,
+                       ucc_log_level_t level,
+                       const ucc_log_component_config_t *comp_conf,
                        const char *message, va_list ap);
 
-    static ucs_log_func_rc_t
+    static ucc_log_func_rc_t
     hide_warns_logger(const char *file, unsigned line, const char *function,
-                      ucs_log_level_t level,
-                      const ucs_log_component_config_t *comp_conf,
+                      ucc_log_level_t level,
+                      const ucc_log_component_config_t *comp_conf,
                       const char *message, va_list ap);
 
-    static ucs_log_func_rc_t
+    static ucc_log_func_rc_t
     wrap_errors_logger(const char *file, unsigned line, const char *function,
-                       ucs_log_level_t level,
-                       const ucs_log_component_config_t *comp_conf,
+                       ucc_log_level_t level,
+                       const ucc_log_component_config_t *comp_conf,
                        const char *message, va_list ap);
 
     unsigned num_errors();
@@ -198,9 +179,7 @@ protected:
 
     state_t                         m_state;
     bool                            m_initialized;
-    unsigned                        m_num_threads;
     config_stack_t                  m_config_stack;
-    ptr_vector<scoped_setenv>       m_env_stack;
     int                             m_num_valgrind_errors_before;
     unsigned                        m_num_errors_before;
     unsigned                        m_num_warnings_before;
@@ -225,7 +204,7 @@ private:
     pthread_barrier_t    m_barrier;
 };
 
-#define UCS_TEST_BASE_IMPL \
+#define UCC_TEST_BASE_IMPL \
     virtual void SetUp() { \
         test_base::SetUpProxy(); \
     } \
@@ -242,7 +221,7 @@ private:
  */
 class test : public testing::Test, public test_base {
 public:
-    UCS_TEST_BASE_IMPL;
+    UCC_TEST_BASE_IMPL;
 };
 
 /*
@@ -251,68 +230,28 @@ public:
 template <typename T>
 class test_with_param : public testing::TestWithParam<T>, public test_base {
 public:
-    UCS_TEST_BASE_IMPL;
-};
-
-/**
- * UCT/UCP/UCG tests common storage for tests entities
- */
-template <typename T>
-class entities_storage {
-public:
-    const ucc::ptr_vector<T>& entities() const {
-        return m_entities;
-    }
-
-    T& sender() {
-        return *m_entities.front();
-    }
-
-    T& receiver() {
-        return *m_entities.back();
-    }
-
-    T& e(size_t idx) {
-        return m_entities.at(idx);
-    }
-
-    bool is_loopback() {
-        return &sender() == &receiver();
-    }
-
-    void skip_loopback() {
-        if (is_loopback()) {
-            UCS_TEST_SKIP_R("loopback");
-        }
-    }
-
-    ucc::ptr_vector<T> m_entities;
+    UCC_TEST_BASE_IMPL;
 };
 
 }
 
-#define UCS_TEST_SET_CONFIG(_dummy, _config) \
-    set_config(_config);
-
 /*
  * Helper macro
  */
-#define UCS_TEST_(test_case_name, test_name, parent_id, \
+#define UCC_TEST_(test_case_name, test_name, parent_id, \
                   num_threads, skip_cond, skip_reason, ...) \
 class GTEST_TEST_CLASS_NAME_(test_case_name, test_name) : public test_case_name { \
  public: \
   GTEST_TEST_CLASS_NAME_(test_case_name, test_name)() { \
-     set_num_threads(num_threads); \
   } \
  protected: \
   virtual void init() { \
-      UCS_PP_FOREACH(UCS_TEST_SET_CONFIG, _, __VA_ARGS__) \
-	  test_case_name::init(); \
+      test_case_name::init(); \
   } \
  private: \
   virtual void check_skip_test() { \
       if (skip_cond) { \
-          UCS_TEST_SKIP_R(skip_reason); \
+          UCC_TEST_SKIP_R(skip_reason); \
       } \
   } \
   virtual void test_body(); \
@@ -328,8 +267,8 @@ class GTEST_TEST_CLASS_NAME_(test_case_name, test_name) : public test_case_name 
         (num_threads == 1) ? #test_name : #test_name "/mt_" #num_threads, \
         "", "", \
         (parent_id), \
-		test_case_name::SetUpTestCase, \
-		test_case_name::TearDownTestCase, \
+        test_case_name::SetUpTestCase, \
+        test_case_name::TearDownTestCase, \
         new ::testing::internal::TestFactoryImpl< \
             GTEST_TEST_CLASS_NAME_(test_case_name, test_name)>); \
 void GTEST_TEST_CLASS_NAME_(test_case_name, test_name)::test_body()
@@ -338,8 +277,8 @@ void GTEST_TEST_CLASS_NAME_(test_case_name, test_name)::test_body()
 /*
  * Define test fixture with modified configuration
  */
-#define UCS_TEST_F(test_fixture, test_name, ...) \
-  UCS_TEST_(test_fixture, test_name, \
+#define UCC_TEST_F(test_fixture, test_name, ...) \
+  UCC_TEST_(test_fixture, test_name, \
             ::testing::internal::GetTypeId<test_fixture>(), \
             1, 0, "", __VA_ARGS__)
 
@@ -347,8 +286,8 @@ void GTEST_TEST_CLASS_NAME_(test_case_name, test_name)::test_body()
 /*
  * Define test fixture with modified configuration and check skip condition
  */
-#define UCS_TEST_SKIP_COND_F(test_fixture, test_name, skip_cond, ...) \
-  UCS_TEST_(test_fixture, test_name, \
+#define UCC_TEST_SKIP_COND_F(test_fixture, test_name, skip_cond, ...) \
+  UCC_TEST_(test_fixture, test_name, \
             ::testing::internal::GetTypeId<test_fixture>(), \
             1, skip_cond, #skip_cond, __VA_ARGS__)
 
@@ -356,8 +295,8 @@ void GTEST_TEST_CLASS_NAME_(test_case_name, test_name)::test_body()
 /*
  * Define test fixture with multiple threads
  */
-#define UCS_MT_TEST_F(test_fixture, test_name, num_threads, ...) \
-  UCS_TEST_(test_fixture, test_name, \
+#define UCC_MT_TEST_F(test_fixture, test_name, num_threads, ...) \
+  UCC_TEST_(test_fixture, test_name, \
             ::testing::internal::GetTypeId<test_fixture>(), \
             num_threads, 0, "", __VA_ARGS__)
 
@@ -365,7 +304,7 @@ void GTEST_TEST_CLASS_NAME_(test_case_name, test_name)::test_body()
 /*
  * Helper macro
  */
-#define UCS_TEST_P_(test_case_name, test_name, num_threads, \
+#define UCC_TEST_P_(test_case_name, test_name, num_threads, \
                     skip_cond, skip_reason, ...) \
   class GTEST_TEST_CLASS_NAME_(test_case_name, test_name) \
       : public test_case_name { \
@@ -376,13 +315,13 @@ void GTEST_TEST_CLASS_NAME_(test_case_name, test_name)::test_body()
     virtual void test_body(); \
    protected: \
     virtual void init() { \
-        UCS_PP_FOREACH(UCS_TEST_SET_CONFIG, _, __VA_ARGS__) \
-		test_case_name::init(); \
+        UCC_PP_FOREACH(UCC_TEST_SET_CONFIG, _, __VA_ARGS__) \
+        test_case_name::init(); \
     } \
    private: \
     virtual void check_skip_test() { \
         if (skip_cond) { \
-            UCS_TEST_SKIP_R(skip_reason); \
+            UCC_TEST_SKIP_R(skip_reason); \
         } \
     } \
     static int AddToRegistry() { \
@@ -408,21 +347,21 @@ void GTEST_TEST_CLASS_NAME_(test_case_name, test_name)::test_body()
 /*
  * Define parameterized test with modified configuration
  */
-#define UCS_TEST_P(test_case_name, test_name, ...) \
-    UCS_TEST_P_(test_case_name, test_name, 1, 0, "", __VA_ARGS__)
+#define UCC_TEST_P(test_case_name, test_name, ...) \
+    UCC_TEST_P_(test_case_name, test_name, 1, 0, "", __VA_ARGS__)
 
 
 /*
  * Define parameterized test with modified configuration and check skip condition
  */
-#define UCS_TEST_SKIP_COND_P(test_case_name, test_name, skip_cond, ...) \
-    UCS_TEST_P_(test_case_name, test_name, 1, skip_cond, #skip_cond, __VA_ARGS__)
+#define UCC_TEST_SKIP_COND_P(test_case_name, test_name, skip_cond, ...) \
+    UCC_TEST_P_(test_case_name, test_name, 1, skip_cond, #skip_cond, __VA_ARGS__)
 
 
 /*
  * Define parameterized test with multiple threads
  */
-#define UCS_MT_TEST_P(test_case_name, test_name, num_threads, ...) \
-    UCS_TEST_P_(test_case_name, test_name, num_threads, 0, "", __VA_ARGS__)
+#define UCC_MT_TEST_P(test_case_name, test_name, num_threads, ...) \
+    UCC_TEST_P_(test_case_name, test_name, num_threads, 0, "", __VA_ARGS__)
 
 #endif
