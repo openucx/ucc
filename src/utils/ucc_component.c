@@ -17,17 +17,21 @@
 #include <unistd.h>
 #include <assert.h>
 
-#define IFACE_NAME_LEN (UCC_MAX_FRAMEWORK_NAME_LEN + UCC_MAX_COMPONENT_NAME_LEN)
+#define IFACE_NAME_LEN_MAX                                                     \
+    (UCC_MAX_FRAMEWORK_NAME_LEN + UCC_MAX_COMPONENT_NAME_LEN + 32)
 
 static ucc_status_t ucc_component_load_one(const char *so_path,
-                                           const char *framework_pattern,
+                                           const char *framework_name,
                                            ucc_component_iface_t **c_iface)
 {
-    char                  *error, iface_struct[IFACE_NAME_LEN];
+    char                   framework_pattern[UCC_MAX_FRAMEWORK_NAME_LEN + 16];
+    char                  *error, iface_struct[IFACE_NAME_LEN_MAX];
     void                  *handle;
     ucc_component_iface_t *iface;
     size_t                 basename_start, iface_struct_name_len;
 
+    ucc_snprintf_safe(framework_pattern, sizeof(framework_pattern), "ucc_%s_",
+                      framework_name);
     basename_start =
         ((ptrdiff_t)strstr(so_path, framework_pattern) - (ptrdiff_t)so_path);
     if (basename_start < 0) {
@@ -73,7 +77,7 @@ ucc_status_t ucc_components_load(const char *framework_name,
 {
     glob_t globbuf;
     int    i, n_loaded;
-    char  *full_pattern, framework_pattern[UCC_MAX_FRAMEWORK_NAME_LEN + 16];
+    char  *full_pattern;
     ucc_status_t            status;
     size_t                  pattern_size;
     ucc_component_iface_t **ifaces = NULL;
@@ -87,8 +91,6 @@ ucc_status_t ucc_components_load(const char *framework_name,
                   framework_name, strlen(framework_name));
         return UCC_ERR_INVALID_PARAM;
     }
-    ucc_snprintf_safe(framework_pattern, sizeof(framework_pattern), "ucc_%s_",
-                      framework_name);
 
     pattern_size =
         strlen(ucc_global_config.component_path) + strlen(framework_name) + 16;
@@ -98,7 +100,7 @@ ucc_status_t ucc_components_load(const char *framework_name,
                   pattern_size);
         return UCC_ERR_NO_MEMORY;
     }
-    ucc_snprintf_safe(full_pattern, pattern_size, "%s/ucc_%s_*.so",
+    ucc_snprintf_safe(full_pattern, pattern_size, "%s/libucc_%s_*.so",
                       ucc_global_config.component_path, framework_name);
     glob(full_pattern, 0, NULL, &globbuf);
     free(full_pattern);
@@ -114,7 +116,7 @@ ucc_status_t ucc_components_load(const char *framework_name,
     }
 
     for (i = 0; i < globbuf.gl_pathc; i++) {
-        status = ucc_component_load_one(globbuf.gl_pathv[i], framework_pattern,
+        status = ucc_component_load_one(globbuf.gl_pathv[i], framework_name,
                                         &ifaces[n_loaded]);
         if (status != UCC_OK) {
             continue;
