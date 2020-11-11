@@ -5,7 +5,7 @@
 
 AC_DEFUN([CHECK_UCX],[
 UCX_MIN_REQUIRED_MAJOR=1
-UCX_MIN_REQUIRED_MINOR=9
+UCX_MIN_REQUIRED_MINOR=10
 AS_IF([test "x$ucx_checked" != "xyes"],[
     ucx_happy="no"
 
