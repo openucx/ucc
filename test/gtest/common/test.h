@@ -27,83 +27,6 @@
 
 namespace ucc {
 
-/* These 10 definitions were grabbed from UCX's log_def.h ... consider importing */
-#define UCC_MAX_LOG_HANDLERS (32)
-
-/**
- * Logging levels.
- */
-typedef enum {
-    UCC_LOG_LEVEL_FATAL,        /* Immediate termination */
-    UCC_LOG_LEVEL_ERROR,        /* Error is returned to the user */
-    UCC_LOG_LEVEL_WARN,         /* Something's wrong, but we continue */
-    UCC_LOG_LEVEL_DIAG,         /* Diagnostics, silent adjustments or internal error handling */
-    UCC_LOG_LEVEL_INFO,         /* Information */
-    UCC_LOG_LEVEL_DEBUG,        /* Low-volume debugging */
-    UCC_LOG_LEVEL_TRACE,        /* High-volume debugging */
-    UCC_LOG_LEVEL_TRACE_REQ,    /* Every send/receive request */
-    UCC_LOG_LEVEL_TRACE_DATA,   /* Data sent/received on the transport */
-    UCC_LOG_LEVEL_TRACE_ASYNC,  /* Asynchronous progress engine */
-    UCC_LOG_LEVEL_TRACE_FUNC,   /* Function calls */
-    UCC_LOG_LEVEL_TRACE_POLL,   /* Polling functions */
-    UCC_LOG_LEVEL_LAST,
-    UCC_LOG_LEVEL_PRINT         /* Temporary output */
-} ucc_log_level_t;
-
-/**
- * Logging component.
- */
-typedef struct ucc_log_component_config {
-    ucc_log_level_t log_level;
-    char            name[16];
-} ucc_log_component_config_t;
-
-typedef enum {
-    UCC_LOG_FUNC_RC_STOP,
-    UCC_LOG_FUNC_RC_CONTINUE
-} ucc_log_func_rc_t;
-
-/**
- * Function type for handling log messages.
- *
- * @param file      Source file name.
- * @param line      Source line number.
- * @param function  Function name.
- * @param level     Log level.
- * @param comp_conf Component specific log config.
- * @param message   Log message - format string.
- * @param ap        Log message format parameters.
- *
- * @return UCC_LOG_FUNC_RC_CONTINUE - continue to next log handler.
- *         UCC_LOG_FUNC_RC_STOP     - don't continue.
- */
-typedef ucc_log_func_rc_t (*ucc_log_func_t)(const char *file, unsigned line,
-                                            const char *function, ucc_log_level_t level,
-                                            const ucc_log_component_config_t *comp_conf,
-                                            const char *message, va_list ap);
-
-static unsigned ucc_log_handlers_count = 0;
-static ucc_log_func_t ucc_log_handlers[UCC_MAX_LOG_HANDLERS];
-
-static inline void ucc_log_push_handler(ucc_log_func_t handler)
-{
-    if (ucc_log_handlers_count < UCC_MAX_LOG_HANDLERS) {
-        ucc_log_handlers[ucc_log_handlers_count++] = handler;
-    }
-}
-
-static inline void ucc_log_pop_handler()
-{
-    if (ucc_log_handlers_count > 0) {
-        --ucc_log_handlers_count;
-    }
-}
-
-static inline unsigned ucc_log_num_handlers()
-{
-    return ucc_log_handlers_count;
-}
-
 /**
  * Base class for tests
  */
@@ -120,16 +43,6 @@ public:
     virtual ~test_base();
 
 protected:
-    class scoped_log_handler {
-    public:
-        scoped_log_handler(ucc_log_func_t handler) {
-            ucc_log_push_handler(handler);
-        }
-        ~scoped_log_handler() {
-            ucc_log_pop_handler();
-        }
-    };
-
     typedef enum {
         NEW, RUNNING, SKIPPED, ABORTED, FINISHED
     } state_t;
@@ -149,48 +62,18 @@ protected:
 
     virtual void test_body() = 0;
 
-    static ucc_log_func_rc_t
-    count_warns_logger(const char *file, unsigned line, const char *function,
-                       ucc_log_level_t level,
-                       const ucc_log_component_config_t *comp_conf,
-                       const char *message, va_list ap);
-
-    static ucc_log_func_rc_t
-    hide_errors_logger(const char *file, unsigned line, const char *function,
-                       ucc_log_level_t level,
-                       const ucc_log_component_config_t *comp_conf,
-                       const char *message, va_list ap);
-
-    static ucc_log_func_rc_t
-    hide_warns_logger(const char *file, unsigned line, const char *function,
-                      ucc_log_level_t level,
-                      const ucc_log_component_config_t *comp_conf,
-                      const char *message, va_list ap);
-
-    static ucc_log_func_rc_t
-    wrap_errors_logger(const char *file, unsigned line, const char *function,
-                       ucc_log_level_t level,
-                       const ucc_log_component_config_t *comp_conf,
-                       const char *message, va_list ap);
-
     unsigned num_errors();
-
-    unsigned num_warnings();
 
     state_t                         m_state;
     bool                            m_initialized;
     config_stack_t                  m_config_stack;
     int                             m_num_valgrind_errors_before;
     unsigned                        m_num_errors_before;
-    unsigned                        m_num_warnings_before;
     unsigned                        m_num_log_handlers_before;
 
     static pthread_mutex_t          m_logger_mutex;
     static unsigned                 m_total_errors;
-    static unsigned                 m_total_warnings;
     static std::vector<std::string> m_errors;
-    static std::vector<std::string> m_warnings;
-    static std::vector<std::string> m_first_warns_and_errors;
 
 private:
     void skipped(const test_skip_exception& e);
