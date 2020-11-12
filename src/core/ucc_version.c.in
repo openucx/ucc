@@ -1,0 +1,18 @@
+/*
+* Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+* See file LICENSE for terms.
+*/
+
+
+void ucc_get_version(unsigned *major_version, unsigned *minor_version,
+                     unsigned *release_number)
+{
+    *major_version  = @MAJOR_VERSION@;
+    *minor_version  = @MINOR_VERSION@;
+    *release_number = @PATCH_VERSION@;
+}
+
+const char *ucc_get_version_string()
+{
+	return "@MAJOR_VERSION@.@MINOR_VERSION@.@PATCH_VERSION@";
+}

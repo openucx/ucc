@@ -139,3 +139,15 @@ ucc_status_t ucc_components_load(const char *framework_name,
         return UCC_ERR_NOT_FOUND;
     }
 }
+
+ucc_component_iface_t* ucc_get_component(ucc_component_framework_t *framework,
+                                         const char *component_name)
+{
+    int i;
+    for (i = 0; i < framework->n_components; i++) {
+        if (0 == strcmp(framework->components[i]->name, component_name)) {
+            return framework->components[i];
+        }
+    }
+    return NULL;
+}

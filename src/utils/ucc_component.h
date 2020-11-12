@@ -13,6 +13,7 @@
 #define UCC_MAX_COMPONENT_NAME_LEN 64
 
 typedef struct ucc_component_iface {
+    const char *name;
     void *dl_handle;
 } ucc_component_iface_t;
 
@@ -31,4 +32,10 @@ typedef struct ucc_component_framework {
    ucc_<framework_name>_<component_name>. */
 ucc_status_t ucc_components_load(const char *framework_name,
                                  ucc_component_framework_t *framework);
+
+/* get the component_iface_t from the initialized framework
+   using the iface name. Returns NULL if the iface with the given
+   name is not found in the framework. */
+ucc_component_iface_t* ucc_get_component(ucc_component_framework_t *framework,
+                                         const char *component_name);
 #endif

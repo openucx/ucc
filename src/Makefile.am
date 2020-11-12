@@ -22,12 +22,16 @@ noinst_HEADERS =             \
 	utils/ucc_log.h          \
 	utils/ucc_parser.h       \
 	utils/ucc_component.h    \
-	utils/ucc_datastruct.h
+	utils/ucc_datastruct.h   \
+	utils/ucc_math.h         \
+	cl/ucc_cl.h
 
 libucc_la_SOURCES =        \
 	core/ucc_lib.c         \
 	core/ucc_constructor.c \
 	core/ucc_global_opts.c \
-	utils/ucc_component.c
+	core/ucc_version.c     \
+	utils/ucc_component.c  \
+	cl/ucc_cl.c
 
 libucc_ladir = $(includedir)
