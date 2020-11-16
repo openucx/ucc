@@ -14,6 +14,7 @@
 #include "ucc_cl_type.h"
 #include "utils/ucc_component.h"
 #include "utils/ucc_parser.h"
+#include "utils/ucc_class.h"
 
 typedef struct ucc_cl_lib   ucc_cl_lib_t;
 typedef struct ucc_cl_iface ucc_cl_iface_t;
@@ -39,23 +40,14 @@ typedef struct ucc_cl_iface {
                                            ucc_cl_lib_t **cl_lib);
     ucc_status_t                   (*finalize)(ucc_cl_lib_t *cl_lib);
 } ucc_cl_iface_t;
+UCC_CLASS_DECLARE(ucc_cl_iface_t);
 
 typedef struct ucc_cl_lib {
     ucc_cl_iface_t             *iface;
     ucc_log_component_config_t  log_component;
     int                         priority;
 } ucc_cl_lib_t;
-
-/* Every component should call this init function during (*init) in order
-   to use common priority/logging mechanism */
-static inline void ucc_cl_lib_init(ucc_cl_lib_t *cl_lib, ucc_cl_iface_t *cl_iface,
-                                   const ucc_cl_lib_config_t *cl_config)
-{
-    cl_lib->log_component = cl_config->log_component;
-    ucc_strncpy_safe(cl_lib->log_component.name, cl_iface->cl_lib_config.name,
-                     sizeof(cl_lib->log_component.name));
-    cl_lib->priority =
-        (-1 == cl_config->priority) ? cl_iface->priority : cl_config->priority;
-}
+UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_lib_config_t *,
+                  const ucc_cl_lib_config_t *);
 
 #endif

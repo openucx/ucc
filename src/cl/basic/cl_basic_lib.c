@@ -15,40 +15,41 @@ static ucc_config_field_t ucc_cl_basic_lib_config_table[] = {
     {NULL}
 };
 
-static ucc_status_t ucc_basic_lib_init(const ucc_lib_params_t *params,
-                                       const ucc_lib_config_t *config,
-                                       const ucc_cl_lib_config_t *cl_config,
-                                       ucc_cl_lib_t **cl_lib)
+UCC_CLASS_INIT_FUNC(ucc_cl_basic_lib_t, ucc_cl_iface_t *cl_iface,
+                    const ucc_lib_config_t *config,
+                    const ucc_cl_lib_config_t *cl_config)
 {
-    ucc_cl_basic_lib_t *lib;
-    ucc_status_t        status;
-    lib = (ucc_cl_basic_lib_t *)ucc_malloc(sizeof(*lib), "basic_lib");
-    ucc_cl_lib_init(&lib->super, &ucc_cl_basic.super, cl_config);
-    if (!lib) {
-        cl_error(&lib->super, "failed to allocate %zd bytes for lib object",
-                 sizeof(*lib));
-        status = UCC_ERR_NO_MEMORY;
-        goto error;
-    }
-    lib->super.iface = &ucc_cl_basic.super;
-    cl_info(&lib->super, "initialized lib object: %p", lib);
-    *cl_lib = &lib->super;
+    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_lib_t, cl_iface, config, cl_config);
+    cl_info(&self->super, "initialized lib object: %p", self);
     return UCC_OK;
-
-error:
-    return status;
 }
 
-static ucc_status_t ucc_basic_lib_finalize(ucc_cl_lib_t *cl_lib)
+UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_lib_t)
+{
+    cl_info(&self->super, "finalizing lib object: %p", self);
+}
+
+UCC_CLASS_DEFINE(ucc_cl_basic_lib_t, ucc_cl_lib_t);
+
+static ucc_status_t ucc_cl_basic_lib_init(const ucc_lib_params_t *params,
+                                          const ucc_lib_config_t *config,
+                                          const ucc_cl_lib_config_t *cl_config,
+                                          ucc_cl_lib_t **cl_lib)
+{
+    return UCC_CLASS_NEW(ucc_cl_basic_lib_t, cl_lib, &ucc_cl_basic.super,
+                         config, cl_config);
+}
+
+static ucc_status_t ucc_cl_basic_lib_finalize(ucc_cl_lib_t *cl_lib)
 {
     ucc_cl_basic_lib_t *lib = ucc_derived_of(cl_lib, ucc_cl_basic_lib_t);
-    cl_info(cl_lib, "finalizing lib object: %p", lib);
-    free(lib);
+    UCC_CLASS_DELETE(ucc_cl_basic_lib_t, lib);
     return UCC_OK;
 }
 
 ucc_cl_basic_iface_t ucc_cl_basic = {
     .super.super.name = "basic",
+    .super.type       = UCC_CL_BASIC,
     .super.priority   = 10,
     .super.cl_lib_config =
         {
@@ -57,6 +58,6 @@ ucc_cl_basic_iface_t ucc_cl_basic = {
             .table  = ucc_cl_basic_lib_config_table,
             .size   = sizeof(ucc_cl_basic_lib_config_t),
         },
-    .super.init     = ucc_basic_lib_init,
-    .super.finalize = ucc_basic_lib_finalize,
+    .super.init     = ucc_cl_basic_lib_init,
+    .super.finalize = ucc_cl_basic_lib_finalize,
 };
