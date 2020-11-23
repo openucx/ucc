@@ -263,27 +263,28 @@ typedef enum {
 /**
  *  @ingroup UCC_COLLECTIVES
  *
- *  @brief The reduction wrapper provides a method to map custom user types to higher level
- *  programming model datatypes
+ *  @brief The reduction wrapper provides an interface for the UCC library to invoke
+ *         user-defined custom reduction callback
  *
  *  @param [in]  invec          The input elements to be reduced by the user function
  *  @param [in]  inoutvec       The input elements to be reduced and output of the reduction
  *  @param [in]  count          The number of elements of type "dtype" to be reduced
- *  @param [in]  dtype          Datatype passed to the reduction operation
+ *  @param [in]  dtype          Datatype specified in the coll_args
+ *  @param [in]  custom_op      A pointer to the user defined reduction passed to the coll_args as custom_reduction_op
  *
  *
  *  @parblock
  *
  *  @b Description
  *
- *  This function is called by the UCC library before calling the user-defined reduction.
- *  Hence, the signature of this function is same as ucc_userdefined_reductions_op_t.
- *  It maps the custom user types to higher level programming model datatypes (such as MPI datatypes)
+ *  This function is called by the UCC library when it needs to perform a non-standard
+ *  user-defined reduction operaion during allreduce/reduce collective.
  *
  *  @endparblock
  */
-typedef void(*ucc_reduction_dtype_mapper_t)(void *invec, void *inoutvec,
-                                            ucc_count_t *count, ucc_datatype_t dtype);
+typedef void(*ucc_reduction_wrapper_t)(void *invec, void *inoutvec,
+                                       ucc_count_t *count, void *dtype,
+                                       void *custom_reduction_op);
 
 /**
  * @brief UCC library initialization parameters
@@ -333,12 +334,12 @@ enum ucc_lib_attr_field{
  *
  */
 typedef struct ucc_lib_params {
-    uint64_t                     mask;
-    ucc_thread_mode_t            thread_mode;
-    uint64_t                     coll_types;
-    uint64_t                     reduction_types;
-    ucc_coll_sync_type_t         sync_type;
-    ucc_reduction_dtype_mapper_t reduction_mapper;
+    uint64_t                mask;
+    ucc_thread_mode_t       thread_mode;
+    uint64_t                coll_types;
+    uint64_t                reduction_types;
+    ucc_coll_sync_type_t    sync_type;
+    ucc_reduction_wrapper_t reduction_wrapper;
 } ucc_lib_params_t;
 
 /**
@@ -1313,29 +1314,6 @@ typedef enum {
 } ucc_error_type_t;
 
 /**
- *  @ingroup UCC_COLLECTIVES
- *
- *  @brief The user-defined reduction function signature.
- *
- *  @param [in]  invec          The input elements to be reduced by the user function
- *  @param [in]  inoutvec       The input elements to be reduced and output of the reduction
- *  @param [in]  count          The number of elements of type "dtype" to be reduced
- *  @param [in]  dtype          Datatype passed to the reduction operation
- *
- *  @parblock
- *
- *  @b Description
- *
- *  @ref ucc_userdefined_reduction_op_t is a reduction operation signature for
- *  user-defined reductions. The signature closely follows the MPI signature.
- *
- *  @endparblock
- *
- */
-typedef void(*ucc_userdefined_reduction_op_t)(void *invec, void *inoutvec,
-                                              ucc_count_t *count,
-                                              ucc_datatype_t dtype);
-/**
  *  @ingroup UCC_COLLECTIVES_DT
  */
 enum ucc_coll_op_args_field {
@@ -1383,15 +1361,14 @@ typedef struct ucc_coll_op_args {
                                                 */
     ucc_coll_buffer_info_t          buffer_info; /*!< Buffer info for the
                                                    collective */
-    ucc_reduction_op_t              predefined_reduction_op; /*!< Reduction
-                                                               operation, if
-                                                               reduce or
-                                                               all-reduce
-                                                               operation
-                                                               selected */
-    ucc_userdefined_reduction_op_t  custom_reduction_op; /*!< User defined
-                                                           reduction operation
-                                                          */
+    struct {
+        ucc_reduction_op_t          predefined_op; /*!< Reduction operation, if
+                                                        reduce or all-reduce
+                                                        operation selected */
+        void                       *custom_op; /*!< User defined
+                                                    reduction operation */
+        void                       *custom_dtype;
+    } reduce;
     ucc_error_type_t                error_type; /*!< Error type */
     ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
     uint64_t                        root; /*!< Root endpoint for rooted
