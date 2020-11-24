@@ -24,7 +24,7 @@ typedef struct ucc_component_framework {
 } ucc_component_framework_t;
 
 /* ucc_components_load searches for all available dynamic components 
-   with the name matching the pattern: ucc_<framework_name>_*.so. 
+   with the name matching the pattern: libucc_<framework_name>_*.so.
    The search is performed in the ucc_global_config.component_path.
    Each dynamic component must have a component interface structure defined.
    This structure must inherit from ucc_component_iface_t.

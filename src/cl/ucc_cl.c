@@ -28,3 +28,22 @@ const char *ucc_cl_names[] = {
     [UCC_CL_ALL]   = "all",
     [UCC_CL_LAST]  = NULL
 };
+
+UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
+                    const ucc_lib_config_t *config,
+                    const ucc_cl_lib_config_t *cl_config)
+{
+    self->iface         = cl_iface;
+    self->log_component = cl_config->log_component;
+    ucc_strncpy_safe(self->log_component.name, cl_iface->cl_lib_config.name,
+                     sizeof(self->log_component.name));
+    self->priority =
+        (-1 == cl_config->priority) ? cl_iface->priority : cl_config->priority;
+    return UCC_OK;
+}
+
+UCC_CLASS_CLEANUP_FUNC(ucc_cl_lib_t)
+{
+}
+
+UCC_CLASS_DEFINE(ucc_cl_lib_t, void);

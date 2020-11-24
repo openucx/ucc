@@ -14,6 +14,7 @@
 #include "ucc_cl_type.h"
 #include "utils/ucc_component.h"
 #include "utils/ucc_parser.h"
+#include "utils/ucc_class.h"
 
 typedef struct ucc_cl_lib   ucc_cl_lib_t;
 typedef struct ucc_cl_iface ucc_cl_iface_t;
@@ -39,11 +40,14 @@ typedef struct ucc_cl_iface {
                                            ucc_cl_lib_t **cl_lib);
     ucc_status_t                   (*finalize)(ucc_cl_lib_t *cl_lib);
 } ucc_cl_iface_t;
+UCC_CLASS_DECLARE(ucc_cl_iface_t);
 
 typedef struct ucc_cl_lib {
     ucc_cl_iface_t             *iface;
     ucc_log_component_config_t  log_component;
     int                         priority;
 } ucc_cl_lib_t;
+UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_lib_config_t *,
+                  const ucc_cl_lib_config_t *);
 
 #endif

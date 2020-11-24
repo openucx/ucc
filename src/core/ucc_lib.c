@@ -133,12 +133,6 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *user_params,
                 continue;
             }
         }
-        cl_lib->log_component = cl_config->log_component;
-        ucc_strncpy_safe(cl_lib->log_component.name,
-                         cl_iface->cl_lib_config.prefix,
-                         sizeof(cl_lib->log_component.name));
-        cl_lib->priority = (-1 == cl_config->priority) ? cl_iface->priority
-                                                       : cl_config->priority;
         ucc_config_parser_release_opts(cl_config,
                                        cl_iface->cl_lib_config.table);
         free(cl_config);
