@@ -47,16 +47,16 @@
 /* UCS error check */
 #define EXPECT_UCC_OK(_expr) \
     do { \
-        ucs_status_t _status = (_expr); \
-        EXPECT_EQ(UCC_OK, _status) << "Error: " << ucs_status_string(_status); \
+        ucc_status_t _status = (_expr); \
+        EXPECT_EQ(UCC_OK, _status) << "Error: " << ucc_status_string(_status); \
     } while (0)
 
 
 #define ASSERT_UCC_OK(_expr, ...) \
     do { \
-        ucs_status_t _status = (_expr); \
+        ucc_status_t _status = (_expr); \
         if ((_status) != UCC_OK) { \
-            UCC_TEST_ABORT("Error: " << ucs_status_string(_status)  __VA_ARGS__); \
+            UCC_TEST_ABORT("Error: " << ucc_status_string(_status)  __VA_ARGS__); \
         } \
     } while (0)
 
