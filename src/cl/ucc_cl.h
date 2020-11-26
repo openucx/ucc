@@ -63,4 +63,25 @@ typedef struct ucc_cl_context {
     ucc_cl_lib_t *cl_lib;
 } ucc_cl_context_t;
 
+#define UCC_CL_IFACE_NAME_PREFIX(_NAME)                 \
+    .name   = UCC_PP_MAKE_STRING(CL_ ## _NAME),         \
+    .prefix = UCC_PP_MAKE_STRING(CL_ ## _NAME ##_)
+
+#define UCC_CL_IFACE_CFG(_cfg, _name, _NAME)                            \
+    .super.cl_ ## _cfg ## _config = {                                   \
+        UCC_CL_IFACE_NAME_PREFIX(_NAME),                                \
+        .table  = ucc_cl_ ## _name ## _ ## _cfg ## _config_table,       \
+        .size   = sizeof(ucc_cl_ ## _name ## _ ## _cfg ## _config_t)}
+
+#define UCC_CL_IFACE_DECLARE(_name, _NAME, _priority)           \
+    ucc_cl_ ## _name ## _iface_t ucc_cl_ ## _name = {           \
+        UCC_CL_IFACE_CFG(lib, _name, _NAME),                    \
+        UCC_CL_IFACE_CFG(context, _name, _NAME),                \
+        .super.super.name = UCC_PP_MAKE_STRING(basic),          \
+        .super.type       = UCC_CL_ ## _NAME,                   \
+        .super.priority   = _priority,                          \
+        .super.init       = ucc_cl_ ## _name ## _lib_init,      \
+        .super.finalize   = ucc_cl_ ## _name ## _lib_finalize,  \
+    }
+
 #endif
