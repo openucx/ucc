@@ -154,5 +154,6 @@ AC_CONFIG_FILES([
                  src/cl/basic/Makefile
                  src/api/ucc_version.h
                  src/core/ucc_version.c
+                 src/ucp_ctx/Makefile
                  ])
 AC_OUTPUT

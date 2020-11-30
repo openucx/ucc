@@ -15,6 +15,7 @@
 #include "utils/ucc_component.h"
 #include "utils/ucc_parser.h"
 #include "utils/ucc_class.h"
+#include "ucp_ctx/ucc_ucp_ctx.h"
 
 typedef struct ucc_cl_lib     ucc_cl_lib_t;
 typedef struct ucc_cl_iface   ucc_cl_iface_t;
@@ -39,6 +40,7 @@ typedef struct ucc_cl_iface {
     ucc_component_iface_t          super;
     ucc_cl_type_t                  type;
     int                            priority;
+    ucc_ucp_ctx_requirement_t      ucp_ctx_req;
     ucc_lib_attr_t                 attr;
     ucc_config_global_list_entry_t cl_lib_config;
     ucs_config_global_list_entry_t cl_context_config;
@@ -73,15 +75,16 @@ typedef struct ucc_cl_context {
         .table  = ucc_cl_ ## _name ## _ ## _cfg ## _config_table,       \
         .size   = sizeof(ucc_cl_ ## _name ## _ ## _cfg ## _config_t)}
 
-#define UCC_CL_IFACE_DECLARE(_name, _NAME, _priority)           \
-    ucc_cl_ ## _name ## _iface_t ucc_cl_ ## _name = {           \
-        UCC_CL_IFACE_CFG(lib, _name, _NAME),                    \
-        UCC_CL_IFACE_CFG(context, _name, _NAME),                \
-        .super.super.name = UCC_PP_MAKE_STRING(basic),          \
-        .super.type       = UCC_CL_ ## _NAME,                   \
-        .super.priority   = _priority,                          \
-        .super.init       = ucc_cl_ ## _name ## _lib_init,      \
-        .super.finalize   = ucc_cl_ ## _name ## _lib_finalize,  \
+#define UCC_CL_IFACE_DECLARE(_name, _NAME, _priority, _ucp_ctx_req)            \
+    ucc_cl_##_name##_iface_t ucc_cl_##_name = {                                \
+        UCC_CL_IFACE_CFG(lib, _name, _NAME),                                   \
+        UCC_CL_IFACE_CFG(context, _name, _NAME),                               \
+        .super.super.name  = UCC_PP_MAKE_STRING(basic),                        \
+        .super.type        = UCC_CL_##_NAME,                                   \
+        .super.priority    = _priority,                                        \
+        .super.ucp_ctx_req = _ucp_ctx_req,                                     \
+        .super.init        = ucc_cl_##_name##_lib_init,                        \
+        .super.finalize    = ucc_cl_##_name##_lib_finalize,                    \
     }
 
 #endif

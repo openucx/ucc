@@ -1,7 +1,7 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
 #
-SUBDIRS = cl/basic
+SUBDIRS = cl/basic ucp_ctx
 
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =

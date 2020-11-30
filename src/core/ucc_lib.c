@@ -13,6 +13,7 @@
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_math.h"
 #include "cl/ucc_cl.h"
+#include "ucp_ctx/ucc_ucp_ctx.h"
 
 UCS_CONFIG_DEFINE_ARRAY(cl_types, sizeof(ucc_cl_type_t),
                         UCS_CONFIG_TYPE_ENUM(ucc_cl_names));

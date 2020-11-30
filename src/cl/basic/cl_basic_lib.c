@@ -58,4 +58,4 @@ static ucc_status_t ucc_cl_basic_lib_finalize(ucc_cl_lib_t *cl_lib)
     return UCC_OK;
 }
 
-UCC_CL_IFACE_DECLARE(basic, BASIC, 10);
+UCC_CL_IFACE_DECLARE(basic, BASIC, 10, UCC_UCP_CTX_NOT_REQUIRED);

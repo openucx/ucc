@@ -30,7 +30,7 @@ static ucc_status_t ucc_component_load_one(const char *so_path,
     ucc_component_iface_t *iface;
     size_t                 basename_start, iface_struct_name_len;
 
-    ucc_snprintf_safe(framework_pattern, sizeof(framework_pattern), "ucc_%s_",
+    ucc_snprintf_safe(framework_pattern, sizeof(framework_pattern), "ucc_%s",
                       framework_name);
     basename_start =
         ((ptrdiff_t)strstr(so_path, framework_pattern) - (ptrdiff_t)so_path);
@@ -100,7 +100,7 @@ ucc_status_t ucc_components_load(const char *framework_name,
                   pattern_size);
         return UCC_ERR_NO_MEMORY;
     }
-    ucc_snprintf_safe(full_pattern, pattern_size, "%s/libucc_%s_*.so",
+    ucc_snprintf_safe(full_pattern, pattern_size, "%s/libucc_%s*.so",
                       ucc_global_config.component_path, framework_name);
     glob(full_pattern, 0, NULL, &globbuf);
     free(full_pattern);

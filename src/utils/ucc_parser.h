@@ -8,6 +8,7 @@
 
 #include "config.h"
 #include "api/ucc_status.h"
+#include "api/ucc_def.h"
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_compiler_def.h"
 

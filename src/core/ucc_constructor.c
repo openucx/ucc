@@ -67,8 +67,15 @@ ucc_status_t ucc_constructor(void)
         }
         status = ucc_components_load("cl", &ucc_global_config.cl_framework);
         if (UCC_OK != status) {
-            ucc_error("no CL components were found in the UCC_COMPONENT_PATH: %s",
-                      ucc_global_config.component_path);
+            ucc_error(
+                "no CL components were found in the UCC_COMPONENT_PATH: %s",
+                ucc_global_config.component_path);
+            return status;
+        }
+        status = ucc_components_load("ucp_ctx",
+                                     &ucc_global_config.ucp_ctx_framework);
+        if (UCC_OK != status) {
+            ucc_error("could not load ucp ctx framework");
             return status;
         }
     }

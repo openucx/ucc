@@ -30,6 +30,8 @@ typedef ucs_log_component_config_t ucc_log_component_config_t;
 #define UCC_PP_MAKE_STRING(x)  _UCC_PP_MAKE_STRING(x)
 #define UCC_PP_QUOTE UCS_PP_QUOTE
 
+#define UCC_MASK UCS_MASK
+
 static inline ucc_status_t ucs_status_to_ucc_status(ucs_status_t status)
 {
     switch (status) {
@@ -55,4 +57,5 @@ static inline ucc_status_t ucs_status_to_ucc_status(ucs_status_t status)
 #define ucc_assert(_cond)
 #endif
 
+#define UCC_STATIC_ASSERT(_cond) UCS_STATIC_ASSERT(_cond)
 #endif
