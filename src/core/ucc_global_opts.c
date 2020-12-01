@@ -15,7 +15,8 @@ ucc_global_config_t ucc_global_config = {
     .initialized    = 0,
 };
 
-ucc_config_field_t ucc_global_config_table[] = {
+ucc_config_field_t ucc_global_config_table[] =
+{
     {"LOG_LEVEL", "warn",
      "UCC logging level. Messages with a level higher or equal to the selected "
      "will be printed.\n"

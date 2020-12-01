@@ -1,10 +1,18 @@
 #
 # Copyright (c) 2020 Mellanox Technologies.  All rights reserved.
+# Copyright (C) Huawei Technologies Co., Ltd. 2020.  All rights reserved.
 # $HEADER$
 #
 SUBDIRS = \
        src \
        tools/info
+
+if HAVE_GTEST
+SUBDIRS += test/gtest
+
+gtest:
+	@make -C test/gtest test
+endif
 
 include $(srcdir)/docs/doxygen/doxygen.am
 
