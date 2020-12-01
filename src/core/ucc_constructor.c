@@ -61,17 +61,16 @@ ucc_status_t ucc_constructor(void)
         if (strlen(ucc_global_config.component_path) == 0) {
             get_default_lib_path();
         }
-    }
-
-    if (!ucc_global_config.component_path) {
-        ucc_error("failed to get ucc components path");
-        return UCC_ERR_NOT_FOUND;
-    }
-    status = ucc_components_load("cl", &ucc_global_config.cl_framework);
-    if (UCC_OK != status) {
-        ucc_error("no CL components were found in the UCC_COMPONENT_PATH: %s",
-                  ucc_global_config.component_path);
-        return status;
+        if (!ucc_global_config.component_path) {
+            ucc_error("failed to get ucc components path");
+            return UCC_ERR_NOT_FOUND;
+        }
+        status = ucc_components_load("cl", &ucc_global_config.cl_framework);
+        if (UCC_OK != status) {
+            ucc_error("no CL components were found in the UCC_COMPONENT_PATH: %s",
+                      ucc_global_config.component_path);
+            return status;
+        }
     }
     return UCC_OK;
 }
