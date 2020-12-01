@@ -737,6 +737,57 @@ ucc_status_t ucc_context_config_read(ucc_lib_h lib_handle,
 
 void ucc_context_config_release(ucc_context_config_h config);
 
+/**
+ *  @ingroup UCC_CONTEXT
+ *
+ *  @brief The @ref ucc_context_config_print routine prints the configuration information
+ *
+ *  @param [in]  config        ucc_context_config_h "Configuration descriptor"
+ *                             to print.
+ *  @param [in]  stream        Output stream to print the configuration to.
+ *  @param [in]  title         Configuration title to print.
+ *  @param [in]  print_flags   Flags that control various printing options.
+ *
+ *  @parblock
+ *
+ *  @b Description
+ *
+ *  The routine prints the configuration information that is stored in
+ *  ucc_context_config_h "configuration" descriptor.
+ *
+ *  @endparblock
+ *
+ */
+
+void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
+                              const char *title, ucc_config_print_flags_t print_flags);
+
+/**
+ *  @ingroup UCC_CONTEXT
+ *
+ *  @brief The @ref ucc_context_config_modify routine modifies the runtime configuration
+ *                  of UCC context (for a given CLS)
+ *
+ *  @param [in] config   Pointer to the configuration descriptor to be modified
+ *  @param [in] cls      Comma separated list of CLS
+ *  @param [in] name     Configuration variable to be modified
+ *  @param [in] value    Configuration value to set
+ *
+ *  @parblock
+ *
+ *  @b Description
+ *
+ *  The @ref ucc_context_config_modify routine sets the value of identifier "name"
+ *  to "value" for a specified CL.
+ *
+ *  @endparblock
+ *
+ *  @return Error code as defined by ucc_status_t
+ */
+
+ucc_status_t ucc_context_config_modify(ucc_context_config_h config,
+                                       const char *cls, const char *name,
+                                       const char *value);
 
 /**
  *  @ingroup UCC_CONTEXT

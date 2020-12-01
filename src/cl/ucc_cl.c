@@ -5,6 +5,8 @@
  */
 
 #include "ucc_cl.h"
+#include "utils/ucc_log.h"
+#include "utils/ucc_malloc.h"
 
 ucc_config_field_t ucc_cl_lib_config_table[] = {
     {"LOG_LEVEL", "warn",
@@ -20,6 +22,10 @@ ucc_config_field_t ucc_cl_lib_config_table[] = {
      "Possible values are: [1,inf]",
      ucc_offsetof(ucc_cl_lib_config_t, priority), UCC_CONFIG_TYPE_INT},
 
+    {NULL}
+};
+
+ucc_config_field_t ucc_cl_context_config_table[] = {
     {NULL}
 };
 
@@ -47,3 +53,49 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_lib_t)
 }
 
 UCC_CLASS_DEFINE(ucc_cl_lib_t, void);
+
+ucc_status_t ucc_parse_cls_string(const char *cls_str,
+                                  ucc_cl_type_t **cls_array, int *n_cls)
+{
+    int            cls_selected[UCC_CL_LAST] = {0};
+    int            n_cls_selected            = 0;
+    char          *cls_copy, *saveptr, *cl;
+    ucc_cl_type_t *cls;
+    ucc_cl_type_t  cl_type;
+    cls_copy = strdup(cls_str);
+    if (!cls_copy) {
+        ucc_error("failed to create a copy cls string");
+        return UCC_ERR_NO_MEMORY;
+    }
+    cl = strtok_r(cls_copy, ",", &saveptr);
+    while (NULL != cl) {
+        cl_type = ucc_cl_name_to_type(cl);
+        if (cl_type == UCC_CL_LAST) {
+            ucc_error("incorrect value is passed as part of UCC_CLS list: %s",
+                      cl);
+            free(cls_copy);
+            return UCC_ERR_INVALID_PARAM;
+        }
+        n_cls_selected++;
+        cls_selected[cl_type] = 1;
+        cl                    = strtok_r(NULL, ",", &saveptr);
+    }
+    free(cls_copy);
+
+    cls = ucc_malloc(n_cls_selected * sizeof(ucc_cl_type_t), "cls_array");
+    if (!cls) {
+        ucc_error("failed to allocate %zd bytes for cls_array",
+                  n_cls_selected * sizeof(int));
+        return UCC_ERR_NO_MEMORY;
+    }
+    n_cls_selected = 0;
+    for (cl_type = 0; cl_type < UCC_CL_LAST; cl_type++) {
+        if (cls_selected[cl_type]) {
+            cls[n_cls_selected++] = cl_type;
+        }
+    }
+    *cls_array = cls;
+    *n_cls     = n_cls_selected;
+    return UCC_OK;
+}
+

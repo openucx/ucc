@@ -10,7 +10,18 @@
 
 static ucc_config_field_t ucc_cl_basic_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_cl_basic_lib_config_t, super),
-     UCS_CONFIG_TYPE_TABLE(ucc_cl_lib_config_table)},
+     UCC_CONFIG_TYPE_TABLE(ucc_cl_lib_config_table)},
+
+    {NULL}
+};
+
+static ucs_config_field_t ucc_cl_basic_context_config_table[] = {
+    {"", "", NULL, ucc_offsetof(ucc_cl_basic_context_config_t, super),
+     UCC_CONFIG_TYPE_TABLE(ucc_cl_context_config_table)},
+
+    {"TEST_PARAM", "5", "For dbg test purpuse : don't commit",
+     ucc_offsetof(ucc_cl_basic_context_config_t, test_param),
+     UCC_CONFIG_TYPE_UINT},
 
     {NULL}
 };
@@ -47,17 +58,4 @@ static ucc_status_t ucc_cl_basic_lib_finalize(ucc_cl_lib_t *cl_lib)
     return UCC_OK;
 }
 
-ucc_cl_basic_iface_t ucc_cl_basic = {
-    .super.super.name = "basic",
-    .super.type       = UCC_CL_BASIC,
-    .super.priority   = 10,
-    .super.cl_lib_config =
-        {
-            .name   = "CL_BASIC",
-            .prefix = "CL_BASIC_",
-            .table  = ucc_cl_basic_lib_config_table,
-            .size   = sizeof(ucc_cl_basic_lib_config_t),
-        },
-    .super.init     = ucc_cl_basic_lib_init,
-    .super.finalize = ucc_cl_basic_lib_finalize,
-};
+UCC_CL_IFACE_DECLARE(basic, BASIC, 10);

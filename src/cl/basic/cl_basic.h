@@ -18,6 +18,11 @@ typedef struct ucc_cl_basic_lib_config {
     ucc_cl_lib_config_t super;
 } ucc_cl_basic_lib_config_t;
 
+typedef struct ucc_cl_basic_context_config {
+    ucc_cl_context_config_t super;
+    int                     test_param;
+} ucc_cl_basic_context_config_t;
+
 typedef struct ucc_cl_basic_lib {
     ucc_cl_lib_t super;
 } ucc_cl_basic_lib_t;
