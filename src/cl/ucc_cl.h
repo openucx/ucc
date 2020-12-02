@@ -28,12 +28,15 @@ typedef struct ucc_cl_lib_config {
 } ucc_cl_lib_config_t;
 
 typedef struct ucc_cl_context_config {
-    ucc_cl_iface_t *iface;
     ucc_cl_lib_t   *cl_lib;
 } ucc_cl_context_config_t;
 
 extern ucc_config_field_t ucc_cl_lib_config_table[];
 extern ucc_config_field_t ucc_cl_context_config_table[];
+
+typedef struct ucc_cl_context_params {
+    const ucc_context_params_t *params;
+} ucc_cl_context_params_t;
 
 typedef struct ucc_cl_iface {
     ucc_component_iface_t          super;
@@ -42,11 +45,16 @@ typedef struct ucc_cl_iface {
     ucc_lib_attr_t                 attr;
     ucc_config_global_list_entry_t cl_lib_config;
     ucs_config_global_list_entry_t cl_context_config;
-    ucc_status_t                   (*init)(const ucc_lib_params_t *params,
-                                           const ucc_lib_config_t *config,
-                                           const ucc_cl_lib_config_t *cl_config,
-                                           ucc_cl_lib_t **cl_lib);
-    ucc_status_t                   (*finalize)(ucc_cl_lib_t *cl_lib);
+    ucc_status_t (*init)(const ucc_lib_params_t *params,
+                         const ucc_lib_config_t *config,
+                         const ucc_cl_lib_config_t *cl_config,
+                         ucc_cl_lib_t **cl_lib);
+    ucc_status_t (*finalize)(ucc_cl_lib_t *cl_lib);
+    ucc_status_t (*context_create)(ucc_cl_lib_t *cl_lib,
+                                   const ucc_cl_context_params_t *params,
+                                   const ucc_cl_context_config_t *config,
+                                   ucc_cl_context_t **cl_ctx);
+    ucc_status_t (*context_destroy)(ucc_cl_context_t *cl_ctx);
 } ucc_cl_iface_t;
 UCC_CLASS_DECLARE(ucc_cl_iface_t);
 
@@ -63,6 +71,8 @@ typedef struct ucc_cl_context {
     ucc_cl_lib_t *cl_lib;
 } ucc_cl_context_t;
 
+UCC_CLASS_DECLARE(ucc_cl_context_t, ucc_cl_lib_t *);
+
 #define UCC_CL_IFACE_NAME_PREFIX(_NAME)                 \
     .name   = UCC_PP_MAKE_STRING(CL_ ## _NAME),         \
     .prefix = UCC_PP_MAKE_STRING(CL_ ## _NAME ##_)
@@ -73,15 +83,17 @@ typedef struct ucc_cl_context {
         .table  = ucc_cl_ ## _name ## _ ## _cfg ## _config_table,       \
         .size   = sizeof(ucc_cl_ ## _name ## _ ## _cfg ## _config_t)}
 
-#define UCC_CL_IFACE_DECLARE(_name, _NAME, _priority)           \
-    ucc_cl_ ## _name ## _iface_t ucc_cl_ ## _name = {           \
-        UCC_CL_IFACE_CFG(lib, _name, _NAME),                    \
-        UCC_CL_IFACE_CFG(context, _name, _NAME),                \
-        .super.super.name = UCC_PP_MAKE_STRING(basic),          \
-        .super.type       = UCC_CL_ ## _NAME,                   \
-        .super.priority   = _priority,                          \
-        .super.init       = ucc_cl_ ## _name ## _lib_init,      \
-        .super.finalize   = ucc_cl_ ## _name ## _lib_finalize,  \
+#define UCC_CL_IFACE_DECLARE(_name, _NAME, _priority)                          \
+    ucc_cl_##_name##_iface_t ucc_cl_##_name = {                                \
+        UCC_CL_IFACE_CFG(lib, _name, _NAME),                                   \
+        UCC_CL_IFACE_CFG(context, _name, _NAME),                               \
+        .super.super.name      = UCC_PP_MAKE_STRING(basic),                    \
+        .super.type            = UCC_CL_##_NAME,                               \
+        .super.priority        = _priority,                                    \
+        .super.init            = ucc_cl_##_name##_lib_init,                    \
+        .super.finalize        = ucc_cl_##_name##_lib_finalize,                \
+        .super.context_create  = ucc_cl_##_name##_context_create,              \
+        .super.context_destroy = ucc_cl_##_name##_context_destroy,             \
     }
 
 #endif

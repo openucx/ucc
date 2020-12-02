@@ -58,4 +58,36 @@ static ucc_status_t ucc_cl_basic_lib_finalize(ucc_cl_lib_t *cl_lib)
     return UCC_OK;
 }
 
+UCC_CLASS_INIT_FUNC(ucc_cl_basic_context_t, ucc_cl_lib_t *cl_lib,
+                    const ucc_cl_context_params_t *params,
+                    const ucc_cl_context_config_t *config)
+{
+    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_lib);
+    cl_info(cl_lib, "initialized cl context: %p", self);
+    return UCC_OK;
+}
+
+UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_context_t)
+{
+    cl_info(self->super.cl_lib, "finalizing cl context: %p", self);
+}
+
+UCC_CLASS_DEFINE(ucc_cl_basic_context_t, ucc_cl_context_t);
+
+static ucc_status_t ucc_cl_basic_context_create(
+    ucc_cl_lib_t *cl_lib, const ucc_cl_context_params_t *params,
+    const ucc_cl_context_config_t *config, ucc_cl_context_t **cl_ctx)
+{
+    return UCC_CLASS_NEW(ucc_cl_basic_context_t, cl_ctx, cl_lib, params,
+                         config);
+}
+
+static ucc_status_t ucc_cl_basic_context_destroy(ucc_cl_context_t *cl_ctx)
+{
+    ucc_cl_basic_context_t *ctx =
+        ucc_derived_of(cl_ctx, ucc_cl_basic_context_t);
+    UCC_CLASS_DELETE(ucc_cl_basic_context_t, ctx);
+    return UCC_OK;
+}
+
 UCC_CL_IFACE_DECLARE(basic, BASIC, 10);

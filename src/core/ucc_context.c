@@ -56,7 +56,6 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
             free(config->configs[i]);
             goto err_config_i;
         }
-        config->configs[config->n_cl_cfg]->iface  = lib->libs[i]->iface;
         config->configs[config->n_cl_cfg]->cl_lib = lib->libs[i];
         config->n_cl_cfg++;
     }
@@ -83,7 +82,8 @@ find_cl_context_config(ucc_context_config_t *cfg, ucc_cl_type_t cl_type)
 {
     int i;
     for (i = 0; i < cfg->n_cl_cfg; i++) {
-        if (cfg->configs[i] && cl_type == cfg->configs[i]->iface->type) {
+        if (cfg->configs[i] &&
+            cl_type == cfg->configs[i]->cl_lib->iface->type) {
             return cfg->configs[i];
         }
     }
@@ -120,11 +120,12 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
                 return UCC_ERR_INVALID_PARAM;
             }
             status = ucc_config_parser_set_value(
-                cl_cfg, cl_cfg->iface->cl_context_config.table, name, value);
+                cl_cfg, cl_cfg->cl_lib->iface->cl_context_config.table, name,
+                value);
             if (UCC_OK != status) {
                 ucc_error("failed to modify CL \"%s\" configuration, name %s, "
                           "value %s",
-                          cl_cfg->iface->super.name, name, value);
+                          cl_cfg->cl_lib->iface->super.name, name, value);
                 return status;
             }
         }
@@ -203,4 +204,85 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
             config->lib->libs[i]->iface->cl_context_config.prefix,
             config->lib->full_prefix, (ucc_config_print_flags_t)flags);
     }
+}
+
+ucc_status_t ucc_context_create(ucc_lib_h lib,
+                                const ucc_context_params_t *params,
+                                const ucc_context_config_h  config,
+                                ucc_context_h *context)
+{
+    ucc_cl_context_params_t cl_ctx_params;
+    ucc_cl_context_t       *cl_ctx;
+    ucc_cl_lib_t           *cl_lib;
+    ucc_context_t          *ctx;
+    ucc_status_t            status;
+    uint64_t                i;
+    int                     num_cls;
+
+    num_cls = config->n_cl_cfg;
+    ctx     = ucc_malloc(sizeof(ucc_context_t), "ucc_context");
+    if (!ctx) {
+        ucc_error("failed to allocate %zd bytes for ucc_context",
+                  sizeof(ucc_context_t));
+        status = UCC_ERR_NO_MEMORY;
+        goto error;
+    }
+    ctx->lib = lib;
+    memcpy(&ctx->params, params, sizeof(ucc_context_params_t));
+
+    ctx->cl_ctx = (ucc_cl_context_t **)ucc_malloc(
+        sizeof(ucc_cl_context_t *) * num_cls, "cl_ctx_array");
+    if (!ctx->cl_ctx) {
+        ucc_error("failed to allocate %zd bytes for cl_ctx array",
+                  sizeof(ucc_cl_context_t *) * num_cls);
+        status = UCC_ERR_NO_MEMORY;
+        goto error_ctx;
+    }
+    ctx->n_cl_ctx        = num_cls;
+    cl_ctx_params.params = params;
+
+    for (i = 0; i < num_cls; i++) {
+        cl_lib = config->configs[i]->cl_lib;
+        status = cl_lib->iface->context_create(cl_lib, &cl_ctx_params,
+                                               config->configs[i], &cl_ctx);
+        if (UCC_OK != status) {
+            ucc_error("failed to create cl context for %s",
+                      cl_lib->iface->super.name);
+            goto error_ctx_create;
+        }
+        ctx->cl_ctx[i] = cl_ctx;
+    }
+    ucc_debug("created ucc context %p", ctx);
+    *context = ctx;
+    return UCC_OK;
+
+error_ctx_create:
+    for (i = i - 1; i >= 0; i--) {
+        config->configs[i]->cl_lib->iface->context_destroy(ctx->cl_ctx[i]);
+    }
+    free(ctx->cl_ctx);
+error_ctx:
+    free(ctx);
+error:
+    return status;
+}
+
+ucc_status_t ucc_context_destroy(ucc_context_t *context)
+{
+    ucc_cl_context_t *cl_ctx;
+    ucc_status_t      status, ret_status = UCC_OK;
+    int               i;
+
+    for (i = 0; i < context->n_cl_ctx; i++) {
+        cl_ctx = context->cl_ctx[i];
+        status = cl_ctx->cl_lib->iface->context_destroy(cl_ctx);
+        if (UCC_OK != status) {
+            ret_status = status;
+            ucc_error("failed to destroy cl context %s",
+                      cl_ctx->cl_lib->iface->super.name);
+        }
+    }
+    free(context->cl_ctx);
+    free(context);
+    return ret_status;
 }

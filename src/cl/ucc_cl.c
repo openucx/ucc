@@ -99,3 +99,14 @@ ucc_status_t ucc_parse_cls_string(const char *cls_str,
     return UCC_OK;
 }
 
+UCC_CLASS_INIT_FUNC(ucc_cl_context_t, ucc_cl_lib_t *cl_lib)
+{
+    self->cl_lib = cl_lib;
+    return UCC_OK;
+}
+
+UCC_CLASS_CLEANUP_FUNC(ucc_cl_context_t)
+{
+}
+
+UCC_CLASS_DEFINE(ucc_cl_context_t, void);
