@@ -12,10 +12,10 @@
 ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
                                      ucc_context_config_t **config_p)
 {
-    int                   i;
-    ucc_status_t          status;
-    ucc_context_config_t *config;
-
+    ucc_cl_context_config_t *cl_config = NULL;
+    int                      i;
+    ucc_status_t             status;
+    ucc_context_config_t    *config;
     config = (ucc_context_config_t *)ucc_malloc(sizeof(ucc_context_config_t),
                                                 "ctx_config");
     if (config == NULL) {
@@ -24,7 +24,7 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
         status = UCC_ERR_NO_MEMORY;
         goto err_config;
     }
-
+    config->lib     = lib;
     config->configs = (ucc_cl_context_config_t **)ucc_calloc(
         lib->n_libs_opened, sizeof(ucc_cl_context_config_t *),
         "cl_configs_array");
@@ -38,35 +38,22 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
     config->n_cl_cfg = 0;
     for (i = 0; i < lib->n_libs_opened; i++) {
         ucc_assert(NULL != lib->libs[i]->iface->cl_context_config.table);
-        config->configs[i] = (ucc_cl_context_config_t *)ucc_malloc(
-            lib->libs[i]->iface->cl_context_config.size, "cl_config");
-        if (!config->configs[i]) {
-            ucc_error("failed to allocate %zd bytes for cl config",
-                      sizeof(lib->libs[i]->iface->cl_context_config.size));
-            status = UCC_ERR_NO_MEMORY;
-            goto err_config_i;
-        }
-        status = ucc_config_parser_fill_opts(
-            config->configs[config->n_cl_cfg],
-            lib->libs[i]->iface->cl_context_config.table, lib->full_prefix,
-            lib->libs[i]->iface->cl_context_config.prefix, 0);
+        status =
+            ucc_cl_context_config_read(lib->libs[i], config, &cl_config);
         if (UCC_OK != status) {
             ucc_error("failed to read CL \"%s\" context configuration",
                       lib->libs[i]->iface->super.name);
-            free(config->configs[i]);
             goto err_config_i;
         }
-        config->configs[config->n_cl_cfg]->iface  = lib->libs[i]->iface;
-        config->configs[config->n_cl_cfg]->cl_lib = lib->libs[i];
+        config->configs[config->n_cl_cfg]         = cl_config;
         config->n_cl_cfg++;
     }
-    config->lib = lib;
     *config_p   = config;
     return UCC_OK;
 
 err_config_i:
     for (i = i - 1; i >= 0; i--) {
-        free(config->configs[i]);
+        ucc_base_config_release(&config->configs[i]->super);
     }
 err_configs:
     free(config->configs);
@@ -83,7 +70,8 @@ find_cl_context_config(ucc_context_config_t *cfg, ucc_cl_type_t cl_type)
 {
     int i;
     for (i = 0; i < cfg->n_cl_cfg; i++) {
-        if (cfg->configs[i] && cl_type == cfg->configs[i]->iface->type) {
+        if (cfg->configs[i] &&
+            (cl_type == cfg->configs[i]->cl_lib->iface->type)) {
             return cfg->configs[i];
         }
     }
@@ -120,11 +108,12 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
                 return UCC_ERR_INVALID_PARAM;
             }
             status = ucc_config_parser_set_value(
-                cl_cfg, cl_cfg->iface->cl_context_config.table, name, value);
+                cl_cfg, cl_cfg->cl_lib->iface->cl_context_config.table, name,
+                value);
             if (UCC_OK != status) {
                 ucc_error("failed to modify CL \"%s\" configuration, name %s, "
                           "value %s",
-                          cl_cfg->iface->super.name, name, value);
+                          cl_cfg->cl_lib->iface->super.name, name, value);
                 return status;
             }
         }
@@ -156,10 +145,7 @@ void ucc_context_config_release(ucc_context_config_t *config)
         if (!config->configs[i]) {
             continue;
         }
-        ucc_config_parser_release_opts(
-            config->configs[i],
-            config->lib->libs[i]->iface->cl_context_config.table);
-        free(config->configs[i]);
+        ucc_base_config_release(&config->configs[i]->super);
     }
     free(config->configs);
     free(config);
@@ -203,4 +189,101 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
             config->lib->libs[i]->iface->cl_context_config.prefix,
             config->lib->full_prefix, (ucc_config_print_flags_t)flags);
     }
+}
+
+static inline void ucc_copy_context_params(ucc_context_params_t *dst,
+                                           const ucc_context_params_t *src)
+{
+    dst->mask = src->mask;
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_TYPE, ctx_type);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_COLL_OOB, oob);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_ID, ctx_id);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_COLL_SYNC_TYPE,
+                            sync_type);
+}
+
+ucc_status_t ucc_context_create(ucc_lib_h lib,
+                                const ucc_context_params_t *params,
+                                const ucc_context_config_h  config,
+                                ucc_context_h *context)
+{
+    ucc_base_context_params_t b_params;
+    ucc_base_context_t       *b_ctx;
+    ucc_cl_lib_t             *cl_lib;
+    ucc_context_t            *ctx;
+    ucc_status_t              status;
+    uint64_t                  i;
+    int                       num_cls;
+
+    num_cls = config->n_cl_cfg;
+    ctx     = ucc_malloc(sizeof(ucc_context_t), "ucc_context");
+    if (!ctx) {
+        ucc_error("failed to allocate %zd bytes for ucc_context",
+                  sizeof(ucc_context_t));
+        status = UCC_ERR_NO_MEMORY;
+        goto error;
+    }
+    ctx->lib = lib;
+    ucc_copy_context_params(&ctx->params, params);
+    ucc_copy_context_params(&b_params.params, params);
+    ctx->cl_ctx = (ucc_cl_context_t **)ucc_malloc(
+        sizeof(ucc_cl_context_t *) * num_cls, "cl_ctx_array");
+    if (!ctx->cl_ctx) {
+        ucc_error("failed to allocate %zd bytes for cl_ctx array",
+                  sizeof(ucc_cl_context_t *) * num_cls);
+        status = UCC_ERR_NO_MEMORY;
+        goto error_ctx;
+    }
+    ctx->n_cl_ctx = 0;
+    for (i = 0; i < num_cls; i++) {
+        cl_lib = config->configs[i]->cl_lib;
+        status = cl_lib->iface->context.create(
+            &b_params, &config->configs[i]->super, &b_ctx);
+        if (UCC_OK != status) {
+            if (lib->specific_cls_requested) {
+                ucc_error("failed to create cl context for %s",
+                          cl_lib->iface->super.name);
+                goto error_ctx_create;
+            } else {
+                ucc_warn("failed to create cl context for %s, skipping",
+                         cl_lib->iface->super.name);
+                continue;
+            }
+        }
+        ctx->cl_ctx[ctx->n_cl_ctx] = ucc_derived_of(b_ctx, ucc_cl_context_t);
+        ctx->n_cl_ctx++;
+    }
+    if (0 == ctx->n_cl_ctx) {
+        ucc_error("no CL context created in ucc_context_create");
+        return UCC_ERR_NO_MESSAGE;
+    }
+    ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
+    *context = ctx;
+    return UCC_OK;
+
+error_ctx_create:
+    for (i = i - 1; i >= 0; i--) {
+        config->configs[i]->cl_lib->iface->context.destroy(
+            &ctx->cl_ctx[i]->super);
+    }
+    free(ctx->cl_ctx);
+error_ctx:
+    free(ctx);
+error:
+    return status;
+}
+
+ucc_status_t ucc_context_destroy(ucc_context_t *context)
+{
+    ucc_cl_context_t *cl_ctx;
+    ucc_cl_lib_t     *cl_lib;
+    int               i;
+    for (i = 0; i < context->n_cl_ctx; i++) {
+        cl_ctx = context->cl_ctx[i];
+        cl_lib = ucc_derived_of(cl_ctx->super.lib, ucc_cl_lib_t);
+        cl_lib->iface->context.destroy(&cl_ctx->super);
+    }
+    free(context->cl_ctx);
+    free(context);
+    return UCC_OK;
 }

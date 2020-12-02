@@ -27,7 +27,8 @@ noinst_HEADERS =             \
 	utils/ucc_datastruct.h   \
 	utils/ucc_math.h         \
 	cl/ucc_cl.h              \
-	cl/ucc_cl_log.h
+	cl/ucc_cl_log.h          \
+	cl/ucc_base_iface.h
 
 libucc_la_SOURCES =        \
 	core/ucc_lib.c         \
@@ -36,6 +37,7 @@ libucc_la_SOURCES =        \
 	core/ucc_version.c     \
 	core/ucc_context.c     \
 	utils/ucc_component.c  \
-	cl/ucc_cl.c
+	cl/ucc_cl.c            \
+	cl/ucc_base_iface.c
 
 libucc_ladir = $(includedir)

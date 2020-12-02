@@ -30,9 +30,12 @@ extern ucc_list_link_t ucc_config_global_list;
 int main(int argc, char **argv)
 {
     ucc_config_print_flags_t print_flags;
-    unsigned print_opts;
-    int      c;
-
+    unsigned                 print_opts;
+    int                      c;
+    ucc_lib_h                lib;
+    ucc_lib_config_h         config;
+    ucc_lib_params_t         params;
+    ucc_status_t             status;
     print_flags = (ucc_config_print_flags_t)0;
     print_opts  = 0;
     while ((c = getopt(argc, argv, "vbcafh")) != -1) {
@@ -68,6 +71,20 @@ int main(int argc, char **argv)
         return -2;
     }
 
+    /* need to call ucc_init to force loading of dynamic
+       ucc components */
+    params.mask        = UCC_LIB_PARAM_FIELD_THREAD_MODE;
+    params.thread_mode = UCC_THREAD_SINGLE;
+    if (UCC_OK != ucc_lib_config_read(NULL, NULL, &config)) {
+        return 0;
+    }
+
+    status = ucc_init(&params, config, &lib);
+    ucc_lib_config_release(config);
+    if (UCC_OK != status) {
+        return 0;
+    }
+
     if (print_opts & PRINT_VERSION) {
         print_version();
     }
@@ -80,6 +97,6 @@ int main(int argc, char **argv)
         ucc_config_parser_print_all_opts(stdout, "UCC_", print_flags,
                                          &ucc_config_global_list);
     }
-
+    ucc_finalize(lib);
     return 0;
 }

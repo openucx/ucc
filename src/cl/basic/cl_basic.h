@@ -8,6 +8,8 @@
 #define UCC_CL_BASIC_H_
 #include "cl/ucc_cl.h"
 
+#define UCC_CL_BASIC_DEFAULT_PRIORITY 10
+
 typedef struct ucc_cl_basic_iface {
     ucc_cl_iface_t super;
 } ucc_cl_basic_iface_t;
@@ -26,7 +28,13 @@ typedef struct ucc_cl_basic_context_config {
 typedef struct ucc_cl_basic_lib {
     ucc_cl_lib_t super;
 } ucc_cl_basic_lib_t;
+UCC_CLASS_DECLARE(ucc_cl_basic_lib_t, const ucc_base_lib_params_t *,
+                  const ucc_base_config_t *);
 
-UCC_CLASS_DECLARE(ucc_cl_basic_lib_t, ucc_cl_iface_t *,
-                  const ucc_lib_config_t *, const ucc_cl_lib_config_t *);
+typedef struct ucc_cl_basic_context {
+    ucc_cl_context_t super;
+} ucc_cl_basic_context_t;
+UCC_CLASS_DECLARE(ucc_cl_basic_context_t, const ucc_base_context_params_t *,
+                  const ucc_base_config_t *);
+
 #endif

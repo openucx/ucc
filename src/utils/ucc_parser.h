@@ -21,15 +21,16 @@ typedef ucs_config_field_t             ucc_config_field_t;
 typedef ucs_config_names_array_t       ucc_config_names_array_t;
 typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 
-#define ucc_config_names_search      ucs_config_names_search
-#define UCC_CONFIG_TYPE_LOG_COMP     UCS_CONFIG_TYPE_LOG_COMP
-#define UCC_CONFIG_REGISTER_TABLE    UCS_CONFIG_REGISTER_TABLE
-#define UCC_CONFIG_TYPE_STRING       UCS_CONFIG_TYPE_STRING
-#define UCC_CONFIG_TYPE_INT          UCS_CONFIG_TYPE_INT
-#define UCC_CONFIG_TYPE_UINT         UCS_CONFIG_TYPE_UINT
-#define UCC_CONFIG_TYPE_STRING_ARRAY UCS_CONFIG_TYPE_STRING_ARRAY
-#define UCC_CONFIG_TYPE_ARRAY        UCS_CONFIG_TYPE_ARRAY
-#define UCC_CONFIG_TYPE_TABLE        UCS_CONFIG_TYPE_TABLE
+#define ucc_config_names_search         ucs_config_names_search
+#define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
+#define UCC_CONFIG_REGISTER_TABLE       UCS_CONFIG_REGISTER_TABLE
+#define UCC_CONFIG_REGISTER_TABLE_ENTRY UCS_CONFIG_REGISTER_TABLE_ENTRY
+#define UCC_CONFIG_TYPE_STRING          UCS_CONFIG_TYPE_STRING
+#define UCC_CONFIG_TYPE_INT             UCS_CONFIG_TYPE_INT
+#define UCC_CONFIG_TYPE_UINT            UCS_CONFIG_TYPE_UINT
+#define UCC_CONFIG_TYPE_STRING_ARRAY    UCS_CONFIG_TYPE_STRING_ARRAY
+#define UCC_CONFIG_TYPE_ARRAY           UCS_CONFIG_TYPE_ARRAY
+#define UCC_CONFIG_TYPE_TABLE           UCS_CONFIG_TYPE_TABLE
 
 static inline ucc_status_t
 ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,

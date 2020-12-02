@@ -9,13 +9,8 @@
 #include "utils/ucc_malloc.h"
 
 ucc_config_field_t ucc_cl_lib_config_table[] = {
-    {"LOG_LEVEL", "warn",
-     "UCC CL logging level. Messages with a level higher or equal to the "
-     "selected will be printed.\n"
-     "Possible values are: fatal, error, warn, info, debug, trace, data, func, "
-     "poll.",
-     ucc_offsetof(ucc_cl_lib_config_t, log_component),
-     UCC_CONFIG_TYPE_LOG_COMP},
+    {"", "", NULL, ucc_offsetof(ucc_cl_lib_config_t, super),
+     UCC_CONFIG_TYPE_TABLE(ucc_base_config_table)},
 
     {"PRIORITY", "-1",
      "UCC CL priority.\n"
@@ -36,15 +31,15 @@ const char *ucc_cl_names[] = {
 };
 
 UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
-                    const ucc_lib_config_t *config,
-                    const ucc_cl_lib_config_t *cl_config)
+                    const ucc_cl_lib_config_t *cl_config, int default_priority)
 {
     self->iface         = cl_iface;
-    self->log_component = cl_config->log_component;
-    ucc_strncpy_safe(self->log_component.name, cl_iface->cl_lib_config.name,
-                     sizeof(self->log_component.name));
+    self->super.log_component = cl_config->super.log_component;
+    ucc_strncpy_safe(self->super.log_component.name,
+                     cl_iface->cl_lib_config.name,
+                     sizeof(self->super.log_component.name));
     self->priority =
-        (-1 == cl_config->priority) ? cl_iface->priority : cl_config->priority;
+        (-1 == cl_config->priority) ? default_priority : cl_config->priority;
     return UCC_OK;
 }
 
@@ -99,3 +94,37 @@ ucc_status_t ucc_parse_cls_string(const char *cls_str,
     return UCC_OK;
 }
 
+UCC_CLASS_INIT_FUNC(ucc_cl_context_t, ucc_cl_lib_t *cl_lib)
+{
+    self->super.lib = &cl_lib->super;
+    return UCC_OK;
+}
+
+UCC_CLASS_CLEANUP_FUNC(ucc_cl_context_t)
+{
+}
+
+UCC_CLASS_DEFINE(ucc_cl_context_t, void);
+
+ucc_status_t ucc_cl_context_config_read(ucc_cl_lib_t *cl_lib,
+                                        const ucc_context_config_t *config,
+                                        ucc_cl_context_config_t **cl_config)
+{
+    ucc_status_t status;
+    status = ucc_base_config_read(config->lib->full_prefix,
+                                  &cl_lib->iface->cl_context_config,
+                                  (ucc_base_config_t **)cl_config);
+    if (UCC_OK == status) {
+        (*cl_config)->cl_lib = cl_lib;
+    }
+    return status;
+}
+
+ucc_status_t ucc_cl_lib_config_read(ucc_cl_iface_t *iface,
+                                    const char *full_prefix,
+                                    const ucc_lib_config_t *config,
+                                    ucc_cl_lib_config_t **cl_config)
+{
+    return ucc_base_config_read(full_prefix, &iface->cl_lib_config,
+                                (ucc_base_config_t **)cl_config);
+}
