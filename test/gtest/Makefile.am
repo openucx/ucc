@@ -67,7 +67,8 @@ gtest_SOURCES = \
 	common/main.cc \
 	common/test.cc \
 	\
-	tl/tl_test.cc
+	tl/tl_test.cc \
+	core/test_lib_config.cc
 
 noinst_HEADERS = \
 	common/gtest.h \
