@@ -50,7 +50,7 @@ $make
 ```sh
 $./autogen.sh
 
-$./configure --with-docs
+$./configure --prefix=<ucc-install-path> --with-docs-only
 
 $make docs
 ```
