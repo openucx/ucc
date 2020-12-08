@@ -176,7 +176,7 @@ typedef enum {
  *
  *  Description
  *
- *  @ref ucc_datatype_t represents the datatypes supported by the UCC library’s
+ *  @ref ucc_datatype_t represents the datatypes supported by the UCC libraryג€™s
  *  collective and reduction operations. The standard operations are signed and
  *  unsigned integers of various sizes, float 16, 32, and 64, and user-defined
  *  datatypes. The UCC_DT_USERDEFINED represents the user-defined datatype. The
@@ -215,7 +215,7 @@ typedef enum {
  *
  *  Description
  *
- *  @ref ucc_thread_mode_t is used to initialize the UCC library’s thread mode.
+ *  @ref ucc_thread_mode_t is used to initialize the UCC libraryג€™s thread mode.
  *  The UCC library can be configured in three thread modes UCC_THREAD_SINGLE,
  *  UCC_THREAD_FUNNELED, and UCC_LIB_THREAD_MULTIPLE. In the UCC_THREAD_SINGLE
  *  mode, the user program must not be multithreaded. In the UCC_THREAD_FUNNELED
@@ -598,7 +598,8 @@ enum ucc_context_params_field {
     UCC_CONTEXT_PARAM_FIELD_TYPE                   = UCC_BIT(0),
     UCC_CONTEXT_PARAM_FIELD_COLL_SYNC_TYPE         = UCC_BIT(1),
     UCC_CONTEXT_PARAM_FIELD_COLL_OOB               = UCC_BIT(2),
-    UCC_CONTEXT_PARAM_FIELD_ID                     = UCC_BIT(3)
+    UCC_CONTEXT_PARAM_FIELD_ID                     = UCC_BIT(3),
+    UCC_CONTEXT_PARAM_FIELD_EXISTING_CL_OBJECTS    = UCC_BIT(4)
 };
 
 /**
@@ -626,6 +627,18 @@ typedef struct ucc_context_oob_coll {
     void            *coll_info;
 }  ucc_context_oob_coll_t;
 
+
+/**
+ * @ingroup UCC_CONTEXT_DT
+ *
+ * @brief OOB collective operation for creating the context
+ */
+typedef struct ucc_context_existing_cl_obj {
+    const char *cl_name;
+    void       *cl_obj;
+}  ucc_context_existing_cl_obj_t;
+
+
 /**
  *
  *  @ingroup UCC_CONTEXT_DT
@@ -649,11 +662,12 @@ typedef struct ucc_context_oob_coll {
  *
  */
 typedef struct ucc_context_params {
-    uint64_t                mask;
-    ucc_context_type_t      ctx_type;
-    ucc_coll_sync_type_t    sync_type;
-    ucc_context_oob_coll_t  oob;
-    uint64_t                ctx_id;
+    uint64_t                       mask;
+    ucc_context_type_t             ctx_type;
+    ucc_coll_sync_type_t           sync_type;
+    ucc_context_oob_coll_t         oob;
+    uint64_t                       ctx_id;
+    ucc_context_existing_cl_obj_t *ctx_obj;
 } ucc_context_params_t;
 
 /**
@@ -767,10 +781,10 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
  *  @ingroup UCC_CONTEXT
  *
  *  @brief The @ref ucc_context_config_modify routine modifies the runtime configuration
- *                  of UCC context (for a given CLS)
+ *                  of UCC context (for a given CLs)
  *
  *  @param [in] config   Pointer to the configuration descriptor to be modified
- *  @param [in] cls      Comma separated list of CLS
+ *  @param [in] cls      Comma separated list of CLs
  *  @param [in] name     Configuration variable to be modified
  *  @param [in] value    Configuration value to set
  *
@@ -822,6 +836,29 @@ ucc_status_t ucc_context_create(ucc_lib_h lib_handle,
                                 const ucc_context_params_t *params,
                                 const ucc_context_config_h  config,
                                 ucc_context_h *context);
+
+/**
+ *  @ingroup UCC_CONTEXT
+ *
+ *  @brief The @ref ucc_context_get_cl_object routine obtains the object used
+ *                  in a UCC context.
+ *
+ *  @param [in]  context  Communication context handle to be queried
+ *  @parblock
+ *
+ *  @b Description
+ *
+ *  @ref ucc_context_get_cl_object routine obtains the objects used by a given
+ *  CL within a content handle.
+ *
+ *  @endparblock
+ *
+ *  @return Error code as defined by ucc_status_t
+ */
+
+ucc_status_t ucc_context_get_cl_object(ucc_context_h context,
+                                       const char* cl_name,
+                                       void **cl_obj);
 
 /**
  *  @ingroup UCC_CONTEXT
