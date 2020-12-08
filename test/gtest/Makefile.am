@@ -57,17 +57,19 @@ gtest_CPPFLAGS = \
 
 gtest_LDFLAGS  = $(GTEST_LDFLAGS) -pthread -no-install -Wl,-dynamic-list-data
 gtest_CFLAGS   = $(BASE_CFLAGS)
-gtest_CXXFLAGS = \
+gtest_CXXFLAGS = -std=gnu++11 \
 	$(BASE_CXXFLAGS) $(GTEST_CXXFLAGS) \
 	-DGTEST_UCM_HOOK_LIB_DIR="\"${abs_builddir}/ucm/test_dlopen/.libs\""
 
-gtest_SOURCES = \
-	common/gtest-all.cc \
+gtest_SOURCES =             \
+	common/gtest-all.cc     \
 	common/test_obj_size.cc \
-	common/main.cc \
-	common/test.cc \
-	\
-	tl/tl_test.cc
+	common/main.cc          \
+	common/test.cc          \
+	                        \
+	tl/tl_test.cc           \
+	core/test_lib_config.cc \
+	core/test_lib.cc
 
 noinst_HEADERS = \
 	common/gtest.h \

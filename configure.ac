@@ -70,10 +70,30 @@ CFLAGS_save="$CFLAGS"
 AC_PROG_CC
 AC_PROG_CXX
 AM_PROG_AS
+AC_PROG_LN_S
+AC_PROG_MKDIR_P
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
 AC_HEADER_STDC
 CFLAGS="$CFLAGS_save"
+
+#
+# Check if 'ln' supports creating relative links
+#
+AC_MSG_CHECKING([if ${LN_S} supports --relative])
+AS_IF([${LN_S} --relative symlinktest 2>/dev/null],
+      [AC_MSG_RESULT([yes])
+       AC_SUBST([LN_RS], ["${LN_S} --relative"])
+       rm symlinktest],
+      [AC_MSG_RESULT([no])
+       AC_SUBST([LN_RS], [${LN_S}])])
+
+AC_SUBST([modulesubdir],   [${PACKAGE_NAME}])               # module directory names
+AC_SUBST([moduledir],      [${libdir}/${modulesubdir}])     # module installation directory
+AC_SUBST([localmoduledir], ['$(abs_top_builddir)/modules']) # local directory for module symlinks
+AC_SUBST([objdir],         [${objdir}])                     # libtool objects dir, usually .libs
+AC_SUBST([shrext],         [${shrext_cmds}])                # libtool shared library extension
+AC_DEFINE_UNQUOTED([UCC_MODULE_SUBDIR], ["${modulesubdir}"], [UCC module sub-directory])
 
 #
 # Additional m4 files
@@ -143,7 +163,7 @@ if test $ucx_happy != "yes"; then
 fi
 
 includes="-I${UCC_TOP_SRCDIR}/src -I${UCC_TOP_BUILDDIR}/src"
-CFLAGS="-std=gnu11"
+CFLAGS="$CFLAGS -std=gnu11"
 CPPFLAGS="$UCS_CPPFLAGS $CPPFLAGS $includes -Wall -Werror"
 LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
 
