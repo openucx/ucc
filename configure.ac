@@ -142,10 +142,10 @@ AS_IF([test "x$with_docs_only" = xyes],
      fi
 
      CHECK_UCX
-        AC_MSG_RESULT([UCX support: $ucx_happy])
-        if test $ucx_happy != "yes"; then
-            AC_MSG_ERROR([UCX is not available])
-        fi
+     AC_MSG_RESULT([UCX support: $ucx_happy])
+     if test $ucx_happy != "yes"; then
+         AC_MSG_ERROR([UCX is not available])
+     fi
     ]) # Docs only
 
 
