@@ -99,12 +99,6 @@ AC_DEFINE_UNQUOTED([UCC_MODULE_SUBDIR], ["${modulesubdir}"], [UCC module sub-dir
 # Additional m4 files
 #
 m4_include([config/m4/ax_prog_doxygen.m4])
-m4_include([config/m4/compiler.m4])
-m4_include([config/m4/gtest.m4])
-m4_include([config/m4/sysdep.m4])
-m4_include([config/m4/ucx.m4])
-
-m4_include([test/gtest/configure.m4])
 
 AC_ARG_WITH([docs_only],
         AS_HELP_STRING([--with-docs-only],
@@ -137,30 +131,45 @@ AS_IF([test "x$with_docs_only" = xyes],
      UCC_DX_ENABLE_CHECK([man])
      UCC_DX_ENABLE_CHECK([pdf])
      AM_CONDITIONAL([DOCS_ONLY], [true])
+     AM_CONDITIONAL([HAVE_GTEST], [false])
+     AM_CONDITIONAL([HAVE_CXX11], [false])
+     AM_CONDITIONAL([HAVE_GNUXX11], [false])
+     AM_CONDITIONAL([HAVE_GLIBCXX_NOTHROW], [false])
+     AM_CONDITIONAL([HAVE_AARCH64_THUNDERX2], [false])
+     AM_CONDITIONAL([HAVE_AARCH64_THUNDERX1], [false])
+     AM_CONDITIONAL([HAVE_AARCH64_HI1620], [false])
+     AM_CONDITIONAL([HAVE_UCX], [false])
     ],
     [
      AM_CONDITIONAL([DOCS_ONLY], [false])
-    ]) # Docs only
+     m4_include([config/m4/compiler.m4])
+     m4_include([config/m4/gtest.m4])
+     m4_include([config/m4/sysdep.m4])
+     m4_include([config/m4/ucx.m4])
+     m4_include([test/gtest/configure.m4])
 
-
-AC_ARG_ENABLE([debug],
+     AC_ARG_ENABLE([debug],
               AS_HELP_STRING([--enable-debug], [Enable extra debugging code (default is NO).]),
               [], [enable_debug=no])
 
-if test $enable_debug = yes; then
-	AC_DEFINE([ENABLE_DEBUG], [1], [Enable debugging code])
-	CFLAGS="$CFLAGS -O0 -g3"
-	AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_TRACE_POLL], [Highest log level])
-else
-	AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_INFO], [Highest log level])
-	CFLAGS="$CFLAGS -O3 -DNDEBUG"
-fi
+     if test $enable_debug = yes; then
+	    AC_DEFINE([ENABLE_DEBUG], [1], [Enable debugging code])
+	    CFLAGS="$CFLAGS -O0 -g3"
+	    AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_TRACE_POLL], [Highest log level])
+     else
+	    AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_INFO], [Highest log level])
+	    CFLAGS="$CFLAGS -O3 -DNDEBUG"
+     fi
 
-CHECK_UCX
-AC_MSG_RESULT([UCX support: $ucx_happy])
-if test $ucx_happy != "yes"; then
-   AC_MSG_ERROR([UCX is not available])
-fi
+     CHECK_UCX
+     AC_MSG_RESULT([UCX support: $ucx_happy])
+     if test $ucx_happy != "yes"; then
+         AC_MSG_ERROR([UCX is not available])
+     fi
+    ]) # Docs only
+
+
+
 
 includes="-I${UCC_TOP_SRCDIR}/src -I${UCC_TOP_BUILDDIR}/src"
 CFLAGS="$CFLAGS -std=gnu11"
