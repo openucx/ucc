@@ -27,7 +27,7 @@ ucc_status_t ucc_base_config_read(const char *full_prefix,
     status = ucc_config_parser_fill_opts(cfg, cfg_entry->table, full_prefix,
                                          cfg_entry->prefix, 0);
     if (UCC_OK != status) {
-        free(cfg);
+        ucc_free(cfg);
         *config = NULL;
     } else {
         *config = cfg;

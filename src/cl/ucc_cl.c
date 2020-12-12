@@ -68,14 +68,14 @@ ucc_status_t ucc_parse_cls_string(const char *cls_str,
         if (cl_type == UCC_CL_LAST) {
             ucc_error("incorrect value is passed as part of UCC_CLS list: %s",
                       cl);
-            free(cls_copy);
+            ucc_free(cls_copy);
             return UCC_ERR_INVALID_PARAM;
         }
         n_cls_selected++;
         cls_selected[cl_type] = 1;
         cl                    = strtok_r(NULL, ",", &saveptr);
     }
-    free(cls_copy);
+    ucc_free(cls_copy);
 
     cls = ucc_malloc(n_cls_selected * sizeof(ucc_cl_type_t), "cls_array");
     if (!cls) {

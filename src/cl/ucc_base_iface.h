@@ -14,6 +14,7 @@
 #include "utils/ucc_component.h"
 #include "utils/ucc_parser.h"
 #include "utils/ucc_class.h"
+#include "utils/ucc_malloc.h"
 
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
@@ -57,7 +58,7 @@ ucc_status_t ucc_base_config_read(const char *full_prefix,
 static inline void ucc_base_config_release(ucc_base_config_t *config)
 {
     ucc_config_parser_release_opts(config, config->cfg_entry->table);
-    free(config);
+    ucc_free(config);
 }
 
 #endif

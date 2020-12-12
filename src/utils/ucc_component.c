@@ -103,7 +103,7 @@ ucc_status_t ucc_components_load(const char *framework_name,
     ucc_snprintf_safe(full_pattern, pattern_size, "%s/libucc_%s_*.so",
                       ucc_global_config.component_path, framework_name);
     glob(full_pattern, 0, NULL, &globbuf);
-    free(full_pattern);
+    ucc_free(full_pattern);
     n_loaded          = 0;
 
     dlerror(); /* Clear any existing error */
@@ -136,7 +136,7 @@ ucc_status_t ucc_components_load(const char *framework_name,
         return UCC_OK;
     } else {
         if (ifaces) {
-            free(ifaces);
+            ucc_free(ifaces);
         }
         return UCC_ERR_NOT_FOUND;
     }

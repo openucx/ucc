@@ -182,7 +182,7 @@ error_cfg_read:
     }
 error:
     if (lib->libs)
-        free(lib->libs);
+        ucc_free(lib->libs);
     return status;
 }
 
@@ -238,7 +238,7 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
     *lib_p = lib;
     return UCC_OK;
 error:
-    free(lib);
+    ucc_free(lib);
     return status;
 }
 
@@ -288,9 +288,9 @@ ucc_status_t ucc_lib_config_read(const char *env_prefix, const char *filename,
     return UCC_OK;
 
 err_free_prefix:
-    free(config->full_prefix);
+    ucc_free(config->full_prefix);
 err_free_config:
-    free(config);
+    ucc_free(config);
 err:
     return status;
 }
@@ -298,8 +298,8 @@ err:
 void ucc_lib_config_release(ucc_lib_config_t *config)
 {
     ucc_config_parser_release_opts(config, ucc_lib_config_table);
-    free(config->full_prefix);
-    free(config);
+    ucc_free(config->full_prefix);
+    ucc_free(config);
 }
 
 void ucc_lib_config_print(const ucc_lib_config_h config, FILE *stream,
@@ -328,7 +328,7 @@ ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
     for (i = 0; i < lib->n_libs_opened; i++) {
         lib->libs[i]->iface->lib.finalize(&lib->libs[i]->super);
     }
-    free(lib->libs);
-    free(lib);
+    ucc_free(lib->libs);
+    ucc_free(lib);
     return UCC_OK;
 }

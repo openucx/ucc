@@ -56,10 +56,10 @@ err_config_i:
         ucc_base_config_release(&config->configs[i]->super);
     }
 err_configs:
-    free(config->configs);
+    ucc_free(config->configs);
 
 err_config:
-    free(config);
+    ucc_free(config);
     return status;
 }
 
@@ -117,7 +117,7 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
                 return status;
             }
         }
-        free(required_cls);
+        ucc_free(required_cls);
     } else {
         for (i = 0; i < config->n_cl_cfg; i++) {
             if (config->configs[i]) {
@@ -147,8 +147,8 @@ void ucc_context_config_release(ucc_context_config_t *config)
         }
         ucc_base_config_release(&config->configs[i]->super);
     }
-    free(config->configs);
-    free(config);
+    ucc_free(config->configs);
+    ucc_free(config);
 }
 
 /* The function prints the configuration of UCC context.
@@ -266,9 +266,9 @@ error_ctx_create:
         config->configs[i]->cl_lib->iface->context.destroy(
             &ctx->cl_ctx[i]->super);
     }
-    free(ctx->cl_ctx);
+    ucc_free(ctx->cl_ctx);
 error_ctx:
-    free(ctx);
+    ucc_free(ctx);
 error:
     return status;
 }
@@ -283,7 +283,7 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
         cl_lib = ucc_derived_of(cl_ctx->super.lib, ucc_cl_lib_t);
         cl_lib->iface->context.destroy(&cl_ctx->super);
     }
-    free(context->cl_ctx);
-    free(context);
+    ucc_free(context->cl_ctx);
+    ucc_free(context);
     return UCC_OK;
 }
