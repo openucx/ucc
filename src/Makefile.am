@@ -38,4 +38,4 @@ libucc_la_SOURCES =        \
 	utils/ucc_component.c  \
 	cl/ucc_cl.c
 
-libucc_ladir = $(includedir)
+libucc_ladir = $(includedir)/ucc
