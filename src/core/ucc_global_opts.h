@@ -16,6 +16,7 @@ typedef struct ucc_global_config {
     /* Log level above which log messages will be printed*/
     ucc_log_component_config_t log_component;
     ucc_component_framework_t  cl_framework;
+    ucc_component_framework_t  tl_framework;
 
     /* Coll component libraries path */
     char *component_path;

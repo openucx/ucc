@@ -63,32 +63,8 @@ typedef struct ucc_cl_context {
 
 UCC_CLASS_DECLARE(ucc_cl_context_t, ucc_cl_lib_t *);
 
-#define UCC_CL_IFACE_NAME_PREFIX(_NAME, _cfg)                                  \
-    .name   = UCC_PP_MAKE_STRING(CL_##_NAME) " " UCC_PP_MAKE_STRING(_cfg),     \
-    .prefix = UCC_PP_MAKE_STRING(CL_##_NAME##_)
-
-#define UCC_CL_IFACE_CFG(_cfg, _name, _NAME)                                   \
-    .super.cl_##_cfg##_config = {                                              \
-        UCC_CL_IFACE_NAME_PREFIX(_NAME, _cfg),                                 \
-        .table = ucc_cl_##_name##_##_cfg##_config_table,                       \
-        .size  = sizeof(ucc_cl_##_name##_##_cfg##_config_t)}
+#define UCC_CL_IFACE_EXT(_NAME) .super.type = UCC_CL_ ## _NAME,
 
 #define UCC_CL_IFACE_DECLARE(_name, _NAME)                                     \
-    ucc_cl_##_name##_iface_t ucc_cl_##_name = {                                \
-        UCC_CL_IFACE_CFG(lib, _name, _NAME),                                   \
-        UCC_CL_IFACE_CFG(context, _name, _NAME),                               \
-        .super.super.name = UCC_PP_MAKE_STRING(_name),                         \
-        .super.type       = UCC_CL_##_NAME,                                    \
-        .super.lib.init   = UCC_CLASS_NEW_FUNC_NAME(ucc_cl_##_name##_lib_t),   \
-        .super.lib.finalize =                                                  \
-            UCC_CLASS_DELETE_FUNC_NAME(ucc_cl_##_name##_lib_t),                \
-        .super.context.create =                                                \
-            UCC_CLASS_NEW_FUNC_NAME(ucc_cl_##_name##_context_t),               \
-        .super.context.destroy =                                               \
-            UCC_CLASS_DELETE_FUNC_NAME(ucc_cl_##_name##_context_t)};           \
-    UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_cl_##_name.super.cl_lib_config,       \
-                                    &ucc_config_global_list);                  \
-    UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_cl_##_name.super.cl_context_config,   \
-                                    &ucc_config_global_list)
-
+    UCC_BASE_IFACE_DECLARE(CL_, cl_, _name, _NAME, UCC_CL_IFACE_EXT(_NAME))
 #endif
