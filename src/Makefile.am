@@ -1,8 +1,14 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
 #
-SUBDIRS = components/cl/basic
+cl_dirs = components/cl/basic
+tl_dirs =
 
+if HAVE_UCX
+tl_dirs += components/tl/ucp
+endif
+
+SUBDIRS = $(cl_dirs) $(tl_dirs)
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =
 

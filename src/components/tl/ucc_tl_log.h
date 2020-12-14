@@ -12,14 +12,14 @@
                       ##__VA_ARGS__)
 
 #define tl_error(_tl_ctx, _fmt, ...)                                           \
-    ucc_log_component_tl(_tl_ctx, UCS_LOG_LEVEL_ERROR, _fmt, ##__VA_ARGS__)
+    ucc_log_component_tl(_tl_ctx, UCC_LOG_LEVEL_ERROR, _fmt, ##__VA_ARGS__)
 #define tl_warn(_tl_ctx, _fmt, ...)                                            \
-    ucc_log_component_tl(_tl_ctx, UCS_LOG_LEVEL_WARN, _fmt, ##__VA_ARGS__)
+    ucc_log_component_tl(_tl_ctx, UCC_LOG_LEVEL_WARN, _fmt, ##__VA_ARGS__)
 #define tl_info(_tl_ctx, _fmt, ...)                                            \
-    ucc_log_component_tl(_tl_ctx, UCS_LOG_LEVEL_INFO, _fmt, ##__VA_ARGS__)
+    ucc_log_component_tl(_tl_ctx, UCC_LOG_LEVEL_INFO, _fmt, ##__VA_ARGS__)
 #define tl_debug(_tl_ctx, _fmt, ...)                                           \
-    ucc_log_component_tl(_tl_ctx, UCS_LOG_LEVEL_DEBUG, _fmt, ##__VA_ARGS__)
+    ucc_log_component_tl(_tl_ctx, UCC_LOG_LEVEL_DEBUG, _fmt, ##__VA_ARGS__)
 #define tl_trace(_tl_ctx, _fmt, ...)                                           \
-    ucc_log_component_tl(_tl_ctx, UCS_LOG_LEVEL_TRACE, _fmt, ##__VA_ARGS__)
+    ucc_log_component_tl(_tl_ctx, UCC_LOG_LEVEL_TRACE, _fmt, ##__VA_ARGS__)
 
 #endif

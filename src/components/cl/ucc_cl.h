@@ -12,6 +12,23 @@
 #include "components/base/ucc_base_iface.h"
 #include "ucc_cl_type.h"
 
+/** CL (collective layer) is an internal collective interface reflecting the
+    public UCC API and extensions to support modularity, the composition of
+    multiple collective implementations, and functionality that bridges the
+    gap between hardware implementation of communication primitives and the
+    programming models.
+
+    The CL layer will build upon TL for the communication transport requirements.
+    The CL can include a basic implementation, which provides minimal
+    functionality over the TL, or can provide more optimized implementation such
+    as hierarchical implementation that leverages multiple TL components.
+
+    The different implementations of CL are realized as different CL components.
+    The CL components are loaded dynamically, and their names should match the
+    predefined pattern “ucc_cl_.so”. The CL that is used for a given application
+    invocation can be selected with the UCC_CLS lib parameter.
+*/
+
 typedef struct ucc_cl_lib     ucc_cl_lib_t;
 typedef struct ucc_cl_iface   ucc_cl_iface_t;
 typedef struct ucc_cl_context ucc_cl_context_t;

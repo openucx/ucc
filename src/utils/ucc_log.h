@@ -10,7 +10,11 @@
 #include "core/ucc_global_opts.h"
 #include <ucs/debug/log_def.h>
 
-#define UCC_LOG_LEVEL_WARN UCS_LOG_LEVEL_WARN
+#define UCC_LOG_LEVEL_ERROR UCS_LOG_LEVEL_ERROR
+#define UCC_LOG_LEVEL_WARN  UCS_LOG_LEVEL_WARN
+#define UCC_LOG_LEVEL_INFO  UCS_LOG_LEVEL_INFO
+#define UCC_LOG_LEVEL_DEBUG UCS_LOG_LEVEL_DEBUG
+#define UCC_LOG_LEVEL_TRACE UCS_LOG_LEVEL_TRACE
 
 /* Generic wrapper macro to invoke ucs logging backend */
 #define ucc_log_component(_level, _component, _fmt, ...)                       \

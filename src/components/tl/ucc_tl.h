@@ -11,6 +11,15 @@
 
 #include "components/base/ucc_base_iface.h"
 
+/** TL (transport layer) is an internal interface that provides a basic
+    implementation of collectives and p2p primitives. It differs from CL in that
+    it focuses on the abstraction over hardware transport rather than the
+    programming model. These collectives can leverage either p2p communication
+    transport or collective transport. The primary example of p2p communication
+    transport is UCX, and the primary example of collective transport is SHARP,
+    MCAST, and shared memory.
+ */
+
 typedef struct ucc_tl_lib     ucc_tl_lib_t;
 typedef struct ucc_tl_iface   ucc_tl_iface_t;
 typedef struct ucc_tl_context ucc_tl_context_t;
