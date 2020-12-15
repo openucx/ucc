@@ -9,7 +9,7 @@
 #ifndef UCC_CL_H_
 #define UCC_CL_H_
 
-#include "ucc_base_iface.h"
+#include "components/base/ucc_base_iface.h"
 #include "ucc_cl_type.h"
 
 typedef struct ucc_cl_lib     ucc_cl_lib_t;

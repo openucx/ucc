@@ -6,7 +6,8 @@
 
 #ifndef UCC_CL_BASIC_H_
 #define UCC_CL_BASIC_H_
-#include "cl/ucc_cl.h"
+#include "components/cl/ucc_cl.h"
+#include "components/cl/ucc_cl_log.h"
 
 #define UCC_CL_BASIC_DEFAULT_PRIORITY 10
 

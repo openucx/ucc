@@ -5,7 +5,6 @@
  */
 
 #include "cl_basic.h"
-#include "cl/ucc_cl_log.h"
 #include "utils/ucc_malloc.h"
 
 UCC_CLASS_INIT_FUNC(ucc_cl_basic_context_t,

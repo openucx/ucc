@@ -180,8 +180,8 @@ AC_CONFIG_FILES([
                  Makefile
                  src/Makefile
                  tools/info/Makefile
-                 src/cl/basic/Makefile
                  src/ucc/api/ucc_version.h
                  src/core/ucc_version.c
+                 src/components/cl/basic/Makefile
                  ])
 AC_OUTPUT

@@ -8,7 +8,7 @@
 
 #include "config.h"
 #include "ucc/api/ucc.h"
-#include "cl/ucc_cl_type.h"
+#include "components/cl/ucc_cl_type.h"
 #include "utils/ucc_parser.h"
 
 typedef struct ucc_cl_lib ucc_cl_lib_t;

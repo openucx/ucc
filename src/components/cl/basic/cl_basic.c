@@ -5,7 +5,6 @@
  */
 
 #include "cl_basic.h"
-#include "cl/ucc_cl_log.h"
 #include "utils/ucc_malloc.h"
 
 static ucc_config_field_t ucc_cl_basic_lib_config_table[] = {

@@ -5,10 +5,10 @@
 
 #include "config.h"
 #include "ucc_context.h"
-#include "cl/ucc_cl.h"
+#include "components/cl/ucc_cl.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
-#include "cl/ucc_cl_type.h"
+
 ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
                                      ucc_context_config_t **config_p)
 {
