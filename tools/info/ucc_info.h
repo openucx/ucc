@@ -7,7 +7,7 @@
 #ifndef UCC_INFO_H
 #define UCC_INFO_H
 
-#include "api/ucc.h"
+#include "ucc/api/ucc.h"
 
 enum {
     PRINT_VERSION      = UCC_BIT(0),

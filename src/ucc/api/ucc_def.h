@@ -8,7 +8,7 @@
 #ifndef UCC_DEF_H_
 #define UCC_DEF_H_
 
-#include <api/ucc_status.h>
+#include <ucc/api/ucc_status.h>
 #include <stddef.h>
 #include <stdint.h>
 

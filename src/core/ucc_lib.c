@@ -6,8 +6,6 @@
 #include "config.h"
 
 #include "ucc_global_opts.h"
-#include "api/ucc.h"
-#include "api/ucc_status.h"
 #include "ucc_lib.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_malloc.h"

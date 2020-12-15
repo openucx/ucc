@@ -7,7 +7,7 @@
 #define UCC_PARSER_H_
 
 #include "config.h"
-#include "api/ucc_status.h"
+#include "ucc/api/ucc_status.h"
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_compiler_def.h"
 
