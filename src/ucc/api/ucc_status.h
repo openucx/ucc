@@ -31,6 +31,8 @@ typedef enum {
     UCC_ERR_NO_RESOURCE                 =   -5,
     UCC_ERR_NO_MESSAGE                  =   -6, /*!< General purpose return code without specific error */
     UCC_ERR_NOT_FOUND                   =   -7,
+    UCC_ERR_NO_ASSOCIATED_RESOURCE      =   -8,
+    UCC_ERR_CANNOT_DESTROY              =   -9,
     UCC_ERR_LAST                        = -100,
 } ucc_status_t;
 
