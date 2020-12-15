@@ -7,7 +7,7 @@
 #define UCC_COMPONENT_H_
 
 #include "config.h"
-#include <api/ucc.h>
+#include "ucc/api/ucc.h"
 
 #define UCC_MAX_FRAMEWORK_NAME_LEN 64
 #define UCC_MAX_COMPONENT_NAME_LEN 64

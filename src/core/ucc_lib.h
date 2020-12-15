@@ -7,7 +7,7 @@
 #define UCC_LIB_H_
 
 #include "config.h"
-#include "api/ucc.h"
+#include "ucc/api/ucc.h"
 #include "cl/ucc_cl_type.h"
 #include "utils/ucc_parser.h"
 

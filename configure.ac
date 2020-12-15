@@ -181,7 +181,7 @@ AC_CONFIG_FILES([
                  src/Makefile
                  tools/info/Makefile
                  src/cl/basic/Makefile
-                 src/api/ucc_version.h
+                 src/ucc/api/ucc_version.h
                  src/core/ucc_version.c
                  ])
 AC_OUTPUT

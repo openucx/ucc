@@ -6,7 +6,7 @@
 #ifndef UCC_CONTEXT_H_
 #define UCC_CONTEXT_H_
 
-#include "api/ucc.h"
+#include "ucc/api/ucc.h"
 
 typedef struct ucc_lib_info          ucc_lib_info_t;
 typedef struct ucc_cl_context        ucc_cl_context_t;

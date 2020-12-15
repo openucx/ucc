@@ -7,7 +7,7 @@
 #define UCC_COMPILER_DEF_H_
 
 #include "config.h"
-#include "api/ucc_status.h"
+#include "ucc/api/ucc_status.h"
 #include <ucs/type/status.h>
 #include <ucs/sys/string.h>
 #include <ucs/sys/preprocessor.h>

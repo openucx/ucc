@@ -9,9 +9,9 @@
 #ifndef UCC_H_
 #define UCC_H_
 
-#include <api/ucc_def.h>
-#include <api/ucc_version.h>
-#include <api/ucc_status.h>
+#include <ucc/api/ucc_def.h>
+#include <ucc/api/ucc_version.h>
+#include <ucc/api/ucc_status.h>
 #include <stdio.h>
 
 BEGIN_C_DECLS

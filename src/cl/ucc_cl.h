@@ -9,7 +9,7 @@
 #ifndef UCC_CL_H_
 #define UCC_CL_H_
 
-#include "api/ucc.h"
+#include "ucc/api/ucc.h"
 #include "core/ucc_lib.h"
 #include "ucc_cl_type.h"
 #include "utils/ucc_component.h"
