@@ -10,7 +10,7 @@
 #include "utils/ucc_log.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_math.h"
-#include "cl/ucc_cl.h"
+#include "components/cl/ucc_cl.h"
 
 UCS_CONFIG_DEFINE_ARRAY(cl_types, sizeof(ucc_cl_type_t),
                         UCS_CONFIG_TYPE_ENUM(ucc_cl_names));
@@ -46,6 +46,21 @@ static inline int ucc_cl_requested(const ucc_lib_config_t *cfg, int cl_type)
     return 0;
 }
 
+static inline void ucc_copy_lib_params(ucc_lib_params_t *dst,
+                                       const ucc_lib_params_t *src)
+{
+    dst->mask = src->mask;
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_LIB_PARAM_FIELD_THREAD_MODE,
+                            thread_mode);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_LIB_PARAM_FIELD_COLL_TYPES,
+                            coll_types);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_LIB_PARAM_FIELD_REDUCTION_TYPES,
+                            reduction_types);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_LIB_PARAM_FIELD_SYNC_TYPE, sync_type);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_LIB_PARAM_FIELD_REDUCTION_WRAPPER,
+                            reduction_wrapper);
+}
+
 /* Core logic for the selection of CL components:
    1. If user does not provide a set of required CLs then we try to
    use only those components that support the required input params.
@@ -58,15 +73,17 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *user_params,
                                           const ucc_lib_config_t *config,
                                           ucc_lib_info_t *lib)
 {
-    int                  n_cls = ucc_global_config.cl_framework.n_components;
-    uint64_t             supported_coll_types = 0;
-    ucc_thread_mode_t    supported_tm         = UCC_THREAD_MULTIPLE;
-    ucc_lib_params_t     params               = *user_params;
-    ucc_cl_iface_t      *cl_iface;
-    ucc_cl_lib_t        *cl_lib;
-    ucc_cl_lib_config_t *cl_config;
-    ucc_status_t         status;
-    int                  i, specific_cls_requested;
+    int                   n_cls = ucc_global_config.cl_framework.n_components;
+    uint64_t              supported_coll_types = 0;
+    ucc_thread_mode_t     supported_tm         = UCC_THREAD_MULTIPLE;
+    ucc_lib_params_t      params               = *user_params;
+    ucc_cl_lib_config_t  *cl_config            = NULL;
+    ucc_cl_iface_t       *cl_iface;
+    ucc_base_lib_t *      b_lib;
+    ucc_base_lib_params_t b_params;
+    ucc_cl_lib_t         *cl_lib;
+    ucc_status_t          status;
+    int                   i;
 
     lib->libs =
         (ucc_cl_lib_t **)ucc_malloc(sizeof(ucc_cl_lib_t *) * n_cls, "cl_libs");
@@ -80,16 +97,17 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *user_params,
         params.mask |= UCC_LIB_PARAM_FIELD_THREAD_MODE;
         params.thread_mode = UCC_THREAD_SINGLE;
     }
+    ucc_copy_lib_params(&b_params.params, &params);
     ucc_assert(config->cls.count >= 1);
-    specific_cls_requested = (0 == ucc_cl_requested(config, UCC_CL_ALL));
+    lib->specific_cls_requested = (0 == ucc_cl_requested(config, UCC_CL_ALL));
     lib->n_libs_opened     = 0;
     for (i = 0; i < n_cls; i++) {
         cl_iface = ucc_derived_of(ucc_global_config.cl_framework.components[i],
                                   ucc_cl_iface_t);
         /* User requested specific list of CLs and current cl_iface is not part
            of the list: skip it. */
-        if (specific_cls_requested &&
-            0 == ucc_cl_requested(config, cl_iface->type)) {
+        if (lib->specific_cls_requested &&
+            (0 == ucc_cl_requested(config, cl_iface->type))) {
             continue;
         }
         if (params.thread_mode > cl_iface->attr.thread_mode) {
@@ -97,43 +115,34 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *user_params,
                1. If cls == "all" - just skip this CL
                2. If specific CLs are requested: continue and user will 
                   have to query result attributes and check thread mode*/
-            if (!specific_cls_requested) {
+            if (!lib->specific_cls_requested) {
                 ucc_info("requested thread_mode is not supported by the CL: %s",
                          cl_iface->super.name);
                 continue;
             }
         }
-        cl_config = ucc_malloc(cl_iface->cl_lib_config.size, "cl_lib_config");
-        if (!cl_config) {
-            status = UCC_ERR_NO_MEMORY;
-            goto error_cl_cleanup;
-        }
-        status = ucc_config_parser_fill_opts(
-            cl_config, cl_iface->cl_lib_config.table, config->full_prefix,
-            cl_iface->cl_lib_config.prefix, 0);
+        status = ucc_cl_lib_config_read(cl_iface, lib->full_prefix, config,
+                                        &cl_config);
         if (UCC_OK != status) {
-            ucc_error("failed to parse CL %s lib configuration",
+            ucc_error("failed to read CL \"%s\" lib configuration",
                       cl_iface->super.name);
-            goto error_cl_config_parse;
+            goto error_cfg_read;
         }
-        status = cl_iface->init(&params, config, cl_config, &cl_lib);
+        status = cl_iface->lib.init(&b_params, &cl_config->super, &b_lib);
         if (UCC_OK != status) {
-            if (specific_cls_requested) {
+            if (lib->specific_cls_requested) {
                 ucc_error("lib_init failed for component: %s",
                           cl_iface->super.name);
                 goto error_cl_init;
             } else {
                 ucc_info("lib_init failed for component: %s, skipping",
                          cl_iface->super.name);
-                ucc_config_parser_release_opts(cl_config,
-                                               cl_iface->cl_lib_config.table);
-                free(cl_config);
+                ucc_base_config_release(&cl_config->super);
                 continue;
             }
         }
-        ucc_config_parser_release_opts(cl_config,
-                                       cl_iface->cl_lib_config.table);
-        free(cl_config);
+        ucc_base_config_release(&cl_config->super);
+        cl_lib                          = ucc_derived_of(b_lib, ucc_cl_lib_t);
         lib->libs[lib->n_libs_opened++] = cl_lib;
         supported_coll_types |= cl_iface->attr.coll_types;
         if (cl_iface->attr.thread_mode < supported_tm) {
@@ -166,16 +175,14 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *user_params,
     return UCS_OK;
 
 error_cl_init:
-    ucc_config_parser_release_opts(cl_config, cl_iface->cl_lib_config.table);
-error_cl_config_parse:
-    free(cl_config);
-error_cl_cleanup:
+    ucc_base_config_release(&cl_config->super);
+error_cfg_read:
     for (i = 0; i < lib->n_libs_opened; i++) {
-        lib->libs[i]->iface->finalize(lib->libs[i]);
+        lib->libs[i]->iface->lib.finalize(&lib->libs[i]->super);
     }
 error:
     if (lib->libs)
-        free(lib->libs);
+        ucc_free(lib->libs);
     return status;
 }
 
@@ -231,7 +238,7 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
     *lib_p = lib;
     return UCC_OK;
 error:
-    free(lib);
+    ucc_free(lib);
     return status;
 }
 
@@ -281,9 +288,9 @@ ucc_status_t ucc_lib_config_read(const char *env_prefix, const char *filename,
     return UCC_OK;
 
 err_free_prefix:
-    free(config->full_prefix);
+    ucc_free(config->full_prefix);
 err_free_config:
-    free(config);
+    ucc_free(config);
 err:
     return status;
 }
@@ -291,8 +298,8 @@ err:
 void ucc_lib_config_release(ucc_lib_config_t *config)
 {
     ucc_config_parser_release_opts(config, ucc_lib_config_table);
-    free(config->full_prefix);
-    free(config);
+    ucc_free(config->full_prefix);
+    ucc_free(config);
 }
 
 void ucc_lib_config_print(const ucc_lib_config_h config, FILE *stream,
@@ -313,19 +320,15 @@ ucc_status_t ucc_lib_config_modify(ucc_lib_config_h config, const char *name,
 ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
 {
     int i;
-    ucc_status_t status, return_status = UCC_OK;
     ucc_assert(lib->n_libs_opened > 0);
     ucc_assert(lib->libs);
     /* If some CL components fails in finalize we will return
        its failure status to the user, however we will still
        try to continue and finalize other CLs */
     for (i = 0; i < lib->n_libs_opened; i++) {
-        status = lib->libs[i]->iface->finalize(lib->libs[i]);
-        if (UCC_OK == return_status && UCC_OK != status) {
-            return_status = status;
-        }
+        lib->libs[i]->iface->lib.finalize(&lib->libs[i]->super);
     }
-    free(lib->libs);
-    free(lib);
-    return return_status;
+    ucc_free(lib->libs);
+    ucc_free(lib);
+    return UCC_OK;
 }

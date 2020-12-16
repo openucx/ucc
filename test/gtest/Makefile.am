@@ -61,20 +61,23 @@ gtest_CXXFLAGS = -std=gnu++11 \
 	$(BASE_CXXFLAGS) $(GTEST_CXXFLAGS) \
 	-DGTEST_UCM_HOOK_LIB_DIR="\"${abs_builddir}/ucm/test_dlopen/.libs\""
 
-gtest_SOURCES =             \
-	common/gtest-all.cc     \
-	common/test_obj_size.cc \
-	common/main.cc          \
-	common/test.cc          \
-	                        \
-	tl/tl_test.cc           \
-	core/test_lib_config.cc \
-	core/test_lib.cc
+gtest_SOURCES =                 \
+	common/gtest-all.cc         \
+	common/test_obj_size.cc     \
+	common/main.cc              \
+	common/test.cc              \
+	                            \
+	tl/tl_test.cc               \
+	core/test_lib_config.cc     \
+	core/test_lib.cc            \
+	core/test_context_config.cc \
+	core/test_context.cc
 
-noinst_HEADERS = \
-	common/gtest.h \
-	common/test.h \
-	common/test_helpers.h
+noinst_HEADERS =          \
+	common/gtest.h        \
+	common/test.h         \
+	common/test_helpers.h \
+	core/test_context.h
 
 .PHONY: test test gdb valgrind fix_rpath ucc
 

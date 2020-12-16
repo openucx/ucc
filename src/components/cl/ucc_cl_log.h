@@ -8,7 +8,8 @@
 #define UCC_CL_LOG_H_
 #include "utils/ucc_log.h"
 #define ucc_log_component_cl(_cl_lib, _level, fmt, ...)                        \
-    ucc_log_component(_level, (_cl_lib)->log_component, fmt, ##__VA_ARGS__)
+    ucc_log_component(_level, ((ucc_base_lib_t *)_cl_lib)->log_component, fmt, \
+                      ##__VA_ARGS__)
 
 #define cl_error(_cl_lib, _fmt, ...)                                           \
     ucc_log_component_cl(_cl_lib, UCS_LOG_LEVEL_ERROR, _fmt, ##__VA_ARGS__)
