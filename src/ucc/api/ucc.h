@@ -606,8 +606,9 @@ typedef struct ucc_resource_params {
     uint64_t                    mask;
     ucc_resource_obj_type_t     obj_type;
     uint64_t                    num_resources;
-    char                        *resource_type[];
-    void                        *resource_value[];
+    char                        *resource_key[];
+    char                        *resource_value[];
+    uint64_t                    value_len;
 } ucc_resource_params_t;
 
 
@@ -615,17 +616,26 @@ typedef struct ucc_resource_params {
  *  @ingroup UCC_LIB
  *
  *  @brief The @ref ucc_associate_resources provides a lazy and dynamic way
- *  to attach resources to the UCC objects. All resource objects should be
- *  previously created.
+ *  to attach resources to the UCC objects.
  *
  *
  *  @param [in]       lib_p                Input library object
  *  @param [in]       params               Parameters to attach the resources
- *  @param [in/out]   ucc_resource_obj     Resource object to be modified
+ *  @param [in,out]   ucc_resource_obj     Resource object to be modified
  *
  *  @parblock
  *
- *  @b Description
+ *  @b Description A local resource association operation for the UCC objects. The parameters
++ *  specify the UCC objects to be associated with the resources. The resources are provided as
++ *  a key/value/length triplet parameters. The values are user and implementation defined.
++ *  The keys are defined has a pattern UCC_RESOURCE_OBJ_*_*. The first wild card specifies
++ *  the object such as library, context, and team. The second wild card is user and implementation
++ *  specific identifer.  The user is responsible for allocating the memory for keys and values.
++ *
++ *  The resource association operation can be called on the object, which is of correct type .i.e.,
++ *  UCC_RESOURCE_TYPE_ASSOCIATED.
++ *
+  * On success, the resources are associated with the object.
  *
  *  @endparblock
  *
@@ -633,29 +643,32 @@ typedef struct ucc_resource_params {
  */
 
 ucc_status_t ucc_associate_resources(ucc_lib_h lib_p, ucc_resource_params_t
-                params, void *ucc_resource_object);
+                                      *params, void *ucc_resource_obj);
 
 /**
  *  @ingroup UCC_LIB
  *
  *  @brief The @ref ucc_disassociate_resources disassociates the resources
- *  attached to the UCC object. All operations except destroy and finalize are
- *  invalid after this operation.
+ *  for the UCC object.
  *
  *
  *  @param [in]       lib_p                Input library object
- *  @param [in/out]   ucc_resource_obj     Resource object to be modified 
+ *  @param [in,out]   ucc_resource_obj     Resource object to be modified
  *
  *  @parblock
  *
- *  @b Description
+ *  @b Description A resource disassociation operation for the UCC objects. All operations
+ *  on this object after disassociation is invalid. The only valid operation for this object is
+ *  to finalize and destroy. It is the responsibility of the implementation to finalize the
+ *  objects. Also, the user is responsible for releasing the memory associated with the keys and
+*  values.
  *
  *  @endparblock
  *
  *  @return Error code as defined by ucc_status_t
  */
 
-ucc_status_t ucc_disassociate_resources(ucc_lib_h lib_p, void *ucc_resource_object);
+ucc_status_t ucc_disassociate_resources(ucc_lib_h lib_p, void *ucc_resource_obj);
 
 
 /*
