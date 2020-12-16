@@ -606,8 +606,8 @@ typedef struct ucc_resource_params {
     uint64_t                    mask;
     ucc_resource_obj_type_t     obj_type;
     uint64_t                    num_resources;
-    char                        *resource_key[];
-    char                        *resource_value[];
+    char                        *resource_key;
+    char                        *resource_value;
     uint64_t                    value_len;
 } ucc_resource_params_t;
 
