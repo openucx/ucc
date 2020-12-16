@@ -969,7 +969,7 @@ typedef struct ucc_team_p2p_conn {
     void            *conn_ctx;
     ucc_status_t    (*req_test)(void *request);
     ucc_status_t    (*req_free)(void *request);
-} ucc_team_p2p_conn;
+} ucc_team_p2p_conn_t;
 
 /**
  *
@@ -1087,7 +1087,7 @@ typedef struct ucc_team_params {
     uint64_t                team_size;
     ucc_coll_sync_type_t    sync_type;
     ucc_team_oob_coll_t     oob;
-    ucc_team_p2p_conn       p2p_conn;
+    ucc_team_p2p_conn_t     p2p_conn;
     ucc_mem_map_params_t    mem_params;
     ucc_ep_map_t            ep_map;
 } ucc_team_params_t;
