@@ -137,7 +137,7 @@ typedef void *ucc_context_addr_t;
 /**
  * @ingroup UCC_TEAM_DT
  */
-typedef void *ucc_context_addr_len_t;
+typedef size_t ucc_context_addr_len_t;
 #endif
 
 
