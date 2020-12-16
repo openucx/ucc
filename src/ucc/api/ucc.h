@@ -626,15 +626,15 @@ typedef struct ucc_resource_params {
  *  @parblock
  *
  *  @b Description A local resource association operation for the UCC objects. The parameters
-+ *  specify the UCC objects to be associated with the resources. The resources are provided as
-+ *  a key/value/length triplet parameters. The values are user and implementation defined.
-+ *  The keys are defined has a pattern UCC_RESOURCE_OBJ_*_*. The first wild card specifies
-+ *  the object such as library, context, and team. The second wild card is user and implementation
-+ *  specific identifer.  The user is responsible for allocating the memory for keys and values.
-+ *
-+ *  The resource association operation can be called on the object, which is of correct type .i.e.,
-+ *  UCC_RESOURCE_TYPE_ASSOCIATED.
-+ *
+ *  specify the UCC objects to be associated with the resources. The resources are provided as
+ *  a key/value/length triplet parameters. The values are user and implementation defined.
+ *  The keys are defined has a pattern UCC_RESOURCE_OBJ_*_*. The first wild card specifies
+ *  the object such as library, context, and team. The second wild card is user and implementation
+ *  specific identifer.  The user is responsible for allocating the memory for keys and values.
+ *
+ *  The resource association operation can be called on the object, which is of correct type .i.e.,
+ *  UCC_RESOURCE_TYPE_ASSOCIATED.
+ *
   * On success, the resources are associated with the object.
  *
  *  @endparblock
