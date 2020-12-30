@@ -12,6 +12,7 @@
 #include "utils/ucc_parser.h"
 
 typedef struct ucc_cl_lib ucc_cl_lib_t;
+
 typedef struct ucc_lib_config {
     char                    *full_prefix;
     struct {
@@ -21,11 +22,12 @@ typedef struct ucc_lib_config {
 } ucc_lib_config_t;
 
 typedef struct ucc_lib_info {
-    int            n_libs_opened;
     char          *full_prefix;
-    ucc_cl_lib_t **libs;
+    int            n_cl_libs_opened;
+    ucc_cl_lib_t **cl_libs;
     ucc_lib_attr_t attr;
     int            specific_cls_requested;
+    ucc_lib_params_t params;
 } ucc_lib_info_t;
 
 void ucc_get_version(unsigned *major_version, unsigned *minor_version,
@@ -40,4 +42,6 @@ const char *ucc_get_version_string(void);
         }                                                                      \
     } while (0)
 
+void ucc_copy_lib_params(ucc_lib_params_t *dst,
+                         const ucc_lib_params_t *src);
 #endif

@@ -26,7 +26,7 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
     }
     config->lib     = lib;
     config->configs = (ucc_cl_context_config_t **)ucc_calloc(
-        lib->n_libs_opened, sizeof(ucc_cl_context_config_t *),
+        lib->n_cl_libs_opened, sizeof(ucc_cl_context_config_t *),
         "cl_configs_array");
     if (config->configs == NULL) {
         ucc_error("failed to allocate %zd bytes for cl configs array",
@@ -36,13 +36,13 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
     }
 
     config->n_cl_cfg = 0;
-    for (i = 0; i < lib->n_libs_opened; i++) {
-        ucc_assert(NULL != lib->libs[i]->iface->cl_context_config.table);
+    for (i = 0; i < lib->n_cl_libs_opened; i++) {
+        ucc_assert(NULL != lib->cl_libs[i]->iface->cl_context_config.table);
         status =
-            ucc_cl_context_config_read(lib->libs[i], config, &cl_config);
+            ucc_cl_context_config_read(lib->cl_libs[i], config, &cl_config);
         if (UCC_OK != status) {
             ucc_error("failed to read CL \"%s\" context configuration",
-                      lib->libs[i]->iface->super.name);
+                      lib->cl_libs[i]->iface->super.name);
             goto err_config_i;
         }
         config->configs[config->n_cl_cfg]         = cl_config;
@@ -123,12 +123,12 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
             if (config->configs[i]) {
                 status = ucc_config_parser_set_value(
                     config->configs[i],
-                    config->lib->libs[i]->iface->cl_context_config.table, name,
+                    config->lib->cl_libs[i]->iface->cl_context_config.table, name,
                     value);
                 if (UCC_OK != status) {
                     ucc_error("failed to modify CL \"%s\" configuration, name "
                               "%s, value %s",
-                              config->lib->libs[i]->iface->super.name, name,
+                              config->lib->cl_libs[i]->iface->super.name, name,
                               value);
                     return status;
                 }
@@ -177,22 +177,22 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
             print_header = 0;
             ucc_config_parser_print_opts(
                 stream, title, config->configs[i],
-                config->lib->libs[i]->iface->cl_context_config.table,
-                config->lib->libs[i]->iface->cl_context_config.prefix,
+                config->lib->cl_libs[i]->iface->cl_context_config.table,
+                config->lib->cl_libs[i]->iface->cl_context_config.prefix,
                 config->lib->full_prefix, UCC_CONFIG_PRINT_HEADER);
         }
 
         ucc_config_parser_print_opts(
-            stream, config->lib->libs[i]->iface->cl_context_config.name,
+            stream, config->lib->cl_libs[i]->iface->cl_context_config.name,
             config->configs[i],
-            config->lib->libs[i]->iface->cl_context_config.table,
-            config->lib->libs[i]->iface->cl_context_config.prefix,
+            config->lib->cl_libs[i]->iface->cl_context_config.table,
+            config->lib->cl_libs[i]->iface->cl_context_config.prefix,
             config->lib->full_prefix, (ucc_config_print_flags_t)flags);
     }
 }
 
-static inline void ucc_copy_context_params(ucc_context_params_t *dst,
-                                           const ucc_context_params_t *src)
+void ucc_copy_context_params(ucc_context_params_t *dst,
+                             const ucc_context_params_t *src)
 {
     dst->mask = src->mask;
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_TYPE, ctx_type);
@@ -226,6 +226,8 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     ctx->lib = lib;
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
+    b_params.context = ctx;
+
     ctx->cl_ctx = (ucc_cl_context_t **)ucc_malloc(
         sizeof(ucc_cl_context_t *) * num_cls, "cl_ctx_array");
     if (!ctx->cl_ctx) {

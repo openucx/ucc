@@ -26,4 +26,7 @@ typedef struct ucc_context_config {
     int                       n_cl_cfg;
 } ucc_context_config_t;
 
+void ucc_copy_context_params(ucc_context_params_t *dst,
+                             const ucc_context_params_t *src);
+
 #endif

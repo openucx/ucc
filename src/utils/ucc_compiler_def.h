@@ -23,7 +23,7 @@
 #define ucc_derived_of    ucs_derived_of
 #define ucc_strncpy_safe  ucs_strncpy_safe
 #define ucc_snprintf_safe snprintf
-
+#define ucc_ilog2         ucs_ilog2
 typedef ucs_log_component_config_t ucc_log_component_config_t;
 
 #define _UCC_PP_MAKE_STRING(x) #x
