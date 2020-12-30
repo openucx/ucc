@@ -13,6 +13,4 @@ libucc_cl_basic_la_SOURCES  = $(sources)
 libucc_cl_basic_la_CPPFLAGS = $(AM_CPPFLAGS)
 libucc_cl_basic_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed
 
-
-
 include $(top_srcdir)/config/module.am

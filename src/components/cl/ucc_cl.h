@@ -80,8 +80,11 @@ typedef struct ucc_cl_context {
 
 UCC_CLASS_DECLARE(ucc_cl_context_t, ucc_cl_lib_t *);
 
-#define UCC_CL_IFACE_EXT(_NAME) .super.type = UCC_CL_ ## _NAME,
+typedef struct ucc_cl_lib_attr {
+    ucc_base_attr_t super;
+    uint64_t tls;
+} ucc_cl_lib_attr_t;
 
 #define UCC_CL_IFACE_DECLARE(_name, _NAME)                                     \
-    UCC_BASE_IFACE_DECLARE(CL_, cl_, _name, _NAME, UCC_CL_IFACE_EXT(_NAME))
+    UCC_BASE_IFACE_DECLARE(CL_, cl_, _name, _NAME)
 #endif

@@ -10,6 +10,7 @@
 
 typedef struct ucc_lib_info          ucc_lib_info_t;
 typedef struct ucc_cl_context        ucc_cl_context_t;
+typedef struct ucc_tl_context        ucc_tl_context_t;
 typedef struct ucc_cl_context_config ucc_cl_context_config_t;
 
 typedef struct ucc_context {
@@ -17,7 +18,9 @@ typedef struct ucc_context {
     ucc_context_params_t params;
     ucc_context_attr_t   attr;
     ucc_cl_context_t   **cl_ctx;
+    ucc_tl_context_t   **tl_ctx;
     int                  n_cl_ctx;
+    int                  n_tl_ctx;
 } ucc_context_t;
 
 typedef struct ucc_context_config {
