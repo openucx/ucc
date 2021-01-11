@@ -10,13 +10,20 @@
 #include <ucs/type/class.h>
 #include "utils/ucc_compiler_def.h"
 
-#define UCC_CLASS_DECLARE         UCS_CLASS_DECLARE
 #define UCC_CLASS_DEFINE          UCS_CLASS_DEFINE
 #define UCC_CLASS_DELETE          UCS_CLASS_DELETE
-#define UCC_CLASS_INIT_FUNC       UCS_CLASS_INIT_FUNC
 #define UCC_CLASS_CLEANUP_FUNC    UCS_CLASS_CLEANUP_FUNC
 #define UCC_CLASS_CLEANUP         UCS_CLASS_CLEANUP
 #define UCC_CLASS_NEW_FUNC_NAME   UCS_CLASS_NEW_FUNC_NAME
+
+#define UCC_CLASS_INIT_FUNC(_type, ...)                                        \
+    ucc_status_t _UCS_CLASS_INIT_NAME(_type)(_type *self,                      \
+                                             ucs_class_t *_myclass,            \
+                                             int *_init_count, ## __VA_ARGS__) \
+
+#define UCC_CLASS_DECLARE(_type, ...)                                          \
+    extern ucs_class_t _UCS_CLASS_DECL_NAME(_type);                            \
+    UCC_CLASS_INIT_FUNC(_type, ## __VA_ARGS__);                                \
 
 #define UCC_CLASS_NEW(...)                                                     \
     ({                                                                         \

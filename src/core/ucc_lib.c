@@ -113,7 +113,7 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *user_params,
         if (params.thread_mode > cl_iface->attr.thread_mode) {
             /* Requested THREAD_MODE is not supported by the CL:
                1. If cls == "all" - just skip this CL
-               2. If specific CLs are requested: continue and user will 
+               2. If specific CLs are requested: continue and user will
                   have to query result attributes and check thread mode*/
             if (!lib->specific_cls_requested) {
                 ucc_info("requested thread_mode is not supported by the CL: %s",
@@ -172,7 +172,7 @@ static ucc_status_t ucc_lib_init_filtered(const ucc_lib_params_t *user_params,
     }
     lib->attr.coll_types  = supported_coll_types;
     lib->attr.thread_mode = ucc_min(supported_tm, params.thread_mode);
-    return UCS_OK;
+    return UCC_OK;
 
 error_cl_init:
     ucc_base_config_release(&cl_config->super);
