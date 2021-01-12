@@ -183,5 +183,6 @@ AC_CONFIG_FILES([
                  src/ucc/api/ucc_version.h
                  src/core/ucc_version.c
                  src/components/cl/basic/Makefile
+                 src/components/tl/ucp/Makefile
                  ])
 AC_OUTPUT

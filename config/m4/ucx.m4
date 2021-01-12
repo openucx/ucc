@@ -80,7 +80,7 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
                 AC_SUBST(UCS_LDFLAGS, "-L$check_ucx_libdir")
             ])
 
-            AC_SUBST(UCX_LIBADD, "-lucp -lucs -lucm")
+            AC_SUBST(UCX_LIBADD, "-lucp -lucm")
             AC_SUBST(UCS_LIBADD, "-lucs")
         ],
         [

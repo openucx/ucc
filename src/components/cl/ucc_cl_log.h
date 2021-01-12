@@ -12,14 +12,14 @@
                       ##__VA_ARGS__)
 
 #define cl_error(_cl_lib, _fmt, ...)                                           \
-    ucc_log_component_cl(_cl_lib, UCS_LOG_LEVEL_ERROR, _fmt, ##__VA_ARGS__)
+    ucc_log_component_cl(_cl_lib, UCC_LOG_LEVEL_ERROR, _fmt, ##__VA_ARGS__)
 #define cl_warn(_cl_lib, _fmt, ...)                                            \
-    ucc_log_component_cl(_cl_lib, UCS_LOG_LEVEL_WARN, _fmt, ##__VA_ARGS__)
+    ucc_log_component_cl(_cl_lib, UCC_LOG_LEVEL_WARN, _fmt, ##__VA_ARGS__)
 #define cl_info(_cl_lib, _fmt, ...)                                            \
-    ucc_log_component_cl(_cl_lib, UCS_LOG_LEVEL_INFO, _fmt, ##__VA_ARGS__)
+    ucc_log_component_cl(_cl_lib, UCC_LOG_LEVEL_INFO, _fmt, ##__VA_ARGS__)
 #define cl_debug(_cl_lib, _fmt, ...)                                           \
-    ucc_log_component_cl(_cl_lib, UCS_LOG_LEVEL_DEBUG, _fmt, ##__VA_ARGS__)
+    ucc_log_component_cl(_cl_lib, UCC_LOG_LEVEL_DEBUG, _fmt, ##__VA_ARGS__)
 #define cl_trace(_cl_lib, _fmt, ...)                                           \
-    ucc_log_component_cl(_cl_lib, UCS_LOG_LEVEL_TRACE, _fmt, ##__VA_ARGS__)
+    ucc_log_component_cl(_cl_lib, UCC_LOG_LEVEL_TRACE, _fmt, ##__VA_ARGS__)
 
 #endif

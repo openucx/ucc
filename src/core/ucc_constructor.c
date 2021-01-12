@@ -71,6 +71,12 @@ ucc_status_t ucc_constructor(void)
                       ucc_global_config.component_path);
             return status;
         }
+        status = ucc_components_load("tl", &ucc_global_config.tl_framework);
+        if (UCC_OK != status) {
+            /* not critical - some CLs may operate w/o use of TL */
+            ucc_debug("no TL components were found in the UCC_COMPONENT_PATH: %s",
+                      ucc_global_config.component_path);
+        }
     }
     return UCC_OK;
 }

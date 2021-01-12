@@ -1,8 +1,14 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
 #
-SUBDIRS = components/cl/basic
+cl_dirs = components/cl/basic
+tl_dirs =
 
+if HAVE_UCX
+tl_dirs += components/tl/ucp
+endif
+
+SUBDIRS = $(cl_dirs) $(tl_dirs)
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =
 
@@ -28,8 +34,10 @@ noinst_HEADERS =                     \
 	utils/ucc_math.h                 \
 	components/base/ucc_base_iface.h \
 	components/cl/ucc_cl.h           \
-	components/cl/ucc_cl_log.h
-
+	components/cl/ucc_cl_log.h       \
+	components/cl/ucc_cl_type.h      \
+	components/tl/ucc_tl.h           \
+	components/tl/ucc_tl_log.h
 
 
 libucc_la_SOURCES =                  \
@@ -40,6 +48,7 @@ libucc_la_SOURCES =                  \
 	core/ucc_context.c               \
 	utils/ucc_component.c            \
 	components/base/ucc_base_iface.c \
-	components/cl/ucc_cl.c
+	components/cl/ucc_cl.c           \
+	components/tl/ucc_tl.c
 
 libucc_ladir = $(includedir)
