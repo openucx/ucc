@@ -41,6 +41,12 @@ typedef struct ucc_tl_ucp_context {
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_tl_ucp_team {
+    ucc_tl_team_t super;
+} ucc_tl_ucp_team_t;
+UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
+                  const ucc_base_team_params_t *);
+
 typedef struct ucc_tl_ucp_req {
     ucc_status_t status;
 } ucc_tl_ucp_req_t;

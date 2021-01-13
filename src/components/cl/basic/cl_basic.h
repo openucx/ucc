@@ -40,4 +40,9 @@ typedef struct ucc_cl_basic_context {
 UCC_CLASS_DECLARE(ucc_cl_basic_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_cl_basic_team {
+    ucc_cl_team_t super;
+} ucc_cl_basic_team_t;
+UCC_CLASS_DECLARE(ucc_cl_basic_team_t, ucc_base_context_t *,
+                  const ucc_base_team_params_t *);
 #endif

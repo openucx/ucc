@@ -23,6 +23,7 @@
 typedef struct ucc_tl_lib     ucc_tl_lib_t;
 typedef struct ucc_tl_iface   ucc_tl_iface_t;
 typedef struct ucc_tl_context ucc_tl_context_t;
+typedef struct ucc_tl_team    ucc_tl_team_t;
 
 typedef enum ucc_tl_type {
     UCC_TL_UCP = UCC_BIT(0),
@@ -55,6 +56,7 @@ typedef struct ucc_tl_iface {
     ucs_config_global_list_entry_t tl_context_config;
     ucc_base_lib_iface_t           lib;
     ucc_base_context_iface_t       context;
+    ucc_base_team_iface_t          team;
 } ucc_tl_iface_t;
 
 typedef struct ucc_tl_lib {
@@ -68,6 +70,11 @@ typedef struct ucc_tl_context {
     int                ref_count;
 } ucc_tl_context_t;
 UCC_CLASS_DECLARE(ucc_tl_context_t, ucc_tl_lib_t *);
+
+typedef struct ucc_tl_team {
+    ucc_base_team_t super;
+} ucc_tl_team_t;
+UCC_CLASS_DECLARE(ucc_tl_team_t, ucc_tl_context_t *);
 
 #define UCC_TL_IFACE_DECLARE(_name, _NAME)                                     \
     UCC_BASE_IFACE_DECLARE(TL_, tl_, _name, _NAME)

@@ -29,6 +29,7 @@ noinst_HEADERS =                     \
 	core/ucc_lib.h                   \
 	core/ucc_context.h               \
 	core/ucc_mc.h                    \
+	core/ucc_team.h                  \
 	utils/ucc_compiler_def.h         \
 	utils/ucc_log.h                  \
 	utils/ucc_parser.h               \
@@ -51,6 +52,7 @@ libucc_la_SOURCES =                  \
 	core/ucc_version.c               \
 	core/ucc_context.c               \
 	core/ucc_mc.c                    \
+	core/ucc_team.c                  \
 	utils/ucc_component.c            \
 	components/base/ucc_base_iface.c \
 	components/cl/ucc_cl.c           \

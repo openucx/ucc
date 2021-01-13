@@ -32,6 +32,7 @@
 typedef struct ucc_cl_lib     ucc_cl_lib_t;
 typedef struct ucc_cl_iface   ucc_cl_iface_t;
 typedef struct ucc_cl_context ucc_cl_context_t;
+typedef struct ucc_cl_team    ucc_cl_team_t;
 
 typedef struct ucc_cl_lib_config {
     ucc_base_config_t  super;
@@ -63,6 +64,7 @@ typedef struct ucc_cl_iface {
     ucc_config_global_list_entry_t cl_context_config;
     ucc_base_lib_iface_t           lib;
     ucc_base_context_iface_t       context;
+    ucc_base_team_iface_t          team;
 } ucc_cl_iface_t;
 
 typedef struct ucc_cl_lib {
@@ -70,15 +72,18 @@ typedef struct ucc_cl_lib {
     ucc_cl_iface_t             *iface;
     int                         priority;
 } ucc_cl_lib_t;
-
 UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_cl_lib_config_t *,
                   int);
 
 typedef struct ucc_cl_context {
     ucc_base_context_t super;
 } ucc_cl_context_t;
-
 UCC_CLASS_DECLARE(ucc_cl_context_t, ucc_cl_lib_t *);
+
+typedef struct ucc_cl_team {
+    ucc_base_team_t super;
+} ucc_cl_team_t;
+UCC_CLASS_DECLARE(ucc_cl_team_t, ucc_cl_context_t *);
 
 typedef struct ucc_cl_lib_attr {
     ucc_base_attr_t super;
@@ -87,4 +92,11 @@ typedef struct ucc_cl_lib_attr {
 
 #define UCC_CL_IFACE_DECLARE(_name, _NAME)                                     \
     UCC_BASE_IFACE_DECLARE(CL_, cl_, _name, _NAME)
+
+#define UCC_CL_CTX_IFACE(_cl_ctx)                                              \
+    (ucc_derived_of((_cl_ctx)->super.lib, ucc_cl_lib_t))->iface
+
+#define UCC_CL_TEAM_IFACE(_cl_team)                                            \
+    (ucc_derived_of((_cl_team)->super.context->lib, ucc_cl_lib_t))->iface
+
 #endif
