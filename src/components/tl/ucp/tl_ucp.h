@@ -32,17 +32,28 @@ typedef struct ucc_tl_ucp_lib {
 UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_tl_ucp_addr_storage ucc_tl_ucp_addr_storage_t;
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t super;
     ucp_context_h    ucp_context;
     ucp_worker_h     ucp_worker;
     size_t           ucp_addrlen;
+    ucp_address_t   *worker_address;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
 typedef struct ucc_tl_ucp_team {
     ucc_tl_team_t super;
+    ucc_status_t  status;
+    int           context_ep_storage; /*< The flag indicates whether ucp endpoints
+                                          are stored on the ucc_tl_ucp_context or
+                                          are they created per-team.
+                                          This optimization is only possible when
+                                          user provides the necessary rank mappings
+                                          team_rank->context_rank. */
+    ucp_ep_h                  *eps;
+    ucc_tl_ucp_addr_storage_t *addr_storage;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
@@ -50,4 +61,18 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 typedef struct ucc_tl_ucp_req {
     ucc_status_t status;
 } ucc_tl_ucp_req_t;
+
+typedef struct ucc_tl_ucp_addr_storage {
+    void                 *oob_req;
+    size_t                max_addrlen;
+    int                   state;
+    int                   is_ctx;
+    size_t               *addrlens;
+    void                 *addresses;
+    ucc_team_oob_coll_t   oob;
+    ucc_tl_ucp_context_t *ctx;
+} ucc_tl_ucp_addr_storage_t;
+
+#define UCC_TL_UCP_TEAM_CTX(_team)                                             \
+    (ucc_derived_of((_team)->super.super.context, ucc_tl_ucp_context_t))
 #endif

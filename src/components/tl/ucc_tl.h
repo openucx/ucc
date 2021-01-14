@@ -82,4 +82,11 @@ UCC_CLASS_DECLARE(ucc_tl_team_t, ucc_tl_context_t *);
 ucc_status_t ucc_tl_context_get(ucc_context_t *ctx, ucc_tl_type_t type,
                                 ucc_tl_context_t **tl_context);
 ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context);
+
+#define UCC_TL_CTX_IFACE(_tl_ctx)                                              \
+    (ucc_derived_of((_tl_ctx)->super.lib, ucc_tl_lib_t))->iface
+
+#define UCC_TL_TEAM_IFACE(_tl_team)                                            \
+    (ucc_derived_of((_tl_team)->super.context->lib, ucc_tl_lib_t))->iface
+
 #endif

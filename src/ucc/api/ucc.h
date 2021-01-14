@@ -977,7 +977,7 @@ typedef struct ucc_team_p2p_conn {
  *  @ingroup UCC_TEAM_DT
  */
 typedef struct  ucc_team_oob_coll {
-    int             (*allgather)(void *src_buf, void *recv_buf, size_t size,
+    ucc_status_t    (*allgather)(void *src_buf, void *recv_buf, size_t size,
                                  void *allgather_info,  void **request);
     ucc_status_t    (*req_test)(void *request);
     ucc_status_t    (*req_free)(void *request);

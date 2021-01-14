@@ -105,6 +105,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     self->ucp_context = ucp_context;
     self->ucp_worker  = ucp_worker;
+    self->worker_address = NULL;
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 

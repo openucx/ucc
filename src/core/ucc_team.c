@@ -74,7 +74,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
         return UCC_ERR_NO_MESSAGE;
     }
     team->last_team_create_posted = i;
-    team->status                  = UCC_INPROGRESS;
+    team->status = (i < context->n_cl_ctx) ? UCC_INPROGRESS : UCC_OK;
     return UCC_OK;
 }
 
@@ -108,7 +108,9 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     }
     memcpy(team->contexts, contexts, sizeof(ucc_context_t *) * num_contexts);
     ucc_copy_team_params(&team->params, params);
-    return ucc_team_create_post_single(contexts[0], team);
+    status    = ucc_team_create_post_single(contexts[0], team);
+    *new_team = team;
+    return status;
 
 err_ctx_alloc:
     free(team);
@@ -168,6 +170,9 @@ ucc_status_t ucc_team_create_test(ucc_team_h team)
 {
     /* we don't support multiple contexts per team yet */
     ucc_assert(team->num_contexts == 1);
+    if (team->status == UCC_OK) {
+        return UCC_OK;
+    }
     return ucc_team_create_test_single(team->contexts[0], team);
 }
 
