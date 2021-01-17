@@ -41,7 +41,7 @@ UCC is BSD-style licensed, as found in the [LICENSE](LICENSE) file.
 ```sh
 $./autogen.sh
 
-$./configure --prefix=<ucc-install-path> --with-ucx==<ucx-install-path>
+$./configure --prefix=<ucc-install-path> --with-ucx=<ucx-install-path>
 
 $make 
 ```
