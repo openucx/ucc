@@ -72,13 +72,15 @@ gtest_SOURCES =                 \
 	core/test_lib.cc            \
 	core/test_context_config.cc \
 	core/test_context.cc        \
-	core/test_mc.cc
+	core/test_mc.cc             \
+	core/test_multiproc.cc
 
 noinst_HEADERS =          \
 	common/gtest.h        \
 	common/test.h         \
 	common/test_helpers.h \
-	core/test_context.h
+	core/test_context.h   \
+	core/test_multiproc.h
 
 .PHONY: test test gdb valgrind fix_rpath ucc
 
