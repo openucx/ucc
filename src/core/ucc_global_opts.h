@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -17,6 +17,7 @@ typedef struct ucc_global_config {
     ucc_log_component_config_t log_component;
     ucc_component_framework_t  cl_framework;
     ucc_component_framework_t  tl_framework;
+    ucc_component_framework_t  mc_framework;
 
     /* Coll component libraries path */
     char *component_path;

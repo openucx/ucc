@@ -12,6 +12,7 @@
 #include "utils/ucc_math.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
+#include "ucc_mc.h"
 
 UCS_CONFIG_DEFINE_ARRAY(cl_types, sizeof(ucc_cl_type_t),
                         UCS_CONFIG_TYPE_ENUM(ucc_cl_names));
@@ -266,6 +267,9 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
     if (UCC_OK != (status = ucc_constructor())) {
         return status;
     }
+    if (UCC_OK != (status = ucc_mc_init())) {
+        return status;
+    }
 
     ucc_get_version(&major_version, &minor_version, &release_number);
 
@@ -401,5 +405,6 @@ ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
     }
     ucc_free(lib->cl_libs);
     ucc_free(lib);
+    ucc_mc_finalize();
     return UCC_OK;
 }

@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2001-2020.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2001-2021.  ALL RIGHTS RESERVED.
 # This software product is a proprietary product of Mellanox Technologies Ltd.
 # (the "Company") and all right, title, and interest and to the software product,
 # including all associated intellectual property rights, are and shall
@@ -184,5 +184,6 @@ AC_CONFIG_FILES([
                  src/core/ucc_version.c
                  src/components/cl/basic/Makefile
                  src/components/tl/ucp/Makefile
+                 src/components/mc/cpu/Makefile
                  ])
 AC_OUTPUT
