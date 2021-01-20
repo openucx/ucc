@@ -2,6 +2,7 @@
  * @file ucc_def.h
  * @date 2020
  * @copyright Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * @copyright Copyright (C) Huawei Technologies Co., Ltd. 2020.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -137,7 +138,7 @@ typedef void *ucc_context_addr_t;
 /**
  * @ingroup UCC_TEAM_DT
  */
-typedef void *ucc_context_addr_len_t;
+typedef size_t ucc_context_addr_len_t;
 #endif
 
 
