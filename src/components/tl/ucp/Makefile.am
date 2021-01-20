@@ -7,7 +7,9 @@ sources =            \
 	tl_ucp.c         \
 	tl_ucp_lib.c     \
 	tl_ucp_context.c \
-	tl_ucp_team.c
+	tl_ucp_team.c    \
+	tl_ucp_ep.h      \
+    tl_ucp_ep.c
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

@@ -89,4 +89,6 @@ ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context);
 #define UCC_TL_TEAM_IFACE(_tl_team)                                            \
     (ucc_derived_of((_tl_team)->super.context->lib, ucc_tl_lib_t))->iface
 
+#define UCC_TL_TEAM_LIB(_tl_team) (_tl_team)->super.super.context->lib
+
 #endif

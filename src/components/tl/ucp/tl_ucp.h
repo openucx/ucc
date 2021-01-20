@@ -23,7 +23,7 @@ typedef struct ucc_tl_ucp_lib_config {
 
 typedef struct ucc_tl_ucp_context_config {
     ucc_tl_context_config_t super;
-    int                     test_param;
+    int                     preconnect;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
@@ -39,6 +39,7 @@ typedef struct ucc_tl_ucp_context {
     ucp_worker_h     ucp_worker;
     size_t           ucp_addrlen;
     ucp_address_t   *worker_address;
+    int              preconnect;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -53,6 +54,8 @@ typedef struct ucc_tl_ucp_team {
                                           user provides the necessary rank mappings
                                           team_rank->context_rank. */
     ucp_ep_h                  *eps;
+    int                        size;
+    int                        rank;
     ucc_tl_ucp_addr_storage_t *addr_storage;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
