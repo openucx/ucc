@@ -23,3 +23,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_lib_t)
 }
 
 UCC_CLASS_DEFINE(ucc_tl_ucp_lib_t, ucc_tl_lib_t);
+
+ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib, ucc_base_attr_t *attr) {
+    return UCC_OK;
+}

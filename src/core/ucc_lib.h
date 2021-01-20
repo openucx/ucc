@@ -12,6 +12,8 @@
 #include "utils/ucc_parser.h"
 
 typedef struct ucc_cl_lib ucc_cl_lib_t;
+typedef struct ucc_tl_lib ucc_tl_lib_t;
+
 typedef struct ucc_lib_config {
     char                    *full_prefix;
     struct {
@@ -21,9 +23,11 @@ typedef struct ucc_lib_config {
 } ucc_lib_config_t;
 
 typedef struct ucc_lib_info {
-    int            n_libs_opened;
     char          *full_prefix;
-    ucc_cl_lib_t **libs;
+    int            n_cl_libs_opened;
+    int            n_tl_libs_opened;
+    ucc_cl_lib_t **cl_libs;
+    ucc_tl_lib_t **tl_libs;
     ucc_lib_attr_t attr;
     int            specific_cls_requested;
 } ucc_lib_info_t;

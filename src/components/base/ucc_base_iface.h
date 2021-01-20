@@ -15,6 +15,7 @@
 #include "utils/ucc_parser.h"
 #include "utils/ucc_class.h"
 #include "utils/ucc_malloc.h"
+#include "utils/ucc_log.h"
 
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
@@ -25,6 +26,10 @@ typedef struct ucc_base_config {
     ucc_log_component_config_t      log_component;
 } ucc_base_config_t;
 
+typedef struct ucc_base_attr_t {
+    ucc_thread_mode_t thread_mode;
+} ucc_base_attr_t;
+
 typedef struct ucc_base_lib_params {
     ucc_lib_params_t params;
 } ucc_base_lib_params_t;
@@ -34,6 +39,7 @@ typedef struct ucc_base_lib_iface {
     ucc_status_t (*init)(const ucc_base_lib_params_t *params,
                          const ucc_base_config_t *config, ucc_base_lib_t **lib);
     void         (*finalize)(ucc_base_lib_t *lib);
+    ucc_status_t (*get_attr)(const ucc_base_lib_t *lib, ucc_base_attr_t *attr);
 } ucc_base_lib_iface_t;
 
 typedef struct ucc_base_context_params {
@@ -42,6 +48,7 @@ typedef struct ucc_base_context_params {
     int                  estimated_num_ppn;
     ucc_thread_mode_t    thread_mode;
     const char          *prefix;
+    ucc_context_t       *context;
 } ucc_base_context_params_t;
 
 typedef struct ucc_base_context {
@@ -53,6 +60,8 @@ typedef struct ucc_base_context_iface {
                            const ucc_base_config_t *config,
                            ucc_base_context_t **ctx);
     void         (*destroy)(ucc_base_context_t *ctx);
+    ucc_status_t (*get_attr)(const ucc_base_context_t *context,
+                             ucc_base_attr_t *attr);
 } ucc_base_context_iface_t;
 
 ucc_status_t ucc_base_config_read(const char *full_prefix,
@@ -75,22 +84,39 @@ static inline void ucc_base_config_release(ucc_base_config_t *config)
         .table = ucc_##_f##_name##_##_cfg##_config_table,                      \
         .size  = sizeof(ucc_##_f##_name##_##_cfg##_config_t)}
 
-#define UCC_BASE_IFACE_DECLARE(_F, _f, _name, _NAME, ...)                      \
+#define UCC_BASE_IFACE_DECLARE(_F, _f, _name, _NAME)                           \
     ucc_##_f##_name##_iface_t ucc_##_f##_name = {                              \
         UCC_IFACE_CFG(_F, _f, lib, _name, _NAME),                              \
         UCC_IFACE_CFG(_F, _f, context, _name, _NAME),                          \
         .super.super.name = UCC_PP_MAKE_STRING(_name),                         \
-        __VA_ARGS__                                                            \
+        .super.type = UCC_ ## _F ## _NAME,                                     \
         .super.lib.init   = UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_lib_t),  \
         .super.lib.finalize =                                                  \
             UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_lib_t),               \
+        .super.lib.get_attr = ucc_ ## _f ## _name ## _get_lib_attr,            \
         .super.context.create =                                                \
             UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_context_t),              \
         .super.context.destroy =                                               \
-        UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_context_t)};              \
+        UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_context_t),               \
+       .super.context.get_attr = ucc_ ## _f ## _name ## _get_context_attr};    \
     UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_##_f##_name.super._f##lib_config,     \
                                     &ucc_config_global_list);                  \
     UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_##_f##_name.super._f##context_config, \
                                     &ucc_config_global_list)
+
+#define ucc_base_log(_lib, _level, fmt, ...)                           \
+    ucc_log_component(_level, (_lib)->log_component, fmt,              \
+                      ##__VA_ARGS__)
+
+#define base_error(_lib, _fmt, ...)                                 \
+    ucc_base_log(_lib, UCC_LOG_LEVEL_ERROR, _fmt, ##__VA_ARGS__)
+#define base_warn(_lib, _fmt, ...)                                  \
+    ucc_base_log(_lib, UCC_LOG_LEVEL_WARN, _fmt, ##__VA_ARGS__)
+#define base_info(_lib, _fmt, ...)                                  \
+    ucc_base_log(_lib, UCC_LOG_LEVEL_INFO, _fmt, ##__VA_ARGS__)
+#define base_debug(_lib, _fmt, ...)                                 \
+    ucc_base_log(_lib, UCC_LOG_LEVEL_DEBUG, _fmt, ##__VA_ARGS__)
+#define base_trace(_lib, _fmt, ...)                                 \
+    ucc_base_log(_lib, UCC_LOG_LEVEL_TRACE, _fmt, ##__VA_ARGS__)
 
 #endif

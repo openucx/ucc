@@ -35,7 +35,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_config->tl_lib);
     status = ucp_config_read(params->prefix, NULL, &ucp_config);
     if (UCS_OK != status) {
-        tl_error(&self->super, "failed to read ucp configuration, %s",
+        tl_error(self->super.super.lib, "failed to read ucp configuration, %s",
                  ucs_status_string(status));
         ucc_status = ucs_status_to_ucc_status(status);
         goto err_cfg;
@@ -64,7 +64,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     status = ucp_init(&ucp_params, ucp_config, &ucp_context);
     ucp_config_release(ucp_config);
     if (UCS_OK != status) {
-        tl_error(&self->super, "failed to init ucp context, %s",
+        tl_error(self->super.super.lib, "failed to init ucp context, %s",
                  ucs_status_string(status));
         ucc_status = ucs_status_to_ucc_status(status);
         goto err_cfg;
@@ -86,7 +86,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     }
     status = ucp_worker_create(ucp_context, &worker_params, &ucp_worker);
     if (UCS_OK != status) {
-        tl_error(&self->super, "failed to create ucp worker, %s",
+        tl_error(self->super.super.lib, "failed to create ucp worker, %s",
                  ucs_status_string(status));
         ucc_status = ucs_status_to_ucc_status(status);
         goto err_worker_create;
@@ -96,7 +96,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         worker_attr.field_mask = UCP_WORKER_ATTR_FIELD_THREAD_MODE;
         ucp_worker_query(ucp_worker, &worker_attr);
         if (worker_attr.thread_mode != UCS_THREAD_MODE_MULTI) {
-            tl_error(&self->super,
+            tl_error(self->super.super.lib,
                      "thread mode multiple is not supported by ucp worker");
             ucc_status = UCC_ERR_NOT_SUPPORTED;
             goto err_thread_mode;
@@ -105,7 +105,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     self->ucp_context = ucp_context;
     self->ucp_worker  = ucp_worker;
-    tl_info(&self->super, "initialized cl context: %p", self);
+    tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 
 err_thread_mode:
@@ -118,9 +118,15 @@ err_cfg:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
-    tl_info(&self->super.super.lib, "finalizing cl context: %p", self);
+    tl_info(self->super.super.lib, "finalizing tl context: %p", self);
     ucp_worker_destroy(self->ucp_worker);
     ucp_cleanup(self->ucp_context);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_ucp_context_t, ucc_tl_context_t);
+
+ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
+                                         ucc_base_attr_t *attr)
+{
+    return UCC_OK;
+}
