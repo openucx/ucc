@@ -34,6 +34,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_ucp_config->super.tl_lib);
     self->preconnect = tl_ucp_config->preconnect;
+    self->ep_close_state.close_req = NULL;
+    self->ep_close_state.ep        = 0;
     status = ucp_config_read(params->prefix, NULL, &ucp_config);
     if (UCS_OK != status) {
         tl_error(self->super.super.lib, "failed to read ucp configuration, %s",

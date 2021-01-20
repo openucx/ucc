@@ -3,7 +3,9 @@
  * See file LICENSE for terms.
  */
 #include "test_multiproc.h"
-
+extern "C" {
+#include "core/ucc_team.h"
+}
 void test_process::init_lib()
 {
     EXPECT_EQ(UCC_OK, ucc_lib_config_read(NULL, NULL, &lib_config));
@@ -148,9 +150,21 @@ void test_multiproc::init_team()
 
 void test_multiproc::destroy_team()
 {
-    for (auto p : procs) {
-        EXPECT_EQ(UCC_OK, ucc_team_destroy(p->team));
-    }
+    ucc_status_t status;
+    bool         all_done;
+    do {
+        all_done = true;
+        for (auto p : procs) {
+            if (p->team) {
+                status = ucc_team_destroy_nb(p->team);
+                if (UCC_OK == status) {
+                    p->team = NULL;
+                } else {
+                    all_done = false;
+                }
+            }
+        }
+    } while (!all_done);
 }
 
 class test_team : public ucc::test {
@@ -166,7 +180,6 @@ UCC_TEST_F(test_team, team_create_destroy)
     tm->init_team();
     tm->destroy_team();
     delete tm;
-
     /* Some power of 2 procs  - 8*/
     tm = new test_multiproc(8);
     tm->init_team();

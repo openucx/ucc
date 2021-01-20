@@ -29,13 +29,27 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_team_t, ucc_base_context_t *cl_context,
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_team_t)
 {
-    ucc_cl_basic_context_t *ctx = UCC_CL_BASIC_TEAM_CTX(self);
-
-    if (self->tl_ucp_team) {
-        UCC_TL_CTX_IFACE(ctx->tl_ucp_ctx)
-            ->team.destroy(&self->tl_ucp_team->super);
-    }
     cl_info(self->super.super.context->lib, "finalizing cl team: %p", self);
+}
+
+UCC_CLASS_DEFINE_DELETE_FUNC(ucc_cl_basic_team_t, ucc_base_team_t);
+UCC_CLASS_DEFINE(ucc_cl_basic_team_t, ucc_cl_team_t);
+
+ucc_status_t ucc_cl_basic_team_destroy(ucc_base_team_t *cl_team)
+{
+    ucc_cl_basic_team_t    *team = ucc_derived_of(cl_team, ucc_cl_basic_team_t);
+    ucc_cl_basic_context_t *ctx  = UCC_CL_BASIC_TEAM_CTX(team);
+    ucc_status_t            status;
+    if (team->tl_ucp_team) {
+        if (UCC_OK !=
+            (status = UCC_TL_CTX_IFACE(ctx->tl_ucp_ctx)
+                          ->team.destroy(&team->tl_ucp_team->super))) {
+            return status;
+        }
+        team->tl_ucp_team = NULL;
+    }
+    UCC_CLASS_DELETE_FUNC_NAME(ucc_cl_basic_team_t)(cl_team);
+    return UCC_OK;
 }
 
 ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)
@@ -52,5 +66,3 @@ ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)
     }
     return status;
 }
-
-UCC_CLASS_DEFINE(ucc_cl_basic_team_t, ucc_cl_team_t);

@@ -180,16 +180,22 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
 {
     ucc_cl_iface_t *cl_iface;
     int             i;
-
+    ucc_status_t    status;
     for (i = 0; i < team->n_cl_teams; i++) {
+        if (!team->cl_teams[i])
+            continue;
         cl_iface = UCC_CL_TEAM_IFACE(team->cl_teams[i]);
-        cl_iface->team.destroy(&team->cl_teams[i]->super);
+        if (UCC_OK !=
+            (status = cl_iface->team.destroy(&team->cl_teams[i]->super))) {
+            return status;
+        }
+        team->cl_teams[i] = NULL;
     }
     ucc_free(team);
     return UCC_OK;
 }
 
-ucc_status_t ucc_team_destroy(ucc_team_h team)
+ucc_status_t ucc_team_destroy_nb(ucc_team_h team)
 {
     if (team->status != UCC_OK) {
         ucc_error("team %p is used before team_create is completed", team);
@@ -199,4 +205,12 @@ ucc_status_t ucc_team_destroy(ucc_team_h team)
     /* we don't support multiple contexts per team yet */
     ucc_assert(team->num_contexts == 1);
     return ucc_team_destroy_single(team);
+}
+ucc_status_t ucc_team_destroy(ucc_team_h team)
+{
+    ucc_status_t status;
+    while (UCC_INPROGRESS == (status = ucc_team_destroy_single(team))) {
+        ; //TODO call ucc progress here
+    }
+    return status;
 }

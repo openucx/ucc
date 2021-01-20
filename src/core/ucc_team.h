@@ -23,4 +23,5 @@ typedef struct ucc_team {
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);
 
+ucc_status_t ucc_team_destroy_nb(ucc_team_h team);
 #endif

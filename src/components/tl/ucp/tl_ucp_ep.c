@@ -36,26 +36,39 @@ ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
 ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx, ucp_ep_h *eps,
                                   int n_eps)
 {
-    void        *close_req;
+    ucc_tl_ucp_ep_close_state_t *state = &ctx->ep_close_state;
     ucs_status_t status;
-    int          i;
-    for (i = 0; i < n_eps; i++) {
-        if (!eps[i]) {
+    if (state->close_req) {
+        ucp_worker_progress(ctx->ucp_worker);
+        status = ucp_request_check_status(state->close_req);
+        if (status != UCS_OK) {
+            return UCC_INPROGRESS;
+        }
+        ucp_request_free(state->close_req);
+        state->ep++;
+    }
+
+    for (; state->ep < n_eps; state->ep++) {
+        if (!eps[state->ep]) {
             continue;
         }
-        close_req = ucp_ep_close_nb(eps[i], UCP_EP_CLOSE_MODE_FLUSH);
-        if (UCS_PTR_IS_ERR(close_req)) {
+        state->close_req =
+            ucp_ep_close_nb(eps[state->ep], UCP_EP_CLOSE_MODE_FLUSH);
+        if (UCS_PTR_IS_ERR(state->close_req)) {
             tl_error(ctx->super.super.lib, "failed to start ep close, ep %p",
-                     eps[i]);
+                     eps[state->ep]);
         }
-        status = UCS_PTR_STATUS(close_req);
+        status = UCS_PTR_STATUS(state->close_req);
         if (status != UCS_OK) {
-            while (status != UCS_OK) {
-                ucp_worker_progress(ctx->ucp_worker);
-                status = ucp_request_check_status(close_req);
+            ucp_worker_progress(ctx->ucp_worker);
+            status = ucp_request_check_status(state->close_req);
+            if (status != UCS_OK) {
+                return UCC_INPROGRESS;
             }
-            ucp_request_free(close_req);
+            ucp_request_free(state->close_req);
         }
     }
+    state->close_req = NULL;
+    state->ep        = 0;
     return UCC_OK;
 }

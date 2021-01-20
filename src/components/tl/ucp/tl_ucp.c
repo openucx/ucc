@@ -43,8 +43,6 @@ UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_ucp_context_t, ucc_base_context_t);
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_ucp_team_t, ucc_base_team_t,
                           ucc_base_context_t *, const ucc_base_team_params_t *);
 
-UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_ucp_team_t, ucc_base_team_t);
-
 extern ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team);
-
+extern ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team);
 UCC_TL_IFACE_DECLARE(ucp, UCP);

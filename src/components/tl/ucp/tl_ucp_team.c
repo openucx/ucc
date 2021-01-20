@@ -159,17 +159,32 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_team_t)
 {
-    ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(self);
     if (self->addr_storage) {
         ucc_tl_ucp_addr_storage_free(self->addr_storage);
     }
-    if (self->eps) {
-        if (UCC_OK != ucc_tl_ucp_close_eps(ctx, self->eps, self->size)) {
-            tl_error(self->super.super.context->lib,
+    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+}
+
+UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_ucp_team_t, ucc_base_team_t);
+UCC_CLASS_DEFINE(ucc_tl_ucp_team_t, ucc_tl_team_t);
+
+ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
+{
+    ucc_tl_ucp_team_t    *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_status_t          status;
+    if (team->eps) {
+        status = ucc_tl_ucp_close_eps(ctx, team->eps, team->size);
+        if (UCC_INPROGRESS == status) {
+            return status;
+        } else if (UCC_OK != status) {
+            tl_error(team->super.super.context->lib,
                      "failed to close team eps");
+            return status;
         }
     }
-    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+    UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_ucp_team_t)(tl_team);
+    return UCC_OK;
 }
 
 static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
@@ -226,5 +241,3 @@ err_preconnect:
     ucc_free(team->eps);
     return status;
 }
-
-UCC_CLASS_DEFINE(ucc_tl_ucp_team_t, ucc_tl_team_t);

@@ -77,7 +77,7 @@ typedef struct ucc_base_team_iface {
                                 const ucc_base_team_params_t *params,
                                 ucc_base_team_t **team);
     ucc_status_t (*create_test)(ucc_base_team_t *team);
-    void         (*destroy)(ucc_base_team_t *team);
+    ucc_status_t (*destroy)(ucc_base_team_t *team);
 } ucc_base_team_iface_t;
 
 ucc_status_t ucc_base_config_read(const char *full_prefix,
@@ -118,8 +118,7 @@ static inline void ucc_base_config_release(ucc_base_config_t *config)
         .super.team.create_post =                                              \
             UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_team_t),                 \
         .super.team.create_test = ucc_##_f##_name##_team_create_test,          \
-        .super.team.destroy =                                                  \
-            UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_team_t)};             \
+        .super.team.destroy     = ucc_##_f##_name##_team_destroy};             \
     UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_##_f##_name.super._f##lib_config,     \
                                     &ucc_config_global_list);                  \
     UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_##_f##_name.super._f##context_config, \
