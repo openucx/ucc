@@ -109,6 +109,9 @@ ucc_status_t req_test(void *request)
 
 ucc_status_t req_free(void *request)
 {
+    test_multiproc::allgather_coll_info_t *ci =
+        (test_multiproc::allgather_coll_info_t *)request;
+    ci->self->ag[ci->my_rank].phase = test_multiproc::AG_INIT;
     return UCC_OK;
 }
 

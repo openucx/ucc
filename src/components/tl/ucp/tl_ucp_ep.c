@@ -45,7 +45,7 @@ ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx, ucp_ep_h *eps,
             return UCC_INPROGRESS;
         }
         ucp_request_free(state->close_req);
-        state->ep++;
+        eps[state->ep++] = NULL;
     }
 
     for (; state->ep < n_eps; state->ep++) {
@@ -59,6 +59,7 @@ ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx, ucp_ep_h *eps,
                      eps[state->ep]);
         }
         status = UCS_PTR_STATUS(state->close_req);
+        /* try progress once */
         if (status != UCS_OK) {
             ucp_worker_progress(ctx->ucp_worker);
             status = ucp_request_check_status(state->close_req);
@@ -66,6 +67,9 @@ ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx, ucp_ep_h *eps,
                 return UCC_INPROGRESS;
             }
             ucp_request_free(state->close_req);
+        }
+        if (status == UCS_OK) {
+            eps[state->ep] = NULL;
         }
     }
     state->close_req = NULL;
