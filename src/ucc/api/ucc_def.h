@@ -66,10 +66,15 @@ typedef struct ucc_team*            ucc_team_h;
  * status of the collective operation, progress, or complete the collective
  * operation.
  */
+typedef struct ucc_coll_req* ucc_coll_req_h;
+typedef ucc_status_t (*ucc_coll_post_fn_t)(ucc_coll_req_h request);
+typedef ucc_status_t (*ucc_coll_finalize_fn_t)(ucc_coll_req_h request);
 typedef struct ucc_coll_req {
-    ucc_status_t status;
+    ucc_status_t           status;
+    ucc_coll_post_fn_t     post;
+    ucc_coll_finalize_fn_t finalize;
 } ucc_coll_req_t;
-typedef struct ucc_coll_req*        ucc_coll_req_h;
+
 
 /**
  * @ingroup UCC_COLLECTIVES

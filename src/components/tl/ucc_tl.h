@@ -57,6 +57,7 @@ typedef struct ucc_tl_iface {
     ucc_base_lib_iface_t           lib;
     ucc_base_context_iface_t       context;
     ucc_base_team_iface_t          team;
+    ucc_base_coll_iface_t          coll;
 } ucc_tl_iface_t;
 
 typedef struct ucc_tl_lib {

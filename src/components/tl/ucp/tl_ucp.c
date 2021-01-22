@@ -46,4 +46,8 @@ UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_ucp_team_t, ucc_base_team_t,
 
 ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team);
 ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team);
+ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_op_args_t *coll_args,
+                                  ucc_base_team_t *team,
+                                  ucc_coll_task_t **task);
+
 UCC_TL_IFACE_DECLARE(ucp, UCP);

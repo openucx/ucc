@@ -7,7 +7,8 @@ sources =              \
 	cl_basic.c         \
 	cl_basic_lib.c     \
 	cl_basic_context.c \
-	cl_basic_team.c
+	cl_basic_team.c    \
+	cl_basic_coll.c
 
 module_LTLIBRARIES          = libucc_cl_basic.la
 libucc_cl_basic_la_SOURCES  = $(sources)

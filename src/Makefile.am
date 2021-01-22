@@ -58,6 +58,7 @@ libucc_la_SOURCES =                  \
 	core/ucc_context.c               \
 	core/ucc_mc.c                    \
 	core/ucc_team.c                  \
+	core/ucc_coll.c                  \
 	schedule/ucc_schedule.c          \
 	utils/ucc_component.c            \
 	components/base/ucc_base_iface.c \

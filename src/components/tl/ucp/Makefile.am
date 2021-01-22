@@ -11,7 +11,8 @@ sources =            \
 	tl_ucp_ep.h      \
 	tl_ucp_ep.c      \
 	tl_ucp_addr.h    \
-	tl_ucp_addr.c
+	tl_ucp_addr.c    \
+	tl_ucp_coll.c
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)
