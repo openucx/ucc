@@ -192,5 +192,6 @@ AC_CONFIG_FILES([
                  src/components/tl/ucp/Makefile
                  src/components/mc/cpu/Makefile
                  src/components/mc/cuda/Makefile
+                 test/mpi/Makefile
                  ])
 AC_OUTPUT
