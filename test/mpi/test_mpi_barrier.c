@@ -16,6 +16,8 @@ do_barrier(ucc_team_h team) {
         .coll_type = UCC_COLL_TYPE_BARRIER,
     };
     UCC_CHECK(ucc_collective_init(&coll, &request, team));
+    UCC_CHECK(ucc_collective_post(request));
+    UCC_CHECK(ucc_collective_finalize(request));
 }
 
 int main (int argc, char **argv) {
