@@ -6,6 +6,8 @@
 
 #include "tl_ucp.h"
 #include "tl_ucp_tag.h"
+#include "tl_ucp_coll.h"
+#include  <limits.h>
 
 static void ucc_tl_ucp_req_init(void *request)
 {
@@ -109,6 +111,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     self->ucp_context = ucp_context;
     self->ucp_worker  = ucp_worker;
     self->worker_address = NULL;
+
+    ucc_status = ucc_mpool_init(&self->req_mp, sizeof(ucc_tl_ucp_task_t),
+                                UCC_CACHE_LINE_SIZE, 8, UINT_MAX, NULL, NULL,
+                                "tl_ucp_req_mp");
+    if (UCC_OK != ucc_status) {
+        tl_error(self->super.super.lib, "failed to initialize tl_ucp_req mpool");
+        goto err_thread_mode;
+    }
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 
@@ -125,6 +135,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
     ucp_worker_destroy(self->ucp_worker);
     ucp_cleanup(self->ucp_context);
+    ucc_mpool_cleanup(&self->req_mp, 1);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_ucp_context_t, ucc_tl_context_t);
