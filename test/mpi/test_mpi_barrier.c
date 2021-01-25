@@ -17,6 +17,9 @@ static inline void do_barrier(ucc_team_h team)
     };
     UCC_CHECK(ucc_collective_init(&coll, &request, team));
     UCC_CHECK(ucc_collective_post(request));
+    while (UCC_OK != ucc_collective_test(request)) {
+        UCC_CHECK(ucc_context_progress(team_ctx));
+    }
     UCC_CHECK(ucc_collective_finalize(request));
 }
 
