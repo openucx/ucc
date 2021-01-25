@@ -273,7 +273,10 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
-    ctx->lib = lib;
+    ctx->lib                     = lib;
+    ctx->progress_array          = NULL;
+    ctx->progress_array_size     = 0;
+    ctx->progress_array_max_size = 0;
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
     b_params.context           = ctx;
@@ -362,3 +365,42 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     ucc_free(context);
     return UCC_OK;
 }
+
+ucc_status_t ucc_context_progress_register(ucc_context_t *ctx, ucc_context_progress_fn_t fn,
+                                           void *progress_arg)
+{
+    int next_pos = ctx->progress_array_size;
+    if (next_pos == ctx->progress_array_max_size) {
+        ctx->progress_array_max_size += 8;
+        ctx->progress_array = ucc_realloc(ctx->progress_array,
+                                          ctx->progress_array_max_size*sizeof(ucc_context_progress_t), "progress_array");
+        if (!ctx->progress_array) {
+            ucc_error("failed to allocate %zd bytes for progress array",
+                      ctx->progress_array_max_size*sizeof(ucc_context_progress_t));
+            return UCC_ERR_NO_MEMORY;
+        }
+    }
+    ctx->progress_array[next_pos].progress_fn  = fn;
+    ctx->progress_array[next_pos].progress_arg = progress_arg;
+    ctx->progress_array_size++;
+    return UCC_OK;
+}
+
+void ucc_context_progress_deregister(ucc_context_t *ctx, ucc_context_progress_fn_t fn,
+                                     void *progress_arg)
+{
+    int i, j;
+    for (i = 0; i < ctx->progress_array_size; i++) {
+        if (ctx->progress_array[i].progress_fn == fn &&
+            ctx->progress_array[i].progress_arg == progress_arg) {
+            for (j = i; j < ctx->progress_array_size - 1; j++) {
+                ctx->progress_array[j] = ctx->progress_array[j+1];
+            }
+            ctx->progress_array_size--;
+            break;
+        }
+    }
+    ucc_assert(0);
+}
+
+
