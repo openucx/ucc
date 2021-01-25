@@ -79,7 +79,7 @@ UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_cl_lib_config_t *,
 typedef struct ucc_cl_context {
     ucc_base_context_t super;
 } ucc_cl_context_t;
-UCC_CLASS_DECLARE(ucc_cl_context_t, ucc_cl_lib_t *);
+UCC_CLASS_DECLARE(ucc_cl_context_t, ucc_cl_lib_t *, ucc_context_t *);
 
 typedef struct ucc_cl_team {
     ucc_base_team_t super;

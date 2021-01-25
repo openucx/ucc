@@ -14,7 +14,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_context_t,
     ucc_status_t status;
     const ucc_cl_context_config_t *cl_config =
         ucc_derived_of(config, ucc_cl_context_config_t);
-    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_config->cl_lib);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_config->cl_lib,
+                              params->context);
     status = ucc_tl_context_get(params->context, UCC_TL_UCP,
                                 &self->tl_ucp_ctx);
     if (UCC_OK != status) {
