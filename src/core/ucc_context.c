@@ -9,7 +9,7 @@
 #include "components/tl/ucc_tl.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
-
+#include "ucc_progress_queue.h"
 ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
                                      ucc_context_config_t **config_p)
 {
@@ -323,6 +323,18 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         status = UCC_ERR_NO_MESSAGE;
         goto error_ctx;
     }
+
+    /* Initialize ctx thread mode:
+       if context is EXCLUSIVE then thread_mode is always SINGLE,
+       otherwise it is  inherited from lib */
+    ctx->thread_mode = ((params->ctx_type == UCC_CONTEXT_EXCLUSIVE) &&
+                        (params->mask & UCC_CONTEXT_PARAM_FIELD_TYPE)) ?
+        UCC_THREAD_SINGLE : lib->attr.thread_mode;
+    status = ucc_progress_queue_init(&ctx->pq, ctx->thread_mode);
+    if (UCC_OK != status) {
+        ucc_error("failed to init progress queue for context %p", ctx);
+        goto error_ctx_create;
+    }
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;
     return UCC_OK;
@@ -361,6 +373,7 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
         }
         tl_lib->iface->context.destroy(&tl_ctx->super);
     }
+    ucc_progress_queue_finalize(context->pq);
     ucc_free(context->tl_ctx);
     ucc_free(context);
     return UCC_OK;
@@ -397,10 +410,30 @@ void ucc_context_progress_deregister(ucc_context_t *ctx, ucc_context_progress_fn
                 ctx->progress_array[j] = ctx->progress_array[j+1];
             }
             ctx->progress_array_size--;
-            break;
+            return;
         }
     }
     ucc_assert(0);
 }
 
 
+ucc_status_t ucc_context_progress(ucc_context_h context)
+{
+    int                     pa_size = context->progress_array_size;
+    ucc_context_progress_t *p;
+    ucc_status_t            status;
+    int                     i;
+    /* progress registered progress fns */
+    for (i = 0; i < pa_size; i++) {
+        p = &context->progress_array[i];
+        /* registred progress fn returns 0 if no communication is made,
+           or positive value otherwise */
+        p->progress_fn(p->progress_arg);
+    }
+
+    /* the fn below returns int - number of completed tasks.
+       TODO : do we need to handle it ? Maybe return to user
+       as int as well? */
+    status = ucc_progress_queue(context->pq);
+    return (status >= 0 ? UCC_OK : status);
+}

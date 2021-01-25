@@ -7,13 +7,14 @@
 #define UCC_CONTEXT_H_
 
 #include "ucc/api/ucc.h"
+#include "ucc_progress_queue.h"
 
 typedef struct ucc_lib_info          ucc_lib_info_t;
 typedef struct ucc_cl_context        ucc_cl_context_t;
 typedef struct ucc_tl_context        ucc_tl_context_t;
 typedef struct ucc_cl_context_config ucc_cl_context_config_t;
 
-typedef int (*ucc_context_progress_fn_t)(void *progress_arg);
+typedef unsigned (*ucc_context_progress_fn_t)(void *progress_arg);
 typedef struct ucc_context_progress {
     ucc_context_progress_fn_t  progress_fn;
     void                      *progress_arg;
@@ -31,6 +32,7 @@ typedef struct ucc_context {
     ucc_context_progress_t *progress_array;
     int                     progress_array_max_size;
     int                     progress_array_size;
+    ucc_progress_queue_t   *pq;
 } ucc_context_t;
 
 typedef struct ucc_context_config {
