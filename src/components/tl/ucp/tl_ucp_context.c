@@ -7,7 +7,7 @@
 #include "tl_ucp.h"
 #include "tl_ucp_tag.h"
 #include "tl_ucp_coll.h"
-#include  <limits.h>
+#include <limits.h>
 
 static void ucc_tl_ucp_req_init(void *request)
 {
@@ -116,7 +116,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                                 UCC_CACHE_LINE_SIZE, 8, UINT_MAX, NULL, NULL,
                                 "tl_ucp_req_mp");
     if (UCC_OK != ucc_status) {
-        tl_error(self->super.super.lib, "failed to initialize tl_ucp_req mpool");
+        tl_error(self->super.super.lib,
+                 "failed to initialize tl_ucp_req mpool");
         goto err_thread_mode;
     }
     tl_info(self->super.super.lib, "initialized tl context: %p", self);

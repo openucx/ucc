@@ -37,14 +37,14 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
 
 typedef struct ucc_tl_ucp_addr_storage ucc_tl_ucp_addr_storage_t;
 typedef struct ucc_tl_ucp_context {
-    ucc_tl_context_t super;
-    ucp_context_h    ucp_context;
-    ucp_worker_h     ucp_worker;
-    size_t           ucp_addrlen;
-    ucp_address_t   *worker_address;
-    uint32_t         preconnect;
+    ucc_tl_context_t            super;
+    ucp_context_h               ucp_context;
+    ucp_worker_h                ucp_worker;
+    size_t                      ucp_addrlen;
+    ucp_address_t              *worker_address;
+    uint32_t                    preconnect;
     ucc_tl_ucp_ep_close_state_t ep_close_state;
-    ucc_mpool_t      req_mp;
+    ucc_mpool_t                 req_mp;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);

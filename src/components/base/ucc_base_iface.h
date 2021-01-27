@@ -87,8 +87,7 @@ typedef struct ucc_base_coll_op_args {
 
 typedef struct ucc_base_coll_iface {
     ucc_status_t (*init)(ucc_base_coll_op_args_t *coll_args,
-                         ucc_base_team_t *team,
-                         ucc_coll_task_t **task);
+                         ucc_base_team_t *team, ucc_coll_task_t **task);
 } ucc_base_coll_iface_t;
 
 ucc_status_t ucc_base_config_read(const char *full_prefix,

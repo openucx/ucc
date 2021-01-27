@@ -28,8 +28,8 @@ ucc_status_t ucc_collective_init(ucc_coll_op_args_t *coll_args,
     /* TO discuss: maybe we want to pass around user pointer ? */
     memcpy(&op_args.args, coll_args, sizeof(ucc_coll_op_args_t));
     cl_team = ucc_select_cl_team(coll_args, team);
-    status = UCC_CL_TEAM_IFACE(cl_team)->coll.init(&op_args, &cl_team->super,
-                                                   &task);
+    status =
+        UCC_CL_TEAM_IFACE(cl_team)->coll.init(&op_args, &cl_team->super, &task);
     if (status != UCC_OK) {
         //TODO more descriptive error msg
         ucc_error("failed to init collective");

@@ -9,9 +9,9 @@
 #include <time.h>
 #include <unistd.h>
 
-static inline void
-do_barrier(ucc_team_h team) {
-    ucc_coll_req_h request;
+static inline void do_barrier(ucc_team_h team)
+{
+    ucc_coll_req_h     request;
     ucc_coll_op_args_t coll = {
         .coll_type = UCC_COLL_TYPE_BARRIER,
     };
@@ -20,11 +20,12 @@ do_barrier(ucc_team_h team) {
     UCC_CHECK(ucc_collective_finalize(request));
 }
 
-int main (int argc, char **argv) {
+int main(int argc, char **argv)
+{
     int rank, size;
 
-    UCC_CHECK(ucc_mpi_test_init(argc, argv, UCC_COLL_TYPE_BARRIER
-                                , UCC_THREAD_SINGLE));
+    UCC_CHECK(ucc_mpi_test_init(argc, argv, UCC_COLL_TYPE_BARRIER,
+                                UCC_THREAD_SINGLE));
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 

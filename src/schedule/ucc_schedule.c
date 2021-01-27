@@ -13,8 +13,7 @@ void ucc_event_manager_init(ucc_event_manager_t *em)
     }
 }
 
-void ucc_event_manager_subscribe(ucc_event_manager_t *em,
-                                 ucc_event_t event,
+void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
                                  ucc_coll_task_t *task)
 {
     em->listeners[event][em->listeners_size[event]] = task;
@@ -57,7 +56,8 @@ static ucc_status_t ucc_schedule_completed_handler(ucc_coll_task_t *task)
 void ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx)
 {
     ucc_coll_task_init(&schedule->super);
-    schedule->super.handlers[UCC_EVENT_COMPLETED] = ucc_schedule_completed_handler;
+    schedule->super.handlers[UCC_EVENT_COMPLETED] =
+        ucc_schedule_completed_handler;
     schedule->n_completed_tasks = 0;
     schedule->ctx               = ctx;
     schedule->n_tasks           = 0;
@@ -65,7 +65,8 @@ void ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx)
 
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
 {
-    ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED, &schedule->super);
+    ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED,
+                                &schedule->super);
     task->schedule = schedule;
     schedule->n_tasks++;
 }
