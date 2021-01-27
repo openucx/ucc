@@ -42,15 +42,20 @@ int ucc_mpi_create_comm_nb(MPI_Comm comm, ucc_team_h *team)
     MPI_Comm_size(comm, &size);
 
     /* Create UCC TEAM for comm world */
-    ucc_team_params_t team_params = {.mask = UCC_TEAM_PARAM_FIELD_EP |
-                                             UCC_TEAM_PARAM_FIELD_OOB,
-                                     .oob = {.allgather    = oob_allgather,
-                                             .req_test     = oob_allgather_test,
-                                             .req_free     = oob_allgather_free,
-                                             .coll_info    = (void *)comm,
-                                             .participants = size},
-                                     .ep  = rank};
-
+    ucc_team_params_t team_params = {
+        .mask               = UCC_TEAM_PARAM_FIELD_EP       |
+                              UCC_TEAM_PARAM_FIELD_EP_RANGE |
+                              UCC_TEAM_PARAM_FIELD_OOB,
+        .oob   = {
+            .allgather      = oob_allgather,
+            .req_test       = oob_allgather_test,
+            .req_free       = oob_allgather_free,
+            .coll_info      = (void*)comm,
+            .participants   = size
+        },
+        .ep                 = rank,
+        .ep_range           = UCC_COLLECTIVE_EP_RANGE_CONTIG
+    };
     UCC_CHECK(ucc_team_create_post(&team_ctx, 1, &team_params, team));
     return 0;
 }

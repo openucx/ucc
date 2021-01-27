@@ -23,12 +23,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->size               = params->params.oob.participants;
     self->scope              = params->scope;
     self->scope_id           = params->scope_id;
+    self->rank               = params->rank;
     if (self->context_ep_storage) {
         self->status = UCC_OK;
     } else {
         self->status = UCC_INPROGRESS;
         status       = ucc_tl_ucp_addr_exchange_start(ctx, params->params.oob,
-                                                &self->addr_storage);
+                                                      &self->addr_storage);
     }
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return status;

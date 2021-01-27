@@ -903,7 +903,7 @@ enum ucc_team_params_field {
     UCC_TEAM_PARAM_FIELD_OUTSTANDING_COLLS      = UCC_BIT(1),
     UCC_TEAM_PARAM_FIELD_EP                     = UCC_BIT(2),
     UCC_TEAM_PARAM_FIELD_EP_LIST                = UCC_BIT(3),
-    UCC_TEAM_PARAM_FIELD_EP_TYPE                = UCC_BIT(4),
+    UCC_TEAM_PARAM_FIELD_EP_RANGE               = UCC_BIT(4),
     UCC_TEAM_PARAM_FIELD_TEAM_SIZE              = UCC_BIT(5),
     UCC_TEAM_PARAM_FIELD_SYNC_TYPE              = UCC_BIT(6),
     UCC_TEAM_PARAM_FIELD_OOB                    = UCC_BIT(7),

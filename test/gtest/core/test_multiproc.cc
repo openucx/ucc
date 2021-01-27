@@ -129,7 +129,11 @@ void test_multiproc::init_team()
         team_params.oob.req_free     = req_free;
         team_params.oob.coll_info    = (void *)cis.back();
         team_params.oob.participants = n_procs;
-        team_params.mask             = UCC_TEAM_PARAM_FIELD_OOB;
+        team_params.ep               = i;
+        team_params.ep_range         = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+        team_params.mask             = UCC_TEAM_PARAM_FIELD_OOB |
+                                       UCC_TEAM_PARAM_FIELD_EP  |
+                                       UCC_TEAM_PARAM_FIELD_EP_RANGE ;
         EXPECT_EQ(UCC_OK,
                   ucc_team_create_post(&(procs[i]->ctx_h), 1, &team_params,
                                        &(procs[i]->team)));
