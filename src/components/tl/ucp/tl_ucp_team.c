@@ -69,8 +69,7 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
     int                   i;
     ucc_status_t          status;
     for (i = 0; i < team->size; i++) {
-        status = ucc_tl_ucp_connect_ep(ctx, team, team->addr_storage->addresses,
-                                       team->addr_storage->max_addrlen, i);
+        status = ucc_tl_ucp_connect_team_ep(team, i);
         if (UCC_OK != status) {
             ucc_tl_ucp_close_eps(ctx, team->eps, team->size);
             return status;
