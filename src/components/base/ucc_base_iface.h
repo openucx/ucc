@@ -68,6 +68,13 @@ typedef struct ucc_base_context_iface {
 
 typedef struct ucc_base_team_params {
     ucc_team_params_t params;
+    int               scope; /* Scope that allocates the team. When TL team is created
+                                the scope would eb a CL_TYPE. This provides a separation
+                                of teams created from different CLs with the same TL_TYPE */
+    int               scope_id; /* The id of the base_team in the specified scope. Use case:
+                                   a single CL team (e.g. basic) creates multiple TL teams
+                                   of the same type (e.g. several tl_ucp teams). In this
+                                   case CL would give those teams different scope_id. */
 } ucc_base_team_params_t;
 
 typedef struct ucc_base_team {

@@ -68,13 +68,12 @@ typedef struct ucc_tl_ucp_team {
     int                        size;
     int                        rank;
     ucc_tl_ucp_addr_storage_t *addr_storage;
+    uint32_t                   id;
+    uint32_t                   scope;
+    uint32_t                   scope_id;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
-
-typedef struct ucc_tl_ucp_req {
-    ucc_status_t status;
-} ucc_tl_ucp_req_t;
 
 #define UCC_TL_UCP_TEAM_CTX(_team)                                             \
     (ucc_derived_of((_team)->super.super.context, ucc_tl_ucp_context_t))

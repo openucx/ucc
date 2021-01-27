@@ -9,16 +9,6 @@
 #include "tl_ucp_coll.h"
 #include <limits.h>
 
-static void ucc_tl_ucp_req_init(void *request)
-{
-    ucc_tl_ucp_req_t *req = (ucc_tl_ucp_req_t *)request;
-    req->status           = UCC_OPERATION_INITIALIZED;
-}
-
-static void ucc_tl_ucp_req_cleanup(void *request)
-{
-}
-
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                     const ucc_base_context_params_t *params,
                     const ucc_base_config_t *config)
@@ -47,14 +37,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         goto err_cfg;
     }
 
-    ucp_params.field_mask =
-        UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_REQUEST_SIZE |
-        UCP_PARAM_FIELD_REQUEST_INIT | UCP_PARAM_FIELD_REQUEST_CLEANUP |
-        UCP_PARAM_FIELD_TAG_SENDER_MASK;
+    ucp_params.field_mask = UCP_PARAM_FIELD_FEATURES |
+                            UCP_PARAM_FIELD_TAG_SENDER_MASK;
     ucp_params.features        = UCP_FEATURE_TAG | UCP_FEATURE_RMA;
-    ucp_params.request_size    = sizeof(ucc_tl_ucp_req_t);
-    ucp_params.request_init    = ucc_tl_ucp_req_init;
-    ucp_params.request_cleanup = ucc_tl_ucp_req_cleanup;
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
 
     if (params->estimated_num_ppn > 0) {
