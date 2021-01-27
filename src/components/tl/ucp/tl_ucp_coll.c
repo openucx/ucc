@@ -8,6 +8,23 @@
 #include "tl_ucp_coll.h"
 #include "barrier/barrier.h"
 
+void ucc_tl_ucp_send_completion_cb(void* request, ucs_status_t status,
+                                   void *user_data)
+{
+    ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
+    ucc_assert(UCS_OK == status);
+    task->send_completed++;
+}
+
+void ucc_tl_ucp_recv_completion_cb(void* request, ucs_status_t status,
+                                   const ucp_tag_recv_info_t *info,
+                                   void *user_data)
+{
+    ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
+    ucc_assert(UCS_OK == status);
+    task->recv_completed++;
+}
+
 static ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
@@ -39,3 +56,4 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_op_args_t *coll_args,
     *task_h = &task->super;
     return status;
 }
+
