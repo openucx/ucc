@@ -106,6 +106,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                  "failed to initialize tl_ucp_req mpool");
         goto err_thread_mode;
     }
+    if (UCC_OK != ucc_context_progress_register(params->context,
+                                                (ucc_context_progress_fn_t)ucp_worker_progress,
+                                                self->ucp_worker))
+    {
+        tl_error(self->super.super.lib, "failed to register progress function");
+        goto err_thread_mode;
+    }
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 
@@ -120,6 +127,9 @@ err_cfg:
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    ucc_context_progress_deregister(self->super.super.ucc_context,
+                                    (ucc_context_progress_fn_t)ucp_worker_progress,
+                                    self->ucp_worker);
     ucp_worker_destroy(self->ucp_worker);
     ucp_cleanup(self->ucp_context);
     ucc_mpool_cleanup(&self->req_mp, 1);
