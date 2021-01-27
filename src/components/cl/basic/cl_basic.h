@@ -40,4 +40,14 @@ typedef struct ucc_cl_basic_context {
 UCC_CLASS_DECLARE(ucc_cl_basic_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_cl_basic_team {
+    ucc_cl_team_t super;
+    ucc_tl_team_t *tl_ucp_team;
+} ucc_cl_basic_team_t;
+UCC_CLASS_DECLARE(ucc_cl_basic_team_t, ucc_base_context_t *,
+                  const ucc_base_team_params_t *);
+
+#define UCC_CL_BASIC_TEAM_CTX(_team)                                           \
+    (ucc_derived_of((_team)->super.super.context, ucc_cl_basic_context_t))
+
 #endif

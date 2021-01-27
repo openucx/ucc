@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -8,6 +8,7 @@
 #define UCC_TL_UCP_H_
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
+#include "tl_ucp_ep.h"
 #include <ucp/api/ucp.h>
 #include <ucs/memory/memory_type.h>
 
@@ -23,7 +24,7 @@ typedef struct ucc_tl_ucp_lib_config {
 
 typedef struct ucc_tl_ucp_context_config {
     ucc_tl_context_config_t super;
-    int                     test_param;
+    uint32_t                preconnect;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
@@ -32,16 +33,39 @@ typedef struct ucc_tl_ucp_lib {
 UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_tl_ucp_addr_storage ucc_tl_ucp_addr_storage_t;
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t super;
     ucp_context_h    ucp_context;
     ucp_worker_h     ucp_worker;
     size_t           ucp_addrlen;
+    ucp_address_t   *worker_address;
+    uint32_t         preconnect;
+    ucc_tl_ucp_ep_close_state_t ep_close_state;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_tl_ucp_team {
+    ucc_tl_team_t              super;
+    ucc_status_t               status;
+    int                        context_ep_storage; /*< The flag
+              indicates whether ucp endpoints are stored on the
+              ucc_tl_ucp_context or are they created per-team.
+              This optimization is only possible when user provides
+              the necessary rank mappings team_rank->context_rank. */
+    ucp_ep_h                  *eps;
+    int                        size;
+    int                        rank;
+    ucc_tl_ucp_addr_storage_t *addr_storage;
+} ucc_tl_ucp_team_t;
+UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
+                  const ucc_base_team_params_t *);
+
 typedef struct ucc_tl_ucp_req {
     ucc_status_t status;
 } ucc_tl_ucp_req_t;
+
+#define UCC_TL_UCP_TEAM_CTX(_team)                                             \
+    (ucc_derived_of((_team)->super.super.context, ucc_tl_ucp_context_t))
 #endif

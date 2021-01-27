@@ -56,7 +56,7 @@ gtest_CPPFLAGS = \
 	$(GTEST_CPPFLAGS)
 
 gtest_LDFLAGS  = $(GTEST_LDFLAGS) -pthread -no-install -Wl,-dynamic-list-data
-gtest_CFLAGS   = $(BASE_CFLAGS)
+gtest_CFLAGS   = $(BASE_CFLAGS) $(AM_CPPFLAGS)
 gtest_CXXFLAGS = -std=gnu++11 \
 	$(BASE_CXXFLAGS) $(GTEST_CXXFLAGS) \
 	-DGTEST_UCM_HOOK_LIB_DIR="\"${abs_builddir}/ucm/test_dlopen/.libs\""
@@ -72,13 +72,15 @@ gtest_SOURCES =                 \
 	core/test_lib.cc            \
 	core/test_context_config.cc \
 	core/test_context.cc        \
-	core/test_mc.cc
+	core/test_mc.cc             \
+	core/test_multiproc.cc
 
 noinst_HEADERS =          \
 	common/gtest.h        \
 	common/test.h         \
 	common/test_helpers.h \
-	core/test_context.h
+	core/test_context.h   \
+	core/test_multiproc.h
 
 .PHONY: test test gdb valgrind fix_rpath ucc
 

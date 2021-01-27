@@ -902,8 +902,8 @@ ucc_status_t ucc_context_get_attr(ucc_context_h context,
  *  @ingroup UCC_TEAM_DT
  */
 enum ucc_team_params_field {
-    UCC_TEAM_PARAM_FIELD_POST_ORDERING          = UCC_BIT(0),
-    UCC_TEAM_PARAM_FIELD_OUTSTANDING_CALLS      = UCC_BIT(1),
+    UCC_TEAM_PARAM_FIELD_ORDERING               = UCC_BIT(0),
+    UCC_TEAM_PARAM_FIELD_OUTSTANDING_COLLS      = UCC_BIT(1),
     UCC_TEAM_PARAM_FIELD_EP                     = UCC_BIT(2),
     UCC_TEAM_PARAM_FIELD_EP_LIST                = UCC_BIT(3),
     UCC_TEAM_PARAM_FIELD_EP_TYPE                = UCC_BIT(4),
@@ -977,7 +977,7 @@ typedef struct ucc_team_p2p_conn {
  *  @ingroup UCC_TEAM_DT
  */
 typedef struct  ucc_team_oob_coll {
-    int             (*allgather)(void *src_buf, void *recv_buf, size_t size,
+    ucc_status_t    (*allgather)(void *src_buf, void *recv_buf, size_t size,
                                  void *allgather_info,  void **request);
     ucc_status_t    (*req_test)(void *request);
     ucc_status_t    (*req_free)(void *request);

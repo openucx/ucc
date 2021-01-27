@@ -20,12 +20,14 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_context_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_context_config_table)},
 
-    {"TEST_PARAM", "5", "For dbg test purpuse : don't commit",
-     ucc_offsetof(ucc_tl_ucp_context_config_t, test_param),
+    {"PRECONNECT", "1024",
+     "Threshold that defines the number of ranks in the UCC team/context "
+     "below which the team/context enpoints will be preconnected during "
+     "corresponding team/context create call",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, preconnect),
      UCC_CONFIG_TYPE_UINT},
 
-    {NULL}
-};
+    {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_ucp_lib_t, ucc_base_lib_t,
                           const ucc_base_lib_params_t *,
@@ -39,4 +41,9 @@ UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_ucp_context_t, ucc_base_context_t,
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_ucp_context_t, ucc_base_context_t);
 
+UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_ucp_team_t, ucc_base_team_t,
+                          ucc_base_context_t *, const ucc_base_team_params_t *);
+
+ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team);
+ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team);
 UCC_TL_IFACE_DECLARE(ucp, UCP);
