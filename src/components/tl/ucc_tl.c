@@ -11,6 +11,7 @@ ucc_config_field_t ucc_tl_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_base_config_table)},
 
+    {NULL}
 };
 
 ucc_config_field_t ucc_tl_context_config_table[] = {
