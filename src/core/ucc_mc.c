@@ -55,6 +55,15 @@ ucc_status_t ucc_mc_init()
     return UCC_OK;
 }
 
+ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type)
+{
+    if (NULL == mc_ops[mem_type]) {
+        return UCC_ERR_NOT_FOUND;
+    }
+
+    return UCC_OK;
+}
+
 ucc_status_t ucc_mc_type(const void *ptr, ucc_memory_type_t *mem_type)
 {
     ucc_memory_type_t mt;

@@ -139,6 +139,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_AARCH64_THUNDERX1], [false])
      AM_CONDITIONAL([HAVE_AARCH64_HI1620], [false])
      AM_CONDITIONAL([HAVE_UCX], [false])
+     AM_CONDITIONAL([HAVE_CUDA], [false])
     ],
     [
      AM_CONDITIONAL([DOCS_ONLY], [false])
@@ -146,6 +147,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/gtest.m4])
      m4_include([config/m4/sysdep.m4])
      m4_include([config/m4/ucx.m4])
+     m4_include([config/m4/cuda.m4])
      m4_include([test/gtest/configure.m4])
 
      AC_ARG_ENABLE([debug],
@@ -153,12 +155,12 @@ AS_IF([test "x$with_docs_only" = xyes],
               [], [enable_debug=no])
 
      if test $enable_debug = yes; then
-	    AC_DEFINE([ENABLE_DEBUG], [1], [Enable debugging code])
-	    CFLAGS="$CFLAGS -O0 -g3"
-	    AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_TRACE_POLL], [Highest log level])
+        AC_DEFINE([ENABLE_DEBUG], [1], [Enable debugging code])
+        CFLAGS="$CFLAGS -O0 -g3"
+        AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_TRACE_POLL], [Highest log level])
      else
-	    AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_INFO], [Highest log level])
-	    CFLAGS="$CFLAGS -O3 -DNDEBUG"
+        AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_INFO], [Highest log level])
+        CFLAGS="$CFLAGS -O3 -DNDEBUG"
      fi
 
      CHECK_UCX
@@ -166,6 +168,10 @@ AS_IF([test "x$with_docs_only" = xyes],
      if test $ucx_happy != "yes"; then
          AC_MSG_ERROR([UCX is not available])
      fi
+
+     CHECK_CUDA
+     AC_MSG_RESULT([CUDA support: $cuda_happy; $CUDA_CPPFLAGS $CUDA_LDFLAGS])
+
     ]) # Docs only
 
 
@@ -185,5 +191,6 @@ AC_CONFIG_FILES([
                  src/components/cl/basic/Makefile
                  src/components/tl/ucp/Makefile
                  src/components/mc/cpu/Makefile
+                 src/components/mc/cuda/Makefile
                  ])
 AC_OUTPUT
