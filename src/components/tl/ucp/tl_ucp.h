@@ -71,6 +71,7 @@ typedef struct ucc_tl_ucp_team {
     uint32_t                   id;
     uint32_t                   scope;
     uint32_t                   scope_id;
+    uint32_t                   seq_num;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

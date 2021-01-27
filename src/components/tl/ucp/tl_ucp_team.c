@@ -24,6 +24,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->scope              = params->scope;
     self->scope_id           = params->scope_id;
     self->rank               = params->rank;
+    self->seq_num            = 0;
+    self->id                 = 0; //TODO take it from base team
     if (self->context_ep_storage) {
         self->status = UCC_OK;
     } else {

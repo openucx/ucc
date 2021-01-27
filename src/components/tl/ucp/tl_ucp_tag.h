@@ -43,4 +43,7 @@
 #define UCC_TL_UCP_TAG_SENDER_MASK                                             \
     UCC_MASK(UCC_TL_UCP_ID_BITS + UCC_TL_UCP_SENDER_BITS + \
              UCC_TL_UCP_SCOPE_ID_BITS + UCC_TL_UCP_SCOPE_BITS)
+
+#define UCC_TL_UCP_GET_SENDER(_tag) ((uint32_t)(((_tag) >> UCC_TL_UCP_SENDER_BITS_OFFSET) & \
+                                                UCC_MASK(UCC_TL_UCP_SENDER_BITS)))
 #endif

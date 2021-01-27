@@ -1,3 +1,8 @@
+/**
+ * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ *
+ * See file LICENSE for terms.
+ */
 #ifndef BARRIER_H_
 #define BARRIER_H_
 #include "../tl_ucp.h"
