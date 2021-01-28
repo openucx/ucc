@@ -47,7 +47,6 @@ UCC_TEST_F(test_mc, init_twice)
     ucc_lib_h lib1, lib2;
     ucc_mc_base_t *mc;
 
-
     ASSERT_EQ(UCC_OK, ucc_lib_config_read(NULL, NULL, &cfg));
     lib_params.mask        = UCC_LIB_PARAM_FIELD_THREAD_MODE;
     lib_params.thread_mode = UCC_THREAD_SINGLE;

@@ -31,8 +31,10 @@ static ucc_status_t ucc_mc_cuda_mem_alloc(void **ptr, size_t size)
     st = cudaMalloc(ptr, size);
     if (st != cudaSuccess) {
         cudaGetLastError();
-        mc_error(&ucc_mc_cuda.super, "failed to allocate %zd bytes, "
-                 "cuda error %d(%s)", size, st, cudaGetErrorString(st));
+        mc_error(&ucc_mc_cuda.super,
+                 "failed to allocate %zd bytes, "
+                 "cuda error %d(%s)",
+                 size, st, cudaGetErrorString(st));
         return UCC_ERR_NO_MEMORY;
     }
     return UCC_OK;
@@ -45,8 +47,10 @@ static ucc_status_t ucc_mc_cuda_mem_free(void *ptr)
     st = cudaFree(ptr);
     if (st != cudaSuccess) {
         cudaGetLastError();
-        mc_error(&ucc_mc_cuda.super, "failed to free mem at %p, "
-                 "cuda error %d(%s)", ptr, st, cudaGetErrorString(st));
+        mc_error(&ucc_mc_cuda.super,
+                 "failed to free mem at %p, "
+                 "cuda error %d(%s)",
+                 ptr, st, cudaGetErrorString(st));
         return UCC_ERR_NO_MESSAGE;
     }
     return UCC_OK;
@@ -56,7 +60,7 @@ static ucc_status_t ucc_mc_cuda_mem_type(const void *ptr,
                                          ucc_memory_type_t *mem_type)
 {
     struct cudaPointerAttributes attr;
-    cudaError_t st;
+    cudaError_t                  st;
 
     st = cudaPointerGetAttributes(&attr, ptr);
     if (st != cudaSuccess) {
@@ -65,19 +69,33 @@ static ucc_status_t ucc_mc_cuda_mem_type(const void *ptr,
     }
 
 #if CUDART_VERSION >= 10000
-    if (attr.type == cudaMemoryTypeDevice) {
+    switch (attr.type) {
+    case cudaMemoryTypeUnregistered:
+    case cudaMemoryTypeHost:
+        *mem_type = UCC_MEMORY_TYPE_HOST;
+        break;
+    case cudaMemoryTypeDevice:
+        *mem_type = UCC_MEMORY_TYPE_CUDA;
+        break;
+    case cudaMemoryTypeManaged:
+        *mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
+        break;
+    }
 #else
     if (attr.memoryType == cudaMemoryTypeDevice) {
-#endif
-        *mem_type = UCC_MEMORY_TYPE_CUDA;
+        if (attr.isManaged) {
+            *mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
+        } else {
+            *mem_type = UCC_MEMORY_TYPE_CUDA;
+        }
     }
     else {
         *mem_type = UCC_MEMORY_TYPE_HOST;
     }
+#endif
 
     return UCC_OK;
 }
-
 
 ucc_mc_cuda_t ucc_mc_cuda = {
     .super.super.name = "cuda mc",

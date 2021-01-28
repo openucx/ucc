@@ -69,6 +69,7 @@ ucc_status_t ucc_mc_type(const void *ptr, ucc_memory_type_t *mem_type)
     ucc_memory_type_t mt;
     ucc_status_t      status;
 
+    /* TODO: consider using memory type cache from UCS */
     /* by default assume memory type host */
     *mem_type = UCC_MEMORY_TYPE_HOST;
     for (mt = UCC_MEMORY_TYPE_HOST + 1; mt < UCC_MEMORY_TYPE_LAST; mt++) {
