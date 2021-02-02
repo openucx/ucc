@@ -204,12 +204,12 @@ static inline void ucc_copy_context_params(ucc_context_params_t *dst,
 }
 
 static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
-                                           ucc_context_config_t *ctx_config)
+                                           ucc_context_config_t *ctx_config,
+                                           ucc_base_context_params_t b_params)
 {
     ucc_lib_info_t *lib = ctx->lib;
     ucc_tl_lib_t *tl_lib;
     ucc_tl_context_config_t *tl_config;
-    ucc_base_context_params_t b_params;
     ucc_base_context_t       *b_ctx;
     int i, num_tls;
     ucc_status_t status;
@@ -222,11 +222,7 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
                   sizeof(ucc_tl_context_t *) * num_tls);
         return UCC_ERR_NO_MEMORY;
     }
-
-    ucc_copy_context_params(&b_params.params, &ctx->params);
-    b_params.prefix      = lib->full_prefix;
-    b_params.thread_mode = lib->attr.thread_mode;
-    ctx->n_tl_ctx        = 0;
+    ctx->n_tl_ctx = 0;
     for (i = 0; i < lib->n_tl_libs_opened; i++) {
         tl_lib = lib->tl_libs[i];
         ucc_assert(NULL != tl_lib->iface->tl_context_config.table);
@@ -275,8 +271,12 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     ctx->lib = lib;
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
-    b_params.context = ctx;
-    status = ucc_create_tl_contexts(ctx, config);
+    b_params.context           = ctx;
+    b_params.estimated_num_eps = 0; //TODO
+    b_params.estimated_num_ppn = 0; //TODO
+    b_params.prefix            = lib->full_prefix;
+    b_params.thread_mode       = lib->attr.thread_mode;
+    status = ucc_create_tl_contexts(ctx, config, b_params);
     if (UCC_OK != status) {
         /* only critical error could have happened - bail */
         ucc_error("failed to create tl contexts");
