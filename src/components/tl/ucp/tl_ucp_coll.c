@@ -35,8 +35,8 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_op_args_t *coll_args,
     ucc_tl_ucp_context_t *ctx     = UCC_TL_UCP_TEAM_CTX(tl_team);
     ucc_tl_ucp_task_t    *task    = ucc_tl_ucp_get_task(ctx);
     task->team                    = tl_team;
-    task->super.super.post        = ucc_tl_ucp_coll_post;
-    task->super.super.finalize    = ucc_tl_ucp_coll_finalize;
+    task->super.post              = ucc_tl_ucp_coll_post;
+    task->super.finalize          = ucc_tl_ucp_coll_finalize;
     *task_h                       = &task->super;
     return UCC_OK;
 }

@@ -67,14 +67,9 @@ typedef struct ucc_team*            ucc_team_h;
  * operation.
  */
 typedef struct ucc_coll_req* ucc_coll_req_h;
-typedef ucc_status_t (*ucc_coll_post_fn_t)(ucc_coll_req_h request);
-typedef ucc_status_t (*ucc_coll_finalize_fn_t)(ucc_coll_req_h request);
 typedef struct ucc_coll_req {
-    ucc_status_t           status;
-    ucc_coll_post_fn_t     post;
-    ucc_coll_finalize_fn_t finalize;
+    ucc_status_t status;
 } ucc_coll_req_t;
-
 
 /**
  * @ingroup UCC_COLLECTIVES

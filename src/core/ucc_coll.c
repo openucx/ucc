@@ -9,6 +9,7 @@
 #include "components/cl/ucc_cl.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
+#include "schedule/ucc_schedule.h"
 
 static ucc_cl_team_t *ucc_select_cl_team(ucc_coll_op_args_t *coll_args,
                                          ucc_team_t *team)
@@ -38,3 +39,16 @@ ucc_status_t ucc_collective_init(ucc_coll_op_args_t *coll_args,
     *request = &task->super;
     return UCC_OK;
 }
+
+ucc_status_t ucc_collective_post(ucc_coll_req_h request)
+{
+    ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
+    return task->post(request);
+}
+
+ucc_status_t ucc_collective_finalize(ucc_coll_req_h request)
+{
+    ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
+    return task->finalize(request);
+}
+

@@ -81,6 +81,7 @@ int ucc_mpi_test_init(int argc, char **argv, uint64_t coll_types,
 
     ucc_lib_params_t lib_params = {
         .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE,
+        .thread_mode = thread_mode,
         /* .coll_types = coll_types, */
     };
 

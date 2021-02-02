@@ -5,25 +5,27 @@
 #include "ucc_schedule.h"
 #include "utils/ucc_compiler_def.h"
 
-void ucc_event_manager_init(ucc_event_manager_t *em)
+ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em)
 {
     int i;
     for (i = 0; i < UCC_EVENT_LAST; i++) {
         em->listeners_size[i] = 0;
     }
+    return UCC_OK;
 }
 
 void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
                                  ucc_coll_task_t *task)
 {
+    ucc_assert(em->listeners_size[event] < MAX_LISTENERS);
     em->listeners[event][em->listeners_size[event]] = task;
     em->listeners_size[event]++;
 }
 
-void ucc_coll_task_init(ucc_coll_task_t *task)
+ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task)
 {
     task->super.status = UCC_OPERATION_INITIALIZED;
-    ucc_event_manager_init(&task->em);
+    return ucc_event_manager_init(&task->em);
 }
 
 ucc_status_t ucc_event_manager_notify(ucc_event_manager_t *em,
@@ -53,14 +55,16 @@ static ucc_status_t ucc_schedule_completed_handler(ucc_coll_task_t *task)
     return UCC_OK;
 }
 
-void ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx)
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx)
 {
-    ucc_coll_task_init(&schedule->super);
+    ucc_status_t status;
+    status = ucc_coll_task_init(&schedule->super);
     schedule->super.handlers[UCC_EVENT_COMPLETED] =
         ucc_schedule_completed_handler;
     schedule->n_completed_tasks = 0;
     schedule->ctx               = ctx;
     schedule->n_tasks           = 0;
+    return status;
 }
 
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)

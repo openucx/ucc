@@ -1476,10 +1476,7 @@ ucc_status_t ucc_collective_init(ucc_coll_op_args_t *coll_args,
  *
  *  @return Error code as defined by ucc_status_t
  */
-static inline ucc_status_t ucc_collective_post(ucc_coll_req_h request)
-{
-    return request->post(request);
-}
+ucc_status_t ucc_collective_post(ucc_coll_req_h request);
 
 
 /**
@@ -1552,10 +1549,7 @@ static inline ucc_status_t ucc_collective_test(ucc_coll_req_h request)
  *
  *  @return Error code as defined by ucc_status_t
  */
-static inline ucc_status_t ucc_collective_finalize(ucc_coll_req_h request)
-{
-    return request->finalize(request);
-}
+ucc_status_t ucc_collective_finalize(ucc_coll_req_h request);
 
 END_C_DECLS
 #endif

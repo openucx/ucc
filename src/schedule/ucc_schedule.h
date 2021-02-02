@@ -7,7 +7,7 @@
 
 #include "ucc/api/ucc.h"
 #include "utils/ucc_list.h"
-#define MAX_LISTENERS 8
+#define MAX_LISTENERS 4
 
 typedef enum {
     UCC_EVENT_COMPLETED = 0,
@@ -18,6 +18,8 @@ typedef enum {
 typedef struct ucc_coll_task ucc_coll_task_t;
 
 typedef ucc_status_t (*ucc_task_event_handler_p)(ucc_coll_task_t *task);
+typedef ucc_status_t (*ucc_coll_post_fn_t)(ucc_coll_req_h request);
+typedef ucc_status_t (*ucc_coll_finalize_fn_t)(ucc_coll_req_h request);
 
 typedef struct ucc_event_manager {
     ucc_coll_task_t *listeners[UCC_EVENT_LAST][MAX_LISTENERS];
@@ -26,6 +28,8 @@ typedef struct ucc_event_manager {
 
 typedef struct ucc_coll_task {
     ucc_coll_req_t             super;
+    ucc_coll_post_fn_t         post;
+    ucc_coll_finalize_fn_t     finalize;
     ucc_event_manager_t        em;
     ucc_task_event_handler_p   handlers[UCC_EVENT_LAST];
     ucc_status_t             (*progress)(struct ucc_coll_task *self);
@@ -42,13 +46,13 @@ typedef struct ucc_schedule {
     ucc_context_t  *ctx;
 } ucc_schedule_t;
 
-void ucc_event_manager_init(ucc_event_manager_t *em);
-void ucc_coll_task_init(ucc_coll_task_t *task);
+ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em);
+ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task);
 void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
                                  ucc_coll_task_t *task);
 ucc_status_t ucc_event_manager_notify(ucc_event_manager_t *em,
                                       ucc_event_t event);
-void         ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx);
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx);
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule);
 #endif
