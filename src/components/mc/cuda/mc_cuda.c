@@ -70,7 +70,6 @@ static ucc_status_t ucc_mc_cuda_mem_type(const void *ptr,
 
 #if CUDART_VERSION >= 10000
     switch (attr.type) {
-    case cudaMemoryTypeUnregistered:
     case cudaMemoryTypeHost:
         *mem_type = UCC_MEMORY_TYPE_HOST;
         break;
@@ -80,6 +79,8 @@ static ucc_status_t ucc_mc_cuda_mem_type(const void *ptr,
     case cudaMemoryTypeManaged:
         *mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
         break;
+    default:
+        return UCC_ERR_NOT_SUPPORTED;
     }
 #else
     if (attr.memoryType == cudaMemoryTypeDevice) {
@@ -89,8 +90,10 @@ static ucc_status_t ucc_mc_cuda_mem_type(const void *ptr,
             *mem_type = UCC_MEMORY_TYPE_CUDA;
         }
     }
-    else {
+    else if (attr.memoryType == cudaMemoryTypeHost) {
         *mem_type = UCC_MEMORY_TYPE_HOST;
+    } else {
+        return UCC_ERR_NOT_SUPPORTED;
     }
 #endif
 
