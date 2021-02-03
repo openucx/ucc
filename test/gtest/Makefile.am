@@ -75,6 +75,17 @@ gtest_SOURCES =                 \
 	core/test_mc.cc             \
 	core/test_multiproc.cc
 
+if HAVE_CUDA
+gtest_SOURCES += \
+	core/test_mc_cuda.cc
+gtest_CPPFLAGS += \
+	$(CUDA_CPPFLAGS)
+gtest_LDFLAGS += \
+	$(CUDA_LDFLAGS)
+gtest_LDADD += \
+	$(CUDA_LIBS)
+endif
+
 noinst_HEADERS =          \
 	common/gtest.h        \
 	common/test.h         \

@@ -20,10 +20,11 @@ UCC_TEST_F(test_mc, init_finalize)
 
 UCC_TEST_F(test_mc, init_is_required)
 {
-    void *ptr;
-
-    EXPECT_NE(UCC_OK, ucc_mc_alloc(&ptr, 1, UCC_MEMORY_TYPE_HOST));
-    EXPECT_NE(UCC_OK, ucc_mc_free(ptr, UCC_MEMORY_TYPE_HOST));
+    ASSERT_EQ(UCC_OK, ucc_constructor());
+    EXPECT_NE(UCC_OK, ucc_mc_available(UCC_MEMORY_TYPE_HOST));
+    EXPECT_EQ(UCC_OK, ucc_mc_init());
+    EXPECT_EQ(UCC_OK, ucc_mc_available(UCC_MEMORY_TYPE_HOST));
+    ucc_mc_finalize();
 }
 
 UCC_TEST_F(test_mc, can_alloc_and_free_host_mem)
@@ -31,12 +32,12 @@ UCC_TEST_F(test_mc, can_alloc_and_free_host_mem)
     void *ptr = NULL;
     size_t size = 4096;
 
-    EXPECT_EQ(UCC_OK, ucc_constructor());
-    EXPECT_EQ(UCC_OK, ucc_mc_init());
+    ASSERT_EQ(UCC_OK, ucc_constructor());
+    ASSERT_EQ(UCC_OK, ucc_mc_init());
     EXPECT_EQ(UCC_OK, ucc_mc_alloc(&ptr, size, UCC_MEMORY_TYPE_HOST));
     memset(ptr, 0, size);
     EXPECT_EQ(UCC_OK, ucc_mc_free(ptr, UCC_MEMORY_TYPE_HOST));
-    EXPECT_EQ(UCC_OK, ucc_mc_finalize());
+    ucc_mc_finalize();
 }
 
 UCC_TEST_F(test_mc, init_twice)
@@ -46,11 +47,10 @@ UCC_TEST_F(test_mc, init_twice)
     ucc_lib_h lib1, lib2;
     ucc_mc_base_t *mc;
 
-
-    EXPECT_EQ(UCC_OK, ucc_lib_config_read(NULL, NULL, &cfg));
+    ASSERT_EQ(UCC_OK, ucc_lib_config_read(NULL, NULL, &cfg));
     lib_params.mask        = UCC_LIB_PARAM_FIELD_THREAD_MODE;
     lib_params.thread_mode = UCC_THREAD_SINGLE;
-    EXPECT_EQ(UCC_OK, ucc_init(&lib_params, cfg, &lib1));
+    ASSERT_EQ(UCC_OK, ucc_init(&lib_params, cfg, &lib1));
     mc = ucc_derived_of(ucc_global_config.mc_framework.components[0],
                         ucc_mc_base_t);
     EXPECT_EQ(1, mc->ref_cnt);
