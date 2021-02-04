@@ -1526,7 +1526,10 @@ ucc_status_t ucc_collective_init_and_post(ucc_coll_op_args_t *coll_args,
  *
  *  @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_collective_test(ucc_coll_req_h request);
+static inline ucc_status_t ucc_collective_test(ucc_coll_req_h request)
+{
+    return request->status;
+}
 
 /**
  *  @ingroup UCC_COLLECTIVES
