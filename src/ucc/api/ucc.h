@@ -325,10 +325,10 @@ enum ucc_lib_attr_field{
  *  Description
  *
  *  @ref ucc_lib_params_t defines the parameters that can be used to customize
- *  the library. The bits in “mask” bit array is defined by @ref
+ *  the library. The bits in "mask" bit array is defined by @ref
  *  ucc_lib_params_field, which correspond to fields in structure @ref
  *  ucc_lib_params_t. The valid fields of the structure is specified by the
- *  setting the bit to “1” in the bit-array “mask”. When bits corresponding to
+ *  setting the bit to "1" in the bit-array "mask". When bits corresponding to
  *  the fields is not set, the fields are not defined.
  *
  *  @endparblock
@@ -354,9 +354,9 @@ typedef struct ucc_lib_params {
  *  Description
  *
  *  @ref ucc_lib_attr_t defines the attributes of the library. The bits in
- *  “mask” bit array is defined by @ref ucc_lib_attr_field, which correspond to
+ *  "mask" bit array is defined by @ref ucc_lib_attr_field, which correspond to
  *  fields in structure @ref ucc_lib_attr_t. The valid fields of the structure
- *  is specified by the setting the bit to “1” in the bit-array “mask”. When
+ *  is specified by the setting the bit to "1" in the bit-array "mask". When
  *  bits corresponding to the fields is not set, the fields are not defined.
  *
  *  @endparblock
@@ -637,11 +637,11 @@ typedef struct ucc_context_oob_coll {
  *  Description
  *
  *  @ref ucc_context_params_t defines the parameters that can be used to
- *  customize the context. The “mask” bit array fields are defined by @ref
- *  ucc_context_params_field. The bits in “mask” bit array is defined by @ref
+ *  customize the context. The "mask" bit array fields are defined by @ref
+ *  ucc_context_params_field. The bits in "mask" bit array is defined by @ref
  *  ucc_context_params_field, which correspond to fields in structure @ref
  *  ucc_context_params_t. The valid fields of the structure is specified by the
- *  setting the bit to “1” in the bit-array “mask”. When bits corresponding to
+ *  setting the bit to "1" in the bit-array "mask". When bits corresponding to
  *  the fields is not set, the fields are not defined.
  *
  *
@@ -667,9 +667,9 @@ typedef struct ucc_context_params {
  *  Description
  *
  *  @ref ucc_context_attr_t defines the attributes of the context. The bits in
- *  “mask” bit array is defined by @ref ucc_context_attr_field, which correspond to
+ *  "mask" bit array is defined by @ref ucc_context_attr_field, which correspond to
  *  fields in structure @ref ucc_context_attr_t. The valid fields of the structure
- *  is specified by the setting the bit to “1” in the bit-array “mask”. When
+ *  is specified by the setting the bit to "1" in the bit-array "mask". When
  *  bits corresponding to the fields is not set, the fields are not defined.
  *
  *  @endparblock
@@ -1067,11 +1067,11 @@ typedef struct ucc_ep_map_t {
  *  Description
  *
  *  @ref ucc_team_params_t defines the parameters that can be used to customize
- *  the team. The “mask” bit array fields are defined by @ref
- *  ucc_team_params_field. The bits in “mask” bit array is defined by @ref
+ *  the team. The "mask" bit array fields are defined by @ref
+ *  ucc_team_params_field. The bits in "mask" bit array is defined by @ref
  *  ucc_team_params_field, which correspond to fields in structure @ref
  *  ucc_team_params_t. The valid fields of the structure is specified by the
- *  setting the bit to “1” in the bit-array “mask”. When bits corresponding to
+ *  setting the bit to "1" in the bit-array "mask". When bits corresponding to
  *  the fields is not set, the fields are not defined.
  *
  *
@@ -1104,9 +1104,9 @@ typedef struct ucc_team_params {
  *  Description
  *
  *  @ref ucc_team_attr_t defines the attributes of the team. The bits in
- *  “mask” bit array is defined by @ref ucc_team_attr_field, which correspond to
+ *  "mask" bit array is defined by @ref ucc_team_attr_field, which correspond to
  *  fields in structure @ref ucc_team_attr_t. The valid fields of the structure
- *  is specified by the setting the bit to “1” in the bit-array “mask”. When
+ *  is specified by the setting the bit to "1" in the bit-array "mask". When
  *  bits corresponding to the fields is not set, the fields are not defined.
  *
  *  @endparblock
@@ -1246,7 +1246,7 @@ ucc_status_t ucc_team_get_attr(ucc_team_h team,
  *
  *  @brief ucc_team_create_from_parent is a nonblocking collective operation,
  *  which creates a new team from the parent team. If a participant intends to
- *  participate in the new team, it passes a TRUE value for the “included”
+ *  participate in the new team, it passes a TRUE value for the "included"
  *  parameter. Otherwise, it passes FALSE. The routine returns immediately after
  *  the post-operation. To learn the completion of the team create operation, the
  *  ucc_team_create_test operation is used.
@@ -1388,21 +1388,21 @@ enum ucc_coll_op_args_field {
  *  @b Description
  *  @n @n
  *  @ref ucc_coll_op_args_t defines the parameters that can be used to customize
- *  the collective operation. The “mask” bit array fields are defined by @ref
- *  ucc_coll_op_args_field. The bits in “mask” bit array is defined by @ref
+ *  the collective operation. The "mask" bit array fields are defined by @ref
+ *  ucc_coll_op_args_field. The bits in "mask" bit array is defined by @ref
  *  ucc_coll_op_args_field, which correspond to fields in structure @ref
  *  ucc_coll_op_args_t. The valid fields of the structure are specified by
- *  setting the corresponding bit to “1” in the bit-array “mask”. When bits
+ *  setting the corresponding bit to "1" in the bit-array "mask". When bits
  *  corresponding to the fields are not set, the fields are not defined.
  *  @n @n
- *  The collective operation is selected by field “coll_type”. If allreduce or
+ *  The collective operation is selected by field "coll_type". If allreduce or
  *  reduce operation is selected, the type of reduction is selected by the field
- *  “predefined_reduction_op” or “custom_reduction_op”. For unordered collective
- *  operations, the user-provided “tag” value orders the collective operation.
+ *  "predefined_reduction_op" or "custom_reduction_op". For unordered collective
+ *  operations, the user-provided "tag" value orders the collective operation.
  *  For rooted collective operations such as reduce, scatter, gather, fan-in, and
- *  fan-out, the “root” field provides the participant endpoint value. The user
- *  can request either “local” or “global” error information using the
- *  “error_type” field.
+ *  fan-out, the "root" field provides the participant endpoint value. The user
+ *  can request either "local" or "global" error information using the
+ *  "error_type" field.
  *
  *  @endparblock
  *
