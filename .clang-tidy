@@ -1,0 +1,16 @@
+---
+Checks: >
+    -*,
+    clang-analyzer-*,
+    -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+    -clang-analyzer-osx.*,
+    -clang-analyzer-optin.osx.*,
+    misc-redundant-expression,
+    misc-static-assert,
+    misc-unused-parameters,
+    readability-redundant-control-flow
+WarningsAsErrors: ''
+HeaderFilterRegex: ''
+AnalyzeTemporaryDtors: false
+FormatStyle:     none
+...

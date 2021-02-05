@@ -27,16 +27,6 @@ static ucc_config_field_t ucc_lib_config_table[] = {
 UCC_CONFIG_REGISTER_TABLE(ucc_lib_config_table, "UCC", NULL, ucc_lib_config_t,
                           &ucc_config_global_list)
 
-static inline ucc_status_t ucc_cl_component_is_loaded(ucc_cl_type_t cl_type)
-{
-    const char *cl_name = ucc_cl_names[cl_type];
-    if (NULL == ucc_get_component(&ucc_global_config.cl_framework, cl_name)) {
-        return UCC_ERR_NOT_FOUND;
-    } else {
-        return UCC_OK;
-    }
-}
-
 static inline int ucc_cl_requested(const ucc_lib_config_t *cfg, int cl_type)
 {
     int i;
