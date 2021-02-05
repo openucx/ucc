@@ -72,7 +72,7 @@ typedef struct ucc_tl_ucp_req {
 #define UCC_TL_UCP_TEAM_CTX(_team)                                             \
     (ucc_derived_of((_team)->super.super.context, ucc_tl_ucp_context_t))
 
-#define UCC_TL_UCP_TEAM_CORE_CTX(_team)                                      \
+#define UCC_TL_UCP_TEAM_CORE_CTX(_team)                                        \
     ((_team)->super.super.context->ucc_context)
 
 #endif

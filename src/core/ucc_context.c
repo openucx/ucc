@@ -328,9 +328,10 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
        if context is EXCLUSIVE then thread_mode is always SINGLE,
        otherwise it is  inherited from lib */
     ctx->thread_mode = ((params->ctx_type == UCC_CONTEXT_EXCLUSIVE) &&
-                        (params->mask & UCC_CONTEXT_PARAM_FIELD_TYPE)) ?
-        UCC_THREAD_SINGLE : lib->attr.thread_mode;
-    status = ucc_progress_queue_init(&ctx->pq, ctx->thread_mode);
+                        (params->mask & UCC_CONTEXT_PARAM_FIELD_TYPE))
+                           ? UCC_THREAD_SINGLE
+                           : lib->attr.thread_mode;
+    status           = ucc_progress_queue_init(&ctx->pq, ctx->thread_mode);
     if (UCC_OK != status) {
         ucc_error("failed to init progress queue for context %p", ctx);
         goto error_ctx_create;
@@ -379,17 +380,21 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     return UCC_OK;
 }
 
-ucc_status_t ucc_context_progress_register(ucc_context_t *ctx, ucc_context_progress_fn_t fn,
+ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
+                                           ucc_context_progress_fn_t fn,
                                            void *progress_arg)
 {
     int next_pos = ctx->progress_array_size;
     if (next_pos == ctx->progress_array_max_size) {
         ctx->progress_array_max_size += 8;
         ctx->progress_array = ucc_realloc(ctx->progress_array,
-                                          ctx->progress_array_max_size*sizeof(ucc_context_progress_t), "progress_array");
+                                          ctx->progress_array_max_size *
+                                              sizeof(ucc_context_progress_t),
+                                          "progress_array");
         if (!ctx->progress_array) {
             ucc_error("failed to allocate %zd bytes for progress array",
-                      ctx->progress_array_max_size*sizeof(ucc_context_progress_t));
+                      ctx->progress_array_max_size *
+                          sizeof(ucc_context_progress_t));
             return UCC_ERR_NO_MEMORY;
         }
     }
@@ -399,7 +404,8 @@ ucc_status_t ucc_context_progress_register(ucc_context_t *ctx, ucc_context_progr
     return UCC_OK;
 }
 
-void ucc_context_progress_deregister(ucc_context_t *ctx, ucc_context_progress_fn_t fn,
+void ucc_context_progress_deregister(ucc_context_t *ctx,
+                                     ucc_context_progress_fn_t fn,
                                      void *progress_arg)
 {
     int i, j;
@@ -407,7 +413,7 @@ void ucc_context_progress_deregister(ucc_context_t *ctx, ucc_context_progress_fn
         if (ctx->progress_array[i].progress_fn == fn &&
             ctx->progress_array[i].progress_arg == progress_arg) {
             for (j = i; j < ctx->progress_array_size - 1; j++) {
-                ctx->progress_array[j] = ctx->progress_array[j+1];
+                ctx->progress_array[j] = ctx->progress_array[j + 1];
             }
             ctx->progress_array_size--;
             return;
@@ -415,7 +421,6 @@ void ucc_context_progress_deregister(ucc_context_t *ctx, ucc_context_progress_fn
     }
     ucc_assert(0);
 }
-
 
 ucc_status_t ucc_context_progress(ucc_context_h context)
 {

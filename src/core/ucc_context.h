@@ -16,8 +16,8 @@ typedef struct ucc_cl_context_config ucc_cl_context_config_t;
 
 typedef unsigned (*ucc_context_progress_fn_t)(void *progress_arg);
 typedef struct ucc_context_progress {
-    ucc_context_progress_fn_t  progress_fn;
-    void                      *progress_arg;
+    ucc_context_progress_fn_t progress_fn;
+    void                     *progress_arg;
 } ucc_context_progress_t;
 
 typedef struct ucc_context {
@@ -45,8 +45,10 @@ typedef struct ucc_context_config {
    progress callback fn (and argument for the callback) into core
    ucc context. Those callbacks will be triggered as part of
    ucc_context_progress. */
-ucc_status_t ucc_context_progress_register(ucc_context_t *ctx, ucc_context_progress_fn_t fn,
+ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
+                                           ucc_context_progress_fn_t fn,
                                            void *progress_arg);
-void ucc_context_progress_deregister(ucc_context_t *ctx, ucc_context_progress_fn_t fn,
-                                     void *progress_arg);
+void         ucc_context_progress_deregister(ucc_context_t *ctx,
+                                             ucc_context_progress_fn_t fn,
+                                             void *progress_arg);
 #endif

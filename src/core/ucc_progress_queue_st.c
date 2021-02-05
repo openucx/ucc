@@ -15,10 +15,10 @@ typedef struct ucc_pq_st {
 
 static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
 {
-    ucc_pq_st_t *pq_st        = ucc_derived_of(pq, ucc_pq_st_t);
-    int          n_progressed = 0;    
+    ucc_pq_st_t     *pq_st        = ucc_derived_of(pq, ucc_pq_st_t);
+    int              n_progressed = 0;
     ucc_coll_task_t *task, *tmp;
-    ucc_status_t status;
+    ucc_status_t     status;
 
     ucc_list_for_each_safe(task, tmp, &pq_st->list, list_elem) {
         if (task->progress) { //TODO maybe dummy empty progress fn is better than branch?
@@ -62,7 +62,6 @@ ucc_status_t ucc_pq_st_init(ucc_progress_queue_t **pq)
     pq_st->super.enqueue  = ucc_pq_st_enqueue;
     pq_st->super.progress = ucc_pq_st_progress;
     pq_st->super.finalize = ucc_pq_st_finalize;
-    *pq = &pq_st->super;
+    *pq                   = &pq_st->super;
     return UCC_OK;
 }
-

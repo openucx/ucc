@@ -36,7 +36,8 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_lib_t)
 
 UCC_CLASS_DEFINE(ucc_tl_lib_t, void);
 
-UCC_CLASS_INIT_FUNC(ucc_tl_context_t, ucc_tl_lib_t *tl_lib, ucc_context_t *ucc_context)
+UCC_CLASS_INIT_FUNC(ucc_tl_context_t, ucc_tl_lib_t *tl_lib,
+                    ucc_context_t *ucc_context)
 {
     UCC_CLASS_CALL_BASE_INIT();
     self->super.lib         = &tl_lib->super;
