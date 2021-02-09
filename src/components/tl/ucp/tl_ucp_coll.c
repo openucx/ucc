@@ -33,8 +33,8 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_op_args_t *coll_args,
         status = ucc_tl_ucp_barrier_init(task);
         break;
     default:
-        status = UCC_ERR_NOT_SUPPORTED;
-        break;
+        ucc_tl_ucp_put_task(task);
+        return UCC_ERR_NOT_SUPPORTED;
     }
     *task_h = &task->super;
     return status;

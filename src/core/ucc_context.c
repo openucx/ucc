@@ -9,6 +9,7 @@
 #include "components/tl/ucc_tl.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
+#include "utils/ucc_list.h"
 #include "ucc_progress_queue.h"
 ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
                                      ucc_context_config_t **config_p)
@@ -274,9 +275,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         goto error;
     }
     ctx->lib                     = lib;
-    ctx->progress_array          = NULL;
-    ctx->progress_array_size     = 0;
-    ctx->progress_array_max_size = 0;
+    ucc_list_head_init(&ctx->progress_list);
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
     b_params.context           = ctx;
@@ -380,27 +379,26 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     return UCC_OK;
 }
 
+typedef struct ucc_context_progress_entry {
+    ucc_list_link_t            list_elem;
+    ucc_context_progress_fn_t  fn;
+    void                      *arg;
+} ucc_context_progress_entry_t;
+
 ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
                                            ucc_context_progress_fn_t fn,
                                            void *progress_arg)
 {
-    int next_pos = ctx->progress_array_size;
-    if (next_pos == ctx->progress_array_max_size) {
-        ctx->progress_array_max_size += 8;
-        ctx->progress_array = ucc_realloc(ctx->progress_array,
-                                          ctx->progress_array_max_size *
-                                              sizeof(ucc_context_progress_t),
-                                          "progress_array");
-        if (!ctx->progress_array) {
-            ucc_error("failed to allocate %zd bytes for progress array",
-                      ctx->progress_array_max_size *
-                          sizeof(ucc_context_progress_t));
-            return UCC_ERR_NO_MEMORY;
-        }
+    ucc_context_progress_entry_t *entry =
+        ucc_malloc(sizeof(*entry), "progress_entry");
+    if (!entry) {
+        ucc_error("failed to allocate %zd bytes for progress ntry",
+                  sizeof(*entry));
+        return UCC_ERR_NO_MEMORY;
     }
-    ctx->progress_array[next_pos].progress_fn  = fn;
-    ctx->progress_array[next_pos].progress_arg = progress_arg;
-    ctx->progress_array_size++;
+    entry->fn  = fn;
+    entry->arg = progress_arg;
+    ucc_list_add_tail(&ctx->progress_list, &entry->list_elem);
     return UCC_OK;
 }
 
@@ -408,14 +406,11 @@ void ucc_context_progress_deregister(ucc_context_t *ctx,
                                      ucc_context_progress_fn_t fn,
                                      void *progress_arg)
 {
-    int i, j;
-    for (i = 0; i < ctx->progress_array_size; i++) {
-        if (ctx->progress_array[i].progress_fn == fn &&
-            ctx->progress_array[i].progress_arg == progress_arg) {
-            for (j = i; j < ctx->progress_array_size - 1; j++) {
-                ctx->progress_array[j] = ctx->progress_array[j + 1];
-            }
-            ctx->progress_array_size--;
+    ucc_context_progress_entry_t *entry, *tmp;
+    ucc_list_for_each_safe(entry, tmp, &ctx->progress_list, list_elem) {
+        if (entry->fn == fn && entry->arg == progress_arg) {
+            ucc_list_del(&entry->list_elem);
+            ucc_free(entry);
             return;
         }
     }
@@ -424,18 +419,12 @@ void ucc_context_progress_deregister(ucc_context_t *ctx,
 
 ucc_status_t ucc_context_progress(ucc_context_h context)
 {
-    int                     pa_size = context->progress_array_size;
-    ucc_context_progress_t *p;
-    ucc_status_t            status;
-    int                     i;
+    ucc_status_t                  status;
+    ucc_context_progress_entry_t *entry;
     /* progress registered progress fns */
-    for (i = 0; i < pa_size; i++) {
-        p = &context->progress_array[i];
-        /* registred progress fn returns 0 if no communication is made,
-           or positive value otherwise */
-        p->progress_fn(p->progress_arg);
+    ucc_list_for_each(entry, &context->progress_list, list_elem) {
+        entry->fn(entry->arg);
     }
-
     /* the fn below returns int - number of completed tasks.
        TODO : do we need to handle it ? Maybe return to user
        as int as well? */

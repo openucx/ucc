@@ -14,4 +14,5 @@
 #define ucc_list_add_tail      ucs_list_add_tail
 #define ucc_list_del           ucs_list_del
 #define ucc_list_for_each_safe ucs_list_for_each_safe
+#define ucc_list_for_each      ucs_list_for_each
 #endif

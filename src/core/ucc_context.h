@@ -8,7 +8,7 @@
 
 #include "ucc/api/ucc.h"
 #include "ucc_progress_queue.h"
-
+#include "utils/ucc_list.h"
 typedef struct ucc_lib_info          ucc_lib_info_t;
 typedef struct ucc_cl_context        ucc_cl_context_t;
 typedef struct ucc_tl_context        ucc_tl_context_t;
@@ -29,9 +29,7 @@ typedef struct ucc_context {
     ucc_tl_context_t      **tl_ctx;
     int                     n_cl_ctx;
     int                     n_tl_ctx;
-    ucc_context_progress_t *progress_array;
-    int                     progress_array_max_size;
-    int                     progress_array_size;
+    ucc_list_link_t         progress_list;
     ucc_progress_queue_t   *pq;
 } ucc_context_t;
 
