@@ -55,6 +55,15 @@
         }                                                                      \
     }
 
+#define UCC_CLASS_CALL_BASE_INIT()                                             \
+    {                                                                          \
+        {                                                                      \
+            if ((_init_count == NULL) || (_myclass == NULL)) {                 \
+                return UCC_ERR_INVALID_PARAM;                                  \
+            }                                                                  \
+        }                                                                      \
+    }
+
 #define UCC_CLASS_DECLARE_NAMED_NEW_FUNC(_name, _argtype, ...)                 \
     ucc_status_t _name(UCS_PP_FOREACH(                                         \
         _UCS_CLASS_INIT_ARG_DEFINE, _,                                         \

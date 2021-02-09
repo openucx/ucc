@@ -33,8 +33,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_context_t)
 
 UCC_CLASS_DEFINE(ucc_cl_basic_context_t, ucc_cl_context_t);
 
-ucc_status_t ucc_cl_basic_get_context_attr(const ucc_base_context_t *context,
-                                           ucc_base_attr_t *attr)
+ucc_status_t ucc_cl_basic_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
+                                           ucc_base_attr_t *attr)             /* NOLINT */
 {
-    return UCC_OK;
+    /* TODO */
+    return UCC_ERR_NOT_IMPLEMENTED;
 }

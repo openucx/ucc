@@ -7,6 +7,7 @@
 #include "tl_ucp.h"
 #include "utils/ucc_malloc.h"
 
+/* NOLINTNEXTLINE  params is not used*/
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
                     const ucc_base_config_t *config)
 {
@@ -24,6 +25,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_lib_t)
 
 UCC_CLASS_DEFINE(ucc_tl_ucp_lib_t, ucc_tl_lib_t);
 
-ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib, ucc_base_attr_t *attr) {
-    return UCC_OK;
+ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
+                                     ucc_base_attr_t *attr)     /* NOLINT */
+{
+    //TODO
+    return UCC_ERR_NOT_IMPLEMENTED;
 }

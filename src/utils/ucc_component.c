@@ -39,7 +39,7 @@ static ucc_status_t ucc_component_load_one(const char *so_path,
     }
     /* The name of the iface stract matches the basename of .so component
        object. basename_start - the starting position of the component name
-       in the full .so path. The name_len is also decreased by 3 to remove 
+       in the full .so path. The name_len is also decreased by 3 to remove
        ".so" extension from the name;
      */
     iface_struct_name_len = strlen(so_path) - basename_start - 3;
@@ -53,8 +53,8 @@ static ucc_status_t ucc_component_load_one(const char *so_path,
     }
     iface = (ucc_component_iface_t *)dlsym(handle, iface_struct);
     if ((error = dlerror()) != NULL) {
-        ucc_error("failed to get iface %s from %s object", iface_struct,
-                  so_path);
+        ucc_error("failed to get iface %s from %s object (%s)", iface_struct,
+                  so_path, error);
         goto iface_error;
     }
     if (!iface) {

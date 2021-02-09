@@ -82,7 +82,7 @@ ucc_status_t ucc_tl_ucp_addr_exchange_test(ucc_tl_ucp_addr_storage_t *storage)
 
     switch (storage->state) {
     case UCC_TL_UCP_ADDR_EXCHANGE_MAX_ADDRLEN:
-        storage->max_addrlen = 0;
+        storage->max_addrlen = storage->addrlens[0];
         for (i = 0; i < oob->participants; i++) {
             if (storage->addrlens[i] > storage->max_addrlen) {
                 storage->max_addrlen = storage->addrlens[i];

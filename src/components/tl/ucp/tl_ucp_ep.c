@@ -16,7 +16,7 @@ ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
         ucc_assert(team && team->eps);
         ep = &team->eps[rank];
     }
-    if (*ep) {
+    if ((ep != NULL) && (*ep)) {
         /* Already connected */
         return UCC_OK;
     }

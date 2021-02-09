@@ -17,6 +17,11 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
     int                      i;
     ucc_status_t             status;
     ucc_context_config_t    *config;
+
+    if (filename != NULL) {
+        ucc_error("read from file is not implemented");
+        return UCC_ERR_NOT_IMPLEMENTED;
+    }
     config = (ucc_context_config_t *)ucc_malloc(sizeof(ucc_context_config_t),
                                                 "ctx_config");
     if (config == NULL) {
@@ -312,7 +317,8 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     }
     if (0 == ctx->n_cl_ctx) {
         ucc_error("no CL context created in ucc_context_create");
-        return UCC_ERR_NO_MESSAGE;
+        status = UCC_ERR_NO_MESSAGE;
+        goto error_ctx;
     }
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;
