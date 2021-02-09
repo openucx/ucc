@@ -37,8 +37,8 @@ typedef struct ucc_mc_ops {
     ucc_status_t (*mem_type)(const void *ptr, ucc_memory_type_t *mem_type);
     ucc_status_t (*mem_alloc)(void **ptr, size_t size);
     ucc_status_t (*mem_free)(void *ptr);
-    ucc_status_t (*reduce)(const void *src1, const void *src2, void *dst,
-                           size_t count, ucc_datatype_t dt,
+    ucc_status_t (*reduce)(const void *src1, const void *src2,
+                           void *dst, size_t count, ucc_datatype_t dt,
                            ucc_reduction_op_t op);
  } ucc_mc_ops_t;
 

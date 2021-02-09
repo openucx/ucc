@@ -11,6 +11,15 @@
 
 static const ucc_mc_ops_t *mc_ops[UCC_MEMORY_TYPE_LAST];
 
+#define UCC_CHECK_MC_AVAILABLE(mc)                                             \
+    do {                                                                       \
+        if (NULL == mc_ops[mc]) {                                              \
+            ucc_error("no components supported memory type %s available",      \
+                    ucc_memory_type_names[mc]);                                \
+            return UCC_ERR_NOT_SUPPORTED;                                      \
+        }                                                                      \
+    } while (0)
+
 ucc_status_t ucc_mc_init()
 {
     int            i, n_mcs;
@@ -30,7 +39,8 @@ ucc_status_t ucc_mc_init()
                 continue;
             }
             status = ucc_config_parser_fill_opts(
-                mc->config, mc->config_table.table, "UCC_", NULL, 1);
+                mc->config, mc->config_table.table, "UCC_",
+                mc->config_table.prefix, 1);
             if (UCC_OK != status) {
                 ucc_info("failed to parse config for component: %s (%d)",
                          mc->super.name, status);
@@ -86,40 +96,22 @@ ucc_status_t ucc_mc_type(const void *ptr, ucc_memory_type_t *mem_type)
 
 ucc_status_t ucc_mc_alloc(void **ptr, size_t size, ucc_memory_type_t mem_type)
 {
-    ucc_status_t status;
-
-    if (NULL == mc_ops[mem_type]) {
-        ucc_error("no components supported memory type %s available",
-                  ucc_memory_type_names[mem_type]);
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-    status = mc_ops[mem_type]->mem_alloc(ptr, size);
-
-    return status;
+    UCC_CHECK_MC_AVAILABLE(mem_type);
+    return mc_ops[mem_type]->mem_alloc(ptr, size);
 }
 
-ucc_status_t ucc_mc_reduce(const void *src1, ucc_memory_type_t src1_mt,
-                           const void *src2, ucc_memory_type_t src2_mt,
-                           void *dst, ucc_memory_type_t dst_mt, size_t count,
-                           ucc_datatype_t dt, ucc_reduction_op_t op)
+ucc_status_t ucc_mc_reduce(const void *src1, const void *src2,
+                           void *dst, size_t count, ucc_datatype_t dt,
+                           ucc_memory_type_t mem_type, ucc_reduction_op_t op)
 {
-    //TODO
-
-    return UCC_ERR_NOT_IMPLEMENTED;
+    UCC_CHECK_MC_AVAILABLE(mem_type);
+    return mc_ops[mem_type]->reduce(src1, src2, dst, count, dt, op);
 }
 
 ucc_status_t ucc_mc_free(void *ptr, ucc_memory_type_t mem_type)
 {
-    ucc_status_t status;
-
-    if (NULL == mc_ops[mem_type]) {
-        ucc_error("no components supported memory type %s available",
-                  ucc_memory_type_names[mem_type]);
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-    status = mc_ops[mem_type]->mem_free(ptr);
-
-    return status;
+    UCC_CHECK_MC_AVAILABLE(mem_type);
+    return mc_ops[mem_type]->mem_free(ptr);
 }
 
 ucc_status_t ucc_mc_finalize()
