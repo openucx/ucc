@@ -4,6 +4,7 @@
 
 sources =    \
 	mc_cpu.h \
+	mc_cpu_reduce.h \
 	mc_cpu.c
 
 module_LTLIBRARIES        = libucc_mc_cpu.la

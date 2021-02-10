@@ -123,17 +123,14 @@ typedef enum {
     UCC_OP_PROD             = UCC_BIT(2),
     UCC_OP_MAX              = UCC_BIT(3),
     UCC_OP_MIN              = UCC_BIT(4),
-    UCC_OP_AND              = UCC_BIT(5),
-    UCC_OP_OR               = UCC_BIT(6),
-    UCC_OP_XOR              = UCC_BIT(7),
-    UCC_OP_LAND             = UCC_BIT(8),
-    UCC_OP_LOR              = UCC_BIT(9),
-    UCC_OP_LXOR             = UCC_BIT(10),
-    UCC_OP_BAND             = UCC_BIT(11),
-    UCC_OP_BOR              = UCC_BIT(12),
-    UCC_OP_BXOR             = UCC_BIT(13),
-    UCC_OP_MAXLOC           = UCC_BIT(14),
-    UCC_OP_MINLOC           = UCC_BIT(15)
+    UCC_OP_LAND             = UCC_BIT(5),
+    UCC_OP_LOR              = UCC_BIT(6),
+    UCC_OP_LXOR             = UCC_BIT(7),
+    UCC_OP_BAND             = UCC_BIT(8),
+    UCC_OP_BOR              = UCC_BIT(9),
+    UCC_OP_BXOR             = UCC_BIT(10),
+    UCC_OP_MAXLOC           = UCC_BIT(11),
+    UCC_OP_MINLOC           = UCC_BIT(12)
 } ucc_reduction_op_t;
 
 /**

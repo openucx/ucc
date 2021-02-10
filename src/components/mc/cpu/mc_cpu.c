@@ -5,7 +5,9 @@
  */
 
 #include "mc_cpu.h"
+#include "mc_cpu_reduce.h"
 #include "utils/ucc_malloc.h"
+#include <sys/types.h>
 
 static ucc_config_field_t ucc_mc_cpu_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_mc_cpu_config_t, super),
@@ -31,6 +33,35 @@ static ucc_status_t ucc_mc_cpu_mem_alloc(void **ptr, size_t size)
         return UCC_ERR_NO_MEMORY;
     }
     return UCC_OK;
+}
+
+static ucc_status_t ucc_mc_cpu_reduce(const void *src1, const void *src2,
+                                      void *dst, size_t count,
+                                      ucc_datatype_t dt, ucc_reduction_op_t op)
+{
+    switch(dt) {
+    case UCC_DT_INT16:
+        DO_DT_REDUCE_INT(int16_t, op, src1, src2, dst, count);
+        break;
+    case UCC_DT_INT32:
+        DO_DT_REDUCE_INT(int32_t, op, src1, src2, dst, count);
+        break;
+    case UCC_DT_INT64:
+        DO_DT_REDUCE_INT(int64_t, op, src1, src2, dst, count);
+        break;
+    case UCC_DT_FLOAT32:
+        ucc_assert(4 == sizeof(float));
+        DO_DT_REDUCE_FLOAT(float, op, src1, src2, dst, count);
+        break;
+    case UCC_DT_FLOAT64:
+        ucc_assert(8 == sizeof(double));
+        DO_DT_REDUCE_FLOAT(double, op, src1, src2, dst, count);
+        break;
+    default:
+        mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%d)", dt);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    return 0;
 }
 
 static ucc_status_t ucc_mc_cpu_mem_free(void *ptr)
@@ -65,6 +96,7 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.ops.mem_type  = ucc_mc_cpu_mem_type,
     .super.ops.mem_alloc = ucc_mc_cpu_mem_alloc,
     .super.ops.mem_free  = ucc_mc_cpu_mem_free,
+    .super.ops.reduce    = ucc_mc_cpu_reduce,
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cpu.super.config_table,

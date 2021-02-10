@@ -3,6 +3,17 @@
 # See file LICENSE for terms.
 #
 
+ARCH5="-gencode=arch=compute_35,code=sm_35
+ARCH6="-gencode=arch=compute_50,code=sm_50
+ARCH8="-gencode=arch=compute_60,code=sm_60 \
+-gencode=arch=compute_61,code=sm_61 \
+-gencode=arch=compute_61,code=compute_61"
+ARCH9="-gencode=arch=compute_70,code=sm_70 \
+-gencode=arch=compute_70,code=compute_70"
+ARCH10="-gencode=arch=compute_75,code=sm_75"
+ARCH11="-gencode=arch=compute_80,code=sm_80 \
+-gencode=arch=compute_80,code=compute_80"
+
 AC_DEFUN([CHECK_CUDA],[
 AS_IF([test "x$cuda_checked" != "xyes"],
    [
@@ -41,6 +52,23 @@ AS_IF([test "x$cuda_checked" != "xyes"],
          AS_IF([test "x$cuda_happy" = "xyes"],
                [AC_CHECK_LIB([cudart], [cudaGetDeviceCount],
                              [CUDA_LIBS="$CUDA_LIBS -lcudart"], [cuda_happy="no"])])
+         # Check for NVCC
+         AS_IF([test "x$cuda_happy" = "xyes"],
+               [AC_CHECK_PROG(cuda_happy, [nvcc], ["yes"], ["no"])])
+         AS_IF([test "x$cuda_happy" = "xyes"],
+               [CUDA_MAJOR_VERSION=`nvcc  --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 1`
+                AS_IF([test $CUDA_MAJOR_VERSION -lt 8],
+                      [cuda_happy=no])])
+         AS_IF([test "x$cuda_happy" = "xyes"],
+               [AS_IF([test $CUDA_MAJOR_VERSION -eq 8],
+                      [NVCC_ARCH="${ARCH5} ${ARCH6} ${ARCH8}"])
+                AS_IF([test $CUDA_MAJOR_VERSION -eq 9],
+                      [NVCC_ARCH="${ARCH5} ${ARCH6} ${ARCH8} ${ARCH9}"])
+                AS_IF([test $CUDA_MAJOR_VERSION -eq 10],
+                      [NVCC_ARCH="${ARCH5} ${ARCH6} ${ARCH8} ${ARCH9} ${ARCH10}"])
+                AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
+                      [NVCC_ARCH="${ARCH6} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11}"])
+                AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])])
          LDFLAGS="$save_LDFLAGS"
          CPPFLAGS="$save_CPPFLAGS"
          LDFLAGS="$save_LDFLAGS"

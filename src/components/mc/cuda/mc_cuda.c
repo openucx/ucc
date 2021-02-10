@@ -12,15 +12,36 @@ static ucc_config_field_t ucc_mc_cuda_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_mc_cuda_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_mc_config_table)},
 
+    {"REDUCE_NUM_BLOCKS", "auto",
+     "Number of thread blocks to use for reduction",
+     ucc_offsetof(ucc_mc_cuda_config_t, reduce_num_blocks),
+     UCC_CONFIG_TYPE_ULUNITS},
+
     {NULL}};
 
 static ucc_status_t ucc_mc_cuda_init()
 {
+    struct cudaDeviceProp prop;
+    int device;
+
+    ucc_mc_cuda_config_t *cfg = MC_CUDA_CONFIG;
+    CUDACHECK(cudaGetDevice(&device));
+    CUDACHECK(cudaGetDeviceProperties(&prop, device));
+    cfg->reduce_num_threads = prop.maxThreadsPerBlock;
+    if (cfg->reduce_num_blocks != UCC_ULUNITS_AUTO) {
+        if (prop.maxGridSize[0] < cfg->reduce_num_blocks) {
+            mc_warn(&ucc_mc_cuda.super, "number of blocks is too large, "
+                    "max supported %d", prop.maxGridSize[0]);
+            cfg->reduce_num_blocks = prop.maxGridSize[0];
+        }
+    }
+    CUDACHECK(cudaStreamCreate(&ucc_mc_cuda.stream));
     return UCC_OK;
 }
 
 static ucc_status_t ucc_mc_cuda_finalize()
 {
+    CUDACHECK(cudaStreamDestroy(ucc_mc_cuda.stream));
     return UCC_OK;
 }
 
@@ -116,6 +137,7 @@ ucc_mc_cuda_t ucc_mc_cuda = {
     .super.ops.mem_type  = ucc_mc_cuda_mem_type,
     .super.ops.mem_alloc = ucc_mc_cuda_mem_alloc,
     .super.ops.mem_free  = ucc_mc_cuda_mem_free,
+    .super.ops.reduce    = ucc_mc_cuda_reduce,
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cuda.super.config_table,
