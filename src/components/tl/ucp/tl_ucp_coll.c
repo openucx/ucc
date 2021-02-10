@@ -8,11 +8,11 @@
 #include "tl_ucp_coll.h"
 #include "barrier/barrier.h"
 
-static ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_req_t *request)
+static ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task = ucc_derived_of(request, ucc_tl_ucp_task_t);
-    tl_info(task->team->super.super.context->lib, "finalizing coll req %p",
-            request);
+    ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    tl_info(task->team->super.super.context->lib, "finalizing coll task %p",
+            task);
     ucc_tl_ucp_put_task(task);
     return UCC_OK;
 }

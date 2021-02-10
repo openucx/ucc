@@ -45,11 +45,11 @@ ucc_status_t ucc_collective_init(ucc_coll_op_args_t *coll_args,
 ucc_status_t ucc_collective_post(ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
-    return task->post(request);
+    return task->post(task);
 }
 
 ucc_status_t ucc_collective_finalize(ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
-    return task->finalize(request);
+    return task->finalize(task);
 }
