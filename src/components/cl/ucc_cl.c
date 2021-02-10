@@ -33,6 +33,7 @@ const char *ucc_cl_names[] = {
 UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
                     const ucc_cl_lib_config_t *cl_config, int default_priority)
 {
+    UCC_CLASS_CALL_BASE_INIT();
     self->iface         = cl_iface;
     self->super.log_component = cl_config->super.log_component;
     ucc_strncpy_safe(self->super.log_component.name,
@@ -76,7 +77,10 @@ ucc_status_t ucc_parse_cls_string(const char *cls_str,
         cl                    = strtok_r(NULL, ",", &saveptr);
     }
     ucc_free(cls_copy);
-
+    if (n_cls_selected == 0) {
+        ucc_error("incorrect value is passed as part of UCC_CLS list: %s", cl);
+        return UCC_ERR_INVALID_PARAM;
+    }
     cls = ucc_malloc(n_cls_selected * sizeof(ucc_cl_type_t), "cls_array");
     if (!cls) {
         ucc_error("failed to allocate %zd bytes for cls_array",
@@ -96,6 +100,7 @@ ucc_status_t ucc_parse_cls_string(const char *cls_str,
 
 UCC_CLASS_INIT_FUNC(ucc_cl_context_t, ucc_cl_lib_t *cl_lib)
 {
+    UCC_CLASS_CALL_BASE_INIT();
     self->super.lib = &cl_lib->super;
     return UCC_OK;
 }
@@ -122,7 +127,6 @@ ucc_status_t ucc_cl_context_config_read(ucc_cl_lib_t *cl_lib,
 
 ucc_status_t ucc_cl_lib_config_read(ucc_cl_iface_t *iface,
                                     const char *full_prefix,
-                                    const ucc_lib_config_t *config,
                                     ucc_cl_lib_config_t **cl_config)
 {
     return ucc_base_config_read(full_prefix, &iface->cl_lib_config,
@@ -131,6 +135,7 @@ ucc_status_t ucc_cl_lib_config_read(ucc_cl_iface_t *iface,
 
 UCC_CLASS_INIT_FUNC(ucc_cl_team_t, ucc_cl_context_t *cl_context)
 {
+    UCC_CLASS_CALL_BASE_INIT();
     self->super.context = &cl_context->super;
     return UCC_OK;
 }

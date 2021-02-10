@@ -21,6 +21,7 @@ ucc_config_field_t ucc_tl_context_config_table[] = {
 UCC_CLASS_INIT_FUNC(ucc_tl_lib_t, ucc_tl_iface_t *tl_iface,
                     const ucc_tl_lib_config_t *tl_config)
 {
+    UCC_CLASS_CALL_BASE_INIT();
     self->iface         = tl_iface;
     self->super.log_component = tl_config->super.log_component;
     ucc_strncpy_safe(self->super.log_component.name,
@@ -37,6 +38,7 @@ UCC_CLASS_DEFINE(ucc_tl_lib_t, void);
 
 UCC_CLASS_INIT_FUNC(ucc_tl_context_t, ucc_tl_lib_t *tl_lib)
 {
+    UCC_CLASS_CALL_BASE_INIT();
     self->super.lib = &tl_lib->super;
     self->ref_count = 0;
     return UCC_OK;
@@ -64,7 +66,6 @@ ucc_status_t ucc_tl_context_config_read(ucc_tl_lib_t *tl_lib,
 
 ucc_status_t ucc_tl_lib_config_read(ucc_tl_iface_t *iface,
                                     const char *full_prefix,
-                                    const ucc_lib_config_t *config,
                                     ucc_tl_lib_config_t **tl_config)
 {
     return ucc_base_config_read(full_prefix, &iface->tl_lib_config,
@@ -95,6 +96,7 @@ ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context)
 
 UCC_CLASS_INIT_FUNC(ucc_tl_team_t, ucc_tl_context_t *tl_context)
 {
+    UCC_CLASS_CALL_BASE_INIT();
     self->super.context = &tl_context->super;
     return UCC_OK;
 }

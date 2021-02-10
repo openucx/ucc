@@ -11,11 +11,13 @@
 #include "utils/ucc_log.h"
 #include "schedule/ucc_schedule.h"
 
+/* NOLINTNEXTLINE  */
 static ucc_cl_team_t *ucc_select_cl_team(ucc_coll_op_args_t *coll_args,
                                          ucc_team_t *team)
 {
-    /* TODO: collective CL selection logic will be there.
-       for now just return 1st CL on a list */
+    /* TODO1: collective CL selection logic will be there.
+       for now just return 1st CL on a list
+       TODO2: remove NOLINT once TODO1 is done */
     return team->cl_teams[0];
 }
 
@@ -51,4 +53,3 @@ ucc_status_t ucc_collective_finalize(ucc_coll_req_h request)
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
     return task->finalize(request);
 }
-

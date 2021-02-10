@@ -73,6 +73,9 @@ static ucc_status_t ucc_mc_cpu_mem_free(void *ptr)
 static ucc_status_t ucc_mc_cpu_mem_type(const void *ptr,
                                         ucc_memory_type_t *mem_type)
 {
+    if (ptr == NULL) {
+        *mem_type = UCC_MEMORY_TYPE_HOST;
+    }
     /* not supposed to be used */
     mc_error(&ucc_mc_cpu.super, "host memory component shouldn't be used for"
                                 "mem type detection");

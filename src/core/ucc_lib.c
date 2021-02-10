@@ -113,8 +113,7 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
                 continue;
             }
         }
-        status = ucc_cl_lib_config_read(cl_iface, lib->full_prefix, config,
-                                        &cl_config);
+        status = ucc_cl_lib_config_read(cl_iface, lib->full_prefix, &cl_config);
         if (UCC_OK != status) {
             ucc_error("failed to read CL \"%s\" lib configuration",
                       cl_iface->super.name);
@@ -179,7 +178,6 @@ error:
 }
 
 static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
-                                    const ucc_lib_config_t *config,
                                     ucc_lib_info_t *lib)
 {
     ucc_status_t          status;
@@ -222,7 +220,7 @@ static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
            cl_context_create.
          */
         if (tl_iface->type & required_tls) {
-            status = ucc_tl_lib_config_read(tl_iface, lib->full_prefix, config,
+            status = ucc_tl_lib_config_read(tl_iface, lib->full_prefix,
                                             &tl_config);
             if (UCC_OK != status) {
                 ucc_warn("failed to read TL \"%s\" lib configuration",
@@ -295,7 +293,7 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
         goto error;
     }
 
-    status = ucc_tl_lib_init(params, config, lib);
+    status = ucc_tl_lib_init(params, lib);
     if (UCC_OK != status) {
         goto error;
     }
@@ -315,6 +313,11 @@ ucc_status_t ucc_lib_config_read(const char *env_prefix, const char *filename,
     size_t            full_prefix_len;
     const char       *base_prefix = "UCC_";
 
+    if (filename != NULL) {
+        ucc_error("read from file is not implemented");
+        status = UCC_ERR_NOT_IMPLEMENTED;
+        goto err;
+    }
     config = ucc_malloc(sizeof(*config), "lib_config");
     if (config == NULL) {
         ucc_error("failed to allocate %zd bytes for lib_config",

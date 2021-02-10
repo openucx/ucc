@@ -20,6 +20,10 @@ static int callback(struct dl_phdr_info *info, size_t size, void *data)
 {
     char *str;
     char *component_path;
+
+    if ((data != NULL) || (size == 0)) {
+        return -1;
+    }
     if (NULL != (str = strstr(info->dlpi_name, UCC_LIB_SO_NAME))) {
         int pos        = (int)(str - info->dlpi_name);
         component_path = (char *)ucc_malloc(pos + UCC_COMPONENT_LIBDIR_LEN + 1,
@@ -33,7 +37,7 @@ static int callback(struct dl_phdr_info *info, size_t size, void *data)
            it'll always write '\0' to the end position of the dest string. */
         ucc_strncpy_safe(component_path, info->dlpi_name, pos + 1);
         component_path[pos] = '\0';
-        strcat(component_path, UCC_COMPONENT_LIBDIR);
+        strncat(component_path, UCC_COMPONENT_LIBDIR, UCC_COMPONENT_LIBDIR_LEN);
         ucc_global_config.component_path =
             ucc_global_config.component_path_default = component_path;
     }

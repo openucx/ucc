@@ -45,8 +45,8 @@ ucc_status_t ucc_tl_context_config_read(ucc_tl_lib_t *tl_lib,
                                         const ucc_context_config_t *config,
                                         ucc_tl_context_config_t **cl_config);
 
-ucc_status_t ucc_tl_lib_config_read(ucc_tl_iface_t *iface, const char *full_prefix,
-                                    const ucc_lib_config_t *config,
+ucc_status_t ucc_tl_lib_config_read(ucc_tl_iface_t *iface,
+                                    const char *full_prefix,
                                     ucc_tl_lib_config_t **cl_config);
 
 typedef struct ucc_tl_iface {
