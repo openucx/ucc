@@ -34,7 +34,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     ucp_worker_h        ucp_worker;
     ucs_status_t        status;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_ucp_config->super.tl_lib);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_ucp_config->super.tl_lib,
+                              params->context);
     self->preconnect = tl_ucp_config->preconnect;
     self->ep_close_state.close_req = NULL;
     self->ep_close_state.ep        = 0;

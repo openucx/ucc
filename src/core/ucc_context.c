@@ -9,7 +9,8 @@
 #include "components/tl/ucc_tl.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
-
+#include "utils/ucc_list.h"
+#include "ucc_progress_queue.h"
 ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
                                      ucc_context_config_t **config_p)
 {
@@ -273,7 +274,8 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
-    ctx->lib = lib;
+    ctx->lib                     = lib;
+    ucc_list_head_init(&ctx->progress_list);
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
     b_params.context           = ctx;
@@ -320,6 +322,19 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         status = UCC_ERR_NO_MESSAGE;
         goto error_ctx;
     }
+
+    /* Initialize ctx thread mode:
+       if context is EXCLUSIVE then thread_mode is always SINGLE,
+       otherwise it is  inherited from lib */
+    ctx->thread_mode = ((params->ctx_type == UCC_CONTEXT_EXCLUSIVE) &&
+                        (params->mask & UCC_CONTEXT_PARAM_FIELD_TYPE))
+                           ? UCC_THREAD_SINGLE
+                           : lib->attr.thread_mode;
+    status           = ucc_progress_queue_init(&ctx->pq, ctx->thread_mode);
+    if (UCC_OK != status) {
+        ucc_error("failed to init progress queue for context %p", ctx);
+        goto error_ctx_create;
+    }
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;
     return UCC_OK;
@@ -358,7 +373,61 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
         }
         tl_lib->iface->context.destroy(&tl_ctx->super);
     }
+    ucc_progress_queue_finalize(context->pq);
     ucc_free(context->tl_ctx);
     ucc_free(context);
     return UCC_OK;
+}
+
+typedef struct ucc_context_progress_entry {
+    ucc_list_link_t            list_elem;
+    ucc_context_progress_fn_t  fn;
+    void                      *arg;
+} ucc_context_progress_entry_t;
+
+ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
+                                           ucc_context_progress_fn_t fn,
+                                           void *progress_arg)
+{
+    ucc_context_progress_entry_t *entry =
+        ucc_malloc(sizeof(*entry), "progress_entry");
+    if (!entry) {
+        ucc_error("failed to allocate %zd bytes for progress ntry",
+                  sizeof(*entry));
+        return UCC_ERR_NO_MEMORY;
+    }
+    entry->fn  = fn;
+    entry->arg = progress_arg;
+    ucc_list_add_tail(&ctx->progress_list, &entry->list_elem);
+    return UCC_OK;
+}
+
+void ucc_context_progress_deregister(ucc_context_t *ctx,
+                                     ucc_context_progress_fn_t fn,
+                                     void *progress_arg)
+{
+    ucc_context_progress_entry_t *entry, *tmp;
+    ucc_list_for_each_safe(entry, tmp, &ctx->progress_list, list_elem) {
+        if (entry->fn == fn && entry->arg == progress_arg) {
+            ucc_list_del(&entry->list_elem);
+            ucc_free(entry);
+            return;
+        }
+    }
+    ucc_assert(0);
+}
+
+ucc_status_t ucc_context_progress(ucc_context_h context)
+{
+    ucc_status_t                  status;
+    ucc_context_progress_entry_t *entry;
+    /* progress registered progress fns */
+    ucc_list_for_each(entry, &context->progress_list, list_elem) {
+        entry->fn(entry->arg);
+    }
+    /* the fn below returns int - number of completed tasks.
+       TODO : do we need to handle it ? Maybe return to user
+       as int as well? */
+    status = ucc_progress_queue(context->pq);
+    return (status >= 0 ? UCC_OK : status);
 }

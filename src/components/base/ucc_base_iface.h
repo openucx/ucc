@@ -53,6 +53,7 @@ typedef struct ucc_base_context_params {
 } ucc_base_context_params_t;
 
 typedef struct ucc_base_context {
+    ucc_context_t  *ucc_context;
     ucc_base_lib_t *lib;
 } ucc_base_context_t;
 
