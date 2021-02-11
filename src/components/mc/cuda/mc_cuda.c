@@ -132,6 +132,7 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
                 return UCC_ERR_NOT_SUPPORTED;
             }
 #endif
+            mem_attr->mem_type = mem_type;
         }
 
         if (mem_attr->field_mask & (UCC_MEM_ATTR_FIELD_ALLOC_LENGTH |
@@ -144,19 +145,10 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
                           ptr, cu_err, cudaGetErrorString(st));
                 return UCC_ERR_NOT_SUPPORTED;
             }
+
+            mem_attr->base_address = base_address;
+            mem_attr->alloc_length = alloc_length;
         }
-    }
-
-    if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_MEM_TYPE) {
-        mem_attr->mem_type = mem_type;
-    }
-
-    if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_BASE_ADDRESS) {
-        mem_attr->base_address = base_address;
-    }
-
-    if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_ALLOC_LENGTH) {
-        mem_attr->alloc_length = alloc_length;
     }
 
     return UCC_OK;
