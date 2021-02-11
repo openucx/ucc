@@ -37,8 +37,8 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team, int team_rank)
 {
     ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
     if (team->context_ep_storage) {
-        int ctx_rank = -1; //TODO map to ctx rank
-        ucc_assert(0);
+        ucc_assert(team->ep_map.type > 0);
+        uint32_t ctx_rank = ucc_ep_map_eval(team->ep_map, team_rank);
         return ucc_tl_ucp_connect_ctx_ep(ctx, ctx_rank);
     }
     return ucc_tl_ucp_connect_ep(ctx, &team->eps[team_rank],

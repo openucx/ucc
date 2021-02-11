@@ -53,6 +53,9 @@ typedef struct ucc_tl_ucp_context {
     ucp_address_t              *worker_address;
     ucc_tl_ucp_ep_close_state_t ep_close_state;
     ucc_mpool_t                 req_mp;
+    uint32_t                    rank; /* context level rank. only valid if ctx
+                                         has oob */
+    uint32_t                    size; /* context size. only valid if ctx has oob */
     ucp_ep_h                   *eps;
     ucc_tl_ucp_addr_storage_t  *addr_storage;
 } ucc_tl_ucp_context_t;
@@ -68,13 +71,15 @@ typedef struct ucc_tl_ucp_team {
               This optimization is only possible when user provides
               the necessary rank mappings team_rank->context_rank. */
     ucp_ep_h                  *eps;
-    int                        size;
-    int                        rank;
+    uint32_t                   size;
+    uint32_t                   rank;
     ucc_tl_ucp_addr_storage_t *addr_storage;
     uint32_t                   id;
     uint32_t                   scope;
     uint32_t                   scope_id;
     uint32_t                   seq_num;
+    ucc_ep_map_t               ep_map; /*< Maps team rank to context rank. Only used when
+                                         user provided CTX_EP, TEAM_EP, and EP_MAP */
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

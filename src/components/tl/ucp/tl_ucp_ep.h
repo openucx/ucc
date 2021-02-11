@@ -10,6 +10,7 @@
 #include "ucc/api/ucc.h"
 #include <ucp/api/ucp.h>
 #include "tl_ucp.h"
+#include "utils/ucc_math.h"
 typedef struct ucc_tl_ucp_context ucc_tl_ucp_context_t;
 typedef struct ucc_tl_ucp_team    ucc_tl_ucp_team_t;
 ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team, int team_rank);
@@ -39,8 +40,7 @@ static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team, int rank,
     } else {
         ctx = UCC_TL_UCP_TEAM_CTX(team);
         ucc_assert(ctx->eps);
-        int ctx_rank = -1; //TODO map to ctx rank
-        ucc_assert(0);
+        uint32_t ctx_rank = ucc_ep_map_eval(team->ep_map, rank);
         if (NULL == ctx->eps[ctx_rank]) {
             /* Not connected yet */
             status = ucc_tl_ucp_connect_ctx_ep(ctx, ctx_rank);

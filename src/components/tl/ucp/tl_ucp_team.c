@@ -26,7 +26,18 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->rank               = params->rank;
     self->seq_num            = 0;
     self->id                 = 0; //TODO take it from base team
+    self->ep_map.type        = 0;
     if (self->context_ep_storage) {
+        if ((params->params.mask & UCC_TEAM_PARAM_FIELD_EP_MAP) &&
+            (params->params.mask & UCC_TEAM_PARAM_FIELD_EP)) {
+            tl_error(tl_context->lib,
+                     "team params ep or ep_map are not provided while "
+                     "UCC_CONTEXT_FLAG_TEAM_EP_MAP flag was set on the "
+                     "ucc context");
+            return UCC_ERR_INVALID_PARAM;
+        }
+        self->rank   = (uint32_t)params->params.ep;
+        self->ep_map = params->params.ep_map;
         self->status = UCC_OK;
     } else {
         self->status = UCC_INPROGRESS;
@@ -57,7 +68,7 @@ ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
     ucc_tl_ucp_team_t    *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
     ucc_status_t          status;
-    if (team->eps) {
+    if (!team->context_ep_storage) {
         status = ucc_tl_ucp_close_eps(ctx, team->eps, team->size);
         if (UCC_INPROGRESS == status) {
             return status;
@@ -80,7 +91,11 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
     for (i = 0; i < team->size; i++) {
         status = ucc_tl_ucp_connect_team_ep(team, i);
         if (UCC_OK != status) {
-            ucc_tl_ucp_close_eps(ctx, team->eps, team->size);
+            if (team->context_ep_storage) {
+                ucc_tl_ucp_close_eps(ctx, ctx->eps, ctx->size);
+            } else {
+                ucc_tl_ucp_close_eps(ctx, team->eps, team->size);
+            }
             return status;
         }
     }

@@ -7,6 +7,8 @@
 #include "tl_ucp.h"
 #include "tl_ucp_tag.h"
 #include "tl_ucp_coll.h"
+#include "tl_ucp_addr.h"
+#include "tl_ucp_ep.h"
 #include <limits.h>
 
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
@@ -94,10 +96,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         }
     }
 
-    self->ucp_context = ucp_context;
-    self->ucp_worker  = ucp_worker;
+    self->ucp_context    = ucp_context;
+    self->ucp_worker     = ucp_worker;
     self->worker_address = NULL;
-
+    self->addr_storage   = NULL;
+    self->eps            = NULL;
     ucc_status = ucc_mpool_init(&self->req_mp, sizeof(ucc_tl_ucp_task_t),
                                 UCC_CACHE_LINE_SIZE, 8, UINT_MAX, NULL, NULL,
                                 "tl_ucp_req_mp");
@@ -106,12 +109,45 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                  "failed to initialize tl_ucp_req mpool");
         goto err_thread_mode;
     }
-    if (UCC_OK != ucc_context_progress_register(
-                      params->context,
+    ucc_status = ucc_context_progress_register(params->context,
                       (ucc_context_progress_fn_t)ucp_worker_progress,
-                      self->ucp_worker)) {
+                      self->ucp_worker);
+    if (UCC_OK != ucc_status) {
         tl_error(self->super.super.lib, "failed to register progress function");
         goto err_thread_mode;
+    }
+    if ((params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) &&
+        (params->params.mask & UCC_CONTEXT_PARAM_FIELD_EP) &&
+        (params->params.mask & UCC_CONTEXT_PARAM_FIELD_FLAGS) &&
+        (params->params.flags & UCC_CONTEXT_FLAG_TEAM_EP_MAP)) {
+        if (params->params.ep >= params->params.oob.participants) {
+            tl_error(self->super.super.lib,
+                     "incorrect ctx ep %llu: out of oob.participants range %u",
+                     (long long unsigned)params->params.ep,
+                     params->params.oob.participants);
+            ucc_status = UCC_ERR_INVALID_PARAM;
+            goto err_thread_mode;
+        }
+        self->rank = (uint32_t)params->params.ep;
+        self->size = params->params.oob.participants;
+        self->eps = ucc_calloc(sizeof(ucp_ep_h), self->size, "ctx_eps");
+        if (!self->eps) {
+            tl_error(self->super.super.lib,
+                     "failed to allocate %zd bytes for ctx eps",
+                     sizeof(ucp_ep_h) * self->size);
+            ucc_status = UCC_ERR_NO_MEMORY;
+            goto err_thread_mode;
+        }
+        ucc_status = ucc_tl_ucp_addr_exchange_start(self, params->params.oob,
+                                                    &self->addr_storage);
+        while (ucc_status != UCC_OK) {
+            if (ucc_status < 0) {
+                tl_error(self->super.super.lib,
+                         "failed to exchange ucp addresses");
+                goto err_thread_mode;
+            }
+            ucc_status = ucc_tl_ucp_addr_exchange_test(self->addr_storage);
+        }
     }
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
@@ -126,7 +162,23 @@ err_cfg:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
+    ucc_status_t status;
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    if (self->eps) {
+        status = ucc_tl_ucp_close_eps(self, self->eps, self->size);
+        while (UCC_OK != status) {
+            if (status < 0) {
+                tl_error(self->super.super.lib,
+                         "failure during tl_ucp_close_eps, %s",
+                         ucc_status_string(status));
+                break;
+            }
+        }
+        ucc_free(self->eps);
+    }
+    if (self->addr_storage) {
+        ucc_tl_ucp_addr_storage_free(self->addr_storage);
+    }
     ucc_context_progress_deregister(
         self->super.super.ucc_context,
         (ucc_context_progress_fn_t)ucp_worker_progress, self->ucp_worker);

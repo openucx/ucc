@@ -13,7 +13,7 @@ enum {
 };
 
 ucc_status_t ucc_tl_ucp_addr_exchange_start(ucc_tl_ucp_context_t *ctx,
-                                            ucc_team_oob_coll_t oob,
+                                            ucc_oob_coll_t oob,
                                             ucc_tl_ucp_addr_storage_t **storage)
 {
     ucc_tl_ucp_addr_storage_t *st =
@@ -63,12 +63,11 @@ cleanup_st:
 
 ucc_status_t ucc_tl_ucp_addr_exchange_test(ucc_tl_ucp_addr_storage_t *storage)
 {
-    ucc_team_oob_coll_t *oob     = &storage->oob;
-    int                  n_polls = 0;
-    ucc_status_t         status;
-    void                *my_addr;
-    int                  i;
-
+    ucc_oob_coll_t *oob     = &storage->oob;
+    int             n_polls = 0;
+    ucc_status_t    status;
+    void           *my_addr;
+    int             i;
     if (storage->state == UCC_TL_UCP_ADDR_EXCHANGE_COMPLETE) {
         return UCC_OK;
     }

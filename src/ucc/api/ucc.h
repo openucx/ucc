@@ -592,10 +592,11 @@ typedef enum {
  *  @ingroup UCC_CONTEXT_DT
  */
 enum ucc_context_params_field {
-    UCC_CONTEXT_PARAM_FIELD_TYPE                   = UCC_BIT(0),
-    UCC_CONTEXT_PARAM_FIELD_COLL_SYNC_TYPE         = UCC_BIT(1),
-    UCC_CONTEXT_PARAM_FIELD_COLL_OOB               = UCC_BIT(2),
-    UCC_CONTEXT_PARAM_FIELD_ID                     = UCC_BIT(3)
+    UCC_CONTEXT_PARAM_FIELD_TYPE                  = UCC_BIT(0),
+    UCC_CONTEXT_PARAM_FIELD_COLL_SYNC_TYPE        = UCC_BIT(1),
+    UCC_CONTEXT_PARAM_FIELD_OOB                   = UCC_BIT(2),
+    UCC_CONTEXT_PARAM_FIELD_EP                    = UCC_BIT(3),
+    UCC_CONTEXT_PARAM_FIELD_FLAGS                 = UCC_BIT(4)
 };
 
 /**
@@ -609,19 +610,24 @@ enum ucc_context_attr_field {
     UCC_CONTEXT_ATTR_FIELD_CONTEXT_ADDR_LEN       = UCC_BIT(3)
 };
 
+typedef enum {
+    UCC_CONTEXT_FLAG_TEAM_EP_MAP = UCC_BIT(0) /*!< ep_map field will be provided by user as part
+                                                of ucc_team_params_t for ucc_team_create_post */
+} ucc_context_flags_t;
+
 /**
  * @ingroup UCC_CONTEXT_DT
  *
  * @brief OOB collective operation for creating the context
  */
-typedef struct ucc_context_oob_coll {
-    int             (*allgather)(void *src_buf, void *recv_buf, size_t size,
+typedef struct ucc_oob_coll {
+    ucc_status_t    (*allgather)(void *src_buf, void *recv_buf, size_t size,
                                  void *allgather_info,  void **request);
     ucc_status_t    (*req_test)(void *request);
     ucc_status_t    (*req_free)(void *request);
     uint32_t        participants;
     void            *coll_info;
-}  ucc_context_oob_coll_t;
+}  ucc_oob_coll_t;
 
 /**
  *
@@ -649,8 +655,11 @@ typedef struct ucc_context_params {
     uint64_t                mask;
     ucc_context_type_t      ctx_type;
     ucc_coll_sync_type_t    sync_type;
-    ucc_context_oob_coll_t  oob;
-    uint64_t                ctx_id;
+    ucc_oob_coll_t          oob;
+    uint64_t                ep; /*!< The uniq value that identifies a calling process. This value
+                                  is only used when the oob is provided and has to be in the
+                                  range [0, oob.participants). */
+    uint64_t                flags;
 } ucc_context_params_t;
 
 /**
@@ -863,7 +872,6 @@ ucc_status_t ucc_context_progress(ucc_context_h context);
  */
 
 ucc_status_t ucc_context_destroy(ucc_context_h context);
-
 /**
  *  @ingroup UCC_CONTEXT
  *
@@ -973,19 +981,6 @@ typedef struct ucc_team_p2p_conn {
  *
  *  @ingroup UCC_TEAM_DT
  */
-typedef struct  ucc_team_oob_coll {
-    ucc_status_t    (*allgather)(void *src_buf, void *recv_buf, size_t size,
-                                 void *allgather_info,  void **request);
-    ucc_status_t    (*req_test)(void *request);
-    ucc_status_t    (*req_free)(void *request);
-    uint32_t         participants;
-    void             *coll_info;
-}  ucc_team_oob_coll_t;
-
-/**
- *
- *  @ingroup UCC_TEAM_DT
- */
 typedef enum {
     UCC_COLLECTIVE_POST_ORDERED     = 0,
     UCC_COLLECTIVE_POST_UNORDERED   = 1
@@ -1045,7 +1040,6 @@ typedef enum {
  */
 typedef struct ucc_ep_map_t {
     ucc_ep_map_type_t type;
-    uint64_t          ep_num; /*!< number of eps mapped to ctx */
     union {
         struct ucc_ep_map_strided strided;
         struct ucc_ep_map_array   array;
@@ -1080,11 +1074,11 @@ typedef struct ucc_team_params {
     ucc_post_ordering_t     ordering;
     uint64_t                outstanding_colls;
     uint64_t                ep;
-    uint64_t                *ep_list;
+    uint64_t               *ep_list;
     ucc_ep_range_type_t     ep_range;
     uint64_t                team_size;
     ucc_coll_sync_type_t    sync_type;
-    ucc_team_oob_coll_t     oob;
+    ucc_oob_coll_t          oob;
     ucc_team_p2p_conn_t     p2p_conn;
     ucc_mem_map_params_t    mem_params;
     ucc_ep_map_t            ep_map;

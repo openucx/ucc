@@ -16,12 +16,12 @@ typedef struct ucc_tl_ucp_addr_storage {
     int                   is_ctx;
     size_t               *addrlens;
     void                 *addresses;
-    ucc_team_oob_coll_t   oob;
+    ucc_oob_coll_t        oob;
     ucc_tl_ucp_context_t *ctx;
 } ucc_tl_ucp_addr_storage_t;
 
 ucc_status_t ucc_tl_ucp_addr_exchange_start(ucc_tl_ucp_context_t *ctx,
-                                            ucc_team_oob_coll_t oob,
+                                            ucc_oob_coll_t oob,
                                             ucc_tl_ucp_addr_storage_t **storage);
 
 ucc_status_t ucc_tl_ucp_addr_exchange_test(ucc_tl_ucp_addr_storage_t *storage);
