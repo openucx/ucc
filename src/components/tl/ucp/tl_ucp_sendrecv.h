@@ -10,6 +10,27 @@
 #include "tl_ucp_tag.h"
 #include "tl_ucp_ep.h"
 #include "utils/ucc_compiler_def.h"
+#include "components/mc/base/ucc_mc_base.h"
+
+static inline ucs_memory_type_t ucc_memtype_to_ucs(ucc_memory_type_t ucc_type)
+{
+    switch (ucc_type) {
+    case UCC_MEMORY_TYPE_HOST:
+        return UCS_MEMORY_TYPE_HOST;
+    case UCC_MEMORY_TYPE_CUDA:
+        return UCS_MEMORY_TYPE_CUDA;
+    case UCC_MEMORY_TYPE_CUDA_MANAGED:
+        return UCS_MEMORY_TYPE_CUDA_MANAGED;
+    case UCC_MEMORY_TYPE_ROCM:
+        return UCS_MEMORY_TYPE_ROCM;
+    case UCC_MEMORY_TYPE_ROCM_MANAGED:
+        return UCS_MEMORY_TYPE_ROCM_MANAGED;
+    case UCC_MEMORY_TYPE_UNKNOWN:
+        break;
+    }
+    return UCS_MEMORY_TYPE_UNKNOWN;
+}
+
 void ucc_tl_ucp_send_completion_cb(void* request, ucs_status_t status,
                                    void *user_data);
 void ucc_tl_ucp_recv_completion_cb(void* request, ucs_status_t status,
@@ -41,7 +62,7 @@ void ucc_tl_ucp_recv_completion_cb(void* request, ucs_status_t status,
         if (UCS_PTR_IS_ERR(ucp_status)) {                               \
             tl_error(UCC_TL_TEAM_LIB(team),                             \
                      "tag %u; dest %d; team_id %u; errmsg %s",          \
-                     tag, dest_group_rank, team->id,                    \
+                     task->tag, dest_group_rank, team->id,              \
                      ucs_status_string(UCS_PTR_STATUS(ucp_status)));    \
             ucp_request_cancel(UCC_TL_UCP_WORKER(team), ucp_status);    \
             ucp_request_free(ucp_status);                               \
@@ -51,9 +72,9 @@ void ucc_tl_ucp_recv_completion_cb(void* request, ucs_status_t status,
 
 
 static inline ucc_status_t
-ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucs_memory_type_t mtype,
-                 int dest_group_rank, ucc_tl_ucp_team_t *team, uint32_t tag,
-                 ucc_tl_ucp_task_t *task)
+ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
+                   int dest_group_rank, ucc_tl_ucp_team_t *team,
+                   ucc_tl_ucp_task_t *task)
 {
     ucp_request_param_t    req_param;
     ucs_status_ptr_t       ucp_status;
@@ -65,7 +86,7 @@ ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucs_memory_type_t mtype,
     if (UCC_OK != status) {
         return status;
     }
-    ucp_tag = UCC_TL_UCP_MAKE_SEND_TAG(tag, team->rank,
+    ucp_tag = UCC_TL_UCP_MAKE_SEND_TAG(task->tag, team->rank,
                                        team->id, team->scope_id, team->scope);
     req_param.op_attr_mask = UCP_OP_ATTR_FIELD_CALLBACK  |
                              UCP_OP_ATTR_FIELD_DATATYPE  |
@@ -73,7 +94,7 @@ ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucs_memory_type_t mtype,
                              UCP_OP_ATTR_FIELD_MEMORY_TYPE;
     req_param.datatype     = ucp_dt_make_contig(msglen);
     req_param.cb.send      = ucc_tl_ucp_send_completion_cb;
-    req_param.memory_type  = mtype;
+    req_param.memory_type  = ucc_memtype_to_ucs(mtype);
     req_param.user_data    = (void*)task;
 
     ucp_status = ucp_tag_send_nbx(ep, buffer, 1, ucp_tag, &req_param);
@@ -85,15 +106,15 @@ ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucs_memory_type_t mtype,
 }
 
 static inline ucc_status_t
-ucc_tl_ucp_recv_nb(void *buffer, size_t msglen, ucs_memory_type_t mtype,
-                 int dest_group_rank, ucc_tl_ucp_team_t *team, uint32_t tag,
+ucc_tl_ucp_recv_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
+                 int dest_group_rank, ucc_tl_ucp_team_t *team,
                  ucc_tl_ucp_task_t *task)
 {
     ucp_request_param_t req_param;
     ucs_status_ptr_t    ucp_status;
     ucp_tag_t           ucp_tag, ucp_tag_mask;
 
-    UCC_TL_UCP_MAKE_RECV_TAG(ucp_tag, ucp_tag_mask, tag,
+    UCC_TL_UCP_MAKE_RECV_TAG(ucp_tag, ucp_tag_mask, task->tag,
                              dest_group_rank, team->id, team->scope_id, team->scope);
     req_param.op_attr_mask = UCP_OP_ATTR_FIELD_CALLBACK  |
                              UCP_OP_ATTR_FIELD_DATATYPE  |
@@ -101,7 +122,7 @@ ucc_tl_ucp_recv_nb(void *buffer, size_t msglen, ucs_memory_type_t mtype,
                              UCP_OP_ATTR_FIELD_MEMORY_TYPE;
     req_param.datatype     = ucp_dt_make_contig(msglen);
     req_param.cb.recv      = ucc_tl_ucp_recv_completion_cb;
-    req_param.memory_type  = mtype;
+    req_param.memory_type  = ucc_memtype_to_ucs(mtype);
     req_param.user_data    = (void*)task;
     ucp_status  = ucp_tag_recv_nbx(UCC_TL_UCP_WORKER(team), buffer, 1, ucp_tag,
                                                      ucp_tag_mask, &req_param);

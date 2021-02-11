@@ -55,7 +55,7 @@ static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
     if (UCC_TL_UCP_TASK_P2P_COMPLETE(task)) {
         return UCC_OK;
     }
-    while (polls < task->n_polls) {
+    while (polls++ < task->n_polls) {
         if (UCC_TL_UCP_TASK_P2P_COMPLETE(task)) {
             return UCC_OK;
         }
