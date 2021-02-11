@@ -83,9 +83,9 @@ ucc_status_t ucc_mc_type(const void *ptr, ucc_memory_type_t *mem_type)
     /* TODO: consider using memory type cache from UCS */
     /* by default assume memory type host */
     *mem_type = UCC_MEMORY_TYPE_HOST;
+    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
     for (mt = UCC_MEMORY_TYPE_HOST + 1; mt < UCC_MEMORY_TYPE_LAST; mt++) {
         if (NULL != mc_ops[mt]) {
-            mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
             status = mc_ops[mt]->mem_query(ptr, 0, &mem_attr);
             if (UCC_OK == status) {
                 *mem_type = mem_attr.mem_type;

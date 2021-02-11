@@ -98,39 +98,41 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
     if (ptr == 0) {
         mem_type = UCC_MEMORY_TYPE_HOST;
     } else {
-        st = cudaPointerGetAttributes(&attr, ptr);
-        if (st != cudaSuccess) {
-            cudaGetLastError();
-            return UCC_ERR_NOT_SUPPORTED;
-        }
-#if CUDART_VERSION >= 10000
-        switch (attr.type) {
-        case cudaMemoryTypeHost:
-            mem_type = UCC_MEMORY_TYPE_HOST;
-            break;
-        case cudaMemoryTypeDevice:
-            mem_type = UCC_MEMORY_TYPE_CUDA;
-            break;
-        case cudaMemoryTypeManaged:
-            mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
-            break;
-        default:
-            return UCC_ERR_NOT_SUPPORTED;
-        }
-#else
-        if (attr.memoryType == cudaMemoryTypeDevice) {
-            if (attr.isManaged) {
-                mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
-            } else {
-                mem_type = UCC_MEMORY_TYPE_CUDA;
+        if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_MEM_TYPE) {
+            st = cudaPointerGetAttributes(&attr, ptr);
+            if (st != cudaSuccess) {
+                cudaGetLastError();
+                return UCC_ERR_NOT_SUPPORTED;
             }
-        }
-        else if (attr.memoryType == cudaMemoryTypeHost) {
-            mem_type = UCC_MEMORY_TYPE_HOST;
-        } else {
-            return UCC_ERR_NOT_SUPPORTED;
-        }
+#if CUDART_VERSION >= 10000
+            switch (attr.type) {
+            case cudaMemoryTypeHost:
+                mem_type = UCC_MEMORY_TYPE_HOST;
+                break;
+            case cudaMemoryTypeDevice:
+                mem_type = UCC_MEMORY_TYPE_CUDA;
+                break;
+            case cudaMemoryTypeManaged:
+                mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
+                break;
+            default:
+                return UCC_ERR_NOT_SUPPORTED;
+            }
+#else
+            if (attr.memoryType == cudaMemoryTypeDevice) {
+                if (attr.isManaged) {
+                    mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
+                } else {
+                    mem_type = UCC_MEMORY_TYPE_CUDA;
+                }
+            }
+            else if (attr.memoryType == cudaMemoryTypeHost) {
+                mem_type = UCC_MEMORY_TYPE_HOST;
+            } else {
+                return UCC_ERR_NOT_SUPPORTED;
+            }
 #endif
+        }
 
         if (mem_attr->field_mask & (UCC_MEM_ATTR_FIELD_ALLOC_LENGTH |
                                     UCC_MEM_ATTR_FIELD_BASE_ADDRESS)) {
@@ -138,7 +140,7 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
                     &alloc_length, (CUdeviceptr)ptr);
             if (cu_err != CUDA_SUCCESS) {
                 mc_error(&ucc_mc_cuda.super,
-                         "ccuMemGetAddressRange(%p) error: %d(%s)",
+                         "cuMemGetAddressRange(%p) error: %d(%s)",
                           ptr, cu_err, cudaGetErrorString(st));
                 return UCC_ERR_NOT_SUPPORTED;
             }

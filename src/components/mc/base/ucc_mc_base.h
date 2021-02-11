@@ -27,11 +27,11 @@ typedef enum ucc_memory_type {
  * UCC memory attributes field mask
  */
 typedef enum ucc_mem_attr_field {
-    UCC_MEM_ATTR_FIELD_MEM_TYPE     = UCS_BIT(0), /**< Indicate if memory type
+    UCC_MEM_ATTR_FIELD_MEM_TYPE     = UCC_BIT(0), /**< Indicate if memory type
                                                        is populated. E.g. CPU/GPU */
-    UCC_MEM_ATTR_FIELD_BASE_ADDRESS = UCS_BIT(2), /**< Request base address of the
+    UCC_MEM_ATTR_FIELD_BASE_ADDRESS = UCC_BIT(2), /**< Request base address of the
                                                        allocation */
-    UCC_MEM_ATTR_FIELD_ALLOC_LENGTH = UCS_BIT(3)  /**< Request the whole length of the
+    UCC_MEM_ATTR_FIELD_ALLOC_LENGTH = UCC_BIT(3)  /**< Request the whole length of the
                                                        allocation */
 } ucc_mem_attr_field_t;
 
