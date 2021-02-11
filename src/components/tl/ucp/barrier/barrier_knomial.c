@@ -130,7 +130,7 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_start(ucc_coll_task_t *coll_task)
     task->barrier.phase          = PHASE_0;
     task->barrier.iteration      = 0;
     task->barrier.radix_mask_pow = 1;
-    task->barrier.radix          = 4; //TODO env var
+    task->barrier.radix          = UCC_TL_UCP_TEAM_CTX(team)->cfg.kn_barrier_radix;
     if (task->barrier.radix > team->size) {
         task->barrier.radix = team->size;
     }

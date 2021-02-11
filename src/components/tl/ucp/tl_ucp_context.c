@@ -26,7 +26,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_ucp_config->super.tl_lib,
                               params->context);
-    self->preconnect = tl_ucp_config->preconnect;
+    memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
     self->ep_close_state.close_req = NULL;
     self->ep_close_state.ep        = 0;
     status = ucp_config_read(params->prefix, NULL, &ucp_config);

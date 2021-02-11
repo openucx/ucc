@@ -27,6 +27,16 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_context_config_t, preconnect),
      UCC_CONFIG_TYPE_UINT},
 
+    {"NPOLLS", "10",
+     "Number of ucp progress polling cycles for p2p requests testing",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, n_polls),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"BARRIER_KN_RADIX", "4",
+     "Radix of the recursive-knomial barrier algorithm",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, kn_barrier_radix),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_ucp_lib_t, ucc_base_lib_t,

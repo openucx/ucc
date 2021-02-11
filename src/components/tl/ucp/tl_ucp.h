@@ -26,6 +26,8 @@ typedef struct ucc_tl_ucp_lib_config {
 typedef struct ucc_tl_ucp_context_config {
     ucc_tl_context_config_t super;
     uint32_t                preconnect;
+    uint32_t                n_polls;
+    uint32_t                kn_barrier_radix;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
@@ -43,11 +45,11 @@ typedef struct ucc_tl_ucp_ep_close_state {
 
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t            super;
+    ucc_tl_ucp_context_config_t cfg;
     ucp_context_h               ucp_context;
     ucp_worker_h                ucp_worker;
     size_t                      ucp_addrlen;
     ucp_address_t              *worker_address;
-    uint32_t                    preconnect;
     ucc_tl_ucp_ep_close_state_t ep_close_state;
     ucc_mpool_t                 req_mp;
     ucp_ep_h                   *eps;

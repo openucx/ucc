@@ -107,7 +107,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
                      sizeof(ucp_ep_h) * team->size);
             return UCC_ERR_NO_MEMORY;
         }
-        if (team->size <= ctx->preconnect) {
+        if (team->size <= ctx->cfg.preconnect) {
             status = ucc_tl_ucp_team_preconnect(team);
             if (UCC_OK != status) {
                 goto err_preconnect;
