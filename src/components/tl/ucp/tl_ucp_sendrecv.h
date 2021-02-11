@@ -12,24 +12,7 @@
 #include "utils/ucc_compiler_def.h"
 #include "components/mc/base/ucc_mc_base.h"
 
-static inline ucs_memory_type_t ucc_memtype_to_ucs(ucc_memory_type_t ucc_type)
-{
-    switch (ucc_type) {
-    case UCC_MEMORY_TYPE_HOST:
-        return UCS_MEMORY_TYPE_HOST;
-    case UCC_MEMORY_TYPE_CUDA:
-        return UCS_MEMORY_TYPE_CUDA;
-    case UCC_MEMORY_TYPE_CUDA_MANAGED:
-        return UCS_MEMORY_TYPE_CUDA_MANAGED;
-    case UCC_MEMORY_TYPE_ROCM:
-        return UCS_MEMORY_TYPE_ROCM;
-    case UCC_MEMORY_TYPE_ROCM_MANAGED:
-        return UCS_MEMORY_TYPE_ROCM_MANAGED;
-    case UCC_MEMORY_TYPE_UNKNOWN:
-        break;
-    }
-    return UCS_MEMORY_TYPE_UNKNOWN;
-}
+extern ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1];
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data);
@@ -94,7 +77,7 @@ static inline ucc_status_t ucc_tl_ucp_send_nb(void *buffer, size_t msglen,
         UCP_OP_ATTR_FIELD_USER_DATA | UCP_OP_ATTR_FIELD_MEMORY_TYPE;
     req_param.datatype    = ucp_dt_make_contig(msglen);
     req_param.cb.send     = ucc_tl_ucp_send_completion_cb;
-    req_param.memory_type = ucc_memtype_to_ucs(mtype);
+    req_param.memory_type = ucc_memtype_to_ucs[mtype];
     req_param.user_data   = (void *)task;
 
     ucp_status = ucp_tag_send_nbx(ep, buffer, 1, ucp_tag, &req_param);
@@ -122,7 +105,7 @@ static inline ucc_status_t ucc_tl_ucp_recv_nb(void *buffer, size_t msglen,
         UCP_OP_ATTR_FIELD_USER_DATA | UCP_OP_ATTR_FIELD_MEMORY_TYPE;
     req_param.datatype    = ucp_dt_make_contig(msglen);
     req_param.cb.recv     = ucc_tl_ucp_recv_completion_cb;
-    req_param.memory_type = ucc_memtype_to_ucs(mtype);
+    req_param.memory_type = ucc_memtype_to_ucs[mtype];
     req_param.user_data   = (void *)task;
     ucp_status = ucp_tag_recv_nbx(UCC_TL_UCP_WORKER(team), buffer, 1, ucp_tag,
                                   ucp_tag_mask, &req_param);
