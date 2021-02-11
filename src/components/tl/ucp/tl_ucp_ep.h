@@ -12,10 +12,8 @@
 #include "tl_ucp.h"
 typedef struct ucc_tl_ucp_context ucc_tl_ucp_context_t;
 typedef struct ucc_tl_ucp_team    ucc_tl_ucp_team_t;
-ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
-                                        int team_rank);
-ucc_status_t ucc_tl_ucp_connect_ctx_ep(ucc_tl_ucp_context_t *ctx,
-                                       int ctx_rank);
+ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team, int team_rank);
+ucc_status_t ucc_tl_ucp_connect_ctx_ep(ucc_tl_ucp_context_t *ctx, int ctx_rank);
 
 ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx, ucp_ep_h *eps,
                                   int n_eps);
@@ -23,7 +21,7 @@ ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx, ucp_ep_h *eps,
 static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team, int rank,
                                              ucp_ep_h *ep)
 {
-    ucc_status_t status;
+    ucc_status_t          status;
     ucc_tl_ucp_context_t *ctx;
     if (!team->context_ep_storage) {
         ucc_assert(team->eps);

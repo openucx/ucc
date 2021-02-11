@@ -26,16 +26,14 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_connect_ctx_ep(ucc_tl_ucp_context_t *ctx,
-                                       int ctx_rank)
+ucc_status_t ucc_tl_ucp_connect_ctx_ep(ucc_tl_ucp_context_t *ctx, int ctx_rank)
 {
     return ucc_tl_ucp_connect_ep(ctx, &ctx->eps[ctx_rank],
                                  ctx->addr_storage->addresses,
                                  ctx->addr_storage->max_addrlen, ctx_rank);
 }
 
-ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
-                                        int team_rank)
+ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team, int team_rank)
 {
     ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
     if (team->context_ep_storage) {

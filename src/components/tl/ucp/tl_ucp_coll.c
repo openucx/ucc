@@ -9,7 +9,7 @@
 #include "tl_ucp_tag.h"
 #include "barrier/barrier.h"
 
-void ucc_tl_ucp_send_completion_cb(void* request, ucs_status_t status,
+void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
@@ -22,7 +22,7 @@ void ucc_tl_ucp_send_completion_cb(void* request, ucs_status_t status,
     ucp_request_free(request);
 }
 
-void ucc_tl_ucp_recv_completion_cb(void* request, ucs_status_t status,
+void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
                                    const ucp_tag_recv_info_t *info, /* NOLINT */
                                    void *user_data)
 {
@@ -57,7 +57,7 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_op_args_t *coll_args,
     memcpy(&task->args, &coll_args->args, sizeof(ucc_coll_op_args_t));
     task->team           = tl_team;
     task->tag            = tl_team->seq_num++; //TODO Wrap around over max tag
-    task->n_polls        = ctx->cfg.n_polls; //TODO set from base_coll_op_args (hint from rt ?) 
+    task->n_polls        = ctx->cfg.n_polls; //TODO set from base_coll_op_args?
     task->super.finalize = ucc_tl_ucp_coll_finalize;
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_BARRIER:
@@ -67,9 +67,7 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_op_args_t *coll_args,
         ucc_tl_ucp_put_task(task);
         return UCC_ERR_NOT_SUPPORTED;
     }
-    tl_info(team->context->lib, "init coll req %p",
-            task);
+    tl_info(team->context->lib, "init coll req %p", task);
     *task_h = &task->super;
     return status;
 }
-

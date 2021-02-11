@@ -37,8 +37,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         goto err_cfg;
     }
 
-    ucp_params.field_mask = UCP_PARAM_FIELD_FEATURES |
-                            UCP_PARAM_FIELD_TAG_SENDER_MASK;
+    ucp_params.field_mask =
+        UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK;
     ucp_params.features        = UCP_FEATURE_TAG | UCP_FEATURE_RMA;
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
 
@@ -106,10 +106,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                  "failed to initialize tl_ucp_req mpool");
         goto err_thread_mode;
     }
-    if (UCC_OK != ucc_context_progress_register(params->context,
-                                                (ucc_context_progress_fn_t)ucp_worker_progress,
-                                                self->ucp_worker))
-    {
+    if (UCC_OK != ucc_context_progress_register(
+                      params->context,
+                      (ucc_context_progress_fn_t)ucp_worker_progress,
+                      self->ucp_worker)) {
         tl_error(self->super.super.lib, "failed to register progress function");
         goto err_thread_mode;
     }
@@ -127,9 +127,9 @@ err_cfg:
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
-    ucc_context_progress_deregister(self->super.super.ucc_context,
-                                    (ucc_context_progress_fn_t)ucp_worker_progress,
-                                    self->ucp_worker);
+    ucc_context_progress_deregister(
+        self->super.super.ucc_context,
+        (ucc_context_progress_fn_t)ucp_worker_progress, self->ucp_worker);
     ucp_worker_destroy(self->ucp_worker);
     ucp_cleanup(self->ucp_context);
     ucc_mpool_cleanup(&self->req_mp, 1);
