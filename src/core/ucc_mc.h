@@ -15,6 +15,8 @@ ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);
 
 ucc_status_t ucc_mc_type(const void *ptr, ucc_memory_type_t *mem_type);
 
+ucc_status_t ucc_mc_query(const void *ptr, size_t length, ucc_mem_attr_t *mem_attr);
+
 ucc_status_t ucc_mc_alloc(void **ptr, size_t len, ucc_memory_type_t mem_type);
 
 ucc_status_t ucc_mc_free(void *ptr, ucc_memory_type_t mem_type);

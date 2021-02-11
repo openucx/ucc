@@ -67,6 +67,35 @@ UCC_TEST_F(test_mc_cuda, can_detect_cuda_mem)
     ucc_mc_finalize();
 }
 
+UCC_TEST_F(test_mc_cuda, can_query_cuda_mem)
+{
+    ucc_mem_attr_t mem_attr;
+    cudaError_t st;
+    void *ptr;
+
+    st = cudaMalloc(&test_ptr, TEST_ALLOC_SIZE);
+    if (st != cudaSuccess) {
+        ADD_FAILURE() << "failed to allocate device memory";
+    }
+
+    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
+    EXPECT_EQ(UCC_OK, ucc_mc_query(test_ptr, TEST_ALLOC_SIZE, &mem_attr));
+    EXPECT_EQ(UCC_MEMORY_TYPE_CUDA, mem_attr.mem_type);
+
+    /* query base addr and length */
+    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE |
+                          UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
+                          UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
+    ptr = (char *)test_ptr + TEST_ALLOC_SIZE/2;
+    EXPECT_EQ(UCC_OK, ucc_mc_query(ptr , 1, &mem_attr));
+    EXPECT_EQ(UCC_MEMORY_TYPE_CUDA, mem_attr.mem_type);
+    EXPECT_EQ(test_ptr, mem_attr.base_address);
+    EXPECT_EQ(TEST_ALLOC_SIZE, mem_attr.alloc_length);
+
+    cudaFree(test_ptr);
+    ucc_mc_finalize();
+}
+
 UCC_TEST_F(test_mc_cuda, can_detect_managed_mem)
 {
     cudaError_t st;

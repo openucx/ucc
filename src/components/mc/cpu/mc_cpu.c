@@ -70,11 +70,11 @@ static ucc_status_t ucc_mc_cpu_mem_free(void *ptr)
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cpu_mem_type(const void *ptr,
-                                        ucc_memory_type_t *mem_type)
+static ucc_status_t ucc_mc_cpu_mem_query(const void *ptr, size_t length,
+                                        ucc_mem_attr_t *mem_attr)
 {
     if (ptr == NULL) {
-        *mem_type = UCC_MEMORY_TYPE_HOST;
+        mem_attr->mem_type = UCC_MEMORY_TYPE_HOST;
     }
     /* not supposed to be used */
     mc_error(&ucc_mc_cpu.super, "host memory component shouldn't be used for"
@@ -96,7 +96,7 @@ ucc_mc_cpu_t ucc_mc_cpu = {
         },
     .super.init          = ucc_mc_cpu_init,
     .super.finalize      = ucc_mc_cpu_finalize,
-    .super.ops.mem_type  = ucc_mc_cpu_mem_type,
+    .super.ops.mem_query = ucc_mc_cpu_mem_query,
     .super.ops.mem_alloc = ucc_mc_cpu_mem_alloc,
     .super.ops.mem_free  = ucc_mc_cpu_mem_free,
     .super.ops.reduce    = ucc_mc_cpu_reduce,

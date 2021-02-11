@@ -7,6 +7,7 @@
 #include "mc_cuda.h"
 #include "utils/ucc_malloc.h"
 #include <cuda_runtime.h>
+#include <cuda.h>
 
 static ucc_config_field_t ucc_mc_cuda_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_mc_cuda_config_t, super),
@@ -77,46 +78,84 @@ static ucc_status_t ucc_mc_cuda_mem_free(void *ptr)
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cuda_mem_type(const void *ptr,
-                                         ucc_memory_type_t *mem_type)
+static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
+                                          size_t length,
+                                          ucc_mem_attr_t *mem_attr)
 {
     struct cudaPointerAttributes attr;
     cudaError_t                  st;
+    CUresult                     cu_err;
+    ucc_memory_type_t            mem_type;
+    void                         *base_address;
+    size_t                       alloc_length;
 
-    st = cudaPointerGetAttributes(&attr, ptr);
-    if (st != cudaSuccess) {
-        cudaGetLastError();
-        return UCC_ERR_NOT_SUPPORTED;
+    if (!(mem_attr->field_mask & (UCC_MEM_ATTR_FIELD_MEM_TYPE     |
+                                  UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
+                                  UCC_MEM_ATTR_FIELD_ALLOC_LENGTH))) {
+        return UCC_OK;
     }
 
+    if (ptr == 0) {
+        mem_type = UCC_MEMORY_TYPE_HOST;
+    } else {
+        st = cudaPointerGetAttributes(&attr, ptr);
+        if (st != cudaSuccess) {
+            cudaGetLastError();
+            return UCC_ERR_NOT_SUPPORTED;
+        }
 #if CUDART_VERSION >= 10000
-    switch (attr.type) {
-    case cudaMemoryTypeHost:
-        *mem_type = UCC_MEMORY_TYPE_HOST;
-        break;
-    case cudaMemoryTypeDevice:
-        *mem_type = UCC_MEMORY_TYPE_CUDA;
-        break;
-    case cudaMemoryTypeManaged:
-        *mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
-        break;
-    default:
-        return UCC_ERR_NOT_SUPPORTED;
-    }
+        switch (attr.type) {
+        case cudaMemoryTypeHost:
+            mem_type = UCC_MEMORY_TYPE_HOST;
+            break;
+        case cudaMemoryTypeDevice:
+            mem_type = UCC_MEMORY_TYPE_CUDA;
+            break;
+        case cudaMemoryTypeManaged:
+            mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
+            break;
+        default:
+            return UCC_ERR_NOT_SUPPORTED;
+        }
 #else
-    if (attr.memoryType == cudaMemoryTypeDevice) {
-        if (attr.isManaged) {
-            *mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
+        if (attr.memoryType == cudaMemoryTypeDevice) {
+            if (attr.isManaged) {
+                mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
+            } else {
+                mem_type = UCC_MEMORY_TYPE_CUDA;
+            }
+        }
+        else if (attr.memoryType == cudaMemoryTypeHost) {
+            mem_type = UCC_MEMORY_TYPE_HOST;
         } else {
-            *mem_type = UCC_MEMORY_TYPE_CUDA;
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+#endif
+
+        if (mem_attr->field_mask & (UCC_MEM_ATTR_FIELD_ALLOC_LENGTH |
+                                    UCC_MEM_ATTR_FIELD_BASE_ADDRESS)) {
+            cu_err = cuMemGetAddressRange((CUdeviceptr*)&base_address,
+                    &alloc_length, (CUdeviceptr)ptr);
+            if (cu_err != CUDA_SUCCESS) {
+                mc_error(&ucc_mc_cuda.super,
+                         "ccuMemGetAddressRange(%p) error: %d(%s)",
+                          ptr, cu_err, cudaGetErrorString(st));
+                return UCC_ERR_NOT_SUPPORTED;
+            }
         }
     }
-    else if (attr.memoryType == cudaMemoryTypeHost) {
-        *mem_type = UCC_MEMORY_TYPE_HOST;
-    } else {
-        return UCC_ERR_NOT_SUPPORTED;
+
+    if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_MEM_TYPE) {
+        mem_attr->mem_type = mem_type;
     }
-#endif
+
+    if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_BASE_ADDRESS) {
+        mem_attr->base_address = base_address;
+    }
+
+    if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_ALLOC_LENGTH) {
+        mem_attr->alloc_length = alloc_length;
+    }
 
     return UCC_OK;
 }
@@ -134,7 +173,7 @@ ucc_mc_cuda_t ucc_mc_cuda = {
         },
     .super.init          = ucc_mc_cuda_init,
     .super.finalize      = ucc_mc_cuda_finalize,
-    .super.ops.mem_type  = ucc_mc_cuda_mem_type,
+    .super.ops.mem_query = ucc_mc_cuda_mem_query,
     .super.ops.mem_alloc = ucc_mc_cuda_mem_alloc,
     .super.ops.mem_free  = ucc_mc_cuda_mem_free,
     .super.ops.reduce    = ucc_mc_cuda_reduce,

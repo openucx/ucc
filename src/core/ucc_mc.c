@@ -78,13 +78,33 @@ ucc_status_t ucc_mc_type(const void *ptr, ucc_memory_type_t *mem_type)
 {
     ucc_memory_type_t mt;
     ucc_status_t      status;
+    ucc_mem_attr_t    mem_attr;
 
     /* TODO: consider using memory type cache from UCS */
     /* by default assume memory type host */
     *mem_type = UCC_MEMORY_TYPE_HOST;
     for (mt = UCC_MEMORY_TYPE_HOST + 1; mt < UCC_MEMORY_TYPE_LAST; mt++) {
         if (NULL != mc_ops[mt]) {
-            status = mc_ops[mt]->mem_type(ptr, mem_type);
+            mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
+            status = mc_ops[mt]->mem_query(ptr, 0, &mem_attr);
+            if (UCC_OK == status) {
+                *mem_type = mem_attr.mem_type;
+                /* found memory type for ptr */
+                return UCC_OK;
+            }
+        }
+    }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_mc_query(const void *ptr, size_t length, ucc_mem_attr_t *mem_attr)
+{
+    ucc_status_t      status;
+    ucc_memory_type_t mt;
+
+    for (mt = UCC_MEMORY_TYPE_HOST + 1; mt < UCC_MEMORY_TYPE_LAST; mt++) {
+        if (NULL != mc_ops[mt]) {
+            status = mc_ops[mt]->mem_query(ptr, length, mem_attr);
             if (UCC_OK == status) {
                 /* found memory type for ptr */
                 return UCC_OK;
