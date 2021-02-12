@@ -59,6 +59,7 @@ typedef struct ucc_tl_ucp_context {
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_tl_ucp_task ucc_tl_ucp_task_t;
 typedef struct ucc_tl_ucp_team {
     ucc_tl_team_t              super;
     ucc_status_t               status;
@@ -75,6 +76,7 @@ typedef struct ucc_tl_ucp_team {
     uint32_t                   scope;
     uint32_t                   scope_id;
     uint32_t                   seq_num;
+    ucc_tl_ucp_task_t         *preconnect_task;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

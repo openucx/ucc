@@ -22,7 +22,7 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_context_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_context_config_table)},
 
-    {"PRECONNECT", "1024",
+    {"PRECONNECT", "0",
      "Threshold that defines the number of ranks in the UCC team/context "
      "below which the team/context enpoints will be preconnected during "
      "corresponding team/context create call",

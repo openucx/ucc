@@ -28,8 +28,9 @@ typedef struct ucc_tl_ucp_task {
     };
 } ucc_tl_ucp_task_t;
 
-static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_context_t *ctx)
+static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
 {
+    ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
     ucc_tl_ucp_task_t *task;
     task                     = ucc_mpool_get(&ctx->req_mp);
     task->super.super.status = UCC_OPERATION_INITIALIZED;
@@ -37,6 +38,8 @@ static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_context_t *ctx)
     task->send_completed     = 0;
     task->recv_posted        = 0;
     task->recv_completed     = 0;
+    task->n_polls            = ctx->cfg.n_polls;
+    task->team               = team;
     return task;
 }
 
