@@ -8,6 +8,7 @@
 #include "tl_ucp_coll.h"
 #include "tl_ucp_tag.h"
 #include "barrier/barrier.h"
+#include "alltoall/alltoall.h"
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
@@ -60,6 +61,9 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_BARRIER:
         status = ucc_tl_ucp_barrier_init(task);
+        break;
+    case UCC_COLL_TYPE_ALLTOALL:
+        status = ucc_tl_ucp_alltoall_init(task);
         break;
     default:
         ucc_tl_ucp_put_task(task);

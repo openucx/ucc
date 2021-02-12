@@ -7,6 +7,11 @@ barrier =                     \
 	barrier/barrier.c         \
 	barrier/barrier_knomial.c
 
+alltoall =                       \
+	alltoall/alltoall.h          \
+	alltoall/alltoall.c          \
+	alltoall/alltoall_pairwise.c
+
 sources =            \
 	tl_ucp.h         \
 	tl_ucp.c         \
@@ -18,7 +23,8 @@ sources =            \
 	tl_ucp_addr.h    \
 	tl_ucp_addr.c    \
 	tl_ucp_coll.c    \
-	$(barrier)
+	$(barrier)       \
+    $(alltoall)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

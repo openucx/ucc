@@ -34,6 +34,12 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_context_config_t, n_polls),
      UCC_CONFIG_TYPE_UINT},
 
+    {"ALLTOALL_PAIRWISE_CHUNK", "1",
+     "Maximum number of outstanding send and receive in alltoall pairwise "
+     "algorithm",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, alltoall_pairwise_chunk),
+     UCC_CONFIG_TYPE_UINT},
+
     {"BARRIER_KN_RADIX", "4",
      "Radix of the recursive-knomial barrier algorithm",
      ucc_offsetof(ucc_tl_ucp_context_config_t, kn_barrier_radix),

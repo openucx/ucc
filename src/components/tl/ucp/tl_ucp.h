@@ -29,6 +29,7 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                n_polls;
     uint32_t                oob_npolls;
     uint32_t                kn_barrier_radix;
+    uint32_t                alltoall_pairwise_chunk;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
