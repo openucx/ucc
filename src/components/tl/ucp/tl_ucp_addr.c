@@ -52,7 +52,7 @@ ucc_status_t ucc_tl_ucp_addr_exchange_start(ucc_tl_ucp_context_t *ctx,
         goto cleanup_addrlens;
     }
     *storage = st;
-    return UCC_OK;
+    return ucc_tl_ucp_addr_exchange_test(st);
 
 cleanup_addrlens:
     free(st->addrlens);
@@ -63,20 +63,27 @@ cleanup_st:
 
 ucc_status_t ucc_tl_ucp_addr_exchange_test(ucc_tl_ucp_addr_storage_t *storage)
 {
+    ucc_team_oob_coll_t *oob     = &storage->oob;
+    int                  n_polls = 0;
     ucc_status_t         status;
     void                *my_addr;
     int                  i;
-    ucc_team_oob_coll_t *oob = &storage->oob;
+
     if (storage->state == UCC_TL_UCP_ADDR_EXCHANGE_COMPLETE) {
         return UCC_OK;
     }
-    status = oob->req_test(storage->oob_req);
+    do {
+        status = oob->req_test(storage->oob_req);
+        if (status < 0) {
+            oob->req_free(storage->oob_req);
+            tl_error(storage->ctx->super.super.lib, "failed during oob req test");
+            goto err;
+        }
+    } while ((UCC_INPROGRESS == status) &&
+             (n_polls++ < storage->ctx->cfg.oob_npolls));
+
     if (UCC_INPROGRESS == status) {
-        return status;
-    } else if (UCC_OK != status) {
-        oob->req_free(storage->oob_req);
-        tl_error(storage->ctx->super.super.lib, "failed during oob req test");
-        goto err;
+        return UCC_INPROGRESS;
     }
     oob->req_free(storage->oob_req);
 

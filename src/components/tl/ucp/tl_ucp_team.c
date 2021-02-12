@@ -32,6 +32,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         self->status = UCC_INPROGRESS;
         status       = ucc_tl_ucp_addr_exchange_start(ctx, params->params.oob,
                                                       &self->addr_storage);
+        if (status == UCC_INPROGRESS) {
+            /* exchange started but not complete return UCC_OK from post */
+            status = UCC_OK;
+        }
     }
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return status;

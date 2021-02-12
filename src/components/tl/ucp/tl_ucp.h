@@ -27,6 +27,7 @@ typedef struct ucc_tl_ucp_context_config {
     ucc_tl_context_config_t super;
     uint32_t                preconnect;
     uint32_t                n_polls;
+    uint32_t                oob_npolls;
     uint32_t                kn_barrier_radix;
 } ucc_tl_ucp_context_config_t;
 
