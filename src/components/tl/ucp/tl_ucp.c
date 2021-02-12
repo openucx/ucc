@@ -6,6 +6,8 @@
 
 #include "tl_ucp.h"
 #include "utils/ucc_malloc.h"
+#include "components/mc/base/ucc_mc_base.h"
+
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib, ucc_base_attr_t *base_attr);
 ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context, ucc_base_attr_t *base_attr);
 
@@ -25,6 +27,16 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      "below which the team/context enpoints will be preconnected during "
      "corresponding team/context create call",
      ucc_offsetof(ucc_tl_ucp_context_config_t, preconnect),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"NPOLLS", "10",
+     "Number of ucp progress polling cycles for p2p requests testing",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, n_polls),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"BARRIER_KN_RADIX", "4",
+     "Radix of the recursive-knomial barrier algorithm",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, kn_barrier_radix),
      UCC_CONFIG_TYPE_UINT},
 
     {NULL}};
@@ -51,3 +63,12 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_op_args_t *coll_args,
                                   ucc_coll_task_t **task);
 
 UCC_TL_IFACE_DECLARE(ucp, UCP);
+
+ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1] = {
+    [UCC_MEMORY_TYPE_HOST]         = UCS_MEMORY_TYPE_HOST,
+    [UCC_MEMORY_TYPE_CUDA]         = UCS_MEMORY_TYPE_CUDA,
+    [UCC_MEMORY_TYPE_CUDA_MANAGED] = UCS_MEMORY_TYPE_CUDA_MANAGED,
+    [UCC_MEMORY_TYPE_ROCM]         = UCS_MEMORY_TYPE_ROCM,
+    [UCC_MEMORY_TYPE_ROCM_MANAGED] = UCS_MEMORY_TYPE_ROCM_MANAGED,
+    [UCC_MEMORY_TYPE_UNKNOWN]      = UCS_MEMORY_TYPE_UNKNOWN
+};

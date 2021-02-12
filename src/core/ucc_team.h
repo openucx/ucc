@@ -19,6 +19,8 @@ typedef struct ucc_team {
     ucc_cl_team_t   **cl_teams;
     int               n_cl_teams;
     int               last_team_create_posted;
+    uint16_t          id; /*< context-uniq team identifier */
+    uint32_t          rank;
 } ucc_team_t;
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);

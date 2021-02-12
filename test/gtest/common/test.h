@@ -193,12 +193,12 @@ void GTEST_TEST_CLASS_NAME_(test_case_name, test_name)::test_body()
       : public test_case_name { \
    public: \
     GTEST_TEST_CLASS_NAME_(test_case_name, test_name)() { \
-       set_num_threads(num_threads); \
+                                                          \
     } \
     virtual void test_body(); \
    protected: \
     virtual void init() { \
-        UCC_PP_FOREACH(UCC_TEST_SET_CONFIG, _, __VA_ARGS__) \
+                                \
         test_case_name::init(); \
     } \
    private: \

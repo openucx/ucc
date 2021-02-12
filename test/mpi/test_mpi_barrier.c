@@ -23,27 +23,25 @@ static inline void do_barrier(ucc_team_h team)
     UCC_CHECK(ucc_collective_finalize(request));
 }
 
-int main(int argc, char **argv)
+int main (int argc, char **argv)
 {
-    int rank, size;
-
+    int rank, size, i, sleep_us;
     UCC_CHECK(ucc_mpi_test_init(argc, argv, UCC_COLL_TYPE_BARRIER,
                                 UCC_THREAD_SINGLE));
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     srand(time(NULL));
-    /* for (i=0; i<size; i++) { */
-    /*     sleep_us = rand() % 1000; */
-    /*     usleep(sleep_us); */
-    /*     if (i == rank) { */
-    /*         printf("Rank %d checks in\n", rank); */
-    /*         fflush(stdout); */
-    /*         usleep(100); */
-    /*     } */
-    /*     do_barrier(ucc_world_team); */
-    /* } */
-    do_barrier(ucc_world_team);
+    for (i=0; i<size; i++) {
+        sleep_us = rand() % 1000;
+        usleep(sleep_us);
+        if (i == rank) {
+            printf("Rank %d checks in\n", rank);
+            fflush(stdout);
+            usleep(100);
+        }
+        do_barrier(ucc_world_team);
+    }
     ucc_mpi_test_finalize();
     return 0;
 }

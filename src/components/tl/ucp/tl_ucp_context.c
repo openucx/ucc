@@ -9,16 +9,6 @@
 #include "tl_ucp_coll.h"
 #include <limits.h>
 
-static void ucc_tl_ucp_req_init(void *request)
-{
-    ucc_tl_ucp_req_t *req = (ucc_tl_ucp_req_t *)request;
-    req->status           = UCC_OPERATION_INITIALIZED;
-}
-
-static void ucc_tl_ucp_req_cleanup(void *request)
-{
-}
-
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                     const ucc_base_context_params_t *params,
                     const ucc_base_config_t *config)
@@ -36,7 +26,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_ucp_config->super.tl_lib,
                               params->context);
-    self->preconnect = tl_ucp_config->preconnect;
+    memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
     self->ep_close_state.close_req = NULL;
     self->ep_close_state.ep        = 0;
     status = ucp_config_read(params->prefix, NULL, &ucp_config);
@@ -48,13 +38,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     }
 
     ucp_params.field_mask =
-        UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_REQUEST_SIZE |
-        UCP_PARAM_FIELD_REQUEST_INIT | UCP_PARAM_FIELD_REQUEST_CLEANUP |
-        UCP_PARAM_FIELD_TAG_SENDER_MASK;
+        UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK;
     ucp_params.features        = UCP_FEATURE_TAG | UCP_FEATURE_RMA;
-    ucp_params.request_size    = sizeof(ucc_tl_ucp_req_t);
-    ucp_params.request_init    = ucc_tl_ucp_req_init;
-    ucp_params.request_cleanup = ucc_tl_ucp_req_cleanup;
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
 
     if (params->estimated_num_ppn > 0) {
@@ -121,6 +106,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                  "failed to initialize tl_ucp_req mpool");
         goto err_thread_mode;
     }
+    if (UCC_OK != ucc_context_progress_register(
+                      params->context,
+                      (ucc_context_progress_fn_t)ucp_worker_progress,
+                      self->ucp_worker)) {
+        tl_error(self->super.super.lib, "failed to register progress function");
+        goto err_thread_mode;
+    }
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 
@@ -135,6 +127,9 @@ err_cfg:
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    ucc_context_progress_deregister(
+        self->super.super.ucc_context,
+        (ucc_context_progress_fn_t)ucp_worker_progress, self->ucp_worker);
     ucp_worker_destroy(self->ucp_worker);
     ucp_cleanup(self->ucp_context);
     ucc_mpool_cleanup(&self->req_mp, 1);

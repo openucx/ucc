@@ -14,9 +14,13 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_team_t, ucc_base_context_t *cl_context,
         ucc_derived_of(cl_context, ucc_cl_basic_context_t);
     ucc_status_t     status;
     ucc_base_team_t *b_team;
+    ucc_base_team_params_t b_params;
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super);
+    memcpy(&b_params, params, sizeof(b_params));
+    b_params.scope    = UCC_CL_BASIC;
+    b_params.scope_id = 0;
     status = UCC_TL_CTX_IFACE(ctx->tl_ucp_ctx)
-                 ->team.create_post(&ctx->tl_ucp_ctx->super, params, &b_team);
+                 ->team.create_post(&ctx->tl_ucp_ctx->super, &b_params, &b_team);
     if (UCC_OK != status) {
         self->tl_ucp_team = NULL;
         cl_error(cl_context->lib, "tl ucp team create post failed");

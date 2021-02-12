@@ -66,14 +66,15 @@ gtest_SOURCES =                 \
 	common/test_obj_size.cc     \
 	common/main.cc              \
 	common/test.cc              \
-	                            \
+	common/test_ucc.cc          \
 	tl/tl_test.cc               \
 	core/test_lib_config.cc     \
 	core/test_lib.cc            \
 	core/test_context_config.cc \
 	core/test_context.cc        \
 	core/test_mc.cc             \
-	core/test_multiproc.cc
+	core/test_team.cc           \
+	core/test_barrier.cc
 
 if HAVE_CUDA
 gtest_SOURCES += \
@@ -90,8 +91,9 @@ noinst_HEADERS =          \
 	common/gtest.h        \
 	common/test.h         \
 	common/test_helpers.h \
-	core/test_context.h   \
-	core/test_multiproc.h
+	common/test_ucc.h     \
+	core/test_context.h
+
 
 .PHONY: test test gdb valgrind fix_rpath ucc
 
