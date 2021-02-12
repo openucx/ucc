@@ -12,6 +12,11 @@ alltoall =                       \
 	alltoall/alltoall.c          \
 	alltoall/alltoall_pairwise.c
 
+alltoallv =                        \
+	alltoallv/alltoallv.h          \
+	alltoallv/alltoallv.c          \
+	alltoallv/alltoallv_pairwise.c
+
 sources =            \
 	tl_ucp.h         \
 	tl_ucp.c         \
@@ -24,7 +29,8 @@ sources =            \
 	tl_ucp_addr.c    \
 	tl_ucp_coll.c    \
 	$(barrier)       \
-    $(alltoall)
+	$(alltoall)      \
+	$(alltoallv)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

@@ -35,9 +35,15 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      UCC_CONFIG_TYPE_UINT},
 
     {"ALLTOALL_PAIRWISE_CHUNK", "1",
-     "Maximum number of outstanding send and receive in alltoall pairwise "
-     "algorithm",
+     "Maximum number of outstanding send and receive messages in alltoall "
+     "pairwise algorithm",
      ucc_offsetof(ucc_tl_ucp_context_config_t, alltoall_pairwise_chunk),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALLV_PAIRWISE_CHUNK", "1",
+     "Maximum number of outstanding send and receive messages in alltoallv "
+     "pairwise algorithm",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, alltoallv_pairwise_chunk),
      UCC_CONFIG_TYPE_UINT},
 
     {"BARRIER_KN_RADIX", "4",
