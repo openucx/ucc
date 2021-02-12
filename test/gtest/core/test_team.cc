@@ -40,3 +40,19 @@ UCC_TEST_F(test_team, team_create_multiple)
     std::shuffle(teams.begin(), teams.end(), std::default_random_engine());
 }
 
+/* Create and destroy several coexisting teams */
+UCC_TEST_F(test_team, team_create_multiple_preconnect)
+{
+    int job_size = 16;
+    UccJob job(job_size,
+               {ucc_env_var_t("UCC_TL_UCP_PRECONNECT", "inf")});
+    int n_teams  = 4; /* how many teams to create */
+    std::vector<UccTeam_h> teams;
+    for (int i = 0; i < n_teams; i++) {
+        int team_size = 2 + (rand() % (job_size - 2 + 1));
+        teams.push_back(job.create_team(team_size));
+    }
+    /* shuffle vector so that teams are destroyed in different order */
+    std::shuffle(teams.begin(), teams.end(), std::default_random_engine());
+}
+
