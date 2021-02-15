@@ -37,7 +37,11 @@ static int callback(struct dl_phdr_info *info, size_t size, void *data)
            it'll always write '\0' to the end position of the dest string. */
         ucc_strncpy_safe(component_path, info->dlpi_name, pos + 1);
         component_path[pos] = '\0';
-        strncat(component_path, UCC_COMPONENT_LIBDIR, UCC_COMPONENT_LIBDIR_LEN);
+        /* clang complains about potentially unsafe strcat function but
+           string to append is const and we allocate exact number of bytes
+           to store final result
+           NOLINTNEXTLINE */
+        strcat(component_path, UCC_COMPONENT_LIBDIR);
         ucc_global_config.component_path =
             ucc_global_config.component_path_default = component_path;
     }
