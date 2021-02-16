@@ -1333,25 +1333,38 @@ ucc_status_t ucc_team_get_all_eps(ucc_team_h team, uint64_t **ep,
  *  @ingroup UCC_COLLECTIVES_DT
  */
 typedef enum {
-    UCC_COLL_BUFF_FLAG_IN_PLACE             = UCC_BIT(0),
-    UCC_COLL_BUFF_FLAG_PERSISTENT           = UCC_BIT(1),
-    UCC_COLL_BUFF_FLAG_COUNT_64BIT          = UCC_BIT(2),
-    UCC_COLL_BUFF_FLAG_DISPLACEMENTS_64BIT  = UCC_BIT(3)
-} ucc_coll_buffer_flags_t;
+    UCC_COLL_ARGS_FLAG_IN_PLACE             = UCC_BIT(0),
+    UCC_COLL_ARGS_FLAG_PERSISTENT           = UCC_BIT(1),
+    UCC_COLL_ARGS_FLAG_COUNT_64BIT          = UCC_BIT(2),
+    UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT  = UCC_BIT(3)
+} ucc_coll_args_flags_t;
 
 /**
  *  @ingroup UCC_COLLECTIVES_DT
  */
+typedef enum ucc_memory_type {
+    UCC_MEMORY_TYPE_HOST,         /**< Default system memory */
+    UCC_MEMORY_TYPE_CUDA,         /**< NVIDIA CUDA memory */
+    UCC_MEMORY_TYPE_CUDA_MANAGED, /**< NVIDIA CUDA managed memory */
+    UCC_MEMORY_TYPE_ROCM,         /**< AMD ROCM memory */
+    UCC_MEMORY_TYPE_ROCM_MANAGED, /**< AMD ROCM managed system memory */
+    UCC_MEMORY_TYPE_LAST,
+    UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
+} ucc_memory_type_t;
+
+typedef struct ucc_coll_buffer_info_v {
+    void             *buffer;
+    ucc_count_t      *counts;
+    ucc_aint_t       *displacements;
+    ucc_datatype_t    datatype;
+    ucc_memory_type_t mem_type;
+} ucc_coll_buffer_info_v_t;
+
 typedef struct ucc_coll_buffer_info {
-    void            *src_buffer;
-    ucc_count_t     *src_counts;
-    ucc_aint_t      *src_displacements;
-    void            *dst_buffer;
-    ucc_count_t     *dst_counts;
-    ucc_aint_t      *dst_displacements;
-    ucc_datatype_t  src_datatype;
-    ucc_datatype_t  dst_datatype;
-    uint64_t        flags;
+    void             *buffer;
+    ucc_count_t       count;
+    ucc_datatype_t    datatype;
+    ucc_memory_type_t mem_type;
 } ucc_coll_buffer_info_t;
 
 /**
@@ -1365,14 +1378,11 @@ typedef enum {
 /**
  *  @ingroup UCC_COLLECTIVES_DT
  */
-enum ucc_coll_op_args_field {
-    UCC_COLL_ARG_FIELD_COLL_TYPE                       = UCC_BIT(0),
-    UCC_COLL_ARG_FIELD_BUFFER_INFO                     = UCC_BIT(1),
-    UCC_COLL_ARG_FIELD_PREDEFINED_REDUCTIONS           = UCC_BIT(2),
-    UCC_COLL_ARG_FIELD_USERDEFINED_REDUCTIONS          = UCC_BIT(3),
-    UCC_COLL_ARG_FIELD_ERROR_TYPE                      = UCC_BIT(4),
-    UCC_COLL_ARG_FIELD_TAG                             = UCC_BIT(5),
-    UCC_COLL_ARG_FIELD_ROOT                            = UCC_BIT(6)
+enum ucc_coll_arg_field {
+    UCC_COLL_ARGS_FIELD_FLAGS                           = UCC_BIT(0),
+    UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS           = UCC_BIT(1),
+    UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS          = UCC_BIT(2),
+    UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(3),
 };
 
 /**
@@ -1384,32 +1394,41 @@ enum ucc_coll_op_args_field {
  *
  *  @b Description
  *  @n @n
- *  @ref ucc_coll_op_args_t defines the parameters that can be used to customize
+ *  @ref ucc_coll_args_t defines the parameters that can be used to customize
  *  the collective operation. The "mask" bit array fields are defined by @ref
- *  ucc_coll_op_args_field. The bits in "mask" bit array is defined by @ref
- *  ucc_coll_op_args_field, which correspond to fields in structure @ref
- *  ucc_coll_op_args_t. The valid fields of the structure are specified by
- *  setting the corresponding bit to "1" in the bit-array "mask". When bits
- *  corresponding to the fields are not set, the fields are not defined.
+ *  ucc_coll_args_field. The bits in "mask" bit array is defined by @ref
+ *  ucc_coll_args_field, which correspond to fields in structure @ref
+ *  ucc_coll_args_t. The valid fields of the structure are specified by
+ *  setting the corresponding bit to "1" in the bit-array "mask".
  *  @n @n
- *  The collective operation is selected by field "coll_type". If allreduce or
- *  reduce operation is selected, the type of reduction is selected by the field
- *  "predefined_reduction_op" or "custom_reduction_op". For unordered collective
+ *  The collective operation is selected by field "coll_type" which must be always
+ *  set by user. If allreduce or *  reduce operation is selected, the type of
+ *  reduction is selected by the field *  "predefined_reduction_op" or
+ *  "custom_reduction_op". For unordered collective
  *  operations, the user-provided "tag" value orders the collective operation.
  *  For rooted collective operations such as reduce, scatter, gather, fan-in, and
- *  fan-out, the "root" field provides the participant endpoint value. The user
+ *  fan-out, the "root" field  must be provided by user and specify the participant
+ *  endpoint value. The user
  *  can request either "local" or "global" error information using the
  *  "error_type" field.
  *
+ *  @n @n
+ *  Information about user buffers used for collective operation must be specified
+ *  according to the "coll_type".
  *  @endparblock
  *
  */
-typedef struct ucc_coll_op_args {
+typedef struct ucc_coll_args {
     uint64_t                        mask;
-    ucc_coll_type_t                 coll_type; /*!< Type of collective operation
-                                                */
-    ucc_coll_buffer_info_t          buffer_info; /*!< Buffer info for the
-                                                   collective */
+    ucc_coll_type_t                 coll_type; /*!< Type of collective operation */
+    union {
+        ucc_coll_buffer_info_t      info;   /*!< Buffer info for the collective */
+        ucc_coll_buffer_info_v_t    info_v; /*!< Buffer info for the collective */
+    } src;
+    union {
+        ucc_coll_buffer_info_t      info;   /*!< Buffer info for the collective */
+        ucc_coll_buffer_info_v_t    info_v; /*!< Buffer info for the collective */
+    } dst;
     struct {
         ucc_reduction_op_t          predefined_op; /*!< Reduction operation, if
                                                         reduce or all-reduce
@@ -1418,11 +1437,12 @@ typedef struct ucc_coll_op_args {
                                                     reduction operation */
         void                       *custom_dtype;
     } reduce;
-    ucc_error_type_t                error_type; /*!< Error type */
-    ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
+    uint64_t                        flags;
     uint64_t                        root; /*!< Root endpoint for rooted
                                              collectives */
-} ucc_coll_op_args_t;
+    ucc_error_type_t                error_type; /*!< Error type */
+    ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
+} ucc_coll_args_t;
 
 /**
  *  @ingroup UCC_COLLECTIVES
@@ -1451,7 +1471,7 @@ typedef struct ucc_coll_op_args {
  *
  *  @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_collective_init(ucc_coll_op_args_t *coll_args,
+ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
                                  ucc_coll_req_h *request, ucc_team_h team);
 
 /**
@@ -1501,7 +1521,7 @@ ucc_status_t ucc_collective_post(ucc_coll_req_h request);
  *
  *  @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_collective_init_and_post(ucc_coll_op_args_t *coll_args,
+ucc_status_t ucc_collective_init_and_post(ucc_coll_args_t *coll_args,
                                           ucc_coll_req_h *request,
                                           ucc_team_h team);
 

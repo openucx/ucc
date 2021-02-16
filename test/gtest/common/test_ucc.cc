@@ -301,7 +301,7 @@ UccTeam_h UccJob::create_team(int _n_procs)
 }
 
 
-UccReq::UccReq(UccTeam_h _team, ucc_coll_op_args_t *args) :
+UccReq::UccReq(UccTeam_h _team, ucc_coll_args_t *args) :
     team(_team)
 {
     ucc_coll_req_h req;

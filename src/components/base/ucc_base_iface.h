@@ -92,12 +92,12 @@ typedef struct ucc_base_team_iface {
     ucc_status_t (*destroy)(ucc_base_team_t *team);
 } ucc_base_team_iface_t;
 
-typedef struct ucc_base_coll_op_args {
-    ucc_coll_op_args_t args;
-} ucc_base_coll_op_args_t;
+typedef struct ucc_base_coll_args {
+    ucc_coll_args_t args;
+} ucc_base_coll_args_t;
 
 typedef struct ucc_base_coll_iface {
-    ucc_status_t (*init)(ucc_base_coll_op_args_t *coll_args,
+    ucc_status_t (*init)(ucc_base_coll_args_t *coll_args,
                          ucc_base_team_t *team, ucc_coll_task_t **task);
 } ucc_base_coll_iface_t;
 
