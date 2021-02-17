@@ -311,6 +311,17 @@ UccReq::UccReq(UccTeam_h _team, ucc_coll_args_t *args) :
     }
 }
 
+UccReq::UccReq(UccTeam_h _team, std::vector<ucc_coll_args_t*> args) :
+        team(_team)
+{
+    EXPECT_EQ(team->procs.size(), args.size());
+    ucc_coll_req_h req;
+    for (auto i = 0; i < team->procs.size(); i++) {
+        EXPECT_EQ(UCC_OK, ucc_collective_init(args[i], &req, team->procs[i].team));
+        reqs.push_back(req);
+    }
+}
+
 UccReq::~UccReq()
 {
     for (auto r : reqs) {

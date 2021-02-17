@@ -74,7 +74,9 @@ gtest_SOURCES =                 \
 	core/test_context.cc        \
 	core/test_mc.cc             \
 	core/test_team.cc           \
-	core/test_barrier.cc
+	core/test_barrier.cc        \
+	core/test_alltoall.cc       \
+	core/test_alltoallv.cc
 
 if HAVE_CUDA
 gtest_SOURCES += \

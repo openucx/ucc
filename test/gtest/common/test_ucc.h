@@ -10,13 +10,27 @@
 #include <tuple>
 #include <memory>
 
+typedef std::vector<ucc_coll_args_t*> UccCollArgsVec;
+
+class UccCollArgs {
+protected:
+    virtual void init_proc_buf(int nprocs, int rank, uint8_t *buf, size_t len) = 0;
+    virtual int  validate_buf(int nprocs, uint8_t *buf, size_t len) = 0;
+public:
+    virtual UccCollArgsVec data_init(int nprocs, ucc_datatype_t dtype,
+                                     size_t count) = 0;
+    virtual void data_fini(UccCollArgsVec args) = 0;
+    virtual void data_validate(UccCollArgsVec args) = 0;
+};
+
 /* A single processes in a Job that runs UCC.
    It has context and lib object */
 class UccProcess {
 public:
     static constexpr ucc_lib_params_t default_lib_params = {
-        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE,
-        .thread_mode = UCC_THREAD_SINGLE
+        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE | UCC_LIB_PARAM_FIELD_COLL_TYPES,
+        .thread_mode = UCC_THREAD_SINGLE,
+        .coll_types = UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV
     };
     static constexpr ucc_context_params_t default_ctx_params = {
         .mask = UCC_CONTEXT_PARAM_FIELD_TYPE,
@@ -107,6 +121,7 @@ public:
 
     std::vector<ucc_coll_req_h> reqs;
     UccReq(UccTeam_h _team, ucc_coll_args_t *args);
+    UccReq(UccTeam_h _team, UccCollArgsVec args);
     ~UccReq();
     void start(void);
     void wait();
