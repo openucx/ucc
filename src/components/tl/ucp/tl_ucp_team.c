@@ -21,12 +21,21 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->context_ep_storage = 0;
     self->addr_storage       = NULL;
     self->size               = params->params.oob.participants;
+    self->scope              = params->scope;
+    self->scope_id           = params->scope_id;
+    self->rank               = params->rank;
+    self->seq_num            = 0;
+    self->id                 = 0; //TODO take it from base team
     if (self->context_ep_storage) {
         self->status = UCC_OK;
     } else {
         self->status = UCC_INPROGRESS;
         status       = ucc_tl_ucp_addr_exchange_start(ctx, params->params.oob,
-                                                &self->addr_storage);
+                                                      &self->addr_storage);
+        if (status == UCC_INPROGRESS) {
+            /* exchange started but not complete return UCC_OK from post */
+            status = UCC_OK;
+        }
     }
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return status;
@@ -69,8 +78,7 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
     int                   i;
     ucc_status_t          status;
     for (i = 0; i < team->size; i++) {
-        status = ucc_tl_ucp_connect_ep(ctx, team, team->addr_storage->addresses,
-                                       team->addr_storage->max_addrlen, i);
+        status = ucc_tl_ucp_connect_team_ep(team, i);
         if (UCC_OK != status) {
             ucc_tl_ucp_close_eps(ctx, team->eps, team->size);
             return status;
@@ -103,7 +111,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
                      sizeof(ucp_ep_h) * team->size);
             return UCC_ERR_NO_MEMORY;
         }
-        if (team->size <= ctx->preconnect) {
+        if (team->size <= ctx->cfg.preconnect) {
             status = ucc_tl_ucp_team_preconnect(team);
             if (UCC_OK != status) {
                 goto err_preconnect;

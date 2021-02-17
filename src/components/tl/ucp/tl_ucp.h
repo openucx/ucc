@@ -8,7 +8,6 @@
 #define UCC_TL_UCP_H_
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
-#include "tl_ucp_ep.h"
 #include "utils/ucc_mpool.h"
 
 #include <ucp/api/ucp.h>
@@ -27,6 +26,9 @@ typedef struct ucc_tl_ucp_lib_config {
 typedef struct ucc_tl_ucp_context_config {
     ucc_tl_context_config_t super;
     uint32_t                preconnect;
+    uint32_t                n_polls;
+    uint32_t                oob_npolls;
+    uint32_t                kn_barrier_radix;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
@@ -36,15 +38,23 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
 
 typedef struct ucc_tl_ucp_addr_storage ucc_tl_ucp_addr_storage_t;
+
+typedef struct ucc_tl_ucp_ep_close_state {
+    int   ep;
+    void *close_req;
+} ucc_tl_ucp_ep_close_state_t;
+
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t            super;
+    ucc_tl_ucp_context_config_t cfg;
     ucp_context_h               ucp_context;
     ucp_worker_h                ucp_worker;
     size_t                      ucp_addrlen;
     ucp_address_t              *worker_address;
-    uint32_t                    preconnect;
     ucc_tl_ucp_ep_close_state_t ep_close_state;
     ucc_mpool_t                 req_mp;
+    ucp_ep_h                   *eps;
+    ucc_tl_ucp_addr_storage_t  *addr_storage;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -61,13 +71,13 @@ typedef struct ucc_tl_ucp_team {
     int                        size;
     int                        rank;
     ucc_tl_ucp_addr_storage_t *addr_storage;
+    uint32_t                   id;
+    uint32_t                   scope;
+    uint32_t                   scope_id;
+    uint32_t                   seq_num;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
-
-typedef struct ucc_tl_ucp_req {
-    ucc_status_t status;
-} ucc_tl_ucp_req_t;
 
 #define UCC_TL_UCP_TEAM_CTX(_team)                                             \
     (ucc_derived_of((_team)->super.super.context, ucc_tl_ucp_context_t))
@@ -75,4 +85,5 @@ typedef struct ucc_tl_ucp_req {
 #define UCC_TL_UCP_TEAM_CORE_CTX(_team)                                        \
     ((_team)->super.super.context->ucc_context)
 
+#define UCC_TL_UCP_WORKER(_team) UCC_TL_UCP_TEAM_CTX(_team)->ucp_worker
 #endif

@@ -15,6 +15,7 @@ void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_TEAM_PARAM_FIELD_OUTSTANDING_COLLS,
                             outstanding_colls);
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_TEAM_PARAM_FIELD_EP, ep);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_TEAM_PARAM_FIELD_EP_RANGE, ep_range);
     //TODO do we need to copy ep_list ?
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_TEAM_PARAM_FIELD_TEAM_SIZE,
                             team_size);
@@ -35,7 +36,21 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     ucc_base_team_t       *b_team;
     ucc_cl_iface_t        *cl_iface;
     ucc_base_team_params_t b_params;
+
+    if ((team->params.mask & UCC_TEAM_PARAM_FIELD_EP) &&
+        (team->params.mask & UCC_TEAM_PARAM_FIELD_EP_RANGE) &&
+        (team->params.ep_range == UCC_COLLECTIVE_EP_RANGE_CONTIG)) {
+        team->rank =
+            team->params.ep; //TODO need to make sure we don't exceed rank size
+    } else {
+        ucc_error(
+            "rank value of a process is not provided via ucc_team_params.ep "
+            "with ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG. "
+            "not supported yet...");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     memcpy(&b_params.params, &team->params, sizeof(ucc_team_params_t));
+    b_params.rank  = team->rank;
     team->cl_teams = ucc_malloc(sizeof(ucc_cl_team_t *) * context->n_cl_ctx);
     if (!team) {
         ucc_error("failed to allocate %zd bytes for cl teams array",

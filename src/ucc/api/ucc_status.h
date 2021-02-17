@@ -9,7 +9,15 @@
 #ifndef UCC_STATUS_H_
 #define UCC_STATUS_H_
 
+#ifdef __cplusplus
+# define BEGIN_C_DECLS  extern "C" {
+# define END_C_DECLS    }
+#else
+# define BEGIN_C_DECLS
+# define END_C_DECLS
+#endif
 
+BEGIN_C_DECLS
 /**
  * @ingroup UCC_UTILS
  * @brief Status codes for the UCC operations
@@ -41,4 +49,5 @@ typedef enum {
 
 const char *ucc_status_string(ucc_status_t status);
 
+END_C_DECLS
 #endif

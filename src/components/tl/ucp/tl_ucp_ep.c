@@ -1,22 +1,15 @@
 #include "tl_ucp.h"
 #include "tl_ucp_ep.h"
+#include "tl_ucp_addr.h"
 
-ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
-                                   ucc_tl_ucp_team_t *team, char *addr_array,
-                                   size_t max_addrlen, int rank)
+static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
+                                                 ucp_ep_h *ep, char *addr_array,
+                                                 size_t max_addrlen, int rank)
 {
     ucp_address_t  *address = (ucp_address_t *)(addr_array + max_addrlen * rank);
     ucp_ep_params_t ep_params;
     ucs_status_t    status;
-    ucp_ep_h       *ep;
-    if (team->context_ep_storage) {
-        //TODO get ep from ctx storage ctx->eps[rank_to_ctx_rank] using mappers
-        ep = NULL;
-    } else {
-        ucc_assert(team && team->eps);
-        ep = &team->eps[rank];
-    }
-    if ((ep != NULL) && (*ep)) {
+    if (*ep) {
         /* Already connected */
         return UCC_OK;
     }
@@ -31,6 +24,26 @@ ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
         return ucs_status_to_ucc_status(status);
     }
     return UCC_OK;
+}
+
+ucc_status_t ucc_tl_ucp_connect_ctx_ep(ucc_tl_ucp_context_t *ctx, int ctx_rank)
+{
+    return ucc_tl_ucp_connect_ep(ctx, &ctx->eps[ctx_rank],
+                                 ctx->addr_storage->addresses,
+                                 ctx->addr_storage->max_addrlen, ctx_rank);
+}
+
+ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team, int team_rank)
+{
+    ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
+    if (team->context_ep_storage) {
+        int ctx_rank = -1; //TODO map to ctx rank
+        ucc_assert(0);
+        return ucc_tl_ucp_connect_ctx_ep(ctx, ctx_rank);
+    }
+    return ucc_tl_ucp_connect_ep(ctx, &team->eps[team_rank],
+                                 team->addr_storage->addresses,
+                                 team->addr_storage->max_addrlen, team_rank);
 }
 
 ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx, ucp_ep_h *eps,

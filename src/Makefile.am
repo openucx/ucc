@@ -14,7 +14,7 @@ if HAVE_CUDA
 mc_dirs += components/mc/cuda
 endif
 
-SUBDIRS = $(cl_dirs) $(tl_dirs) $(mc_dirs)
+SUBDIRS = . $(cl_dirs) $(tl_dirs) $(mc_dirs)
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =
 
@@ -64,6 +64,7 @@ libucc_la_SOURCES =                  \
 	core/ucc_progress_queue_st.c     \
 	schedule/ucc_schedule.c          \
 	utils/ucc_component.c            \
+	utils/ucc_status.c               \
 	components/base/ucc_base_iface.c \
 	components/cl/ucc_cl.c           \
 	components/tl/ucc_tl.c           \

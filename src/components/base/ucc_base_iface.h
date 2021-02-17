@@ -68,6 +68,16 @@ typedef struct ucc_base_context_iface {
 
 typedef struct ucc_base_team_params {
     ucc_team_params_t params;
+    int               scope; /* Scope that allocates the team. When TL team is created
+                                the scope would be a CL_TYPE. This provides a separation
+                                of teams created from different CLs with the same TL_TYPE */
+    int               scope_id; /* The id of the base_team in the specified scope. Use case:
+                                   a single CL team (e.g. basic) creates multiple TL teams
+                                   of the same type (e.g. several tl_ucp teams). In this
+                                   case CL would give those teams different scope_id. */
+    uint32_t          rank; /* Rank of a calling process in the TL/CL team. It is a uniq
+                               process identifier within a team (not job) but it has the
+                               property: it is always contig and in the range [0, team_size).*/
 } ucc_base_team_params_t;
 
 typedef struct ucc_base_team {

@@ -10,6 +10,7 @@
 #endif
 
 #include "test_helpers.h"
+#include "test_ucc.h"
 
 static int ucc_gtest_random_seed = -1;
 
@@ -28,6 +29,7 @@ void parse_test_opts(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
+    int ret;
     // coverity[fun_call_w_exception]: uncaught exceptions cause nonzero exit anyway, so don't warn.
     ::testing::InitGoogleTest(&argc, argv);
 
@@ -38,5 +40,7 @@ int main(int argc, char **argv) {
     UCC_TEST_MESSAGE << "Using random seed of " << ucc_gtest_random_seed;
     srand(ucc_gtest_random_seed);
 
-    return RUN_ALL_TESTS();
+    ret = RUN_ALL_TESTS();
+    UccJob::cleanup();
+    return ret;
 }
