@@ -7,11 +7,18 @@
 # $HEADER$
 #
 
-bin_PROGRAMS = test_mpi_barrier
+bin_PROGRAMS = ucc_test_mpi
 
-test_mpi_barrier_SOURCES=test_mpi_barrier.c test_mpi.c
+ucc_test_mpi_SOURCES = \
+	test_mpi.cc        \
+	main.cc            \
+	buffer.cc          \
+	mpi_util.cc        \
+	test_case.cc       \
+	test_barrier.cc    \
+	test_allreduce.cc
 
-CC=mpicc
-CFLAGS+=-I${top_builddir}/src -std=c11
+CXX=mpicxx
+CXXFLAGS+=-I${top_builddir}/src -std=gnu++11
 
 LDFLAGS=-L${top_builddir}/src/.libs -lucc
