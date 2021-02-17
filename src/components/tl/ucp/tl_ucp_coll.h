@@ -25,6 +25,13 @@ typedef struct ucc_tl_ucp_task {
             int radix_mask_pow;
             int radix;
         } barrier;
+        struct {
+            int   phase;
+            int   iteration;
+            int   radix_mask_pow;
+            int   radix;
+            void *scratch;
+        } allreduce_kn;
     };
 } ucc_tl_ucp_task_t;
 

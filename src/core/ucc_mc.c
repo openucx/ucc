@@ -120,9 +120,9 @@ ucc_status_t ucc_mc_alloc(void **ptr, size_t size, ucc_memory_type_t mem_type)
     return mc_ops[mem_type]->mem_alloc(ptr, size);
 }
 
-ucc_status_t ucc_mc_reduce(const void *src1, const void *src2,
-                           void *dst, size_t count, ucc_datatype_t dt,
-                           ucc_memory_type_t mem_type, ucc_reduction_op_t op)
+ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
+                           size_t count, ucc_datatype_t dt,
+                           ucc_reduction_op_t op, ucc_memory_type_t mem_type)
 {
     UCC_CHECK_MC_AVAILABLE(mem_type);
     return mc_ops[mem_type]->reduce(src1, src2, dst, count, dt, op);
@@ -153,5 +153,23 @@ ucc_status_t ucc_mc_finalize()
         }
     }
 
+    return UCC_OK;
+}
+
+ucc_status_t ucc_mc_reduce_multi(void *sbuf1, void *sbuf2, void *rbuf,
+                                 size_t count, size_t size, size_t stride,
+                                 ucc_datatype_t dtype, ucc_reduction_op_t op,
+                                 ucc_memory_type_t mem_type)
+{
+    int i;
+    if (size == 0) {
+        return UCC_OK;
+    }
+    //TODO implemente efficient reduce_multi in the mc components
+    ucc_mc_reduce(sbuf1, sbuf2, rbuf, size, dtype, op, mem_type);
+    for (i = 1; i < count; i++) {
+        ucc_mc_reduce((void *)((ptrdiff_t)sbuf2 + stride * i), rbuf, rbuf, size,
+                      dtype, op, mem_type);
+    }
     return UCC_OK;
 }
