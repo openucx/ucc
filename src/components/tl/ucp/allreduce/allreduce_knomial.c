@@ -58,6 +58,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     void              *scratch    = task->allreduce_kn.scratch;
     void              *sbuf       = task->args.src.info.buffer;
     void              *rbuf       = task->args.dst.info.buffer;
+    ucc_memory_type_t  smem       = task->args.src.info.mem_type;
+    ucc_memory_type_t  rmem       = task->args.dst.info.mem_type;
     size_t             count      = task->args.src.info.count;
     ucc_datatype_t     dt         = task->args.src.info.datatype;
     size_t             data_size  = count * ucc_dt_size(dt);
@@ -70,21 +72,19 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     RESTORE_STATE();
     if ((iteration > 0) || (node_type == KN_NODE_PROXY)) {
         sbuf = rbuf;
+        smem = rmem;
     }
     GOTO_PHASE(task->allreduce_kn.phase);
 
     if (KN_NODE_EXTRA == node_type) {
         peer = KN_RECURSIVE_GET_PROXY(myrank, full_size);
-        ucc_tl_ucp_send_nb(sbuf, data_size, UCC_MEMORY_TYPE_UNKNOWN, peer, team,
-                           task);
-        ucc_tl_ucp_recv_nb(rbuf, data_size, UCC_MEMORY_TYPE_UNKNOWN, peer, team,
-                           task);
+        ucc_tl_ucp_send_nb(sbuf, data_size, smem, peer, team, task);
+        ucc_tl_ucp_recv_nb(rbuf, data_size, rmem, peer, team, task);
     }
 
     if (KN_NODE_PROXY == node_type) {
         peer = KN_RECURSIVE_GET_EXTRA(myrank, full_size);
-        ucc_tl_ucp_recv_nb(scratch, data_size, UCC_MEMORY_TYPE_UNKNOWN, peer,
-                           team, task);
+        ucc_tl_ucp_recv_nb(scratch, data_size, smem, peer, team, task);
     }
 PHASE_EXTRA:
     if (KN_NODE_PROXY == node_type || KN_NODE_EXTRA == node_type) {
@@ -95,9 +95,8 @@ PHASE_EXTRA:
         if (KN_NODE_EXTRA == node_type) {
             goto completion;
         } else {
-            ucc_mc_reduce(task->args.src.info.buffer, scratch, rbuf,
-                          count, dt, task->args.reduce.predefined_op,
-                          UCC_MEMORY_TYPE_HOST);
+            ucc_dt_reduce(task->args.src.info.buffer, scratch, rbuf,
+                          count, dt, UCC_MEMORY_TYPE_HOST, &task->args);
         }
     }
     for (; iteration < pow_k_sup; iteration++) {
@@ -107,8 +106,7 @@ PHASE_EXTRA:
                    (myrank - myrank % step_size);
             if (peer >= full_size)
                 continue;
-            ucc_tl_ucp_send_nb(sbuf, data_size, UCC_MEMORY_TYPE_UNKNOWN, peer,
-                               team, task);
+            ucc_tl_ucp_send_nb(sbuf, data_size, smem, peer, team, task);
         }
 
         recv_offset = 0;
@@ -118,8 +116,7 @@ PHASE_EXTRA:
             if (peer >= full_size)
                 continue;
             ucc_tl_ucp_recv_nb((void*)((ptrdiff_t)scratch + recv_offset),
-                               data_size, UCC_MEMORY_TYPE_UNKNOWN, peer, team,
-                               task);
+                               data_size, smem, peer, team, task);
             recv_offset += data_size;
         }
         radix_pow *= radix;
@@ -130,17 +127,16 @@ PHASE_EXTRA:
         }
 
         if (task->send_posted > iteration * (radix - 1)) {
-            ucc_mc_reduce_multi(
+            ucc_dt_reduce_multi(
                 sbuf, scratch, rbuf,
                 task->send_posted - iteration * (radix - 1), count, data_size,
-                dt, task->args.reduce.predefined_op, UCC_MEMORY_TYPE_HOST);
+                dt, UCC_MEMORY_TYPE_HOST, &task->args);
         }
         sbuf = rbuf;
     }
     if (KN_NODE_PROXY == node_type) {
         peer = KN_RECURSIVE_GET_EXTRA(myrank, full_size);
-        ucc_tl_ucp_send_nb(rbuf, data_size, UCC_MEMORY_TYPE_UNKNOWN, peer, team,
-                           task);
+        ucc_tl_ucp_send_nb(rbuf, data_size, rmem, peer, team, task);
         goto PHASE_PROXY;
     } else {
         goto completion;
@@ -154,7 +150,7 @@ PHASE_PROXY:
 
 completion:
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
-    ucc_mc_free(task->allreduce_kn.scratch, UCC_MEMORY_TYPE_HOST);
+    ucc_mc_free(task->allreduce_kn.scratch, task->args.src.info.mem_type);
     task->super.super.status = UCC_OK;
     return UCC_OK;
 }
@@ -174,7 +170,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
         ucc_min(UCC_TL_UCP_TEAM_CTX(team)->cfg.allreduce_kn_radix, team->size);
     ucc_mc_alloc(&task->allreduce_kn.scratch,
                  (task->allreduce_kn.radix - 1) * data_size,
-                 UCC_MEMORY_TYPE_HOST);
+                 task->args.src.info.mem_type);
 
     task->super.super.status = UCC_INPROGRESS;
     status = ucc_tl_ucp_allreduce_knomial_progress(&task->super);
