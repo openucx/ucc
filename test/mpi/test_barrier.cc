@@ -6,8 +6,7 @@
 
 #include "test_mpi.h"
 
-TestBarrier::TestBarrier(ucc_test_team_t &team) :
-    TestCase(team, UCC_MEMORY_TYPE_HOST, 0)
+TestBarrier::TestBarrier(ucc_test_team_t &team) : TestCase(team)
 {
     status = UCC_OK;
     args.coll_type = UCC_COLL_TYPE_BARRIER;

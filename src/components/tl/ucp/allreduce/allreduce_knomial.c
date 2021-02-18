@@ -50,9 +50,9 @@ enum {
 
 ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task   = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team   = task->team;
-    int                myrank = team->rank;
+    ucc_tl_ucp_task_t *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team       = task->team;
+    int                myrank     = team->rank;
     int                group_size = team->size;
     int                radix      = task->allreduce_kn.radix;
     void              *scratch    = task->allreduce_kn.scratch;
@@ -60,9 +60,11 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     void              *rbuf       = task->args.dst.info.buffer;
     ucc_memory_type_t  smem       = task->args.src.info.mem_type;
     ucc_memory_type_t  rmem       = task->args.dst.info.mem_type;
-    size_t             count      = task->args.src.info.count;
-    ucc_datatype_t     dt         = task->args.src.info.datatype;
+    size_t             count      = task->args.dst.info.count;
+    ucc_datatype_t     dt         = task->args.dst.info.datatype;
     size_t             data_size  = count * ucc_dt_size(dt);
+    ucc_memory_type_t  send_mem;
+    void              *send_buf;
     ptrdiff_t          recv_offset;
     int full_tree_size, pow_k_sup, n_full_subtrees, full_size, node_type;
     int iteration, radix_pow, k, step_size, peer;
@@ -70,9 +72,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     KN_RECURSIVE_SETUP(radix, myrank, group_size, pow_k_sup, full_tree_size,
                        n_full_subtrees, full_size, node_type);
     RESTORE_STATE();
-    if ((iteration > 0) || (node_type == KN_NODE_PROXY)) {
+    if (UCC_IS_INPLACE(task->args)) {
         sbuf = rbuf;
-        smem = rmem;
     }
     GOTO_PHASE(task->allreduce_kn.phase);
 
@@ -95,7 +96,7 @@ PHASE_EXTRA:
         if (KN_NODE_EXTRA == node_type) {
             goto completion;
         } else {
-            ucc_dt_reduce(task->args.src.info.buffer, scratch, rbuf,
+            ucc_dt_reduce(sbuf, scratch, rbuf,
                           count, dt, UCC_MEMORY_TYPE_HOST, &task->args);
         }
     }
@@ -106,7 +107,15 @@ PHASE_EXTRA:
                    (myrank - myrank % step_size);
             if (peer >= full_size)
                 continue;
-            ucc_tl_ucp_send_nb(sbuf, data_size, smem, peer, team, task);
+            if ((iteration == 0) && (KN_NODE_PROXY != node_type) &&
+                !UCC_IS_INPLACE(task->args)) {
+                send_buf = sbuf;
+                send_mem = smem;
+            } else {
+                send_buf = rbuf;
+                send_mem = rmem;
+            }
+            ucc_tl_ucp_send_nb(send_buf, data_size, send_mem, peer, team, task);
         }
 
         recv_offset = 0;
@@ -127,12 +136,17 @@ PHASE_EXTRA:
         }
 
         if (task->send_posted > iteration * (radix - 1)) {
+            if ((iteration == 0) && (KN_NODE_PROXY != node_type) &&
+                !UCC_IS_INPLACE(task->args)) {
+                send_buf = sbuf;
+            } else {
+                send_buf = rbuf;
+            }
             ucc_dt_reduce_multi(
-                sbuf, scratch, rbuf,
+                send_buf, scratch, rbuf,
                 task->send_posted - iteration * (radix - 1), count, data_size,
                 dt, UCC_MEMORY_TYPE_HOST, &task->args);
         }
-        sbuf = rbuf;
     }
     if (KN_NODE_PROXY == node_type) {
         peer = KN_RECURSIVE_GET_EXTRA(myrank, full_size);

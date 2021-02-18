@@ -70,6 +70,7 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
     ops = {UCC_OP_SUM, UCC_OP_MAX};
     colls = {UCC_COLL_TYPE_BARRIER, UCC_COLL_TYPE_ALLREDUCE};
     mtypes = {UCC_MEMORY_TYPE_HOST};
+    inplace = TEST_NO_INPLACE;
 }
 
 UccTestMpi::~UccTestMpi()
@@ -196,14 +197,14 @@ ucc_status_t UccTestMpi::run_all()
                             c == UCC_COLL_TYPE_REDUCE) {
                             for (auto dt : dtypes) {
                                 for (auto op : ops) {
-                                    auto tc = TestCase::init(c, t, m, mt, dt, op);
+                                    auto tc = TestCase::init(c, t, m, inplace, mt, dt, op);
                                     if (UCC_OK != tc.get()->exec()) {
                                         status = UCC_ERR_NO_MESSAGE;
                                     }
                                 }
                             }
                         } else {
-                            auto tc = TestCase::init(c, t, m, mt);
+                            auto tc = TestCase::init(c, t, m, inplace, mt);
                             if (UCC_OK != tc.get()->exec()) {
                                 status = UCC_ERR_NO_MESSAGE;
                             }

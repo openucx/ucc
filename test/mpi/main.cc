@@ -12,6 +12,7 @@ static std::vector<ucc_test_mpi_team_t> teams = {TEAM_WORLD, TEAM_REVERSE,
                                                  TEAM_SPLIT_HALF, TEAM_SPLIT_ODD_EVEN};
 static size_t msgrange[3] = {8, (1ULL << 21), 8};
 static char *cls = NULL;
+static std::vector<ucc_test_mpi_inplace_t> inplace = {TEST_NO_INPLACE};
 static std::vector<std::string> str_split(const char *value, const char *delimiter)
 {
     std::vector<std::string> rst;
@@ -36,6 +37,7 @@ void PrintHelp()
        "--mtypes   <m1,m2,..>:        list of mtypes: host,cuda\n"
        "--dtypes   <d1,d2,..>:        list of dtypes: (u)int8(16,32,64),float32(64)\n"
        "--ops      <o1,o2,..>:        list of ops:sum,prod,max,min,land,lor,lxor,band,bor,bxor\n"
+       "--inplace  <value>:           0 - no inplace, 1 - inplace, 2 - both\n"
        "--msgsize  <min:max[:power]>  mesage sizes range:\n"
        "--help:              Show help\n";
     exit(1);
@@ -174,16 +176,36 @@ static void process_msgrange(const char *arg)
     }
 }
 
+static void process_inplace(const char *arg)
+{
+    int value = std::stoi(arg);
+    switch(value) {
+    case 0:
+        inplace = {TEST_NO_INPLACE};
+        break;
+    case 1:
+        inplace = {TEST_INPLACE};
+        break;
+    case 2:
+        inplace = {TEST_NO_INPLACE, TEST_INPLACE};
+        break;
+    default:
+        break;
+    }
+}
+
+
 void ProcessArgs(int argc, char** argv)
 {
-    const char* const short_opts = "c:t:m:d:o:M:h";
+    const char* const short_opts = "c:t:m:d:o:M:I:h";
     const option long_opts[] = {
         {"colls",   required_argument, nullptr, 'c'},
         {"teams",   required_argument, nullptr, 't'},
-        {"mtypes",  required_argument, nullptr, 'm'},
+        {"mtypes",  required_argument, nullptr, 'M'},
         {"dtypes",  required_argument, nullptr, 'd'},
         {"ops",     required_argument, nullptr, 'o'},
-        {"msgsize", required_argument, nullptr, 'M'},
+        {"msgsize", required_argument, nullptr, 'm'},
+        {"inplace", required_argument, nullptr, 'I'},
         {"help",    no_argument,       nullptr, 'h'},
         {nullptr,   no_argument,       nullptr, 0}
     };
@@ -203,7 +225,7 @@ void ProcessArgs(int argc, char** argv)
         case 't':
             teams = process_arg<ucc_test_mpi_team_t>(optarg, team_str_to_type);
             break;
-        case 'm':
+        case 'M':
             mtypes = process_arg<ucc_memory_type_t>(optarg, mtype_str_to_type);
             break;
         case 'd':
@@ -212,8 +234,11 @@ void ProcessArgs(int argc, char** argv)
         case 'o':
             ops = process_arg<ucc_reduction_op_t>(optarg, op_str_to_type);
             break;
-        case 'M':
+        case 'm':
             process_msgrange(optarg);
+            break;
+        case 'I':
+            process_inplace(optarg);
             break;
         case 'h': // -h or --help
         case '?': // Unrecognized option
@@ -235,8 +260,11 @@ int main(int argc, char *argv[])
     test.set_ops(ops);
 
     test.set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
-    if (UCC_OK != test.run_all()) {
-        return -1;
+    for (auto &inpl : inplace) {
+        test.set_inplace(inpl);
+        if (UCC_OK != test.run_all()) {
+            return -1;
+        }
     }
 
     return 0;

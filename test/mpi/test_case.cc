@@ -9,6 +9,7 @@
 std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
                                          ucc_test_team_t &_team,
                                          size_t msgsize,
+                                         ucc_test_mpi_inplace_t inplace,
                                          ucc_memory_type_t mt,
                                          ucc_datatype_t dt,
                                          ucc_reduction_op_t op)
@@ -17,7 +18,8 @@ std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
     case UCC_COLL_TYPE_BARRIER:
         return std::make_shared<TestBarrier>(_team);
     case UCC_COLL_TYPE_ALLREDUCE:
-        return std::make_shared<TestAllreduce>(msgsize, dt, op, mt, _team);
+        return std::make_shared<TestAllreduce>(msgsize, inplace, dt,
+                                               op, mt, _team);
     default:
         break;
     }
@@ -71,18 +73,25 @@ ucc_status_t TestCase::exec()
 }
 
 TestCase::TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type,
-                   size_t _msgsize) :
-    team(_team), mem_type(_mem_type),  msgsize(_msgsize)
+                   size_t _msgsize, ucc_test_mpi_inplace_t _inplace) :
+    team(_team), mem_type(_mem_type),  msgsize(_msgsize), inplace(_inplace)
 {
     sbuf      = NULL;
     rbuf      = NULL;
     check_buf = NULL;
+    args.mask = 0;
 }
 
 TestCase::~TestCase()
 {
     UCC_CHECK(ucc_collective_finalize(req));
-    UCC_CHECK(ucc_mc_free(sbuf, mem_type));
-    UCC_CHECK(ucc_mc_free(rbuf, mem_type));
-    UCC_CHECK(ucc_mc_free(check_buf, mem_type));
+    if (sbuf) {
+        UCC_CHECK(ucc_mc_free(sbuf, mem_type));
+    }
+    if (rbuf) {
+        UCC_CHECK(ucc_mc_free(rbuf, mem_type));
+    }
+    if (check_buf) {
+        UCC_CHECK(ucc_mc_free(check_buf, mem_type));
+    }
 }

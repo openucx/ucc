@@ -33,6 +33,11 @@ typedef enum {
     TEAM_LAST
 } ucc_test_mpi_team_t;
 
+typedef enum {
+    TEST_NO_INPLACE,
+    TEST_INPLACE
+} ucc_test_mpi_inplace_t;
+
 static inline const char* team_str(ucc_test_mpi_team_t t) {
     switch(t) {
     case TEAM_WORLD:
@@ -62,6 +67,7 @@ typedef struct ucc_test_team {
 class UccTestMpi {
     ucc_context_h ctx;
     ucc_lib_h     lib;
+    ucc_test_mpi_inplace_t inplace;
     void create_team(ucc_test_mpi_team_t t);
     void destroy_team(ucc_test_team_t &team);
     ucc_team_h create_ucc_team(MPI_Comm comm);    
@@ -81,6 +87,9 @@ public:
     void set_colls(std::vector<ucc_coll_type_t> &_colls);
     void set_ops(std::vector<ucc_reduction_op_t> &_ops);
     void set_mtypes(std::vector<ucc_memory_type_t> &_mtypes);
+    void set_inplace(ucc_test_mpi_inplace_t _inplace) {
+        inplace = _inplace;
+    }
     ucc_status_t run_all();
 };
 
@@ -89,6 +98,7 @@ protected:
     ucc_test_team_t team;    
     ucc_memory_type_t mem_type;
     size_t msgsize;
+    ucc_test_mpi_inplace_t inplace;
     ucc_coll_args_t args;
     ucc_coll_req_h req;
     void *sbuf;
@@ -98,11 +108,13 @@ public:
     static std::shared_ptr<TestCase> init(ucc_coll_type_t _type,
                                           ucc_test_team_t &_team,
                                           size_t msgsize = 0,
+                                          ucc_test_mpi_inplace_t inplace = TEST_NO_INPLACE,
                                           ucc_memory_type_t mt = UCC_MEMORY_TYPE_HOST,
                                           ucc_datatype_t dt = UCC_DT_INT32,
                                           ucc_reduction_op_t op = UCC_OP_SUM);
 
-    TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type, size_t _msgsize);
+    TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
+             size_t _msgsize = 0, ucc_test_mpi_inplace_t _inplace = TEST_NO_INPLACE);
     ~TestCase();
     virtual void run();
     virtual ucc_status_t check() = 0;
@@ -126,7 +138,8 @@ class TestAllreduce : public TestCase {
     ucc_datatype_t dt;
     ucc_reduction_op_t op;
 public:
-    TestAllreduce(size_t _msgsize, ucc_datatype_t _dt, ucc_reduction_op_t _op,
+    TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
+                  ucc_datatype_t _dt, ucc_reduction_op_t _op,
                   ucc_memory_type_t _mt, ucc_test_team_t &team);
     ucc_status_t check();
     std::string str();
