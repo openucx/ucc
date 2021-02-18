@@ -22,6 +22,11 @@ allreduce =                       \
 	allreduce/allreduce.c         \
 	allreduce/allreduce_knomial.c
 
+allgather =                       \
+	allgather/allgather.h         \
+	allgather/allgather.c         \
+	allgather/allgather_ring.c
+
 sources =            \
 	tl_ucp.h         \
 	tl_ucp.c         \
@@ -36,7 +41,8 @@ sources =            \
 	$(barrier)       \
 	$(alltoall)      \
 	$(alltoallv)     \
-	$(allreduce)
+	$(allreduce)     \
+	$(allgather)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

@@ -11,6 +11,7 @@
 #include "alltoall/alltoall.h"
 #include "alltoallv/alltoallv.h"
 #include "allreduce/allreduce.h"
+#include "allgather/allgather.h"
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
@@ -73,6 +74,9 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
         break;
     case UCC_COLL_TYPE_ALLREDUCE:
         status = ucc_tl_ucp_allreduce_init(task);
+        break;
+    case UCC_COLL_TYPE_ALLGATHER:
+        status = ucc_tl_ucp_allgather_init(task);
         break;
     default:
         status = UCC_ERR_NOT_SUPPORTED;
