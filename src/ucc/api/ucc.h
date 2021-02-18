@@ -151,16 +151,22 @@ typedef enum {
  *
  */
 typedef enum {
-    UCC_COLL_TYPE_BARRIER            = UCC_BIT(0),
-    UCC_COLL_TYPE_BCAST              = UCC_BIT(1),
+    UCC_COLL_TYPE_ALLGATHER          = UCC_BIT(0),
+    UCC_COLL_TYPE_ALLGATHERV         = UCC_BIT(1),
     UCC_COLL_TYPE_ALLREDUCE          = UCC_BIT(2),
-    UCC_COLL_TYPE_REDUCE             = UCC_BIT(3),
-    UCC_COLL_TYPE_ALLTOALL           = UCC_BIT(4),
-    UCC_COLL_TYPE_ALLGATHER          = UCC_BIT(5),
-    UCC_COLL_TYPE_GATHER             = UCC_BIT(6),
-    UCC_COLL_TYPE_SCATTER            = UCC_BIT(7),
-    UCC_COLL_TYPE_FANIN              = UCC_BIT(8),
-    UCC_COLL_TYPE_FANOUT             = UCC_BIT(9)
+    UCC_COLL_TYPE_ALLTOALL           = UCC_BIT(3),
+    UCC_COLL_TYPE_ALLTOALLV          = UCC_BIT(4),
+    UCC_COLL_TYPE_BARRIER            = UCC_BIT(5),
+    UCC_COLL_TYPE_BCAST              = UCC_BIT(6),
+    UCC_COLL_TYPE_FANIN              = UCC_BIT(7),
+    UCC_COLL_TYPE_FANOUT             = UCC_BIT(8),
+    UCC_COLL_TYPE_GATHER             = UCC_BIT(9),
+    UCC_COLL_TYPE_GATHERV            = UCC_BIT(10),
+    UCC_COLL_TYPE_REDUCE             = UCC_BIT(11),
+    UCC_COLL_TYPE_REDUCE_SCATTER     = UCC_BIT(12),
+    UCC_COLL_TYPE_REDUCE_SCATTERV    = UCC_BIT(13),
+    UCC_COLL_TYPE_SCATTER            = UCC_BIT(14),
+    UCC_COLL_TYPE_SCATTERV           = UCC_BIT(15)
 } ucc_coll_type_t;
 
 /**
@@ -1343,11 +1349,11 @@ typedef enum {
  *  @ingroup UCC_COLLECTIVES_DT
  */
 typedef enum ucc_memory_type {
-    UCC_MEMORY_TYPE_HOST,         /**< Default system memory */
-    UCC_MEMORY_TYPE_CUDA,         /**< NVIDIA CUDA memory */
-    UCC_MEMORY_TYPE_CUDA_MANAGED, /**< NVIDIA CUDA managed memory */
-    UCC_MEMORY_TYPE_ROCM,         /**< AMD ROCM memory */
-    UCC_MEMORY_TYPE_ROCM_MANAGED, /**< AMD ROCM managed system memory */
+    UCC_MEMORY_TYPE_HOST,         /*!< Default system memory */
+    UCC_MEMORY_TYPE_CUDA,         /*!< NVIDIA CUDA memory */
+    UCC_MEMORY_TYPE_CUDA_MANAGED, /*!< NVIDIA CUDA managed memory */
+    UCC_MEMORY_TYPE_ROCM,         /*!< AMD ROCM memory */
+    UCC_MEMORY_TYPE_ROCM_MANAGED, /*!< AMD ROCM managed system memory */
     UCC_MEMORY_TYPE_LAST,
     UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
 } ucc_memory_type_t;
@@ -1378,7 +1384,7 @@ typedef enum {
 /**
  *  @ingroup UCC_COLLECTIVES_DT
  */
-enum ucc_coll_arg_field {
+enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_FLAGS                           = UCC_BIT(0),
     UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS           = UCC_BIT(1),
     UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS          = UCC_BIT(2),
