@@ -50,14 +50,12 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_op_args_t *coll_args,
                                   ucc_coll_task_t **task_h)
 {
     ucc_tl_ucp_team_t    *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_context_t *ctx     = UCC_TL_UCP_TEAM_CTX(tl_team);
-    ucc_tl_ucp_task_t    *task    = ucc_tl_ucp_get_task(ctx);
+    ucc_tl_ucp_task_t    *task    = ucc_tl_ucp_get_task(tl_team);
     ucc_status_t          status;
     ucc_coll_task_init(&task->super);
     memcpy(&task->args, &coll_args->args, sizeof(ucc_coll_op_args_t));
     task->team           = tl_team;
     task->tag            = tl_team->seq_num++; //TODO Wrap around over max tag
-    task->n_polls        = ctx->cfg.n_polls; //TODO set from base_coll_op_args?
     task->super.finalize = ucc_tl_ucp_coll_finalize;
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_BARRIER:

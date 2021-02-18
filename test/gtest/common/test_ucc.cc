@@ -231,6 +231,29 @@ UccJob::UccJob(int _n_procs) : n_procs(_n_procs)
     }
 }
 
+UccJob::UccJob(int _n_procs, ucc_job_env_t vars) : n_procs(_n_procs)
+{
+    ucc_job_env_t env_bkp;
+    char *var;
+    for (auto &v : vars) {
+        var = std::getenv(v.first.c_str());
+        if (var) {
+            /* found env - back it up for later restore
+               after processes creation */
+            env_bkp.push_back(ucc_env_var_t(v.first, var));
+        }
+        setenv(v.first.c_str(), v.second.c_str(), 1);
+    }
+    for (int i = 0; i < n_procs; i++) {
+        procs.push_back(std::make_shared<UccProcess>());
+    }
+
+    for (auto &v : env_bkp) {
+        /*restore original env */
+        setenv(v.first.c_str(), v.second.c_str(), 1);
+    }
+}
+
 UccJob::~UccJob()
 {
 }
