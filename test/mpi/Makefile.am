@@ -16,7 +16,8 @@ ucc_test_mpi_SOURCES = \
 	mpi_util.cc        \
 	test_case.cc       \
 	test_barrier.cc    \
-	test_allreduce.cc
+	test_allreduce.cc  \
+	test_allgather.cc
 
 CXX=mpicxx
 CXXFLAGS+=-I${top_builddir}/src -std=gnu++11

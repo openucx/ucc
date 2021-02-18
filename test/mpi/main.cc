@@ -3,7 +3,8 @@
 #include "test_mpi.h"
 
 static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
-                                             UCC_COLL_TYPE_ALLREDUCE};
+                                             UCC_COLL_TYPE_ALLREDUCE,
+                                             UCC_COLL_TYPE_ALLGATHER};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
 static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
                                              UCC_DT_FLOAT32, UCC_DT_FLOAT64};
@@ -77,6 +78,8 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
         return UCC_COLL_TYPE_BARRIER;
     } else if (coll == "allreduce") {
         return UCC_COLL_TYPE_ALLREDUCE;
+    } else if (coll == "allgather") {
+        return UCC_COLL_TYPE_ALLGATHER;
     } else {
         std::cerr << "incorrect coll type: " << coll << std::endl;
         PrintHelp();

@@ -145,6 +145,13 @@ public:
     std::string str();
 };
 
+class TestAllgather : public TestCase {
+public:
+    TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
+                  ucc_memory_type_t _mt, ucc_test_team_t &team);
+    ucc_status_t check();
+};
+
 void init_buffer(void *buf, size_t count, ucc_datatype_t dt,
                  ucc_memory_type_t mt, int value);
 
