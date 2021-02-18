@@ -206,7 +206,7 @@ static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
     lib->tl_libs =
         (ucc_tl_lib_t **)ucc_malloc(sizeof(ucc_tl_lib_t *) * n_tls, "tl_libs");
     lib->n_tl_libs_opened = 0;
-    if (!lib->cl_libs) {
+    if (!lib->tl_libs) {
         ucc_error("failed to allocate %zd bytes for tl_libs",
                   sizeof(ucc_tl_lib_t *) * n_tls);
         return UCC_ERR_NO_MEMORY;
@@ -393,6 +393,9 @@ ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
     /* If some CL components fails in finalize we will return
        its failure status to the user, however we will still
        try to continue and finalize other CLs */
+    for (i = 0; i < lib->n_tl_libs_opened; i++) {
+        lib->tl_libs[i]->iface->lib.finalize(&lib->tl_libs[i]->super);
+    }
     for (i = 0; i < lib->n_cl_libs_opened; i++) {
         lib->cl_libs[i]->iface->lib.finalize(&lib->cl_libs[i]->super);
     }
