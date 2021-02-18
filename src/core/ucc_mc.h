@@ -27,6 +27,10 @@ ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
                            size_t count, ucc_datatype_t dt,
                            ucc_reduction_op_t op, ucc_memory_type_t mem_type);
 
+ucc_status_t ucc_mc_memcpy(void *dst, const void *src, size_t len,
+                           ucc_memory_type_t dst_mem,
+                           ucc_memory_type_t src_mem);
+
 ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
                                  size_t count, size_t size, size_t stride,
                                  ucc_datatype_t dtype, ucc_reduction_op_t op,

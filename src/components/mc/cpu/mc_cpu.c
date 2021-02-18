@@ -70,6 +70,14 @@ static ucc_status_t ucc_mc_cpu_mem_free(void *ptr)
     return UCC_OK;
 }
 
+static ucc_status_t ucc_mc_cpu_mem_copy(void *dst, const void *src, size_t len,
+                                        ucc_memory_type_t dst_mem, /* NOLINT */
+                                        ucc_memory_type_t src_mem) /* NOLINT */
+{
+    memcpy(dst, src, len);
+    return UCC_OK;
+}
+
 static ucc_status_t ucc_mc_cpu_mem_query(const void *ptr, size_t length,
                                         ucc_mem_attr_t *mem_attr)
 {
@@ -101,6 +109,7 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.ops.mem_alloc = ucc_mc_cpu_mem_alloc,
     .super.ops.mem_free  = ucc_mc_cpu_mem_free,
     .super.ops.reduce    = ucc_mc_cpu_reduce,
+    .super.ops.mem_copy  = ucc_mc_cpu_mem_copy
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cpu.super.config_table,
