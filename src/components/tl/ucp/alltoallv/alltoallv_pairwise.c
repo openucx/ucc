@@ -21,43 +21,66 @@ static inline int get_send_peer(int rank, int size, int step)
     return (rank - step + size) % size;
 }
 
+static inline size_t get_count(ucc_count_t *counts, int idx,
+                               ucc_coll_args_flags_t flags)
+{
+    if (flags & UCC_COLL_ARGS_FLAG_COUNT_64BIT) {
+        return ((uint64_t*)counts)[idx];
+    } else {
+        return ((uint32_t*)counts)[idx];
+    }
+}
+
+static inline size_t get_displacement(ucc_aint_t *displacements, int idx,
+                                      ucc_coll_args_flags_t flags)
+{
+    if (flags & UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT) {
+        return ((uint64_t*)displacements)[idx];
+    } else {
+        return ((uint32_t*)displacements)[idx];
+    }
+}
+
 ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t  *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t  *team  = task->team;
-    ptrdiff_t           sbuf  = (ptrdiff_t)task->args.buffer_info.src_buffer;
-    ptrdiff_t           rbuf  = (ptrdiff_t)task->args.buffer_info.dst_buffer;
+    ptrdiff_t           sbuf  = (ptrdiff_t)task->args.src.info_v.buffer;
+    ptrdiff_t           rbuf  = (ptrdiff_t)task->args.dst.info_v.buffer;
     int                 grank = team->rank;
     int                 gsize = team->size;
     int                 polls = 0;
     int peer, chunk, nreqs;
-    size_t rdt_size, sdt_size, data_size;
-    ucc_aint_t *src_displ, *rcv_displ;
+    size_t rdt_size, sdt_size, data_size, data_displ;
 
     chunk = UCC_TL_UCP_TEAM_CTX(team)->cfg.alltoallv_pairwise_chunk;
     nreqs = (chunk > gsize || chunk == 0) ? gsize: chunk;
-    rdt_size = ucc_dt_size(task->args.buffer_info.dst_datatype);
-    sdt_size = ucc_dt_size(task->args.buffer_info.src_datatype);
-    src_displ = task->args.buffer_info.src_displacements;
-    rcv_displ = task->args.buffer_info.dst_displacements;
+    rdt_size = ucc_dt_size(task->args.src.info_v.datatype);
+    sdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
     while ((task->send_posted < gsize || task->recv_posted < gsize) &&
            (polls++ < task->n_polls+1)) {
         ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker);
         while ((task->recv_posted < gsize) &&
               ((task->recv_posted - task->recv_completed) < nreqs)) {
             peer = get_recv_peer(grank, gsize, task->recv_posted);
-            data_size = task->args.buffer_info.dst_counts[peer] * rdt_size;
-            ucc_tl_ucp_recv_nb((void*)(rbuf + rcv_displ[peer] * rdt_size),
-                               data_size, UCC_MEMORY_TYPE_UNKNOWN, peer, team,
+            data_size = get_count(task->args.dst.info_v.counts, peer,
+                                  task->args.flags) * rdt_size;
+            data_displ = get_displacement(task->args.dst.info_v.counts, peer,
+                                          task->args.flags) * rdt_size;
+            ucc_tl_ucp_recv_nb((void*)(rbuf + data_displ), data_size,
+                               task->args.dst.info_v.mem_type, peer, team,
                                task);
             polls = 0;
         }
         while ((task->send_posted < gsize) &&
               ((task->send_posted - task->send_completed) < nreqs)) {
             peer = get_send_peer(grank, gsize, task->send_posted);
-            data_size = task->args.buffer_info.src_counts[peer] * sdt_size;
-            ucc_tl_ucp_send_nb((void*)(sbuf + src_displ[peer] * sdt_size),
-                               data_size, UCC_MEMORY_TYPE_UNKNOWN, peer, team,
+            data_size = get_count(task->args.src.info_v.counts, peer,
+                                  task->args.flags) * sdt_size;
+            data_displ = get_displacement(task->args.src.info_v.counts, peer,
+                                          task->args.flags) * sdt_size;
+            ucc_tl_ucp_send_nb((void*)(sbuf + data_displ), data_size,
+                               task->args.src.info_v.mem_type, peer, team,
                                task);
             polls = 0;
         }
