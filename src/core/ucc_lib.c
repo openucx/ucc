@@ -388,19 +388,19 @@ ucc_status_t ucc_lib_config_modify(ucc_lib_config_h config, const char *name,
 ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
 {
     int i;
+    ucc_status_t status;
+
     ucc_assert(lib->n_cl_libs_opened > 0);
     ucc_assert(lib->cl_libs);
-    /* If some CL components fails in finalize we will return
-       its failure status to the user, however we will still
-       try to continue and finalize other CLs */
     for (i = 0; i < lib->n_tl_libs_opened; i++) {
         lib->tl_libs[i]->iface->lib.finalize(&lib->tl_libs[i]->super);
     }
     for (i = 0; i < lib->n_cl_libs_opened; i++) {
         lib->cl_libs[i]->iface->lib.finalize(&lib->cl_libs[i]->super);
     }
+    status = ucc_mc_finalize();
+    ucc_free(lib->tl_libs);
     ucc_free(lib->cl_libs);
     ucc_free(lib);
-    ucc_mc_finalize();
-    return UCC_OK;
+    return status;
 }
