@@ -138,7 +138,7 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_start(ucc_coll_task_t *coll_task)
     task->barrier.iteration      = 0;
     task->barrier.radix_mask_pow = 1;
     task->barrier.radix =
-        ucc_min(UCC_TL_UCP_TEAM_CTX(team)->cfg.kn_barrier_radix, team->size);
+        ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.kn_barrier_radix, team->size);
     task->super.super.status = UCC_INPROGRESS;
     status = ucc_tl_ucp_barrier_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {

@@ -73,6 +73,10 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
         ucc_tl_ucp_put_task(task);
         return UCC_ERR_NOT_SUPPORTED;
     }
+    if (status != UCC_OK) {
+        ucc_tl_ucp_put_task(task);
+        return status;
+    }
     tl_info(team->context->lib, "init coll req %p", task);
     *task_h = &task->super;
     return status;

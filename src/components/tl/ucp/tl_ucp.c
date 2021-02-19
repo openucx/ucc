@@ -15,8 +15,24 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
 
-    {NULL}
-};
+    {"ALLTOALL_PAIRWISE_NUM_POSTS", "1",
+     "Maximum number of outstanding send and receive messages in alltoall "
+     "pairwise algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_pairwise_num_posts),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALLV_PAIRWISE_NUM_POSTS", "1",
+     "Maximum number of outstanding send and receive messages in alltoallv "
+     "pairwise algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_pairwise_num_posts),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"BARRIER_KN_RADIX", "4",
+     "Radix of the recursive-knomial barrier algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, kn_barrier_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {NULL}};
 
 static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_context_config_t, super),
@@ -32,23 +48,6 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
     {"NPOLLS", "10",
      "Number of ucp progress polling cycles for p2p requests testing",
      ucc_offsetof(ucc_tl_ucp_context_config_t, n_polls),
-     UCC_CONFIG_TYPE_UINT},
-
-    {"ALLTOALL_PAIRWISE_CHUNK", "1",
-     "Maximum number of outstanding send and receive messages in alltoall "
-     "pairwise algorithm",
-     ucc_offsetof(ucc_tl_ucp_context_config_t, alltoall_pairwise_chunk),
-     UCC_CONFIG_TYPE_UINT},
-
-    {"ALLTOALLV_PAIRWISE_CHUNK", "1",
-     "Maximum number of outstanding send and receive messages in alltoallv "
-     "pairwise algorithm",
-     ucc_offsetof(ucc_tl_ucp_context_config_t, alltoallv_pairwise_chunk),
-     UCC_CONFIG_TYPE_UINT},
-
-    {"BARRIER_KN_RADIX", "4",
-     "Radix of the recursive-knomial barrier algorithm",
-     ucc_offsetof(ucc_tl_ucp_context_config_t, kn_barrier_radix),
      UCC_CONFIG_TYPE_UINT},
 
     {"OOB_NPOLLS", "20",

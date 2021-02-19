@@ -11,9 +11,11 @@
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
                     const ucc_base_config_t *config)
 {
-    const ucc_tl_lib_config_t *tl_config =
-        ucc_derived_of(config, ucc_tl_lib_config_t);
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_lib_t, &ucc_tl_ucp.super, tl_config);
+    const ucc_tl_ucp_lib_config_t *tl_ucp_config =
+        ucc_derived_of(config, ucc_tl_ucp_lib_config_t);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_lib_t, &ucc_tl_ucp.super,
+                              &tl_ucp_config->super);
+    memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
     tl_info(&self->super, "initialized lib object: %p", self);
     return UCC_OK;
 }

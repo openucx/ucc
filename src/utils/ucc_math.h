@@ -12,8 +12,9 @@
 #define ucc_min(_a, _b) ucs_min((_a), (_b))
 #define ucc_max(_a, _b) ucs_max((_a), (_b))
 
-static inline size_t ucc_dt_size(ucc_datatype_t dt) {
-    switch(dt) {
+static inline size_t ucc_dt_size(ucc_datatype_t dt)
+{
+    switch (dt) {
     case UCC_DT_INT8:
     case UCC_DT_UINT8:
         return 1;
