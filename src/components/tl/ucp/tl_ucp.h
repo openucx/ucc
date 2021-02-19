@@ -23,6 +23,7 @@ typedef struct ucc_tl_ucp_lib_config {
     ucc_tl_lib_config_t super;
     uint32_t            barrier_kn_radix;
     uint32_t            allreduce_kn_radix;
+    uint32_t            bcast_kn_radix;
     uint32_t            alltoall_pairwise_num_posts;
     uint32_t            alltoallv_pairwise_num_posts;
 } ucc_tl_ucp_lib_config_t;
