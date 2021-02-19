@@ -83,6 +83,8 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
         return UCC_COLL_TYPE_ALLGATHER;
     } else if (coll == "allgatherv") {
         return UCC_COLL_TYPE_ALLGATHERV;
+    } else if (coll == "bcast") {
+        return UCC_COLL_TYPE_BCAST;
     } else {
         std::cerr << "incorrect coll type: " << coll << std::endl;
         PrintHelp();

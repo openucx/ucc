@@ -9,6 +9,7 @@
 BEGIN_C_DECLS
 #include "utils/ucc_math.h"
 END_C_DECLS
+#include <algorithm>
 
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
                        std::vector<ucc_test_mpi_team_t> &test_teams,
@@ -71,6 +72,8 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
     colls = {UCC_COLL_TYPE_BARRIER, UCC_COLL_TYPE_ALLREDUCE};
     mtypes = {UCC_MEMORY_TYPE_HOST};
     inplace = TEST_NO_INPLACE;
+    root_type = ROOT_RANDOM;
+    root_value = 10;
 }
 
 UccTestMpi::~UccTestMpi()
@@ -205,6 +208,10 @@ ucc_status_t UccTestMpi::run_all()
                             }
                         } else {
                             auto tc = TestCase::init(c, t, m, inplace, mt);
+                            if (TEST_INPLACE == inplace &&
+                                !tc.get()->inplace_supported()) {
+                                continue;
+                            }
                             if (UCC_OK != tc.get()->exec()) {
                                 status = UCC_ERR_NO_MESSAGE;
                             }
@@ -215,4 +222,26 @@ ucc_status_t UccTestMpi::run_all()
         }
     }
     return status;
+}
+
+std::vector<int> UccTestMpi::roots(ucc_test_team_t &team)
+{
+    int size;
+    std::vector<int> _roots;
+    MPI_Comm_size(team.comm, &size);
+    switch(root_type) {
+    case ROOT_SINGLE:
+        _roots = std::vector<int>({ucc_min(root_value, size-1)});
+        break;
+    case ROOT_RANDOM:
+        _roots.resize(root_value);
+        std::generate(_roots.begin(), _roots.end(), [=](){ return rand() % size;});
+    case ROOT_ALL:
+        _roots.resize(size);
+        std::iota(_roots.begin(), _roots.end(), 0);
+        break;
+    default:
+        assert(0);
+    }
+    return _roots;
 }
