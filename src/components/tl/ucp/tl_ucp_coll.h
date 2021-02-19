@@ -10,7 +10,7 @@
 #include "schedule/ucc_schedule.h"
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t    super;
-    ucc_coll_op_args_t args;
+    ucc_coll_args_t    args;
     ucc_tl_ucp_team_t *team;
     uint32_t           send_posted;
     uint32_t           send_completed;

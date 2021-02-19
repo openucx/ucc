@@ -106,7 +106,7 @@ public:
     };
 
     std::vector<ucc_coll_req_h> reqs;
-    UccReq(UccTeam_h _team, ucc_coll_op_args_t *args);
+    UccReq(UccTeam_h _team, ucc_coll_args_t *args);
     ~UccReq();
     void start(void);
     void wait();

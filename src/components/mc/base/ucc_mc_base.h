@@ -13,16 +13,6 @@
 #include "utils/ucc_parser.h"
 #include "core/ucc_global_opts.h"
 
-typedef enum ucc_memory_type {
-    UCC_MEMORY_TYPE_HOST,         /**< Default system memory */
-    UCC_MEMORY_TYPE_CUDA,         /**< NVIDIA CUDA memory */
-    UCC_MEMORY_TYPE_CUDA_MANAGED, /**< NVIDIA CUDA managed memory */
-    UCC_MEMORY_TYPE_ROCM,         /**< AMD ROCM memory */
-    UCC_MEMORY_TYPE_ROCM_MANAGED, /**< AMD ROCM managed system memory */
-    UCC_MEMORY_TYPE_LAST,
-    UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
-} ucc_memory_type_t;
-
 /**
  * UCC memory attributes field mask
  */

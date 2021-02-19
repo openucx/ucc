@@ -9,7 +9,7 @@
 class test_barrier : public ucc::test
 {
 public:
-    ucc_coll_op_args_t coll;
+    ucc_coll_args_t coll;
     test_barrier() {
         coll.coll_type = UCC_COLL_TYPE_BARRIER;
     }
