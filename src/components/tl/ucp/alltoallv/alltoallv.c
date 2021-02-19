@@ -15,8 +15,14 @@ ucc_status_t ucc_tl_ucp_alltoallv_init(ucc_tl_ucp_task_t *task)
 {
     if ((task->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
         (task->args.flags & UCC_COLL_ARGS_FLAG_IN_PLACE)) {
-        tl_error(task->team->super.super.context->lib,
+        tl_error(UCC_TL_TEAM_LIB(task->team),
                  "inplace alltoallv is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    if ((task->args.src.info_v.datatype == UCC_DT_USERDEFINED) ||
+        (task->args.dst.info_v.datatype == UCC_DT_USERDEFINED)) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post     = ucc_tl_ucp_alltoallv_pairwise_start;
