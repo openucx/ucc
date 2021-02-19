@@ -140,6 +140,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_AARCH64_HI1620], [false])
      AM_CONDITIONAL([HAVE_UCX], [false])
      AM_CONDITIONAL([HAVE_CUDA], [false])
+     AM_CONDITIONAL([HAVE_NCCL], [false])
     ],
     [
      AM_CONDITIONAL([DOCS_ONLY], [false])
@@ -148,6 +149,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/sysdep.m4])
      m4_include([config/m4/ucx.m4])
      m4_include([config/m4/cuda.m4])
+     m4_include([config/m4/nccl.m4])
      m4_include([test/gtest/configure.m4])
 
      AC_ARG_ENABLE([debug],
@@ -174,6 +176,8 @@ AS_IF([test "x$with_docs_only" = xyes],
      CHECK_CUDA
      AC_MSG_RESULT([CUDA support: $cuda_happy; $CUDA_CPPFLAGS $CUDA_LDFLAGS])
 
+     CHECK_NCCL
+     AC_MSG_RESULT([NCCL support: $nccl_happy])
     ]) # Docs only
 
 
@@ -192,6 +196,7 @@ AC_CONFIG_FILES([
                  src/core/ucc_version.c
                  src/components/cl/basic/Makefile
                  src/components/tl/ucp/Makefile
+                 src/components/tl/nccl/Makefile
                  src/components/mc/cpu/Makefile
                  src/components/mc/cuda/Makefile
                  src/components/mc/cuda/kernel/Makefile

@@ -26,7 +26,8 @@ typedef struct ucc_tl_context ucc_tl_context_t;
 typedef struct ucc_tl_team    ucc_tl_team_t;
 
 typedef enum ucc_tl_type {
-    UCC_TL_UCP = UCC_BIT(0),
+    UCC_TL_UCP  = UCC_BIT(0),
+    UCC_TL_NCCL = UCC_BIT(1),
 } ucc_tl_type_t;
 
 typedef struct ucc_tl_lib_config {
