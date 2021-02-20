@@ -11,17 +11,19 @@
 #include "utils/ucc_math.h"
 #include "tl_ucp_sendrecv.h"
 
-static inline int get_recv_peer(int rank, int size, int step)
+static inline ucc_rank_t get_recv_peer(ucc_rank_t rank, ucc_rank_t size,
+                                       ucc_rank_t step)
 {
     return (rank + step) % size;
 }
 
-static inline int get_send_peer(int rank, int size, int step)
+static inline ucc_rank_t get_send_peer(ucc_rank_t rank, ucc_rank_t size,
+                                       ucc_rank_t step)
 {
     return (rank - step + size) % size;
 }
 
-static inline size_t get_count(ucc_count_t *counts, int idx,
+static inline size_t get_count(ucc_count_t *counts, ucc_rank_t idx,
                                ucc_tl_ucp_task_t *task)
 {
     if ((task->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
@@ -31,7 +33,7 @@ static inline size_t get_count(ucc_count_t *counts, int idx,
     return ((uint32_t *)counts)[idx];
 }
 
-static inline size_t get_displacement(ucc_aint_t *displacements, int idx,
+static inline size_t get_displacement(ucc_aint_t *displacements, ucc_rank_t idx,
                                       ucc_tl_ucp_task_t *task)
 {
     if ((task->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
@@ -47,10 +49,11 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team  = task->team;
     ptrdiff_t          sbuf  = (ptrdiff_t)task->args.src.info_v.buffer;
     ptrdiff_t          rbuf  = (ptrdiff_t)task->args.dst.info_v.buffer;
-    int                grank = team->rank;
-    int                gsize = team->size;
+    ucc_rank_t         grank = team->rank;
+    ucc_rank_t         gsize = team->size;
     int                polls = 0;
-    int                peer, posts, nreqs;
+    ucc_rank_t         peer;
+    int                posts, nreqs;//, count_stride, displ_stride;
     size_t             rdt_size, sdt_size, data_size, data_displ;
 
     posts    = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoallv_pairwise_num_posts;
@@ -62,11 +65,11 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
         ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker);
         while ((task->recv_posted < gsize) &&
                ((task->recv_posted - task->recv_completed) < nreqs)) {
-            peer      = get_recv_peer(grank, gsize, task->recv_posted);
-            data_size = get_count(task->args.dst.info_v.counts, peer, task) *
-                        rdt_size;
-            data_displ = get_displacement(task->args.dst.info_v.counts, peer,
-                                          task) * rdt_size;
+            peer       = get_recv_peer(grank, gsize, task->recv_posted);
+            data_size  = get_count(task->args.dst.info_v.counts, peer, task) *
+                         rdt_size;
+            data_displ = get_displacement(task->args.dst.info_v.displacements,
+                                          peer, task) * rdt_size;
             ucc_tl_ucp_recv_nb((void *)(rbuf + data_displ), data_size,
                                task->args.dst.info_v.mem_type, peer, team,
                                task);
@@ -74,11 +77,11 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
         }
         while ((task->send_posted < gsize) &&
                ((task->send_posted - task->send_completed) < nreqs)) {
-            peer      = get_send_peer(grank, gsize, task->send_posted);
-            data_size = get_count(task->args.src.info_v.counts, peer, task) *
-                                  sdt_size;
-            data_displ = get_displacement(task->args.src.info_v.counts, peer,
-                                          task) * sdt_size;
+            peer       = get_send_peer(grank, gsize, task->send_posted);
+            data_size  = get_count(task->args.src.info_v.counts, peer, task) *
+                         sdt_size;
+            data_displ = get_displacement(task->args.src.info_v.displacements,
+                                          peer, task) * sdt_size;
             ucc_tl_ucp_send_nb((void *)(sbuf + data_displ), data_size,
                                task->args.src.info_v.mem_type, peer, team,
                                task);

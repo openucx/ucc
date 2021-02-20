@@ -72,8 +72,8 @@ typedef struct ucc_tl_ucp_team {
               This optimization is only possible when user provides
               the necessary rank mappings team_rank->context_rank. */
     ucp_ep_h                  *eps;
-    int                        size;
-    int                        rank;
+    ucc_rank_t                 size;
+    ucc_rank_t                 rank;
     ucc_tl_ucp_addr_storage_t *addr_storage;
     uint32_t                   id;
     uint32_t                   scope;

@@ -65,6 +65,7 @@ libucc_la_SOURCES =                  \
 	schedule/ucc_schedule.c          \
 	utils/ucc_component.c            \
 	utils/ucc_status.c               \
+    utils/ucc_math.c                 \
 	components/base/ucc_base_iface.c \
 	components/cl/ucc_cl.c           \
 	components/tl/ucc_tl.c           \

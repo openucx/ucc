@@ -11,12 +11,14 @@
 #include "utils/ucc_math.h"
 #include "tl_ucp_sendrecv.h"
 
-static inline int get_recv_peer(int rank, int size, int step)
+static inline ucc_rank_t get_recv_peer(ucc_rank_t rank, ucc_rank_t size,
+                                       ucc_rank_t step)
 {
     return (rank + step) % size;
 }
 
-static inline int get_send_peer(int rank, int size, int step)
+static inline ucc_rank_t get_send_peer(ucc_rank_t rank, ucc_rank_t size,
+                                       ucc_rank_t step)
 {
     return (rank - step + size) % size;
 }
@@ -27,10 +29,11 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_progress(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team  = task->team;
     ptrdiff_t          sbuf  = (ptrdiff_t)task->args.src.info.buffer;
     ptrdiff_t          rbuf  = (ptrdiff_t)task->args.dst.info.buffer;
-    int                grank = team->rank;
-    int                gsize = team->size;
+    ucc_rank_t         grank = team->rank;
+    ucc_rank_t         gsize = team->size;
+    ucc_rank_t         peer;
     int                polls = 0;
-    int                peer, posts, nreqs;
+    int                posts, nreqs;
     size_t             data_size;
 
     posts     = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoall_pairwise_num_posts;
@@ -73,8 +76,7 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_alltoall_pairwise_progress(&task->super);
     if (UCC_INPROGRESS == task->super.super.status) {
         ucc_progress_enqueue(UCC_TL_UCP_TEAM_CORE_CTX(team)->pq, &task->super);
-    }
-    else if (task->super.super.status < 0) {
+    } else if (task->super.super.status < 0) {
         return task->super.super.status;
     }
     return UCC_OK;
