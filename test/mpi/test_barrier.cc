@@ -30,9 +30,11 @@ ucc_status_t TestBarrier::test()
 
 void TestBarrier::run()
 {
-    int rank, size;
+    int completed = 1;
     int *recv = NULL;
+    int rank, size;
     MPI_Request rreq;
+
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
     if (0 == rank) {
@@ -43,10 +45,12 @@ void TestBarrier::run()
     usleep((rand() % 500)*1000);
     for (int i = 0; i < size; i++) {
         if (0 == rank) {
+            recv[i] = -1;
+            completed = 0;
             MPI_Irecv(&recv[i], 1, MPI_INT, MPI_ANY_SOURCE, 123, team.comm, &rreq);
         }
         if (rank == i) {
-            MPI_Send(&rank, 1, MPI_INT, 0, 123, team.comm);
+            MPI_Ssend(&rank, 1, MPI_INT, 0, 123, team.comm);
         }
         UCC_CHECK(ucc_collective_post(req));
         do {
@@ -56,12 +60,15 @@ void TestBarrier::run()
                 MPI_Abort(MPI_COMM_WORLD, -1);
             }
             ucc_context_progress(team.ctx);
+            if (0 == rank && !completed) {
+                MPI_Test(&rreq, &completed, MPI_STATUS_IGNORE);
+            }
         } while(UCC_OK != status);
-
-        if  (0 == rank) {
+        if  (0 == rank && !completed) {
             MPI_Wait(&rreq, MPI_STATUS_IGNORE);
         }
     }
+    MPI_Barrier(team.comm);
     if (0 == rank) {
         for (int i = 0; i < size; i++) {
             if (recv[i] != i) {
