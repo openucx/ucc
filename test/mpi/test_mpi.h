@@ -59,6 +59,9 @@ static inline const char* team_str(ucc_test_mpi_team_t t) {
     return NULL;
 }
 
+int ucc_coll_inplace_supported(ucc_coll_type_t c);
+int ucc_coll_is_rooted(ucc_coll_type_t c);
+
 typedef struct ucc_test_team {
     ucc_test_mpi_team_t type;
     MPI_Comm comm;
@@ -84,7 +87,7 @@ class UccTestMpi {
     std::vector<ucc_datatype_t> dtypes;
     std::vector<ucc_reduction_op_t> ops;
     std::vector<ucc_coll_type_t> colls;
-    std::vector<int> roots(ucc_test_team_t &team);
+    std::vector<int> gen_roots(ucc_test_team_t &team);
 public:
     UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
                std::vector<ucc_test_mpi_team_t> &test_teams,
@@ -109,6 +112,7 @@ class TestCase {
 protected:
     ucc_test_team_t team;
     ucc_memory_type_t mem_type;
+    int root;
     size_t msgsize;
     ucc_test_mpi_inplace_t inplace;
     ucc_coll_args_t args;
@@ -119,6 +123,7 @@ protected:
 public:
     static std::shared_ptr<TestCase> init(ucc_coll_type_t _type,
                                           ucc_test_team_t &_team,
+                                          int    root    = 0,
                                           size_t msgsize = 0,
                                           ucc_test_mpi_inplace_t inplace = TEST_NO_INPLACE,
                                           ucc_memory_type_t mt = UCC_MEMORY_TYPE_HOST,
@@ -132,21 +137,11 @@ public:
     virtual ucc_status_t check() = 0;
     virtual std::string str();
     virtual ucc_status_t test();
-    virtual int inplace_supported() { return 1; }
     void wait();
     ucc_status_t exec();
 };
 
-class TestCaseNoInplace : public TestCase {
-public:
-    virtual int inplace_supported() { return 0; }
-    TestCaseNoInplace(ucc_test_team_t &_team,
-                      ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
-                      size_t _msgsize = 0) :
-        TestCase(_team, _mem_type, _msgsize){};
-};
-
-class TestBarrier : public TestCaseNoInplace {
+class TestBarrier : public TestCase {
     ucc_status_t status;
 public:
     TestBarrier(ucc_test_team_t &team);
@@ -184,10 +179,10 @@ public:
     ucc_status_t check() override;
 };
 
-class TestBcast : public TestCaseNoInplace {
-    int root;
+class TestBcast : public TestCase {
 public:
-    TestBcast(size_t _msgsize, ucc_memory_type_t _mt, int root, ucc_test_team_t &team);
+    TestBcast(size_t _msgsize, ucc_memory_type_t _mt, int root,
+              ucc_test_team_t &team);
     ucc_status_t check();
 };
 

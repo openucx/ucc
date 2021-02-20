@@ -182,38 +182,70 @@ void UccTestMpi::set_ops(std::vector<ucc_reduction_op_t> &_ops)
     ops = _ops;
 }
 
+int ucc_coll_inplace_supported(ucc_coll_type_t c)
+{
+    switch(c) {
+    case UCC_COLL_TYPE_BARRIER:
+    case UCC_COLL_TYPE_BCAST:
+    case UCC_COLL_TYPE_FANIN:
+    case UCC_COLL_TYPE_FANOUT:
+        return 0;
+    default:
+        return 1;
+    }
+}
+
+int ucc_coll_is_rooted(ucc_coll_type_t c)
+{
+    switch(c) {
+    case UCC_COLL_TYPE_ALLREDUCE:
+    case UCC_COLL_TYPE_ALLGATHER:
+    case UCC_COLL_TYPE_ALLTOALL:
+    case UCC_COLL_TYPE_BARRIER:
+        return 0;
+    default:
+        return 1;
+    }
+}
 
 ucc_status_t UccTestMpi::run_all()
 {
     ucc_status_t status = UCC_OK;
     for (auto &c : colls) {
         for (auto &t : teams) {
-            if (c == UCC_COLL_TYPE_BARRIER) {
-                auto tc = TestCase::init(c, t);
-                if (UCC_OK != tc.get()->exec()) {
-                    status = UCC_ERR_NO_MESSAGE;
-                }
-            } else {
-                for (auto mt : mtypes) {
-                    for (auto m : msgsizes) {
-                        if (c == UCC_COLL_TYPE_ALLREDUCE ||
-                            c == UCC_COLL_TYPE_REDUCE) {
-                            for (auto dt : dtypes) {
-                                for (auto op : ops) {
-                                    auto tc = TestCase::init(c, t, m, inplace, mt, dt, op);
-                                    if (UCC_OK != tc.get()->exec()) {
-                                        status = UCC_ERR_NO_MESSAGE;
+            std::vector<int> roots = {0};
+            if (ucc_coll_is_rooted(c)) {
+                roots = gen_roots(t);
+            }
+            for (auto r : roots) {
+                if (c == UCC_COLL_TYPE_BARRIER) {
+                    auto tc = TestCase::init(c, t);
+                    if (UCC_OK != tc.get()->exec()) {
+                        status = UCC_ERR_NO_MESSAGE;
+                    }
+                } else {
+                    for (auto mt : mtypes) {
+                        for (auto m : msgsizes) {
+                            if (c == UCC_COLL_TYPE_ALLREDUCE ||
+                                c == UCC_COLL_TYPE_REDUCE) {
+                                for (auto dt : dtypes) {
+                                    for (auto op : ops) {
+                                        auto tc = TestCase::init(c, t, r, m,
+                                                                 inplace, mt, dt, op);
+                                        if (UCC_OK != tc.get()->exec()) {
+                                            status = UCC_ERR_NO_MESSAGE;
+                                        }
                                     }
                                 }
-                            }
-                        } else {
-                            auto tc = TestCase::init(c, t, m, inplace, mt);
-                            if (TEST_INPLACE == inplace &&
-                                !tc.get()->inplace_supported()) {
-                                continue;
-                            }
-                            if (UCC_OK != tc.get()->exec()) {
-                                status = UCC_ERR_NO_MESSAGE;
+                            } else {
+                                auto tc = TestCase::init(c, t, r, m, inplace, mt);
+                                if (TEST_INPLACE == inplace &&
+                                    ucc_coll_inplace_supported(c)) {
+                                    continue;
+                                }
+                                if (UCC_OK != tc.get()->exec()) {
+                                    status = UCC_ERR_NO_MESSAGE;
+                                }
                             }
                         }
                     }
@@ -224,7 +256,7 @@ ucc_status_t UccTestMpi::run_all()
     return status;
 }
 
-std::vector<int> UccTestMpi::roots(ucc_test_team_t &team)
+std::vector<int> UccTestMpi::gen_roots(ucc_test_team_t &team)
 {
     int size;
     std::vector<int> _roots;
@@ -236,6 +268,7 @@ std::vector<int> UccTestMpi::roots(ucc_test_team_t &team)
     case ROOT_RANDOM:
         _roots.resize(root_value);
         std::generate(_roots.begin(), _roots.end(), [=](){ return rand() % size;});
+        break;
     case ROOT_ALL:
         _roots.resize(size);
         std::iota(_roots.begin(), _roots.end(), 0);

@@ -11,7 +11,7 @@
 
 TestBcast::TestBcast(size_t _msgsize, ucc_memory_type_t _mt,
                      int _root, ucc_test_team_t &_team) :
-    TestCaseNoInplace(_team, _mt, _msgsize)
+    TestCase(_team, _mt, _msgsize)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t count = _msgsize/dt_size;

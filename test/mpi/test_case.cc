@@ -8,6 +8,7 @@
 
 std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
                                          ucc_test_team_t &_team,
+                                         int root,
                                          size_t msgsize,
                                          ucc_test_mpi_inplace_t inplace,
                                          ucc_memory_type_t mt,
@@ -25,7 +26,7 @@ std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
     case UCC_COLL_TYPE_ALLGATHERV:
         return std::make_shared<TestAllgatherv>(msgsize, inplace, mt, _team);
     case UCC_COLL_TYPE_BCAST:
-        return std::make_shared<TestBcast>(msgsize, mt, 0, _team);
+        return std::make_shared<TestBcast>(msgsize, mt, root, _team);
     default:
         break;
     }
@@ -56,9 +57,15 @@ void TestCase::wait()
 }
 
 std::string TestCase::str() {
-    return std::string("tc=")+std::string(ucc_coll_type_str(args.coll_type)) +
-        std::string(" team=") + std::string(team_str(team.type)) + " msgsize="
-        + std::to_string(msgsize);
+    std::string _str = std::string("tc=") + ucc_coll_type_str(args.coll_type) +
+        " team=" + team_str(team.type) + " msgsize=" + std::to_string(msgsize);
+    if (ucc_coll_inplace_supported(args.coll_type)) {
+        _str += std::string(" inplace=") + (inplace == TEST_INPLACE ? "1" : "0");
+    }
+    if (ucc_coll_is_rooted(args.coll_type)) {
+        _str += std::string(" root=") + std::to_string(root);
+    }
+    return _str;
 }
 
 ucc_status_t TestCase::exec()
