@@ -1,6 +1,7 @@
 #include <getopt.h>
 #include <sstream>
 #include "test_mpi.h"
+#include <chrono>
 
 static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
                                              UCC_COLL_TYPE_ALLREDUCE,
@@ -295,6 +296,9 @@ void ProcessArgs(int argc, char** argv)
 
 int main(int argc, char *argv[])
 {
+    std::chrono::steady_clock::time_point begin =
+        std::chrono::steady_clock::now();
+    int rank;
     ProcessArgs(argc, argv);
 
     UccTestMpi test(argc, argv, UCC_THREAD_SINGLE, teams, cls);
@@ -310,6 +314,25 @@ int main(int argc, char *argv[])
             return -1;
         }
     }
+    std::cout << std::flush;
+    MPI_Allreduce(MPI_IN_PLACE, test.results.data(), test.results.size(),
+                  MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+    if (0 == rank) {
+        std::chrono::steady_clock::time_point end =
+            std::chrono::steady_clock::now();
+        int failed = 0;
+        for (auto s : test.results) {
+            if (s < 0) failed++;
+        }
+        std::cout << "\n===== UCC MPI TEST =====\n" <<
+            "   total tests : " << test.results.size() << "\n" << 
+            "   passed      : " << test.results.size() - failed << "\n" <<
+            "   failed      : " << failed << "\n" <<
+            "   elapsed     : " <<
+            std::chrono::duration_cast<std::chrono::seconds>(end - begin).count()
+                  << "s" << std::endl;
+    }
     return 0;
 }

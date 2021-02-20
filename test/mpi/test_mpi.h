@@ -89,6 +89,7 @@ class UccTestMpi {
     std::vector<ucc_coll_type_t> colls;
     std::vector<int> gen_roots(ucc_test_team_t &team);
 public:
+    std::vector<ucc_status_t> results;
     UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
                std::vector<ucc_test_mpi_team_t> &test_teams,
                const char* cls = NULL);

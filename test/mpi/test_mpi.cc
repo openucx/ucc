@@ -10,7 +10,7 @@ BEGIN_C_DECLS
 #include "utils/ucc_math.h"
 END_C_DECLS
 #include <algorithm>
-
+#include <assert.h>
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
                        std::vector<ucc_test_mpi_team_t> &test_teams,
                        const char *cls)
@@ -220,9 +220,7 @@ ucc_status_t UccTestMpi::run_all()
             for (auto r : roots) {
                 if (c == UCC_COLL_TYPE_BARRIER) {
                     auto tc = TestCase::init(c, t);
-                    if (UCC_OK != tc.get()->exec()) {
-                        status = UCC_ERR_NO_MESSAGE;
-                    }
+                    results.push_back(tc.get()->exec());
                 } else {
                     for (auto mt : mtypes) {
                         for (auto m : msgsizes) {
@@ -232,9 +230,7 @@ ucc_status_t UccTestMpi::run_all()
                                     for (auto op : ops) {
                                         auto tc = TestCase::init(c, t, r, m,
                                                                  inplace, mt, dt, op);
-                                        if (UCC_OK != tc.get()->exec()) {
-                                            status = UCC_ERR_NO_MESSAGE;
-                                        }
+                                        results.push_back(tc.get()->exec());
                                     }
                                 }
                             } else {
@@ -243,9 +239,7 @@ ucc_status_t UccTestMpi::run_all()
                                     ucc_coll_inplace_supported(c)) {
                                     continue;
                                 }
-                                if (UCC_OK != tc.get()->exec()) {
-                                    status = UCC_ERR_NO_MESSAGE;
-                                }
+                                results.push_back(tc.get()->exec());
                             }
                         }
                     }
