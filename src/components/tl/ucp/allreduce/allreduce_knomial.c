@@ -52,8 +52,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team       = task->team;
-    int                myrank     = team->rank;
-    int                group_size = team->size;
+    ucc_rank_t         myrank     = team->rank;
+    ucc_rank_t         group_size = team->size;
     int                radix      = task->allreduce_kn.radix;
     void              *scratch    = task->allreduce_kn.scratch;
     void              *sbuf       = task->args.src.info.buffer;
@@ -66,14 +66,18 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_memory_type_t  send_mem;
     void              *send_buf;
     ptrdiff_t          recv_offset;
+    ucc_rank_t         peer;
+    ucc_status_t       status;
     int full_tree_size, pow_k_sup, n_full_subtrees, full_size, node_type;
-    int iteration, radix_pow, k, step_size, peer;
+    int iteration, radix_pow, k, step_size;
+
 
     KN_RECURSIVE_SETUP(radix, myrank, group_size, pow_k_sup, full_tree_size,
                        n_full_subtrees, full_size, node_type);
     RESTORE_STATE();
     if (UCC_IS_INPLACE(task->args)) {
         sbuf = rbuf;
+        smem = rmem;
     }
     GOTO_PHASE(task->allreduce_kn.phase);
 

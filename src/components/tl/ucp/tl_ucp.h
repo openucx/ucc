@@ -44,8 +44,8 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
 typedef struct ucc_tl_ucp_addr_storage ucc_tl_ucp_addr_storage_t;
 
 typedef struct ucc_tl_ucp_ep_close_state {
-    int   ep;
-    void *close_req;
+    ucc_rank_t ep;
+    void      *close_req;
 } ucc_tl_ucp_ep_close_state_t;
 
 typedef struct ucc_tl_ucp_context {

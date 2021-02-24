@@ -54,8 +54,9 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t         myrank     = team->rank;
     ucc_rank_t         group_size = team->size;
     int                radix      = task->barrier.radix;
+    ucc_rank_t         peer;
     int full_tree_size, pow_k_sup, n_full_subtrees, full_size, node_type;
-    int iteration, radix_pow, k, step_size, peer;
+    int iteration, radix_pow, k, step_size;
 
     KN_RECURSIVE_SETUP(radix, myrank, group_size, pow_k_sup, full_tree_size,
                        n_full_subtrees, full_size, node_type);

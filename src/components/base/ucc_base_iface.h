@@ -75,7 +75,7 @@ typedef struct ucc_base_team_params {
                                    a single CL team (e.g. basic) creates multiple TL teams
                                    of the same type (e.g. several tl_ucp teams). In this
                                    case CL would give those teams different scope_id. */
-    uint32_t          rank; /* Rank of a calling process in the TL/CL team. It is a uniq
+    ucc_rank_t        rank; /* Rank of a calling process in the TL/CL team. It is a uniq
                                process identifier within a team (not job) but it has the
                                property: it is always contig and in the range [0, team_size).*/
 } ucc_base_team_params_t;
