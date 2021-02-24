@@ -17,7 +17,12 @@ ucc_status_t ucc_tl_ucp_allreduce_init(ucc_tl_ucp_task_t *task)
                  "userdefined reductions are not supported yet");
         return UCC_ERR_NOT_SUPPORTED;
     }
-
+    if (!UCC_IS_INPLACE(task->args) && (task->args.src.info.mem_type !=
+                                        task->args.dst.info.mem_type)) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "assymetric src/dst memory types are not supported yetpp");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     task->super.post     = ucc_tl_ucp_allreduce_knomial_start;
     task->super.progress = ucc_tl_ucp_allreduce_knomial_progress;
     return UCC_OK;

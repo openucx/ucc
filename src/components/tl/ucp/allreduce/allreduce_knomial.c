@@ -51,12 +51,10 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     void                  *scratch    = task->allreduce_kn.scratch;
     void                  *sbuf       = task->args.src.info.buffer;
     void                  *rbuf       = task->args.dst.info.buffer;
-    ucc_memory_type_t      smem       = task->args.src.info.mem_type;
-    ucc_memory_type_t      rmem       = task->args.dst.info.mem_type;
+    ucc_memory_type_t      mem_type   = task->args.src.info.mem_type;
     size_t                 count      = task->args.src.info.count;
     ucc_datatype_t         dt         = task->args.src.info.datatype;
     size_t                 data_size  = count * ucc_dt_size(dt);
-    ucc_memory_type_t      send_mem;
     void                  *send_buf;
     ptrdiff_t              recv_offset;
     ucc_rank_t             peer;
@@ -64,19 +62,18 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_kn_radix_t         loop_step;
     if (UCC_IS_INPLACE(task->args)) {
         sbuf = rbuf;
-        smem = rmem;
     }
     GOTO_PHASE(task->allreduce_kn.phase);
 
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, team->rank);
-        ucc_tl_ucp_send_nb(sbuf, data_size, smem, peer, team, task);
-        ucc_tl_ucp_recv_nb(rbuf, data_size, rmem, peer, team, task);
+        ucc_tl_ucp_send_nb(sbuf, data_size, mem_type, peer, team, task);
+        ucc_tl_ucp_recv_nb(rbuf, data_size, mem_type, peer, team, task);
     }
 
     if (KN_NODE_PROXY == node_type) {
         peer = ucc_knomial_pattern_get_extra(p, team->rank);
-        ucc_tl_ucp_recv_nb(scratch, data_size, smem, peer, team, task);
+        ucc_tl_ucp_recv_nb(scratch, data_size, mem_type, peer, team, task);
     }
 PHASE_EXTRA:
     if (KN_NODE_PROXY == node_type || KN_NODE_EXTRA == node_type) {
@@ -88,7 +85,7 @@ PHASE_EXTRA:
             goto completion;
         } else {
             if (UCC_OK != (status = ucc_dt_reduce(sbuf, scratch, rbuf,
-                                                  count, dt, smem, &task->args))) {
+                                                  count, dt, mem_type, &task->args))) {
                 tl_error(UCC_TL_TEAM_LIB(task->team),
                          "failed to perform dt reduction");
                 task->super.super.status = status;
@@ -105,12 +102,10 @@ PHASE_EXTRA:
             if ((p->iteration == 0) && (KN_NODE_PROXY != node_type) &&
                 !UCC_IS_INPLACE(task->args)) {
                 send_buf = sbuf;
-                send_mem = smem;
             } else {
                 send_buf = rbuf;
-                send_mem = rmem;
             }
-            ucc_tl_ucp_send_nb(send_buf, data_size, send_mem, peer, team, task);
+            ucc_tl_ucp_send_nb(send_buf, data_size, mem_type, peer, team, task);
         }
 
         recv_offset = 0;
@@ -120,7 +115,7 @@ PHASE_EXTRA:
             if (peer == UCC_KN_PEER_NULL)
                 continue;
             ucc_tl_ucp_recv_nb((void*)((ptrdiff_t)scratch + recv_offset),
-                               data_size, smem, peer, team, task);
+                               data_size, mem_type, peer, team, task);
             recv_offset += data_size;
         }
 
@@ -140,7 +135,7 @@ PHASE_EXTRA:
             if (UCC_OK != (status = ucc_dt_reduce_multi(
                 send_buf, scratch, rbuf,
                 task->send_posted - p->iteration * (radix - 1), count, data_size,
-                dt, smem, &task->args))) {
+                dt, mem_type, &task->args))) {
                 tl_error(UCC_TL_TEAM_LIB(task->team),
                          "failed to perform dt reduction");
                 task->super.super.status = status;
@@ -151,7 +146,7 @@ PHASE_EXTRA:
     }
     if (KN_NODE_PROXY == node_type) {
         peer = ucc_knomial_pattern_get_extra(p, team->rank);
-        ucc_tl_ucp_send_nb(rbuf, data_size, rmem, peer, team, task);
+        ucc_tl_ucp_send_nb(rbuf, data_size, mem_type, peer, team, task);
         goto PHASE_PROXY;
     } else {
         goto completion;
@@ -179,6 +174,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     size_t             data_size = count * ucc_dt_size(dt);
     ucc_status_t       status;
     task->allreduce_kn.phase          = PHASE_INIT;
+    ucc_assert(task->args.src.info.mem_type ==
+               task->args.dst.info.mem_type);
     ucc_knomial_pattern_init(team->size, team->rank,
                              ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
                                      cfg.allreduce_kn_radix, team->size),
