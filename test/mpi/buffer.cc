@@ -11,6 +11,8 @@ BEGIN_C_DECLS
 #include "utils/ucc_math.h"
 END_C_DECLS
 
+#define TEST_MPI_FP_EPSILON 1e-5
+
 template<typename T>
 void init_buffer_host(void *buf, size_t count, int _value)
 {
@@ -27,50 +29,56 @@ void init_buffer(void *buf, size_t count, ucc_datatype_t dt,
     if (mt != UCC_MEMORY_TYPE_HOST) {
         std::cerr << "Unsupported mt\n";
         MPI_Abort(MPI_COMM_WORLD, -1);
-    } else {
-        switch(dt) {
-        case UCC_DT_INT8:
-            init_buffer_host<int8_t>(buf, count, value);
-            break;
-        case UCC_DT_UINT8:
-            init_buffer_host<uint8_t>(buf, count, value);
-            break;
-        case UCC_DT_INT16:
-            init_buffer_host<int16_t>(buf, count, value);
-            break;
-        case UCC_DT_UINT16:
-            init_buffer_host<uint16_t>(buf, count, value);
-            break;
-        case UCC_DT_INT32:
-            init_buffer_host<int32_t>(buf, count, value);
-            break;
-        case UCC_DT_UINT32:
-            init_buffer_host<uint32_t>(buf, count, value);
-            break;
-        case UCC_DT_INT64:
-            init_buffer_host<int64_t>(buf, count, value);
-            break;
-        case UCC_DT_UINT64:
-            init_buffer_host<uint64_t>(buf, count, value);
-            break;
-        case UCC_DT_FLOAT32:
-            init_buffer_host<float>(buf, count, value);
-            break;
-        case UCC_DT_FLOAT64:
-            init_buffer_host<double>(buf, count, value);
-            break;
-        default:
-            std::cerr << "Unsupported dt\n";
-            MPI_Abort(MPI_COMM_WORLD, -1);
-            break;
-        }
+    }
+    switch(dt) {
+    case UCC_DT_INT8:
+        init_buffer_host<int8_t>(buf, count, value);
+        break;
+    case UCC_DT_UINT8:
+        init_buffer_host<uint8_t>(buf, count, value);
+        break;
+    case UCC_DT_INT16:
+        init_buffer_host<int16_t>(buf, count, value);
+        break;
+    case UCC_DT_UINT16:
+        init_buffer_host<uint16_t>(buf, count, value);
+        break;
+    case UCC_DT_INT32:
+        init_buffer_host<int32_t>(buf, count, value);
+        break;
+    case UCC_DT_UINT32:
+        init_buffer_host<uint32_t>(buf, count, value);
+        break;
+    case UCC_DT_INT64:
+        init_buffer_host<int64_t>(buf, count, value);
+        break;
+    case UCC_DT_UINT64:
+        init_buffer_host<uint64_t>(buf, count, value);
+        break;
+    case UCC_DT_FLOAT32:
+        init_buffer_host<float>(buf, count, value);
+        break;
+    case UCC_DT_FLOAT64:
+        init_buffer_host<double>(buf, count, value);
+        break;
+    default:
+        std::cerr << "Unsupported dt\n";
+        MPI_Abort(MPI_COMM_WORLD, -1);
+        break;
     }
 }
 
 template<typename T>
+static inline bool is_equal(T a, T b, T epsilon)
+{
+    return fabs(a - b) <= ( (fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
+}
+
+template<typename T>
 ucc_status_t compare_buffers_fp(T *b1, T *b2, size_t count) {
+    T epsilon = (T)TEST_MPI_FP_EPSILON;
     for (int i = 0; i < count; i++) {
-        if (fabs((b1[i]-b2[i])/b1[i]) > 1e-5) {
+        if (!is_equal(b1[i], b2[i], epsilon)) {
             return UCC_ERR_NO_MESSAGE;
         }
     }
