@@ -8,6 +8,7 @@
 #define UCC_TL_UCP_COLL_H_
 #include "tl_ucp.h"
 #include "schedule/ucc_schedule.h"
+#include "coll_patterns/recursive_knomial.h"
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t    super;
     ucc_coll_args_t    args;
@@ -20,17 +21,13 @@ typedef struct ucc_tl_ucp_task {
     uint32_t           n_polls;
     union {
         struct {
-            int phase;
-            int iteration;
-            int radix_mask_pow;
-            int radix;
+            int                   phase;
+            ucc_knomial_pattern_t p;
         } barrier;
         struct {
-            int   phase;
-            int   iteration;
-            int   radix_mask_pow;
-            int   radix;
-            void *scratch;
+            int                   phase;
+            ucc_knomial_pattern_t p;
+            void                 *scratch;
         } allreduce_kn;
     };
 } ucc_tl_ucp_task_t;

@@ -7,6 +7,9 @@
 #ifndef RECURSIVE_KNOMIAL_H_
 #define RECURSIVE_KNOMIAL_H_
 
+#define UCC_KN_PEER_NULL ((ucc_rank_t)-1)
+typedef uint16_t ucc_kn_radix_t;
+
 enum {
     KN_NODE_BASE,  /*< Participates in the main loop of the recursive KN algorithm */
     KN_NODE_PROXY, /*< Participates in the main loop and receives/sends the data from/to EXTRA */
@@ -33,33 +36,78 @@ enum {
         _full_pow_size = (fs != _size) ? fs / _radix : fs;                     \
     } while (0)
 
+typedef struct ucc_knomial_pattern {
+    ucc_kn_radix_t radix;
+    uint8_t        iteration;
+    uint8_t        pow_radix_sup;
+    uint8_t        node_type;
+    ucc_rank_t     radix_pow;
+    ucc_rank_t     n_extra; /**< number of "extra" ranks to be served by "proxies" */
+} ucc_knomial_pattern_t;
+
 /**
  *  Initializes recursive knomial tree attributes.
- *  @param [in]  _radix            Knomial radix
- *  @param [in]  _myrank           Rank in a team
- *  @param [in]  _size             Team size
- *  @param [out] _pow_radix_super  (see above)
- *  @param [out] _full_pow_size    (see above)
- *  @param [out] _n_full_subtrees  Number of full knomial subtrees that fit into team size
- *  @param [out] _full_size        Total number of nodes in the set of full subtrees
- *  @param [out] _node_type        Rank node type
+ *  @param [in]  radix Knomial radix
+ *  @param [in]  rank  Rank in a team
+ *  @param [in]  size  Team size
+ *  @param [out] p     ucc_knomial_pattern
  */
-#define KN_RECURSIVE_SETUP(__radix, __myrank, __size, __pow_k_sup,             \
-                           __full_pow_size, __n_full_subtrees, __full_size,    \
-                           __node_type)                                        \
-    do {                                                                       \
-        CALC_POW_RADIX_SUP(__size, __radix, __pow_k_sup, __full_pow_size);     \
-        __n_full_subtrees = __size / __full_pow_size;                          \
-        __full_size       = __n_full_subtrees * __full_pow_size;               \
-        __node_type =                                                          \
-            __myrank >= __full_size                                            \
-                ? KN_NODE_EXTRA                                                \
-                : (__size > __full_size && __myrank < __size - __full_size     \
-                       ? KN_NODE_PROXY                                         \
-                       : KN_NODE_BASE);                                        \
-    } while (0)
 
-#define KN_RECURSIVE_GET_PROXY(__myrank, __full_size) (__myrank - __full_size)
-#define KN_RECURSIVE_GET_EXTRA(__myrank, __full_size) (__myrank + __full_size)
+static inline void ucc_knomial_pattern_init(ucc_rank_t size, ucc_rank_t rank,
+                                            ucc_kn_radix_t radix,
+                                            ucc_knomial_pattern_t *p)
+{
+    ucc_rank_t full_pow_size, n_full_subtrees;
+    CALC_POW_RADIX_SUP(size, radix, p->pow_radix_sup, full_pow_size);
+    n_full_subtrees  = size / full_pow_size;
+    p->n_extra       = size - n_full_subtrees * full_pow_size;
+    p->radix         = radix;
+    p->iteration     = 0;
+    p->radix_pow     = 1;
+    p->node_type     = KN_NODE_BASE;
+    if (rank < p->n_extra * 2) {
+        p->node_type = (rank % 2) ? KN_NODE_EXTRA : KN_NODE_PROXY;
+    }
+}
 
+static inline ucc_rank_t ucc_knomial_pattern_get_proxy(ucc_knomial_pattern_t *p,
+                                                       ucc_rank_t rank)
+{
+    return rank - 1;
+}
+
+static inline ucc_rank_t ucc_knomial_pattern_get_extra(ucc_knomial_pattern_t *p,
+                                                       ucc_rank_t rank)
+{
+    return rank + 1;
+}
+
+static inline int ucc_knomial_pattern_loop_done(ucc_knomial_pattern_t *p)
+{
+    return p->iteration == p->pow_radix_sup;
+}
+
+static inline ucc_rank_t ucc_knomial_pattern_get_loop_peer(ucc_knomial_pattern_t *p,
+                                                           ucc_rank_t rank,
+                                                           ucc_rank_t size,
+                                                           ucc_kn_radix_t loop_step)
+{
+    ucc_assert(p->node_type == KN_NODE_BASE ||
+               p->node_type == KN_NODE_PROXY);
+    ucc_assert(loop_step >= 1 && loop_step < p->radix);
+    ucc_assert((rank >= p->n_extra * 2) || ((rank % 2) == 0));
+    ucc_rank_t loop_rank = (rank < p->n_extra * 2) ? rank/2 : rank - p->n_extra;
+    ucc_rank_t step_size = p->radix_pow * p->radix;
+    ucc_rank_t peer      = (loop_rank + loop_step * p->radix_pow) % step_size +
+        (loop_rank - loop_rank % step_size);
+
+    return (peer >= (size - p->n_extra)) ? UCC_KN_PEER_NULL :
+        (peer < p->n_extra) ? peer*2 : peer + p->n_extra;
+}
+
+static inline void ucc_knomial_pattern_next_iteration(ucc_knomial_pattern_t *p)
+{
+    p->iteration++;
+    p->radix_pow *= p->radix;
+}
 #endif

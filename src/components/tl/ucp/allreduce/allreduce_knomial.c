@@ -35,46 +35,33 @@ enum {
         };                                                                     \
     } while (0)
 
-#define RESTORE_STATE()                                                        \
-    do {                                                                       \
-        iteration = task->allreduce_kn.iteration;                              \
-        radix_pow = task->allreduce_kn.radix_mask_pow;                         \
-    } while (0)
 
-#define SAVE_STATE(_phase)                                                     \
-    do {                                                                       \
-        task->allreduce_kn.phase          = _phase;                            \
-        task->allreduce_kn.iteration      = iteration;                         \
-        task->allreduce_kn.radix_mask_pow = radix_pow;                         \
+#define SAVE_STATE(_phase)                                            \
+    do {                                                              \
+        task->allreduce_kn.phase = _phase;                            \
     } while (0)
 
 ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team       = task->team;
-    ucc_rank_t         myrank     = team->rank;
-    ucc_rank_t         group_size = team->size;
-    int                radix      = task->allreduce_kn.radix;
-    void              *scratch    = task->allreduce_kn.scratch;
-    void              *sbuf       = task->args.src.info.buffer;
-    void              *rbuf       = task->args.dst.info.buffer;
-    ucc_memory_type_t  smem       = task->args.src.info.mem_type;
-    ucc_memory_type_t  rmem       = task->args.dst.info.mem_type;
-    size_t             count      = task->args.src.info.count;
-    ucc_datatype_t     dt         = task->args.src.info.datatype;
-    size_t             data_size  = count * ucc_dt_size(dt);
-    ucc_memory_type_t  send_mem;
-    void              *send_buf;
-    ptrdiff_t          recv_offset;
-    ucc_rank_t         peer;
-    ucc_status_t       status;
-    int full_tree_size, pow_k_sup, n_full_subtrees, full_size, node_type;
-    int iteration, radix_pow, k, step_size;
-
-
-    KN_RECURSIVE_SETUP(radix, myrank, group_size, pow_k_sup, full_tree_size,
-                       n_full_subtrees, full_size, node_type);
-    RESTORE_STATE();
+    ucc_tl_ucp_task_t     *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t     *team       = task->team;
+    ucc_kn_radix_t         radix      = task->allreduce_kn.p.radix;
+    uint8_t                node_type  = task->allreduce_kn.p.node_type;
+    ucc_knomial_pattern_t *p          = &task->allreduce_kn.p;
+    void                  *scratch    = task->allreduce_kn.scratch;
+    void                  *sbuf       = task->args.src.info.buffer;
+    void                  *rbuf       = task->args.dst.info.buffer;
+    ucc_memory_type_t      smem       = task->args.src.info.mem_type;
+    ucc_memory_type_t      rmem       = task->args.dst.info.mem_type;
+    size_t                 count      = task->args.src.info.count;
+    ucc_datatype_t         dt         = task->args.src.info.datatype;
+    size_t                 data_size  = count * ucc_dt_size(dt);
+    ucc_memory_type_t      send_mem;
+    void                  *send_buf;
+    ptrdiff_t              recv_offset;
+    ucc_rank_t             peer;
+    ucc_status_t           status;
+    ucc_kn_radix_t         loop_step;
     if (UCC_IS_INPLACE(task->args)) {
         sbuf = rbuf;
         smem = rmem;
@@ -82,13 +69,13 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     GOTO_PHASE(task->allreduce_kn.phase);
 
     if (KN_NODE_EXTRA == node_type) {
-        peer = KN_RECURSIVE_GET_PROXY(myrank, full_size);
+        peer = ucc_knomial_pattern_get_proxy(p, team->rank);
         ucc_tl_ucp_send_nb(sbuf, data_size, smem, peer, team, task);
         ucc_tl_ucp_recv_nb(rbuf, data_size, rmem, peer, team, task);
     }
 
     if (KN_NODE_PROXY == node_type) {
-        peer = KN_RECURSIVE_GET_EXTRA(myrank, full_size);
+        peer = ucc_knomial_pattern_get_extra(p, team->rank);
         ucc_tl_ucp_recv_nb(scratch, data_size, smem, peer, team, task);
     }
 PHASE_EXTRA:
@@ -109,14 +96,13 @@ PHASE_EXTRA:
             }
         }
     }
-    for (; iteration < pow_k_sup; iteration++) {
-        step_size = radix_pow * radix;
-        for (k = 1; k < radix; k++) {
-            peer = (myrank + k * radix_pow) % step_size +
-                   (myrank - myrank % step_size);
-            if (peer >= full_size)
+    while(!ucc_knomial_pattern_loop_done(p)) {
+        for (loop_step = 1; loop_step < radix; loop_step++) {
+            peer = ucc_knomial_pattern_get_loop_peer(p, team->rank,
+                                                     team->size, loop_step);
+            if (peer == UCC_KN_PEER_NULL)
                 continue;
-            if ((iteration == 0) && (KN_NODE_PROXY != node_type) &&
+            if ((p->iteration == 0) && (KN_NODE_PROXY != node_type) &&
                 !UCC_IS_INPLACE(task->args)) {
                 send_buf = sbuf;
                 send_mem = smem;
@@ -128,24 +114,24 @@ PHASE_EXTRA:
         }
 
         recv_offset = 0;
-        for (k = 1; k < radix; k++) {
-            peer = (myrank + k * radix_pow) % step_size +
-                   (myrank - myrank % step_size);
-            if (peer >= full_size)
+        for (loop_step = 1; loop_step < radix; loop_step++) {
+            peer = ucc_knomial_pattern_get_loop_peer(p, team->rank,
+                                                     team->size, loop_step);
+            if (peer == UCC_KN_PEER_NULL)
                 continue;
             ucc_tl_ucp_recv_nb((void*)((ptrdiff_t)scratch + recv_offset),
                                data_size, smem, peer, team, task);
             recv_offset += data_size;
         }
-        radix_pow *= radix;
+
     PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             SAVE_STATE(PHASE_LOOP);
             return task->super.super.status;
         }
 
-        if (task->send_posted > iteration * (radix - 1)) {
-            if ((iteration == 0) && (KN_NODE_PROXY != node_type) &&
+        if (task->send_posted > p->iteration * (radix - 1)) {
+            if ((p->iteration == 0) && (KN_NODE_PROXY != node_type) &&
                 !UCC_IS_INPLACE(task->args)) {
                 send_buf = sbuf;
             } else {
@@ -153,7 +139,7 @@ PHASE_EXTRA:
             }
             if (UCC_OK != (status = ucc_dt_reduce_multi(
                 send_buf, scratch, rbuf,
-                task->send_posted - iteration * (radix - 1), count, data_size,
+                task->send_posted - p->iteration * (radix - 1), count, data_size,
                 dt, smem, &task->args))) {
                 tl_error(UCC_TL_TEAM_LIB(task->team),
                          "failed to perform dt reduction");
@@ -161,9 +147,10 @@ PHASE_EXTRA:
                 return status;
             }
         }
+        ucc_knomial_pattern_next_iteration(p);
     }
     if (KN_NODE_PROXY == node_type) {
-        peer = KN_RECURSIVE_GET_EXTRA(myrank, full_size);
+        peer = ucc_knomial_pattern_get_extra(p, team->rank);
         ucc_tl_ucp_send_nb(rbuf, data_size, rmem, peer, team, task);
         goto PHASE_PROXY;
     } else {
@@ -192,12 +179,12 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     size_t             data_size = count * ucc_dt_size(dt);
     ucc_status_t       status;
     task->allreduce_kn.phase          = PHASE_INIT;
-    task->allreduce_kn.iteration      = 0;
-    task->allreduce_kn.radix_mask_pow = 1;
-    task->allreduce_kn.radix =
-        ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.allreduce_kn_radix, team->size);
+    ucc_knomial_pattern_init(team->size, team->rank,
+                             ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
+                                     cfg.allreduce_kn_radix, team->size),
+                             &task->allreduce_kn.p);
     if (UCC_OK != (status = ucc_mc_alloc(&task->allreduce_kn.scratch,
-                                         (task->allreduce_kn.radix - 1) * data_size,
+                                         (task->allreduce_kn.p.radix - 1) * data_size,
                                          task->args.src.info.mem_type))) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
                  "failed to allocate scratch buffer");
