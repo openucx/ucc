@@ -21,6 +21,9 @@ extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 
 typedef struct ucc_tl_ucp_lib_config {
     ucc_tl_lib_config_t super;
+    uint32_t            kn_barrier_radix;
+    uint32_t            alltoall_pairwise_num_posts;
+    uint32_t            alltoallv_pairwise_num_posts;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {
@@ -28,11 +31,11 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                preconnect;
     uint32_t                n_polls;
     uint32_t                oob_npolls;
-    uint32_t                kn_barrier_radix;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
-    ucc_tl_lib_t super;
+    ucc_tl_lib_t            super;
+    ucc_tl_ucp_lib_config_t cfg;
 } ucc_tl_ucp_lib_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
@@ -69,8 +72,8 @@ typedef struct ucc_tl_ucp_team {
               This optimization is only possible when user provides
               the necessary rank mappings team_rank->context_rank. */
     ucp_ep_h                  *eps;
-    int                        size;
-    int                        rank;
+    ucc_rank_t                 size;
+    ucc_rank_t                 rank;
     ucc_tl_ucp_addr_storage_t *addr_storage;
     uint32_t                   id;
     uint32_t                   scope;
@@ -80,6 +83,9 @@ typedef struct ucc_tl_ucp_team {
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
+
+#define UCC_TL_UCP_TEAM_LIB(_team)                                             \
+    (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_ucp_lib_t))
 
 #define UCC_TL_UCP_TEAM_CTX(_team)                                             \
     (ucc_derived_of((_team)->super.super.context, ucc_tl_ucp_context_t))

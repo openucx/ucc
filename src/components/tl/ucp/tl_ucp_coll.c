@@ -8,6 +8,8 @@
 #include "tl_ucp_coll.h"
 #include "tl_ucp_tag.h"
 #include "barrier/barrier.h"
+#include "alltoall/alltoall.h"
+#include "alltoallv/alltoallv.h"
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
@@ -61,9 +63,19 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
     case UCC_COLL_TYPE_BARRIER:
         status = ucc_tl_ucp_barrier_init(task);
         break;
+    case UCC_COLL_TYPE_ALLTOALL:
+        status = ucc_tl_ucp_alltoall_init(task);
+        break;
+    case UCC_COLL_TYPE_ALLTOALLV:
+        status = ucc_tl_ucp_alltoallv_init(task);
+        break;
     default:
         ucc_tl_ucp_put_task(task);
         return UCC_ERR_NOT_SUPPORTED;
+    }
+    if (status != UCC_OK) {
+        ucc_tl_ucp_put_task(task);
+        return status;
     }
     tl_info(team->context->lib, "init coll req %p", task);
     *task_h = &task->super;

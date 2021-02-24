@@ -51,8 +51,8 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team       = task->team;
-    int                myrank     = team->rank;
-    int                group_size = team->size;
+    ucc_rank_t         myrank     = team->rank;
+    ucc_rank_t         group_size = team->size;
     int                radix      = task->barrier.radix;
     int full_tree_size, pow_k_sup, n_full_subtrees, full_size, node_type;
     int iteration, radix_pow, k, step_size, peer;
@@ -138,7 +138,7 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_start(ucc_coll_task_t *coll_task)
     task->barrier.iteration      = 0;
     task->barrier.radix_mask_pow = 1;
     task->barrier.radix =
-        ucc_min(UCC_TL_UCP_TEAM_CTX(team)->cfg.kn_barrier_radix, team->size);
+        ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.kn_barrier_radix, team->size);
     task->super.super.status = UCC_INPROGRESS;
     status = ucc_tl_ucp_barrier_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {
