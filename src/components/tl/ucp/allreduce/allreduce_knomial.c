@@ -60,8 +60,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     void              *rbuf       = task->args.dst.info.buffer;
     ucc_memory_type_t  smem       = task->args.src.info.mem_type;
     ucc_memory_type_t  rmem       = task->args.dst.info.mem_type;
-    size_t             count      = task->args.dst.info.count;
-    ucc_datatype_t     dt         = task->args.dst.info.datatype;
+    size_t             count      = task->args.src.info.count;
+    ucc_datatype_t     dt         = task->args.src.info.datatype;
     size_t             data_size  = count * ucc_dt_size(dt);
     ucc_memory_type_t  send_mem;
     void              *send_buf;
@@ -100,8 +100,13 @@ PHASE_EXTRA:
         if (KN_NODE_EXTRA == node_type) {
             goto completion;
         } else {
-            ucc_dt_reduce(sbuf, scratch, rbuf,
-                          count, dt, UCC_MEMORY_TYPE_HOST, &task->args);
+            if (UCC_OK != (status = ucc_dt_reduce(sbuf, scratch, rbuf,
+                                                  count, dt, smem, &task->args))) {
+                tl_error(UCC_TL_TEAM_LIB(task->team),
+                         "failed to perform dt reduction");
+                task->super.super.status = status;
+                return status;
+            }
         }
     }
     for (; iteration < pow_k_sup; iteration++) {
@@ -146,10 +151,15 @@ PHASE_EXTRA:
             } else {
                 send_buf = rbuf;
             }
-            ucc_dt_reduce_multi(
+            if (UCC_OK != (status = ucc_dt_reduce_multi(
                 send_buf, scratch, rbuf,
                 task->send_posted - iteration * (radix - 1), count, data_size,
-                dt, UCC_MEMORY_TYPE_HOST, &task->args);
+                dt, smem, &task->args))) {
+                tl_error(UCC_TL_TEAM_LIB(task->team),
+                         "failed to perform dt reduction");
+                task->super.super.status = status;
+                return status;
+            }
         }
     }
     if (KN_NODE_PROXY == node_type) {
@@ -185,10 +195,14 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     task->allreduce_kn.iteration      = 0;
     task->allreduce_kn.radix_mask_pow = 1;
     task->allreduce_kn.radix =
-        ucc_min(UCC_TL_UCP_TEAM_CTX(team)->cfg.allreduce_kn_radix, team->size);
-    ucc_mc_alloc(&task->allreduce_kn.scratch,
-                 (task->allreduce_kn.radix - 1) * data_size,
-                 task->args.src.info.mem_type);
+        ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.allreduce_kn_radix, team->size);
+    if (UCC_OK != (status = ucc_mc_alloc(&task->allreduce_kn.scratch,
+                                         (task->allreduce_kn.radix - 1) * data_size,
+                                         task->args.src.info.mem_type))) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "failed to allocate scratch buffer");
+        return status;
+    }
 
     task->super.super.status = UCC_INPROGRESS;
     status = ucc_tl_ucp_allreduce_knomial_progress(&task->super);

@@ -156,7 +156,7 @@ ucc_status_t ucc_mc_finalize()
     return UCC_OK;
 }
 
-ucc_status_t ucc_mc_reduce_multi(void *sbuf1, void *sbuf2, void *rbuf,
+ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
                                  size_t count, size_t size, size_t stride,
                                  ucc_datatype_t dtype, ucc_reduction_op_t op,
                                  ucc_memory_type_t mem_type)
@@ -166,9 +166,9 @@ ucc_status_t ucc_mc_reduce_multi(void *sbuf1, void *sbuf2, void *rbuf,
         return UCC_OK;
     }
     //TODO implemente efficient reduce_multi in the mc components
-    ucc_mc_reduce(sbuf1, sbuf2, rbuf, size, dtype, op, mem_type);
+    ucc_mc_reduce(src1, src2, dst, size, dtype, op, mem_type);
     for (i = 1; i < count; i++) {
-        ucc_mc_reduce((void *)((ptrdiff_t)sbuf2 + stride * i), rbuf, rbuf, size,
+        ucc_mc_reduce((void *)((ptrdiff_t)src2 + stride * i), dst, dst, size,
                       dtype, op, mem_type);
     }
     return UCC_OK;
