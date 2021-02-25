@@ -85,6 +85,22 @@ ucc_status_t ucc_tl_context_get(ucc_context_t *ctx, ucc_tl_type_t type,
                                 ucc_tl_context_t **tl_context);
 ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context);
 
+typedef struct ucc_team_create_multiple_req {
+    ucc_tl_context_t       **contexts;
+    ucc_base_team_params_t **params;
+    ucc_tl_team_t          **teams;
+    ucc_status_t            *teams_status;
+    int                      last_created;
+    int                      n_teams;
+} ucc_team_create_multiple_req_t;
+
+ucc_status_t ucc_team_create_multiple_req_alloc(ucc_team_create_multiple_req_t **req,
+                                                int n_teams);
+
+ucc_status_t ucc_tl_team_create_multiple(ucc_team_create_multiple_req_t *req);
+
+void ucc_team_create_multiple_req_free(ucc_team_create_multiple_req_t *req);
+
 #define UCC_TL_CTX_IFACE(_tl_ctx)                                              \
     (ucc_derived_of((_tl_ctx)->super.lib, ucc_tl_lib_t))->iface
 

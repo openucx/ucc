@@ -56,7 +56,7 @@ typedef struct ucc_tl_nccl_team {
 typedef struct ucc_tl_nccl_task {
     ucc_coll_task_t     super;
     ucc_tl_nccl_team_t *team;
-    ucc_coll_op_args_t  args;
+    ucc_coll_args_t     args;
     cudaEvent_t         completed;
 } ucc_tl_nccl_task_t;
 

@@ -134,7 +134,7 @@ static ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_op_args_t *coll_args,
+ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *team,
                                    ucc_coll_task_t **task_h)
 {
@@ -146,7 +146,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_op_args_t *coll_args,
 
     task = ucc_mpool_get(&nccl_ctx->req_mp);
     ucc_coll_task_init(&task->super);
-    memcpy(&task->args, &coll_args->args, sizeof(ucc_coll_op_args_t));
+    memcpy(&task->args, &coll_args->args, sizeof(ucc_coll_args_t));
     task->team = nccl_team;
     task->super.finalize = ucc_tl_nccl_coll_finalize;
     CUDACHECK_GOTO(cudaEventCreateWithFlags(&task->completed,

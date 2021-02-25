@@ -8,8 +8,8 @@ sources =             \
 	tl_nccl_lib.c     \
 	tl_nccl_context.c \
 	tl_nccl_team.c    \
-    tl_nccl_coll.h    \
-    tl_nccl_coll.c
+	tl_nccl_coll.h    \
+	tl_nccl_coll.c
 
 module_LTLIBRARIES = libucc_tl_nccl.la
 libucc_tl_nccl_la_SOURCES  = $(sources)
