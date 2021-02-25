@@ -7,25 +7,6 @@
 #include "tl_nccl.h"
 #include "tl_nccl_coll.h"
 
-#define NCCLCHECK_GOTO(_cmd, _label, _status, _lib) do {                       \
-  ncclResult_t e = _cmd;                                                       \
-  if(ncclSuccess != e) {                                                       \
-    tl_error(_lib, "NCCL error %d %s", e, ncclGetErrorString(e));              \
-    _status = UCC_ERR_NO_MESSAGE;                                              \
-    goto _label;                                                               \
-  }                                                                            \
-} while(0)
-
-#define CUDACHECK_GOTO(_cmd, _label, _status, _lib) do {                       \
-  cudaError_t e = _cmd;                                                        \
-  if(cudaSuccess != e) {                                                       \
-    tl_error(_lib, "CUDA error %d %s", e, cudaGetErrorName(e));                \
-    _status = UCC_ERR_NO_MESSAGE;                                              \
-    goto _label;                                                               \
-  }                                                                            \
-} while(0)
-
-
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {

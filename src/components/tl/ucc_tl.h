@@ -108,4 +108,8 @@ void ucc_team_create_multiple_req_free(ucc_team_create_multiple_req_t *req);
     (ucc_derived_of((_tl_team)->super.context->lib, ucc_tl_lib_t))->iface
 
 #define UCC_TL_TEAM_LIB(_tl_team) (_tl_team)->super.super.context->lib
+
+#define UCC_TL_CORE_CTX(_tl_team)                                              \
+    ((_tl_team)->super.super.context->ucc_context)
+
 #endif
