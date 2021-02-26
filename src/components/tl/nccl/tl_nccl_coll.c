@@ -46,11 +46,11 @@ ncclRedOp_t ucc_to_nccl_reduce_op[] = {
 
 ucc_status_t ucc_nccl_collective_progress(ucc_coll_task_t *coll_task)
 {
-    cudaError_t cuda_st;
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    cudaError_t cuda_st;
 
     cuda_st = cudaEventQuery(task->completed);
-    switch(cuda_st) {
+    switch (cuda_st) {
     case cudaSuccess:
         coll_task->super.status = UCC_OK;
         return UCC_OK;
@@ -78,12 +78,12 @@ ucc_status_t ucc_nccl_alltoall_start(ucc_coll_task_t *coll_task)
                 ucc_dt_size(task->args.src.info.datatype);
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
     for (peer = 0; peer < gsize; peer++) {
-        NCCLCHECK_GOTO(ncclSend((void*)(sbuf + peer*data_size), data_size,
+        NCCLCHECK_GOTO(ncclSend((void *)(sbuf + peer * data_size), data_size,
                                 ncclChar, peer, team->nccl_comm, stream),
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
-        NCCLCHECK_GOTO(ncclRecv((void*)(rbuf + peer*data_size), data_size,
+        NCCLCHECK_GOTO(ncclRecv((void *)(rbuf + peer * data_size), data_size,
                                 ncclChar, peer, team->nccl_comm, stream),
-                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+                       exit_coll, status, UCC_TL_TEAM_LIB(team));
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
 
@@ -104,7 +104,7 @@ ucc_status_t ucc_tl_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
                  "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post = ucc_nccl_alltoall_start;
+    task->super.post     = ucc_nccl_alltoall_start;
     task->super.progress = ucc_nccl_collective_progress;
     return UCC_OK;
 }
@@ -142,23 +142,25 @@ ucc_status_t ucc_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
 
     task->super.super.status = UCC_INPROGRESS;
     sdt_size = ucc_dt_size(task->args.src.info_v.datatype);
-    rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+    rdt_size                   = ucc_dt_size(task->args.dst.info_v.datatype);
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
     for (peer = 0; peer < team->size; peer++) {
-        data_size  = get_count(task->args.src.info_v.counts, peer, task) *
-                               sdt_size;
-        data_displ = get_displacement(task->args.src.info_v.displacements,
-                                      peer, task) * sdt_size;
-        NCCLCHECK_GOTO(ncclSend((void*)(sbuf + data_displ), data_size,
+        data_size  =
+            get_count(task->args.src.info_v.counts, peer, task) * sdt_size;
+        data_displ =
+            get_displacement(task->args.src.info_v.displacements,peer, task) *
+            sdt_size;
+        NCCLCHECK_GOTO(ncclSend((void *)(sbuf + data_displ), data_size,
                                 ncclChar, peer, team->nccl_comm, stream),
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
-        data_size  = get_count(task->args.dst.info_v.counts, peer, task) *
-                               rdt_size;
-        data_displ = get_displacement(task->args.dst.info_v.displacements,
-                                      peer, task) * rdt_size;
-        NCCLCHECK_GOTO(ncclRecv((void*)(rbuf + data_displ), data_size,
+        data_size  =
+            get_count(task->args.dst.info_v.counts, peer, task) * rdt_size;
+        data_displ =
+            get_displacement(task->args.dst.info_v.displacements, peer, task) *
+            rdt_size;
+        NCCLCHECK_GOTO(ncclRecv((void *)(rbuf + data_displ), data_size,
                                 ncclChar, peer, team->nccl_comm, stream),
-                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+                       exit_coll, status, UCC_TL_TEAM_LIB(team));
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
 
@@ -173,13 +175,13 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_alltoallv_init(ucc_tl_nccl_task_t *task)
 {
-    if ((task->args.src.info.datatype == UCC_DT_USERDEFINED) ||
-        (task->args.dst.info.datatype == UCC_DT_USERDEFINED)) {
+    if ((task->args.src.info_v.datatype == UCC_DT_USERDEFINED) ||
+        (task->args.dst.info_v.datatype == UCC_DT_USERDEFINED)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
                  "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post = ucc_nccl_alltoallv_start;
+    task->super.post     = ucc_nccl_alltoallv_start;
     task->super.progress = ucc_nccl_collective_progress;
     return UCC_OK;
 }

@@ -17,15 +17,13 @@ static ucc_config_field_t ucc_tl_nccl_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_nccl_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
 
-    {NULL}
-};
+    {NULL}};
 
 static ucs_config_field_t ucc_tl_nccl_context_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_nccl_context_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_context_config_table)},
 
-    {NULL}
-};
+    {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_nccl_lib_t, ucc_base_lib_t,
                           const ucc_base_lib_params_t *,

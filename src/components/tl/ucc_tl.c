@@ -96,13 +96,14 @@ ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context)
     return UCC_OK;
 }
 
-ucc_status_t ucc_team_create_multiple_req_alloc(ucc_team_create_multiple_req_t **req,
-                                        int n_teams)
+ucc_status_t
+ucc_team_create_multiple_req_alloc(ucc_team_create_multiple_req_t **req,
+                                   int n_teams)
 {
     ucc_team_create_multiple_req_t *r;
 
     r = ucc_malloc(sizeof(ucc_team_create_multiple_req_t),
-                          "team create multiple req alloc");
+                   "team create multiple req alloc");
     if (!r) {
         goto exit_err;
     }
@@ -127,8 +128,8 @@ ucc_status_t ucc_team_create_multiple_req_alloc(ucc_team_create_multiple_req_t *
         goto free_teams;
     }
     r->last_created = -1;
-    r->n_teams = n_teams;
-    *req = r;
+    r->n_teams      = n_teams;
+    *req            = r;
     return UCC_OK;
 free_teams:
     ucc_free(r->teams);
@@ -154,9 +155,9 @@ void ucc_team_create_multiple_req_free(ucc_team_create_multiple_req_t *req)
 
 ucc_status_t ucc_tl_team_create_multiple(ucc_team_create_multiple_req_t *req)
 {
+    int *id = &req->last_created;
     ucc_base_team_t *b_team;
     ucc_status_t     status;
-    int *id = &req->last_created;
 
     if (*id == req->n_teams) {
         return UCC_OK;
@@ -167,20 +168,20 @@ ucc_status_t ucc_tl_team_create_multiple(ucc_team_create_multiple_req_t *req)
         if (*id == req->n_teams) {
             return UCC_OK;
         }
-        status = UCC_TL_CTX_IFACE(req->contexts[*id])->team.create_post(
-                    &((req->contexts[*id])->super),
-                    req->params[*id],
-                    &b_team);
+        status = UCC_TL_CTX_IFACE(req->contexts[*id])
+                     ->team.create_post(&((req->contexts[*id])->super),
+                                        req->params[*id], &b_team);
         if (UCC_OK != status) {
             req->teams_status[*id] = status;
-            req->teams[*id] = NULL;
+            req->teams[*id]        = NULL;
         } else {
             req->teams_status[*id] = UCC_INPROGRESS;
-            req->teams[*id] = ucc_derived_of(b_team, ucc_tl_team_t);
+            req->teams[*id]        = ucc_derived_of(b_team, ucc_tl_team_t);
         }
         return UCC_INPROGRESS;
     }
-    req->teams_status[*id] = UCC_TL_CTX_IFACE(req->contexts[*id])->team.create_test(&req->teams[*id]->super);
+    req->teams_status[*id] = UCC_TL_CTX_IFACE(req->contexts[*id])
+                                 ->team.create_test(&req->teams[*id]->super);
     return UCC_INPROGRESS;
 }
 

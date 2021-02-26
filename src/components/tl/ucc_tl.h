@@ -94,8 +94,9 @@ typedef struct ucc_team_create_multiple_req {
     int                      n_teams;
 } ucc_team_create_multiple_req_t;
 
-ucc_status_t ucc_team_create_multiple_req_alloc(ucc_team_create_multiple_req_t **req,
-                                                int n_teams);
+ucc_status_t
+ucc_team_create_multiple_req_alloc(ucc_team_create_multiple_req_t **req,
+                                   int n_teams);
 
 ucc_status_t ucc_tl_team_create_multiple(ucc_team_create_multiple_req_t *req);
 
@@ -109,7 +110,6 @@ void ucc_team_create_multiple_req_free(ucc_team_create_multiple_req_t *req);
 
 #define UCC_TL_TEAM_LIB(_tl_team) (_tl_team)->super.super.context->lib
 
-#define UCC_TL_CORE_CTX(_tl_team)                                              \
-    ((_tl_team)->super.super.context->ucc_context)
+#define UCC_TL_CORE_CTX(_tl_team) ((_tl_team)->super.super.context->ucc_context)
 
 #endif
