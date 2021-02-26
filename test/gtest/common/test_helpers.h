@@ -9,6 +9,8 @@
 #ifndef UCC_TEST_HELPERS_H
 #define UCC_TEST_HELPERS_H
 
+#include "src/ucc/api/ucc.h"
+#include "src/utils/ucc_math.h"
 #include "gtest.h"
 
 #ifndef UINT16_MAX
@@ -156,8 +158,6 @@ T from_string(const std::string& str) {
 }
 
 namespace detail {
-
-#define ucc_max(_a, _b) ((_a > _b) ? _a : _b) // TODO: remove after ucc_max is merged upstream correctly
 
 class message_stream {
 public:

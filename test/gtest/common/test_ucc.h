@@ -13,10 +13,29 @@
 typedef std::vector<ucc_coll_args_t*> UccCollArgsVec;
 
 class UccCollArgs {
-protected:
-    virtual void init_proc_buf(int nprocs, int rank, uint8_t *buf, size_t len) = 0;
-    virtual int  validate_buf(int nprocs, uint8_t *buf, size_t len) = 0;
+protected: 
+    void alltoallx_init_buf(int src_rank, int dst_rank, uint8_t *buf, size_t len)
+    {
+        for (int i = 0; i < len; i++) {
+            buf[i] = (uint8_t)(((src_rank + len - i) *
+                                (dst_rank + 1)) % UINT8_MAX);
+        }
+    }
+    int alltoallx_validate_buf(int src_rank, int dst_rank, uint8_t *buf, size_t len)
+    {
+        int err = 0;
+        for (int i = 0; i < len; i ++) {
+            uint8_t expected = (uint8_t)
+                    (((dst_rank + len - i) *
+                      (src_rank + 1)) % UINT8_MAX);
+            if (buf[i] != expected) {
+                err++;
+            }
+        }
+        return err;
+    }
 public:
+    virtual ~UccCollArgs() {}
     virtual UccCollArgsVec data_init(int nprocs, ucc_datatype_t dtype,
                                      size_t count) = 0;
     virtual void data_fini(UccCollArgsVec args) = 0;
@@ -28,9 +47,12 @@ public:
 class UccProcess {
 public:
     static constexpr ucc_lib_params_t default_lib_params = {
-        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE | UCC_LIB_PARAM_FIELD_COLL_TYPES,
+        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE |
+                UCC_LIB_PARAM_FIELD_COLL_TYPES,
         .thread_mode = UCC_THREAD_SINGLE,
-        .coll_types = UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV
+        .coll_types = UCC_COLL_TYPE_BARRIER |
+                      UCC_COLL_TYPE_ALLTOALL |
+                      UCC_COLL_TYPE_ALLTOALLV
     };
     static constexpr ucc_context_params_t default_ctx_params = {
         .mask = UCC_CONTEXT_PARAM_FIELD_TYPE,

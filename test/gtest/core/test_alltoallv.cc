@@ -4,35 +4,12 @@
  */
 
 #include "common/test_ucc.h"
-
-// tmp
-#ifdef ucc_max
-#undef ucc_max
-#endif
-
 #include "src/utils/ucc_math.h"
 
 using Param_0 = std::tuple<int, int>;
 
 class test_alltoallv : public UccCollArgs, public ucc::test
 {
-private:
-    void init_proc_buf(int nprocs, int rank, uint8_t *buf, size_t len)
-    {
-        for (auto i = 0; i < len; i++) {
-            buf[i] = (uint8_t)rank;
-        }
-    }
-    int validate_buf(int proc, uint8_t *buf, size_t len)
-    {
-        int err = 0;
-        for (int i = 0; i < len; i ++) {
-            if (buf[i] != proc) {
-                err++;
-            }
-        }
-        return err;
-    }
 public:
     UccCollArgsVec data_init(int nprocs, ucc_datatype_t dtype,
                              size_t count) {
@@ -44,11 +21,15 @@ public:
                     calloc(1, sizeof(ucc_coll_args_t));
             coll->coll_type = UCC_COLL_TYPE_ALLTOALLV;
             coll->mask = UCC_COLL_ARGS_FIELD_FLAGS;
-            coll->flags = UCC_COLL_ARGS_FLAG_COUNT_64BIT | UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT;
+            coll->flags = UCC_COLL_ARGS_FLAG_COUNT_64BIT |
+                          UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT;
+
+            coll->src.info_v.mem_type = UCC_MEMORY_TYPE_HOST;
             coll->src.info_v.counts = (ucc_count_t*)malloc(sizeof(ucc_count_t) * nprocs);
             coll->src.info_v.datatype = dtype;
             coll->src.info_v.displacements = (ucc_aint_t*)malloc(sizeof(ucc_aint_t) * nprocs);
 
+            coll->dst.info_v.mem_type = UCC_MEMORY_TYPE_HOST;
             coll->dst.info_v.counts = (ucc_count_t*)malloc(sizeof(ucc_count_t) * nprocs);
             coll->dst.info_v.datatype = dtype;
             coll->dst.info_v.displacements = (ucc_aint_t*)malloc(sizeof(ucc_aint_t) * nprocs);
@@ -56,7 +37,6 @@ public:
             buf_count = 0;
             for (int i = 0; i < nprocs; i++) {
                 int rank_count = (nprocs + r - i) * count;
-
                 coll->src.info_v.counts[i] = rank_count;
                 coll->src.info_v.displacements[i] = buf_count;
                 buf_count += rank_count;
@@ -64,11 +44,10 @@ public:
 
             coll->src.info_v.buffer = malloc(buf_count * ucc_dt_size(dtype));
             for (int i = 0; i < nprocs; i++) {
-                init_proc_buf(nprocs, i, (uint8_t*)coll->src.info_v.buffer +
+                alltoallx_init_buf(r, i, (uint8_t*)coll->src.info_v.buffer +
                               coll->src.info_v.displacements[i] * ucc_dt_size(dtype),
                               coll->src.info_v.counts[i] * ucc_dt_size(dtype));
             }
-
             buf_count = 0;
             for (int i = 0; i < nprocs; i++) {
                 int rank_count = (nprocs - r + i) * count;
@@ -83,23 +62,27 @@ public:
     }
     void data_validate(UccCollArgsVec args)
     {
-        int proc = 0;
-        size_t dst_size = 0;
-        for (ucc_coll_args_t* coll : args) {
-            dst_size = 0;
+        for (int r = 0; r < args.size(); r++) {
+            ucc_coll_args_t* coll = args[r];
             for (int i = 0; i < args.size(); i++) {
-                dst_size += coll->dst.info_v.counts[i];
+                size_t rank_size = ucc_dt_size(coll->dst.info_v.datatype) *
+                        (size_t)coll->dst.info_v.counts[i];
+                size_t rank_offs = ucc_dt_size(coll->dst.info_v.datatype) *
+                        (size_t)coll->dst.info_v.displacements[i];
+                EXPECT_EQ(0,
+                          alltoallx_validate_buf(r, i,
+                          (uint8_t*)coll->dst.info_v.buffer + rank_offs,
+                          rank_size));
             }
-            EXPECT_EQ(0, validate_buf(proc, (uint8_t*)coll->dst.info_v.buffer,
-                         dst_size * ucc_dt_size(coll->dst.info_v.datatype)));
-            proc++;
         }
     }
     void data_fini(UccCollArgsVec args)
     {
         for (ucc_coll_args_t* coll : args) {
+            free(coll->src.info_v.buffer);
             free(coll->src.info_v.counts);
             free(coll->src.info_v.displacements);
+            free(coll->dst.info_v.buffer);
             free(coll->dst.info_v.counts);
             free(coll->dst.info_v.displacements);
             free(coll);
