@@ -55,9 +55,9 @@ ucc_status_t ucc_tl_ucp_addr_exchange_start(ucc_tl_ucp_context_t *ctx,
     return ucc_tl_ucp_addr_exchange_test(st);
 
 cleanup_addrlens:
-    free(st->addrlens);
+    ucc_free(st->addrlens);
 cleanup_st:
-    free(st);
+    ucc_free(st);
     return status;
 }
 
@@ -129,15 +129,15 @@ ucc_status_t ucc_tl_ucp_addr_exchange_test(ucc_tl_ucp_addr_storage_t *storage)
     return UCC_OK;
 
 err:
-    free(storage->addrlens);
-    free(storage->addresses);
-    free(storage);
+    ucc_free(storage->addrlens);
+    ucc_free(storage->addresses);
+    ucc_free(storage);
     return status;
 }
 
 void ucc_tl_ucp_addr_storage_free(ucc_tl_ucp_addr_storage_t *storage)
 {
-    free(storage->addresses);
+    ucc_free(storage->addresses);
     ucc_assert(NULL == storage->addrlens);
-    free(storage);
+    ucc_free(storage);
 }
