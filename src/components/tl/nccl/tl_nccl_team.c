@@ -58,7 +58,6 @@ UCC_CLASS_DEFINE(ucc_tl_nccl_team_t, ucc_tl_team_t);
 
 ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team)
 {
-    // ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_nccl_team_t)(tl_team);
     return UCC_OK;
 }
@@ -72,7 +71,7 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
     status = team->oob.req_test(team->oob_req);
     if (status < 0) {
         team->oob.req_free(team->oob_req);
-        tl_error(team->super.super.context->lib, "oob req test failed");
+        tl_error(tl_team->context->lib, "oob req test failed");
         goto free_unique_id;
     }
     if (status == UCC_INPROGRESS) {
@@ -80,22 +79,22 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
     }
     status = team->oob.req_free(team->oob_req);
     if (status != UCC_OK) {
-        tl_error(team->super.super.context->lib, "oob req free failed");
+        tl_error(tl_team->context->lib, "oob req free failed");
         goto free_unique_id;
     }
     CUDACHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
                    cudaStreamNonBlocking), free_unique_id, status,
-                   team->super.super.context->lib);
+                   tl_team->context->lib);
     nccl_status = ncclCommInitRank(&team->nccl_comm,team->size,
                                    team->unique_id[0], team->rank);
     if (nccl_status != ncclSuccess) {
-        tl_info(team->super.super.context->lib, "NCCL error %d %s",
+        tl_info(tl_team->context->lib, "NCCL error %d %s",
                 nccl_status, ncclGetErrorString(nccl_status));
         status = UCC_ERR_NO_MESSAGE;
         goto free_stream;
     }
-
     ucc_free(team->unique_id);
+    tl_info(tl_team->context->lib, "initialized tl team: %p", team);
     return UCC_OK;
 
 free_stream:
@@ -137,6 +136,9 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     {
     case UCC_COLL_TYPE_ALLTOALL:
         status = ucc_tl_nccl_alltoall_init(task);
+        break;
+    case UCC_COLL_TYPE_ALLTOALLV:
+        status = ucc_tl_nccl_alltoallv_init(task);
         break;
     default:
         status = UCC_ERR_NOT_SUPPORTED;

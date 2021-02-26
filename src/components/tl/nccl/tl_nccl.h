@@ -48,8 +48,8 @@ typedef struct ucc_tl_nccl_team {
     void                *oob_req;
     ucc_team_oob_coll_t  oob;
     ncclComm_t           nccl_comm;
-    uint32_t             rank;
-    uint32_t             size;
+    ucc_rank_t           rank;
+    ucc_rank_t           size;
     cudaStream_t         stream;
 } ucc_tl_nccl_team_t;
 
