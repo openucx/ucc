@@ -128,7 +128,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     return status;
 
 err_ctx_alloc:
-    free(team);
+    ucc_free(team);
     return status;
 }
 
