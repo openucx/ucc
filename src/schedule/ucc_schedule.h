@@ -55,4 +55,9 @@ ucc_status_t ucc_event_manager_notify(ucc_event_manager_t *em,
 ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx);
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule);
+
+#define UCC_IS_INPLACE(_args) \
+    (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
+     ((_args).flags & UCC_COLL_ARGS_FLAG_IN_PLACE))
+
 #endif

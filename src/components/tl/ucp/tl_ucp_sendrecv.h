@@ -56,7 +56,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
 
 static inline ucc_status_t ucc_tl_ucp_send_nb(void *buffer, size_t msglen,
                                               ucc_memory_type_t mtype,
-                                              int               dest_group_rank,
+                                              ucc_rank_t dest_group_rank,
                                               ucc_tl_ucp_team_t *team,
                                               ucc_tl_ucp_task_t *task)
 {
@@ -91,7 +91,7 @@ static inline ucc_status_t ucc_tl_ucp_send_nb(void *buffer, size_t msglen,
 
 static inline ucc_status_t ucc_tl_ucp_recv_nb(void *buffer, size_t msglen,
                                               ucc_memory_type_t mtype,
-                                              int               dest_group_rank,
+                                              ucc_rank_t dest_group_rank,
                                               ucc_tl_ucp_team_t *team,
                                               ucc_tl_ucp_task_t *task)
 {

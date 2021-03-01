@@ -34,42 +34,32 @@ enum {
         };                                                                     \
     } while (0)
 
-#define RESTORE_STATE()                                                        \
-    do {                                                                       \
-        iteration = task->barrier.iteration;                                   \
-        radix_pow = task->barrier.radix_mask_pow;                              \
-    } while (0)
 
-#define SAVE_STATE(_phase)                                                     \
-    do {                                                                       \
-        task->barrier.phase          = _phase;                                 \
-        task->barrier.iteration      = iteration;                              \
-        task->barrier.radix_mask_pow = radix_pow;                              \
+#define SAVE_STATE(_phase)                                            \
+    do {                                                              \
+        task->barrier.phase = _phase;                                 \
     } while (0)
 
 ucc_status_t ucc_tl_ucp_barrier_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team       = task->team;
-    ucc_rank_t         myrank     = team->rank;
-    ucc_rank_t         group_size = team->size;
-    int                radix      = task->barrier.radix;
-    int full_tree_size, pow_k_sup, n_full_subtrees, full_size, node_type;
-    int iteration, radix_pow, k, step_size, peer;
+    ucc_tl_ucp_task_t     *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t     *team       = task->team;
+    ucc_kn_radix_t         radix      = task->barrier.p.radix;
+    uint8_t                node_type  = task->barrier.p.node_type;
+    ucc_knomial_pattern_t *p          = &task->barrier.p;
+    ucc_rank_t             peer;
+    ucc_kn_radix_t         loop_step;
 
-    KN_RECURSIVE_SETUP(radix, myrank, group_size, pow_k_sup, full_tree_size,
-                       n_full_subtrees, full_size, node_type);
-    RESTORE_STATE();
     GOTO_PHASE(task->barrier.phase);
 
     if (KN_NODE_EXTRA == node_type) {
-        peer = KN_RECURSIVE_GET_PROXY(myrank, full_size);
+        peer = ucc_knomial_pattern_get_proxy(p, team->rank);
         ucc_tl_ucp_send_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team, task);
         ucc_tl_ucp_recv_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team, task);
     }
 
     if (KN_NODE_PROXY == node_type) {
-        peer = KN_RECURSIVE_GET_EXTRA(myrank, full_size);
+        peer = ucc_knomial_pattern_get_extra(p, team->rank);
         ucc_tl_ucp_recv_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team, task);
     }
 PHASE_EXTRA:
@@ -83,34 +73,33 @@ PHASE_EXTRA:
         }
     }
 
-    for (; iteration < pow_k_sup; iteration++) {
-        step_size = radix_pow * radix;
-        for (k = 1; k < radix; k++) {
-            peer = (myrank + k * radix_pow) % step_size +
-                   (myrank - myrank % step_size);
-            if (peer >= full_size)
+    while(!ucc_knomial_pattern_loop_done(p)) {
+        for (loop_step = 1; loop_step < radix; loop_step++) {
+            peer = ucc_knomial_pattern_get_loop_peer(p, team->rank,
+                                                     team->size, loop_step);
+            if (peer == UCC_KN_PEER_NULL)
                 continue;
             ucc_tl_ucp_send_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team,
                                task);
         }
 
-        for (k = 1; k < radix; k++) {
-            peer = (myrank + k * radix_pow) % step_size +
-                   (myrank - myrank % step_size);
-            if (peer >= full_size)
+        for (loop_step = 1; loop_step < radix; loop_step++) {
+            peer = ucc_knomial_pattern_get_loop_peer(p, team->rank,
+                                                     team->size, loop_step);
+            if (peer == UCC_KN_PEER_NULL)
                 continue;
             ucc_tl_ucp_recv_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team,
                                task);
         }
-        radix_pow *= radix;
     PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             SAVE_STATE(PHASE_LOOP);
             return UCC_INPROGRESS;
         }
+        ucc_knomial_pattern_next_iteration(p);
     }
     if (KN_NODE_PROXY == node_type) {
-        peer = KN_RECURSIVE_GET_EXTRA(myrank, full_size);
+        peer = ucc_knomial_pattern_get_extra(p, team->rank);
         ucc_tl_ucp_send_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team, task);
         goto PHASE_PROXY;
     } else {
@@ -135,10 +124,10 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team = task->team;
     ucc_status_t       status;
     task->barrier.phase          = PHASE_INIT;
-    task->barrier.iteration      = 0;
-    task->barrier.radix_mask_pow = 1;
-    task->barrier.radix =
-        ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.kn_barrier_radix, team->size);
+    ucc_knomial_pattern_init(team->size, team->rank,
+                             ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
+                                     cfg.barrier_kn_radix, team->size),
+                             &task->barrier.p);
     task->super.super.status = UCC_INPROGRESS;
     status = ucc_tl_ucp_barrier_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {

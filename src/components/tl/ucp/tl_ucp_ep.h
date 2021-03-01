@@ -12,13 +12,13 @@
 #include "tl_ucp.h"
 typedef struct ucc_tl_ucp_context ucc_tl_ucp_context_t;
 typedef struct ucc_tl_ucp_team    ucc_tl_ucp_team_t;
-ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team, int team_rank);
-ucc_status_t ucc_tl_ucp_connect_ctx_ep(ucc_tl_ucp_context_t *ctx, int ctx_rank);
+ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team, ucc_rank_t team_rank);
+ucc_status_t ucc_tl_ucp_connect_ctx_ep(ucc_tl_ucp_context_t *ctx, ucc_rank_t ctx_rank);
 
 ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx, ucp_ep_h *eps,
-                                  int n_eps);
+                                  ucc_rank_t n_eps);
 
-static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team, int rank,
+static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team, ucc_rank_t rank,
                                              ucp_ep_h *ep)
 {
     ucc_status_t          status;
@@ -39,7 +39,7 @@ static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team, int rank,
     } else {
         ctx = UCC_TL_UCP_TEAM_CTX(team);
         ucc_assert(ctx->eps);
-        int ctx_rank = -1; //TODO map to ctx rank
+        ucc_rank_t ctx_rank = -1; //TODO map to ctx rank
         ucc_assert(0);
         if (NULL == ctx->eps[ctx_rank]) {
             /* Not connected yet */

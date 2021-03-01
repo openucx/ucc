@@ -21,7 +21,8 @@ extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 
 typedef struct ucc_tl_ucp_lib_config {
     ucc_tl_lib_config_t super;
-    uint32_t            kn_barrier_radix;
+    uint32_t            barrier_kn_radix;
+    uint32_t            allreduce_kn_radix;
     uint32_t            alltoall_pairwise_num_posts;
     uint32_t            alltoallv_pairwise_num_posts;
 } ucc_tl_ucp_lib_config_t;
@@ -43,8 +44,8 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
 typedef struct ucc_tl_ucp_addr_storage ucc_tl_ucp_addr_storage_t;
 
 typedef struct ucc_tl_ucp_ep_close_state {
-    int   ep;
-    void *close_req;
+    ucc_rank_t ep;
+    void      *close_req;
 } ucc_tl_ucp_ep_close_state_t;
 
 typedef struct ucc_tl_ucp_context {

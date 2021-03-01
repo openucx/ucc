@@ -78,7 +78,8 @@ ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 
 static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
 {
-    int i, src, dst;
+    ucc_rank_t src, dst;
+    int i;
     if (!team->preconnect_task) {
         team->preconnect_task = ucc_tl_ucp_get_task(team);
         team->preconnect_task->tag = 0;

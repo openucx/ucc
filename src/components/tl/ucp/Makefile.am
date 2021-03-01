@@ -17,6 +17,11 @@ alltoallv =                        \
 	alltoallv/alltoallv.c          \
 	alltoallv/alltoallv_pairwise.c
 
+allreduce =                       \
+	allreduce/allreduce.h         \
+	allreduce/allreduce.c         \
+	allreduce/allreduce_knomial.c
+
 sources =            \
 	tl_ucp.h         \
 	tl_ucp.c         \
@@ -30,7 +35,8 @@ sources =            \
 	tl_ucp_coll.c    \
 	$(barrier)       \
 	$(alltoall)      \
-	$(alltoallv)
+	$(alltoallv)     \
+	$(allreduce)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

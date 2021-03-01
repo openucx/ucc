@@ -23,4 +23,42 @@ ucc_status_t ucc_mc_free(void *ptr, ucc_memory_type_t mem_type);
 
 ucc_status_t ucc_mc_finalize();
 
+ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
+                           size_t count, ucc_datatype_t dt,
+                           ucc_reduction_op_t op, ucc_memory_type_t mem_type);
+
+ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
+                                 size_t count, size_t size, size_t stride,
+                                 ucc_datatype_t dtype, ucc_reduction_op_t op,
+                                 ucc_memory_type_t mem_type);
+
+static inline ucc_status_t ucc_dt_reduce(const void *src1, const void *src2,
+                                         void *dst, size_t count,
+                                         ucc_datatype_t dt,
+                                         ucc_memory_type_t mem_type,
+                                         ucc_coll_args_t *args)
+{
+    if (args->mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) {
+        return UCC_ERR_NOT_SUPPORTED; //TODO
+    } else {
+        return ucc_mc_reduce(src1, src2, dst, count, dt,
+                             args->reduce.predefined_op, mem_type);
+    }
+}
+
+static inline ucc_status_t ucc_dt_reduce_multi(void *src1, void *src2, void *dst,
+                                               size_t count, size_t size,
+                                               size_t stride, ucc_datatype_t dt,
+                                               ucc_memory_type_t mem_type,
+                                               ucc_coll_args_t *args)
+{
+    if (args->mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) {
+        return UCC_ERR_NOT_SUPPORTED; //TODO
+    } else {
+        return ucc_mc_reduce_multi(src1, src2, dst, count, size, stride,
+                                   dt, args->reduce.predefined_op, mem_type);
+    }
+}
+
+
 #endif

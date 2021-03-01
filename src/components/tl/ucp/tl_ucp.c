@@ -29,7 +29,12 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
 
     {"BARRIER_KN_RADIX", "4",
      "Radix of the recursive-knomial barrier algorithm",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, kn_barrier_radix),
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, barrier_kn_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLREDUCE_KN_RADIX", "4",
+     "Radix of the recursive-knomial allreduce algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
     {NULL}};

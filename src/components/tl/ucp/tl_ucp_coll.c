@@ -10,6 +10,7 @@
 #include "barrier/barrier.h"
 #include "alltoall/alltoall.h"
 #include "alltoallv/alltoallv.h"
+#include "allreduce/allreduce.h"
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
@@ -57,7 +58,8 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
     ucc_coll_task_init(&task->super);
     memcpy(&task->args, &coll_args->args, sizeof(ucc_coll_args_t));
     task->team           = tl_team;
-    task->tag            = tl_team->seq_num++; //TODO Wrap around over max tag
+    task->tag            = tl_team->seq_num;
+    tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_TAG;
     task->super.finalize = ucc_tl_ucp_coll_finalize;
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_BARRIER:
@@ -69,9 +71,12 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
     case UCC_COLL_TYPE_ALLTOALLV:
         status = ucc_tl_ucp_alltoallv_init(task);
         break;
+    case UCC_COLL_TYPE_ALLREDUCE:
+        status = ucc_tl_ucp_allreduce_init(task);
+        break;
     default:
-        ucc_tl_ucp_put_task(task);
-        return UCC_ERR_NOT_SUPPORTED;
+        status = UCC_ERR_NOT_SUPPORTED;
+        break;
     }
     if (status != UCC_OK) {
         ucc_tl_ucp_put_task(task);
