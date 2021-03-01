@@ -69,13 +69,13 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
     ncclResult_t nccl_status;
 
     status = team->oob.req_test(team->oob_req);
-    if (status < 0) {
+    if (status == UCC_INPROGRESS) {
+        return UCC_INPROGRESS;
+    }
+    if (status != UCC_OK) {
         team->oob.req_free(team->oob_req);
         tl_error(tl_team->context->lib, "oob req test failed");
         goto free_unique_id;
-    }
-    if (status == UCC_INPROGRESS) {
-        return UCC_INPROGRESS;
     }
     status = team->oob.req_free(team->oob_req);
     if (status != UCC_OK) {
@@ -106,12 +106,15 @@ free_unique_id:
 
 static ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    tl_info(task->team->super.super.context->lib, "finalizing coll task %p",
-            task);
-    cudaEventDestroy(task->completed);
+    ucc_tl_nccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_status_t       status = UCC_OK ;
+
+    tl_info(UCC_TL_TEAM_LIB(task->team), "finalizing coll task %p", task);
+    CUDACHECK_GOTO(cudaEventDestroy(task->completed), put_task, status,
+                   UCC_TL_TEAM_LIB(task->team));
+put_task:
     ucc_mpool_put(task);
-    return UCC_OK;
+    return status;
 }
 
 ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
@@ -141,6 +144,9 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
         status = ucc_tl_nccl_alltoallv_init(task);
         break;
     default:
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "collective %d is not supported by nccl tl",
+                 coll_args->args.coll_type);
         status = UCC_ERR_NOT_SUPPORTED;
     }
     if (status != UCC_OK) {

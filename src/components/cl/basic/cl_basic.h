@@ -11,6 +11,7 @@
 #include "components/tl/ucc_tl.h"
 
 #define UCC_CL_BASIC_DEFAULT_PRIORITY 10
+#define UCC_CL_BASIC_NUM_TLS 2
 
 typedef struct ucc_cl_basic_iface {
     ucc_cl_iface_t super;

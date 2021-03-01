@@ -29,7 +29,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_team_t, ucc_base_context_t *cl_context,
     self->tl_ucp_team  = NULL;
     self->tl_nccl_team = NULL;
 
-    status = ucc_team_create_multiple_req_alloc(&self->team_create_req, 2);
+    status = ucc_team_create_multiple_req_alloc(&self->team_create_req,
+                                                UCC_CL_BASIC_NUM_TLS);
     if (UCC_OK != status) {
         ucc_free(b_params);
         return status;
@@ -47,6 +48,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_team_t, ucc_base_context_t *cl_context,
 
     status = ucc_tl_team_create_multiple(self->team_create_req);
     if (status < 0) {
+        cl_error(cl_context->lib, "failed to post tl team create (%d)",
+                 status);
         return status;
     }
     cl_info(cl_context->lib, "posted cl team: %p", self);
@@ -65,25 +68,31 @@ ucc_status_t ucc_cl_basic_team_destroy(ucc_base_team_t *cl_team)
 {
     ucc_cl_basic_team_t    *team = ucc_derived_of(cl_team, ucc_cl_basic_team_t);
     ucc_cl_basic_context_t *ctx  = UCC_CL_BASIC_TEAM_CTX(team);
-    ucc_status_t            status;
+    ucc_status_t            status, global_status;
+
+    global_status = UCC_OK;
     if (team->tl_ucp_team) {
-        if (UCC_OK !=
-            (status = UCC_TL_CTX_IFACE(ctx->tl_ucp_ctx)
-                          ->team.destroy(&team->tl_ucp_team->super))) {
-            return status;
+        status = UCC_TL_CTX_IFACE(ctx->tl_ucp_ctx)
+                    ->team.destroy(&team->tl_ucp_team->super);
+        if (UCC_OK != status) {
+            cl_error(ctx->super.super.lib, "ucp team destroy failed (%d)",
+                     status);
+            global_status = status;
         }
         team->tl_ucp_team = NULL;
     }
     if (team->tl_nccl_team) {
-        if (UCC_OK !=
-            (status = UCC_TL_CTX_IFACE(ctx->tl_nccl_ctx)
-                          ->team.destroy(&team->tl_nccl_team->super))) {
-            return status;
+        status = UCC_TL_CTX_IFACE(ctx->tl_nccl_ctx)
+                    ->team.destroy(&team->tl_nccl_team->super);
+        if (UCC_OK != status) {
+            cl_error(ctx->super.super.lib, "nccl team destroy failed (%d)",
+                     status);
+            global_status = status;
         }
         team->tl_nccl_team = NULL;
     }
     UCC_CLASS_DELETE_FUNC_NAME(ucc_cl_basic_team_t)(cl_team);
-    return UCC_OK;
+    return global_status;
 }
 
 ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)

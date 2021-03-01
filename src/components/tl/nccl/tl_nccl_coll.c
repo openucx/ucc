@@ -76,6 +76,10 @@ ucc_status_t ucc_nccl_alltoall_start(ucc_coll_task_t *coll_task)
     task->super.super.status = UCC_INPROGRESS;
     data_size = (size_t)task->args.src.info.count *
                 ucc_dt_size(task->args.src.info.datatype);
+    if (data_size == 0) {
+        task->super.super.status = UCC_OK;
+        return UCC_OK;
+    }
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
     for (peer = 0; peer < gsize; peer++) {
         NCCLCHECK_GOTO(ncclSend((void *)(sbuf + peer * data_size), data_size,
@@ -137,30 +141,32 @@ ucc_status_t ucc_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
     ucc_status_t        status = UCC_OK;
     ptrdiff_t           sbuf   = (ptrdiff_t)task->args.src.info.buffer;
     ptrdiff_t           rbuf   = (ptrdiff_t)task->args.dst.info.buffer;
-    size_t data_size, data_displ, sdt_size, rdt_size;
+    size_t sdt_size, rdt_size, count, displ;
     ucc_rank_t peer;
 
     task->super.super.status = UCC_INPROGRESS;
     sdt_size = ucc_dt_size(task->args.src.info_v.datatype);
-    rdt_size                   = ucc_dt_size(task->args.dst.info_v.datatype);
+    rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
     for (peer = 0; peer < team->size; peer++) {
-        data_size  =
-            get_count(task->args.src.info_v.counts, peer, task) * sdt_size;
-        data_displ =
-            get_displacement(task->args.src.info_v.displacements,peer, task) *
-            sdt_size;
-        NCCLCHECK_GOTO(ncclSend((void *)(sbuf + data_displ), data_size,
-                                ncclChar, peer, team->nccl_comm, stream),
-                       exit_coll, status, UCC_TL_TEAM_LIB(team));
-        data_size  =
-            get_count(task->args.dst.info_v.counts, peer, task) * rdt_size;
-        data_displ =
-            get_displacement(task->args.dst.info_v.displacements, peer, task) *
-            rdt_size;
-        NCCLCHECK_GOTO(ncclRecv((void *)(rbuf + data_displ), data_size,
-                                ncclChar, peer, team->nccl_comm, stream),
-                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+        count = get_count(task->args.src.info_v.counts, peer, task);
+        if (count != 0) {
+            displ = get_displacement(task->args.src.info_v.displacements, peer,
+                                     task);
+            NCCLCHECK_GOTO(ncclSend((void *)(sbuf + displ * sdt_size),
+                                    count * sdt_size, ncclChar, peer,
+                                    team->nccl_comm, stream),
+                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
+        count = get_count(task->args.dst.info_v.counts, peer, task);
+        if (count != 0) {
+            displ = get_displacement(task->args.dst.info_v.displacements, peer,
+                                     task);
+            NCCLCHECK_GOTO(ncclRecv((void *)(rbuf + displ * rdt_size),
+                                    count * rdt_size, ncclChar, peer,
+                                    team->nccl_comm, stream),
+                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
 
