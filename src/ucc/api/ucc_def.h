@@ -134,4 +134,15 @@ typedef void *ucc_context_addr_t;
  * @ingroup UCC_TEAM_DT
  */
 typedef size_t ucc_context_addr_len_t;
+
+
+/**
+ * @ingroup UCC_EVENTS_DT
+ * @brief UCC execution engine handle
+ *
+ * The UCC execution engine handle is an opaque handle created by the library representing
+ * the execution context and related queues.
+ */
+typedef struct ucc_ee_handle*      ucc_ee_h;
+
 #endif

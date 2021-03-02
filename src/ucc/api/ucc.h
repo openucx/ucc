@@ -1676,7 +1676,7 @@ typedef struct ucc_ee_attribs {
  *
  * @return Error code as defined by ucc_status_t
  */
- ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params *params, ucc_ee_h *ee);
+ ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params_t *params, ucc_ee_h *ee);
 
  /**
  * @ingroup UCC_EVENT
