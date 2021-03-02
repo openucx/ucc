@@ -85,6 +85,20 @@ BEGIN_C_DECLS
   */
 
 /**
+  * @defgroup UCC_EVENT_DT Events and Triggered operations' datastructures
+  * @{
+  *  Data-structures associated with event-driven collective execution
+  * @}
+  */
+
+/**
+  * @defgroup UCC_EVENT Events and Triggered Operations
+  * @{
+  *  Event-driven Collective Execution
+  * @}
+  */
+
+/**
   * @defgroup UCC_UTILS Utility Operations
   * @{
   *  Helper functions to be used across the library
@@ -1573,6 +1587,230 @@ static inline ucc_status_t ucc_collective_test(ucc_coll_req_h request)
  *  @return Error code as defined by ucc_status_t
  */
 ucc_status_t ucc_collective_finalize(ucc_coll_req_h request);
+
+
+/**
+ * @ingroup UCC_EVENT_DT
+ * 
+ */
+
+typedef enum ucc_event_type {
+	UCC_EVENT_COLLECTIVE_POST       = UCC_BIT(0),
+	UCC_EVENT_COLLECTIVE_COMPLETE   = UCC_BIT(1),
+	UCC_EVENT_COMPUTE_COMPLETE      = UCC_BIT(2),
+	UCC_EVENT_OVERFLOW              = UCC_BIT(3)
+} ucc_event_type_t;
+
+/**
+ * @ingroup UCC_EVENT_DT
+ * 
+ */
+typedef enum ucc_ee_type {
+    UCC_CUDA_STREAM = UCC_BIT(0),
+	UCC_CPU_THREAD  = UCC_BIT(1),
+	UCC_DPU_THREAD  = UCC_BIT(2)
+} ucc_ee_type_t;
+
+/**
+ * @ingroup UCC_EVENT_DT
+ * 
+ */
+typedef struct ucc_event_context {
+    ucc_event_type_t     ev_type;
+    size_t 		         info_size;
+    void 		         *info;
+} ucc_event_context_t;
+
+/**
+ * @ingroup UCC_EVENT_DT
+ * 
+ */
+typedef struct ucc_event {
+	ucc_event_type_t        ev_type;
+	ucc_event_context_t     *event_context;
+	ucc_coll_req_h          req;
+} ucc_event_t;
+
+/**
+ * @ingroup UCC_EVENT_DT
+ * 
+ */
+typedef enum ucc_event_queue_type {
+	UCC_POST_QUEUE          = UCC_BIT(0),
+	UCC_COMPLETION_QUEUE    = UCC_BIT(1)
+} ucc_event_queue_type_t;
+
+/**
+ * @ingroup UCC_EVENT_DT
+ * 
+ */
+typedef struct ucc_ee_params {
+     ucc_ee_type_t 			        ee_type;
+     ucc_event_queue_type_t        	ee_eq;
+     void 		     		        *ee_context;
+} ucc_ee_params_t;
+
+/**
+ * @ingroup UCC_EVENT_DT
+ * 
+ */
+typedef struct ucc_ee_attribs {
+    ucc_event_queue_t   post_queue;
+    ucc_event_queue_t   completion_queue;
+} ucc_ee_attribs_t;
+
+/**
+ * @ingroup UCC_EVENT
+ * 
+ * @brief The routine creates the execution context for collective operations.
+ * 
+ * @param [in] team     team handle
+ * @param [in] params   user provided params to customize the execution engine
+ * @param [out] ee      execution engine handle
+ * 
+ * @parblock
+ *
+ * @b Description
+ * 
+ * @endparblock
+ * 
+ * @return Error code as defined by ucc_status_t
+ */
+ ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params *params, ucc_ee_h *ee);
+
+ /**
+ * @ingroup UCC_EVENT
+ * 
+ * @brief The routine destroys the execution context created for collective operations.
+ * 
+ * @param [in] ee   Execution engine handle
+ * 
+ * @parblock
+ *
+ * @b Description
+ * 
+ * @endparblock
+ * 
+ * @return Error code as defined by ucc_status_t
+ */
+ ucc_status_t ucc_ee_destroy(ucc_ee_h ee);
+
+/**
+ * @ingroup UCC_EVENT
+ * 
+ * @brief The routine gets the event from the event queue.
+ *
+ * @param [in]  ee        execution engine handle
+ * @param [in]  eq_type        Event queue to pull the event
+ * @param [out] ev        Event structure fetched from the event queue
+ * 
+ * @parblock
+ *
+ * @b Description
+ * 
+ * @endparblock
+ * 
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
+                ucc_event_t *ev);
+
+
+/**
+ * @ingroup UCC_EVENT
+ * 
+ * @brief The routine gets the event from the event queue.
+ *
+ * @param [in]  ee        execution engine handle
+ * @param [in]  eq_type   Event queue to pull the event
+ * @param [out] ev        Event structure fetched from the event queue
+ * 
+ * @parblock
+ *
+ * @b Description
+ * 
+ * @endparblock
+ * 
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
+                ucc_event_t *ev);
+
+/**
+ * @ingroup UCC_EVENT
+ * 
+ * @brief The routine to set the event to the tail of the queue.
+ *
+ * @param [in]  ee        execution engine handle
+ * @param [in]  eq_type   Event queue to pull the event
+ * @param [in]  ev        Event structure fetched from the event queue
+ * 
+ * @parblock
+ *
+ * @b Description
+ * 
+ * @endparblock
+ * 
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
+                ucc_event_t ev);
+
+/**
+ * @ingroup UCC_EVENT
+ * 
+ * @brief The routine polls the event queue and fetches the event from the head of the queue.
+ *
+ * @param [in]  ee        execution engine handle
+ * @param [in]  eq_type   Event queue to read the event
+ * 
+ * @parblock
+ *
+ * @b Description
+ * 
+ * @endparblock
+ * 
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_poll(ucc_ee_h ee, ucc_event_queue_type_t eq_type);
+
+/**
+ * @ingroup UCC_EVENT
+ * 
+ * @brief The routine blocks the calling thread until there is an event on the queue.
+ *
+ * @param [in]  ee        execution engine handle
+ * @param [in]  eq_type   Event queue to read the event
+ * 
+ * @parblock
+ *
+ * @b Description
+ * 
+ * @endparblock
+ * 
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_event_queue_type_t eq_type);
+
+
+/**
+ * @ingroup UCC_EVENT
+ * 
+ * @brief The routine posts the collective operation on the execution engine, which is 
+ * launched on the event.
+ *
+ * @param [in]  ee          execution engine handle
+ * @param [in]  ee_event    Event triggering the post operation
+ * 
+ * @parblock
+ *
+ * @b Description
+ * 
+ * @endparblock
+ * 
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_event_t ee_event);
 
 END_C_DECLS
 #endif
