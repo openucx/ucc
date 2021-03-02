@@ -275,7 +275,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         goto error;
     }
     ctx->lib                     = lib;
-    ucc_list_head_init(&ctx->progress_list);
+    ucc_list_head_init(&ctx->progress_list); // todo shouldn't the struct be also MT in case of UCC_THREAD_MULTIPLE?
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
     b_params.context           = ctx;
