@@ -63,22 +63,6 @@ are related to the compute event.
 (5) On completion of the collective operation, the library posts
 UCC\_EVENT\_COLLECTIVE\_COMPLETE event to the completion event queue.
 
-
-(1) The application initializes the collective operation, when it ready. Also it
-posts the collective operation which will be triggered on an event. For example,
-the event here is completion of compute by the application.
-
-(2) When the application completes compute, it posts the UCC\_EVENT\_COMPUTE\_COMPLETE event
-to the execution engine. 
-
-(3) The library thread polls the event queue and triggers the operations that
-are related to the compute event.
-
-(4)  The library posts the UCC\_EVENT\_\_COLLECTIVE\_POST event to the event queue.
-
-(5) On completion of the collective operation, the library posts
-UCC\_EVENT\_COLLECTIVE\_COMPLETE event to the event queue.
-
 \image latex ucc\_events.pdf "UCC Execution Engine and Events"
 \image html ucc\_events.png "UCC Execution Engine and Events"
 
