@@ -30,19 +30,39 @@ engines.
 
 ### Triggered Operations
 
-Triggered operations enable posting of operations on an event. For triggered
+Triggered operations enable the posting of operations on an event. For triggered
 operations, the team should be configured with event-driven execution. The
 collection operations is defined by the interface @ref
 ucc\_collective\_triggered\_post.
 
-Ordering: The ordering for triggered operations are established via tags. 
+The operations are launched on the event. So, there is no order established by
+the library. If user desires an order for the triggered operations, the
+user should provide the tag for matching the collective operations.
 
 ### Interaction between an User Thread and Event-driven UCC
 
-The figure shows the interaction between applications threads and the UCC
-library configured with event-driven teams. In this example scenario, we assume that
-the UCC team is configured with two events queues - one for post operations and
-one for completions. 
+The figure shows the interaction between application threads and the UCC library
+configured with event-driven teams. In this example scenario, we assume that the
+UCC team are configured with two events queues - one for post operations and one
+for completions.
+
+(1) The application initializes the collective operation when it knows the
+control parameters of the collective such as buffer addresses, lengths, and
+participants of the collective. The data need not be ready as it posts the
+collective operation which will be triggered on an event. For example, the event
+here is the completion of compute by the application.
+
+(2) When the application completes the compute, it posts the
+UCC\_EVENT\_COMPUTE\_COMPLETE event to the execution engine.
+
+(3) The library thread polls the event queue and triggers the operations that
+are related to the compute event.
+
+(4) The library posts the UCC\_EVENT\_POST\_COMPLETE event to the event queue.
+
+(5) On completion of the collective operation, the library posts
+UCC\_EVENT\_COLLECTIVE\_COMPLETE event to the completion event queue.
+
 
 (1) The application initializes the collective operation, when it ready. Also it
 posts the collective operation which will be triggered on an event. For example,
