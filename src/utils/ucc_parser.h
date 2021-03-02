@@ -10,6 +10,7 @@
 #include "ucc/api/ucc_status.h"
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_compiler_def.h"
+#include "utils/ucc_list.h"
 
 #include <ucs/config/parser.h>
 #include <ucs/sys/preprocessor.h>

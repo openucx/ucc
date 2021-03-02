@@ -2,6 +2,7 @@
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
+
 #ifndef UCC_SPINLOCK_H_
 #define UCC_SPINLOCK_H_
 

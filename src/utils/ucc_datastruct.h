@@ -9,7 +9,6 @@
 #include <ucs/datastruct/list.h>
 
 #define UCC_LIST_HEAD UCS_LIST_HEAD
-#define ucc_list_link_t ucs_list_link_t
 typedef uint32_t ucc_rank_t;
 
 #endif

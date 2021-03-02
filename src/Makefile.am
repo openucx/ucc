@@ -74,6 +74,7 @@ libucc_la_SOURCES =                  \
 	core/ucc_coll.c                  \
 	core/ucc_progress_queue.c        \
 	core/ucc_progress_queue_st.c     \
+	core/ucc_progress_queue_mt.c     \
 	schedule/ucc_schedule.c          \
 	utils/ucc_component.c            \
 	utils/ucc_status.c               \
