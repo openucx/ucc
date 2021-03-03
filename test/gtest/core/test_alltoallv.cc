@@ -19,7 +19,7 @@ public:
     UccCollArgsVec data_init(int nprocs, ucc_datatype_t dtype,
                              size_t count) {
         int buf_count;
-        UccCollArgsVec args;
+        UccCollArgsVec args(nprocs);
 
         for (auto r = 0; r < nprocs; r++) {
             ucc_coll_args_t *coll = (ucc_coll_args_t*)
@@ -61,7 +61,7 @@ public:
                 buf_count += rank_count;
             }
             coll->dst.info_v.buffer = malloc(buf_count * ucc_dt_size(dtype));
-            args.push_back(coll);
+            args[r] = coll;
         }
         return args;
     }

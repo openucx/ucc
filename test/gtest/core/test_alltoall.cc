@@ -4,12 +4,6 @@
  */
 
 #include "common/test_ucc.h"
-
-// tmp
-#ifdef ucc_max
-#undef ucc_max
-#endif
-
 #include "src/utils/ucc_math.h"
 
 using Param_0 = std::tuple<int, int, int>;
@@ -20,10 +14,11 @@ class test_alltoall : public UccCollArgs, public ucc::test
 public:
     UccCollArgsVec data_init(int nprocs, ucc_datatype_t dtype,
                                      size_t count) {
-        UccCollArgsVec args;
+        UccCollArgsVec args(nprocs);
         for (auto i = 0; i < nprocs; i++) {
             ucc_coll_args_t *coll = (ucc_coll_args_t*)
                     calloc(1, sizeof(ucc_coll_args_t));
+            coll->mask = 0;
             coll->coll_type = UCC_COLL_TYPE_ALLTOALL;
             coll->src.info.mem_type = UCC_MEMORY_TYPE_HOST;
             coll->src.info.count   = (ucc_count_t)count;
@@ -40,7 +35,7 @@ public:
                 alltoallx_init_buf(r, i, (uint8_t*)coll->src.info.buffer +
                               r * rank_size, rank_size);
             }
-            args.push_back(coll);
+            args[i] = coll;
         }
         return args;
     }

@@ -311,7 +311,7 @@ UccReq::UccReq(UccTeam_h _team, ucc_coll_args_t *args) :
     }
 }
 
-UccReq::UccReq(UccTeam_h _team, std::vector<ucc_coll_args_t*> args) :
+UccReq::UccReq(UccTeam_h _team, UccCollArgsVec args) :
         team(_team)
 {
     EXPECT_EQ(team->procs.size(), args.size());
