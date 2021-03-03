@@ -1655,8 +1655,8 @@ typedef struct ucc_ee_params {
  *
  */
 typedef struct ucc_ee_attribs {
-    ucc_event_queue_t   post_queue;
-    ucc_event_queue_t   completion_queue;
+    ucc_event_queue_h   post_queue;
+    ucc_event_queue_h   completion_queue;
 } ucc_ee_attribs_t;
 
 /**

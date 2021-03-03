@@ -145,4 +145,14 @@ typedef size_t ucc_context_addr_len_t;
  */
 typedef struct ucc_ee_handle*      ucc_ee_h;
 
+/**
+ * @ingroup UCC_EVENTS_DT
+ * @brief UCC event queue handle
+ *
+ * The UCC event queue handle is an opaque handle created by the library representing
+ * the event queues.
+ */
+typedef struct ucc_event_queue_handle*      ucc_event_queue_h;
+
+
 #endif
