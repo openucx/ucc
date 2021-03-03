@@ -7,13 +7,14 @@ env:
   OPEN_UCX_BRANCH: master
 jobs:
   clang-tidy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common
-        sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| sudo apt-key add -
+        sudo apt-add-repository 'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-11 main'
         sudo apt-get install -y --no-install-recommends doxygen doxygen-latex clang-tidy-11 bear
     - name: Get UCX
       run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
