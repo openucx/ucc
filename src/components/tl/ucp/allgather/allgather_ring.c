@@ -62,8 +62,11 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
 
     task->super.super.status     = UCC_INPROGRESS;
     if (!UCC_IS_INPLACE(task->args)) {
-        ucc_mc_memcpy((void*)((ptrdiff_t)rbuf + data_size * team->rank),
-                      sbuf, data_size, rmem, smem);
+        status = ucc_mc_memcpy((void*)((ptrdiff_t)rbuf + data_size * team->rank),
+                               sbuf, data_size, rmem, smem);
+        if (UCC_OK != status) {
+            return status;
+        }
     }
 
     status = ucc_tl_ucp_allgather_ring_progress(&task->super);
