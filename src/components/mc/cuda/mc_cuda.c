@@ -101,9 +101,9 @@ static inline ucc_status_t ucc_mc_cuda_memcpy_kind_map(ucc_memory_type_t dst_mem
     return status;
 }
 
-static ucc_status_t ucc_mc_cuda_mem_cpy(void *dst, const void *src, size_t len,
-                                        ucc_memory_type_t dst_mem,
-                                        ucc_memory_type_t src_mem)
+static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
+                                       ucc_memory_type_t dst_mem,
+                                       ucc_memory_type_t src_mem)
 {
     cudaError_t    st;
     cudaMemcpyKind kind;
@@ -231,6 +231,7 @@ ucc_mc_cuda_t ucc_mc_cuda = {
     .super.ops.mem_alloc = ucc_mc_cuda_mem_alloc,
     .super.ops.mem_free  = ucc_mc_cuda_mem_free,
     .super.ops.reduce    = ucc_mc_cuda_reduce,
+    .super.ops.memcpy    = ucc_mc_cuda_memcpy
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cuda.super.config_table,
