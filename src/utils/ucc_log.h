@@ -64,6 +64,8 @@ static inline const char* ucc_coll_type_str(ucc_coll_type_t ct)
         return "Alltoall";
     case UCC_COLL_TYPE_ALLGATHER:
         return "Allgather";
+    case UCC_COLL_TYPE_ALLGATHERV:
+        return "Allgatherv";
     case UCC_COLL_TYPE_GATHER:
         return "Gather";
     case UCC_COLL_TYPE_SCATTER:

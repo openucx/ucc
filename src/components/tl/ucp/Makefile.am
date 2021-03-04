@@ -26,6 +26,10 @@ allgather =                       \
 	allgather/allgather.h         \
 	allgather/allgather.c         \
 	allgather/allgather_ring.c
+allgatherv =                      \
+	allgatherv/allgatherv.h       \
+	allgatherv/allgatherv.c       \
+	allgatherv/allgatherv_ring.c
 
 sources =            \
 	tl_ucp.h         \
@@ -42,7 +46,8 @@ sources =            \
 	$(alltoall)      \
 	$(alltoallv)     \
 	$(allreduce)     \
-	$(allgather)
+	$(allgather)     \
+    $(allgatherv)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

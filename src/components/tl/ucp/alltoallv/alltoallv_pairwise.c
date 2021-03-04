@@ -23,26 +23,6 @@ static inline ucc_rank_t get_send_peer(ucc_rank_t rank, ucc_rank_t size,
     return (rank - step + size) % size;
 }
 
-static inline size_t get_count(ucc_count_t *counts, ucc_rank_t idx,
-                               ucc_tl_ucp_task_t *task)
-{
-    if ((task->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-        (task->args.flags & UCC_COLL_ARGS_FLAG_COUNT_64BIT)) {
-        return ((uint64_t *)counts)[idx];
-    }
-    return ((uint32_t *)counts)[idx];
-}
-
-static inline size_t get_displacement(ucc_aint_t *displacements, ucc_rank_t idx,
-                                      ucc_tl_ucp_task_t *task)
-{
-    if ((task->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-        (task->args.flags & UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT)) {
-        return ((uint64_t *)displacements)[idx];
-    }
-    return ((uint32_t *)displacements)[idx];
-}
-
 ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
@@ -66,10 +46,11 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
         while ((task->recv_posted < gsize) &&
                ((task->recv_posted - task->recv_completed) < nreqs)) {
             peer       = get_recv_peer(grank, gsize, task->recv_posted);
-            data_size  = get_count(task->args.dst.info_v.counts, peer, task) *
-                         rdt_size;
-            data_displ = get_displacement(task->args.dst.info_v.displacements,
-                                          peer, task) * rdt_size;
+            data_size  = ucc_coll_args_get_count(&task->args,
+                            task->args.dst.info_v.counts, peer) * rdt_size;
+            data_displ = ucc_coll_args_get_displacement(&task->args,
+                            task->args.dst.info_v.displacements,
+                            peer) * rdt_size;
             ucc_tl_ucp_recv_nb((void *)(rbuf + data_displ), data_size,
                                task->args.dst.info_v.mem_type, peer, team,
                                task);
@@ -78,10 +59,11 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
         while ((task->send_posted < gsize) &&
                ((task->send_posted - task->send_completed) < nreqs)) {
             peer       = get_send_peer(grank, gsize, task->send_posted);
-            data_size  = get_count(task->args.src.info_v.counts, peer, task) *
-                         sdt_size;
-            data_displ = get_displacement(task->args.src.info_v.displacements,
-                                          peer, task) * sdt_size;
+            data_size  = ucc_coll_args_get_count(&task->args,
+                            task->args.src.info_v.counts, peer) * sdt_size;
+            data_displ = ucc_coll_args_get_displacement(&task->args,
+                            task->args.src.info_v.displacements,
+                            peer) * sdt_size;
             ucc_tl_ucp_send_nb((void *)(sbuf + data_displ), data_size,
                                task->args.src.info_v.mem_type, peer, team,
                                task);

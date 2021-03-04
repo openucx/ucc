@@ -12,7 +12,7 @@ END_C_DECLS
 
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
                        std::vector<ucc_test_mpi_team_t> &test_teams,
-                           const char *cls)
+                       const char *cls)
 {
     int required = (tm == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
         : MPI_THREAD_MULTIPLE;

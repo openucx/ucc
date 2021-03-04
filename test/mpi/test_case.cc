@@ -22,6 +22,8 @@ std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
                                                op, mt, _team);
     case UCC_COLL_TYPE_ALLGATHER:
         return std::make_shared<TestAllgather>(msgsize, inplace, mt, _team);
+    case UCC_COLL_TYPE_ALLGATHERV:
+        return std::make_shared<TestAllgatherv>(msgsize, inplace, mt, _team);
     default:
         break;
     }
