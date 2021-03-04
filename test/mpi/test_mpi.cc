@@ -11,12 +11,11 @@ BEGIN_C_DECLS
 END_C_DECLS
 
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
-                       std::vector<ucc_test_mpi_team_t> &test_teams,
-                           const char *cls)
+                       const char *cls)
 {
     int required = (tm == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
         : MPI_THREAD_MULTIPLE;
-    int rank, size, provided;
+    int size, provided;
     ucc_lib_config_h lib_config;
     ucc_context_config_h ctx_config;
 
@@ -26,7 +25,6 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
         std::cerr << "could not initialize MPI in thread multiple\n";
         abort();
     }
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     if (size < 2) {
         std::cerr << "test requires at least 2 ranks\n";
@@ -54,17 +52,6 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
     UCC_CHECK(ucc_context_config_read(lib, NULL, &ctx_config));
     UCC_CHECK(ucc_context_create(lib, &ctx_params, ctx_config, &ctx));
     ucc_context_config_release(ctx_config);
-    for (auto &t : test_teams) {
-        if (size < 4 && (t == TEAM_SPLIT_HALF || t == TEAM_SPLIT_ODD_EVEN)) {
-            if (rank == 0) {
-                std::cout << "size of the world=" << size <<
-                    " is too small to create team " << team_str(t) <<
-                    ", skipping ...\n";
-            }
-            continue;
-        }
-        create_team(t);
-    }
     set_msgsizes(8, ((1ULL) << 21), 8);
     dtypes = {UCC_DT_INT32, UCC_DT_INT64, UCC_DT_FLOAT32, UCC_DT_FLOAT64};
     ops = {UCC_OP_SUM, UCC_OP_MAX};
@@ -73,10 +60,34 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
     inplace = TEST_NO_INPLACE;
 }
 
+void UccTestMpi::create_teams(int num_of_threads, std::vector<ucc_test_mpi_team_t> &test_teams){
+    int size, rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    for(int i = 0; i<num_of_threads; i++) {
+        std::vector<ucc_test_team_t> teams;
+        threads_teams.push_back(teams);
+        for (auto &t : test_teams) {
+            if (size < 4 &&
+                (t == TEAM_SPLIT_HALF || t == TEAM_SPLIT_ODD_EVEN)) {
+                if (rank == 0) {
+                    std::cout << "size of the world=" << size
+                              << " is too small to create team " << team_str(t)
+                              << ", skipping ...\n";
+                }
+                continue;
+            }
+            create_team(t, i);
+        }
+    }
+}
+
 UccTestMpi::~UccTestMpi()
 {
-    for (auto &t : teams) {
-        destroy_team(t);
+    for (auto &teams : threads_teams) {
+        for (auto &t : teams) {
+            destroy_team(t);
+        }
     }
     UCC_CHECK(ucc_context_destroy(ctx));
     UCC_CHECK(ucc_finalize(lib));
@@ -133,11 +144,11 @@ ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm)
 }
 
 
-void UccTestMpi::create_team(ucc_test_mpi_team_t t)
+void UccTestMpi::create_team(ucc_test_mpi_team_t t, int thread_index)
 {
     MPI_Comm comm = create_mpi_comm(t);
     ucc_team_h team = create_ucc_team(comm);
-    teams.push_back(ucc_test_team_t(t, comm, team, ctx));
+    threads_teams.at(thread_index).push_back(ucc_test_team_t(t, comm, team, ctx));
 }
 
 void UccTestMpi::destroy_team(ucc_test_team_t &team)
@@ -180,33 +191,42 @@ void UccTestMpi::set_ops(std::vector<ucc_reduction_op_t> &_ops)
 }
 
 
-ucc_status_t UccTestMpi::run_all()
+void UccTestMpi::run_all(ucc_status_t* status, int thread_index, std::vector<ucc_test_mpi_inplace_t> &inplace_args, int iterations)
 {
-    ucc_status_t status = UCC_OK;
-    for (auto &c : colls) {
-        for (auto &t : teams) {
-            if (c == UCC_COLL_TYPE_BARRIER) {
-                auto tc = TestCase::init(c, t);
-                if (UCC_OK != tc.get()->exec()) {
-                    status = UCC_ERR_NO_MESSAGE;
-                }
-            } else {
-                for (auto mt : mtypes) {
-                    for (auto m : msgsizes) {
-                        if (c == UCC_COLL_TYPE_ALLREDUCE ||
-                            c == UCC_COLL_TYPE_REDUCE) {
-                            for (auto dt : dtypes) {
-                                for (auto op : ops) {
-                                    auto tc = TestCase::init(c, t, m, inplace, mt, dt, op);
-                                    if (UCC_OK != tc.get()->exec()) {
-                                        status = UCC_ERR_NO_MESSAGE;
+    *status = UCC_OK;
+    for(int i = 0; i < iterations; i++) {
+        for (auto &inpl : inplace_args) {
+            set_inplace(inpl);
+            for (auto &c : colls) {
+                for (auto &t : threads_teams.at(thread_index)) {
+                    if (c == UCC_COLL_TYPE_BARRIER) {
+                        auto tc = TestCase::init(c, t);
+                        if (UCC_OK != tc.get()->exec()) {
+                            *status = UCC_ERR_NO_MESSAGE;
+                        }
+                    }
+                    else {
+                        for (auto mt : mtypes) {
+                            for (auto m : msgsizes) {
+                                if (c == UCC_COLL_TYPE_ALLREDUCE ||
+                                    c == UCC_COLL_TYPE_REDUCE) {
+                                    for (auto dt : dtypes) {
+                                        for (auto op : ops) {
+                                            auto tc = TestCase::init(
+                                                c, t, m, inplace, mt, dt, op);
+                                            if (UCC_OK != tc.get()->exec()) {
+                                                *status = UCC_ERR_NO_MESSAGE;
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                        } else {
-                            auto tc = TestCase::init(c, t, m, inplace, mt);
-                            if (UCC_OK != tc.get()->exec()) {
-                                status = UCC_ERR_NO_MESSAGE;
+                                else {
+                                    auto tc =
+                                        TestCase::init(c, t, m, inplace, mt);
+                                    if (UCC_OK != tc.get()->exec()) {
+                                        *status = UCC_ERR_NO_MESSAGE;
+                                    }
+                                }
                             }
                         }
                     }
@@ -214,5 +234,4 @@ ucc_status_t UccTestMpi::run_all()
             }
         }
     }
-    return status;
 }

@@ -68,10 +68,10 @@ class UccTestMpi {
     ucc_context_h ctx;
     ucc_lib_h     lib;
     ucc_test_mpi_inplace_t inplace;
-    void create_team(ucc_test_mpi_team_t t);
+    void create_team(ucc_test_mpi_team_t t, int thread_index);
     void destroy_team(ucc_test_team_t &team);
     ucc_team_h create_ucc_team(MPI_Comm comm);    
-    std::vector<ucc_test_team_t> teams;
+    std::vector<std::vector<ucc_test_team_t>> threads_teams;
     std::vector<size_t> msgsizes;
     std::vector<ucc_memory_type_t> mtypes;
     std::vector<ucc_datatype_t> dtypes;
@@ -79,7 +79,6 @@ class UccTestMpi {
     std::vector<ucc_coll_type_t> colls;
 public:
     UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
-               std::vector<ucc_test_mpi_team_t> &test_teams,
                const char* cls = NULL);
     ~UccTestMpi();
     void set_msgsizes(size_t min, size_t max, size_t power);
@@ -90,7 +89,8 @@ public:
     void set_inplace(ucc_test_mpi_inplace_t _inplace) {
         inplace = _inplace;
     }
-    ucc_status_t run_all();
+    void run_all(ucc_status_t* status, int thread_index, std::vector<ucc_test_mpi_inplace_t> &inplace_args, int iterations);
+    void create_teams(int num_of_threads, std::vector<ucc_test_mpi_team_t> &test_teams);
 };
 
 class TestCase {

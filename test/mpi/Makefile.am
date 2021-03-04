@@ -19,6 +19,6 @@ ucc_test_mpi_SOURCES = \
 	test_allreduce.cc
 
 CXX=mpicxx
-CXXFLAGS+=-I${top_builddir}/src -std=gnu++11
+CXXFLAGS+=-I${top_builddir}/src -std=gnu++11 -pthread
 
 LDFLAGS=-L${top_builddir}/src/.libs -lucc

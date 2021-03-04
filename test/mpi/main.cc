@@ -1,6 +1,7 @@
 #include <getopt.h>
 #include <sstream>
 #include "test_mpi.h"
+#include <thread>
 
 static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
                                              UCC_COLL_TYPE_ALLREDUCE};
@@ -252,17 +253,35 @@ void ProcessArgs(int argc, char** argv)
 int main(int argc, char *argv[])
 {
     ProcessArgs(argc, argv);
+    int num_of_threads = 10, iterations = 50;
+    ucc_status_t status[num_of_threads];
+    std::thread threads[num_of_threads];
 
-    UccTestMpi test(argc, argv, UCC_THREAD_SINGLE, teams, cls);
-    test.set_colls(colls);
-    test.set_dtypes(dtypes);
-    test.set_mtypes(mtypes);
-    test.set_ops(ops);
+    UccTestMpi test_st(argc, argv, UCC_THREAD_SINGLE, cls);
+    test_st.create_teams(1, teams);
+    test_st.set_colls(colls);
+    test_st.set_dtypes(dtypes);
+    test_st.set_mtypes(mtypes);
+    test_st.set_ops(ops);
+    test_st.set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
+    test_st.run_all(&status[0], 0, inplace, 1);
+    if (UCC_OK != status[0]) {
+        return -1;
+    }
 
-    test.set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
-    for (auto &inpl : inplace) {
-        test.set_inplace(inpl);
-        if (UCC_OK != test.run_all()) {
+    UccTestMpi test_mt(argc, argv, UCC_THREAD_MULTIPLE, cls);
+    test_mt.create_teams(num_of_threads, teams); // thread multiple doesn't allow multiple threads per team
+    test_mt.set_colls(colls);
+    test_mt.set_dtypes(dtypes);
+    test_mt.set_mtypes(mtypes);
+    test_mt.set_ops(ops);
+    test_mt.set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
+    for(int i = 0; i < num_of_threads; i++) {
+        threads[i] = std::thread(&UccTestMpi::run_all, test_mt, &status[i], i, std::ref(inplace), iterations);
+    }
+    for(int i = 0; i < num_of_threads; i++) {
+        threads[i].join();
+        if (UCC_OK != status[i]) {
             return -1;
         }
     }
