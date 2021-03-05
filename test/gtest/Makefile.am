@@ -73,6 +73,7 @@ gtest_SOURCES =                 \
 	core/test_context_config.cc \
 	core/test_context.cc        \
 	core/test_mc.cc             \
+	core/test_mc_reduce.cc      \
 	core/test_team.cc           \
 	core/test_barrier.cc        \
 	core/test_alltoall.cc       \
