@@ -33,17 +33,15 @@ TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                     count, TEST_DT, _mt, rank);
     }
 
-    args.coll_type            = UCC_COLL_TYPE_ALLGATHER;
-
-    args.src.info.buffer      = sbuf;
-    args.src.info.count       = count;
-    args.src.info.datatype    = TEST_DT;
-    args.src.info.mem_type    = _mt;
-
-    args.dst.info.buffer      = rbuf;
-    args.dst.info.count       = count;
-    args.dst.info.datatype    = TEST_DT;
-    args.dst.info.mem_type    = _mt;
+    args.coll_type         = UCC_COLL_TYPE_ALLGATHER;
+    args.src.info.buffer   = sbuf;
+    args.src.info.count    = count;
+    args.src.info.datatype = TEST_DT;
+    args.src.info.mem_type = _mt;
+    args.dst.info.buffer   = rbuf;
+    args.dst.info.count    = count;
+    args.dst.info.datatype = TEST_DT;
+    args.dst.info.mem_type = _mt;
     UCC_CHECK(ucc_collective_init(&args, &req, team.team));
 }
 

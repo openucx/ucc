@@ -78,46 +78,15 @@ static ucc_status_t ucc_mc_cuda_mem_free(void *ptr)
     return UCC_OK;
 }
 
-static inline ucc_status_t ucc_mc_cuda_memcpy_kind_map(ucc_memory_type_t dst_mem,
-                                                       ucc_memory_type_t src_mem,
-                                                       cudaMemcpyKind *kind)
-{
-    ucc_status_t status = UCC_OK;
-    switch (dst_mem) {
-    case UCC_MEMORY_TYPE_HOST:
-        ucc_assert(src_mem == UCC_MEMORY_TYPE_CUDA);
-        *kind = cudaMemcpyDeviceToHost;
-        break;
-    case UCC_MEMORY_TYPE_CUDA:
-        ucc_assert(src_mem == UCC_MEMORY_TYPE_CUDA ||
-                   src_mem == UCC_MEMORY_TYPE_HOST);
-        *kind = (src_mem == UCC_MEMORY_TYPE_HOST) ?
-            cudaMemcpyHostToDevice : cudaMemcpyDeviceToDevice;
-        break;
-    default:
-        status = UCC_ERR_INVALID_PARAM;
-        break;
-    }
-    return status;
-}
-
 static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
                                        ucc_memory_type_t dst_mem,
                                        ucc_memory_type_t src_mem)
 {
     cudaError_t    st;
-    cudaMemcpyKind kind;
-    ucc_status_t   status;
     ucc_assert(dst_mem == UCC_MEMORY_TYPE_CUDA ||
                src_mem == UCC_MEMORY_TYPE_CUDA);
 
-    if (UCC_OK != (status = ucc_mc_cuda_memcpy_kind_map(dst_mem, src_mem, &kind))) {
-        mc_error(&ucc_mc_cuda.super,
-                 "failed to derive cudaMemcpyKind, dst_mem_type %d, src_mem_type %d",
-                 dst_mem, src_mem);
-        return status;
-    }
-    st = cudaMemcpyAsync(dst, src, len, kind, &ucc_mc_cuda.stream);
+    st = cudaMemcpyAsync(dst, src, len, cudaMemcpyDefault, ucc_mc_cuda.stream);
     if (st != cudaSuccess) {
         cudaGetLastError();
         mc_error(&ucc_mc_cuda.super,
@@ -126,7 +95,7 @@ static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
                  dst, src, len, st, cudaGetErrorString(st));
         return UCC_ERR_NO_MESSAGE;
     }
-    st = cudaStreamSynchronize(&ucc_mc_cuda.stream);
+    st = cudaStreamSynchronize(ucc_mc_cuda.stream);
     if (st != cudaSuccess) {
         cudaGetLastError();
         mc_error(&ucc_mc_cuda.super,
