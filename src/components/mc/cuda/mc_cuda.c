@@ -78,6 +78,35 @@ static ucc_status_t ucc_mc_cuda_mem_free(void *ptr)
     return UCC_OK;
 }
 
+static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
+                                       ucc_memory_type_t dst_mem,
+                                       ucc_memory_type_t src_mem)
+{
+    cudaError_t    st;
+    ucc_assert(dst_mem == UCC_MEMORY_TYPE_CUDA ||
+               src_mem == UCC_MEMORY_TYPE_CUDA);
+
+    st = cudaMemcpyAsync(dst, src, len, cudaMemcpyDefault, ucc_mc_cuda.stream);
+    if (st != cudaSuccess) {
+        cudaGetLastError();
+        mc_error(&ucc_mc_cuda.super,
+                 "failed to launch cudaMemcpyAsync,  dst %p, src %p, len %zd "
+                 "cuda error %d(%s)",
+                 dst, src, len, st, cudaGetErrorString(st));
+        return UCC_ERR_NO_MESSAGE;
+    }
+    st = cudaStreamSynchronize(ucc_mc_cuda.stream);
+    if (st != cudaSuccess) {
+        cudaGetLastError();
+        mc_error(&ucc_mc_cuda.super,
+                 "failed to synchronize mc_cuda.stream "
+                 "cuda error %d(%s)",
+                 st, cudaGetErrorString(st));
+        return UCC_ERR_NO_MESSAGE;
+    }
+    return UCC_OK;
+}
+
 static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
                                           size_t length,
                                           ucc_mem_attr_t *mem_attr)
@@ -171,6 +200,7 @@ ucc_mc_cuda_t ucc_mc_cuda = {
     .super.ops.mem_alloc = ucc_mc_cuda_mem_alloc,
     .super.ops.mem_free  = ucc_mc_cuda_mem_free,
     .super.ops.reduce    = ucc_mc_cuda_reduce,
+    .super.ops.memcpy    = ucc_mc_cuda_memcpy
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cuda.super.config_table,

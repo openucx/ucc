@@ -20,6 +20,8 @@ std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
     case UCC_COLL_TYPE_ALLREDUCE:
         return std::make_shared<TestAllreduce>(msgsize, inplace, dt,
                                                op, mt, _team);
+    case UCC_COLL_TYPE_ALLGATHER:
+        return std::make_shared<TestAllgather>(msgsize, inplace, mt, _team);
     default:
         break;
     }

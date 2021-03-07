@@ -134,6 +134,27 @@ ucc_status_t ucc_mc_free(void *ptr, ucc_memory_type_t mem_type)
     return mc_ops[mem_type]->mem_free(ptr);
 }
 
+ucc_status_t ucc_mc_memcpy(void *dst, const void *src, size_t len,
+                           ucc_memory_type_t dst_mem,
+                           ucc_memory_type_t src_mem)
+{
+    ucc_memory_type_t mt;
+    if (src_mem == UCC_MEMORY_TYPE_UNKNOWN ||
+        dst_mem == UCC_MEMORY_TYPE_UNKNOWN) {
+        return UCC_ERR_INVALID_PARAM;
+    } else if (src_mem == UCC_MEMORY_TYPE_HOST &&
+               dst_mem == UCC_MEMORY_TYPE_HOST) {
+        UCC_CHECK_MC_AVAILABLE(UCC_MEMORY_TYPE_HOST);
+        return mc_ops[UCC_MEMORY_TYPE_HOST]->memcpy(dst, src, len,
+                                                    UCC_MEMORY_TYPE_HOST,
+                                                    UCC_MEMORY_TYPE_HOST);
+    }
+    /* take any non host MC component */
+    mt = (dst_mem == UCC_MEMORY_TYPE_HOST) ? src_mem : dst_mem;
+    UCC_CHECK_MC_AVAILABLE(mt);
+    return mc_ops[mt]->memcpy(dst, src, len, dst_mem, src_mem);
+}
+
 ucc_status_t ucc_mc_finalize()
 {
    ucc_memory_type_t  mt;
