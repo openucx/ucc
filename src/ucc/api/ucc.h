@@ -1593,7 +1593,6 @@ ucc_status_t ucc_collective_finalize(ucc_coll_req_h request);
  * @ingroup UCC_EVENT_DT
  *
  */
-
 typedef enum ucc_event_type {
 	UCC_EVENT_COLLECTIVE_POST       = UCC_BIT(0),
 	UCC_EVENT_COLLECTIVE_COMPLETE   = UCC_BIT(1),
@@ -1607,8 +1606,7 @@ typedef enum ucc_event_type {
  */
 typedef enum ucc_ee_type {
     UCC_CUDA_STREAM = UCC_BIT(0),
-	UCC_CPU_THREAD  = UCC_BIT(1),
-	UCC_DPU_THREAD  = UCC_BIT(2)
+	UCC_CPU_THREAD  = UCC_BIT(1)
 } ucc_ee_type_t;
 
 /**
@@ -1616,9 +1614,8 @@ typedef enum ucc_ee_type {
  *
  */
 typedef struct ucc_event_context {
-    ucc_event_type_t     ev_type;
-    size_t 		         info_size;
-    void 		         *info;
+    size_t              info_size;
+    void                *info;
 } ucc_event_context_t;
 
 /**
@@ -1635,29 +1632,11 @@ typedef struct ucc_event {
  * @ingroup UCC_EVENT_DT
  *
  */
-typedef enum ucc_event_queue_type {
-	UCC_POST_QUEUE          = UCC_BIT(0),
-	UCC_COMPLETION_QUEUE    = UCC_BIT(1)
-} ucc_event_queue_type_t;
-
-/**
- * @ingroup UCC_EVENT_DT
- *
- */
 typedef struct ucc_ee_params {
-     ucc_ee_type_t 			        ee_type;
-     ucc_event_queue_type_t        	ee_eq;
-     void 		     		        *ee_context;
+     ucc_ee_type_t  ee_type;
+     void           *ee_context;
+     size_t         ee_context_size;
 } ucc_ee_params_t;
-
-/**
- * @ingroup UCC_EVENT_DT
- *
- */
-typedef struct ucc_ee_attribs {
-    ucc_event_queue_h   post_queue;
-    ucc_event_queue_h   completion_queue;
-} ucc_ee_attribs_t;
 
 /**
  * @ingroup UCC_EVENT
@@ -1701,7 +1680,6 @@ typedef struct ucc_ee_attribs {
  * @brief The routine gets the event from the event queue.
  *
  * @param [in]  ee        execution engine handle
- * @param [in]  eq_type        Event queue to pull the event
  * @param [out] ev        Event structure fetched from the event queue
  *
  * @parblock
@@ -1712,18 +1690,15 @@ typedef struct ucc_ee_attribs {
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
-                ucc_ev_t *ev);
-
+ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t *ev);
 
 /**
  * @ingroup UCC_EVENT
  *
- * @brief The routine gets the event from the event queue.
+ * @brief The routine acks the events from the event queue.
  *
- * @param [in]  ee        execution engine handle
- * @param [in]  eq_type   Event queue to pull the event
- * @param [out] ev        Event structure fetched from the event queue
+ * @param [in]  ee             execution engine handle
+ * @param [in]  nevents        acknowledges nevents from the execution engine 
  *
  * @parblock
  *
@@ -1733,8 +1708,8 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
-                ucc_ev_t *ev);
+ucc_status_t ucc_ee_get_event(ucc_ee_h ee, unsigned int nevents);
+
 
 /**
  * @ingroup UCC_EVENT
@@ -1742,7 +1717,6 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
  * @brief The routine to set the event to the tail of the queue.
  *
  * @param [in]  ee        execution engine handle
- * @param [in]  eq_type   Event queue to pull the event
  * @param [in]  ev        Event structure fetched from the event queue
  *
  * @parblock
@@ -1753,8 +1727,7 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
-                ucc_ev_t ev);
+ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t ev);
 
 /**
  * @ingroup UCC_EVENT
@@ -1762,7 +1735,7 @@ ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
  * @brief The routine polls the event queue and fetches the event from the head of the queue.
  *
  * @param [in]  ee        execution engine handle
- * @param [in]  eq_type   Event queue to read the event
+ * @param [out] ev        Event structure fetched from the event queue
  *
  * @parblock
  *
@@ -1772,7 +1745,7 @@ ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_event_queue_type_t eq_type,
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_ee_poll(ucc_ee_h ee, ucc_event_queue_type_t eq_type);
+ucc_status_t ucc_ee_poll(ucc_ee_h ee, ucc_ev_t *ev);
 
 /**
  * @ingroup UCC_EVENT
@@ -1780,7 +1753,7 @@ ucc_status_t ucc_ee_poll(ucc_ee_h ee, ucc_event_queue_type_t eq_type);
  * @brief The routine blocks the calling thread until there is an event on the queue.
  *
  * @param [in]  ee        execution engine handle
- * @param [in]  eq_type   Event queue to read the event
+ * @param [out] ev        Event structure fetched from the event queue
  *
  * @parblock
  *
@@ -1790,7 +1763,7 @@ ucc_status_t ucc_ee_poll(ucc_ee_h ee, ucc_event_queue_type_t eq_type);
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_event_queue_type_t eq_type);
+ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
 
 
 /**
