@@ -1708,7 +1708,7 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_ee_get_event(ucc_ee_h ee, unsigned int nevents);
+ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, unsigned int nevents);
 
 
 /**
