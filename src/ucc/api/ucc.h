@@ -1732,24 +1732,6 @@ ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t ev);
 /**
  * @ingroup UCC_EVENT
  *
- * @brief The routine polls the event queue and fetches the event from the head of the queue.
- *
- * @param [in]  ee        execution engine handle
- * @param [out] ev        Event structure fetched from the event queue
- *
- * @parblock
- *
- * @b Description
- *
- * @endparblock
- *
- * @return Error code as defined by ucc_status_t
- */
-ucc_status_t ucc_ee_poll(ucc_ee_h ee, ucc_ev_t *ev);
-
-/**
- * @ingroup UCC_EVENT
- *
  * @brief The routine blocks the calling thread until there is an event on the queue.
  *
  * @param [in]  ee        execution engine handle
