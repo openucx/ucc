@@ -1697,8 +1697,8 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @brief The routine acks the events from the event queue.
  *
- * @param [in]  ee             execution engine handle
- * @param [in]  nevents        acknowledges nevents from the execution engine 
+ * @param [in]  ee      execution engine handle
+ * @param [in]  ev      Event to be acked
  *
  * @parblock
  *
@@ -1708,7 +1708,7 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, unsigned int nevents);
+ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t ev);
 
 
 /**
