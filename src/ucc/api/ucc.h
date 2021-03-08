@@ -770,10 +770,10 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
  *  @ingroup UCC_CONTEXT
  *
  *  @brief The @ref ucc_context_config_modify routine modifies the runtime configuration
- *                  of UCC context (for a given CLS)
+ *                  of UCC context (optionally for a given CLS)
  *
  *  @param [in] config   Pointer to the configuration descriptor to be modified
- *  @param [in] cls      Comma separated list of CLS
+ *  @param [in] cls      Comma separated list of CLS or NULL. If NULL then core context config is modified.
  *  @param [in] name     Configuration variable to be modified
  *  @param [in] value    Configuration value to set
  *

@@ -37,6 +37,8 @@ typedef struct ucc_context_config {
     ucc_lib_info_t           *lib;
     ucc_cl_context_config_t **configs;
     int                       n_cl_cfg;
+    uint32_t                  estimated_num_eps;
+    uint32_t                  estimated_num_ppn;
 } ucc_context_config_t;
 
 /* Any internal UCC component (TL, CL, etc) may register its own

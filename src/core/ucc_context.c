@@ -11,6 +11,20 @@
 #include "utils/ucc_log.h"
 #include "utils/ucc_list.h"
 #include "ucc_progress_queue.h"
+
+static ucc_config_field_t ucc_context_config_table[] = {
+    {"ESTIMATED_NUM_EPS", "0",
+     "An optimization hint of how many endpoints will be created on this context",
+     ucc_offsetof(ucc_context_config_t, estimated_num_eps), UCC_CONFIG_TYPE_UINT},
+
+    {"ESTIMATED_NUM_PPN", "0",
+     "An optimization hint of how many endpoints created on this context reside"
+     " on the same node",
+     ucc_offsetof(ucc_context_config_t, estimated_num_ppn), UCC_CONFIG_TYPE_UINT},
+
+    {NULL}
+};
+
 ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
                                      ucc_context_config_t **config_p)
 {
@@ -31,6 +45,14 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
         status = UCC_ERR_NO_MEMORY;
         goto err_config;
     }
+
+    status = ucc_config_parser_fill_opts(config, ucc_context_config_table,
+                                         lib->full_prefix, NULL, 0);
+    if (status != UCC_OK) {
+        ucc_error("failed to read UCC core context config");
+        goto err_configs;
+    }
+
     config->lib     = lib;
     config->configs = (ucc_cl_context_config_t **)ucc_calloc(
         lib->n_cl_libs_opened, sizeof(ucc_cl_context_config_t *),
@@ -99,7 +121,16 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
     int                      i;
     ucc_status_t             status;
     ucc_cl_context_config_t *cl_cfg;
-    if (0 != strcmp(cls, "all")) {
+    if (NULL == cls) {
+        /* cls is NULL means modify core ucc context config */
+        status = ucc_config_parser_set_value(config, ucc_context_config_table, name,
+                                             value);
+        if (UCC_OK != status) {
+            ucc_error("failed to modify CORE configuration, name %s, value %s",
+                      name, value);;
+            return status;
+        }
+    } else if (0 != strcmp(cls, "all")) {
         ucc_cl_type_t *required_cls;
         int            n_required_cls;
         status = ucc_parse_cls_string(cls, &required_cls, &n_required_cls);
@@ -176,17 +207,21 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
        CL name as title */
     flags |= UCC_CONFIG_PRINT_HEADER;
 
+    if (print_header) {
+        ucc_config_parser_print_opts(
+            stream, title, config,
+            ucc_context_config_table, "",
+            config->lib->full_prefix, UCC_CONFIG_PRINT_HEADER);
+    }
+
+    ucc_config_parser_print_opts(
+        stream, "CORE",
+        config, ucc_context_config_table, "",
+        config->lib->full_prefix, (ucc_config_print_flags_t)flags);
+
     for (i = 0; i < config->n_cl_cfg; i++) {
         if (!config->configs[i]) {
             continue;
-        }
-        if (print_header) {
-            print_header = 0;
-            ucc_config_parser_print_opts(
-                stream, title, config->configs[i],
-                config->lib->cl_libs[i]->iface->cl_context_config.table,
-                config->lib->cl_libs[i]->iface->cl_context_config.prefix,
-                config->lib->full_prefix, UCC_CONFIG_PRINT_HEADER);
         }
 
         ucc_config_parser_print_opts(
@@ -279,8 +314,8 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
     b_params.context           = ctx;
-    b_params.estimated_num_eps = 0; //TODO
-    b_params.estimated_num_ppn = 0; //TODO
+    b_params.estimated_num_eps = config->estimated_num_eps;
+    b_params.estimated_num_ppn = config->estimated_num_ppn;
     b_params.prefix            = lib->full_prefix;
     b_params.thread_mode       = lib->attr.thread_mode;
     status = ucc_create_tl_contexts(ctx, config, b_params);
