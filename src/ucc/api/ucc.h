@@ -1651,6 +1651,17 @@ typedef struct ucc_ee_params {
  *
  * @b Description
  *
+ * @ref ucc_ee_create creates the execution engine. It enables event-driven
+ * collective execution. @ref ucc_ee_params_t allows the execution engine to be
+ * configured to abstract either GPU and CPU threads. The execution engine is
+ * created and coupled with the team. There can be many execution engines
+ * coupled to the team. However, attaching the same execution engine to multiple
+ * teams is not allowed. The execution engine is created after the team is
+ * created and destroyed before the team is destroyed. It is the user's
+ * responsibility to destroy the execution engines before the team. If the team
+ * is destroyed before the execution engine is destroyed, the result is
+ * undefined.
+ *
  * @endparblock
  *
  * @return Error code as defined by ucc_status_t
@@ -1667,6 +1678,13 @@ typedef struct ucc_ee_params {
  * @parblock
  *
  * @b Description
+ *
+ * @ref ucc_ee_destroy releases the resources attached with the
+ * execution engine and destroys the execution engine. All events and triggered
+ * operations related to this ee are invalid after the destroy operation. To
+ * avoid race between the creation and destroying the execution engine, for a
+ * given ee, the @ref ucc_ee_create and @ref ucc_ee_destroy must be invoked from
+ * the same thread.
  *
  * @endparblock
  *
@@ -1686,6 +1704,13 @@ typedef struct ucc_ee_params {
  *
  * @b Description
  *
+ * @ref ucc_ee_get_event fetches the events from the execution engine. If there
+ * are no events posted on the ee, it returns immediately without waiting for
+ * events. All events must be acknowledged using the @ref ucc_ee_ack_event
+ * interface. The event acknowledged is destroyed by the library. An event
+ * fetched with @ref ucc_ee_get_event but not acknowledged might consume
+ * resources in the library.
+ *
  * @endparblock
  *
  * @return Error code as defined by ucc_status_t
@@ -1703,6 +1728,11 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t *ev);
  * @parblock
  *
  * @b Description
+ *
+ * An event acknowledged by the user using @ref ucc_ee_ack_event is destroyed by
+ * the library. Any triggered operations on the event should be completed before
+ * calling this interface. The behavior is undefined if the user acknowledges
+ * the event while waiting on the event or triggering operations on the event.
  *
  * @endparblock
  *
@@ -1723,6 +1753,11 @@ ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t ev);
  *
  * @b Description
  *
+ * @ref ucc_ee_set_event sets the event on the execution engine. If the
+ * operations are waiting on the event when the user sets the event, the
+ * operations are launched. The events created by the user need to be destroyed
+ * by the user.
+ *
  * @endparblock
  *
  * @return Error code as defined by ucc_status_t
@@ -1740,6 +1775,9 @@ ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t ev);
  * @parblock
  *
  * @b Description
+ *
+ * The user thread invoking the @ref ucc_ee_wait interface is blocked until an
+ * event is posted to the execution engine.
  *
  * @endparblock
  *
@@ -1760,6 +1798,10 @@ ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
  * @parblock
  *
  * @b Description
+ *
+ * @ref ucc_collective_triggered_post allow the users to schedule a collective
+ * operation that executes in the future when an event occurs on the execution
+ * engine.
  *
  * @endparblock
  *
