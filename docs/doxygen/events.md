@@ -5,23 +5,30 @@ execution on the CUDA streams, CPU threads, and DPU threads. It is intended to
 interact with execution threads that are asynchronous (offloaded collective
 execution) which can be implemented on GPUs, DPUs, or remote CPUs.  
 
-In the event-driven execution, the events are generated when there is an event
-in the UCC library. The event can include that an operation posted or completed.
-The users can launch the UCC collective operations through the triggered
-operations. Besides the execution engine, events and event queues are key for
+UCC supports triggering collective operations by library-generated and
+user-generated events. The library events are generated on posting or completion
+of operations. The user-generated events include the completion of compute or
+communication operations. With a combination of library-generated and
+user-generated events, one can build dependencies between compute and collective
+operations, or between the collective operations.
+
+Besides the execution engine, events are key for
 event-driven execution. The operations on the execution engines generate events
-that are stored on the event queues. The valid events are defined by @ref
-ucc\_event\_type\_t.
+that are stored internally on the execution engines.
+The valid events are defined by @ref ucc\_event\_type\_t. If the underlying
+hardware doesn't support event-driven execution, the implementations
+can implement this with the event queues or lists.
 
 The interaction between the user and library is through the UCC interfaces. @ref
-ucc\_ee\_create creates execution engines. The number and type of events queues
-on the execution engine are configurable during the creation time. The user or
-library can generate an event and post it to the event queues using @ref
+ucc\_ee\_create creates execution engines. The user or
+library can generate an event and post it to the execution engines using @ref
 ucc\_ee\_set\_event interface. The user can wait on the events with the @ref
-ucc\_ee\_wait interface.
+ucc\_ee\_wait interface. The user can get the event from the ee using
+ucc\_ee\_get\_event interface and acknowledge the event with ucc\_ee\_ack\_event
+interface. Once acknowledged, the library destroys the event.
 
 Thread Mode: While in the UCC\_THREAD\_MULTIPLE mode, the execution engine and
-operations can be invoked from multiple threads. 
+operations can be invoked from multiple threads.
 
 Order: All non-triggered operations posted to the execution engine are executed
 in-order. However, there are no ordering guarantees between the execution
