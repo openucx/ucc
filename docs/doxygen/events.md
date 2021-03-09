@@ -11,15 +11,14 @@ The users can launch the UCC collective operations through the triggered
 operations. Besides the execution engine, events and event queues are key for
 event-driven execution. The operations on the execution engines generate events
 that are stored on the event queues. The valid events are defined by @ref
-ucc\_event\_type\_t and valid event queues are defined by @ref
-ucc\_event\_queue\_type\_t.
+ucc\_event\_type\_t.
 
 The interaction between the user and library is through the UCC interfaces. @ref
 ucc\_ee\_create creates execution engines. The number and type of events queues
 on the execution engine are configurable during the creation time. The user or
 library can generate an event and post it to the event queues using @ref
-ucc\_ee\_set\_event interface. The user can poll or wait on the event queue with
-@ref ucc\_ee\_poll and @ref ucc\_ee\_wait interfaces respectively.
+ucc\_ee\_set\_event interface. The user can wait on the events with the @ref
+ucc\_ee\_wait interface.
 
 Thread Mode: While in the UCC\_THREAD\_MULTIPLE mode, the execution engine and
 operations can be invoked from multiple threads. 
