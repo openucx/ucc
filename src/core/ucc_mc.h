@@ -24,6 +24,12 @@ ucc_status_t ucc_mc_free(void *ptr, ucc_memory_type_t mem_type);
 
 ucc_status_t ucc_mc_finalize();
 
+ucc_status_t ucc_mc_ee_task_post(void *ee_context, ucc_ee_type_t ee_type, void **ee_task);
+
+ucc_status_t ucc_mc_ee_task_query(void *ee_task, ucc_ee_type_t ee_type);
+
+ucc_status_t ucc_mc_ee_task_end(void *ee_task, ucc_ee_type_t ee_type);
+
 ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
                            size_t count, ucc_datatype_t dt,
                            ucc_reduction_op_t op, ucc_memory_type_t mem_type);
@@ -65,6 +71,5 @@ static inline ucc_status_t ucc_dt_reduce_multi(void *src1, void *src2,
                                    dt, args->reduce.predefined_op, mem_type);
     }
 }
-
 
 #endif

@@ -10,6 +10,7 @@
 #include "utils/ucc_log.h"
 
 static const ucc_mc_ops_t *mc_ops[UCC_MEMORY_TYPE_LAST];
+static const ucc_ee_ops_t *ee_ops[UCC_EE_LAST];
 
 #define UCC_CHECK_MC_AVAILABLE(mc)                                             \
     do {                                                                       \
@@ -60,6 +61,7 @@ ucc_status_t ucc_mc_init()
         }
         mc->ref_cnt++;
         mc_ops[mc->type] = &mc->ops;
+        ee_ops[mc->ee_type] = &mc->ee_ops;
     }
 
     return UCC_OK;
@@ -192,4 +194,19 @@ ucc_status_t ucc_mc_finalize()
     }
 
     return UCC_OK;
+}
+
+ucc_status_t ucc_mc_ee_task_post(void *ee_context, ucc_ee_type_t ee_type, void **ee_task)
+{
+    return ee_ops[ee_type]->ee_task_post(ee_context, ee_task);
+}
+
+ucc_status_t ucc_mc_ee_task_query(void *ee_task, ucc_ee_type_t ee_type)
+{
+    return ee_ops[ee_type]->ee_task_query(ee_task);
+}
+
+ucc_status_t ucc_mc_ee_task_end(void *ee_task, ucc_ee_type_t ee_type)
+{
+    return ee_ops[ee_type]->ee_task_end(ee_task);
 }

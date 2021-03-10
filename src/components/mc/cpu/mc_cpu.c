@@ -129,6 +129,23 @@ static ucc_status_t ucc_mc_cpu_mem_query(const void *ptr, size_t length,
     return UCC_ERR_NOT_SUPPORTED;
 }
 
+ucc_status_t ucc_ee_cpu_task_post(void *ee_context, void **ee_req)
+{
+    *ee_req = NULL;
+
+    return UCC_OK;
+}
+
+ucc_status_t ucc_ee_cpu_task_query(void *ee_req)
+{
+    return UCC_OK;
+}
+
+ucc_status_t ucc_ee_cpu_task_end(void *ee_req)
+{
+    return UCC_OK;
+}
+
 
 ucc_mc_cpu_t ucc_mc_cpu = {
     .super.super.name       = "cpu mc",
@@ -149,6 +166,9 @@ ucc_mc_cpu_t ucc_mc_cpu = {
             .table  = ucc_mc_cpu_config_table,
             .size   = sizeof(ucc_mc_cpu_config_t),
         },
+    .super.ee_ops.ee_task_post  = ucc_ee_cpu_task_post,
+    .super.ee_ops.ee_task_query = ucc_ee_cpu_task_query,
+    .super.ee_ops.ee_task_end   = ucc_ee_cpu_task_end
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cpu.super.config_table,

@@ -11,6 +11,7 @@
 #include "ucc_compiler_def.h"
 
 typedef ucs_mpool_t ucc_mpool_t;
+typedef ucs_mpool_ops_t ucc_mpool_ops_t;
 #define ucc_mpool_get(_mp) ucs_mpool_get((_mp))
 #define ucc_mpool_put(_obj) ucs_mpool_put((_obj))
 

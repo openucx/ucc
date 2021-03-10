@@ -23,3 +23,8 @@ const char *ucc_memory_type_names[] = {
     [UCC_MEMORY_TYPE_ROCM]         = "rocm",
     [UCC_MEMORY_TYPE_ROCM_MANAGED] = "rocm-managed",
     [UCC_MEMORY_TYPE_LAST]         = "unknown"};
+
+
+const char *ucc_ee_type_names[] = {
+    [UCC_EE_CUDA_STREAM] = "cuda stream",
+    [UCC_EE_CPU_THREAD]  = "cpu thread"};

@@ -35,6 +35,9 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
                 return status;
             }
             ucc_list_del(&task->list_elem);
+            if (task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
+                task->finalize(task);
+            }
         }
     }
     return n_progressed;
