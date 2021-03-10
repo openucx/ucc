@@ -6,6 +6,7 @@
 
 #include "tl_ucp.h"
 #include "utils/ucc_malloc.h"
+#include "core/ucc_mc.h"
 #include "components/mc/base/ucc_mc_base.h"
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib, ucc_base_attr_t *base_attr);
@@ -65,6 +66,11 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_context_config_t, oob_npolls),
      UCC_CONFIG_TYPE_UINT},
 
+    {"PRE_REG_MEM", "0",
+     "Pre Register collective memory region with UCX",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, pre_reg_mem),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_ucp_lib_t, ucc_base_lib_t,
@@ -87,6 +93,9 @@ ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team);
 ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
                                   ucc_base_team_t *team,
                                   ucc_coll_task_t **task);
+ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
+                                        ucs_memory_type_t mem_type,
+                                        ucc_tl_ucp_context_t *ctx);
 
 UCC_TL_IFACE_DECLARE(ucp, UCP);
 
@@ -98,3 +107,29 @@ ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1] = {
     [UCC_MEMORY_TYPE_ROCM_MANAGED] = UCS_MEMORY_TYPE_ROCM_MANAGED,
     [UCC_MEMORY_TYPE_UNKNOWN]      = UCS_MEMORY_TYPE_UNKNOWN
 };
+
+void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
+                                 size_t length, ucc_memory_type_t mem_type)
+{
+    void *base_address  = addr;
+    size_t alloc_length = length;
+    ucc_mem_attr_t mem_attr;
+    ucc_status_t status;
+
+    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
+                          UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
+    status = ucc_mc_query(addr, length, &mem_attr);
+    if (status == UCC_OK) {
+        base_address = mem_attr.base_address;
+        alloc_length = mem_attr.alloc_length;
+    } else {
+       tl_warn(UCC_TL_TEAM_LIB(team), "failed to query base addr and len");
+    }
+
+    status = ucc_tl_ucp_populate_rcache(base_address, alloc_length,
+                                        ucc_memtype_to_ucs[mem_type],
+                                        UCC_TL_UCP_TEAM_CTX(team));
+    if (status != UCC_OK) {
+        tl_warn(UCC_TL_TEAM_LIB(team), "ucc_tl_ucp_mem_map failed");
+    }
+}

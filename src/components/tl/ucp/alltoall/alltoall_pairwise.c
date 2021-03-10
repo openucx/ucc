@@ -70,9 +70,20 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team = task->team;
+    size_t data_size;
 
     task->super.super.status = UCC_INPROGRESS;
     task->n_polls            = ucc_min(1, task->n_polls);
+
+    if (UCC_TL_UCP_TEAM_CTX(team)->cfg.pre_reg_mem) {
+        data_size = (size_t)task->args.src.info.count *
+                    ucc_dt_size(task->args.src.info.datatype);
+        ucc_tl_ucp_pre_register_mem(team, task->args.src.info.buffer, data_size,
+                                    task->args.src.info.mem_type);
+        ucc_tl_ucp_pre_register_mem(team, task->args.dst.info.buffer, data_size,
+                                    task->args.dst.info.mem_type);
+    }
+
     ucc_tl_ucp_alltoall_pairwise_progress(&task->super);
     if (UCC_INPROGRESS == task->super.super.status) {
         ucc_progress_enqueue(UCC_TL_UCP_TEAM_CORE_CTX(team)->pq, &task->super);
