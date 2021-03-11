@@ -59,7 +59,6 @@ ucc_status_t ucc_cl_lib_config_read(ucc_cl_iface_t *iface,
 typedef struct ucc_cl_iface {
     ucc_component_iface_t          super;
     ucc_cl_type_t                  type;
-    ucc_lib_attr_t                 attr;
     ucc_config_global_list_entry_t cl_lib_config;
     ucc_config_global_list_entry_t cl_context_config;
     ucc_base_lib_iface_t           lib;

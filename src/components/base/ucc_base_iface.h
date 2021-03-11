@@ -28,7 +28,7 @@ typedef struct ucc_base_config {
 } ucc_base_config_t;
 
 typedef struct ucc_base_attr_t {
-    ucc_thread_mode_t thread_mode;
+    ucc_lib_attr_t attr;
 } ucc_base_attr_t;
 
 typedef struct ucc_base_lib_params {
