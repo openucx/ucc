@@ -121,6 +121,10 @@ protected:
     void *sbuf;
     void *rbuf;
     void *check_buf;
+
+    MPI_Request progress_request;
+    uint8_t     progress_buf[1];
+    void mpi_progress(void);
 public:
     static std::shared_ptr<TestCase> init(ucc_coll_type_t _type,
                                           ucc_test_team_t &_team,

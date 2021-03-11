@@ -47,6 +47,7 @@ void TestCase::wait()
 {
     ucc_status_t status;
     do {
+        mpi_progress();
         status = test();
         if (status < 0) {
             std::cerr << "error during coll test\n";
@@ -54,6 +55,13 @@ void TestCase::wait()
         }
         ucc_context_progress(team.ctx);
     } while (UCC_OK != status);
+}
+
+void TestCase::mpi_progress(void)
+{
+    MPI_Status status;
+    int flag = 0;
+    MPI_Test(&progress_request, &flag, &status);
 }
 
 std::string TestCase::str() {
@@ -89,14 +97,23 @@ TestCase::TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type,
                    size_t _msgsize, ucc_test_mpi_inplace_t _inplace) :
     team(_team), mem_type(_mem_type),  msgsize(_msgsize), inplace(_inplace)
 {
+    int rank;
     sbuf      = NULL;
     rbuf      = NULL;
     check_buf = NULL;
     args.mask = 0;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Irecv((void*)progress_buf, 1, MPI_CHAR, rank, 0, MPI_COMM_WORLD,
+              &progress_request);
 }
 
 TestCase::~TestCase()
 {
+    MPI_Status status;
+    MPI_Cancel(&progress_request);
+    MPI_Wait(&progress_request, &status);
+
     UCC_CHECK(ucc_collective_finalize(req));
     if (sbuf) {
         UCC_CHECK(ucc_mc_free(sbuf, mem_type));
