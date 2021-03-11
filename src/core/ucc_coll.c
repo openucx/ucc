@@ -6,6 +6,7 @@
 #include "config.h"
 #include "ucc_team.h"
 #include "ucc_context.h"
+#include "ucc_mc.h"
 #include "components/cl/ucc_cl.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
@@ -21,13 +22,108 @@ static ucc_cl_team_t *ucc_select_cl_team(ucc_coll_args_t *coll_args,
     return team->cl_teams[0];
 }
 
+#define UCC_BUFFER_INFO_CHECK_MEM_TYPE(_info) do {                             \
+    if ((_info).mem_type == UCC_MEMORY_TYPE_UNKNOWN) {                         \
+        ucc_status_t st = ucc_mc_type((_info).buffer, &((_info).mem_type));    \
+        if (st != UCC_OK) {                                                    \
+            return st;                                                         \
+        }                                                                      \
+    }                                                                          \
+} while(0)
+
+#define UCC_IS_ROOT(_args, _myrank) ((_args).root == (_myrank))
+
+static ucc_status_t ucc_coll_args_check_mem_type(ucc_coll_args_t *coll_args,
+                                                 ucc_rank_t rank)
+{
+    switch (coll_args->coll_type) {
+    case UCC_COLL_TYPE_BARRIER:
+    case UCC_COLL_TYPE_FANIN:
+    case UCC_COLL_TYPE_FANOUT:
+        return UCC_OK;
+    case UCC_COLL_TYPE_BCAST:
+        UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
+        return UCC_OK;
+    case UCC_COLL_TYPE_ALLREDUCE:
+        UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info);
+        if (!UCC_IS_INPLACE(*coll_args)) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
+        } else {
+            coll_args->src.info.mem_type = coll_args->dst.info.mem_type;
+        }
+        return UCC_OK;
+    case UCC_COLL_TYPE_ALLGATHER:
+    case UCC_COLL_TYPE_ALLTOALL:
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info);
+        if (!UCC_IS_INPLACE(*coll_args)) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
+        }
+        return UCC_OK;
+    case UCC_COLL_TYPE_ALLGATHERV:
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info_v);
+        if (!UCC_IS_INPLACE(*coll_args)) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
+        }
+        return UCC_OK;
+    case UCC_COLL_TYPE_ALLTOALLV:
+        UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info_v);
+        if (!UCC_IS_INPLACE(*coll_args)) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info_v);
+        }
+        return UCC_OK;
+    case UCC_COLL_TYPE_GATHER:
+    case UCC_COLL_TYPE_REDUCE:
+        if (UCC_IS_ROOT(*coll_args, rank)) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info);
+        }
+        if (!(UCC_IS_INPLACE(*coll_args) && UCC_IS_ROOT(*coll_args, rank))) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
+        }
+        return UCC_OK;
+    case UCC_COLL_TYPE_GATHERV:
+        if (UCC_IS_ROOT(*coll_args, rank)) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info_v);
+        }
+        if (!(UCC_IS_INPLACE(*coll_args) && UCC_IS_ROOT(*coll_args, rank))) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
+        }
+        return UCC_OK;
+    case UCC_COLL_TYPE_SCATTER:
+        if (UCC_IS_ROOT(*coll_args, rank)) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
+        }
+        if (!(UCC_IS_INPLACE(*coll_args) && UCC_IS_ROOT(*coll_args, rank))) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info);
+        }
+        return UCC_OK;
+    case UCC_COLL_TYPE_SCATTERV:
+        if (UCC_IS_ROOT(*coll_args, rank)) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info_v);
+        }
+        if (!(UCC_IS_INPLACE(*coll_args) && UCC_IS_ROOT(*coll_args, rank))) {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info);
+        }
+        return UCC_OK;
+    default:
+        ucc_error("unknown collective type");
+        return UCC_ERR_INVALID_PARAM;
+    };
+}
+
 ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
                                  ucc_coll_req_h *request, ucc_team_h team)
 {
-    ucc_cl_team_t          *cl_team;
-    ucc_base_coll_args_t    op_args;
-    ucc_status_t            status;
-    ucc_coll_task_t        *task;
+    ucc_cl_team_t         *cl_team;
+    ucc_coll_task_t       *task;
+    ucc_base_coll_args_t   op_args;
+    ucc_status_t           status;
+    status = ucc_coll_args_check_mem_type(coll_args, team->rank);
+    if (status != UCC_OK) {
+        ucc_error("memory type detection failed");
+        return status;
+    }
     /* TO discuss: maybe we want to pass around user pointer ? */
     memcpy(&op_args.args, coll_args, sizeof(ucc_coll_args_t));
     cl_team = ucc_select_cl_team(coll_args, team);

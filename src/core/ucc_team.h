@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -7,6 +7,7 @@
 #define UCC_TEAM_H_
 
 #include "ucc/api/ucc.h"
+#include "utils/ucc_datastruct.h"
 
 typedef struct ucc_context ucc_context_t;
 typedef struct ucc_cl_team ucc_cl_team_t;
@@ -20,7 +21,7 @@ typedef struct ucc_team {
     int               n_cl_teams;
     int               last_team_create_posted;
     uint16_t          id; /*< context-uniq team identifier */
-    uint32_t          rank;
+    ucc_rank_t        rank;
 } ucc_team_t;
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);
