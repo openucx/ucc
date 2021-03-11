@@ -9,6 +9,7 @@
 #include "allgatherv.h"
 #include "core/ucc_progress_queue.h"
 #include "utils/ucc_math.h"
+#include "utils/ucc_coll_utils.h"
 #include "tl_ucp_sendrecv.h"
 
 ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
@@ -22,25 +23,27 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
     ucc_datatype_t     rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
     ucc_rank_t         sendto   = (grank + 1) % gsize;
     ucc_rank_t         recvfrom = (grank - 1 + gsize) % gsize;
-    ucc_rank_t         chunk;
+    ucc_rank_t         send_idx, recv_idx;
     size_t             data_size, data_displ;
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return task->super.super.status;
     }
     while (task->send_posted < gsize) {
-        chunk = (grank - task->send_posted + 1 + gsize) % gsize;
+        send_idx = (grank - task->send_posted + 1 + gsize) % gsize;
         data_displ = ucc_coll_args_get_displacement(&task->args,
-                        task->args.dst.info_v.displacements, chunk) * rdt_size;
+                        task->args.dst.info_v.displacements, send_idx) *
+                        rdt_size;
         data_size = ucc_coll_args_get_count(&task->args,
-                        task->args.dst.info_v.counts, chunk) * rdt_size;
+                        task->args.dst.info_v.counts, send_idx) * rdt_size;
         ucc_tl_ucp_send_nb((void*)(rbuf + data_displ), data_size, rmem, sendto,
                            team, task);
-        chunk = (grank - task->recv_posted + gsize) % gsize;
+        recv_idx = (grank - task->recv_posted + gsize) % gsize;
         data_displ = ucc_coll_args_get_displacement(&task->args,
-                        task->args.dst.info_v.displacements, chunk) * rdt_size;
+                        task->args.dst.info_v.displacements, recv_idx) *
+                        rdt_size;
         data_size = ucc_coll_args_get_count(&task->args,
-                        task->args.dst.info_v.counts, chunk) * rdt_size;
+                        task->args.dst.info_v.counts, recv_idx) * rdt_size;
         ucc_tl_ucp_recv_nb((void*)(rbuf + data_displ), data_size, rmem,
                            recvfrom, team, task);
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {

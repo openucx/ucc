@@ -9,6 +9,7 @@
 #include "alltoallv.h"
 #include "core/ucc_progress_queue.h"
 #include "utils/ucc_math.h"
+#include "utils/ucc_coll_utils.h"
 #include "tl_ucp_sendrecv.h"
 
 static inline ucc_rank_t get_recv_peer(ucc_rank_t rank, ucc_rank_t size,

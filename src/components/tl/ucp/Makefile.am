@@ -47,7 +47,7 @@ sources =            \
 	$(alltoallv)     \
 	$(allreduce)     \
 	$(allgather)     \
-    $(allgatherv)
+	$(allgatherv)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

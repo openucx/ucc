@@ -42,10 +42,12 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                     count, TEST_DT, _mt, rank);
     }
     args.coll_type                = UCC_COLL_TYPE_ALLGATHERV;
-    args.src.info.buffer          = sbuf;
-    args.src.info.count           = count;
-    args.src.info.datatype        = TEST_DT;
-    args.src.info.mem_type        = _mt;
+    if (TEST_NO_INPLACE == inplace) {
+        args.src.info.buffer          = sbuf;
+        args.src.info.datatype        = TEST_DT;
+        args.src.info.mem_type        = _mt;
+        args.src.info.count           = count;
+    }
     args.dst.info_v.buffer        = rbuf;
     args.dst.info_v.counts        = (ucc_count_t*)counts;
     args.dst.info_v.displacements = (ucc_aint_t*)displacements;
@@ -64,18 +66,11 @@ TestAllgatherv::~TestAllgatherv() {
 }
 ucc_status_t TestAllgatherv::check()
 {
-    size_t       count = args.src.info.count;
+    size_t       count = counts[0];
     MPI_Datatype dt    = ucc_dt_to_mpi(TEST_DT);
     int          size;
     MPI_Comm_size(team.comm, &size);
     MPI_Allgatherv((inplace == TEST_INPLACE) ? MPI_IN_PLACE : sbuf, count, dt,
                    check_buf, (int*)counts, (int*)displacements, dt, team.comm);
     return compare_buffers(rbuf, check_buf, count*size, TEST_DT, mem_type);
-}
-
-std::string TestAllgatherv::str() {
-    return std::string("tc=")+std::string(ucc_coll_type_str(args.coll_type)) +
-        " team=" + team_str(team.type) + " msgsize=" +
-        std::to_string(msgsize) + " inplace=" +
-        (inplace == TEST_INPLACE ? "1" : "0");
 }

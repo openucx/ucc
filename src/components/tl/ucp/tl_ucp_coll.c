@@ -57,6 +57,7 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_team_t    *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t    *task    = ucc_tl_ucp_get_task(tl_team);
     ucc_status_t          status;
+
     ucc_coll_task_init(&task->super);
     memcpy(&task->args, &coll_args->args, sizeof(ucc_coll_args_t));
     task->team           = tl_team;

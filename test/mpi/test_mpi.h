@@ -160,7 +160,6 @@ public:
                    ucc_memory_type_t _mt, ucc_test_team_t &team);
     ~TestAllgatherv();
     ucc_status_t check() override;
-    std::string str() override;
 };
 
 void init_buffer(void *buf, size_t count, ucc_datatype_t dt,
