@@ -180,30 +180,85 @@ template<typename T>
 class test_mc_reduce : public testing::Test {
   protected:
     const int COUNT = 1024;
+    ucc_memory_type_t mem_type;
     virtual void SetUp() override
     {
         ucc_constructor();
         ucc_mc_init();
-        ucc_mc_alloc((void**)&buf1, COUNT*sizeof(*buf1), UCC_MEMORY_TYPE_HOST);
-        ucc_mc_alloc((void**)&buf2, COUNT*sizeof(*buf2), UCC_MEMORY_TYPE_HOST);
-        ucc_mc_alloc((void**)&res, COUNT*sizeof(*res), UCC_MEMORY_TYPE_HOST);
-        for (int i = 0 ; i < COUNT; i++) {
-            buf1[i] = (typename T::type)(i + 1);
-            buf2[i] = (typename T::type)(2 * i + 1);
-            res[i]  = (typename T::type)(0);
+        buf1_h = buf2_h = res_h = nullptr;
+        buf1_d = buf2_d = res_d = nullptr;
+    }
+
+    ucc_status_t alloc_bufs(ucc_memory_type_t mtype, size_t n)
+    {
+        size_t n_bytes = COUNT*sizeof(typename T::type);
+        mem_type = mtype;
+
+        ucc_mc_alloc((void**)&res_h, n_bytes, UCC_MEMORY_TYPE_HOST);
+        ucc_mc_alloc((void**)&buf1_h, n_bytes, UCC_MEMORY_TYPE_HOST);
+        ucc_mc_alloc((void**)&buf2_h, n * n_bytes, UCC_MEMORY_TYPE_HOST);
+
+        for (int i = 0; i < COUNT; i++) {
+            res_h[i] = (typename T::type)(0);
+        }
+        for (int i = 0; i < COUNT; i++) {
+            buf1_h[i] = (typename T::type)(i + 1);
+        }
+        for (int j = 0; j < n; j++) {
+            for (int i = 0; i < COUNT; i++) {
+                buf2_h[i + j * COUNT] =  (typename T::type)(2 * i + j + 1);
+            }
+        }
+        if (mtype != UCC_MEMORY_TYPE_HOST) {
+            ucc_mc_alloc((void**)&res_d, n_bytes, mtype);
+            ucc_mc_alloc((void**)&buf1_d, n_bytes, mtype);
+            ucc_mc_alloc((void**)&buf2_d, n*n_bytes, mtype);
+            ucc_mc_memcpy(res_d, res_h, n_bytes, mtype, UCC_MEMORY_TYPE_HOST);
+            ucc_mc_memcpy(buf1_d, buf1_h, n_bytes, mtype, UCC_MEMORY_TYPE_HOST);
+            ucc_mc_memcpy(buf2_d, buf2_h, n * n_bytes, mtype,
+                          UCC_MEMORY_TYPE_HOST);
         }
 
+        return UCC_OK;
     }
+
+    ucc_status_t free_bufs(ucc_memory_type_t mtype)
+    {
+        if (buf1_h != nullptr) {
+            ucc_mc_free((void*)buf1_h, UCC_MEMORY_TYPE_HOST);
+        }
+        if (buf2_h != nullptr) {
+            ucc_mc_free((void*)buf2_h, UCC_MEMORY_TYPE_HOST);
+        }
+        if (res_h != nullptr) {
+            ucc_mc_free((void*)res_h, UCC_MEMORY_TYPE_HOST);
+        }
+        if (buf1_d != nullptr) {
+            ucc_mc_free((void*)buf1_d, mtype);
+        }
+        if (buf2_d != nullptr) {
+            ucc_mc_free((void*)buf2_d, mtype);
+        }
+        if (res_d != nullptr) {
+            ucc_mc_free((void*)res_d, mtype);
+        }
+
+        return UCC_OK;
+    }
+
     virtual void TearDown() override
     {
-        ucc_mc_free((void*)buf1, UCC_MEMORY_TYPE_HOST);
-        ucc_mc_free((void*)buf2, UCC_MEMORY_TYPE_HOST);
-        ucc_mc_free((void*)res, UCC_MEMORY_TYPE_HOST);
+        free_bufs(mem_type);
         ucc_mc_finalize();
     }
-    typename T::type *buf1;
-    typename T::type *buf2;
-    typename T::type *res;
+    typename T::type *buf1_h;
+    typename T::type *buf2_h;
+    typename T::type *res_h;
+
+    typename T::type *buf1_d;
+    typename T::type *buf2_d;
+    typename T::type *res_d;
+
 };
 
 using ReductionTypesOps = ::testing::Types<ReductionTest<UCC_DT_INT16, max>,
@@ -246,12 +301,3 @@ using ReductionTypesOps = ::testing::Types<ReductionTest<UCC_DT_INT16, max>,
                                            ReductionTest<UCC_DT_FLOAT64, prod>>;
 
 TYPED_TEST_CASE(test_mc_reduce, ReductionTypesOps);
-TYPED_TEST(test_mc_reduce, ucc_op_sum) {
-    ucc_mc_reduce(this->buf1, this->buf2, this->res,
-                  this->COUNT, TypeParam::dt,
-                  TypeParam::redop, UCC_MEMORY_TYPE_HOST);
-    for (int i = 0; i < this->COUNT; i++) {
-        TypeParam::assert_equal(TypeParam::do_op(this->buf1[i],this->buf2[i]),
-                                this->res[i]);
-    }
-}
