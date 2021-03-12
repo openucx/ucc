@@ -9,8 +9,8 @@
 #ifndef UCC_TEST_HELPERS_H
 #define UCC_TEST_HELPERS_H
 
-#include "src/ucc/api/ucc.h"
-#include "src/utils/ucc_math.h"
+#include "ucc/api/ucc.h"
+#include "utils/ucc_math.h"
 #include "gtest.h"
 
 #ifndef UINT16_MAX

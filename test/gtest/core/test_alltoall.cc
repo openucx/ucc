@@ -4,7 +4,7 @@
  */
 
 #include "common/test_ucc.h"
-#include "src/utils/ucc_math.h"
+#include "utils/ucc_math.h"
 
 using Param_0 = std::tuple<int, int, int>;
 using Param_1 = std::tuple<int, int>;
