@@ -25,6 +25,9 @@ END_C_DECLS
         MPI_Abort(MPI_COMM_WORLD, -1);                              \
     }
 
+extern int test_rand_seed;
+extern size_t test_max_size;
+
 typedef enum {
     TEAM_WORLD,
     TEAM_REVERSE,
@@ -43,6 +46,28 @@ typedef enum {
     ROOT_RANDOM,
     ROOT_ALL
 } ucc_test_mpi_root_t;
+
+typedef enum {
+    TEST_FLAG_VSIZE_32BIT,
+    TEST_FLAG_VSIZE_64BIT
+} ucc_test_vsize_flag_t;
+
+typedef enum {
+    TEST_SKIP_NONE,
+    TEST_SKIP_MEM_LIMIT,
+    TEST_SKIP_LAST
+} test_skip_cause_t;
+
+static inline const char* skip_str(test_skip_cause_t s) {
+    switch(s) {
+    case TEST_SKIP_MEM_LIMIT:
+        return "maximum buffer size reached";
+    default:
+        return "unknown";
+    }
+    return NULL;
+}
+
 static inline const char* team_str(ucc_test_mpi_team_t t) {
     switch(t) {
     case TEAM_WORLD:
@@ -88,6 +113,8 @@ class UccTestMpi {
     std::vector<ucc_reduction_op_t> ops;
     std::vector<ucc_coll_type_t> colls;
     std::vector<int> gen_roots(ucc_test_team_t &team);
+    std::vector<ucc_test_vsize_flag_t> counts_vsize;
+    std::vector<ucc_test_vsize_flag_t> displs_vsize;
 public:
     std::vector<ucc_status_t> results;
     UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
@@ -102,7 +129,9 @@ public:
     void set_inplace(ucc_test_mpi_inplace_t _inplace) {
         inplace = _inplace;
     }
-    ucc_status_t run_all();
+    void set_count_vsizes(std::vector<ucc_test_vsize_flag_t> &_counts_vsize);
+    void set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vsize);
+    void run_all();
     void set_root(ucc_test_mpi_root_t _root_type, int _root_value) {
         root_type = _root_type;
         root_value = _root_value;
@@ -121,10 +150,10 @@ protected:
     void *sbuf;
     void *rbuf;
     void *check_buf;
-
     MPI_Request progress_request;
     uint8_t     progress_buf[1];
     void mpi_progress(void);
+    test_skip_cause_t test_skip;
 public:
     static std::shared_ptr<TestCase> init(ucc_coll_type_t _type,
                                           ucc_test_team_t &_team,
@@ -133,7 +162,9 @@ public:
                                           ucc_test_mpi_inplace_t inplace = TEST_NO_INPLACE,
                                           ucc_memory_type_t mt = UCC_MEMORY_TYPE_HOST,
                                           ucc_datatype_t dt = UCC_DT_INT32,
-                                          ucc_reduction_op_t op = UCC_OP_SUM);
+                                          ucc_reduction_op_t op = UCC_OP_SUM,
+                                          ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
+                                          ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT);
 
     TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
              size_t _msgsize = 0, ucc_test_mpi_inplace_t _inplace = TEST_NO_INPLACE);
@@ -144,6 +175,8 @@ public:
     virtual ucc_status_t test();
     void wait();
     ucc_status_t exec();
+    test_skip_cause_t skip(int skip_cond, test_skip_cause_t cause,
+                           MPI_Comm comm);
 };
 
 class TestBarrier : public TestCase {
@@ -189,6 +222,61 @@ public:
     TestBcast(size_t _msgsize, ucc_memory_type_t _mt, int root,
               ucc_test_team_t &team);
     ucc_status_t check();
+};
+
+class TestAlltoall : public TestCase {
+    ucc_datatype_t dt;
+public:
+    TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
+                 ucc_datatype_t _dt, ucc_memory_type_t _mt,
+                 ucc_test_team_t &_team);
+    ucc_status_t check();
+    std::string str();
+};
+
+class TestAlltoallv : public TestCase {
+    ucc_datatype_t dt;
+    size_t sncounts;
+    size_t rncounts;
+    int *scounts;
+    int *sdispls;
+    int *rcounts;
+    int *rdispls;
+    ucc_test_vsize_flag_t count_bits;
+    ucc_test_vsize_flag_t displ_bits;
+
+    template<typename T>
+    static void* _mpi_counts_to_ucc(int *mpi_counts, size_t _ncount)
+    {
+        void *ucc_counts = (T*)malloc(sizeof(T) * _ncount);
+        for (auto i = 0; i < _ncount; i++) {
+            ((T*)ucc_counts)[i] = mpi_counts[i];
+        }
+        return ucc_counts;
+    }
+public:
+    TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
+                  ucc_datatype_t _dt, ucc_memory_type_t _mt,
+                  ucc_test_team_t &_team,
+                  ucc_test_vsize_flag_t count_bits,
+                  ucc_test_vsize_flag_t displ_bits);
+    ucc_status_t check();
+    std::string str();
+    ~TestAlltoallv()
+    {
+        if (scounts) {
+            free(scounts);
+        }
+        if (sdispls) {
+            free(sdispls);
+        }
+        if (rcounts) {
+            free(rcounts);
+        }
+        if (rdispls) {
+            free(rdispls);
+        }
+    }
 };
 
 void init_buffer(void *buf, size_t count, ucc_datatype_t dt,

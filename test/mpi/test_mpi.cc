@@ -201,6 +201,7 @@ int ucc_coll_is_rooted(ucc_coll_type_t c)
     case UCC_COLL_TYPE_ALLREDUCE:
     case UCC_COLL_TYPE_ALLGATHER:
     case UCC_COLL_TYPE_ALLTOALL:
+    case UCC_COLL_TYPE_ALLTOALLV:
     case UCC_COLL_TYPE_BARRIER:
         return 0;
     default:
@@ -208,9 +209,18 @@ int ucc_coll_is_rooted(ucc_coll_type_t c)
     }
 }
 
-ucc_status_t UccTestMpi::run_all()
+void UccTestMpi::set_count_vsizes(std::vector<ucc_test_vsize_flag_t> &_counts_vsize)
 {
-    ucc_status_t status = UCC_OK;
+    counts_vsize =  _counts_vsize;
+}
+
+void UccTestMpi::set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vsize)
+{
+    displs_vsize = _displs_vsize;
+}
+
+void UccTestMpi::run_all()
+{
     for (auto &c : colls) {
         for (auto &t : teams) {
             std::vector<int> roots = {0};
@@ -233,10 +243,42 @@ ucc_status_t UccTestMpi::run_all()
                                         results.push_back(tc.get()->exec());
                                     }
                                 }
+                            } else if (c == UCC_COLL_TYPE_ALLTOALL ||
+                                       c == UCC_COLL_TYPE_ALLTOALLV) {
+                                if (TEST_INPLACE == inplace &&
+                                    ucc_coll_inplace_supported(c)) {
+                                    results.push_back(UCC_ERR_NOT_IMPLEMENTED);
+                                    continue;
+                                }
+                                for (auto dt : dtypes) {
+                                    switch (c) {
+                                    case UCC_COLL_TYPE_ALLTOALL:
+                                    {
+                                        auto tc = TestCase::init(c, t, r, m, inplace, mt, dt);
+                                        results.push_back(tc.get()->exec());
+                                        break;
+                                    }
+                                    case UCC_COLL_TYPE_ALLTOALLV:
+                                    {
+                                        for (auto count_bits : counts_vsize) {
+                                           for (auto displ_bits : displs_vsize) {
+                                                auto tc = TestCase::init(c, t, r, m, inplace,
+                                                                 mt, dt, (ucc_reduction_op_t)-1,
+                                                                 count_bits, displ_bits);
+                                                results.push_back(tc.get()->exec());
+                                            }
+                                        }
+                                        break;
+                                    }
+                                    default:
+                                        continue;
+                                    }
+                                }
                             } else {
                                 auto tc = TestCase::init(c, t, r, m, inplace, mt);
                                 if (TEST_INPLACE == inplace &&
                                     ucc_coll_inplace_supported(c)) {
+                                    results.push_back(UCC_ERR_NOT_IMPLEMENTED);
                                     continue;
                                 }
                                 results.push_back(tc.get()->exec());
@@ -247,7 +289,6 @@ ucc_status_t UccTestMpi::run_all()
             }
         }
     }
-    return status;
 }
 
 std::vector<int> UccTestMpi::gen_roots(ucc_test_team_t &team)

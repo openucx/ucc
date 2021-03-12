@@ -13,7 +13,9 @@ std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
                                          ucc_test_mpi_inplace_t inplace,
                                          ucc_memory_type_t mt,
                                          ucc_datatype_t dt,
-                                         ucc_reduction_op_t op)
+                                         ucc_reduction_op_t op,
+                                         ucc_test_vsize_flag_t count_bits,
+                                         ucc_test_vsize_flag_t displ_bits)
 {
     switch(_type) {
     case UCC_COLL_TYPE_BARRIER:
@@ -27,6 +29,11 @@ std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
         return std::make_shared<TestAllgatherv>(msgsize, inplace, mt, _team);
     case UCC_COLL_TYPE_BCAST:
         return std::make_shared<TestBcast>(msgsize, mt, root, _team);
+    case UCC_COLL_TYPE_ALLTOALL:
+        return std::make_shared<TestAlltoall>(msgsize, inplace, dt, mt, _team);
+    case UCC_COLL_TYPE_ALLTOALLV:
+        return std::make_shared<TestAlltoallv>(msgsize, inplace, dt, mt, _team,
+                                               count_bits, displ_bits);
     default:
         break;
     }
@@ -81,17 +88,38 @@ ucc_status_t TestCase::exec()
     ucc_status_t status;
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-    if (0 == world_rank) {
-        std::cout << str() << std::endl;
-    }
-    run();
-    wait();
-    status = check();
-    if (UCC_OK != status) {
-        std::cerr << "FAILURE in: " << str() << std::endl;
+    if (TEST_SKIP_NONE == test_skip) {
+        if (0 == world_rank) {
+            std::cout << str() << std::endl;
+        }
+        run();
+        wait();
+        status = check();
+        if (UCC_OK != status) {
+            std::cerr << "FAILURE in: " << str() << std::endl;
+        }
+    } else {
+        if (0 == world_rank) {
+            std::cout << "SKIPPED: " << skip_str(test_skip) << ": "
+                      << str() << " " << std::endl;
+        }
+        status = UCC_ERR_LAST;
     }
     return status;
 }
+
+test_skip_cause_t TestCase::skip(int skip_cond, test_skip_cause_t cause,
+                                 MPI_Comm comm)
+{
+    int rank;
+    test_skip_cause_t skip = skip_cond ? cause : TEST_SKIP_NONE;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Reduce((void*)&skip, (void*)&test_skip, 1,
+               MPI_INT, MPI_MAX, 0, comm);
+    MPI_Bcast((void*)&test_skip, 1, MPI_INT, 0, comm);
+    return test_skip;
+}
+
 
 TestCase::TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type,
                    size_t _msgsize, ucc_test_mpi_inplace_t _inplace) :
@@ -102,6 +130,8 @@ TestCase::TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type,
     rbuf      = NULL;
     check_buf = NULL;
     args.mask = 0;
+    args.flags = 0;
+    test_skip = TEST_SKIP_NONE;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Irecv((void*)progress_buf, 1, MPI_CHAR, rank, 0, MPI_COMM_WORLD,
@@ -114,7 +144,9 @@ TestCase::~TestCase()
     MPI_Cancel(&progress_request);
     MPI_Wait(&progress_request, &status);
 
-    UCC_CHECK(ucc_collective_finalize(req));
+    if (TEST_SKIP_NONE == test_skip) {
+        UCC_CHECK(ucc_collective_finalize(req));
+    }
     if (sbuf) {
         UCC_CHECK(ucc_mc_free(sbuf, mem_type));
     }
