@@ -139,21 +139,21 @@ ucc_status_t ucc_mc_cuda_reduce(const void *src1, const void *src2, void *dst,
     switch (dt)
     {
         case UCC_DT_INT16:
-            DT_REDUCE_INT(int16_t, op, src1, src2, dst, count, stream, th, bk);
+            DT_REDUCE_INT(int16_t, op, src1, src2, dst, count, stream, bk, th);
             break;
         case UCC_DT_INT32:
-            DT_REDUCE_INT(int32_t, op, src1, src2, dst, count, stream, th, bk);
+            DT_REDUCE_INT(int32_t, op, src1, src2, dst, count, stream, bk, th);
             break;
         case UCC_DT_INT64:
-            DT_REDUCE_INT(int64_t, op, src1, src2, dst, count, stream, th, bk);
+            DT_REDUCE_INT(int64_t, op, src1, src2, dst, count, stream, bk, th);
             break;
         case UCC_DT_FLOAT32:
             ucc_assert(4 == sizeof(float));
-            DT_REDUCE_FLOAT(float, op, src1, src2, dst, count, stream, th, bk);
+            DT_REDUCE_FLOAT(float, op, src1, src2, dst, count, stream, bk, th);
             break;
         case UCC_DT_FLOAT64:
             ucc_assert(8 == sizeof(double));
-            DT_REDUCE_FLOAT(double, op, src1, src2, dst, count, stream, th, bk);
+            DT_REDUCE_FLOAT(double, op, src1, src2, dst, count, stream, bk, th);
             break;
         default:
             mc_error(&ucc_mc_cuda.super, "unsupported reduction type (%d)", dt);
