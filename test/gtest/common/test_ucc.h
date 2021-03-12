@@ -10,13 +10,49 @@
 #include <tuple>
 #include <memory>
 
+typedef std::vector<ucc_coll_args_t*> UccCollArgsVec;
+
+class UccCollArgs {
+protected: 
+    void alltoallx_init_buf(int src_rank, int dst_rank, uint8_t *buf, size_t len)
+    {
+        for (int i = 0; i < len; i++) {
+            buf[i] = (uint8_t)(((src_rank + len - i) *
+                                (dst_rank + 1)) % UINT8_MAX);
+        }
+    }
+    int alltoallx_validate_buf(int src_rank, int dst_rank, uint8_t *buf, size_t len)
+    {
+        int err = 0;
+        for (int i = 0; i < len; i ++) {
+            uint8_t expected = (uint8_t)
+                    (((dst_rank + len - i) *
+                      (src_rank + 1)) % UINT8_MAX);
+            if (buf[i] != expected) {
+                err++;
+            }
+        }
+        return err;
+    }
+public:
+    virtual ~UccCollArgs() {}
+    virtual UccCollArgsVec data_init(int nprocs, ucc_datatype_t dtype,
+                                     size_t count) = 0;
+    virtual void data_fini(UccCollArgsVec args) = 0;
+    virtual void data_validate(UccCollArgsVec args) = 0;
+};
+
 /* A single processes in a Job that runs UCC.
    It has context and lib object */
 class UccProcess {
 public:
     static constexpr ucc_lib_params_t default_lib_params = {
-        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE,
-        .thread_mode = UCC_THREAD_SINGLE
+        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE |
+                UCC_LIB_PARAM_FIELD_COLL_TYPES,
+        .thread_mode = UCC_THREAD_SINGLE,
+        .coll_types = UCC_COLL_TYPE_BARRIER |
+                      UCC_COLL_TYPE_ALLTOALL |
+                      UCC_COLL_TYPE_ALLTOALLV
     };
     static constexpr ucc_context_params_t default_ctx_params = {
         .mask = UCC_CONTEXT_PARAM_FIELD_TYPE,
@@ -107,6 +143,7 @@ public:
 
     std::vector<ucc_coll_req_h> reqs;
     UccReq(UccTeam_h _team, ucc_coll_args_t *args);
+    UccReq(UccTeam_h _team, UccCollArgsVec args);
     ~UccReq();
     void start(void);
     void wait();
