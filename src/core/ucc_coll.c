@@ -10,6 +10,7 @@
 #include "components/cl/ucc_cl.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
+#include "utils/ucc_coll_utils.h"
 #include "schedule/ucc_schedule.h"
 
 /* NOLINTNEXTLINE  */

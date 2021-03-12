@@ -11,6 +11,7 @@
 #include "tl_ucp_sendrecv.h"
 #include "coll_patterns/recursive_knomial.h"
 #include "utils/ucc_math.h"
+#include "utils/ucc_coll_utils.h"
 #include "core/ucc_mc.h"
 enum {
     PHASE_INIT,

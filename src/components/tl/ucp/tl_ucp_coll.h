@@ -6,9 +6,11 @@
 
 #ifndef UCC_TL_UCP_COLL_H_
 #define UCC_TL_UCP_COLL_H_
+
 #include "tl_ucp.h"
 #include "schedule/ucc_schedule.h"
 #include "coll_patterns/recursive_knomial.h"
+
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t    super;
     ucc_coll_args_t    args;

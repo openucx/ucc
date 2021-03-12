@@ -42,6 +42,7 @@ noinst_HEADERS =                     \
 	utils/ucc_component.h            \
 	utils/ucc_datastruct.h           \
 	utils/ucc_math.h                 \
+	utils/ucc_coll_utils.h           \
 	components/base/ucc_base_iface.h \
 	components/cl/ucc_cl.h           \
 	components/cl/ucc_cl_log.h       \

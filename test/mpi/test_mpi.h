@@ -70,7 +70,7 @@ class UccTestMpi {
     ucc_test_mpi_inplace_t inplace;
     void create_team(ucc_test_mpi_team_t t);
     void destroy_team(ucc_test_team_t &team);
-    ucc_team_h create_ucc_team(MPI_Comm comm);    
+    ucc_team_h create_ucc_team(MPI_Comm comm);
     std::vector<ucc_test_team_t> teams;
     std::vector<size_t> msgsizes;
     std::vector<ucc_memory_type_t> mtypes;
@@ -95,7 +95,7 @@ public:
 
 class TestCase {
 protected:
-    ucc_test_team_t team;    
+    ucc_test_team_t team;
     ucc_memory_type_t mem_type;
     size_t msgsize;
     ucc_test_mpi_inplace_t inplace;
@@ -115,7 +115,7 @@ public:
 
     TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
              size_t _msgsize = 0, ucc_test_mpi_inplace_t _inplace = TEST_NO_INPLACE);
-    ~TestCase();
+    virtual ~TestCase();
     virtual void run();
     virtual ucc_status_t check() = 0;
     virtual std::string str();
@@ -150,6 +150,16 @@ public:
     TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
                   ucc_memory_type_t _mt, ucc_test_team_t &team);
     ucc_status_t check();
+};
+
+class TestAllgatherv : public TestCase {
+    int *counts;
+    int *displacements;
+public:
+    TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
+                   ucc_memory_type_t _mt, ucc_test_team_t &team);
+    ~TestAllgatherv();
+    ucc_status_t check() override;
 };
 
 void init_buffer(void *buf, size_t count, ucc_datatype_t dt,

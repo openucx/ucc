@@ -6,6 +6,7 @@
 #include "config.h"
 #include "tl_ucp.h"
 #include "allreduce.h"
+#include "utils/ucc_coll_utils.h"
 
 ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *task);
 ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *task);

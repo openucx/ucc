@@ -8,6 +8,7 @@
 
 #include "config.h"
 #include <ucs/sys/math.h>
+#include "ucc_datastruct.h"
 
 #define ucc_min(_a, _b) ucs_min((_a), (_b))
 #define ucc_max(_a, _b) ucs_max((_a), (_b))

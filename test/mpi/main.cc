@@ -4,7 +4,8 @@
 
 static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
                                              UCC_COLL_TYPE_ALLREDUCE,
-                                             UCC_COLL_TYPE_ALLGATHER};
+                                             UCC_COLL_TYPE_ALLGATHER,
+                                             UCC_COLL_TYPE_ALLGATHERV};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
 static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
                                              UCC_DT_FLOAT32, UCC_DT_FLOAT64};
@@ -33,7 +34,7 @@ static std::vector<std::string> str_split(const char *value, const char *delimit
 void PrintHelp()
 {
     std::cout <<
-       "--colls    <c1,c2,..>:        list of collectives: barrier,allreduce\n"
+       "--colls    <c1,c2,..>:        list of collectives: barrier,allreduce,allgatherv\n"
        "--teams    <t1,t2,..>:        list of teams: world,half,reverse,odd_even\n"
        "--mtypes   <m1,m2,..>:        list of mtypes: host,cuda\n"
        "--dtypes   <d1,d2,..>:        list of dtypes: (u)int8(16,32,64),float32(64)\n"
@@ -80,6 +81,8 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
         return UCC_COLL_TYPE_ALLREDUCE;
     } else if (coll == "allgather") {
         return UCC_COLL_TYPE_ALLGATHER;
+    } else if (coll == "allgatherv") {
+        return UCC_COLL_TYPE_ALLGATHERV;
     } else {
         std::cerr << "incorrect coll type: " << coll << std::endl;
         PrintHelp();
@@ -196,7 +199,6 @@ static void process_inplace(const char *arg)
         break;
     }
 }
-
 
 void ProcessArgs(int argc, char** argv)
 {
