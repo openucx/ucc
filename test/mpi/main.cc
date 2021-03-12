@@ -1,6 +1,7 @@
 #include <getopt.h>
 #include <sstream>
 #include "test_mpi.h"
+#include <chrono>
 
 static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
                                              UCC_COLL_TYPE_ALLREDUCE,
@@ -15,6 +16,8 @@ static std::vector<ucc_test_mpi_team_t> teams = {TEAM_WORLD, TEAM_REVERSE,
 static size_t msgrange[3] = {8, (1ULL << 21), 8};
 static char *cls = NULL;
 static std::vector<ucc_test_mpi_inplace_t> inplace = {TEST_NO_INPLACE};
+static ucc_test_mpi_root_t root_type = ROOT_RANDOM;
+static int root_value = 10;
 static std::vector<std::string> str_split(const char *value, const char *delimiter)
 {
     std::vector<std::string> rst;
@@ -41,6 +44,7 @@ void PrintHelp()
        "--ops      <o1,o2,..>:        list of ops:sum,prod,max,min,land,lor,lxor,band,bor,bxor\n"
        "--inplace  <value>:           0 - no inplace, 1 - inplace, 2 - both\n"
        "--msgsize  <min:max[:power]>  mesage sizes range:\n"
+       "--root     <type:[value]>     type of root selection: single:<value>, random:<value>, all\n"
        "--help:              Show help\n";
     exit(1);
 }
@@ -83,6 +87,8 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
         return UCC_COLL_TYPE_ALLGATHER;
     } else if (coll == "allgatherv") {
         return UCC_COLL_TYPE_ALLGATHERV;
+    } else if (coll == "bcast") {
+        return UCC_COLL_TYPE_BCAST;
     } else {
         std::cerr << "incorrect coll type: " << coll << std::endl;
         PrintHelp();
@@ -200,9 +206,39 @@ static void process_inplace(const char *arg)
     }
 }
 
+static void process_root(const char *arg)
+{
+    auto tokens = str_split(arg, ":");
+    std::string root_type_str = tokens[0];
+    if (root_type_str == "all") {
+        if (tokens.size() != 1) {
+            goto err;
+        }
+        root_type = ROOT_ALL;
+    } else if (root_type_str == "random") {
+        if (tokens.size() != 2) {
+            goto err;
+        }
+        root_type = ROOT_RANDOM;
+        root_value = std::atoi(tokens[1].c_str());
+    } else if (root_type_str == "single") {
+        if (tokens.size() != 2) {
+            goto err;
+        }
+        root_type = ROOT_SINGLE;
+        root_value = std::atoi(tokens[1].c_str());
+    } else {
+        goto err;
+    }
+    return;
+err:
+    std::cerr << "incorrect root setting" << arg << std::endl;
+    PrintHelp();
+}
+
 void ProcessArgs(int argc, char** argv)
 {
-    const char* const short_opts = "c:t:m:d:o:M:I:h";
+    const char* const short_opts = "c:t:m:d:o:M:I:r:h";
     const option long_opts[] = {
         {"colls",   required_argument, nullptr, 'c'},
         {"teams",   required_argument, nullptr, 't'},
@@ -211,6 +247,7 @@ void ProcessArgs(int argc, char** argv)
         {"ops",     required_argument, nullptr, 'o'},
         {"msgsize", required_argument, nullptr, 'm'},
         {"inplace", required_argument, nullptr, 'I'},
+        {"root",    required_argument, nullptr, 'r'},
         {"help",    no_argument,       nullptr, 'h'},
         {nullptr,   no_argument,       nullptr, 0}
     };
@@ -245,6 +282,9 @@ void ProcessArgs(int argc, char** argv)
         case 'I':
             process_inplace(optarg);
             break;
+        case 'r':
+            process_root(optarg);
+            break;
         case 'h': // -h or --help
         case '?': // Unrecognized option
         default:
@@ -256,6 +296,9 @@ void ProcessArgs(int argc, char** argv)
 
 int main(int argc, char *argv[])
 {
+    std::chrono::steady_clock::time_point begin =
+        std::chrono::steady_clock::now();
+    int rank;
     ProcessArgs(argc, argv);
 
     UccTestMpi test(argc, argv, UCC_THREAD_SINGLE, teams, cls);
@@ -263,7 +306,7 @@ int main(int argc, char *argv[])
     test.set_dtypes(dtypes);
     test.set_mtypes(mtypes);
     test.set_ops(ops);
-
+    test.set_root(root_type, root_value);
     test.set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
     for (auto &inpl : inplace) {
         test.set_inplace(inpl);
@@ -271,6 +314,25 @@ int main(int argc, char *argv[])
             return -1;
         }
     }
+    std::cout << std::flush;
+    MPI_Allreduce(MPI_IN_PLACE, test.results.data(), test.results.size(),
+                  MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+    if (0 == rank) {
+        std::chrono::steady_clock::time_point end =
+            std::chrono::steady_clock::now();
+        int failed = 0;
+        for (auto s : test.results) {
+            if (s < 0) failed++;
+        }
+        std::cout << "\n===== UCC MPI TEST =====\n" <<
+            "   total tests : " << test.results.size() << "\n" << 
+            "   passed      : " << test.results.size() - failed << "\n" <<
+            "   failed      : " << failed << "\n" <<
+            "   elapsed     : " <<
+            std::chrono::duration_cast<std::chrono::seconds>(end - begin).count()
+                  << "s" << std::endl;
+    }
     return 0;
 }

@@ -13,6 +13,7 @@
 #include "allreduce/allreduce.h"
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
+#include "bcast/bcast.h"
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
@@ -82,6 +83,9 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
         break;
     case UCC_COLL_TYPE_ALLGATHERV:
         status = ucc_tl_ucp_allgatherv_init(task);
+        break;
+    case UCC_COLL_TYPE_BCAST:
+        status = ucc_tl_ucp_bcast_init(task);
         break;
     default:
         status = UCC_ERR_NOT_SUPPORTED;

@@ -17,6 +17,11 @@ alltoallv =                        \
 	alltoallv/alltoallv.c          \
 	alltoallv/alltoallv_pairwise.c
 
+bcast =                   \
+	bcast/bcast.h         \
+	bcast/bcast.c         \
+	bcast/bcast_knomial.c
+
 allreduce =                       \
 	allreduce/allreduce.h         \
 	allreduce/allreduce.c         \
@@ -47,7 +52,8 @@ sources =            \
 	$(alltoallv)     \
 	$(allreduce)     \
 	$(allgather)     \
-	$(allgatherv)
+	$(allgatherv)    \
+	$(bcast)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

@@ -17,9 +17,8 @@ template<typename T>
 void init_buffer_host(void *buf, size_t count, int _value)
 {
     T *ptr = (T *)buf;
-    T value = (T)_value;
     for (int i = 0; i < count; i++) {
-        ptr[i] = value;
+        ptr[i] = (T)((_value + i + 1) % 128);
     }
 }
 

@@ -31,6 +31,10 @@ typedef struct ucc_tl_ucp_task {
             ucc_knomial_pattern_t p;
             void                 *scratch;
         } allreduce_kn;
+        struct {
+            ucc_rank_t            dist;
+            uint32_t              radix;
+        } bcast_kn;
     };
 } ucc_tl_ucp_task_t;
 
