@@ -33,4 +33,26 @@ static inline size_t ucc_dt_size(ucc_datatype_t dt)
     return 0;
 }
 
+static inline ucc_rank_t ucc_ep_map_eval(ucc_ep_map_t map, ucc_rank_t rank)
+{
+    ucc_rank_t r;
+    switch(map.type) {
+    case UCC_EP_MAP_FULL:
+        r = rank;
+        break;
+    case UCC_EP_MAP_STRIDED:
+        r = map.strided.start + rank*map.strided.stride;
+        break;
+    case UCC_EP_MAP_ARRAY:
+        r = *((ucc_rank_t*)((ptrdiff_t)map.array.map + rank*map.array.elem_size));
+        break;
+    case UCC_EP_MAP_CB:
+        r = (ucc_rank_t)map.cb.cb(rank, map.cb.cb_ctx);
+        break;
+    default:
+        r = -1;
+    }
+    return r;
+}
+
 #endif

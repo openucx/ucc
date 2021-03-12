@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -96,6 +96,13 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
 ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
                                         ucs_memory_type_t mem_type,
                                         ucc_tl_ucp_context_t *ctx);
+ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
+                                          void *rbuf, ucc_datatype_t dt,
+                                          size_t count, ucc_reduction_op_t op,
+                                          ucc_tl_team_subset_t subset,
+                                          ucc_coll_task_t **task);
+ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task);
+ucc_status_t ucc_tl_ucp_service_cleanup(ucc_coll_task_t *task);
 
 UCC_TL_IFACE_DECLARE(ucp, UCP);
 
@@ -132,4 +139,11 @@ void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
     if (status != UCC_OK) {
         tl_warn(UCC_TL_TEAM_LIB(team), "ucc_tl_ucp_mem_map failed");
     }
+}
+
+__attribute__((constructor)) static void tl_ucp_iface_init(void)
+{
+    ucc_tl_ucp.super.scoll.allreduce = ucc_tl_ucp_service_allreduce;
+    ucc_tl_ucp.super.scoll.test      = ucc_tl_ucp_service_test;
+    ucc_tl_ucp.super.scoll.cleanup   = ucc_tl_ucp_service_cleanup;
 }

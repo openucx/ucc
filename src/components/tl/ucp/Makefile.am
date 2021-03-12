@@ -36,23 +36,24 @@ allgatherv =                      \
 	allgatherv/allgatherv.c       \
 	allgatherv/allgatherv_ring.c
 
-sources =            \
-	tl_ucp.h         \
-	tl_ucp.c         \
-	tl_ucp_lib.c     \
-	tl_ucp_context.c \
-	tl_ucp_team.c    \
-	tl_ucp_ep.h      \
-	tl_ucp_ep.c      \
-	tl_ucp_addr.h    \
-	tl_ucp_addr.c    \
-	tl_ucp_coll.c    \
-	$(barrier)       \
-	$(alltoall)      \
-	$(alltoallv)     \
-	$(allreduce)     \
-	$(allgather)     \
-	$(allgatherv)    \
+sources =                 \
+	tl_ucp.h              \
+	tl_ucp.c              \
+	tl_ucp_lib.c          \
+	tl_ucp_context.c      \
+	tl_ucp_team.c         \
+	tl_ucp_ep.h           \
+	tl_ucp_ep.c           \
+	tl_ucp_addr.h         \
+	tl_ucp_addr.c         \
+	tl_ucp_coll.c         \
+	tl_ucp_service_coll.c \
+	$(barrier)            \
+	$(alltoall)           \
+	$(alltoallv)          \
+	$(allreduce)          \
+	$(allgather)          \
+	$(allgatherv)         \
 	$(bcast)
 
 module_LTLIBRARIES = libucc_tl_ucp.la

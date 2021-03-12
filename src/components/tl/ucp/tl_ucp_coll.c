@@ -63,7 +63,7 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
     memcpy(&task->args, &coll_args->args, sizeof(ucc_coll_args_t));
     task->team           = tl_team;
     task->tag            = tl_team->seq_num;
-    tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_TAG;
+    tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
     task->super.finalize = ucc_tl_ucp_coll_finalize;
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_BARRIER:

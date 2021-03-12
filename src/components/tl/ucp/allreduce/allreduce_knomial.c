@@ -56,6 +56,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     size_t                 count      = task->args.src.info.count;
     ucc_datatype_t         dt         = task->args.src.info.datatype;
     size_t                 data_size  = count * ucc_dt_size(dt);
+    ucc_rank_t             size       = (ucc_rank_t)task->subset.map.ep_num;
+    ucc_rank_t             rank       = task->subset.myrank;
     void                  *send_buf;
     ptrdiff_t              recv_offset;
     ucc_rank_t             peer;
@@ -67,7 +69,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     GOTO_PHASE(task->allreduce_kn.phase);
 
     if (KN_NODE_EXTRA == node_type) {
-        peer = ucc_knomial_pattern_get_proxy(p, team->rank);
+        peer = ucc_ep_map_eval(task->subset.map,
+                               ucc_knomial_pattern_get_proxy(p, rank));
         UCPCHECK_GOTO(
             ucc_tl_ucp_send_nb(sbuf, data_size, mem_type, peer, team, task),
             task, out);
@@ -77,7 +80,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     }
 
     if (KN_NODE_PROXY == node_type) {
-        peer = ucc_knomial_pattern_get_extra(p, team->rank);
+        peer = ucc_ep_map_eval(task->subset.map,
+                               ucc_knomial_pattern_get_extra(p, rank));
         UCPCHECK_GOTO(
             ucc_tl_ucp_recv_nb(scratch, data_size, mem_type, peer, team, task),
             task, out);
@@ -102,8 +106,9 @@ PHASE_EXTRA:
     }
     while(!ucc_knomial_pattern_loop_done(p)) {
         for (loop_step = 1; loop_step < radix; loop_step++) {
-            peer = ucc_knomial_pattern_get_loop_peer(p, team->rank,
-                                                     team->size, loop_step);
+            peer = ucc_ep_map_eval(task->subset.map,
+                                   ucc_knomial_pattern_get_loop_peer(p, rank,
+                                                                     size, loop_step));
             if (peer == UCC_KN_PEER_NULL)
                 continue;
             if ((p->iteration == 0) && (KN_NODE_PROXY != node_type) &&
@@ -119,8 +124,9 @@ PHASE_EXTRA:
 
         recv_offset = 0;
         for (loop_step = 1; loop_step < radix; loop_step++) {
-            peer = ucc_knomial_pattern_get_loop_peer(p, team->rank,
-                                                     team->size, loop_step);
+            peer = ucc_ep_map_eval(task->subset.map,
+                                   ucc_knomial_pattern_get_loop_peer(p, rank,
+                                                                     size, loop_step));
             if (peer == UCC_KN_PEER_NULL)
                 continue;
             UCPCHECK_GOTO(
@@ -156,7 +162,8 @@ PHASE_EXTRA:
         ucc_knomial_pattern_next_iteration(p);
     }
     if (KN_NODE_PROXY == node_type) {
-        peer = ucc_knomial_pattern_get_extra(p, team->rank);
+        peer = ucc_ep_map_eval(task->subset.map,
+                               ucc_knomial_pattern_get_extra(p, rank));
         UCPCHECK_GOTO(
             ucc_tl_ucp_send_nb(rbuf, data_size, mem_type, peer, team, task),
             task, out);
@@ -186,13 +193,16 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     size_t             count     = task->args.src.info.count;
     ucc_datatype_t     dt        = task->args.src.info.datatype;
     size_t             data_size = count * ucc_dt_size(dt);
+    ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
+    ucc_rank_t         rank      = task->subset.myrank;
     ucc_status_t       status;
+
     task->allreduce_kn.phase          = PHASE_INIT;
     ucc_assert(task->args.src.info.mem_type ==
                task->args.dst.info.mem_type);
-    ucc_knomial_pattern_init(team->size, team->rank,
+    ucc_knomial_pattern_init(size, rank,
                              ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
-                                     cfg.allreduce_kn_radix, team->size),
+                                     cfg.allreduce_kn_radix, size),
                              &task->allreduce_kn.p);
     if (UCC_OK != (status = ucc_mc_alloc(&task->allreduce_kn.scratch,
                                          (task->allreduce_kn.p.radix - 1) * data_size,
