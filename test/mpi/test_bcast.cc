@@ -19,6 +19,12 @@ TestBcast::TestBcast(size_t _msgsize, ucc_memory_type_t _mt,
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
     root = _root;
+    args.coll_type            = UCC_COLL_TYPE_BCAST;
+
+    if (skip(test_max_size && (test_max_size < (_msgsize*size)),
+             TEST_SKIP_MEM_LIMIT, team.comm)) {
+        return;
+    }
 
     UCC_CHECK(ucc_mc_alloc(&check_buf, _msgsize*size, _mt));
     UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
@@ -26,7 +32,6 @@ TestBcast::TestBcast(size_t _msgsize, ucc_memory_type_t _mt,
         init_buffer(sbuf, count, TEST_DT, _mt, rank);
     }
 
-    args.coll_type            = UCC_COLL_TYPE_BCAST;
     args.src.info.buffer      = sbuf;
     args.src.info.count       = count;
     args.src.info.datatype    = TEST_DT;

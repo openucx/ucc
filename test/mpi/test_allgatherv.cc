@@ -16,8 +16,17 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t count = _msgsize/dt_size;
     int rank, size;
+
+    counts = NULL;
+    displacements = NULL;
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
+
+    if (skip(test_max_size &&
+              (test_max_size < (_msgsize*size)),
+        TEST_SKIP_MEM_LIMIT, team.comm)) {
+        return;
+    }
 
     UCC_CHECK(ucc_mc_alloc((void**)&counts, size * sizeof(uint32_t),
                            UCC_MEMORY_TYPE_HOST));

@@ -19,6 +19,14 @@ TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
 
+    args.coll_type         = UCC_COLL_TYPE_ALLGATHER;
+
+    if (skip(test_max_size &&
+              (test_max_size < (_msgsize*size)),
+        TEST_SKIP_MEM_LIMIT, team.comm)) {
+        return;
+    }
+
     UCC_CHECK(ucc_mc_alloc(&rbuf, _msgsize*size, _mt));
     UCC_CHECK(ucc_mc_alloc(&check_buf, _msgsize*size, _mt));
     if (TEST_NO_INPLACE == inplace) {
@@ -33,7 +41,6 @@ TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                     count, TEST_DT, _mt, rank);
     }
 
-    args.coll_type         = UCC_COLL_TYPE_ALLGATHER;
     args.src.info.buffer   = sbuf;
     args.src.info.count    = count;
     args.src.info.datatype = TEST_DT;

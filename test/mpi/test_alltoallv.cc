@@ -140,9 +140,6 @@ std::string TestAlltoallv::str()
     if (ucc_coll_inplace_supported(UCC_COLL_TYPE_ALLTOALLV)) {
         _str += std::string(" inplace=") + (inplace == TEST_INPLACE ? "1" : "0");
     }
-    if (ucc_coll_is_rooted(UCC_COLL_TYPE_ALLTOALLV)) {
-        _str += std::string(" root=") + std::to_string(root);
-    }
     _str += std::string(" dt=") + ucc_datatype_str(dt) +
             " counts=" + (count_bits == TEST_FLAG_VSIZE_64BIT ? "64" : "32") +
             " displs=" + (displ_bits == TEST_FLAG_VSIZE_64BIT ? "64" : "32");
