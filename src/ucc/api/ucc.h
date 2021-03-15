@@ -1588,16 +1588,15 @@ static inline ucc_status_t ucc_collective_test(ucc_coll_req_h request)
  */
 ucc_status_t ucc_collective_finalize(ucc_coll_req_h request);
 
-
 /**
  * @ingroup UCC_EVENT_DT
  *
  */
 typedef enum ucc_event_type {
-	UCC_EVENT_COLLECTIVE_POST       = UCC_BIT(0),
-	UCC_EVENT_COLLECTIVE_COMPLETE   = UCC_BIT(1),
-	UCC_EVENT_COMPUTE_COMPLETE      = UCC_BIT(2),
-	UCC_EVENT_OVERFLOW              = UCC_BIT(3)
+    UCC_EVENT_COLLECTIVE_POST     = UCC_BIT(0),
+    UCC_EVENT_COLLECTIVE_COMPLETE = UCC_BIT(1),
+    UCC_EVENT_COMPUTE_COMPLETE    = UCC_BIT(2),
+    UCC_EVENT_OVERFLOW            = UCC_BIT(3)
 } ucc_event_type_t;
 
 /**
@@ -1614,10 +1613,10 @@ typedef enum ucc_ee_type {
  *
  */
 typedef struct ucc_event {
-    ucc_event_type_t    ev_type;
-    void                *ev_context;
-    size_t              ev_context_size;
-    ucc_coll_req_h      req;
+    ucc_event_type_t ev_type;
+    void *           ev_context;
+    size_t           ev_context_size;
+    ucc_coll_req_h   req;
 } ucc_ev_t;
 
 /**
@@ -1625,9 +1624,9 @@ typedef struct ucc_event {
  *
  */
 typedef struct ucc_ee_params {
-     ucc_ee_type_t  ee_type;
-     void           *ee_context;
-     size_t         ee_context_size;
+    ucc_ee_type_t ee_type;
+    void *        ee_context;
+    size_t        ee_context_size;
 } ucc_ee_params_t;
 
 /**
@@ -1658,9 +1657,10 @@ typedef struct ucc_ee_params {
  *
  * @return Error code as defined by ucc_status_t
  */
- ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params_t *params, ucc_ee_h *ee);
+ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params_t *params,
+                           ucc_ee_h *ee);
 
- /**
+/**
  * @ingroup UCC_EVENT
  *
  * @brief The routine destroys the execution context created for collective operations.
@@ -1682,7 +1682,7 @@ typedef struct ucc_ee_params {
  *
  * @return Error code as defined by ucc_status_t
  */
- ucc_status_t ucc_ee_destroy(ucc_ee_h ee);
+ucc_status_t ucc_ee_destroy(ucc_ee_h ee);
 
 /**
  * @ingroup UCC_EVENT
@@ -1732,7 +1732,6 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t **ev);
  */
 ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t *ev);
 
-
 /**
  * @ingroup UCC_EVENT
  *
@@ -1776,7 +1775,6 @@ ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t *ev);
  * @return Error code as defined by ucc_status_t
  */
 ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
-
 
 /**
  * @ingroup UCC_EVENT
