@@ -128,7 +128,8 @@ TestCase::TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type,
     int rank;
     sbuf      = NULL;
     rbuf      = NULL;
-    check_buf = NULL;
+    check_sbuf = NULL;
+    check_rbuf = NULL;
     args.mask = 0;
     args.flags = 0;
     test_skip = TEST_SKIP_NONE;
@@ -153,7 +154,10 @@ TestCase::~TestCase()
     if (rbuf) {
         UCC_CHECK(ucc_mc_free(rbuf, mem_type));
     }
-    if (check_buf) {
-        UCC_CHECK(ucc_mc_free(check_buf, mem_type));
+    if (check_sbuf) {
+        UCC_CHECK(ucc_mc_free(check_sbuf, UCC_MEMORY_TYPE_HOST));
+    }
+    if (check_rbuf) {
+        UCC_CHECK(ucc_mc_free(check_rbuf, UCC_MEMORY_TYPE_HOST));
     }
 }

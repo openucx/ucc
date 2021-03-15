@@ -200,6 +200,7 @@ int ucc_coll_is_rooted(ucc_coll_type_t c)
     switch(c) {
     case UCC_COLL_TYPE_ALLREDUCE:
     case UCC_COLL_TYPE_ALLGATHER:
+    case UCC_COLL_TYPE_ALLGATHERV:
     case UCC_COLL_TYPE_ALLTOALL:
     case UCC_COLL_TYPE_ALLTOALLV:
     case UCC_COLL_TYPE_BARRIER:

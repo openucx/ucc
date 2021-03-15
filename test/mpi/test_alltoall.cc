@@ -26,15 +26,17 @@ TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     }
 
     UCC_CHECK(ucc_mc_alloc(&rbuf, _msgsize * nprocs, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_buf, _msgsize * nprocs, _mt));
+    UCC_CHECK(ucc_mc_alloc(&check_rbuf, _msgsize * nprocs, UCC_MEMORY_TYPE_HOST));
     if (TEST_NO_INPLACE == inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize * nprocs, _mt));
         init_buffer(sbuf, count * nprocs, dt, _mt, rank);
+        UCC_CHECK(ucc_mc_alloc(&check_sbuf, _msgsize * nprocs, UCC_MEMORY_TYPE_HOST));
+        init_buffer(check_sbuf, count * nprocs, dt, _mt, rank);
     } else {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
         init_buffer(rbuf, count * nprocs, dt, _mt, rank);
-        init_buffer(check_buf, count * nprocs, dt, _mt, rank);
+        init_buffer(check_rbuf, count * nprocs, dt, UCC_MEMORY_TYPE_HOST, rank);
     }
 
     args.coll_type            = UCC_COLL_TYPE_ALLTOALL;
@@ -54,9 +56,9 @@ TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 ucc_status_t TestAlltoall::check()
 {
     size_t count = args.src.info.count;
-    MPI_Alltoall(inplace ? MPI_IN_PLACE : sbuf, count, ucc_dt_to_mpi(dt),
-                 check_buf, count, ucc_dt_to_mpi(dt), team.comm);
-    return compare_buffers(rbuf, check_buf, count, dt, mem_type);
+    MPI_Alltoall(inplace ? MPI_IN_PLACE : check_sbuf, count, ucc_dt_to_mpi(dt),
+                 check_rbuf, count, ucc_dt_to_mpi(dt), team.comm);
+    return compare_buffers(rbuf, check_rbuf, count, dt, mem_type);
 }
 
 std::string TestAlltoall::str()

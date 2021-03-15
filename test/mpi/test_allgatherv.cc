@@ -16,11 +16,11 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t count = _msgsize/dt_size;
     int rank, size;
-
     counts = NULL;
     displacements = NULL;
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
+    args.coll_type                = UCC_COLL_TYPE_ALLGATHERV;
 
     if (skip(test_max_size &&
               (test_max_size < (_msgsize*size)),
@@ -33,7 +33,7 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     UCC_CHECK(ucc_mc_alloc((void**)&displacements, size * sizeof(uint32_t),
                            UCC_MEMORY_TYPE_HOST));
     UCC_CHECK(ucc_mc_alloc(&rbuf, _msgsize*size, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_buf, _msgsize*size, _mt));
+    UCC_CHECK(ucc_mc_alloc(&check_rbuf, _msgsize*size, UCC_MEMORY_TYPE_HOST));
     for (int i = 0; i < size; i++) {
         counts[i] = count;
         displacements[i] = i * count;
@@ -42,15 +42,16 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         args.mask = 0;
         UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
         init_buffer(sbuf, count, TEST_DT, _mt, rank);
+        UCC_CHECK(ucc_mc_alloc(&check_sbuf, _msgsize, UCC_MEMORY_TYPE_HOST));
+        init_buffer(check_sbuf, count, TEST_DT, UCC_MEMORY_TYPE_HOST, rank);
     } else {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
         init_buffer((void*)((ptrdiff_t)rbuf + rank*count*dt_size),
                     count, TEST_DT, _mt, rank);
-        init_buffer((void*)((ptrdiff_t)check_buf + rank*count*dt_size),
-                    count, TEST_DT, _mt, rank);
+        init_buffer((void*)((ptrdiff_t)check_rbuf + rank*count*dt_size),
+                    count, TEST_DT, UCC_MEMORY_TYPE_HOST, rank);
     }
-    args.coll_type                = UCC_COLL_TYPE_ALLGATHERV;
     if (TEST_NO_INPLACE == inplace) {
         args.src.info.buffer          = sbuf;
         args.src.info.datatype        = TEST_DT;
@@ -79,7 +80,7 @@ ucc_status_t TestAllgatherv::check()
     MPI_Datatype dt    = ucc_dt_to_mpi(TEST_DT);
     int          size;
     MPI_Comm_size(team.comm, &size);
-    MPI_Allgatherv((inplace == TEST_INPLACE) ? MPI_IN_PLACE : sbuf, count, dt,
-                   check_buf, (int*)counts, (int*)displacements, dt, team.comm);
-    return compare_buffers(rbuf, check_buf, count*size, TEST_DT, mem_type);
+    MPI_Allgatherv((inplace == TEST_INPLACE) ? MPI_IN_PLACE : check_sbuf, count, dt,
+                   check_rbuf, (int*)counts, (int*)displacements, dt, team.comm);
+    return compare_buffers(rbuf, check_rbuf, count*size, TEST_DT, mem_type);
 }

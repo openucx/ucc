@@ -28,6 +28,13 @@ END_C_DECLS
 extern int test_rand_seed;
 extern size_t test_max_size;
 
+#define UCC_ALLOC_COPY_BUF(_new_buf, _new_mtype, _old_buf, _old_mtype, _size) \
+{                                                                             \
+    UCC_CHECK(ucc_mc_alloc(&(_new_buf), _size, _new_mtype));                  \
+    UCC_CHECK(ucc_mc_memcpy(_new_buf, _old_buf, _size,                        \
+              _new_mtype, _old_mtype));                                       \
+}
+
 typedef enum {
     TEAM_WORLD,
     TEAM_REVERSE,
@@ -149,7 +156,8 @@ protected:
     ucc_coll_req_h req;
     void *sbuf;
     void *rbuf;
-    void *check_buf;
+    void *check_sbuf;
+    void *check_rbuf;
     MPI_Request progress_request;
     uint8_t     progress_buf[1];
     void mpi_progress(void);

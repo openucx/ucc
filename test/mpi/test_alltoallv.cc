@@ -84,9 +84,13 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     }
 
     UCC_CHECK(ucc_mc_alloc(&sbuf, sncounts * dt_size, _mt));
+    UCC_CHECK(ucc_mc_alloc(&check_sbuf, sncounts * dt_size,
+                           UCC_MEMORY_TYPE_HOST));
     UCC_CHECK(ucc_mc_alloc(&rbuf, rncounts * dt_size, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_buf, rncounts * dt_size, _mt));
+    UCC_CHECK(ucc_mc_alloc(&check_rbuf, rncounts * dt_size,
+                           UCC_MEMORY_TYPE_HOST));
     init_buffer(sbuf, sncounts, dt, _mt, rank);
+    init_buffer(check_sbuf, sncounts, dt, UCC_MEMORY_TYPE_HOST, rank);
 
     args.src.info_v.buffer = sbuf;
     args.src.info_v.datatype = _dt;
@@ -124,10 +128,9 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
 ucc_status_t TestAlltoallv::check()
 {
-    MPI_Alltoallv(sbuf, scounts, sdispls, ucc_dt_to_mpi(dt), check_buf,
+    MPI_Alltoallv(check_sbuf, scounts, sdispls, ucc_dt_to_mpi(dt), check_rbuf,
                   rcounts, rdispls, ucc_dt_to_mpi(dt), team.comm);
-
-    return compare_buffers(rbuf, check_buf, rncounts, dt, mem_type);
+    return compare_buffers(rbuf, check_rbuf, rncounts, dt, mem_type);
 }
 
 std::string TestAlltoallv::str()

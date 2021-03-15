@@ -26,10 +26,12 @@ TestBcast::TestBcast(size_t _msgsize, ucc_memory_type_t _mt,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc(&check_buf, _msgsize*size, _mt));
+    UCC_CHECK(ucc_mc_alloc(&check_rbuf, _msgsize*size, UCC_MEMORY_TYPE_HOST));
     UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
+    UCC_CHECK(ucc_mc_alloc(&check_sbuf, _msgsize, UCC_MEMORY_TYPE_HOST));
     if (rank == root) {
         init_buffer(sbuf, count, TEST_DT, _mt, rank);
+        init_buffer(check_sbuf, count, TEST_DT, UCC_MEMORY_TYPE_HOST, rank);
     }
 
     args.src.info.buffer      = sbuf;
@@ -46,7 +48,7 @@ ucc_status_t TestBcast::check()
     MPI_Datatype dt    = ucc_dt_to_mpi(TEST_DT);
     int          rank;
     MPI_Comm_rank(team.comm, &rank);
-    MPI_Bcast((rank == root) ? sbuf : check_buf, count, dt, root, team.comm);
+    MPI_Bcast((rank == root) ? check_sbuf : check_rbuf, count, dt, root, team.comm);
     return (rank == root) ? UCC_OK :
-        compare_buffers(sbuf, check_buf, count, TEST_DT, mem_type);
+        compare_buffers(sbuf, check_rbuf, count, TEST_DT, mem_type);
 }

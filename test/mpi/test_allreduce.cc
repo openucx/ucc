@@ -19,15 +19,17 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     dt = _dt;
 
     UCC_CHECK(ucc_mc_alloc(&rbuf, _msgsize, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_buf, _msgsize, _mt));
+    UCC_CHECK(ucc_mc_alloc(&check_rbuf, _msgsize, UCC_MEMORY_TYPE_HOST));
     if (TEST_NO_INPLACE == inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
         init_buffer(sbuf, count, dt, _mt, rank);
+        UCC_CHECK(ucc_mc_alloc(&check_sbuf, _msgsize, UCC_MEMORY_TYPE_HOST));
+        init_buffer(check_sbuf, count, dt, UCC_MEMORY_TYPE_HOST, rank);
     } else {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
         init_buffer(rbuf, count, dt, _mt, rank);
-        init_buffer(check_buf, count, dt, _mt, rank);
+        init_buffer(check_rbuf, count, dt, UCC_MEMORY_TYPE_HOST, rank);
     }
 
     args.coll_type            = UCC_COLL_TYPE_ALLREDUCE;
@@ -49,9 +51,9 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 ucc_status_t TestAllreduce::check()
 {
     size_t count = args.src.info.count;
-    MPI_Allreduce(inplace ? MPI_IN_PLACE : sbuf, check_buf, count,
+    MPI_Allreduce(inplace ? MPI_IN_PLACE : check_sbuf, check_rbuf, count,
                   ucc_dt_to_mpi(dt), ucc_op_to_mpi(op), team.comm);
-    return compare_buffers(rbuf, check_buf, count, dt, mem_type);
+    return compare_buffers(rbuf, check_rbuf, count, dt, mem_type);
 }
 
 std::string TestAllreduce::str() {
