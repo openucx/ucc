@@ -97,7 +97,8 @@ ucc_status_t ucc_mc_type(const void *ptr, ucc_memory_type_t *mem_type)
     return UCC_OK;
 }
 
-ucc_status_t ucc_mc_query(const void *ptr, size_t length, ucc_mem_attr_t *mem_attr)
+ucc_status_t ucc_mc_query(const void *ptr, size_t length,
+                          ucc_mem_attr_t *mem_attr)
 {
     ucc_status_t      status;
     ucc_memory_type_t mt;
@@ -124,8 +125,24 @@ ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
                            size_t count, ucc_datatype_t dt,
                            ucc_reduction_op_t op, ucc_memory_type_t mem_type)
 {
+    if (count == 0) {
+        return UCC_OK;
+    }
     UCC_CHECK_MC_AVAILABLE(mem_type);
     return mc_ops[mem_type]->reduce(src1, src2, dst, count, dt, op);
+}
+
+ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
+                                 size_t size, size_t count, size_t stride,
+                                 ucc_datatype_t dtype, ucc_reduction_op_t op,
+                                 ucc_memory_type_t mem_type)
+{
+    if (count == 0) {
+        return UCC_OK;
+    }
+    UCC_CHECK_MC_AVAILABLE(mem_type);
+    return mc_ops[mem_type]->reduce_multi(src1, src2, dst, size, count, stride,
+                                          dtype, op);
 }
 
 ucc_status_t ucc_mc_free(void *ptr, ucc_memory_type_t mem_type)
@@ -174,23 +191,5 @@ ucc_status_t ucc_mc_finalize()
         }
     }
 
-    return UCC_OK;
-}
-
-ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
-                                 size_t count, size_t size, size_t stride,
-                                 ucc_datatype_t dtype, ucc_reduction_op_t op,
-                                 ucc_memory_type_t mem_type)
-{
-    int i;
-    if (size == 0) {
-        return UCC_OK;
-    }
-    //TODO implemente efficient reduce_multi in the mc components
-    ucc_mc_reduce(src1, src2, dst, size, dtype, op, mem_type);
-    for (i = 1; i < count; i++) {
-        ucc_mc_reduce((void *)((ptrdiff_t)src2 + stride * i), dst, dst, size,
-                      dtype, op, mem_type);
-    }
     return UCC_OK;
 }

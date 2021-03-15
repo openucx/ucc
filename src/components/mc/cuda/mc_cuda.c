@@ -184,9 +184,17 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
 }
 
 ucc_mc_cuda_t ucc_mc_cuda = {
-    .super.super.name = "cuda mc",
-    .super.ref_cnt    = 0,
-    .super.type       = UCC_MEMORY_TYPE_CUDA,
+    .super.super.name       = "cuda mc",
+    .super.ref_cnt          = 0,
+    .super.type             = UCC_MEMORY_TYPE_CUDA,
+    .super.init             = ucc_mc_cuda_init,
+    .super.finalize         = ucc_mc_cuda_finalize,
+    .super.ops.mem_query    = ucc_mc_cuda_mem_query,
+    .super.ops.mem_alloc    = ucc_mc_cuda_mem_alloc,
+    .super.ops.mem_free     = ucc_mc_cuda_mem_free,
+    .super.ops.reduce       = ucc_mc_cuda_reduce,
+    .super.ops.reduce_multi = ucc_mc_cuda_reduce_multi,
+    .super.ops.memcpy       = ucc_mc_cuda_memcpy,
     .super.config_table =
         {
             .name   = "CUDA memory component",
@@ -194,13 +202,6 @@ ucc_mc_cuda_t ucc_mc_cuda = {
             .table  = ucc_mc_cuda_config_table,
             .size   = sizeof(ucc_mc_cuda_config_t),
         },
-    .super.init          = ucc_mc_cuda_init,
-    .super.finalize      = ucc_mc_cuda_finalize,
-    .super.ops.mem_query = ucc_mc_cuda_mem_query,
-    .super.ops.mem_alloc = ucc_mc_cuda_mem_alloc,
-    .super.ops.mem_free  = ucc_mc_cuda_mem_free,
-    .super.ops.reduce    = ucc_mc_cuda_reduce,
-    .super.ops.memcpy    = ucc_mc_cuda_memcpy
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cuda.super.config_table,
