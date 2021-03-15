@@ -87,17 +87,21 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_start(ucc_coll_task_t *coll_task)
     task->n_polls            = ucc_min(1, task->n_polls);
 
     if (UCC_TL_UCP_TEAM_CTX(team)->cfg.pre_reg_mem) {
-        ucc_tl_ucp_pre_register_mem(team, task->args.src.info_v.buffer,
-                                    (ucc_coll_args_get_total_count(&task->args,
-                                     task->args.src.info_v.counts, team->size ) *
-                                     ucc_dt_size(task->args.src.info_v.datatype)),
-                                    task->args.src.info_v.mem_type);
+        if (task->args.flags & UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER) {
+            ucc_tl_ucp_pre_register_mem(team, task->args.src.info_v.buffer,
+                                        (ucc_coll_args_get_total_count(&task->args,
+                                         task->args.src.info_v.counts, team->size ) *
+                                         ucc_dt_size(task->args.src.info_v.datatype)),
+                                        task->args.src.info_v.mem_type);
+        }
 
-        ucc_tl_ucp_pre_register_mem(team, task->args.dst.info_v.buffer,
-                                    (ucc_coll_args_get_total_count(&task->args,
-                                     task->args.dst.info_v.counts, team->size) *
-                                     ucc_dt_size(task->args.dst.info_v.datatype)),
-                                    task->args.dst.info_v.mem_type);
+        if (task->args.flags & UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER) {
+            ucc_tl_ucp_pre_register_mem(team, task->args.dst.info_v.buffer,
+                                        (ucc_coll_args_get_total_count(&task->args,
+                                         task->args.dst.info_v.counts, team->size) *
+                                         ucc_dt_size(task->args.dst.info_v.datatype)),
+                                        task->args.dst.info_v.mem_type);
+        }
     }
 
     ucc_tl_ucp_alltoallv_pairwise_progress(&task->super);
