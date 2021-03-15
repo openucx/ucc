@@ -30,6 +30,8 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team  = task->team;
     ptrdiff_t          sbuf  = (ptrdiff_t)task->args.src.info_v.buffer;
     ptrdiff_t          rbuf  = (ptrdiff_t)task->args.dst.info_v.buffer;
+    ucc_memory_type_t  smem  = task->args.src.info_v.mem_type;
+    ucc_memory_type_t  rmem  = task->args.dst.info_v.mem_type;
     ucc_rank_t         grank = team->rank;
     ucc_rank_t         gsize = team->size;
     int                polls = 0;
@@ -52,9 +54,9 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
             data_displ = ucc_coll_args_get_displacement(&task->args,
                             task->args.dst.info_v.displacements,
                             peer) * rdt_size;
-            ucc_tl_ucp_recv_nb((void *)(rbuf + data_displ), data_size,
-                               task->args.dst.info_v.mem_type, peer, team,
-                               task);
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)(rbuf + data_displ),
+                                             data_size, rmem, peer, team, task),
+                          task, out);
             polls = 0;
         }
         while ((task->send_posted < gsize) &&
@@ -65,9 +67,9 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
             data_displ = ucc_coll_args_get_displacement(&task->args,
                             task->args.src.info_v.displacements,
                             peer) * sdt_size;
-            ucc_tl_ucp_send_nb((void *)(sbuf + data_displ), data_size,
-                               task->args.src.info_v.mem_type, peer, team,
-                               task);
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(sbuf + data_displ),
+                                             data_size, smem, peer, team, task),
+                          task, out);
             polls = 0;
         }
     }
@@ -75,6 +77,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
         return task->super.super.status;
     }
     task->super.super.status = ucc_tl_ucp_test(task);
+out:
     return task->super.super.status;
 }
 

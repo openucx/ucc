@@ -36,23 +36,26 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
                         rdt_size;
         data_size = ucc_coll_args_get_count(&task->args,
                         task->args.dst.info_v.counts, send_idx) * rdt_size;
-        ucc_tl_ucp_send_nb((void*)(rbuf + data_displ), data_size, rmem, sendto,
-                           team, task);
+        UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(rbuf + data_displ), data_size,
+                                         rmem, sendto, team, task),
+                      task, out);
         recv_idx = (grank - task->recv_posted + gsize) % gsize;
         data_displ = ucc_coll_args_get_displacement(&task->args,
                         task->args.dst.info_v.displacements, recv_idx) *
                         rdt_size;
         data_size = ucc_coll_args_get_count(&task->args,
                         task->args.dst.info_v.counts, recv_idx) * rdt_size;
-        ucc_tl_ucp_recv_nb((void*)(rbuf + data_displ), data_size, rmem,
-                           recvfrom, team, task);
+        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)(rbuf + data_displ), data_size,
+                                         rmem, recvfrom, team, task),
+                      task, out);
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             return task->super.super.status;
         }
     }
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.super.status = UCC_OK;
-    return UCC_OK;
+out:
+    return task->super.super.status;
 }
 
 ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
@@ -77,9 +80,12 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
         data_size  = ucc_coll_args_get_count(
                         &task->args, task->args.dst.info_v.counts,
                         grank) *rdt_size;
-        ucc_tl_ucp_recv_nb((void *)rbuf + data_displ, data_size, rmem, grank,
-                           team, task);
-        ucc_tl_ucp_send_nb((void *)sbuf, data_size, smem, grank, team, task);
+        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)rbuf + data_displ, data_size,
+                                         rmem, grank, team, task),
+                      task, error);
+        UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)sbuf, data_size, smem, grank,
+                                         team, task),
+                      task, error);
     } else {
         /* to simplify progress fucnction and make it identical for
            in-place and non in-place */
@@ -94,4 +100,6 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
         return status;
     }
     return UCC_OK;
+error:
+    return task->super.super.status;
 }
