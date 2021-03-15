@@ -1707,7 +1707,7 @@ typedef struct ucc_ee_params {
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t *ev);
+ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t **ev);
 
 /**
  * @ingroup UCC_EVENT
@@ -1730,7 +1730,7 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t ev);
+ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t *ev);
 
 
 /**
@@ -1799,7 +1799,7 @@ ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t ee_event);
+ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ee_event);
 
 END_C_DECLS
 #endif
