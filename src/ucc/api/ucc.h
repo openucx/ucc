@@ -1605,27 +1605,19 @@ typedef enum ucc_event_type {
  *
  */
 typedef enum ucc_ee_type {
-    UCC_CUDA_STREAM = UCC_BIT(0),
-	UCC_CPU_THREAD  = UCC_BIT(1)
+    UCC_CUDA_STREAM = 0,
+    UCC_CPU_THREAD,
 } ucc_ee_type_t;
 
 /**
  * @ingroup UCC_EVENT_DT
  *
  */
-typedef struct ucc_event_context {
-    size_t              info_size;
-    void                *info;
-} ucc_event_context_t;
-
-/**
- * @ingroup UCC_EVENT_DT
- *
- */
 typedef struct ucc_event {
-	ucc_event_type_t        ev_type;
-	ucc_event_context_t     *event_context;
-	ucc_coll_req_h          req;
+    ucc_event_type_t    ev_type;
+    void                *ev_context;
+    size_t              ev_context_size;
+    ucc_coll_req_h      req;
 } ucc_ev_t;
 
 /**
@@ -1762,7 +1754,7 @@ ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t ev);
  *
  * @return Error code as defined by ucc_status_t
  */
-ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t ev);
+ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t *ev);
 
 /**
  * @ingroup UCC_EVENT
