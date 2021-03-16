@@ -85,6 +85,20 @@ BEGIN_C_DECLS
   */
 
 /**
+  * @defgroup UCC_EVENT_DT Events and Triggered operations' datastructures
+  * @{
+  *  Data-structures associated with event-driven collective execution
+  * @}
+  */
+
+/**
+  * @defgroup UCC_EVENT Events and Triggered Operations
+  * @{
+  *  Event-driven Collective Execution
+  * @}
+  */
+
+/**
   * @defgroup UCC_UTILS Utility Operations
   * @{
   *  Helper functions to be used across the library
@@ -1573,6 +1587,219 @@ static inline ucc_status_t ucc_collective_test(ucc_coll_req_h request)
  *  @return Error code as defined by ucc_status_t
  */
 ucc_status_t ucc_collective_finalize(ucc_coll_req_h request);
+
+/**
+ * @ingroup UCC_EVENT_DT
+ *
+ */
+typedef enum ucc_event_type {
+    UCC_EVENT_COLLECTIVE_POST     = UCC_BIT(0),
+    UCC_EVENT_COLLECTIVE_COMPLETE = UCC_BIT(1),
+    UCC_EVENT_COMPUTE_COMPLETE    = UCC_BIT(2),
+    UCC_EVENT_OVERFLOW            = UCC_BIT(3)
+} ucc_event_type_t;
+
+/**
+ * @ingroup UCC_EVENT_DT
+ *
+ */
+typedef enum ucc_ee_type {
+    UCC_CUDA_STREAM = 0,
+    UCC_CPU_THREAD,
+    UCC_EE_LAST,
+    UCC_EE_UNKNOWN = UCC_EE_LAST
+} ucc_ee_type_t;
+
+/**
+ * @ingroup UCC_EVENT_DT
+ *
+ */
+typedef struct ucc_event {
+    ucc_event_type_t ev_type;
+    void *           ev_context;
+    size_t           ev_context_size;
+    ucc_coll_req_h   req;
+} ucc_ev_t;
+
+/**
+ * @ingroup UCC_EVENT_DT
+ *
+ */
+typedef struct ucc_ee_params {
+    ucc_ee_type_t ee_type;
+    void *        ee_context;
+    size_t        ee_context_size;
+} ucc_ee_params_t;
+
+/**
+ * @ingroup UCC_EVENT
+ *
+ * @brief The routine creates the execution context for collective operations.
+ *
+ * @param [in] team     team handle
+ * @param [in] params   user provided params to customize the execution engine
+ * @param [out] ee      execution engine handle
+ *
+ * @parblock
+ *
+ * @b Description
+ *
+ * @ref ucc_ee_create creates the execution engine. It enables event-driven
+ * collective execution. @ref ucc_ee_params_t allows the execution engine to be
+ * configured to abstract either GPU and CPU threads. The execution engine is
+ * created and coupled with the team. There can be many execution engines
+ * coupled to the team. However, attaching the same execution engine to multiple
+ * teams is not allowed. The execution engine is created after the team is
+ * created and destroyed before the team is destroyed. It is the user's
+ * responsibility to destroy the execution engines before the team. If the team
+ * is destroyed before the execution engine is destroyed, the result is
+ * undefined.
+ *
+ * @endparblock
+ *
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params_t *params,
+                           ucc_ee_h *ee);
+
+/**
+ * @ingroup UCC_EVENT
+ *
+ * @brief The routine destroys the execution context created for collective operations.
+ *
+ * @param [in] ee   Execution engine handle
+ *
+ * @parblock
+ *
+ * @b Description
+ *
+ * @ref ucc_ee_destroy releases the resources attached with the
+ * execution engine and destroys the execution engine. All events and triggered
+ * operations related to this ee are invalid after the destroy operation. To
+ * avoid race between the creation and destroying the execution engine, for a
+ * given ee, the @ref ucc_ee_create and @ref ucc_ee_destroy must be invoked from
+ * the same thread.
+ *
+ * @endparblock
+ *
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_destroy(ucc_ee_h ee);
+
+/**
+ * @ingroup UCC_EVENT
+ *
+ * @brief The routine gets the event from the event queue.
+ *
+ * @param [in]  ee        execution engine handle
+ * @param [out] ev        Event structure fetched from the event queue
+ *
+ * @parblock
+ *
+ * @b Description
+ *
+ * @ref ucc_ee_get_event fetches the events from the execution engine. If there
+ * are no events posted on the ee, it returns immediately without waiting for
+ * events. All events must be acknowledged using the @ref ucc_ee_ack_event
+ * interface. The event acknowledged is destroyed by the library. An event
+ * fetched with @ref ucc_ee_get_event but not acknowledged might consume
+ * resources in the library.
+ *
+ * @endparblock
+ *
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t **ev);
+
+/**
+ * @ingroup UCC_EVENT
+ *
+ * @brief The routine acks the events from the event queue.
+ *
+ * @param [in]  ee      execution engine handle
+ * @param [in]  ev      Event to be acked
+ *
+ * @parblock
+ *
+ * @b Description
+ *
+ * An event acknowledged by the user using @ref ucc_ee_ack_event is destroyed by
+ * the library. Any triggered operations on the event should be completed before
+ * calling this interface. The behavior is undefined if the user acknowledges
+ * the event while waiting on the event or triggering operations on the event.
+ *
+ * @endparblock
+ *
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t *ev);
+
+/**
+ * @ingroup UCC_EVENT
+ *
+ * @brief The routine to set the event to the tail of the queue.
+ *
+ * @param [in]  ee        execution engine handle
+ * @param [in]  ev        Event structure fetched from the event queue
+ *
+ * @parblock
+ *
+ * @b Description
+ *
+ * @ref ucc_ee_set_event sets the event on the execution engine. If the
+ * operations are waiting on the event when the user sets the event, the
+ * operations are launched. The events created by the user need to be destroyed
+ * by the user.
+ *
+ * @endparblock
+ *
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t *ev);
+
+/**
+ * @ingroup UCC_EVENT
+ *
+ * @brief The routine blocks the calling thread until there is an event on the queue.
+ *
+ * @param [in]  ee        execution engine handle
+ * @param [out] ev        Event structure fetched from the event queue
+ *
+ * @parblock
+ *
+ * @b Description
+ *
+ * The user thread invoking the @ref ucc_ee_wait interface is blocked until an
+ * event is posted to the execution engine.
+ *
+ * @endparblock
+ *
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
+
+/**
+ * @ingroup UCC_EVENT
+ *
+ * @brief The routine posts the collective operation on the execution engine, which is
+ * launched on the event.
+ *
+ * @param [in]  ee          execution engine handle
+ * @param [in]  ee_event    Event triggering the post operation
+ *
+ * @parblock
+ *
+ * @b Description
+ *
+ * @ref ucc_collective_triggered_post allow the users to schedule a collective
+ * operation that executes in the future when an event occurs on the execution
+ * engine.
+ *
+ * @endparblock
+ *
+ * @return Error code as defined by ucc_status_t
+ */
+ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ee_event);
 
 END_C_DECLS
 #endif
