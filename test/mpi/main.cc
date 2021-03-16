@@ -7,7 +7,8 @@
 static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
                                              UCC_COLL_TYPE_ALLREDUCE,
                                              UCC_COLL_TYPE_ALLGATHER,
-                                             UCC_COLL_TYPE_ALLGATHERV};
+                                             UCC_COLL_TYPE_ALLGATHERV,
+                                             UCC_COLL_TYPE_BCAST};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
 static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
                                              UCC_DT_FLOAT32, UCC_DT_FLOAT64};
@@ -16,7 +17,7 @@ static std::vector<ucc_test_mpi_team_t> teams = {TEAM_WORLD, TEAM_REVERSE,
                                                  TEAM_SPLIT_HALF, TEAM_SPLIT_ODD_EVEN};
 static size_t msgrange[3] = {8, (1ULL << 21), 8};
 static char *cls = NULL;
-static std::vector<ucc_test_mpi_inplace_t> inplace = {TEST_NO_INPLACE};
+static std::vector<ucc_test_mpi_inplace_t> inplace = {TEST_NO_INPLACE, TEST_INPLACE};
 static ucc_test_mpi_root_t root_type = ROOT_RANDOM;
 static int root_value = 10;
 static std::vector<std::string> str_split(const char *value, const char *delimiter)
