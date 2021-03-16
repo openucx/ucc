@@ -54,3 +54,23 @@ MPI_Comm create_mpi_comm(ucc_test_mpi_team_t t)
     }
     return MPI_COMM_NULL;
 }
+static MPI_Request progress_request = NULL;
+void mpi_progress()
+{
+    int completed;
+    if (!progress_request) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_Isend(NULL, 0, MPI_BYTE, rank, 456, MPI_COMM_WORLD, &progress_request);
+    }
+    MPI_Test(&progress_request, &completed, MPI_STATUS_IGNORE);
+}
+
+void mpi_progress_cleanup() {
+    int rank;
+    if (progress_request) {
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_Recv(NULL, 0, MPI_BYTE, rank, 456, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Wait(&progress_request, MPI_STATUS_IGNORE);
+    }
+}

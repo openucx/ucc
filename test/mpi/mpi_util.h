@@ -76,4 +76,6 @@ static inline MPI_Op ucc_op_to_mpi(ucc_reduction_op_t op)
 }
 
 MPI_Comm create_mpi_comm(ucc_test_mpi_team_t t);
+void mpi_progress();
+void mpi_progress_cleanup();
 #endif

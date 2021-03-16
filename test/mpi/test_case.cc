@@ -5,7 +5,7 @@
  */
 
 #include "test_mpi.h"
-
+#include "mpi_util.h"
 std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
                                          ucc_test_team_t &_team,
                                          int root,
@@ -53,6 +53,7 @@ void TestCase::wait()
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
         ucc_context_progress(team.ctx);
+        mpi_progress();
     } while (UCC_OK != status);
 }
 

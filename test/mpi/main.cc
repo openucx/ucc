@@ -2,6 +2,7 @@
 #include <sstream>
 #include "test_mpi.h"
 #include <chrono>
+#include "mpi_util.h"
 
 static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
                                              UCC_COLL_TYPE_ALLREDUCE,
@@ -334,5 +335,6 @@ int main(int argc, char *argv[])
             std::chrono::duration_cast<std::chrono::seconds>(end - begin).count()
                   << "s" << std::endl;
     }
+    mpi_progress_cleanup();
     return 0;
 }
