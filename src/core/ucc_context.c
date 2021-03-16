@@ -309,7 +309,8 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
-    ctx->lib                     = lib;
+    ctx->lib         = lib;
+    ctx->service_ctx = NULL;
     ucc_list_head_init(&ctx->progress_list);
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);

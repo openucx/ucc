@@ -7,6 +7,7 @@
 #include "ucc_team.h"
 #include "ucc_lib.h"
 #include "components/cl/ucc_cl.h"
+#include "components/tl/ucc_tl.h"
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
 {
@@ -31,12 +32,7 @@ void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
 static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
                                                 ucc_team_t *team)
 {
-    int                    i;
-    ucc_status_t           status;
-    ucc_base_team_t       *b_team;
-    ucc_cl_iface_t        *cl_iface;
-    ucc_base_team_params_t b_params;
-
+    ucc_status_t status;
     if ((team->params.mask & UCC_TEAM_PARAM_FIELD_EP) &&
         (team->params.mask & UCC_TEAM_PARAM_FIELD_EP_RANGE) &&
         (team->params.ep_range == UCC_COLLECTIVE_EP_RANGE_CONTIG)) {
@@ -49,48 +45,40 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
             "not supported yet...");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    memcpy(&b_params.params, &team->params, sizeof(ucc_team_params_t));
-    b_params.rank  = team->rank;
     team->cl_teams = ucc_malloc(sizeof(ucc_cl_team_t *) * context->n_cl_ctx);
     if (!team) {
         ucc_error("failed to allocate %zd bytes for cl teams array",
                   sizeof(ucc_cl_team_t *) * context->n_cl_ctx);
         return UCC_ERR_NO_MEMORY;
     }
-    for (i = 0; i < context->n_cl_ctx; i++) {
-        cl_iface = UCC_CL_CTX_IFACE(context->cl_ctx[i]);
-        status   = cl_iface->team.create_post(&context->cl_ctx[i]->super,
-                                            &b_params, &b_team);
-
-        if (status != UCC_OK) {
-            ucc_debug("failed to create CL %s team", cl_iface->super.name);
-            /* TODO: what is the logic here? continue or report error?
-               maybe need to recheck supported matrix after the whole
-               ucc_team is created and report error if not all requested
-               capabilities are provided */
-            continue;
+    if (!team->service_team) {
+        ucc_base_team_params_t b_params;
+        ucc_base_team_t       *b_team;
+        status = ucc_tl_context_get(context, UCC_TL_UCP, &context->service_ctx);
+        if (UCC_OK != status) {
+            ucc_warn("TL UCP context is not available, "
+                     "service team can not be created");
+            goto error;
         }
-        status = cl_iface->team.create_test(b_team);
-        if (status < 0) {
-            ucc_debug("failed to create CL %s team", cl_iface->super.name);
-            /* TODO: see comment above */
-            continue;
+        memcpy(&b_params, &team->params, sizeof(ucc_team_params_t));
+        b_params.rank     = team->rank;
+        b_params.scope    = UCC_CL_LAST + 1; // CORE scopre id - never overlaps with CL type
+        b_params.scope_id = 0;
+        status = UCC_TL_CTX_IFACE(context->service_ctx)
+            ->team.create_post(&context->service_ctx->super, &b_params, &b_team);
+        if (UCC_OK != status) {
+            ucc_error("tl ucp service team create post failed");
+            goto error;
         }
-        team->cl_teams[team->n_cl_teams++] =
-            ucc_derived_of(b_team, ucc_cl_team_t);
-        if (status == UCC_INPROGRESS) {
-            /* workaround to fix oob allgather issue if multiple teams use it
-               simultaneously*/
-            break;
-        }
+        team->service_team = ucc_derived_of(b_team, ucc_tl_team_t);
     }
-    if (team->n_cl_teams == 0) {
-        ucc_error("no cl teams have been created for ucc_team");
-        return UCC_ERR_NO_MESSAGE;
-    }
-    team->last_team_create_posted = i;
-    team->status = (i < context->n_cl_ctx) ? UCC_INPROGRESS : UCC_OK;
+    team->last_team_create_posted = -1;
+    team->status                  = UCC_INPROGRESS;
     return UCC_OK;
+
+error:
+    free(team->cl_teams);
+    return status;
 }
 
 ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts,
@@ -113,6 +101,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     }
     team->n_cl_teams   = 0;
     team->num_contexts = num_contexts;
+    team->service_team = NULL;
     team->contexts =
         ucc_malloc(sizeof(ucc_context_t *) * num_contexts, "ucc_team_ctx");
     if (!team->contexts) {
@@ -121,6 +110,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
         status = UCC_ERR_NO_MEMORY;
         goto err_ctx_alloc;
     }
+
     memcpy(team->contexts, contexts, sizeof(ucc_context_t *) * num_contexts);
     ucc_copy_team_params(&team->params, params);
     status    = ucc_team_create_post_single(contexts[0], team);
@@ -141,17 +131,30 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
     ucc_status_t           status;
     ucc_base_team_params_t b_params;
 
-    cl_iface = UCC_CL_CTX_IFACE(context->cl_ctx[team->last_team_create_posted]);
-    b_team   = &team->cl_teams[team->last_team_create_posted]->super;
-    status   = cl_iface->team.create_test(b_team);
-    if (status < 0) {
-        ucc_debug("failed to create CL %s team", cl_iface->super.name);
-        /* TODO: see comment above */
-    } else if (status == UCC_INPROGRESS) {
-        return status;
+    if (team->service_team && (team->last_team_create_posted < 0)) {
+        status = UCC_TL_CTX_IFACE(context->service_ctx)
+            ->team.create_test(&team->service_team->super);
+        if (UCC_OK != status) {
+            if (UCC_INPROGRESS != status) {
+                team->service_team = NULL;
+                ucc_error("failed to create service tl ucp team");
+            }
+            return status;
+        }
     }
-
+    if (team->last_team_create_posted >= 0) {
+        cl_iface = UCC_CL_CTX_IFACE(context->cl_ctx[team->last_team_create_posted]);
+        b_team   = &team->cl_teams[team->last_team_create_posted]->super;
+        status   = cl_iface->team.create_test(b_team);
+        if (status < 0) {
+            ucc_debug("failed to create CL %s team", cl_iface->super.name);
+            /* TODO: see comment above */
+        } else if (status == UCC_INPROGRESS) {
+            return status;
+        }
+    }
     memcpy(&b_params.params, &team->params, sizeof(ucc_team_params_t));
+    b_params.rank = team->rank;
     for (i = team->last_team_create_posted + 1; i < context->n_cl_ctx; i++) {
         cl_iface = UCC_CL_CTX_IFACE(context->cl_ctx[i]);
         status   = cl_iface->team.create_post(&context->cl_ctx[i]->super,
@@ -170,6 +173,7 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
         team->cl_teams[team->n_cl_teams++] =
             ucc_derived_of(b_team, ucc_cl_team_t);
         if (status == UCC_INPROGRESS) {
+            team->last_team_create_posted = i;
             /* workaround to fix oob allgather issue if multiple teams use it
                simultaneously*/
             return UCC_INPROGRESS;
@@ -196,6 +200,14 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
     ucc_cl_iface_t *cl_iface;
     int             i;
     ucc_status_t    status;
+    if (team->service_team) {
+        if (UCC_OK != (status = UCC_TL_CTX_IFACE(team->contexts[0]->service_ctx)
+                       ->team.destroy(&team->service_team->super))) {
+            return status;
+        }
+        team->service_team = NULL;
+        ucc_tl_context_put(team->contexts[0]->service_ctx);
+    }
     for (i = 0; i < team->n_cl_teams; i++) {
         if (!team->cl_teams[i])
             continue;

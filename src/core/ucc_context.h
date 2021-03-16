@@ -27,6 +27,7 @@ typedef struct ucc_context {
     ucc_thread_mode_t       thread_mode;
     ucc_cl_context_t      **cl_ctx;
     ucc_tl_context_t      **tl_ctx;
+    ucc_tl_context_t       *service_ctx;
     int                     n_cl_ctx;
     int                     n_tl_ctx;
     ucc_list_link_t         progress_list;
