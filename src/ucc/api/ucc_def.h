@@ -143,6 +143,6 @@ typedef size_t ucc_context_addr_len_t;
  * The UCC execution engine handle is an opaque handle created by the library representing
  * the execution context and related queues.
  */
-typedef struct ucc_ee_handle*      ucc_ee_h;
+typedef struct ucc_ee*      ucc_ee_h;
 
 #endif
