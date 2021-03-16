@@ -255,14 +255,20 @@ std::vector<int> UccTestMpi::gen_roots(ucc_test_team_t &team)
 {
     int size;
     std::vector<int> _roots;
+    std::default_random_engine eng;
+    eng.seed(123);
     MPI_Comm_size(team.comm, &size);
+    std::uniform_int_distribution<int> urd(0, size-1);
+
     switch(root_type) {
     case ROOT_SINGLE:
         _roots = std::vector<int>({ucc_min(root_value, size-1)});
         break;
     case ROOT_RANDOM:
         _roots.resize(root_value);
-        std::generate(_roots.begin(), _roots.end(), [=](){ return rand() % size;});
+        for (unsigned i = 0; i < _roots.size(); i++) {
+            _roots[i] = urd(eng);
+        }
         break;
     case ROOT_ALL:
         _roots.resize(size);
