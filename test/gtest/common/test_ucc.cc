@@ -100,7 +100,8 @@ ucc_status_t UccTeam::req_test(void *request)
     switch (ci->self->ag[ci->my_rank].phase) {
     case UccTeam::AG_READY:
         for (int i = 0; i < n_procs; i++) {
-            if (ci->self->ag[i].phase == UccTeam::AG_INIT) {
+            if ((ci->self->ag[i].phase == UccTeam::AG_INIT) ||
+                (ci->self->ag[i].phase == UccTeam::AG_COMPLETE)) {
                 return UCC_INPROGRESS;
             }
         }
