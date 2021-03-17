@@ -9,6 +9,9 @@
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
 
+static ucc_status_t ucc_team_alloc_id(ucc_team_t *team);
+static void ucc_team_relase_id(ucc_team_t *team);
+
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
 {
     dst->mask = src->mask;
@@ -102,6 +105,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     team->n_cl_teams   = 0;
     team->num_contexts = num_contexts;
     team->service_team = NULL;
+    team->id           = ((uint16_t)-1);
     team->contexts =
         ucc_malloc(sizeof(ucc_context_t *) * num_contexts, "ucc_team_ctx");
     if (!team->contexts) {
@@ -142,6 +146,10 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             return status;
         }
     }
+    if (team->id == ((uint16_t)-1)) {
+        status = ucc_team_alloc_id(team);
+    }
+
     if (team->last_team_create_posted >= 0) {
         cl_iface = UCC_CL_CTX_IFACE(context->cl_ctx[team->last_team_create_posted]);
         b_team   = &team->cl_teams[team->last_team_create_posted]->super;
@@ -233,11 +241,104 @@ ucc_status_t ucc_team_destroy_nb(ucc_team_h team)
     ucc_assert(team->num_contexts == 1);
     return ucc_team_destroy_single(team);
 }
+
 ucc_status_t ucc_team_destroy(ucc_team_h team)
 {
     ucc_status_t status;
+    ucc_team_relase_id(team);
     while (UCC_INPROGRESS == (status = ucc_team_destroy_single(team))) {
         ; //TODO call ucc progress here
     }
     return status;
+}
+
+static inline int
+find_first_set_and_zero(uint64_t *value) {
+    int i;
+    for (i=0; i<64; i++) {
+        if (*value & ((uint64_t)1 << i)) {
+            *value &= ~((uint64_t)1 << i);
+            return i+1;
+        }
+    }
+    return 0;
+}
+
+static inline void
+set_id_bit(uint64_t *local, int id) {
+    int map_pos = id / 64;
+    int pos = id % 64;
+    local[map_pos] |= ((uint64_t)1 << (pos-1));
+}
+
+static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
+{
+    ucc_context_t *ctx = team->contexts[0]; /* at least 1 ctx is always available */
+    uint64_t *local, *global;
+    if (!ctx->ids.pool) {
+        ctx->ids.pool = ucc_malloc(ctx->ids.pool_size*2*sizeof(uint64_t), "ids_pool");
+        if (!ctx->ids.pool) {
+            ucc_error("failed to allocate %zd bytes for team_ids_pool",
+                      ctx->ids.pool_size*2*sizeof(uint64_t));
+            return UCC_ERR_NO_MEMORY;
+        }
+        /* init all bits to 1 - all available */
+        memset(ctx->ids.pool, 255, ctx->ids.pool_size*2*sizeof(uint64_t));
+    }
+    local  = ctx->ids.pool;
+    global = ctx->ids.pool + ctx->ids.pool_size;
+    ucc_coll_task_t *task;
+    ucc_tl_team_subset_t subset = {
+        .map.type = UCC_EP_MAP_FULL,
+        .map.ep_num = team->params.oob.participants,
+        .myrank   = team->rank
+    };
+    ucc_tl_iface_t *tl_iface = UCC_TL_TEAM_IFACE(team->service_team);
+
+    ucc_status_t status = tl_iface->scoll.allreduce(
+        &team->service_team->super, global, local, UCC_DT_UINT64, ctx->ids.pool_size, UCC_OP_BAND,
+        subset, &task);
+    if (status < 0) {
+        ucc_error("failed to start service allreduce for team ids pool allocation: %s",
+                  ucc_status_string(status));
+        return status;
+    }
+    do {
+        status = tl_iface->scoll.test(task);
+        if (status < 0) {
+            ucc_error("service allreduce test failure: %s",
+                      ucc_status_string(status));
+            return status;
+        }
+        ucc_context_progress(ctx);
+    } while (UCC_OK != status);
+    tl_iface->scoll.cleanup(task);
+
+    memcpy(local, global, ctx->ids.pool_size*sizeof(uint64_t));
+    int pos = 0, i;
+    for (i=0; i<ctx->ids.pool_size; i++) {
+        if ((pos = find_first_set_and_zero(&local[i])) > 0) {
+            break;
+        }
+    }
+    if (pos > 0) {
+        ucc_assert(pos <= 64);
+        team->id = (uint16_t)(i*64+pos);
+        ucc_info("allocated ID %d for team %p", team->id, team);
+    } else {
+        team->id = 0;
+        ucc_warn("could not allocate team id, whole id space is occupied, "
+                 "try increasing UCC_TEAM_IDS_POOL_SIZE");
+        return UCC_ERR_NO_RESOURCE;
+    }
+    ucc_assert(team->id > 0);
+    return UCC_OK;
+}
+
+static void ucc_team_relase_id(ucc_team_t *team)
+{
+    ucc_context_t *ctx = team->contexts[0];
+    if (1 /* Check id is internal */) {
+        set_id_bit(ctx->ids.pool, team->id);
+    }
 }

@@ -22,6 +22,12 @@ static ucc_config_field_t ucc_context_config_table[] = {
      " on the same node",
      ucc_offsetof(ucc_context_config_t, estimated_num_ppn), UCC_CONFIG_TYPE_UINT},
 
+    {"TEAM_IDS_POOL_SIZE", "32",
+     "Defines the size of the team_id_pool. The number of coexisting unique team ids "
+     "for a single process is team_ids_pool_size*64. This parameter is relevant when "
+     "internal team id allocation takes place.",
+     ucc_offsetof(ucc_context_config_t, team_ids_pool_size), UCC_CONFIG_TYPE_UINT},
+
     {NULL}
 };
 
@@ -309,8 +315,10 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
-    ctx->lib         = lib;
-    ctx->service_ctx = NULL;
+    ctx->lib           = lib;
+    ctx->service_ctx   = NULL;
+    ctx->ids.pool_size = config->team_ids_pool_size;
+    ctx->ids.pool      = NULL;
     ucc_list_head_init(&ctx->progress_list);
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
@@ -412,6 +420,7 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     ucc_progress_queue_finalize(context->pq);
     ucc_free(context->tl_ctx);
     ucc_free(context);
+    ucc_free(context->ids.pool);
     return UCC_OK;
 }
 
