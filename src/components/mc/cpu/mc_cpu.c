@@ -40,6 +40,9 @@ static ucc_status_t ucc_mc_cpu_reduce(const void *src1, const void *src2,
                                       ucc_datatype_t dt, ucc_reduction_op_t op)
 {
     switch(dt) {
+    case UCC_DT_INT8:
+        DO_DT_REDUCE_INT(int8_t, op, src1, src2, dst, count);
+        break;
     case UCC_DT_INT16:
         DO_DT_REDUCE_INT(int16_t, op, src1, src2, dst, count);
         break;
@@ -48,6 +51,18 @@ static ucc_status_t ucc_mc_cpu_reduce(const void *src1, const void *src2,
         break;
     case UCC_DT_INT64:
         DO_DT_REDUCE_INT(int64_t, op, src1, src2, dst, count);
+        break;
+    case UCC_DT_UINT8:
+        DO_DT_REDUCE_INT(uint8_t, op, src1, src2, dst, count);
+        break;
+    case UCC_DT_UINT16:
+        DO_DT_REDUCE_INT(uint16_t, op, src1, src2, dst, count);
+        break;
+    case UCC_DT_UINT32:
+        DO_DT_REDUCE_INT(uint32_t, op, src1, src2, dst, count);
+        break;
+    case UCC_DT_UINT64:
+        DO_DT_REDUCE_INT(uint64_t, op, src1, src2, dst, count);
         break;
     case UCC_DT_FLOAT32:
         ucc_assert(4 == sizeof(float));
