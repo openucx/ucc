@@ -6,14 +6,29 @@
 #ifndef TEST_UCC_H
 #define TEST_UCC_H
 #include "test.h"
+#include "ucc/api/ucc.h"
+#include "core/ucc_mc.h"
 #include <vector>
 #include <tuple>
 #include <memory>
 
-typedef std::vector<ucc_coll_args_t*> UccCollArgsVec;
+typedef struct {
+   void *init_buf;
+   size_t rbuf_size;
+   ucc_coll_args_t *args;
+} gtest_ucc_coll_ctx_t;
+
+typedef std::vector<gtest_ucc_coll_ctx_t*> UccCollCtxVec;
+
+typedef enum {
+    TEST_NO_INPLACE,
+    TEST_INPLACE
+} gtest_ucc_inplace_t;
 
 class UccCollArgs {
 protected: 
+    ucc_memory_type_t mem_type;
+    gtest_ucc_inplace_t inplace;
     void alltoallx_init_buf(int src_rank, int dst_rank, uint8_t *buf, size_t len)
     {
         for (int i = 0; i < len; i++) {
@@ -35,11 +50,18 @@ protected:
         return err;
     }
 public:
+    UccCollArgs() {
+        // defaults
+        mem_type = UCC_MEMORY_TYPE_HOST;
+        inplace = TEST_NO_INPLACE;
+    }
     virtual ~UccCollArgs() {}
-    virtual UccCollArgsVec data_init(int nprocs, ucc_datatype_t dtype,
+    virtual UccCollCtxVec data_init(int nprocs, ucc_datatype_t dtype,
                                      size_t count) = 0;
-    virtual void data_fini(UccCollArgsVec args) = 0;
-    virtual void data_validate(UccCollArgsVec args) = 0;
+    virtual void data_fini(UccCollCtxVec args) = 0;
+    virtual void data_validate(UccCollCtxVec args) = 0;
+    void set_mem_type(ucc_memory_type_t _mt);
+    void set_inplace(gtest_ucc_inplace_t _inplace);
 };
 
 /* A single processes in a Job that runs UCC.
@@ -52,7 +74,11 @@ public:
         .thread_mode = UCC_THREAD_SINGLE,
         .coll_types = UCC_COLL_TYPE_BARRIER |
                       UCC_COLL_TYPE_ALLTOALL |
-                      UCC_COLL_TYPE_ALLTOALLV
+                      UCC_COLL_TYPE_ALLTOALLV |
+                      UCC_COLL_TYPE_ALLREDUCE |
+                      UCC_COLL_TYPE_ALLGATHER |
+                      UCC_COLL_TYPE_ALLGATHERV |
+                      UCC_COLL_TYPE_BCAST
     };
     static constexpr ucc_context_params_t default_ctx_params = {
         .mask = UCC_CONTEXT_PARAM_FIELD_TYPE,
@@ -144,7 +170,7 @@ public:
 
     std::vector<ucc_coll_req_h> reqs;
     UccReq(UccTeam_h _team, ucc_coll_args_t *args);
-    UccReq(UccTeam_h _team, UccCollArgsVec args);
+    UccReq(UccTeam_h _team, UccCollCtxVec args);
     ~UccReq();
     void start(void);
     void wait();

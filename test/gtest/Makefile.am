@@ -78,6 +78,10 @@ gtest_SOURCES =                     \
 	core/test_barrier.cc            \
 	core/test_alltoall.cc           \
 	core/test_alltoallv.cc          \
+	core/test_allgather.cc          \
+	core/test_allgatherv.cc         \
+	core/test_bcast.cc              \
+	core/test_allreduce.cc          \
 	utils/test_string.cc            \
 	coll_score/test_score.cc        \
 	coll_score/test_score_str.cc    \

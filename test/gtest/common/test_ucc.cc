@@ -319,13 +319,14 @@ err:
     reqs.clear();
 }
 
-UccReq::UccReq(UccTeam_h _team, UccCollArgsVec args) :
+UccReq::UccReq(UccTeam_h _team, UccCollCtxVec args) :
         team(_team)
 {
     EXPECT_EQ(team->procs.size(), args.size());
     ucc_coll_req_h req;
     for (auto i = 0; i < team->procs.size(); i++) {
-        if (UCC_OK != ucc_collective_init(args[i], &req, team->procs[i].team)) {
+        if (UCC_OK != ucc_collective_init(args[i]->args, &req,
+                                          team->procs[i].team)) {
             goto err;
         }
         reqs.push_back(req);
@@ -396,4 +397,14 @@ void UccReq::startall(std::vector<UccReq> &reqs)
     for (auto &r : reqs) {
         r.start();
     }
+}
+
+void UccCollArgs::set_mem_type(ucc_memory_type_t _mt)
+{
+    mem_type = _mt;
+}
+
+void UccCollArgs::set_inplace(gtest_ucc_inplace_t _inplace)
+{
+    inplace = _inplace;
 }
