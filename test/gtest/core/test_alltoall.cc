@@ -68,12 +68,12 @@ class test_alltoall_0 : public test_alltoall,
 
 UCC_TEST_P(test_alltoall_0, single)
 {
-    const int size = std::get<0>(GetParam());
-    const ucc_datatype_t dtype = (ucc_datatype_t)std::get<1>(GetParam());
-    const int count = std::get<2>(GetParam());
-
-    UccTeam_h team = UccJob::getStaticJob()->create_team(size);
-    UccCollArgsVec args = data_init(size, (ucc_datatype_t)dtype, count);
+    const int            team_id = std::get<0>(GetParam());
+    const ucc_datatype_t dtype   = (ucc_datatype_t)std::get<1>(GetParam());
+    const int            count   = std::get<2>(GetParam());
+    UccTeam_h            team    = UccJob::getStaticTeams()[team_id];
+    int                  size    = team->procs.size();
+    UccCollArgsVec       args    = data_init(size, (ucc_datatype_t)dtype, count);
     UccReq    req(team, args);
     req.start();
     req.wait();
@@ -85,7 +85,7 @@ INSTANTIATE_TEST_CASE_P(
     ,
     test_alltoall_0,
     ::testing::Combine(
-        ::testing::Values(1,3,16), // nprocs
+        ::testing::Range(1, UccJob::nStaticTeams), // team_ids
         ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_FLOAT64 + 1), // dtype
         ::testing::Values(1,3,8))); // count
 
@@ -95,9 +95,8 @@ class test_alltoall_1 : public test_alltoall,
 UCC_TEST_P(test_alltoall_1, multiple)
 {
     const ucc_datatype_t dtype = (ucc_datatype_t)std::get<0>(GetParam());
-    const int count = std::get<1>(GetParam());
-
-    std::vector<UccReq> reqs;
+    const int            count = std::get<1>(GetParam());
+    std::vector<UccReq>  reqs;
     std::vector<UccCollArgsVec> args;
     for (auto &team : UccJob::getStaticTeams()) {
         UccCollArgsVec arg = data_init(team->procs.size(),

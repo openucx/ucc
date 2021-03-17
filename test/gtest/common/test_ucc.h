@@ -113,11 +113,12 @@ typedef std::vector<ucc_env_var_t> ucc_job_env_t;
 /* UccJob - environent that has n_procs processes.
    Multiple UccTeams can be created from UccJob */
 class UccJob {
-    static const int staticUccJobSize = 16;
-    static constexpr int staticTeamSizes[] = {2, 7, 8};
     static UccJob* staticUccJob;
     static std::vector<UccTeam_h> staticTeams;
 public:
+    static const int nStaticTeams     = 3;
+    static const int staticUccJobSize = 16;
+    static constexpr int staticTeamSizes[nStaticTeams] = {2, 11, 16};
     static void cleanup();
     static UccJob* getStaticJob();
     static const std::vector<UccTeam_h> &getStaticTeams();
