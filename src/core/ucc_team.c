@@ -54,6 +54,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
                   sizeof(ucc_cl_team_t *) * context->n_cl_ctx);
         return UCC_ERR_NO_MEMORY;
     }
+    team->state = UCC_TEAM_CL_CREATE;
     if (!team->service_team) {
         ucc_base_team_params_t b_params;
         ucc_base_team_t       *b_team;
@@ -74,6 +75,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
             goto error;
         }
         team->service_team = ucc_derived_of(b_team, ucc_tl_team_t);
+        team->state = UCC_TEAM_SERVICE_TEAM;
     }
     team->last_team_create_posted = -1;
     team->status                  = UCC_INPROGRESS;
@@ -105,6 +107,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     team->n_cl_teams   = 0;
     team->num_contexts = num_contexts;
     team->service_team = NULL;
+    team->task         = NULL;
     team->id           = ((uint16_t)-1);
     team->contexts =
         ucc_malloc(sizeof(ucc_context_t *) * num_contexts, "ucc_team_ctx");
@@ -126,29 +129,27 @@ err_ctx_alloc:
     return status;
 }
 
-ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
-                                         ucc_team_t    *team)
+static inline ucc_status_t
+ucc_team_create_service_team(ucc_context_t *context, ucc_team_t *team)
+{
+    ucc_status_t status;
+    status = UCC_TL_CTX_IFACE(context->service_ctx)
+        ->team.create_test(&team->service_team->super);
+    if (status < 0) {
+        team->service_team = NULL;
+        ucc_error("failed to create service tl ucp team");
+    }
+    return status;
+}
+
+static inline ucc_status_t
+ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
 {
     int                    i;
     ucc_cl_iface_t        *cl_iface;
     ucc_base_team_t       *b_team;
     ucc_status_t           status;
     ucc_base_team_params_t b_params;
-
-    if (team->service_team && (team->last_team_create_posted < 0)) {
-        status = UCC_TL_CTX_IFACE(context->service_ctx)
-            ->team.create_test(&team->service_team->super);
-        if (UCC_OK != status) {
-            if (UCC_INPROGRESS != status) {
-                team->service_team = NULL;
-                ucc_error("failed to create service tl ucp team");
-            }
-            return status;
-        }
-    }
-    if (team->id == ((uint16_t)-1)) {
-        status = ucc_team_alloc_id(team);
-    }
 
     if (team->last_team_create_posted >= 0) {
         cl_iface = UCC_CL_CTX_IFACE(context->cl_ctx[team->last_team_create_posted]);
@@ -185,6 +186,32 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             /* workaround to fix oob allgather issue if multiple teams use it
                simultaneously*/
             return UCC_INPROGRESS;
+        }
+    }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
+                                         ucc_team_t    *team)
+{
+    ucc_status_t status;
+    switch (team->state) {
+    case UCC_TEAM_SERVICE_TEAM:
+        status = ucc_team_create_service_team(context, team);
+        if (UCC_OK != status) {
+            return status;
+        }
+        team->state = UCC_TEAM_ALLOC_ID;
+    case UCC_TEAM_ALLOC_ID:
+        status = ucc_team_alloc_id(team);
+        if (UCC_OK != status) {
+            return status;
+        }
+        team->state = UCC_TEAM_CL_CREATE;
+    case UCC_TEAM_CL_CREATE:
+        status = ucc_team_create_cls(context, team);
+        if (UCC_OK != status) {
+            return status;
         }
     }
     team->status = UCC_OK;
@@ -273,8 +300,13 @@ set_id_bit(uint64_t *local, int id) {
 
 static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
 {
-    ucc_context_t *ctx = team->contexts[0]; /* at least 1 ctx is always available */
-    uint64_t *local, *global;
+    /* at least 1 ctx is always available */
+    ucc_context_t   *ctx      = team->contexts[0];
+    ucc_tl_iface_t  *tl_iface = UCC_TL_TEAM_IFACE(team->service_team);
+    uint64_t        *local, *global;
+    ucc_status_t     status;
+    int              pos, i;
+
     if (!ctx->ids.pool) {
         ctx->ids.pool = ucc_malloc(ctx->ids.pool_size*2*sizeof(uint64_t), "ids_pool");
         if (!ctx->ids.pool) {
@@ -287,35 +319,35 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
     }
     local  = ctx->ids.pool;
     global = ctx->ids.pool + ctx->ids.pool_size;
-    ucc_coll_task_t *task;
-    ucc_tl_team_subset_t subset = {
-        .map.type = UCC_EP_MAP_FULL,
-        .map.ep_num = team->params.oob.participants,
-        .myrank   = team->rank
-    };
-    ucc_tl_iface_t *tl_iface = UCC_TL_TEAM_IFACE(team->service_team);
 
-    ucc_status_t status = tl_iface->scoll.allreduce(
-        &team->service_team->super, global, local, UCC_DT_UINT64, ctx->ids.pool_size, UCC_OP_BAND,
-        subset, &task);
-    if (status < 0) {
-        ucc_error("failed to start service allreduce for team ids pool allocation: %s",
-                  ucc_status_string(status));
-        return status;
-    }
-    do {
-        status = tl_iface->scoll.test(task);
+    if (!team->task) {
+        ucc_tl_team_subset_t subset = {
+            .map.type   = UCC_EP_MAP_FULL,
+            .map.ep_num = team->params.oob.participants,
+            .myrank     = team->rank
+        };
+        status = tl_iface->scoll.allreduce(
+            &team->service_team->super, global, local, UCC_DT_UINT64, ctx->ids.pool_size, UCC_OP_BAND,
+            subset, &team->task);
         if (status < 0) {
-            ucc_error("service allreduce test failure: %s",
+            ucc_error("failed to start service allreduce for team ids pool allocation: %s",
                       ucc_status_string(status));
             return status;
         }
-        ucc_context_progress(ctx);
-    } while (UCC_OK != status);
-    tl_iface->scoll.cleanup(task);
-
+    }
+    ucc_context_progress(ctx);
+    status = tl_iface->scoll.test(team->task);
+    if (status < 0) {
+        ucc_error("service allreduce test failure: %s",
+                  ucc_status_string(status));
+        return status;
+    } else if (status != UCC_OK) {
+        return status;
+    }
+    tl_iface->scoll.cleanup(team->task);
+    team->task = NULL;
     memcpy(local, global, ctx->ids.pool_size*sizeof(uint64_t));
-    int pos = 0, i;
+    pos = 0;
     for (i=0; i<ctx->ids.pool_size; i++) {
         if ((pos = find_first_set_and_zero(&local[i])) > 0) {
             break;

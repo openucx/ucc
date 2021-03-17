@@ -12,9 +12,16 @@
 typedef struct ucc_context ucc_context_t;
 typedef struct ucc_cl_team ucc_cl_team_t;
 typedef struct ucc_tl_team ucc_tl_team_t;
+typedef struct ucc_coll_task ucc_coll_task_t;
+typedef enum {
+    UCC_TEAM_SERVICE_TEAM,
+    UCC_TEAM_ALLOC_ID,
+    UCC_TEAM_CL_CREATE,
+} ucc_team_state_t;
 
 typedef struct ucc_team {
     ucc_status_t      status;
+    ucc_team_state_t  state;
     ucc_context_t   **contexts;
     uint32_t          num_contexts;
     ucc_team_params_t params;
@@ -24,6 +31,7 @@ typedef struct ucc_team {
     uint16_t          id; /*< context-uniq team identifier */
     ucc_rank_t        rank;
     ucc_tl_team_t    *service_team;
+    ucc_coll_task_t  *task;
 } ucc_team_t;
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);
