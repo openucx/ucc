@@ -17,17 +17,6 @@ extern "C" {
 #include <assert.h>
 #include <stdio.h>
 
-#define  DO_OP_MAX(_v1, _v2) (_v1 > _v2 ? _v1 : _v2)
-#define  DO_OP_MIN(_v1, _v2) (_v1 < _v2 ? _v1 : _v2)
-#define  DO_OP_SUM(_v1, _v2) (_v1 + _v2)
-#define DO_OP_PROD(_v1, _v2) (_v1 * _v2)
-#define DO_OP_LAND(_v1, _v2) (_v1 && _v2)
-#define DO_OP_BAND(_v1, _v2) (_v1 & _v2)
-#define  DO_OP_LOR(_v1, _v2) (_v1 || _v2)
-#define  DO_OP_BOR(_v1, _v2) (_v1 | _v2)
-#define DO_OP_LXOR(_v1, _v2) ((!_v1) != (!_v2))
-#define DO_OP_BXOR(_v1, _v2) (_v1 ^ _v2)
-
 #define CUDA_REDUCE_WITH_OP(NAME, OP)                                          \
 template <typename T>                                                          \
 __global__ void UCC_REDUCE_CUDA_ ## NAME (const T *s1, const T *s2, T *d,      \
@@ -92,6 +81,7 @@ CUDA_REDUCE_WITH_OP(BXOR, DO_OP_BXOR)
         case UCC_OP_LOR:                                                       \
             LAUNCH_KERNEL(LOR, type, sbuf1, sbuf2, dest, size, count, ld, s,   \
                           b, t);                                               \
+            break;                                                             \
         case UCC_OP_BOR:                                                       \
             LAUNCH_KERNEL(BOR, type, sbuf1, sbuf2, dest, size, count, ld, s,   \
                           b, t);                                               \
@@ -150,14 +140,11 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
                                       size_t stride, ucc_datatype_t dt,
                                       ucc_reduction_op_t op)
 {
-    size_t ld = stride / ucc_dt_size(dt);
-    int th;
-    unsigned long bk;
-    cudaStream_t stream;
+    cudaStream_t  stream = ucc_mc_cuda.stream;
+    size_t        ld     = stride / ucc_dt_size(dt);
+    int           th     = MC_CUDA_CONFIG->reduce_num_threads;;
+    unsigned long bk     = (count + th - 1)/th;;
 
-    stream = ucc_mc_cuda.stream;
-    th = MC_CUDA_CONFIG->reduce_num_threads;
-    bk = (count + th - 1)/th;
     if (MC_CUDA_CONFIG->reduce_num_blocks != UCC_ULUNITS_AUTO) {
         bk = ucc_min(bk, MC_CUDA_CONFIG->reduce_num_blocks);
     }

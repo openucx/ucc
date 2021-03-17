@@ -73,7 +73,7 @@ static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
     int i;
     ucc_status_t st;
 
-    //TODO implemente efficient reduce_multi
+    //TODO implement efficient reduce_multi
     st = ucc_mc_cpu_reduce(src1, src2, dst, count, dt, op);
     for (i = 1; i < size; i++) {
         if (st != UCC_OK) {
