@@ -5,11 +5,7 @@
  */
 
 #include "cl_basic.h"
-
-static inline int ucc_is_inplace(ucc_coll_args_t *args) {
-    return (args->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-           (args->flags & UCC_COLL_ARGS_FLAG_IN_PLACE);
-}
+#include "utils/ucc_coll_utils.h"
 
 ucc_status_t ucc_cl_basic_select_tl(ucc_base_coll_args_t *args,
                                     ucc_cl_basic_team_t *cl_basic_team,
@@ -20,17 +16,17 @@ ucc_status_t ucc_cl_basic_select_tl(ucc_base_coll_args_t *args,
     if (cl_basic_team->tl_nccl_team != NULL) {
         switch (args->args.coll_type) {
         case UCC_COLL_TYPE_ALLTOALL:
-            if ((args->args.src.info.mem_type == UCC_MEMORY_TYPE_CUDA) &&
-                (ucc_is_inplace(&args->args) ||
-                 (args->args.dst.info.mem_type == UCC_MEMORY_TYPE_CUDA))) {
+            if ((args->args.dst.info.mem_type == UCC_MEMORY_TYPE_CUDA) &&
+                (UCC_IS_INPLACE(args->args) ||
+                 (args->args.src.info.mem_type == UCC_MEMORY_TYPE_CUDA))) {
                 *tl_team = cl_basic_team->tl_nccl_team;
                 return UCC_OK;
             }
             break;
         case UCC_COLL_TYPE_ALLTOALLV:
-            if ((args->args.src.info_v.mem_type == UCC_MEMORY_TYPE_CUDA) &&
-                (ucc_is_inplace(&args->args) ||
-                 (args->args.dst.info_v.mem_type == UCC_MEMORY_TYPE_CUDA))) {
+            if ((args->args.dst.info_v.mem_type == UCC_MEMORY_TYPE_CUDA) &&
+                (UCC_IS_INPLACE(args->args) ||
+                 (args->args.src.info_v.mem_type == UCC_MEMORY_TYPE_CUDA))) {
                 *tl_team = cl_basic_team->tl_nccl_team;
                 return UCC_OK;
             }

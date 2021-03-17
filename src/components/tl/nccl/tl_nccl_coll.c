@@ -6,6 +6,7 @@
 
 #include "tl_nccl_coll.h"
 #include "utils/ucc_math.h"
+#include "utils/ucc_coll_utils.h"
 
 #define ncclOpUnsupported (ncclNumOps + 1)
 #define ncclDataTypeUnsupported (ncclNumTypes + 1)
@@ -102,6 +103,11 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
 {
+    if (UCC_IS_INPLACE(task->args)) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "inplace alltoallv is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     if ((task->args.src.info.datatype == UCC_DT_USERDEFINED) ||
         (task->args.dst.info.datatype == UCC_DT_USERDEFINED)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
@@ -111,26 +117,6 @@ ucc_status_t ucc_tl_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
     task->super.post     = ucc_nccl_alltoall_start;
     task->super.progress = ucc_nccl_collective_progress;
     return UCC_OK;
-}
-
-static inline size_t get_count(ucc_count_t *counts, ucc_rank_t idx,
-                               ucc_tl_nccl_task_t *task)
-{
-    if ((task->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-        (task->args.flags & UCC_COLL_ARGS_FLAG_COUNT_64BIT)) {
-        return ((uint64_t *)counts)[idx];
-    }
-    return ((uint32_t *)counts)[idx];
-}
-
-static inline size_t get_displacement(ucc_aint_t *displacements, ucc_rank_t idx,
-                                      ucc_tl_nccl_task_t *task)
-{
-    if ((task->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-        (task->args.flags & UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT)) {
-        return ((uint64_t *)displacements)[idx];
-    }
-    return ((uint32_t *)displacements)[idx];
 }
 
 ucc_status_t ucc_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
@@ -149,19 +135,21 @@ ucc_status_t ucc_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
     rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
     for (peer = 0; peer < team->size; peer++) {
-        count = get_count(task->args.src.info_v.counts, peer, task);
+        count = ucc_coll_args_get_count(&task->args,
+                                        task->args.src.info_v.counts, peer);
         if (count != 0) {
-            displ = get_displacement(task->args.src.info_v.displacements, peer,
-                                     task);
+            displ = ucc_coll_args_get_displacement(&task->args,
+                        task->args.src.info_v.displacements, peer);
             NCCLCHECK_GOTO(ncclSend((void *)(sbuf + displ * sdt_size),
                                     count * sdt_size, ncclChar, peer,
                                     team->nccl_comm, stream),
                         exit_coll, status, UCC_TL_TEAM_LIB(team));
         }
-        count = get_count(task->args.dst.info_v.counts, peer, task);
+        count = ucc_coll_args_get_count(&task->args,
+                                        task->args.dst.info_v.counts, peer);
         if (count != 0) {
-            displ = get_displacement(task->args.dst.info_v.displacements, peer,
-                                     task);
+            displ = ucc_coll_args_get_displacement(&task->args,
+                        task->args.dst.info_v.displacements, peer);
             NCCLCHECK_GOTO(ncclRecv((void *)(rbuf + displ * rdt_size),
                                     count * rdt_size, ncclChar, peer,
                                     team->nccl_comm, stream),
@@ -181,6 +169,11 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_alltoallv_init(ucc_tl_nccl_task_t *task)
 {
+    if (UCC_IS_INPLACE(task->args)) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "inplace alltoall is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     if ((task->args.src.info_v.datatype == UCC_DT_USERDEFINED) ||
         (task->args.dst.info_v.datatype == UCC_DT_USERDEFINED)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),

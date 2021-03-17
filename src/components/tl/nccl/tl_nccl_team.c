@@ -27,8 +27,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NO_MEMORY;
     }
     if (self->rank == 0) {
-        NCCLCHECK_GOTO(ncclGetUniqueId(&self->unique_id[self->size]),
-                       free_unique_id, status, ctx->super.super.lib);
+        ncclResult_t st;
+        st = ncclGetUniqueId(&self->unique_id[self->size]);
+        if (st != ncclSuccess) {
+            tl_error(ctx->super.super.lib, "failed to get unique id");
+            memset(&self->unique_id[self->size], 0, sizeof(ncclUniqueId));
+        }
     }
     status = self->oob.allgather(&self->unique_id[self->size], self->unique_id,
                                  sizeof(ncclUniqueId), self->oob.coll_info,
@@ -67,7 +71,7 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
     ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
     ucc_status_t status;
     ncclResult_t nccl_status;
-
+    ncclUniqueId errorid;
     status = team->oob.req_test(team->oob_req);
     if (status == UCC_INPROGRESS) {
         return UCC_INPROGRESS;
@@ -82,6 +86,13 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
         tl_error(tl_team->context->lib, "oob req free failed");
         goto free_unique_id;
     }
+    /* check unique id is valid */
+    memset(&errorid, 0, sizeof(errorid));
+    if (!memcmp(&errorid, team->unique_id, sizeof(errorid))) {
+        tl_error(tl_team->context->lib, "incorrect unique id");
+        goto free_unique_id;
+    }
+
     CUDACHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
                    cudaStreamNonBlocking), free_unique_id, status,
                    tl_team->context->lib);

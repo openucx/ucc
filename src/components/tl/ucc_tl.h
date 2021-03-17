@@ -86,12 +86,14 @@ ucc_status_t ucc_tl_context_get(ucc_context_t *ctx, ucc_tl_type_t type,
 ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context);
 
 typedef struct ucc_team_create_multiple_req {
-    ucc_tl_context_t       **contexts;
-    ucc_base_team_params_t **params;
-    ucc_tl_team_t          **teams;
-    ucc_status_t            *teams_status;
-    int                      last_created;
-    int                      n_teams;
+    int                          n_teams;
+    int                          last_created;
+    struct ucc_team_team_desc {
+        ucc_tl_context_t        *ctx;
+        ucc_tl_team_t           *team;
+        ucc_base_team_params_t   param;
+        ucc_status_t             status;
+    } descs[1];
 } ucc_team_create_multiple_req_t;
 
 ucc_status_t
