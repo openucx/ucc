@@ -55,7 +55,14 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
         return UCC_ERR_NO_MEMORY;
     }
     team->state = UCC_TEAM_CL_CREATE;
-    if (!team->service_team) {
+    /* If we don't have team id provided by user then we will have to
+       perform internal team id allocation. We need a service team for that
+       to run service allreduce.
+       TODO: we might also need service team if other CLs require if (e.g. hier),
+       need to add proper query interface */
+    if (team->id == 0) {
+        /* id team->id == 0 then external id was not provided,
+           (external id has high bit set) - start service team creation */
         ucc_base_team_params_t b_params;
         ucc_base_team_t       *b_team;
         status = ucc_tl_context_get(context, UCC_TL_UCP, &context->service_ctx);
@@ -108,7 +115,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     team->num_contexts = num_contexts;
     team->service_team = NULL;
     team->task         = NULL;
-    team->id           = ((uint16_t)-1);
+    team->id           = 0;
     team->contexts =
         ucc_malloc(sizeof(ucc_context_t *) * num_contexts, "ucc_team_ctx");
     if (!team->contexts) {
@@ -120,6 +127,11 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
 
     memcpy(team->contexts, contexts, sizeof(ucc_context_t *) * num_contexts);
     ucc_copy_team_params(&team->params, params);
+    /* check if user provides team id and if it is not too large */
+    if ((params->mask & UCC_TEAM_PARAM_FIELD_ID) &&
+        (params->id <= UCC_TEAM_ID_MAX)) {
+        team->id = ((uint16_t)params->id) | UCC_TEAM_ID_EXTERNAL_BIT;
+    }
     status    = ucc_team_create_post_single(contexts[0], team);
     *new_team = team;
     return status;
@@ -358,7 +370,6 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
         team->id = (uint16_t)(i*64+pos);
         ucc_info("allocated ID %d for team %p", team->id, team);
     } else {
-        team->id = 0;
         ucc_warn("could not allocate team id, whole id space is occupied, "
                  "try increasing UCC_TEAM_IDS_POOL_SIZE");
         return UCC_ERR_NO_RESOURCE;
@@ -370,7 +381,8 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
 static void ucc_team_relase_id(ucc_team_t *team)
 {
     ucc_context_t *ctx = team->contexts[0];
-    if (1 /* Check id is internal */) {
+    /* release the id pool bit if it was not provided by user */
+    if (!UCC_TEAM_ID_IS_EXTERNAL(team)) {
         set_id_bit(ctx->ids.pool, team->id);
     }
 }

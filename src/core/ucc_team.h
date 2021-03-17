@@ -34,6 +34,11 @@ typedef struct ucc_team {
     ucc_coll_task_t  *task;
 } ucc_team_t;
 
+/* If the bit is set then team_id is provided by the user */
+#define UCC_TEAM_ID_EXTERNAL_BIT ((uint16_t)UCC_BIT(15))
+#define UCC_TEAM_ID_IS_EXTERNAL(_team) (team->id & UCC_TEAM_ID_EXTERNAL_BIT)
+#define UCC_TEAM_ID_MAX ((uint16_t)UCC_BIT(15) - 1)
+
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src);
 
 ucc_status_t ucc_team_destroy_nb(ucc_team_h team);

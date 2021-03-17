@@ -929,7 +929,8 @@ enum ucc_team_params_field {
     UCC_TEAM_PARAM_FIELD_OOB                    = UCC_BIT(7),
     UCC_TEAM_PARAM_FIELD_P2P_CONN               = UCC_BIT(8),
     UCC_TEAM_PARAM_FIELD_MEM_PARAMS             = UCC_BIT(9),
-    UCC_TEAM_PARAM_FIELD_EP_MAP                 = UCC_BIT(10)
+    UCC_TEAM_PARAM_FIELD_EP_MAP                 = UCC_BIT(10),
+    UCC_TEAM_PARAM_FIELD_ID                     = UCC_BIT(11),
 };
 
 /**
@@ -1108,6 +1109,7 @@ typedef struct ucc_team_params {
     ucc_team_p2p_conn_t     p2p_conn;
     ucc_mem_map_params_t    mem_params;
     ucc_ep_map_t            ep_map;
+    uint64_t                id;
 } ucc_team_params_t;
 
 /**
