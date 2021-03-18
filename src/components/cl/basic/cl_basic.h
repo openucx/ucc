@@ -11,6 +11,7 @@
 #include "components/tl/ucc_tl.h"
 
 #define UCC_CL_BASIC_DEFAULT_PRIORITY 10
+#define UCC_CL_BASIC_NUM_TLS 2
 
 typedef struct ucc_cl_basic_iface {
     ucc_cl_iface_t super;
@@ -36,13 +37,16 @@ UCC_CLASS_DECLARE(ucc_cl_basic_lib_t, const ucc_base_lib_params_t *,
 typedef struct ucc_cl_basic_context {
     ucc_cl_context_t super;
     ucc_tl_context_t *tl_ucp_ctx;
+    ucc_tl_context_t *tl_nccl_ctx;
 } ucc_cl_basic_context_t;
 UCC_CLASS_DECLARE(ucc_cl_basic_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
 typedef struct ucc_cl_basic_team {
-    ucc_cl_team_t super;
-    ucc_tl_team_t *tl_ucp_team;
+    ucc_cl_team_t                   super;
+    ucc_team_create_multiple_req_t *team_create_req;
+    ucc_tl_team_t                  *tl_ucp_team;
+    ucc_tl_team_t                  *tl_nccl_team;
 } ucc_cl_basic_team_t;
 UCC_CLASS_DECLARE(ucc_cl_basic_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

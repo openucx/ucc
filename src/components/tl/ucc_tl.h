@@ -26,7 +26,8 @@ typedef struct ucc_tl_context ucc_tl_context_t;
 typedef struct ucc_tl_team    ucc_tl_team_t;
 
 typedef enum ucc_tl_type {
-    UCC_TL_UCP = UCC_BIT(0),
+    UCC_TL_UCP  = UCC_BIT(0),
+    UCC_TL_NCCL = UCC_BIT(1),
 } ucc_tl_type_t;
 
 typedef struct ucc_tl_lib_config {
@@ -84,6 +85,25 @@ ucc_status_t ucc_tl_context_get(ucc_context_t *ctx, ucc_tl_type_t type,
                                 ucc_tl_context_t **tl_context);
 ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context);
 
+typedef struct ucc_team_create_multiple_req {
+    int                          n_teams;
+    int                          last_created;
+    struct ucc_team_team_desc {
+        ucc_tl_context_t        *ctx;
+        ucc_tl_team_t           *team;
+        ucc_base_team_params_t   param;
+        ucc_status_t             status;
+    } descs[1];
+} ucc_team_create_multiple_req_t;
+
+ucc_status_t
+ucc_team_create_multiple_req_alloc(ucc_team_create_multiple_req_t **req,
+                                   int n_teams);
+
+ucc_status_t ucc_tl_team_create_multiple(ucc_team_create_multiple_req_t *req);
+
+void ucc_team_create_multiple_req_free(ucc_team_create_multiple_req_t *req);
+
 #define UCC_TL_CTX_IFACE(_tl_ctx)                                              \
     (ucc_derived_of((_tl_ctx)->super.lib, ucc_tl_lib_t))->iface
 
@@ -91,4 +111,7 @@ ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context);
     (ucc_derived_of((_tl_team)->super.context->lib, ucc_tl_lib_t))->iface
 
 #define UCC_TL_TEAM_LIB(_tl_team) (_tl_team)->super.super.context->lib
+
+#define UCC_TL_CORE_CTX(_tl_team) ((_tl_team)->super.super.context->ucc_context)
+
 #endif
