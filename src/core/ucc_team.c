@@ -54,7 +54,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
                   sizeof(ucc_cl_team_t *) * context->n_cl_ctx);
         return UCC_ERR_NO_MEMORY;
     }
-    team->state = UCC_TEAM_CL_CREATE;
+    team->state = UCC_TEAM_ALLOC_ID;
     /* If we don't have team id provided by user then we will have to
        perform internal team id allocation. We need a service team for that
        to run service allreduce.
@@ -75,6 +75,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
         b_params.rank     = team->rank;
         b_params.scope    = UCC_CL_LAST + 1; // CORE scopre id - never overlaps with CL type
         b_params.scope_id = 0;
+        b_params.id       = 0;
         status = UCC_TL_CTX_IFACE(context->service_ctx)
             ->team.create_post(&context->service_ctx->super, &b_params, &b_team);
         if (UCC_OK != status) {
@@ -176,6 +177,7 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
     }
     memcpy(&b_params.params, &team->params, sizeof(ucc_team_params_t));
     b_params.rank = team->rank;
+    b_params.id   = team->id;
     for (i = team->last_team_create_posted + 1; i < context->n_cl_ctx; i++) {
         cl_iface = UCC_CL_CTX_IFACE(context->cl_ctx[i]);
         status   = cl_iface->team.create_post(&context->cl_ctx[i]->super,
@@ -220,6 +222,11 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             return status;
         }
         team->state = UCC_TEAM_CL_CREATE;
+        if (team->service_team) {
+            /* update serivice team id */
+            UCC_TL_TEAM_IFACE(team->service_team)->scoll.update_id
+                (&team->service_team->super, team->id);
+        }
     case UCC_TEAM_CL_CREATE:
         status = ucc_team_create_cls(context, team);
         if (UCC_OK != status) {
@@ -319,6 +326,11 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
     ucc_status_t     status;
     int              pos, i;
 
+    if (team->id > 0) {
+        ucc_assert(UCC_TEAM_ID_IS_EXTERNAL(team));
+        return UCC_OK;
+    }
+    ucc_assert(team->service_team);
     if (!ctx->ids.pool) {
         ctx->ids.pool = ucc_malloc(ctx->ids.pool_size*2*sizeof(uint64_t), "ids_pool");
         if (!ctx->ids.pool) {

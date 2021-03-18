@@ -103,7 +103,7 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           ucc_coll_task_t **task);
 ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task);
 ucc_status_t ucc_tl_ucp_service_cleanup(ucc_coll_task_t *task);
-
+void ucc_tl_ucp_service_update_id(ucc_base_team_t *team, uint16_t id);
 UCC_TL_IFACE_DECLARE(ucp, UCP);
 
 ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1] = {
@@ -146,4 +146,5 @@ __attribute__((constructor)) static void tl_ucp_iface_init(void)
     ucc_tl_ucp.super.scoll.allreduce = ucc_tl_ucp_service_allreduce;
     ucc_tl_ucp.super.scoll.test      = ucc_tl_ucp_service_test;
     ucc_tl_ucp.super.scoll.cleanup   = ucc_tl_ucp_service_cleanup;
+    ucc_tl_ucp.super.scoll.update_id = ucc_tl_ucp_service_update_id;
 }

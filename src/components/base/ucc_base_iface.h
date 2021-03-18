@@ -78,6 +78,7 @@ typedef struct ucc_base_team_params {
     ucc_rank_t        rank; /* Rank of a calling process in the TL/CL team. It is a uniq
                                process identifier within a team (not job) but it has the
                                property: it is always contig and in the range [0, team_size).*/
+    uint16_t          id;  /* core level team id */
 } ucc_base_team_params_t;
 
 typedef struct ucc_base_team {

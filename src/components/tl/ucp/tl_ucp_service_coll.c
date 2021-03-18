@@ -56,3 +56,8 @@ void ucc_tl_ucp_service_cleanup(ucc_coll_task_t *task)
     ucc_tl_ucp_task_t *tl_task = ucc_derived_of(task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_put_task(tl_task);
 }
+
+void ucc_tl_ucp_service_update_id(ucc_base_team_t *team, uint16_t id) {
+    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    tl_team->id                = id;
+}

@@ -62,6 +62,7 @@ typedef struct ucc_tl_service_coll {
                               ucc_tl_team_subset_t subset, ucc_coll_task_t **task);
     ucc_status_t (*test)(ucc_coll_task_t *task);
     ucc_status_t (*cleanup)(ucc_coll_task_t *task);
+    void         (*update_id)(ucc_base_team_t *team, uint16_t id);
 } ucc_tl_service_coll_t;
 
 typedef struct ucc_tl_iface {
