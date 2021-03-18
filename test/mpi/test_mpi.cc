@@ -222,6 +222,7 @@ void UccTestMpi::set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vs
 
 void UccTestMpi::run_all()
 {
+    size_t s = test_max_size;
     for (auto &c : colls) {
         for (auto &t : teams) {
             std::vector<int> roots = {0};
@@ -240,43 +241,41 @@ void UccTestMpi::run_all()
                                 for (auto dt : dtypes) {
                                     for (auto op : ops) {
                                         auto tc = TestCase::init(c, t, r, m,
-                                                                 inplace, mt, dt, op);
+                                                                 inplace, mt,
+                                                                 s, dt, op);
                                         results.push_back(tc.get()->exec());
                                     }
                                 }
                             } else if (c == UCC_COLL_TYPE_ALLTOALL ||
                                        c == UCC_COLL_TYPE_ALLTOALLV) {
-                                if (TEST_INPLACE == inplace &&
-                                    ucc_coll_inplace_supported(c)) {
-                                    results.push_back(UCC_ERR_NOT_IMPLEMENTED);
+                                switch (c) {
+                                case UCC_COLL_TYPE_ALLTOALL:
+                                {
+                                    auto tc = TestCase::init(c, t, r, m,
+                                                             inplace, mt, s);
+                                    results.push_back(tc.get()->exec());
+                                    break;
+                                }
+                                case UCC_COLL_TYPE_ALLTOALLV:
+                                {
+                                    for (auto count_bits : counts_vsize) {
+                                        for (auto displ_bits : displs_vsize) {
+                                            auto tc = TestCase::init(c, t, r, m,
+                                                                     inplace,
+                                                                     mt, s,
+                                                                     (ucc_datatype_t)-1,
+                                                                     (ucc_reduction_op_t)-1,
+                                                                     count_bits, displ_bits);
+                                            results.push_back(tc.get()->exec());
+                                        }
+                                    }
+                                    break;
+                                }
+                                default:
                                     continue;
                                 }
-                                for (auto dt : dtypes) {
-                                    switch (c) {
-                                    case UCC_COLL_TYPE_ALLTOALL:
-                                    {
-                                        auto tc = TestCase::init(c, t, r, m, inplace, mt, dt);
-                                        results.push_back(tc.get()->exec());
-                                        break;
-                                    }
-                                    case UCC_COLL_TYPE_ALLTOALLV:
-                                    {
-                                        for (auto count_bits : counts_vsize) {
-                                           for (auto displ_bits : displs_vsize) {
-                                                auto tc = TestCase::init(c, t, r, m, inplace,
-                                                                 mt, dt, (ucc_reduction_op_t)-1,
-                                                                 count_bits, displ_bits);
-                                                results.push_back(tc.get()->exec());
-                                            }
-                                        }
-                                        break;
-                                    }
-                                    default:
-                                        continue;
-                                    }
-                                }
                             } else {
-                                auto tc = TestCase::init(c, t, r, m, inplace, mt);
+                                auto tc = TestCase::init(c, t, r, m, inplace, mt, s);
                                 if (TEST_INPLACE == inplace &&
                                     ucc_coll_inplace_supported(c)) {
                                     results.push_back(UCC_ERR_NOT_IMPLEMENTED);

@@ -4,7 +4,7 @@
 #include <chrono>
 
 int test_rand_seed = -1;
-size_t test_max_size = 0;
+static size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX;
 
 static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
                                              UCC_COLL_TYPE_BCAST,
@@ -117,15 +117,25 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
 
 static ucc_memory_type_t mtype_str_to_type(std::string mtype)
 {
+    ucc_memory_type_t mem_type;
+
     if (mtype == "host") {
-        return UCC_MEMORY_TYPE_HOST;
+        mem_type = UCC_MEMORY_TYPE_HOST;
     } else if (mtype == "cuda") {
-        return UCC_MEMORY_TYPE_CUDA;
+        mem_type = UCC_MEMORY_TYPE_CUDA;
     } else {
         std::cerr << "incorrect memory type: " << mtype << std::endl;
         PrintHelp();
     }
-    abort();
+    if (UCC_MEMORY_TYPE_HOST != mem_type && UCC_OK != ucc_mc_available(mem_type)) {
+        std::cerr << "requested memory type "
+                  << ucc_memory_type_names[mem_type]
+                  << " is not supported "
+                  << std::endl;
+        exit(1);
+    }
+
+    return mem_type;
 }
 
 static ucc_datatype_t dtype_str_to_type(std::string dtype)
@@ -380,9 +390,9 @@ int main(int argc, char *argv[])
         std::chrono::steady_clock::now();
     int rank;
     int failed = 0;
-    ProcessArgs(argc, argv);
 
     UccTestMpi test(argc, argv, UCC_THREAD_SINGLE, teams, cls);
+    ProcessArgs(argc, argv);
     test.set_colls(colls);
     test.set_dtypes(dtypes);
     test.set_mtypes(mtypes);
@@ -391,6 +401,7 @@ int main(int argc, char *argv[])
     test.set_count_vsizes(counts_vsize);
     test.set_displ_vsizes(displs_vsize);
     test.set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
+    test.set_max_size(test_max_size);
     test_rand_seed = init_rand_seed(test_rand_seed);
 
     PrintInfo();

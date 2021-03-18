@@ -10,8 +10,9 @@
 #define TEST_DT UCC_DT_UINT32
 
 TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-                               ucc_memory_type_t _mt, ucc_test_team_t &_team) :
-    TestCase(_team, _mt, _msgsize, _inplace)
+                               ucc_memory_type_t _mt, ucc_test_team_t &_team,
+                               size_t _max_size) :
+    TestCase(_team, _mt, _msgsize, _inplace, _max_size)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t count = _msgsize/dt_size;
@@ -20,11 +21,12 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     displacements = NULL;
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
-    args.coll_type                = UCC_COLL_TYPE_ALLGATHERV;
+    args.coll_type = UCC_COLL_TYPE_ALLGATHERV;
 
-    if (skip(test_max_size &&
-              (test_max_size < (_msgsize*size)),
-        TEST_SKIP_MEM_LIMIT, team.comm)) {
+    if (test_max_size < (_msgsize*size)) {
+        test_skip = TEST_SKIP_MEM_LIMIT;
+    }
+    if (TEST_SKIP_NONE != skip_reduce(test_skip, team.comm)) {
         return;
     }
 
@@ -42,8 +44,7 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         args.mask = 0;
         UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
         init_buffer(sbuf, count, TEST_DT, _mt, rank);
-        UCC_CHECK(ucc_mc_alloc(&check_sbuf, _msgsize, UCC_MEMORY_TYPE_HOST));
-        init_buffer(check_sbuf, count, TEST_DT, UCC_MEMORY_TYPE_HOST, rank);
+        UCC_ALLOC_COPY_BUF(check_sbuf, UCC_MEMORY_TYPE_HOST, sbuf, _mt, _msgsize);
     } else {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;

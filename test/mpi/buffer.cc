@@ -101,14 +101,12 @@ ucc_status_t compare_buffers(void *_rst, void *expected, size_t count,
 {
     ucc_status_t status = UCC_ERR_NO_MESSAGE;
     void *rst = NULL;
-    int rst_alloced = 0;
 
     if (UCC_MEMORY_TYPE_HOST == mt) {
         rst = _rst;
     } else if (UCC_MEMORY_TYPE_CUDA == mt) {
         UCC_ALLOC_COPY_BUF(rst, UCC_MEMORY_TYPE_HOST, _rst, mt,
                            count * ucc_dt_size(dt));
-        rst_alloced = 1;
     } else {
         std::cerr << "Unsupported mt\n";
         MPI_Abort(MPI_COMM_WORLD, -1);
@@ -124,7 +122,7 @@ ucc_status_t compare_buffers(void *_rst, void *expected, size_t count,
             UCC_ERR_NO_MESSAGE : UCC_OK;
     }
 
-    if (rst_alloced) {
+    if (UCC_MEMORY_TYPE_HOST != mt) {
         UCC_CHECK(ucc_mc_free(rst, UCC_MEMORY_TYPE_HOST));
     }
 
