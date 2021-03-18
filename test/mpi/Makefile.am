@@ -25,3 +25,8 @@ CXX=mpicxx
 CXXFLAGS+=-I${top_builddir}/src -std=gnu++11
 
 LDFLAGS=-L${top_builddir}/src/.libs -lucc
+
+if HAVE_CUDA
+CFLAGS += $(CUDA_CFLAGS) -DUCC_TEST_WITH_CUDA
+LDFLAGS+= $(CUDA_LDFLAGS) -lcudart
+endif

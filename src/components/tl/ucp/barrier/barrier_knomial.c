@@ -47,20 +47,23 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_kn_radix_t         radix      = task->barrier.p.radix;
     uint8_t                node_type  = task->barrier.p.node_type;
     ucc_knomial_pattern_t *p          = &task->barrier.p;
+    ucc_memory_type_t      mtype      = UCC_MEMORY_TYPE_UNKNOWN;
     ucc_rank_t             peer;
     ucc_kn_radix_t         loop_step;
 
     GOTO_PHASE(task->barrier.phase);
-
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, team->rank);
-        ucc_tl_ucp_send_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team, task);
-        ucc_tl_ucp_recv_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team, task);
+        UCPCHECK_GOTO(ucc_tl_ucp_send_nb(NULL, 0, mtype, peer, team, task),
+                      task, out);
+        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(NULL, 0, mtype, peer, team, task),
+                      task, out);
     }
 
     if (KN_NODE_PROXY == node_type) {
         peer = ucc_knomial_pattern_get_extra(p, team->rank);
-        ucc_tl_ucp_recv_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team, task);
+        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(NULL, 0, mtype, peer, team, task),
+                      task, out);
     }
 PHASE_EXTRA:
     if (KN_NODE_PROXY == node_type || KN_NODE_EXTRA == node_type) {
@@ -79,8 +82,8 @@ PHASE_EXTRA:
                                                      team->size, loop_step);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
-            ucc_tl_ucp_send_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team,
-                               task);
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb(NULL, 0, mtype, peer, team, task),
+                          task, out);
         }
 
         for (loop_step = 1; loop_step < radix; loop_step++) {
@@ -88,8 +91,8 @@ PHASE_EXTRA:
                                                      team->size, loop_step);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
-            ucc_tl_ucp_recv_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team,
-                               task);
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(NULL, 0, mtype, peer, team, task),
+                          task, out);
         }
     PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
@@ -100,7 +103,8 @@ PHASE_EXTRA:
     }
     if (KN_NODE_PROXY == node_type) {
         peer = ucc_knomial_pattern_get_extra(p, team->rank);
-        ucc_tl_ucp_send_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, peer, team, task);
+        UCPCHECK_GOTO(ucc_tl_ucp_send_nb(NULL, 0, mtype, peer, team, task),
+                      task, out);
         goto PHASE_PROXY;
     } else {
         goto completion;
@@ -115,7 +119,8 @@ PHASE_PROXY:
 completion:
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.super.status = UCC_OK;
-    return UCC_OK;
+out:
+    return task->super.super.status;
 }
 
 ucc_status_t ucc_tl_ucp_barrier_knomial_start(ucc_coll_task_t *coll_task)

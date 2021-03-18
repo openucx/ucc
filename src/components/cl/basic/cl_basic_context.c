@@ -19,9 +19,18 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_context_t,
     status = ucc_tl_context_get(params->context, UCC_TL_UCP,
                                 &self->tl_ucp_ctx);
     if (UCC_OK != status) {
-        cl_warn(cl_config->cl_lib, "TL UCP context is not available, CL BASIC can't proceed");
+        cl_warn(cl_config->cl_lib,
+                "TL UCP context is not available, CL BASIC can't proceed");
         return UCC_ERR_NOT_FOUND;
     }
+    status = ucc_tl_context_get(params->context, UCC_TL_NCCL,
+                                &self->tl_nccl_ctx);
+    if (UCC_OK != status) {
+        cl_info(cl_config->cl_lib,
+                "TL NCCL context is not available, skipping");
+        self->tl_nccl_ctx = NULL;
+    }
+
     cl_info(cl_config->cl_lib, "initialized cl context: %p", self);
     return UCC_OK;
 }
@@ -30,6 +39,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_context_t)
 {
     cl_info(self->super.super.lib, "finalizing cl context: %p", self);
     ucc_tl_context_put(self->tl_ucp_ctx);
+    if (self->tl_nccl_ctx) {
+        ucc_tl_context_put(self->tl_nccl_ctx);
+    }
 }
 
 UCC_CLASS_DEFINE(ucc_cl_basic_context_t, ucc_cl_context_t);

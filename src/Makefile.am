@@ -14,6 +14,10 @@ if HAVE_CUDA
 mc_dirs += components/mc/cuda
 endif
 
+if HAVE_NCCL
+tl_dirs += components/tl/nccl
+endif
+
 SUBDIRS = . $(cl_dirs) $(tl_dirs) $(mc_dirs)
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =

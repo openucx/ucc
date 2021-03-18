@@ -96,6 +96,64 @@ ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context)
     return UCC_OK;
 }
 
+ucc_status_t
+ucc_team_create_multiple_req_alloc(ucc_team_create_multiple_req_t **req,
+                                   int n_teams)
+{
+    ucc_team_create_multiple_req_t *r;
+
+    r = ucc_malloc(sizeof(ucc_team_create_multiple_req_t) +
+                   (n_teams - 1) * sizeof(struct ucc_team_team_desc),
+                   "team create multiple request");
+    if (!r) {
+        goto exit_err;
+    }
+    r->last_created = -1;
+    r->n_teams      = n_teams;
+    *req            = r;
+    return UCC_OK;
+exit_err:
+    *req = NULL;
+    return UCC_ERR_NO_MEMORY;
+}
+
+void ucc_team_create_multiple_req_free(ucc_team_create_multiple_req_t *req)
+{
+    ucc_free(req);
+}
+
+ucc_status_t ucc_tl_team_create_multiple(ucc_team_create_multiple_req_t *req)
+{
+    int *id = &req->last_created;
+    ucc_base_team_t *b_team;
+    ucc_status_t     status;
+
+    if (*id == req->n_teams) {
+        return UCC_OK;
+    }
+    if ((*id == -1) || (req->descs[*id].status != UCC_INPROGRESS)) {
+        /* post next team */
+        *id += 1;
+        if (*id == req->n_teams) {
+            return UCC_OK;
+        }
+        status = UCC_TL_CTX_IFACE(req->descs[*id].ctx)
+                     ->team.create_post(&((req->descs[*id].ctx->super)),
+                                        &req->descs[*id].param, &b_team);
+        if (UCC_OK != status) {
+            req->descs[*id].status = status;
+            req->descs[*id].team   = NULL;
+        } else {
+            req->descs[*id].status = UCC_INPROGRESS;
+            req->descs[*id].team   = ucc_derived_of(b_team, ucc_tl_team_t);
+        }
+        return UCC_INPROGRESS;
+    }
+    req->descs[*id].status = UCC_TL_CTX_IFACE(req->descs[*id].ctx)
+                               ->team.create_test(&req->descs[*id].team->super);
+    return UCC_INPROGRESS;
+}
+
 UCC_CLASS_INIT_FUNC(ucc_tl_team_t, ucc_tl_context_t *tl_context)
 {
     UCC_CLASS_CALL_BASE_INIT();
