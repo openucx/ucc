@@ -27,25 +27,33 @@ ucc_status_t ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t         sendto     = (group_rank + 1) % group_size;
     ucc_rank_t         recvfrom   = (group_rank - 1 + group_size) % group_size;
     int                step;
+    void              *buf;
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return task->super.super.status;
     }
 
     while (task->send_posted < group_size - 1) {
         step = task->send_posted;
-        ucc_tl_ucp_send_nb((void*)((ptrdiff_t)rbuf +
-                           ((group_rank - step + group_size) % group_size)
-                            * data_size), data_size, rmem, sendto, team, task);
-        ucc_tl_ucp_recv_nb((void*)((ptrdiff_t)rbuf +
-                           ((group_rank - step - 1 + group_size) % group_size)
-                            * data_size), data_size, rmem, recvfrom, team, task);
+        buf  = (void *)((ptrdiff_t)rbuf +
+                       ((group_rank - step + group_size) % group_size) *
+                           data_size);
+        UCPCHECK_GOTO(
+            ucc_tl_ucp_send_nb(buf, data_size, rmem, sendto, team, task),
+            task, out);
+        buf = (void *)((ptrdiff_t)rbuf +
+                       ((group_rank - step - 1 + group_size) % group_size) *
+                           data_size);
+        UCPCHECK_GOTO(
+            ucc_tl_ucp_recv_nb(buf, data_size, rmem, recvfrom, team, task),
+            task, out);
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             return task->super.super.status;
         }
     }
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.super.status = UCC_OK;
-    return UCC_OK;
+out:
+    return task->super.super.status;
 }
 
 ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
