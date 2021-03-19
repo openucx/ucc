@@ -17,7 +17,8 @@ typedef enum {
 
 typedef struct ucc_coll_task ucc_coll_task_t;
 
-typedef ucc_status_t (*ucc_task_event_handler_p)(ucc_coll_task_t *task);
+typedef ucc_status_t (*ucc_task_event_handler_p)(ucc_coll_task_t *parent,
+                                                 ucc_coll_task_t *task);
 typedef ucc_status_t (*ucc_coll_post_fn_t)(ucc_coll_task_t *task);
 typedef ucc_status_t (*ucc_coll_triggered_post_fn_t)(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *task);
 typedef ucc_status_t (*ucc_coll_finalize_fn_t)(ucc_coll_task_t *task);
@@ -60,7 +61,7 @@ ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em);
 ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task);
 void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
                                  ucc_coll_task_t *task);
-ucc_status_t ucc_event_manager_notify(ucc_event_manager_t *em,
+ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event);
 ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx);
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);

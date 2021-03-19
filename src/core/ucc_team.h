@@ -47,7 +47,6 @@ typedef struct ucc_team {
 typedef struct ucc_ee {
     ucc_team_h       team;
     ucc_ee_type_t    ee_type;
-    void             *ee_task; /* TODO: make list */
     ucc_spinlock_t   lock;
     ucc_queue_head_t event_in_queue;
     ucc_queue_head_t event_out_queue;

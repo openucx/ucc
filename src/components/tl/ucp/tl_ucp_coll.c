@@ -53,30 +53,33 @@ static ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_ucp_triggered_coll_complete(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_ucp_triggered_coll_complete(ucc_coll_task_t *parent_task,
+                                                       ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
 
     tl_info(task->team->super.super.context->lib,
         "triggered collective complete. task:%p", coll_task);
-    return ucc_mc_ee_task_end(coll_task->ee->ee_task, coll_task->ee->ee_type);
+    return ucc_mc_ee_task_end(coll_task->ee_task, coll_task->ee->ee_type);
 }
 
-static ucc_status_t ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_task,
+                                                      ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_status_t status;
 
     tl_info(task->team->super.super.context->lib, "event triggered. task:%p", coll_task);
 
+    coll_task->ee_task = parent_task->ee_task;
     status = coll_task->post(coll_task);
     if (status == UCC_OK) {
-        return ucc_tl_ucp_triggered_coll_complete(coll_task);
+        return ucc_tl_ucp_triggered_coll_complete(coll_task, coll_task);
     } else {
 
         ucc_assert(coll_task->super.status = UCC_INPROGRESS);
 
-        if (coll_task->ee->ee_task) {
+        if (coll_task->ee_task) {
             ucc_event_manager_init(&coll_task->em);
             coll_task->handlers[UCC_EVENT_COMPLETED] = ucc_tl_ucp_triggered_coll_complete;
             ucc_event_manager_subscribe(&coll_task->em, UCC_EVENT_COMPLETED, coll_task);
@@ -130,7 +133,6 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
         post_event->ev_type = UCC_EVENT_COLLECTIVE_POST;
         post_event->ev_context_size = 0;
         ucc_ee_set_event_internal(coll_task->ee, post_event, &coll_task->ee->event_out_queue);
-        task->super.ee->ee_task = task->super.ee_task;
         task->super.super.status = UCC_OK;
     }
 
