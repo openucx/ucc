@@ -6,11 +6,6 @@
 
 #include "tl_ucp_addr.h"
 #include "tl_ucp.h"
-enum {
-    UCC_TL_UCP_ADDR_EXCHANGE_MAX_ADDRLEN,
-    UCC_TL_UCP_ADDR_EXCHANGE_GATHER,
-    UCC_TL_UCP_ADDR_EXCHANGE_COMPLETE,
-};
 
 ucc_status_t ucc_tl_ucp_addr_exchange_start(ucc_tl_ucp_context_t *ctx,
                                             ucc_team_oob_coll_t oob,
@@ -66,7 +61,7 @@ ucc_status_t ucc_tl_ucp_addr_exchange_test(ucc_tl_ucp_addr_storage_t *storage)
     ucc_team_oob_coll_t *oob     = &storage->oob;
     int                  n_polls = 0;
     ucc_status_t         status;
-    void                *my_addr;
+    ucc_tl_ucp_addr_t   *my_addr;
     int                  i;
 
     if (storage->state == UCC_TL_UCP_ADDR_EXCHANGE_COMPLETE) {
@@ -97,6 +92,7 @@ ucc_status_t ucc_tl_ucp_addr_exchange_test(ucc_tl_ucp_addr_storage_t *storage)
         }
         ucc_free(storage->addrlens);
         storage->addrlens = NULL;
+        storage->max_addrlen += sizeof(ucc_tl_ucp_addr_t) - 1;
         storage->addresses =
             ucc_malloc(storage->max_addrlen * (oob->participants + 1),
                        "tl_ucp_storage_addresses");
@@ -108,10 +104,12 @@ ucc_status_t ucc_tl_ucp_addr_exchange_test(ucc_tl_ucp_addr_storage_t *storage)
                 storage->max_addrlen * (oob->participants + 1));
             goto err;
         }
-        my_addr = (void *)((ptrdiff_t)storage->addresses +
+        my_addr = (ucc_tl_ucp_addr_t *)((ptrdiff_t)storage->addresses +
                            oob->participants * storage->max_addrlen);
-        memcpy(my_addr, storage->ctx->worker_address,
-               storage->ctx->ucp_addrlen);
+        /*pack ucc_context_id for ep hashing */
+        my_addr->id = storage->ctx->super.super.ucc_context->id;
+        memcpy(my_addr->addr, storage->ctx->worker_address,
+                       storage->ctx->ucp_addrlen);
         status =
             oob->allgather(my_addr, storage->addresses, storage->max_addrlen,
                            oob->coll_info, &storage->oob_req);
