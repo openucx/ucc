@@ -50,6 +50,7 @@ noinst_HEADERS =                     \
 	utils/ucc_list.h				 \
 	utils/ucc_queue.h				 \
 	utils/ucc_proc_info.h            \
+	utils/khash.h                    \
 	components/base/ucc_base_iface.h \
 	components/cl/ucc_cl.h           \
 	components/cl/ucc_cl_log.h       \
