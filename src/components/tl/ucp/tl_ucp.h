@@ -33,6 +33,7 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                preconnect;
     uint32_t                n_polls;
     uint32_t                oob_npolls;
+    uint32_t                pre_reg_mem;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
@@ -96,4 +97,7 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
     ((_team)->super.super.context->ucc_context)
 
 #define UCC_TL_UCP_WORKER(_team) UCC_TL_UCP_TEAM_CTX(_team)->ucp_worker
+
+void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
+                                 size_t length, ucc_memory_type_t mem_type);
 #endif

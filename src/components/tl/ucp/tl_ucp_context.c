@@ -137,6 +137,35 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 
 UCC_CLASS_DEFINE(ucc_tl_ucp_context_t, ucc_tl_context_t);
 
+ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
+                                        ucs_memory_type_t mem_type,
+                                        ucc_tl_ucp_context_t *ctx)
+{
+    ucp_mem_map_params_t mmap_params;
+    ucp_mem_h            mh;
+    ucs_status_t         status;
+
+    mmap_params.field_mask  = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+                              UCP_MEM_MAP_PARAM_FIELD_LENGTH  |
+                              UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
+    mmap_params.address     = addr;
+    mmap_params.length      = length;
+    mmap_params.memory_type = mem_type;
+
+    /* do map and umap to populate the cache */
+    status = ucp_mem_map(ctx->ucp_context, &mmap_params, &mh);
+    if (status != UCS_OK) {
+        return ucs_status_to_ucc_status(status);
+    }
+
+    status = ucp_mem_unmap(ctx->ucp_context, mh);
+    if (status != UCS_OK) {
+        return ucs_status_to_ucc_status(status);
+    }
+
+    return UCC_OK;
+}
+
 ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
                                          ucc_base_attr_t *attr) /* NOLINT */
 {
