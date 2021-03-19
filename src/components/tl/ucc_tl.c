@@ -97,34 +97,34 @@ ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context)
 }
 
 ucc_status_t
-ucc_team_create_multiple_req_alloc(ucc_team_create_multiple_req_t **req,
+ucc_team_multiple_req_alloc(ucc_team_multiple_req_t **req,
                                    int n_teams)
 {
-    ucc_team_create_multiple_req_t *r;
+    ucc_team_multiple_req_t *r;
 
-    r = ucc_malloc(sizeof(ucc_team_create_multiple_req_t) +
+    r = ucc_malloc(sizeof(ucc_team_multiple_req_t) +
                    (n_teams - 1) * sizeof(struct ucc_team_team_desc),
                    "team create multiple request");
     if (!r) {
         goto exit_err;
     }
-    r->last_created = -1;
-    r->n_teams      = n_teams;
-    *req            = r;
+    r->last    = -1;
+    r->n_teams = n_teams;
+    *req       = r;
     return UCC_OK;
 exit_err:
     *req = NULL;
     return UCC_ERR_NO_MEMORY;
 }
 
-void ucc_team_create_multiple_req_free(ucc_team_create_multiple_req_t *req)
+void ucc_team_multiple_req_free(ucc_team_multiple_req_t *req)
 {
     ucc_free(req);
 }
 
-ucc_status_t ucc_tl_team_create_multiple(ucc_team_create_multiple_req_t *req)
+ucc_status_t ucc_tl_team_create_multiple(ucc_team_multiple_req_t *req)
 {
-    int *id = &req->last_created;
+    int *id = &req->last;
     ucc_base_team_t *b_team;
     ucc_status_t     status;
 
@@ -152,6 +152,24 @@ ucc_status_t ucc_tl_team_create_multiple(ucc_team_create_multiple_req_t *req)
     req->descs[*id].status = UCC_TL_CTX_IFACE(req->descs[*id].ctx)
                                ->team.create_test(&req->descs[*id].team->super);
     return UCC_INPROGRESS;
+}
+
+ucc_status_t ucc_tl_team_destroy_multiple(ucc_team_multiple_req_t *req)
+{
+    int         *id = &req->last;
+    ucc_status_t status;
+    if (*id < 0) (*id)++;
+    while (*id != req->n_teams) {
+        status = UCC_TL_TEAM_IFACE(req->descs[*id].team)
+                     ->team.destroy(&req->descs[*id].team->super);
+        req->descs[*id].status = status;
+        if (UCC_INPROGRESS != status) {
+            (*id)++;
+        } else {
+            return UCC_INPROGRESS;
+        }
+    }
+    return UCC_OK;
 }
 
 UCC_CLASS_INIT_FUNC(ucc_tl_team_t, ucc_tl_context_t *tl_context)

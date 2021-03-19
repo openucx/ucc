@@ -43,10 +43,10 @@ UCC_CLASS_DECLARE(ucc_cl_basic_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
 typedef struct ucc_cl_basic_team {
-    ucc_cl_team_t                   super;
-    ucc_team_create_multiple_req_t *team_create_req;
-    ucc_tl_team_t                  *tl_ucp_team;
-    ucc_tl_team_t                  *tl_nccl_team;
+    ucc_cl_team_t            super;
+    ucc_team_multiple_req_t *team_create_req;
+    ucc_tl_team_t           *tl_ucp_team;
+    ucc_tl_team_t           *tl_nccl_team;
 } ucc_cl_basic_team_t;
 UCC_CLASS_DECLARE(ucc_cl_basic_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
