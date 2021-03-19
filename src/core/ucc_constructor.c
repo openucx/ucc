@@ -8,7 +8,7 @@
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_component.h"
 #include "utils/ucc_log.h"
-
+#include "utils/ucc_proc_info.h"
 #include <link.h>
 #include <dlfcn.h>
 
@@ -89,9 +89,13 @@ ucc_status_t ucc_constructor(void)
         }
         status = ucc_components_load("mc", &ucc_global_config.mc_framework);
         if (UCC_OK != status) {
-            ucc_debug("no memory components were found in the "
+            ucc_error("no memory components were found in the "
                       "UCC_COMPONENT_PATH: %s",
                       ucc_global_config.component_path);
+            return status;
+        }
+        if (UCC_OK != ucc_local_proc_info_init()) {
+            ucc_error("failed to initialize local proc info");
             return status;
         }
     }

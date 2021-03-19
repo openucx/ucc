@@ -12,6 +12,7 @@
 #include "utils/ucc_list.h"
 #include "ucc_progress_queue.h"
 
+static uint32_t ucc_context_seq_num = 0;
 static ucc_config_field_t ucc_context_config_table[] = {
     {"ESTIMATED_NUM_EPS", "0",
      "An optimization hint of how many endpoints will be created on this context",
@@ -379,6 +380,9 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         ucc_error("failed to init progress queue for context %p", ctx);
         goto error_ctx_create;
     }
+    ctx->id.host_id = ucc_local_proc.host_id;
+    ctx->id.pid     = getpid();
+    ctx->id.seq_num = ucc_context_seq_num++;
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;
     return UCC_OK;

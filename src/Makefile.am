@@ -49,6 +49,7 @@ noinst_HEADERS =                     \
 	utils/ucc_coll_utils.h           \
 	utils/ucc_list.h				 \
 	utils/ucc_queue.h				 \
+	utils/ucc_proc_info.h            \
 	components/base/ucc_base_iface.h \
 	components/cl/ucc_cl.h           \
 	components/cl/ucc_cl_log.h       \
@@ -73,6 +74,7 @@ libucc_la_SOURCES =                  \
 	utils/ucc_component.c            \
 	utils/ucc_status.c               \
     utils/ucc_math.c                 \
+    utils/ucc_proc_info.c            \
 	components/base/ucc_base_iface.c \
 	components/cl/ucc_cl.c           \
 	components/tl/ucc_tl.c           \
