@@ -47,15 +47,18 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
                     vpeer = vrank + i * dist;
                     if (vpeer < team_size) {
                         peer = (vpeer + root) % team_size;
-                        ucc_tl_ucp_send_nb(buffer, data_size, mtype, peer, team,
-                                           task);
+                        UCPCHECK_GOTO(ucc_tl_ucp_send_nb(buffer, data_size,
+                                                         mtype, peer, team,
+                                                         task),
+                                      task, out);
                     }
                 }
             } else {
                 vroot_at_level = vrank - pos * dist;
                 root_at_level  = (vroot_at_level + root) % team_size;
-                ucc_tl_ucp_recv_nb(buffer, data_size, mtype, root_at_level,
-                                   team, task);
+                UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(buffer, data_size, mtype,
+                                                 root_at_level, team, task),
+                              task, out);
                 ucc_assert(task->send_posted == 0 && task->recv_posted == 1);
             }
         }
@@ -68,7 +71,8 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
 
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.super.status = UCC_OK;
-    return UCC_OK;
+out:
+    return task->super.super.status;
 }
 
 ucc_status_t ucc_tl_ucp_bcast_knomial_start(ucc_coll_task_t *coll_task)

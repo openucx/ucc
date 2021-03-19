@@ -79,6 +79,7 @@ ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
 {
     ucc_rank_t src, dst;
+    ucc_status_t status;
     int i;
     if (!team->preconnect_task) {
         team->preconnect_task = ucc_tl_ucp_get_task(team);
@@ -90,10 +91,16 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
     for (i = team->preconnect_task->send_posted; i < team->size; i++) {
         src = (team->rank - i + team->size) % team->size;
         dst = (team->rank + i) % team->size;
-        ucc_tl_ucp_send_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, src, team,
-                           team->preconnect_task);
-        ucc_tl_ucp_recv_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, dst, team,
-                           team->preconnect_task);
+        status = ucc_tl_ucp_send_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, src, team,
+                                    team->preconnect_task);
+        if (UCC_OK != status) {
+            return status;
+        }
+        status = ucc_tl_ucp_recv_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, dst, team,
+                                    team->preconnect_task);
+        if (UCC_OK != status) {
+            return status;
+        }
         if (UCC_INPROGRESS == ucc_tl_ucp_test(team->preconnect_task)) {
             return UCC_INPROGRESS;
         }

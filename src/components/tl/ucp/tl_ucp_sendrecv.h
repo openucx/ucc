@@ -119,4 +119,13 @@ static inline ucc_status_t ucc_tl_ucp_recv_nb(void *buffer, size_t msglen,
     return UCC_OK;
 }
 
+#define UCPCHECK_GOTO(_cmd, _task, _label)                                     \
+    do {                                                                       \
+        ucc_status_t _status = (_cmd);                                         \
+        if (UCC_OK != _status) {                                               \
+            _task->super.super.status = _status;                               \
+            goto _label;                                                       \
+        }                                                                      \
+    } while (0)
+
 #endif
