@@ -9,9 +9,10 @@
 
 #define TEST_DT UCC_DT_UINT32
 
-TestBcast::TestBcast(size_t _msgsize, ucc_memory_type_t _mt,
-                     int _root, ucc_test_team_t &_team, size_t _max_size) :
-    TestCase(_team, _mt, _msgsize, (ucc_test_mpi_inplace_t)0, _max_size)
+TestBcast::TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
+                     ucc_memory_type_t _mt, int _root, ucc_test_team_t &_team,
+                     size_t _max_size) :
+    TestCase(_team, _mt, _msgsize, _inplace, _max_size)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t count = _msgsize/dt_size;
@@ -21,6 +22,9 @@ TestBcast::TestBcast(size_t _msgsize, ucc_memory_type_t _mt,
     root = _root;
     args.coll_type = UCC_COLL_TYPE_BCAST;
 
+    if (TEST_INPLACE == inplace && !ucc_coll_inplace_supported(args.coll_type)) {
+        test_skip = TEST_SKIP_NOT_IMPL_INPLACE;
+    }
     if (skip_reduce(test_max_size < (_msgsize*size), TEST_SKIP_MEM_LIMIT,
                     team.comm)) {
         return;

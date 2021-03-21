@@ -55,7 +55,7 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
     args.coll_type = UCC_COLL_TYPE_ALLTOALLV;
 
-    if (TEST_INPLACE == inplace && ucc_coll_inplace_supported(args.coll_type)) {
+    if (TEST_INPLACE == inplace && !ucc_coll_inplace_supported(args.coll_type)) {
         test_skip = TEST_SKIP_NOT_IMPL_INPLACE;
     }
 

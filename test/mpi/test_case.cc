@@ -31,7 +31,8 @@ std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
         return std::make_shared<TestAllgatherv>(msgsize, inplace, mt, _team,
                                                 max_size);
     case UCC_COLL_TYPE_BCAST:
-        return std::make_shared<TestBcast>(msgsize, mt, root, _team, max_size);
+        return std::make_shared<TestBcast>(msgsize, inplace, mt, root, _team,
+                                           max_size);
     case UCC_COLL_TYPE_ALLTOALL:
         return std::make_shared<TestAlltoall>(msgsize, inplace, mt, _team,
                                               max_size);

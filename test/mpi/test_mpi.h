@@ -241,8 +241,9 @@ public:
 
 class TestBcast : public TestCase {
 public:
-    TestBcast(size_t _msgsize, ucc_memory_type_t _mt, int root,
-              ucc_test_team_t &team, size_t _max_size);
+    TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
+              ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
+              size_t _max_size);
     ucc_status_t check();
 };
 

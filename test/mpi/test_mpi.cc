@@ -189,6 +189,10 @@ int ucc_coll_inplace_supported(ucc_coll_type_t c)
     case UCC_COLL_TYPE_BCAST:
     case UCC_COLL_TYPE_FANIN:
     case UCC_COLL_TYPE_FANOUT:
+    /* remove alltoall [v] from here once it starts supporting inplace */
+    case UCC_COLL_TYPE_ALLTOALL:
+    case UCC_COLL_TYPE_ALLTOALLV:
+    /**/
         return 0;
     default:
         return 1;
@@ -277,7 +281,7 @@ void UccTestMpi::run_all()
                             } else {
                                 auto tc = TestCase::init(c, t, r, m, inplace, mt, s);
                                 if (TEST_INPLACE == inplace &&
-                                    ucc_coll_inplace_supported(c)) {
+                                    !ucc_coll_inplace_supported(c)) {
                                     results.push_back(UCC_ERR_NOT_IMPLEMENTED);
                                     continue;
                                 }
