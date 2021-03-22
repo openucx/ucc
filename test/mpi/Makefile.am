@@ -19,7 +19,9 @@ ucc_test_mpi_SOURCES = \
 	test_allreduce.cc  \
 	test_allgather.cc  \
 	test_allgatherv.cc \
-	test_bcast.cc
+	test_bcast.cc      \
+	test_alltoall.cc   \
+	test_alltoallv.cc
 
 CXX=mpicxx
 CXXFLAGS+=-I${top_builddir}/src -std=gnu++11

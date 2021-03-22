@@ -3,16 +3,26 @@
 #include "test_mpi.h"
 #include <chrono>
 
+int test_rand_seed = -1;
+static size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX;
+
 static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
+                                             UCC_COLL_TYPE_BCAST,
                                              UCC_COLL_TYPE_ALLREDUCE,
                                              UCC_COLL_TYPE_ALLGATHER,
-                                             UCC_COLL_TYPE_ALLGATHERV};
+                                             UCC_COLL_TYPE_ALLGATHERV,
+                                             UCC_COLL_TYPE_ALLTOALL,
+                                             UCC_COLL_TYPE_ALLTOALLV};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
 static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
                                              UCC_DT_FLOAT32, UCC_DT_FLOAT64};
 static std::vector<ucc_reduction_op_t> ops = {UCC_OP_SUM, UCC_OP_MAX};
 static std::vector<ucc_test_mpi_team_t> teams = {TEAM_WORLD, TEAM_REVERSE,
                                                  TEAM_SPLIT_HALF, TEAM_SPLIT_ODD_EVEN};
+static std::vector<ucc_test_vsize_flag_t> counts_vsize = {TEST_FLAG_VSIZE_32BIT,
+                                                          TEST_FLAG_VSIZE_64BIT};
+static std::vector<ucc_test_vsize_flag_t> displs_vsize = {TEST_FLAG_VSIZE_32BIT,
+                                                          TEST_FLAG_VSIZE_64BIT};
 static size_t msgrange[3] = {8, (1ULL << 21), 8};
 static char *cls = NULL;
 static std::vector<ucc_test_mpi_inplace_t> inplace = {TEST_NO_INPLACE};
@@ -37,14 +47,19 @@ static std::vector<std::string> str_split(const char *value, const char *delimit
 void PrintHelp()
 {
     std::cout <<
-       "--colls    <c1,c2,..>:        list of collectives: barrier,allreduce,allgatherv\n"
-       "--teams    <t1,t2,..>:        list of teams: world,half,reverse,odd_even\n"
-       "--mtypes   <m1,m2,..>:        list of mtypes: host,cuda\n"
-       "--dtypes   <d1,d2,..>:        list of dtypes: (u)int8(16,32,64),float32(64)\n"
-       "--ops      <o1,o2,..>:        list of ops:sum,prod,max,min,land,lor,lxor,band,bor,bxor\n"
-       "--inplace  <value>:           0 - no inplace, 1 - inplace, 2 - both\n"
-       "--msgsize  <min:max[:power]>  mesage sizes range:\n"
-       "--root     <type:[value]>     type of root selection: single:<value>, random:<value>, all\n"
+       "--colls      <c1,c2,..>:        list of collectives: barrier,allreduce,allgather,allgatherv,bcast,alltoall,alltoallv\n"
+       "--teams      <t1,t2,..>:        list of teams: world,half,reverse,odd_even\n"
+       "--mtypes     <m1,m2,..>:        list of mtypes: host,cuda\n"
+       "--dtypes     <d1,d2,..>:        list of dtypes: (u)int8(16,32,64),float32(64)\n"
+       "--ops        <o1,o2,..>:        list of ops:sum,prod,max,min,land,lor,lxor,band,bor,bxor\n"
+       "--inplace    <value>:           0 - no inplace, 1 - inplace, 2 - both\n"
+       "--msgsize    <min:max[:power]>  mesage sizes range:\n"
+       "--root       <type:[value]>     type of root selection: single:<value>, random:<value>, all\n"
+       "--seed       <value>:           user defined random seed\n"
+       "--max_size   <value>:           maximum send/recv buffer allocation size\n"
+       "--count_bits <c1,c2,..>:        list of counts bits: 32,64          (alltoallv only)\n"
+       "--displ_bits <d1,d2,..>:        list of displacements bits: 32,64   (alltoallv only)\n"
+       "\n"
        "--help:              Show help\n";
     exit(1);
 }
@@ -89,6 +104,10 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
         return UCC_COLL_TYPE_ALLGATHERV;
     } else if (coll == "bcast") {
         return UCC_COLL_TYPE_BCAST;
+    } else if (coll == "alltoall") {
+        return UCC_COLL_TYPE_ALLTOALL;
+    } else if (coll == "alltoallv") {
+        return UCC_COLL_TYPE_ALLTOALLV;
     } else {
         std::cerr << "incorrect coll type: " << coll << std::endl;
         PrintHelp();
@@ -98,15 +117,25 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
 
 static ucc_memory_type_t mtype_str_to_type(std::string mtype)
 {
+    ucc_memory_type_t mem_type;
+
     if (mtype == "host") {
-        return UCC_MEMORY_TYPE_HOST;
+        mem_type = UCC_MEMORY_TYPE_HOST;
     } else if (mtype == "cuda") {
-        return UCC_MEMORY_TYPE_CUDA;
+        mem_type = UCC_MEMORY_TYPE_CUDA;
     } else {
         std::cerr << "incorrect memory type: " << mtype << std::endl;
         PrintHelp();
     }
-    abort();
+    if (UCC_MEMORY_TYPE_HOST != mem_type && UCC_OK != ucc_mc_available(mem_type)) {
+        std::cerr << "requested memory type "
+                  << ucc_memory_type_names[mem_type]
+                  << " is not supported "
+                  << std::endl;
+        exit(1);
+    }
+
+    return mem_type;
 }
 
 static ucc_datatype_t dtype_str_to_type(std::string dtype)
@@ -162,6 +191,19 @@ static ucc_reduction_op_t op_str_to_type(std::string op)
         return UCC_OP_BXOR;
     } else {
         std::cerr << "incorrect op: " << op << std::endl;
+        PrintHelp();
+    }
+    abort();
+}
+
+static ucc_test_vsize_flag_t bits_str_to_type(std::string vsize)
+{
+    if (vsize == "32") {
+        return TEST_FLAG_VSIZE_32BIT;
+    } else if (vsize == "64") {
+        return TEST_FLAG_VSIZE_64BIT;
+    } else {
+        std::cerr << "incorrect vsize: " << vsize << std::endl;
         PrintHelp();
     }
     abort();
@@ -236,9 +278,41 @@ err:
     PrintHelp();
 }
 
+int init_rand_seed(int user_seed)
+{
+    int rank, seed;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (0 > user_seed) {
+        if (0 == rank) {
+            seed = time(NULL) % 32768;
+        }
+    } else {
+        seed = user_seed;
+    }
+    MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (0 != rank) {
+        seed += rank;
+    }
+    return seed;
+}
+
+void PrintInfo()
+{
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+    if (world_rank) {
+        return;
+    }
+    std::cout << "\n===== UCC MPI TEST INFO =======\n"
+              << "   seed        : " << std::to_string(test_rand_seed) << "\n"
+              <<   "===============================\n"
+              << std::endl;
+}
+
 void ProcessArgs(int argc, char** argv)
 {
-    const char* const short_opts = "c:t:m:d:o:M:I:r:h";
+    const char* const short_opts = "c:t:m:d:o:M:I:r:s:C:D:Z:h";
     const option long_opts[] = {
         {"colls",   required_argument, nullptr, 'c'},
         {"teams",   required_argument, nullptr, 't'},
@@ -248,6 +322,10 @@ void ProcessArgs(int argc, char** argv)
         {"msgsize", required_argument, nullptr, 'm'},
         {"inplace", required_argument, nullptr, 'I'},
         {"root",    required_argument, nullptr, 'r'},
+        {"seed",    required_argument, nullptr, 's'},
+        {"max_size", required_argument, nullptr, 'Z'},
+        {"count_bits", required_argument, nullptr, 'C'},
+        {"displ_bits", required_argument, nullptr, 'D'},
         {"help",    no_argument,       nullptr, 'h'},
         {nullptr,   no_argument,       nullptr, 0}
     };
@@ -285,6 +363,18 @@ void ProcessArgs(int argc, char** argv)
         case 'r':
             process_root(optarg);
             break;
+        case 's':
+            test_rand_seed = std::stoi(optarg);
+            break;
+        case 'Z':
+            test_max_size = std::stoi(optarg);
+            break;
+        case 'C':
+            counts_vsize = process_arg<ucc_test_vsize_flag_t>(optarg, bits_str_to_type);
+            break;
+        case 'D':
+            displs_vsize = process_arg<ucc_test_vsize_flag_t>(optarg, bits_str_to_type);
+            break;
         case 'h': // -h or --help
         case '?': // Unrecognized option
         default:
@@ -299,20 +389,26 @@ int main(int argc, char *argv[])
     std::chrono::steady_clock::time_point begin =
         std::chrono::steady_clock::now();
     int rank;
-    ProcessArgs(argc, argv);
+    int failed = 0;
 
     UccTestMpi test(argc, argv, UCC_THREAD_SINGLE, teams, cls);
+    ProcessArgs(argc, argv);
     test.set_colls(colls);
     test.set_dtypes(dtypes);
     test.set_mtypes(mtypes);
     test.set_ops(ops);
     test.set_root(root_type, root_value);
+    test.set_count_vsizes(counts_vsize);
+    test.set_displ_vsizes(displs_vsize);
     test.set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
+    test.set_max_size(test_max_size);
+    test_rand_seed = init_rand_seed(test_rand_seed);
+
+    PrintInfo();
+
     for (auto &inpl : inplace) {
         test.set_inplace(inpl);
-        if (UCC_OK != test.run_all()) {
-            return -1;
-        }
+        test.run_all();
     }
     std::cout << std::flush;
     MPI_Allreduce(MPI_IN_PLACE, test.results.data(), test.results.size(),
@@ -322,17 +418,29 @@ int main(int argc, char *argv[])
     if (0 == rank) {
         std::chrono::steady_clock::time_point end =
             std::chrono::steady_clock::now();
-        int failed = 0;
+        int skipped = 0;
+        int done = 0;
         for (auto s : test.results) {
-            if (s < 0) failed++;
+            switch(s) {
+            case UCC_OK:
+                done++;
+                break;
+            case UCC_ERR_NOT_IMPLEMENTED:
+            case UCC_ERR_LAST:
+                skipped++;
+                break;
+            default:
+                failed++;
+            }
         }
-        std::cout << "\n===== UCC MPI TEST =====\n" <<
+        std::cout << "\n===== UCC MPI TEST REPORT =====\n" <<
             "   total tests : " << test.results.size() << "\n" << 
-            "   passed      : " << test.results.size() - failed << "\n" <<
+            "   passed      : " << done << "\n" <<
+            "   skipped     : " << skipped << "\n" <<
             "   failed      : " << failed << "\n" <<
             "   elapsed     : " <<
             std::chrono::duration_cast<std::chrono::seconds>(end - begin).count()
                   << "s" << std::endl;
     }
-    return 0;
+    return failed;
 }
