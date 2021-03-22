@@ -448,11 +448,12 @@ ucc_status_t ucc_ee_get_event_internal(ucc_ee_h ee, ucc_ev_t **ev, ucc_queue_hea
     ucc_event_desc_t *event_desc;
     ucc_queue_elem_t *elem;
 
+    ucc_spin_lock(&ee->lock);
     if (ucc_queue_is_empty(queue)) {
+        ucc_spin_unlock(&ee->lock);
         return UCC_ERR_NOT_FOUND;
     }
 
-    ucc_spin_lock(&ee->lock);
     elem = ucc_queue_pull(queue);
     ucc_spin_unlock(&ee->lock);
 
@@ -509,7 +510,10 @@ ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t *ev)
 
 ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev)
 {
-    while(UCC_OK != ucc_ee_get_event(ee, &ev));
+    while(UCC_OK != ucc_ee_get_event(ee, &ev)) {
+        ucc_progress_queue(ee->team->contexts[0]->pq);
+    }
+
     return UCC_OK;
 
 }

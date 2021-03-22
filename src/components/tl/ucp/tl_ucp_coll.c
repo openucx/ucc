@@ -67,13 +67,12 @@ static ucc_status_t ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_ta
                                                       ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_status_t status;
 
     tl_info(task->team->super.super.context->lib, "event triggered. task:%p", coll_task);
 
     coll_task->ee_task = parent_task->ee_task;
-    status = coll_task->post(coll_task);
-    if (status == UCC_OK) {
+    coll_task->post(coll_task);
+    if (coll_task->super.status == UCC_OK) {
         return ucc_tl_ucp_triggered_coll_complete(coll_task, coll_task);
     } else {
 
