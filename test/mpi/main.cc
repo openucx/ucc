@@ -24,7 +24,6 @@ static std::vector<ucc_test_vsize_flag_t> counts_vsize = {TEST_FLAG_VSIZE_32BIT,
 static std::vector<ucc_test_vsize_flag_t> displs_vsize = {TEST_FLAG_VSIZE_32BIT,
                                                           TEST_FLAG_VSIZE_64BIT};
 static size_t msgrange[3] = {8, (1ULL << 21), 8};
-static char *cls = NULL;
 static std::vector<ucc_test_mpi_inplace_t> inplace = {TEST_NO_INPLACE};
 static ucc_test_mpi_root_t root_type = ROOT_RANDOM;
 static int root_value = 10;
@@ -390,9 +389,9 @@ int main(int argc, char *argv[])
         std::chrono::steady_clock::now();
     int rank;
     int failed = 0;
-
-    UccTestMpi test(argc, argv, UCC_THREAD_SINGLE, teams, cls);
+    UccTestMpi test(argc, argv, UCC_THREAD_SINGLE);
     ProcessArgs(argc, argv);
+    test.create_teams(teams);
     test.set_colls(colls);
     test.set_dtypes(dtypes);
     test.set_mtypes(mtypes);
