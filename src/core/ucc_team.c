@@ -272,6 +272,7 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
         }
         team->cl_teams[i] = NULL;
     }
+    ucc_team_relase_id(team);
     ucc_free(team);
     return UCC_OK;
 }
@@ -291,7 +292,6 @@ ucc_status_t ucc_team_destroy_nb(ucc_team_h team)
 ucc_status_t ucc_team_destroy(ucc_team_h team)
 {
     ucc_status_t status;
-    ucc_team_relase_id(team);
     while (UCC_INPROGRESS == (status = ucc_team_destroy_single(team))) {
         ; //TODO call ucc progress here
     }
@@ -313,8 +313,9 @@ find_first_set_and_zero(uint64_t *value) {
 static inline void
 set_id_bit(uint64_t *local, int id) {
     int map_pos = id / 64;
-    int pos = id % 64;
-    local[map_pos] |= ((uint64_t)1 << (pos-1));
+    int pos = (id-1) % 64;
+    ucc_assert(id >= 1);
+    local[map_pos] |= ((uint64_t)1 << pos);
 }
 
 static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
@@ -351,7 +352,7 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
             .myrank     = team->rank
         };
         status = tl_iface->scoll.allreduce(
-            &team->service_team->super, global, local, UCC_DT_UINT64, ctx->ids.pool_size, UCC_OP_BAND,
+            &team->service_team->super, local, global, UCC_DT_UINT64, ctx->ids.pool_size, UCC_OP_BAND,
             subset, &team->task);
         if (status < 0) {
             ucc_error("failed to start service allreduce for team ids pool allocation: %s",
