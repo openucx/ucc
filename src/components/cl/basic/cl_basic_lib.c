@@ -31,7 +31,10 @@ UCC_CLASS_DEFINE(ucc_cl_basic_lib_t, ucc_cl_lib_t);
 ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
                                        ucc_base_attr_t *base_attr)
 {
-    ucc_cl_lib_attr_t *attr = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
-    attr->tls               = UCC_TL_UCP | UCC_TL_NCCL;
+    ucc_cl_lib_attr_t *attr      = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
+    attr->tls                    = UCC_TL_UCP | UCC_TL_NCCL;
+    attr->super.attr.thread_mode = UCC_THREAD_SINGLE;
+    /* TODO: fill coll_types, reduction_types, sync_mode.
+       Correctly fill thead_mode multiple when possible. */
     return UCC_OK;
 }
