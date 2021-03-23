@@ -24,7 +24,7 @@ TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
     args.coll_type = UCC_COLL_TYPE_ALLTOALL;
 
-    if (TEST_INPLACE == inplace && ucc_coll_inplace_supported(args.coll_type)) {
+    if (TEST_INPLACE == inplace && !ucc_coll_inplace_supported(args.coll_type)) {
         test_skip = TEST_SKIP_NOT_IMPL_INPLACE;
     }
     if (test_max_size < (_msgsize * nprocs)) {
