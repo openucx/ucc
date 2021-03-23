@@ -120,12 +120,12 @@ test_skip_cause_t TestCase::skip_reduce(int skip_cond, test_skip_cause_t cause,
     test_skip_cause_t test_skip;
     test_skip_cause_t skip = skip_cond ? cause : TestCase::test_skip;
     MPI_Allreduce((void*)&skip, (void*)&test_skip, 1, MPI_INT, MPI_MAX, comm);
+    TestCase::test_skip = test_skip;
     return test_skip;
 }
 
 test_skip_cause_t TestCase::skip_reduce(test_skip_cause_t cause, MPI_Comm comm)
 {
-    MPI_Allreduce((void*)&cause, (void*)&test_skip, 1, MPI_INT, MPI_MAX, comm);
     return skip_reduce(1, cause, comm);
 }
 

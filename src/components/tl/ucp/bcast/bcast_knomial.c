@@ -59,7 +59,6 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
                 UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(buffer, data_size, mtype,
                                                  root_at_level, team, task),
                               task, out);
-                ucc_assert(task->send_posted == 0 && task->recv_posted == 1);
             }
         }
         dist /= radix;

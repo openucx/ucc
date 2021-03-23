@@ -11,13 +11,10 @@ BEGIN_C_DECLS
 END_C_DECLS
 #include <algorithm>
 #include <assert.h>
-UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
-                       std::vector<ucc_test_mpi_team_t> &test_teams,
-                       const char *cls)
-{
+UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm) {
     int required = (tm == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
         : MPI_THREAD_MULTIPLE;
-    int rank, size, provided;
+    int size, provided;
     ucc_lib_config_h lib_config;
     ucc_context_config_h ctx_config;
 
@@ -27,7 +24,6 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
         std::cerr << "could not initialize MPI in thread multiple\n";
         abort();
     }
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     if (size < 2) {
         std::cerr << "test requires at least 2 ranks\n";
@@ -46,15 +42,27 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
         .ctx_type = UCC_CONTEXT_EXCLUSIVE,
     };
     UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
-    if (cls) {
-        UCC_CHECK(ucc_lib_config_modify(lib_config, "CLS", cls));
-    }
     UCC_CHECK(ucc_init(&lib_params, lib_config, &lib));
     ucc_lib_config_release(lib_config);
 
     UCC_CHECK(ucc_context_config_read(lib, NULL, &ctx_config));
     UCC_CHECK(ucc_context_create(lib, &ctx_params, ctx_config, &ctx));
     ucc_context_config_release(ctx_config);
+    set_msgsizes(8, ((1ULL) << 21), 8);
+    dtypes = {UCC_DT_INT32, UCC_DT_INT64, UCC_DT_FLOAT32, UCC_DT_FLOAT64};
+    ops = {UCC_OP_SUM, UCC_OP_MAX};
+    colls = {UCC_COLL_TYPE_BARRIER, UCC_COLL_TYPE_ALLREDUCE};
+    mtypes = {UCC_MEMORY_TYPE_HOST};
+    inplace = TEST_NO_INPLACE;
+    root_type = ROOT_RANDOM;
+    root_value = 10;
+}
+
+void UccTestMpi::create_teams(std::vector<ucc_test_mpi_team_t> &test_teams)
+{
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
     for (auto &t : test_teams) {
         if (size < 4 && (t == TEAM_SPLIT_HALF || t == TEAM_SPLIT_ODD_EVEN)) {
             if (rank == 0) {
@@ -66,14 +74,6 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
         }
         create_team(t);
     }
-    set_msgsizes(8, ((1ULL) << 21), 8);
-    dtypes = {UCC_DT_INT32, UCC_DT_INT64, UCC_DT_FLOAT32, UCC_DT_FLOAT64};
-    ops = {UCC_OP_SUM, UCC_OP_MAX};
-    colls = {UCC_COLL_TYPE_BARRIER, UCC_COLL_TYPE_ALLREDUCE};
-    mtypes = {UCC_MEMORY_TYPE_HOST};
-    inplace = TEST_NO_INPLACE;
-    root_type = ROOT_RANDOM;
-    root_value = 10;
 }
 
 UccTestMpi::~UccTestMpi()

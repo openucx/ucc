@@ -129,9 +129,7 @@ class UccTestMpi {
     size_t test_max_size;
 public:
     std::vector<ucc_status_t> results;
-    UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm,
-               std::vector<ucc_test_mpi_team_t> &test_teams,
-               const char* cls = NULL);
+    UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm);
     ~UccTestMpi();
     void set_msgsizes(size_t min, size_t max, size_t power);
     void set_dtypes(std::vector<ucc_datatype_t> &_dtypes);
@@ -151,6 +149,7 @@ public:
     void set_max_size(size_t _max_size) {
         test_max_size = _max_size;
     }
+    void create_teams(std::vector<ucc_test_mpi_team_t> &test_teams);
 };
 
 class TestCase {
@@ -262,6 +261,10 @@ class TestAlltoallv : public TestCase {
     int *sdispls;
     int *rcounts;
     int *rdispls;
+    ucc_count_t *scounts64;
+    ucc_count_t *sdispls64;
+    ucc_count_t *rcounts64;
+    ucc_count_t *rdispls64;
     ucc_test_vsize_flag_t count_bits;
     ucc_test_vsize_flag_t displ_bits;
 

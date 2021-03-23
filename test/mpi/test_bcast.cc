@@ -25,7 +25,7 @@ TestBcast::TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     if (TEST_INPLACE == inplace && !ucc_coll_inplace_supported(args.coll_type)) {
         test_skip = TEST_SKIP_NOT_IMPL_INPLACE;
     }
-    if (skip_reduce(test_max_size < (_msgsize*size), TEST_SKIP_MEM_LIMIT,
+    if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT,
                     team.comm)) {
         return;
     }

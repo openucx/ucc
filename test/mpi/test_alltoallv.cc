@@ -41,12 +41,16 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &nprocs);
 
-    sncounts = 0;
-    rncounts = 0;
-    scounts = NULL;
-    sdispls = NULL;
-    rcounts = NULL;
-    rdispls = NULL;
+    sncounts   = 0;
+    rncounts   = 0;
+    scounts    = NULL;
+    sdispls    = NULL;
+    rcounts    = NULL;
+    rdispls    = NULL;
+    scounts64  = NULL;
+    sdispls64  = NULL;
+    rcounts64  = NULL;
+    rdispls64  = NULL;
     count_bits = _count_bits;
     displ_bits = _displ_bits;
 
@@ -57,6 +61,11 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
     if (TEST_INPLACE == inplace && !ucc_coll_inplace_supported(args.coll_type)) {
         test_skip = TEST_SKIP_NOT_IMPL_INPLACE;
+    }
+
+    if (skip_reduce(test_max_size < (_msgsize * nprocs), TEST_SKIP_MEM_LIMIT,
+                    team.comm)) {
+        return;
     }
 
     if (count_bits == TEST_FLAG_VSIZE_64BIT) {
@@ -91,12 +100,6 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         rncounts += rcounts[i];
     }
 
-    if (test_max_size < (_msgsize * nprocs)) {
-        test_skip = TEST_SKIP_MEM_LIMIT;
-    }
-    if (TEST_SKIP_NONE != skip_reduce(test_skip, team.comm)) {
-        return;
-    }
 
     UCC_CHECK(ucc_mc_alloc(&sbuf, sncounts * dt_size, _mt));
     init_buffer(sbuf, sncounts, TEST_DT, _mt, rank);
@@ -115,18 +118,18 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     args.dst.info_v.mem_type = _mt;
 
     if (TEST_FLAG_VSIZE_64BIT == count_bits) {
-        args.src.info_v.counts =
+        args.src.info_v.counts = scounts64 = 
                 (ucc_count_t*)mpi_counts_to_ucc<uint64_t>(scounts, nprocs);
-        args.dst.info_v.counts =
+        args.dst.info_v.counts = rcounts64 =
                 (ucc_count_t*)mpi_counts_to_ucc<uint64_t>(rcounts, nprocs);
     } else {
         args.src.info_v.counts = (ucc_count_t*)scounts;
         args.dst.info_v.counts = (ucc_count_t*)rcounts;
     }
     if (TEST_FLAG_VSIZE_64BIT == displ_bits) {
-        args.src.info_v.displacements =
+        args.src.info_v.displacements = sdispls64 = 
                 (ucc_aint_t*)mpi_counts_to_ucc<uint64_t>(sdispls, nprocs);
-        args.dst.info_v.displacements =
+        args.dst.info_v.displacements = rdispls64 =
                 (ucc_aint_t*)mpi_counts_to_ucc<uint64_t>(rdispls, nprocs);
     } else {
         args.src.info_v.displacements = (ucc_aint_t*)sdispls;
@@ -138,27 +141,14 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
 TestAlltoallv::~TestAlltoallv()
 {
-    if (scounts) {
-        free(scounts);
-    }
-    if (sdispls) {
-        free(sdispls);
-    }
-    if (rcounts) {
-        free(rcounts);
-    }
-    if (rdispls) {
-        free(rdispls);
-    }
-
-    if (TEST_FLAG_VSIZE_64BIT == count_bits) {
-        free(args.src.info_v.counts);
-        free(args.dst.info_v.counts);
-    }
-    if (TEST_FLAG_VSIZE_64BIT == displ_bits) {
-        free(args.src.info_v.displacements);
-        free(args.dst.info_v.displacements);
-    }
+    free(scounts);
+    free(sdispls);
+    free(rcounts);
+    free(rdispls);
+    free(scounts64);
+    free(sdispls64);
+    free(rcounts64);
+    free(rdispls64);
 }
 
 ucc_status_t TestAlltoallv::check()
