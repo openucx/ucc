@@ -45,8 +45,8 @@ ncclRedOp_t ucc_to_nccl_reduce_op[] = {
     [UCC_OP_MINLOC]      = ncclOpUnsupported,
 };
 
-static inline ucc_status_t
-ucc_nccl_check_dt_supported(ucc_datatype_t dt1, ucc_datatype_t dt2)
+static inline ucc_status_t ucc_nccl_check_dt_supported(ucc_datatype_t dt1,
+                                                       ucc_datatype_t dt2)
 {
     if ((dt1 != dt2) || (ucc_to_nccl_dtype[dt1] == ncclDataTypeUnsupported)) {
         return UCC_ERR_NOT_SUPPORTED;
@@ -54,7 +54,7 @@ ucc_nccl_check_dt_supported(ucc_datatype_t dt1, ucc_datatype_t dt2)
     return UCC_OK;
 }
 
-ucc_status_t ucc_nccl_collective_progress(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_nccl_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     cudaError_t cuda_st;
@@ -72,7 +72,7 @@ ucc_status_t ucc_nccl_collective_progress(ucc_coll_task_t *coll_task)
     }
 }
 
-ucc_status_t ucc_nccl_alltoall_start(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
@@ -101,8 +101,8 @@ ucc_status_t ucc_nccl_alltoall_start(ucc_coll_task_t *coll_task)
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream),
-                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
+                   UCC_TL_TEAM_LIB(team));
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -112,7 +112,7 @@ exit_coll:
     return status;
 }
 
-ucc_status_t ucc_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
+ucc_status_t ucc_tl_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
 {
     if (UCC_IS_INPLACE(task->args)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
@@ -125,12 +125,12 @@ ucc_status_t ucc_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
                  "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post     = ucc_nccl_alltoall_start;
-    task->super.progress = ucc_nccl_collective_progress;
+    task->super.post     = ucc_tl_nccl_alltoall_start;
+    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 
-ucc_status_t ucc_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
@@ -168,8 +168,8 @@ ucc_status_t ucc_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
         }
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream),
-                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
+                   UCC_TL_TEAM_LIB(team));
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -179,7 +179,7 @@ exit_coll:
     return status;
 }
 
-ucc_status_t ucc_nccl_alltoallv_init(ucc_tl_nccl_task_t *task)
+ucc_status_t ucc_tl_nccl_alltoallv_init(ucc_tl_nccl_task_t *task)
 {
     if (UCC_IS_INPLACE(task->args)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
@@ -192,12 +192,12 @@ ucc_status_t ucc_nccl_alltoallv_init(ucc_tl_nccl_task_t *task)
                  "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post     = ucc_nccl_alltoallv_start;
-    task->super.progress = ucc_nccl_collective_progress;
+    task->super.post     = ucc_tl_nccl_alltoallv_start;
+    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 
-ucc_status_t ucc_nccl_allreduce_start(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
@@ -217,8 +217,8 @@ ucc_status_t ucc_nccl_allreduce_start(ucc_coll_task_t *coll_task)
     NCCLCHECK_GOTO(ncclAllReduce(src, dst, count, dt, op, team->nccl_comm,
                                  stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream),
-                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
+                   UCC_TL_TEAM_LIB(team));
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -228,7 +228,7 @@ exit_coll:
     return status;
 }
 
-ucc_status_t ucc_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
+ucc_status_t ucc_tl_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
 {
     if ((task->args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
         (ucc_to_nccl_reduce_op[task->args.reduce.predefined_op] ==
@@ -243,12 +243,12 @@ ucc_status_t ucc_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
                  "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post     = ucc_nccl_allreduce_start;
-    task->super.progress = ucc_nccl_collective_progress;
+    task->super.post     = ucc_tl_nccl_allreduce_start;
+    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 
-ucc_status_t ucc_nccl_allgather_start(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
@@ -265,8 +265,8 @@ ucc_status_t ucc_nccl_allgather_start(ucc_coll_task_t *coll_task)
     task->super.super.status = UCC_INPROGRESS;
     NCCLCHECK_GOTO(ncclAllGather(src, dst, count, dt, team->nccl_comm, stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream),
-                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
+                   UCC_TL_TEAM_LIB(team));
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -289,12 +289,12 @@ ucc_status_t ucc_tl_nccl_allgather_init(ucc_tl_nccl_task_t *task)
                  "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post     = ucc_nccl_allgather_start;
-    task->super.progress = ucc_nccl_collective_progress;
+    task->super.post     = ucc_tl_nccl_allgather_start;
+    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 
-ucc_status_t ucc_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
@@ -330,8 +330,8 @@ ucc_status_t ucc_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
         }
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream),
-                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
+                   UCC_TL_TEAM_LIB(team));
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -341,7 +341,7 @@ exit_coll:
     return status;
 }
 
-ucc_status_t ucc_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
+ucc_status_t ucc_tl_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
 {
     if (UCC_IS_INPLACE(task->args)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
@@ -354,12 +354,12 @@ ucc_status_t ucc_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
                  "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post     = ucc_nccl_allgatherv_start;
-    task->super.progress = ucc_nccl_collective_progress;
+    task->super.post     = ucc_tl_nccl_allgatherv_start;
+    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 
-ucc_status_t ucc_nccl_bcast_start(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
@@ -375,8 +375,8 @@ ucc_status_t ucc_nccl_bcast_start(ucc_coll_task_t *coll_task)
     NCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->nccl_comm,
                                  stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream),
-                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
+                   UCC_TL_TEAM_LIB(team));
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -386,7 +386,7 @@ exit_coll:
     return status;
 }
 
-ucc_status_t ucc_nccl_bcast_init(ucc_tl_nccl_task_t *task)
+ucc_status_t ucc_tl_nccl_bcast_init(ucc_tl_nccl_task_t *task)
 {
     if (UCC_OK != ucc_nccl_check_dt_supported(task->args.src.info.datatype,
                                               task->args.src.info.datatype)) {
@@ -395,7 +395,7 @@ ucc_status_t ucc_nccl_bcast_init(ucc_tl_nccl_task_t *task)
                  "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post     = ucc_nccl_bcast_start;
-    task->super.progress = ucc_nccl_collective_progress;
+    task->super.post     = ucc_tl_nccl_bcast_start;
+    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }

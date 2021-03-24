@@ -149,22 +149,22 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     switch (coll_args->args.coll_type)
     {
     case UCC_COLL_TYPE_ALLGATHER:
-        status = ucc_nccl_allgather_init(task);
+        status = ucc_tl_nccl_allgather_init(task);
         break;
     case UCC_COLL_TYPE_ALLGATHERV:
-        status = ucc_nccl_allgatherv_init(task);
+        status = ucc_tl_nccl_allgatherv_init(task);
         break;
     case UCC_COLL_TYPE_ALLREDUCE:
-        status = ucc_nccl_allreduce_init(task);
+        status = ucc_tl_nccl_allreduce_init(task);
         break;
     case UCC_COLL_TYPE_ALLTOALL:
-        status = ucc_nccl_alltoall_init(task);
+        status = ucc_tl_nccl_alltoall_init(task);
         break;
     case UCC_COLL_TYPE_ALLTOALLV:
-        status = ucc_nccl_alltoallv_init(task);
+        status = ucc_tl_nccl_alltoallv_init(task);
         break;
     case UCC_COLL_TYPE_BCAST:
-        status = ucc_nccl_bcast_init(task);
+        status = ucc_tl_nccl_bcast_init(task);
         break;
     default:
         tl_error(UCC_TL_TEAM_LIB(task->team),
