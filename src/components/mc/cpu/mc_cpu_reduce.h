@@ -7,16 +7,7 @@
 #ifndef UCC_MC_CPU_REDUCE_H_
 #define UCC_MC_CPU_REDUCE_H_
 
-#define  DO_OP_MAX(_v1, _v2) (_v1 > _v2 ? _v1 : _v2)
-#define  DO_OP_MIN(_v1, _v2) (_v1 < _v2 ? _v1 : _v2)
-#define  DO_OP_SUM(_v1, _v2) (_v1 + _v2)
-#define DO_OP_PROD(_v1, _v2) (_v1 * _v2)
-#define DO_OP_LAND(_v1, _v2) (_v1 && _v2)
-#define DO_OP_BAND(_v1, _v2) (_v1 & _v2)
-#define  DO_OP_LOR(_v1, _v2) (_v1 || _v2)
-#define  DO_OP_BOR(_v1, _v2) (_v1 | _v2)
-#define DO_OP_LXOR(_v1, _v2) ((!_v1) != (!_v2))
-#define DO_OP_BXOR(_v1, _v2) (_v1 ^ _v2)
+#include "utils/ucc_math.h"
 
 #define DO_DT_REDUCE_WITH_OP(s1, s2, d, count, OP) do {                        \
         size_t i;                                                              \

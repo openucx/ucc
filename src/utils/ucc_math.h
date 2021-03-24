@@ -13,6 +13,17 @@
 #define ucc_min(_a, _b) ucs_min((_a), (_b))
 #define ucc_max(_a, _b) ucs_max((_a), (_b))
 
+#define DO_OP_MAX(_v1, _v2) (_v1 > _v2 ? _v1 : _v2)
+#define DO_OP_MIN(_v1, _v2) (_v1 < _v2 ? _v1 : _v2)
+#define DO_OP_SUM(_v1, _v2) (_v1 + _v2)
+#define DO_OP_PROD(_v1, _v2) (_v1 * _v2)
+#define DO_OP_LAND(_v1, _v2) (_v1 && _v2)
+#define DO_OP_BAND(_v1, _v2) (_v1 & _v2)
+#define DO_OP_LOR(_v1, _v2) (_v1 || _v2)
+#define DO_OP_BOR(_v1, _v2) (_v1 | _v2)
+#define DO_OP_LXOR(_v1, _v2) ((!_v1) != (!_v2))
+#define DO_OP_BXOR(_v1, _v2) (_v1 ^ _v2)
+
 extern size_t ucc_dt_sizes[UCC_DT_USERDEFINED];
 static inline size_t ucc_dt_size(ucc_datatype_t dt)
 {

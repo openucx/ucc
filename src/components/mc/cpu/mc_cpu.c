@@ -64,6 +64,27 @@ static ucc_status_t ucc_mc_cpu_reduce(const void *src1, const void *src2,
     return 0;
 }
 
+static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
+                                            void *dst, size_t size,
+                                            size_t count, size_t stride,
+                                            ucc_datatype_t dt,
+                                            ucc_reduction_op_t op)
+{
+    int i;
+    ucc_status_t st;
+
+    //TODO implement efficient reduce_multi
+    st = ucc_mc_cpu_reduce(src1, src2, dst, count, dt, op);
+    for (i = 1; i < size; i++) {
+        if (st != UCC_OK) {
+            return st;
+        }
+        st = ucc_mc_cpu_reduce((void *)((ptrdiff_t)src2 + stride * i), dst, dst,
+                               count, dt, op);
+    }
+    return st;
+}
+
 static ucc_status_t ucc_mc_cpu_mem_free(void *ptr)
 {
     ucc_free(ptr);
@@ -95,23 +116,24 @@ static ucc_status_t ucc_mc_cpu_mem_query(const void *ptr, size_t length,
 
 
 ucc_mc_cpu_t ucc_mc_cpu = {
-    .super.super.name = "cpu mc",
-    .super.ref_cnt    = 0,
-    .super.type       = UCC_MEMORY_TYPE_HOST,
-    .super.config_table =
+    .super.super.name       = "cpu mc",
+    .super.ref_cnt          = 0,
+    .super.type             = UCC_MEMORY_TYPE_HOST,
+    .super.init             = ucc_mc_cpu_init,
+    .super.finalize         = ucc_mc_cpu_finalize,
+    .super.ops.mem_query    = ucc_mc_cpu_mem_query,
+    .super.ops.mem_alloc    = ucc_mc_cpu_mem_alloc,
+    .super.ops.mem_free     = ucc_mc_cpu_mem_free,
+    .super.ops.reduce       = ucc_mc_cpu_reduce,
+    .super.ops.reduce_multi = ucc_mc_cpu_reduce_multi,
+    .super.ops.memcpy       = ucc_mc_cpu_memcpy,
+    .super.config_table     =
         {
             .name   = "CPU memory component",
             .prefix = "MC_CPU_",
             .table  = ucc_mc_cpu_config_table,
             .size   = sizeof(ucc_mc_cpu_config_t),
         },
-    .super.init          = ucc_mc_cpu_init,
-    .super.finalize      = ucc_mc_cpu_finalize,
-    .super.ops.mem_query = ucc_mc_cpu_mem_query,
-    .super.ops.mem_alloc = ucc_mc_cpu_mem_alloc,
-    .super.ops.mem_free  = ucc_mc_cpu_mem_free,
-    .super.ops.reduce    = ucc_mc_cpu_reduce,
-    .super.ops.memcpy    = ucc_mc_cpu_memcpy
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cpu.super.config_table,
