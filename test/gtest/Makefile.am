@@ -73,6 +73,7 @@ gtest_SOURCES =                 \
 	core/test_context_config.cc \
 	core/test_context.cc        \
 	core/test_mc.cc             \
+	core/test_mc_reduce_host.cc \
 	core/test_team.cc           \
 	core/test_barrier.cc        \
 	core/test_alltoall.cc       \
@@ -80,7 +81,8 @@ gtest_SOURCES =                 \
 
 if HAVE_CUDA
 gtest_SOURCES += \
-	core/test_mc_cuda.cc
+	core/test_mc_cuda.cc        \
+	core/test_mc_reduce_cuda.cc
 gtest_CPPFLAGS += \
 	$(CUDA_CPPFLAGS)
 gtest_LDFLAGS += \
@@ -94,7 +96,8 @@ noinst_HEADERS =          \
 	common/test.h         \
 	common/test_helpers.h \
 	common/test_ucc.h     \
-	core/test_context.h
+	core/test_context.h   \
+	core/test_mc_reduce.h
 
 
 .PHONY: test test gdb valgrind fix_rpath ucc

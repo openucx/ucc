@@ -80,6 +80,9 @@ CUDA_REDUCE_WITH_OP(BXOR, DO_OP_BXOR)
         case UCC_OP_LOR:                                                       \
             LAUNCH_KERNEL(LOR, type, sbuf1, sbuf2, dest, count, s, b, t);      \
             break;                                                             \
+        case UCC_OP_BOR:                                                       \
+            LAUNCH_KERNEL(BOR, type, sbuf1, sbuf2, dest, count, s, b, t);      \
+            break;                                                             \
         case UCC_OP_LXOR:                                                      \
             LAUNCH_KERNEL(LXOR, type, sbuf1, sbuf2, dest, count, s, b, t);     \
             break;                                                             \
