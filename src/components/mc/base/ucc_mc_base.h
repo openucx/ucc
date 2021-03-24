@@ -85,6 +85,10 @@ typedef struct ucc_ee_ops {
     ucc_status_t (*ee_task_post)(void *ee_context, void **ee_req);
     ucc_status_t (*ee_task_query)(void *ee_req);
     ucc_status_t (*ee_task_end)(void *ee_req);
+    ucc_status_t (*ee_create_event)(void **event);
+    ucc_status_t (*ee_destroy_event)(void *event);
+    ucc_status_t (*ee_event_post)(void *ee_context, void *event);
+    ucc_status_t (*ee_event_test)(void *event);
 } ucc_ee_ops_t;
 
 typedef struct ucc_mc_base {

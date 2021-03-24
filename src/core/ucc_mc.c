@@ -210,3 +210,23 @@ ucc_status_t ucc_mc_ee_task_end(void *ee_task, ucc_ee_type_t ee_type)
 {
     return ee_ops[ee_type]->ee_task_end(ee_task);
 }
+
+ucc_status_t ucc_mc_ee_create_event(void **event, ucc_ee_type_t ee_type)
+{
+    return ee_ops[ee_type]->ee_create_event(event);
+}
+
+ucc_status_t ucc_mc_ee_destroy_event(void *event, ucc_ee_type_t ee_type)
+{
+    return ee_ops[ee_type]->ee_destroy_event(event);
+}
+
+ucc_status_t ucc_mc_ee_event_post(void *ee_context, void *event, ucc_ee_type_t ee_type)
+{
+    return ee_ops[ee_type]->ee_event_post(ee_context, event);
+}
+
+ucc_status_t ucc_mc_ee_event_test(void *event, ucc_ee_type_t ee_type)
+{
+    return ee_ops[ee_type]->ee_event_test(event);
+}

@@ -405,6 +405,49 @@ ucc_status_t ucc_ee_cuda_task_end(void *ee_req)
     return UCC_OK;
 }
 
+ucc_status_t ucc_ee_cuda_create_event(void **event)
+{
+    ucc_mc_cuda_event_t *cuda_event;
+
+    cuda_event = ucs_mpool_get(&ucc_mc_cuda.events);
+    ucc_assert(cuda_event);
+    *event = cuda_event->event;
+    return UCC_OK;
+}
+
+ucc_status_t ucc_ee_cuda_destroy_event(void *event)
+{
+    ucc_mc_cuda_event_t *cuda_event;
+
+    cuda_event = ucc_container_of(event, ucc_mc_cuda_event_t, event);
+    ucs_mpool_put(cuda_event);
+    return UCC_OK;
+}
+
+ucc_status_t ucc_ee_cuda_event_post(void *ee_context, void *event)
+{
+    cudaStream_t stream = (cudaStream_t )ee_context;
+
+    CUDACHECK(cudaEventRecord((cudaEvent_t)event, stream));
+    return UCC_OK;
+}
+
+ucc_status_t ucc_ee_cuda_event_test(void *event)
+{
+    cudaError_t cu_err;
+
+    cu_err = cudaEventQuery((cudaEvent_t)event);
+    switch(cu_err) {
+    case cudaSuccess:
+        return UCC_OK;
+    case cudaErrorNotReady:
+        return UCC_INPROGRESS;
+    default:
+        return UCC_ERR_NO_MESSAGE;
+    }
+    return UCC_OK;
+}
+
 ucc_mc_cuda_t ucc_mc_cuda = {
     .super.super.name       = "cuda mc",
     .super.ref_cnt          = 0,
@@ -424,9 +467,13 @@ ucc_mc_cuda_t ucc_mc_cuda = {
             .table  = ucc_mc_cuda_config_table,
             .size   = sizeof(ucc_mc_cuda_config_t),
         },
-    .super.ee_ops.ee_task_post  = ucc_ee_cuda_task_post,
-    .super.ee_ops.ee_task_query = ucc_ee_cuda_task_query,
-    .super.ee_ops.ee_task_end   = ucc_ee_cuda_task_end
+    .super.ee_ops.ee_task_post     = ucc_ee_cuda_task_post,
+    .super.ee_ops.ee_task_query    = ucc_ee_cuda_task_query,
+    .super.ee_ops.ee_task_end      = ucc_ee_cuda_task_end,
+    .super.ee_ops.ee_create_event  = ucc_ee_cuda_create_event,
+    .super.ee_ops.ee_destroy_event = ucc_ee_cuda_destroy_event,
+    .super.ee_ops.ee_event_post    = ucc_ee_cuda_event_post,
+    .super.ee_ops.ee_event_test    = ucc_ee_cuda_event_test,
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cuda.super.config_table,
