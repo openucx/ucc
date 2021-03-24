@@ -15,7 +15,7 @@ template<typename T>
 void * TestAlltoallv::mpi_counts_to_ucc(int *mpi_counts, size_t _ncount)
 {
     void *ucc_counts = (T*)malloc(sizeof(T) * _ncount);
-    for (auto i = 0; i < _ncount; i++) {
+    for (size_t i = 0; i < _ncount; i++) {
         ((T*)ucc_counts)[i] = mpi_counts[i];
     }
     return ucc_counts;

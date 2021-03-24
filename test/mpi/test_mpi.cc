@@ -11,6 +11,8 @@ BEGIN_C_DECLS
 END_C_DECLS
 #include <algorithm>
 #include <assert.h>
+#include <random>
+
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm) {
     int required = (tm == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
         : MPI_THREAD_MULTIPLE;
