@@ -97,7 +97,11 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
 
     if (task->super.ev == NULL) {
-        if (UCC_OK == ucc_ee_get_event_internal(task->super.ee, &ev,
+        if (task->super.ee->ee_type == UCC_EE_CUDA_STREAM) {
+            /* implicit event triggered */
+            task->super.ev = (ucc_ev_t *) 0xFFFF; /* dummy event */
+            task->super.ee_task = NULL;
+        } else if (UCC_OK == ucc_ee_get_event_internal(task->super.ee, &ev,
                                                 &task->super.ee->event_in_queue)) {
             tl_info(task->team->super.super.context->lib,
                     "triggered event arrivied. task:%p", coll_task);
