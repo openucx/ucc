@@ -18,7 +18,7 @@ template<typename T>
 void init_buffer_host(void *buf, size_t count, int _value)
 {
     T *ptr = (T *)buf;
-    for (int i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
         ptr[i] = (T)((_value + i + 1) % 128);
     }
 }
@@ -88,7 +88,7 @@ static inline bool is_equal(T a, T b, T epsilon)
 template<typename T>
 ucc_status_t compare_buffers_fp(T *b1, T *b2, size_t count) {
     T epsilon = (T)TEST_MPI_FP_EPSILON;
-    for (int i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
         if (!is_equal(b1[i], b2[i], epsilon)) {
             return UCC_ERR_NO_MESSAGE;
         }

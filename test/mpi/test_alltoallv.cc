@@ -15,7 +15,7 @@ template<typename T>
 void * TestAlltoallv::mpi_counts_to_ucc(int *mpi_counts, size_t _ncount)
 {
     void *ucc_counts = (T*)malloc(sizeof(T) * _ncount);
-    for (auto i = 0; i < _ncount; i++) {
+    for (size_t i = 0; i < _ncount; i++) {
         ((T*)ucc_counts)[i] = mpi_counts[i];
     }
     return ucc_counts;
@@ -99,7 +99,13 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         sncounts += scounts[i];
         rncounts += rcounts[i];
     }
-
+    if ((test_max_size < (sncounts * dt_size)) ||
+            (test_max_size < (rncounts * dt_size))) {
+        test_skip = TEST_SKIP_MEM_LIMIT;
+    }
+    if (TEST_SKIP_NONE != skip_reduce(test_skip, team.comm)) {
+        return;
+    }
 
     UCC_CHECK(ucc_mc_alloc(&sbuf, sncounts * dt_size, _mt));
     init_buffer(sbuf, sncounts, TEST_DT, _mt, rank);
