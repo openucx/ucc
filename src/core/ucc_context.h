@@ -20,6 +20,11 @@ typedef struct ucc_context_progress {
     void                     *progress_arg;
 } ucc_context_progress_t;
 
+typedef struct ucc_team_id_pool {
+    uint64_t *pool;
+    uint32_t  pool_size;
+} ucc_team_id_pool_t;
+
 typedef struct ucc_context {
     ucc_lib_info_t         *lib;
     ucc_context_params_t    params;
@@ -27,16 +32,19 @@ typedef struct ucc_context {
     ucc_thread_mode_t       thread_mode;
     ucc_cl_context_t      **cl_ctx;
     ucc_tl_context_t      **tl_ctx;
+    ucc_tl_context_t       *service_ctx;
     int                     n_cl_ctx;
     int                     n_tl_ctx;
     ucc_list_link_t         progress_list;
     ucc_progress_queue_t   *pq;
+    ucc_team_id_pool_t      ids;
 } ucc_context_t;
 
 typedef struct ucc_context_config {
     ucc_lib_info_t           *lib;
     ucc_cl_context_config_t **configs;
     int                       n_cl_cfg;
+    uint32_t                  team_ids_pool_size;
     uint32_t                  estimated_num_eps;
     uint32_t                  estimated_num_ppn;
 } ucc_context_config_t;

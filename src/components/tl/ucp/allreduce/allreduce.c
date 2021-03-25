@@ -8,9 +8,6 @@
 #include "allreduce.h"
 #include "utils/ucc_coll_utils.h"
 
-ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *task);
-ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *task);
-
 ucc_status_t ucc_tl_ucp_allreduce_init(ucc_tl_ucp_task_t *task)
 {
     if (task->args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) {

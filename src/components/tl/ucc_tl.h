@@ -50,6 +50,21 @@ ucc_status_t ucc_tl_lib_config_read(ucc_tl_iface_t *iface,
                                     const char *full_prefix,
                                     ucc_tl_lib_config_t **cl_config);
 
+typedef struct ucc_tl_team_subset {
+    ucc_ep_map_t map;
+    ucc_rank_t   myrank;
+} ucc_tl_team_subset_t ;
+
+typedef struct ucc_tl_service_coll {
+    ucc_status_t (*allreduce)(ucc_base_team_t *team, void *sbuf, void *rbuf,
+                              ucc_datatype_t dt, size_t count,
+                              ucc_reduction_op_t op,
+                              ucc_tl_team_subset_t subset, ucc_coll_task_t **task);
+    ucc_status_t (*test)(ucc_coll_task_t *task);
+    ucc_status_t (*cleanup)(ucc_coll_task_t *task);
+    void         (*update_id)(ucc_base_team_t *team, uint16_t id);
+} ucc_tl_service_coll_t;
+
 typedef struct ucc_tl_iface {
     ucc_component_iface_t          super;
     ucc_tl_type_t                  type;
@@ -59,6 +74,7 @@ typedef struct ucc_tl_iface {
     ucc_base_context_iface_t       context;
     ucc_base_team_iface_t          team;
     ucc_base_coll_iface_t          coll;
+    ucc_tl_service_coll_t          scoll;
 } ucc_tl_iface_t;
 
 typedef struct ucc_tl_lib {

@@ -12,15 +12,16 @@
 #include "coll_patterns/recursive_knomial.h"
 
 typedef struct ucc_tl_ucp_task {
-    ucc_coll_task_t    super;
-    ucc_coll_args_t    args;
-    ucc_tl_ucp_team_t *team;
-    uint32_t           send_posted;
-    uint32_t           send_completed;
-    uint32_t           recv_posted;
-    uint32_t           recv_completed;
-    uint32_t           tag;
-    uint32_t           n_polls;
+    ucc_coll_task_t      super;
+    ucc_coll_args_t      args;
+    ucc_tl_ucp_team_t   *team;
+    uint32_t             send_posted;
+    uint32_t             send_completed;
+    uint32_t             recv_posted;
+    uint32_t             recv_completed;
+    uint32_t             tag;
+    uint32_t             n_polls;
+    ucc_tl_team_subset_t subset;
     union {
         struct {
             int                   phase;
@@ -50,6 +51,9 @@ static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
     task->recv_completed     = 0;
     task->n_polls            = ctx->cfg.n_polls;
     task->team               = team;
+    task->subset.map.type    = UCC_EP_MAP_FULL;
+    task->subset.map.ep_num  = team->size;
+    task->subset.myrank      = team->rank;
     return task;
 }
 

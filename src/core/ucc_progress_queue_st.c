@@ -22,6 +22,7 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
 
     ucc_list_for_each_safe(task, tmp, &pq_st->list, list_elem) {
         if (task->progress) { //TODO maybe dummy empty progress fn is better than branch?
+            ucc_assert(task->super.status != UCC_OK);
             status = task->progress(task);
             if (status < 0) {
                 return status;
