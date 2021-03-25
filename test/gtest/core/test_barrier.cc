@@ -25,8 +25,7 @@ UCC_TEST_F(test_barrier, single_2proc)
 
 UCC_TEST_F(test_barrier, single_max_procs)
 {
-    int team_size = UccJob::getStaticJob()->n_procs;
-    UccTeam_h team = UccJob::getStaticJob()->create_team(team_size);
+    UccTeam_h team = UccJob::getStaticTeams().back();
     UccReq    req(team, &coll);
     req.start();
     req.wait();
