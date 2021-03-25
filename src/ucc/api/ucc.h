@@ -277,6 +277,24 @@ typedef enum {
     UCC_SYNC_COLLECTIVES    = 1  /*!< Non-synchronous collectives */
 } ucc_coll_sync_type_t;
 
+/**
+ *
+ *  @ingroup UCC_LIB_INIT_DT
+ *
+ *  @brief Enumeration representing the resource type
+ *
+ *  @parblock
+ *
+ *  @endparblock
+ *
+ */
+typedef enum {
+    UCC_RESOURCE_TYPE_EXCLUSIVE     = 0, /*!< Created and used by UCC
+                                           exclusively */
+    UCC_RESOURCE_TYPE_ASSOCIATED    = 1  /*!< Created by UCC and can be
+                                           associated with external resources */
+} ucc_resource_type_t;
+
 
 /**
  *  @ingroup UCC_COLLECTIVES
@@ -317,7 +335,8 @@ enum ucc_lib_params_field{
     UCC_LIB_PARAM_FIELD_COLL_TYPES          = UCC_BIT(1),
     UCC_LIB_PARAM_FIELD_REDUCTION_TYPES     = UCC_BIT(2),
     UCC_LIB_PARAM_FIELD_SYNC_TYPE           = UCC_BIT(3),
-    UCC_LIB_PARAM_FIELD_REDUCTION_WRAPPER   = UCC_BIT(4)
+    UCC_LIB_PARAM_FIELD_REDUCTION_WRAPPER   = UCC_BIT(4),
+    UCC_LIB_PARAM_FIELD_RESOURCE_TYPE       = UCC_BIT(5)
 };
 
 /**
@@ -328,7 +347,8 @@ enum ucc_lib_attr_field{
     UCC_LIB_ATTR_FIELD_THREAD_MODE       = UCC_BIT(0),
     UCC_LIB_ATTR_FIELD_COLL_TYPES        = UCC_BIT(1),
     UCC_LIB_ATTR_FIELD_REDUCTION_TYPES   = UCC_BIT(2),
-    UCC_LIB_ATTR_FIELD_SYNC_TYPE         = UCC_BIT(3)
+    UCC_LIB_ATTR_FIELD_SYNC_TYPE         = UCC_BIT(3),
+    UCC_LIB_ATTR_FIELD_RESOURCE_TYPE     = UCC_BIT(4)
 };
 
 /**
@@ -358,6 +378,7 @@ typedef struct ucc_lib_params {
     uint64_t                reduction_types;
     ucc_coll_sync_type_t    sync_type;
     ucc_reduction_wrapper_t reduction_wrapper;
+    ucc_resource_type_t     resource_type;
 } ucc_lib_params_t;
 
 /**
@@ -385,6 +406,7 @@ typedef struct ucc_lib_attr {
     uint64_t                coll_types;
     uint64_t                reduction_types;
     ucc_coll_sync_type_t    sync_type;
+    ucc_resource_type_t     resource_type;
 } ucc_lib_attr_t;
 
 
@@ -592,6 +614,81 @@ ucc_status_t ucc_finalize(ucc_lib_h lib_p);
 
 ucc_status_t ucc_lib_get_attr(ucc_lib_h lib_p, ucc_lib_attr_t *lib_attr);
 
+enum ucc_resource_obj_type_t {
+    UCC_RESOURCE_OBJ_LIB       = UCC_BIT(0),
+    UCC_RESOURCE_OBJ_CONTEXT   = UCC_BIT(1),
+    UCC_RESOURCE_OBJ_TEAM      = UCC_BIT(2)
+};
+
+typedef struct ucc_resource_params {
+    uint64_t                    mask;
+    ucc_resource_obj_type_t     obj_type;
+    uint64_t                    num_resources;
+    char                        *resource_key;
+    char                        *resource_value;
+    uint64_t                    value_len;
+} ucc_resource_params_t;
+
+
+/**
+ *  @ingroup UCC_LIB
+ *
+ *  @brief The @ref ucc_associate_resources provides a lazy and dynamic way
+ *  to attach resources to the UCC objects.
+ *
+ *
+ *  @param [in]       lib_p                Input library object
+ *  @param [in]       params               Parameters to attach the resources
+ *  @param [in,out]   ucc_resource_obj     Resource object to be modified
+ *
+ *  @parblock
+ *
+ *  @b Description A local resource association operation for the UCC objects. The parameters
+ *  specify the UCC objects to be associated with the resources. The resources are provided as
+ *  a key/value/length triplet parameters. The values are user and implementation defined.
+ *  The keys are defined has a pattern UCC_RESOURCE_OBJ_*_*. The first wild card specifies
+ *  the object such as library, context, and team. The second wild card is user and implementation
+ *  specific identifer.  The user is responsible for allocating the memory for keys and values.
+ *
+ *  The resource association operation can be called on the object, which is of correct type .i.e.,
+ *  UCC_RESOURCE_TYPE_ASSOCIATED.
+ *
+  * On success, the resources are associated with the object.
+ *
+ *  @endparblock
+ *
+ *  @return Error code as defined by ucc_status_t
+ */
+
+ucc_status_t ucc_associate_resources(ucc_lib_h lib_p, ucc_resource_params_t
+                                      *params, void *ucc_resource_obj);
+
+/**
+ *  @ingroup UCC_LIB
+ *
+ *  @brief The @ref ucc_disassociate_resources disassociates the resources
+ *  for the UCC object.
+ *
+ *
+ *  @param [in]       lib_p                Input library object
+ *  @param [in,out]   ucc_resource_obj     Resource object to be modified
+ *
+ *  @parblock
+ *
+ *  @b Description A resource disassociation operation for the UCC objects. All operations
+ *  on this object after disassociation is invalid. The only valid operation for this object is
+ *  to finalize and destroy. It is the responsibility of the implementation to finalize the
+ *  objects. Also, the user is responsible for releasing the memory associated with the keys and
+*  values.
+ *
+ *  @endparblock
+ *
+ *  @return Error code as defined by ucc_status_t
+ */
+
+ucc_status_t ucc_disassociate_resources(ucc_lib_h lib_p, void *ucc_resource_obj);
+
+
 /*
  * *************************************************************
  *                   Context Section
@@ -615,7 +712,8 @@ enum ucc_context_params_field {
     UCC_CONTEXT_PARAM_FIELD_TYPE                   = UCC_BIT(0),
     UCC_CONTEXT_PARAM_FIELD_COLL_SYNC_TYPE         = UCC_BIT(1),
     UCC_CONTEXT_PARAM_FIELD_COLL_OOB               = UCC_BIT(2),
-    UCC_CONTEXT_PARAM_FIELD_ID                     = UCC_BIT(3)
+    UCC_CONTEXT_PARAM_FIELD_ID                     = UCC_BIT(3),
+    UCC_CONTEXT_PARAM_FIELD_RESOURCE_TYPE          = UCC_BIT(4)
 };
 
 /**
@@ -626,7 +724,8 @@ enum ucc_context_attr_field {
     UCC_CONTEXT_ATTR_FIELD_TYPE                   = UCC_BIT(0),
     UCC_CONTEXT_ATTR_FIELD_COLL_SYNC_TYPE         = UCC_BIT(1),
     UCC_CONTEXT_ATTR_FIELD_CONTEXT_ADDR           = UCC_BIT(2),
-    UCC_CONTEXT_ATTR_FIELD_CONTEXT_ADDR_LEN       = UCC_BIT(3)
+    UCC_CONTEXT_ATTR_FIELD_CONTEXT_ADDR_LEN       = UCC_BIT(3),
+    UCC_CONTEXT_ATTR_FIELD_RESOURCE_TYPE          = UCC_BIT(4)
 };
 
 /**
@@ -671,6 +770,7 @@ typedef struct ucc_context_params {
     ucc_coll_sync_type_t    sync_type;
     ucc_context_oob_coll_t  oob;
     uint64_t                ctx_id;
+    ucc_resource_type_t     resource_type;
 } ucc_context_params_t;
 
 /**
@@ -698,6 +798,7 @@ typedef struct ucc_context_attr {
     ucc_coll_sync_type_t    sync_type;
     ucc_context_addr_t      ctx_addr;
     ucc_context_addr_len_t  ctx_addr_len;
+    ucc_resource_type_t     resource_type;
 } ucc_context_attr_t;
 
 /**
@@ -929,7 +1030,8 @@ enum ucc_team_params_field {
     UCC_TEAM_PARAM_FIELD_OOB                    = UCC_BIT(7),
     UCC_TEAM_PARAM_FIELD_P2P_CONN               = UCC_BIT(8),
     UCC_TEAM_PARAM_FIELD_MEM_PARAMS             = UCC_BIT(9),
-    UCC_TEAM_PARAM_FIELD_EP_MAP                 = UCC_BIT(10)
+    UCC_TEAM_PARAM_FIELD_EP_MAP                 = UCC_BIT(10),
+    UCC_TEAM_PARAM_FIELD_RESOURCE_TYPE          = UCC_BIT(11)
 };
 
 /**
@@ -942,7 +1044,8 @@ enum ucc_team_attr_field {
     UCC_TEAM_ATTR_FIELD_EP                     = UCC_BIT(2),
     UCC_TEAM_ATTR_FIELD_EP_RANGE               = UCC_BIT(3),
     UCC_TEAM_ATTR_FIELD_SYNC_TYPE              = UCC_BIT(4),
-    UCC_TEAM_ATTR_FIELD_MEM_PARAMS             = UCC_BIT(5)
+    UCC_TEAM_ATTR_FIELD_MEM_PARAMS             = UCC_BIT(5),
+    UCC_TEAM_ATTR_FIELD_RESOURCE_TYPE          = UCC_BIT(6)
 };
 
 /**
@@ -1108,6 +1211,7 @@ typedef struct ucc_team_params {
     ucc_team_p2p_conn_t     p2p_conn;
     ucc_mem_map_params_t    mem_params;
     ucc_ep_map_t            ep_map;
+    ucc_resource_type_t     resource_type;
 } ucc_team_params_t;
 
 /**
@@ -1137,6 +1241,7 @@ typedef struct ucc_team_attr {
     ucc_ep_range_type_t    ep_range;
     ucc_coll_sync_type_t   sync_type;
     ucc_mem_map_params_t   mem_params;
+    ucc_resource_type_t    resource_type;
 } ucc_team_attr_t;
 
 
