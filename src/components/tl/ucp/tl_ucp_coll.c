@@ -119,11 +119,6 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
             tl_error(task->team->super.super.context->lib, "error in ee task post");
             return status;
         }
-    }
-
-    if (task->super.ee_task == NULL ||
-        (UCC_OK == ucc_mc_ee_task_query(task->super.ee_task, task->super.ee->ee_type)))
-    {
 
         /* TODO: mpool */
         post_event = ucc_malloc(sizeof(ucc_ev_t), "event");
@@ -136,6 +131,11 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
         post_event->ev_type = UCC_EVENT_COLLECTIVE_POST;
         post_event->ev_context_size = 0;
         ucc_ee_set_event_internal(coll_task->ee, post_event, &coll_task->ee->event_out_queue);
+    }
+
+    if (task->super.ee_task == NULL ||
+        (UCC_OK == ucc_mc_ee_task_query(task->super.ee_task, task->super.ee->ee_type)))
+    {
         task->super.super.status = UCC_OK;
     }
 
@@ -153,13 +153,19 @@ ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_
     ev_task->super.finalize = ucc_tl_ucp_coll_finalize;
     ev_task->super.super.status = UCC_INPROGRESS;
 
+    tl_info(task->team->super.super.context->lib, "triggered post. task:%p", coll_task);
     ev_task->super.progress = ucc_tl_ucp_ee_wait_for_event_trigger;
     ucc_event_manager_init(&ev_task->super.em);
     coll_task->handlers[UCC_EVENT_COMPLETED] = ucc_tl_ucp_event_trigger_complete;
     ucc_event_manager_subscribe(&ev_task->super.em, UCC_EVENT_COMPLETED, coll_task);
-    ucc_progress_enqueue(UCC_TL_UCP_TEAM_CORE_CTX(ev_task->team)->pq, &ev_task->super);
 
-    tl_info(task->team->super.super.context->lib, "triggered post. task:%p", coll_task);
+    ucc_tl_ucp_ee_wait_for_event_trigger(&ev_task->super);
+    if (ev_task->super.super.status == UCC_OK) {
+        ucc_tl_ucp_event_trigger_complete(&ev_task->super, coll_task);
+        ucc_tl_ucp_put_task(ev_task);
+        return UCC_OK;
+    }
+    ucc_progress_enqueue(UCC_TL_UCP_TEAM_CORE_CTX(ev_task->team)->pq, &ev_task->super);
 
     return UCC_OK;
 }
