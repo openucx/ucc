@@ -98,13 +98,37 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
                                   const ucc_team_params_t *params,
                                   ucc_team_h *new_team)
 {
+    ucc_rank_t   team_size = 0;
     ucc_team_t  *team;
     ucc_status_t status;
+
     if (num_contexts < 1) {
         return UCC_ERR_INVALID_PARAM;
     } else if (num_contexts > 1) {
         ucc_error("team creation from multiple contexts is not supported yet");
         return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (params->mask & UCC_TEAM_PARAM_FIELD_TEAM_SIZE) {
+        team_size = (ucc_rank_t)params->team_size;
+        //TODO check it is not too big
+    }
+    if (params->mask & UCC_TEAM_PARAM_FIELD_OOB) {
+        if (team_size > 0 && params->oob.participants != team_size) {
+            ucc_error(
+                "inconsistent team_sizes provided as params.team_size %llu "
+                "and params.oob.participants %llu",
+                (unsigned long long)params->team_size,
+                (unsigned long long)params->oob.participants);
+            return UCC_ERR_INVALID_PARAM;
+        }
+        team_size = (ucc_rank_t)params->oob.participants;
+        //TODO check it is not too big
+    }
+    if (team_size < 2) {
+        ucc_warn("minimal size of UCC team is 2, provided %llu",
+                 (unsigned long long)team_size);
+        return UCC_ERR_INVALID_PARAM;
     }
     team = ucc_malloc(sizeof(ucc_team_t), "ucc_team");
     if (!team) {
@@ -117,7 +141,8 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     team->service_team = NULL;
     team->task         = NULL;
     team->id           = 0;
-    team->contexts =
+    team->size         = 0;
+    team->contexts     =
         ucc_malloc(sizeof(ucc_context_t *) * num_contexts, "ucc_team_ctx");
     if (!team->contexts) {
         ucc_error("failed to allocate %zd bytes for ucc team contexts array",
