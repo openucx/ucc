@@ -20,11 +20,13 @@
 
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
+    char                      *score_str;
 } ucc_base_lib_t;
 
 typedef struct ucc_base_config {
     ucc_config_global_list_entry_t *cfg_entry;
     ucc_log_component_config_t      log_component;
+    char                           *score_str;
 } ucc_base_config_t;
 
 typedef struct ucc_base_attr_t {
@@ -85,21 +87,28 @@ typedef struct ucc_base_team {
     ucc_base_context_t *context;
 } ucc_base_team_t;
 
+typedef struct ucc_coll_score ucc_coll_score_t;
 typedef struct ucc_base_team_iface {
     ucc_status_t (*create_post)(ucc_base_context_t *context,
                                 const ucc_base_team_params_t *params,
                                 ucc_base_team_t **team);
     ucc_status_t (*create_test)(ucc_base_team_t *team);
     ucc_status_t (*destroy)(ucc_base_team_t *team);
+    ucc_status_t (*get_scores)(ucc_base_team_t *team, ucc_coll_score_t **score);
 } ucc_base_team_iface_t;
 
+typedef struct ucc_team ucc_team_t;
 typedef struct ucc_base_coll_args {
     ucc_coll_args_t args;
+    ucc_team_t     *team;
 } ucc_base_coll_args_t;
 
+typedef ucc_status_t (*ucc_base_coll_init_fn_t)(ucc_base_coll_args_t *coll_args,
+                                                ucc_base_team_t      *team,
+                                                ucc_coll_task_t     **task);
+
 typedef struct ucc_base_coll_iface {
-    ucc_status_t (*init)(ucc_base_coll_args_t *coll_args,
-                         ucc_base_team_t *team, ucc_coll_task_t **task);
+    ucc_base_coll_init_fn_t init;
 } ucc_base_coll_iface_t;
 
 ucc_status_t ucc_base_config_read(const char *full_prefix,
@@ -141,6 +150,7 @@ static inline void ucc_base_config_release(ucc_base_config_t *config)
             UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_team_t),                 \
         .super.team.create_test = ucc_##_f##_name##_team_create_test,          \
         .super.team.destroy     = ucc_##_f##_name##_team_destroy,              \
+        .super.team.get_scores  = ucc_##_f##_name##_team_get_scores,           \
         .super.coll.init        = ucc_##_f##_name##_coll_init};                \
     UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_##_f##_name.super._f##lib_config,     \
                                     &ucc_config_global_list);                  \

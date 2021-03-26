@@ -10,6 +10,9 @@ ucc_config_field_t ucc_base_config_table[] = {
      "poll.",
      ucc_offsetof(ucc_base_config_t, log_component), UCC_CONFIG_TYPE_LOG_COMP},
 
+    {"COLL_SCORE", "", "description",
+     ucc_offsetof(ucc_base_config_t, score_str), UCC_CONFIG_TYPE_STRING},
+
     {NULL}};
 
 ucc_status_t ucc_base_config_read(const char *full_prefix,

@@ -27,6 +27,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_lib_t, ucc_tl_iface_t *tl_iface,
     ucc_strncpy_safe(self->super.log_component.name,
                      tl_iface->tl_lib_config.name,
                      sizeof(self->super.log_component.name));
+    self->super.score_str = strdup(tl_config->super.score_str);
     return UCC_OK;
 }
 

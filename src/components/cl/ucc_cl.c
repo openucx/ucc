@@ -41,6 +41,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
                      sizeof(self->super.log_component.name));
     self->priority =
         (-1 == cl_config->priority) ? default_priority : cl_config->priority;
+    self->super.score_str = cl_config->super.score_str;
     return UCC_OK;
 }
 
