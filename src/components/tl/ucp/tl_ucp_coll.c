@@ -67,17 +67,22 @@ static ucc_status_t ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_ta
                                                       ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_status_t status;
 
     tl_info(task->team->super.super.context->lib, "event triggered. task:%p", coll_task);
 
     coll_task->ee_task = parent_task->ee_task;
-    coll_task->post(coll_task);
+    status = coll_task->post(coll_task);
+    if (status != UCC_OK) {
+        tl_error(task->team->super.super.context->lib,
+                 "Failed post the triggered collecitve. task:%p", coll_task);
+        return status;
+    }
+
     if (coll_task->super.status == UCC_OK) {
         return ucc_tl_ucp_triggered_coll_complete(coll_task, coll_task);
     } else {
-
         ucc_assert(coll_task->super.status = UCC_INPROGRESS);
-
         if (coll_task->ee_task) {
             ucc_event_manager_init(&coll_task->em);
             coll_task->handlers[UCC_EVENT_COMPLETED] = ucc_tl_ucp_triggered_coll_complete;
@@ -117,6 +122,7 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
                                      task->super.ee->ee_type, &task->super.ee_task);
         if (status != UCC_OK) {
             tl_error(task->team->super.super.context->lib, "error in ee task post");
+            task->super.super.status = status;
             return status;
         }
 
@@ -130,6 +136,7 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
 
         post_event->ev_type = UCC_EVENT_COLLECTIVE_POST;
         post_event->ev_context_size = 0;
+        post_event->req = &coll_task->triggered_task->super;
         ucc_ee_set_event_internal(coll_task->ee, post_event, &coll_task->ee->event_out_queue);
     }
 
@@ -139,16 +146,18 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
         task->super.super.status = UCC_OK;
     }
 
-    return task->super.super.status;
+    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_task_t *ev_task  = ucc_tl_ucp_get_task(task->team);
+    ucc_status_t status;
 
     ev_task->super.ee = ee;
     ev_task->super.ev = NULL;
+    ev_task->super.triggered_task = coll_task;
     ev_task->super.flags = UCC_COLL_TASK_FLAG_INTERNAL;
     ev_task->super.finalize = ucc_tl_ucp_coll_finalize;
     ev_task->super.super.status = UCC_INPROGRESS;
@@ -159,7 +168,10 @@ ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_
     coll_task->handlers[UCC_EVENT_COMPLETED] = ucc_tl_ucp_event_trigger_complete;
     ucc_event_manager_subscribe(&ev_task->super.em, UCC_EVENT_COMPLETED, coll_task);
 
-    ucc_tl_ucp_ee_wait_for_event_trigger(&ev_task->super);
+    status = ucc_tl_ucp_ee_wait_for_event_trigger(&ev_task->super);
+    if (status != UCC_OK) {
+        return status;
+    }
     if (ev_task->super.super.status == UCC_OK) {
         ucc_tl_ucp_event_trigger_complete(&ev_task->super, coll_task);
         ucc_tl_ucp_put_task(ev_task);

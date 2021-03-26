@@ -23,10 +23,23 @@ typedef enum ucc_mc_cuda_task_stream_type {
     UCC_MC_CUDA_INTERNAL_STREAM
 } ucc_mc_cuda_task_stream_type_t;
 
-enum ucc_mcc_task_status {
+typedef enum ucc_mc_task_status {
     UCC_MC_CUDA_TASK_POSTED,
     UCC_MC_CUDA_TASK_STARTED
-};
+} ucc_mc_task_status_t;
+
+static inline ucc_status_t cuda_error_to_ucc_status(cudaError_t cu_err)
+{
+    switch(cu_err) {
+    case cudaSuccess:
+        return UCC_OK;
+    case cudaErrorNotReady:
+        return UCC_INPROGRESS;
+    default:
+        break;
+    }
+    return UCC_ERR_NO_MESSAGE;
+}
 
 typedef ucc_status_t (*ucc_mc_cuda_task_post_fn) (uint32_t *dev_status,
                                                   cudaStream_t stream);

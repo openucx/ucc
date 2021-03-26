@@ -9,7 +9,7 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
-static const char *strm_task_modes[] = {
+static const char *stream_task_modes[] = {
     [UCC_MC_CUDA_TASK_KERNEL]  = "kernel",
     [UCC_MC_CUDA_TASK_MEM_OPS] = "driver",
     [UCC_MC_CUDA_TASK_AUTO]    = "auto",
@@ -30,16 +30,16 @@ static ucc_config_field_t ucc_mc_cuda_config_table[] = {
      UCC_CONFIG_TYPE_ULUNITS},
 
     {"STREAM_TASK_MODE", "auto",
-     "Mechanishm to to create stream dependancy."
-     "kernel - use waiting kernel"
-     "driver - use driver MEM_OPS"
+     "Mechanism to create stream dependency\n"
+     "kernel - use waiting kernel\n"
+     "driver - use driver MEM_OPS\n"
      "auto   - runtime automatically chooses best one",
      ucc_offsetof(ucc_mc_cuda_config_t, strm_task_mode),
-     UCC_CONFIG_TYPE_ENUM(strm_task_modes)},
+     UCC_CONFIG_TYPE_ENUM(stream_task_modes)},
 
     {"TASK_STREAM", "user",
-     "Stream for cuda task"
-     "user - user stream provided in execution engine context"
+     "Stream for cuda task\n"
+     "user - user stream provided in execution engine context\n"
      "ucc  - ucc library internal stream",
      ucc_offsetof(ucc_mc_cuda_config_t, task_strm_type),
      UCC_CONFIG_TYPE_ENUM(task_stream_types)},
@@ -95,7 +95,6 @@ static void ucc_mc_cuda_event_cleanup(ucs_mpool_t *mp, void *obj)
     if (cudaSuccess != cudaEventDestroy(base->event)) {
         mc_error(&ucc_mc_cuda.super, "cudaEventDestroy Failed");
     }
-
 }
 
 static ucs_mpool_ops_t ucc_mc_cuda_event_mpool_ops = {
@@ -127,7 +126,7 @@ static ucc_status_t ucc_mc_cuda_post_driver_stream_task(uint32_t *status,
 static ucc_status_t ucc_mc_cuda_init()
 {
     struct cudaDeviceProp prop;
-    ucc_status_t status;
+    ucs_status_t status;
     int device;
     CUdevice cu_dev;
     int mem_ops_attr;
@@ -150,18 +149,18 @@ static ucc_status_t ucc_mc_cuda_init()
     status = ucs_mpool_init(&ucc_mc_cuda.events, 0, sizeof(ucc_mc_cuda_event_t),
                             0, UCC_CACHE_LINE_SIZE, 16, UINT_MAX,
                             &ucc_mc_cuda_event_mpool_ops, "CUDA Event Objects");
-    if (status != UCC_OK) {
+    if (status != UCS_OK) {
         mc_error(&ucc_mc_cuda.super, "Error to create event pool");
-        return status;
+        return ucs_status_to_ucc_status(status);
     }
 
     /* create request pool */
     status = ucs_mpool_init(&ucc_mc_cuda.strm_reqs, 0, sizeof(ucc_mc_cuda_stream_request_t),
                             0, UCC_CACHE_LINE_SIZE, 16, UINT_MAX,
                             &ucc_mc_cuda_stream_req_mpool_ops, "CUDA Event Objects");
-    if (status != UCC_OK) {
+    if (status != UCS_OK) {
         mc_error(&ucc_mc_cuda.super, "Error to create event pool");
-        return status;
+        return ucs_status_to_ucc_status(status);
     }
 
     if (cfg->strm_task_mode == UCC_MC_CUDA_TASK_KERNEL) {
@@ -437,15 +436,7 @@ ucc_status_t ucc_ee_cuda_event_test(void *event)
     cudaError_t cu_err;
 
     cu_err = cudaEventQuery((cudaEvent_t)event);
-    switch(cu_err) {
-    case cudaSuccess:
-        return UCC_OK;
-    case cudaErrorNotReady:
-        return UCC_INPROGRESS;
-    default:
-        return UCC_ERR_NO_MESSAGE;
-    }
-    return UCC_OK;
+    return cuda_error_to_ucc_status(cu_err);
 }
 
 ucc_mc_cuda_t ucc_mc_cuda = {
