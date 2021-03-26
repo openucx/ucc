@@ -26,7 +26,7 @@ libucc_la_CPPFLAGS = $(AM_CPPFLAGS)
 libucc_la_CFLAGS   = -c
 libucc_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed
 
-nobase_dist_libucc_la_HEADERS = 	\
+nobase_dist_libucc_la_HEADERS =	\
 	ucc/api/ucc.h                   \
 	ucc/api/ucc_def.h               \
 	ucc/api/ucc_version.h           \
@@ -41,6 +41,7 @@ noinst_HEADERS =                     \
 	core/ucc_ee.h                    \
 	core/ucc_progress_queue.h        \
 	schedule/ucc_schedule.h          \
+	coll_select/coll_select.h        \
 	utils/ucc_compiler_def.h         \
 	utils/ucc_log.h                  \
 	utils/ucc_parser.h               \
@@ -48,8 +49,9 @@ noinst_HEADERS =                     \
 	utils/ucc_datastruct.h           \
 	utils/ucc_math.h                 \
 	utils/ucc_coll_utils.h           \
-	utils/ucc_list.h				 \
-	utils/ucc_queue.h				 \
+	utils/ucc_list.h                 \
+	utils/ucc_string.h               \
+	utils/ucc_queue.h                \
 	utils/ucc_proc_info.h            \
 	utils/khash.h                    \
 	utils/ucc_spinlock.h             \
@@ -77,11 +79,15 @@ libucc_la_SOURCES =                  \
 	core/ucc_progress_queue_st.c     \
 	core/ucc_progress_queue_mt.c     \
 	schedule/ucc_schedule.c          \
+	coll_select/coll_select.c        \
+	coll_select/score_map.c          \
 	utils/ucc_component.c            \
 	utils/ucc_status.c               \
 	utils/ucc_mpool.c                \
 	utils/ucc_math.c                 \
 	utils/ucc_proc_info.c            \
+	utils/ucc_string.c               \
+	utils/ucc_coll_utils.c           \
 	components/base/ucc_base_iface.c \
 	components/cl/ucc_cl.c           \
 	components/tl/ucc_tl.c           \

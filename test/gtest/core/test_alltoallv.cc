@@ -137,21 +137,17 @@ UCC_TEST_P(test_alltoallv_1, single)
     data_fini(args);
 }
 
-
 INSTANTIATE_TEST_CASE_P(
-        64,
-        test_alltoallv_0,
+        64, test_alltoallv_0,
         ::testing::Combine(
             ::testing::Range(1, UccJob::nStaticTeams), // team_ids
             ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_FLOAT64 + 1))); // dtype
 
 INSTANTIATE_TEST_CASE_P(
-        32,
-        test_alltoallv_1,
+        32, test_alltoallv_1,
         ::testing::Combine(
             ::testing::Range(1, UccJob::nStaticTeams), // team_ids
             ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_FLOAT64 + 1))); // dtype
-
 
 class test_alltoallv_2 : public test_alltoallv<uint64_t>,
         public ::testing::WithParamInterface<int> {};
