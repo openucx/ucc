@@ -8,6 +8,7 @@
 #define UCC_TL_UCP_H_
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
+#include "core/ucc_ee.h"
 #include "utils/ucc_mpool.h"
 #include "tl_ucp_ep_hash.h"
 #include <ucp/api/ucp.h>
