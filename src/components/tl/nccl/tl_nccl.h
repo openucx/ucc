@@ -83,4 +83,7 @@ UCC_CLASS_DECLARE(ucc_tl_nccl_team_t, ucc_base_context_t *,
         }                                                                      \
     } while (0)
 
+#define UCC_TL_NCCL_TEAM_LIB(_team)                                            \
+    (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_nccl_lib_t))
+
 #endif

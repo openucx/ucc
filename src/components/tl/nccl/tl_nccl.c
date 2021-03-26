@@ -41,9 +41,13 @@ UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_nccl_team_t, ucc_base_team_t,
                           ucc_base_context_t *, const ucc_base_team_params_t *);
 
 ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team);
+
 ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team);
+
 ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *team,
                                    ucc_coll_task_t **task);
 
+ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
+                                         ucc_coll_score_t **score_p);
 UCC_TL_IFACE_DECLARE(nccl, NCCL);
