@@ -89,6 +89,7 @@ ucc_status_t ucc_cl_basic_team_destroy(ucc_base_team_t *cl_team)
         status = team->team_create_req->descs[1].status;
     }
     ucc_team_multiple_req_free(team->team_create_req);
+    ucc_coll_score_free_map(team->score_map);
     UCC_CLASS_DELETE_FUNC_NAME(ucc_cl_basic_team_t)(cl_team);
     return status;
 }
@@ -98,7 +99,7 @@ ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)
     ucc_cl_basic_team_t    *team = ucc_derived_of(cl_team, ucc_cl_basic_team_t);
     ucc_cl_basic_context_t *ctx  = UCC_CL_BASIC_TEAM_CTX(team);
     ucc_status_t            status;
-
+    ucc_coll_score_t       *tl_ucp_score, *tl_nccl_score, *score;
     status = ucc_tl_team_create_multiple(team->team_create_req);
     if (status == UCC_OK) {
         team->tl_ucp_team = NULL;
@@ -120,6 +121,42 @@ ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)
         status            = team->team_create_req->descs[0].status;
         ucc_team_multiple_req_free(team->team_create_req);
         team->team_create_req = NULL;
+
+        status =
+            UCC_TL_CTX_IFACE(ctx->tl_ucp_ctx)
+                ->team.get_scores(&team->tl_ucp_team->super, &tl_ucp_score);
+        if (UCC_OK != status) {
+            cl_error(ctx->super.super.lib, "failed to get tl ucp scores");
+            return status;
+        }
+        score = tl_ucp_score;
+        if (team->tl_nccl_team) {
+            status = UCC_TL_CTX_IFACE(ctx->tl_nccl_ctx)
+                         ->team.get_scores(&team->tl_nccl_team->super,
+                                           &tl_nccl_score);
+            if (UCC_OK != status) {
+                cl_error(ctx->super.super.lib, "failed to get tl nccl scores");
+                ucc_coll_score_free(tl_ucp_score);
+                return status;
+            }
+            status =
+                ucc_coll_score_merge(tl_ucp_score, tl_nccl_score, &score, 1);
+            if (UCC_OK != status) {
+                cl_error(ctx->super.super.lib,
+                         "failed to merge TL ucp and nccl scores");
+                return status;
+            }
+        }
+        status = ucc_coll_score_build_map(score, &team->score_map);
+        if (UCC_OK != status) {
+            cl_error(ctx->super.super.lib, "failed to build score map");
+        }
     }
     return status;
+}
+
+ucc_status_t ucc_cl_basic_team_get_scores(ucc_base_team_t *cl_team, /* NOLINT */
+                                          ucc_coll_score_t **score) /* NOLINT */
+{
+    return UCC_ERR_NOT_IMPLEMENTED;
 }

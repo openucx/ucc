@@ -9,7 +9,7 @@
 #include "components/cl/ucc_cl.h"
 #include "components/cl/ucc_cl_log.h"
 #include "components/tl/ucc_tl.h"
-
+#include "coll_select/coll_select.h"
 #define UCC_CL_BASIC_DEFAULT_PRIORITY 10
 #define UCC_CL_BASIC_NUM_TLS 2
 
@@ -47,6 +47,7 @@ typedef struct ucc_cl_basic_team {
     ucc_team_multiple_req_t *team_create_req;
     ucc_tl_team_t           *tl_ucp_team;
     ucc_tl_team_t           *tl_nccl_team;
+    ucc_score_map_t         *score_map;
 } ucc_cl_basic_team_t;
 UCC_CLASS_DECLARE(ucc_cl_basic_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
