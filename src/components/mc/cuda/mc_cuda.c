@@ -410,15 +410,14 @@ ucc_status_t ucc_ee_cuda_create_event(void **event)
 
     cuda_event = ucs_mpool_get(&ucc_mc_cuda.events);
     ucc_assert(cuda_event);
-    *event = cuda_event->event;
+    *event = cuda_event;
     return UCC_OK;
 }
 
 ucc_status_t ucc_ee_cuda_destroy_event(void *event)
 {
-    ucc_mc_cuda_event_t *cuda_event;
+    ucc_mc_cuda_event_t *cuda_event = event;
 
-    cuda_event = ucc_container_of(event, ucc_mc_cuda_event_t, event);
     ucs_mpool_put(cuda_event);
     return UCC_OK;
 }
@@ -426,16 +425,18 @@ ucc_status_t ucc_ee_cuda_destroy_event(void *event)
 ucc_status_t ucc_ee_cuda_event_post(void *ee_context, void *event)
 {
     cudaStream_t stream = (cudaStream_t )ee_context;
+    ucc_mc_cuda_event_t *cuda_event = event;
 
-    CUDACHECK(cudaEventRecord((cudaEvent_t)event, stream));
+    CUDACHECK(cudaEventRecord(cuda_event->event, stream));
     return UCC_OK;
 }
 
 ucc_status_t ucc_ee_cuda_event_test(void *event)
 {
     cudaError_t cu_err;
+    ucc_mc_cuda_event_t *cuda_event = event;
 
-    cu_err = cudaEventQuery((cudaEvent_t)event);
+    cu_err = cudaEventQuery(cuda_event->event);
     return cuda_error_to_ucc_status(cu_err);
 }
 

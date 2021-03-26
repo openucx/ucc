@@ -30,6 +30,14 @@ ucc_status_t ucc_mc_ee_task_query(void *ee_task, ucc_ee_type_t ee_type);
 
 ucc_status_t ucc_mc_ee_task_end(void *ee_task, ucc_ee_type_t ee_type);
 
+ucc_status_t ucc_mc_ee_create_event(void **event, ucc_ee_type_t ee_type);
+
+ucc_status_t ucc_mc_ee_destroy_event(void *event, ucc_ee_type_t ee_type);
+
+ucc_status_t ucc_mc_ee_event_post(void *ee_context, void *event, ucc_ee_type_t ee_type);
+
+ucc_status_t ucc_mc_ee_event_test(void *event, ucc_ee_type_t ee_type);
+
 ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
                            size_t count, ucc_datatype_t dt,
                            ucc_reduction_op_t op, ucc_memory_type_t mem_type);

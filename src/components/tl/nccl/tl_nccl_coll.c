@@ -5,6 +5,8 @@
  */
 
 #include "tl_nccl_coll.h"
+#include "core/ucc_mc.h"
+#include "core/ucc_ee.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 
@@ -57,26 +59,19 @@ static inline ucc_status_t ucc_nccl_check_dt_supported(ucc_datatype_t dt1,
 ucc_status_t ucc_tl_nccl_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    cudaError_t cuda_st;
+    ucc_status_t status;
 
-    cuda_st = cudaEventQuery(task->completed);
-    switch (cuda_st) {
-    case cudaSuccess:
-        coll_task->super.status = UCC_OK;
-        return UCC_OK;
-    case cudaErrorNotReady:
-        return UCC_INPROGRESS;
-    default:
-        coll_task->super.status = UCC_ERR_NO_MESSAGE;
-        return coll_task->super.status;
-    }
+    status = ucc_mc_ee_event_test(task->completed, UCC_EE_CUDA_STREAM);
+    coll_task->super.status = status;
+    return status;
 }
 
 ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
-    cudaStream_t        stream = team->stream;
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     ucc_rank_t          gsize  = team->size;
     ucc_status_t        status = UCC_OK;
     ptrdiff_t           sbuf   = (ptrdiff_t)task->args.src.info.buffer;
@@ -101,8 +96,7 @@ ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
-                   UCC_TL_TEAM_LIB(team));
+    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -134,7 +128,8 @@ ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
-    cudaStream_t        stream = team->stream;
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     ucc_status_t        status = UCC_OK;
     ptrdiff_t           sbuf   = (ptrdiff_t)task->args.src.info_v.buffer;
     ptrdiff_t           rbuf   = (ptrdiff_t)task->args.dst.info_v.buffer;
@@ -168,8 +163,7 @@ ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
         }
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
-                   UCC_TL_TEAM_LIB(team));
+    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -201,11 +195,12 @@ ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     void               *dst    = task->args.dst.info.buffer;
     void               *src    = UCC_IS_INPLACE(task->args) ?
                                     task->args.dst.info.buffer:
                                     task->args.src.info.buffer;
-    cudaStream_t        stream = team->stream;
     ucc_status_t        status = UCC_OK;
     ncclDataType_t      dt     = ucc_to_nccl_dtype[
                                     task->args.src.info.datatype];
@@ -217,8 +212,7 @@ ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
     NCCLCHECK_GOTO(ncclAllReduce(src, dst, count, dt, op, team->nccl_comm,
                                  stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
-                   UCC_TL_TEAM_LIB(team));
+    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -252,21 +246,21 @@ ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     void               *dst    = task->args.dst.info.buffer;
     void               *src    = UCC_IS_INPLACE(task->args) ?
                                     task->args.dst.info.buffer:
                                     task->args.src.info.buffer;
     ncclDataType_t      dt     = ucc_to_nccl_dtype[
                                     task->args.dst.info.datatype];
-    cudaStream_t        stream = team->stream;
     ucc_status_t        status = UCC_OK;
     size_t              count  = task->args.dst.info.count;
 
     task->super.super.status = UCC_INPROGRESS;
     NCCLCHECK_GOTO(ncclAllGather(src, dst, count, dt, team->nccl_comm, stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
-                   UCC_TL_TEAM_LIB(team));
+    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -298,7 +292,8 @@ ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
-    cudaStream_t        stream = team->stream;
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     ucc_status_t        status = UCC_OK;
     void               *sbuf   = task->args.src.info.buffer;
     ptrdiff_t           rbuf   = (ptrdiff_t)task->args.dst.info_v.buffer;
@@ -330,8 +325,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
         }
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
-                   UCC_TL_TEAM_LIB(team));
+    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -363,10 +357,11 @@ ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_tl_nccl_team_t *team   = task->team;
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     void               *src    = task->args.src.info.buffer;
     ncclDataType_t      dt     = ucc_to_nccl_dtype[
                                     task->args.src.info.datatype];
-    cudaStream_t        stream = team->stream;
     ucc_status_t        status = UCC_OK;
     size_t              count  = task->args.src.info.count;
     ucc_rank_t          root   = task->args.root;
@@ -375,8 +370,7 @@ ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
     NCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->nccl_comm,
                                  stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
-    CUDACHECK_GOTO(cudaEventRecord(task->completed, stream), exit_coll, status,
-                   UCC_TL_TEAM_LIB(team));
+    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);

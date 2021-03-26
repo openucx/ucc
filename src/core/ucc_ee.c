@@ -38,7 +38,8 @@ ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params_t *params,
     ucc_queue_head_init(&ee->event_out_queue);
     *ee_p = ee;
 
-    ucc_info("ucc_ee_create: ee is created ");
+    ucc_info("ucc_ee_create: ee is created ee:%p ee_context:%p",
+              ee, params->ee_context);
 
     return UCC_OK;
 }
@@ -48,7 +49,7 @@ ucc_status_t ucc_ee_destroy(ucc_ee_h ee)
     ucc_spinlock_destroy(&ee->lock);
     ucc_free(ee);
 
-    ucc_info("ucc_ee_create: ee is destroyed ");
+    ucc_info("ucc_ee_create: ee is destroyed. ee:%p", ee);
 
     return UCC_OK;
 }
