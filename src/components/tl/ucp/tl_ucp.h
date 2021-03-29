@@ -46,7 +46,6 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
 typedef struct ucc_tl_ucp_addr_storage ucc_tl_ucp_addr_storage_t;
 
 typedef struct ucc_tl_ucp_ep_close_state {
-    ucc_rank_t ep;
     void      *close_req;
 } ucc_tl_ucp_ep_close_state_t;
 
@@ -57,10 +56,8 @@ typedef struct ucc_tl_ucp_context {
     ucp_worker_h                ucp_worker;
     size_t                      ucp_addrlen;
     ucp_address_t              *worker_address;
-    ucp_ep_h                   *eps;
     ucc_tl_ucp_ep_close_state_t ep_close_state;
     ucc_mpool_t                 req_mp;
-    ucc_tl_ucp_addr_storage_t  *addr_storage;
     tl_ucp_ep_hash_t           *ep_hash;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
@@ -73,7 +70,6 @@ typedef struct ucc_tl_ucp_team {
     ucc_rank_t                 size;
     ucc_rank_t                 rank;
     ucc_tl_ucp_addr_storage_t *addr_storage;
-    int                        ctx_addr_exchange;
     uint32_t                   id;
     uint32_t                   scope;
     uint32_t                   scope_id;

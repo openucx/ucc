@@ -27,25 +27,11 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_connect_ctx_ep(ucc_tl_ucp_context_t *ctx, ucc_rank_t ctx_rank)
-{
-    return ucc_tl_ucp_connect_ep(ctx, &ctx->eps[ctx_rank],
-                                 (char*)ctx->addr_storage->addresses,
-                                 ctx->addr_storage->max_addrlen, ctx_rank);
-}
-
 ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team, ucc_rank_t team_rank,
                                         ucc_context_id_t key, ucp_ep_h *ep)
 {
     ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_status_t status;
-    if (ctx->eps) {
-        int ctx_rank = -1; //TODO map to ctx rank
-        ucc_assert(0);
-        status = ucc_tl_ucp_connect_ctx_ep(ctx, ctx_rank);
-        *ep = ctx->eps[0]; //TODO map
-        return status;
-    }
+    ucc_status_t          status;
     status = ucc_tl_ucp_connect_ep(ctx, ep,
                                    (char*)team->addr_storage->addresses,
                                    team->addr_storage->max_addrlen, team_rank);
@@ -68,11 +54,8 @@ ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx)
         }
         ucp_request_free(state->close_req);
     }
-    while (1) {
-        ep = tl_ucp_hash_pop(ctx->ep_hash);
-        if (NULL == ep) {
-            break;
-        }
+    ep = tl_ucp_hash_pop(ctx->ep_hash);
+    while (ep) {
         state->close_req =
             ucp_ep_close_nb(ep, UCP_EP_CLOSE_MODE_FLUSH);
         if (UCS_PTR_IS_ERR(state->close_req)) {
@@ -89,6 +72,7 @@ ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx)
             }
             ucp_request_free(state->close_req);
         }
+        ep = tl_ucp_hash_pop(ctx->ep_hash);
     }
     state->close_req = NULL;
     return UCC_OK;

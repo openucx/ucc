@@ -29,8 +29,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                               params->context);
     memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
     self->ep_close_state.close_req = NULL;
-    self->ep_close_state.ep        = 0;
-    self->eps                      = NULL;
     status = ucp_config_read(params->prefix, NULL, &ucp_config);
     if (UCS_OK != status) {
         tl_error(self->super.super.lib, "failed to read ucp configuration, %s",
@@ -132,9 +130,15 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     ucc_status_t status;
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
     while (UCC_OK != (status = ucc_tl_ucp_close_eps(self))) {
-        ; //TODO can we hang the runtime this way ?
+        //TODO can we hang the runtime this way ?
+        if (status < 0) {
+            tl_error(self->super.super.lib,
+                     "failed to close ucp endpoint: %s",
+                     ucc_status_string(status));
+            break;
+        }
     }
-	kh_destroy(tl_ucp_ep_hash, self->ep_hash);
+    kh_destroy(tl_ucp_ep_hash, self->ep_hash);
     ucc_context_progress_deregister(
         self->super.super.ucc_context,
         (ucc_context_progress_fn_t)ucp_worker_progress, self->ucp_worker);

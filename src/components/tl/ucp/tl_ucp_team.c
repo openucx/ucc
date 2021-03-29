@@ -20,7 +20,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super);
     /* TODO: init based on ctx settings and on params: need to check
              if all the necessary ranks mappings are provided */
-    self->ctx_addr_exchange  = 0;
     self->addr_storage       = NULL;
     self->preconnect_task    = NULL;
     self->size               = params->params.oob.participants;
@@ -29,17 +28,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->rank               = params->rank;
     self->id                 = params->id;
     self->seq_num            = 0;
-
-    if (self->ctx_addr_exchange) {
-        self->status = UCC_OK;
-    } else {
-        self->status = UCC_INPROGRESS;
-        status       = ucc_tl_ucp_addr_exchange_start(ctx, params->params.oob,
-                                                      &self->addr_storage);
-        if (status == UCC_INPROGRESS) {
-            /* exchange started but not complete return UCC_OK from post */
-            status = UCC_OK;
-        }
+    self->status             = UCC_INPROGRESS;
+    status                   = ucc_tl_ucp_addr_exchange_start(ctx,
+                                                   params->params.oob,
+                                                  &self->addr_storage);
+    if (status == UCC_INPROGRESS) {
+        /* exchange started but not complete return UCC_OK from post */
+        status = UCC_OK;
     }
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return status;

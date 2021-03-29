@@ -423,8 +423,8 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     }
     ucc_progress_queue_finalize(context->pq);
     ucc_free(context->tl_ctx);
-    ucc_free(context);
     ucc_free(context->ids.pool);
+    ucc_free(context);
     return UCC_OK;
 }
 
