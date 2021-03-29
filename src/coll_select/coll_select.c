@@ -361,6 +361,57 @@ static ucc_status_t str_to_score(const char *str, ucc_score_t *score)
     return UCC_OK;
 }
 
+static ucc_status_t str_to_msgranges(const char *str, size_t **ranges,
+                                     unsigned *n_ranges)
+{
+    ucc_status_t      status = UCC_OK;
+    char            **tokens;
+    char            **tokens2;
+    unsigned          i, n_tokens, n_tokens2;
+    size_t            m1, m2;
+    tokens = ucc_str_split(str, ",");
+    if (!tokens) {
+        status = UCC_ERR_INVALID_PARAM;
+        goto out;
+    }
+    n_tokens = ucc_str_split_count(tokens);
+    *ranges = ucc_malloc(2 * n_tokens * sizeof(size_t), "ucc_msgsize_ranges");
+    if (!(*ranges)) {
+        ucc_error("failed to allocate %zd bytes for ucc_mem_types",
+                  sizeof(size_t) * 2 * n_tokens);
+        status = UCC_ERR_NO_MEMORY;
+        goto out;
+    }
+
+    for (i = 0; i < n_tokens; i++) {
+        tokens2 = ucc_str_split(tokens[i], "-");
+        if (!tokens2) {
+            goto err;
+        }
+        n_tokens2 = ucc_str_split_count(tokens2);
+        if (n_tokens2 != 2) {
+            goto err;
+        }
+        if (UCC_OK != ucc_str_to_memunits(tokens2[0], &m1) ||
+            UCC_OK != ucc_str_to_memunits(tokens2[1], &m2)) {
+            goto err;
+        }
+        ucc_str_split_free(tokens2);
+        (*ranges)[2 * i] = m1;
+        (*ranges)[2 * i + 1] = m2;
+    }
+    *n_ranges = i;
+out:
+    ucc_str_split_free(tokens);
+    return status;
+ err:
+    ucc_str_split_free(tokens2);
+    ucc_free(*ranges);
+    *ranges = NULL;
+    status  = UCC_ERR_NOT_FOUND;
+    goto out;
+}
+
 static ucc_status_t ucc_coll_score_parse_str(const char       *str,
                                              ucc_coll_score_t *score,
                                              ucc_rank_t        team_size)
@@ -368,11 +419,12 @@ static ucc_status_t ucc_coll_score_parse_str(const char       *str,
     ucc_status_t       status  = UCC_OK;
     ucc_coll_type_t   *ct      = NULL;
     ucc_memory_type_t *mt      = NULL;
+    size_t            *msg     = NULL;
     ucc_score_t        score_v = UCC_SCORE_INVALID;
     char             **tokens;
-    unsigned           i, n_tokens, ct_n, mt_n, c, m;
+    unsigned           i, n_tokens, ct_n, mt_n, c, m, n_ranges, r;
 
-    mt_n   = ct_n = 0;
+    mt_n   = ct_n = n_ranges = 0;
     tokens = ucc_str_split(str, ":");
     if (!tokens) {
         status = UCC_ERR_INVALID_PARAM;
@@ -390,6 +442,9 @@ static ucc_status_t ucc_coll_score_parse_str(const char       *str,
             UCC_OK == str_to_score(tokens[i], &score_v)) {
             continue;
         }
+        if (!msg && UCC_OK == str_to_msgranges(tokens[i], &msg, &n_ranges)) {
+            continue;
+        }
         /* if we get there then we could not match token to any field */
         status = UCC_ERR_INVALID_PARAM;
 
@@ -403,15 +458,28 @@ static ucc_status_t ucc_coll_score_parse_str(const char       *str,
             ct_n = UCC_COLL_TYPE_NUM;
         if (!mt)
             mt_n = UCC_MEMORY_TYPE_LAST;
+        if (!msg)
+            n_ranges = 1;
         for (c = 0; c < ct_n; c++) {
             for (m = 0; m < mt_n; m++) {
-                status = coll_score_add_range(score, ct ? ct[c] : UCC_BIT(c),
-                                              mt ? mt[m] : m, 0, UCC_MSG_MAX,
-                                              score_v, NULL, NULL);
+                for (r = 0; r < n_ranges; r++) {
+                    size_t m_start = 0;
+                    size_t m_end   = UCC_MSG_MAX;
+                    if (msg) {
+                        m_start = msg[r * 2];
+                        m_end   = msg[r * 2 + 1];
+                    }
+                    status = coll_score_add_range(score, ct ? ct[c] : UCC_BIT(c),
+                                                  mt ? mt[m] : m, m_start, m_end,
+                                                  score_v, NULL, NULL);
+                }
             }
         }
     }
 out:
+    ucc_free(ct);
+    ucc_free(mt);
+    ucc_free(msg);
     ucc_str_split_free(tokens);
     return status;
 }
@@ -455,24 +523,96 @@ error:
 static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
                                               ucc_list_link_t *src)
 {
-    unsigned long n1 = ucc_list_length(dest);
-    unsigned long n2 = ucc_list_length(src);
-    if (n1 == 0 || n2 == 0) {
+    ucc_list_link_t *s = src->next;
+    ucc_list_link_t *d = dest->next;
+    ucc_msg_range_t *range, *tmp, *next, *rs, *rd, *new;
+    ucc_status_t status;
+    if (ucc_list_is_empty(src) || ucc_list_is_empty(dest)) {
         return UCC_OK;
     }
-    //TODO implement actual multi-range update
-    // So far there should only be 1 entry in src: range 0 - UCC_MSG_MAX
-    ucc_msg_range_t *dest_range, *src_range, *tmp;
-    ucc_assert(n2 == 1);
-    src_range = ucc_list_head(src, ucc_msg_range_t, list_elem);
-    ucc_assert((src_range->start == 0) && (src_range->end == UCC_MSG_MAX));
-    ucc_list_for_each(dest_range, dest, list_elem) {
-        dest_range->score = src_range->score;
+    while (s != src && d != dest) {
+        rs = ucc_container_of(s, ucc_msg_range_t, list_elem);
+        rd = ucc_container_of(d, ucc_msg_range_t, list_elem);
+        if (rd->start >= rs->end) {
+            /* skip src range - no overlap */
+            s = s->next;
+        } else if (rd->end <= rs->start) {
+            /* no overlap - inverse case: skip dst range */
+            d = d->next;
+        } else if (rd->start <  rs->start) {
+            new = ucc_malloc(sizeof(*new), "ucc_msg_range");
+            if (!new) {
+                ucc_error("failed to allocate %zd bytes for ucc_msg_range",
+                          sizeof(*new));
+                status = UCC_ERR_NO_MEMORY;
+                goto out;
+            }
+            memcpy(new, rd, sizeof(*new));
+            rd->end = rs->start;
+            new->start = rs->start;
+            ucc_list_insert_after(d, &new->list_elem);
+            d = &new->list_elem;
+        } else if (rd->end <= rs->end) {
+            /* rd->start >= rs->start */
+            rd->score = rs->score;
+            d = d->next;
+        } else {
+            new = ucc_malloc(sizeof(*new), "ucc_msg_range");
+            if (!new) {
+                ucc_error("failed to allocate %zd bytes for ucc_msg_range",
+                          sizeof(*new));
+                status = UCC_ERR_NO_MEMORY;
+                goto out;
+            }
+            memcpy(new, rd, sizeof(*new));
+            rd->end = rs->end;
+            rd->score = rs->score;
+            new->start = rs->end;
+            ucc_list_insert_after(d, &new->list_elem);
+            d = &new->list_elem;
+            s = s->next;
+        }
     }
     /* remove potentially disabled ranges */
-    ucc_list_for_each_safe(dest_range, tmp, dest, list_elem) {
-        if (0 == dest_range->score) {
-            ucc_list_del(&dest_range->list_elem);
+    ucc_list_for_each_safe(range, tmp, dest, list_elem) {
+        if (0 == range->score) {
+            ucc_list_del(&range->list_elem);
+            ucc_free(range);
+        }
+    }
+
+    /* Merge consequtive ranges with the same score and same init fn
+       if any have been produced by the algorithm above */
+    ucc_list_for_each_safe(range, tmp, dest, list_elem) { //NOLINT
+        if (range->list_elem.next != dest) {
+            next = ucc_container_of(range->list_elem.next, ucc_msg_range_t,
+                                    list_elem);
+            //NOLINTNEXTLINE
+            if (range->score == next->score && range->end == next->start &&
+                range->init == next->init && range->team == next->team) {
+                next->start = range->start;
+                ucc_list_del(&range->list_elem);
+                ucc_free(range);
+            }
+        }
+    }
+    return UCC_OK;
+out:
+    return status;
+}
+
+ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
+                                   ucc_coll_score_t *update)
+{
+    ucc_status_t      status;
+    int               i, j;
+    for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
+        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
+            status = ucc_coll_score_update_one(&score->scores[i][j],
+                                               &update->scores[i][j]);
+            if (UCC_OK != status) {
+                return status;
+            }
         }
     }
     return UCC_OK;
@@ -484,22 +624,11 @@ ucc_status_t ucc_coll_score_update_from_str(const char *str,
 {
     ucc_status_t      status;
     ucc_coll_score_t *score_str;
-    int               i, j;
     status = ucc_coll_score_alloc_from_str(str, &score_str, team_size);
     if (UCC_OK != status) {
-        goto out;
+        return status;
     }
-    for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
-        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            status = ucc_coll_score_update_one(&score->scores[i][j],
-                                               &score_str->scores[i][j]);
-            if (UCC_OK != status) {
-                goto out;
-            }
-        }
-    }
-
-out:
+    status = ucc_coll_score_update(score, score_str);
     ucc_coll_score_free(score_str);
     return status;
 }

@@ -57,6 +57,9 @@ ucc_status_t ucc_coll_score_update_from_str(const char *str,
                                             ucc_coll_score_t *score,
                                             ucc_rank_t        team_size);
 
+ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
+                                   ucc_coll_score_t *update);
+
 ucc_status_t ucc_coll_score_build_default(ucc_base_team_t *team,
                                           ucc_score_t             default_score,
                                           ucc_base_coll_init_fn_t default_init,

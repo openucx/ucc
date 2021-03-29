@@ -16,4 +16,5 @@ void         ucc_str_split_free(char **split);
 
 ucc_status_t ucc_str_is_number(const char *str);
 
+ucc_status_t ucc_str_to_memunits(const char *buf, void *dest);
 #endif

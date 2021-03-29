@@ -7,7 +7,7 @@
 #include "ucc_malloc.h"
 #include "ucc_log.h"
 #include <ctype.h>
-
+#include <ucs/sys/string.h>
 char **ucc_str_split(const char *str, const char *delim)
 {
     unsigned alloc_size = 8;
@@ -94,4 +94,9 @@ ucc_status_t ucc_str_is_number(const char *str)
         }
     }
     return UCC_OK;
+}
+
+ucc_status_t ucc_str_to_memunits(const char *buf, void *dest)
+{
+    return ucs_status_to_ucc_status(ucs_str_to_memunits(buf, dest));
 }

@@ -2,15 +2,7 @@
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
-extern "C" {
-#include "coll_select/coll_select.h"
-}
-#include <common/test.h>
-#include <string>
-#include <vector>
-
-class test_score : public ucc::test {
-};
+#include "test_score.h"
 
 UCC_TEST_F(test_score, alloc_free)
 {
@@ -69,9 +61,6 @@ UCC_TEST_F(test_score, add_range_sorted)
     ucc_coll_score_free(score);
 }
 
-typedef std::tuple<size_t, size_t, ucc_score_t> range_t;
-#define RANGE(_start, _end, _score) std::make_tuple(_start, _end, _score)
-#define RLIST(...) std::vector<range_t>(__VA_ARGS__)
 
 class test_score_merge : public test_score {
   public:
@@ -87,20 +76,19 @@ class test_score_merge : public test_score {
     {
         ucc_coll_score_free(merge);
     }
-    ucc_status_t check_range(ucc_coll_score_t *score, ucc_coll_type_t c,
-                             ucc_memory_type_t m, std::vector<range_t> check);
-    void         init_score(ucc_coll_score_t *score, std::vector<range_t> v,
-                            ucc_coll_type_t c);
 };
 
-ucc_status_t test_score_merge::check_range(ucc_coll_score_t *   score,
-                                           ucc_coll_type_t      c,
-                                           ucc_memory_type_t    m,
-                                           std::vector<range_t> check)
+ucc_status_t test_score::check_range(ucc_coll_score_t *   score,
+                                     ucc_coll_type_t      c,
+                                     ucc_memory_type_t    m,
+                                     std::vector<range_t> check)
 {
     ucc_msg_range_t *range;
     ucc_list_link_t *list = &score->scores[ucc_ilog2(c)][m];
     auto             r    = check.begin();
+    if (check.size() != ucc_list_length(list)) {
+        return UCC_ERR_NO_MESSAGE;
+    }
     ucc_list_for_each(range, list, list_elem)
     {
         if (range->start != std::get<0>(*r) || range->end != std::get<1>(*r) ||
@@ -112,13 +100,13 @@ ucc_status_t test_score_merge::check_range(ucc_coll_score_t *   score,
     return UCC_OK;
 }
 
-void test_score_merge::init_score(ucc_coll_score_t *   score,
-                                  std::vector<range_t> v, ucc_coll_type_t c)
+void test_score::init_score(ucc_coll_score_t *   score,
+                            std::vector<range_t> v, ucc_coll_type_t c)
 {
     for (auto &r : v) {
         EXPECT_EQ(UCC_OK, ucc_coll_score_add_range(
-                              score, c, UCC_MEMORY_TYPE_HOST, std::get<0>(r),
-                              std::get<1>(r), std::get<2>(r), NULL, NULL));
+                      score, c, UCC_MEMORY_TYPE_HOST, std::get<0>(r),
+                      std::get<1>(r), std::get<2>(r), NULL, NULL));
     }
 }
 
