@@ -20,9 +20,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super);
     /* TODO: init based on ctx settings and on params: need to check
              if all the necessary ranks mappings are provided */
-    self->context_ep_storage = 0;
     self->addr_storage       = NULL;
-    self->eps                = NULL;
     self->preconnect_task    = NULL;
     self->size               = params->params.oob.participants;
     self->scope              = params->scope;
@@ -30,16 +28,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->rank               = params->rank;
     self->id                 = params->id;
     self->seq_num            = 0;
-    if (self->context_ep_storage) {
-        self->status = UCC_OK;
-    } else {
-        self->status = UCC_INPROGRESS;
-        status       = ucc_tl_ucp_addr_exchange_start(ctx, params->params.oob,
-                                                      &self->addr_storage);
-        if (status == UCC_INPROGRESS) {
-            /* exchange started but not complete return UCC_OK from post */
-            status = UCC_OK;
-        }
+    self->status             = UCC_INPROGRESS;
+    status                   = ucc_tl_ucp_addr_exchange_start(ctx,
+                                                   params->params.oob,
+                                                  &self->addr_storage);
+    if (status == UCC_INPROGRESS) {
+        /* exchange started but not complete return UCC_OK from post */
+        status = UCC_OK;
     }
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return status;
@@ -58,20 +53,6 @@ UCC_CLASS_DEFINE(ucc_tl_ucp_team_t, ucc_tl_team_t);
 
 ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 {
-    ucc_tl_ucp_team_t    *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_status_t          status;
-    if (team->eps) {
-        status = ucc_tl_ucp_close_eps(ctx, team->eps, team->size);
-        if (UCC_INPROGRESS == status) {
-            return status;
-        } else if (UCC_OK != status) {
-            tl_error(team->super.super.context->lib,
-                     "failed to close team eps");
-            return status;
-        }
-        ucc_free(team->eps);
-    }
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_ucp_team_t)(tl_team);
     return UCC_OK;
 }
@@ -120,19 +101,13 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     if (team->status == UCC_OK) {
         return UCC_OK;
     }
-    if (team->addr_storage && (!team->eps)) {
+    if (team->addr_storage &&
+        (team->addr_storage->state != UCC_TL_UCP_ADDR_EXCHANGE_COMPLETE)) {
         status = ucc_tl_ucp_addr_exchange_test(team->addr_storage);
         if (UCC_INPROGRESS == status) {
             return UCC_INPROGRESS;
         } else if (UCC_OK != status) {
             return status;
-        }
-        team->eps = ucc_calloc(sizeof(ucp_ep_h), team->size, "team_eps");
-        if (!team->eps) {
-            tl_error(tl_team->context->lib,
-                     "failed to allocate %zd bytes for team eps",
-                     sizeof(ucp_ep_h) * team->size);
-            return UCC_ERR_NO_MEMORY;
         }
     }
     if (team->size <= ctx->cfg.preconnect) {
@@ -149,6 +124,5 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     return UCC_OK;
 
 err_preconnect:
-    ucc_free(team->eps);
     return status;
 }

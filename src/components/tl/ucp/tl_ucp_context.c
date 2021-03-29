@@ -7,6 +7,7 @@
 #include "tl_ucp.h"
 #include "tl_ucp_tag.h"
 #include "tl_ucp_coll.h"
+#include "tl_ucp_ep.h"
 #include <limits.h>
 
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
@@ -28,7 +29,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                               params->context);
     memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
     self->ep_close_state.close_req = NULL;
-    self->ep_close_state.ep        = 0;
     status = ucp_config_read(params->prefix, NULL, &ucp_config);
     if (UCS_OK != status) {
         tl_error(self->super.super.lib, "failed to read ucp configuration, %s",
@@ -113,6 +113,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         tl_error(self->super.super.lib, "failed to register progress function");
         goto err_thread_mode;
     }
+    self->ep_hash = kh_init(tl_ucp_ep_hash);
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 
@@ -126,7 +127,18 @@ err_cfg:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
+    ucc_status_t status;
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    while (UCC_OK != (status = ucc_tl_ucp_close_eps(self))) {
+        //TODO can we hang the runtime this way ?
+        if (status < 0) {
+            tl_error(self->super.super.lib,
+                     "failed to close ucp endpoint: %s",
+                     ucc_status_string(status));
+            break;
+        }
+    }
+    kh_destroy(tl_ucp_ep_hash, self->ep_hash);
     ucc_context_progress_deregister(
         self->super.super.ucc_context,
         (ucc_context_progress_fn_t)ucp_worker_progress, self->ucp_worker);

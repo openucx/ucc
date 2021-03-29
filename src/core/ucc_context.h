@@ -9,6 +9,8 @@
 #include "ucc/api/ucc.h"
 #include "ucc_progress_queue.h"
 #include "utils/ucc_list.h"
+#include "utils/ucc_proc_info.h"
+
 typedef struct ucc_lib_info          ucc_lib_info_t;
 typedef struct ucc_cl_context        ucc_cl_context_t;
 typedef struct ucc_tl_context        ucc_tl_context_t;
@@ -25,6 +27,12 @@ typedef struct ucc_team_id_pool {
     uint32_t  pool_size;
 } ucc_team_id_pool_t;
 
+typedef struct ucc_context_id {
+    ucc_host_id_t host_id;
+    pid_t         pid;
+    uint32_t      seq_num;
+} ucc_context_id_t;
+
 typedef struct ucc_context {
     ucc_lib_info_t         *lib;
     ucc_context_params_t    params;
@@ -38,6 +46,7 @@ typedef struct ucc_context {
     ucc_list_link_t         progress_list;
     ucc_progress_queue_t   *pq;
     ucc_team_id_pool_t      ids;
+    ucc_context_id_t        id;
 } ucc_context_t;
 
 typedef struct ucc_context_config {

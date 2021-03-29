@@ -9,7 +9,7 @@
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
 #include "utils/ucc_mpool.h"
-
+#include "tl_ucp_ep_hash.h"
 #include <ucp/api/ucp.h>
 #include <ucs/memory/memory_type.h>
 
@@ -46,7 +46,6 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
 typedef struct ucc_tl_ucp_addr_storage ucc_tl_ucp_addr_storage_t;
 
 typedef struct ucc_tl_ucp_ep_close_state {
-    ucc_rank_t ep;
     void      *close_req;
 } ucc_tl_ucp_ep_close_state_t;
 
@@ -59,8 +58,7 @@ typedef struct ucc_tl_ucp_context {
     ucp_address_t              *worker_address;
     ucc_tl_ucp_ep_close_state_t ep_close_state;
     ucc_mpool_t                 req_mp;
-    ucp_ep_h                   *eps;
-    ucc_tl_ucp_addr_storage_t  *addr_storage;
+    tl_ucp_ep_hash_t           *ep_hash;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -69,12 +67,6 @@ typedef struct ucc_tl_ucp_task ucc_tl_ucp_task_t;
 typedef struct ucc_tl_ucp_team {
     ucc_tl_team_t              super;
     ucc_status_t               status;
-    int                        context_ep_storage; /*< The flag
-              indicates whether ucp endpoints are stored on the
-              ucc_tl_ucp_context or are they created per-team.
-              This optimization is only possible when user provides
-              the necessary rank mappings team_rank->context_rank. */
-    ucp_ep_h                  *eps;
     ucc_rank_t                 size;
     ucc_rank_t                 rank;
     ucc_tl_ucp_addr_storage_t *addr_storage;
