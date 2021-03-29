@@ -38,6 +38,7 @@ noinst_HEADERS =                     \
 	core/ucc_context.h               \
 	core/ucc_mc.h                    \
 	core/ucc_team.h                  \
+	core/ucc_ee.h                    \
 	core/ucc_progress_queue.h        \
 	schedule/ucc_schedule.h          \
 	utils/ucc_compiler_def.h         \
@@ -51,6 +52,7 @@ noinst_HEADERS =                     \
 	utils/ucc_queue.h				 \
 	utils/ucc_proc_info.h            \
 	utils/khash.h                    \
+	utils/ucc_spinlock.h             \
 	components/base/ucc_base_iface.h \
 	components/cl/ucc_cl.h           \
 	components/cl/ucc_cl_log.h       \
@@ -68,6 +70,7 @@ libucc_la_SOURCES =                  \
 	core/ucc_context.c               \
 	core/ucc_mc.c                    \
 	core/ucc_team.c                  \
+	core/ucc_ee.c                    \
 	core/ucc_coll.c                  \
 	core/ucc_progress_queue.c        \
 	core/ucc_progress_queue_st.c     \

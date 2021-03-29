@@ -30,11 +30,14 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
         }
         if (UCC_OK == task->super.status) {
             n_progressed++;
-            status = ucc_event_manager_notify(&task->em, UCC_EVENT_COMPLETED);
+            status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
             if (status != UCC_OK) {
                 return status;
             }
             ucc_list_del(&task->list_elem);
+            if (task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
+                task->finalize(task);
+            }
         }
     }
     return n_progressed;

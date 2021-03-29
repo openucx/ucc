@@ -25,19 +25,21 @@ void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
 ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task)
 {
     task->super.status = UCC_OPERATION_INITIALIZED;
+    task->ee           = NULL;
     return ucc_event_manager_init(&task->em);
 }
 
-ucc_status_t ucc_event_manager_notify(ucc_event_manager_t *em,
+ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event)
 {
-    ucc_coll_task_t *task;
-    ucc_status_t     status;
-    int              i;
+    ucc_event_manager_t *em = &parent_task->em;
+    ucc_coll_task_t     *task;
+    ucc_status_t        status;
+    int                 i;
 
     for (i = 0; i < em->listeners_size[event]; i++) {
         task   = em->listeners[event][i];
-        status = task->handlers[event](task);
+        status = task->handlers[event](parent_task, task);
         if (status != UCC_OK) {
             return status;
         }
@@ -45,7 +47,8 @@ ucc_status_t ucc_event_manager_notify(ucc_event_manager_t *em,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_schedule_completed_handler(ucc_coll_task_t *task)
+static ucc_status_t ucc_schedule_completed_handler(ucc_coll_task_t *parent_task,
+                                                   ucc_coll_task_t *task)
 {
     ucc_schedule_t *self = ucc_container_of(task, ucc_schedule_t, super);
     self->n_completed_tasks += 1;
@@ -78,6 +81,6 @@ void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule)
 {
     schedule->super.super.status = UCC_INPROGRESS;
-    return ucc_event_manager_notify(&schedule->super.em,
+    return ucc_event_manager_notify(&schedule->super,
                                     UCC_EVENT_SCHEDULE_STARTED);
 }
