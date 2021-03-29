@@ -25,8 +25,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_nccl_lib_t)
 UCC_CLASS_DEFINE(ucc_tl_nccl_lib_t, ucc_tl_lib_t);
 
 ucc_status_t ucc_tl_nccl_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
-                                     ucc_base_attr_t *attr)     /* NOLINT */
+                                     ucc_base_attr_t *attr)
 {
-    //TODO
-    return UCC_ERR_NOT_IMPLEMENTED;
+    ucc_tl_lib_attr_t *attr      = ucc_derived_of(attr, ucc_tl_lib_attr_t);
+    attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
+    return UCC_OK;
 }
