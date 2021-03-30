@@ -125,6 +125,35 @@ err_cfg:
     return ucc_status;
 }
 
+static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
+                                       ucc_context_oob_coll_t *oob)
+{
+    char        *rbuf = ucc_malloc(sizeof(char*) * oob->participants,
+                                   "tmp_barrier");
+    ucc_status_t status;
+    char         sbuf;
+    void        *req;
+
+    if (!rbuf) {
+        tl_error(ctx->super.super.lib,
+                 "failed to allocate %zd bytes for tmp barrier array",
+                 sizeof(char*) * oob->participants);
+        return;
+    }
+    if (UCC_OK == oob->allgather(&sbuf, rbuf, sizeof(char), oob->coll_info,
+                                 &req)) {
+        ucc_assert(req);
+        while (UCC_OK != (status = oob->req_test(req))) {
+            if (status < 0) {
+                tl_error(ctx->super.super.lib, "failed to test oob req");
+                break;
+            }
+        }
+        oob->req_free(req);
+    }
+    ucc_free(rbuf);
+}
+
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
     ucc_status_t status;
@@ -139,12 +168,15 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
         }
     }
     kh_destroy(tl_ucp_ep_hash, self->ep_hash);
+    if (UCC_TL_CTX_HAS_OOB(self)) {
+        ucc_tl_ucp_context_barrier(self, &UCC_TL_CTX_OOB(self));
+    }
     ucc_context_progress_deregister(
         self->super.super.ucc_context,
         (ucc_context_progress_fn_t)ucp_worker_progress, self->ucp_worker);
     ucp_worker_destroy(self->ucp_worker);
-    ucp_cleanup(self->ucp_context);
     ucc_mpool_cleanup(&self->req_mp, 1);
+    ucp_cleanup(self->ucp_context);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_ucp_context_t, ucc_tl_context_t);
