@@ -24,6 +24,7 @@ typedef enum ucc_mc_cuda_task_stream_type {
 } ucc_mc_cuda_task_stream_type_t;
 
 typedef enum ucc_mc_task_status {
+    UCC_MC_CUDA_TASK_COMPLETED,
     UCC_MC_CUDA_TASK_POSTED,
     UCC_MC_CUDA_TASK_STARTED
 } ucc_mc_task_status_t;
@@ -91,34 +92,34 @@ extern ucc_mc_cuda_t ucc_mc_cuda;
         }                                                                      \
 } while(0)
 
-#define CUDA_FUNC(_func)                                        \
-    ({                                                          \
-        ucc_status_t _status = UCC_OK;                          \
-        do {                                                    \
-            cudaError_t _result = (_func);                      \
-            if (cudaSuccess != _result) {                       \
-                mc_error(&ucc_mc_cuda.super, "%s() failed: %s",  \
-                       #_func, cudaGetErrorString(_result));    \
-                _status = UCC_ERR_INVALID_PARAM;                \
-            }                                                   \
-        } while (0);                                            \
-        _status;                                                \
+#define CUDA_FUNC(_func)                                                       \
+    ({                                                                         \
+        ucc_status_t _status = UCC_OK;                                         \
+        do {                                                                   \
+            cudaError_t _result = (_func);                                     \
+            if (cudaSuccess != _result) {                                      \
+                mc_error(&ucc_mc_cuda.super, "%s() failed: %s",                \
+                       #_func, cudaGetErrorString(_result));                   \
+                _status = UCC_ERR_INVALID_PARAM;                               \
+            }                                                                  \
+        } while (0);                                                           \
+        _status;                                                               \
     })
 
-#define CUDADRV_FUNC(_func)                                     \
-    ({                                                          \
-        ucc_status_t _status = UCS_OK;                          \
-        do {                                                    \
-            CUresult _result = (_func);                         \
-            const char *cu_err_str;                             \
-            if (CUDA_SUCCESS != _result) {                      \
-                cuGetErrorString(_result, &cu_err_str);         \
-                mc_error(&ucc_mc_cuda.super, "%s() failed: %s",        \
-                        #_func, cu_err_str);                   \
-                _status = UCC_ERR_INVALID_PARAM;                \
-            }                                                   \
-        } while (0);                                            \
-        _status;                                                \
+#define CUDADRV_FUNC(_func)                                                    \
+    ({                                                                         \
+        ucc_status_t _status = UCS_OK;                                         \
+        do {                                                                   \
+            CUresult _result = (_func);                                        \
+            const char *cu_err_str;                                            \
+            if (CUDA_SUCCESS != _result) {                                     \
+                cuGetErrorString(_result, &cu_err_str);                        \
+                mc_error(&ucc_mc_cuda.super, "%s() failed: %s",                \
+                        #_func, cu_err_str);                                   \
+                _status = UCC_ERR_INVALID_PARAM;                               \
+            }                                                                  \
+        } while (0);                                                           \
+        _status;                                                               \
     })
 
 #define MC_CUDA_CONFIG                                                         \
