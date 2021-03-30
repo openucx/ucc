@@ -612,10 +612,10 @@ typedef enum {
  *  @ingroup UCC_CONTEXT_DT
  */
 enum ucc_context_params_field {
-    UCC_CONTEXT_PARAM_FIELD_TYPE                   = UCC_BIT(0),
-    UCC_CONTEXT_PARAM_FIELD_COLL_SYNC_TYPE         = UCC_BIT(1),
-    UCC_CONTEXT_PARAM_FIELD_COLL_OOB               = UCC_BIT(2),
-    UCC_CONTEXT_PARAM_FIELD_ID                     = UCC_BIT(3)
+    UCC_CONTEXT_PARAM_FIELD_TYPE              = UCC_BIT(0),
+    UCC_CONTEXT_PARAM_FIELD_SYNC_TYPE         = UCC_BIT(1),
+    UCC_CONTEXT_PARAM_FIELD_OOB               = UCC_BIT(2),
+    UCC_CONTEXT_PARAM_FIELD_ID                = UCC_BIT(3)
 };
 
 /**
@@ -623,10 +623,10 @@ enum ucc_context_params_field {
  *  @ingroup UCC_CONTEXT_DT
  */
 enum ucc_context_attr_field {
-    UCC_CONTEXT_ATTR_FIELD_TYPE                   = UCC_BIT(0),
-    UCC_CONTEXT_ATTR_FIELD_COLL_SYNC_TYPE         = UCC_BIT(1),
-    UCC_CONTEXT_ATTR_FIELD_CONTEXT_ADDR           = UCC_BIT(2),
-    UCC_CONTEXT_ATTR_FIELD_CONTEXT_ADDR_LEN       = UCC_BIT(3)
+    UCC_CONTEXT_ATTR_FIELD_TYPE               = UCC_BIT(0),
+    UCC_CONTEXT_ATTR_FIELD_SYNC_TYPE          = UCC_BIT(1),
+    UCC_CONTEXT_ATTR_FIELD_CTX_ADDR           = UCC_BIT(2),
+    UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN       = UCC_BIT(3)
 };
 
 /**
@@ -635,7 +635,7 @@ enum ucc_context_attr_field {
  * @brief OOB collective operation for creating the context
  */
 typedef struct ucc_context_oob_coll {
-    int             (*allgather)(void *src_buf, void *recv_buf, size_t size,
+    ucc_status_t    (*allgather)(void *src_buf, void *recv_buf, size_t size,
                                  void *allgather_info,  void **request);
     ucc_status_t    (*req_test)(void *request);
     ucc_status_t    (*req_free)(void *request);
@@ -667,7 +667,7 @@ typedef struct ucc_context_oob_coll {
  */
 typedef struct ucc_context_params {
     uint64_t                mask;
-    ucc_context_type_t      ctx_type;
+    ucc_context_type_t      type;
     ucc_coll_sync_type_t    sync_type;
     ucc_context_oob_coll_t  oob;
     uint64_t                ctx_id;
@@ -694,7 +694,7 @@ typedef struct ucc_context_params {
  */
 typedef struct ucc_context_attr {
     uint64_t                mask;
-    ucc_context_type_t      ctx_type;
+    ucc_context_type_t      type;
     ucc_coll_sync_type_t    sync_type;
     ucc_context_addr_t      ctx_addr;
     ucc_context_addr_len_t  ctx_addr_len;
