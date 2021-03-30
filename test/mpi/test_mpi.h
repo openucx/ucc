@@ -109,15 +109,16 @@ typedef struct ucc_test_team {
 } ucc_test_team_t;
 
 class UccTestMpi {
-    ucc_context_h ctx;
-    ucc_lib_h     lib;
+    ucc_thread_mode_t      tm;
+    ucc_context_h          ctx;
+    ucc_lib_h              lib;
     ucc_test_mpi_inplace_t inplace;
     ucc_test_mpi_root_t    root_type;
     int                    root_value;
+    int                    iterations;
     void create_team(ucc_test_mpi_team_t t);
     void destroy_team(ucc_test_team_t &team);
     ucc_team_h create_ucc_team(MPI_Comm comm);
-    std::vector<ucc_test_team_t> teams;
     std::vector<size_t> msgsizes;
     std::vector<ucc_memory_type_t> mtypes;
     std::vector<ucc_datatype_t> dtypes;
@@ -128,15 +129,19 @@ class UccTestMpi {
     std::vector<ucc_test_vsize_flag_t> displs_vsize;
     size_t test_max_size;
 public:
+    std::vector<ucc_test_team_t> teams;
+    void run_all_at_team(ucc_test_team_t &team, std::vector<ucc_status_t> &rst);
     std::vector<ucc_status_t> results;
     UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm, int is_local);
     ~UccTestMpi();
     void set_msgsizes(size_t min, size_t max, size_t power);
     void set_dtypes(std::vector<ucc_datatype_t> &_dtypes);
     void set_colls(std::vector<ucc_coll_type_t> &_colls);
+    void set_iter(int iter);
     void set_ops(std::vector<ucc_reduction_op_t> &_ops);
     void set_mtypes(std::vector<ucc_memory_type_t> &_mtypes);
-    void set_inplace(ucc_test_mpi_inplace_t _inplace) {
+    void set_inplace(ucc_test_mpi_inplace_t _inplace)
+    {
         inplace = _inplace;
     }
     void set_count_vsizes(std::vector<ucc_test_vsize_flag_t> &_counts_vsize);
