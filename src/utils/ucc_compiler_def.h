@@ -50,6 +50,25 @@ static inline ucc_status_t ucs_status_to_ucc_status(ucs_status_t status)
     return UCC_ERR_NO_MESSAGE;
 }
 
+static inline ucs_status_t ucc_status_to_ucs_status(ucc_status_t status)
+{
+    switch (status) {
+    case UCC_OK:
+        return UCS_OK;
+    case UCC_INPROGRESS:
+        return UCS_INPROGRESS;
+    case UCC_ERR_NO_MEMORY:
+        return UCS_ERR_NO_MEMORY;
+    case UCC_ERR_INVALID_PARAM:
+        return UCS_ERR_INVALID_PARAM;
+    case UCC_ERR_NO_RESOURCE:
+        return UCS_ERR_NO_RESOURCE;
+    default:
+        break;
+    }
+    return UCS_ERR_NO_MESSAGE;
+}
+
 #if ENABLE_DEBUG == 1
 #define ucc_assert(_cond) assert(_cond)
 #else
