@@ -2,6 +2,12 @@
 #include "tl_ucp_ep.h"
 #include "tl_ucp_addr.h"
 
+static void ucc_tl_ucp_err_handler(void *arg, ucp_ep_h ep, ucs_status_t status)
+{
+    /* Dummy fn - we don't expect errors in disconnect flow */
+    ;
+}
+
 static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
                                                  ucp_ep_h *ep, char *addr_array,
                                                  size_t max_addrlen, ucc_rank_t rank)
@@ -17,6 +23,13 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
     ep_params.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
     ep_params.address    = (ucp_address_t*)address->addr;
 
+    if (!UCC_TL_CTX_HAS_OOB(ctx)) {
+        ep_params.err_mode        = UCP_ERR_HANDLING_MODE_PEER;
+        ep_params.err_handler.cb  = ucc_tl_ucp_err_handler;
+        ep_params.err_handler.arg = NULL;
+        ep_params.field_mask     |= UCP_EP_PARAM_FIELD_ERR_HANDLING_MODE |
+                                    UCP_EP_PARAM_FIELD_ERR_HANDLER;
+    }
     status = ucp_ep_create(ctx->ucp_worker, &ep_params, ep);
 
     if (UCS_OK != status) {

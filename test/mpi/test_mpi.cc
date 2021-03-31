@@ -13,7 +13,31 @@ END_C_DECLS
 #include <assert.h>
 #include <random>
 
-UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm) {
+static ucc_status_t oob_allgather(void *sbuf, void *rbuf, size_t msglen,
+                                  void *coll_info, void **req)
+{
+    MPI_Comm    comm = (MPI_Comm)coll_info;
+    MPI_Request request;
+    MPI_Iallgather(sbuf, msglen, MPI_BYTE, rbuf, msglen, MPI_BYTE, comm,
+                   &request);
+    *req = (void *)request;
+    return UCC_OK;
+}
+
+static ucc_status_t oob_allgather_test(void *req)
+{
+    MPI_Request request = (MPI_Request)req;
+    int         completed;
+    MPI_Test(&request, &completed, MPI_STATUS_IGNORE);
+    return completed ? UCC_OK : UCC_INPROGRESS;
+}
+
+static ucc_status_t oob_allgather_free(void *req)
+{
+    return UCC_OK;
+}
+
+UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm, int is_local) {
     int required = (tm == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
         : MPI_THREAD_MULTIPLE;
     int size, provided;
@@ -40,9 +64,16 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm) {
 
     /* Init ucc context for a specified UCC_TEST_TLS */
     ucc_context_params_t ctx_params = {
-        .mask     = UCC_CONTEXT_PARAM_FIELD_TYPE,
-        .ctx_type = UCC_CONTEXT_EXCLUSIVE,
+        .mask = UCC_CONTEXT_PARAM_FIELD_TYPE,
+        .type = UCC_CONTEXT_EXCLUSIVE
     };
+    if (!is_local) {
+        ctx_params.mask         |= UCC_CONTEXT_PARAM_FIELD_OOB;
+        ctx_params.oob.allgather = oob_allgather;
+        ctx_params.oob.req_test  = oob_allgather_test;
+        ctx_params.oob.req_free  = oob_allgather_free;
+        ctx_params.oob.coll_info = (void*)MPI_COMM_WORLD;
+    }
     UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
     UCC_CHECK(ucc_init(&lib_params, lib_config, &lib));
     ucc_lib_config_release(lib_config);
@@ -86,30 +117,6 @@ UccTestMpi::~UccTestMpi()
     UCC_CHECK(ucc_context_destroy(ctx));
     UCC_CHECK(ucc_finalize(lib));
     MPI_Finalize();
-}
-
-static ucc_status_t oob_allgather(void *sbuf, void *rbuf, size_t msglen,
-                                  void *coll_info, void **req)
-{
-    MPI_Comm    comm = (MPI_Comm)coll_info;
-    MPI_Request request;
-    MPI_Iallgather(sbuf, msglen, MPI_BYTE, rbuf, msglen, MPI_BYTE, comm,
-                   &request);
-    *req = (void *)request;
-    return UCC_OK;
-}
-
-static ucc_status_t oob_allgather_test(void *req)
-{
-    MPI_Request request = (MPI_Request)req;
-    int         completed;
-    MPI_Test(&request, &completed, MPI_STATUS_IGNORE);
-    return completed ? UCC_OK : UCC_INPROGRESS;
-}
-
-static ucc_status_t oob_allgather_free(void *req)
-{
-    return UCC_OK;
 }
 
 ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm)

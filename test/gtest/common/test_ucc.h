@@ -56,7 +56,7 @@ public:
     };
     static constexpr ucc_context_params_t default_ctx_params = {
         .mask = UCC_CONTEXT_PARAM_FIELD_TYPE,
-        .ctx_type = UCC_CONTEXT_EXCLUSIVE
+        .type = UCC_CONTEXT_EXCLUSIVE
     };
     ucc_lib_h            lib_h;
     ucc_context_h        ctx_h;

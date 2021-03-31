@@ -244,10 +244,10 @@ static inline void ucc_copy_context_params(ucc_context_params_t *dst,
                                            const ucc_context_params_t *src)
 {
     dst->mask = src->mask;
-    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_TYPE, ctx_type);
-    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_COLL_OOB, oob);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_TYPE, type);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_OOB, oob);
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_ID, ctx_id);
-    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_COLL_SYNC_TYPE,
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_SYNC_TYPE,
                             sync_type);
 }
 
@@ -371,7 +371,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     /* Initialize ctx thread mode:
        if context is EXCLUSIVE then thread_mode is always SINGLE,
        otherwise it is  inherited from lib */
-    ctx->thread_mode = ((params->ctx_type == UCC_CONTEXT_EXCLUSIVE) &&
+    ctx->thread_mode = ((params->type == UCC_CONTEXT_EXCLUSIVE) &&
                         (params->mask & UCC_CONTEXT_PARAM_FIELD_TYPE))
                            ? UCC_THREAD_SINGLE
                            : lib->attr.thread_mode;

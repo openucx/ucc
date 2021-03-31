@@ -54,7 +54,7 @@ public:
             for (int i = 0; i < args.size(); i++) {
                 size_t rank_size = ucc_dt_size(coll->dst.info.datatype) *
                         (size_t)coll->dst.info.count;
-                EXPECT_EQ(0,
+                ASSERT_EQ(0,
                           alltoallx_validate_buf(i, r,
                           (uint8_t*)coll->dst.info.buffer + rank_size * i,
                           rank_size));

@@ -129,7 +129,7 @@ class UccTestMpi {
     size_t test_max_size;
 public:
     std::vector<ucc_status_t> results;
-    UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm);
+    UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm, int is_local);
     ~UccTestMpi();
     void set_msgsizes(size_t min, size_t max, size_t power);
     void set_dtypes(std::vector<ucc_datatype_t> &_dtypes);

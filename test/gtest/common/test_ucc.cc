@@ -167,7 +167,7 @@ void UccTeam::init_team()
         all_done = 1;
         for (int i = 0; i < n_procs; i++) {
             status = ucc_team_create_test(procs[i].team);
-            EXPECT_GE(status, 0);
+            ASSERT_GE(status, 0);
             if (UCC_INPROGRESS == status) {
                 all_done = 0;
             }
@@ -190,6 +190,8 @@ void UccTeam::destroy_team()
                 status = ucc_team_destroy_nb(p.team);
                 if (UCC_OK == status) {
                     p.team = NULL;
+                } else if (status < 0) {
+                    return;
                 } else {
                     all_done = false;
                 }
@@ -307,9 +309,14 @@ UccReq::UccReq(UccTeam_h _team, ucc_coll_args_t *args) :
 {
     ucc_coll_req_h req;
     for (auto &p : team->procs) {
-        EXPECT_EQ(UCC_OK, ucc_collective_init(args, &req, p.team));
+        if (UCC_OK != ucc_collective_init(args, &req, p.team)) {
+            goto err;
+        }
         reqs.push_back(req);
     }
+    return;
+err:
+    reqs.clear();
 }
 
 UccReq::UccReq(UccTeam_h _team, UccCollArgsVec args) :
@@ -318,9 +325,14 @@ UccReq::UccReq(UccTeam_h _team, UccCollArgsVec args) :
     EXPECT_EQ(team->procs.size(), args.size());
     ucc_coll_req_h req;
     for (auto i = 0; i < team->procs.size(); i++) {
-        EXPECT_EQ(UCC_OK, ucc_collective_init(args[i], &req, team->procs[i].team));
+        if (UCC_OK != ucc_collective_init(args[i], &req, team->procs[i].team)) {
+            goto err;
+        }
         reqs.push_back(req);
     }
+    return;
+err:
+    reqs.clear();
 }
 
 UccReq::~UccReq()
@@ -332,8 +344,9 @@ UccReq::~UccReq()
 
 void UccReq::start()
 {
+    ASSERT_NE(0, reqs.size());
     for (auto r : reqs) {
-        EXPECT_EQ(UCC_OK, ucc_collective_post(r));
+        ASSERT_EQ(UCC_OK, ucc_collective_post(r));
     }
 }
 
@@ -346,13 +359,16 @@ ucc_status_t UccReq::test()
             break;
         }
     }
-    EXPECT_GE(status, 0);
     return status;
 }
 
 void UccReq::wait()
 {
-    while (UCC_OK != test()) {
+    ucc_status_t status;
+    while (UCC_OK != (status = test())) {
+        if (status < 0) {
+            return;
+        }
         team->progress();
     }
 }
@@ -360,10 +376,14 @@ void UccReq::wait()
 void UccReq::waitall(std::vector<UccReq> &reqs)
 {
     bool alldone = false;
+    ucc_status_t status;
     while (!alldone) {
         alldone = true;
         for (auto &r : reqs) {
-            if (UCC_OK != r.test()) {
+            if (UCC_OK != (status = r.test())) {
+                if (status < 0) {
+                    return;
+                }
                 alldone = false;
                 r.team->progress();
             }

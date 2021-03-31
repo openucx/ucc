@@ -389,7 +389,7 @@ int main(int argc, char *argv[])
         std::chrono::steady_clock::now();
     int rank;
     int failed = 0;
-    UccTestMpi test(argc, argv, UCC_THREAD_SINGLE);
+    UccTestMpi test(argc, argv, UCC_THREAD_SINGLE, 0);
     ProcessArgs(argc, argv);
     test.create_teams(teams);
     test.set_colls(colls);
