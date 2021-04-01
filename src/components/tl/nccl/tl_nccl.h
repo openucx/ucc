@@ -60,6 +60,11 @@ typedef struct ucc_tl_nccl_task {
     cudaEvent_t         completed;
 } ucc_tl_nccl_task_t;
 
+#define UCC_TL_NCCL_SUPPORTED_COLLS                         \
+    (UCC_COLL_TYPE_ALLTOALL  | UCC_COLL_TYPE_ALLTOALLV  |   \
+     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |   \
+     UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BCAST)
+
 UCC_CLASS_DECLARE(ucc_tl_nccl_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 

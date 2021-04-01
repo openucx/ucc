@@ -139,8 +139,8 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     /* There can be a different logic for different coll_type/mem_type.
        Right now just init everything the same way. */
     status = ucc_coll_score_build_default(tl_team, tl_ucp_default_coll_score,
-                                          ucc_tl_ucp_coll_init,
-                                          UCC_COLL_TYPE_ALL, NULL, 0, &score);
+                              ucc_tl_ucp_coll_init, UCC_TL_UCP_SUPPORTED_COLLS,
+                              NULL, 0, &score);
     if (UCC_OK != status) {
         return status;
     }

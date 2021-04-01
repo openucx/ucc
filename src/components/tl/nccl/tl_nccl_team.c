@@ -224,9 +224,6 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
     ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
     ucc_tl_nccl_lib_t * lib  = UCC_TL_NCCL_TEAM_LIB(team);
     ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_CUDA;
-    ucc_coll_type_t     ct   = UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |
-        UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |
-        UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BCAST;
     ucc_coll_score_t   *score;
     ucc_status_t        status;
 
@@ -234,7 +231,8 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
        Right now just init everything the same way. */
     status =
         ucc_coll_score_build_default(tl_team, tl_nccl_default_coll_score,
-                                     ucc_tl_nccl_coll_init, ct, &mt, 1, &score);
+                           ucc_tl_nccl_coll_init, UCC_TL_NCCL_SUPPORTED_COLLS,
+                           &mt, 1, &score);
     if (UCC_OK != status) {
         return status;
     }
