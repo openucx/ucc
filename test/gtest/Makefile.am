@@ -79,9 +79,9 @@ gtest_SOURCES =                     \
 	core/test_alltoall.cc           \
 	core/test_alltoallv.cc          \
 	utils/test_string.cc            \
-	coll_select/test_score.cc       \
-	coll_select/test_score_str.cc   \
-	coll_select/test_score_update.cc
+	coll_score/test_score.cc        \
+	coll_score/test_score_str.cc    \
+	coll_score/test_score_update.cc
 
 if HAVE_CUDA
 gtest_SOURCES += \
@@ -102,7 +102,7 @@ noinst_HEADERS =            \
 	common/test_ucc.h       \
 	core/test_context.h     \
 	core/test_mc_reduce.h   \
-	coll_select/test_score.h
+	coll_score/test_score.h
 
 .PHONY: test test gdb valgrind fix_rpath ucc
 

@@ -3,7 +3,7 @@
  *
  * See file LICENSE for terms.
  */
-#include "coll_select.h"
+#include "ucc_coll_score.h"
 #include "utils/ucc_coll_utils.h"
 typedef struct ucc_score_map {
     ucc_coll_score_t *score;

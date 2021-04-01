@@ -3,7 +3,7 @@
  *
  * See file LICENSE for terms.
  */
-#include "coll_select.h"
+#include "ucc_coll_score.h"
 #include "utils/ucc_string.h"
 #include "utils/ucc_coll_utils.h"
 

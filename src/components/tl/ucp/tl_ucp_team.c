@@ -10,7 +10,7 @@
 #include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
 #include "utils/ucc_malloc.h"
-#include "coll_select/coll_select.h"
+#include "coll_score/ucc_coll_score.h"
 
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)

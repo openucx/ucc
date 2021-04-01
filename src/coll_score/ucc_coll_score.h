@@ -4,10 +4,9 @@
  * See file LICENSE for terms.
  */
 
+#ifndef UCC_COLL_SCORE_H_
+#define UCC_COLL_SCORE_H_
 #include "config.h"
-#ifndef COLL_SELECT_H_
-#define COLL_SELECT_H_
-
 #include "utils/ucc_list.h"
 #include "components/base/ucc_base_iface.h"
 #include "utils/ucc_coll_utils.h"

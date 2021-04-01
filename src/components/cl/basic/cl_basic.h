@@ -9,7 +9,7 @@
 #include "components/cl/ucc_cl.h"
 #include "components/cl/ucc_cl_log.h"
 #include "components/tl/ucc_tl.h"
-#include "coll_select/coll_select.h"
+#include "coll_score/ucc_coll_score.h"
 
 #ifndef UCC_CL_BASIC_DEFAULT_SCORE
 #define UCC_CL_BASIC_DEFAULT_SCORE 10

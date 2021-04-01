@@ -6,7 +6,7 @@
 #ifndef UCC_TEST_SCORE_H
 #define UCC_TEST_SCORE_H
 extern "C" {
-#include "coll_select/coll_select.h"
+#include "coll_score/ucc_coll_score.h"
 }
 #include <common/test.h>
 #include <string>
