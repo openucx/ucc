@@ -232,7 +232,7 @@ ucc_status_t ucc_tl_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
         return UCC_ERR_NOT_SUPPORTED;
     }
     if (UCC_OK != ucc_nccl_check_dt_supported(task->args.src.info.datatype,
-                                              task->args.dst.info.datatype)) {
+                                              task->args.src.info.datatype)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
                  "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
