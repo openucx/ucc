@@ -44,7 +44,7 @@ ucc_status_t ucc_mpool_init(ucc_mpool_t *mp, size_t priv_size, size_t elem_size,
     }
 
     ucc_spinlock_init(&mp->lock, 0);
-    mp->tm                 = UCC_THREAD_MULTIPLE;
+    mp->tm                 = tm;
     mp->ucc_ops            = ops;
     ucs_ops->chunk_alloc   = ucc_mpool_chunk_alloc_wrapper;
     ucs_ops->chunk_release = ucc_mpool_chunk_release_wrapper;
