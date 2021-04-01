@@ -409,6 +409,23 @@ ucc_status_t ucc_lib_config_modify(ucc_lib_config_h config, const char *name,
                                        value);
 }
 
+ucc_status_t ucc_lib_get_attr(ucc_lib_h lib_p, ucc_lib_attr_t *lib_attr)
+{
+    ucc_lib_info_t *lib = (ucc_lib_info_t *)lib_p;
+
+    if (lib_attr->mask & UCC_LIB_ATTR_FIELD_THREAD_MODE) {
+        lib_attr->thread_mode = lib->attr.thread_mode;
+    }
+    if (lib_attr->mask & UCC_LIB_ATTR_FIELD_COLL_TYPES) {
+        lib_attr->coll_types = lib->attr.coll_types;
+    }
+    if ((lib_attr->mask & UCC_LIB_ATTR_FIELD_REDUCTION_TYPES) ||
+        (lib_attr->mask & UCC_LIB_ATTR_FIELD_SYNC_TYPE)) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    return UCC_OK;
+}
+
 ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
 {
     int i;
