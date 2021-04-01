@@ -24,8 +24,9 @@ void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
 
 ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task)
 {
-    task->super.status = UCC_OPERATION_INITIALIZED;
-    task->ee           = NULL;
+    task->super.status   = UCC_OPERATION_INITIALIZED;
+    task->ee             = NULL;
+    task->was_progressed = 0;
     return ucc_event_manager_init(&task->em);
 }
 

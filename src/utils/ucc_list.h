@@ -16,4 +16,6 @@
 #define ucc_list_for_each_safe ucs_list_for_each_safe
 #define ucc_list_for_each      ucs_list_for_each
 #define ucc_list_is_empty      ucs_list_is_empty
+#define ucc_list_extract_head  ucs_list_extract_head
+
 #endif

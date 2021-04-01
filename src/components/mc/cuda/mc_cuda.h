@@ -9,7 +9,7 @@
 
 #include "components/mc/base/ucc_mc_base.h"
 #include "components/mc/ucc_mc_log.h"
-#include "ucs/datastruct/mpool.h"
+#include "utils/ucc_mpool.h"
 #include <cuda_runtime.h>
 
 typedef enum ucc_mc_cuda_strm_task_mode {
@@ -55,8 +55,8 @@ typedef struct ucc_mc_cuda_config {
 typedef struct ucc_mc_cuda {
     ucc_mc_base_t                  super;
     cudaStream_t                   stream;
-    ucs_mpool_t                    events;
-    ucs_mpool_t                    strm_reqs;
+    ucc_mpool_t                    events;
+    ucc_mpool_t                    strm_reqs;
     ucc_mc_cuda_strm_task_mode_t   strm_task_mode;
     ucc_mc_cuda_task_stream_type_t task_strm_type;
     ucc_mc_cuda_task_post_fn       post_strm_task;

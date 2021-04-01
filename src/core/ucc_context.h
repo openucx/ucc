@@ -61,7 +61,10 @@ typedef struct ucc_context_config {
 /* Any internal UCC component (TL, CL, etc) may register its own
    progress callback fn (and argument for the callback) into core
    ucc context. Those callbacks will be triggered as part of
-   ucc_context_progress. */
+   ucc_context_progress.
+   Any progress callback fn inserted is required to be thread safe.
+   If not, we need to add to this engine a thread safe mechanism. */
+
 ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
                                            ucc_context_progress_fn_t fn,
                                            void *progress_arg);

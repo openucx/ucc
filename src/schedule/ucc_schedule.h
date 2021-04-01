@@ -48,6 +48,7 @@ typedef struct ucc_coll_task {
     ucc_coll_task_t             *triggered_task;
     /* used for progress queue */
     ucc_list_link_t              list_elem;
+    uint8_t                      was_progressed;
 } ucc_coll_task_t;
 
 typedef struct ucc_context ucc_context_t;
