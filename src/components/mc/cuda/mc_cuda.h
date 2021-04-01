@@ -16,11 +16,13 @@ typedef enum ucc_mc_cuda_strm_task_mode {
     UCC_MC_CUDA_TASK_KERNEL,
     UCC_MC_CUDA_TASK_MEM_OPS,
     UCC_MC_CUDA_TASK_AUTO,
+    UCC_MC_CUDA_TASK_LAST,
 } ucc_mc_cuda_strm_task_mode_t;
 
 typedef enum ucc_mc_cuda_task_stream_type {
     UCC_MC_CUDA_USER_STREAM,
-    UCC_MC_CUDA_INTERNAL_STREAM
+    UCC_MC_CUDA_INTERNAL_STREAM,
+    UCC_MC_CUDA_TASK_STREAM_LAST
 } ucc_mc_cuda_task_stream_type_t;
 
 typedef enum ucc_mc_task_status {
