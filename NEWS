@@ -4,7 +4,7 @@
  * See file LICENSE for terms.
  */
 
-## 1.0.0 (TBD)
+## 0.1.0 (TBD)
 
 ### Features
 
@@ -13,7 +13,7 @@
   engine, memory types, and triggered operations
 
 #### Core
-- Added implementation for UCC abstractions - library, contexts, team,
+- Added implementation for UCC abstractions - library, context, team,
   collective operations, execution engine, memory types, and triggered
   operations
 - Added support for memory types - CUDA, and CPU
@@ -24,7 +24,7 @@
 
 - Added support for collectives, while the source and destination is either in
   CPU or device (GPU) 
-- Added support for UCC_THREAD_MULTIPLE_MODE
+- Added support for UCC_THREAD_MULTIPLE
 - Added support for CUDA stream-based collectives 
 
 
@@ -40,5 +40,5 @@
 
 #### Tests
 
-- Added support for unit (gtest) infrastructure
+- Added support for unit testing (gtest) infrastructure
 - Added support for MPI tests
