@@ -53,7 +53,8 @@ static ucc_status_t ucc_mc_cuda_stream_req_mpool_chunk_malloc(ucc_mpool_t *mp,
 {
     ucc_status_t status;
 
-    status = CUDA_FUNC(cudaHostAlloc((void**)chunk_p, *size_p, cudaHostAllocMapped));
+    status = CUDA_FUNC(cudaHostAlloc((void**)chunk_p, *size_p,
+                       cudaHostAllocMapped));
     return status;
 }
 
@@ -103,12 +104,8 @@ static ucc_mpool_ops_t ucc_mc_cuda_event_mpool_ops = {
     .obj_cleanup   = ucc_mc_cuda_event_cleanup,
 };
 
-//TODO implement cuda kernel
-static ucc_status_t ucc_mc_cuda_post_kernel_stream_task(uint32_t *status,
-                                                        cudaStream_t stream)
-{
-    return UCC_ERR_NOT_IMPLEMENTED;
-}
+ucc_status_t ucc_mc_cuda_post_kernel_stream_task(uint32_t *status,
+                                                 cudaStream_t stream);
 
 static ucc_status_t ucc_mc_cuda_post_driver_stream_task(uint32_t *status,
                                                         cudaStream_t stream)
@@ -117,7 +114,8 @@ static ucc_status_t ucc_mc_cuda_post_driver_stream_task(uint32_t *status,
 
     CUDADRV_FUNC(cuStreamWriteValue32(stream, status_ptr,
                                       UCC_MC_CUDA_TASK_STARTED, 0));
-    CUDADRV_FUNC(cuStreamWaitValue32(stream, status_ptr, UCC_OK,
+    CUDADRV_FUNC(cuStreamWaitValue32(stream, status_ptr,
+                                     UCC_MC_CUDA_TASK_COMPLETED,
                                      CU_STREAM_WAIT_VALUE_EQ));
     return UCC_OK;
 }
@@ -142,7 +140,8 @@ static ucc_status_t ucc_mc_cuda_init()
         }
     }
 
-    CUDACHECK(cudaStreamCreateWithFlags(&ucc_mc_cuda.stream, cudaStreamNonBlocking));
+    CUDACHECK(cudaStreamCreateWithFlags(&ucc_mc_cuda.stream,
+              cudaStreamNonBlocking));
 
     /*create event pool */
     status = ucc_mpool_init(&ucc_mc_cuda.events, 0, sizeof(ucc_mc_cuda_event_t),
@@ -178,12 +177,14 @@ static ucc_status_t ucc_mc_cuda_init()
 
         if (cfg->strm_task_mode == UCC_MC_CUDA_TASK_AUTO) {
             if (mem_ops_attr == 0) {
-                mc_warn(&ucc_mc_cuda.super, "CUDA MEM OPS are not supported or disabled");
+                mc_info(&ucc_mc_cuda.super,
+                        "CUDA MEM OPS are not supported or disabled");
                 ucc_mc_cuda.strm_task_mode = UCC_MC_CUDA_TASK_KERNEL;
                 ucc_mc_cuda.post_strm_task = ucc_mc_cuda_post_kernel_stream_task;
             }
         } else if (mem_ops_attr == 0) {
-            mc_error(&ucc_mc_cuda.super, "CUDA MEM OPS are not supported or disabled");
+            mc_error(&ucc_mc_cuda.super,
+                     "CUDA MEM OPS are not supported or disabled");
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
