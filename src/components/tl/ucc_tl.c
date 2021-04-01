@@ -33,6 +33,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_lib_t, ucc_tl_iface_t *tl_iface,
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_lib_t)
 {
+    ucc_free(self->super.score_str);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_lib_t, void);

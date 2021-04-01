@@ -37,7 +37,6 @@ typedef struct ucc_cl_team    ucc_cl_team_t;
 typedef struct ucc_cl_lib_config {
     ucc_base_config_t  super;
     ucc_cl_iface_t    *iface;
-    int                priority;
 } ucc_cl_lib_config_t;
 extern ucc_config_field_t ucc_cl_lib_config_table[];
 
@@ -70,10 +69,8 @@ typedef struct ucc_cl_iface {
 typedef struct ucc_cl_lib {
     ucc_base_lib_t              super;
     ucc_cl_iface_t             *iface;
-    int                         priority;
 } ucc_cl_lib_t;
-UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_cl_lib_config_t *,
-                  int);
+UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_cl_lib_config_t *);
 
 typedef struct ucc_cl_context {
     ucc_base_context_t super;

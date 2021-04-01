@@ -220,7 +220,6 @@ free_task:
 ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
                                          ucc_coll_score_t **score_p)
 {
-    const ucc_score_t   tl_nccl_default_coll_score = 100;
     ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
     ucc_tl_nccl_lib_t * lib  = UCC_TL_NCCL_TEAM_LIB(team);
     ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_CUDA;
@@ -230,7 +229,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
     /* There can be a different logic for different coll_type/mem_type.
        Right now just init everything the same way. */
     status =
-        ucc_coll_score_build_default(tl_team, tl_nccl_default_coll_score,
+        ucc_coll_score_build_default(tl_team, UCC_TL_NCCL_DEFAULT_SCORE,
                            ucc_tl_nccl_coll_init, UCC_TL_NCCL_SUPPORTED_COLLS,
                            &mt, 1, &score);
     if (UCC_OK != status) {

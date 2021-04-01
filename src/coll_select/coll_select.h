@@ -11,8 +11,9 @@
 #include "utils/ucc_list.h"
 #include "components/base/ucc_base_iface.h"
 #include "utils/ucc_coll_utils.h"
+#include "utils/ucc_compiler_def.h"
 #include <limits.h>
-typedef int ucc_score_t;
+
 #define UCC_SCORE_MAX INT_MAX
 #define UCC_SCORE_MIN 0
 #define UCC_SCORE_INVALID -1

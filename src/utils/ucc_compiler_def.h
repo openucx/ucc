@@ -25,6 +25,7 @@
 #define ucc_snprintf_safe snprintf
 
 typedef ucs_log_component_config_t ucc_log_component_config_t;
+typedef int                        ucc_score_t;
 
 #define _UCC_PP_MAKE_STRING(x) #x
 #define UCC_PP_MAKE_STRING(x)  _UCC_PP_MAKE_STRING(x)

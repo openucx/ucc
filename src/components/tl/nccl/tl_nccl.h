@@ -14,6 +14,10 @@
 #include <nccl.h>
 #include <cuda.h>
 
+#ifndef UCC_TL_NCCL_DEFAULT_SCORE
+#define UCC_TL_NCCL_DEFAULT_SCORE 20
+#endif
+
 typedef struct ucc_tl_nccl_iface {
     ucc_tl_iface_t super;
 } ucc_tl_nccl_iface_t;

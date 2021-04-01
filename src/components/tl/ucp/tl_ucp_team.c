@@ -131,14 +131,13 @@ err_preconnect:
 ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
                                         ucc_coll_score_t **score_p)
 {
-    const ucc_score_t  tl_ucp_default_coll_score = 10;
     ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_lib_t  *lib  = UCC_TL_UCP_TEAM_LIB(team);
     ucc_coll_score_t  *score;
     ucc_status_t       status;
     /* There can be a different logic for different coll_type/mem_type.
        Right now just init everything the same way. */
-    status = ucc_coll_score_build_default(tl_team, tl_ucp_default_coll_score,
+    status = ucc_coll_score_build_default(tl_team, UCC_TL_UCP_DEFAULT_SCORE,
                               ucc_tl_ucp_coll_init, UCC_TL_UCP_SUPPORTED_COLLS,
                               NULL, 0, &score);
     if (UCC_OK != status) {

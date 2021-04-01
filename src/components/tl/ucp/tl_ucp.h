@@ -14,6 +14,10 @@
 #include <ucp/api/ucp.h>
 #include <ucs/memory/memory_type.h>
 
+#ifndef UCC_TL_UCP_DEFAULT_SCORE
+#define UCC_TL_UCP_DEFAULT_SCORE 10
+#endif
+
 typedef struct ucc_tl_ucp_iface {
     ucc_tl_iface_t super;
 } ucc_tl_ucp_iface_t;

@@ -55,10 +55,11 @@ static void get_default_lib_path()
 
 ucc_status_t ucc_constructor(void)
 {
+    ucc_global_config_t *cfg = &ucc_global_config;
     ucc_status_t status;
-    if (!ucc_global_config.initialized) {
-        ucc_global_config.initialized            = 1;
-        ucc_global_config.component_path_default = NULL;
+    if (!cfg->initialized) {
+        cfg->initialized            = 1;
+        cfg->component_path_default = NULL;
 
         status = ucc_config_parser_fill_opts(
             &ucc_global_config, ucc_global_config_table, "UCC_", NULL, 1);
@@ -66,32 +67,42 @@ ucc_status_t ucc_constructor(void)
             ucc_error("failed to parse global options");
             return status;
         }
-        if (strlen(ucc_global_config.component_path) == 0) {
+        if (strlen(cfg->component_path) == 0) {
             get_default_lib_path();
         }
-        if (!ucc_global_config.component_path) {
+        if (!cfg->component_path) {
             ucc_error("failed to get ucc components path");
             return UCC_ERR_NOT_FOUND;
         }
-        status = ucc_components_load("cl", &ucc_global_config.cl_framework);
+        status = ucc_components_load("cl", &cfg->cl_framework);
         if (UCC_OK != status) {
             ucc_error("no CL components were found in the "
                       "UCC_COMPONENT_PATH: %s",
-                      ucc_global_config.component_path);
+                      cfg->component_path);
             return status;
         }
-        status = ucc_components_load("tl", &ucc_global_config.tl_framework);
+        status = ucc_component_check_scores_uniq(&cfg->cl_framework);
+        if (UCC_OK != status) {
+            ucc_error("CLs must have distinct uniq default scores");
+            return status;
+        }
+        status = ucc_components_load("tl", &cfg->tl_framework);
         if (UCC_OK != status) {
             /* not critical - some CLs may operate w/o use of TL */
             ucc_debug("no TL components were found in the "
                       "UCC_COMPONENT_PATH: %s",
-                      ucc_global_config.component_path);
+                      cfg->component_path);
         }
-        status = ucc_components_load("mc", &ucc_global_config.mc_framework);
+        status = ucc_component_check_scores_uniq(&cfg->tl_framework);
+        if (UCC_OK != status) {
+            ucc_error("TLs must have distinct uniq default scores");
+            return status;
+        }
+        status = ucc_components_load("mc", &cfg->mc_framework);
         if (UCC_OK != status) {
             ucc_error("no memory components were found in the "
                       "UCC_COMPONENT_PATH: %s",
-                      ucc_global_config.component_path);
+                      cfg->component_path);
             return status;
         }
         if (UCC_OK != ucc_local_proc_info_init()) {

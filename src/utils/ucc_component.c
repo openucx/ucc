@@ -153,3 +153,20 @@ ucc_component_iface_t* ucc_get_component(ucc_component_framework_t *framework,
     }
     return NULL;
 }
+
+ucc_status_t
+ucc_component_check_scores_uniq(ucc_component_framework_t *framework)
+{
+    ucc_component_iface_t **c = framework->components;
+    int i, j;
+    for (i = 0; i < framework->n_components; i++) {
+        for (j = i+1; j < framework->n_components; j++) {
+            if (c[i]->score == c[j]->score) {
+                ucc_error("components %s and %s have the same default score %d",
+                          c[i]->name, c[j]->name, c[i]->score);
+                return UCC_ERR_INVALID_PARAM;
+            }
+        }
+    }
+    return UCC_OK;
+}

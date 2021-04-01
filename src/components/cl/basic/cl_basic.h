@@ -10,7 +10,11 @@
 #include "components/cl/ucc_cl_log.h"
 #include "components/tl/ucc_tl.h"
 #include "coll_select/coll_select.h"
-#define UCC_CL_BASIC_DEFAULT_PRIORITY 10
+
+#ifndef UCC_CL_BASIC_DEFAULT_SCORE
+#define UCC_CL_BASIC_DEFAULT_SCORE 10
+#endif
+
 #define UCC_CL_BASIC_NUM_TLS 2
 
 typedef struct ucc_cl_basic_iface {

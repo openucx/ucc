@@ -8,13 +8,15 @@
 
 #include "config.h"
 #include "ucc/api/ucc.h"
+#include "utils/ucc_compiler_def.h"
 
 #define UCC_MAX_FRAMEWORK_NAME_LEN 64
 #define UCC_MAX_COMPONENT_NAME_LEN 64
 
 typedef struct ucc_component_iface {
     const char *name;
-    void *dl_handle;
+    void       *dl_handle;
+    ucc_score_t score;
 } ucc_component_iface_t;
 
 typedef struct ucc_component_framework {
@@ -38,4 +40,6 @@ ucc_status_t ucc_components_load(const char *framework_name,
    name is not found in the framework. */
 ucc_component_iface_t* ucc_get_component(ucc_component_framework_t *framework,
                                          const char *component_name);
+ucc_status_t
+ucc_component_check_scores_uniq(ucc_component_framework_t *framework);
 #endif
