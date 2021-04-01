@@ -82,7 +82,7 @@ static ucc_status_t ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_ta
     if (coll_task->super.status == UCC_OK) {
         return ucc_tl_ucp_triggered_coll_complete(coll_task, coll_task);
     } else {
-        ucc_assert(coll_task->super.status = UCC_INPROGRESS);
+        ucc_assert(coll_task->super.status == UCC_INPROGRESS);
         if (coll_task->ee_task) {
             ucc_event_manager_init(&coll_task->em);
             coll_task->handlers[UCC_EVENT_COMPLETED] = ucc_tl_ucp_triggered_coll_complete;
