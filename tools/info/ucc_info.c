@@ -7,6 +7,7 @@
 #include "config.h"
 
 #include "ucc_info.h"
+#include "core/ucc_global_opts.h"
 #include "utils/ucc_parser.h"
 #include "utils/ucc_datastruct.h"
 #include <getopt.h>
@@ -20,7 +21,8 @@ static void usage()
     printf("  -b Show build configuration\n");
     printf("  -c Show UCC configuration\n");
     printf("  -a Show also hidden configuration\n");
-    printf("  -f Display fully decorated output\n");
+    printf("  -f Show fully decorated output\n");
+    printf("  -s Show default components scores\n");
     printf("  -h Show this help message\n");
 
     printf("\n");
@@ -29,16 +31,18 @@ extern ucc_list_link_t ucc_config_global_list;
 
 int main(int argc, char **argv)
 {
+    ucc_global_config_t *cfg = &ucc_global_config;
     ucc_config_print_flags_t print_flags;
     unsigned                 print_opts;
-    int                      c;
+    int                      c, show_scores;
     ucc_lib_h                lib;
     ucc_lib_config_h         config;
     ucc_lib_params_t         params;
     ucc_status_t             status;
     print_flags = (ucc_config_print_flags_t)0;
     print_opts  = 0;
-    while ((c = getopt(argc, argv, "vbcafh")) != -1) {
+    show_scores = 0;
+    while ((c = getopt(argc, argv, "vbcafhs")) != -1) {
         switch (c) {
         case 'f':
             print_flags |= UCC_CONFIG_PRINT_CONFIG |
@@ -57,6 +61,9 @@ int main(int argc, char **argv)
         case 'b':
             print_opts |= PRINT_BUILD_CONFIG;
             break;
+        case 's':
+            show_scores = 1;
+            break;
         case 'h':
             usage();
             return 0;
@@ -66,7 +73,7 @@ int main(int argc, char **argv)
         }
     }
 
-    if ((print_opts == 0) && (print_flags == 0)) {
+    if ((print_opts == 0) && (print_flags == 0) && (!show_scores)) {
         usage();
         return -2;
     }
@@ -96,6 +103,24 @@ int main(int argc, char **argv)
     if (print_flags & UCC_CONFIG_PRINT_CONFIG) {
         ucc_config_parser_print_all_opts(stdout, "UCC_", print_flags,
                                          &ucc_config_global_list);
+    }
+    if (show_scores) {
+        if (cfg->cl_framework.n_components) {
+            printf("Default CLs scores:");
+            for (c = 0; c < cfg->cl_framework.n_components; c++) {
+                printf(" %s=%d", cfg->cl_framework.components[c]->name,
+                       cfg->cl_framework.components[c]->score);
+            }
+            printf("\n");
+        }
+        if (cfg->tl_framework.n_components) {
+            printf("Default TLs scores:");
+            for (c = 0; c < cfg->tl_framework.n_components; c++) {
+                printf(" %s=%d", cfg->tl_framework.components[c]->name,
+                       cfg->tl_framework.components[c]->score);
+            }
+            printf("\n");
+        }
     }
     ucc_finalize(lib);
     return 0;
