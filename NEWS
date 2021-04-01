@@ -1,0 +1,44 @@
+/**
+ * @copyright Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ *
+ * See file LICENSE for terms.
+ */
+
+## 0.1.0 (TBD)
+
+### Features
+
+#### API
+- UCC API to support library, contexts, teams, collective operations, execution
+  engine, memory types, and triggered operations
+
+#### Core
+- Added implementation for UCC abstractions - library, context, team,
+  collective operations, execution engine, memory types, and triggered
+  operations
+- Added support for memory types - CUDA, and CPU
+- Added support for configuring UCC library and contexts
+
+
+#### CL 
+
+- Added support for collectives, while the source and destination is either in
+  CPU or device (GPU) 
+- Added support for UCC_THREAD_MULTIPLE
+- Added support for CUDA stream-based collectives 
+
+
+#### TL
+
+- Added support for send/receive based collectives using UCX/UCP as a transport
+  layer
+- Support for basic collectives types including barrier, alltoall, alltoallv,
+  broadcast, allgather, allgatherv, allreduce was added in the UCP TL
+- Added support using NCCL as a transport layer
+- Support for collectives types including alltoall, alltoallv, allgather,
+  allgatherv, allreduce, and broadcast
+
+#### Tests
+
+- Added support for unit testing (gtest) infrastructure
+- Added support for MPI tests
