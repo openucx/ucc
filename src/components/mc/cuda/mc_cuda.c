@@ -13,11 +13,13 @@ static const char *stream_task_modes[] = {
     [UCC_MC_CUDA_TASK_KERNEL]  = "kernel",
     [UCC_MC_CUDA_TASK_MEM_OPS] = "driver",
     [UCC_MC_CUDA_TASK_AUTO]    = "auto",
+    [UCC_MC_CUDA_TASK_LAST]    = NULL
 };
 
 static const char *task_stream_types[] = {
-    [UCC_MC_CUDA_USER_STREAM]     = "user",
-    [UCC_MC_CUDA_INTERNAL_STREAM] = "ucc",
+    [UCC_MC_CUDA_USER_STREAM]      = "user",
+    [UCC_MC_CUDA_INTERNAL_STREAM]  = "ucc",
+    [UCC_MC_CUDA_TASK_STREAM_LAST] = NULL
 };
 
 static ucc_config_field_t ucc_mc_cuda_config_table[] = {
