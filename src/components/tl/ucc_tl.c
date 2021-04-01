@@ -24,6 +24,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_lib_t, ucc_tl_iface_t *tl_iface,
     UCC_CLASS_CALL_BASE_INIT();
     self->iface         = tl_iface;
     self->super.log_component = tl_config->super.log_component;
+    if (0 == strcmp(tl_config->super.score_str, "0")) {
+        return UCC_ERR_NO_MESSAGE;
+    }
     ucc_strncpy_safe(self->super.log_component.name,
                      tl_iface->tl_lib_config.name,
                      sizeof(self->super.log_component.name));
