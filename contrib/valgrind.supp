@@ -1,0 +1,470 @@
+{
+   libgomp_mem_leak
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:_dl_allocate_tls
+   fun:pthread_create@@GLIBC_2.2.5
+}
+{
+   libnl_error_string
+   Memcheck:Leak
+   ...
+   fun:__nl_error
+}
+{
+   libnl_cache_from_ibv_create_ah__remove_cache_provide_from_libibverbs
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:rtnl_*_alloc_cache
+   ...
+   fun:*ibv_create_ah*
+}
+{
+   ibv_cmd_create_ah
+   Memcheck:Param
+   write(buf)
+   obj:*
+   fun:ibv_cmd_create_ah
+   obj:*/libmlx5*.so*
+   fun:ibv_create_ah
+}
+{
+   libcuda_leak
+   Memcheck:Leak
+   ...
+   obj:*libcuda*.so*
+}
+{
+   libcuda_cond
+   Memcheck:Cond
+   ...
+   obj:*libcuda*.so*
+}
+{
+   libcuda_value8
+   Memcheck:Value8
+   ...
+   obj:*libcuda*.so*
+}
+{
+   fun:gdr_open
+   Memcheck:Param
+   ioctl(generic)
+   fun:ioctl
+   fun:gdr_open
+}
+{
+   gdr_get_info_ioctl
+   Memcheck:Param
+   ioctl(generic)
+   fun:ioctl
+   fun:gdr_get_info
+}
+{
+   gdr_unpin_ioctl
+   Memcheck:Param
+   ioctl(generic)
+   fun:ioctl
+   fun:gdr_unpin_buffer
+}
+{
+   gdr_copy_cond
+   Memcheck:Cond
+   ...
+   fun:gdr_copy_to_bar
+}
+{
+   gdr_copy_cond_1
+   Memcheck:Cond
+   ...
+   fun:gdr_copy_from_bar
+}
+{
+   gdr_copy_value8
+   Memcheck:Value8
+   ...
+   fun:gdr_copy_to_bar
+}
+{
+   gdr_copy_value8_1
+   Memcheck:Value8
+   ...
+   fun:gdr_copy_from_bar
+}
+{
+    ibv_exp_reg_mr
+    Memcheck:Param
+    write(buf)
+    ...
+    fun:ibv_exp_reg_mr
+}
+{
+    ibv_exp_free_dm
+    Memcheck:Param
+    write(buf)
+    ...
+    fun:ibv_exp_free_dm
+}
+{
+    ibv_exp_cmd_free_dm
+    Memcheck:Param
+    write(buf)
+    ...
+    fun:ibv_exp_cmd_free_dm
+}
+{
+   res_domain_leak
+   Memcheck:Leak
+   ...
+   fun:ibv_exp_create_res_domain
+}
+{
+   ibverbs_get_device_list
+   Memcheck:Leak
+   ...
+   fun:ibverbs_get_device_list
+}
+{
+   fix_dereg_mr
+   Memcheck:Cond
+   ...
+   fun:ibv_dereg_mr@@IBVERBS_1.1
+}
+{
+   exp_query_device_cond
+   Memcheck:Cond
+   fun:ibv_exp_cmd_query_device
+}
+{
+   ucma_init_device
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:ucma_init_device
+}
+{
+   ucm_get_dev_index
+   Memcheck:Leak
+   ...
+   fun:ib_cm_open_device
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   obj:*/libhfi1verbs-rdmav22.so*
+   obj:*/libibverbs.so*
+   ...
+   fun:ibv_get_device_list
+}
+{
+   rdma_core_ibv_get_device_list
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   ...
+   obj:*/libibverbs.so*
+   ...
+   fun:ibv_get_device_list
+}
+{
+   verbs_open_device
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:verbs_open_device
+}
+{
+   uct_ib_iface_prepare_rx_wrs_val
+   Memcheck:Value8
+   fun:uct_ib_iface_prepare_rx_wrs
+}
+{
+   uct_ib_iface_prepare_rx_wrs_cond
+   Memcheck:Cond
+   fun:uct_ib_iface_prepare_rx_wrs
+}
+{
+   uct_ib_iface_recv_desc_hdr
+   Memcheck:Value8
+   fun:uct_ib_iface_recv_desc_hdr
+}
+{
+   mlx4_ibv_post_srq_recv_val
+   Memcheck:Value8
+   obj:*/libmlx4.so*
+   fun:ibv_post_srq_recv
+}
+{
+   mlx4_ibv_post_srq_recv_cond
+   Memcheck:Cond
+   obj:*/libmlx4.so*
+   fun:ibv_post_srq_recv
+}
+{
+   uct_rc_verbs_iface_common_prepost_recvs
+   Memcheck:Cond
+   fun:uct_rc_verbs_iface_common_prepost_recvs
+}
+{
+   uct_rc_verbs_iface_post_recv_always_val
+   Memcheck:Value8
+   fun:uct_rc_verbs_iface_post_recv_always
+}
+{
+   uct_rc_verbs_iface_post_recv_always_cond
+   Memcheck:Cond
+   fun:uct_rc_verbs_iface_post_recv_always
+}
+{
+   uct_rc_verbs_iface_post_recv_common_val
+   Memcheck:Value8
+   ...
+   fun:uct_rc_verbs_iface_post_recv_common
+}
+{
+   uct_rc_verbs_iface_post_recv_common_cond
+   Memcheck:Cond
+   fun:uct_rc_verbs_iface_post_recv_common
+}
+{
+   gdrcopy_ioctl
+   Memcheck:Param
+   ioctl(generic)
+   fun:ioctl
+   fun:gdr_pin_buffer
+}
+{
+   gdr_map
+   Memcheck:Cond
+   fun:gdr_map
+}
+{
+   gdr_copy_to_mapping_cond
+   Memcheck:Cond
+   ...
+   fun:gdr_copy_to_mapping
+}
+{
+   fun:gdr_copy_from_mapping_cond
+   Memcheck:Cond
+   ...
+   fun:gdr_copy_from_mapping
+}
+{
+   gdr_copy_to_mapping_value8
+   Memcheck:Value8
+   ...
+   fun:gdr_copy_to_mapping
+}
+{
+   gdr_copy_from_mapping_value8
+   Memcheck:Value8
+   ...
+   fun:gdr_copy_from_mapping
+}
+{
+   gdr_unmap
+   Memcheck:Cond
+   fun:gdr_unmap
+}
+{
+    is_cuda_supported_unint_access
+    Memcheck:Param
+    ioctl(generic)
+    fun:ioctl
+    ...
+    fun:cuDeviceTotalMem_v2
+    ...
+    fun:cudaGetDeviceCount
+}
+{
+   rdmacm_event_channel
+   Memcheck:Leak
+   ...
+   fun:rdma_create_event_channel
+}
+{
+   rdmacm_bind_addr
+   Memcheck:Leak
+   ...
+   fun:rdma_bind_addr
+}
+{
+   xpmem_get
+   Memcheck:Cond
+   fun:xpmem_get
+}
+{
+   dlopen_mem_leak
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_dlerror_run
+   fun:dlopen@@GLIBC_2.2.5
+}
+{
+   ibv_create_srq_cond
+   Memcheck:Cond
+   obj:*
+   fun:ibv_cmd_create_srq
+   obj:*/libmlx5*.so*
+   fun:ibv_create_srq
+}
+{
+   vfprintf_param
+   Memcheck:Param
+   write(buf)
+   obj:/usr/lib64/libc-2.17.so
+   fun:_IO_file_write@@GLIBC_2.2.5
+   fun:_IO_file_xsputn@@GLIBC_2.2.5
+   fun:buffered_vfprintf
+   fun:vfprintf
+}
+{
+   vfprintf_cond
+   Memcheck:Cond
+   fun:vfprintf
+   fun:buffered_vfprintf
+   fun:vfprintf
+   fun:fprintf
+}
+{
+   ucs_log_print_cond
+   Memcheck:Cond
+   fun:vfprintf
+   ...
+   fun:ucs_log_print
+   fun:ucs_log_default_handler
+   fun:ucs_log_dispatch
+}
+{
+    cudaSetDevice
+    Memcheck:Leak
+    match-leak-kinds: possible
+    ...
+    fun:cudaSetDevice
+}
+
+# should be removed once fixed
+{
+   ucc_components_load
+   Memcheck:Leak
+   ...
+   fun:ucc_components_load
+}
+{
+   ucc_cl_lib_init
+   Memcheck:Cond
+   ...
+   fun:ucc_cl_lib_init
+}
+{
+   ucc_context_config_modify
+   Memcheck:Leak
+   ...
+   fun:ucc_context_config_modify
+}
+{
+   ucc_team_create_post
+   Memcheck:Leak
+   ...
+   fun:ucc_team_create_post
+}
+{
+   ucc_free(lib->full_prefix);
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:strdup
+   fun:ucc_init_version
+}
+{
+   ucs_config_sscanf_string_leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:strdup
+   fun:ucs_config_sscanf_string
+}
+{
+   ucc_mc_cuda_init_leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:ucs_mpool_init
+   fun:ucc_mc_cuda_init
+}
+{
+   strdup_leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:ucm_malloc_allocated
+   fun:ucm_malloc_impl
+   fun:ucm_malloc
+   fun:strdup
+   fun:ucc_init_version
+}
+{
+   strdup_leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:ucm_malloc_allocated
+   fun:ucm_malloc_impl
+   fun:ucm_malloc
+   fun:strdup
+   fun:ucc_init_version
+}
+#{
+#   ucc_tl_nccl_param
+#   Memcheck:Param
+#   ...
+#   fun:ucc_tl_nccl_team_create_test
+#}
+{
+   ucc_tl_nccl_leak
+   Memcheck:Leak
+   ...
+   fun:ucc_tl_nccl_*
+}
+
+{
+   ucc_tl_ucp_addr8
+   Memcheck:Addr8
+   ...
+   fun:ucc_tl_ucp_close_eps
+}
+{
+   ucc_tl_ucp_leak
+   Memcheck:Leak
+   ...
+   fun:ucc_tl_ucp_*
+}
+{
+   ucc_tl_nccl_team_create_test
+   Memcheck:Param
+   socketcall.sendto(msg)
+   fun:send
+   fun:socketProgressOpt
+   fun:socketWait
+   fun:socketSend
+   fun:ncclIbConnect
+   fun:_ZL18initTransportsRankP8ncclCommP12ncclUniqueId
+   fun:_Z20ncclCommInitRankSyncPP8ncclCommi12ncclUniqueIdii
+   fun:_ZL19ncclCommInitRankDevPP8ncclCommi12ncclUniqueIdii
+   fun:ncclCommInitRank
+   fun:ucc_tl_nccl_team_create_test
+   fun:ucc_tl_team_create_multiple
+   fun:ucc_cl_basic_team_create_test
+   fun:ucc_team_create_cls
+   fun:ucc_team_create_test_single
+   fun:ucc_team_create_test
+   fun:_ZN10UccTestMpi15create_ucc_teamEP19ompi_communicator_t
+   fun:_ZN10UccTestMpi11create_teamE19ucc_test_mpi_team_t
+   fun:_ZN10UccTestMpi12create_teamsERSt6vectorI19ucc_test_mpi_team_tSaIS1_EE
+   fun:main
+}
+
