@@ -25,7 +25,7 @@ typedef struct ucc_pq_mt {
 
 static void ucc_pq_mt_enqueue(ucc_progress_queue_t *pq, ucc_coll_task_t *task)
 {
-    ucc_pq_mt_t *pq_mt      = ucc_derived_of(pq, ucc_pq_mt_t);
+    ucc_pq_mt_t *pq_mt = ucc_derived_of(pq, ucc_pq_mt_t);
 
     ucc_spin_lock(&pq_mt->locked_queue_lock);
     ucc_list_add_tail(&pq_mt->locked_queue, &task->list_elem);
@@ -48,11 +48,11 @@ static void ucc_pq_mt_enqueue_opt(ucc_progress_queue_t *pq, ucc_coll_task_t *tas
     ucc_pq_mt_enqueue(pq, task);
 }
 
-inline static void ucc_pq_mt_dequeue(ucc_progress_queue_t *pq,
+static void ucc_pq_mt_dequeue(ucc_progress_queue_t *pq,
                                      ucc_coll_task_t     **popped_task_ptr,
                                      int                   is_first_call)
 {
-    ucc_pq_mt_t *pq_mt      = ucc_derived_of(pq, ucc_pq_mt_t);
+    ucc_pq_mt_t *pq_mt           = ucc_derived_of(pq, ucc_pq_mt_t);
     ucc_coll_task_t *popped_task = NULL;
 
     ucc_spin_lock(&pq_mt->locked_queue_lock);
@@ -65,7 +65,7 @@ inline static void ucc_pq_mt_dequeue(ucc_progress_queue_t *pq,
     *popped_task_ptr = popped_task;
 }
 
-inline static void ucc_pq_mt_dequeue_opt(ucc_progress_queue_t *pq,
+static void ucc_pq_mt_dequeue_opt(ucc_progress_queue_t *pq,
                                          ucc_coll_task_t     **popped_task_ptr,
                                          int                   is_first_call)
 {
