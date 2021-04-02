@@ -64,6 +64,7 @@ ucc_status_t ucc_pq_st_init(ucc_progress_queue_t **pq)
     }
     ucc_list_head_init(&pq_st->list);
     pq_st->super.enqueue  = ucc_pq_st_enqueue;
+    pq_st->super.dequeue  = NULL;
     pq_st->super.progress = ucc_pq_st_progress;
     pq_st->super.finalize = ucc_pq_st_finalize;
     *pq                   = &pq_st->super;
