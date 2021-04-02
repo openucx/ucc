@@ -45,6 +45,7 @@ static inline ucc_status_t cuda_error_to_ucc_status(cudaError_t cu_err)
 }
 
 typedef ucc_status_t (*ucc_mc_cuda_task_post_fn) (uint32_t *dev_status,
+                                                  int blocking_wait,
                                                   cudaStream_t stream);
 
 typedef struct ucc_mc_cuda_config {
@@ -53,6 +54,7 @@ typedef struct ucc_mc_cuda_config {
     int                            reduce_num_threads;
     ucc_mc_cuda_strm_task_mode_t   strm_task_mode;
     ucc_mc_cuda_task_stream_type_t task_strm_type;
+    int                            stream_blocking_wait;
 } ucc_mc_cuda_config_t;
 
 typedef struct ucc_mc_cuda {

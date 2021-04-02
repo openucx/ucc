@@ -46,6 +46,11 @@ static ucc_config_field_t ucc_mc_cuda_config_table[] = {
      ucc_offsetof(ucc_mc_cuda_config_t, task_strm_type),
      UCC_CONFIG_TYPE_ENUM(task_stream_types)},
 
+    {"STREAM_BLOCKING_WAIT", "1",
+     "Stream is blocked until collective operation is done",
+     ucc_offsetof(ucc_mc_cuda_config_t, stream_blocking_wait),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}
 };
 
@@ -107,18 +112,23 @@ static ucc_mpool_ops_t ucc_mc_cuda_event_mpool_ops = {
 };
 
 ucc_status_t ucc_mc_cuda_post_kernel_stream_task(uint32_t *status,
+                                                 int blocking_wait,
                                                  cudaStream_t stream);
 
 static ucc_status_t ucc_mc_cuda_post_driver_stream_task(uint32_t *status,
+                                                        int blocking_wait,
                                                         cudaStream_t stream)
 {
     CUdeviceptr status_ptr  = (CUdeviceptr)status;
 
     CUDADRV_FUNC(cuStreamWriteValue32(stream, status_ptr,
                                       UCC_MC_CUDA_TASK_STARTED, 0));
-    CUDADRV_FUNC(cuStreamWaitValue32(stream, status_ptr,
-                                     UCC_MC_CUDA_TASK_COMPLETED,
-                                     CU_STREAM_WAIT_VALUE_EQ));
+    if (blocking_wait) {
+        CUDADRV_FUNC(cuStreamWaitValue32(stream, status_ptr,
+                                         UCC_MC_CUDA_TASK_COMPLETED,
+                                         CU_STREAM_WAIT_VALUE_EQ));
+    }
+
     return UCC_OK;
 }
 
@@ -347,6 +357,7 @@ ucc_status_t ucc_ee_cuda_task_post(void *ee_stream, void **ee_req)
     ucc_mc_cuda_stream_request_t *req;
     ucc_mc_cuda_event_t *cuda_event;
     ucc_status_t status;
+    ucc_mc_cuda_config_t *cfg = MC_CUDA_CONFIG;
 
     req = ucc_mpool_get(&ucc_mc_cuda.strm_reqs);
     ucc_assert(req);
@@ -354,7 +365,9 @@ ucc_status_t ucc_ee_cuda_task_post(void *ee_stream, void **ee_req)
     req->stream = (cudaStream_t)ee_stream;
 
     if (ucc_mc_cuda.task_strm_type == UCC_MC_CUDA_USER_STREAM) {
-        status = ucc_mc_cuda.post_strm_task(req->dev_status, req->stream);
+        status = ucc_mc_cuda.post_strm_task(req->dev_status,
+                                            cfg->stream_blocking_wait,
+                                            req->stream);
         if (status != UCC_OK) {
             goto free_req;
         }
@@ -363,7 +376,9 @@ ucc_status_t ucc_ee_cuda_task_post(void *ee_stream, void **ee_req)
         ucc_assert(cuda_event);
         CUDACHECK(cudaEventRecord(cuda_event->event, req->stream));
         CUDACHECK(cudaStreamWaitEvent(ucc_mc_cuda.stream, cuda_event->event, 0));
-        status = ucc_mc_cuda.post_strm_task(req->dev_status, ucc_mc_cuda.stream);
+        status = ucc_mc_cuda.post_strm_task(req->dev_status,
+                                            cfg->stream_blocking_wait,
+                                            ucc_mc_cuda.stream);
         if (status != UCC_OK) {
             goto free_event;
         }

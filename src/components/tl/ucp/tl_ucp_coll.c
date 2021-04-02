@@ -47,7 +47,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
 static ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    tl_info(task->team->super.super.context->lib, "finalizing coll task %p",
+    tl_info(task->team->super.super.context->lib, "finalizing ev_task %p",
             task);
     ucc_tl_ucp_put_task(task);
     return UCC_OK;
@@ -69,7 +69,8 @@ static ucc_status_t ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_ta
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_status_t status;
 
-    tl_info(task->team->super.super.context->lib, "event triggered. task:%p", coll_task);
+    tl_info(task->team->super.super.context->lib,
+            "event triggered. ev_task:%p coll_task:%p", parent_task, coll_task);
 
     coll_task->ee_task = parent_task->ee_task;
     status = coll_task->post(coll_task);
@@ -109,7 +110,7 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
         } else if (UCC_OK == ucc_ee_get_event_internal(task->super.ee, &ev,
                                                 &task->super.ee->event_in_queue)) {
             tl_info(task->team->super.super.context->lib,
-                    "triggered event arrivied. task:%p", coll_task);
+                    "triggered event arrivied. ev_task:%p", coll_task);
             task->super.ev = ev;
             task->super.ee_task = NULL;
         } else {
@@ -155,6 +156,7 @@ ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_
     ucc_tl_ucp_task_t *ev_task  = ucc_tl_ucp_get_task(task->team);
     ucc_status_t status;
 
+    ucc_coll_task_init(&ev_task->super);
     ev_task->super.ee = ee;
     ev_task->super.ev = NULL;
     ev_task->super.triggered_task = coll_task;
@@ -162,7 +164,8 @@ ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_
     ev_task->super.finalize = ucc_tl_ucp_coll_finalize;
     ev_task->super.super.status = UCC_INPROGRESS;
 
-    tl_info(task->team->super.super.context->lib, "triggered post. task:%p", coll_task);
+    tl_info(task->team->super.super.context->lib,
+            "triggered post. ev_task:%p coll_task:%p", &ev_task->super, coll_task);
     ev_task->super.progress = ucc_tl_ucp_ee_wait_for_event_trigger;
     ucc_event_manager_init(&ev_task->super.em);
     coll_task->handlers[UCC_EVENT_COMPLETED] = ucc_tl_ucp_event_trigger_complete;
