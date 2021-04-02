@@ -18,7 +18,7 @@ struct ucc_progress_queue {
 
 ucc_status_t ucc_progress_queue_init(ucc_progress_queue_t **pq,
                                      ucc_thread_mode_t tm,
-                                     uint32_t mt_lock_free_progress_q);
+                                     uint32_t lock_free_progress_q);
 
 static inline void ucc_progress_enqueue(ucc_progress_queue_t *pq,
                                         ucc_coll_task_t *task)

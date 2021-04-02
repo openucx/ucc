@@ -140,7 +140,7 @@ static void ucc_pq_mt_finalize(ucc_progress_queue_t *pq)
 }
 
 ucc_status_t ucc_pq_mt_init(ucc_progress_queue_t **pq,
-                            uint32_t mt_lock_free_progress_q)
+                            uint32_t lock_free_progress_q)
 {
     ucc_pq_mt_t *pq_mt = ucc_malloc(sizeof(*pq_mt), "pq_mt");
     if (!pq_mt) {
@@ -154,7 +154,7 @@ ucc_status_t ucc_pq_mt_init(ucc_progress_queue_t **pq,
     pq_mt->tasks_counters[0] = 0;
     pq_mt->tasks_counters[1] = 0;
 
-    if (mt_lock_free_progress_q) {
+    if (lock_free_progress_q) {
         pq_mt->super.enqueue    = ucc_pq_mt_enqueue_opt;
         pq_mt->super.dequeue    = ucc_pq_mt_dequeue_opt;
     } else {

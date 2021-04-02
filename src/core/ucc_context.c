@@ -18,9 +18,9 @@ static ucc_config_field_t ucc_context_config_table[] = {
      "An optimization hint of how many endpoints will be created on this context",
      ucc_offsetof(ucc_context_config_t, estimated_num_eps), UCC_CONFIG_TYPE_UINT},
 
-    {"MT_LOCK_FREE_PROGRESS_Q", "0",
+    {"LOCK_FREE_PROGRESS_Q", "0",
      "Enable lock free progress queue optimization",
-     ucc_offsetof(ucc_context_config_t, mt_lock_free_progress_q), UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_context_config_t, lock_free_progress_q), UCC_CONFIG_TYPE_UINT},
 
     {"ESTIMATED_NUM_PPN", "0",
      "An optimization hint of how many endpoints created on this context reside"
@@ -380,7 +380,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
                            ? UCC_THREAD_SINGLE
                            : lib->attr.thread_mode;
     status           = ucc_progress_queue_init(&ctx->pq, ctx->thread_mode,
-                                               config->mt_lock_free_progress_q);
+                                               config->lock_free_progress_q);
     if (UCC_OK != status) {
         ucc_error("failed to init progress queue for context %p", ctx);
         goto error_ctx_create;
