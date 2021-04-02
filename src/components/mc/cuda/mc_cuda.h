@@ -28,7 +28,8 @@ typedef enum ucc_mc_cuda_task_stream_type {
 typedef enum ucc_mc_task_status {
     UCC_MC_CUDA_TASK_COMPLETED,
     UCC_MC_CUDA_TASK_POSTED,
-    UCC_MC_CUDA_TASK_STARTED
+    UCC_MC_CUDA_TASK_STARTED,
+    UCC_MC_CUDA_TASK_COMPLETED_ACK
 } ucc_mc_task_status_t;
 
 static inline ucc_status_t cuda_error_to_ucc_status(cudaError_t cu_err)

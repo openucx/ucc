@@ -121,14 +121,15 @@ static ucc_status_t ucc_mc_cuda_post_driver_stream_task(uint32_t *status,
 {
     CUdeviceptr status_ptr  = (CUdeviceptr)status;
 
-    CUDADRV_FUNC(cuStreamWriteValue32(stream, status_ptr,
-                                      UCC_MC_CUDA_TASK_STARTED, 0));
     if (blocking_wait) {
+        CUDADRV_FUNC(cuStreamWriteValue32(stream, status_ptr,
+                                          UCC_MC_CUDA_TASK_STARTED, 0));
         CUDADRV_FUNC(cuStreamWaitValue32(stream, status_ptr,
                                          UCC_MC_CUDA_TASK_COMPLETED,
                                          CU_STREAM_WAIT_VALUE_EQ));
     }
-
+    CUDADRV_FUNC(cuStreamWriteValue32(stream, status_ptr,
+                                      UCC_MC_CUDA_TASK_COMPLETED_ACK, 0));
     return UCC_OK;
 }
 
@@ -405,7 +406,11 @@ ucc_status_t ucc_ee_cuda_task_query(void *ee_req)
 {
     ucc_mc_cuda_stream_request_t *req = ee_req;
 
-    if (req->status != UCC_MC_CUDA_TASK_STARTED) {
+    /* ee task might be only in POSTED, STARTED or COMPLETED_ACK state
+       COMPLETED state is used by ucc_ee_cuda_task_end function to request
+       stream unblock*/
+    ucc_assert(req->status != UCC_MC_CUDA_TASK_COMPLETED);
+    if (req->status == UCC_MC_CUDA_TASK_POSTED) {
         return UCC_INPROGRESS;
     }
     mc_info(&ucc_mc_cuda.super, "CUDA stream task started. req:%p", req);
@@ -415,11 +420,17 @@ ucc_status_t ucc_ee_cuda_task_query(void *ee_req)
 ucc_status_t ucc_ee_cuda_task_end(void *ee_req)
 {
     ucc_mc_cuda_stream_request_t *req = ee_req;
+    volatile ucc_mc_task_status_t *st = &req->status;
 
-    req->status = UCC_OK;
-
-    mc_info(&ucc_mc_cuda.super, "CUDA stream task done. req:%p", req);
+    /* can be safely ended only if it's in STARTED or COMPLETED_ACK state */
+    ucc_assert((*st != UCC_MC_CUDA_TASK_POSTED) &&
+               (*st != UCC_MC_CUDA_TASK_COMPLETED));
+    if (*st == UCC_MC_CUDA_TASK_STARTED) {
+        *st = UCC_MC_CUDA_TASK_COMPLETED;
+        while(*st != UCC_MC_CUDA_TASK_COMPLETED_ACK) { }
+    }
     ucc_mpool_put(req);
+    mc_info(&ucc_mc_cuda.super, "CUDA stream task done. req:%p", req);
     return UCC_OK;
 }
 
