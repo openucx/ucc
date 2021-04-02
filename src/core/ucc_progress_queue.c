@@ -7,15 +7,16 @@
 #include "ucc_progress_queue.h"
 
 ucc_status_t ucc_pq_st_init(ucc_progress_queue_t **pq);
-ucc_status_t ucc_pq_mt_init(ucc_progress_queue_t **pq);
+ucc_status_t ucc_pq_mt_init(ucc_progress_queue_t **pq, uint32_t mt_lock_free_progress_q);
 
 ucc_status_t ucc_progress_queue_init(ucc_progress_queue_t **pq,
-                                     ucc_thread_mode_t      tm)
+                                     ucc_thread_mode_t      tm,
+                                     uint32_t mt_lock_free_progress_q)
 {
     if (tm == UCC_THREAD_SINGLE) {
         return ucc_pq_st_init(pq);
     } else { // TODO also for UCC_THREAD_FUNNELED?
-        return ucc_pq_mt_init(pq);
+        return ucc_pq_mt_init(pq, mt_lock_free_progress_q);
     }
 }
 

@@ -56,6 +56,7 @@ typedef struct ucc_context_config {
     uint32_t                  team_ids_pool_size;
     uint32_t                  estimated_num_eps;
     uint32_t                  estimated_num_ppn;
+    uint32_t                  mt_lock_free_progress_q;
 } ucc_context_config_t;
 
 /* Any internal UCC component (TL, CL, etc) may register its own

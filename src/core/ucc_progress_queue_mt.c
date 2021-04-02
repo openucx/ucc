@@ -26,6 +26,15 @@ typedef struct ucc_pq_mt {
 static void ucc_pq_mt_enqueue(ucc_progress_queue_t *pq, ucc_coll_task_t *task)
 {
     ucc_pq_mt_t *pq_mt      = ucc_derived_of(pq, ucc_pq_mt_t);
+
+    ucc_spin_lock(&pq_mt->locked_queue_lock);
+    ucc_list_add_tail(&pq_mt->locked_queue, &task->list_elem);
+    ucc_spin_unlock(&pq_mt->locked_queue_lock);
+}
+
+static void ucc_pq_mt_enqueue_opt(ucc_progress_queue_t *pq, ucc_coll_task_t *task)
+{
+    ucc_pq_mt_t *pq_mt      = ucc_derived_of(pq, ucc_pq_mt_t);
     int          which_pool = task->was_progressed ^ (pq_mt->which_pool & 1);
     int          i;
     for (i = 0; i < LINE_SIZE; i++) {
@@ -35,15 +44,32 @@ static void ucc_pq_mt_enqueue(ucc_progress_queue_t *pq, ucc_coll_task_t *task)
             return;
         }
     }
-    ucc_spin_lock(&pq_mt->locked_queue_lock);
-    ucc_list_add_tail(&pq_mt->locked_queue, &task->list_elem);
-    ucc_spin_unlock(&pq_mt->locked_queue_lock);
+
+    ucc_pq_mt_enqueue(pq, task);
 }
 
-inline static void ucc_pq_mt_dequeue(ucc_pq_mt_t *     pq_mt,
-                                     ucc_coll_task_t **popped_task_ptr,
-                                     int               is_first_call)
+inline static void ucc_pq_mt_dequeue(ucc_progress_queue_t *pq,
+                                     ucc_coll_task_t     **popped_task_ptr,
+                                     int                   is_first_call)
 {
+    ucc_pq_mt_t *pq_mt      = ucc_derived_of(pq, ucc_pq_mt_t);
+    ucc_coll_task_t *popped_task = NULL;
+
+    ucc_spin_lock(&pq_mt->locked_queue_lock);
+    if (!ucc_list_is_empty(&pq_mt->locked_queue)) {
+        popped_task = ucc_list_extract_head(&pq_mt->locked_queue,
+                                            ucc_coll_task_t, list_elem);
+        popped_task->was_progressed = 1;
+    }
+    ucc_spin_unlock(&pq_mt->locked_queue_lock);
+    *popped_task_ptr = popped_task;
+}
+
+inline static void ucc_pq_mt_dequeue_opt(ucc_progress_queue_t *pq,
+                                         ucc_coll_task_t     **popped_task_ptr,
+                                         int                   is_first_call)
+{
+    ucc_pq_mt_t *pq_mt  = ucc_derived_of(pq, ucc_pq_mt_t);
     // Save value in the beginning of the function
     int curr_which_pool = pq_mt->which_pool;
     int which_pool      = curr_which_pool & 1; // turn from even/odd -> bool
@@ -64,30 +90,23 @@ inline static void ucc_pq_mt_dequeue(ucc_pq_mt_t *     pq_mt,
             }
         }
     }
+
     if (is_first_call) {
         ucc_atomic_cswap8(&pq_mt->which_pool, curr_which_pool,
                           curr_which_pool + 1);
-        ucc_pq_mt_dequeue(pq_mt, popped_task_ptr, 0);
+        pq->dequeue(pq, popped_task_ptr, 0);
         return;
     }
-    popped_task = NULL;
-    ucc_spin_lock(&pq_mt->locked_queue_lock);
-    if (!ucc_list_is_empty(&pq_mt->locked_queue)) {
-        popped_task = ucc_list_extract_head(&pq_mt->locked_queue,
-                                            ucc_coll_task_t, list_elem);
-        popped_task->was_progressed = 1;
-    }
-    ucc_spin_unlock(&pq_mt->locked_queue_lock);
-    *popped_task_ptr = popped_task;
+
+    ucc_pq_mt_dequeue(pq, popped_task_ptr, 0);
 }
 
 static int ucc_pq_mt_progress(ucc_progress_queue_t *pq)
 {
-    ucc_pq_mt_t *    pq_mt        = ucc_derived_of(pq, ucc_pq_mt_t);
     int              n_progressed = 0;
     ucc_coll_task_t *task;
     ucc_status_t     status;
-    ucc_pq_mt_dequeue(pq_mt, &task, 1);
+    pq->dequeue(pq, &task, 1);
     if (task) {
         if (task->progress) {
             status = task->progress(task);
@@ -107,7 +126,7 @@ static int ucc_pq_mt_progress(ucc_progress_queue_t *pq)
                 task->finalize(task);
             }
         } else {
-            ucc_pq_mt_enqueue(pq, task);
+            pq->enqueue(pq, task);
         }
     }
     return n_progressed;
@@ -120,7 +139,8 @@ static void ucc_pq_mt_finalize(ucc_progress_queue_t *pq)
     ucc_free(pq_mt);
 }
 
-ucc_status_t ucc_pq_mt_init(ucc_progress_queue_t **pq)
+ucc_status_t ucc_pq_mt_init(ucc_progress_queue_t **pq,
+                            uint32_t mt_lock_free_progress_q)
 {
     ucc_pq_mt_t *pq_mt = ucc_malloc(sizeof(*pq_mt), "pq_mt");
     if (!pq_mt) {
@@ -133,7 +153,14 @@ ucc_status_t ucc_pq_mt_init(ucc_progress_queue_t **pq)
     pq_mt->which_pool        = 0;
     pq_mt->tasks_counters[0] = 0;
     pq_mt->tasks_counters[1] = 0;
-    pq_mt->super.enqueue     = ucc_pq_mt_enqueue;
+
+    if (mt_lock_free_progress_q) {
+        pq_mt->super.enqueue    = ucc_pq_mt_enqueue_opt;
+        pq_mt->super.dequeue    = ucc_pq_mt_dequeue_opt;
+    } else {
+        pq_mt->super.enqueue    = ucc_pq_mt_enqueue;
+        pq_mt->super.dequeue    = ucc_pq_mt_dequeue;
+    }
     pq_mt->super.progress    = ucc_pq_mt_progress;
     pq_mt->super.finalize    = ucc_pq_mt_finalize;
     *pq                      = &pq_mt->super;
