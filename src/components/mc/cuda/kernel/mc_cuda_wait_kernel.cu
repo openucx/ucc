@@ -19,11 +19,12 @@ __global__ void wait_kernel(volatile uint32_t *status) {
     do {
         st = (ucc_status_t)*status;
     } while(st != UCC_MC_CUDA_TASK_COMPLETED);
+    *status = UCC_MC_CUDA_TASK_COMPLETED_ACK;
     return;
 }
 
 __global__ void wait_kernel_nb(volatile uint32_t *status) {
-    *status = UCC_MC_CUDA_TASK_STARTED;
+    *status = UCC_MC_CUDA_TASK_COMPLETED_ACK;
     return;
 }
 
