@@ -89,21 +89,32 @@ UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_ucp_team_t, ucc_base_team_t,
                           ucc_base_context_t *, const ucc_base_team_params_t *);
 
 ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team);
+
 ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team);
+
 ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
                                   ucc_base_team_t *team,
                                   ucc_coll_task_t **task);
+
 ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
                                         ucs_memory_type_t mem_type,
                                         ucc_tl_ucp_context_t *ctx);
+
 ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, ucc_datatype_t dt,
                                           size_t count, ucc_reduction_op_t op,
                                           ucc_tl_team_subset_t subset,
                                           ucc_coll_task_t **task);
+
 ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task);
+
 ucc_status_t ucc_tl_ucp_service_cleanup(ucc_coll_task_t *task);
-void ucc_tl_ucp_service_update_id(ucc_base_team_t *team, uint16_t id);
+
+void         ucc_tl_ucp_service_update_id(ucc_base_team_t *team, uint16_t id);
+
+ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
+                                        ucc_coll_score_t **score);
+
 UCC_TL_IFACE_DECLARE(ucp, UCP);
 
 ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1] = {

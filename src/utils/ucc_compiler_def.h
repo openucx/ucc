@@ -25,6 +25,7 @@
 #define ucc_snprintf_safe snprintf
 
 typedef ucs_log_component_config_t ucc_log_component_config_t;
+typedef int                        ucc_score_t;
 
 #define _UCC_PP_MAKE_STRING(x) #x
 #define UCC_PP_MAKE_STRING(x)  _UCC_PP_MAKE_STRING(x)
@@ -76,4 +77,5 @@ static inline ucs_status_t ucc_status_to_ucs_status(ucc_status_t status)
 #endif
 
 #define UCC_CACHE_LINE_SIZE 128 //TODO detect it
+#define ucc_for_each_bit ucs_for_each_bit
 #endif

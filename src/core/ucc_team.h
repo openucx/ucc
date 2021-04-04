@@ -32,6 +32,7 @@ typedef struct ucc_team {
     ucc_rank_t        rank;
     ucc_tl_team_t    *service_team;
     ucc_coll_task_t  *task;
+    ucc_rank_t        size;
 } ucc_team_t;
 
 /* If the bit is set then team_id is provided by the user */

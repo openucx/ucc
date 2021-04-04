@@ -8,6 +8,7 @@
 #include "tl_nccl_coll.h"
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
+#include "coll_score/ucc_coll_score.h"
 
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
@@ -213,5 +214,35 @@ free_event:
     cudaEventDestroy(task->completed);
 free_task:
     ucc_mpool_put(task);
+    return status;
+}
+
+ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
+                                         ucc_coll_score_t **score_p)
+{
+    ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
+    ucc_tl_nccl_lib_t * lib  = UCC_TL_NCCL_TEAM_LIB(team);
+    ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_CUDA;
+    ucc_coll_score_t   *score;
+    ucc_status_t        status;
+
+    /* There can be a different logic for different coll_type/mem_type.
+       Right now just init everything the same way. */
+    status =
+        ucc_coll_score_build_default(tl_team, UCC_TL_NCCL_DEFAULT_SCORE,
+                           ucc_tl_nccl_coll_init, UCC_TL_NCCL_SUPPORTED_COLLS,
+                           &mt, 1, &score);
+    if (UCC_OK != status) {
+        return status;
+    }
+    if (strlen(lib->super.super.score_str) > 0) {
+        status = ucc_coll_score_update_from_str(lib->super.super.score_str,
+                                                score, team->size);
+        if (status == UCC_ERR_INVALID_PARAM) {
+            /* User provided incorrect input - try to proceed */
+            status = UCC_OK;
+        }
+    }
+    *score_p = score;
     return status;
 }

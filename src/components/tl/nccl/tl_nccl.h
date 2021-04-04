@@ -14,6 +14,10 @@
 #include <nccl.h>
 #include <cuda.h>
 
+#ifndef UCC_TL_NCCL_DEFAULT_SCORE
+#define UCC_TL_NCCL_DEFAULT_SCORE 20
+#endif
+
 typedef struct ucc_tl_nccl_iface {
     ucc_tl_iface_t super;
 } ucc_tl_nccl_iface_t;
@@ -60,6 +64,11 @@ typedef struct ucc_tl_nccl_task {
     cudaEvent_t         completed;
 } ucc_tl_nccl_task_t;
 
+#define UCC_TL_NCCL_SUPPORTED_COLLS                         \
+    (UCC_COLL_TYPE_ALLTOALL  | UCC_COLL_TYPE_ALLTOALLV  |   \
+     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |   \
+     UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BCAST)
+
 UCC_CLASS_DECLARE(ucc_tl_nccl_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
@@ -82,5 +91,8 @@ UCC_CLASS_DECLARE(ucc_tl_nccl_team_t, ucc_base_context_t *,
             goto _label;                                                       \
         }                                                                      \
     } while (0)
+
+#define UCC_TL_NCCL_TEAM_LIB(_team)                                            \
+    (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_nccl_lib_t))
 
 #endif

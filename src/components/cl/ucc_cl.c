@@ -12,11 +12,6 @@ ucc_config_field_t ucc_cl_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_cl_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_base_config_table)},
 
-    {"PRIORITY", "-1",
-     "UCC CL priority.\n"
-     "Possible values are: [1,inf]",
-     ucc_offsetof(ucc_cl_lib_config_t, priority), UCC_CONFIG_TYPE_INT},
-
     {NULL}
 };
 
@@ -31,7 +26,7 @@ const char *ucc_cl_names[] = {
 };
 
 UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
-                    const ucc_cl_lib_config_t *cl_config, int default_priority)
+                    const ucc_cl_lib_config_t *cl_config)
 {
     UCC_CLASS_CALL_BASE_INIT();
     self->iface         = cl_iface;
@@ -39,13 +34,13 @@ UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
     ucc_strncpy_safe(self->super.log_component.name,
                      cl_iface->cl_lib_config.name,
                      sizeof(self->super.log_component.name));
-    self->priority =
-        (-1 == cl_config->priority) ? default_priority : cl_config->priority;
+    self->super.score_str = strdup(cl_config->super.score_str);
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_lib_t)
 {
+    ucc_free(self->super.score_str);
 }
 
 UCC_CLASS_DEFINE(ucc_cl_lib_t, void);

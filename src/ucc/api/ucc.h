@@ -180,7 +180,8 @@ typedef enum {
     UCC_COLL_TYPE_REDUCE_SCATTER     = UCC_BIT(12),
     UCC_COLL_TYPE_REDUCE_SCATTERV    = UCC_BIT(13),
     UCC_COLL_TYPE_SCATTER            = UCC_BIT(14),
-    UCC_COLL_TYPE_SCATTERV           = UCC_BIT(15)
+    UCC_COLL_TYPE_SCATTERV           = UCC_BIT(15),
+    UCC_COLL_TYPE_LAST
 } ucc_coll_type_t;
 
 /**

@@ -8,6 +8,22 @@
 
 #include "config.h"
 #include "ucc_datastruct.h"
+#include "ucc_math.h"
+#include <string.h>
+
+#define UCC_COLL_TYPE_NUM (ucc_ilog2(UCC_COLL_TYPE_LAST - 1) + 1)
+
+#define UCC_COLL_TYPE_ALL ((UCC_COLL_TYPE_LAST << 1) - 3)
+
+#define UCC_MEMORY_TYPE_ASSYMETRIC                                             \
+    ((ucc_memory_type_t)((int)UCC_MEMORY_TYPE_LAST + 1))
+
+#define UCC_MEMORY_TYPE_NOT_APPLY                                              \
+    ((ucc_memory_type_t)((int)UCC_MEMORY_TYPE_LAST + 2))
+
+#define UCC_MSG_SIZE_INVALID SIZE_MAX
+
+#define UCC_MSG_SIZE_ASSYMETRIC (UCC_MSG_SIZE_INVALID - 1)
 
 #define UCC_IS_INPLACE(_args) \
     (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
@@ -41,7 +57,7 @@ ucc_coll_args_get_total_count(const ucc_coll_args_t *args,
 {
     size_t count = 0;
     int i;
-
+    // TODO switch to base args and cache total count there - can we do it ?
     if ((args->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
         (args->flags & UCC_COLL_ARGS_FLAG_COUNT_64BIT)) {
         for (i = 0; i < size; i++) {
@@ -55,6 +71,15 @@ ucc_coll_args_get_total_count(const ucc_coll_args_t *args,
 
     return count;
 }
+typedef struct ucc_base_coll_args ucc_base_coll_args_t;
+
+ucc_coll_type_t   ucc_coll_type_from_str(const char *str);
+
+ucc_memory_type_t ucc_mem_type_from_str(const char *str);
+
+size_t            ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs);
+
+ucc_memory_type_t ucc_coll_args_mem_type(const ucc_base_coll_args_t *bargs);
 
 
 static inline ucc_rank_t ucc_ep_map_eval(ucc_ep_map_t map, ucc_rank_t rank)

@@ -82,8 +82,7 @@ UCC_TEST_P(test_alltoall_0, single)
 }
 
 INSTANTIATE_TEST_CASE_P(
-    ,
-    test_alltoall_0,
+    , test_alltoall_0,
     ::testing::Combine(
         ::testing::Range(1, UccJob::nStaticTeams), // team_ids
         ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_FLOAT64 + 1), // dtype

@@ -101,9 +101,10 @@ class test_alltoallv_0 : public test_alltoallv <uint64_t>,
 
 UCC_TEST_P(test_alltoallv_0, single)
 {
-    const int size = std::get<0>(GetParam());
-    const ucc_datatype_t dtype = (ucc_datatype_t)std::get<1>(GetParam());
-    UccTeam_h team = UccJob::getStaticJob()->create_team(size);
+    const int            team_id = std::get<0>(GetParam());
+    const ucc_datatype_t dtype   = (ucc_datatype_t)std::get<1>(GetParam());
+    UccTeam_h            team    = UccJob::getStaticTeams()[team_id];
+    int                  size    = team->procs.size();
 
     coll_mask = UCC_COLL_ARGS_FIELD_FLAGS;
     coll_flags = UCC_COLL_ARGS_FLAG_COUNT_64BIT |
@@ -137,21 +138,17 @@ UCC_TEST_P(test_alltoallv_1, single)
     data_fini(args);
 }
 
-
 INSTANTIATE_TEST_CASE_P(
-        64,
-        test_alltoallv_0,
+        64, test_alltoallv_0,
         ::testing::Combine(
             ::testing::Range(1, UccJob::nStaticTeams), // team_ids
             ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_FLOAT64 + 1))); // dtype
 
 INSTANTIATE_TEST_CASE_P(
-        32,
-        test_alltoallv_1,
+        32, test_alltoallv_1,
         ::testing::Combine(
             ::testing::Range(1, UccJob::nStaticTeams), // team_ids
             ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_FLOAT64 + 1))); // dtype
-
 
 class test_alltoallv_2 : public test_alltoallv<uint64_t>,
         public ::testing::WithParamInterface<int> {};
@@ -159,7 +156,6 @@ class test_alltoallv_2 : public test_alltoallv<uint64_t>,
 class test_alltoallv_3 : public test_alltoallv<uint32_t>,
         public ::testing::WithParamInterface<int> {};
 
-# if 0
 UCC_TEST_P(test_alltoallv_2, multiple)
 {
     const ucc_datatype_t dtype = (ucc_datatype_t)(GetParam());
@@ -216,4 +212,3 @@ INSTANTIATE_TEST_CASE_P(
         32,
         test_alltoallv_3,
         ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_FLOAT64 + 1)); // dtype
-#endif
