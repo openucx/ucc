@@ -29,6 +29,9 @@ static ucc_test_mpi_root_t root_type = ROOT_RANDOM;
 static int root_value = 10;
 static ucc_thread_mode_t                   thread_mode  = UCC_THREAD_SINGLE;
 static int                                 iterations   = 1;
+#ifdef HAVE_CUDA
+static test_set_cuda_device_t test_cuda_set_device = TEST_SET_DEV_NONE;
+#endif
 static std::vector<std::string> str_split(const char *value, const char *delimiter)
 {
     std::vector<std::string> rst;
@@ -60,6 +63,7 @@ void PrintHelp()
        "--max_size   <value>:           maximum send/recv buffer allocation size\n"
        "--count_bits <c1,c2,..>:        list of counts bits: 32,64          (alltoallv only)\n"
        "--displ_bits <d1,d2,..>:        list of displacements bits: 32,64   (alltoallv only)\n"
+       "--set_device <value>:           0 - don't set, 1 - cuda_device = local_rank, 2 - cuda_device = local_rank % cuda_device_count"
        "\n"
        "--help:              Show help\n";
     exit(1);
@@ -305,7 +309,7 @@ void PrintInfo()
 
 int ProcessArgs(int argc, char** argv)
 {
-    const char *const short_opts  = "c:t:m:d:o:M:I:r:s:C:D:i:Z:Th";
+    const char *const short_opts  = "c:t:m:d:o:M:I:r:s:C:D:i:Z:ThS:";
     const option      long_opts[] = {
                                 {"colls", required_argument, nullptr, 'c'},
                                 {"teams", required_argument, nullptr, 't'},
@@ -321,6 +325,9 @@ int ProcessArgs(int argc, char** argv)
                                 {"displ_bits", required_argument, nullptr, 'D'},
                                 {"iter", required_argument, nullptr, 'i'},
                                 {"thread-multiple", no_argument, nullptr, 'T'},
+#ifdef HAVE_CUDA
+                                {"set_device", required_argument, nullptr, 'S'},
+#endif
                                 {"help", no_argument, nullptr, 'h'},
                                 {nullptr, no_argument, nullptr, 0}
     };
@@ -376,6 +383,11 @@ int ProcessArgs(int argc, char** argv)
         case 'i':
             iterations = std::stoi(optarg);
             break;
+#ifdef HAVE_CUDA
+        case 'S':
+            test_cuda_set_device = (test_set_cuda_device_t)std::stoi(optarg);
+            break;
+#endif
         case 'h': // -h or --help
         case '?': // Unrecognized option
         default:
@@ -437,6 +449,9 @@ int main(int argc, char *argv[])
     test->set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
     test->set_max_size(test_max_size);
     test_rand_seed = init_rand_seed(test_rand_seed);
+#ifdef HAVE_CUDA
+    test->set_cuda_device(test_cuda_set_device);
+#endif
 
     PrintInfo();
 

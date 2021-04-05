@@ -41,6 +41,9 @@ static ucc_status_t oob_allgather_free(void *req)
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_local) {
     ucc_lib_config_h lib_config;
     ucc_context_config_h ctx_config;
+    int size;
+
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     /* Init ucc library */
     ucc_lib_params_t lib_params = {
@@ -229,6 +232,38 @@ void UccTestMpi::set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vs
 {
     displs_vsize = _displs_vsize;
 }
+
+#ifdef HAVE_CUDA
+void UccTestMpi::set_cuda_device(test_set_cuda_device_t set_device)
+{
+    MPI_Comm local_comm;
+    int cuda_dev_count;
+    int local_rank;
+    int device_id;
+    MPI_Comm_split_type(MPI_COMM_WORLD, OMPI_COMM_TYPE_NODE, 0, MPI_INFO_NULL,
+                        &local_comm);
+    MPI_Comm_rank(local_comm, &local_rank);
+    CUDA_CHECK(cudaGetDeviceCount(&cuda_dev_count));
+
+    switch (set_device) {
+    case TEST_SET_DEV_LRANK:
+        if(local_rank >= cuda_dev_count) {
+            std::cerr << "*** UCC TEST FAIL: "
+                      << "not enough CUDA devices on the node to map processes.\n";
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+        device_id = local_rank;
+        break;
+    case TEST_SET_DEV_LRANK_ROUND:
+        device_id = local_rank % cuda_dev_count;
+        break;
+    case TEST_SET_DEV_NONE:
+    default:
+        return;
+    }
+    CUDA_CHECK(cudaSetDevice(device_id));
+}
+#endif
 
 void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                  std::vector<ucc_status_t> &rst)

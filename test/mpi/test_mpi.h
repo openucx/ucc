@@ -17,6 +17,10 @@ BEGIN_C_DECLS
 #include "core/ucc_mc.h"
 #include "utils/ucc_math.h"
 END_C_DECLS
+#ifdef HAVE_CUDA
+#include <cuda.h>
+#include <cuda_runtime.h>
+#endif
 
 #define STR(x) #x
 #define UCC_CHECK(_call)                                            \
@@ -35,6 +39,17 @@ extern int test_rand_seed;
     UCC_CHECK(ucc_mc_memcpy(_new_buf, _old_buf, _size,                        \
               _new_mtype, _old_mtype));                                       \
 }
+
+#ifdef HAVE_CUDA
+#define CUDA_CHECK(_call) {                                         \
+    cudaError_t cuda_err = (_call);                                 \
+    if (cudaSuccess != (cuda_err)) {                                \
+        std::cerr << "*** UCC TEST FAIL: " << STR(_call) << ": "    \
+                  << cudaGetErrorString(cuda_err) << "\n" ;         \
+        MPI_Abort(MPI_COMM_WORLD, -1);                              \
+    }                                                               \
+}
+#endif
 
 typedef enum {
     TEAM_WORLD,
@@ -66,6 +81,14 @@ typedef enum {
     TEST_SKIP_MEM_LIMIT,
     TEST_SKIP_LAST
 } test_skip_cause_t;
+
+#ifdef HAVE_CUDA
+typedef enum {
+    TEST_SET_DEV_NONE,
+    TEST_SET_DEV_LRANK,
+    TEST_SET_DEV_LRANK_ROUND
+} test_set_cuda_device_t;
+#endif
 
 static inline const char* skip_str(test_skip_cause_t s) {
     switch(s) {
@@ -146,6 +169,9 @@ public:
     }
     void set_count_vsizes(std::vector<ucc_test_vsize_flag_t> &_counts_vsize);
     void set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vsize);
+#ifdef HAVE_CUDA
+    void set_cuda_device(test_set_cuda_device_t set_device);
+#endif
     void run_all();
     void set_root(ucc_test_mpi_root_t _root_type, int _root_value) {
         root_type = _root_type;
