@@ -107,8 +107,8 @@ static ucc_status_t ucc_mc_cpu_mem_free(void *ptr)
 }
 
 static ucc_status_t ucc_mc_cpu_memcpy(void *dst, const void *src, size_t len,
-                                      ucc_memory_type_t dst_mem,
-                                      ucc_memory_type_t src_mem)
+                                      ucc_memory_type_t dst_mem, //NOLINT
+                                      ucc_memory_type_t src_mem) //NOLINT
 {
     ucc_assert((dst_mem == UCC_MEMORY_TYPE_HOST) &&
                (src_mem == UCC_MEMORY_TYPE_HOST));
@@ -129,19 +129,19 @@ static ucc_status_t ucc_mc_cpu_mem_query(const void *ptr, size_t length,
     return UCC_ERR_NOT_SUPPORTED;
 }
 
-ucc_status_t ucc_ee_cpu_task_post(void *ee_context, void **ee_req)
+ucc_status_t ucc_ee_cpu_task_post(void *ee_context, //NOLINT
+                                  void **ee_req)
 {
     *ee_req = NULL;
-
     return UCC_OK;
 }
 
-ucc_status_t ucc_ee_cpu_task_query(void *ee_req)
+ucc_status_t ucc_ee_cpu_task_query(void *ee_req) //NOLINT
 {
     return UCC_OK;
 }
 
-ucc_status_t ucc_ee_cpu_task_end(void *ee_req)
+ucc_status_t ucc_ee_cpu_task_end(void *ee_req) //NOLINT
 {
     return UCC_OK;
 }
@@ -152,17 +152,18 @@ ucc_status_t ucc_ee_cpu_create_event(void **event)
     return UCC_OK;
 }
 
-ucc_status_t ucc_ee_cpu_destroy_event(void *event)
+ucc_status_t ucc_ee_cpu_destroy_event(void *event) //NOLINT
 {
     return UCC_OK;
 }
 
-ucc_status_t ucc_ee_cpu_event_post(void *ee_context, void *event)
+ucc_status_t ucc_ee_cpu_event_post(void *ee_context, //NOLINT
+                                   void *event) //NOLINT
 {
     return UCC_OK;
 }
 
-ucc_status_t ucc_ee_cpu_event_test(void *event)
+ucc_status_t ucc_ee_cpu_event_test(void *event) //NOLINT
 {
     return UCC_OK;
 }

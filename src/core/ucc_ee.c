@@ -38,7 +38,7 @@ ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params_t *params,
     ucc_queue_head_init(&ee->event_out_queue);
     *ee_p = ee;
 
-    ucc_info("ucc_ee_create: ee is created ee:%p ee_context:%p",
+    ucc_info("ee is created: %p ee_context: %p",
               ee, params->ee_context);
 
     return UCC_OK;
@@ -46,10 +46,9 @@ ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params_t *params,
 
 ucc_status_t ucc_ee_destroy(ucc_ee_h ee)
 {
+    ucc_info("ee is destroyed: %p", ee);
     ucc_spinlock_destroy(&ee->lock);
     ucc_free(ee);
-
-    ucc_info("ucc_ee_create: ee is destroyed. ee:%p", ee);
 
     return UCC_OK;
 }
@@ -83,7 +82,8 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t **ev)
     return ucc_ee_get_event_internal(ee, ev, &ee->event_out_queue);
 }
 
-ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t *ev)
+ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, //NOLINT
+                              ucc_ev_t *ev)
 {
     ucc_event_desc_t *event_desc;
 

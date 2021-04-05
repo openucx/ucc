@@ -53,8 +53,9 @@ static ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_ucp_triggered_coll_complete(ucc_coll_task_t *parent_task,
-                                                       ucc_coll_task_t *coll_task)
+static ucc_status_t
+ucc_tl_ucp_triggered_coll_complete(ucc_coll_task_t *parent_task, //NOLINT
+                                   ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
 
@@ -63,8 +64,9 @@ static ucc_status_t ucc_tl_ucp_triggered_coll_complete(ucc_coll_task_t *parent_t
     return ucc_mc_ee_task_end(coll_task->ee_task, coll_task->ee->ee_type);
 }
 
-static ucc_status_t ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_task,
-                                                      ucc_coll_task_t *coll_task)
+static ucc_status_t
+ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_task,
+                                  ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_status_t status;
@@ -150,19 +152,20 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, //NOLINT
+                                       ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_task_t *ev_task  = ucc_tl_ucp_get_task(task->team);
-    ucc_status_t status;
+    ucc_tl_ucp_task_t *task    = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_task_t *ev_task = ucc_tl_ucp_get_task(task->team);
+    ucc_status_t       status;
 
     ucc_coll_task_init(&ev_task->super);
-    ev_task->super.ee = ee;
-    ev_task->super.ev = NULL;
+    ev_task->super.ee             = ee;
+    ev_task->super.ev             = NULL;
     ev_task->super.triggered_task = coll_task;
-    ev_task->super.flags = UCC_COLL_TASK_FLAG_INTERNAL;
-    ev_task->super.finalize = ucc_tl_ucp_coll_finalize;
-    ev_task->super.super.status = UCC_INPROGRESS;
+    ev_task->super.flags          = UCC_COLL_TASK_FLAG_INTERNAL;
+    ev_task->super.finalize       = ucc_tl_ucp_coll_finalize;
+    ev_task->super.super.status   = UCC_INPROGRESS;
 
     tl_info(task->team->super.super.context->lib,
             "triggered post. ev_task:%p coll_task:%p", &ev_task->super, coll_task);

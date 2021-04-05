@@ -414,7 +414,7 @@ out:
 
 static ucc_status_t ucc_coll_score_parse_str(const char       *str,
                                              ucc_coll_score_t *score,
-                                             ucc_rank_t        team_size)
+                                             ucc_rank_t        team_size)//NOLINT
 {
     ucc_status_t       status  = UCC_OK;
     ucc_coll_type_t   *ct      = NULL;
