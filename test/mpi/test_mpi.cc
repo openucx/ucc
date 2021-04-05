@@ -39,25 +39,9 @@ static ucc_status_t oob_allgather_free(void *req)
 }
 
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_local) {
-    int required = (_tm == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
-        : MPI_THREAD_MULTIPLE;
-    int size, provided;
     ucc_lib_config_h lib_config;
     ucc_context_config_h ctx_config;
 
-
-    MPI_Init_thread(&argc, &argv, required, &provided);
-    if (provided != required) {
-        std::cerr << "could not initialize MPI in thread multiple\n";
-        abort();
-    }
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (size < 2) {
-        std::cerr << "test requires at least 2 ranks\n";
-        MPI_Abort(MPI_COMM_WORLD, -1);
-    }
     /* Init ucc library */
     ucc_lib_params_t lib_params = {
         .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE,
@@ -124,7 +108,6 @@ UccTestMpi::~UccTestMpi()
     }
     UCC_CHECK(ucc_context_destroy(ctx));
     UCC_CHECK(ucc_finalize(lib));
-    MPI_Finalize();
 }
 
 ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm)
