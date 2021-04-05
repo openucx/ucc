@@ -187,7 +187,7 @@ void UccTeam::destroy_team()
         all_done = true;
         for (auto &p : procs) {
             if (p.team) {
-                status = ucc_team_destroy_nb(p.team);
+                status = ucc_team_destroy(p.team);
                 if (UCC_OK == status) {
                     p.team = NULL;
                 } else if (status < 0) {
