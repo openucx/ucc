@@ -1,7 +1,7 @@
 /**
  * @file ucc.h
  * @date 2020
- * @copyright Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * @copyright Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  * @copyright Copyright (C) Huawei Technologies Co., Ltd. 2020.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
@@ -824,11 +824,12 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_h config,
  *  @b Description
  *
  *  The ucc_context_create creates the context and ucc_context_destroy
- *  releases the resources and destroys the context state. The creation of context
- *  does not necessarily indicate its readiness to be used for collective or other
- *  group operations. On success, the context handle will be created and ucc_status_t will return
- *  UCC_OK. On error, the library object will not be created and corresponding
- *  error code as defined by ucc_status_t is returned.
+ *  releases the resources and destroys the context state. The creation of
+ *  context does not necessarily indicate its readiness to be used for
+ *  collective or other group operations. On success, the context handle will be
+ *  created and ucc_status_t will return UCC_OK. On error, the library object
+ *  will not be created and corresponding error code as defined by ucc_status_t
+ *  is returned.
  *
  *  @endparblock
  *
@@ -1212,9 +1213,13 @@ ucc_status_t ucc_team_create_test(ucc_team_h team);
  *
  *  @b Description
  *
- *  @ref ucc_team_destroy is a blocking collective operation to release all
+ *  @ref ucc_team_destroy is a nonblocking collective operation to release all
  *  resources associated with the team handle, and destroy the team handle. It is
  *  invalid to post a collective operation after the ucc_team_destroy operation.
+ *  It is invalid to call @ref ucc_team_destroy operation while @ref
+ *  ucc_team_create_post is in progress. It is the user's responsibility to ensure
+ *  there is one outstanding @ref ucc_team_create_post or @ref ucc_team_destroy
+ *  operation is in progress.
  *
  *
  *  @endparblock
