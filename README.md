@@ -21,7 +21,7 @@ UCC is a collective communication operations API and library that is flexible, c
 * Hardware collectives are a first-class citizen
 
 ### UCC Component Architecture
-![](docs/doxygen/images/ucc_components.png)
+![](docs/images/ucc_components.png)
 
 ## Contributing
 Thanks for your interest in contributing to UCC, please see our technical and
