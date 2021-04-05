@@ -163,6 +163,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     return status;
 
 err_ctx_alloc:
+    *new_team = NULL;
     ucc_free(team);
     return status;
 }
@@ -266,6 +267,10 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
 
 ucc_status_t ucc_team_create_test(ucc_team_h team)
 {
+    if (NULL == team) {
+        ucc_error("ucc_team_create_test: invalid team handle: NULL");
+        return UCC_ERR_INVALID_PARAM;
+    }
     /* we don't support multiple contexts per team yet */
     ucc_assert(team->num_contexts == 1);
     if (team->status == UCC_OK) {
@@ -302,8 +307,13 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
     return UCC_OK;
 }
 
-ucc_status_t ucc_team_destroy_nb(ucc_team_h team)
+ucc_status_t ucc_team_destroy(ucc_team_h team)
 {
+    if (NULL == team) {
+        ucc_error("ucc_team_destroy: invalid team handle: NULL");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
     if (team->status != UCC_OK) {
         ucc_error("team %p is used before team_create is completed", team);
         return UCC_ERR_INVALID_PARAM;
@@ -312,15 +322,6 @@ ucc_status_t ucc_team_destroy_nb(ucc_team_h team)
     /* we don't support multiple contexts per team yet */
     ucc_assert(team->num_contexts == 1);
     return ucc_team_destroy_single(team);
-}
-
-ucc_status_t ucc_team_destroy(ucc_team_h team)
-{
-    ucc_status_t status;
-    while (UCC_INPROGRESS == (status = ucc_team_destroy_single(team))) {
-        ; //TODO call ucc progress here
-    }
-    return status;
 }
 
 static inline int

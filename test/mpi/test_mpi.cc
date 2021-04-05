@@ -161,7 +161,13 @@ void UccTestMpi::create_team(ucc_test_mpi_team_t t)
 
 void UccTestMpi::destroy_team(ucc_test_team_t &team)
 {
-    UCC_CHECK(ucc_team_destroy(team.team));
+    ucc_status_t status;
+    while (UCC_INPROGRESS == (status = ucc_team_destroy(team.team))) {
+        if (UCC_OK != status) {
+            std::cerr << "ucc_team_destroy failed\n";
+            break;
+        }
+    }
     if (team.comm != MPI_COMM_WORLD) {
         MPI_Comm_free(&team.comm);
     }
