@@ -19,10 +19,10 @@ public:
     uint64_t coll_flags;
 
     test_alltoallv() : coll_mask(0), coll_flags(0) {}
-    UccCollCtxVec data_init(int nprocs, ucc_datatype_t dtype,
-                             size_t count) {
+    void data_init(int nprocs, ucc_datatype_t dtype, size_t count,
+                   UccCollCtxVec &ctxs) {
         int buf_count;
-        UccCollCtxVec ctxs(nprocs);
+        ctxs.resize(nprocs);
 
         for (auto r = 0; r < nprocs; r++) {
             ucc_coll_args_t *coll = (ucc_coll_args_t*)
@@ -64,9 +64,9 @@ public:
             UCC_CHECK(ucc_mc_alloc(&coll->src.info_v.buffer,
                                    buf_count * ucc_dt_size(dtype),
                                    mem_type));
-            ucc_mc_memcpy(coll->src.info_v.buffer, ctxs[r]->init_buf,
-                          buf_count * ucc_dt_size(dtype), mem_type,
-                          UCC_MEMORY_TYPE_HOST);
+            UCC_CHECK(ucc_mc_memcpy(coll->src.info_v.buffer, ctxs[r]->init_buf,
+                                    buf_count * ucc_dt_size(dtype), mem_type,
+                                    UCC_MEMORY_TYPE_HOST));
 
             /* TODO: inplace support */
 
@@ -82,7 +82,6 @@ public:
                                    buf_count * ucc_dt_size(dtype),
                                    mem_type));
         }
-        return ctxs;
     }
     void data_validate(UccCollCtxVec ctxs)
     {
@@ -92,8 +91,9 @@ public:
             for (int r = 0; r < ctxs.size(); r++) {
                 UCC_CHECK(ucc_mc_alloc((void**)&dsts[r], ctxs[r]->rbuf_size,
                                        UCC_MEMORY_TYPE_HOST));
-                ucc_mc_memcpy(dsts[r], ctxs[r]->args->dst.info_v.buffer,
-                              ctxs[r]->rbuf_size, UCC_MEMORY_TYPE_HOST, mem_type);
+                UCC_CHECK(ucc_mc_memcpy(dsts[r], ctxs[r]->args->dst.info_v.buffer,
+                                        ctxs[r]->rbuf_size, UCC_MEMORY_TYPE_HOST,
+                                        mem_type));
             }
         } else {
             for (int r = 0; r < ctxs.size(); r++) {
@@ -148,6 +148,7 @@ UCC_TEST_P(test_alltoallv_0, single)
     const ucc_datatype_t dtype   = (ucc_datatype_t)std::get<3>(GetParam());
     UccTeam_h            team    = UccJob::getStaticTeams()[team_id];
     int                  size    = team->procs.size();
+    UccCollCtxVec        ctxs;
 
     coll_mask = UCC_COLL_ARGS_FIELD_FLAGS;
     coll_flags = UCC_COLL_ARGS_FLAG_COUNT_64BIT |
@@ -155,13 +156,13 @@ UCC_TEST_P(test_alltoallv_0, single)
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    UccCollCtxVec        args    = data_init(size, (ucc_datatype_t)dtype, 1);
-    UccReq    req(team, args);
+    data_init(size, (ucc_datatype_t)dtype, 1, ctxs);
+    UccReq    req(team, ctxs);
     req.start();
     req.wait();
 
-    data_validate(args);
-    data_fini(args);
+    data_validate(ctxs);
+    data_fini(ctxs);
 }
 
 
@@ -176,17 +177,18 @@ UCC_TEST_P(test_alltoallv_1, single)
     const ucc_datatype_t dtype   = (ucc_datatype_t)std::get<3>(GetParam());
     UccTeam_h            team    = UccJob::getStaticTeams()[team_id];
     int                  size    = team->procs.size();
+    UccCollCtxVec        ctxs;
 
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    UccCollCtxVec args    = data_init(size, (ucc_datatype_t)dtype, 1);
-    UccReq    req(team, args);
+    data_init(size, (ucc_datatype_t)dtype, 1, ctxs);
+    UccReq    req(team, ctxs);
     req.start();
     req.wait();
 
-    data_validate(args);
-    data_fini(args);
+    data_validate(ctxs);
+    data_fini(ctxs);
 }
 
 INSTANTIATE_TEST_CASE_P(

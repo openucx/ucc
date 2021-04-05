@@ -7,7 +7,9 @@
 #define TEST_UCC_H
 #include "test.h"
 #include "ucc/api/ucc.h"
+extern "C" {
 #include "core/ucc_mc.h"
+}
 #include <vector>
 #include <tuple>
 #include <memory>
@@ -56,8 +58,8 @@ public:
         inplace = TEST_NO_INPLACE;
     }
     virtual ~UccCollArgs() {}
-    virtual UccCollCtxVec data_init(int nprocs, ucc_datatype_t dtype,
-                                     size_t count) = 0;
+    virtual void data_init(int nprocs, ucc_datatype_t dtype,
+                           size_t count, UccCollCtxVec &args) = 0;
     virtual void data_fini(UccCollCtxVec args) = 0;
     virtual void data_validate(UccCollCtxVec args) = 0;
     void set_mem_type(ucc_memory_type_t _mt);

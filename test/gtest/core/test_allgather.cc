@@ -14,10 +14,10 @@ using Param_0 = std::tuple<int, int, ucc_memory_type_t, int, gtest_ucc_inplace_t
 class test_allgather : public UccCollArgs, public ucc::test
 {
 public:
-    UccCollCtxVec data_init(int nprocs, ucc_datatype_t dtype,
-                                     size_t count)
+    void data_init(int nprocs, ucc_datatype_t dtype, size_t count,
+                   UccCollCtxVec &ctxs)
     {
-        UccCollCtxVec ctxs(nprocs);
+        ctxs.resize(nprocs);
         for (auto r = 0; r < nprocs; r++) {
             ucc_coll_args_t *coll = (ucc_coll_args_t*)
                     calloc(1, sizeof(ucc_coll_args_t));
@@ -37,8 +37,8 @@ public:
             UCC_CHECK(ucc_mc_alloc(&ctxs[r]->init_buf,
                                    ucc_dt_size(dtype) * count,
                                    UCC_MEMORY_TYPE_HOST));
+            uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
             for (int i = 0; i < ucc_dt_size(dtype) * count; i++) {
-                uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
                 sbuf[i] = r;
             }
 
@@ -48,19 +48,18 @@ public:
             if (TEST_INPLACE == inplace) {
                 coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-                ucc_mc_memcpy((void*)((ptrdiff_t)coll->dst.info.buffer +
-                                      r * count * ucc_dt_size(dtype)),
-                              ctxs[r]->init_buf, ucc_dt_size(dtype) * count,
-                              mem_type, UCC_MEMORY_TYPE_HOST);
+                UCC_CHECK(ucc_mc_memcpy((void*)((ptrdiff_t)coll->dst.info.buffer +
+                                        r * count * ucc_dt_size(dtype)),
+                                        ctxs[r]->init_buf, ucc_dt_size(dtype) * count,
+                                        mem_type, UCC_MEMORY_TYPE_HOST));
             } else {
                 UCC_CHECK(ucc_mc_alloc(&coll->src.info.buffer,
                           ucc_dt_size(dtype) * count, mem_type));
-                ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
-                              ucc_dt_size(dtype) * count, mem_type,
-                              UCC_MEMORY_TYPE_HOST);
+                UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
+                                        ucc_dt_size(dtype) * count, mem_type,
+                                        UCC_MEMORY_TYPE_HOST));
             }
         }
-        return ctxs;
     }
     void data_fini(UccCollCtxVec ctxs)
     {
@@ -84,8 +83,9 @@ public:
             for (int r = 0; r < ctxs.size(); r++) {
                 UCC_CHECK(ucc_mc_alloc((void**)&dsts[r], ctxs[r]->rbuf_size,
                                        UCC_MEMORY_TYPE_HOST));
-                ucc_mc_memcpy(dsts[r], ctxs[r]->args->dst.info.buffer,
-                              ctxs[r]->rbuf_size, UCC_MEMORY_TYPE_HOST, mem_type);
+                UCC_CHECK(ucc_mc_memcpy(dsts[r], ctxs[r]->args->dst.info.buffer,
+                                        ctxs[r]->rbuf_size, UCC_MEMORY_TYPE_HOST,
+                                        mem_type));
             }
         } else {
             for (int r = 0; r < ctxs.size(); r++) {
@@ -104,7 +104,7 @@ public:
         }
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
-                ucc_mc_free((void*)dsts[r], UCC_MEMORY_TYPE_HOST);
+                UCC_CHECK(ucc_mc_free((void*)dsts[r], UCC_MEMORY_TYPE_HOST));
             }
         }
     }
@@ -122,16 +122,17 @@ UCC_TEST_P(test_allgather_0, single_host)
     const gtest_ucc_inplace_t inplace  = std::get<4>(GetParam());
     UccTeam_h                 team     = UccJob::getStaticTeams()[team_id];
     int                       size     = team->procs.size();
+    UccCollCtxVec             ctxs;
 
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    UccCollCtxVec args = data_init(size, dtype, count);
-    UccReq    req(team, args);
+    data_init(size, dtype, count, ctxs);
+    UccReq    req(team, ctxs);
     req.start();
     req.wait();
-    data_validate(args);
-    data_fini(args);
+    data_validate(ctxs);
+    data_fini(ctxs);
 }
 
 INSTANTIATE_TEST_CASE_P(
@@ -139,11 +140,11 @@ INSTANTIATE_TEST_CASE_P(
     test_allgather_0,
     ::testing::Combine(
         ::testing::Range(1, UccJob::nStaticTeams), // team_ids
-        ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_FLOAT64 + 1), // dtype
+        ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_FLOAT64 + 1, 4), // dtype
 #ifdef HAVE_CUDA
         ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
-        ::testing::Values(1,3), // count
+        ::testing::Values(1,3,8192), // count
         ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE)));  // inplace

@@ -16,9 +16,10 @@ class test_bcast : public UccCollArgs, public ucc::test
 private:
     int root;
 public:
-    UccCollCtxVec data_init(int nprocs, ucc_datatype_t dtype, size_t count)
+    void data_init(int nprocs, ucc_datatype_t dtype, size_t count,
+                   UccCollCtxVec &ctxs)
     {
-        UccCollCtxVec ctxs(nprocs);
+        ctxs.resize(nprocs);
         for (auto r = 0; r < nprocs; r++) {
             ucc_coll_args_t *coll = (ucc_coll_args_t*)
                     calloc(1, sizeof(ucc_coll_args_t));
@@ -40,16 +41,15 @@ public:
             if (r == root) {
                 UCC_CHECK(ucc_mc_alloc(&ctxs[r]->init_buf, ctxs[r]->rbuf_size,
                                        UCC_MEMORY_TYPE_HOST));
+                uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
                 for (int i = 0; i < ctxs[r]->rbuf_size; i++) {
-                    uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
-                    sbuf[i] = i;
+                    sbuf[i] = (uint8_t)i;
                 }
-                ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
-                              ctxs[r]->rbuf_size, mem_type,
-                              UCC_MEMORY_TYPE_HOST);
+                UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
+                                        ctxs[r]->rbuf_size, mem_type,
+                                        UCC_MEMORY_TYPE_HOST));
             }
         }
-        return ctxs;
     }
     void data_fini(UccCollCtxVec ctxs)
     {
@@ -70,8 +70,9 @@ public:
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
                 UCC_CHECK(ucc_mc_alloc((void**)&dsts, ctxs[root]->rbuf_size,
                                        UCC_MEMORY_TYPE_HOST));
-                ucc_mc_memcpy(dsts, ctxs[root]->args->src.info.buffer,
-                              ctxs[root]->rbuf_size, UCC_MEMORY_TYPE_HOST, mem_type);
+                UCC_CHECK(ucc_mc_memcpy(dsts, ctxs[root]->args->src.info.buffer,
+                                        ctxs[root]->rbuf_size,
+                                        UCC_MEMORY_TYPE_HOST, mem_type));
         } else {
             dsts = (uint8_t*)ctxs[root]->args->src.info.buffer;
         }
@@ -81,11 +82,11 @@ public:
                 continue;
             }
             for (int i = 0; i < ctxs[r]->rbuf_size; i++) {
-                EXPECT_EQ(i, dsts[i]);
+                EXPECT_EQ((uint8_t)i, dsts[i]);
             }
         }
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
-            ucc_mc_free((void*)dsts, UCC_MEMORY_TYPE_HOST);
+            UCC_CHECK(ucc_mc_free((void*)dsts, UCC_MEMORY_TYPE_HOST));
         }
         return;
     }
@@ -107,16 +108,17 @@ UCC_TEST_P(test_bcast_0, single_host)
     const int                 root     = std::get<4>(GetParam());
     UccTeam_h                 team     = UccJob::getStaticTeams()[team_id];
     int                       size     = team->procs.size();
+    UccCollCtxVec             ctxs;
 
     set_mem_type(mem_type);
     set_root(root);
 
-    UccCollCtxVec args = data_init(size, (ucc_datatype_t)dtype, count);
-    UccReq    req(team, args);
+    data_init(size, (ucc_datatype_t)dtype, count, ctxs);
+    UccReq    req(team, ctxs);
     req.start();
     req.wait();
-    data_validate(args);
-    data_fini(args);
+    data_validate(ctxs);
+    data_fini(ctxs);
 }
 
 INSTANTIATE_TEST_CASE_P(
@@ -124,11 +126,11 @@ INSTANTIATE_TEST_CASE_P(
     test_bcast_0,
     ::testing::Combine(
         ::testing::Range(1, UccJob::nStaticTeams), // team_ids
-        ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_UINT32 + 1), // dtype
+        ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_UINT32 + 1, 3), // dtype
 #ifdef HAVE_CUDA
         ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
-        ::testing::Values(1,3), // count
+        ::testing::Values(1,3,65536), // count
         ::testing::Values(0,1))); // root

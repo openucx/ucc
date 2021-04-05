@@ -21,8 +21,10 @@ extern "C" {
 template<typename T>
 class test_allreduce : public UccCollArgs, public testing::Test {
   public:
-    UccCollCtxVec data_init(int nprocs, ucc_datatype_t dt, size_t count) {
-        UccCollCtxVec ctxs(nprocs);
+    void data_init(int nprocs, ucc_datatype_t dt, size_t count,
+                   UccCollCtxVec &ctxs)
+    {
+        ctxs.resize(nprocs);
         for (int r = 0; r < nprocs; r++) {
             ucc_coll_args_t *coll = (ucc_coll_args_t*)
                     calloc(1, sizeof(ucc_coll_args_t));
@@ -47,15 +49,15 @@ class test_allreduce : public UccCollArgs, public testing::Test {
             if (TEST_INPLACE == inplace) {
                 coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-                ucc_mc_memcpy(coll->dst.info.buffer, ctxs[r]->init_buf,
-                              ucc_dt_size(dt) * count, mem_type,
-                              UCC_MEMORY_TYPE_HOST);
+                UCC_CHECK(ucc_mc_memcpy(coll->dst.info.buffer, ctxs[r]->init_buf,
+                                        ucc_dt_size(dt) * count, mem_type,
+                                        UCC_MEMORY_TYPE_HOST));
             } else {
                 UCC_CHECK(ucc_mc_alloc(&coll->src.info.buffer,
                           ucc_dt_size(dt) * count, mem_type));
-                ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
-                              ucc_dt_size(dt) * count, mem_type,
-                              UCC_MEMORY_TYPE_HOST);
+                UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
+                                        ucc_dt_size(dt) * count, mem_type,
+                                        UCC_MEMORY_TYPE_HOST));
             }
             coll->src.info.mem_type = mem_type;
             coll->src.info.count   = (ucc_count_t)count;
@@ -65,7 +67,6 @@ class test_allreduce : public UccCollArgs, public testing::Test {
             coll->dst.info.count   = (ucc_count_t)count;
             coll->dst.info.datatype = dt;
         }
-        return ctxs;
     }
     void data_fini(UccCollCtxVec ctxs) {
         for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
@@ -90,9 +91,9 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 UCC_CHECK(ucc_mc_alloc((void**)&dsts[r],
                                        count * sizeof(typename T::type),
                                        UCC_MEMORY_TYPE_HOST));
-                ucc_mc_memcpy(dsts[r], ctxs[r]->args->dst.info.buffer,
-                              count * sizeof(typename T::type), UCC_MEMORY_TYPE_HOST,
-                              mem_type);
+                UCC_CHECK(ucc_mc_memcpy(dsts[r], ctxs[r]->args->dst.info.buffer,
+                                        count * sizeof(typename T::type), UCC_MEMORY_TYPE_HOST,
+                                        mem_type));
             }
         } else {
             for (int r = 0; r < ctxs.size(); r++) {
@@ -111,7 +112,7 @@ class test_allreduce : public UccCollArgs, public testing::Test {
         }
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
-                ucc_mc_free((void*)dsts[r], UCC_MEMORY_TYPE_HOST);
+                UCC_CHECK(ucc_mc_free((void*)dsts[r], UCC_MEMORY_TYPE_HOST));
             }
         }
         return;
@@ -127,9 +128,10 @@ TYPED_TEST_CASE(test_allreduce, ReductionTypesOps);
         for (int count : counts) {                                             \
             UccTeam_h team = UccJob::getStaticTeams()[tid];                    \
             int       size = team->procs.size();                               \
+            UccCollCtxVec ctxs;                                                \
             this->set_mem_type(_mem_type);                                     \
             this->set_inplace(_inplace);                                       \
-            UccCollCtxVec ctxs = this->data_init(size, TypeParam::dt, count);  \
+            this->data_init(size, TypeParam::dt, count, ctxs);                 \
             UccReq    req(team, ctxs);                                         \
             req.start();                                                       \
             req.wait();                                                        \

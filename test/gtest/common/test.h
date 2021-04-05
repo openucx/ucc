@@ -25,7 +25,7 @@
 #include <vector>
 #include <string>
 
-#define UCC_CHECK(_call)    EXPECT_EQ(UCC_OK, (_call))
+#define UCC_CHECK(_call)    ASSERT_EQ(UCC_OK, (_call))
 
 namespace ucc {
 

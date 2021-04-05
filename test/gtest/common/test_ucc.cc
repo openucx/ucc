@@ -319,13 +319,13 @@ err:
     reqs.clear();
 }
 
-UccReq::UccReq(UccTeam_h _team, UccCollCtxVec args) :
+UccReq::UccReq(UccTeam_h _team, UccCollCtxVec ctxs) :
         team(_team)
 {
-    EXPECT_EQ(team->procs.size(), args.size());
+    EXPECT_EQ(team->procs.size(), ctxs.size());
     ucc_coll_req_h req;
     for (auto i = 0; i < team->procs.size(); i++) {
-        if (UCC_OK != ucc_collective_init(args[i]->args, &req,
+        if (UCC_OK != ucc_collective_init(ctxs[i]->args, &req,
                                           team->procs[i].team)) {
             goto err;
         }
@@ -401,6 +401,10 @@ void UccReq::startall(std::vector<UccReq> &reqs)
 
 void UccCollArgs::set_mem_type(ucc_memory_type_t _mt)
 {
+    if (UCC_OK != ucc_mc_available(_mt)) {
+        UCC_TEST_SKIP_R(ucc::to_string(ucc_memory_type_names[_mt]) +
+                        " memory type not available");
+    }
     mem_type = _mt;
 }
 
