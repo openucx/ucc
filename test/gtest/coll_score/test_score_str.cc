@@ -40,7 +40,7 @@ UCC_TEST_F(test_score_str, check_valid)
     EXPECT_EQ(UCC_SCORE_MAX, SCORE(score, GATHERV, HOST));
     ucc_coll_score_free(score);
 
-    str = "alltoall,bCAst:hOst:10;scatter:inf;reduce:1";
+    str = "alltoall,bCAst:hOst:10#scatter:inf#reduce:1";
     EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
     EXPECT_EQ(10, SCORE(score, BCAST, HOST));
     EXPECT_EQ(UCC_SCORE_MAX, SCORE(score, SCATTER, HOST));
@@ -91,7 +91,7 @@ UCC_TEST_F(test_score_str, check_range_multiple)
                           RLIST({RANGE(64, 256, 10), RANGE(1024,2048,10), RANGE(4096,5000,10)})));
     ucc_coll_score_free(score);
 
-    str = "alltoall,barrier:1k-4K,64-256:cuda:10;20:99-12M:bcast";
+    str = "alltoall,barrier:1k-4K,64-256:cuda:10#20:99-12M:bcast";
     EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
     EXPECT_EQ(UCC_OK,
               check_range(score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_CUDA,

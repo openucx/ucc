@@ -496,7 +496,7 @@ ucc_status_t ucc_coll_score_alloc_from_str(const char *str,
     if (UCC_OK != status) {
         return status;
     }
-    tokens = ucc_str_split(str, ";");
+    tokens = ucc_str_split(str, "#");
     if (!tokens) {
         status = UCC_ERR_INVALID_PARAM;
         goto error;
