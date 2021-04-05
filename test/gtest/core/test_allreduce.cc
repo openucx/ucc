@@ -159,24 +159,47 @@ TYPED_TEST(test_allreduce, single_cuda_inplace) {
 }
 #endif
 
-/* TODO: enable parallel teams once it is supported */
-/*
-TYPED_TEST(test_allreduce, multi) {
-    const int count = 2;
 
-    std::vector<UccReq> reqs;
-    std::vector<UccCollArgsVec> args;
-    for (auto &team : UccJob::getStaticTeams()) {
-        UccCollArgsVec arg = this->data_init(team->procs.size(),
-                                       TypeParam::dt, count);
-        args.push_back(arg);
-        reqs.push_back(UccReq(team, arg));
-    }
-    UccReq::startall(reqs);
-    UccReq::waitall(reqs);
-    for (auto arg : args) {
-        this->data_validate(arg);
-        this->data_fini(arg);
-    }
+#define TEST_DECLARE_MULTIPLE(_mem_type, _inplace)                             \
+{                                                                              \
+    std::array<int,3> counts {1,2,4};                                          \
+    for (int count : counts) {                                                 \
+        std::vector<UccReq>        reqs;                                       \
+        std::vector<UccCollCtxVec> ctxs;                                       \
+        for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {                 \
+            UccTeam_h       team = UccJob::getStaticTeams()[tid];              \
+            int             size = team->procs.size();                         \
+            UccCollCtxVec   ctx;                                               \
+            this->set_inplace(_inplace);                                       \
+            this->set_mem_type(_mem_type);                                     \
+            this->data_init(size, TypeParam::dt, count, ctx);                  \
+            reqs.push_back(UccReq(team, ctx));                                 \
+            ctxs.push_back(ctx);                                               \
+        }                                                                      \
+        UccReq::startall(reqs);                                                \
+        UccReq::waitall(reqs);                                                 \
+        for (auto ctx : ctxs) {                                                \
+            this->data_validate(ctx);                                          \
+            this->data_fini(ctx);                                              \
+        }                                                                      \
+    }                                                                          \
 }
-*/
+
+TYPED_TEST(test_allreduce, multiple) {
+    TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE);
+}
+
+TYPED_TEST(test_allreduce, multiple_inplace) {
+    TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE);
+}
+
+#ifdef HAVE_CUDA
+TYPED_TEST(test_allreduce, multiple_cuda) {
+    TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE);
+}
+
+TYPED_TEST(test_allreduce, multiple_cuda_inplace) {
+    TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE);
+}
+#endif
+

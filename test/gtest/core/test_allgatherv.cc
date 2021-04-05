@@ -10,6 +10,7 @@ extern "C" {
 #include "utils/ucc_math.h"
 
 using Param_0 = std::tuple<int, int, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
+using Param_1 = std::tuple<int, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
 
 class test_allgatherv : public UccCollArgs, public ucc::test
 {
@@ -155,11 +156,10 @@ UCC_TEST_P(test_allgatherv_0, single_host)
 }
 
 INSTANTIATE_TEST_CASE_P(
-    ,
-    test_allgatherv_0,
+    , test_allgatherv_0,
     ::testing::Combine(
         ::testing::Range(1, UccJob::nStaticTeams), // team_ids
-        ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_FLOAT64 + 1, 4), // dtype
+        ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_INT64 + 1), // dtype
 #ifdef HAVE_CUDA
         ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
 #else
@@ -168,3 +168,47 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Values(1,3,8192), // count
         ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE)));  // inplace
 
+class test_allgatherv_1 : public test_allgatherv,
+        public ::testing::WithParamInterface<Param_1> {};
+
+UCC_TEST_P(test_allgatherv_1, multiple)
+{
+    const ucc_datatype_t       dtype    = (ucc_datatype_t)std::get<0>(GetParam());
+    const ucc_memory_type_t    mem_type = std::get<1>(GetParam());
+    const int                  count    = std::get<2>(GetParam());
+    const gtest_ucc_inplace_t  inplace  = std::get<3>(GetParam());
+    std::vector<UccReq>        reqs;
+    std::vector<UccCollCtxVec> ctxs;
+
+    for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {
+        UccTeam_h       team = UccJob::getStaticTeams()[tid];
+        int             size = team->procs.size();
+        UccCollCtxVec   ctx;
+
+        this->set_inplace(inplace);
+        this->set_mem_type(mem_type);
+
+        data_init(size, (ucc_datatype_t)dtype, count, ctx);
+        reqs.push_back(UccReq(team, ctx));
+        ctxs.push_back(ctx);
+    }
+    UccReq::startall(reqs);
+    UccReq::waitall(reqs);
+
+    for (auto ctx : ctxs) {
+        data_validate(ctx);
+        data_fini(ctx);
+    }
+}
+
+INSTANTIATE_TEST_CASE_P(
+    , test_allgatherv_1,
+    ::testing::Combine(
+        ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_INT64 + 1), // dtype
+#ifdef HAVE_CUDA
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+#else
+        ::testing::Values(UCC_MEMORY_TYPE_HOST),
+#endif
+        ::testing::Values(1,3,8192), // count
+        ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE)));  // inplace

@@ -9,7 +9,8 @@ extern "C" {
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
-using Param = std::tuple<int, int, ucc_memory_type_t, int, int>;
+using Param_0 = std::tuple<int, int, ucc_memory_type_t, int, int>;
+using Param_1 = std::tuple<int, ucc_memory_type_t, int, int>;
 
 class test_bcast : public UccCollArgs, public ucc::test
 {
@@ -97,7 +98,7 @@ public:
 };
 
 class test_bcast_0 : public test_bcast,
-        public ::testing::WithParamInterface<Param> {};
+        public ::testing::WithParamInterface<Param_0> {};
 
 UCC_TEST_P(test_bcast_0, single_host)
 {
@@ -122,10 +123,54 @@ UCC_TEST_P(test_bcast_0, single_host)
 }
 
 INSTANTIATE_TEST_CASE_P(
-    ,
-    test_bcast_0,
+    , test_bcast_0,
     ::testing::Combine(
         ::testing::Range(1, UccJob::nStaticTeams), // team_ids
+        ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_UINT32 + 1, 3), // dtype
+#ifdef HAVE_CUDA
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+#else
+        ::testing::Values(UCC_MEMORY_TYPE_HOST),
+#endif
+        ::testing::Values(1,3,65536), // count
+        ::testing::Values(0,1))); // root
+
+class test_bcast_1 : public test_bcast,
+        public ::testing::WithParamInterface<Param_1> {};
+
+UCC_TEST_P(test_bcast_1, multiple)
+{
+    const ucc_datatype_t       dtype    = (ucc_datatype_t)std::get<0>(GetParam());
+    const ucc_memory_type_t    mem_type = std::get<1>(GetParam());
+    const int                  count    = std::get<2>(GetParam());
+    const int                  root     = std::get<3>(GetParam());
+    std::vector<UccReq>        reqs;
+    std::vector<UccCollCtxVec> ctxs;
+
+    for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {
+        UccTeam_h       team = UccJob::getStaticTeams()[tid];
+        int             size = team->procs.size();
+        UccCollCtxVec   ctx;
+
+        set_mem_type(mem_type);
+        set_root(root);
+
+        data_init(size, (ucc_datatype_t)dtype, count, ctx);
+        reqs.push_back(UccReq(team, ctx));
+        ctxs.push_back(ctx);
+    }
+    UccReq::startall(reqs);
+    UccReq::waitall(reqs);
+
+    for (auto ctx : ctxs) {
+        data_validate(ctx);
+        data_fini(ctx);
+    }
+}
+
+INSTANTIATE_TEST_CASE_P(
+    , test_bcast_1,
+    ::testing::Combine(
         ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_UINT32 + 1, 3), // dtype
 #ifdef HAVE_CUDA
         ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
