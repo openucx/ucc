@@ -20,6 +20,9 @@ UCC is a collective communication operations API and library that is flexible, c
 * Repetitive collective operations (init once and invoke multiple times)
 * Hardware collectives are a first-class citizen
 
+### UCC Component Architecture
+![](docs/doxygen/images/ucc_components.png)
+
 ## Contributing
 Thanks for your interest in contributing to UCC, please see our technical and
 legal guidelines in the [contributing](CONTRIBUTING.md) file.
@@ -54,3 +57,8 @@ $./configure --prefix=<ucc-install-path> --with-docs-only
 
 $make docs
 ```
+
+### Supported Transports
+* UCX/UCP
+  - InfiniBand, ROCE, Cray Gemini and Aries, Shared Memory
+* NCCL
