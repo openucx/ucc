@@ -45,8 +45,10 @@ CUDA_REDUCE_WITH_OP(LXOR, DO_OP_LXOR)
 CUDA_REDUCE_WITH_OP(BXOR, DO_OP_BXOR)
 
 #define LAUNCH_KERNEL(NAME, type, src1, src2, dest, size, count, ld, s, b, t)  \
+    do {                                                                       \
         UCC_REDUCE_CUDA_ ## NAME<type> <<<b, t, 0, s>>>(src1, src2, dest,      \
-                                                        size, count, ld)
+                                                        size, count, ld);      \
+    } while(0)
 
 #define DT_REDUCE_INT(type, op, src1_p, src2_p, dest_p, size, count, ld, s,    \
                       b, t) do {                                               \
@@ -176,6 +178,7 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
             mc_error(&ucc_mc_cuda.super, "unsupported reduction type (%d)", dt);
             return UCC_ERR_NOT_SUPPORTED;
     }
+    CUDACHECK(cudaGetLastError());
     CUDACHECK(cudaStreamSynchronize(stream));
     return UCC_OK;
 }
