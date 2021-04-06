@@ -103,7 +103,7 @@ public:
                         (size_t)coll->dst.info.count;
                 ASSERT_EQ(0,
                           alltoallx_validate_buf(i, r,
-                          (uint8_t*)coll->dst.info.buffer + rank_size * i,
+                          (uint8_t*)dsts[r] + rank_size * i,
                           rank_size));
             }
         }
