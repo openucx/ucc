@@ -69,11 +69,12 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_loc
     ucc_context_params_t ctx_params = {
     };
     if (!is_local) {
-        ctx_params.mask         |= UCC_CONTEXT_PARAM_FIELD_OOB;
-        ctx_params.oob.allgather = oob_allgather;
-        ctx_params.oob.req_test  = oob_allgather_test;
-        ctx_params.oob.req_free  = oob_allgather_free;
-        ctx_params.oob.coll_info = (void*)MPI_COMM_WORLD;
+        ctx_params.mask            |= UCC_CONTEXT_PARAM_FIELD_OOB;
+        ctx_params.oob.allgather    = oob_allgather;
+        ctx_params.oob.req_test     = oob_allgather_test;
+        ctx_params.oob.req_free     = oob_allgather_free;
+        ctx_params.oob.coll_info    = (void*)MPI_COMM_WORLD;
+        ctx_params.oob.participants = size;
     }
     UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
     UCC_CHECK(ucc_init(&lib_params, lib_config, &lib));
