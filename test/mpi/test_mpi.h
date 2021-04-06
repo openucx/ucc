@@ -118,6 +118,9 @@ static inline const char* team_str(ucc_test_mpi_team_t t) {
     return NULL;
 }
 
+#ifdef HAVE_CUDA
+void set_cuda_device(test_set_cuda_device_t set_device);
+#endif
 int ucc_coll_inplace_supported(ucc_coll_type_t c);
 int ucc_coll_is_rooted(ucc_coll_type_t c);
 
@@ -169,9 +172,6 @@ public:
     }
     void set_count_vsizes(std::vector<ucc_test_vsize_flag_t> &_counts_vsize);
     void set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vsize);
-#ifdef HAVE_CUDA
-    void set_cuda_device(test_set_cuda_device_t set_device);
-#endif
     void run_all();
     void set_root(ucc_test_mpi_root_t _root_type, int _root_value) {
         root_type = _root_type;

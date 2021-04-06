@@ -234,7 +234,7 @@ void UccTestMpi::set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vs
 }
 
 #ifdef HAVE_CUDA
-void UccTestMpi::set_cuda_device(test_set_cuda_device_t set_device)
+void set_cuda_device(test_set_cuda_device_t set_device)
 {
     MPI_Comm local_comm;
     int cuda_dev_count;

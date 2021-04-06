@@ -428,6 +428,9 @@ int main(int argc, char *argv[])
         goto mpi_exit;
     }
 
+#ifdef HAVE_CUDA
+    set_cuda_device(test_cuda_set_device);
+#endif
     test = new UccTestMpi(argc, argv, thread_mode, 0);
     for (auto &m : mtypes) {
         if (UCC_MEMORY_TYPE_HOST != m && UCC_OK != ucc_mc_available(m)) {
@@ -449,9 +452,6 @@ int main(int argc, char *argv[])
     test->set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
     test->set_max_size(test_max_size);
     test_rand_seed = init_rand_seed(test_rand_seed);
-#ifdef HAVE_CUDA
-    test->set_cuda_device(test_cuda_set_device);
-#endif
 
     PrintInfo();
 
