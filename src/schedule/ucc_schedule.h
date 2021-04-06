@@ -8,6 +8,8 @@
 #include "ucc/api/ucc.h"
 #include "utils/ucc_list.h"
 #include "utils/ucc_log.h"
+#include "utils/ucc_lock_free_queue.h"
+
 #define MAX_LISTENERS 4
 
 typedef enum {
@@ -49,9 +51,12 @@ typedef struct ucc_coll_task {
     ucc_ev_t                    *ev;
     void                        *ee_task;
     ucc_coll_task_t             *triggered_task;
-    /* used for progress queue */
-    ucc_list_link_t              list_elem;
-    uint8_t                      was_progressed;
+    union {
+        /* used for st & locked mt progress queue */
+        ucc_list_link_t              list_elem;
+        /* used for lf mt progress queue */
+        ucc_lf_queue_elem_t          lf_elem;
+    };
 } ucc_coll_task_t;
 
 typedef struct ucc_context ucc_context_t;

@@ -83,6 +83,7 @@ gtest_SOURCES =                     \
 	core/test_bcast.cc              \
 	core/test_allreduce.cc          \
 	utils/test_string.cc            \
+	utils/test_lock_free_queue.cc   \
 	coll_score/test_score.cc        \
 	coll_score/test_score_str.cc    \
 	coll_score/test_score_update.cc
