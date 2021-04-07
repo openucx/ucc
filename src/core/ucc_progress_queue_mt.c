@@ -49,8 +49,8 @@ static void ucc_pq_mt_enqueue_opt(ucc_progress_queue_t *pq, ucc_coll_task_t *tas
 }
 
 static void ucc_pq_mt_dequeue(ucc_progress_queue_t *pq,
-                                     ucc_coll_task_t     **popped_task_ptr,
-                                     int                   is_first_call)
+                              ucc_coll_task_t     **popped_task_ptr,
+                              int                   is_first_call) //NOLINT
 {
     ucc_pq_mt_t *pq_mt           = ucc_derived_of(pq, ucc_pq_mt_t);
     ucc_coll_task_t *popped_task = NULL;
@@ -66,8 +66,8 @@ static void ucc_pq_mt_dequeue(ucc_progress_queue_t *pq,
 }
 
 static void ucc_pq_mt_dequeue_opt(ucc_progress_queue_t *pq,
-                                         ucc_coll_task_t     **popped_task_ptr,
-                                         int                   is_first_call)
+                                  ucc_coll_task_t     **popped_task_ptr,
+                                  int                   is_first_call)
 {
     ucc_pq_mt_t *pq_mt  = ucc_derived_of(pq, ucc_pq_mt_t);
     // Save value in the beginning of the function

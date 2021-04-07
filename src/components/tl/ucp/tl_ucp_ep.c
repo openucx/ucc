@@ -2,6 +2,7 @@
 #include "tl_ucp_ep.h"
 #include "tl_ucp_addr.h"
 
+//NOLINTNEXTLINE
 static void ucc_tl_ucp_err_handler(void *arg, ucp_ep_h ep, ucs_status_t status)
 {
     /* Dummy fn - we don't expect errors in disconnect flow */

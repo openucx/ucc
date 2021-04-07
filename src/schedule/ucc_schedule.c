@@ -49,8 +49,9 @@ ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_schedule_completed_handler(ucc_coll_task_t *parent_task,
-                                                   ucc_coll_task_t *task)
+static ucc_status_t
+ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
+                               ucc_coll_task_t *task)
 {
     ucc_schedule_t *self = ucc_container_of(task, ucc_schedule_t, super);
     self->n_completed_tasks += 1;

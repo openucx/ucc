@@ -118,7 +118,6 @@ ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)
             cl_error(ctx->super.super.lib, "failed to create tl ucp team");
         }
         team->tl_ucp_team = team->team_create_req->descs[0].team;
-        status            = team->team_create_req->descs[0].status;
         ucc_team_multiple_req_free(team->team_create_req);
         team->team_create_req = NULL;
 
