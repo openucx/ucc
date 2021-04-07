@@ -29,6 +29,9 @@ static ucc_test_mpi_root_t root_type = ROOT_RANDOM;
 static int root_value = 10;
 static ucc_thread_mode_t                   thread_mode  = UCC_THREAD_SINGLE;
 static int                                 iterations   = 1;
+#ifdef HAVE_CUDA
+static test_set_cuda_device_t test_cuda_set_device = TEST_SET_DEV_NONE;
+#endif
 static std::vector<std::string> str_split(const char *value, const char *delimiter)
 {
     std::vector<std::string> rst;
@@ -60,6 +63,7 @@ void PrintHelp()
        "--max_size   <value>:           maximum send/recv buffer allocation size\n"
        "--count_bits <c1,c2,..>:        list of counts bits: 32,64          (alltoallv only)\n"
        "--displ_bits <d1,d2,..>:        list of displacements bits: 32,64   (alltoallv only)\n"
+       "--set_device <value>:           0 - don't set, 1 - cuda_device = local_rank, 2 - cuda_device = local_rank % cuda_device_count"
        "\n"
        "--help:              Show help\n";
     exit(1);
@@ -303,9 +307,9 @@ void PrintInfo()
               << std::endl;
 }
 
-void ProcessArgs(int argc, char** argv)
+int ProcessArgs(int argc, char** argv)
 {
-    const char *const short_opts  = "c:t:m:d:o:M:I:r:s:C:D:i:Z:Th";
+    const char *const short_opts  = "c:t:m:d:o:M:I:r:s:C:D:i:Z:ThS:";
     const option      long_opts[] = {
                                 {"colls", required_argument, nullptr, 'c'},
                                 {"teams", required_argument, nullptr, 't'},
@@ -321,6 +325,9 @@ void ProcessArgs(int argc, char** argv)
                                 {"displ_bits", required_argument, nullptr, 'D'},
                                 {"iter", required_argument, nullptr, 'i'},
                                 {"thread-multiple", no_argument, nullptr, 'T'},
+#ifdef HAVE_CUDA
+                                {"set_device", required_argument, nullptr, 'S'},
+#endif
                                 {"help", no_argument, nullptr, 'h'},
                                 {nullptr, no_argument, nullptr, 0}
     };
@@ -376,13 +383,18 @@ void ProcessArgs(int argc, char** argv)
         case 'i':
             iterations = std::stoi(optarg);
             break;
+#ifdef HAVE_CUDA
+        case 'S':
+            test_cuda_set_device = (test_set_cuda_device_t)std::stoi(optarg);
+            break;
+#endif
         case 'h': // -h or --help
         case '?': // Unrecognized option
         default:
-            PrintHelp();
-            break;
+            return 1;
         }
     }
+    return 0;
 }
 
 int main(int argc, char *argv[])
@@ -391,36 +403,64 @@ int main(int argc, char *argv[])
         std::chrono::steady_clock::now();
     int rank;
     int failed = 0;
-    ProcessArgs(argc, argv);
-    UccTestMpi test(argc, argv, thread_mode, 0);
+    int size, provided;
+    int required = (thread_mode == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
+        : MPI_THREAD_MULTIPLE;
+    UccTestMpi *test;
+
+    MPI_Init_thread(&argc, &argv, required, &provided);
+    if (provided != required) {
+        std::cerr << "could not initialize MPI in thread multiple\n";
+        abort();
+    }
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (size < 2) {
+        std::cerr << "test requires at least 2 ranks\n";
+        MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+
+    if (ProcessArgs(argc, argv)) {
+        if (0 == rank) {
+            PrintHelp();
+        }
+        failed = -1;
+        goto mpi_exit;
+    }
+
+#ifdef HAVE_CUDA
+    set_cuda_device(test_cuda_set_device);
+#endif
+    test = new UccTestMpi(argc, argv, thread_mode, 0);
     for (auto &m : mtypes) {
         if (UCC_MEMORY_TYPE_HOST != m && UCC_OK != ucc_mc_available(m)) {
             std::cerr << "requested memory type " << ucc_memory_type_names[m]
                       << " is not supported " << std::endl;
-            return 1;
+            failed = -1;
+            goto test_exit;
         }
     }
-    test.create_teams(teams);
-    test.set_iter(iterations);
-    test.set_colls(colls);
-    test.set_dtypes(dtypes);
-    test.set_mtypes(mtypes);
-    test.set_ops(ops);
-    test.set_root(root_type, root_value);
-    test.set_count_vsizes(counts_vsize);
-    test.set_displ_vsizes(displs_vsize);
-    test.set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
-    test.set_max_size(test_max_size);
+    test->create_teams(teams);
+    test->set_iter(iterations);
+    test->set_colls(colls);
+    test->set_dtypes(dtypes);
+    test->set_mtypes(mtypes);
+    test->set_ops(ops);
+    test->set_root(root_type, root_value);
+    test->set_count_vsizes(counts_vsize);
+    test->set_displ_vsizes(displs_vsize);
+    test->set_msgsizes(msgrange[0],msgrange[1],msgrange[2]);
+    test->set_max_size(test_max_size);
     test_rand_seed = init_rand_seed(test_rand_seed);
 
     PrintInfo();
 
     for (auto &inpl : inplace) {
-        test.set_inplace(inpl);
-        test.run_all();
+        test->set_inplace(inpl);
+        test->run_all();
     }
     std::cout << std::flush;
-    MPI_Allreduce(MPI_IN_PLACE, test.results.data(), test.results.size(),
+    MPI_Allreduce(MPI_IN_PLACE, test->results.data(), test->results.size(),
                   MPI_INT, MPI_MIN, MPI_COMM_WORLD);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -429,7 +469,7 @@ int main(int argc, char *argv[])
             std::chrono::steady_clock::now();
         int skipped = 0;
         int done = 0;
-        for (auto s : test.results) {
+        for (auto s : test->results) {
             switch(s) {
             case UCC_OK:
                 done++;
@@ -443,7 +483,7 @@ int main(int argc, char *argv[])
             }
         }
         std::cout << "\n===== UCC MPI TEST REPORT =====\n" <<
-            "   total tests : " << test.results.size() << "\n" << 
+            "   total tests : " << test->results.size() << "\n" <<
             "   passed      : " << done << "\n" <<
             "   skipped     : " << skipped << "\n" <<
             "   failed      : " << failed << "\n" <<
@@ -451,5 +491,9 @@ int main(int argc, char *argv[])
             std::chrono::duration_cast<std::chrono::seconds>(end - begin).count()
                   << "s" << std::endl;
     }
+test_exit:
+    delete test;
+mpi_exit:
+    MPI_Finalize();
     return failed;
 }
