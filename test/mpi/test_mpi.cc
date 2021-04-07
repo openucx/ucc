@@ -240,7 +240,7 @@ void UccTestMpi::set_cuda_device(test_set_cuda_device_t set_device)
     int cuda_dev_count;
     int local_rank;
     int device_id;
-    MPI_Comm_split_type(MPI_COMM_WORLD, OMPI_COMM_TYPE_NODE, 0, MPI_INFO_NULL,
+    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
                         &local_comm);
     MPI_Comm_rank(local_comm, &local_rank);
     CUDA_CHECK(cudaGetDeviceCount(&cuda_dev_count));
