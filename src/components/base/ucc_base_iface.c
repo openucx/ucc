@@ -10,8 +10,8 @@ ucc_config_field_t ucc_base_config_table[] = {
      "poll.",
      ucc_offsetof(ucc_base_config_t, log_component), UCC_CONFIG_TYPE_LOG_COMP},
 
-    {"COLL_SCORE", "", "Collective score modifier for a CL/TL component\n"
-     "format: \";\"-separated list of score values with optional qualifiers:\n"
+    {"SCORE", "", "Collective score modifier for a CL/TL component\n"
+     "format: \"#\"-separated list of score values with optional qualifiers:\n"
      "        <coll_type_1,..,coll_type_n>:<mem_type_1,..,mem_type_n>:"
      "<msg_range_1,..,msg_range_n>:score\n"
      "        msg_range has the format: start-end, where start,end - integers"
