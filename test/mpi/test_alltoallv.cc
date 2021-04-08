@@ -57,14 +57,10 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &nprocs);
 
-    args.coll_type = UCC_COLL_TYPE_ALLTOALLV;
+    args.coll_type = UCC_COLL_TYPE_ALLTOALLV;  
 
-    if (TEST_INPLACE == inplace && !ucc_coll_inplace_supported(args.coll_type)) {
-        test_skip = TEST_SKIP_NOT_IMPL_INPLACE;
-    }
-
-    if (skip_reduce(test_max_size < (_msgsize * nprocs), TEST_SKIP_MEM_LIMIT,
-                    team.comm)) {
+    if (TEST_SKIP_NONE != skip_reduce(test_max_size < (_msgsize * nprocs),
+                                      TEST_SKIP_MEM_LIMIT, team.comm)) {
         return;
     }
 
@@ -142,7 +138,7 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         args.dst.info_v.displacements = (ucc_aint_t*)rdispls;
     }
 
-    UCC_CHECK(ucc_collective_init(&args, &req, team.team));
+    UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
 TestAlltoallv::~TestAlltoallv()

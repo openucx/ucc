@@ -8,19 +8,21 @@
 #include "mpi_util.h"
 TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                              ucc_datatype_t _dt, ucc_reduction_op_t _op,
-                             ucc_memory_type_t _mt, ucc_test_team_t &_team) :
-    TestCase(_team, _mt, _msgsize, _inplace)
+                             ucc_memory_type_t _mt, ucc_test_team_t &_team,
+                             size_t _max_size) :
+    TestCase(_team, _mt, _msgsize, _inplace, _max_size)
 {
     size_t dt_size = ucc_dt_size(_dt);
     size_t count = _msgsize/dt_size;
     int rank;
+
     MPI_Comm_rank(team.comm, &rank);
     op = _op;
     dt = _dt;
-
     args.coll_type = UCC_COLL_TYPE_ALLREDUCE;
 
-    if (TEST_SKIP_NONE != skip_reduce(test_skip, team.comm)) {
+    if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT,
+                    team.comm)) {
         return;
     }
 
@@ -49,7 +51,7 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     args.dst.info.count       = count;
     args.dst.info.datatype    = _dt;
     args.dst.info.mem_type    = _mt;
-    UCC_CHECK(ucc_collective_init(&args, &req, team.team));
+    UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
 ucc_status_t TestAllreduce::check()

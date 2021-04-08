@@ -23,10 +23,24 @@ END_C_DECLS
 #endif
 
 #define STR(x) #x
-#define UCC_CHECK(_call)                                            \
-    if (UCC_OK != (_call)) {                                        \
-        std::cerr << "*** UCC TEST FAIL: " << STR(_call) << "\n";   \
-        MPI_Abort(MPI_COMM_WORLD, -1);                              \
+#define UCC_CHECK(_call)                                                \
+    if (UCC_OK != (_call)) {                                            \
+        std::cerr << "*** UCC TEST FAIL: " << STR(_call) << "\n";       \
+        MPI_Abort(MPI_COMM_WORLD, -1);                                  \
+    }
+
+#define UCC_CHECK_SKIP(_call, _skip_cause)                              \
+    {                                                                   \
+        ucc_status_t status;                                            \
+        status = (_call);                                               \
+        if(UCC_ERR_NOT_SUPPORTED == status)  {                          \
+            _skip_cause = TEST_SKIP_NOT_SUPPORTED;                      \
+        } else if (UCC_ERR_NOT_IMPLEMENTED == status) {                 \
+            _skip_cause = TEST_SKIP_NOT_IMPLEMENTED;                    \
+        } else if (UCC_OK != status) {                                  \
+            std::cerr << "*** UCC TEST FAIL: " << STR(_call) << "\n";   \
+            MPI_Abort(MPI_COMM_WORLD, -1);                              \
+        }                                                               \
     }
 
 #define TEST_UCC_RANK_BUF_SIZE_MAX (8*1024*1024)
@@ -77,7 +91,8 @@ typedef enum {
 
 typedef enum {
     TEST_SKIP_NONE,
-    TEST_SKIP_NOT_IMPL_INPLACE,
+    TEST_SKIP_NOT_SUPPORTED,
+    TEST_SKIP_NOT_IMPLEMENTED,
     TEST_SKIP_MEM_LIMIT,
     TEST_SKIP_LAST
 } test_skip_cause_t;
@@ -94,8 +109,10 @@ static inline const char* skip_str(test_skip_cause_t s) {
     switch(s) {
     case TEST_SKIP_MEM_LIMIT:
         return "maximum buffer size reached";
-    case TEST_SKIP_NOT_IMPL_INPLACE:
-        return "inplace not implemented";
+    case TEST_SKIP_NOT_SUPPORTED:
+        return "not supported";
+    case TEST_SKIP_NOT_IMPLEMENTED:
+        return "not implemented";
     default:
         return "unknown";
     }
@@ -245,7 +262,8 @@ class TestAllreduce : public TestCase {
 public:
     TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
                   ucc_datatype_t _dt, ucc_reduction_op_t _op,
-                  ucc_memory_type_t _mt, ucc_test_team_t &team);
+                  ucc_memory_type_t _mt, ucc_test_team_t &team,
+                  size_t _max_size);
     ucc_status_t check();
     std::string str();
 };
