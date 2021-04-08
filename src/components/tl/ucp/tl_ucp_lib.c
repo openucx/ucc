@@ -13,6 +13,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
 {
     const ucc_tl_ucp_lib_config_t *tl_ucp_config =
         ucc_derived_of(config, ucc_tl_ucp_lib_config_t);
+    int                            n_plugins     =
+        ucc_tl_ucp.super.coll_plugins.n_components;
+    ucc_tl_coll_plugin_iface_t *tlcp;
+    int                         i;
+    ucc_status_t                status;
+
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_lib_t, &ucc_tl_ucp.super,
                               &tl_ucp_config->super);
     memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
@@ -27,8 +33,41 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
         self->cfg.reduce_kn_radix         = tl_ucp_config->kn_radix;
         self->cfg.scatter_kn_radix        = tl_ucp_config->kn_radix;
     }
+
+    self->tlcp_configs = NULL;
+    if (n_plugins) {
+        self->tlcp_configs = ucc_malloc(sizeof(void*)*n_plugins, "tlcp_configs");
+        if (!self->tlcp_configs) {
+            tl_error(&self->super, "failed to allocate %zd bytes for tlcp_configs",
+                     sizeof(void*)*n_plugins);
+            status = UCC_ERR_NO_MEMORY;
+            goto err;
+        }
+        for (i = 0; i < n_plugins; i++) {
+            tlcp = ucc_derived_of(ucc_tl_ucp.super.coll_plugins.components[i],
+                                  ucc_tl_coll_plugin_iface_t);
+            tlcp->id = i;
+            self->tlcp_configs[i] = ucc_malloc(tlcp->config.size, "tlcp_cfg");
+            if (!self->tlcp_configs[i]) {
+                tl_error(&self->super, "failed to allocate %zd bytes for tlcp_cfg",
+                         tlcp->config.size);
+                status = UCC_ERR_NO_MEMORY;
+                goto err_cfg;
+            }
+            status = ucc_config_parser_fill_opts(self->tlcp_configs[i], tlcp->config.table,
+                                                 params->full_prefix,
+                                                 ucc_tl_ucp.super.tl_lib_config.prefix, 0);
+        }
+    }
     tl_info(&self->super, "initialized lib object: %p", self);
     return UCC_OK;
+
+err_cfg:
+    for (i--; i >= 0; i--) {
+        ucc_free(self->tlcp_configs[i]);
+    }
+err:
+    return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_lib_t)

@@ -237,8 +237,9 @@ static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
     ucc_tl_iface_t       *tl_iface;
 
     ucc_copy_lib_params(&b_params.params, user_params);
-    n_tls = ucc_global_config.tl_framework.n_components;
-    lib->tl_libs =
+    b_params.full_prefix = lib->full_prefix;
+    n_tls                = ucc_global_config.tl_framework.n_components;
+    lib->tl_libs         =
         (ucc_tl_lib_t **)ucc_malloc(sizeof(ucc_tl_lib_t *) * n_tls, "tl_libs");
     lib->n_tl_libs_opened = 0;
     if (!lib->tl_libs) {

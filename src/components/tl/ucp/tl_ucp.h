@@ -73,6 +73,7 @@ typedef struct ucc_tl_ucp_context_config {
 typedef struct ucc_tl_ucp_lib {
     ucc_tl_lib_t            super;
     ucc_tl_ucp_lib_config_t cfg;
+    void                  **tlcp_configs;
 } ucc_tl_ucp_lib_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);

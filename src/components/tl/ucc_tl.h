@@ -57,6 +57,13 @@ typedef struct ucc_tl_service_coll {
     void         (*update_id)(ucc_base_team_t *team, uint16_t id);
 } ucc_tl_service_coll_t;
 
+typedef struct ucc_tl_coll_plugin_iface {
+    ucc_component_iface_t          super;
+    ucs_config_global_list_entry_t config;
+    ucc_get_coll_scores_fn_t       get_scores;
+    uint32_t                       id;
+} ucc_tl_coll_plugin_iface_t;
+
 typedef struct ucc_tl_iface {
     ucc_component_iface_t          super;
     ucs_config_global_list_entry_t tl_lib_config;
@@ -67,6 +74,7 @@ typedef struct ucc_tl_iface {
     ucc_base_coll_iface_t          coll;
     ucc_tl_service_coll_t          scoll;
     ucc_base_coll_alg_info_t *     alg_info[UCC_COLL_TYPE_NUM];
+    ucc_component_framework_t      coll_plugins;
 } ucc_tl_iface_t;
 
 typedef struct ucc_tl_lib {
