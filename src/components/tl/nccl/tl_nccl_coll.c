@@ -249,14 +249,16 @@ ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     void               *dst    = task->args.dst.info.buffer;
-    void               *src    = UCC_IS_INPLACE(task->args) ?
-                                    task->args.dst.info.buffer:
-                                    task->args.src.info.buffer;
+    void               *src    = task->args.src.info.buffer;
     ncclDataType_t      dt     = ucc_to_nccl_dtype[
                                     task->args.dst.info.datatype];
     ucc_status_t        status = UCC_OK;
     size_t              count  = task->args.dst.info.count;
 
+    if (UCC_IS_INPLACE(task->args)) {
+        src = (void*)((ptrdiff_t)task->args.dst.info.buffer +
+               count * ucc_dt_size(task->args.dst.info.datatype) * team->rank);
+    }
     task->super.super.status = UCC_INPROGRESS;
     NCCLCHECK_GOTO(ncclAllGather(src, dst, count, dt, team->nccl_comm, stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
