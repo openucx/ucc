@@ -10,6 +10,7 @@
 #include <ucs/sys/math.h>
 #include "ucc_datastruct.h"
 #include "ucc/api/ucc.h"
+#include "ucc_compiler_def.h"
 #define ucc_min(_a, _b) ucs_min((_a), (_b))
 #define ucc_max(_a, _b) ucs_max((_a), (_b))
 #define ucc_ilog2(_v)   ucs_ilog2((_v))
@@ -28,9 +29,10 @@
 extern size_t ucc_dt_sizes[UCC_DT_USERDEFINED];
 static inline size_t ucc_dt_size(ucc_datatype_t dt)
 {
-    if (dt < UCC_DT_USERDEFINED) {
+    if (ucc_likely(dt < UCC_DT_USERDEFINED)) {
         return ucc_dt_sizes[dt];
     }
+    // TODO remove ucc_likely once custom datatype is implemented
     return 0;
 }
 

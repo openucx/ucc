@@ -24,7 +24,7 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
         if (task->progress) { //TODO maybe dummy empty progress fn is better than branch?
             ucc_assert(task->super.status != UCC_OK);
             status = task->progress(task);
-            if (status < 0) {
+            if (ucc_unlikely(status < 0)) {
                 return status;
             }
         }

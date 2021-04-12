@@ -46,7 +46,7 @@ static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team, ucc_rank_t
     if (NULL == (*ep)) {
         /* Not connected yet */
         status = ucc_tl_ucp_connect_team_ep(team, rank, key, ep);
-        if (UCC_OK != status) {
+        if (ucc_unlikely(UCC_OK != status)) {
             tl_error(UCC_TL_TEAM_LIB(team), "failed to connect team ep");
             *ep = NULL;
             return status;

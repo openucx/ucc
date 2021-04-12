@@ -110,7 +110,7 @@ static int ucc_pq_mt_progress(ucc_progress_queue_t *pq)
     if (task) {
         if (task->progress) {
             status = task->progress(task);
-            if (status < 0) {
+            if (ucc_unlikely(status < 0)) {
                 return status;
             }
         }
@@ -119,7 +119,7 @@ static int ucc_pq_mt_progress(ucc_progress_queue_t *pq)
             return n_progressed;
         }
         n_progressed++;
-        if (0 > (status = ucc_task_complete(task))) {
+        if (ucc_unlikely(0 > (status = ucc_task_complete(task)))) {
             return status;
         }
     }

@@ -90,8 +90,9 @@ static void ucc_mc_cuda_event_init(ucc_mpool_t *mp, void *obj, void *chunk)
 {
     ucc_mc_cuda_event_t *base = (ucc_mc_cuda_event_t *) obj;
 
-    if (cudaSuccess != cudaEventCreateWithFlags(&base->event,
-                                                cudaEventDisableTiming)) {
+    if (ucc_unlikely(
+            cudaSuccess !=
+            cudaEventCreateWithFlags(&base->event, cudaEventDisableTiming))) {
         mc_error(&ucc_mc_cuda.super, "cudaEventCreateWithFlags Failed");
     }
 }
@@ -99,7 +100,7 @@ static void ucc_mc_cuda_event_init(ucc_mpool_t *mp, void *obj, void *chunk)
 static void ucc_mc_cuda_event_cleanup(ucc_mpool_t *mp, void *obj)
 {
     ucc_mc_cuda_event_t *base = (ucc_mc_cuda_event_t *) obj;
-    if (cudaSuccess != cudaEventDestroy(base->event)) {
+    if (ucc_unlikely(cudaSuccess != cudaEventDestroy(base->event))) {
         mc_error(&ucc_mc_cuda.super, "cudaEventDestroy Failed");
     }
 }
@@ -226,7 +227,7 @@ static ucc_status_t ucc_mc_cuda_mem_alloc(void **ptr, size_t size)
     cudaError_t st;
 
     st = cudaMalloc(ptr, size);
-    if (st != cudaSuccess) {
+    if (ucc_unlikely(st != cudaSuccess)) {
         cudaGetLastError();
         mc_error(&ucc_mc_cuda.super,
                  "failed to allocate %zd bytes, "
@@ -244,7 +245,7 @@ static ucc_status_t ucc_mc_cuda_mem_free(void *ptr)
     cudaError_t st;
 
     st = cudaFree(ptr);
-    if (st != cudaSuccess) {
+    if (ucc_unlikely(st != cudaSuccess)) {
         cudaGetLastError();
         mc_error(&ucc_mc_cuda.super,
                  "failed to free mem at %p, "
@@ -264,7 +265,7 @@ static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
                src_mem == UCC_MEMORY_TYPE_CUDA);
 
     st = cudaMemcpyAsync(dst, src, len, cudaMemcpyDefault, ucc_mc_cuda.stream);
-    if (st != cudaSuccess) {
+    if (ucc_unlikely(st != cudaSuccess)) {
         cudaGetLastError();
         mc_error(&ucc_mc_cuda.super,
                  "failed to launch cudaMemcpyAsync,  dst %p, src %p, len %zd "
@@ -273,7 +274,7 @@ static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
         return UCC_ERR_NO_MESSAGE;
     }
     st = cudaStreamSynchronize(ucc_mc_cuda.stream);
-    if (st != cudaSuccess) {
+    if (ucc_unlikely(st != cudaSuccess)) {
         cudaGetLastError();
         mc_error(&ucc_mc_cuda.super,
                  "failed to synchronize mc_cuda.stream "
@@ -308,7 +309,7 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
     } else {
         if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_MEM_TYPE) {
             st = cudaPointerGetAttributes(&attr, ptr);
-            if (st != cudaSuccess) {
+            if (ucc_unlikely(st != cudaSuccess)) {
                 cudaGetLastError();
                 return UCC_ERR_NOT_SUPPORTED;
             }
@@ -333,8 +334,7 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
                 } else {
                     mem_type = UCC_MEMORY_TYPE_CUDA;
                 }
-            }
-            else if (attr.memoryType == cudaMemoryTypeHost) {
+            } else if (ucc_likely(attr.memoryType == cudaMemoryTypeHost)) {
                 mem_type = UCC_MEMORY_TYPE_HOST;
             } else {
                 return UCC_ERR_NOT_SUPPORTED;
@@ -347,7 +347,7 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
                                     UCC_MEM_ATTR_FIELD_BASE_ADDRESS)) {
             cu_err = cuMemGetAddressRange((CUdeviceptr*)&base_address,
                     &alloc_length, (CUdeviceptr)ptr);
-            if (cu_err != CUDA_SUCCESS) {
+            if (ucc_unlikely(cu_err != CUDA_SUCCESS)) {
                 mc_error(&ucc_mc_cuda.super,
                          "cuMemGetAddressRange(%p) error: %d(%s)",
                           ptr, cu_err, cudaGetErrorString(st));
@@ -379,7 +379,7 @@ ucc_status_t ucc_ee_cuda_task_post(void *ee_stream, void **ee_req)
         status = ucc_mc_cuda.post_strm_task(req->dev_status,
                                             cfg->stream_blocking_wait,
                                             req->stream);
-        if (status != UCC_OK) {
+        if (ucc_unlikely(status != UCC_OK)) {
             goto free_req;
         }
     } else {
@@ -390,7 +390,7 @@ ucc_status_t ucc_ee_cuda_task_post(void *ee_stream, void **ee_req)
         status = ucc_mc_cuda.post_strm_task(req->dev_status,
                                             cfg->stream_blocking_wait,
                                             ucc_mc_cuda.stream);
-        if (status != UCC_OK) {
+        if (ucc_unlikely(status != UCC_OK)) {
             goto free_event;
         }
         CUDACHECK(cudaEventRecord(cuda_event->event, ucc_mc_cuda.stream));

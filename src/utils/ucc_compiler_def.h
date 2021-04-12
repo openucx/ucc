@@ -23,6 +23,8 @@
 #define ucc_derived_of    ucs_derived_of
 #define ucc_strncpy_safe  ucs_strncpy_safe
 #define ucc_snprintf_safe snprintf
+#define ucc_likely        ucs_likely
+#define ucc_unlikely      ucs_unlikely
 
 typedef ucs_log_component_config_t ucc_log_component_config_t;
 typedef int                        ucc_score_t;

@@ -78,7 +78,7 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 {
     ucc_status_t status = task->super.status;
     ucc_assert((status == UCC_OK) || (status < 0));
-    if (status == UCC_OK) {
+    if (ucc_likely(status == UCC_OK)) {
         status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
     } else {
         /* error in task status */

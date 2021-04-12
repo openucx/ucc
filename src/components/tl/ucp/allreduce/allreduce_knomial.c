@@ -72,9 +72,9 @@ UCC_KN_PHASE_EXTRA:
         if (KN_NODE_EXTRA == node_type) {
             goto completion;
         } else {
-            if (UCC_OK != (status = ucc_dt_reduce(sbuf, scratch, rbuf,
-                                                  count, dt, mem_type,
-                                                  &task->args))) {
+            if (ucc_unlikely(UCC_OK != (status = ucc_dt_reduce(
+                                            sbuf, scratch, rbuf, count, dt,
+                                            mem_type, &task->args)))) {
                 tl_error(UCC_TL_TEAM_LIB(task->team),
                          "failed to perform dt reduction");
                 task->super.super.status = status;
@@ -126,10 +126,11 @@ UCC_KN_PHASE_EXTRA:
             } else {
                 send_buf = rbuf;
             }
-            if (UCC_OK != (status = ucc_dt_reduce_multi(
-                send_buf, scratch, rbuf,
-                task->send_posted - p->iteration * (radix - 1), count,
-                data_size, dt, mem_type, &task->args))) {
+            if (ucc_unlikely(UCC_OK !=
+                    (status = ucc_dt_reduce_multi(
+                         send_buf, scratch, rbuf,
+                         task->send_posted - p->iteration * (radix - 1), count,
+                         data_size, dt, mem_type, &task->args)))) {
                 tl_error(UCC_TL_TEAM_LIB(task->team),
                          "failed to perform dt reduction");
                 task->super.super.status = status;
@@ -201,7 +202,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
     task->super.finalize = ucc_tl_ucp_allreduce_knomial_finalize;
     status = ucc_mc_alloc(&task->allreduce_kn.scratch, (radix - 1) * data_size,
                           task->args.src.info.mem_type);
-    if (status != UCC_OK) {
+    if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
                  "failed to allocate scratch buffer");
         return status;
@@ -216,13 +217,13 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_finalize(ucc_coll_task_t *coll_task)
 
     global_st = ucc_mc_free(task->allreduce_kn.scratch,
                             task->args.src.info.mem_type);
-    if (global_st != UCC_OK) {
+    if (ucc_unlikely(global_st != UCC_OK)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
                  "failed to free scratch buffer");
     }
 
     st = ucc_tl_ucp_coll_finalize(&task->super);
-    if (st != UCC_OK) {
+    if (ucc_unlikely(st != UCC_OK)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
                  "failed finalize collective");
         global_st = st;

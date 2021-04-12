@@ -14,7 +14,7 @@ static const ucc_ee_ops_t *ee_ops[UCC_EE_LAST];
 
 #define UCC_CHECK_MC_AVAILABLE(mc)                                             \
     do {                                                                       \
-        if (NULL == mc_ops[mc]) {                                              \
+        if (ucc_unlikely(NULL == mc_ops[mc])) {                                \
             ucc_error("no components supported memory type %s available",      \
                       ucc_memory_type_names[mc]);                              \
             return UCC_ERR_NOT_SUPPORTED;                                      \

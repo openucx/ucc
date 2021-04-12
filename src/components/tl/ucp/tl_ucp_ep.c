@@ -33,7 +33,7 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
     }
     status = ucp_ep_create(ctx->ucp_worker, &ep_params, ep);
 
-    if (UCS_OK != status) {
+    if (ucc_unlikely(UCS_OK != status)) {
         tl_error(ctx->super.super.lib, "ucp returned connect error: %s",
                  ucs_status_string(status));
         return ucs_status_to_ucc_status(status);
@@ -72,7 +72,7 @@ ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx)
     while (ep) {
         state->close_req =
             ucp_ep_close_nb(ep, UCP_EP_CLOSE_MODE_FLUSH);
-        if (UCS_PTR_IS_ERR(state->close_req)) {
+        if (ucc_unlikely(UCS_PTR_IS_ERR(state->close_req))) {
             tl_error(ctx->super.super.lib, "failed to start ep close, ep %p",
                      ep);
         }
