@@ -145,7 +145,9 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     }
     if (strlen(lib->super.super.score_str) > 0) {
         status = ucc_coll_score_update_from_str(lib->super.super.score_str,
-                                                score, team->size);
+                                                score, team->size,
+                                                ucc_tl_ucp_coll_init,
+                                                &team->super.super);
         if (status == UCC_ERR_INVALID_PARAM) {
             /* User provided incorrect input - try to proceed */
             status = UCC_OK;

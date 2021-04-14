@@ -51,11 +51,15 @@ ucc_status_t  ucc_coll_score_merge(ucc_coll_score_t * score1,
 
 ucc_status_t ucc_coll_score_alloc_from_str(const char *str,
                                            ucc_coll_score_t **score,
-                                           ucc_rank_t         team_size);
+                                           ucc_rank_t         team_size,
+                                           ucc_base_coll_init_fn_t init,
+                                           ucc_base_team_t *team);
 
 ucc_status_t ucc_coll_score_update_from_str(const char *str,
                                             ucc_coll_score_t *score,
-                                            ucc_rank_t        team_size);
+                                            ucc_rank_t        team_size,
+                                            ucc_base_coll_init_fn_t init,
+                                            ucc_base_team_t *team);
 
 ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
                                    ucc_coll_score_t *update);
