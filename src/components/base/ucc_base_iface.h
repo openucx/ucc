@@ -122,7 +122,7 @@ static inline void ucc_base_config_release(ucc_base_config_t *config)
 }
 
 #define UCC_IFACE_NAME_PREFIX(_F, _NAME, _cfg)                                 \
-    .name   = UCC_PP_MAKE_STRING(_F##_NAME) " " UCC_PP_MAKE_STRING(_cfg),      \
+    .name   = UCC_PP_MAKE_STRING(_F##_NAME),                                   \
     .prefix = UCC_PP_MAKE_STRING(_F##_NAME##_)
 
 #define UCC_IFACE_CFG(_F, _f, _cfg, _name, _NAME)                              \

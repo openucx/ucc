@@ -10,5 +10,5 @@
 #include <stdint.h>
 #define UCC_LIST_HEAD UCS_LIST_HEAD
 typedef uint32_t ucc_rank_t;
-
+#define UCC_RANK_MAX UINT32_MAX
 #endif
