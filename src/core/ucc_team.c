@@ -195,8 +195,8 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
         b_team   = &team->cl_teams[team->last_team_create_posted]->super;
         status   = cl_iface->team.create_test(b_team);
         if (status < 0) {
-            ucc_debug("failed to create CL %s team", cl_iface->super.name);
-            /* TODO: see comment above */
+            team->n_cl_teams--;
+            ucc_info("failed to create CL %s team", cl_iface->super.name);
         } else if (status == UCC_INPROGRESS) {
             return status;
         }
@@ -209,13 +209,13 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
         status   = cl_iface->team.create_post(&context->cl_ctx[i]->super,
                                             &b_params, &b_team);
         if (status != UCC_OK) {
-            ucc_debug("failed to create CL %s team", cl_iface->super.name);
+            ucc_info("failed to create CL %s team", cl_iface->super.name);
             /* TODO: see comment above*/
             continue;
         }
         status = cl_iface->team.create_test(b_team);
         if (status < 0) {
-            ucc_debug("failed to create CL %s team", cl_iface->super.name);
+            ucc_info("failed to create CL %s team", cl_iface->super.name);
             /* TODO: see comment above */
             continue;
         }
@@ -228,24 +228,28 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
             return UCC_INPROGRESS;
         }
     }
+    if (0 == team->n_cl_teams) {
+        ucc_error("No CL teams were created");
+        return UCC_ERR_NO_MESSAGE;
+    }
     return UCC_OK;
 }
 
 ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
                                          ucc_team_t    *team)
 {
-    ucc_status_t status;
+    ucc_status_t status = UCC_OK;
     switch (team->state) {
     case UCC_TEAM_SERVICE_TEAM:
         status = ucc_team_create_service_team(context, team);
         if (UCC_OK != status) {
-            return status;
+            goto out;
         }
         team->state = UCC_TEAM_ALLOC_ID;
     case UCC_TEAM_ALLOC_ID:
         status = ucc_team_alloc_id(team);
         if (UCC_OK != status) {
-            return status;
+            goto out;
         }
         team->state = UCC_TEAM_CL_CREATE;
         if (team->service_team) {
@@ -255,14 +259,12 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
         }
     case UCC_TEAM_CL_CREATE:
         status = ucc_team_create_cls(context, team);
-        if (UCC_OK != status) {
-            return status;
-        }
     }
-    team->status = UCC_OK;
+out:
+    team->status = status;
     /* TODO: add team/coll selection and check if some teams are never
              used after selection and clean them up */
-    return UCC_OK;
+    return status;
 }
 
 ucc_status_t ucc_team_create_test(ucc_team_h team)
