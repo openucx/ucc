@@ -6,12 +6,11 @@
 #include "ucc_coll_utils.h"
 #include "components/base/ucc_base_iface.h"
 #include "core/ucc_team.h"
-#define STR(x) #x
-#define STR_TYPE_CHECK(_str, _p, _prefix)       \
-    do {                                        \
-        if ((0 == strcasecmp(STR(_p), _str))) { \
-            return _prefix##_p;                 \
-        }                                       \
+#define STR_TYPE_CHECK(_str, _p, _prefix)                       \
+    do {                                                        \
+        if ((0 == strcasecmp(_UCC_PP_MAKE_STRING(_p), _str))) { \
+            return _prefix##_p;                                 \
+        }                                                       \
     } while (0)
 
 #define STR_COLL_TYPE_CHECK(_str, _p) STR_TYPE_CHECK(_str, _p, UCC_COLL_TYPE_)
