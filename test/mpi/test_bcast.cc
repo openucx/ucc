@@ -22,9 +22,6 @@ TestBcast::TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     root = _root;
     args.coll_type = UCC_COLL_TYPE_BCAST;
 
-    if (TEST_INPLACE == inplace && !ucc_coll_inplace_supported(args.coll_type)) {
-        test_skip = TEST_SKIP_NOT_IMPL_INPLACE;
-    }
     if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT,
                     team.comm)) {
         return;
@@ -44,7 +41,7 @@ TestBcast::TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     args.src.info.datatype    = TEST_DT;
     args.src.info.mem_type    = _mt;
     args.root                 = root;
-    UCC_CHECK(ucc_collective_init(&args, &req, team.team));
+    UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
 ucc_status_t TestBcast::check()

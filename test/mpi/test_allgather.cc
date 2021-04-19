@@ -22,10 +22,8 @@ TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
     args.coll_type = UCC_COLL_TYPE_ALLGATHER;
 
-    if (test_max_size < (_msgsize*size)) {
-        test_skip = TEST_SKIP_MEM_LIMIT;
-    }
-    if (TEST_SKIP_NONE != skip_reduce(test_skip, team.comm)) {
+    if (TEST_SKIP_NONE != skip_reduce(test_max_size < (_msgsize*size),
+                                      TEST_SKIP_MEM_LIMIT, team.comm)) {
         return;
     }
 
@@ -52,7 +50,7 @@ TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     args.dst.info.count    = count;
     args.dst.info.datatype = TEST_DT;
     args.dst.info.mem_type = _mt;
-    UCC_CHECK(ucc_collective_init(&args, &req, team.team));
+    UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
 ucc_status_t TestAllgather::check()
