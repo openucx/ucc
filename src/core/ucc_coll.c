@@ -126,6 +126,7 @@ ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
         return status;
     }
     /* TO discuss: maybe we want to pass around user pointer ? */
+    op_args.mask = 0;
     memcpy(&op_args.args, coll_args, sizeof(ucc_coll_args_t));
     op_args.team = team;
     cl_team      = ucc_select_cl_team(coll_args, team);

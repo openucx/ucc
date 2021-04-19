@@ -673,7 +673,7 @@ ucc_status_t ucc_coll_score_alloc_from_str(const char *            str,
     *score_p = score;
     return UCC_OK;
 error_msg:
-    ucc_error("failed to parse UCC_*_SCORE parameter: %s", tokens[i]);
+    ucc_error("failed to parse UCC_*_TUNE parameter: %s", tokens[i]);
 error:
     *score_p = NULL;
     ucc_coll_score_free(score);
