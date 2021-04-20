@@ -150,6 +150,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/ucx.m4])
      m4_include([config/m4/cuda.m4])
      m4_include([config/m4/nccl.m4])
+     m4_include([config/m4/tl_coll_plugins.m4])
      m4_include([test/gtest/configure.m4])
 
      AC_ARG_ENABLE([debug],
@@ -188,6 +189,7 @@ CFLAGS="$CFLAGS -std=gnu11"
 CPPFLAGS="$UCS_CPPFLAGS $CPPFLAGS $includes -Wall -Werror"
 LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
 
+CHECK_TL_COLL_PLUGINS
 AC_CONFIG_FILES([
                  Makefile
                  src/Makefile

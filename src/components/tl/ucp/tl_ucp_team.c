@@ -131,10 +131,14 @@ err_preconnect:
 ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
                                         ucc_coll_score_t **score_p)
 {
-    ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_lib_t  *lib  = UCC_TL_UCP_TEAM_LIB(team);
-    ucc_coll_score_t  *score;
-    ucc_status_t       status;
+    ucc_component_framework_t  *plugins = &ucc_tl_ucp.super.coll_plugins;
+    ucc_tl_ucp_team_t          *team    = ucc_derived_of(tl_team,
+                                                         ucc_tl_ucp_team_t);
+    ucc_tl_ucp_lib_t           *lib     = UCC_TL_UCP_TEAM_LIB(team);
+    ucc_coll_score_t           *score, *tlcp_score;
+    ucc_status_t                status;
+    ucc_tl_coll_plugin_iface_t *tlcp;
+    int                         i;
     /* There can be a different logic for different coll_type/mem_type.
        Right now just init everything the same way. */
     status = ucc_coll_score_build_default(tl_team, UCC_TL_UCP_DEFAULT_SCORE,
@@ -149,8 +153,25 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
         if (status == UCC_ERR_INVALID_PARAM) {
             /* User provided incorrect input - try to proceed */
             status = UCC_OK;
+        } else if (status < 0) {
+            goto err;
+        }
+    }
+    for (i = 0; i < plugins->n_components; i++) {
+        tlcp = ucc_derived_of(plugins->components[i],
+                              ucc_tl_coll_plugin_iface_t);
+        status = tlcp->get_scores(tl_team, &tlcp_score);
+        if (UCC_OK != status) {
+            goto err;
+        }
+        status = ucc_coll_score_merge_in(&score, tlcp_score, 1);
+        if (UCC_OK != status) {
+            goto err;
         }
     }
     *score_p = score;
+    return UCC_OK;
+err:
+    ucc_coll_score_free(score);
     return status;
 }

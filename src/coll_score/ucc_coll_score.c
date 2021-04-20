@@ -273,6 +273,17 @@ out:
     return status;
 }
 
+ucc_status_t ucc_coll_score_merge_in(ucc_coll_score_t **dst,
+                                     ucc_coll_score_t *src, int free_src)
+{
+    ucc_coll_score_t *tmp;
+    ucc_status_t      status;
+
+    status = ucc_coll_score_merge(src, *dst, &tmp, free_src);
+    *dst = tmp;
+    return status;
+}
+
 static ucc_status_t str_to_coll_type(const char *str, unsigned *ct_n,
                                      ucc_coll_type_t **ct)
 {

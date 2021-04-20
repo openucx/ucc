@@ -216,6 +216,7 @@ static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
     ucc_tl_iface_t *tl_iface;
 
     ucc_copy_lib_params(&b_params.params, user_params);
+    b_params.full_prefix = lib->full_prefix;
     required_tls = 0;
     for (i = 0; i < lib->n_cl_libs_opened; i++) {
         cl_lib = lib->cl_libs[i];

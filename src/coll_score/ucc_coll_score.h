@@ -49,6 +49,9 @@ ucc_status_t  ucc_coll_score_merge(ucc_coll_score_t * score1,
                                    ucc_coll_score_t * score2,
                                    ucc_coll_score_t **rst, int free_inputs);
 
+ucc_status_t ucc_coll_score_merge_in(ucc_coll_score_t **dst,
+                                     ucc_coll_score_t *src, int free_src);
+
 ucc_status_t ucc_coll_score_alloc_from_str(const char *str,
                                            ucc_coll_score_t **score,
                                            ucc_rank_t         team_size);

@@ -158,4 +158,5 @@ __attribute__((constructor)) static void tl_ucp_iface_init(void)
     ucc_tl_ucp.super.scoll.test      = ucc_tl_ucp_service_test;
     ucc_tl_ucp.super.scoll.cleanup   = ucc_tl_ucp_service_cleanup;
     ucc_tl_ucp.super.scoll.update_id = ucc_tl_ucp_service_update_id;
+    ucc_components_load("tlcp_ucp", &ucc_tl_ucp.super.coll_plugins);
 }

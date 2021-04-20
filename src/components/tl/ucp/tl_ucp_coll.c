@@ -44,7 +44,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
     ucp_request_free(request);
 }
 
-static ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     tl_info(task->team->super.super.context->lib, "finalizing ev_task %p",

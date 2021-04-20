@@ -1,7 +1,10 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
 #
-
+if BUILD_TL_COLL_PLUGINS
+SUBDIRS = .
+include makefile.coll_plugins.am
+endif
 barrier =                     \
 	barrier/barrier.h         \
 	barrier/barrier.c         \
