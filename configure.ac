@@ -141,6 +141,10 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_UCX], [false])
      AM_CONDITIONAL([HAVE_CUDA], [false])
      AM_CONDITIONAL([HAVE_NCCL], [false])
+     AM_CONDITIONAL([HAVE_MPI], [false])
+     AM_CONDITIONAL([HAVE_MPIRUN], [false])
+     AM_CONDITIONAL([HAVE_MPICC], [false])
+     AM_CONDITIONAL([HAVE_MPICXX], [false])
     ],
     [
      AM_CONDITIONAL([DOCS_ONLY], [false])
@@ -150,8 +154,10 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/ucx.m4])
      m4_include([config/m4/cuda.m4])
      m4_include([config/m4/nccl.m4])
+     m4_include([config/m4/mpi.m4])
      m4_include([test/gtest/configure.m4])
 
+     AC_MSG_RESULT([MPI perftest: ${mpi_enable}])
      AC_ARG_ENABLE([debug],
               AS_HELP_STRING([--enable-debug], [Enable extra debugging code (default is NO).]),
               [], [enable_debug=no])
@@ -191,7 +197,6 @@ LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
 AC_CONFIG_FILES([
                  Makefile
                  src/Makefile
-                 tools/info/Makefile
                  src/ucc/api/ucc_version.h
                  src/core/ucc_version.c
                  src/components/cl/basic/Makefile
@@ -201,5 +206,7 @@ AC_CONFIG_FILES([
                  src/components/mc/cuda/Makefile
                  src/components/mc/cuda/kernel/Makefile
                  test/mpi/Makefile
+                 tools/info/Makefile
+                 tools/perf/Makefile
                  ])
 AC_OUTPUT
