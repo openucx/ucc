@@ -135,13 +135,21 @@ static ucc_status_t ucc_mc_cuda_post_driver_stream_task(uint32_t *status,
 
 static ucc_status_t ucc_mc_cuda_init()
 {
-    struct cudaDeviceProp prop;
-    ucc_status_t          status;
-    int device;
-    CUdevice cu_dev;
-    int mem_ops_attr;
-
     ucc_mc_cuda_config_t *cfg = MC_CUDA_CONFIG;
+    struct cudaDeviceProp prop;
+    ucc_status_t status;
+    int device, num_devices, mem_ops_attr;
+    CUdevice cu_dev;
+    cudaError_t cuda_st;
+
+    ucc_strncpy_safe(ucc_mc_cuda.super.config->log_component.name,
+                     ucc_mc_cuda.super.super.name,
+                     sizeof(ucc_mc_cuda.super.config->log_component.name));
+    cuda_st = cudaGetDeviceCount(&num_devices);
+    if ((cuda_st != cudaSuccess) || (num_devices == 0)) {
+        mc_info(&ucc_mc_cuda.super, "cuda devices are not found");
+        return UCC_ERR_NO_RESOURCE;
+    }
     CUDACHECK(cudaGetDevice(&device));
     CUDACHECK(cudaGetDeviceProperties(&prop, device));
     cfg->reduce_num_threads = prop.maxThreadsPerBlock;
