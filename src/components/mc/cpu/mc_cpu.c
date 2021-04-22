@@ -17,6 +17,9 @@ static ucc_config_field_t ucc_mc_cpu_config_table[] = {
 
 static ucc_status_t ucc_mc_cpu_init()
 {
+    ucc_strncpy_safe(ucc_mc_cpu.super.config->log_component.name,
+                     ucc_mc_cpu.super.super.name,
+                     sizeof(ucc_mc_cpu.super.config->log_component.name));
     return UCC_OK;
 }
 
