@@ -58,5 +58,6 @@ ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
             ucc_error("Unsupported UCS thread mode");
             return UCC_ERR_NO_RESOURCE;
     }
+    attr->super.attr.coll_types = UCC_TL_UCP_SUPPORTED_COLLS;
     return UCC_OK;
 }
