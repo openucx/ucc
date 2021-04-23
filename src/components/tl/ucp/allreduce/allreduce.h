@@ -14,7 +14,7 @@ enum {
     UCC_TL_UCP_ALLREDUCE_ALG_LAST
 };
 
-extern const char *ucc_tl_ucp_allreduce_alg_str[UCC_TL_UCP_ALLREDUCE_ALG_LAST+1];
+extern ucc_base_coll_alg_info_t ucc_tl_ucp_allreduce_algs[UCC_TL_UCP_ALLREDUCE_ALG_LAST+1];
 ucc_status_t ucc_tl_ucp_allreduce_init(ucc_tl_ucp_task_t *task);
 
 #if 0
@@ -41,7 +41,7 @@ static inline int ucc_tl_ucp_allreduce_alg_from_str(const char *str)
 {
     int i;
     for (i = 0; i < UCC_TL_UCP_ALLREDUCE_ALG_LAST; i++) {
-        if (0 == strcasecmp(str, ucc_tl_ucp_allreduce_alg_str[i])) {
+        if (0 == strcasecmp(str, ucc_tl_ucp_allreduce_algs[i].name)) {
             break;
         }
     }

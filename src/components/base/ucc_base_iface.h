@@ -16,6 +16,7 @@
 #include "utils/ucc_class.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
+#include "utils/ucc_coll_utils.h"
 #include "schedule/ucc_schedule.h"
 
 typedef struct ucc_base_lib {
@@ -121,6 +122,12 @@ static inline void ucc_base_config_release(ucc_base_config_t *config)
     ucc_free(config);
 }
 
+typedef struct ucc_base_coll_alg_info {
+    unsigned    id;
+    const char *name;
+    const char *desc;
+} ucc_base_coll_alg_info_t;
+
 #define UCC_IFACE_NAME_PREFIX(_F, _NAME, _cfg)                                 \
     .name   = UCC_PP_MAKE_STRING(_F##_NAME),                                   \
     .prefix = UCC_PP_MAKE_STRING(_F##_NAME##_)
@@ -152,7 +159,8 @@ static inline void ucc_base_config_release(ucc_base_config_t *config)
         .super.team.create_test = ucc_##_f##_name##_team_create_test,          \
         .super.team.destroy     = ucc_##_f##_name##_team_destroy,              \
         .super.team.get_scores  = ucc_##_f##_name##_team_get_scores,           \
-        .super.coll.init        = ucc_##_f##_name##_coll_init};                \
+        .super.coll.init        = ucc_##_f##_name##_coll_init,                 \
+        .super.alg_info         = {NULL}};                                     \
     UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_##_f##_name.super._f##lib_config,     \
                                     &ucc_config_global_list);                  \
     UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_##_f##_name.super._f##context_config, \
