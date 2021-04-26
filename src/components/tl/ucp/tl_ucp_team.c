@@ -158,7 +158,7 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     }
     if (strlen(lib->super.super.score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->super.super.score_str, score, team->size, ucc_tl_ucp_coll_init,
+            lib->super.super.score_str, score, team->size, NULL,
             &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
             ucc_tl_ucp_alg_id_to_init);
 
