@@ -49,30 +49,32 @@ ucc_status_t  ucc_coll_score_merge(ucc_coll_score_t * score1,
                                    ucc_coll_score_t * score2,
                                    ucc_coll_score_t **rst, int free_inputs);
 
-typedef ucc_status_t (*ucc_alg_id_to_init_fn_t)(int alg_id, const char *alg_id_str,
-                                                ucc_coll_type_t coll_type,
+typedef ucc_status_t (*ucc_alg_id_to_init_fn_t)(int               alg_id,
+                                                const char *      alg_id_str,
+                                                ucc_coll_type_t   coll_type,
                                                 ucc_memory_type_t mem_type,
                                                 ucc_base_coll_init_fn_t *init);
 
-ucc_status_t ucc_coll_score_alloc_from_str(const char *str,
-                                           ucc_coll_score_t **score,
-                                           ucc_rank_t         team_size,
+ucc_status_t ucc_coll_score_alloc_from_str(const char *            str,
+                                           ucc_coll_score_t **     score,
+                                           ucc_rank_t              team_size,
                                            ucc_base_coll_init_fn_t init,
-                                           ucc_base_team_t *team,
+                                           ucc_base_team_t *       team,
                                            ucc_alg_id_to_init_fn_t alg_fn);
 
-ucc_status_t ucc_coll_score_update_from_str(const char *str,
-                                            ucc_coll_score_t *score,
-                                            ucc_rank_t        team_size,
+ucc_status_t ucc_coll_score_update_from_str(const char *            str,
+                                            ucc_coll_score_t       *score,
+                                            ucc_rank_t              team_size,
                                             ucc_base_coll_init_fn_t init,
-                                            ucc_base_team_t *team,
-                                            ucc_score_t default_score,                                                                                     ucc_alg_id_to_init_fn_t alg_fn);
+                                            ucc_base_team_t        *team,
+                                            ucc_score_t             def_score,
+                                            ucc_alg_id_to_init_fn_t alg_fn);
 
 ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
                                    ucc_coll_score_t *update,
-                                   ucc_score_t default_score);
+                                   ucc_score_t       default_score);
 
-ucc_status_t ucc_coll_score_build_default(ucc_base_team_t *team,
+ucc_status_t ucc_coll_score_build_default(ucc_base_team_t        *team,
                                           ucc_score_t             default_score,
                                           ucc_base_coll_init_fn_t default_init,
                                           ucc_coll_type_t         coll_types,

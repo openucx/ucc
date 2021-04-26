@@ -50,7 +50,7 @@ int main(int argc, char **argv)
     ucc_lib_config_h         config;
     ucc_lib_params_t         params;
     ucc_status_t             status;
-    ucc_tl_iface_t          *tl;
+    ucc_tl_iface_t *         tl;
     print_flags = (ucc_config_print_flags_t)0;
     print_opts  = 0;
     show_scores = 0;
@@ -89,8 +89,8 @@ int main(int argc, char **argv)
         }
     }
 
-    if ((print_opts == 0) && (print_flags == 0) &&
-        (!show_scores) && (!show_algs)) {
+    if ((print_opts == 0) && (print_flags == 0) && (!show_scores) &&
+        (!show_algs)) {
         usage();
         return -2;
     }
@@ -141,7 +141,8 @@ int main(int argc, char **argv)
     }
     if (show_algs) {
         for (c = 0; c < cfg->tl_framework.n_components; c++) {
-            tl = ucc_derived_of(cfg->tl_framework.components[c], ucc_tl_iface_t);
+            tl =
+                ucc_derived_of(cfg->tl_framework.components[c], ucc_tl_iface_t);
             printf("TL/%s algorithms:\n", tl->super.name);
             for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
                 if (tl->alg_info[i]) {

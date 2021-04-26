@@ -142,10 +142,10 @@ typedef struct ucc_base_coll_alg_info {
     ucc_##_f##_name##_iface_t ucc_##_f##_name = {                              \
         UCC_IFACE_CFG(_F, _f, lib, _name, _NAME),                              \
         UCC_IFACE_CFG(_F, _f, context, _name, _NAME),                          \
-        .super.super.score  = UCC_##_F##_NAME##_DEFAULT_SCORE,                 \
-        .super.super.name   = UCC_PP_MAKE_STRING(_name),                       \
-        .super.type         = UCC_##_F##_NAME,                                 \
-        .super.lib.init     = UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_lib_t),\
+        .super.super.score = UCC_##_F##_NAME##_DEFAULT_SCORE,                  \
+        .super.super.name  = UCC_PP_MAKE_STRING(_name),                        \
+        .super.type        = UCC_##_F##_NAME,                                  \
+        .super.lib.init    = UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_lib_t), \
         .super.lib.finalize =                                                  \
             UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_lib_t),               \
         .super.lib.get_attr = ucc_##_f##_name##_get_lib_attr,                  \

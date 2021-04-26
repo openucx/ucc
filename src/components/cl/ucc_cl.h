@@ -64,7 +64,7 @@ typedef struct ucc_cl_iface {
     ucc_base_context_iface_t       context;
     ucc_base_team_iface_t          team;
     ucc_base_coll_iface_t          coll;
-    ucc_base_coll_alg_info_t*      alg_info[UCC_COLL_TYPE_NUM];
+    ucc_base_coll_alg_info_t *     alg_info[UCC_COLL_TYPE_NUM];
 } ucc_cl_iface_t;
 
 typedef struct ucc_cl_lib {

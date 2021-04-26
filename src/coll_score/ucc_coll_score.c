@@ -366,7 +366,7 @@ static ucc_status_t str_to_alg_id(const char *str, const char **alg_id)
     if ('@' != str[0]) {
         return UCC_ERR_NOT_FOUND;
     }
-    *alg_id = str+1;
+    *alg_id = str + 1;
     return UCC_OK;
 }
 
@@ -422,12 +422,12 @@ err:
 }
 
 static ucc_status_t str_to_tsizes(const char *str, ucc_rank_t **tsizes,
-                                     unsigned *n_tsizes)
+                                  unsigned *n_tsizes)
 {
-    ucc_status_t      status = UCC_OK;
-    char            **tokens;
-    char            **tokens2;
-    unsigned          i, n_tokens, n_tokens2;
+    ucc_status_t status = UCC_OK;
+    char **      tokens;
+    char **      tokens2;
+    unsigned     i, n_tokens, n_tokens2;
 
     /* team_size qualifer should be enclosed in "[]".
        It it a coma-separated list of ranges start-end or
@@ -481,7 +481,7 @@ static ucc_status_t str_to_tsizes(const char *str, ucc_rank_t **tsizes,
         if (0 == strcasecmp("inf", tokens2[1])) {
             (*tsizes)[2 * i + 1] = UCC_RANK_MAX;
         } else if (UCC_OK == ucc_str_is_number(tokens2[1])) {
-            (*tsizes)[2 * i + 1] =  (ucc_rank_t)atoi(tokens2[1]);
+            (*tsizes)[2 * i + 1] = (ucc_rank_t)atoi(tokens2[1]);
         } else {
             status  = UCC_ERR_INVALID_PARAM;
             goto err;
@@ -503,9 +503,9 @@ err:
     goto out;
 }
 
-static ucc_status_t ucc_coll_score_parse_str(const char       *str,
+static ucc_status_t ucc_coll_score_parse_str(const char *str,
                                              ucc_coll_score_t *score,
-                                             ucc_rank_t        team_size,//NOLINT
+                                             ucc_rank_t team_size, //NOLINT
                                              ucc_base_coll_init_fn_t init,
                                              ucc_base_team_t *team,
                                              ucc_alg_id_to_init_fn_t alg_fn)
@@ -520,9 +520,9 @@ static ucc_status_t ucc_coll_score_parse_str(const char       *str,
     ucc_score_t             score_v  = UCC_SCORE_INVALID;
     int                     ts_skip  = 0;
     char                  **tokens;
-    unsigned                i, n_tokens, ct_n, mt_n, c, m, n_ranges, r, n_tsizes;
+    unsigned i, n_tokens, ct_n, mt_n, c, m, n_ranges, r, n_tsizes;
 
-    mt_n   = ct_n = n_ranges = n_tsizes = 0;
+    mt_n = ct_n = n_ranges = n_tsizes = 0;
     tokens = ucc_str_split(str, ":");
     if (!tokens) {
         status = UCC_ERR_INVALID_PARAM;
@@ -560,14 +560,13 @@ static ucc_status_t ucc_coll_score_parse_str(const char       *str,
            str setting to the  current team */
         ts_skip = 1;
         for (i = 0; i < n_tsizes; i++) {
-            if (team_size >= tsizes[2*i] && team_size <= tsizes[2*i + 1]) {
+            if (team_size >= tsizes[2 * i] && team_size <= tsizes[2 * i + 1]) {
                 ts_skip = 0;
                 break;
             }
         }
     }
-    if (!ts_skip && (UCC_SCORE_INVALID != score_v ||
-                     NULL != alg_id)) {
+    if (!ts_skip && (UCC_SCORE_INVALID != score_v || NULL != alg_id)) {
         /* Score provided but not coll_types/mem_types.
            This means: apply score to ALL coll_types/mem_types */
         if (!ct)
@@ -583,30 +582,36 @@ static ucc_status_t ucc_coll_score_parse_str(const char       *str,
                 if (alg_id) {
                     if (!alg_fn) {
                         status = UCC_ERR_NOT_SUPPORTED;
-                        ucc_error("modifying algorithm id is not supported by component %s",
+                        ucc_error("modifying algorithm id is not supported by "
+                                  "component %s",
                                   team->context->lib->log_component.name);
                         goto out;
                     }
                     ucc_assert(NULL != team);
-                    const char* alg_id_str = NULL;
+                    const char *alg_id_str = NULL;
                     int         alg_id_n   = 0;
                     if (UCC_OK == ucc_str_is_number(alg_id)) {
                         alg_id_n = atoi(alg_id);
                     } else {
                         alg_id_str = alg_id;
                     }
-                    status = alg_fn(alg_id_n, alg_id_str, coll_type, mem_type, &alg_init);
+                    status = alg_fn(alg_id_n, alg_id_str, coll_type, mem_type,
+                                    &alg_init);
                     if (UCC_ERR_INVALID_PARAM == status) {
-                        ucc_error("incorrect algorithm id provided: %s, %s, component %s",
-                                  alg_id, str, team->context->lib->log_component.name);
+                        ucc_error("incorrect algorithm id provided: %s, %s, "
+                                  "component %s",
+                                  alg_id, str,
+                                  team->context->lib->log_component.name);
                         goto out;
                     } else if (UCC_ERR_NOT_SUPPORTED == status) {
-                        ucc_error("modifying algorithm id is not supported for %s, alg %s, component %s",
+                        ucc_error("modifying algorithm id is not supported for "
+                                  "%s, alg %s, component %s",
                                   ucc_coll_type_str(coll_type), alg_id,
                                   team->context->lib->log_component.name);
                         goto out;
                     } else if (status < 0) {
-                        ucc_error("failed to map alg id to init: %s, %s, status %s, component %s",
+                        ucc_error("failed to map alg id to init: %s, %s, "
+                                  "status %s, component %s",
                                   alg_id, str, ucc_status_string(status),
                                   team->context->lib->log_component.name);
                         goto out;
@@ -619,9 +624,9 @@ static ucc_status_t ucc_coll_score_parse_str(const char       *str,
                         m_start = msg[r * 2];
                         m_end   = msg[r * 2 + 1];
                     }
-                    status = coll_score_add_range(score, coll_type, mem_type,
-                                                  m_start, m_end,
-                                                  score_v, alg_init ? alg_init : init, team);
+                    status = coll_score_add_range(
+                        score, coll_type, mem_type, m_start, m_end, score_v,
+                        alg_init ? alg_init : init, team);
                 }
             }
         }
@@ -635,11 +640,11 @@ out:
     return status;
 }
 
-ucc_status_t ucc_coll_score_alloc_from_str(const char *str,
-                                           ucc_coll_score_t **score_p,
-                                           ucc_rank_t         team_size,
+ucc_status_t ucc_coll_score_alloc_from_str(const char *            str,
+                                           ucc_coll_score_t **     score_p,
+                                           ucc_rank_t              team_size,
                                            ucc_base_coll_init_fn_t init,
-                                           ucc_base_team_t *team,
+                                           ucc_base_team_t *       team,
                                            ucc_alg_id_to_init_fn_t alg_fn)
 {
     ucc_coll_score_t *score;
@@ -657,7 +662,8 @@ ucc_status_t ucc_coll_score_alloc_from_str(const char *str,
     }
     n_tokens = ucc_str_split_count(tokens);
     for (i = 0; i < n_tokens; i++) {
-        status = ucc_coll_score_parse_str(tokens[i], score, team_size, init, team, alg_fn);
+        status = ucc_coll_score_parse_str(tokens[i], score, team_size, init,
+                                          team, alg_fn);
         if (UCC_OK != status) {
             goto error_msg;
         }
@@ -674,21 +680,22 @@ error:
     return status;
 }
 
-#define MSG_RANGE_DUP(_src) ({                                          \
-    ucc_msg_range_t *_dup = ucc_malloc(sizeof(*_dup), "ucc_msg_range"); \
-    if (!_dup) {                                                        \
-        ucc_error("failed to allocate %zd bytes for ucc_msg_range",     \
-                  sizeof(*_dup));                                       \
-        status = UCC_ERR_NO_MEMORY;                                     \
-        goto out;                                                       \
-    }                                                                   \
-    memcpy(_dup, _src, sizeof(*_dup));                                  \
-    _dup;                                                               \
+#define MSG_RANGE_DUP(_src)                                                    \
+    ({                                                                         \
+        ucc_msg_range_t *_dup = ucc_malloc(sizeof(*_dup), "ucc_msg_range");    \
+        if (!_dup) {                                                           \
+            ucc_error("failed to allocate %zd bytes for ucc_msg_range",        \
+                      sizeof(*_dup));                                          \
+            status = UCC_ERR_NO_MEMORY;                                        \
+            goto out;                                                          \
+        }                                                                      \
+        memcpy(_dup, _src, sizeof(*_dup));                                     \
+        _dup;                                                                  \
     })
 
 static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
                                               ucc_list_link_t *src,
-                                              ucc_score_t default_score)
+                                              ucc_score_t      default_score)
 {
     ucc_list_link_t *s = src->next;
     ucc_list_link_t *d = dest->next;
@@ -703,7 +710,7 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
         ucc_assert((NULL == rs->init) || (NULL != rs->team));
         if (rd->start >= rs->end) {
             /* skip src range - no overlap */
-            s   = s->next;
+            s = s->next;
             if (rs->init) {
                 new = MSG_RANGE_DUP(rs);
                 if (new->score == UCC_SCORE_INVALID) {
@@ -721,11 +728,11 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
             ucc_list_insert_before(d, &new->list_elem);
         } else if (rd->start > rs->start) {
             if (rs->init) {
-                new       = MSG_RANGE_DUP(rs);
+                new = MSG_RANGE_DUP(rs);
                 if (new->score == UCC_SCORE_INVALID) {
                     new->score = default_score;
                 }
-                new->end  = rd->start;
+                new->end = rd->start;
                 ucc_list_insert_before(d, &new->list_elem);
             }
             rs->start = rd->start;
@@ -740,9 +747,9 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
                     rd->team = rs->team;
                 }
                 rs->start = rd->end;
-                d = d->next;
+                d         = d->next;
             } else if (rs->end < rd->end) {
-                new       = MSG_RANGE_DUP(rd);
+                new      = MSG_RANGE_DUP(rd);
                 new->end = rs->end;
                 if (UCC_SCORE_INVALID != rs->score) {
                     new->score = rs->score;
@@ -753,7 +760,7 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
                 }
                 ucc_list_insert_before(d, &new->list_elem);
                 rd->start = rs->end;
-                s = s->next;
+                s         = s->next;
             } else {
                 if (UCC_SCORE_INVALID != rs->score) {
                     rd->score = rs->score;
@@ -805,15 +812,14 @@ out:
 
 ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
                                    ucc_coll_score_t *update,
-                                   ucc_score_t default_score)
+                                   ucc_score_t       default_score)
 {
     ucc_status_t      status;
     int               i, j;
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
         for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            status = ucc_coll_score_update_one(&score->scores[i][j],
-                                               &update->scores[i][j],
-                                               default_score);
+            status = ucc_coll_score_update_one(
+                &score->scores[i][j], &update->scores[i][j], default_score);
             if (UCC_OK != status) {
                 return status;
             }
@@ -822,22 +828,22 @@ ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
     return UCC_OK;
 }
 
-ucc_status_t ucc_coll_score_update_from_str(const char *str,
-                                            ucc_coll_score_t *score,
-                                            ucc_rank_t        team_size,
+ucc_status_t ucc_coll_score_update_from_str(const char *            str,
+                                            ucc_coll_score_t       *score,
+                                            ucc_rank_t              team_size,
                                             ucc_base_coll_init_fn_t init,
-                                            ucc_base_team_t *team,
-                                            ucc_score_t default_score,
+                                            ucc_base_team_t        *team,
+                                            ucc_score_t             def_score,
                                             ucc_alg_id_to_init_fn_t alg_fn)
 {
     ucc_status_t      status;
     ucc_coll_score_t *score_str;
-    status = ucc_coll_score_alloc_from_str(str, &score_str, team_size,
-                                           init, team, alg_fn);
+    status = ucc_coll_score_alloc_from_str(str, &score_str, team_size, init,
+                                           team, alg_fn);
     if (UCC_OK != status) {
         return status;
     }
-    status = ucc_coll_score_update(score, score_str, default_score);
+    status = ucc_coll_score_update(score, score_str, def_score);
     ucc_coll_score_free(score_str);
     return status;
 }

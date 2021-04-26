@@ -145,12 +145,10 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
         return status;
     }
     for (i = 0; i < UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR; i++) {
-        status = ucc_coll_score_update_from_str(ucc_tl_ucp_default_alg_select_str[i],
-                                                score, team->size,
-                                                ucc_tl_ucp_coll_init,
-                                                &team->super.super,
-                                                UCC_TL_UCP_DEFAULT_SCORE,
-                                                ucc_tl_ucp_alg_id_to_init);
+        status = ucc_coll_score_update_from_str(
+            ucc_tl_ucp_default_alg_select_str[i], score, team->size,
+            ucc_tl_ucp_coll_init, &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
+            ucc_tl_ucp_alg_id_to_init);
         if (UCC_OK != status) {
             tl_error(tl_team->context->lib,
                      "failed to apply default coll select setting: %s",
@@ -159,16 +157,14 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
         }
     }
     if (strlen(lib->super.super.score_str) > 0) {
-        status = ucc_coll_score_update_from_str(lib->super.super.score_str,
-                                                score, team->size,
-                                                ucc_tl_ucp_coll_init,
-                                                &team->super.super,
-                                                UCC_TL_UCP_DEFAULT_SCORE,
-                                                ucc_tl_ucp_alg_id_to_init);
+        status = ucc_coll_score_update_from_str(
+            lib->super.super.score_str, score, team->size, ucc_tl_ucp_coll_init,
+            &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
+            ucc_tl_ucp_alg_id_to_init);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
-        if ((status < 0) && (status != UCC_ERR_INVALID_PARAM)
-            && (status != UCC_ERR_NOT_SUPPORTED)) {
+        if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
+            (status != UCC_ERR_NOT_SUPPORTED)) {
             goto err;
         }
     }

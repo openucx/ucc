@@ -141,8 +141,10 @@ UCC_TEST_F(test_score_update, same_score)
 
 UCC_TEST_F(test_score_update, non_overlap_2)
 {
-    init_score(score, RLIST({RANGE(0, 100, 100)}), UCC_COLL_TYPE_BARRIER, 0x1, 0x1);
-    init_score(update, RLIST({RANGE(300, 400, 100)}), UCC_COLL_TYPE_BARRIER, 0x2, 0x2);
+    init_score(score, RLIST({RANGE(0, 100, 100)}), UCC_COLL_TYPE_BARRIER, 0x1,
+               0x1);
+    init_score(update, RLIST({RANGE(300, 400, 100)}), UCC_COLL_TYPE_BARRIER,
+               0x2, 0x2);
     EXPECT_EQ(UCC_OK, ucc_coll_score_update(score, update, 0));
     EXPECT_EQ(UCC_OK,
               check_range(score, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST,
@@ -151,8 +153,10 @@ UCC_TEST_F(test_score_update, non_overlap_2)
 
 UCC_TEST_F(test_score_update, init_reset)
 {
-    init_score(score, RLIST({RANGE(0, 100, 100)}), UCC_COLL_TYPE_BARRIER, 0x1, 0x1);
-    init_score(update, RLIST({RANGE(0, 100, 100)}), UCC_COLL_TYPE_BARRIER, 0x2, 0x2);
+    init_score(score, RLIST({RANGE(0, 100, 100)}), UCC_COLL_TYPE_BARRIER, 0x1,
+               0x1);
+    init_score(update, RLIST({RANGE(0, 100, 100)}), UCC_COLL_TYPE_BARRIER, 0x2,
+               0x2);
     EXPECT_EQ(UCC_OK, ucc_coll_score_update(score, update, 0));
     EXPECT_EQ(UCC_OK,
               check_range(score, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST,
@@ -160,8 +164,10 @@ UCC_TEST_F(test_score_update, init_reset)
     EXPECT_EQ(0x2, (uint64_t)(FIRST_RANGE(score, BARRIER, HOST)->init));
 
     reset();
-    init_score(score, RLIST({RANGE(0, 100, 100)}), UCC_COLL_TYPE_BARRIER, 0x1, 0x1);
-    init_score(update, RLIST({RANGE(50, 150, 50)}), UCC_COLL_TYPE_BARRIER, 0x2, 0x2);
+    init_score(score, RLIST({RANGE(0, 100, 100)}), UCC_COLL_TYPE_BARRIER, 0x1,
+               0x1);
+    init_score(update, RLIST({RANGE(50, 150, 50)}), UCC_COLL_TYPE_BARRIER, 0x2,
+               0x2);
     EXPECT_EQ(UCC_OK, ucc_coll_score_update(score, update, 0));
     EXPECT_EQ(UCC_OK,
               check_range(score, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST,
@@ -169,12 +175,13 @@ UCC_TEST_F(test_score_update, init_reset)
     EXPECT_EQ(0x1, (uint64_t)(FIRST_RANGE(score, BARRIER, HOST)->init));
 
     reset();
-    init_score(score, RLIST({RANGE(50, 150, 100)}), UCC_COLL_TYPE_BARRIER, 0x1, 0x1);
-    init_score(update, RLIST({RANGE(0, 100, 50)}), UCC_COLL_TYPE_BARRIER, 0x2, 0x2);
+    init_score(score, RLIST({RANGE(50, 150, 100)}), UCC_COLL_TYPE_BARRIER, 0x1,
+               0x1);
+    init_score(update, RLIST({RANGE(0, 100, 50)}), UCC_COLL_TYPE_BARRIER, 0x2,
+               0x2);
     EXPECT_EQ(UCC_OK, ucc_coll_score_update(score, update, 0));
     EXPECT_EQ(UCC_OK,
               check_range(score, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST,
                           RLIST({RANGE(0, 100, 50), RANGE(100, 150, 100)})));
     EXPECT_EQ(0x2, (uint64_t)(FIRST_RANGE(score, BARRIER, HOST)->init));
 }
-

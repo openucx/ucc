@@ -15,9 +15,9 @@
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
 #include "bcast/bcast.h"
-const char* ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
-    UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR
-};
+const char
+    *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
+        UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR};
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
@@ -194,7 +194,7 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
                                   ucc_base_team_t *team,
                                   ucc_coll_task_t **task_h)
 {
-    ucc_tl_ucp_task_t    *task    = ucc_tl_ucp_init_task(coll_args, team);
+    ucc_tl_ucp_task_t    *task = ucc_tl_ucp_init_task(coll_args, team);
     ucc_status_t          status;
 
     switch (coll_args->args.coll_type) {
@@ -233,7 +233,7 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
 
 static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
 {
-    switch(coll_type) {
+    switch (coll_type) {
     case UCC_COLL_TYPE_ALLREDUCE:
         return ucc_tl_ucp_allreduce_alg_from_str(str);
     default:
@@ -242,8 +242,8 @@ static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
     return -1;
 }
 
-ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char* alg_id_str,
-                                       ucc_coll_type_t coll_type,
+ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
+                                       ucc_coll_type_t   coll_type,
                                        ucc_memory_type_t mem_type, //NOLINT
                                        ucc_base_coll_init_fn_t *init)
 {
@@ -254,7 +254,7 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char* alg_id_str,
 
     switch (coll_type) {
     case UCC_COLL_TYPE_ALLREDUCE:
-        switch(alg_id) {
+        switch (alg_id) {
         case UCC_TL_UCP_ALLREDUCE_ALG_KNOMIAL:
             *init = ucc_tl_ucp_allreduce_knomial_init;
             break;
