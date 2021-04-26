@@ -131,9 +131,11 @@ ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
     cl_team      = ucc_select_cl_team(coll_args, team);
     status =
         UCC_CL_TEAM_IFACE(cl_team)->coll.init(&op_args, &cl_team->super, &task);
-    if (status != UCC_OK) {
-        //TODO more descriptive error msg
-        ucc_error("failed to init collective");
+    if (UCC_ERR_NOT_SUPPORTED == status) {
+        ucc_debug("failed to init collective: not supported");
+        return status;
+    } else if (status < 0) {
+        ucc_error("failed to init collective: %s", ucc_status_string(status));
         return status;
     }
     *request = &task->super;
