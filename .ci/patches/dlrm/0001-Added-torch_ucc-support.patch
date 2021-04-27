@@ -1,0 +1,30 @@
+From bcd8fc065ef04a0ea8f06e61a5e2581a308719fd Mon Sep 17 00:00:00 2001
+From: artemry-nv <artemry@nvidia.com>
+Date: Tue, 9 Mar 2021 00:41:16 +0300
+Subject: [PATCH] Added torch_ucc support
+
+Signed-off-by: artemry-nv <artemry@nvidia.com>
+---
+ extend_distributed.py | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/extend_distributed.py b/extend_distributed.py
+index adcb60b..1f2c8a5 100644
+--- a/extend_distributed.py
++++ b/extend_distributed.py
+@@ -20,6 +20,12 @@ except ImportError as e:
+     # print(e)
+     torch_ccl = False
+ 
++try:
++    import torch_ucc
++except ImportError as e:
++    torch_ucc = False
++
++
+ my_rank = -1
+ my_size = -1
+ my_local_rank = -1
+-- 
+2.24.3 (Apple Git-128)
+
