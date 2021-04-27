@@ -1,0 +1,101 @@
+---
+job: 'ucc'
+
+registry_host: 'harbor.mellanox.com'
+registry_path: '/torch-ucc'
+registry_auth: '05d98651-e11c-4a57-9cc6-52df79014b89'
+
+#kubernetes:
+#  cloud: 'swx-k8s'
+
+volumes:
+  - { mountPath: '/hpc/local', hostPath: '/hpc/local' }
+  - { mountPath: '/auto/sw_tools', hostPath: '/auto/sw_tools' }
+  - { mountPath: '/.autodirect/mtrswgwork', hostPath: '/.autodirect/mtrswgwork' }
+  - { mountPath: '/.autodirect/sw/release', hostPath: '/.autodirect/sw/release' }
+
+env:
+  CUDA_VER: '11.2.1'
+  UCC_URI_SUFFIX: 'ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}'
+  UCC_DOCKER_IMAGE_NAME: '${registry_host}${registry_path}/${UCC_URI_SUFFIX}'
+  TORCH_UCC_ROOT_DIR: '/opt/nvidia/torch-ucc'
+  TORCH_UCC_SRC_DIR: '${TORCH_UCC_ROOT_DIR}/src'
+  TORCH_UCC_BIN_DIR: '${TORCH_UCC_ROOT_DIR}/bin'
+
+docker_opt: '--pull always --network=host --uts=host --ipc=host --ulimit stack=67108864 --ulimit memlock=-1 --security-opt seccomp=unconfined --cap-add=SYS_ADMIN --device=/dev/infiniband/ --gpus all --user root'
+
+runs_on_dockers:
+  - {
+    file: '.ci/Dockerfile.centos8',
+    name: 'centos8',
+    tag: '${BUILD_NUMBER}',
+    arch: 'x86_64',
+    uri: '${UCC_URI_SUFFIX}',
+    build_args: '--network=host --rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg TORCH_UCC_ROOT_DIR=${TORCH_UCC_ROOT_DIR}',
+    cloud: 'swx-k8s',
+    nodeLabel: 'dockerserver && swx-clx01',
+  }
+
+# bare metal
+runs_on_agents:
+  - nodeLabel: 'swx-clx01'
+
+steps:
+  #============================================================================
+  - name: Check Env
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    containerSelector: "{name:'centos8'}"
+    run: |
+      echo "INFO: check environment"
+      hostname
+      printenv
+      cat /proc/1/cgroup
+      cat /etc/*release*
+      id
+      find /opt/nvidia
+      ibv_devinfo
+      nvidia-smi
+      nvidia-smi topo -m
+  #============================================================================
+  - name: Run UCC tests
+    containerSelector: "{name:'centos8'}"
+    run: |
+      echo "INFO: Run UCC tests"
+      hostname
+      cat /proc/1/cgroup
+      pip3 list | grep torch
+      ${TORCH_UCC_SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh
+  #============================================================================
+  - name: Run Torch-UCC tests (UCC)
+    containerSelector: "{name:'centos8'}"
+    run: |
+      echo "INFO: Run Torch-UCC tests (UCC)"
+      hostname
+      cat /proc/1/cgroup
+      pip3 list | grep torch
+      ${TORCH_UCC_SRC_DIR}/ucc/.ci/scripts/run_tests_torch_ucc.sh
+  #============================================================================
+  - name: Run docker containers
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    run: |
+      echo "INFO: Run docker containers"
+      ${WORKSPACE}/.ci/scripts/run_docker.sh
+  #============================================================================
+  - name: Run UCC MPI tests
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    run: |
+      echo "INFO: Run UCC MPI tests"
+      ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
+  #============================================================================
+  - name: Run DLRM tests (UCC/GPU)
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    run: |
+      echo "INFO: Run DLRM tests (UCC/GPU)"
+      ${WORKSPACE}/.ci/scripts/run_dlrm_docker.sh
+  #============================================================================
+  - name: Stop docker containers
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    run: |
+      echo "INFO: Stop docker containers"
+      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+  #============================================================================

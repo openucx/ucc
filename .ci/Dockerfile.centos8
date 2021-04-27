@@ -1,0 +1,92 @@
+ARG CUDA_VER='11.2.1'
+FROM nvidia/cuda:${CUDA_VER}-devel-centos8
+#==============================================================================
+ARG TORCH_UCC_ROOT_DIR=/opt/nvidia/torch-ucc
+ENV TORCH_UCC_SRC_DIR=${TORCH_UCC_ROOT_DIR}/src
+ENV TORCH_UCC_PKG_DIR=${TORCH_UCC_ROOT_DIR}/pkg
+ENV TORCH_UCC_BIN_DIR=${TORCH_UCC_ROOT_DIR}/bin
+ENV TORCH_UCC_WORKLOADS_DIR=${TORCH_UCC_ROOT_DIR}/workloads
+ENV TORCH_UCC_GITHUB_URL=https://github.com/openucx/torch-ucc.git
+ENV TORCH_UCC_BRANCH=master
+ENV CUDA_HOME=/usr/local/cuda
+ENV UCX_GITHUB_URL=https://github.com/openucx/ucx.git
+ENV UCX_BRANCH=master
+ENV UCX_BUILD_TYPE=release-mt
+ENV UCX_INSTALL_DIR=${TORCH_UCC_BIN_DIR}/ucx/build-${UCX_BUILD_TYPE}
+ENV UCC_INSTALL_DIR=${TORCH_UCC_BIN_DIR}/ucc/build
+#==============================================================================
+RUN yum groupinstall -y \
+    'Development Tools' \
+    'Infiniband Support'
+RUN yum config-manager --set-enabled powertools && yum install -y \
+    cmake \
+    numactl \
+    numactl-devel \
+    openmpi \
+    openmpi-devel \
+    openssh-server \
+    protobuf-compiler \
+    protobuf-devel \
+    python36-devel \
+    rdma-core-devel \
+    vim
+# Remove old UCX
+RUN rpm -e --nodeps ucx
+ENV PATH=/usr/lib64/openmpi/bin:$PATH
+RUN echo "export PATH=\"/usr/lib64/openmpi/bin:\$PATH\"" >> /etc/bashrc && \
+    export LD_LIBRARY_PATH=\"/usr/lib64/openmpi/lib:\${LD_LIBRARY_PATH}\" >> /etc/bashrc
+#==============================================================================
+# Configure SSH
+RUN mkdir -p /var/run/sshd && \
+    cat /etc/ssh/ssh_config | grep -v StrictHostKeyChecking > /etc/ssh/ssh_config.new && \
+    echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config.new && \
+    mv /etc/ssh/ssh_config.new /etc/ssh/ssh_config && \
+    ssh-keygen -A &&  \
+    rm -f /run/nologin
+#==============================================================================
+RUN mkdir -p ${TORCH_UCC_SRC_DIR} && \
+    mkdir -p ${TORCH_UCC_PKG_DIR} && \
+    mkdir -p ${TORCH_UCC_BIN_DIR} && \
+    mkdir -p ${TORCH_UCC_WORKLOADS_DIR}
+
+RUN git clone ${TORCH_UCC_GITHUB_URL} ${TORCH_UCC_SRC_DIR} && \
+    cd ${TORCH_UCC_SRC_DIR} && \
+    git checkout ${TORCH_UCC_BRANCH}
+
+RUN mkdir -p ${TORCH_UCC_SRC_DIR}/ucx && \
+    git clone --recursive ${UCX_GITHUB_URL} ${TORCH_UCC_SRC_DIR}/ucx && \
+    cd ${TORCH_UCC_SRC_DIR}/ucx && \
+    git checkout ${UCX_BRANCH}
+
+COPY . ${TORCH_UCC_SRC_DIR}/ucc
+#==============================================================================
+# Build UCX
+RUN ${TORCH_UCC_SRC_DIR}/ucc/.ci/scripts/build_ucx.sh
+ENV PATH=${UCX_INSTALL_DIR}/bin:${PATH}
+#==============================================================================
+# Configure Python
+RUN ${TORCH_UCC_SRC_DIR}/ucc/.ci/scripts/configure_python.sh
+#==============================================================================
+# Build UCC
+RUN ${TORCH_UCC_SRC_DIR}/ucc/.ci/scripts/build_ucc.sh
+#==============================================================================
+# Install PyTorch
+RUN ${TORCH_UCC_SRC_DIR}/ucc/.ci/scripts/install_torch.sh
+#==============================================================================
+# Install workloads
+WORKDIR ${TORCH_UCC_WORKLOADS_DIR}
+RUN git clone https://github.com/facebookresearch/dlrm.git && \
+    cd ${TORCH_UCC_WORKLOADS_DIR}/dlrm && \
+    git apply ${TORCH_UCC_SRC_DIR}/ucc/.ci/patches/dlrm/0001-Added-torch_ucc-support.patch && \
+    git apply ${TORCH_UCC_SRC_DIR}/ucc/.ci/patches/dlrm/0002-Fixed-arg-list.patch && \
+    pip3 install -r ${TORCH_UCC_WORKLOADS_DIR}/dlrm/requirements.txt && \
+    pip3 install tensorboard
+RUN git clone https://github.com/facebookresearch/param.git && \
+    pip3 install -r ${TORCH_UCC_WORKLOADS_DIR}/param/requirements.txt
+#==============================================================================
+# Install torch_ucc (UCC version) python module and build a wheel package
+RUN ${TORCH_UCC_SRC_DIR}/ucc/.ci/scripts/install_torch_ucc.sh
+#==============================================================================
+RUN groupadd -g 11429 swx-jenkins
+RUN adduser --no-create-home --uid 6213 --gid 11429 --home /labhome/swx-jenkins swx-jenkins
+#==============================================================================
