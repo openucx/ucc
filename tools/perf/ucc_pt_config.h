@@ -24,15 +24,18 @@ struct ucc_pt_bootstrap_config {
 };
 
 struct ucc_pt_benchmark_config {
-    ucc_coll_type_t         coll_type;
-    size_t                  min_count;
-    size_t                  max_count;
-    ucc_datatype_t          dt;
-    ucc_memory_type_t       mt;
-    ucc_reduction_op_t      op;
-    bool                    inplace;
-    int                     n_iter;
-    int                     n_warmup;
+    ucc_coll_type_t    coll_type;
+    size_t             min_count;
+    size_t             max_count;
+    ucc_datatype_t     dt;
+    ucc_memory_type_t  mt;
+    ucc_reduction_op_t op;
+    bool               inplace;
+    size_t             large_thresh;
+    int                n_iter_small;
+    int                n_warmup_small;
+    int                n_iter_large;
+    int                n_warmup_large;
 };
 
 struct ucc_pt_config {

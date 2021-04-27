@@ -20,20 +20,28 @@ ucc_status_t ucc_pt_benchmark::run_bench()
 
     print_header();
     for (size_t cnt = config.min_count; cnt <= config.max_count; cnt *= 2) {
-        UCCCHECK_GOTO(coll->get_coll(cnt, args), exit_err, st);
-        UCCCHECK_GOTO(run_single_test(args, time), free_coll, st);
-        coll->free_coll(args);
+        size_t coll_size = cnt * ucc_dt_size(config.dt);
+        int iter = config.n_iter_small;
+        int warmup = config.n_warmup_small;
+        if (coll_size >= config.large_thresh) {
+            iter = config.n_iter_large;
+            warmup = config.n_warmup_large;
+        }
+        UCCCHECK_GOTO(coll->init_coll_args(cnt, args), exit_err, st);
+        UCCCHECK_GOTO(run_single_test(args, iter, warmup, time), free_coll, st);
+        coll->free_coll_args(args);
         print_time(cnt, time);
     }
 
     return UCC_OK;
 free_coll:
-    coll->free_coll(args);
+    coll->free_coll_args(args);
 exit_err:
     return st;
 }
 
 ucc_status_t ucc_pt_benchmark::run_single_test(ucc_coll_args_t args,
+                                               int nwarmup, int niter,
                                                std::chrono::nanoseconds &time)
 {
     ucc_team_h    team = comm->get_team();
@@ -43,21 +51,26 @@ ucc_status_t ucc_pt_benchmark::run_single_test(ucc_coll_args_t args,
 
     UCCCHECK_GOTO(comm->barrier(), exit_err, st);
     time = std::chrono::nanoseconds::zero();
-    for (int i = 0; i < config.n_warmup + config.n_iter; i++) {
+    for (int i = 0; i < nwarmup + niter; i++) {
         auto s = std::chrono::high_resolution_clock::now();
         UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
         UCCCHECK_GOTO(ucc_collective_post(req), free_req, st);
-        do {
+        st = ucc_collective_test(req);
+        while (st == UCC_INPROGRESS) {
             UCCCHECK_GOTO(ucc_context_progress(ctx), free_req, st);
-        } while (ucc_collective_test(req) == UCC_INPROGRESS);
+            st = ucc_collective_test(req);
+        }
         ucc_collective_finalize(req);
         auto f = std::chrono::high_resolution_clock::now();
-        if (i >= config.n_warmup) {
+        if (st != UCC_OK) {
+            goto exit_err;
+        }
+        if (i >= nwarmup) {
             time += std::chrono::duration_cast<std::chrono::nanoseconds>(f - s);
         }
         UCCCHECK_GOTO(comm->barrier(), exit_err, st);
     }
-    time /= config.n_iter;
+    time /= niter;
     return UCC_OK;
 free_req:
     ucc_collective_finalize(req);
@@ -68,21 +81,38 @@ exit_err:
 void ucc_pt_benchmark::print_header()
 {
     if (comm->get_rank() == 0) {
-        std::cout << "Collective: " << ucc_coll_type_str(config.coll_type)
+        std::ios iostate(nullptr);
+        iostate.copyfmt(std::cout);
+        std::cout << std::left << std::setw(24)
+                  << "Collective: " << ucc_coll_type_str(config.coll_type)
                   << std::endl;
-        std::cout << "Memory type: " << ucc_memory_type_names[config.mt]
+        std::cout << std::left << std::setw(24)
+                  << "Memory type: " << ucc_memory_type_names[config.mt]
                   << std::endl;
-        std::cout << "Data type: " << config.dt
+        std::cout << std::left << std::setw(24)
+                  << "Data type: " << ucc_datatype_str(config.dt)
                   << std::endl;
-        std::cout << "Operation type: " << config.op
+        std::cout << std::left << std::setw(24)
+                  << "Operation type: " << ucc_reduction_op_str(config.op)
                   << std::endl;
-        std::cout << "Warmup: "<< config.n_warmup << "; "
-                     "Iterations: "<< config.n_iter
+        std::cout << std::left << std::setw(24)
+                  << "Warmup:" << std::endl
+                  << std::left << std::setw(24)
+                  << "  small" << config.n_warmup_small << std::endl
+                  << std::left << std::setw(24)
+                  << "  large" << config.n_warmup_large << std::endl;
+        std::cout << std::left << std::setw(24)
+                  << "Iterations:" << std::endl
+                  << std::left << std::setw(24)
+                  << "  small" << config.n_iter_small << std::endl
+                  << std::left << std::setw(24)
+                  << "  large" << config.n_iter_large << std::endl;
+        std::cout.copyfmt(iostate);
+        std::cout << std::endl;
+        std::cout << std::setw(12) << "Count"
+                  << std::setw(12) << "Size"
+                  << std::setw(24) << "Time, us"
                   << std::endl;
-        std::cout << std::setw(12) << "Count" <<
-                     std::setw(12) << "Size" <<
-                     std::setw(24) << "Time, us" <<
-                     std::endl;
         std::cout << std::setw(36) << "avg" <<
                      std::setw(12) << "min" <<
                      std::setw(12) << "max" <<

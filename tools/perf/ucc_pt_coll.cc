@@ -25,8 +25,8 @@ ucc_pt_coll_allreduce::ucc_pt_coll_allreduce(ucc_datatype_t dt,
     coll_args.dst.info.mem_type = mt;
 }
 
-ucc_status_t ucc_pt_coll_allreduce::get_coll(size_t count,
-                                             ucc_coll_args_t &args)
+ucc_status_t ucc_pt_coll_allreduce::init_coll_args(size_t count,
+                                                   ucc_coll_args_t &args)
 {
     size_t       dt_size = ucc_dt_size(coll_args.src.info.datatype);
     size_t       size    = count * dt_size;
@@ -47,7 +47,7 @@ exit:
     return st;
 }
 
-void ucc_pt_coll_allreduce::free_coll(ucc_coll_args_t &args)
+void ucc_pt_coll_allreduce::free_coll_args(ucc_coll_args_t &args)
 {
     if (!UCC_IS_INPLACE(args)) {
         ucc_mc_free(args.src.info.buffer, args.src.info.mem_type);

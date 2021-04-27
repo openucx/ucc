@@ -2,6 +2,7 @@
 #include <cstring>
 #include "ucc_pt_comm.h"
 #include "ucc_pt_bootstrap_mpi.h"
+#include "ucc_perftest.h"
 
 ucc_pt_comm::ucc_pt_comm()
 {
@@ -36,66 +37,52 @@ ucc_context_h ucc_pt_comm::get_context()
 ucc_status_t ucc_pt_comm::init()
 {
     ucc_lib_config_h lib_config;
-    ucc_context_config_h context_config;
+    ucc_context_config_h ctx_config;
     ucc_lib_params_t lib_params;
-    ucc_context_params_t context_params;
+    ucc_context_params_t ctx_params;
     ucc_team_params_t team_params;
     ucc_status_t st;
-    st = ucc_lib_config_read("TORCH", nullptr, &lib_config);
 
-    if (st != UCC_OK) {
-        std::cerr << "failed to read UCC lib config: " << ucc_status_string(st);
-        return st;
-    }
+    UCCCHECK_GOTO(ucc_lib_config_read("PERFTEST", nullptr, &lib_config),
+                  exit_err, st);
     std::memset(&lib_params, 0, sizeof(ucc_lib_params_t));
     lib_params.mask = UCC_LIB_PARAM_FIELD_THREAD_MODE;
     lib_params.thread_mode = UCC_THREAD_SINGLE;
-    st = ucc_init(&lib_params, lib_config, &lib);
-    ucc_lib_config_release(lib_config);
-
-    st = ucc_context_config_read(lib, NULL, &context_config);
-    if (st != UCC_OK) {
-        ucc_finalize(lib);
-        std::cerr << "failed to read UCC context config: "
-                  << ucc_status_string(st);
-        return st;
-    }
-    std::memset(&context_params, 0, sizeof(ucc_context_params_t));
-    context_params.mask = UCC_CONTEXT_PARAM_FIELD_TYPE |
+    UCCCHECK_GOTO(ucc_init(&lib_params, lib_config, &lib), free_lib_config, st);
+    UCCCHECK_GOTO(ucc_context_config_read(lib, NULL, &ctx_config),
+                  free_lib, st);
+    std::memset(&ctx_params, 0, sizeof(ucc_context_params_t));
+    ctx_params.mask = UCC_CONTEXT_PARAM_FIELD_TYPE |
                           UCC_CONTEXT_PARAM_FIELD_OOB;
-    context_params.type = UCC_CONTEXT_SHARED;
-    context_params.oob  = bootstrap->get_context_oob();
-    ucc_context_create(lib, &context_params, context_config, &context);
-    ucc_context_config_release(context_config);
-    if (st != UCC_OK) {
-        ucc_finalize(lib);
-        std::cerr << "failed to create UCC context: " << ucc_status_string(st);
-        return st;
-    }
+    ctx_params.type = UCC_CONTEXT_SHARED;
+    ctx_params.oob  = bootstrap->get_context_oob();
+    UCCCHECK_GOTO(ucc_context_create(lib, &ctx_params, ctx_config, &context),
+                  free_ctx_config, st);
     team_params.mask     = UCC_TEAM_PARAM_FIELD_EP |
                            UCC_TEAM_PARAM_FIELD_EP_RANGE |
                            UCC_TEAM_PARAM_FIELD_OOB;
     team_params.oob      = bootstrap->get_team_oob();
     team_params.ep       = bootstrap->get_rank();
     team_params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
-    st = ucc_team_create_post(&context, 1, &team_params, &team);
-    if (st != UCC_OK) {
-        std::cerr << "failed to post UCC team create: " <<
-                     ucc_status_string(st);
-        ucc_context_destroy(context);
-        ucc_finalize(lib);
-        return st;
-    }
+    UCCCHECK_GOTO(ucc_team_create_post(&context, 1, &team_params, &team),
+                  free_ctx, st);
     do {
         st = ucc_team_create_test(team);
     } while(st == UCC_INPROGRESS);
-    if (st != UCC_OK) {
-        std::cerr << "failed to create UCC team: " << ucc_status_string(st);
-        ucc_context_destroy(context);
-        ucc_finalize(lib);
-        return st;
-    }
+    UCCCHECK_GOTO(st, free_ctx, st);
+    ucc_context_config_release(ctx_config);
+    ucc_lib_config_release(lib_config);
     return UCC_OK;
+free_ctx:
+    ucc_context_destroy(context);
+free_ctx_config:
+    ucc_context_config_release(ctx_config);
+free_lib:
+    ucc_finalize(lib);
+free_lib_config:
+    ucc_lib_config_release(lib_config);
+exit_err:
+    return st;
 }
 
 ucc_status_t ucc_pt_comm::finalize()

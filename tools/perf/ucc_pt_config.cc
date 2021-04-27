@@ -1,16 +1,19 @@
 #include "ucc_pt_config.h"
 
 ucc_pt_config::ucc_pt_config() {
-    bootstrap.bootstrap = UCC_PT_BOOTSTRAP_MPI;
-    bench.coll_type     = UCC_COLL_TYPE_ALLREDUCE;
-    bench.min_count     = 128;
-    bench.max_count     = 128;
-    bench.dt            = UCC_DT_FLOAT32;
-    bench.mt            = UCC_MEMORY_TYPE_HOST;
-    bench.op            = UCC_OP_SUM;
-    bench.inplace       = false;
-    bench.n_iter        = 10;
-    bench.n_warmup      = 10;
+    bootstrap.bootstrap  = UCC_PT_BOOTSTRAP_MPI;
+    bench.coll_type      = UCC_COLL_TYPE_ALLREDUCE;
+    bench.min_count      = 128;
+    bench.max_count      = 128;
+    bench.dt             = UCC_DT_FLOAT32;
+    bench.mt             = UCC_MEMORY_TYPE_HOST;
+    bench.op             = UCC_OP_SUM;
+    bench.inplace        = false;
+    bench.n_iter_small   = 1000;
+    bench.n_warmup_small = 100;
+    bench.n_iter_large   = 200;
+    bench.n_warmup_large = 20;
+    bench.large_thresh   = 64 * 1024;
 }
 
 const std::map<std::string, ucc_reduction_op_t> ucc_pt_op_map = {
@@ -38,14 +41,14 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                     std::cerr << "invalid collective" << std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
-                bench.coll_type = ucc_pt_coll_map.at(std::string(optarg));
+                bench.coll_type = ucc_pt_coll_map.at(optarg);
                 break;
             case 'o':
                 if (ucc_pt_op_map.count(optarg) == 0) {
                     std::cerr << "invalid operation" << std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
-                bench.op = ucc_pt_op_map.at(std::string(optarg));
+                bench.op = ucc_pt_op_map.at(optarg);
                 break;
             case 'b':
                 std::stringstream(optarg) >> bench.min_count;
@@ -54,10 +57,12 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                 std::stringstream(optarg) >> bench.max_count;
                 break;
             case 'n':
-                std::stringstream(optarg) >> bench.n_iter;
+                std::stringstream(optarg) >> bench.n_iter_small;
+                bench.n_iter_large = bench.n_iter_small;
                 break;
             case 'w':
-                std::stringstream(optarg) >> bench.n_warmup;
+                std::stringstream(optarg) >> bench.n_warmup_small;
+                bench.n_warmup_large = bench.n_warmup_small;
                 break;
             case 'i':
                 bench.inplace = true;
