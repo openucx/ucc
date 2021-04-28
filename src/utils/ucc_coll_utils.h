@@ -56,7 +56,7 @@ ucc_coll_args_get_total_count(const ucc_coll_args_t *args,
                               const ucc_count_t *counts, ucc_rank_t size)
 {
     size_t count = 0;
-    int i;
+    ucc_rank_t i;
     // TODO switch to base args and cache total count there - can we do it ?
     if ((args->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
         (args->flags & UCC_COLL_ARGS_FLAG_COUNT_64BIT)) {

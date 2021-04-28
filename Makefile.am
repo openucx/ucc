@@ -3,9 +3,13 @@
 # Copyright (C) Huawei Technologies Co., Ltd. 2020.  All rights reserved.
 # $HEADER$
 #
-SUBDIRS = \
-       src \
-       tools/info
+SUBDIRS =      \
+	src        \
+	tools/info
+
+if HAVE_MPICXX
+SUBDIRS += tools/perf
+endif
 
 if HAVE_GTEST
 SUBDIRS += test/gtest
