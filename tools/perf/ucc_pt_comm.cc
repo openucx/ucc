@@ -42,6 +42,7 @@ ucc_status_t ucc_pt_comm::init()
     ucc_context_params_t ctx_params;
     ucc_team_params_t team_params;
     ucc_status_t st;
+    std::string cfg_mod;
 
     UCCCHECK_GOTO(ucc_lib_config_read("PERFTEST", nullptr, &lib_config),
                   exit_err, st);
@@ -51,6 +52,12 @@ ucc_status_t ucc_pt_comm::init()
     UCCCHECK_GOTO(ucc_init(&lib_params, lib_config, &lib), free_lib_config, st);
     UCCCHECK_GOTO(ucc_context_config_read(lib, NULL, &ctx_config),
                   free_lib, st);
+    cfg_mod = std::to_string(bootstrap->get_size());
+    UCCCHECK_GOTO(ucc_context_config_modify(ctx_config, NULL,
+                  "ESTIMATED_NUM_EPS", cfg_mod.c_str()), free_ctx_config, st);
+    cfg_mod = std::to_string(bootstrap->get_ppn());
+    UCCCHECK_GOTO(ucc_context_config_modify(ctx_config, NULL,
+                  "ESTIMATED_NUM_PPN", cfg_mod.c_str()), free_ctx_config, st);
     std::memset(&ctx_params, 0, sizeof(ucc_context_params_t));
     ctx_params.mask = UCC_CONTEXT_PARAM_FIELD_TYPE |
                           UCC_CONTEXT_PARAM_FIELD_OOB;

@@ -19,6 +19,7 @@ public:
 protected:
     int rank;
     int size;
+    int ppn;
 };
 
 #endif

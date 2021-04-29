@@ -9,13 +9,18 @@
 
 bin_PROGRAMS = ucc_perftest
 
-ucc_perftest_SOURCES =      \
-	ucc_perftest.cc         \
-	ucc_pt_config.cc        \
-	ucc_pt_comm.cc          \
-	ucc_pt_benchmark.cc     \
-	ucc_pt_coll.cc          \
-	ucc_pt_bootstrap_mpi.cc
+ucc_perftest_SOURCES =       \
+	ucc_perftest.cc          \
+	ucc_pt_config.cc         \
+	ucc_pt_comm.cc           \
+	ucc_pt_benchmark.cc      \
+	ucc_pt_bootstrap_mpi.cc  \
+	ucc_pt_coll.cc           \
+    ucc_pt_coll_allgather.cc \
+    ucc_pt_coll_allreduce.cc \
+    ucc_pt_coll_alltoall.cc  \
+    ucc_pt_coll_barrier.cc   \
+    ucc_pt_coll_bcast.cc
 
 CXX=$(MPICXX)
 LD=$(MPICXX)
