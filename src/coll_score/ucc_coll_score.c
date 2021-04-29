@@ -131,7 +131,7 @@ static ucc_status_t ucc_coll_score_merge_one(ucc_list_link_t *list1,
 {
     ucc_list_link_t  lst1, lst2;
     ucc_msg_range_t *r1, *r2, *left, *right, *best, *new;
-    ucc_msg_range_t *range, *tmp, *next;
+    ucc_msg_range_t *range, *temp, *next;
     ucc_status_t     status;
 
     if (ucc_list_is_empty(list1) && ucc_list_is_empty(list2)) {
@@ -222,7 +222,7 @@ static ucc_status_t ucc_coll_score_merge_one(ucc_list_link_t *list1,
     }
     /* Merge consequtive ranges with the same score and same init fn
        if any have been produced by the algorithm above */
-    ucc_list_for_each_safe(range, tmp, out, list_elem) {
+    ucc_list_for_each_safe(range, temp, out, list_elem) {
         if (range->list_elem.next != out) {
             next = ucc_container_of(range->list_elem.next, ucc_msg_range_t,
                                     list_elem);

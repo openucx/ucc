@@ -58,7 +58,8 @@ sources =                 \
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)
-libucc_tl_ucp_la_CPPFLAGS = $(AM_CPPFLAGS) $(UCX_CPPFLAGS)
+libucc_tl_ucp_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS) $(UCX_CPPFLAGS)
+libucc_tl_ucp_la_CFLAGS   = $(BASE_CFLAGS)
 libucc_tl_ucp_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(UCX_LDFLAGS)
 libucc_tl_ucp_la_LIBADD   = $(UCX_LIBADD) $(UCC_TOP_BUILDDIR)/src/libucc.la
 

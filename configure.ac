@@ -157,6 +157,8 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/mpi.m4])
      m4_include([test/gtest/configure.m4])
 
+     mc_modules=":cpu"
+     tl_modules=""
      AC_MSG_RESULT([MPI perftest: ${mpi_enable}])
      AC_ARG_ENABLE([debug],
               AS_HELP_STRING([--enable-debug], [Enable extra debugging code (default is NO).]),
@@ -169,29 +171,33 @@ AS_IF([test "x$with_docs_only" = xyes],
         AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_TRACE_POLL], [Highest log level])
      else
         AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_INFO], [Highest log level])
-        CFLAGS="$CFLAGS -O3 -DNDEBUG"
-        CXXFLAGS="$CXXFLAGS -O3 -DNDEBUG"
+        CFLAGS="$CFLAGS -O3 -g -DNDEBUG"
+        CXXFLAGS="$CXXFLAGS -O3 -g -DNDEBUG"
      fi
 
      CHECK_UCX
      AC_MSG_RESULT([UCX support: $ucx_happy])
      if test $ucx_happy != "yes"; then
          AC_MSG_ERROR([UCX is not available])
+     else
+         tl_modules="${tl_modules}:ucp"
      fi
 
      CHECK_CUDA
      AC_MSG_RESULT([CUDA support: $cuda_happy; $CUDA_CPPFLAGS $CUDA_LDFLAGS])
+     if test $cuda_happy = "yes"; then
+         mc_modules="${mc_modules}:cuda"
+     fi
 
      CHECK_NCCL
      AC_MSG_RESULT([NCCL support: $nccl_happy])
+     if test $nccl_happy = "yes"; then
+         tl_modules="${tl_modules}:nccl"
+     fi
     ]) # Docs only
 
-
-
-
-includes="-I${UCC_TOP_SRCDIR}/src -I${UCC_TOP_BUILDDIR}/src"
 CFLAGS="$CFLAGS -std=gnu11"
-CPPFLAGS="$UCS_CPPFLAGS $CPPFLAGS $includes -Wall -Werror"
+CPPFLAGS="$CPPFLAGS $UCS_CPPFLAGS $includes"
 LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
 
 AC_CONFIG_FILES([
@@ -210,3 +216,23 @@ AC_CONFIG_FILES([
                  tools/perf/Makefile
                  ])
 AC_OUTPUT
+
+#
+# Print build condiguration
+#
+AC_MSG_NOTICE([=========================================================])
+AS_IF([test "x$with_docs_only" = xyes],
+[
+AC_MSG_NOTICE([Building documents only])
+],
+[
+AC_MSG_NOTICE([UCC build configuration:])
+AC_MSG_NOTICE([      Build prefix:   ${prefix}])
+AC_MSG_NOTICE([Preprocessor flags:   ${CPPFLAGS} ${BASE_CPPFLAGS}])
+AC_MSG_NOTICE([        C compiler:   ${CC} ${CFLAGS} ${BASE_CFLAGS}])
+AC_MSG_NOTICE([      C++ compiler:   ${CXX} ${CXXFLAGS} ${BASE_CXXFLAGS}])
+AC_MSG_NOTICE([          Perftest:   ${mpi_enable}])
+AC_MSG_NOTICE([        MC modules:   <$(echo ${mc_modules}|tr ':' ' ') >])
+AC_MSG_NOTICE([        TL modules:   <$(echo ${tl_modules}|tr ':' ' ') >])
+])
+AC_MSG_NOTICE([=========================================================])

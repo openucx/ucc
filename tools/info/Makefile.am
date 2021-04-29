@@ -26,6 +26,7 @@ noinst_HEADERS = \
 nodist_ucc_info_SOURCES = \
 	build_config.h
 
-ucc_info_CPPFLAGS = $(AM_CPPFLAGS) -I${UCC_TOP_BUILDDIR}/src
+ucc_info_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS) -I${UCC_TOP_BUILDDIR}/src
+ucc_info_CFLAGS = $(BASE_CFLAGS)
 ucc_info_LDADD = \
 	$(UCC_TOP_BUILDDIR)/src/libucc.la

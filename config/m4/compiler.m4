@@ -9,7 +9,7 @@
 #
 # Initialize CFLAGS
 #
-BASE_CFLAGS="-g -Wall -Werror"
+BASE_CFLAGS="-Wall -Werror"
 
 
 #
@@ -32,38 +32,6 @@ AC_DEFUN([CHECK_CXX_COMP],
                             [AC_MSG_ERROR([Cannot continue. Please install C++ compiler.])])
           AC_LANG_POP([C++])
          ])
-
-
-#
-# Debug mode
-#
-AC_ARG_ENABLE(debug,
-        AC_HELP_STRING([--enable-debug], [Enable debug mode build]),
-        [],
-        [enable_debug=no])
-AS_IF([test "x$enable_debug" = xyes],
-        [BASE_CFLAGS="-D_DEBUG $BASE_CFLAGS"
-         BASE_CXXFLAGS="-D_DEBUG" $BASE_CXXFLAGS],
-        [])
-
-
-#
-# Optimization level
-#
-AC_ARG_ENABLE(compiler-opt,
-        AC_HELP_STRING([--enable-compiler-opt], [Set optimization level [0-3]]),
-        [],
-        [enable_compiler_opt="none"])
-AS_IF([test "x$enable_compiler_opt" = "xyes"], [BASE_CFLAGS="-O3 $BASE_CFLAGS"],
-      [test "x$enable_compiler_opt" = "xnone"],
-          [AS_IF([test "x$enable_debug" = xyes],
-                 [BASE_CFLAGS="-O0 $BASE_CFLAGS"
-                  BASE_CXXFLAGS="-O0 $BASE_CXXFLAGS"],
-                 [BASE_CFLAGS="-O3 $BASE_CFLAGS"
-                  BASE_CXXFLAGS="-O0 $BASE_CXXFLAGS"])],
-      [test "x$enable_compiler_opt" = "xno"], [],
-      [BASE_CFLAGS="-O$enable_compiler_opt $BASE_CFLAGS"])
-
 
 #
 # CHECK_CROSS_COMP (program, true-action, false-action)
@@ -318,12 +286,12 @@ ADD_COMPILER_FLAG_IF_SUPPORTED([-diag-disable 269],
 # guarantee alignment for 16 bytes only. Force using compiler 16-bytes alignment
 # by default if option is supported.
 #
-UCC_ALLOC_ALIGN=16
-ADD_COMPILER_FLAG_IF_SUPPORTED([-fmax-type-align=$UCC_ALLOC_ALIGN],
-                               [-fmax-type-align=$UCC_ALLOC_ALIGN],
-                               [AC_LANG_SOURCE([[int main(int argc, char** argv){return 0;}]])],
-                               [AC_DEFINE_UNQUOTED([UCC_ALLOC_ALIGN], $UCC_ALLOC_ALIGN, [Set aligment assumption for compiler])],
-                               [])
+#UCC_ALLOC_ALIGN=16
+#ADD_COMPILER_FLAG_IF_SUPPORTED([-fmax-type-align=$UCC_ALLOC_ALIGN],
+#                               [-fmax-type-align=$UCC_ALLOC_ALIGN],
+#                               [AC_LANG_SOURCE([[int main(int argc, char** argv){return 0;}]])],
+#                               [AC_DEFINE_UNQUOTED([UCC_ALLOC_ALIGN], $UCC_ALLOC_ALIGN, [Set aligment assumption for compiler])],
+#                               [])
 
 
 #
@@ -495,7 +463,6 @@ CHECK_COMPILER_FLAG([-pedantic], [-pedantic],
 #
 ADD_COMPILER_FLAGS_IF_SUPPORTED([[-Wno-missing-field-initializers],
                                  [-Wno-unused-parameter],
-                                 [-Wno-unused-label],
                                  [-Wno-long-long],
                                  [-Wno-endif-labels],
                                  [-Wno-sign-compare],
@@ -517,7 +484,6 @@ BASE_CXXFLAGS="$BASE_CFLAGS"
 #
 ADD_COMPILER_FLAGS_IF_SUPPORTED([[-Wno-pointer-sign],
                                  [-Werror-implicit-function-declaration],
-                                 [-Wno-format-zero-length],
                                  [-Wnested-externs],
                                  [-Wshadow],
                                  [-Wenum-conversion]],
