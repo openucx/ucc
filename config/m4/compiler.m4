@@ -123,7 +123,7 @@ AC_DEFUN([COMPILER_CPU_OPTIMIZATION],
                 [AC_HELP_STRING([--with-$1], [Use $2 compiler option.])],
                 [],
                 [with_$1=$enable_optimizations])
-   
+
     AS_IF([test "x$with_$1" != "xno"],
           [SAVE_CFLAGS="$CFLAGS"
            CFLAGS="$BASE_CFLAGS $CFLAGS $3"
@@ -150,15 +150,15 @@ AC_DEFUN([DETECT_UARCH],
     cpuarch=`grep 'CPU architecture' /proc/cpuinfo 2> /dev/null | cut -d: -f2 | tr -d " " | head -n 1`
     cpuvar=`grep 'CPU variant' /proc/cpuinfo 2> /dev/null | cut -d: -f2 | tr -d " " | head -n 1`
     cpupart=`grep 'CPU part' /proc/cpuinfo 2> /dev/null | cut -d: -f2 | tr -d " " | head -n 1`
-   
+
     ax_cpu=""
     ax_arch=""
-    
+
     AC_MSG_NOTICE(Detected CPU implementation: ${cpuimpl})
     AC_MSG_NOTICE(Detected CPU architecture: ${cpuarch})
     AC_MSG_NOTICE(Detected CPU variant: ${cpuvar})
     AC_MSG_NOTICE(Detected CPU part: ${cpupart})
-   
+
     case $cpuimpl in
       0x42) case $cpupart in
         0x516 | 0x0516)
@@ -194,7 +194,7 @@ AC_DEFUN([DETECT_UARCH],
         ;;
       *)
         ;;
-    esac 
+    esac
     AM_CONDITIONAL([HAVE_AARCH64_THUNDERX2], [test x$ax_cpu = xthunderx2t99])
     AM_CONDITIONAL([HAVE_AARCH64_THUNDERX1], [test x$ax_cpu = xthunderxt88])
     AM_CONDITIONAL([HAVE_AARCH64_HI1620], [test x$ax_cpu = xtsv110])
@@ -361,9 +361,9 @@ AS_IF([test "x$ax_cpu" != "x"],
       ])
 
 
-# 
+#
 # Architecture tuning
-# 
+#
 AS_IF([test "x$ax_arch" != "x"],
       [COMPILER_CPU_OPTIMIZATION([march], [architecture tuning], [-march=$ax_arch],
                                  [int main(int argc, char** argv) { return 0;}])
@@ -519,7 +519,8 @@ ADD_COMPILER_FLAGS_IF_SUPPORTED([[-Wno-pointer-sign],
                                  [-Werror-implicit-function-declaration],
                                  [-Wno-format-zero-length],
                                  [-Wnested-externs],
-                                 [-Wshadow]],
+                                 [-Wshadow],
+                                 [-Wenum-conversion]],
                                 [AC_LANG_SOURCE([[int main(int argc, char **argv){return 0;}]])])
 
 
