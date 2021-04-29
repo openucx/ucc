@@ -135,6 +135,8 @@ UCC_TEST_F(test_score_merge, overlap_single)
                           RLIST({RANGE(0, 50, 10), RANGE(50, 150, 100)})));
     ucc_coll_score_free(merge);
 
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score1));
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score2));
     init_score(score1, RLIST({RANGE(0, 100, 100)}), UCC_COLL_TYPE_BARRIER);
     init_score(score2, RLIST({RANGE(50, 150, 10)}), UCC_COLL_TYPE_BARRIER);
     EXPECT_EQ(UCC_OK, ucc_coll_score_merge(score1, score2, &merge, 1));
@@ -153,6 +155,8 @@ UCC_TEST_F(test_score_merge, inclusive)
                           RLIST({RANGE(0, 90, 100)})));
     ucc_coll_score_free(merge);
 
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score1));
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score2));
     init_score(score1, RLIST({RANGE(0, 90, 10)}), UCC_COLL_TYPE_BARRIER);
     init_score(score2, RLIST({RANGE(30, 60, 100)}), UCC_COLL_TYPE_BARRIER);
     EXPECT_EQ(UCC_OK, ucc_coll_score_merge(score1, score2, &merge, 1));
@@ -172,6 +176,8 @@ UCC_TEST_F(test_score_merge, same_start)
                           RLIST({RANGE(0, 100, 100)})));
     ucc_coll_score_free(merge);
 
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score1));
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score2));
     init_score(score1, RLIST({RANGE(0, 100, 10)}), UCC_COLL_TYPE_BARRIER);
     init_score(score2, RLIST({RANGE(0, 50, 100)}), UCC_COLL_TYPE_BARRIER);
     EXPECT_EQ(UCC_OK, ucc_coll_score_merge(score1, score2, &merge, 1));
@@ -180,6 +186,8 @@ UCC_TEST_F(test_score_merge, same_start)
                           RLIST({RANGE(0, 50, 100), RANGE(50, 100, 10)})));
     ucc_coll_score_free(merge);
 
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score1));
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score2));
     init_score(score1, RLIST({RANGE(1, 100, 10)}), UCC_COLL_TYPE_BARRIER);
     init_score(score2, RLIST({RANGE(1, 50, 100)}), UCC_COLL_TYPE_BARRIER);
     EXPECT_EQ(UCC_OK, ucc_coll_score_merge(score1, score2, &merge, 1));
@@ -200,6 +208,8 @@ UCC_TEST_F(test_score_merge, 1_overlaps_many)
                           RLIST({RANGE(0, 100, 100)})));
     ucc_coll_score_free(merge);
 
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score1));
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score2));
     init_score(score1, RLIST({RANGE(0, 100, 10)}), UCC_COLL_TYPE_BARRIER);
     init_score(
         score2,

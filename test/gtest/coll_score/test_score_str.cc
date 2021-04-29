@@ -72,7 +72,6 @@ UCC_TEST_F(test_score_str, check_range_1)
     EXPECT_EQ(UCC_OK,
               check_range(score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_CUDA,
                           RLIST({RANGE(64, 256, 10)})));
-    ucc_coll_score_free(score);
 
     EXPECT_NE(UCC_OK,
               check_range(score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_HOST,
@@ -113,5 +112,3 @@ UCC_TEST_F(test_score_str, check_range_multiple)
                           RLIST({RANGE(99, 12*1024*1024, 20)})));
     ucc_coll_score_free(score);
 }
-
-

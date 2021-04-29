@@ -442,6 +442,7 @@ ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
     status = ucc_mc_finalize();
     ucc_free(lib->tl_libs);
     ucc_free(lib->cl_libs);
+    ucc_free(lib->full_prefix);
     ucc_free(lib);
     return status;
 }

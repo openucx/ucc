@@ -77,5 +77,7 @@ void TestBarrier::run()
             }
         }
     }
-    delete recv;
+    if (0 == rank) {
+        delete[] recv;
+    }
 }
