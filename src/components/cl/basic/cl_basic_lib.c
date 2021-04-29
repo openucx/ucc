@@ -51,6 +51,7 @@ ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
         return status;
     }
     attr->super.attr.thread_mode = ucp_tl_attr.super.attr.thread_mode;
+    attr->super.attr.coll_types  = ucp_tl_attr.super.attr.coll_types;
     nccl_iface = ucc_get_component(&ucc_global_config.tl_framework, "nccl");
     if (nccl_iface) {
         tl_nccl_iface = ucc_derived_of(nccl_iface, ucc_tl_iface_t);
@@ -62,7 +63,8 @@ ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
         }
         attr->super.attr.thread_mode = ucc_min(attr->super.attr.thread_mode,
     			nccl_tl_attr.super.attr.thread_mode);
+        attr->super.attr.coll_types  |= nccl_tl_attr.super.attr.coll_types;
     }
-    /* TODO: fill coll_types, reduction_types, sync_mode.*/
+
     return UCC_OK;
 }
