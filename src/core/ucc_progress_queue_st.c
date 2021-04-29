@@ -28,16 +28,13 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
                 return status;
             }
         }
-        if (UCC_OK == task->super.status) {
-            n_progressed++;
-            status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
-            if (status != UCC_OK) {
-                return status;
-            }
-            ucc_list_del(&task->list_elem);
-            if (task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
-                task->finalize(task);
-            }
+        if (UCC_INPROGRESS == task->super.status) {
+            continue;
+        }
+        ucc_list_del(&task->list_elem);
+        n_progressed++;
+        if (0 > (status = ucc_task_complete(task))) {
+            return status;
         }
     }
     return n_progressed;
