@@ -7,6 +7,7 @@
 
 #include "ucc/api/ucc.h"
 #include "utils/ucc_list.h"
+#include "utils/ucc_log.h"
 #define MAX_LISTENERS 4
 
 typedef enum {
@@ -29,7 +30,8 @@ typedef struct ucc_event_manager {
 } ucc_event_manager_t;
 
 enum {
-    UCC_COLL_TASK_FLAG_INTERNAL = UCC_BIT(0)
+    UCC_COLL_TASK_FLAG_INTERNAL = UCC_BIT(0),
+    UCC_COLL_TASK_FLAG_CB       = UCC_BIT(1)
 };
 
 typedef struct ucc_coll_task {
@@ -38,6 +40,7 @@ typedef struct ucc_coll_task {
     ucc_coll_post_fn_t           post;
     ucc_coll_triggered_post_fn_t triggered_post;
     ucc_coll_finalize_fn_t       finalize;
+    ucc_coll_callback_t          cb;
     ucc_event_manager_t          em;
     ucc_task_event_handler_p     handlers[UCC_EVENT_LAST];
     ucc_status_t               (*progress)(struct ucc_coll_task *self);
@@ -69,4 +72,24 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx);
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule);
 
+static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
+{
+    ucc_status_t status = task->super.status;
+    ucc_assert((status == UCC_OK) || (status < 0));
+    if (status == UCC_OK) {
+        status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
+    } else {
+        /* error in task status */
+        ucc_error("failure in task %p, %s", task,
+                  ucc_status_string(task->super.status));
+    }
+
+    if (task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
+        task->finalize(task);
+    }
+    if (task->flags & UCC_COLL_TASK_FLAG_CB) {
+        task->cb.cb(task->cb.data, status);
+    }
+    return status;
+}
 #endif

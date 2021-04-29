@@ -1413,6 +1413,7 @@ enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS           = UCC_BIT(1),
     UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS          = UCC_BIT(2),
     UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(3),
+    UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(4)
 };
 
 /**
@@ -1472,6 +1473,7 @@ typedef struct ucc_coll_args {
                                              collectives */
     ucc_error_type_t                error_type; /*!< Error type */
     ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
+    ucc_coll_callback_t             cb;
 } ucc_coll_args_t;
 
 /**
