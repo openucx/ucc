@@ -132,7 +132,7 @@ static ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
 ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucs_status_t status;
+    ucc_status_t status;
     ucc_ev_t *post_event;
 
     ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
@@ -140,7 +140,7 @@ ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task
     tl_info(task->team->super.super.context->lib, "triggered post. task:%p", coll_task);
 
     status = coll_task->post(coll_task);
-    if (status == UCS_OK) {
+    if (status == UCC_OK) {
         /* TODO: mpool */
         post_event = ucc_malloc(sizeof(ucc_ev_t), "event");
         if (post_event == NULL) {
