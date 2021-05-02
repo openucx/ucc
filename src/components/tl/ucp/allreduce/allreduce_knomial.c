@@ -182,7 +182,7 @@ completion:
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.super.status = UCC_OK;
 out:
-    ucc_mc_free(task->allreduce_kn.scratch, task->args.src.info.mem_type);
+    ucc_mc_free(task->mc_header, task->args.src.info.mem_type);
     return task->super.super.status;
 }
 
@@ -204,14 +204,14 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
                              ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
                                      cfg.allreduce_kn_radix, size),
                              &task->allreduce_kn.p);
-    if (UCC_OK != (status = ucc_mc_alloc(&task->allreduce_kn.scratch,
+    if (UCC_OK != (status = ucc_mc_alloc(&task->mc_header,
                                          (task->allreduce_kn.p.radix - 1) * data_size,
                                          task->args.src.info.mem_type))) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
                  "failed to allocate scratch buffer");
         return status;
     }
-
+    task->allreduce_kn.scratch = task->mc_header->addr;
     task->super.super.status = UCC_INPROGRESS;
     status = ucc_tl_ucp_allreduce_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {

@@ -56,6 +56,9 @@ typedef struct ucc_mc_cuda_config {
     ucc_mc_cuda_strm_task_mode_t   strm_task_mode;
     ucc_mc_cuda_task_stream_type_t task_strm_type;
     int                            stream_blocking_wait;
+    size_t                         cuda_elem_size;
+    int                            cuda_max_elems;
+
 } ucc_mc_cuda_config_t;
 
 typedef struct ucc_mc_cuda {
@@ -63,6 +66,9 @@ typedef struct ucc_mc_cuda {
     cudaStream_t                   stream;
     ucc_mpool_t                    events;
     ucc_mpool_t                    strm_reqs;
+    ucc_mpool_t                    mpool; // need more indicative name to diffirentiate from events and strm_reqs?
+    int                            mpool_init_flag;
+    ucc_spinlock_t                 mpool_init_spinlock;
     ucc_mc_cuda_strm_task_mode_t   strm_task_mode;
     ucc_mc_cuda_task_stream_type_t task_strm_type;
     ucc_mc_cuda_task_post_fn       post_strm_task;

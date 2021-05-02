@@ -10,18 +10,20 @@
 #include "tl_ucp.h"
 #include "schedule/ucc_schedule.h"
 #include "coll_patterns/recursive_knomial.h"
+#include "components/mc/base/ucc_mc_base.h"
 
 typedef struct ucc_tl_ucp_task {
-    ucc_coll_task_t      super;
-    ucc_coll_args_t      args;
-    ucc_tl_ucp_team_t   *team;
-    uint32_t             send_posted;
-    uint32_t             send_completed;
-    uint32_t             recv_posted;
-    uint32_t             recv_completed;
-    uint32_t             tag;
-    uint32_t             n_polls;
-    ucc_tl_team_subset_t subset;
+    ucc_coll_task_t         super;
+    ucc_coll_args_t         args;
+    ucc_tl_ucp_team_t      *team;
+    uint32_t                send_posted;
+    uint32_t                send_completed;
+    uint32_t                recv_posted;
+    uint32_t                recv_completed;
+    uint32_t                tag;
+    uint32_t                n_polls;
+    ucc_tl_team_subset_t    subset;
+    ucc_mc_buffer_header_t *mc_header;
     union {
         struct {
             int                   phase;

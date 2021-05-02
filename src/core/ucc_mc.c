@@ -117,7 +117,7 @@ ucc_status_t ucc_mc_query(const void *ptr, size_t length,
     return UCC_OK;
 }
 
-ucc_status_t ucc_mc_alloc(void **ptr, size_t size, ucc_memory_type_t mem_type)
+ucc_status_t ucc_mc_alloc(ucc_mc_buffer_header_t **ptr, size_t size, ucc_memory_type_t mem_type)
 {
     UCC_CHECK_MC_AVAILABLE(mem_type);
     return mc_ops[mem_type]->mem_alloc(ptr, size);
@@ -147,7 +147,7 @@ ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
                                           dtype, op);
 }
 
-ucc_status_t ucc_mc_free(void *ptr, ucc_memory_type_t mem_type)
+ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *ptr, ucc_memory_type_t mem_type)
 {
     UCC_CHECK_MC_AVAILABLE(mem_type);
     return mc_ops[mem_type]->mem_free(ptr);

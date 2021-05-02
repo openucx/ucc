@@ -34,6 +34,7 @@ typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 #define UCC_CONFIG_TYPE_TABLE           UCS_CONFIG_TYPE_TABLE
 #define UCC_CONFIG_TYPE_ULUNITS         UCS_CONFIG_TYPE_ULUNITS
 #define UCC_CONFIG_TYPE_ENUM            UCS_CONFIG_TYPE_ENUM
+#define UCC_CONFIG_TYPE_MEMUNITS        UCS_CONFIG_TYPE_MEMUNITS
 #define UCC_ULUNITS_AUTO                UCS_ULUNITS_AUTO
 
 static inline ucc_status_t

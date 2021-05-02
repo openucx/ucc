@@ -37,11 +37,13 @@ public:
 
             ctxs[r]->rbuf_size = ucc_dt_size(dtype) * count;
 
-            UCC_CHECK(ucc_mc_alloc(&coll->src.info.buffer, ctxs[r]->rbuf_size,
+            UCC_CHECK(ucc_mc_alloc(&coll->src.info.mc_header, ctxs[r]->rbuf_size,
                                    mem_type));
+            coll->src.info.buffer = coll->src.info.mc_header->addr;
             if (r == root) {
-                UCC_CHECK(ucc_mc_alloc(&ctxs[r]->init_buf, ctxs[r]->rbuf_size,
+                UCC_CHECK(ucc_mc_alloc(&ctxs[r]->mc_header, ctxs[r]->rbuf_size,
                                        UCC_MEMORY_TYPE_HOST));
+                ctxs[r]->init_buf = ctxs[r]->mc_header->addr;
                 uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
                 for (int i = 0; i < ctxs[r]->rbuf_size; i++) {
                     sbuf[i] = (uint8_t)i;
@@ -56,8 +58,8 @@ public:
     {
         for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
             ucc_coll_args_t* coll = ctx->args;
-            UCC_CHECK(ucc_mc_free(coll->src.info.buffer, mem_type));
-            UCC_CHECK(ucc_mc_free(ctx->init_buf, UCC_MEMORY_TYPE_HOST));
+            UCC_CHECK(ucc_mc_free(coll->src.info.mc_header, mem_type));
+            UCC_CHECK(ucc_mc_free(ctx->mc_header, UCC_MEMORY_TYPE_HOST));
             free(coll);
             free(ctx);
         }
@@ -67,10 +69,12 @@ public:
     {
         int root = ctxs[0]->args->root;
         uint8_t *dsts;
+        ucc_mc_buffer_header_t *dsts_mc_header;
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
-                UCC_CHECK(ucc_mc_alloc((void**)&dsts, ctxs[root]->rbuf_size,
+                UCC_CHECK(ucc_mc_alloc(&dsts_mc_header, ctxs[root]->rbuf_size,
                                        UCC_MEMORY_TYPE_HOST));
+                dsts = (uint8_t *) dsts_mc_header->addr;
                 UCC_CHECK(ucc_mc_memcpy(dsts, ctxs[root]->args->src.info.buffer,
                                         ctxs[root]->rbuf_size,
                                         UCC_MEMORY_TYPE_HOST, mem_type));
@@ -87,7 +91,7 @@ public:
             }
         }
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
-            UCC_CHECK(ucc_mc_free((void*)dsts, UCC_MEMORY_TYPE_HOST));
+            UCC_CHECK(ucc_mc_free(dsts_mc_header, UCC_MEMORY_TYPE_HOST));
         }
         return;
     }

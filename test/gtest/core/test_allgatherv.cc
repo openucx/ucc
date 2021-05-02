@@ -48,17 +48,19 @@ public:
             coll->dst.info_v.displacements = (ucc_aint_t*)displs;
             coll->dst.info_v.datatype = dtype;
 
-            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->init_buf,
+            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->mc_header,
                                    ucc_dt_size(dtype) * my_count,
                                    UCC_MEMORY_TYPE_HOST));
+            ctxs[r]->init_buf = ctxs[r]->mc_header->addr;
             for (int i = 0; i < (ucc_dt_size(dtype) * my_count); i++) {
                 uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
                 sbuf[i] = r;
             }
 
             ctxs[r]->rbuf_size = ucc_dt_size(dtype) * all_counts;
-            UCC_CHECK(ucc_mc_alloc(&coll->dst.info_v.buffer, ctxs[r]->rbuf_size,
+            UCC_CHECK(ucc_mc_alloc(&coll->dst.info_v.mc_header, ctxs[r]->rbuf_size,
                       mem_type));
+            coll->dst.info_v.buffer = coll->dst.info_v.mc_header->addr;
             if (TEST_INPLACE == inplace) {
                 coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
@@ -67,8 +69,9 @@ public:
                                         ctxs[r]->init_buf, ucc_dt_size(dtype) * my_count,
                                         mem_type, UCC_MEMORY_TYPE_HOST));
             } else {
-                UCC_CHECK(ucc_mc_alloc(&coll->src.info.buffer,
+                UCC_CHECK(ucc_mc_alloc(&coll->src.info.mc_header,
                           ucc_dt_size(dtype) * my_count, mem_type));
+                coll->src.info.buffer = coll->src.info.mc_header->addr;
                 UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
                                         ucc_dt_size(dtype) * my_count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
@@ -81,12 +84,12 @@ public:
         for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
             ucc_coll_args_t* coll = ctx->args;
             if (coll->src.info.buffer) { /* no inplace */
-                UCC_CHECK(ucc_mc_free(coll->src.info.buffer, mem_type));
+                UCC_CHECK(ucc_mc_free(coll->src.info.mc_header, mem_type));
             }
-            UCC_CHECK(ucc_mc_free(coll->dst.info.buffer, mem_type));
+            UCC_CHECK(ucc_mc_free(coll->dst.info_v.mc_header, mem_type)); // TODO: check if needs to b via info or info_v
             free(coll->dst.info_v.displacements);
             free(coll->dst.info_v.counts);
-            UCC_CHECK(ucc_mc_free(ctx->init_buf, UCC_MEMORY_TYPE_HOST));
+            UCC_CHECK(ucc_mc_free(ctx->mc_header, UCC_MEMORY_TYPE_HOST));
             free(coll);
             free(ctx);
         }
@@ -95,11 +98,13 @@ public:
     void data_validate(UccCollCtxVec ctxs)
     {
         std::vector<uint8_t *> dsts(ctxs.size());
+        std::vector<ucc_mc_buffer_header_t *> dsts_mc_headers(ctxs.size());
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
-                UCC_CHECK(ucc_mc_alloc((void**)&dsts[r], ctxs[r]->rbuf_size,
+                UCC_CHECK(ucc_mc_alloc(&dsts_mc_headers[r], ctxs[r]->rbuf_size,
                                        UCC_MEMORY_TYPE_HOST));
+                dsts[r] = (uint8_t *) dsts_mc_headers[r]->addr;
                 UCC_CHECK(ucc_mc_memcpy(dsts[r], ctxs[r]->args->dst.info_v.buffer,
                                         ctxs[r]->rbuf_size, UCC_MEMORY_TYPE_HOST,
                                         mem_type));
@@ -124,7 +129,7 @@ public:
         }
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
-                UCC_CHECK(ucc_mc_free((void*)dsts[r], UCC_MEMORY_TYPE_HOST));
+                UCC_CHECK(ucc_mc_free(dsts_mc_headers[r], UCC_MEMORY_TYPE_HOST));
             }
         }
     }

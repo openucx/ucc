@@ -51,6 +51,12 @@ static ucc_config_field_t ucc_mc_cuda_config_table[] = {
      ucc_offsetof(ucc_mc_cuda_config_t, stream_blocking_wait),
      UCC_CONFIG_TYPE_UINT},
 
+     {"CUDA_ELEM_SIZE", "1024", "The size of each element in mc cuda mpool", ucc_offsetof(ucc_mc_cuda_config_t, cuda_elem_size),
+         		UCC_CONFIG_TYPE_MEMUNITS},
+
+     {"CUDA_MAX_ELEMS", "8", "The max amount of elements in mc cuda mpool", ucc_offsetof(ucc_mc_cuda_config_t, cuda_max_elems),
+         		UCC_CONFIG_TYPE_UINT},
+
     {NULL}
 };
 
@@ -211,6 +217,7 @@ static ucc_status_t ucc_mc_cuda_init()
     }
 
     ucc_mc_cuda.task_strm_type = cfg->task_strm_type;
+    ucc_spinlock_init(&ucc_mc_cuda.mpool_init_spinlock, 0);
 
     return UCC_OK;
 }
@@ -218,39 +225,114 @@ static ucc_status_t ucc_mc_cuda_init()
 static ucc_status_t ucc_mc_cuda_finalize()
 {
     CUDACHECK(cudaStreamDestroy(ucc_mc_cuda.stream));
-    return UCC_OK;
-}
-
-static ucc_status_t ucc_mc_cuda_mem_alloc(void **ptr, size_t size)
-{
-    cudaError_t st;
-
-    st = cudaMalloc(ptr, size);
-    if (st != cudaSuccess) {
-        cudaGetLastError();
-        mc_error(&ucc_mc_cuda.super,
-                 "failed to allocate %zd bytes, "
-                 "cuda error %d(%s)",
-                 size, st, cudaGetErrorString(st));
-        return UCC_ERR_NO_MEMORY;
+    if (ucc_mc_cuda.mpool_init_flag) {
+        ucc_mpool_cleanup(&ucc_mc_cuda.mpool, 1);
+        ucc_mc_cuda.mpool_init_flag = 0;
     }
-
-    mc_debug(&ucc_mc_cuda.super, "ucc_mc_cuda_mem_alloc size:%ld", size);
+    ucc_spinlock_destroy(&ucc_mc_cuda.mpool_init_spinlock);
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cuda_mem_free(void *ptr)
+static ucc_status_t ucc_mc_cuda_mem_alloc(ucc_mc_buffer_header_t **ptr, size_t size)
 {
-    cudaError_t st;
+	ucc_mc_buffer_header_t *h = NULL;
+	if (size <= MC_CUDA_CONFIG->cuda_elem_size){
+		h = (ucc_mc_buffer_header_t *) ucc_mpool_get(&ucc_mc_cuda.mpool);
+	}
+	if (!h) {
+		// Slow path
+		cudaError_t st;
+		h = ucc_malloc(sizeof(ucc_mc_buffer_header_t), "mc cuda");
+		if (!h){
+			mc_error(&ucc_mc_cuda.super, "failed to allocate %zd bytes", sizeof(ucc_mc_buffer_header_t));
+			return UCC_ERR_NO_MEMORY;
+		}
+		st = cudaMalloc(&h->addr, size);
+		if (st != cudaSuccess) {
+			cudaGetLastError();
+			mc_error(&ucc_mc_cuda.super, "failed to allocate %zd bytes, " "cuda error %d(%s)", size, st, cudaGetErrorString(st));
+			return UCC_ERR_NO_MEMORY;
+		}
+		mc_debug(&ucc_mc_cuda.super, "ucc_mc_cuda_mem_alloc size:%zd", size); // todo: should i keep this? add it also to chunk alloc? in cpu?
+		h->from_pool = 0;
+	}
+	*ptr = h;
+	return UCC_OK;
+}
 
-    st = cudaFree(ptr);
-    if (st != cudaSuccess) {
-        cudaGetLastError();
-        mc_error(&ucc_mc_cuda.super,
-                 "failed to free mem at %p, "
-                 "cuda error %d(%s)",
-                 ptr, st, cudaGetErrorString(st));
-        return UCC_ERR_NO_MESSAGE;
+static ucc_status_t ucc_mc_cuda_chunk_alloc(ucc_mpool_t *mp, size_t *size_p, void **chunk_p)
+{
+	*chunk_p = ucc_malloc(*size_p, "mc cuda");
+	if (!*chunk_p){
+		mc_error(&ucc_mc_cuda.super, "failed to allocate %zd bytes", *size_p);
+		return UCC_ERR_NO_MEMORY;
+	}
+
+    return UCC_OK;
+}
+
+static void ucc_mc_cuda_chunk_init(ucc_mpool_t *mp, void *obj, void *chunk)
+{
+	ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t*) obj;
+	cudaError_t st = cudaMalloc(&h->addr, MC_CUDA_CONFIG->cuda_elem_size);
+	if (st != cudaSuccess) {
+	    cudaGetLastError();
+	    mc_error(&ucc_mc_cuda.super, "failed to allocate %zd bytes, " "cuda error %d(%s)", MC_CUDA_CONFIG->cuda_elem_size, st, cudaGetErrorString(st));
+	}
+	h->from_pool = 1;
+}
+
+static void ucc_mc_cuda_chunk_release(ucc_mpool_t *mp, void *chunk)
+{
+	ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t*) chunk;
+	cudaError_t st;
+	st = cudaFree(h->addr);
+	if (st != cudaSuccess) {
+	    cudaGetLastError();
+	    mc_error(&ucc_mc_cuda.super, "failed to free mem at %p, " "cuda error %d(%s)", chunk, st, cudaGetErrorString(st));
+	}
+	ucc_free(h);
+}
+
+static ucc_mpool_ops_t ucc_mc_ops = {
+    .chunk_alloc   = ucc_mc_cuda_chunk_alloc,
+    .chunk_release = ucc_mc_cuda_chunk_release,
+    .obj_init      = ucc_mc_cuda_chunk_init,
+    .obj_cleanup   = NULL
+};
+
+static ucc_status_t ucc_mc_cuda_mem_alloc_with_init(ucc_mc_buffer_header_t **ptr, size_t size)
+{
+	ucc_spin_lock(&ucc_mc_cuda.mpool_init_spinlock);
+	if (! ucc_mc_cuda.mpool_init_flag) {
+		// TODO: currently only with thread multiple, need to change?
+		ucc_status_t status = ucc_mpool_init(&ucc_mc_cuda.mpool, 0, sizeof(ucc_mc_buffer_header_t),
+				0, UCC_CACHE_LINE_SIZE, 1, MC_CUDA_CONFIG ->cuda_max_elems,
+				&ucc_mc_ops, UCC_THREAD_MULTIPLE, "mc cuda mpool buffers");
+		if (status != UCC_OK) {
+			return status;
+		}
+		ucc_mc_cuda.super.ops.mem_alloc = ucc_mc_cuda_mem_alloc;
+		ucc_mc_cuda.mpool_init_flag = 1;
+	}
+	ucc_spin_unlock(&ucc_mc_cuda.mpool_init_spinlock);
+	return ucc_mc_cuda_mem_alloc(ptr, size);
+}
+
+static ucc_status_t ucc_mc_cuda_mem_free(ucc_mc_buffer_header_t *ptr)
+{
+	if (!ptr->from_pool) {
+    	cudaError_t st;
+    	st = cudaFree(ptr->addr);
+    	if (st != cudaSuccess) {
+    	    cudaGetLastError();
+    	    mc_error(&ucc_mc_cuda.super, "failed to free mem at %p, " "cuda error %d(%s)", ptr->addr, st, cudaGetErrorString(st));
+    	    return UCC_ERR_NO_MESSAGE;
+    	}
+    	ucc_free(ptr);
+    }
+    else {
+    	ucc_mpool_put(ptr);
     }
     return UCC_OK;
 }
@@ -485,7 +567,7 @@ ucc_mc_cuda_t ucc_mc_cuda = {
     .super.init             = ucc_mc_cuda_init,
     .super.finalize         = ucc_mc_cuda_finalize,
     .super.ops.mem_query    = ucc_mc_cuda_mem_query,
-    .super.ops.mem_alloc    = ucc_mc_cuda_mem_alloc,
+    .super.ops.mem_alloc    = ucc_mc_cuda_mem_alloc_with_init,
     .super.ops.mem_free     = ucc_mc_cuda_mem_free,
     .super.ops.reduce       = ucc_mc_cuda_reduce,
     .super.ops.reduce_multi = ucc_mc_cuda_reduce_multi,
@@ -504,6 +586,7 @@ ucc_mc_cuda_t ucc_mc_cuda = {
     .super.ee_ops.ee_destroy_event = ucc_ee_cuda_destroy_event,
     .super.ee_ops.ee_event_post    = ucc_ee_cuda_event_post,
     .super.ee_ops.ee_event_test    = ucc_ee_cuda_event_test,
+    .mpool_init_flag               = 0,
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cuda.super.config_table,
