@@ -8,7 +8,9 @@
 
 #include "utils/ucc_spinlock.h"
 #include "utils/ucc_atomic.h"
+#include "utils/ucc_list.h"
 #include <string.h>
+#include <stdio.h>
 
 /* This data structure is thread safe */
 
@@ -31,17 +33,15 @@ typedef struct ucc_lf_queue {
 static inline void ucc_lf_queue_enqueue(ucc_lf_queue_t *     queue,
                                         ucc_lf_queue_elem_t *elem)
 {
-
-    int which_pool = elem->was_progressed ^ (queue->which_pool & 1);
+	uint8_t which_pool = elem->was_progressed ^ (queue->which_pool & 1);
     int i;
     for (i = 0; i < LINE_SIZE; i++) {
         if (ucc_atomic_bool_cswap64(
-                (uint64_t *)&(queue->elements[which_pool][i]), 0,
+                (uint64_t *)&(queue->elements[which_pool][i]), 0LL,
                 (uint64_t)elem)) {
             return;
         }
     }
-
     ucc_spin_lock(&queue->locked_queue_lock[which_pool]);
     ucc_list_add_tail(&queue->locked_queue[which_pool],
                       &elem->locked_list_elem);
@@ -52,8 +52,8 @@ static inline ucc_lf_queue_elem_t *ucc_lf_queue_dequeue(ucc_lf_queue_t *queue,
                                                         int is_first_call)
 {
     // Save value in the beginning of the function
-    int curr_which_pool = queue->which_pool;
-    int which_pool      = curr_which_pool & 1; // turn from even/odd -> bool
+	uint8_t curr_which_pool = queue->which_pool;
+    uint8_t which_pool      = curr_which_pool & 1; // turn from even/odd -> bool
     int i;
     ucc_lf_queue_elem_t *elem;
     for (i = 0; i < LINE_SIZE; i++) {
@@ -61,7 +61,7 @@ static inline ucc_lf_queue_elem_t *ucc_lf_queue_dequeue(ucc_lf_queue_t *queue,
         if (elem) {
             if (ucc_atomic_bool_cswap64(
                     (uint64_t *)&(queue->elements[which_pool][i]),
-                    (uint64_t)elem, 0)) {
+                    (uint64_t)elem, 0LL)) {
                 elem->was_progressed = 1;
                 return elem;
             }
@@ -76,10 +76,8 @@ static inline ucc_lf_queue_elem_t *ucc_lf_queue_dequeue(ucc_lf_queue_t *queue,
     }
     ucc_spin_unlock(&queue->locked_queue_lock[which_pool]);
     if (!elem) {
-        ucc_atomic_cswap8(&queue->which_pool, curr_which_pool,
-                          curr_which_pool + 1);
-        if (is_first_call) {
-            // TODO maybe only when which_pool increase is OK
+        if (ucc_atomic_bool_cswap8(&queue->which_pool, curr_which_pool,
+                curr_which_pool + 1) && is_first_call) {
             return ucc_lf_queue_dequeue(queue, 0);
         }
     }
@@ -94,8 +92,8 @@ static inline void ucc_lf_queue_destroy(ucc_lf_queue_t *queue)
 
 static inline void ucc_lf_queue_init(ucc_lf_queue_t *queue)
 {
-    memset(&queue->elements, 0,
-           NUM_POOLS * LINE_SIZE * sizeof(ucc_lf_queue_elem_t *));
+	memset(&queue->elements, 0,
+	           NUM_POOLS * LINE_SIZE * sizeof(ucc_lf_queue_elem_t *));
     ucc_spinlock_init(&queue->locked_queue_lock[0], 0);
     ucc_spinlock_init(&queue->locked_queue_lock[1], 0);
     ucc_list_head_init(&queue->locked_queue[0]);
