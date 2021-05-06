@@ -302,7 +302,9 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
     }
 
     if (ptr == 0) {
-        mem_type = UCC_MEMORY_TYPE_HOST;
+        mem_attr->mem_type     = UCC_MEMORY_TYPE_HOST;
+        mem_attr->base_address = NULL;
+        mem_attr->alloc_length = 0;
     } else {
         if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_MEM_TYPE) {
             st = cudaPointerGetAttributes(&attr, ptr);
