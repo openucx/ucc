@@ -114,19 +114,13 @@ static int ucc_pq_mt_progress(ucc_progress_queue_t *pq)
                 return status;
             }
         }
-        if (UCC_OK == task->super.status) {
-            n_progressed++;
-            // TODO need to decide for st/mt progress should it return #progressed/#completed tasks,
-            // and document accordingly
-            status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
-            if (status != UCC_OK) {
-                return status;
-            }
-            if (task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
-                task->finalize(task);
-            }
-        } else {
+        if (UCC_INPROGRESS == task->super.status) {
             pq->enqueue(pq, task);
+            return n_progressed;
+        }
+        n_progressed++;
+        if (0 > (status = ucc_task_complete(task))) {
+            return status;
         }
     }
     return n_progressed;

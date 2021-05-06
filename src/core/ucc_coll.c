@@ -138,6 +138,10 @@ ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
         ucc_error("failed to init collective: %s", ucc_status_string(status));
         return status;
     }
+    if (coll_args->mask & UCC_COLL_ARGS_FIELD_CB) {
+        task->cb = coll_args->cb;
+        task->flags |= UCC_COLL_TASK_FLAG_CB;
+    }
     *request = &task->super;
     return UCC_OK;
 }

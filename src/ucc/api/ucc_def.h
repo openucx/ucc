@@ -64,6 +64,18 @@ typedef struct ucc_coll_req {
 } ucc_coll_req_t;
 
 /**
+ * @ingroup UCC_COLLECTIVES_DT
+ * @brief UCC collective completion callback
+ *
+ * The callback is invoked whenever the collective operation is completed.
+ * It is not allowed to call UCC APIs from the completion callback except
+ * for @ref ucc_collective_finalize.
+ */
+typedef struct ucc_coll_callback {
+    void (*cb)(void *data, ucc_status_t status);
+    void  *data;
+} ucc_coll_callback_t;
+/**
  * @ingroup UCC_COLLECTIVES
  * @brief UCC memory handle
  *
@@ -144,5 +156,6 @@ typedef size_t ucc_context_addr_len_t;
  * the execution context and related queues.
  */
 typedef struct ucc_ee*      ucc_ee_h;
+
 
 #endif
