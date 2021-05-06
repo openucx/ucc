@@ -105,6 +105,10 @@ ucc_status_t ucc_mc_query(const void *ptr, size_t length,
     ucc_status_t      status;
     ucc_memory_type_t mt;
 
+    mem_attr->mem_type     = UCC_MEMORY_TYPE_HOST;
+    mem_attr->base_address = (void *)ptr;
+    mem_attr->alloc_length = length;
+
     for (mt = UCC_MEMORY_TYPE_HOST + 1; mt < UCC_MEMORY_TYPE_LAST; mt++) {
         if (NULL != mc_ops[mt]) {
             status = mc_ops[mt]->mem_query(ptr, length, mem_attr);
