@@ -10,7 +10,7 @@ ucc_config_field_t ucc_base_config_table[] = {
      "poll.",
      ucc_offsetof(ucc_base_config_t, log_component), UCC_CONFIG_TYPE_LOG_COMP},
 
-    {"SCORE", "", "Collective score modifier for a CL/TL component\n"
+    {"TUNE", "", "Collective tuning modifier for a CL/TL component\n"
      "format: token1#token2#...#tokenn - '#' separated list of tokens where\n"
      "    token=coll_type:msg_range:mem_type:team_size:score:alg - ':' separated\n"
      "    list of qualifiers. Each qualifier is optional. The only requirement\n"
