@@ -24,8 +24,8 @@ ucc_test_mpi_SOURCES = \
 	test_alltoallv.cc
 
 CXX=mpicxx
-ucc_test_mpi_CXXFLAGS=-I${top_builddir}/src -std=gnu++11
-
+ucc_test_mpi_CPPFLAGS=$(BASE_CPPFLAGS)
+ucc_test_mpi_CXXFLAGS=$(BASE_CXXFLAGS) -std=gnu++11
 ucc_test_mpi_LDFLAGS=-L${top_builddir}/src/.libs -lucc
 
 if HAVE_CUDA

@@ -8,6 +8,7 @@
 #include "utils/ucc_malloc.h"
 #include "core/ucc_mc.h"
 #include "components/mc/base/ucc_mc_base.h"
+#include "allreduce/allreduce.h"
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib, ucc_base_attr_t *base_attr);
 ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context, ucc_base_attr_t *base_attr);
@@ -158,4 +159,6 @@ __attribute__((constructor)) static void tl_ucp_iface_init(void)
     ucc_tl_ucp.super.scoll.test      = ucc_tl_ucp_service_test;
     ucc_tl_ucp.super.scoll.cleanup   = ucc_tl_ucp_service_cleanup;
     ucc_tl_ucp.super.scoll.update_id = ucc_tl_ucp_service_update_id;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLREDUCE)] =
+        ucc_tl_ucp_allreduce_algs;
 }

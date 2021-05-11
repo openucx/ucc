@@ -21,6 +21,7 @@
 #define ucc_list_head          ucs_list_head
 #define ucc_list_next          ucs_list_next
 #define ucc_list_insert_after  ucs_list_insert_after
+#define ucc_list_insert_before ucs_list_insert_before
 
 #define ucc_list_destruct(_list, _elem_type, _elem_destruct, _member)          \
     do {                                                                       \

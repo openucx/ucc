@@ -9,6 +9,8 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
+static ucc_status_t ucc_mc_cuda_mem_alloc_with_init(ucc_mc_buffer_header_t **ptr, size_t size);
+
 static const char *stream_task_modes[] = {
     [UCC_MC_CUDA_TASK_KERNEL]  = "kernel",
     [UCC_MC_CUDA_TASK_MEM_OPS] = "driver",
@@ -228,6 +230,7 @@ static ucc_status_t ucc_mc_cuda_finalize()
     if (ucc_mc_cuda.mpool_init_flag) {
         ucc_mpool_cleanup(&ucc_mc_cuda.mpool, 1);
         ucc_mc_cuda.mpool_init_flag = 0;
+        ucc_mc_cuda.super.ops.mem_alloc = ucc_mc_cuda_mem_alloc_with_init;
     }
     ucc_spinlock_destroy(&ucc_mc_cuda.mpool_init_spinlock);
     return UCC_OK;

@@ -100,13 +100,15 @@ ucc_status_t test_score::check_range(ucc_coll_score_t *   score,
     return UCC_OK;
 }
 
-void test_score::init_score(ucc_coll_score_t *   score,
-                            std::vector<range_t> v, ucc_coll_type_t c)
+void test_score::init_score(ucc_coll_score_t *score, std::vector<range_t> v,
+                            ucc_coll_type_t c, uint64_t init_fn, uint64_t team)
 {
     for (auto &r : v) {
         EXPECT_EQ(UCC_OK, ucc_coll_score_add_range(
-                      score, c, UCC_MEMORY_TYPE_HOST, std::get<0>(r),
-                      std::get<1>(r), std::get<2>(r), NULL, NULL));
+                              score, c, UCC_MEMORY_TYPE_HOST, std::get<0>(r),
+                              std::get<1>(r), std::get<2>(r),
+                              (ucc_base_coll_init_fn_t)init_fn,
+                              (ucc_base_team_t *)team));
     }
 }
 

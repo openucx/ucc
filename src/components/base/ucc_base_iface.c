@@ -10,15 +10,26 @@ ucc_config_field_t ucc_base_config_table[] = {
      "poll.",
      ucc_offsetof(ucc_base_config_t, log_component), UCC_CONFIG_TYPE_LOG_COMP},
 
-    {"SCORE", "", "Collective score modifier for a CL/TL component\n"
-     "format: \"#\"-separated list of score values with optional qualifiers:\n"
-     "        <coll_type_1,..,coll_type_n>:<mem_type_1,..,mem_type_n>:"
-     "<msg_range_1,..,msg_range_n>:score\n"
-     "        msg_range has the format: start-end, where start,end - integers"
-     " or \"inf\"\n"
-     "        score: positive integer, 0 or inf; \n"
-     "               0 - disables the CL/TL in the given range for a given coll\n"
-     "               inf - forces the CL/TL in the given range for a given coll",
+    {"TUNE", "", "Collective tuning modifier for a CL/TL component\n"
+     "format: token1#token2#...#tokenn - '#' separated list of tokens where\n"
+     "    token=coll_type:msg_range:mem_type:team_size:score:alg - ':' separated\n"
+     "    list of qualifiers. Each qualifier is optional. The only requirement\n"
+     "    is that either \"score\" or \"alg\" is provided.\n"
+     "qualifiers:\n"
+     "    coll_type=coll_type_1,coll_type_2,...,coll_type_n - ',' separated\n"
+     "              list of coll_types\n"
+     "    msg_range=m_start_1-m_end_1,m_start_2-m_end_2,..,m_start_n-m_end_n -\n"
+     "              ',' separated list of msg ranges, where each range is\n"
+     "              represented by \"start\" and \"end\" values separated by \"-\".\n"
+     "              Special value \"inf\" means MAX msg size.\n"
+     "    mem_type=m1,m2,..,mn - ',' separated list of memory types\n"
+     "    team_size=[t_start_1-t_end_1,t_start_2-t_end_2,...,t_start_n-t_end_n] -\n"
+     "              ',' separated list of team size ranges enclosed with [].\n"
+     "    score=value - int value from 0 to \"inf\"\n"
+     "          0 - disables the CL/TL in the given range for a given coll\n"
+     "          inf - forces the CL/TL in the given range for a given coll\n"
+     "    alg=@<value|str> - character @ followed by either int number or string\n"
+     "        representing the collective algorithm.",
      ucc_offsetof(ucc_base_config_t, score_str), UCC_CONFIG_TYPE_STRING},
 
     {NULL}};

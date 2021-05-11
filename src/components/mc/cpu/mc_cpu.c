@@ -9,6 +9,8 @@
 #include "utils/ucc_malloc.h"
 #include <sys/types.h>
 
+static ucc_status_t ucc_mc_cpu_mem_alloc_with_init(ucc_mc_buffer_header_t **ptr, size_t size);
+
 static ucc_config_field_t ucc_mc_cpu_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_mc_cpu_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_mc_config_table)},
@@ -36,6 +38,7 @@ static ucc_status_t ucc_mc_cpu_finalize()
 	if (ucc_mc_cpu.mpool_init_flag){
 		ucc_mpool_cleanup(&ucc_mc_cpu.mpool, 1);
 		ucc_mc_cpu.mpool_init_flag = 0;
+		ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_alloc_with_init;
 	}
     ucc_spinlock_destroy(&ucc_mc_cpu.mpool_init_spinlock);
     return UCC_OK;

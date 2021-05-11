@@ -119,7 +119,7 @@ extern ucc_mc_cuda_t ucc_mc_cuda;
 
 #define CUDADRV_FUNC(_func)                                                    \
     ({                                                                         \
-        ucc_status_t _status = UCS_OK;                                         \
+        ucc_status_t _status = UCC_OK;                                         \
         do {                                                                   \
             CUresult _result = (_func);                                        \
             const char *cu_err_str;                                            \

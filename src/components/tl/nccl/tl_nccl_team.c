@@ -132,7 +132,7 @@ static ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
 ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucs_status_t status;
+    ucc_status_t status;
     ucc_ev_t *post_event;
 
     ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
@@ -140,7 +140,7 @@ ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task
     tl_info(task->team->super.super.context->lib, "triggered post. task:%p", coll_task);
 
     status = coll_task->post(coll_task);
-    if (status == UCS_OK) {
+    if (status == UCC_OK) {
         /* TODO: mpool */
         post_event = ucc_malloc(sizeof(ucc_ev_t), "event");
         if (post_event == NULL) {
@@ -236,13 +236,19 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
         return status;
     }
     if (strlen(lib->super.super.score_str) > 0) {
-        status = ucc_coll_score_update_from_str(lib->super.super.score_str,
-                                                score, team->size);
-        if (status == UCC_ERR_INVALID_PARAM) {
-            /* User provided incorrect input - try to proceed */
-            status = UCC_OK;
+        status = ucc_coll_score_update_from_str(
+            lib->super.super.score_str, score, team->size,
+            ucc_tl_nccl_coll_init, &team->super.super,
+            UCC_TL_NCCL_DEFAULT_SCORE, NULL);
+        /* If INVALID_PARAM - User provided incorrect input - try to proceed */
+        if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
+            (status != UCC_ERR_NOT_SUPPORTED)) {
+            goto err;
         }
     }
     *score_p = score;
+    return UCC_OK;
+err:
+    ucc_coll_score_free(score);
     return status;
 }

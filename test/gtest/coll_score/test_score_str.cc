@@ -22,12 +22,14 @@ UCC_TEST_F(test_score_str, check_valid)
 {
     std::string       str = "alltoall:cuda:10";
     ucc_coll_score_t *score;
-    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
+    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0,
+                                                    NULL, NULL, NULL));
     EXPECT_EQ(10, SCORE(score, ALLTOALL, CUDA));
     ucc_coll_score_free(score);
 
     str = "host,Cuda:Bcast,SCATTER:10";
-    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
+    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0,
+                                                    NULL, NULL, NULL));
     EXPECT_EQ(10, SCORE(score, BCAST, CUDA));
     EXPECT_EQ(10, SCORE(score, BCAST, HOST));
     EXPECT_EQ(10, SCORE(score, SCATTER, CUDA));
@@ -35,13 +37,15 @@ UCC_TEST_F(test_score_str, check_valid)
     ucc_coll_score_free(score);
 
     str = "inf:gatHerv";
-    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
+    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0,
+                                                    NULL, NULL, NULL));
     EXPECT_EQ(UCC_SCORE_MAX, SCORE(score, GATHERV, ROCM));
     EXPECT_EQ(UCC_SCORE_MAX, SCORE(score, GATHERV, HOST));
     ucc_coll_score_free(score);
 
     str = "alltoall,bCAst:hOst:10#scatter:inf#reduce:1";
-    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
+    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0,
+                                                    NULL, NULL, NULL));
     EXPECT_EQ(10, SCORE(score, BCAST, HOST));
     EXPECT_EQ(UCC_SCORE_MAX, SCORE(score, SCATTER, HOST));
     EXPECT_EQ(UCC_SCORE_MAX, SCORE(score, SCATTER, CUDA_MANAGED));
@@ -54,7 +58,8 @@ UCC_TEST_F(test_score_str, check_invalid)
     std::string       str = "alltoallll:cuda:10";
     ucc_coll_score_t *score;
     testing::internal::CaptureStdout();
-    EXPECT_NE(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
+    EXPECT_NE(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0,
+                                                    NULL, NULL, NULL));
     testing::internal::GetCapturedStdout();
 }
 
@@ -62,7 +67,8 @@ UCC_TEST_F(test_score_str, check_range_1)
 {
     std::string       str = "alltoall:64-256:cuda:10";
     ucc_coll_score_t *score;
-    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
+    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0,
+                                                    NULL, NULL, NULL));
     EXPECT_EQ(UCC_OK,
               check_range(score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_CUDA,
                           RLIST({RANGE(64, 256, 10)})));
@@ -74,7 +80,8 @@ UCC_TEST_F(test_score_str, check_range_1)
     ucc_coll_score_free(score);
 
     str = "10-20:scatter:host:99";
-    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
+    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0,
+                                                    NULL, NULL, NULL));
     EXPECT_EQ(UCC_OK,
               check_range(score, UCC_COLL_TYPE_SCATTER, UCC_MEMORY_TYPE_HOST,
                           RLIST({RANGE(10, 20, 99)})));
@@ -85,14 +92,16 @@ UCC_TEST_F(test_score_str, check_range_multiple)
 {
     std::string       str = "alltoall:1k-2k,64-256,4096-5000:cuda:10";
     ucc_coll_score_t *score;
-    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
+    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0,
+                                                    NULL, NULL, NULL));
     EXPECT_EQ(UCC_OK,
               check_range(score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_CUDA,
                           RLIST({RANGE(64, 256, 10), RANGE(1024,2048,10), RANGE(4096,5000,10)})));
     ucc_coll_score_free(score);
 
     str = "alltoall,barrier:1k-4K,64-256:cuda:10#20:99-12M:bcast";
-    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0));
+    EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0,
+                                                    NULL, NULL, NULL));
     EXPECT_EQ(UCC_OK,
               check_range(score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_CUDA,
                           RLIST({RANGE(64, 256, 10), RANGE(1024,4096,10)})));

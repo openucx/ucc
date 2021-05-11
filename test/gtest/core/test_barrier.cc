@@ -11,6 +11,7 @@ class test_barrier : public ucc::test
 public:
     ucc_coll_args_t coll;
     test_barrier() {
+        coll.mask      = 0;
         coll.coll_type = UCC_COLL_TYPE_BARRIER;
     }
 };
