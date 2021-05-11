@@ -10,6 +10,11 @@
 #include "tl_ucp.h"
 #include "schedule/ucc_schedule.h"
 #include "coll_patterns/recursive_knomial.h"
+#include "tl_ucp_tag.h"
+
+#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 1
+extern const char
+    *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
 
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t      super;
@@ -58,6 +63,31 @@ static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
     return task;
 }
 
+ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
+                                  ucc_base_team_t *     team,
+                                  ucc_coll_task_t **    task_h);
+
+ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task);
+
+ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
+                                       ucc_coll_task_t *coll_task);
+
+static inline ucc_tl_ucp_task_t *
+ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
+{
+    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
+
+    ucc_coll_task_init(&task->super);
+    memcpy(&task->args, &coll_args->args, sizeof(ucc_coll_args_t));
+    task->team           = tl_team;
+    task->tag            = tl_team->seq_num;
+    tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
+    task->super.finalize = ucc_tl_ucp_coll_finalize;
+    task->super.triggered_post = ucc_tl_ucp_triggered_post;
+    return task;
+}
+
 static inline void ucc_tl_ucp_put_task(ucc_tl_ucp_task_t *task)
 {
     ucc_mpool_put(task);
@@ -81,8 +111,13 @@ static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
     }
     return UCC_INPROGRESS;
 }
+
 ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
                                   ucc_base_team_t      *team,
                                   ucc_coll_task_t     **task_h);
 
+ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
+                                       ucc_coll_type_t          coll_type,
+                                       ucc_memory_type_t        mem_type,
+                                       ucc_base_coll_init_fn_t *init);
 #endif

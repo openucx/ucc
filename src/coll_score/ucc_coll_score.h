@@ -34,8 +34,11 @@ typedef struct ucc_coll_score {
 
 typedef struct ucc_score_map ucc_score_map_t;
 
+/* Allocates empty score data structure */
 ucc_status_t  ucc_coll_score_alloc(ucc_coll_score_t **score);
 
+/* Adds a single score range to the storage.
+   "init" must be either proper base_coll_init_fn or NULL. */
 ucc_status_t  ucc_coll_score_add_range(ucc_coll_score_t *score,
                                        ucc_coll_type_t   coll_type,
                                        ucc_memory_type_t mem_type, size_t start,
@@ -43,35 +46,95 @@ ucc_status_t  ucc_coll_score_add_range(ucc_coll_score_t *score,
                                        ucc_base_coll_init_fn_t init,
                                        ucc_base_team_t *team);
 
+/* Releases the score data structure and all the score ranges stored
+   there */
 void          ucc_coll_score_free(ucc_coll_score_t *score);
 
+/* Merges 2 scores score1 and score2 into the new score "rst" selecting
+   larger score. Ie.: rst will contain a range from score1 if either
+   score of that range in score1 is larger than that of score2 or
+   that range does not overlap with score2.
+
+    This fn is used by CL to merge scores from multiple TLs and produce
+    a score map. As a result the produced score map will select TL with
+    higher score.*/
 ucc_status_t  ucc_coll_score_merge(ucc_coll_score_t * score1,
                                    ucc_coll_score_t * score2,
                                    ucc_coll_score_t **rst, int free_inputs);
 
-ucc_status_t ucc_coll_score_alloc_from_str(const char *str,
-                                           ucc_coll_score_t **score,
-                                           ucc_rank_t         team_size);
+/* Callback that maps alg_id (int or str) to the "init" function.
+   This callback is provided by the component (CL/TL) that uses
+   ucc_coll_score_alloc_from_str.
+   Return values:
+   UCC_OK - input alg_id can be correctly mapped to the "init" fn
+   UCC_ERR_NOT_SUPPORTED - CL/TL does allow changing algorithms ids for
+   the given coll_type, mem_type
+   UCC_ERR_INVALID_PARAM - incorrect value of alg_id is provided */
+typedef ucc_status_t (*ucc_alg_id_to_init_fn_t)(int               alg_id,
+                                                const char *      alg_id_str,
+                                                ucc_coll_type_t   coll_type,
+                                                ucc_memory_type_t mem_type,
+                                                ucc_base_coll_init_fn_t *init);
 
-ucc_status_t ucc_coll_score_update_from_str(const char *str,
-                                            ucc_coll_score_t *score,
-                                            ucc_rank_t        team_size);
+/* Parses SCORE string (see ucc_base_iface.c for pattern description)
+   and initializes score data structure. team_size is used to filter
+   score ranges provided by user. "init" - default init function to be
+   used if alg_id is not explicitly present in SCORE str. */
+ucc_status_t ucc_coll_score_alloc_from_str(const char *            str,
+                                           ucc_coll_score_t **     score,
+                                           ucc_rank_t              team_size,
+                                           ucc_base_coll_init_fn_t init,
+                                           ucc_base_team_t *       team,
+                                           ucc_alg_id_to_init_fn_t alg_fn);
+
+/* Update existing score datastructure with the custom input specified
+   in "str". Update applies the modifications specified in "str" to the
+   existing "score": if some range in "str" overlaps with a range in "score"
+   then the latter is modified according to "str" (in contrast to
+   ucc_coll_score_merge where MAX score rule is used). If the new range
+   is provided in "str" and it does not have "score" qualifier then def_score
+   is used for it. If the new range is provided in "str" and it does not have
+   "alg_id" qualifier than "init" fn is used otherwise "init" is taken from
+   alg_fn mapper callback.
+
+   This function has 2 usages (see tl_ucp_team.c: ucc_tl_ucp_team_get_scores
+   function):
+   1. Construct custom score table for component based on the built-in
+      selection rules represented by string. In this case "init"" can be set
+      to some generic init function (ucc_tl_ucp_coll_init).
+   2. Update existing score datastruct with user input: in this case
+      "init" is set to NULL. User provided ranges without alg_id will not
+      modify any existing "init" functions in that case and only change the
+      score of existing ranges*/
+ucc_status_t ucc_coll_score_update_from_str(const char *            str,
+                                            ucc_coll_score_t       *score,
+                                            ucc_rank_t              team_size,
+                                            ucc_base_coll_init_fn_t init,
+                                            ucc_base_team_t        *team,
+                                            ucc_score_t             def_score,
+                                            ucc_alg_id_to_init_fn_t alg_fn);
 
 ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
-                                   ucc_coll_score_t *update);
+                                   ucc_coll_score_t *update,
+                                   ucc_score_t       default_score);
 
-ucc_status_t ucc_coll_score_build_default(ucc_base_team_t *team,
+/* Initializes the default score datastruct with a set of coll_types specified
+   as a bitmap, mem_types passed as array, default score value and default init fn.
+   The collective will have msg range 0-inf. */
+ucc_status_t ucc_coll_score_build_default(ucc_base_team_t        *team,
                                           ucc_score_t             default_score,
                                           ucc_base_coll_init_fn_t default_init,
                                           ucc_coll_type_t         coll_types,
                                           ucc_memory_type_t      *mem_types,
                                           int mt_n, ucc_coll_score_t **score_p);
 
+/* Builds optimized representation of a score for the faster lookup */
 ucc_status_t ucc_coll_score_build_map(ucc_coll_score_t *score,
                                       ucc_score_map_t **map);
 
 void         ucc_coll_score_free_map(ucc_score_map_t *map);
 
+/* Selects the "init" function from score map based on coll_args */
 ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t         *map,
                                        ucc_base_coll_args_t    *args,
                                        ucc_base_coll_init_fn_t *init,

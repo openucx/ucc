@@ -6,7 +6,6 @@
 
 #include "tl_ucp.h"
 #include "tl_ucp_coll.h"
-#include "tl_ucp_tag.h"
 #include "core/ucc_mc.h"
 #include "core/ucc_team.h"
 #include "barrier/barrier.h"
@@ -16,6 +15,9 @@
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
 #include "bcast/bcast.h"
+const char
+    *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
+        UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR};
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
@@ -44,7 +46,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
     ucp_request_free(request);
 }
 
-static ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     tl_info(task->team->super.super.context->lib, "finalizing ev_task %p",
@@ -192,17 +194,9 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
                                   ucc_base_team_t *team,
                                   ucc_coll_task_t **task_h)
 {
-    ucc_tl_ucp_team_t    *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_task_t    *task    = ucc_tl_ucp_get_task(tl_team);
+    ucc_tl_ucp_task_t    *task = ucc_tl_ucp_init_task(coll_args, team);
     ucc_status_t          status;
 
-    ucc_coll_task_init(&task->super);
-    memcpy(&task->args, &coll_args->args, sizeof(ucc_coll_args_t));
-    task->team                 = tl_team;
-    task->tag                  = tl_team->seq_num;
-    tl_team->seq_num           = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
-    task->super.finalize       = ucc_tl_ucp_coll_finalize;
-    task->super.triggered_post = ucc_tl_ucp_triggered_post;
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_BARRIER:
         status = ucc_tl_ucp_barrier_init(task);
@@ -234,5 +228,47 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
     }
     tl_info(team->context->lib, "init coll req %p", task);
     *task_h = &task->super;
+    return status;
+}
+
+static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
+{
+    switch (coll_type) {
+    case UCC_COLL_TYPE_ALLREDUCE:
+        return ucc_tl_ucp_allreduce_alg_from_str(str);
+    default:
+        break;
+    }
+    return -1;
+}
+
+ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
+                                       ucc_coll_type_t   coll_type,
+                                       ucc_memory_type_t mem_type, //NOLINT
+                                       ucc_base_coll_init_fn_t *init)
+{
+    ucc_status_t status = UCC_OK;
+    if (alg_id_str) {
+        alg_id = alg_id_from_str(coll_type, alg_id_str);
+    }
+
+    switch (coll_type) {
+    case UCC_COLL_TYPE_ALLREDUCE:
+        switch (alg_id) {
+        case UCC_TL_UCP_ALLREDUCE_ALG_KNOMIAL:
+            *init = ucc_tl_ucp_allreduce_knomial_init;
+            break;
+        case UCC_TL_UCP_ALLREDUCE_ALG_SRA_KNOMIAL:
+            *init = ucc_tl_ucp_allreduce_sra_knomial_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        };
+        break;
+    default:
+        status = UCC_ERR_NOT_SUPPORTED;
+        break;
+    }
     return status;
 }

@@ -16,6 +16,7 @@
 #include "utils/ucc_class.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
+#include "utils/ucc_coll_utils.h"
 #include "schedule/ucc_schedule.h"
 
 typedef struct ucc_base_lib {
@@ -121,8 +122,14 @@ static inline void ucc_base_config_release(ucc_base_config_t *config)
     ucc_free(config);
 }
 
+typedef struct ucc_base_coll_alg_info {
+    unsigned    id;
+    const char *name;
+    const char *desc;
+} ucc_base_coll_alg_info_t;
+
 #define UCC_IFACE_NAME_PREFIX(_F, _NAME, _cfg)                                 \
-    .name   = UCC_PP_MAKE_STRING(_F##_NAME) " " UCC_PP_MAKE_STRING(_cfg),      \
+    .name   = UCC_PP_MAKE_STRING(_F##_NAME),                                   \
     .prefix = UCC_PP_MAKE_STRING(_F##_NAME##_)
 
 #define UCC_IFACE_CFG(_F, _f, _cfg, _name, _NAME)                              \
@@ -135,10 +142,10 @@ static inline void ucc_base_config_release(ucc_base_config_t *config)
     ucc_##_f##_name##_iface_t ucc_##_f##_name = {                              \
         UCC_IFACE_CFG(_F, _f, lib, _name, _NAME),                              \
         UCC_IFACE_CFG(_F, _f, context, _name, _NAME),                          \
-        .super.super.score  = UCC_##_F##_NAME##_DEFAULT_SCORE,                 \
-        .super.super.name   = UCC_PP_MAKE_STRING(_name),                       \
-        .super.type         = UCC_##_F##_NAME,                                 \
-        .super.lib.init     = UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_lib_t),\
+        .super.super.score = UCC_##_F##_NAME##_DEFAULT_SCORE,                  \
+        .super.super.name  = UCC_PP_MAKE_STRING(_name),                        \
+        .super.type        = UCC_##_F##_NAME,                                  \
+        .super.lib.init    = UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_lib_t), \
         .super.lib.finalize =                                                  \
             UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_lib_t),               \
         .super.lib.get_attr = ucc_##_f##_name##_get_lib_attr,                  \
@@ -152,7 +159,8 @@ static inline void ucc_base_config_release(ucc_base_config_t *config)
         .super.team.create_test = ucc_##_f##_name##_team_create_test,          \
         .super.team.destroy     = ucc_##_f##_name##_team_destroy,              \
         .super.team.get_scores  = ucc_##_f##_name##_team_get_scores,           \
-        .super.coll.init        = ucc_##_f##_name##_coll_init};                \
+        .super.coll.init        = ucc_##_f##_name##_coll_init,                 \
+        .super.alg_info         = {NULL}};                                     \
     UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_##_f##_name.super._f##lib_config,     \
                                     &ucc_config_global_list);                  \
     UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_##_f##_name.super._f##context_config, \

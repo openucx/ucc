@@ -22,10 +22,11 @@ bcast =                   \
 	bcast/bcast.c         \
 	bcast/bcast_knomial.c
 
-allreduce =                       \
-	allreduce/allreduce.h         \
-	allreduce/allreduce.c         \
-	allreduce/allreduce_knomial.c
+allreduce =                           \
+	allreduce/allreduce.h             \
+	allreduce/allreduce.c             \
+	allreduce/allreduce_knomial.c     \
+	allreduce/allreduce_sra_knomial.c
 
 allgather =                       \
 	allgather/allgather.h         \
