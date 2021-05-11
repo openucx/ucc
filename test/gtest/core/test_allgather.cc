@@ -76,10 +76,10 @@ public:
         }
         ctxs.clear();
     }
-    void data_validate(UccCollCtxVec ctxs)
+    bool data_validate(UccCollCtxVec ctxs)
     {
+        bool                   ret = true;
         std::vector<uint8_t *> dsts(ctxs.size());
-
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
                 UCC_CHECK(ucc_mc_alloc((void**)&dsts[r], ctxs[r]->rbuf_size,
@@ -98,8 +98,11 @@ public:
             for (int r = 0; r < ctxs.size(); r++) {
                 size_t rank_size = ucc_dt_size((ctxs[r])->args->src.info.datatype) *
                         (ctxs[r])->args->src.info.count;
-                for (int i = 0; i < rank_size; i++) {
-                    EXPECT_EQ(r, rbuf[r*rank_size + i]);
+                for (int j = 0; j < rank_size; j++) {
+                    if (r != rbuf[r*rank_size + j]) {
+                        ret = false;
+                        break;
+                    }
                 }
             }
         }
@@ -108,6 +111,7 @@ public:
                 UCC_CHECK(ucc_mc_free((void*)dsts[r], UCC_MEMORY_TYPE_HOST));
             }
         }
+        return ret;
     }
 };
 
@@ -132,7 +136,7 @@ UCC_TEST_P(test_allgather_0, single_host)
     UccReq    req(team, ctxs);
     req.start();
     req.wait();
-    data_validate(ctxs);
+    EXPECT_EQ(true, data_validate(ctxs));
     data_fini(ctxs);
 }
 
@@ -178,7 +182,7 @@ UCC_TEST_P(test_allgather_1, multiple_host)
     UccReq::waitall(reqs);
 
     for (auto ctx : ctxs) {
-        data_validate(ctx);
+        EXPECT_EQ(true, data_validate(ctx));
         data_fini(ctx);
     }
 }
