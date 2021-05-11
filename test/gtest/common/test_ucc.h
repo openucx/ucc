@@ -61,7 +61,7 @@ public:
     virtual void data_init(int nprocs, ucc_datatype_t dtype,
                            size_t count, UccCollCtxVec &args) = 0;
     virtual void data_fini(UccCollCtxVec args) = 0;
-    virtual void data_validate(UccCollCtxVec args) = 0;
+    virtual bool data_validate(UccCollCtxVec args) = 0;
     void set_mem_type(ucc_memory_type_t _mt);
     void set_inplace(gtest_ucc_inplace_t _inplace);
 };

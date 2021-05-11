@@ -81,7 +81,7 @@ class test_allreduce : public UccCollArgs, public testing::Test {
         }
         ctxs.clear();
     }
-    void data_validate(UccCollCtxVec ctxs)
+    bool data_validate(UccCollCtxVec ctxs)
     {
         size_t count = (ctxs[0])->args->src.info.count;
         std::vector<typename T::type *> dsts(ctxs.size());
@@ -115,7 +115,7 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 UCC_CHECK(ucc_mc_free((void*)dsts[r], UCC_MEMORY_TYPE_HOST));
             }
         }
-        return;
+        return true;
     }
 };
 
@@ -135,7 +135,7 @@ TYPED_TEST_CASE(test_allreduce, ReductionTypesOps);
             UccReq    req(team, ctxs);                                         \
             req.start();                                                       \
             req.wait();                                                        \
-            this->data_validate(ctxs);                                         \
+            EXPECT_EQ(true, this->data_validate(ctxs));                           \
             this->data_fini(ctxs);                                             \
         }                                                                      \
     }                                                                          \
@@ -179,7 +179,7 @@ TYPED_TEST(test_allreduce, single_cuda_inplace) {
         UccReq::startall(reqs);                                                \
         UccReq::waitall(reqs);                                                 \
         for (auto ctx : ctxs) {                                                \
-            this->data_validate(ctx);                                          \
+            EXPECT_EQ(true, this->data_validate(ctx));                            \
             this->data_fini(ctx);                                              \
         }                                                                      \
     }                                                                          \
