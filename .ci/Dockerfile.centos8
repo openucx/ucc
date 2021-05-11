@@ -77,8 +77,6 @@ RUN ${TORCH_UCC_SRC_DIR}/ucc/.ci/scripts/install_torch.sh
 WORKDIR ${TORCH_UCC_WORKLOADS_DIR}
 RUN git clone https://github.com/facebookresearch/dlrm.git && \
     cd ${TORCH_UCC_WORKLOADS_DIR}/dlrm && \
-    git apply ${TORCH_UCC_SRC_DIR}/ucc/.ci/patches/dlrm/0001-Added-torch_ucc-support.patch && \
-    git apply ${TORCH_UCC_SRC_DIR}/ucc/.ci/patches/dlrm/0002-Fixed-arg-list.patch && \
     pip3 install -r ${TORCH_UCC_WORKLOADS_DIR}/dlrm/requirements.txt && \
     pip3 install tensorboard
 RUN git clone https://github.com/facebookresearch/param.git && \

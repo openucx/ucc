@@ -40,12 +40,25 @@
           default: "1.0.0"
           description: "UCC version"
     triggers:
+#      - github-pull-request:
+#          cron: 'H/5 * * * *'
+#          trigger-phrase: '.*\bbot:retest\b.*'
+#          status-add-test-results: true
+#          auth-id: '549927eb-7f38-4a8f-997a-81dd63605782'
+#          org-list: ["Mellanox","openucx"]
+#          white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mellanox-github"]
+#          allow-whitelist-orgs-as-admins: true
       - github-pull-request:
           cron: 'H/5 * * * *'
           trigger-phrase: '.*\bbot:retest\b.*'
+          status-context: "ucc"
+          success-status: "Test PASSed."
+          failure-status: "Test FAILed."
+          error-status:   "Test FAILed."
           status-add-test-results: true
-          auth-id: '549927eb-7f38-4a8f-997a-81dd63605782'
-          org-list: ["Mellanox"]
+          # swx-jenkins2 from GitHub Pull Request Builder
+          auth-id: 'cb48aefb-4f90-4d52-a9bc-63d92382e0be'
+          org-list: ["Mellanox","openucx"]
           white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mellanox-github"]
           allow-whitelist-orgs-as-admins: true
     pipeline-scm:
