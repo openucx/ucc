@@ -6,6 +6,6 @@ cd "${UCC_SRC_DIR}/build"
 
 export UCX_WARN_UNUSED_ENV_VARS=n
 # Disable NCCL
-export UCC_TL_NCCL_SCORE=0
+export UCC_TL_NCCL_TUNE=0
 
 make gtest
