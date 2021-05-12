@@ -11,6 +11,7 @@
 
 #include "components/base/ucc_base_iface.h"
 #include "ucc_cl_type.h"
+#include "utils/ucc_parser.h"
 
 /** CL (collective layer) is an internal collective interface reflecting the
     public UCC API and extensions to support modularity, the composition of
@@ -35,8 +36,9 @@ typedef struct ucc_cl_context ucc_cl_context_t;
 typedef struct ucc_cl_team    ucc_cl_team_t;
 
 typedef struct ucc_cl_lib_config {
-    ucc_base_config_t  super;
-    ucc_cl_iface_t    *iface;
+    ucc_base_config_t        super;
+    ucc_cl_iface_t          *iface;
+    ucc_config_names_array_t tls;
 } ucc_cl_lib_config_t;
 extern ucc_config_field_t ucc_cl_lib_config_table[];
 
@@ -68,8 +70,9 @@ typedef struct ucc_cl_iface {
 } ucc_cl_iface_t;
 
 typedef struct ucc_cl_lib {
-    ucc_base_lib_t              super;
-    ucc_cl_iface_t             *iface;
+    ucc_base_lib_t           super;
+    ucc_cl_iface_t          *iface;
+    ucc_config_names_array_t tls;
 } ucc_cl_lib_t;
 UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_cl_lib_config_t *);
 
@@ -84,12 +87,16 @@ typedef struct ucc_cl_team {
 UCC_CLASS_DECLARE(ucc_cl_team_t, ucc_cl_context_t *);
 
 typedef struct ucc_cl_lib_attr {
-    ucc_base_attr_t super;
-    uint64_t tls;
+    ucc_base_attr_t           super;
+    ucc_config_names_array_t *tls;
 } ucc_cl_lib_attr_t;
 
-#define UCC_CL_IFACE_DECLARE(_name, _NAME)                                     \
-    UCC_BASE_IFACE_DECLARE(CL_, cl_, _name, _NAME)
+#define UCC_CL_IFACE_DECLARE(_name, _NAME)                              \
+    UCC_BASE_IFACE_DECLARE(CL_, cl_, _name, _NAME)                      \
+        __attribute__((constructor)) static void ucc_cl_ ## _name ##    \
+        _iface_construct(void) {                                        \
+        ucc_cl_ ## _name .super.type = UCC_CL_ ## _NAME;                \
+    }                                                                   \
 
 #define UCC_CL_CTX_IFACE(_cl_ctx)                                              \
     (ucc_derived_of((_cl_ctx)->super.lib, ucc_cl_lib_t))->iface

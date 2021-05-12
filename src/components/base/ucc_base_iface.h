@@ -144,7 +144,6 @@ typedef struct ucc_base_coll_alg_info {
         UCC_IFACE_CFG(_F, _f, context, _name, _NAME),                          \
         .super.super.score = UCC_##_F##_NAME##_DEFAULT_SCORE,                  \
         .super.super.name  = UCC_PP_MAKE_STRING(_name),                        \
-        .super.type        = UCC_##_F##_NAME,                                  \
         .super.lib.init    = UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_lib_t), \
         .super.lib.finalize =                                                  \
             UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_lib_t),               \
