@@ -5,9 +5,6 @@ registry_host: 'harbor.mellanox.com'
 registry_path: '/torch-ucc'
 registry_auth: '05d98651-e11c-4a57-9cc6-52df79014b89'
 
-#kubernetes:
-#  cloud: 'swx-k8s'
-
 volumes:
   - { mountPath: '/hpc/local', hostPath: '/hpc/local' }
   - { mountPath: '/auto/sw_tools', hostPath: '/auto/sw_tools' }
