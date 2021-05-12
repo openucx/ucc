@@ -63,9 +63,10 @@ public:
         }
         ctxs.clear();
     }
-    void data_validate(UccCollCtxVec ctxs)
+    bool data_validate(UccCollCtxVec ctxs)
     {
-        int root = ctxs[0]->args->root;
+        bool     ret  = true;
+        int      root = ctxs[0]->args->root;
         uint8_t *dsts;
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
@@ -83,13 +84,16 @@ public:
                 continue;
             }
             for (int i = 0; i < ctxs[r]->rbuf_size; i++) {
-                EXPECT_EQ((uint8_t)i, dsts[i]);
+                if ((uint8_t)i != dsts[i]) {
+                    ret = false;
+                    break;
+                }
             }
         }
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             UCC_CHECK(ucc_mc_free((void*)dsts, UCC_MEMORY_TYPE_HOST));
         }
-        return;
+        return ret;
     }
     void set_root(int _root)
     {
@@ -118,7 +122,7 @@ UCC_TEST_P(test_bcast_0, single_host)
     UccReq    req(team, ctxs);
     req.start();
     req.wait();
-    data_validate(ctxs);
+    EXPECT_EQ(true, data_validate(ctxs));
     data_fini(ctxs);
 }
 
@@ -163,7 +167,7 @@ UCC_TEST_P(test_bcast_1, multiple)
     UccReq::waitall(reqs);
 
     for (auto ctx : ctxs) {
-        data_validate(ctx);
+        EXPECT_EQ(true, data_validate(ctx));
         data_fini(ctx);
     }
 }
