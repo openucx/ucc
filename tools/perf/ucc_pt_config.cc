@@ -25,8 +25,10 @@ const std::map<std::string, ucc_reduction_op_t> ucc_pt_op_map = {
 
 const std::map<std::string, ucc_coll_type_t> ucc_pt_coll_map = {
     {"allgather", UCC_COLL_TYPE_ALLGATHER},
+    {"allgatherv", UCC_COLL_TYPE_ALLGATHERV},
     {"allreduce", UCC_COLL_TYPE_ALLREDUCE},
     {"alltoall", UCC_COLL_TYPE_ALLTOALL},
+    {"alltoallv", UCC_COLL_TYPE_ALLTOALLV},
     {"barrier", UCC_COLL_TYPE_BARRIER},
     {"bcast", UCC_COLL_TYPE_BCAST},
 };
@@ -77,6 +79,7 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                     return UCC_ERR_INVALID_PARAM;
                 }
                 bench.mt = ucc_pt_memtype_map.at(optarg);
+                comm.mt  = bench.mt;
                 break;
             case 'd':
                 if (ucc_pt_datatype_map.count(optarg) == 0) {

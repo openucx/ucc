@@ -14,12 +14,20 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
         coll = new ucc_pt_coll_allgather(comm->get_size(), cfg.dt, cfg.mt,
                                          cfg.inplace);
         break;
+    case UCC_COLL_TYPE_ALLGATHERV:
+        coll = new ucc_pt_coll_allgatherv(comm->get_size(), cfg.dt, cfg.mt,
+                                          cfg.inplace);
+        break;
     case UCC_COLL_TYPE_ALLREDUCE:
         coll = new ucc_pt_coll_allreduce(cfg.dt, cfg.mt, cfg.op, cfg.inplace);
         break;
     case UCC_COLL_TYPE_ALLTOALL:
         coll = new ucc_pt_coll_alltoall(comm->get_size(), cfg.dt, cfg.mt,
                                         cfg.inplace);
+        break;
+    case UCC_COLL_TYPE_ALLTOALLV:
+        coll = new ucc_pt_coll_alltoallv(comm->get_size(), cfg.dt, cfg.mt,
+                                         cfg.inplace);
         break;
     case UCC_COLL_TYPE_BARRIER:
         coll = new ucc_pt_coll_barrier();

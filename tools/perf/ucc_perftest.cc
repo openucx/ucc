@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
 
     pt_config.process_args(argc, argv);
     try {
-        comm = new ucc_pt_comm();
+        comm = new ucc_pt_comm(pt_config.comm);
     } catch(std::exception &e) {
         std::cerr << e.what() << std::endl;
         std::exit(1);

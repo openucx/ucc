@@ -8,16 +8,19 @@
 #define UCC_PT_COMM_H
 
 #include <ucc/api/ucc.h>
+#include "ucc_pt_config.h"
 #include "ucc_pt_bootstrap.h"
 #include "ucc_pt_bootstrap_mpi.h"
 
 class ucc_pt_comm {
+    ucc_pt_comm_config cfg;
     ucc_lib_h lib;
     ucc_context_h context;
     ucc_team_h team;
     ucc_pt_bootstrap *bootstrap;
+    void set_gpu_device();
 public:
-    ucc_pt_comm();
+    ucc_pt_comm(ucc_pt_comm_config config);
     int get_rank();
     int get_size();
     ucc_team_h get_team();
