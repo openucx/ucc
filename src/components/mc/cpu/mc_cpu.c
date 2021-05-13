@@ -179,6 +179,7 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.super.name       = "cpu mc",
     .super.ref_cnt          = 0,
     .super.type             = UCC_MEMORY_TYPE_HOST,
+    .super.ee_type          = UCC_EE_CPU_THREAD,
     .super.init             = ucc_mc_cpu_init,
     .super.finalize         = ucc_mc_cpu_finalize,
     .super.ops.mem_query    = ucc_mc_cpu_mem_query,

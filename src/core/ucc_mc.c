@@ -16,7 +16,16 @@ static const ucc_ee_ops_t *ee_ops[UCC_EE_LAST];
     do {                                                                       \
         if (NULL == mc_ops[mc]) {                                              \
             ucc_error("no components supported memory type %s available",      \
-                    ucc_memory_type_names[mc]);                                \
+                      ucc_memory_type_names[mc]);                              \
+            return UCC_ERR_NOT_SUPPORTED;                                      \
+        }                                                                      \
+    } while (0)
+
+#define UCC_CHECK_EE_AVAILABLE(ee)                                             \
+    do {                                                                       \
+        if (NULL == ee_ops[ee]) {                                              \
+            ucc_error("no components supported ee %s available",               \
+                      ucc_ee_type_names[ee]);                                  \
             return UCC_ERR_NOT_SUPPORTED;                                      \
         }                                                                      \
     } while (0)
@@ -28,6 +37,7 @@ ucc_status_t ucc_mc_init()
     ucc_status_t   status;
 
     memset(mc_ops, 0, UCC_MEMORY_TYPE_LAST * sizeof(ucc_mc_ops_t *));
+    memset(ee_ops, 0, UCC_EE_LAST * sizeof(ucc_ee_ops_t *));
     n_mcs = ucc_global_config.mc_framework.n_components;
     for (i = 0; i < n_mcs; i++) {
         mc = ucc_derived_of(ucc_global_config.mc_framework.components[i],
@@ -202,35 +212,42 @@ ucc_status_t ucc_mc_finalize()
 
 ucc_status_t ucc_mc_ee_task_post(void *ee_context, ucc_ee_type_t ee_type, void **ee_task)
 {
+    UCC_CHECK_EE_AVAILABLE(ee_type);
     return ee_ops[ee_type]->ee_task_post(ee_context, ee_task);
 }
 
 ucc_status_t ucc_mc_ee_task_query(void *ee_task, ucc_ee_type_t ee_type)
 {
+    UCC_CHECK_EE_AVAILABLE(ee_type);
     return ee_ops[ee_type]->ee_task_query(ee_task);
 }
 
 ucc_status_t ucc_mc_ee_task_end(void *ee_task, ucc_ee_type_t ee_type)
 {
+    UCC_CHECK_EE_AVAILABLE(ee_type);
     return ee_ops[ee_type]->ee_task_end(ee_task);
 }
 
 ucc_status_t ucc_mc_ee_create_event(void **event, ucc_ee_type_t ee_type)
 {
+    UCC_CHECK_EE_AVAILABLE(ee_type);
     return ee_ops[ee_type]->ee_create_event(event);
 }
 
 ucc_status_t ucc_mc_ee_destroy_event(void *event, ucc_ee_type_t ee_type)
 {
+    UCC_CHECK_EE_AVAILABLE(ee_type);
     return ee_ops[ee_type]->ee_destroy_event(event);
 }
 
 ucc_status_t ucc_mc_ee_event_post(void *ee_context, void *event, ucc_ee_type_t ee_type)
 {
+    UCC_CHECK_EE_AVAILABLE(ee_type);
     return ee_ops[ee_type]->ee_event_post(ee_context, event);
 }
 
 ucc_status_t ucc_mc_ee_event_test(void *event, ucc_ee_type_t ee_type)
 {
+    UCC_CHECK_EE_AVAILABLE(ee_type);
     return ee_ops[ee_type]->ee_event_test(event);
 }

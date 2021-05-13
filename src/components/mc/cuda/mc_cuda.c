@@ -483,6 +483,7 @@ ucc_status_t ucc_ee_cuda_event_test(void *event)
 ucc_mc_cuda_t ucc_mc_cuda = {
     .super.super.name       = "cuda mc",
     .super.ref_cnt          = 0,
+    .super.ee_type          = UCC_EE_CUDA_STREAM,
     .super.type             = UCC_MEMORY_TYPE_CUDA,
     .super.init             = ucc_mc_cuda_init,
     .super.finalize         = ucc_mc_cuda_finalize,
