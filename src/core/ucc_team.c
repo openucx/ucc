@@ -305,6 +305,8 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
         team->cl_teams[i] = NULL;
     }
     ucc_team_relase_id(team);
+    ucc_free(team->cl_teams);
+    ucc_free(team->contexts);
     ucc_free(team);
     return UCC_OK;
 }
@@ -427,4 +429,3 @@ static void ucc_team_relase_id(ucc_team_t *team)
         set_id_bit(ctx->ids.pool, team->id);
     }
 }
-
