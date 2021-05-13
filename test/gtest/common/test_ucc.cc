@@ -14,13 +14,37 @@ UccProcess::UccProcess(const ucc_lib_params_t &lib_params,
 {
     ucc_lib_config_h     lib_config;
     ucc_context_config_h ctx_config;
-    EXPECT_EQ(UCC_OK, ucc_lib_config_read(NULL, NULL, &lib_config));
-    EXPECT_EQ(UCC_OK, ucc_init(&lib_params, lib_config, &lib_h));
+    ucc_status_t         status;
+    std::stringstream    err_msg;
+
+    status = ucc_lib_config_read(NULL, NULL, &lib_config);
+    if (status != UCC_OK) {
+        err_msg << "ucc_lib_config_read failed";
+        goto exit_err;
+    }
+    status = ucc_init(&lib_params, lib_config, &lib_h);
     ucc_lib_config_release(lib_config);
-    EXPECT_EQ(UCC_OK, ucc_context_config_read(lib_h, NULL, &ctx_config));
-    EXPECT_EQ(UCC_OK,
-              ucc_context_create(lib_h, &ctx_params, ctx_config, &ctx_h));
+    if (status != UCC_OK) {
+        err_msg << "ucc_init failed";
+        goto exit_err;
+    }
+    status = ucc_context_config_read(lib_h, NULL, &ctx_config);
+    if (status != UCC_OK) {
+        err_msg << "ucc_context_config_read failed";
+        goto free_lib;
+    }
+    status = ucc_context_create(lib_h, &ctx_params, ctx_config, &ctx_h);
     ucc_context_config_release(ctx_config);
+    if (status != UCC_OK) {
+        err_msg << "ucc_context_create failed";
+        goto free_lib;
+    }
+    return;
+free_lib:
+    ucc_finalize(lib_h);
+exit_err:
+    err_msg << ": "<< ucc_status_string(status) << " (" << status << ")";
+    throw std::runtime_error(err_msg.str());
 }
 
 UccProcess::~UccProcess()
