@@ -14,37 +14,15 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 
-enum {
-    PHASE_INIT,
-    PHASE_LOOP,  /* main loop of recursive k-ing */
-    PHASE_EXTRA /* recv from extra rank */
-};
-
-#define CHECK_PHASE(_p)                         \
-    case _p:                                    \
-    goto _p;                                    \
-    break;
-
-#define GOTO_PHASE(_phase)                                                     \
-    do {                                                                       \
-        switch (_phase) {                                                      \
-            CHECK_PHASE(PHASE_EXTRA);                                          \
-            CHECK_PHASE(PHASE_LOOP);                                           \
-        case PHASE_INIT:                                                       \
-            break;                                                             \
-        };                                                                     \
-    } while (0)
-
-
 #define SAVE_STATE(_phase)                      \
     do {                                        \
-        task->reduce_scatter_kn.phase = _phase;      \
+        task->reduce_scatter_kn.phase = _phase; \
     } while (0)
 
 
 ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t     *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_task_t     *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t     *team       = task->team;
     ucc_kn_radix_t         radix      = task->reduce_scatter_kn.p.radix;
     uint8_t                node_type  = task->reduce_scatter_kn.p.node_type;
@@ -68,7 +46,7 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_ta
 
     local_seg_count = 0;
     block_count     = ucc_sra_kn_compute_block_count(count, rank, p);
-    GOTO_PHASE(task->reduce_scatter_kn.phase);
+    UCC_KN_GOTO_PHASE(task->reduce_scatter_kn.phase);
 
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, rank);
@@ -84,10 +62,10 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_ta
             task, out);
     }
 
-PHASE_EXTRA:
+UCC_KN_PHASE_EXTRA:
     if ((KN_NODE_PROXY == node_type) || (KN_NODE_EXTRA == node_type)) {
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            SAVE_STATE(PHASE_EXTRA);
+            SAVE_STATE(UCC_KN_PHASE_EXTRA);
             return task->super.super.status;
         }
         if (KN_NODE_EXTRA == node_type) {
@@ -138,9 +116,9 @@ PHASE_EXTRA:
                 task, out);
             rbuf = PTR_OFFSET(rbuf, local_seg_count*dt_size);
         }
-    PHASE_LOOP:
+    UCC_KN_PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            SAVE_STATE(PHASE_LOOP);
+            SAVE_STATE(UCC_KN_PHASE_LOOP);
             return task->super.super.status;
         }
         if (task->send_posted > p->iteration * (radix - 1)) {
@@ -177,6 +155,7 @@ PHASE_EXTRA:
     if (UCC_OK != status) {
         return status;
     }
+UCC_KN_PHASE_PROXY: /* unused label */
 out:
     task->super.super.status = UCC_OK;
     return task->super.super.status;
@@ -237,7 +216,7 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(ucc_base_coll_args_t *coll
     task->super.progress = ucc_tl_ucp_reduce_scatter_knomial_progress;
     task->super.finalize = ucc_tl_ucp_reduce_scatter_knomial_finalize;
 
-    task->reduce_scatter_kn.phase   = PHASE_INIT;
+    task->reduce_scatter_kn.phase   = UCC_KN_PHASE_INIT;
     task->reduce_scatter_kn.scratch = task->args.dst.info.buffer;
     ucc_assert(task->args.src.info.mem_type ==
                task->args.dst.info.mem_type);

@@ -145,4 +145,29 @@ static inline void ucc_knomial_pattern_next_iteration_backward(ucc_knomial_patte
     p->radix_pow /= p->radix;
 }
 
+/* A set of convenience macros used to implement sw based progress
+   of the algorithms that use kn pattern */
+enum {
+    UCC_KN_PHASE_INIT,
+    UCC_KN_PHASE_LOOP,  /* main loop of recursive k-ing */
+    UCC_KN_PHASE_EXTRA, /* recv from extra rank */
+    UCC_KN_PHASE_PROXY  /* recv from extra rank */
+};
+
+#define UCC_KN_CHECK_PHASE(_p)                  \
+    case _p:                                    \
+    goto _p;                                    \
+    break;
+
+#define UCC_KN_GOTO_PHASE(_phase)                   \
+    do {                                            \
+        switch (_phase) {                           \
+            UCC_KN_CHECK_PHASE(UCC_KN_PHASE_EXTRA); \
+            UCC_KN_CHECK_PHASE(UCC_KN_PHASE_LOOP);  \
+            UCC_KN_CHECK_PHASE(UCC_KN_PHASE_PROXY); \
+        case UCC_KN_PHASE_INIT:                     \
+            break;                                  \
+        };                                          \
+    } while (0)
+
 #endif

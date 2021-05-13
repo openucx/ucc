@@ -14,39 +14,15 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 
-enum {
-    PHASE_INIT,
-    PHASE_LOOP,  /* main loop of recursive k-ing */
-    PHASE_EXTRA, /* recv from extra rank */
-    PHASE_PROXY  /* recv from extra rank */
-};
-
-#define CHECK_PHASE(_p)                         \
-    case _p:                                    \
-    goto _p;                                    \
-    break;
-
-#define GOTO_PHASE(_phase)                                                     \
-    do {                                                                       \
-        switch (_phase) {                                                      \
-            CHECK_PHASE(PHASE_EXTRA);                                          \
-            CHECK_PHASE(PHASE_LOOP);                                           \
-            CHECK_PHASE(PHASE_PROXY);                                          \
-        case PHASE_INIT:                                                       \
-            break;                                                             \
-        };                                                                     \
-    } while (0)
-
-
 #define SAVE_STATE(_phase)                      \
     do {                                        \
-        task->reduce_scatter_kn.phase = _phase;      \
+        task->allgather_kn.phase = _phase;      \
     } while (0)
 
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t     *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_task_t     *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t     *team       = task->team;
     ucc_kn_radix_t         radix      = task->allgather_kn.p.radix;
     uint8_t                node_type  = task->allgather_kn.p.node_type;
@@ -65,17 +41,17 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_kn_radix_t         loop_step;
     size_t                 block_count, peer_seg_count, local_seg_count;
 
-    GOTO_PHASE(task->allgather_kn.phase);
+    UCC_KN_GOTO_PHASE(task->allgather_kn.phase);
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, rank);
         UCPCHECK_GOTO(
             ucc_tl_ucp_recv_nb(rbuf, data_size, mem_type, peer, team, task),
             task, out);
     }
-PHASE_EXTRA:
+UCC_KN_PHASE_EXTRA:
     if (KN_NODE_EXTRA == node_type) {
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            SAVE_STATE(PHASE_EXTRA);
+            SAVE_STATE(UCC_KN_PHASE_EXTRA);
             return task->super.super.status;
         }
         goto out;
@@ -113,9 +89,9 @@ PHASE_EXTRA:
                                    peer_seg_count * dt_size, mem_type, peer, team, task),
                 task, out);
         }
-    PHASE_LOOP:
+    UCC_KN_PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            SAVE_STATE(PHASE_LOOP);
+            SAVE_STATE(UCC_KN_PHASE_LOOP);
             return task->super.super.status;
         }
         ucc_knomial_pattern_next_iteration_backward(p);
@@ -129,9 +105,9 @@ PHASE_EXTRA:
     } else {
         goto out;
     }
-PHASE_PROXY:
+UCC_KN_PHASE_PROXY:
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-        SAVE_STATE(PHASE_PROXY);
+        SAVE_STATE(UCC_KN_PHASE_PROXY);
         return task->super.super.status;
     }
 
@@ -148,7 +124,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         rank = team->rank;
     ucc_status_t       status;
     ptrdiff_t          offset;
-    task->allgather_kn.phase          = PHASE_INIT;
+    task->allgather_kn.phase          = UCC_KN_PHASE_INIT;
     ucc_assert(task->args.src.info.mem_type ==
                task->args.dst.info.mem_type);
 
