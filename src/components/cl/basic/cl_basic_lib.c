@@ -28,6 +28,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_lib_t)
 
 UCC_CLASS_DEFINE(ucc_cl_basic_lib_t, ucc_cl_lib_t);
 
+
 static inline ucc_status_t check_tl_lib_attr(const ucc_base_lib_t *lib,
                                              ucc_tl_iface_t *      tl_iface,
                                              ucc_cl_lib_attr_t *   attr)
@@ -49,7 +50,7 @@ static inline ucc_status_t check_tl_lib_attr(const ucc_base_lib_t *lib,
 }
 
 ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
-                                       ucc_base_attr_t *     base_attr)
+                                       ucc_base_lib_attr_t  *base_attr)
 {
     ucc_cl_lib_attr_t *attr   = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
     ucc_cl_lib_t *     cl_lib = ucc_derived_of(lib, ucc_cl_lib_t);

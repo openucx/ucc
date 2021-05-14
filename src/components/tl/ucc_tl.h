@@ -117,7 +117,7 @@ ucc_status_t ucc_tl_team_destroy_multiple(ucc_team_multiple_req_t *req);
 void ucc_team_multiple_req_free(ucc_team_multiple_req_t *req);
 
 typedef struct ucc_tl_lib_attr {
-    ucc_base_attr_t super;
+    ucc_base_lib_attr_t super;
 } ucc_tl_lib_attr_t;
 
 #define UCC_TL_CTX_IFACE(_tl_ctx)                                              \

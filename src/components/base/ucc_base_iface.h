@@ -30,9 +30,9 @@ typedef struct ucc_base_config {
     char                           *score_str;
 } ucc_base_config_t;
 
-typedef struct ucc_base_attr_t {
+typedef struct ucc_base_lib_attr_t {
     ucc_lib_attr_t attr;
-} ucc_base_attr_t;
+} ucc_base_lib_attr_t;
 
 typedef struct ucc_base_lib_params {
     ucc_lib_params_t params;
@@ -43,7 +43,8 @@ typedef struct ucc_base_lib_iface {
     ucc_status_t (*init)(const ucc_base_lib_params_t *params,
                          const ucc_base_config_t *config, ucc_base_lib_t **lib);
     void         (*finalize)(ucc_base_lib_t *lib);
-    ucc_status_t (*get_attr)(const ucc_base_lib_t *lib, ucc_base_attr_t *attr);
+    ucc_status_t (*get_attr)(const ucc_base_lib_t *lib,
+                             ucc_base_lib_attr_t *attr);
 } ucc_base_lib_iface_t;
 
 typedef struct ucc_base_context_params {
@@ -60,13 +61,17 @@ typedef struct ucc_base_context {
     ucc_base_lib_t *lib;
 } ucc_base_context_t;
 
+typedef struct ucc_base_ctx_attr_t {
+    ucc_context_attr_t attr;
+} ucc_base_ctx_attr_t;
+
 typedef struct ucc_base_context_iface {
     ucc_status_t (*create)(const ucc_base_context_params_t *params,
                            const ucc_base_config_t *config,
                            ucc_base_context_t **ctx);
     void         (*destroy)(ucc_base_context_t *ctx);
     ucc_status_t (*get_attr)(const ucc_base_context_t *context,
-                             ucc_base_attr_t *attr);
+                             ucc_base_ctx_attr_t *attr);
 } ucc_base_context_iface_t;
 
 typedef struct ucc_base_team_params {

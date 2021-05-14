@@ -36,7 +36,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_lib_t)
 UCC_CLASS_DEFINE(ucc_tl_ucp_lib_t, ucc_tl_lib_t);
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
-                                     ucc_base_attr_t *base_attr)
+                                     ucc_base_lib_attr_t *base_attr)
 {
     ucc_tl_lib_attr_t *attr = ucc_derived_of(base_attr, ucc_tl_lib_attr_t);
     ucs_status_t   status;
