@@ -6,6 +6,7 @@
 #include "ucc_malloc.h"
 #include "ucc_component.h"
 #include "ucc_log.h"
+#include "ucc_math.h"
 #include "core/ucc_global_opts.h"
 
 #include <sys/types.h>
@@ -62,6 +63,7 @@ static ucc_status_t ucc_component_load_one(const char *so_path,
         goto iface_error;
     }
     iface->dl_handle = handle;
+    iface->id        = ucc_str_hash_djb2(iface->name);
     (*c_iface)       = iface;
     return UCC_OK;
 
@@ -70,6 +72,36 @@ iface_error:
 error:
     *c_iface = NULL;
     return UCC_ERR_NO_MESSAGE;
+}
+
+#define CHECK_COMPONENT_UNIQ(_framework, _field) do {                       \
+        ucc_component_iface_t **c = _framework->components;                 \
+        int i, j;                                                           \
+        for (i = 0; i < framework->n_components; i++) {                     \
+            for (j = i+1; j < framework->n_components; j++) {               \
+                if (c[i]-> _field == c[j]-> _field) {                       \
+                    ucc_error("components %s and %s have the same default " \
+                              UCC_PP_MAKE_STRING(_field) " %lu",            \
+                              c[i]->name, c[j]->name,                       \
+                              (unsigned long) c[i]-> _field);               \
+                    return UCC_ERR_INVALID_PARAM;                           \
+                }                                                           \
+            }                                                               \
+        }                                                                   \
+    } while(0)
+
+ucc_status_t
+ucc_component_check_scores_uniq(ucc_component_framework_t *framework)
+{
+    CHECK_COMPONENT_UNIQ(framework, score);
+    return UCC_OK;
+}
+
+static ucc_status_t
+ucc_component_check_ids_uniq(ucc_component_framework_t *framework)
+{
+    CHECK_COMPONENT_UNIQ(framework, id);
+    return UCC_OK;
 }
 
 ucc_status_t ucc_components_load(const char *framework_name,
@@ -124,22 +156,32 @@ ucc_status_t ucc_components_load(const char *framework_name,
         n_loaded++;
     }
 
+    assert(n_loaded <= globbuf.gl_pathc);
     if (globbuf.gl_pathc > 0) {
         globfree(&globbuf);
     }
-    if (n_loaded) {
-        assert(n_loaded <= globbuf.gl_pathc);
-        ifaces = ucc_realloc(ifaces, n_loaded * sizeof(ucc_component_iface_t *),
-                             "ifaces");
-        framework->components   = ifaces;
-        framework->n_components = n_loaded;
-        return UCC_OK;
-    } else {
+    if (!n_loaded) {
         if (ifaces) {
             ucc_free(ifaces);
         }
         return UCC_ERR_NOT_FOUND;
     }
+
+
+    ifaces = ucc_realloc(ifaces, n_loaded * sizeof(ucc_component_iface_t *),
+                         "ifaces");
+    framework->components   = ifaces;
+    framework->n_components = n_loaded;
+    if (UCC_OK != ucc_component_check_ids_uniq(framework)) {
+        /* This can only happen when the new component is added
+           (potentially as a plugin - black box) and its name hash
+           will produce collision with some other component.
+           This has nearly 0 probability and must be resolved by
+           the component developer via just a rename of a component. */
+        ucc_error("all components of a framwork must have uniq name hash");
+        return UCC_ERR_INVALID_PARAM;
+    }
+    return UCC_OK;
 }
 
 ucc_component_iface_t* ucc_get_component(ucc_component_framework_t *framework,
