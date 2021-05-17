@@ -79,14 +79,14 @@ ucc_status_t ucc_tl_lib_config_read(ucc_tl_iface_t *iface,
                                 (ucc_base_config_t **)tl_config);
 }
 
-ucc_status_t ucc_tl_context_get(ucc_context_t *ctx, ucc_tl_type_t type,
+ucc_status_t ucc_tl_context_get(ucc_context_t *ctx, const char* name,
                                 ucc_tl_context_t **tl_context)
 {
     int i;
     ucc_tl_lib_t *tl_lib;
     for (i = 0; i < ctx->n_tl_ctx; i++) {
         tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
-        if (tl_lib->iface->type == type) {
+        if (0 == strcmp(tl_lib->iface->super.name, name)) {
             ctx->tl_ctx[i]->ref_count++;
             *tl_context = ctx->tl_ctx[i];
             return UCC_OK;

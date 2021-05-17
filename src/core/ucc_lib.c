@@ -71,8 +71,8 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
     ucc_thread_mode_t     lowest_tm            = UCC_THREAD_MULTIPLE;
     ucc_lib_params_t      params               = *user_params;
     ucc_cl_lib_config_t  *cl_config            = NULL;
-    ucc_cl_lib_attr_t     attrs[UCC_CL_LAST];
     ucc_cl_iface_t       *cl_iface;
+    ucc_cl_lib_attr_t    *attrs;
     ucc_base_lib_t *      b_lib;
     ucc_base_lib_params_t b_params;
     ucc_cl_lib_t         *cl_lib;
@@ -87,6 +87,17 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
+
+    lib->cl_attrs = (ucc_cl_lib_attr_t *)
+        ucc_malloc(sizeof(ucc_cl_lib_attr_t) * n_cls, "cl_attrs");
+    if (!lib->cl_attrs) {
+        ucc_error("failed to allocate %zd bytes for cl_attrs",
+                  sizeof(ucc_cl_lib_attr_t) * n_cls);
+        status = UCC_ERR_NO_MEMORY;
+        goto error;
+    }
+    attrs = lib->cl_attrs;
+
     if (!(params.mask & UCC_LIB_PARAM_FIELD_THREAD_MODE)) {
         params.mask |= UCC_LIB_PARAM_FIELD_THREAD_MODE;
         params.thread_mode = UCC_THREAD_SINGLE;
@@ -125,20 +136,22 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
         }
         ucc_base_config_release(&cl_config->super);
         cl_lib                          = ucc_derived_of(b_lib, ucc_cl_lib_t);
-        lib->cl_libs[lib->n_cl_libs_opened++] = cl_lib;
-        status = cl_iface->lib.get_attr(&cl_lib->super, &attrs[i].super);
+        lib->cl_libs[lib->n_cl_libs_opened] = cl_lib;
+        status = cl_iface->lib.get_attr(&cl_lib->super,
+                                        &attrs[lib->n_cl_libs_opened].super);
         if (UCC_OK != status) {
             ucc_error("failed to query cl lib %s attr", cl_lib->iface->super.name);
             return status;
         }
         ucc_info("lib_prefix \"%s\": initialized component \"%s\" score %d",
                  config->full_prefix, cl_iface->super.name, cl_iface->super.score);
-        if (attrs[i].super.attr.thread_mode > highest_tm) {
-            highest_tm = attrs[i].super.attr.thread_mode;
+        if (attrs[lib->n_cl_libs_opened].super.attr.thread_mode > highest_tm) {
+            highest_tm = attrs[lib->n_cl_libs_opened].super.attr.thread_mode;
         }
         if (attrs[i].super.attr.thread_mode < lowest_tm) {
-            lowest_tm = attrs[i].super.attr.thread_mode;
+            lowest_tm = attrs[lib->n_cl_libs_opened].super.attr.thread_mode;
         }
+        lib->n_cl_libs_opened++;
     }
 
     if (lib->n_cl_libs_opened == 0) {
@@ -196,9 +209,22 @@ error_cfg_read:
         lib->cl_libs[i]->iface->lib.finalize(&lib->cl_libs[i]->super);
     }
 error:
-    if (lib->cl_libs)
-        ucc_free(lib->cl_libs);
+    ucc_free(lib->cl_attrs);
+    ucc_free(lib->cl_libs);
     return status;
+}
+
+static int ucc_tl_is_required(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface)
+{
+    int i;
+    for (i = 0; i < lib->n_cl_libs_opened; i++) {
+        ucc_config_names_array_t *tls = lib->cl_attrs[i].tls;
+        if ((tls->count == 1 && !strcmp(tls->names[0], "all")) ||
+            ucc_config_names_search(*tls, tl_iface->super.name) >= 0) {
+            return 1;
+        }
+    }
+    return 0;
 }
 
 static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
@@ -206,26 +232,13 @@ static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
 {
     ucc_status_t          status;
     int                   i, n_tls;
-    uint64_t              required_tls;
-    ucc_cl_lib_attr_t     cl_lib_attr;
-    ucc_cl_lib_t         *cl_lib;
     ucc_tl_lib_t         *tl_lib;
     ucc_tl_lib_config_t  *tl_config;
     ucc_base_lib_t *      b_lib;
     ucc_base_lib_params_t b_params;
-    ucc_tl_iface_t *tl_iface;
+    ucc_tl_iface_t       *tl_iface;
 
     ucc_copy_lib_params(&b_params.params, user_params);
-    required_tls = 0;
-    for (i = 0; i < lib->n_cl_libs_opened; i++) {
-        cl_lib = lib->cl_libs[i];
-        status = cl_lib->iface->lib.get_attr(&cl_lib->super, &cl_lib_attr.super);
-        if (UCC_OK != status) {
-            ucc_error("failed to query cl lib %s attr", cl_lib->iface->super.name);
-            return status;
-        }
-        required_tls |= cl_lib_attr.tls;
-    }
     n_tls = ucc_global_config.tl_framework.n_components;
     lib->tl_libs =
         (ucc_tl_lib_t **)ucc_malloc(sizeof(ucc_tl_lib_t *) * n_tls, "tl_libs");
@@ -243,7 +256,7 @@ static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
            Failure to init a TL is not critical. Let CLs deal with it later during
            cl_context_create.
          */
-        if (tl_iface->type & required_tls) {
+        if (ucc_tl_is_required(lib, tl_iface)) {
             status = ucc_tl_lib_config_read(tl_iface, lib->full_prefix,
                                             &tl_config);
             if (UCC_OK != status) {
@@ -428,7 +441,7 @@ ucc_status_t ucc_lib_get_attr(ucc_lib_h lib_p, ucc_lib_attr_t *lib_attr)
 
 ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
 {
-    int i;
+    int          i;
     ucc_status_t status;
 
     ucc_assert(lib->n_cl_libs_opened > 0);
@@ -443,6 +456,7 @@ ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
     ucc_free(lib->tl_libs);
     ucc_free(lib->cl_libs);
     ucc_free(lib->full_prefix);
+    ucc_free(lib->cl_attrs);
     ucc_free(lib);
     return status;
 }
