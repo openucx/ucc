@@ -44,29 +44,31 @@ ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_start(ucc_coll_task_t *coll_task)
     return ucc_schedule_start(schedule);
 }
 
-ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_finalize(ucc_coll_task_t *coll_task)
+ucc_status_t
+ucc_tl_ucp_allreduce_sra_knomial_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_schedule_t *schedule = ucc_derived_of(coll_task, ucc_schedule_t);
     ucc_tl_ucp_put_schedule(schedule);
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
-                                                   ucc_base_team_t *team,
-                                                   ucc_coll_task_t **task_h)
+ucc_status_t
+ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
+                                      ucc_base_team_t      *team,
+                                      ucc_coll_task_t     **task_h)
 {
-    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_schedule_t *schedule = ucc_tl_ucp_get_schedule(tl_team);
-    size_t             count     = coll_args->args.src.info.count;
-    ucc_base_coll_args_t args = *coll_args;
-    ucc_coll_task_t   *task, *rs_task;
-    ucc_status_t status;
-    ucc_kn_radix_t radix;
+    ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_schedule_t      *schedule = ucc_tl_ucp_get_schedule(tl_team);
+    size_t               count    = coll_args->args.src.info.count;
+    ucc_base_coll_args_t args     = *coll_args;
+    ucc_coll_task_t     *task, *rs_task;
+    ucc_status_t         status;
+    ucc_kn_radix_t       radix;
     ALLREDUCE_TASK_CHECK(coll_args->args, tl_team);
-    radix = ucc_min(UCC_TL_UCP_TEAM_LIB(tl_team)->
-                    cfg.allreduce_sra_kn_radix, tl_team->size);
+    radix = ucc_min(UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sra_kn_radix,
+                    tl_team->size);
 
-    if (((count + radix - 1)/radix*(radix-1) > count) ||
+    if (((count + radix - 1) / radix * (radix - 1) > count) ||
         ((radix - 1) > count)) {
         radix = 2;
     }
@@ -77,20 +79,19 @@ ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_ar
     ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
                                 task);
     task->handlers[UCC_EVENT_SCHEDULE_STARTED] = ucc_task_start_handler;
-    rs_task = task;
+    rs_task                                    = task;
 
-    args.args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+    args.args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
     args.args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     ucc_tl_ucp_allgather_knomial_init_r(&args, team, &task, radix);
     task->flags = UCC_COLL_TASK_FLAG_INTERNAL;
     ucc_schedule_add_task(schedule, task);
-    ucc_event_manager_subscribe(&rs_task->em, UCC_EVENT_COMPLETED,
-                                task);
+    ucc_event_manager_subscribe(&rs_task->em, UCC_EVENT_COMPLETED, task);
     task->handlers[UCC_EVENT_COMPLETED] = ucc_task_start_handler;
     schedule->super.post     = ucc_tl_ucp_allreduce_sra_knomial_start;
     schedule->super.progress = NULL;
     schedule->super.finalize = ucc_tl_ucp_allreduce_sra_knomial_finalize;
-    *task_h = &schedule->super;
+    *task_h                  = &schedule->super;
     return UCC_OK;
 out:
     ucc_tl_ucp_put_schedule(schedule);

@@ -40,7 +40,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init(ucc_base_coll_args_t *coll_args,
 {
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task;
-    ucc_status_t status;
+    ucc_status_t       status;
     ALLREDUCE_TASK_CHECK(coll_args->args, tl_team);
     task                 = ucc_tl_ucp_init_task(coll_args, team);
     task->super.post     = ucc_tl_ucp_allreduce_knomial_start;
