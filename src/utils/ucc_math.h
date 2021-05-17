@@ -50,4 +50,5 @@ static inline unsigned long ucc_str_hash_djb2(const char *str)
     }
     return hash;
 }
+
 #endif

@@ -74,21 +74,22 @@ error:
     return UCC_ERR_NO_MESSAGE;
 }
 
-#define CHECK_COMPONENT_UNIQ(_framework, _field) do {                       \
-        ucc_component_iface_t **c = _framework->components;                 \
-        int i, j;                                                           \
-        for (i = 0; i < framework->n_components; i++) {                     \
-            for (j = i+1; j < framework->n_components; j++) {               \
-                if (c[i]-> _field == c[j]-> _field) {                       \
-                    ucc_error("components %s and %s have the same default " \
-                              UCC_PP_MAKE_STRING(_field) " %lu",            \
-                              c[i]->name, c[j]->name,                       \
-                              (unsigned long) c[i]-> _field);               \
-                    return UCC_ERR_INVALID_PARAM;                           \
-                }                                                           \
-            }                                                               \
-        }                                                                   \
-    } while(0)
+#define CHECK_COMPONENT_UNIQ(_framework, _field)                               \
+    do {                                                                       \
+        ucc_component_iface_t **c = _framework->components;                    \
+        int                     i, j;                                          \
+        for (i = 0; i < framework->n_components; i++) {                        \
+            for (j = i + 1; j < framework->n_components; j++) {                \
+                if (c[i]->_field == c[j]->_field) {                            \
+                    ucc_error("components %s and %s have the same "            \
+                              "default " UCC_PP_MAKE_STRING(_field) " %lu",    \
+                              c[i]->name, c[j]->name,                          \
+                              (unsigned long)c[i]->_field);                    \
+                    return UCC_ERR_INVALID_PARAM;                              \
+                }                                                              \
+            }                                                                  \
+        }                                                                      \
+    } while (0)
 
 ucc_status_t
 ucc_component_check_scores_uniq(ucc_component_framework_t *framework)
@@ -167,7 +168,6 @@ ucc_status_t ucc_components_load(const char *framework_name,
         return UCC_ERR_NOT_FOUND;
     }
 
-
     ifaces = ucc_realloc(ifaces, n_loaded * sizeof(ucc_component_iface_t *),
                          "ifaces");
     framework->components   = ifaces;
@@ -194,23 +194,6 @@ ucc_component_iface_t* ucc_get_component(ucc_component_framework_t *framework,
         }
     }
     return NULL;
-}
-
-ucc_status_t
-ucc_component_check_scores_uniq(ucc_component_framework_t *framework)
-{
-    ucc_component_iface_t **c = framework->components;
-    int i, j;
-    for (i = 0; i < framework->n_components; i++) {
-        for (j = i+1; j < framework->n_components; j++) {
-            if (c[i]->score == c[j]->score) {
-                ucc_error("components %s and %s have the same default score %d",
-                          c[i]->name, c[j]->name, c[i]->score);
-                return UCC_ERR_INVALID_PARAM;
-            }
-        }
-    }
-    return UCC_OK;
 }
 
 char* ucc_get_framework_components_list(ucc_component_framework_t *framework,
