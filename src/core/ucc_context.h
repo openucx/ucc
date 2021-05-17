@@ -34,19 +34,20 @@ typedef struct ucc_context_id {
 } ucc_context_id_t;
 
 typedef struct ucc_context {
-    ucc_lib_info_t         *lib;
-    ucc_context_params_t    params;
-    ucc_context_attr_t      attr;
-    ucc_thread_mode_t       thread_mode;
-    ucc_cl_context_t      **cl_ctx;
-    ucc_tl_context_t      **tl_ctx;
-    ucc_tl_context_t       *service_ctx;
-    int                     n_cl_ctx;
-    int                     n_tl_ctx;
-    ucc_list_link_t         progress_list;
-    ucc_progress_queue_t   *pq;
-    ucc_team_id_pool_t      ids;
-    ucc_context_id_t        id;
+    ucc_lib_info_t          *lib;
+    ucc_context_params_t     params;
+    ucc_context_attr_t       attr;
+    ucc_thread_mode_t        thread_mode;
+    ucc_cl_context_t       **cl_ctx;
+    ucc_tl_context_t       **tl_ctx;
+    ucc_tl_context_t        *service_ctx;
+    int                      n_cl_ctx;
+    int                      n_tl_ctx;
+    ucc_config_names_array_t all_tls;
+    ucc_list_link_t          progress_list;
+    ucc_progress_queue_t    *pq;
+    ucc_team_id_pool_t       ids;
+    ucc_context_id_t         id;
 } ucc_context_t;
 
 typedef struct ucc_context_config {

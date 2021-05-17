@@ -296,7 +296,34 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
         ctx->tl_ctx[ctx->n_tl_ctx] = ucc_derived_of(b_ctx, ucc_tl_context_t);
         ctx->n_tl_ctx++;
     }
+    if (ctx->n_tl_ctx == 0) {
+        ucc_error("no tl contexts were created");
+        status = UCC_ERR_NOT_FOUND;
+        goto err;
+    }
+    /* build the list of names of all available tl contexts.
+       This is a convenience data struct for CLs */
+    ctx->all_tls.count = ctx->n_tl_ctx;
+    ctx->all_tls.names = ucc_malloc(sizeof(char*) * ctx->n_tl_ctx, "all_tls");
+    if (!ctx->all_tls.names) {
+        ucc_error("failed to allocate %zd bytes for all_tls names",
+                  sizeof(char*) * ctx->n_tl_ctx);
+        status = UCC_ERR_NO_MEMORY;
+        goto err;
+
+    }
+    for (i = 0; i < ctx->n_tl_ctx; i++) {
+        ctx->all_tls.names[i] = (char*)ucc_derived_of(ctx->tl_ctx[i]->super.lib,
+                                               ucc_tl_lib_t)->iface->super.name;
+    }
     return UCC_OK;
+err:
+    for (i = 0; i < ctx->n_tl_ctx; i++) {
+        tl_lib = lib->tl_libs[i];
+        tl_lib->iface->context.destroy(&ctx->tl_ctx[i]->super);
+    }
+    ucc_free(ctx->tl_ctx);
+    return status;
 }
 
 ucc_status_t ucc_context_create(ucc_lib_h lib,
@@ -427,6 +454,7 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
         tl_lib->iface->context.destroy(&tl_ctx->super);
     }
     ucc_progress_queue_finalize(context->pq);
+    ucc_free(context->all_tls.names);
     ucc_free(context->tl_ctx);
     ucc_free(context->ids.pool);
     ucc_free(context);

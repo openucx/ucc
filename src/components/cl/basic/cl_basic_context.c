@@ -11,37 +11,54 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_context_t,
                     const ucc_base_context_params_t *params,
                     const ucc_base_config_t *config)
 {
-    ucc_status_t status;
     const ucc_cl_context_config_t *cl_config =
         ucc_derived_of(config, ucc_cl_context_config_t);
+    ucc_config_names_array_t      *tls       = &cl_config->cl_lib->tls;
+    ucc_status_t status;
+    int          i;
+
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_config->cl_lib,
                               params->context);
-    status = ucc_tl_context_get(params->context, "ucp",
-                                &self->tl_ucp_ctx);
-    if (UCC_OK != status) {
-        cl_warn(cl_config->cl_lib,
-                "TL UCP context is not available, CL BASIC can't proceed");
-        return UCC_ERR_NOT_FOUND;
-    }
-    status = ucc_tl_context_get(params->context, "nccl",
-                                &self->tl_nccl_ctx);
-    if (UCC_OK != status) {
-        cl_info(cl_config->cl_lib,
-                "TL NCCL context is not available, skipping");
-        self->tl_nccl_ctx = NULL;
+    if (tls->count == 1 && !strcmp(tls->names[0], "all")) {
+        tls = &params->context->all_tls;
     }
 
+    self->tl_ctxs = ucc_malloc(sizeof(ucc_tl_context_t**) * tls->count,
+                               "cl_basic_tl_ctxs");
+    if (!self->tl_ctxs) {
+        cl_error(cl_config->cl_lib, "failed to allocate %zd bytes for tl_ctxs",
+                 sizeof(ucc_tl_context_t**) * tls->count);
+        return UCC_ERR_NO_MEMORY;
+    }
+    self->n_tl_ctxs = 0;
+    for (i = 0; i < tls->count; i++) {
+        status = ucc_tl_context_get(params->context, tls->names[i],
+                                    &self->tl_ctxs[self->n_tl_ctxs]);
+        if (UCC_OK != status) {
+            cl_info(cl_config->cl_lib,
+                    "TL %s context is not available, skipping", tls->names[i]);
+        } else {
+            self->n_tl_ctxs++;
+        }
+    }
+    if (0 == self->n_tl_ctxs) {
+        cl_error(cl_config->cl_lib, "no TL contexts are available");
+        ucc_free(self->tl_ctxs);
+        self->tl_ctxs = NULL;
+        return UCC_ERR_NOT_FOUND;
+    }
     cl_info(cl_config->cl_lib, "initialized cl context: %p", self);
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_context_t)
 {
+    int i;
     cl_info(self->super.super.lib, "finalizing cl context: %p", self);
-    ucc_tl_context_put(self->tl_ucp_ctx);
-    if (self->tl_nccl_ctx) {
-        ucc_tl_context_put(self->tl_nccl_ctx);
+    for (i = 0; i < self->n_tl_ctxs; i++) {
+        ucc_tl_context_put(self->tl_ctxs[i]);
     }
+    ucc_free(self->tl_ctxs);
 }
 
 UCC_CLASS_DEFINE(ucc_cl_basic_context_t, ucc_cl_context_t);
