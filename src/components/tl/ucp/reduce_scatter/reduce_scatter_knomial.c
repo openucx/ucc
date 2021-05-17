@@ -180,16 +180,9 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
     status = ucc_tl_ucp_reduce_scatter_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {
         ucc_progress_enqueue(UCC_TL_UCP_TEAM_CORE_CTX(team)->pq, &task->super);
+        return UCC_OK;
     }
-    else if (status < 0) {
-        return status;
-    } else {
-        ucc_event_manager_notify(coll_task, UCC_EVENT_COMPLETED);
-        if (coll_task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
-            coll_task->finalize(coll_task);
-        }
-    }
-    return UCC_OK;
+    return ucc_task_complete(coll_task);
 }
 
 ucc_status_t

@@ -151,15 +151,9 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     status = ucc_tl_ucp_allgather_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {
         ucc_progress_enqueue(UCC_TL_UCP_TEAM_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
-        return status;
-    } else {
-        ucc_event_manager_notify(coll_task, UCC_EVENT_COMPLETED);
-        if (coll_task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
-            coll_task->finalize(coll_task);
-        }
+        return UCC_OK;
     }
-    return UCC_OK;
+    return ucc_task_complete(coll_task);
 }
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
@@ -183,7 +177,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
 ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
                                                ucc_base_team_t      *team,
                                                ucc_coll_task_t     **task_h)
-
+{
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         size    = tl_team->size;
     ucc_kn_radix_t     radix;

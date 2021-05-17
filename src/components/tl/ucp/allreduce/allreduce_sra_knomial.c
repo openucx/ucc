@@ -73,7 +73,13 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
         radix = 2;
     }
 
-    ucc_tl_ucp_reduce_scatter_knomial_init_r(&args, team, &task, radix);
+    /* 1st step of allreduce: knomial reduce_scatter */
+    status = ucc_tl_ucp_reduce_scatter_knomial_init_r(&args, team, &task, radix);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(tl_team),
+                 "failed to init reduce_scatter_knomial task");
+        goto out;
+    }
     task->flags = UCC_COLL_TASK_FLAG_INTERNAL;
     ucc_schedule_add_task(schedule, task);
     ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
@@ -81,13 +87,21 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
     task->handlers[UCC_EVENT_SCHEDULE_STARTED] = ucc_task_start_handler;
     rs_task                                    = task;
 
+    /* 2nd step of allreduce: knomial allgather. 2nd task subscribes
+     to completion event of reduce_scatter task. */
     args.args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
     args.args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-    ucc_tl_ucp_allgather_knomial_init_r(&args, team, &task, radix);
+    status = ucc_tl_ucp_allgather_knomial_init_r(&args, team, &task, radix);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(tl_team),
+                 "failed to init allgather_knomial task");
+        goto out;
+    }
     task->flags = UCC_COLL_TASK_FLAG_INTERNAL;
     ucc_schedule_add_task(schedule, task);
     ucc_event_manager_subscribe(&rs_task->em, UCC_EVENT_COMPLETED, task);
     task->handlers[UCC_EVENT_COMPLETED] = ucc_task_start_handler;
+
     schedule->super.post     = ucc_tl_ucp_allreduce_sra_knomial_start;
     schedule->super.progress = NULL;
     schedule->super.finalize = ucc_tl_ucp_allreduce_sra_knomial_finalize;
