@@ -28,16 +28,16 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_lib_t)
 
 UCC_CLASS_DEFINE(ucc_cl_basic_lib_t, ucc_cl_lib_t);
 
-/* NOLINTNEXTLINE */
 ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
                                        ucc_base_attr_t *base_attr)
 {
-    ucc_cl_lib_attr_t *attr = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
-    attr->tls               = UCC_TL_UCP | UCC_TL_NCCL;
+    ucc_cl_lib_attr_t     *attr   = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
+    ucc_cl_lib_t          *cl_lib = ucc_derived_of(lib, ucc_cl_lib_t);
     ucc_status_t           status;
     ucc_tl_lib_attr_t      ucp_tl_attr, nccl_tl_attr;
     ucc_component_iface_t *ucp_iface, *nccl_iface;
     ucc_tl_iface_t        *tl_ucp_iface, *tl_nccl_iface;
+    attr->tls = &cl_lib->tls;
     ucp_iface = ucc_get_component(&ucc_global_config.tl_framework, "ucp");
     if (!ucp_iface) {
     	cl_error(lib, "failed to get UCP component");

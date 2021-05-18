@@ -15,10 +15,10 @@ static ucc_config_field_t ucc_mc_cpu_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_mc_cpu_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_mc_config_table)},
 
-    {"CPU_ELEM_SIZE", "1024", "The size of each element in mc cpu mpool", ucc_offsetof(ucc_mc_cpu_config_t, cpu_elem_size),
+    {"ELEM_SIZE", "1024", "The size of each element in mc cpu mpool", ucc_offsetof(ucc_mc_cpu_config_t, cpu_elem_size),
     		UCC_CONFIG_TYPE_MEMUNITS},
 
-    {"CPU_MAX_ELEMS", "8", "The max amount of elements in mc cpu mpool", ucc_offsetof(ucc_mc_cpu_config_t, cpu_max_elems),
+    {"MAX_ELEMS", "8", "The max amount of elements in mc cpu mpool", ucc_offsetof(ucc_mc_cpu_config_t, cpu_max_elems),
     		UCC_CONFIG_TYPE_UINT},
 
     {NULL}
@@ -65,6 +65,20 @@ static ucc_status_t ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **ptr, size_t si
     return UCC_OK;
 }
 
+static ucc_status_t ucc_mc_cpu_mem_alloc_slow_path_only(ucc_mc_buffer_header_t **ptr, size_t size)
+{
+	size_t size_with_h = size + sizeof(ucc_mc_buffer_header_t);
+	ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t *) ucc_malloc(size_with_h, "mc cpu");
+	if (!h) {
+		mc_error(&ucc_mc_cpu.super, "failed to allocate %zd bytes", size_with_h);
+		return UCC_ERR_NO_MEMORY;
+	}
+	h->from_pool = 0;
+	h->addr = (void *) ((ptrdiff_t) h + sizeof(ucc_mc_buffer_header_t));
+	*ptr = h;
+    return UCC_OK;
+}
+
 static ucc_status_t ucc_mc_cpu_chunk_alloc(ucc_mpool_t *mp, size_t *size_p, void **chunk_p) {
 	*chunk_p = ucc_malloc(*size_p, "mc cpu"); // TODO: should I use hugeTableAlloc instead?
 	if (!*chunk_p) {
@@ -96,6 +110,13 @@ static ucc_mpool_ops_t ucc_mc_ops = {
 static ucc_status_t ucc_mc_cpu_mem_alloc_with_init(ucc_mc_buffer_header_t **ptr, size_t size)
 {
 	ucc_spin_lock(&ucc_mc_cpu.mpool_init_spinlock);
+
+	if (MC_CPU_CONFIG->cpu_max_elems == 0) {
+		ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_alloc_slow_path_only;
+		ucc_spin_unlock(&ucc_mc_cpu.mpool_init_spinlock);
+		return ucc_mc_cpu_mem_alloc_slow_path_only(ptr, size);
+	}
+
 	if (! ucc_mc_cpu.mpool_init_flag) {
 		// TODO: currently only with thread multiple, need to change?
 		ucc_status_t status = ucc_mpool_init(&ucc_mc_cpu.mpool, 0, sizeof(ucc_mc_buffer_header_t) + MC_CPU_CONFIG->cpu_elem_size,
@@ -201,7 +222,10 @@ static ucc_status_t ucc_mc_cpu_mem_query(const void *ptr, size_t length,
                                         ucc_mem_attr_t *mem_attr)
 {
     if (ptr == NULL || length == 0) {
-        mem_attr->mem_type = UCC_MEMORY_TYPE_HOST;
+        mem_attr->mem_type     = UCC_MEMORY_TYPE_HOST;
+        mem_attr->base_address = NULL;
+        mem_attr->alloc_length = 0;
+        return UCC_OK;
     }
 
     /* not supposed to be used */
@@ -254,6 +278,7 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.super.name       = "cpu mc",
     .super.ref_cnt          = 0,
     .super.type             = UCC_MEMORY_TYPE_HOST,
+    .super.ee_type          = UCC_EE_CPU_THREAD,
     .super.init             = ucc_mc_cpu_init,
     .super.finalize         = ucc_mc_cpu_finalize,
     .super.ops.mem_query    = ucc_mc_cpu_mem_query,

@@ -159,15 +159,15 @@ TestCase::~TestCase()
         UCC_CHECK(ucc_collective_finalize(req));
     }
     if (sbuf) {
-        UCC_CHECK(ucc_mc_free(sbuf, mem_type));
+        UCC_CHECK(ucc_mc_free(sbuf_header, mem_type));
     }
     if (rbuf) {
-        UCC_CHECK(ucc_mc_free(rbuf, mem_type));
+        UCC_CHECK(ucc_mc_free(rbuf_header, mem_type));
     }
     if (check_sbuf) {
-        UCC_CHECK(ucc_mc_free(check_sbuf, UCC_MEMORY_TYPE_HOST));
+        UCC_CHECK(ucc_mc_free(check_sbuf_header, UCC_MEMORY_TYPE_HOST));
     }
     if (check_rbuf) {
-        UCC_CHECK(ucc_mc_free(check_rbuf, UCC_MEMORY_TYPE_HOST));
+        UCC_CHECK(ucc_mc_free(check_rbuf_header, UCC_MEMORY_TYPE_HOST));
     }
 }

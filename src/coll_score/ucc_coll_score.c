@@ -97,6 +97,7 @@ void ucc_coll_score_free(ucc_coll_score_t *score)
                               list_elem);
         }
     }
+    ucc_free(score);
 }
 
 static ucc_status_t ucc_score_list_dup(ucc_list_link_t *src,

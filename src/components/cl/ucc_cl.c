@@ -12,6 +12,9 @@ ucc_config_field_t ucc_cl_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_cl_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_base_config_table)},
 
+    {"TLS", "all", NULL, ucc_offsetof(ucc_cl_lib_config_t, tls),
+     UCC_CONFIG_TYPE_STRING_ARRAY},
+
     {NULL}
 };
 
@@ -28,6 +31,7 @@ const char *ucc_cl_names[] = {
 UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
                     const ucc_cl_lib_config_t *cl_config)
 {
+    ucc_status_t status;
     UCC_CLASS_CALL_BASE_INIT();
     self->iface         = cl_iface;
     self->super.log_component = cl_config->super.log_component;
@@ -35,12 +39,18 @@ UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
                      cl_iface->cl_lib_config.name,
                      sizeof(self->super.log_component.name));
     self->super.score_str = strdup(cl_config->super.score_str);
-    return UCC_OK;
+    status = ucc_config_names_array_dup(&self->tls, &cl_config->tls);
+    if (UCC_OK != status) {
+        ucc_error("failed to dup TLS config_names_array for CL %s",
+                  cl_iface->cl_lib_config.name);
+    }
+    return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_lib_t)
 {
     ucc_free(self->super.score_str);
+    ucc_config_names_array_free(&self->tls);
 }
 
 UCC_CLASS_DEFINE(ucc_cl_lib_t, void);

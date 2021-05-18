@@ -53,10 +53,10 @@ static ucc_config_field_t ucc_mc_cuda_config_table[] = {
      ucc_offsetof(ucc_mc_cuda_config_t, stream_blocking_wait),
      UCC_CONFIG_TYPE_UINT},
 
-     {"CUDA_ELEM_SIZE", "1024", "The size of each element in mc cuda mpool", ucc_offsetof(ucc_mc_cuda_config_t, cuda_elem_size),
+     {"ELEM_SIZE", "1024", "The size of each element in mc cuda mpool", ucc_offsetof(ucc_mc_cuda_config_t, cuda_elem_size),
          		UCC_CONFIG_TYPE_MEMUNITS},
 
-     {"CUDA_MAX_ELEMS", "8", "The max amount of elements in mc cuda mpool", ucc_offsetof(ucc_mc_cuda_config_t, cuda_max_elems),
+     {"MAX_ELEMS", "8", "The max amount of elements in mc cuda mpool", ucc_offsetof(ucc_mc_cuda_config_t, cuda_max_elems),
          		UCC_CONFIG_TYPE_UINT},
 
     {NULL}
@@ -256,9 +256,29 @@ static ucc_status_t ucc_mc_cuda_mem_alloc(ucc_mc_buffer_header_t **ptr, size_t s
 			mc_error(&ucc_mc_cuda.super, "failed to allocate %zd bytes, " "cuda error %d(%s)", size, st, cudaGetErrorString(st));
 			return UCC_ERR_NO_MEMORY;
 		}
-		mc_debug(&ucc_mc_cuda.super, "ucc_mc_cuda_mem_alloc size:%zd", size); // todo: should i keep this? add it also to chunk alloc? in cpu?
+		mc_debug(&ucc_mc_cuda.super, "ucc_mc_cuda_mem_alloc size:%zd", size); // TODO: should i keep this? add it also to chunk alloc? in cpu?
 		h->from_pool = 0;
 	}
+	*ptr = h;
+	return UCC_OK;
+}
+
+static ucc_status_t ucc_mc_cuda_mem_alloc_slow_path_only(ucc_mc_buffer_header_t **ptr, size_t size)
+{
+	cudaError_t st;
+	ucc_mc_buffer_header_t *h = ucc_malloc(sizeof(ucc_mc_buffer_header_t), "mc cuda");
+	if (!h){
+		mc_error(&ucc_mc_cuda.super, "failed to allocate %zd bytes", sizeof(ucc_mc_buffer_header_t));
+		return UCC_ERR_NO_MEMORY;
+	}
+	st = cudaMalloc(&h->addr, size);
+	if (st != cudaSuccess) {
+		cudaGetLastError();
+		mc_error(&ucc_mc_cuda.super, "failed to allocate %zd bytes, " "cuda error %d(%s)", size, st, cudaGetErrorString(st));
+		return UCC_ERR_NO_MEMORY;
+	}
+	mc_debug(&ucc_mc_cuda.super, "ucc_mc_cuda_mem_alloc size:%zd", size); // TODO: should i keep this? add it also to chunk alloc? in cpu?
+	h->from_pool = 0;
 	*ptr = h;
 	return UCC_OK;
 }
@@ -287,26 +307,37 @@ static void ucc_mc_cuda_chunk_init(ucc_mpool_t *mp, void *obj, void *chunk)
 
 static void ucc_mc_cuda_chunk_release(ucc_mpool_t *mp, void *chunk)
 {
-	ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t*) chunk;
+	ucc_free(chunk);
+}
+
+static void ucc_mc_cuda_chunk_cleanup(ucc_mpool_t *mp, void *obj)
+{
+	ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t*) obj;
 	cudaError_t st;
 	st = cudaFree(h->addr);
 	if (st != cudaSuccess) {
-	    cudaGetLastError();
-	    mc_error(&ucc_mc_cuda.super, "failed to free mem at %p, " "cuda error %d(%s)", chunk, st, cudaGetErrorString(st));
+		cudaGetLastError();
+		mc_error(&ucc_mc_cuda.super, "failed to free mem at %p, " "cuda error %d(%s)", obj, st, cudaGetErrorString(st));
 	}
-	ucc_free(h);
 }
 
 static ucc_mpool_ops_t ucc_mc_ops = {
     .chunk_alloc   = ucc_mc_cuda_chunk_alloc,
     .chunk_release = ucc_mc_cuda_chunk_release,
     .obj_init      = ucc_mc_cuda_chunk_init,
-    .obj_cleanup   = NULL
+    .obj_cleanup   = ucc_mc_cuda_chunk_cleanup
 };
 
 static ucc_status_t ucc_mc_cuda_mem_alloc_with_init(ucc_mc_buffer_header_t **ptr, size_t size)
 {
 	ucc_spin_lock(&ucc_mc_cuda.mpool_init_spinlock);
+
+    if (MC_CUDA_CONFIG ->cuda_max_elems == 0){
+    	ucc_mc_cuda.super.ops.mem_alloc = ucc_mc_cuda_mem_alloc_slow_path_only;
+    	ucc_spin_unlock(&ucc_mc_cuda.mpool_init_spinlock);
+    	return ucc_mc_cuda_mem_alloc_slow_path_only(ptr, size);
+    }
+
 	if (! ucc_mc_cuda.mpool_init_flag) {
 		// TODO: currently only with thread multiple, need to change?
 		ucc_status_t status = ucc_mpool_init(&ucc_mc_cuda.mpool, 0, sizeof(ucc_mc_buffer_header_t),
@@ -387,7 +418,9 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
     }
 
     if (ptr == 0) {
-        mem_type = UCC_MEMORY_TYPE_HOST;
+        mem_attr->mem_type     = UCC_MEMORY_TYPE_HOST;
+        mem_attr->base_address = NULL;
+        mem_attr->alloc_length = 0;
     } else {
         if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_MEM_TYPE) {
             st = cudaPointerGetAttributes(&attr, ptr);
@@ -566,6 +599,7 @@ ucc_status_t ucc_ee_cuda_event_test(void *event)
 ucc_mc_cuda_t ucc_mc_cuda = {
     .super.super.name       = "cuda mc",
     .super.ref_cnt          = 0,
+    .super.ee_type          = UCC_EE_CUDA_STREAM,
     .super.type             = UCC_MEMORY_TYPE_CUDA,
     .super.init             = ucc_mc_cuda_init,
     .super.finalize         = ucc_mc_cuda_finalize,

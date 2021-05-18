@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -8,6 +8,7 @@
 
 #include "config.h"
 #include "ucc/api/ucc_status.h"
+#include "ucc/api/ucc_def.h"
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_list.h"
@@ -108,4 +109,8 @@ ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
     ucs_config_parser_print_all_opts(stream, prefix, ucs_flags, config_list);
 }
 
+ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
+                                        const ucc_config_names_array_t *src);
+
+void ucc_config_names_array_free(ucc_config_names_array_t *array);
 #endif

@@ -16,14 +16,14 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_context_t,
         ucc_derived_of(config, ucc_cl_context_config_t);
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_config->cl_lib,
                               params->context);
-    status = ucc_tl_context_get(params->context, UCC_TL_UCP,
+    status = ucc_tl_context_get(params->context, "ucp",
                                 &self->tl_ucp_ctx);
     if (UCC_OK != status) {
         cl_warn(cl_config->cl_lib,
                 "TL UCP context is not available, CL BASIC can't proceed");
         return UCC_ERR_NOT_FOUND;
     }
-    status = ucc_tl_context_get(params->context, UCC_TL_NCCL,
+    status = ucc_tl_context_get(params->context, "nccl",
                                 &self->tl_nccl_ctx);
     if (UCC_OK != status) {
         cl_info(cl_config->cl_lib,

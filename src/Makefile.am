@@ -88,6 +88,7 @@ libucc_la_SOURCES =                  \
 	utils/ucc_proc_info.c            \
 	utils/ucc_string.c               \
 	utils/ucc_coll_utils.c           \
+	utils/ucc_parser.c               \
 	components/base/ucc_base_iface.c \
 	components/cl/ucc_cl.c           \
 	components/tl/ucc_tl.c           \

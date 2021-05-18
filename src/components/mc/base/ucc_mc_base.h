@@ -61,6 +61,11 @@ typedef struct ucc_mem_attr {
  */
 extern const char *ucc_memory_type_names[];
 
+/**
+ * Array of string names for each execution engine type
+ */
+extern const char *ucc_ee_type_names[];
+
 typedef struct ucc_mc_config {
     ucc_log_component_config_t log_component;
 } ucc_mc_config_t;

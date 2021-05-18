@@ -26,12 +26,16 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc(&rbuf, _msgsize, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_rbuf, _msgsize, UCC_MEMORY_TYPE_HOST));
+    UCC_CHECK(ucc_mc_alloc(&rbuf_header, _msgsize, _mt));
+    rbuf = rbuf_header->addr;
+    UCC_CHECK(ucc_mc_alloc(&check_rbuf_header, _msgsize, UCC_MEMORY_TYPE_HOST));
+    check_rbuf = check_rbuf_header->addr;
     if (TEST_NO_INPLACE == inplace) {
-        UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
+        UCC_CHECK(ucc_mc_alloc(&sbuf_header, _msgsize, _mt));
+        sbuf = sbuf_header->addr;
         init_buffer(sbuf, count, dt, _mt, rank);
-        UCC_ALLOC_COPY_BUF(check_sbuf, UCC_MEMORY_TYPE_HOST, sbuf, _mt, _msgsize);
+        UCC_ALLOC_COPY_BUF(check_sbuf_header, UCC_MEMORY_TYPE_HOST, sbuf, _mt, _msgsize);
+        check_sbuf = check_sbuf_header->addr;
     } else {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;

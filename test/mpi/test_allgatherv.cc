@@ -17,6 +17,8 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t count = _msgsize/dt_size;
     int rank, size;
+    counts_header = NULL;
+    displacements_header = NULL;
     counts = NULL;
     displacements = NULL;
     MPI_Comm_rank(team.comm, &rank);
@@ -28,21 +30,27 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc((void**)&counts, size * sizeof(uint32_t),
+    UCC_CHECK(ucc_mc_alloc(&counts_header, size * sizeof(uint32_t),
                            UCC_MEMORY_TYPE_HOST));
-    UCC_CHECK(ucc_mc_alloc((void**)&displacements, size * sizeof(uint32_t),
+    counts = (int *) counts_header->addr;
+    UCC_CHECK(ucc_mc_alloc(&displacements_header, size * sizeof(uint32_t),
                            UCC_MEMORY_TYPE_HOST));
-    UCC_CHECK(ucc_mc_alloc(&rbuf, _msgsize*size, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_rbuf, _msgsize*size, UCC_MEMORY_TYPE_HOST));
+    displacements = (int *) displacements_header->addr;
+    UCC_CHECK(ucc_mc_alloc(&rbuf_header, _msgsize*size, _mt));
+    rbuf = rbuf_header->addr;
+    UCC_CHECK(ucc_mc_alloc(&check_rbuf_header, _msgsize*size, UCC_MEMORY_TYPE_HOST));
+    check_rbuf = check_rbuf_header->addr;
     for (int i = 0; i < size; i++) {
         counts[i] = count;
         displacements[i] = i * count;
     }
     if (TEST_NO_INPLACE == inplace) {
         args.mask = 0;
-        UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
+        UCC_CHECK(ucc_mc_alloc(&sbuf_header, _msgsize, _mt));
+        sbuf = sbuf_header->addr;
         init_buffer(sbuf, count, TEST_DT, _mt, rank);
-        UCC_ALLOC_COPY_BUF(check_sbuf, UCC_MEMORY_TYPE_HOST, sbuf, _mt, _msgsize);
+        UCC_ALLOC_COPY_BUF(check_sbuf_header, UCC_MEMORY_TYPE_HOST, sbuf, _mt, _msgsize);
+        check_sbuf = check_sbuf_header->addr;
     } else {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
@@ -67,10 +75,10 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
 TestAllgatherv::~TestAllgatherv() {
     if (counts) {
-        ucc_mc_free(counts, UCC_MEMORY_TYPE_HOST);
+        ucc_mc_free(counts_header, UCC_MEMORY_TYPE_HOST);
     }
     if (displacements) {
-        ucc_mc_free(displacements, UCC_MEMORY_TYPE_HOST);
+        ucc_mc_free(displacements_header, UCC_MEMORY_TYPE_HOST);
     }
 }
 ucc_status_t TestAllgatherv::check()

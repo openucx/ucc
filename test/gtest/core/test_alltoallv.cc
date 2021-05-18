@@ -87,8 +87,9 @@ public:
             coll->dst.info_v.buffer = coll->dst.info_v.mc_header->addr;
         }
     }
-    void data_validate(UccCollCtxVec ctxs)
+    bool  data_validate(UccCollCtxVec ctxs)
     {
+        bool                   ret = true;
         std::vector<uint8_t *> dsts(ctxs.size());
         std::vector<ucc_mc_buffer_header_t *> dsts_mc_headers(ctxs.size());
 
@@ -113,10 +114,11 @@ public:
                         (size_t)((T*)coll->dst.info_v.counts)[i];
                 size_t rank_offs = ucc_dt_size(coll->dst.info_v.datatype) *
                         (size_t)((T*)coll->dst.info_v.displacements)[i];
-                EXPECT_EQ(0,
-                          alltoallx_validate_buf(r, i,
-                          (uint8_t*)dsts[r] + rank_offs,
-                          rank_size));
+                if (0 != alltoallx_validate_buf(r, i, (uint8_t*)dsts[r] +
+                                                rank_offs, rank_size)) {
+                    ret = false;
+                    break;
+                }
             }
         }
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
@@ -124,6 +126,7 @@ public:
                 ucc_mc_free(dsts_mc_headers[r], UCC_MEMORY_TYPE_HOST);
             }
         }
+        return ret;
     }
     void data_fini(UccCollCtxVec ctxs)
     {
@@ -167,7 +170,7 @@ UCC_TEST_P(test_alltoallv_0, single)
     req.start();
     req.wait();
 
-    data_validate(ctxs);
+    EXPECT_EQ(true, data_validate(ctxs));
     data_fini(ctxs);
 }
 
@@ -193,7 +196,7 @@ UCC_TEST_P(test_alltoallv_1, single)
     req.start();
     req.wait();
 
-    data_validate(ctxs);
+    EXPECT_EQ(true, data_validate(ctxs));
     data_fini(ctxs);
 }
 
@@ -257,7 +260,7 @@ UCC_TEST_P(test_alltoallv_2, multiple)
     UccReq::waitall(reqs);
 
     for (auto ctx : ctxs) {
-        data_validate(ctx);
+        EXPECT_EQ(true, data_validate(ctx));
         data_fini(ctx);
     }
 }
@@ -286,7 +289,7 @@ UCC_TEST_P(test_alltoallv_3, multiple)
     UccReq::waitall(reqs);
 
     for (auto ctx : ctxs) {
-        data_validate(ctx);
+        EXPECT_EQ(true, data_validate(ctx));
         data_fini(ctx);
     }
 }

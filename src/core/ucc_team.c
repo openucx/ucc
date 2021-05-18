@@ -65,7 +65,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
            (external id has high bit set) - start service team creation */
         ucc_base_team_params_t b_params;
         ucc_base_team_t       *b_team;
-        status = ucc_tl_context_get(context, UCC_TL_UCP, &context->service_ctx);
+        status = ucc_tl_context_get(context, "ucp", &context->service_ctx);
         if (UCC_OK != status) {
             ucc_warn("TL UCP context is not available, "
                      "service team can not be created");
@@ -305,6 +305,8 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
         team->cl_teams[i] = NULL;
     }
     ucc_team_relase_id(team);
+    ucc_free(team->cl_teams);
+    ucc_free(team->contexts);
     ucc_free(team);
     return UCC_OK;
 }
@@ -427,4 +429,3 @@ static void ucc_team_relase_id(ucc_team_t *team)
         set_id_bit(ctx->ids.pool, team->id);
     }
 }
-
