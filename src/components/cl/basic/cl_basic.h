@@ -29,7 +29,6 @@ typedef struct ucc_cl_basic_lib_config {
 
 typedef struct ucc_cl_basic_context_config {
     ucc_cl_context_config_t super;
-    int                     test_param;
 } ucc_cl_basic_context_config_t;
 
 typedef struct ucc_cl_basic_lib {
@@ -39,9 +38,9 @@ UCC_CLASS_DECLARE(ucc_cl_basic_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
 
 typedef struct ucc_cl_basic_context {
-    ucc_cl_context_t super;
-    ucc_tl_context_t *tl_ucp_ctx;
-    ucc_tl_context_t *tl_nccl_ctx;
+    ucc_cl_context_t   super;
+    ucc_tl_context_t **tl_ctxs;
+    unsigned           n_tl_ctxs;
 } ucc_cl_basic_context_t;
 UCC_CLASS_DECLARE(ucc_cl_basic_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -49,8 +48,8 @@ UCC_CLASS_DECLARE(ucc_cl_basic_context_t, const ucc_base_context_params_t *,
 typedef struct ucc_cl_basic_team {
     ucc_cl_team_t            super;
     ucc_team_multiple_req_t *team_create_req;
-    ucc_tl_team_t           *tl_ucp_team;
-    ucc_tl_team_t           *tl_nccl_team;
+    ucc_tl_team_t          **tl_teams;
+    unsigned                 n_tl_teams;
     ucc_score_map_t         *score_map;
 } ucc_cl_basic_team_t;
 UCC_CLASS_DECLARE(ucc_cl_basic_team_t, ucc_base_context_t *,

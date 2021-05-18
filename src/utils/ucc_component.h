@@ -42,4 +42,6 @@ ucc_component_iface_t* ucc_get_component(ucc_component_framework_t *framework,
                                          const char *component_name);
 ucc_status_t
 ucc_component_check_scores_uniq(ucc_component_framework_t *framework);
+char* ucc_get_framework_components_list(ucc_component_framework_t *framework,
+                                        char delimiter);
 #endif

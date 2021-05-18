@@ -45,17 +45,8 @@ UCC_TEST_F(test_context_config, print)
 UCC_TEST_F(test_context_config, modify)
 {
     ucc_context_config_h ctx_config;
-    unsigned             flags;
     std::string          output;
-    flags = UCC_CONFIG_PRINT_CONFIG;
     EXPECT_EQ(UCC_OK, ucc_context_config_read(lib_h, NULL, &ctx_config));
-
-    /* modify known field to expected value */
-    EXPECT_EQ(UCC_OK, ucc_context_config_modify(ctx_config, "basic", "TEST_PARAM", "12345"));
-    testing::internal::CaptureStdout();
-    ucc_context_config_print(ctx_config, stdout, "", (ucc_config_print_flags_t)flags);
-    output = testing::internal::GetCapturedStdout();
-    EXPECT_NE(std::string::npos, output.find("UCC_CL_BASIC_TEST_PARAM=12345"));
 
     /* modify uknown field */
     testing::internal::CaptureStdout();
