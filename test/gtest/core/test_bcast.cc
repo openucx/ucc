@@ -37,8 +37,9 @@ public:
 
             ctxs[r]->rbuf_size = ucc_dt_size(dtype) * count;
 
-            UCC_CHECK(ucc_mc_alloc(&coll->src.info.buffer, ctxs[r]->rbuf_size,
-                                   mem_type));
+            UCC_CHECK(ucc_mc_alloc(&coll->src.info.mc_header,
+                                   ctxs[r]->rbuf_size, mem_type));
+            coll->src.info.buffer = coll->src.info.mc_header->addr;
             if (r == root) {
                 ctxs[r]->init_buf = ucc_malloc(ctxs[r]->rbuf_size, "init buf");
                 EXPECT_NE(ctxs[r]->init_buf, nullptr);
@@ -57,7 +58,7 @@ public:
         for (auto r = 0; r < ctxs.size(); r++) {
             gtest_ucc_coll_ctx_t *ctx = ctxs[r];
             ucc_coll_args_t* coll = ctx->args;
-            UCC_CHECK(ucc_mc_free(coll->src.info.buffer, mem_type));
+            UCC_CHECK(ucc_mc_free(coll->src.info.mc_header, mem_type));
             if (r == coll->root) {
                 ucc_free(ctx->init_buf);
             }
@@ -71,6 +72,7 @@ public:
         bool     ret  = true;
         int      root = ctxs[0]->args->root;
         uint8_t *dsts;
+        ucc_mc_buffer_header_t *dsts_mc_header;
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
                 dsts = (uint8_t*) ucc_malloc(ctxs[root]->rbuf_size, "dsts buf");

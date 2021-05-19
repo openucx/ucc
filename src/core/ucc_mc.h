@@ -20,9 +20,11 @@ ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);
  */
 ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr);
 
-ucc_status_t ucc_mc_alloc(void **ptr, size_t len, ucc_memory_type_t mem_type);
+ucc_status_t ucc_mc_alloc(ucc_mc_buffer_header_t **ptr, size_t len,
+                          ucc_memory_type_t mem_type);
 
-ucc_status_t ucc_mc_free(void *ptr, ucc_memory_type_t mem_type);
+ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *ptr,
+                         ucc_memory_type_t       mem_type);
 
 ucc_status_t ucc_mc_finalize();
 

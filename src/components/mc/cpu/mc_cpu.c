@@ -9,33 +9,140 @@
 #include "utils/ucc_malloc.h"
 #include <sys/types.h>
 
+static ucc_status_t ucc_mc_cpu_mem_alloc_with_init(ucc_mc_buffer_header_t **ptr,
+                                                   size_t size);
+
 static ucc_config_field_t ucc_mc_cpu_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_mc_cpu_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_mc_config_table)},
 
-    {NULL}};
+    {"ELEM_SIZE", "1024", "The size of each element in mc cpu mpool",
+     ucc_offsetof(ucc_mc_cpu_config_t, cpu_elem_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"MAX_ELEMS", "8", "The max amount of elements in mc cpu mpool",
+     ucc_offsetof(ucc_mc_cpu_config_t, cpu_max_elems), UCC_CONFIG_TYPE_UINT},
+
+    {NULL}
+
+};
 
 static ucc_status_t ucc_mc_cpu_init()
 {
     ucc_strncpy_safe(ucc_mc_cpu.super.config->log_component.name,
                      ucc_mc_cpu.super.super.name,
                      sizeof(ucc_mc_cpu.super.config->log_component.name));
+    ucc_spinlock_init(&ucc_mc_cpu.mpool_init_spinlock, 0);
     return UCC_OK;
 }
 
 static ucc_status_t ucc_mc_cpu_finalize()
 {
+    if (ucc_mc_cpu.mpool_init_flag) {
+        ucc_mpool_cleanup(&ucc_mc_cpu.mpool, 1);
+        ucc_mc_cpu.mpool_init_flag     = 0;
+        ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_alloc_with_init;
+    }
+    ucc_spinlock_destroy(&ucc_mc_cpu.mpool_init_spinlock);
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cpu_mem_alloc(void **ptr, size_t size)
+static ucc_status_t ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **ptr,
+                                         size_t                   size)
 {
-    (*ptr) = ucc_malloc(size, "mc cpu");
-    if (ucc_unlikely(!(*ptr))) {
-        mc_error(&ucc_mc_cpu.super, "failed to allocate %zd bytes", size);
+    ucc_mc_buffer_header_t *h = NULL;
+    if (size <= MC_CPU_CONFIG->cpu_elem_size) {
+        h = (ucc_mc_buffer_header_t *)ucc_mpool_get(&ucc_mc_cpu.mpool);
+    }
+    if (!h) {
+        // Slow path
+        size_t size_with_h = size + sizeof(ucc_mc_buffer_header_t);
+        h = (ucc_mc_buffer_header_t *)ucc_malloc(size_with_h, "mc cpu");
+        if (!h) {
+            mc_error(&ucc_mc_cpu.super, "failed to allocate %zd bytes",
+                     size_with_h);
+            return UCC_ERR_NO_MEMORY;
+        }
+        h->from_pool = 0;
+        h->addr      = (void *)((ptrdiff_t)h + sizeof(ucc_mc_buffer_header_t));
+    }
+    *ptr = h;
+    return UCC_OK;
+}
+
+static ucc_status_t
+ucc_mc_cpu_mem_alloc_slow_path_only(ucc_mc_buffer_header_t **ptr, size_t size)
+{
+    size_t                  size_with_h = size + sizeof(ucc_mc_buffer_header_t);
+    ucc_mc_buffer_header_t *h =
+        (ucc_mc_buffer_header_t *)ucc_malloc(size_with_h, "mc cpu");
+    if (!h) {
+        mc_error(&ucc_mc_cpu.super, "failed to allocate %zd bytes",
+                 size_with_h);
         return UCC_ERR_NO_MEMORY;
     }
+    h->from_pool = 0;
+    h->addr      = (void *)((ptrdiff_t)h + sizeof(ucc_mc_buffer_header_t));
+    *ptr         = h;
     return UCC_OK;
+}
+
+static ucc_status_t ucc_mc_cpu_chunk_alloc(ucc_mpool_t *mp, size_t *size_p,
+                                           void **chunk_p)
+{
+    *chunk_p = ucc_malloc(
+        *size_p, "mc cpu"); // TODO: should I use hugeTableAlloc instead?
+    if (!*chunk_p) {
+        mc_error(&ucc_mc_cpu.super, "failed to allocate %zd bytes", *size_p);
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    return UCC_OK;
+}
+
+static void ucc_mc_cpu_chunk_init(ucc_mpool_t *mp, void *obj, void *chunk)
+{
+    ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t *)obj;
+    h->from_pool              = 1;
+    h->addr = (void *)((ptrdiff_t)h + sizeof(ucc_mc_buffer_header_t));
+}
+
+static void ucc_mc_cpu_chunk_release(ucc_mpool_t *mp, void *chunk)
+{
+    ucc_free(chunk);
+}
+
+static ucc_mpool_ops_t ucc_mc_ops = {.chunk_alloc   = ucc_mc_cpu_chunk_alloc,
+                                     .chunk_release = ucc_mc_cpu_chunk_release,
+                                     .obj_init      = ucc_mc_cpu_chunk_init,
+                                     .obj_cleanup   = NULL};
+
+static ucc_status_t ucc_mc_cpu_mem_alloc_with_init(ucc_mc_buffer_header_t **ptr,
+                                                   size_t size)
+{
+    ucc_spin_lock(&ucc_mc_cpu.mpool_init_spinlock);
+
+    if (MC_CPU_CONFIG->cpu_max_elems == 0) {
+        ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_alloc_slow_path_only;
+        ucc_spin_unlock(&ucc_mc_cpu.mpool_init_spinlock);
+        return ucc_mc_cpu_mem_alloc_slow_path_only(ptr, size);
+    }
+
+    if (!ucc_mc_cpu.mpool_init_flag) {
+        // TODO: currently only with thread multiple, need to change?
+        ucc_status_t status = ucc_mpool_init(
+            &ucc_mc_cpu.mpool, 0,
+            sizeof(ucc_mc_buffer_header_t) + MC_CPU_CONFIG->cpu_elem_size, 0,
+            UCC_CACHE_LINE_SIZE, 1, MC_CPU_CONFIG->cpu_max_elems, &ucc_mc_ops,
+            UCC_THREAD_MULTIPLE, "mc cpu mpool buffers");
+        if (status != UCC_OK) {
+            return status;
+        }
+        ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_alloc;
+        ucc_mc_cpu.mpool_init_flag     = 1;
+    }
+    ucc_spin_unlock(&ucc_mc_cpu.mpool_init_spinlock);
+    return ucc_mc_cpu_mem_alloc(ptr, size);
 }
 
 static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
@@ -91,9 +198,14 @@ static ucc_status_t ucc_mc_cpu_reduce(const void *src1, const void *src2,
     return ucc_mc_cpu_reduce_multi(src1, src2, dst, 1, count, 0, dt, op);
 }
 
-static ucc_status_t ucc_mc_cpu_mem_free(void *ptr)
+static ucc_status_t ucc_mc_cpu_mem_free(ucc_mc_buffer_header_t *ptr)
 {
-    ucc_free(ptr);
+    if (!ptr->from_pool) {
+        ucc_free(ptr);
+    }
+    else {
+        ucc_mpool_put(ptr);
+    }
     return UCC_OK;
 }
 
@@ -155,7 +267,6 @@ ucc_status_t ucc_ee_cpu_event_test(void *event) //NOLINT
     return UCC_OK;
 }
 
-
 ucc_mc_cpu_t ucc_mc_cpu = {
     .super.super.name       = "cpu mc",
     .super.ref_cnt          = 0,
@@ -164,12 +275,12 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.init             = ucc_mc_cpu_init,
     .super.finalize         = ucc_mc_cpu_finalize,
     .super.ops.mem_query    = ucc_mc_cpu_mem_query,
-    .super.ops.mem_alloc    = ucc_mc_cpu_mem_alloc,
+    .super.ops.mem_alloc    = ucc_mc_cpu_mem_alloc_with_init,
     .super.ops.mem_free     = ucc_mc_cpu_mem_free,
     .super.ops.reduce       = ucc_mc_cpu_reduce,
     .super.ops.reduce_multi = ucc_mc_cpu_reduce_multi,
     .super.ops.memcpy       = ucc_mc_cpu_memcpy,
-    .super.config_table     =
+    .super.config_table =
         {
             .name   = "CPU memory component",
             .prefix = "MC_CPU_",
@@ -183,6 +294,7 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.ee_ops.ee_destroy_event = ucc_ee_cpu_destroy_event,
     .super.ee_ops.ee_event_post    = ucc_ee_cpu_event_post,
     .super.ee_ops.ee_event_test    = ucc_ee_cpu_event_test,
+    .mpool_init_flag               = 0,
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_mc_cpu.super.config_table,

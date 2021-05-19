@@ -29,16 +29,21 @@ UCC_TEST_F(test_mc, init_is_required)
 
 UCC_TEST_F(test_mc, can_alloc_and_free_host_mem)
 {
+    ucc_mc_buffer_header_t *h    = NULL;
     void *ptr = NULL;
     size_t size = 4096;
 
     ASSERT_EQ(UCC_OK, ucc_constructor());
     ASSERT_EQ(UCC_OK, ucc_mc_init());
-    EXPECT_EQ(UCC_OK, ucc_mc_alloc(&ptr, size, UCC_MEMORY_TYPE_HOST));
+    EXPECT_EQ(UCC_OK, ucc_mc_alloc(&h, size, UCC_MEMORY_TYPE_HOST));
+    ptr = h->addr;
     memset(ptr, 0, size);
-    EXPECT_EQ(UCC_OK, ucc_mc_free(ptr, UCC_MEMORY_TYPE_HOST));
+    EXPECT_EQ(UCC_OK, ucc_mc_free(h, UCC_MEMORY_TYPE_HOST));
     ucc_mc_finalize();
 }
+
+// TODO: add UCC_TEST_F for multi threaded: spawn (multiple times - in a loop) pthreads and call ucc_mc_alloc/free.
+// Make sure to allocate more than max amount of elems so it should test slow path as well
 
 UCC_TEST_F(test_mc, init_twice)
 {

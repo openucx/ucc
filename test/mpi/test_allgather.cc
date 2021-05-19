@@ -27,13 +27,17 @@ TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc(&rbuf, _msgsize*size, _mt));
+    UCC_CHECK(ucc_mc_alloc(&rbuf_header, _msgsize * size, _mt));
+    rbuf = rbuf_header->addr;
     check_rbuf = ucc_malloc(_msgsize*size, "check rbuf");
     UCC_MALLOC_CHECK(check_rbuf);
     if (TEST_NO_INPLACE == inplace) {
-        UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
+        UCC_CHECK(ucc_mc_alloc(&sbuf_header, _msgsize, _mt));
+        sbuf = sbuf_header->addr;
         init_buffer(sbuf, count, TEST_DT, _mt, rank);
-        UCC_ALLOC_COPY_BUF(check_sbuf, UCC_MEMORY_TYPE_HOST, sbuf, _mt, _msgsize);
+        UCC_ALLOC_COPY_BUF(check_sbuf_header, UCC_MEMORY_TYPE_HOST, sbuf, _mt,
+                           _msgsize);
+        check_sbuf = check_sbuf_header->addr;
     } else {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;

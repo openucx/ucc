@@ -103,11 +103,13 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc(&sbuf, sncounts * dt_size, _mt));
+    UCC_CHECK(ucc_mc_alloc(&sbuf_header, sncounts * dt_size, _mt));
+    sbuf = sbuf_header->addr;
     init_buffer(sbuf, sncounts, TEST_DT, _mt, rank);
-    UCC_ALLOC_COPY_BUF(check_sbuf, UCC_MEMORY_TYPE_HOST, sbuf, _mt,
+    UCC_ALLOC_COPY_BUF(check_sbuf_header, UCC_MEMORY_TYPE_HOST, sbuf, _mt,
                        sncounts * dt_size);
-    UCC_CHECK(ucc_mc_alloc(&rbuf, rncounts * dt_size, _mt));
+    UCC_CHECK(ucc_mc_alloc(&rbuf_header, rncounts * dt_size, _mt));
+    rbuf = rbuf_header->addr;
     check_rbuf = ucc_malloc(rncounts * dt_size, "check rbuf");
     UCC_MALLOC_CHECK(check_rbuf);
 

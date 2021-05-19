@@ -44,8 +44,10 @@ public:
                                    rank_size);
             }
 
-            UCC_CHECK(ucc_mc_alloc(&coll->dst.info.buffer,
-                      ucc_dt_size(dtype) * count * nprocs, mem_type));
+            UCC_CHECK(ucc_mc_alloc(&coll->dst.info.mc_header,
+                                   ucc_dt_size(dtype) * count * nprocs,
+                                   mem_type));
+            coll->dst.info.buffer = coll->dst.info.mc_header->addr;
             if (TEST_INPLACE == inplace) {
                 coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
@@ -53,8 +55,10 @@ public:
                                         ucc_dt_size(dtype) * count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
             } else {
-                UCC_CHECK(ucc_mc_alloc(&coll->src.info.buffer,
-                          ucc_dt_size(dtype) * count * nprocs, mem_type));
+                UCC_CHECK(ucc_mc_alloc(&coll->src.info.mc_header,
+                                       ucc_dt_size(dtype) * count * nprocs,
+                                       mem_type));
+                coll->src.info.buffer = coll->src.info.mc_header->addr;
                 UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[i]->init_buf,
                                         ucc_dt_size(dtype) * count * nprocs, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
@@ -66,7 +70,7 @@ public:
         for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
             ucc_coll_args_t* coll = ctx->args;
             if (coll->src.info.buffer) { /* no inplace */
-                UCC_CHECK(ucc_mc_free(coll->src.info.buffer, mem_type));
+                UCC_CHECK(ucc_mc_free(coll->src.info.mc_header, mem_type));
             }
             UCC_CHECK(ucc_mc_free(coll->dst.info.buffer, mem_type));
             ucc_free(ctx->init_buf);
@@ -79,6 +83,7 @@ public:
     {
         bool                   ret = true;
         std::vector<uint8_t *> dsts(ctxs.size());
+        std::vector<ucc_mc_buffer_header_t *> dsts_mc_headers(ctxs.size());
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {

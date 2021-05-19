@@ -29,7 +29,8 @@ TestBcast::TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
     check_rbuf = ucc_malloc(_msgsize * size, "check rbuf");
     UCC_MALLOC_CHECK(check_rbuf);
-    UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
+    UCC_CHECK(ucc_mc_alloc(&sbuf_header, _msgsize, _mt));
+    sbuf = sbuf_header->addr;
     check_sbuf = ucc_malloc(_msgsize, "check sbuf");
     UCC_MALLOC_CHECK(check_sbuf);
     if (rank == root) {

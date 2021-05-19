@@ -11,9 +11,10 @@ extern "C" {
 
 class test_mc_cuda : public ucc::test {
   protected:
-    const int         TEST_ALLOC_SIZE = 1024;
-    void *            test_ptr;
-    ucc_memory_type_t test_mtype;
+    const int               TEST_ALLOC_SIZE = 1024;
+    ucc_mc_buffer_header_t *mc_header;
+    void *                  test_ptr;
+    ucc_memory_type_t       test_mtype;
     virtual void SetUp() override
     {
         ucc::test::SetUp();
@@ -37,10 +38,14 @@ UCC_TEST_F(test_mc_cuda, mc_cuda_load)
 UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem)
 {
     EXPECT_EQ(UCC_OK,
-              ucc_mc_alloc(&test_ptr, TEST_ALLOC_SIZE, UCC_MEMORY_TYPE_CUDA));
+              ucc_mc_alloc(&mc_header, TEST_ALLOC_SIZE, UCC_MEMORY_TYPE_CUDA));
+    test_ptr = mc_header->addr;
     EXPECT_EQ(cudaSuccess, cudaMemset(test_ptr, 0, TEST_ALLOC_SIZE));
-    EXPECT_EQ(UCC_OK, ucc_mc_free(test_ptr, UCC_MEMORY_TYPE_CUDA));
+    EXPECT_EQ(UCC_OK, ucc_mc_free(mc_header, UCC_MEMORY_TYPE_CUDA));
 }
+
+// TODO: add UCC_TEST_F for multi threaded: spawn (multiple times - in a loop) pthreads and call ucc_mc_alloc/free.
+// Make sure to allocate more than max amount of elems so it should test slow path as well
 
 UCC_TEST_F(test_mc_cuda, can_detect_host_mem)
 {

@@ -16,9 +16,10 @@ extern "C" {
 #include <memory>
 
 typedef struct {
-   void *init_buf;
-   size_t rbuf_size;
-   ucc_coll_args_t *args;
+    ucc_mc_buffer_header_t *mc_header;
+    void *                  init_buf;
+    size_t                  rbuf_size;
+    ucc_coll_args_t *       args;
 } gtest_ucc_coll_ctx_t;
 
 typedef std::vector<gtest_ucc_coll_ctx_t*> UccCollCtxVec;
