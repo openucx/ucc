@@ -31,11 +31,17 @@ allreduce =                           \
 allgather =                       \
 	allgather/allgather.h         \
 	allgather/allgather.c         \
-	allgather/allgather_ring.c
+	allgather/allgather_ring.c    \
+	allgather/allgather_knomial.c
+
 allgatherv =                      \
 	allgatherv/allgatherv.h       \
 	allgatherv/allgatherv.c       \
 	allgatherv/allgatherv_ring.c
+
+reduce_scatter =	                        \
+	reduce_scatter/reduce_scatter.h         \
+	reduce_scatter/reduce_scatter_knomial.c
 
 sources =                 \
 	tl_ucp.h              \
@@ -55,7 +61,8 @@ sources =                 \
 	$(allreduce)          \
 	$(allgather)          \
 	$(allgatherv)         \
-	$(bcast)
+	$(bcast)              \
+	$(reduce_scatter)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

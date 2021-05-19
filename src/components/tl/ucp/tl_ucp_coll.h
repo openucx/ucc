@@ -38,6 +38,15 @@ typedef struct ucc_tl_ucp_task {
             void                 *scratch;
         } allreduce_kn;
         struct {
+            int                   phase;
+            ucc_knomial_pattern_t p;
+            void                 *scratch;
+        } reduce_scatter_kn;
+        struct {
+            int                   phase;
+            ucc_knomial_pattern_t p;
+        } allgather_kn;
+        struct {
             ucc_rank_t            dist;
             uint32_t              radix;
         } bcast_kn;
@@ -61,6 +70,19 @@ static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
     task->subset.map.ep_num  = team->size;
     task->subset.myrank      = team->rank;
     return task;
+}
+
+static inline ucc_schedule_t *ucc_tl_ucp_get_schedule(ucc_tl_ucp_team_t *team)
+{
+    ucc_tl_ucp_context_t *ctx      = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_schedule_t       *schedule = ucc_mpool_get(&ctx->req_mp);
+    ucc_schedule_init(schedule, UCC_TL_UCP_TEAM_CORE_CTX(team));
+    return schedule;
+}
+
+static inline void ucc_tl_ucp_put_schedule(ucc_schedule_t *schedule)
+{
+    ucc_mpool_put(schedule);
 }
 
 ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,

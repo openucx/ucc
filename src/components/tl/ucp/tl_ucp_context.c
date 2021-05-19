@@ -8,6 +8,7 @@
 #include "tl_ucp_tag.h"
 #include "tl_ucp_coll.h"
 #include "tl_ucp_ep.h"
+#include "utils/ucc_math.h"
 #include <limits.h>
 
 static ucc_mpool_ops_t ucc_tl_ucp_req_mpool_ops = {
@@ -105,10 +106,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     self->ucp_worker  = ucp_worker;
     self->worker_address = NULL;
 
-    ucc_status = ucc_mpool_init(&self->req_mp, 0, sizeof(ucc_tl_ucp_task_t), 0,
-                                UCC_CACHE_LINE_SIZE, 8, UINT_MAX,
-                                &ucc_tl_ucp_req_mpool_ops, params->thread_mode,
-                                "tl_ucp_req_mp");
+    ucc_status = ucc_mpool_init(
+        &self->req_mp, 0,
+        ucc_max(sizeof(ucc_tl_ucp_task_t), sizeof(ucc_schedule_t)), 0,
+        UCC_CACHE_LINE_SIZE, 8, UINT_MAX, &ucc_tl_ucp_req_mpool_ops,
+        params->thread_mode, "tl_ucp_req_mp");
     if (UCC_OK != ucc_status) {
         tl_error(self->super.super.lib,
                  "failed to initialize tl_ucp_req mpool");

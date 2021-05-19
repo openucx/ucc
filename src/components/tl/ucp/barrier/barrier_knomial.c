@@ -11,29 +11,6 @@
 #include "tl_ucp_sendrecv.h"
 #include "coll_patterns/recursive_knomial.h"
 #include "utils/ucc_math.h"
-enum {
-    PHASE_INIT,
-    PHASE_LOOP,  /* main loop of recursive k-ing */
-    PHASE_EXTRA, /* recv from extra rank */
-    PHASE_PROXY, /* send from proxy to extra rank */
-};
-
-#define CHECK_PHASE(_p)                                                        \
-    case _p:                                                                   \
-        goto _p;                                                               \
-        break;
-
-#define GOTO_PHASE(_phase)                                                     \
-    do {                                                                       \
-        switch (_phase) {                                                      \
-            CHECK_PHASE(PHASE_EXTRA);                                          \
-            CHECK_PHASE(PHASE_PROXY);                                          \
-            CHECK_PHASE(PHASE_LOOP);                                           \
-        case PHASE_INIT:                                                       \
-            break;                                                             \
-        };                                                                     \
-    } while (0)
-
 
 #define SAVE_STATE(_phase)                                            \
     do {                                                              \
@@ -51,7 +28,7 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t             peer;
     ucc_kn_radix_t         loop_step;
 
-    GOTO_PHASE(task->barrier.phase);
+    UCC_KN_GOTO_PHASE(task->barrier.phase);
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, team->rank);
         UCPCHECK_GOTO(ucc_tl_ucp_send_nb(NULL, 0, mtype, peer, team, task),
@@ -65,10 +42,10 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_progress(ucc_coll_task_t *coll_task)
         UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(NULL, 0, mtype, peer, team, task),
                       task, out);
     }
-PHASE_EXTRA:
+UCC_KN_PHASE_EXTRA:
     if (KN_NODE_PROXY == node_type || KN_NODE_EXTRA == node_type) {
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            SAVE_STATE(PHASE_EXTRA);
+            SAVE_STATE(UCC_KN_PHASE_EXTRA);
             return UCC_INPROGRESS;
         }
         if (KN_NODE_EXTRA == node_type) {
@@ -94,9 +71,9 @@ PHASE_EXTRA:
             UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(NULL, 0, mtype, peer, team, task),
                           task, out);
         }
-    PHASE_LOOP:
+    UCC_KN_PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            SAVE_STATE(PHASE_LOOP);
+            SAVE_STATE(UCC_KN_PHASE_LOOP);
             return UCC_INPROGRESS;
         }
         ucc_knomial_pattern_next_iteration(p);
@@ -105,14 +82,14 @@ PHASE_EXTRA:
         peer = ucc_knomial_pattern_get_extra(p, team->rank);
         UCPCHECK_GOTO(ucc_tl_ucp_send_nb(NULL, 0, mtype, peer, team, task),
                       task, out);
-        goto PHASE_PROXY;
+        goto UCC_KN_PHASE_PROXY;
     } else {
         goto completion;
     }
 
-PHASE_PROXY:
+UCC_KN_PHASE_PROXY:
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-        SAVE_STATE(PHASE_PROXY);
+        SAVE_STATE(UCC_KN_PHASE_PROXY);
         return UCC_INPROGRESS;
     }
 
@@ -128,7 +105,7 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team = task->team;
     ucc_status_t       status;
-    task->barrier.phase          = PHASE_INIT;
+    task->barrier.phase = UCC_KN_PHASE_INIT;
     ucc_knomial_pattern_init(team->size, team->rank,
                              ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
                                      cfg.barrier_kn_radix, team->size),

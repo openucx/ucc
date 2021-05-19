@@ -13,29 +13,6 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 #include "core/ucc_mc.h"
-enum {
-    PHASE_INIT,
-    PHASE_LOOP,  /* main loop of recursive k-ing */
-    PHASE_EXTRA, /* recv from extra rank */
-    PHASE_PROXY, /* send from proxy to extra rank */
-};
-
-#define CHECK_PHASE(_p)                                                        \
-    case _p:                                                                   \
-        goto _p;                                                               \
-        break;
-
-#define GOTO_PHASE(_phase)                                                     \
-    do {                                                                       \
-        switch (_phase) {                                                      \
-            CHECK_PHASE(PHASE_EXTRA);                                          \
-            CHECK_PHASE(PHASE_PROXY);                                          \
-            CHECK_PHASE(PHASE_LOOP);                                           \
-        case PHASE_INIT:                                                       \
-            break;                                                             \
-        };                                                                     \
-    } while (0)
-
 
 #define SAVE_STATE(_phase)                                            \
     do {                                                              \
@@ -66,7 +43,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     if (UCC_IS_INPLACE(task->args)) {
         sbuf = rbuf;
     }
-    GOTO_PHASE(task->allreduce_kn.phase);
+    UCC_KN_GOTO_PHASE(task->allreduce_kn.phase);
 
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_ep_map_eval(task->subset.map,
@@ -86,10 +63,10 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
             ucc_tl_ucp_recv_nb(scratch, data_size, mem_type, peer, team, task),
             task, out);
     }
-PHASE_EXTRA:
+UCC_KN_PHASE_EXTRA:
     if (KN_NODE_PROXY == node_type || KN_NODE_EXTRA == node_type) {
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            SAVE_STATE(PHASE_EXTRA);
+            SAVE_STATE(UCC_KN_PHASE_EXTRA);
             return task->super.super.status;
         }
         if (KN_NODE_EXTRA == node_type) {
@@ -136,9 +113,9 @@ PHASE_EXTRA:
             recv_offset += data_size;
         }
 
-    PHASE_LOOP:
+    UCC_KN_PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            SAVE_STATE(PHASE_LOOP);
+            SAVE_STATE(UCC_KN_PHASE_LOOP);
             return task->super.super.status;
         }
 
@@ -167,14 +144,14 @@ PHASE_EXTRA:
         UCPCHECK_GOTO(
             ucc_tl_ucp_send_nb(rbuf, data_size, mem_type, peer, team, task),
             task, out);
-        goto PHASE_PROXY;
+        goto UCC_KN_PHASE_PROXY;
     } else {
         goto completion;
     }
 
-PHASE_PROXY:
+UCC_KN_PHASE_PROXY:
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-        SAVE_STATE(PHASE_PROXY);
+        SAVE_STATE(UCC_KN_PHASE_PROXY);
         return task->super.super.status;
     }
 
@@ -197,7 +174,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         rank      = task->subset.myrank;
     ucc_status_t       status;
 
-    task->allreduce_kn.phase          = PHASE_INIT;
+    task->allreduce_kn.phase = UCC_KN_PHASE_INIT;
     ucc_assert(task->args.src.info.mem_type ==
                task->args.dst.info.mem_type);
     ucc_knomial_pattern_init(size, rank,
