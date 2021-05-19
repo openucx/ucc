@@ -12,39 +12,45 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_team_t, ucc_base_context_t *cl_context,
 {
     ucc_cl_basic_context_t *ctx =
         ucc_derived_of(cl_context, ucc_cl_basic_context_t);
-    int                     n_teams = 1, i;
+    int                     i;
     ucc_status_t            status;
 
-    self->tl_ucp_team  = NULL;
-    self->tl_nccl_team = NULL;
-    ucc_assert(ctx->tl_ucp_ctx != NULL);
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super);
-    status = ucc_team_multiple_req_alloc(&self->team_create_req,
-                                         UCC_CL_BASIC_NUM_TLS);
+    self->tl_teams = ucc_malloc(sizeof(ucc_tl_team_t *) * ctx->n_tl_ctxs,
+                                "cl_basic_tl_teams");
+    if (!self->tl_teams) {
+        cl_error(cl_context->lib, "failed to allocate %zd bytes for tl_teams",
+                 sizeof(ucc_tl_team_t *) * ctx->n_tl_ctxs);
+        status = UCC_ERR_NO_MEMORY;
+        goto err;
+    }
+    self->n_tl_teams = 0;
+    status           = ucc_team_multiple_req_alloc(&self->team_create_req,
+                                                   ctx->n_tl_ctxs);
     if (UCC_OK != status) {
         cl_error(cl_context->lib, "failed to allocate team req multiple");
-        return status;
+        goto err;
     }
-    self->team_create_req->descs[0].ctx = ctx->tl_ucp_ctx;
-    if (ctx->tl_nccl_ctx) {
-        self->team_create_req->descs[1].ctx = ctx->tl_nccl_ctx;
-        n_teams++;
-    }
-    for (i = 0; i < n_teams; i++) {
+    for (i = 0; i < ctx->n_tl_ctxs; i++) {
         memcpy(&self->team_create_req->descs[i].param, params,
                sizeof(ucc_base_team_params_t));
+        self->team_create_req->descs[i].ctx            = ctx->tl_ctxs[i];
         self->team_create_req->descs[i].param.scope    = UCC_CL_BASIC;
         self->team_create_req->descs[i].param.scope_id = 0;
     }
-    self->team_create_req->n_teams = n_teams;
+    self->team_create_req->n_teams = ctx->n_tl_ctxs;
+
     status = ucc_tl_team_create_multiple(self->team_create_req);
     if (status < 0) {
         cl_error(cl_context->lib, "failed to post tl team create (%d)",
                  status);
-        return status;
+        goto err;
     }
     cl_info(cl_context->lib, "posted cl team: %p", self);
     return UCC_OK;
+err:
+    ucc_free(self->tl_teams);
+    return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_team_t)
@@ -60,36 +66,34 @@ ucc_status_t ucc_cl_basic_team_destroy(ucc_base_team_t *cl_team)
     ucc_cl_basic_team_t    *team    = ucc_derived_of(cl_team, ucc_cl_basic_team_t);
     ucc_cl_basic_context_t *ctx     = UCC_CL_BASIC_TEAM_CTX(team);
     ucc_status_t            status  = UCC_OK;
-    int                     n_teams = team->tl_nccl_team ? 2 : 1;
+    int                     i;
+
     if (NULL == team->team_create_req) {
         status = ucc_team_multiple_req_alloc(&team->team_create_req,
-                                             UCC_CL_BASIC_NUM_TLS);
+                                             team->n_tl_teams);
         if (UCC_OK != status) {
             cl_error(ctx->super.super.lib, "failed to allocate team req multiple");
             return status;
         }
-        team->team_create_req->n_teams       = n_teams;
-        team->team_create_req->descs[0].team = team->tl_ucp_team;
-        team->team_create_req->descs[1].team = team->tl_nccl_team;
+        team->team_create_req->n_teams       = team->n_tl_teams;
+        for (i = 0; i < team->n_tl_teams; i++) {
+            team->team_create_req->descs[i].team = team->tl_teams[i];
+        }
     }
     status = ucc_tl_team_destroy_multiple(team->team_create_req);
     if (UCC_INPROGRESS == status) {
         return status;
     }
-
-    if (team->team_create_req->descs[0].status != UCC_OK) {
-        cl_error(ctx->super.super.lib, "ucp team destroy failed (%d)",
-                 status);
-        status = team->team_create_req->descs[0].status;
-    }
-
-    if (n_teams > 1 && (team->team_create_req->descs[1].status != UCC_OK)) {
-        cl_error(ctx->super.super.lib, "nccl team destroy failed (%d)",
-                 status);
-        status = team->team_create_req->descs[1].status;
+    for (i = 0; i < team->n_tl_teams; i++) {
+        if (team->team_create_req->descs[i].status != UCC_OK) {
+            cl_error(ctx->super.super.lib, "tl team destroy failed (%d)",
+                     status);
+            status = team->team_create_req->descs[i].status;
+        }
     }
     ucc_team_multiple_req_free(team->team_create_req);
     ucc_coll_score_free_map(team->score_map);
+    ucc_free(team->tl_teams);
     UCC_CLASS_DELETE_FUNC_NAME(ucc_cl_basic_team_t)(cl_team);
     return status;
 }
@@ -99,52 +103,53 @@ ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)
     ucc_cl_basic_team_t    *team = ucc_derived_of(cl_team, ucc_cl_basic_team_t);
     ucc_cl_basic_context_t *ctx  = UCC_CL_BASIC_TEAM_CTX(team);
     ucc_status_t            status;
-    ucc_coll_score_t       *tl_ucp_score, *tl_nccl_score, *score;
+    int                     i;
+    ucc_coll_score_t       *score, *score_next, *score_merge;
     status = ucc_tl_team_create_multiple(team->team_create_req);
     if (status == UCC_OK) {
-        team->tl_ucp_team = NULL;
-        team->tl_nccl_team = NULL;
-        if ((ctx->tl_nccl_ctx != NULL) &&
-            (team->team_create_req->descs[1].status == UCC_OK)) {
-            team->tl_nccl_team = team->team_create_req->descs[1].team;
-            cl_info(ctx->super.super.lib, "initialized nccl team");
-        }
-        if (team->team_create_req->descs[0].status != UCC_OK) {
-            if (team->tl_nccl_team) {
-                UCC_TL_CTX_IFACE(ctx->tl_nccl_ctx)
-                    ->team.destroy(&team->tl_nccl_team->super);
-                team->tl_nccl_team = NULL;
+        for (i = 0; i < ctx->n_tl_ctxs; i++) {
+            if (team->team_create_req->descs[i].status == UCC_OK) {
+                team->tl_teams[team->n_tl_teams++] =
+                    team->team_create_req->descs[i].team;
+                cl_info(ctx->super.super.lib, "initialized tl %s team",
+                        UCC_TL_CTX_IFACE(team->team_create_req->descs[i].ctx)->
+                        super.name);
+            } else {
+                cl_info(ctx->super.super.lib, "failed to create tl %s team",
+                        UCC_TL_CTX_IFACE(team->team_create_req->descs[i].ctx)->
+                        super.name);
             }
-            cl_error(ctx->super.super.lib, "failed to create tl ucp team");
         }
-        team->tl_ucp_team = team->team_create_req->descs[0].team;
         ucc_team_multiple_req_free(team->team_create_req);
         team->team_create_req = NULL;
-
+        if (0 == team->n_tl_teams) {
+            cl_error(ctx->super.super.lib, "no tl teams were created");
+            return UCC_ERR_NOT_FOUND;
+        }
         status =
-            UCC_TL_CTX_IFACE(ctx->tl_ucp_ctx)
-                ->team.get_scores(&team->tl_ucp_team->super, &tl_ucp_score);
+            UCC_TL_TEAM_IFACE(team->tl_teams[0])
+                ->team.get_scores(&team->tl_teams[0]->super, &score);
         if (UCC_OK != status) {
-            cl_error(ctx->super.super.lib, "failed to get tl ucp scores");
+            cl_error(ctx->super.super.lib, "failed to get tl %s scores",
+                     UCC_TL_TEAM_IFACE(team->tl_teams[0])->super.name);
             return status;
         }
-        score = tl_ucp_score;
-        if (team->tl_nccl_team) {
-            status = UCC_TL_CTX_IFACE(ctx->tl_nccl_ctx)
-                         ->team.get_scores(&team->tl_nccl_team->super,
-                                           &tl_nccl_score);
+        for (i = 1; i < team->n_tl_teams; i++) {
+            status =
+                UCC_TL_TEAM_IFACE(team->tl_teams[i])
+                ->team.get_scores(&team->tl_teams[i]->super, &score_next);
             if (UCC_OK != status) {
-                cl_error(ctx->super.super.lib, "failed to get tl nccl scores");
-                ucc_coll_score_free(tl_ucp_score);
+                cl_error(ctx->super.super.lib, "failed to get tl %s scores",
+                         UCC_TL_TEAM_IFACE(team->tl_teams[i])->super.name);
                 return status;
             }
             status =
-                ucc_coll_score_merge(tl_ucp_score, tl_nccl_score, &score, 1);
+                ucc_coll_score_merge(score, score_next, &score_merge, 1);
             if (UCC_OK != status) {
-                cl_error(ctx->super.super.lib,
-                         "failed to merge TL ucp and nccl scores");
+                cl_error(ctx->super.super.lib, "failed to merge scores");
                 return status;
             }
+            score = score_merge;
         }
         status = ucc_coll_score_build_map(score, &team->score_map);
         if (UCC_OK != status) {

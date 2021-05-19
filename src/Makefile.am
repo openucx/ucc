@@ -63,7 +63,9 @@ noinst_HEADERS =                     \
 	components/tl/ucc_tl.h           \
 	components/tl/ucc_tl_log.h       \
 	components/mc/base/ucc_mc_base.h \
-	components/mc/ucc_mc_log.h
+	components/mc/ucc_mc_log.h       \
+	coll_patterns/recursive_knomial.h \
+	coll_patterns/sra_knomial.h
 
 libucc_la_SOURCES =                  \
 	core/ucc_lib.c                   \

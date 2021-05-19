@@ -34,4 +34,6 @@ static inline size_t ucc_dt_size(ucc_datatype_t dt)
     return 0;
 }
 
+#define PTR_OFFSET(_ptr, _offset)                                              \
+    ((void *)((ptrdiff_t)(_ptr) + (size_t)(_offset)))
 #endif

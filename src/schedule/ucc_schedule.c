@@ -87,3 +87,9 @@ ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule)
     return ucc_event_manager_notify(&schedule->super,
                                     UCC_EVENT_SCHEDULE_STARTED);
 }
+
+ucc_status_t ucc_task_start_handler(ucc_coll_task_t *parent, /* NOLINT */
+                                    ucc_coll_task_t *task)
+{
+    return task->post(task);
+}

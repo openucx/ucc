@@ -99,7 +99,9 @@ typedef struct ucc_base_team_iface {
 } ucc_base_team_iface_t;
 
 typedef struct ucc_team ucc_team_t;
+
 typedef struct ucc_base_coll_args {
+    uint64_t        mask;
     ucc_coll_args_t args;
     ucc_team_t     *team;
 } ucc_base_coll_args_t;

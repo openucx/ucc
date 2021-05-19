@@ -7,12 +7,17 @@
 #include "ucc_cl.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_malloc.h"
+#include "core/ucc_global_opts.h"
 
+static char * ucc_cl_tls_doc_str = "List of TLs used by a given CL component.\n"
+    "Allowed values: either \"all\" or comma-separated list of: ";
+#define TLS_CONFIG_ENTRY 1
 ucc_config_field_t ucc_cl_lib_config_table[] = {
-    {"", "", NULL, ucc_offsetof(ucc_cl_lib_config_t, super),
+    [0] = {"", "", NULL, ucc_offsetof(ucc_cl_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_base_config_table)},
 
-    {"TLS", "all", NULL, ucc_offsetof(ucc_cl_lib_config_t, tls),
+    [TLS_CONFIG_ENTRY] = {"TLS", "all", NULL,
+                          ucc_offsetof(ucc_cl_lib_config_t, tls),
      UCC_CONFIG_TYPE_STRING_ARRAY},
 
     {NULL}
@@ -137,6 +142,26 @@ ucc_status_t ucc_cl_lib_config_read(ucc_cl_iface_t *iface,
                                     const char *full_prefix,
                                     ucc_cl_lib_config_t **cl_config)
 {
+    char  *tls_list;
+    char  *doc_str;
+    size_t doc_len;
+    if (!ucc_cl_lib_config_table[TLS_CONFIG_ENTRY].doc) {
+        tls_list = ucc_get_framework_components_list(
+            &ucc_global_config.tl_framework, ',');
+        if (tls_list) {
+            doc_len = strlen(ucc_cl_tls_doc_str) + strlen(tls_list) + 1;
+            doc_str = ucc_malloc(doc_len, "cl_tls_doc");
+            if (!doc_str) {
+                ucc_error("failed to allocate %zd bytes for cl_tls_doc",
+                          doc_len);
+            } else {
+                ucc_snprintf_safe(doc_str, doc_len, "%s%s", ucc_cl_tls_doc_str,
+                                  tls_list);
+                ucc_cl_lib_config_table[TLS_CONFIG_ENTRY].doc = doc_str;
+            }
+            ucc_free(tls_list);
+        }
+    }
     return ucc_base_config_read(full_prefix, &iface->cl_lib_config,
                                 (ucc_base_config_t **)cl_config);
 }

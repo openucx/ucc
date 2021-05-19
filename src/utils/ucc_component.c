@@ -170,3 +170,30 @@ ucc_component_check_scores_uniq(ucc_component_framework_t *framework)
     }
     return UCC_OK;
 }
+
+char* ucc_get_framework_components_list(ucc_component_framework_t *framework,
+                                        char delimiter)
+{
+    size_t len;
+    int    i;
+    char  *list;
+
+    len = 0;
+    for (i = 0; i < framework->n_components; i++) {
+        /* component name + ',' delimiter */
+        len += strlen(framework->components[i]->name) + 1;
+    }
+    list = ucc_malloc(len, "components_list");
+    if (!list) {
+        ucc_error("failed to allocate %zd bytes for components_list", len);
+        return NULL;
+    }
+    list[0] = '\0';
+    for (i = 0; i < framework->n_components; i++) {
+        strcat(list, framework->components[i]->name);
+        if (i < framework->n_components - 1) {
+            strcat(list, &delimiter);
+        }
+    }
+    return list;
+}
