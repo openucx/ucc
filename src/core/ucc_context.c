@@ -35,6 +35,8 @@ static ucc_config_field_t ucc_context_config_table[] = {
 
     {NULL}
 };
+UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
+                          ucc_context_config_t, &ucc_config_global_list);
 
 ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
                                      ucc_context_config_t **config_p)
