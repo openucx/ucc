@@ -22,47 +22,69 @@ HEAD_NODE=$(head -1 "$HOSTFILE")
 export HEAD_NODE
 export MASTER_ADDR=${HEAD_NODE}
 
-NP=$(wc --lines "$HOSTFILE" | awk '{print $1}')
+N_HOSTS=$(wc --lines "$HOSTFILE" | awk '{print $1}')
+NP_HOSTS=${N_HOSTS}
+N_CPU=$(nproc)
+NP_CPU=$((N_CPU * N_HOSTS))
+N_GPU=$(nvidia-smi --list-gpus | wc --lines)
+NP_GPU=$((N_GPU * N_HOSTS))
 
 # shellcheck disable=SC2086
 mpirun \
-    -np $NP \
+    -np ${NP_HOSTS} \
     --hostfile ${HOSTFILE} \
     --map-by node \
     --allow-run-as-root \
     --mca plm_rsh_args '-p 12345' \
     -x PATH \
     -x LD_LIBRARY_PATH \
+    --report-bindings \
     hostname
 
 # shellcheck disable=SC2086
 mpirun \
-    -np $NP \
+    -np ${NP_HOSTS} \
     --hostfile ${HOSTFILE} \
     --map-by node \
     --allow-run-as-root \
     --mca plm_rsh_args '-p 12345' \
     -x PATH \
     -x LD_LIBRARY_PATH \
+    --report-bindings \
     cat /proc/1/cgroup
 
-echo "INFO: UCC MPI unit tests (CPU/GPU with NCCL) ..."
+echo "INFO: UCC MPI unit tests (CPU) ..."
 # shellcheck disable=SC2086
 mpirun \
-    -np $NP \
+    -np ${NP_CPU} \
     --hostfile ${HOSTFILE} \
     --map-by node \
     --allow-run-as-root \
     --mca plm_rsh_args '-p 12345' \
     -x PATH \
     -x LD_LIBRARY_PATH \
-    /opt/nvidia/torch-ucc/src/ucc/build/test/mpi/ucc_test_mpi --mtypes host,cuda --inplace 2 --set_device 1 --root random:2 --count_bits 32,64 --displ_bits 32,64
-echo "INFO: UCC MPI unit tests (CPU/GPU with NCCL) ... DONE"
+    --report-bindings \
+    /opt/nvidia/torch-ucc/src/ucc/build/test/mpi/ucc_test_mpi --mtypes host --inplace 2 --set_device 1 --root random:2 --count_bits 32,64 --displ_bits 32,64
+echo "INFO: UCC MPI unit tests (CPU) ... DONE"
+
+echo "INFO: UCC MPI unit tests (GPU with NCCL) ..."
+# shellcheck disable=SC2086
+mpirun \
+    -np ${NP_GPU} \
+    --hostfile ${HOSTFILE} \
+    --map-by node \
+    --allow-run-as-root \
+    --mca plm_rsh_args '-p 12345' \
+    -x PATH \
+    -x LD_LIBRARY_PATH \
+    --report-bindings \
+    /opt/nvidia/torch-ucc/src/ucc/build/test/mpi/ucc_test_mpi --mtypes cuda --inplace 2 --set_device 1 --root random:2 --count_bits 32,64 --displ_bits 32,64
+echo "INFO: UCC MPI unit tests (GPU with NCCL) ... DONE"
 
 echo "INFO: UCC MPI unit tests (GPU without NCCL) ..."
 # shellcheck disable=SC2086
 mpirun \
-    -np $NP \
+    -np ${NP_GPU} \
     --hostfile ${HOSTFILE} \
     --map-by node \
     --allow-run-as-root \
@@ -70,5 +92,6 @@ mpirun \
     -x PATH \
     -x LD_LIBRARY_PATH \
     -x UCC_TL_NCCL_TUNE=0 \
+    --report-bindings \
     /opt/nvidia/torch-ucc/src/ucc/build/test/mpi/ucc_test_mpi --mtypes cuda --inplace 2 --set_device 1 --root random:2 --count_bits 32,64 --displ_bits 32,64
 echo "INFO: UCC MPI unit tests (GPU without NCCL) ... DONE"
