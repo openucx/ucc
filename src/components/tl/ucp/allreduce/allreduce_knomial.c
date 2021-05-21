@@ -14,27 +14,27 @@
 #include "utils/ucc_coll_utils.h"
 #include "core/ucc_mc.h"
 
-#define SAVE_STATE(_phase)                                            \
-    do {                                                              \
-        task->allreduce_kn.phase = _phase;                            \
+#define SAVE_STATE(_phase)                                                     \
+    do {                                                                       \
+        task->allreduce_kn.phase = _phase;                                     \
     } while (0)
 
-ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *ctask)
 {
-    ucc_tl_ucp_task_t     *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t     *team       = task->team;
-    ucc_kn_radix_t         radix      = task->allreduce_kn.p.radix;
-    uint8_t                node_type  = task->allreduce_kn.p.node_type;
-    ucc_knomial_pattern_t *p          = &task->allreduce_kn.p;
-    void                  *scratch    = task->allreduce_kn.scratch;
-    void                  *sbuf       = task->args.src.info.buffer;
-    void                  *rbuf       = task->args.dst.info.buffer;
-    ucc_memory_type_t      mem_type   = task->args.src.info.mem_type;
-    size_t                 count      = task->args.src.info.count;
-    ucc_datatype_t         dt         = task->args.src.info.datatype;
-    size_t                 data_size  = count * ucc_dt_size(dt);
-    ucc_rank_t             size       = (ucc_rank_t)task->subset.map.ep_num;
-    ucc_rank_t             rank       = task->subset.myrank;
+    ucc_tl_ucp_task_t     *task      = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t     *team      = task->team;
+    ucc_kn_radix_t         radix     = task->allreduce_kn.p.radix;
+    uint8_t                node_type = task->allreduce_kn.p.node_type;
+    ucc_knomial_pattern_t *p         = &task->allreduce_kn.p;
+    void                  *scratch   = task->allreduce_kn.scratch;
+    void                  *sbuf      = task->args.src.info.buffer;
+    void                  *rbuf      = task->args.dst.info.buffer;
+    ucc_memory_type_t      mem_type  = task->args.src.info.mem_type;
+    size_t                 count     = task->args.src.info.count;
+    ucc_datatype_t         dt        = task->args.src.info.datatype;
+    size_t                 data_size = count * ucc_dt_size(dt);
+    ucc_rank_t             size      = (ucc_rank_t)task->subset.map.ep_num;
+    ucc_rank_t             rank      = task->subset.myrank;
     void                  *send_buf;
     ptrdiff_t              recv_offset;
     ucc_rank_t             peer;
@@ -73,7 +73,8 @@ UCC_KN_PHASE_EXTRA:
             goto completion;
         } else {
             if (UCC_OK != (status = ucc_dt_reduce(sbuf, scratch, rbuf,
-                                                  count, dt, mem_type, &task->args))) {
+                                                  count, dt, mem_type,
+                                                  &task->args))) {
                 tl_error(UCC_TL_TEAM_LIB(task->team),
                          "failed to perform dt reduction");
                 task->super.super.status = status;
@@ -83,9 +84,8 @@ UCC_KN_PHASE_EXTRA:
     }
     while(!ucc_knomial_pattern_loop_done(p)) {
         for (loop_step = 1; loop_step < radix; loop_step++) {
-            peer = ucc_ep_map_eval(task->subset.map,
-                                   ucc_knomial_pattern_get_loop_peer(p, rank,
-                                                                     size, loop_step));
+            peer = ucc_knomial_pattern_get_loop_peer(p, rank, size, loop_step);
+            peer = ucc_ep_map_eval(task->subset.map, peer);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
             if ((p->iteration == 0) && (KN_NODE_PROXY != node_type) &&
@@ -95,15 +95,15 @@ UCC_KN_PHASE_EXTRA:
                 send_buf = rbuf;
             }
             UCPCHECK_GOTO(
-                ucc_tl_ucp_send_nb(send_buf, data_size, mem_type, peer, team, task),
+                ucc_tl_ucp_send_nb(send_buf, data_size, mem_type, peer, team,
+                                   task),
                 task, out);
         }
 
         recv_offset = 0;
         for (loop_step = 1; loop_step < radix; loop_step++) {
-            peer = ucc_ep_map_eval(task->subset.map,
-                                   ucc_knomial_pattern_get_loop_peer(p, rank,
-                                                                     size, loop_step));
+            peer = ucc_knomial_pattern_get_loop_peer(p, rank, size, loop_step);
+            peer = ucc_ep_map_eval(task->subset.map, peer);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
             UCPCHECK_GOTO(
@@ -128,8 +128,8 @@ UCC_KN_PHASE_EXTRA:
             }
             if (UCC_OK != (status = ucc_dt_reduce_multi(
                 send_buf, scratch, rbuf,
-                task->send_posted - p->iteration * (radix - 1), count, data_size,
-                dt, mem_type, &task->args))) {
+                task->send_posted - p->iteration * (radix - 1), count,
+                data_size, dt, mem_type, &task->args))) {
                 tl_error(UCC_TL_TEAM_LIB(task->team),
                          "failed to perform dt reduction");
                 task->super.super.status = status;
@@ -159,7 +159,6 @@ completion:
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.super.status = UCC_OK;
 out:
-    ucc_mc_free(task->allreduce_kn.scratch, task->args.src.info.mem_type);
     return task->super.super.status;
 }
 
@@ -167,9 +166,6 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team      = task->team;
-    size_t             count     = task->args.src.info.count;
-    ucc_datatype_t     dt        = task->args.src.info.datatype;
-    size_t             data_size = count * ucc_dt_size(dt);
     ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
     ucc_rank_t         rank      = task->subset.myrank;
     ucc_status_t       status;
@@ -181,14 +177,6 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
                              ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
                                      cfg.allreduce_kn_radix, size),
                              &task->allreduce_kn.p);
-    if (UCC_OK != (status = ucc_mc_alloc(&task->allreduce_kn.scratch,
-                                         (task->allreduce_kn.p.radix - 1) * data_size,
-                                         task->args.src.info.mem_type))) {
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "failed to allocate scratch buffer");
-        return status;
-    }
-
     task->super.super.status = UCC_INPROGRESS;
     status = ucc_tl_ucp_allreduce_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {
@@ -196,4 +184,48 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
         return UCC_OK;
     }
     return ucc_task_complete(coll_task);
+}
+
+ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
+{
+    size_t             count     = task->args.src.info.count;
+    ucc_datatype_t     dt        = task->args.src.info.datatype;
+    size_t             data_size = count * ucc_dt_size(dt);
+    ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
+    ucc_kn_radix_t     radix     = ucc_min(UCC_TL_UCP_TEAM_LIB(task->team)->
+                                     cfg.allreduce_kn_radix, size);
+    ucc_status_t       status;
+
+    task->super.post     = ucc_tl_ucp_allreduce_knomial_start;
+    task->super.progress = ucc_tl_ucp_allreduce_knomial_progress;
+    task->super.finalize = ucc_tl_ucp_allreduce_knomial_finalize;
+    status = ucc_mc_alloc(&task->allreduce_kn.scratch, (radix - 1) * data_size,
+                          task->args.src.info.mem_type);
+    if (status != UCC_OK) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "failed to allocate scratch buffer");
+        return status;
+    }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_ucp_allreduce_knomial_finalize(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_status_t st, global_st;
+
+    global_st = ucc_mc_free(task->allreduce_kn.scratch,
+                            task->args.src.info.mem_type);
+    if (global_st != UCC_OK) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "failed to free scratch buffer");
+    }
+
+    st = ucc_tl_ucp_coll_finalize(&task->super);
+    if (st != UCC_OK) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "failed finalize collective");
+        global_st = st;
+    }
+    return global_st;
 }
