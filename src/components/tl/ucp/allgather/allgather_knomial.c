@@ -116,6 +116,7 @@ UCC_KN_PHASE_PROXY:
     }
 
 out:
+    UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_done", 0);
     task->super.super.status = UCC_OK;
     return task->super.super.status;
 }
@@ -128,6 +129,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         rank = team->rank;
     ucc_status_t       status;
     ptrdiff_t          offset;
+
+    UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
     task->allgather_kn.phase = UCC_KN_PHASE_INIT;
     ucc_assert(task->args.src.info.mem_type == task->args.dst.info.mem_type);
 

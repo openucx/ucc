@@ -12,6 +12,7 @@
 #include "coll_patterns/recursive_knomial.h"
 #include "components/mc/base/ucc_mc_base.h"
 #include "tl_ucp_tag.h"
+#include "utils/profile/ucc_profile.h"
 
 #define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 1
 extern const char
@@ -58,9 +59,10 @@ typedef struct ucc_tl_ucp_task {
 
 static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
 {
-    ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_tl_ucp_task_t *task;
-    task                     = ucc_mpool_get(&ctx->req_mp);
+    ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_tl_ucp_task_t    *task = ucc_mpool_get(&ctx->req_mp);;
+
+    UCC_PROFILE_REQUEST_NEW(task, "tl_ucp_task", 0);
     task->super.super.status = UCC_OPERATION_INITIALIZED;
     task->super.flags        = 0;
     task->send_posted        = 0;
@@ -72,19 +74,30 @@ static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
     task->subset.map.type    = UCC_EP_MAP_FULL;
     task->subset.map.ep_num  = team->size;
     task->subset.myrank      = team->rank;
+
     return task;
+}
+
+static inline void ucc_tl_ucp_put_task(ucc_tl_ucp_task_t *task)
+{
+    UCC_PROFILE_REQUEST_FREE(task);
+    ucc_mpool_put(task);
 }
 
 static inline ucc_schedule_t *ucc_tl_ucp_get_schedule(ucc_tl_ucp_team_t *team)
 {
     ucc_tl_ucp_context_t *ctx      = UCC_TL_UCP_TEAM_CTX(team);
     ucc_schedule_t       *schedule = ucc_mpool_get(&ctx->req_mp);
+
+    UCC_PROFILE_REQUEST_NEW(schedule, "tl_ucp_task", 0);
     ucc_schedule_init(schedule, UCC_TL_UCP_TEAM_CORE_CTX(team));
+
     return schedule;
 }
 
 static inline void ucc_tl_ucp_put_schedule(ucc_schedule_t *schedule)
 {
+    UCC_PROFILE_REQUEST_FREE(schedule);
     ucc_mpool_put(schedule);
 }
 
@@ -111,11 +124,6 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     task->super.finalize = ucc_tl_ucp_coll_finalize;
     task->super.triggered_post = ucc_tl_ucp_triggered_post;
     return task;
-}
-
-static inline void ucc_tl_ucp_put_task(ucc_tl_ucp_task_t *task)
-{
-    ucc_mpool_put(task);
 }
 
 #define UCC_TL_UCP_TASK_P2P_COMPLETE(_task)                                    \

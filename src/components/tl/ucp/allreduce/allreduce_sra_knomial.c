@@ -41,6 +41,7 @@
 ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_start(ucc_coll_task_t *coll_task)
 {
     ucc_schedule_t *schedule = ucc_derived_of(coll_task, ucc_schedule_t);
+    UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_sra_knomial_start", 0);
     return ucc_schedule_start(schedule);
 }
 

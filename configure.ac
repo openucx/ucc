@@ -164,6 +164,9 @@ AS_IF([test "x$with_docs_only" = xyes],
               AS_HELP_STRING([--enable-debug], [Enable extra debugging code (default is NO).]),
               [], [enable_debug=no])
 
+#
+# Enables logging levels above INFO for debug build
+#
      if test $enable_debug = yes; then
         AC_DEFINE([ENABLE_DEBUG], [1], [Enable debugging code])
         CFLAGS="$CFLAGS -O0 -g3"
@@ -174,6 +177,22 @@ AS_IF([test "x$with_docs_only" = xyes],
         CFLAGS="$CFLAGS -O3 -g -DNDEBUG"
         CXXFLAGS="$CXXFLAGS -O3 -g -DNDEBUG"
      fi
+
+#
+# Enables profiling support.
+#
+    AC_ARG_ENABLE([profiling],
+        AS_HELP_STRING([--enable-profiling], [Enable profiling support, default: NO]),
+        [],
+        [enable_profiling=no])
+
+    AS_IF([test "x$enable_profiling" = xyes],
+        [AS_MESSAGE([enabling profiling])
+        AC_DEFINE([HAVE_PROFILING], [1], [Enable profiling])
+        HAVE_PROFILING=yes]
+        [:]
+    )
+    AM_CONDITIONAL([HAVE_PROFILING],[test "x$HAVE_PROFILING" = "xyes"])
 
      CHECK_UCX
      AC_MSG_RESULT([UCX support: $ucx_happy])

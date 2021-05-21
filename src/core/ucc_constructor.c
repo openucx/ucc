@@ -9,6 +9,7 @@
 #include "utils/ucc_component.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_proc_info.h"
+#include "utils/profile/ucc_profile.h"
 #include <link.h>
 #include <dlfcn.h>
 
@@ -106,6 +107,10 @@ ucc_status_t ucc_constructor(void)
             ucc_error("failed to initialize local proc info");
             return status;
         }
+#ifdef HAVE_PROFILING
+        ucc_profile_init(cfg->profile_mode, cfg->profile_file,
+                         cfg->profile_log_size);
+#endif
     }
     return UCC_OK;
 }
@@ -113,6 +118,9 @@ ucc_status_t ucc_constructor(void)
 __attribute__((destructor)) static void ucc_destructor(void)
 {
     if (ucc_global_config.initialized) {
+#ifdef HAVE_PROFILING
+        ucc_profile_cleanup();
+#endif
         ucc_config_parser_release_opts(&ucc_global_config,
                                        ucc_global_config_table);
     }
