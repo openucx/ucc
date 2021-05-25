@@ -24,7 +24,7 @@ noinst_LIBRARIES =
 
 libucc_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS)
 libucc_la_CFLAGS   = -c $(BASE_CFLAGS)
-libucc_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed
+libucc_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed -pthread
 
 nobase_dist_libucc_la_HEADERS =	\
 	ucc/api/ucc.h                   \
