@@ -28,6 +28,29 @@ const std::map<std::string, ucc_coll_type_t> ucc_pt_coll_map = {
     {"allgatherv", UCC_COLL_TYPE_ALLGATHERV},
     {"allreduce", UCC_COLL_TYPE_ALLREDUCE},
     {"alltoall", UCC_COLL_TYPE_ALLTOALL},
+    {"alltoallv", UCC_COLL_TYPE_ALLTOALLV},
+    {"barrier", UCC_COLL_TYPE_BARRIER},
+    {"bcast", UCC_COLL_TYPE_BCAST},
+};
+
+const std::map<std::string, ucc_memory_type_t> ucc_pt_memtype_map = {
+    {"host", UCC_MEMORY_TYPE_HOST},
+    {"cuda", UCC_MEMORY_TYPE_CUDA},
+};
+
+const std::map<std::string, ucc_datatype_t> ucc_pt_datatype_map = {
+    {"int8", UCC_DT_INT8},
+    {"uint8", UCC_DT_UINT8},
+    {"int16", UCC_DT_INT16},
+    {"uint16", UCC_DT_UINT16},
+    {"float16", UCC_DT_FLOAT16},
+    {"int32", UCC_DT_INT32},
+    {"float32", UCC_DT_FLOAT32},
+    {"int64", UCC_DT_INT64},
+    {"uint64", UCC_DT_UINT64},
+    {"float64", UCC_DT_FLOAT64},
+    {"int128", UCC_DT_INT128},
+    {"uint128", UCC_DT_UINT128},
 };
 
 ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
@@ -49,6 +72,21 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                     return UCC_ERR_INVALID_PARAM;
                 }
                 bench.op = ucc_pt_op_map.at(optarg);
+                break;
+            case 'm':
+                if (ucc_pt_memtype_map.count(optarg) == 0) {
+                    std::cerr << "invalid memory type" << std::endl;
+                    return UCC_ERR_INVALID_PARAM;
+                }
+                bench.mt = ucc_pt_memtype_map.at(optarg);
+                comm.mt  = bench.mt;
+                break;
+            case 'd':
+                if (ucc_pt_datatype_map.count(optarg) == 0) {
+                    std::cerr << "invalid datatype" << std::endl;
+                    return UCC_ERR_INVALID_PARAM;
+                }
+                bench.dt = ucc_pt_datatype_map.at(optarg);
                 break;
             case 'b':
                 std::stringstream(optarg) >> bench.min_count;
@@ -78,14 +116,16 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
 
 void ucc_pt_config::print_help()
 {
-    std::cout<<"Usage: ucc_perftest [options]"<<std::endl;
-    std::cout<<"  -c <collective name>: Collective type"<<std::endl;
-    std::cout<<"  -b <count>: Min number of elements"<<std::endl;
-    std::cout<<"  -e <count>: Max number of elements"<<std::endl;
-    std::cout<<"  -i: inplace collective"<<std::endl;
-    std::cout<<"  -o <op name>: operation type for rudction"<<std::endl;
-    std::cout<<"  -n <number>: number of iterations"<<std::endl;
-    std::cout<<"  -w <number>: number of warmup iterations"<<std::endl;
-    std::cout<<"  -h: show this help message"<<std::endl;
-    std::cout<<std::endl;
+    std::cout << "Usage: ucc_perftest [options]"<<std::endl;
+    std::cout << "  -c <collective name>: Collective type"<<std::endl;
+    std::cout << "  -b <count>: Min number of elements"<<std::endl;
+    std::cout << "  -e <count>: Max number of elements"<<std::endl;
+    std::cout << "  -i: inplace collective"<<std::endl;
+    std::cout << "  -d <dt name>: datatype"<<std::endl;
+    std::cout << "  -o <op name>: reduction operation type"<<std::endl;
+    std::cout << "  -m <mtype name>: memory type"<<std::endl;
+    std::cout << "  -n <number>: number of iterations"<<std::endl;
+    std::cout << "  -w <number>: number of warmup iterations"<<std::endl;
+    std::cout << "  -h: show this help message"<<std::endl;
+    std::cout << std::endl;
 }

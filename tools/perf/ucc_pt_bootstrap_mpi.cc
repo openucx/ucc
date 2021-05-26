@@ -24,7 +24,8 @@ static ucc_status_t mpi_oob_allgather_free(void *req)
     return UCC_OK;
 }
 
-ucc_pt_bootstrap_mpi::ucc_pt_bootstrap_mpi() {
+ucc_pt_bootstrap_mpi::ucc_pt_bootstrap_mpi()
+{
     MPI_Init(NULL, NULL);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -42,14 +43,17 @@ ucc_pt_bootstrap_mpi::ucc_pt_bootstrap_mpi() {
     team_oob.participants = size;
 }
 
-int ucc_pt_bootstrap_mpi::get_rank() {
+int ucc_pt_bootstrap_mpi::get_rank()
+{
     return rank;
 }
 
-int ucc_pt_bootstrap_mpi::get_size() {
+int ucc_pt_bootstrap_mpi::get_size()
+{
     return size;
 }
 
-ucc_pt_bootstrap_mpi::~ucc_pt_bootstrap_mpi() {
+ucc_pt_bootstrap_mpi::~ucc_pt_bootstrap_mpi()
+{
     MPI_Finalize();
 }

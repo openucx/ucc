@@ -23,10 +23,10 @@ class ucc_pt_benchmark {
     void print_time(size_t count, std::chrono::nanoseconds time);
 public:
     ucc_pt_benchmark(ucc_pt_benchmark_config cfg, ucc_pt_comm *communcator);
-    ucc_status_t run_bench();
+    ucc_status_t run_bench() noexcept;
     ucc_status_t run_single_test(ucc_coll_args_t args,
                                  int nwarmup, int niter,
-                                 std::chrono::nanoseconds &time);
+                                 std::chrono::nanoseconds &time) noexcept;
     ~ucc_pt_benchmark();
 };
 
