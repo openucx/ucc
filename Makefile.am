@@ -8,12 +8,13 @@ SUBDIRS =      \
 	tools/info
 
 if HAVE_MPICXX
-SUBDIRS += tools/perf
+SUBDIRS +=     \
+	tools/perf \
+	test/mpi
 endif
 
 if HAVE_GTEST
 SUBDIRS += test/gtest
-
 gtest:
 	@make -C test/gtest test
 endif
