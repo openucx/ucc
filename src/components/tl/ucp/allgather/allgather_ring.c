@@ -53,6 +53,7 @@ ucc_status_t ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.super.status = UCC_OK;
 out:
+    UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_ring_done", 0);
     return task->super.super.status;
 }
 
@@ -69,6 +70,7 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     size_t             data_size = count * ucc_dt_size(dt);
     ucc_status_t       status;
 
+    UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_ring_start", 0);
     task->super.super.status     = UCC_INPROGRESS;
     if (!UCC_IS_INPLACE(task->args)) {
         status = ucc_mc_memcpy((void*)((ptrdiff_t)rbuf + data_size * team->rank),

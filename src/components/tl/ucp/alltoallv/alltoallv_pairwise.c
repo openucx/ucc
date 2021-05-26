@@ -78,6 +78,10 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
     }
     task->super.super.status = ucc_tl_ucp_test(task);
 out:
+    if (task->super.super.status != UCC_INPROGRESS) {
+        UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_alltoallv_pairwise_done", 0);
+    }
+
     return task->super.super.status;
 }
 
@@ -86,6 +90,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team = task->team;
 
+    UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_alltoallv_pairwise_start", 0);
     task->super.super.status = UCC_INPROGRESS;
     task->n_polls            = ucc_min(1, task->n_polls);
 

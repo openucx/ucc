@@ -116,8 +116,8 @@ UCC_KN_PHASE_PROXY:
     }
 
 out:
-    UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_done", 0);
     task->super.super.status = UCC_OK;
+    UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_done", 0);
     return task->super.super.status;
 }
 
