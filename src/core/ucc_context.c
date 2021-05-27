@@ -525,7 +525,7 @@ ucc_status_t ucc_context_progress(ucc_context_h context)
     /* the fn below returns int - number of completed tasks.
        TODO : do we need to handle it ? Maybe return to user
        as int as well? */
-    status = ucc_progress_queue(context->pq);
+    status = (ucc_status_t)ucc_progress_queue(context->pq);
     return (status >= 0 ? UCC_OK : status);
 }
 

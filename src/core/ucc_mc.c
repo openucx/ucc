@@ -96,7 +96,8 @@ ucc_status_t ucc_mc_type(const void *ptr, ucc_memory_type_t *mem_type)
     /* by default assume memory type host */
     *mem_type = UCC_MEMORY_TYPE_HOST;
     mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
-    for (mt = UCC_MEMORY_TYPE_HOST + 1; mt < UCC_MEMORY_TYPE_LAST; mt++) {
+    mt = (ucc_memory_type_t)(UCC_MEMORY_TYPE_HOST + 1);
+    for (; mt < UCC_MEMORY_TYPE_LAST; mt++) {
         if (NULL != mc_ops[mt]) {
             status = mc_ops[mt]->mem_query(ptr, 0, &mem_attr);
             if (UCC_OK == status) {
@@ -119,7 +120,8 @@ ucc_status_t ucc_mc_query(const void *ptr, size_t length,
     mem_attr->base_address = (void *)ptr;
     mem_attr->alloc_length = length;
 
-    for (mt = UCC_MEMORY_TYPE_HOST + 1; mt < UCC_MEMORY_TYPE_LAST; mt++) {
+    mt = (ucc_memory_type_t)(UCC_MEMORY_TYPE_HOST + 1);
+    for (; mt < UCC_MEMORY_TYPE_LAST; mt++) {
         if (NULL != mc_ops[mt]) {
             status = mc_ops[mt]->mem_query(ptr, length, mem_attr);
             if (UCC_OK == status) {

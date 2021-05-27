@@ -20,7 +20,7 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t         gsize    = team->size;
     ptrdiff_t          rbuf     = (ptrdiff_t)task->args.dst.info_v.buffer;
     ucc_memory_type_t  rmem     = task->args.dst.info_v.mem_type;
-    ucc_datatype_t     rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+    size_t             rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
     ucc_rank_t         sendto   = (grank + 1) % gsize;
     ucc_rank_t         recvfrom = (grank - 1 + gsize) % gsize;
     ucc_rank_t         send_idx, recv_idx;

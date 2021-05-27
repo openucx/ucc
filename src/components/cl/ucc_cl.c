@@ -99,7 +99,7 @@ ucc_status_t ucc_parse_cls_string(const char *cls_str,
         return UCC_ERR_NO_MEMORY;
     }
     n_cls_selected = 0;
-    for (cl_type = 0; cl_type < UCC_CL_LAST; cl_type++) {
+    for (cl_type = (ucc_cl_type_t)0; cl_type < UCC_CL_LAST; cl_type++) {
         if (cls_selected[cl_type]) {
             cls[n_cls_selected++] = cl_type;
         }
