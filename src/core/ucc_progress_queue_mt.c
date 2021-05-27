@@ -14,7 +14,7 @@
 typedef struct ucc_pq_mt {
     ucc_progress_queue_t super;
     ucc_lf_queue_t       lf_queue;
-} ucc_pq_mt_t; // TODO the struct isn't a queue because not maintaining order, maybe another name
+} ucc_pq_mt_t;
 
 typedef struct ucc_pq_mt_locked {
     ucc_progress_queue_t super;

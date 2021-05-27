@@ -10,7 +10,6 @@
 #include "utils/ucc_atomic.h"
 #include "utils/ucc_list.h"
 #include <string.h>
-#include <stdio.h>
 
 /* This data structure is thread safe */
 
@@ -28,7 +27,7 @@ typedef struct ucc_lf_queue {
     ucc_lf_queue_elem_t *elements[NUM_POOLS][LINE_SIZE];
     uint8_t              which_pool;
     ucc_list_link_t      locked_queue[NUM_POOLS];
-} ucc_lf_queue_t; // TODO the struct isn't a queue because not maintaining order, maybe another name
+} ucc_lf_queue_t;
 
 static inline void ucc_lf_queue_enqueue(ucc_lf_queue_t *     queue,
                                         ucc_lf_queue_elem_t *elem)

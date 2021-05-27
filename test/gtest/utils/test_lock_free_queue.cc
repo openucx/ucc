@@ -14,9 +14,11 @@ extern "C" {
 #include <common/test.h>
 #include <vector>
 
+#define NUM_ITERS 5000000
+
 typedef struct ucc_test_queue {
-	ucc_lf_queue_t      lf_queue;
-	int64_t            test_sum;
+    ucc_lf_queue_t      lf_queue;
+    int64_t             test_sum;
     uint32_t            elems_num;
     uint32_t            active_producers_threads;
     uint32_t            memory_err;
@@ -25,8 +27,7 @@ typedef struct ucc_test_queue {
 void *producer_thread(void *arg)
 {
 	ucc_test_queue_t *test = (ucc_test_queue_t *)arg;
-    for(int j = 0; j < 5000000; j++){
-    	// TODO: should we use ucc_mc_alloc instead of ucc_malloc?
+    for(int j = 0; j < NUM_ITERS; j++){
     	ucc_lf_queue_elem_t * elem = (ucc_lf_queue_elem_t *) ucc_malloc(sizeof(ucc_lf_queue_elem_t));
     	elem->was_progressed = 0;
     	if (!elem) {
