@@ -36,16 +36,18 @@ ucc_status_t ucc_pt_coll_alltoall::init_coll_args(size_t count,
 
     args = coll_args;
     args.dst.info.count = count;
-    UCCCHECK_GOTO(ucc_mc_alloc(&args.dst.info.buffer, size,
+    UCCCHECK_GOTO(ucc_mc_alloc(&args.dst.info.mc_header, size,
                                args.dst.info.mem_type), exit, st);
+    args.dst.info.buffer = args.dst.info.mc_header->addr;
     if (!UCC_IS_INPLACE(args)) {
         args.src.info.count = count;
-        UCCCHECK_GOTO(ucc_mc_alloc(&args.src.info.buffer, size,
+        UCCCHECK_GOTO(ucc_mc_alloc(&args.src.info.mc_header, size,
                                    args.src.info.mem_type), free_dst, st);
+        args.src.info.buffer = args.src.info.mc_header->addr;
     }
     return UCC_OK;
 free_dst:
-    ucc_mc_free(args.dst.info.buffer, args.dst.info.mem_type);
+    ucc_mc_free(args.dst.info.mc_header, args.dst.info.mem_type);
 exit:
     return st;
 }
@@ -53,9 +55,9 @@ exit:
 void ucc_pt_coll_alltoall::free_coll_args(ucc_coll_args_t &args)
 {
     if (!UCC_IS_INPLACE(args)) {
-        ucc_mc_free(args.src.info.buffer, args.src.info.mem_type);
+        ucc_mc_free(args.src.info.mc_header, args.src.info.mem_type);
     }
-    ucc_mc_free(args.dst.info.buffer, args.dst.info.mem_type);
+    ucc_mc_free(args.dst.info.mc_header, args.dst.info.mem_type);
 }
 
 double ucc_pt_coll_alltoall::get_bus_bw(double time_us)

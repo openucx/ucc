@@ -196,7 +196,7 @@ typedef enum {
  *
  *  Description
  *
- *  @ref ucc_datatype_t represents the datatypes supported by the UCC library’s
+ *  @ref ucc_datatype_t represents the datatypes supported by the UCC library's
  *  collective and reduction operations. The standard operations are signed and
  *  unsigned integers of various sizes, float 16, 32, and 64, and user-defined
  *  datatypes. The UCC_DT_USERDEFINED represents the user-defined datatype. The
@@ -235,7 +235,7 @@ typedef enum {
  *
  *  Description
  *
- *  @ref ucc_thread_mode_t is used to initialize the UCC library’s thread mode.
+ *  @ref ucc_thread_mode_t is used to initialize the UCC library's thread mode.
  *  The UCC library can be configured in three thread modes UCC_THREAD_SINGLE,
  *  UCC_THREAD_FUNNELED, and UCC_LIB_THREAD_MULTIPLE. In the UCC_THREAD_SINGLE
  *  mode, the user program must not be multithreaded. In the UCC_THREAD_FUNNELED
@@ -1385,6 +1385,8 @@ typedef enum ucc_memory_type {
 
 typedef struct ucc_coll_buffer_info_v {
     ucc_mc_buffer_header_t *mc_header;
+    ucc_mc_buffer_header_t *counts_header;
+    ucc_mc_buffer_header_t *displacements_header;
     void *                  buffer;
     ucc_count_t *           counts;
     ucc_aint_t *            displacements;

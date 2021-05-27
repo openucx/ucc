@@ -28,7 +28,6 @@ typedef struct ucc_tl_ucp_task {
     uint32_t                tag;
     uint32_t                n_polls;
     ucc_tl_team_subset_t    subset;
-    ucc_mc_buffer_header_t *mc_header;
     union {
         struct {
             int                   phase;
@@ -38,11 +37,13 @@ typedef struct ucc_tl_ucp_task {
             int                   phase;
             ucc_knomial_pattern_t p;
             void                 *scratch;
+            ucc_mc_buffer_header_t *mc_header;
         } allreduce_kn;
         struct {
             int                   phase;
             ucc_knomial_pattern_t p;
             void                 *scratch;
+            ucc_mc_buffer_header_t *mc_header;
         } reduce_scatter_kn;
         struct {
             int                   phase;

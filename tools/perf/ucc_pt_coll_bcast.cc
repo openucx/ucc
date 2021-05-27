@@ -30,15 +30,16 @@ ucc_status_t ucc_pt_coll_bcast::init_coll_args(size_t count,
 
     args = coll_args;
     args.src.info.count = count;
-    UCCCHECK_GOTO(ucc_mc_alloc(&args.src.info.buffer, size,
+    UCCCHECK_GOTO(ucc_mc_alloc(&args.src.info.mc_header, size,
                                args.src.info.mem_type), exit, st);
+    args.src.info.buffer = args.src.info.mc_header->addr;
 exit:
     return st;
 }
 
 void ucc_pt_coll_bcast::free_coll_args(ucc_coll_args_t &args)
 {
-    ucc_mc_free(args.src.info.buffer, args.src.info.mem_type);
+    ucc_mc_free(args.src.info.mc_header, args.src.info.mem_type);
 }
 
 double ucc_pt_coll_bcast::get_bus_bw(double time_us)
