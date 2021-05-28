@@ -286,7 +286,6 @@ static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
 }
 
 static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
-                                          size_t length,
                                           ucc_mem_attr_t *mem_attr)
 {
     struct cudaPointerAttributes attr;
@@ -302,61 +301,55 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
         return UCC_OK;
     }
 
-    if (ptr == 0) {
-        mem_attr->mem_type     = UCC_MEMORY_TYPE_HOST;
-        mem_attr->base_address = NULL;
-        mem_attr->alloc_length = 0;
-    } else {
-        if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_MEM_TYPE) {
-            st = cudaPointerGetAttributes(&attr, ptr);
-            if (ucc_unlikely(st != cudaSuccess)) {
-                cudaGetLastError();
-                return UCC_ERR_NOT_SUPPORTED;
-            }
+    if (mem_attr->field_mask & UCC_MEM_ATTR_FIELD_MEM_TYPE) {
+        st = cudaPointerGetAttributes(&attr, ptr);
+        if (st != cudaSuccess) {
+            cudaGetLastError();
+            return UCC_ERR_NOT_SUPPORTED;
+        }
 #if CUDART_VERSION >= 10000
-            switch (attr.type) {
-            case cudaMemoryTypeHost:
-                mem_type = UCC_MEMORY_TYPE_HOST;
-                break;
-            case cudaMemoryTypeDevice:
-                mem_type = UCC_MEMORY_TYPE_CUDA;
-                break;
-            case cudaMemoryTypeManaged:
-                mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
-                break;
-            default:
-                return UCC_ERR_NOT_SUPPORTED;
-            }
+        switch (attr.type) {
+        case cudaMemoryTypeHost:
+            mem_type = UCC_MEMORY_TYPE_HOST;
+            break;
+        case cudaMemoryTypeDevice:
+            mem_type = UCC_MEMORY_TYPE_CUDA;
+            break;
+        case cudaMemoryTypeManaged:
+            mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
+            break;
+        default:
+            return UCC_ERR_NOT_SUPPORTED;
+        }
 #else
-            if (attr.memoryType == cudaMemoryTypeDevice) {
-                if (attr.isManaged) {
-                    mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
-                } else {
-                    mem_type = UCC_MEMORY_TYPE_CUDA;
-                }
-            } else if (ucc_likely(attr.memoryType == cudaMemoryTypeHost)) {
-                mem_type = UCC_MEMORY_TYPE_HOST;
+        if (attr.memoryType == cudaMemoryTypeDevice) {
+            if (attr.isManaged) {
+                mem_type = UCC_MEMORY_TYPE_CUDA_MANAGED;
             } else {
-                return UCC_ERR_NOT_SUPPORTED;
+                mem_type = UCC_MEMORY_TYPE_CUDA;
             }
+        } else if (attr.memoryType == cudaMemoryTypeHost) {
+            mem_type = UCC_MEMORY_TYPE_HOST;
+        } else {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
 #endif
-            mem_attr->mem_type = mem_type;
+        mem_attr->mem_type = mem_type;
+    }
+
+    if (mem_attr->field_mask & (UCC_MEM_ATTR_FIELD_ALLOC_LENGTH |
+                                UCC_MEM_ATTR_FIELD_BASE_ADDRESS)) {
+        cu_err = cuMemGetAddressRange((CUdeviceptr*)&base_address,
+                &alloc_length, (CUdeviceptr)ptr);
+        if (cu_err != CUDA_SUCCESS) {
+            mc_debug(&ucc_mc_cuda.super,
+                     "cuMemGetAddressRange(%p) error: %d(%s)",
+                      ptr, cu_err, cudaGetErrorString(st));
+            return UCC_ERR_NOT_SUPPORTED;
         }
 
-        if (mem_attr->field_mask & (UCC_MEM_ATTR_FIELD_ALLOC_LENGTH |
-                                    UCC_MEM_ATTR_FIELD_BASE_ADDRESS)) {
-            cu_err = cuMemGetAddressRange((CUdeviceptr*)&base_address,
-                    &alloc_length, (CUdeviceptr)ptr);
-            if (ucc_unlikely(cu_err != CUDA_SUCCESS)) {
-                mc_error(&ucc_mc_cuda.super,
-                         "cuMemGetAddressRange(%p) error: %d(%s)",
-                          ptr, cu_err, cudaGetErrorString(st));
-                return UCC_ERR_NOT_SUPPORTED;
-            }
-
-            mem_attr->base_address = base_address;
-            mem_attr->alloc_length = alloc_length;
-        }
+        mem_attr->base_address = base_address;
+        mem_attr->alloc_length = alloc_length;
     }
 
     return UCC_OK;

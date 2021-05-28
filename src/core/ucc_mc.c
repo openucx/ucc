@@ -86,46 +86,23 @@ ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type)
     return UCC_OK;
 }
 
-ucc_status_t ucc_mc_type(const void *ptr, ucc_memory_type_t *mem_type)
-{
-    ucc_memory_type_t mt;
-    ucc_status_t      status;
-    ucc_mem_attr_t    mem_attr;
-
-    /* TODO: consider using memory type cache from UCS */
-    /* by default assume memory type host */
-    *mem_type = UCC_MEMORY_TYPE_HOST;
-    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
-    mt = (ucc_memory_type_t)(UCC_MEMORY_TYPE_HOST + 1);
-    for (; mt < UCC_MEMORY_TYPE_LAST; mt++) {
-        if (NULL != mc_ops[mt]) {
-            status = mc_ops[mt]->mem_query(ptr, 0, &mem_attr);
-            if (UCC_OK == status) {
-                *mem_type = mem_attr.mem_type;
-                /* found memory type for ptr */
-                return UCC_OK;
-            }
-        }
-    }
-    return UCC_OK;
-}
-
-ucc_status_t ucc_mc_query(const void *ptr, size_t length,
-                          ucc_mem_attr_t *mem_attr)
+ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr)
 {
     ucc_status_t      status;
     ucc_memory_type_t mt;
 
     mem_attr->mem_type     = UCC_MEMORY_TYPE_HOST;
     mem_attr->base_address = (void *)ptr;
-    mem_attr->alloc_length = length;
+    if (ptr == NULL) {
+        mem_attr->alloc_length = 0;
+        return UCC_OK;
+    }
 
     mt = (ucc_memory_type_t)(UCC_MEMORY_TYPE_HOST + 1);
     for (; mt < UCC_MEMORY_TYPE_LAST; mt++) {
         if (NULL != mc_ops[mt]) {
-            status = mc_ops[mt]->mem_query(ptr, length, mem_attr);
+            status = mc_ops[mt]->mem_query(ptr, mem_attr);
             if (UCC_OK == status) {
-                /* found memory type for ptr */
                 return UCC_OK;
             }
         }
@@ -212,7 +189,8 @@ ucc_status_t ucc_mc_finalize()
     return UCC_OK;
 }
 
-ucc_status_t ucc_mc_ee_task_post(void *ee_context, ucc_ee_type_t ee_type, void **ee_task)
+ucc_status_t ucc_mc_ee_task_post(void *ee_context, ucc_ee_type_t ee_type,
+                                 void **ee_task)
 {
     UCC_CHECK_EE_AVAILABLE(ee_type);
     return ee_ops[ee_type]->ee_task_post(ee_context, ee_task);
@@ -242,7 +220,8 @@ ucc_status_t ucc_mc_ee_destroy_event(void *event, ucc_ee_type_t ee_type)
     return ee_ops[ee_type]->ee_destroy_event(event);
 }
 
-ucc_status_t ucc_mc_ee_event_post(void *ee_context, void *event, ucc_ee_type_t ee_type)
+ucc_status_t ucc_mc_ee_event_post(void *ee_context, void *event,
+                                  ucc_ee_type_t ee_type)
 {
     UCC_CHECK_EE_AVAILABLE(ee_type);
     return ee_ops[ee_type]->ee_event_post(ee_context, event);

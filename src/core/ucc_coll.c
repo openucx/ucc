@@ -23,16 +23,18 @@ static ucc_cl_team_t *ucc_select_cl_team(ucc_coll_args_t *coll_args,
     return team->cl_teams[0];
 }
 
-#define UCC_BUFFER_INFO_CHECK_MEM_TYPE(_info)                                  \
-    do {                                                                       \
-        if ((_info).mem_type == UCC_MEMORY_TYPE_UNKNOWN) {                     \
-            ucc_status_t st =                                                  \
-                ucc_mc_type((_info).buffer, &((_info).mem_type));              \
-            if (ucc_unlikely(st != UCC_OK)) {                                  \
-                return st;                                                     \
-            }                                                                  \
+#define UCC_BUFFER_INFO_CHECK_MEM_TYPE(_info) do {                             \
+    if ((_info).mem_type == UCC_MEMORY_TYPE_UNKNOWN) {                         \
+        ucc_mem_attr_t mem_attr;                                               \
+        ucc_status_t st;                                                       \
+        mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;                     \
+        st = ucc_mc_get_mem_attr((_info).buffer, &mem_attr);                   \
+        if (ucc_unlikely(st != UCC_OK)) {                                      \
+            return st;                                                         \
         }                                                                      \
-    } while (0)
+        (_info).mem_type = mem_attr.mem_type;                                  \
+    }                                                                          \
+} while(0)
 
 #define UCC_IS_ROOT(_args, _myrank) ((_args).root == (_myrank))
 

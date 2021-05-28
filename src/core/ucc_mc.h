@@ -13,10 +13,12 @@ ucc_status_t ucc_mc_init();
 
 ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);
 
-ucc_status_t ucc_mc_type(const void *ptr, ucc_memory_type_t *mem_type);
-
-ucc_status_t ucc_mc_query(const void *ptr, size_t length,
-                          ucc_mem_attr_t *mem_attr);
+/**
+ * Query for memory attributes.
+ * @param [in]        ptr       Memory pointer to query.
+ * @param [in,out]    mem_attr  Memory attributes.
+ */
+ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr);
 
 ucc_status_t ucc_mc_alloc(void **ptr, size_t len, ucc_memory_type_t mem_type);
 
@@ -24,7 +26,8 @@ ucc_status_t ucc_mc_free(void *ptr, ucc_memory_type_t mem_type);
 
 ucc_status_t ucc_mc_finalize();
 
-ucc_status_t ucc_mc_ee_task_post(void *ee_context, ucc_ee_type_t ee_type, void **ee_task);
+ucc_status_t ucc_mc_ee_task_post(void *ee_context, ucc_ee_type_t ee_type,
+                                 void **ee_task);
 
 ucc_status_t ucc_mc_ee_task_query(void *ee_task, ucc_ee_type_t ee_type);
 
@@ -34,18 +37,43 @@ ucc_status_t ucc_mc_ee_create_event(void **event, ucc_ee_type_t ee_type);
 
 ucc_status_t ucc_mc_ee_destroy_event(void *event, ucc_ee_type_t ee_type);
 
-ucc_status_t ucc_mc_ee_event_post(void *ee_context, void *event, ucc_ee_type_t ee_type);
+ucc_status_t ucc_mc_ee_event_post(void *ee_context, void *event,
+                                  ucc_ee_type_t ee_type);
 
 ucc_status_t ucc_mc_ee_event_test(void *event, ucc_ee_type_t ee_type);
 
-ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
-                           size_t count, ucc_datatype_t dt,
-                           ucc_reduction_op_t op, ucc_memory_type_t mem_type);
 
 ucc_status_t ucc_mc_memcpy(void *dst, const void *src, size_t len,
                            ucc_memory_type_t dst_mem,
                            ucc_memory_type_t src_mem);
 
+/**
+ * Performs reduction of two vectors and stores result to dst
+ * @param [in]  src1     First vector reduction operand
+ * @param [in]  src2     Second vector reduction operand
+ * @param [out] dst      dst = src1 (op) src2{0}
+ * @param [in]  count    Number of elements in dst
+ * @param [in]  dtype    Vectors elements datatype
+ * @param [in]  op       Reduction operation
+ * @param [in]  mem_type Vectors memory type
+ */
+ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
+                           size_t count, ucc_datatype_t dtype,
+                           ucc_reduction_op_t op, ucc_memory_type_t mem_type);
+
+/**
+ * Performs reduction of multiple vectors and stores result to dst
+ * @param [in]  src1     First vector reduction operand
+ * @param [in]  src2     Array of vector reduction operands
+ * @param [out] dst      dst = src1 (op) src2{0} (op) src2{1} (op) ...
+ *                                               (op) src2{size-1}
+ * @param [in]  count    Number of elements in dst
+ * @param [in]  size     Number of vectors in src2
+ * @param [in]  stride   Offset between vectors in src2
+ * @param [in]  dtype    Vectors elements datatype
+ * @param [in]  op       Reduction operation
+ * @param [in]  mem_type Vectors memory type
+ */
 ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
                                  size_t count, size_t size, size_t stride,
                                  ucc_datatype_t dtype, ucc_reduction_op_t op,

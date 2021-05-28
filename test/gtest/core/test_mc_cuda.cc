@@ -44,25 +44,30 @@ UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem)
 
 UCC_TEST_F(test_mc_cuda, can_detect_host_mem)
 {
+    ucc_mem_attr_t mem_attr;
+
+    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
     test_ptr = malloc(TEST_ALLOC_SIZE);
     if (test_ptr == NULL) {
         ADD_FAILURE() << "failed to allocate host memory";
     }
-    EXPECT_EQ(UCC_OK, ucc_mc_type(test_ptr, &test_mtype));
-    EXPECT_EQ(UCC_MEMORY_TYPE_HOST, test_mtype);
+    EXPECT_EQ(UCC_OK, ucc_mc_get_mem_attr(test_ptr, &mem_attr));
+    EXPECT_EQ(UCC_MEMORY_TYPE_HOST, mem_attr.mem_type);
     free(test_ptr);
 }
 
 UCC_TEST_F(test_mc_cuda, can_detect_cuda_mem)
 {
+    ucc_mem_attr_t mem_attr;
     cudaError_t st;
 
+    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
     st = cudaMalloc(&test_ptr, TEST_ALLOC_SIZE);
     if (st != cudaSuccess) {
         ADD_FAILURE() << "failed to allocate device memory";
     }
-    EXPECT_EQ(UCC_OK, ucc_mc_type(test_ptr, &test_mtype));
-    EXPECT_EQ(UCC_MEMORY_TYPE_CUDA, test_mtype);
+    EXPECT_EQ(UCC_OK, ucc_mc_get_mem_attr(test_ptr, &mem_attr));
+    EXPECT_EQ(UCC_MEMORY_TYPE_CUDA, mem_attr.mem_type);
     cudaFree(test_ptr);
     ucc_mc_finalize();
 }
@@ -79,15 +84,16 @@ UCC_TEST_F(test_mc_cuda, can_query_cuda_mem)
     }
 
     mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
-    EXPECT_EQ(UCC_OK, ucc_mc_query(test_ptr, TEST_ALLOC_SIZE, &mem_attr));
+    EXPECT_EQ(UCC_OK, ucc_mc_get_mem_attr(test_ptr, &mem_attr));
     EXPECT_EQ(UCC_MEMORY_TYPE_CUDA, mem_attr.mem_type);
 
     /* query base addr and length */
-    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE |
-                          UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
-                          UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
+    mem_attr.field_mask   = UCC_MEM_ATTR_FIELD_MEM_TYPE |
+                            UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
+                            UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
+    mem_attr.alloc_length = 1;
     ptr = (char *)test_ptr + TEST_ALLOC_SIZE/2;
-    EXPECT_EQ(UCC_OK, ucc_mc_query(ptr , 1, &mem_attr));
+    EXPECT_EQ(UCC_OK, ucc_mc_get_mem_attr(ptr, &mem_attr));
     EXPECT_EQ(UCC_MEMORY_TYPE_CUDA, mem_attr.mem_type);
     EXPECT_EQ(test_ptr, mem_attr.base_address);
     EXPECT_EQ(TEST_ALLOC_SIZE, mem_attr.alloc_length);
@@ -99,25 +105,29 @@ UCC_TEST_F(test_mc_cuda, can_query_cuda_mem)
 UCC_TEST_F(test_mc_cuda, can_detect_managed_mem)
 {
     cudaError_t st;
+    ucc_mem_attr_t mem_attr;
 
     st = cudaMallocManaged(&test_ptr, TEST_ALLOC_SIZE);
     if (st != cudaSuccess) {
         ADD_FAILURE() << "failed to allocate managed memory";
     }
-    EXPECT_EQ(UCC_OK, ucc_mc_type(test_ptr, &test_mtype));
-    EXPECT_EQ(UCC_MEMORY_TYPE_CUDA_MANAGED, test_mtype);
+    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
+    EXPECT_EQ(UCC_OK, ucc_mc_get_mem_attr(test_ptr, &mem_attr));
+    EXPECT_EQ(UCC_MEMORY_TYPE_CUDA_MANAGED, mem_attr.mem_type);
     cudaFree(test_ptr);
 }
 
 UCC_TEST_F(test_mc_cuda, can_detect_host_alloc_mem)
 {
     cudaError_t st;
+    ucc_mem_attr_t mem_attr;
 
     st = cudaHostAlloc(&test_ptr, TEST_ALLOC_SIZE, cudaHostAllocDefault);
     if (st != cudaSuccess) {
         ADD_FAILURE() << "failed to allocate host mapped memory";
     }
-    EXPECT_EQ(UCC_OK, ucc_mc_type(test_ptr, &test_mtype));
-    EXPECT_EQ(UCC_MEMORY_TYPE_HOST, test_mtype);
+    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
+    EXPECT_EQ(UCC_OK, ucc_mc_get_mem_attr(test_ptr, &mem_attr));
+    EXPECT_EQ(UCC_MEMORY_TYPE_HOST, mem_attr.mem_type);
     cudaFreeHost(test_ptr);
 }
