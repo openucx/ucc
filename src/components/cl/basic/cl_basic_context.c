@@ -23,7 +23,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_context_t,
         tls = &params->context->all_tls;
     }
 
-    self->tl_ctxs = ucc_malloc(sizeof(ucc_tl_context_t**) * tls->count,
+    self->tl_ctxs = ucc_malloc(sizeof(ucc_tl_context_t*) * tls->count,
                                "cl_basic_tl_ctxs");
     if (!self->tl_ctxs) {
         cl_error(cl_config->cl_lib, "failed to allocate %zd bytes for tl_ctxs",
