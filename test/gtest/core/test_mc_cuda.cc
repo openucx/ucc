@@ -5,9 +5,33 @@
 
 extern "C" {
 #include <core/ucc_mc.h>
+#include <pthread.h>
 }
 #include <common/test.h>
 #include <cuda_runtime.h>
+#include <vector>
+
+void *mt_ucc_mc_cuda_calls(void * args)
+{
+	size_t *size = (size_t *) args;
+	int num_of_alloc_calls = 50;
+	std::vector<ucc_mc_buffer_header_t *> headers;
+	std::vector<void *> pointers;
+
+	headers.resize(num_of_alloc_calls);
+	pointers.resize(num_of_alloc_calls);
+
+	for (int i = 0; i < num_of_alloc_calls; i++){
+		pointers[i] = NULL;
+		EXPECT_EQ(UCC_OK,
+			  ucc_mc_alloc(&headers[i], *size, UCC_MEMORY_TYPE_CUDA));
+		pointers[i] = headers[i]->addr;
+		EXPECT_EQ(cudaSuccess, cudaMemset(pointers[i], 0, *size));
+		EXPECT_EQ(UCC_OK, ucc_mc_free(headers[i], UCC_MEMORY_TYPE_CUDA));
+	}
+
+	return 0;
+}
 
 class test_mc_cuda : public ucc::test {
   protected:
@@ -37,6 +61,7 @@ UCC_TEST_F(test_mc_cuda, mc_cuda_load)
 
 UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem)
 {
+	// mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1024 and is configurable at runtime.
     EXPECT_EQ(UCC_OK,
               ucc_mc_alloc(&mc_header, TEST_ALLOC_SIZE, UCC_MEMORY_TYPE_CUDA));
     test_ptr = mc_header->addr;
@@ -44,8 +69,21 @@ UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem)
     EXPECT_EQ(UCC_OK, ucc_mc_free(mc_header, UCC_MEMORY_TYPE_CUDA));
 }
 
-// TODO: add UCC_TEST_F for multi threaded: spawn (multiple times - in a loop) pthreads and call ucc_mc_alloc/free.
-// Make sure to allocate more than max amount of elems so it should test slow path as well
+UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem_mt)
+{
+	// mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1024 and is configurable at runtime.
+	size_t size = TEST_ALLOC_SIZE;
+	int num_of_threads = 20;
+	std::vector<pthread_t> threads;
+	threads.resize(num_of_threads);
+
+	for (int i = 0; i < num_of_threads; i++) {
+		pthread_create(&threads[i], NULL, &mt_ucc_mc_cuda_calls, (void *)&size);
+	}
+	for (int i = 0; i < num_of_threads; i++) {
+		pthread_join(threads[i], NULL);
+	}
+}
 
 UCC_TEST_F(test_mc_cuda, can_detect_host_mem)
 {

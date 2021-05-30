@@ -5,8 +5,31 @@
 
 extern "C" {
 #include <core/ucc_mc.h>
+#include <pthread.h>
 }
 #include <common/test.h>
+#include <vector>
+
+void *mt_ucc_mc_cpu_calls(void * args)
+{
+	size_t *size = (size_t *) args;
+	int num_of_alloc_calls = 50;
+	std::vector<ucc_mc_buffer_header_t *> headers;
+	std::vector<void *> pointers;
+
+	headers.resize(num_of_alloc_calls);
+	pointers.resize(num_of_alloc_calls);
+
+	for (int i = 0; i < num_of_alloc_calls; i++){
+		pointers[i] = NULL;
+		EXPECT_EQ(UCC_OK, ucc_mc_alloc(&headers[i], *size, UCC_MEMORY_TYPE_HOST));
+		pointers[i] = headers[i]->addr;
+		memset(pointers[i], 0, *size);
+		EXPECT_EQ(UCC_OK, ucc_mc_free(headers[i], UCC_MEMORY_TYPE_HOST));
+	}
+
+	return 0;
+}
 
 class test_mc : public ucc::test {
 };
@@ -29,9 +52,10 @@ UCC_TEST_F(test_mc, init_is_required)
 
 UCC_TEST_F(test_mc, can_alloc_and_free_host_mem)
 {
+	// mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1024 and is configurable at runtime.
+	size_t size = 4096;
     ucc_mc_buffer_header_t *h    = NULL;
     void *ptr = NULL;
-    size_t size = 4096;
 
     ASSERT_EQ(UCC_OK, ucc_constructor());
     ASSERT_EQ(UCC_OK, ucc_mc_init());
@@ -42,8 +66,24 @@ UCC_TEST_F(test_mc, can_alloc_and_free_host_mem)
     ucc_mc_finalize();
 }
 
-// TODO: add UCC_TEST_F for multi threaded: spawn (multiple times - in a loop) pthreads and call ucc_mc_alloc/free.
-// Make sure to allocate more than max amount of elems so it should test slow path as well
+UCC_TEST_F(test_mc, can_alloc_and_free_host_mem_mt)
+{
+	// mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1024 and is configurable at runtime.
+	size_t size = 1024;
+    int num_of_threads = 20;
+
+    std::vector<pthread_t> threads;
+    threads.resize(num_of_threads);
+    ASSERT_EQ(UCC_OK, ucc_constructor());
+    ASSERT_EQ(UCC_OK, ucc_mc_init());
+    for (int i = 0; i < num_of_threads; i++) {
+    	pthread_create(&threads[i], NULL, &mt_ucc_mc_cpu_calls, (void *)&size);
+    }
+    for (int i = 0; i < num_of_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+    ucc_mc_finalize();
+}
 
 UCC_TEST_F(test_mc, init_twice)
 {
