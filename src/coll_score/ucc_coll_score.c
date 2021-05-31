@@ -578,8 +578,10 @@ static ucc_status_t ucc_coll_score_parse_str(const char *str,
             n_ranges = 1;
         for (c = 0; c < ct_n; c++) {
             for (m = 0; m < mt_n; m++) {
-                ucc_coll_type_t   coll_type = ct ? ct[c] : UCC_BIT(c);
-                ucc_memory_type_t mem_type  = mt ? mt[m] : m;
+                ucc_coll_type_t   coll_type = ct ? ct[c] :
+                                                   (ucc_coll_type_t)UCC_BIT(c);
+                ucc_memory_type_t mem_type  = mt ? mt[m] :
+                                                   (ucc_memory_type_t)m;
                 if (alg_id) {
                     if (!alg_fn) {
                         status = UCC_ERR_NOT_SUPPORTED;
@@ -852,7 +854,7 @@ ucc_status_t ucc_coll_score_update_from_str(const char *            str,
 ucc_status_t ucc_coll_score_build_default(ucc_base_team_t        *team,
                                           ucc_score_t             default_score,
                                           ucc_base_coll_init_fn_t default_init,
-                                          ucc_coll_type_t         coll_types,
+                                          uint64_t                coll_types,
                                           ucc_memory_type_t      *mem_types,
                                           int mt_n, ucc_coll_score_t **score_p)
 {
@@ -860,6 +862,8 @@ ucc_status_t ucc_coll_score_build_default(ucc_base_team_t        *team,
     ucc_status_t      status;
     ucc_memory_type_t m;
     uint64_t          c;
+    ucc_coll_type_t   ct;
+
     status = ucc_coll_score_alloc(&score);
     if (UCC_OK != status) {
         return status;
@@ -870,9 +874,10 @@ ucc_status_t ucc_coll_score_build_default(ucc_base_team_t        *team,
     }
 
     ucc_for_each_bit(c, coll_types) {
-        for (m = 0; m < mt_n; m++) {
+        for (m = UCC_MEMORY_TYPE_HOST; m < mt_n; m++) {
+            ct = (ucc_coll_type_t)UCC_BIT(c);
             status = ucc_coll_score_add_range(
-                score, UCC_BIT(c), mem_types ? mem_types[m] : m, 0, UCC_MSG_MAX,
+                score, ct, mem_types ? mem_types[m] : m, 0, UCC_MSG_MAX,
                 default_score, default_init, team);
             if (UCC_OK != status) {
                 ucc_coll_score_free(score);

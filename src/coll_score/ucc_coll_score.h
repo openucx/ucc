@@ -124,7 +124,7 @@ ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
 ucc_status_t ucc_coll_score_build_default(ucc_base_team_t        *team,
                                           ucc_score_t             default_score,
                                           ucc_base_coll_init_fn_t default_init,
-                                          ucc_coll_type_t         coll_types,
+                                          uint64_t                coll_types,
                                           ucc_memory_type_t      *mem_types,
                                           int mt_n, ucc_coll_score_t **score_p);
 

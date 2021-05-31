@@ -79,7 +79,7 @@ static ucc_status_t ucc_mc_cpu_reduce(const void *src1, const void *src2,
         mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%d)", dt);
         return UCC_ERR_NOT_SUPPORTED;
     }
-    return 0;
+    return UCC_OK;
 }
 
 static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,

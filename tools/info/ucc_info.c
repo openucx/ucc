@@ -58,15 +58,15 @@ int main(int argc, char **argv)
     while ((c = getopt(argc, argv, "vbcafhsA")) != -1) {
         switch (c) {
         case 'f':
-            print_flags |= UCC_CONFIG_PRINT_CONFIG |
-                           UCC_CONFIG_PRINT_HEADER |
-                           UCC_CONFIG_PRINT_DOC;
+            print_flags |= (ucc_config_print_flags_t)(UCC_CONFIG_PRINT_CONFIG |
+                                                      UCC_CONFIG_PRINT_HEADER |
+                                                      UCC_CONFIG_PRINT_DOC);
             break;
         case 'c':
-            print_flags |= UCC_CONFIG_PRINT_CONFIG;
+            print_flags |= (ucc_config_print_flags_t)UCC_CONFIG_PRINT_CONFIG;
             break;
         case 'a':
-            print_flags |= UCC_CONFIG_PRINT_HIDDEN;
+            print_flags |= (ucc_config_print_flags_t)UCC_CONFIG_PRINT_HIDDEN;
             break;
         case 'v':
             print_opts |= PRINT_VERSION;
@@ -146,7 +146,8 @@ int main(int argc, char **argv)
             printf("TL/%s algorithms:\n", tl->super.name);
             for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
                 if (tl->alg_info[i]) {
-                    printf("  %s\n", ucc_coll_type_str(UCC_BIT(i)));
+                    printf("  %s\n",
+                           ucc_coll_type_str((ucc_coll_type_t)UCC_BIT(i)));
                     print_algorithm_info(tl->alg_info[i]);
                 }
             }
