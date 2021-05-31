@@ -45,3 +45,32 @@ UCC_TEST_F(test_context, init_multiple)
         EXPECT_EQ(UCC_OK, ucc_context_destroy(ctx_h));
     }
 }
+
+test_context_get_attr::test_context_get_attr()
+{
+    ucc_context_params_t ctx_params;
+    ctx_params.mask = UCC_CONTEXT_PARAM_FIELD_TYPE;
+    ctx_params.type = UCC_CONTEXT_EXCLUSIVE;
+    EXPECT_EQ(UCC_OK,
+              ucc_context_create(lib_h, &ctx_params, ctx_config, &ctx_h));
+}
+
+test_context_get_attr::~test_context_get_attr()
+{
+    EXPECT_EQ(UCC_OK, ucc_context_destroy(ctx_h));
+}
+
+UCC_TEST_F(test_context_get_attr, addr_len)
+{
+    ucc_context_attr_t attr;
+    attr.mask = UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN;
+    EXPECT_EQ(UCC_OK, ucc_context_get_attr(ctx_h, &attr));
+}
+
+UCC_TEST_F(test_context_get_attr, addr)
+{
+    ucc_context_attr_t attr;
+    attr.mask = UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
+    EXPECT_EQ(UCC_OK, ucc_context_get_attr(ctx_h, &attr));
+    EXPECT_EQ(true, ((attr.ctx_addr_len == 0) || (NULL != attr.ctx_addr)));
+}

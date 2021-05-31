@@ -353,6 +353,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     ctx->service_ctx   = NULL;
     ctx->ids.pool_size = config->team_ids_pool_size;
     ctx->ids.pool      = NULL;
+    memset(&ctx->attr, 0, sizeof(ctx->attr));
     ucc_list_head_init(&ctx->progress_list);
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
@@ -433,6 +434,14 @@ error:
     return status;
 }
 
+static ucc_status_t ucc_context_free_attr(ucc_context_attr_t *context_attr)
+{
+    if (context_attr->mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR) {
+        ucc_free(context_attr->ctx_addr);
+    }
+    return UCC_OK;
+}
+
 ucc_status_t ucc_context_destroy(ucc_context_t *context)
 {
     ucc_cl_context_t *cl_ctx;
@@ -440,6 +449,10 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     ucc_tl_context_t *tl_ctx;
     ucc_tl_lib_t     *tl_lib;
     int               i;
+
+    if (UCC_OK != ucc_context_free_attr(&context->attr)) {
+        ucc_error("failed to free context attributes");
+    }
     for (i = 0; i < context->n_cl_ctx; i++) {
         cl_ctx = context->cl_ctx[i];
         cl_lib = ucc_derived_of(cl_ctx->super.lib, ucc_cl_lib_t);
@@ -515,3 +528,124 @@ ucc_status_t ucc_context_progress(ucc_context_h context)
     status = ucc_progress_queue(context->pq);
     return (status >= 0 ? UCC_OK : status);
 }
+
+static ucc_status_t ucc_context_pack_addr(ucc_context_t             *context,
+                                          ucc_context_addr_len_t    *addr_len,
+                                          int                       *n_packed,
+                                          ucc_context_addr_header_t *h)
+{
+    ucc_context_addr_len_t total_len = 0;
+    ptrdiff_t              offset    = 0;
+    int                    i, packed, last_packed;
+    ucc_base_ctx_attr_t    attr;
+    ucc_cl_lib_t          *cl_lib;
+    ucc_tl_lib_t          *tl_lib;
+    ucc_status_t           status;
+
+
+    attr.attr.mask = UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN;
+    if (h) {
+        attr.attr.mask |= UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
+        offset      = (ptrdiff_t)UCC_CONTEXT_ADDR_DATA(h) - (ptrdiff_t)h;
+        last_packed = 0;
+    }
+    packed = 0;
+
+    for (i = 0; i < context->n_cl_ctx; i++) {
+        cl_lib = ucc_derived_of(context->cl_ctx[i]->super.lib, ucc_cl_lib_t);
+        attr.attr.ctx_addr = PTR_OFFSET(h, offset);
+        status =
+            cl_lib->iface->context.get_attr(&context->cl_ctx[i]->super, &attr);
+        if (UCC_OK != status) {
+            ucc_error("failed to query addr len from %s",
+                      cl_lib->super.log_component.name);
+            return status;
+        }
+        if (attr.attr.ctx_addr_len > 0) {
+            total_len += attr.attr.ctx_addr_len;
+            packed++;
+            if (h) {
+                h->components[last_packed].id     = cl_lib->iface->super.id;
+                h->components[last_packed].offset = offset;
+                last_packed++;
+                offset += attr.attr.ctx_addr_len;
+            }
+        }
+    }
+
+    for (i = 0; i < context->n_tl_ctx; i++) {
+        tl_lib = ucc_derived_of(context->tl_ctx[i]->super.lib, ucc_tl_lib_t);
+        attr.attr.ctx_addr = PTR_OFFSET(h, offset);
+        status =
+            tl_lib->iface->context.get_attr(&context->tl_ctx[i]->super, &attr);
+        if (UCC_OK != status) {
+            ucc_error("failed to query addr len from %s",
+                      tl_lib->super.log_component.name);
+            return status;
+        }
+        if (attr.attr.ctx_addr_len > 0) {
+            total_len += attr.attr.ctx_addr_len;
+            packed++;
+            if (h) {
+                h->components[last_packed].id     = tl_lib->iface->super.id;
+                h->components[last_packed].offset = offset;
+                last_packed++;
+                offset += attr.attr.ctx_addr_len;
+            }
+        }
+    }
+
+    if (addr_len) {
+        *addr_len = total_len + UCC_CONTEXT_ADDR_HEADER_SIZE(packed);
+    }
+    if (n_packed) {
+        *n_packed = packed;
+    }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
+                                  ucc_context_attr_t *context_attr)
+{
+    ucc_status_t               status   = UCC_OK;
+    ucc_context_addr_header_t *h;
+    if (context_attr->mask & (UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
+                              UCC_CONTEXT_ATTR_FIELD_CTX_ADDR)) {
+        if (!(context->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN)) {
+            /* addrlen is not computed yet - do it once and cache on
+               context->attr */
+            status = ucc_context_pack_addr(context, &context->attr.ctx_addr_len,
+                                           &context->n_addr_packed, NULL);
+            if (UCC_OK != status) {
+                ucc_error("failed to calc ucc context address length");
+                return status;
+            }
+            context->attr.mask        |= UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN;
+        }
+        context_attr->ctx_addr_len = context->attr.ctx_addr_len;
+    }
+
+    if (context_attr->mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR) {
+        if (!(context->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR)) {
+            /* addr_len and n_packed are computed already */
+            h = ucc_malloc(context->attr.ctx_addr_len, "ucc_context_address");
+            if (!h) {
+                ucc_error("failed to allocate %zd bytes for ucc_context_address",
+                          context->attr.ctx_addr_len);
+                return UCC_ERR_NO_MEMORY;
+            }
+            h->n_components = context->n_addr_packed;
+            status          = ucc_context_pack_addr(context, NULL, NULL, h);
+            if (UCC_OK != status) {
+                ucc_error("failed to calc ucc context address length");
+                return status;
+            }
+            context->attr.mask    |= UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
+            context->attr.ctx_addr = (ucc_context_addr_h)h;
+        }
+        context_attr->ctx_addr = context->attr.ctx_addr;
+    }
+
+    return status;
+}
+

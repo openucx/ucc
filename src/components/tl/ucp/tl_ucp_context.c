@@ -220,9 +220,27 @@ ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                                         ucc_base_attr_t *attr) /* NOLINT */
+ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
+                                         ucc_base_ctx_attr_t      *attr)
 {
-    /* TODO */
-    return UCC_ERR_NOT_IMPLEMENTED;
+    ucc_tl_ucp_context_t *ctx = ucc_derived_of(context, ucc_tl_ucp_context_t);
+    ucs_status_t          ucs_status;
+    if ((attr->attr.mask & (UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
+                            UCC_CONTEXT_ATTR_FIELD_CTX_ADDR)) &&
+        (NULL == ctx->worker_address)) {
+        ucs_status = ucp_worker_get_address(
+            ctx->ucp_worker, &ctx->worker_address, &ctx->ucp_addrlen);
+        if (UCS_OK != ucs_status) {
+            tl_error(ctx->super.super.lib, "failed to get ucp worker address");
+            return ucs_status_to_ucc_status(ucs_status);
+        }
+    }
+    if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
+        attr->attr.ctx_addr_len = ctx->ucp_addrlen;
+    }
+    if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR) {
+        memcpy(attr->attr.ctx_addr, ctx->worker_address, ctx->ucp_addrlen);
+    }
+
+    return UCC_OK;
 }

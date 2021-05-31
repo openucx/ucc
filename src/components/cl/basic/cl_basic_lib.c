@@ -49,7 +49,7 @@ static inline ucc_status_t check_tl_lib_attr(const ucc_base_lib_t *lib,
 }
 
 ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
-                                       ucc_base_attr_t *     base_attr)
+                                       ucc_base_lib_attr_t  *base_attr)
 {
     ucc_cl_lib_attr_t *attr   = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
     ucc_cl_lib_t *     cl_lib = ucc_derived_of(lib, ucc_cl_lib_t);
