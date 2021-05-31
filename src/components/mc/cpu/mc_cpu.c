@@ -31,7 +31,7 @@ static ucc_status_t ucc_mc_cpu_finalize()
 static ucc_status_t ucc_mc_cpu_mem_alloc(void **ptr, size_t size)
 {
     (*ptr) = ucc_malloc(size, "mc cpu");
-    if (!(*ptr)) {
+    if (ucc_unlikely(!(*ptr))) {
         mc_error(&ucc_mc_cpu.super, "failed to allocate %zd bytes", size);
         return UCC_ERR_NO_MEMORY;
     }
@@ -94,7 +94,7 @@ static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
     //TODO implement efficient reduce_multi
     st = ucc_mc_cpu_reduce(src1, src2, dst, count, dt, op);
     for (i = 1; i < size; i++) {
-        if (st != UCC_OK) {
+        if (ucc_unlikely(st != UCC_OK)) {
             return st;
         }
         st = ucc_mc_cpu_reduce((void *)((ptrdiff_t)src2 + stride * i), dst, dst,

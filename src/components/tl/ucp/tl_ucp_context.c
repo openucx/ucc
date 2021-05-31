@@ -208,12 +208,12 @@ ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
 
     /* do map and umap to populate the cache */
     status = ucp_mem_map(ctx->ucp_context, &mmap_params, &mh);
-    if (status != UCS_OK) {
+    if (ucc_unlikely(status != UCS_OK)) {
         return ucs_status_to_ucc_status(status);
     }
 
     status = ucp_mem_unmap(ctx->ucp_context, mh);
-    if (status != UCS_OK) {
+    if (ucc_unlikely(status != UCS_OK)) {
         return ucs_status_to_ucc_status(status);
     }
 

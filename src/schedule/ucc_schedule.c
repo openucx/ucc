@@ -42,7 +42,7 @@ ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
     for (i = 0; i < em->listeners_size[event]; i++) {
         task   = em->listeners[event][i];
         status = task->handlers[event](parent_task, task);
-        if (status != UCC_OK) {
+        if (ucc_unlikely(status != UCC_OK)) {
             return status;
         }
     }

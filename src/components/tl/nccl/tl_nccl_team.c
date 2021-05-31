@@ -140,10 +140,10 @@ ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task
     tl_info(task->team->super.super.context->lib, "triggered post. task:%p", coll_task);
 
     status = coll_task->post(coll_task);
-    if (status == UCC_OK) {
+    if (ucc_likely(status == UCC_OK)) {
         /* TODO: mpool */
         post_event = ucc_malloc(sizeof(ucc_ev_t), "event");
-        if (post_event == NULL) {
+        if (ucc_unlikely(post_event == NULL)) {
             tl_error(task->team->super.super.context->lib,
                     "failed to allocate memory for event");
             return UCC_ERR_NO_MEMORY;
@@ -174,7 +174,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     task->super.finalize = ucc_tl_nccl_coll_finalize;
     task->super.triggered_post = ucc_tl_nccl_triggered_post;
     status = ucc_mc_ee_create_event((void **)&task->completed, UCC_EE_CUDA_STREAM);
-    if (status != UCC_OK) {
+    if (ucc_unlikely(status != UCC_OK)) {
         goto free_task;
     }
     switch (coll_args->args.coll_type)
@@ -203,7 +203,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
                  coll_args->args.coll_type);
         status = UCC_ERR_NOT_SUPPORTED;
     }
-    if (status != UCC_OK) {
+    if (ucc_unlikely(status != UCC_OK)) {
         goto free_event;
     }
     tl_info(UCC_TL_TEAM_LIB(task->team), "init coll task %p", task);
@@ -232,7 +232,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
         ucc_coll_score_build_default(tl_team, UCC_TL_NCCL_DEFAULT_SCORE,
                            ucc_tl_nccl_coll_init, UCC_TL_NCCL_SUPPORTED_COLLS,
                            &mt, 1, &score);
-    if (UCC_OK != status) {
+    if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
     if (strlen(lib->super.super.score_str) > 0) {

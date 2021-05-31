@@ -71,7 +71,7 @@
             ucc_status_t _status = _UCS_CLASS_INIT_NAME(_superclass)(      \
                 &self->super, _myclass->superclass, _init_count,               \
                 ##__VA_ARGS__);                                                \
-            if (_status != UCC_OK) {                                           \
+            if (ucc_unlikely(_status != UCC_OK)) {                                           \
                 return _status;                                                \
             }                                                                  \
             if (_myclass->superclass != &_UCS_CLASS_DECL_NAME(void)) {         \

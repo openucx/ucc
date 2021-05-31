@@ -43,7 +43,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
 
 #define UCC_TL_UCP_CHECK_REQ_STATUS()                                          \
     do {                                                                       \
-        if (UCS_PTR_IS_ERR(ucp_status)) {                                      \
+        if (ucc_unlikely(UCS_PTR_IS_ERR(ucp_status))) {                        \
             tl_error(UCC_TL_TEAM_LIB(team),                                    \
                      "tag %u; dest %d; team_id %u; errmsg %s", task->tag,      \
                      dest_group_rank, team->id,                                \
@@ -67,7 +67,7 @@ static inline ucc_status_t ucc_tl_ucp_send_nb(void *buffer, size_t msglen,
     ucp_tag_t           ucp_tag;
 
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
-    if (UCC_OK != status) {
+    if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
     ucp_tag = UCC_TL_UCP_MAKE_SEND_TAG(task->tag, team->rank, team->id,

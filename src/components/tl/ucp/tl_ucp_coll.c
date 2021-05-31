@@ -23,7 +23,7 @@ void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
-    if (UCS_OK != status) {
+    if (ucc_unlikely(UCS_OK != status)) {
         tl_error(task->team->super.super.context->lib,
                  "failure in send completion %s", ucs_status_string(status));
         task->super.super.status = ucs_status_to_ucc_status(status);
@@ -37,7 +37,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
-    if (UCS_OK != status) {
+    if (ucc_unlikely(UCS_OK != status)) {
         tl_error(task->team->super.super.context->lib,
                  "failure in send completion %s", ucs_status_string(status));
         task->super.super.status = ucs_status_to_ucc_status(status);
@@ -78,7 +78,7 @@ ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_task,
 
     coll_task->ee_task = parent_task->ee_task;
     status = coll_task->post(coll_task);
-    if (status != UCC_OK) {
+    if (ucc_unlikely(status != UCC_OK)) {
         tl_error(task->team->super.super.context->lib,
                  "Failed post the triggered collecitve. task:%p", coll_task);
         return status;
@@ -114,7 +114,7 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
         } else if (UCC_OK == ucc_ee_get_event_internal(task->super.ee, &ev,
                                                 &task->super.ee->event_in_queue)) {
             tl_info(task->team->super.super.context->lib,
-                    "triggered event arrivied. ev_task:%p", coll_task);
+                    "triggered event arrived. ev_task:%p", coll_task);
             task->super.ev = ev;
             task->super.ee_task = NULL;
         } else {
@@ -125,7 +125,7 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
     if (task->super.ee_task == NULL) {
         status = ucc_mc_ee_task_post(task->super.ee->ee_context,
                                      task->super.ee->ee_type, &task->super.ee_task);
-        if (status != UCC_OK) {
+        if (ucc_unlikely(status != UCC_OK)) {
             tl_error(task->team->super.super.context->lib, "error in ee task post");
             task->super.super.status = status;
             return status;
@@ -133,7 +133,7 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
 
         /* TODO: mpool */
         post_event = ucc_malloc(sizeof(ucc_ev_t), "event");
-        if (post_event == NULL) {
+        if (ucc_unlikely(post_event == NULL)) {
             tl_error(task->team->super.super.context->lib,
                      "failed to allocate memory for event");
             return UCC_ERR_NO_MEMORY;
@@ -177,7 +177,7 @@ ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, //NOLINT
     ucc_event_manager_subscribe(&ev_task->super.em, UCC_EVENT_COMPLETED, coll_task);
 
     status = ucc_tl_ucp_ee_wait_for_event_trigger(&ev_task->super);
-    if (status != UCC_OK) {
+    if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
     if (ev_task->super.super.status == UCC_OK) {
@@ -222,7 +222,7 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
     default:
         status = UCC_ERR_NOT_SUPPORTED;
     }
-    if (status != UCC_OK) {
+    if (ucc_unlikely(status != UCC_OK)) {
         ucc_tl_ucp_put_task(task);
         return status;
     }

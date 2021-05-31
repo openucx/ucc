@@ -50,7 +50,8 @@ ncclRedOp_t ucc_to_nccl_reduce_op[] = {
 static inline ucc_status_t ucc_nccl_check_dt_supported(ucc_datatype_t dt1,
                                                        ucc_datatype_t dt2)
 {
-    if ((dt1 != dt2) || (ucc_to_nccl_dtype[dt1] == ncclDataTypeUnsupported)) {
+    if (ucc_unlikely((dt1 != dt2) ||
+                     (ucc_to_nccl_dtype[dt1] == ncclDataTypeUnsupported))) {
         return UCC_ERR_NOT_SUPPORTED;
     }
     return UCC_OK;
@@ -100,7 +101,7 @@ ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
@@ -167,7 +168,7 @@ ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
@@ -216,7 +217,7 @@ ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
@@ -266,7 +267,7 @@ ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
@@ -331,7 +332,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
@@ -376,7 +377,7 @@ ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
