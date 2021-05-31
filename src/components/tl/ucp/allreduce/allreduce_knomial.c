@@ -203,7 +203,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
     status = ucc_mc_alloc(&task->allreduce_kn.mc_header, (radix - 1) * data_size,
                           task->args.src.info.mem_type);
     task->allreduce_kn.scratch = task->allreduce_kn.mc_header->addr;
-    if (status != UCC_OK) {
+    if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TL_TEAM_LIB(task->team),
                  "failed to allocate scratch buffer");
         return status;

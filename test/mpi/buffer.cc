@@ -26,7 +26,6 @@ void init_buffer_host(void *buf, size_t count, int _value)
 void init_buffer(void *_buf, size_t count, ucc_datatype_t dt,
                  ucc_memory_type_t mt, int value)
 {
-    ucc_mc_buffer_header_t *h   = NULL;
     void *buf = NULL;
     if (mt == UCC_MEMORY_TYPE_CUDA) {
         buf = ucc_malloc(count * ucc_dt_size(dt), "buf");
@@ -101,7 +100,7 @@ ucc_status_t compare_buffers(void *_rst, void *expected, size_t count,
                              ucc_datatype_t dt, ucc_memory_type_t mt)
 {
     ucc_status_t status = UCC_ERR_NO_MESSAGE;
-    ucc_mc_buffer_header_t *rst_header = NULL;
+    ucc_mc_buffer_header_t *rst_header;
     void *rst = NULL;
 
     if (UCC_MEMORY_TYPE_HOST == mt) {

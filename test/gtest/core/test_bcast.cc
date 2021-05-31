@@ -3,9 +3,6 @@
  * See file LICENSE for terms.
  */
 
-extern "C" {
-#include <core/ucc_mc.h>
-}
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
@@ -37,9 +34,9 @@ public:
 
             ctxs[r]->rbuf_size = ucc_dt_size(dtype) * count;
 
-            UCC_CHECK(ucc_mc_alloc(&coll->src.info.mc_header,
+            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_header,
                                    ctxs[r]->rbuf_size, mem_type));
-            coll->src.info.buffer = coll->src.info.mc_header->addr;
+            coll->src.info.buffer = ctxs[r]->src_header->addr;
             if (r == root) {
                 ctxs[r]->init_buf = ucc_malloc(ctxs[r]->rbuf_size, "init buf");
                 EXPECT_NE(ctxs[r]->init_buf, nullptr);
@@ -58,7 +55,7 @@ public:
         for (auto r = 0; r < ctxs.size(); r++) {
             gtest_ucc_coll_ctx_t *ctx = ctxs[r];
             ucc_coll_args_t* coll = ctx->args;
-            UCC_CHECK(ucc_mc_free(coll->src.info.mc_header, mem_type));
+            UCC_CHECK(ucc_mc_free(ctx->src_header, mem_type));
             if (r == coll->root) {
                 ucc_free(ctx->init_buf);
             }
@@ -72,7 +69,6 @@ public:
         bool     ret  = true;
         int      root = ctxs[0]->args->root;
         uint8_t *dsts;
-        ucc_mc_buffer_header_t *dsts_mc_header;
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
                 dsts = (uint8_t*) ucc_malloc(ctxs[root]->rbuf_size, "dsts buf");

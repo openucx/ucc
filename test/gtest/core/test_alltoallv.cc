@@ -3,9 +3,6 @@
  * See file LICENSE for terms.
  */
 
-extern "C" {
-#include <core/ucc_mc.h>
-}
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
@@ -61,9 +58,9 @@ public:
                                ((T*)coll->src.info_v.displacements)[i] * ucc_dt_size(dtype),
                                ((T*)coll->src.info_v.counts)[i] * ucc_dt_size(dtype));
             }
-            UCC_CHECK(ucc_mc_alloc(&coll->src.info_v.mc_header,
+            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_header,
                                    buf_count * ucc_dt_size(dtype), mem_type));
-            coll->src.info_v.buffer = coll->src.info_v.mc_header->addr;
+            coll->src.info_v.buffer = ctxs[r]->src_header->addr;
             UCC_CHECK(ucc_mc_memcpy(coll->src.info_v.buffer, ctxs[r]->init_buf,
                                     buf_count * ucc_dt_size(dtype), mem_type,
                                     UCC_MEMORY_TYPE_HOST));
@@ -78,16 +75,15 @@ public:
                 buf_count += rank_count;
             }
             ctxs[r]->rbuf_size = buf_count * ucc_dt_size(dtype);
-            UCC_CHECK(ucc_mc_alloc(&coll->dst.info_v.mc_header,
+            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_header,
                                    buf_count * ucc_dt_size(dtype), mem_type));
-            coll->dst.info_v.buffer = coll->dst.info_v.mc_header->addr;
+            coll->dst.info_v.buffer = ctxs[r]->dst_header->addr;
         }
     }
     bool  data_validate(UccCollCtxVec ctxs)
     {
         bool                   ret = true;
         std::vector<uint8_t *> dsts(ctxs.size());
-        std::vector<ucc_mc_buffer_header_t *> dsts_mc_headers(ctxs.size());
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
@@ -125,17 +121,18 @@ public:
     }
     void data_fini(UccCollCtxVec ctxs)
     {
-        for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
-            ucc_coll_args_t* coll = ctx->args;
-            UCC_CHECK(ucc_mc_free(coll->src.info_v.mc_header, mem_type));
+//        for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
+    	for (int r = 0; r < ctxs.size(); r++) {
+            ucc_coll_args_t* coll = ctxs[r]->args;
+            UCC_CHECK(ucc_mc_free(ctxs[r]->src_header, mem_type));
             free(coll->src.info_v.counts);
             free(coll->src.info_v.displacements);
-            UCC_CHECK(ucc_mc_free(coll->dst.info_v.mc_header, mem_type));
+            UCC_CHECK(ucc_mc_free(ctxs[r]->dst_header, mem_type));
             free(coll->dst.info_v.counts);
             free(coll->dst.info_v.displacements);
-            ucc_free(ctx->init_buf);
+            ucc_free(ctxs[r]->init_buf);
             free(coll);
-            free(ctx);
+            free(ctxs[r]);
         }
         ctxs.clear();
     }

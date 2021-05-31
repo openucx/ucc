@@ -30,28 +30,28 @@ typedef struct ucc_tl_ucp_task {
     ucc_tl_team_subset_t    subset;
     union {
         struct {
-            int                   phase;
-            ucc_knomial_pattern_t p;
+            int                     phase;
+            ucc_knomial_pattern_t   p;
         } barrier;
         struct {
-            int                   phase;
-            ucc_knomial_pattern_t p;
-            void                 *scratch;
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+            void                   *scratch;
             ucc_mc_buffer_header_t *mc_header;
         } allreduce_kn;
         struct {
-            int                   phase;
-            ucc_knomial_pattern_t p;
-            void                 *scratch;
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+            void                   *scratch;
             ucc_mc_buffer_header_t *mc_header;
         } reduce_scatter_kn;
         struct {
-            int                   phase;
-            ucc_knomial_pattern_t p;
+            int                     phase;
+            ucc_knomial_pattern_t   p;
         } allgather_kn;
         struct {
-            ucc_rank_t            dist;
-            uint32_t              radix;
+            ucc_rank_t              dist;
+            uint32_t                radix;
         } bcast_kn;
     };
 } ucc_tl_ucp_task_t;

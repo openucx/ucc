@@ -37,7 +37,7 @@ class test_mc : public ucc::test {
 UCC_TEST_F(test_mc, init_finalize)
 {
     EXPECT_EQ(UCC_OK, ucc_constructor());
-    EXPECT_EQ(UCC_OK, ucc_mc_init());
+    EXPECT_EQ(UCC_OK, ucc_mc_init(UCC_THREAD_SINGLE));
     EXPECT_EQ(UCC_OK, ucc_mc_finalize());
 }
 
@@ -45,7 +45,7 @@ UCC_TEST_F(test_mc, init_is_required)
 {
     ASSERT_EQ(UCC_OK, ucc_constructor());
     EXPECT_NE(UCC_OK, ucc_mc_available(UCC_MEMORY_TYPE_HOST));
-    EXPECT_EQ(UCC_OK, ucc_mc_init());
+    EXPECT_EQ(UCC_OK, ucc_mc_init(UCC_THREAD_SINGLE));
     EXPECT_EQ(UCC_OK, ucc_mc_available(UCC_MEMORY_TYPE_HOST));
     ucc_mc_finalize();
 }
@@ -58,7 +58,7 @@ UCC_TEST_F(test_mc, can_alloc_and_free_host_mem)
     void *ptr = NULL;
 
     ASSERT_EQ(UCC_OK, ucc_constructor());
-    ASSERT_EQ(UCC_OK, ucc_mc_init());
+    ASSERT_EQ(UCC_OK, ucc_mc_init(UCC_THREAD_SINGLE));
     EXPECT_EQ(UCC_OK, ucc_mc_alloc(&h, size, UCC_MEMORY_TYPE_HOST));
     ptr = h->addr;
     memset(ptr, 0, size);
@@ -69,15 +69,16 @@ UCC_TEST_F(test_mc, can_alloc_and_free_host_mem)
 UCC_TEST_F(test_mc, can_alloc_and_free_host_mem_mt)
 {
 	// mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1024 and is configurable at runtime.
-	size_t size = 1024;
-    int num_of_threads = 20;
+	size_t size = 128;
+    int num_of_threads = 10;
 
     std::vector<pthread_t> threads;
     threads.resize(num_of_threads);
     ASSERT_EQ(UCC_OK, ucc_constructor());
-    ASSERT_EQ(UCC_OK, ucc_mc_init());
+    ASSERT_EQ(UCC_OK, ucc_mc_init(UCC_THREAD_MULTIPLE));
     for (int i = 0; i < num_of_threads; i++) {
     	pthread_create(&threads[i], NULL, &mt_ucc_mc_cpu_calls, (void *)&size);
+    	size = size*2;
     }
     for (int i = 0; i < num_of_threads; i++) {
         pthread_join(threads[i], NULL);

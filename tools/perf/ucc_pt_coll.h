@@ -8,6 +8,9 @@
 #define UCC_PT_COLL_H
 
 #include <ucc/api/ucc.h>
+extern "C" {
+#include <core/ucc_mc.h>
+}
 
 class ucc_pt_coll {
 protected:
@@ -15,6 +18,8 @@ protected:
     bool has_reduction_;
     bool has_range_;
     ucc_coll_args_t coll_args;
+    ucc_mc_buffer_header_t *dst_header;
+    ucc_mc_buffer_header_t *src_header;
 public:
     virtual ucc_status_t init_coll_args(size_t count,
                                         ucc_coll_args_t &args) = 0;

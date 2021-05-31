@@ -69,6 +69,7 @@ typedef struct ucc_mc_cuda {
     ucc_mpool_t                    mpool;
     int                            mpool_init_flag;
     ucc_spinlock_t                 mpool_init_spinlock;
+    ucc_thread_mode_t              tm;
     ucc_mc_cuda_strm_task_mode_t   strm_task_mode;
     ucc_mc_cuda_task_stream_type_t task_strm_type;
     ucc_mc_cuda_task_post_fn       post_strm_task;

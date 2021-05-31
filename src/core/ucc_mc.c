@@ -30,7 +30,7 @@ static const ucc_ee_ops_t *ee_ops[UCC_EE_LAST];
         }                                                                      \
     } while (0)
 
-ucc_status_t ucc_mc_init()
+ucc_status_t ucc_mc_init(ucc_thread_mode_t thread_mode)
 {
     int            i, n_mcs;
     ucc_mc_base_t *mc;
@@ -58,7 +58,7 @@ ucc_status_t ucc_mc_init()
                 ucc_free(mc->config);
                 continue;
             }
-            status = mc->init();
+            status = mc->init(thread_mode);
             if (UCC_OK != status) {
                 ucc_info("mc_init failed for component: %s, skipping (%d)",
                          mc->super.name, status);

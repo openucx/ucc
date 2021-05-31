@@ -14,8 +14,7 @@
 #include <ucc/api/ucc_version.h>
 #include <ucc/api/ucc_status.h>
 #include <stdio.h>
-//#include "components/mc/base/ucc_mc_base.h"
-typedef struct ucc_mc_buffer_header ucc_mc_buffer_header_t;
+
 
 BEGIN_C_DECLS
 
@@ -1384,9 +1383,6 @@ typedef enum ucc_memory_type {
 } ucc_memory_type_t;
 
 typedef struct ucc_coll_buffer_info_v {
-    ucc_mc_buffer_header_t *mc_header;
-    ucc_mc_buffer_header_t *counts_header;
-    ucc_mc_buffer_header_t *displacements_header;
     void *                  buffer;
     ucc_count_t *           counts;
     ucc_aint_t *            displacements;
@@ -1395,7 +1391,6 @@ typedef struct ucc_coll_buffer_info_v {
 } ucc_coll_buffer_info_v_t;
 
 typedef struct ucc_coll_buffer_info {
-    ucc_mc_buffer_header_t *mc_header;
     void *                  buffer;
     ucc_count_t             count;
     ucc_datatype_t          datatype;

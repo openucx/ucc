@@ -17,8 +17,6 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t count = _msgsize/dt_size;
     int rank, size;
-    counts_header        = NULL;
-    displacements_header = NULL;
     counts = NULL;
     displacements = NULL;
     MPI_Comm_rank(team.comm, &rank);

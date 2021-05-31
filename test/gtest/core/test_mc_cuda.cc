@@ -43,7 +43,7 @@ class test_mc_cuda : public ucc::test {
     {
         ucc::test::SetUp();
         ucc_constructor();
-        ucc_mc_init();
+        ucc_mc_init(UCC_THREAD_SINGLE);
         test_ptr   = NULL;
         test_mtype = UCC_MEMORY_TYPE_UNKNOWN;
     }
@@ -52,6 +52,18 @@ class test_mc_cuda : public ucc::test {
         ucc_mc_finalize();
         ucc::test::TearDown();
     }
+};
+
+class test_mc_cuda_mt : public test_mc_cuda{
+protected:
+  virtual void SetUp() override
+  {
+      ucc::test::SetUp();
+      ucc_constructor();
+      ucc_mc_init(UCC_THREAD_MULTIPLE);
+      test_ptr   = NULL;
+      test_mtype = UCC_MEMORY_TYPE_UNKNOWN;
+  }
 };
 
 UCC_TEST_F(test_mc_cuda, mc_cuda_load)
@@ -69,16 +81,17 @@ UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem)
     EXPECT_EQ(UCC_OK, ucc_mc_free(mc_header, UCC_MEMORY_TYPE_CUDA));
 }
 
-UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem_mt)
+UCC_TEST_F(test_mc_cuda_mt, can_alloc_and_free_mem_mt)
 {
 	// mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1024 and is configurable at runtime.
-	size_t size = TEST_ALLOC_SIZE;
-	int num_of_threads = 20;
+	size_t size = 128;
+	int num_of_threads = 10;
 	std::vector<pthread_t> threads;
 	threads.resize(num_of_threads);
 
 	for (int i = 0; i < num_of_threads; i++) {
 		pthread_create(&threads[i], NULL, &mt_ucc_mc_cuda_calls, (void *)&size);
+		size = size*2;
 	}
 	for (int i = 0; i < num_of_threads; i++) {
 		pthread_join(threads[i], NULL);

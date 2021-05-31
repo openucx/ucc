@@ -16,7 +16,8 @@ extern "C" {
 #include <memory>
 
 typedef struct {
-    ucc_mc_buffer_header_t *mc_header;
+    ucc_mc_buffer_header_t *dst_header;
+    ucc_mc_buffer_header_t *src_header;
     void *                  init_buf;
     size_t                  rbuf_size;
     ucc_coll_args_t *       args;

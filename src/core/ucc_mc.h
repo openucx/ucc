@@ -9,7 +9,14 @@
 #include "ucc/api/ucc.h"
 #include "components/mc/base/ucc_mc_base.h"
 
-ucc_status_t ucc_mc_init();
+typedef struct ucc_mem_attr ucc_mem_attr_t;
+
+typedef struct ucc_mc_buffer_header {
+    int   from_pool;
+    void *addr;
+} ucc_mc_buffer_header_t;
+
+ucc_status_t ucc_mc_init(ucc_thread_mode_t thread_mode);
 
 ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);
 
@@ -80,6 +87,7 @@ ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
                                  size_t count, size_t size, size_t stride,
                                  ucc_datatype_t dtype, ucc_reduction_op_t op,
                                  ucc_memory_type_t mem_type);
+
 
 static inline ucc_status_t ucc_dt_reduce(const void *src1, const void *src2,
                                          void *dst, size_t count,

@@ -3,9 +3,6 @@
  * See file LICENSE for terms.
  */
 
-extern "C" {
-#include <core/ucc_mc.h>
-}
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
@@ -44,10 +41,10 @@ public:
                                    rank_size);
             }
 
-            UCC_CHECK(ucc_mc_alloc(&coll->dst.info.mc_header,
+            UCC_CHECK(ucc_mc_alloc(&ctxs[i]->dst_header,
                                    ucc_dt_size(dtype) * count * nprocs,
                                    mem_type));
-            coll->dst.info.buffer = coll->dst.info.mc_header->addr;
+            coll->dst.info.buffer = ctxs[i]->dst_header->addr;
             if (TEST_INPLACE == inplace) {
                 coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
@@ -55,10 +52,10 @@ public:
                                         ucc_dt_size(dtype) * count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
             } else {
-                UCC_CHECK(ucc_mc_alloc(&coll->src.info.mc_header,
+                UCC_CHECK(ucc_mc_alloc(&ctxs[i]->src_header,
                                        ucc_dt_size(dtype) * count * nprocs,
                                        mem_type));
-                coll->src.info.buffer = coll->src.info.mc_header->addr;
+                coll->src.info.buffer = ctxs[i]->src_header->addr;
                 UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[i]->init_buf,
                                         ucc_dt_size(dtype) * count * nprocs, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
@@ -67,15 +64,16 @@ public:
     }
     void data_fini(UccCollCtxVec ctxs)
     {
-        for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
-            ucc_coll_args_t* coll = ctx->args;
+//        for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
+    	for (int i = 0; i < ctxs.size(); i++) {
+            ucc_coll_args_t* coll = ctxs[i]->args;
             if (coll->src.info.buffer) { /* no inplace */
-                UCC_CHECK(ucc_mc_free(coll->src.info.mc_header, mem_type));
+                UCC_CHECK(ucc_mc_free(ctxs[i]->src_header, mem_type));
             }
-            UCC_CHECK(ucc_mc_free(coll->dst.info.buffer, mem_type));
-            ucc_free(ctx->init_buf);
+            UCC_CHECK(ucc_mc_free(ctxs[i]->dst_header, mem_type));
+            ucc_free(ctxs[i]->init_buf);
             free(coll);
-            free(ctx);
+            free(ctxs[i]);
         }
         ctxs.clear();
     }

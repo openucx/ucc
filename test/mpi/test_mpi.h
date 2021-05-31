@@ -218,10 +218,7 @@ protected:
     ucc_test_mpi_inplace_t inplace;
     ucc_coll_args_t args;
     ucc_coll_req_h req;
-    ucc_mc_buffer_header_t *sbuf_header;
-    ucc_mc_buffer_header_t *rbuf_header;
-    ucc_mc_buffer_header_t *check_sbuf_header;
-    ucc_mc_buffer_header_t *check_rbuf_header;
+    ucc_mc_buffer_header_t *sbuf_header, *rbuf_header, *check_sbuf_header; //, *check_rbuf_header;
     void *sbuf;
     void *rbuf;
     void *check_sbuf;
@@ -290,8 +287,6 @@ public:
 };
 
 class TestAllgatherv : public TestCase {
-    ucc_mc_buffer_header_t *counts_header;
-    ucc_mc_buffer_header_t *displacements_header;
     int *counts;
     int *displacements;
 public:

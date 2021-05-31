@@ -3,9 +3,6 @@
 #include <ucc/api/ucc.h>
 #include <utils/ucc_math.h>
 #include <utils/ucc_coll_utils.h>
-extern "C" {
-#include <core/ucc_mc.h>
-}
 
 ucc_pt_coll_barrier::ucc_pt_coll_barrier()
 {

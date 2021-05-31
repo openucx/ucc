@@ -292,7 +292,7 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
     if (UCC_OK != (status = ucc_constructor())) {
         return status;
     }
-    if (UCC_OK != (status = ucc_mc_init())) {
+    if (UCC_OK != (status = ucc_mc_init(params->thread_mode))) {
         return status;
     }
 
@@ -365,7 +365,7 @@ ucc_status_t ucc_lib_config_read(const char *env_prefix, const char *filename,
     /* full_prefix for a UCC lib config is either just
           (i)  "UCC_" - if no "env_prefix" is provided, or
           (ii) "AAA_UCC" - where AAA is the value of "env_prefix".
-       Allocate space to build prefix str and two characters ("_" and “\0”) */
+       Allocate space to build prefix str and two characters ("_" and "\0") */
     full_prefix_len =
         strlen(base_prefix) + (env_prefix ? strlen(env_prefix) : 0) + 2;
     config->full_prefix = ucc_malloc(full_prefix_len, "full_prefix");

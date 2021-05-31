@@ -9,9 +9,6 @@
  * See file LICENSE for terms.
  */
 
-extern "C" {
-#include <core/ucc_mc.h>
-}
 #include "test_mc_reduce.h"
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
@@ -44,9 +41,9 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 ptr[i] = (typename T::type)(2 * i + r + 1);
             }
 
-            UCC_CHECK(ucc_mc_alloc(&coll->dst.info.mc_header,
+            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_header,
                                    ucc_dt_size(dt) * count, mem_type));
-            coll->dst.info.buffer = coll->dst.info.mc_header->addr;
+            coll->dst.info.buffer = ctxs[r]->dst_header->addr;
             if (TEST_INPLACE == inplace) {
                 coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
@@ -54,9 +51,9 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                                         ucc_dt_size(dt) * count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
             } else {
-                UCC_CHECK(ucc_mc_alloc(&coll->src.info.mc_header,
+                UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_header,
                                        ucc_dt_size(dt) * count, mem_type));
-                coll->src.info.buffer = coll->src.info.mc_header->addr;
+                coll->src.info.buffer = ctxs[r]->src_header->addr;
                 UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
                                         ucc_dt_size(dt) * count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
@@ -71,15 +68,16 @@ class test_allreduce : public UccCollArgs, public testing::Test {
         }
     }
     void data_fini(UccCollCtxVec ctxs) {
-        for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
-            ucc_coll_args_t* coll = ctx->args;
+    	for (int r = 0; r < ctxs.size(); r++) {
+//        for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
+            ucc_coll_args_t* coll = ctxs[r]->args;
             if (coll->src.info.buffer) { /* no inplace */
-                UCC_CHECK(ucc_mc_free(coll->src.info.mc_header, mem_type));
+                UCC_CHECK(ucc_mc_free(ctxs[r]->src_header, mem_type));
             }
-            UCC_CHECK(ucc_mc_free(coll->dst.info.buffer, mem_type));
-            ucc_free(ctx->init_buf);
+            UCC_CHECK(ucc_mc_free(ctxs[r]->dst_header, mem_type));
+            ucc_free(ctxs[r]->init_buf);
             free(coll);
-            free(ctx);
+            free(ctxs[r]);
         }
         ctxs.clear();
     }
@@ -87,7 +85,6 @@ class test_allreduce : public UccCollArgs, public testing::Test {
     {
         size_t count = (ctxs[0])->args->src.info.count;
         std::vector<typename T::type *> dsts(ctxs.size());
-        std::vector<ucc_mc_buffer_header_t *> dsts_mc_headers(ctxs.size());
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
@@ -137,7 +134,7 @@ TYPED_TEST_CASE(test_allreduce, ReductionTypesOps);
             UccReq    req(team, ctxs);                                         \
             req.start();                                                       \
             req.wait();                                                        \
-            EXPECT_EQ(true, this->data_validate(ctxs));                           \
+            EXPECT_EQ(true, this->data_validate(ctxs));                        \
             this->data_fini(ctxs);                                             \
         }                                                                      \
     }                                                                          \
@@ -181,7 +178,7 @@ TYPED_TEST(test_allreduce, single_cuda_inplace) {
         UccReq::startall(reqs);                                                \
         UccReq::waitall(reqs);                                                 \
         for (auto ctx : ctxs) {                                                \
-            EXPECT_EQ(true, this->data_validate(ctx));                            \
+            EXPECT_EQ(true, this->data_validate(ctx));                         \
             this->data_fini(ctx);                                              \
         }                                                                      \
     }                                                                          \

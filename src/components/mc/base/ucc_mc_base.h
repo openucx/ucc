@@ -13,6 +13,9 @@
 #include "utils/ucc_parser.h"
 #include "utils/ucc_mpool.h"
 #include "core/ucc_global_opts.h"
+#include "core/ucc_mc.h"
+
+typedef struct ucc_mc_buffer_header ucc_mc_buffer_header_t;
 
 /**
  * UCC memory attributes field mask
@@ -105,7 +108,7 @@ typedef struct ucc_mc_base {
     ucc_memory_type_t               type;
     ucc_mc_config_t                *config;
     ucc_config_global_list_entry_t  config_table;
-    ucc_status_t                   (*init)();
+    ucc_status_t                   (*init)(ucc_thread_mode_t thread_mode);
     ucc_status_t                   (*finalize)();
     ucc_mc_ops_t                    ops;
     const ucc_ee_ops_t              ee_ops;
