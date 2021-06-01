@@ -84,11 +84,12 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
                   ucc_status_string(task->super.status));
     }
 
-    if (task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
-        task->finalize(task);
-    }
     if (task->flags & UCC_COLL_TASK_FLAG_CB) {
         task->cb.cb(task->cb.data, status);
+    }
+
+    if (task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
+        task->finalize(task);
     }
     return status;
 }
