@@ -54,10 +54,13 @@ public:
     }
     void data_fini(UccCollCtxVec ctxs)
     {
-        for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
+        for (auto r = 0; r < ctxs.size(); r++) {
+            gtest_ucc_coll_ctx_t *ctx = ctxs[r];
             ucc_coll_args_t* coll = ctx->args;
             UCC_CHECK(ucc_mc_free(coll->src.info.buffer, mem_type));
-            UCC_CHECK(ucc_mc_free(ctx->init_buf, UCC_MEMORY_TYPE_HOST));
+            if (r == coll->root) {
+                UCC_CHECK(ucc_mc_free(ctx->init_buf, UCC_MEMORY_TYPE_HOST));
+            }
             free(coll);
             free(ctx);
         }
