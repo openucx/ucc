@@ -99,7 +99,7 @@ public:
             }
         } else {
             for (int r = 0; r < ctxs.size(); r++) {
-                dsts[r] = (uint8_t *)(ctxs[r]->args->dst.info.buffer);
+                dsts[r] = (uint8_t *)(ctxs[r]->args->dst.info_v.buffer);
             }
         }
         for (int r = 0; r < ctxs.size(); r++) {

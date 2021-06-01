@@ -7,11 +7,33 @@
 int main(int argc, char *argv[])
 {
     ucc_pt_config pt_config;
+    ucc_pt_comm *comm;
+    ucc_pt_benchmark *bench;
+    ucc_status_t st;
+
     pt_config.process_args(argc, argv);
-    ucc_pt_comm comm;
-    comm.init();
-    ucc_pt_benchmark bench(pt_config.bench, &comm);
-    bench.run_bench();
-    comm.finalize();
+    try {
+        comm = new ucc_pt_comm(pt_config.comm);
+    } catch(std::exception &e) {
+        std::cerr << e.what() << std::endl;
+        std::exit(1);
+    }
+    st = comm->init();
+    if (st != UCC_OK) {
+        delete comm;
+        std::exit(1);
+    }
+    try {
+        bench = new ucc_pt_benchmark(pt_config.bench, comm);
+    } catch(std::exception &e) {
+        std::cerr << e.what() << std::endl;
+        comm->finalize();
+        delete comm;
+        std::exit(1);
+    }
+    bench->run_bench();
+    delete bench;
+    comm->finalize();
+    delete comm;
     return 0;
 }

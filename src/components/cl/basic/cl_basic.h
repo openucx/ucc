@@ -15,8 +15,6 @@
 #define UCC_CL_BASIC_DEFAULT_SCORE 10
 #endif
 
-#define UCC_CL_BASIC_NUM_TLS 2
-
 typedef struct ucc_cl_basic_iface {
     ucc_cl_iface_t super;
 } ucc_cl_basic_iface_t;

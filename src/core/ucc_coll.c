@@ -23,14 +23,16 @@ static ucc_cl_team_t *ucc_select_cl_team(ucc_coll_args_t *coll_args,
     return team->cl_teams[0];
 }
 
-#define UCC_BUFFER_INFO_CHECK_MEM_TYPE(_info) do {                             \
-    if ((_info).mem_type == UCC_MEMORY_TYPE_UNKNOWN) {                         \
-        ucc_status_t st = ucc_mc_type((_info).buffer, &((_info).mem_type));    \
-        if (st != UCC_OK) {                                                    \
-            return st;                                                         \
+#define UCC_BUFFER_INFO_CHECK_MEM_TYPE(_info)                                  \
+    do {                                                                       \
+        if ((_info).mem_type == UCC_MEMORY_TYPE_UNKNOWN) {                     \
+            ucc_status_t st =                                                  \
+                ucc_mc_type((_info).buffer, &((_info).mem_type));              \
+            if (ucc_unlikely(st != UCC_OK)) {                                  \
+                return st;                                                     \
+            }                                                                  \
         }                                                                      \
-    }                                                                          \
-} while(0)
+    } while (0)
 
 #define UCC_IS_ROOT(_args, _myrank) ((_args).root == (_myrank))
 
@@ -121,7 +123,7 @@ ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
     ucc_base_coll_args_t   op_args;
     ucc_status_t           status;
     status = ucc_coll_args_check_mem_type(coll_args, team->rank);
-    if (status != UCC_OK) {
+    if (ucc_unlikely(status != UCC_OK)) {
         ucc_error("memory type detection failed");
         return status;
     }
@@ -135,7 +137,7 @@ ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
     if (UCC_ERR_NOT_SUPPORTED == status) {
         ucc_debug("failed to init collective: not supported");
         return status;
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         ucc_error("failed to init collective: %s", ucc_status_string(status));
         return status;
     }

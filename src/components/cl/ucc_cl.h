@@ -87,7 +87,7 @@ typedef struct ucc_cl_team {
 UCC_CLASS_DECLARE(ucc_cl_team_t, ucc_cl_context_t *);
 
 typedef struct ucc_cl_lib_attr {
-    ucc_base_attr_t           super;
+    ucc_base_lib_attr_t       super;
     ucc_config_names_array_t *tls;
 } ucc_cl_lib_attr_t;
 

@@ -697,7 +697,7 @@ typedef struct ucc_context_attr {
     uint64_t                mask;
     ucc_context_type_t      type;
     ucc_coll_sync_type_t    sync_type;
-    ucc_context_addr_t      ctx_addr;
+    ucc_context_addr_h      ctx_addr;
     ucc_context_addr_len_t  ctx_addr_len;
 } ucc_context_attr_t;
 
@@ -908,7 +908,6 @@ ucc_status_t ucc_context_destroy(ucc_context_h context);
 
 ucc_status_t ucc_context_get_attr(ucc_context_h context,
                                   ucc_context_attr_t *context_attr);
-
 
 /*
  * *************************************************************

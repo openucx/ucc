@@ -99,7 +99,7 @@ ucc_status_t ucc_parse_cls_string(const char *cls_str,
         return UCC_ERR_NO_MEMORY;
     }
     n_cls_selected = 0;
-    for (cl_type = 0; cl_type < UCC_CL_LAST; cl_type++) {
+    for (cl_type = (ucc_cl_type_t)0; cl_type < UCC_CL_LAST; cl_type++) {
         if (cls_selected[cl_type]) {
             cls[n_cls_selected++] = cl_type;
         }
@@ -147,7 +147,7 @@ ucc_status_t ucc_cl_lib_config_read(ucc_cl_iface_t *iface,
     size_t doc_len;
     if (!ucc_cl_lib_config_table[TLS_CONFIG_ENTRY].doc) {
         tls_list = ucc_get_framework_components_list(
-            &ucc_global_config.tl_framework, ',');
+            &ucc_global_config.tl_framework, ",");
         if (tls_list) {
             doc_len = strlen(ucc_cl_tls_doc_str) + strlen(tls_list) + 1;
             doc_str = ucc_malloc(doc_len, "cl_tls_doc");

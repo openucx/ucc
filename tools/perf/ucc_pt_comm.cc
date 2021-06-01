@@ -4,14 +4,31 @@
 #include "ucc_pt_bootstrap_mpi.h"
 #include "ucc_perftest.h"
 
-ucc_pt_comm::ucc_pt_comm()
+ucc_pt_comm::ucc_pt_comm(ucc_pt_comm_config config)
 {
+    cfg = config;
     bootstrap = new ucc_pt_bootstrap_mpi();
 }
 
 ucc_pt_comm::~ucc_pt_comm()
 {
     delete bootstrap;
+}
+
+void ucc_pt_comm::set_gpu_device()
+{
+#ifdef HAVE_CUDA
+    cudaError_t st;
+    int dev_count;
+    CUDA_CHECK_GOTO(cudaGetDeviceCount(&dev_count), exit_cuda, st);
+    if (dev_count == 0) {
+        return;
+    }
+    CUDA_CHECK_GOTO(cudaSetDevice(bootstrap->get_local_rank() % dev_count),
+                    exit_cuda, st);
+exit_cuda:
+#endif
+    return;
 }
 
 int ucc_pt_comm::get_rank()
@@ -42,7 +59,11 @@ ucc_status_t ucc_pt_comm::init()
     ucc_context_params_t ctx_params;
     ucc_team_params_t team_params;
     ucc_status_t st;
+    std::string cfg_mod;
 
+    if (cfg.mt != UCC_MEMORY_TYPE_HOST) {
+        set_gpu_device();
+    }
     UCCCHECK_GOTO(ucc_lib_config_read("PERFTEST", nullptr, &lib_config),
                   exit_err, st);
     std::memset(&lib_params, 0, sizeof(ucc_lib_params_t));
@@ -51,9 +72,15 @@ ucc_status_t ucc_pt_comm::init()
     UCCCHECK_GOTO(ucc_init(&lib_params, lib_config, &lib), free_lib_config, st);
     UCCCHECK_GOTO(ucc_context_config_read(lib, NULL, &ctx_config),
                   free_lib, st);
+    cfg_mod = std::to_string(bootstrap->get_size());
+    UCCCHECK_GOTO(ucc_context_config_modify(ctx_config, NULL,
+                  "ESTIMATED_NUM_EPS", cfg_mod.c_str()), free_ctx_config, st);
+    cfg_mod = std::to_string(bootstrap->get_ppn());
+    UCCCHECK_GOTO(ucc_context_config_modify(ctx_config, NULL,
+                  "ESTIMATED_NUM_PPN", cfg_mod.c_str()), free_ctx_config, st);
     std::memset(&ctx_params, 0, sizeof(ucc_context_params_t));
     ctx_params.mask = UCC_CONTEXT_PARAM_FIELD_TYPE |
-                          UCC_CONTEXT_PARAM_FIELD_OOB;
+                      UCC_CONTEXT_PARAM_FIELD_OOB;
     ctx_params.type = UCC_CONTEXT_SHARED;
     ctx_params.oob  = bootstrap->get_context_oob();
     UCCCHECK_GOTO(ucc_context_create(lib, &ctx_params, ctx_config, &context),

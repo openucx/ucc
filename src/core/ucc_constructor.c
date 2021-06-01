@@ -18,30 +18,27 @@
 
 static int callback(struct dl_phdr_info *info, size_t size, void *data)
 {
-    char *str;
-    char *component_path;
-
+    char  *str;
+    char  *component_path;
+    size_t len;
+    int    pos;
     if ((data != NULL) || (size == 0)) {
         return -1;
     }
     if (NULL != (str = strstr(info->dlpi_name, UCC_LIB_SO_NAME))) {
-        int pos        = (int)(str - info->dlpi_name);
-        component_path = (char *)ucc_malloc(pos + UCC_COMPONENT_LIBDIR_LEN + 1,
-                                            "component_path");
+        pos            = (int)(str - info->dlpi_name);
+        len            = pos + UCC_COMPONENT_LIBDIR_LEN + 1;
+        component_path = (char *)ucc_malloc(len, "component_path");
         if (!component_path) {
-            ucc_error("failed to allocate %zd bytes for component_path",
-                      pos + UCC_COMPONENT_LIBDIR_LEN + 1);
+            ucc_error("failed to allocate %zd bytes for component_path", len);
             return -1;
         }
         /* copying up to pos+1 due to ucs_strncpy_safe implementation specifics:
            it'll always write '\0' to the end position of the dest string. */
         ucc_strncpy_safe(component_path, info->dlpi_name, pos + 1);
+        len                -= (pos + 1);
         component_path[pos] = '\0';
-        /* clang complains about potentially unsafe strcat function but
-           string to append is const and we allocate exact number of bytes
-           to store final result
-           NOLINTNEXTLINE */
-        strcat(component_path, UCC_COMPONENT_LIBDIR);
+        strncat(component_path, UCC_COMPONENT_LIBDIR, len);
         ucc_global_config.component_path =
             ucc_global_config.component_path_default = component_path;
     }

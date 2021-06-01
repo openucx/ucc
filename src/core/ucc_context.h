@@ -43,6 +43,8 @@ typedef struct ucc_context {
     ucc_tl_context_t        *service_ctx;
     int                      n_cl_ctx;
     int                      n_tl_ctx;
+    int                      n_addr_packed; /*< Number of LT/CL components whose addresses are packed
+                                              into ucc_co0ntext->attr.addr */
     ucc_config_names_array_t all_tls;
     ucc_list_link_t          progress_list;
     ucc_progress_queue_t    *pq;
@@ -73,4 +75,31 @@ ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
 void         ucc_context_progress_deregister(ucc_context_t *ctx,
                                              ucc_context_progress_fn_t fn,
                                              void *progress_arg);
+
+/* UCC context packed address layout:
+   --------------------------------------------------------------------------
+   |n_components|id0|offset0|id1|offset1|..|idN|offsetN|data0|data1|..|dataN|
+   --------------------------------------------------------------------------
+   each component can extract its own addressing using offset into data.
+   Offset is found by id. */
+typedef struct ucc_context_addr_header {
+    int n_components; // Number of CL/TL components whose address is packed
+    struct {
+        unsigned long id;     // id of component computed during framework load
+        ptrdiff_t     offset; // offset of the address of the component in the
+            // packed data array. Componete from the start of the header
+    } components[1];
+} ucc_context_addr_header_t;
+
+#define UCC_CONTEXT_ADDR_HEADER_SIZE(_n_components)                            \
+    ({                                                                         \
+        ucc_context_addr_header_t _h;                                          \
+        size_t                    _size;                                       \
+        _size = sizeof(_h) + sizeof(_h.components[0]) * (_n_components - 1);   \
+        _size;                                                                 \
+    })
+
+#define UCC_CONTEXT_ADDR_DATA(_header)                                         \
+    PTR_OFFSET(_header, UCC_CONTEXT_ADDR_HEADER_SIZE(_header->n_components))
+
 #endif

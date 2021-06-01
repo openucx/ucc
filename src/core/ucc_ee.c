@@ -98,7 +98,7 @@ ucc_status_t ucc_ee_set_event_internal(ucc_ee_h ee, ucc_ev_t *ev, ucc_queue_head
     ucc_event_desc_t *event_desc;
 
     event_desc = ucc_malloc(sizeof(ucc_event_desc_t), "event descriptor");
-    if (!event_desc) {
+    if (ucc_unlikely(!event_desc)) {
         ucc_error("failed to allocate ucc event descriptor");
         return UCC_ERR_NO_MEMORY;
     }

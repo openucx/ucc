@@ -23,6 +23,10 @@ struct ucc_pt_bootstrap_config {
     ucc_pt_bootstrap_type_t bootstrap;
 };
 
+struct ucc_pt_comm_config {
+    ucc_memory_type_t mt;
+};
+
 struct ucc_pt_benchmark_config {
     ucc_coll_type_t    coll_type;
     size_t             min_count;
@@ -40,6 +44,7 @@ struct ucc_pt_benchmark_config {
 
 struct ucc_pt_config {
     ucc_pt_bootstrap_config bootstrap;
+    ucc_pt_comm_config      comm;
     ucc_pt_benchmark_config bench;
 
     ucc_pt_config();

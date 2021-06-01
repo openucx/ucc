@@ -24,5 +24,11 @@ public:
     ~test_context();
 };
 
+class test_context_get_attr : public test_context {
+  public:
+    ucc_context_h ctx_h;
+    test_context_get_attr();
+    ~test_context_get_attr();
+};
 
 #endif

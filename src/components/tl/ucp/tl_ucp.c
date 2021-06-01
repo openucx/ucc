@@ -10,8 +10,10 @@
 #include "components/mc/base/ucc_mc_base.h"
 #include "allreduce/allreduce.h"
 
-ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib, ucc_base_attr_t *base_attr);
-ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context, ucc_base_attr_t *base_attr);
+ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib,
+                                     ucc_base_lib_attr_t  *base_attr);
+ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
+                                         ucc_base_ctx_attr_t      *base_attr);
 
 static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_lib_config_t, super),
@@ -161,17 +163,17 @@ void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
     mem_attr.field_mask = UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
                           UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
     status = ucc_mc_query(addr, length, &mem_attr);
-    if (status == UCC_OK) {
+    if (ucc_likely(status == UCC_OK)) {
         base_address = mem_attr.base_address;
         alloc_length = mem_attr.alloc_length;
     } else {
-       tl_warn(UCC_TL_TEAM_LIB(team), "failed to query base addr and len");
+        tl_warn(UCC_TL_TEAM_LIB(team), "failed to query base addr and len");
     }
 
     status = ucc_tl_ucp_populate_rcache(base_address, alloc_length,
                                         ucc_memtype_to_ucs[mem_type],
                                         UCC_TL_UCP_TEAM_CTX(team));
-    if (status != UCC_OK) {
+    if (ucc_unlikely(status != UCC_OK)) {
         tl_warn(UCC_TL_TEAM_LIB(team), "ucc_tl_ucp_mem_map failed");
     }
 }

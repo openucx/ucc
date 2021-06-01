@@ -45,8 +45,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_nccl_context_t)
 
 UCC_CLASS_DEFINE(ucc_tl_nccl_context_t, ucc_tl_context_t);
 
-ucc_status_t ucc_tl_nccl_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                                          ucc_base_attr_t *attr) /* NOLINT */
+ucc_status_t
+ucc_tl_nccl_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
+                             ucc_base_ctx_attr_t      *attr)    /* NOLINT */
 {
     /* TODO */
     return UCC_ERR_NOT_IMPLEMENTED;

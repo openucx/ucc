@@ -28,43 +28,65 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_lib_t)
 
 UCC_CLASS_DEFINE(ucc_cl_basic_lib_t, ucc_cl_lib_t);
 
-ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
-                                       ucc_base_attr_t *base_attr)
+static inline ucc_status_t check_tl_lib_attr(const ucc_base_lib_t *lib,
+                                             ucc_tl_iface_t *      tl_iface,
+                                             ucc_cl_lib_attr_t *   attr)
 {
-    ucc_cl_lib_attr_t     *attr   = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
-    ucc_cl_lib_t          *cl_lib = ucc_derived_of(lib, ucc_cl_lib_t);
-    ucc_status_t           status;
-    ucc_tl_lib_attr_t      ucp_tl_attr, nccl_tl_attr;
-    ucc_component_iface_t *ucp_iface, *nccl_iface;
-    ucc_tl_iface_t        *tl_ucp_iface, *tl_nccl_iface;
-    attr->tls = &cl_lib->tls;
-    ucp_iface = ucc_get_component(&ucc_global_config.tl_framework, "ucp");
-    if (!ucp_iface) {
-    	cl_error(lib, "failed to get UCP component");
-    	return UCC_ERR_NO_RESOURCE;
-    }
-    tl_ucp_iface = ucc_derived_of(ucp_iface, ucc_tl_iface_t);
-    memset(&ucp_tl_attr, 0, sizeof(ucc_tl_lib_attr_t));
-    status = tl_ucp_iface->lib.get_attr(NULL, &ucp_tl_attr.super);
+    ucc_tl_lib_attr_t tl_attr;
+    ucc_status_t      status;
+
+    memset(&tl_attr, 0, sizeof(tl_attr));
+    status = tl_iface->lib.get_attr(NULL, &tl_attr.super);
     if (UCC_OK != status) {
-        cl_error(lib, "failed to query cl lib attributes");
+        cl_error(lib, "failed to query tl %s lib attributes",
+                 tl_iface->super.name);
         return status;
     }
-    attr->super.attr.thread_mode = ucp_tl_attr.super.attr.thread_mode;
-    attr->super.attr.coll_types  = ucp_tl_attr.super.attr.coll_types;
-    nccl_iface = ucc_get_component(&ucc_global_config.tl_framework, "nccl");
-    if (nccl_iface) {
-        tl_nccl_iface = ucc_derived_of(nccl_iface, ucc_tl_iface_t);
-        memset(&nccl_tl_attr, 0, sizeof(ucc_tl_lib_attr_t));
-        status = tl_nccl_iface->lib.get_attr(NULL, &nccl_tl_attr.super);
-        if (UCC_OK != status) {
-            cl_error(lib, "failed to query cl lib attributes");
-            return status;
-        }
-        attr->super.attr.thread_mode = ucc_min(attr->super.attr.thread_mode,
-    			nccl_tl_attr.super.attr.thread_mode);
-        attr->super.attr.coll_types  |= nccl_tl_attr.super.attr.coll_types;
-    }
+    attr->super.attr.thread_mode =
+        ucc_min(attr->super.attr.thread_mode, tl_attr.super.attr.thread_mode);
+    attr->super.attr.coll_types |= tl_attr.super.attr.coll_types;
+    return UCC_OK;
+}
 
+ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
+                                       ucc_base_lib_attr_t  *base_attr)
+{
+    ucc_cl_lib_attr_t *attr   = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
+    ucc_cl_lib_t *     cl_lib = ucc_derived_of(lib, ucc_cl_lib_t);
+    ucc_config_names_array_t *tls = &cl_lib->tls;
+    ucc_tl_iface_t *          tl_iface;
+    int                       i;
+    ucc_status_t              status;
+
+    attr->tls                    = &cl_lib->tls;
+    attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
+    attr->super.attr.coll_types  = 0;
+    if (tls->count == 1 && !strcmp(tls->names[0], "all")) {
+        /* Check all available components, since CL_BASIC_TLS == "all" */
+        for (i = 0; i < ucc_global_config.tl_framework.n_components; i++) {
+            tl_iface = ucc_derived_of(
+                ucc_global_config.tl_framework.components[i], ucc_tl_iface_t);
+            ucc_assert(tl_iface);
+            if (UCC_OK != (status = check_tl_lib_attr(lib, tl_iface, attr))) {
+                return status;
+            }
+        }
+    } else {
+        for (i = 0; i < tls->count; i++) {
+            /* Check TLs proveded in CL_BASIC_TLS. Not all of them could be
+               available, check for NULL. */
+            tl_iface = ucc_derived_of(
+                ucc_get_component(&ucc_global_config.tl_framework,
+                                  tls->names[i]),
+                ucc_tl_iface_t);
+            if (!tl_iface) {
+                cl_warn(lib, "tl %s is not available", tls->names[i]);
+                continue;
+            }
+            if (UCC_OK != (status = check_tl_lib_attr(lib, tl_iface, attr))) {
+                return status;
+            }
+        }
+    }
     return UCC_OK;
 }

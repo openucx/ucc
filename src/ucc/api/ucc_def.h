@@ -140,7 +140,7 @@ typedef void *ucc_p2p_conn_t;
 /**
  * @ingroup UCC_TEAM_DT
  */
-typedef void *ucc_context_addr_t;
+typedef void* ucc_context_addr_h;
 
 /**
  * @ingroup UCC_TEAM_DT

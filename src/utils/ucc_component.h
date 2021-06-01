@@ -14,9 +14,10 @@
 #define UCC_MAX_COMPONENT_NAME_LEN 64
 
 typedef struct ucc_component_iface {
-    const char *name;
-    void       *dl_handle;
-    ucc_score_t score;
+    const char    *name;
+    unsigned long  id;
+    void          *dl_handle;
+    ucc_score_t    score;
 } ucc_component_iface_t;
 
 typedef struct ucc_component_framework {
@@ -43,5 +44,5 @@ ucc_component_iface_t* ucc_get_component(ucc_component_framework_t *framework,
 ucc_status_t
 ucc_component_check_scores_uniq(ucc_component_framework_t *framework);
 char* ucc_get_framework_components_list(ucc_component_framework_t *framework,
-                                        char delimiter);
+                                        const char* delimiter);
 #endif

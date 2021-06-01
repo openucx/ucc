@@ -14,43 +14,44 @@
 #define ncclDataTypeUnsupported (ncclNumTypes + 1)
 
 ncclDataType_t ucc_to_nccl_dtype[] = {
-    [UCC_DT_INT8]        = ncclInt8,
-    [UCC_DT_INT16]       = ncclDataTypeUnsupported,
-    [UCC_DT_INT32]       = ncclInt32,
-    [UCC_DT_INT64]       = ncclInt64,
-    [UCC_DT_INT128]      = ncclDataTypeUnsupported,
-    [UCC_DT_UINT8]       = ncclUint8,
-    [UCC_DT_UINT16]      = ncclDataTypeUnsupported,
-    [UCC_DT_UINT32]      = ncclUint32,
-    [UCC_DT_UINT64]      = ncclUint64,
-    [UCC_DT_UINT128]     = ncclDataTypeUnsupported,
-    [UCC_DT_FLOAT16]     = ncclFloat16,
-    [UCC_DT_FLOAT32]     = ncclFloat32,
-    [UCC_DT_FLOAT64]     = ncclFloat64,
-    [UCC_DT_USERDEFINED] = ncclDataTypeUnsupported,
-    [UCC_DT_OPAQUE]      = ncclDataTypeUnsupported,
+    [UCC_DT_INT8]        = (ncclDataType_t)ncclInt8,
+    [UCC_DT_INT16]       = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_INT32]       = (ncclDataType_t)ncclInt32,
+    [UCC_DT_INT64]       = (ncclDataType_t)ncclInt64,
+    [UCC_DT_INT128]      = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_UINT8]       = (ncclDataType_t)ncclUint8,
+    [UCC_DT_UINT16]      = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_UINT32]      = (ncclDataType_t)ncclUint32,
+    [UCC_DT_UINT64]      = (ncclDataType_t)ncclUint64,
+    [UCC_DT_UINT128]     = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_FLOAT16]     = (ncclDataType_t)ncclFloat16,
+    [UCC_DT_FLOAT32]     = (ncclDataType_t)ncclFloat32,
+    [UCC_DT_FLOAT64]     = (ncclDataType_t)ncclFloat64,
+    [UCC_DT_USERDEFINED] = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_OPAQUE]      = (ncclDataType_t)ncclDataTypeUnsupported,
 };
 
 ncclRedOp_t ucc_to_nccl_reduce_op[] = {
-    [UCC_OP_USERDEFINED] = ncclOpUnsupported,
-    [UCC_OP_SUM]         = ncclSum,
-    [UCC_OP_PROD]        = ncclProd,
-    [UCC_OP_MAX]         = ncclMax,
-    [UCC_OP_MIN]         = ncclMin,
-    [UCC_OP_LAND]        = ncclOpUnsupported,
-    [UCC_OP_LOR]         = ncclOpUnsupported,
-    [UCC_OP_LXOR]        = ncclOpUnsupported,
-    [UCC_OP_BAND]        = ncclOpUnsupported,
-    [UCC_OP_BOR]         = ncclOpUnsupported,
-    [UCC_OP_BXOR]        = ncclOpUnsupported,
-    [UCC_OP_MAXLOC]      = ncclOpUnsupported,
-    [UCC_OP_MINLOC]      = ncclOpUnsupported,
+    [UCC_OP_USERDEFINED] = (ncclRedOp_t)ncclOpUnsupported,
+    [UCC_OP_SUM]         = (ncclRedOp_t)ncclSum,
+    [UCC_OP_PROD]        = (ncclRedOp_t)ncclProd,
+    [UCC_OP_MAX]         = (ncclRedOp_t)ncclMax,
+    [UCC_OP_MIN]         = (ncclRedOp_t)ncclMin,
+    [UCC_OP_LAND]        = (ncclRedOp_t)ncclOpUnsupported,
+    [UCC_OP_LOR]         = (ncclRedOp_t)ncclOpUnsupported,
+    [UCC_OP_LXOR]        = (ncclRedOp_t)ncclOpUnsupported,
+    [UCC_OP_BAND]        = (ncclRedOp_t)ncclOpUnsupported,
+    [UCC_OP_BOR]         = (ncclRedOp_t)ncclOpUnsupported,
+    [UCC_OP_BXOR]        = (ncclRedOp_t)ncclOpUnsupported,
+    [UCC_OP_MAXLOC]      = (ncclRedOp_t)ncclOpUnsupported,
+    [UCC_OP_MINLOC]      = (ncclRedOp_t)ncclOpUnsupported,
 };
 
 static inline ucc_status_t ucc_nccl_check_dt_supported(ucc_datatype_t dt1,
                                                        ucc_datatype_t dt2)
 {
-    if ((dt1 != dt2) || (ucc_to_nccl_dtype[dt1] == ncclDataTypeUnsupported)) {
+    if (ucc_unlikely((dt1 != dt2) ||
+                     (ucc_to_nccl_dtype[dt1] == ncclDataTypeUnsupported))) {
         return UCC_ERR_NOT_SUPPORTED;
     }
     return UCC_OK;
@@ -100,7 +101,7 @@ ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
@@ -167,7 +168,7 @@ ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
@@ -216,7 +217,7 @@ ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
@@ -266,7 +267,7 @@ ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
@@ -331,7 +332,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
@@ -376,7 +377,7 @@ ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
 exit_coll:
     if (status == UCC_OK) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (status < 0) {
+    } else if (ucc_unlikely(status < 0)) {
         task->super.super.status = status;
     }
     return status;
