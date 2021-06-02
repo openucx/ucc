@@ -27,7 +27,8 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     }
 
     UCC_CHECK(ucc_mc_alloc(&rbuf, _msgsize, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_rbuf, _msgsize, UCC_MEMORY_TYPE_HOST));
+    check_rbuf = ucc_malloc(_msgsize, "check rbuf");
+    UCC_MALLOC_CHECK(check_rbuf);
     if (TEST_NO_INPLACE == inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
         init_buffer(sbuf, count, dt, _mt, rank);

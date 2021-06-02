@@ -9,6 +9,7 @@
 #include "ucc/api/ucc.h"
 extern "C" {
 #include "core/ucc_mc.h"
+#include "utils/ucc_malloc.h"
 }
 #include <vector>
 #include <tuple>

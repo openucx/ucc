@@ -13,6 +13,9 @@
 #include <unistd.h>
 #include <mpi.h>
 #include <ucc/api/ucc.h>
+extern "C" {
+#include "utils/ucc_malloc.h"
+}
 BEGIN_C_DECLS
 #include "core/ucc_mc.h"
 #include "utils/ucc_math.h"
@@ -26,6 +29,12 @@ END_C_DECLS
 #define UCC_CHECK(_call)                                                \
     if (UCC_OK != (_call)) {                                            \
         std::cerr << "*** UCC TEST FAIL: " << STR(_call) << "\n";       \
+        MPI_Abort(MPI_COMM_WORLD, -1);                                  \
+    }
+
+#define UCC_MALLOC_CHECK(_obj)                                          \
+    if (!(_obj)) {                                                      \
+        std::cerr << "*** UCC MALLOC FAIL \n";                          \
         MPI_Abort(MPI_COMM_WORLD, -1);                                  \
     }
 

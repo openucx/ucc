@@ -37,12 +37,10 @@ ucc_status_t ucc_pt_coll_allgatherv::init_coll_args(size_t count,
     ucc_status_t st;
 
     args = coll_args;
-    UCCCHECK_GOTO(ucc_mc_alloc((void**)&args.dst.info_v.counts,
-                               comm_size *sizeof(uint32_t),
-                               UCC_MEMORY_TYPE_HOST), exit, st);
-    UCCCHECK_GOTO(ucc_mc_alloc((void**)&args.dst.info_v.displacements,
-                               comm_size *sizeof(uint32_t),
-                               UCC_MEMORY_TYPE_HOST), free_count, st);
+    args.dst.info_v.counts = (ucc_count_t *) ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");
+    UCC_MALLOC_CHECK_GOTO(args.dst.info_v.counts, exit, st);
+    args.dst.info_v.displacements = (ucc_aint_t *) ucc_malloc(comm_size * sizeof(uint32_t), "displacements buf");
+    UCC_MALLOC_CHECK_GOTO(args.dst.info_v.displacements, free_count, st);
     UCCCHECK_GOTO(ucc_mc_alloc(&args.dst.info_v.buffer, size_dst,
                                args.dst.info_v.mem_type), free_displ, st);
     if (!UCC_IS_INPLACE(args)) {
@@ -58,12 +56,11 @@ ucc_status_t ucc_pt_coll_allgatherv::init_coll_args(size_t count,
 free_dst:
     ucc_mc_free(args.dst.info_v.buffer, args.dst.info_v.mem_type);
 free_displ:
-    ucc_mc_free(args.dst.info_v.displacements, UCC_MEMORY_TYPE_HOST);
+    ucc_free(args.dst.info_v.displacements);
 free_count:
-    ucc_mc_free(args.dst.info_v.counts, UCC_MEMORY_TYPE_HOST);
+    ucc_free(args.dst.info_v.counts);
 exit:
     return st;
-    return UCC_OK;
 }
 
 void ucc_pt_coll_allgatherv::free_coll_args(ucc_coll_args_t &args)
@@ -72,8 +69,8 @@ void ucc_pt_coll_allgatherv::free_coll_args(ucc_coll_args_t &args)
         ucc_mc_free(args.src.info.buffer, args.src.info.mem_type);
     }
     ucc_mc_free(args.dst.info_v.buffer, args.dst.info_v.mem_type);
-    ucc_mc_free(args.dst.info_v.counts, UCC_MEMORY_TYPE_HOST);
-    ucc_mc_free(args.dst.info_v.displacements, UCC_MEMORY_TYPE_HOST);
+    ucc_free(args.dst.info_v.counts);
+    ucc_free(args.dst.info_v.displacements);
 }
 
 double ucc_pt_coll_allgatherv::get_bus_bw(double time_us)

@@ -35,9 +35,8 @@ public:
             coll->dst.info.count   = (ucc_count_t)count;
             coll->dst.info.datatype = dtype;
 
-            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->init_buf,
-                                   ucc_dt_size(dtype) * count,
-                                   UCC_MEMORY_TYPE_HOST));
+            ctxs[r]->init_buf = ucc_malloc(ucc_dt_size(dtype) * count, "init buf");
+            EXPECT_NE(ctxs[r]->init_buf, nullptr);
             uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
             for (int i = 0; i < ucc_dt_size(dtype) * count; i++) {
                 sbuf[i] = r;
@@ -70,7 +69,7 @@ public:
                 UCC_CHECK(ucc_mc_free(coll->src.info.buffer, mem_type));
             }
             UCC_CHECK(ucc_mc_free(coll->dst.info.buffer, mem_type));
-            UCC_CHECK(ucc_mc_free(ctx->init_buf, UCC_MEMORY_TYPE_HOST));
+            ucc_free(ctx->init_buf);
             free(coll);
             free(ctx);
         }
@@ -82,8 +81,8 @@ public:
         std::vector<uint8_t *> dsts(ctxs.size());
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
-                UCC_CHECK(ucc_mc_alloc((void**)&dsts[r], ctxs[r]->rbuf_size,
-                                       UCC_MEMORY_TYPE_HOST));
+                dsts[r] = (uint8_t *) ucc_malloc(ctxs[r]->rbuf_size, "dsts buf");
+                EXPECT_NE(dsts[r], nullptr);
                 UCC_CHECK(ucc_mc_memcpy(dsts[r], ctxs[r]->args->dst.info.buffer,
                                         ctxs[r]->rbuf_size, UCC_MEMORY_TYPE_HOST,
                                         mem_type));
@@ -108,7 +107,7 @@ public:
         }
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
-                UCC_CHECK(ucc_mc_free((void*)dsts[r], UCC_MEMORY_TYPE_HOST));
+                ucc_free(dsts[r]);
             }
         }
         return ret;

@@ -27,9 +27,11 @@ TestBcast::TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc(&check_rbuf, _msgsize*size, UCC_MEMORY_TYPE_HOST));
+    check_rbuf = ucc_malloc(_msgsize * size, "check rbuf");
+    UCC_MALLOC_CHECK(check_rbuf);
     UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_sbuf, _msgsize, UCC_MEMORY_TYPE_HOST));
+    check_sbuf = ucc_malloc(_msgsize, "check sbuf");
+    UCC_MALLOC_CHECK(check_sbuf);
     if (rank == root) {
         init_buffer(sbuf, count, TEST_DT, _mt, rank);
         UCC_CHECK(ucc_mc_memcpy(check_sbuf, sbuf, _msgsize,                        \

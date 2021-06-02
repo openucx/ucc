@@ -30,7 +30,8 @@ TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     }
 
     UCC_CHECK(ucc_mc_alloc(&rbuf, _msgsize * nprocs, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_rbuf, _msgsize * nprocs, UCC_MEMORY_TYPE_HOST));
+    check_rbuf = ucc_malloc(_msgsize * nprocs, "check rbuf");
+    UCC_MALLOC_CHECK(check_rbuf);
     if (TEST_NO_INPLACE == inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf, _msgsize * nprocs, _mt));
         init_buffer(sbuf, count * nprocs, TEST_DT, _mt, rank);

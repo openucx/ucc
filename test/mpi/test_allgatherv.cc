@@ -28,12 +28,13 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc((void**)&counts, size * sizeof(uint32_t),
-                           UCC_MEMORY_TYPE_HOST));
-    UCC_CHECK(ucc_mc_alloc((void**)&displacements, size * sizeof(uint32_t),
-                           UCC_MEMORY_TYPE_HOST));
+    counts = (int *) ucc_malloc(size * sizeof(uint32_t), "counts buf");
+    UCC_MALLOC_CHECK(counts);
+    displacements = (int *) ucc_malloc(size * sizeof(uint32_t), "displacements buf");
+    UCC_MALLOC_CHECK(displacements);
     UCC_CHECK(ucc_mc_alloc(&rbuf, _msgsize*size, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_rbuf, _msgsize*size, UCC_MEMORY_TYPE_HOST));
+    check_rbuf = ucc_malloc(_msgsize*size, "check rbuf");
+    UCC_MALLOC_CHECK(check_rbuf);
     for (int i = 0; i < size; i++) {
         counts[i] = count;
         displacements[i] = i * count;
@@ -67,10 +68,10 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
 TestAllgatherv::~TestAllgatherv() {
     if (counts) {
-        ucc_mc_free(counts, UCC_MEMORY_TYPE_HOST);
+        ucc_free(counts);
     }
     if (displacements) {
-        ucc_mc_free(displacements, UCC_MEMORY_TYPE_HOST);
+        ucc_free(displacements);
     }
 }
 ucc_status_t TestAllgatherv::check()
