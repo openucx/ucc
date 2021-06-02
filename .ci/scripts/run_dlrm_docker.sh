@@ -18,5 +18,5 @@ fi
 HEAD_NODE=$(head -1 "$HOSTFILE")
 export HEAD_NODE
 
-#sudo ssh -p "${DOCKER_SSH_PORT}" "${HEAD_NODE}" /opt/nvidia/torch-ucc/src/ucc/.ci/scripts/run_dlrm.sh cpu "/opt/nvidia/torch-ucc/src/ucc/.ci/configs/${HEAD_NODE}/hostfile.txt"
-sudo ssh -p "${DOCKER_SSH_PORT}" "${HEAD_NODE}" /opt/nvidia/torch-ucc/src/ucc/.ci/scripts/run_dlrm.sh gpu "/opt/nvidia/torch-ucc/src/ucc/.ci/configs/${HEAD_NODE}/hostfile.txt"
+#sudo ssh -p "${DOCKER_SSH_PORT}" "${HEAD_NODE}" /opt/nvidia/src/ucc/.ci/scripts/run_dlrm.sh cpu "/opt/nvidia/src/ucc/.ci/configs/${HEAD_NODE}/hostfile.txt"
+sudo ssh -p "${DOCKER_SSH_PORT}" "${HEAD_NODE}" /opt/nvidia/src/ucc/.ci/scripts/run_dlrm.sh gpu "/opt/nvidia/src/ucc/.ci/configs/${HEAD_NODE}/hostfile.txt"
