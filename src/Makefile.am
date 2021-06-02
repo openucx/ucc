@@ -50,6 +50,7 @@ noinst_HEADERS =                     \
 	utils/ucc_math.h                 \
 	utils/ucc_coll_utils.h           \
 	utils/ucc_list.h                 \
+	utils/ucc_lock_free_queue.h      \
 	utils/ucc_string.h               \
 	utils/ucc_queue.h                \
 	utils/ucc_proc_info.h            \
