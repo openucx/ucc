@@ -18,4 +18,4 @@ fi
 HEAD_NODE=$(head -1 "$HOSTFILE")
 export HEAD_NODE
 
-sudo ssh -p "${DOCKER_SSH_PORT}" "${HEAD_NODE}" /opt/nvidia/torch-ucc/src/ucc/.ci/scripts/run_tests_ucc_mpi.sh "/opt/nvidia/torch-ucc/src/ucc/.ci/configs/${HEAD_NODE}/hostfile.txt"
+sudo ssh -p "${DOCKER_SSH_PORT}" "${HEAD_NODE}" /opt/nvidia/src/ucc/.ci/scripts/run_tests_ucc_mpi.sh "/opt/nvidia/src/ucc/.ci/configs/${HEAD_NODE}/hostfile.txt"

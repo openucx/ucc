@@ -2,7 +2,7 @@
 set -o pipefail
 
 echo "INFO: Build UCC"
-UCC_SRC_DIR="${TORCH_UCC_SRC_DIR}/ucc"
+UCC_SRC_DIR="${SRC_DIR}/ucc"
 cd "${UCC_SRC_DIR}"
 "${UCC_SRC_DIR}/autogen.sh"
 mkdir -p "${UCC_SRC_DIR}/build"

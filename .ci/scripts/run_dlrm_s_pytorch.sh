@@ -46,7 +46,7 @@ if [ "${CPU_GPU_MODE}" = "gpu" ]; then
 fi
 
 # shellcheck disable=SC2086
-python /opt/nvidia/torch-ucc/workloads/dlrm/dlrm_s_pytorch.py \
+python /opt/nvidia/workloads/dlrm/dlrm_s_pytorch.py \
     --mini-batch-size=2048 \
     --test-mini-batch-size=16384 \
     --test-num-workers=0 \

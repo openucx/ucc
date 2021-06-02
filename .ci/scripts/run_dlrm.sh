@@ -60,4 +60,4 @@ mpirun \
     -x LD_LIBRARY_PATH \
     -x MASTER_ADDR \
     -x CPU_GPU_MODE \
-    /opt/nvidia/torch-ucc/src/ucc/.ci/scripts/run_dlrm_s_pytorch.sh
+    /opt/nvidia/src/ucc/.ci/scripts/run_dlrm_s_pytorch.sh
