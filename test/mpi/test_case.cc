@@ -165,9 +165,9 @@ TestCase::~TestCase()
         UCC_CHECK(ucc_mc_free(rbuf, mem_type));
     }
     if (check_sbuf) {
-        UCC_CHECK(ucc_mc_free(check_sbuf, UCC_MEMORY_TYPE_HOST));
+        ucc_free(check_sbuf);
     }
     if (check_rbuf) {
-        UCC_CHECK(ucc_mc_free(check_rbuf, UCC_MEMORY_TYPE_HOST));
+        ucc_free(check_rbuf);
     }
 }

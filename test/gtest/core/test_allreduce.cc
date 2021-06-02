@@ -36,8 +36,8 @@ class test_allreduce : public UccCollArgs, public testing::Test {
             coll->coll_type = UCC_COLL_TYPE_ALLREDUCE;
             coll->reduce.predefined_op = T::redop;
 
-            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->init_buf, ucc_dt_size(dt) * count,
-                                   UCC_MEMORY_TYPE_HOST));
+            ctxs[r]->init_buf = ucc_malloc(ucc_dt_size(dt) * count, "init buf");
+            EXPECT_NE(ctxs[r]->init_buf, nullptr);
             for (int i = 0; i < count; i++) {
                 typename T::type * ptr;
                 ptr = (typename T::type *)ctxs[r]->init_buf;
@@ -75,7 +75,7 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 UCC_CHECK(ucc_mc_free(coll->src.info.buffer, mem_type));
             }
             UCC_CHECK(ucc_mc_free(coll->dst.info.buffer, mem_type));
-            UCC_CHECK(ucc_mc_free(ctx->init_buf, UCC_MEMORY_TYPE_HOST));
+            ucc_free(ctx->init_buf);
             free(coll);
             free(ctx);
         }
@@ -88,9 +88,8 @@ class test_allreduce : public UccCollArgs, public testing::Test {
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
-                UCC_CHECK(ucc_mc_alloc((void**)&dsts[r],
-                                       count * sizeof(typename T::type),
-                                       UCC_MEMORY_TYPE_HOST));
+                dsts[r] = (typename T::type *) ucc_malloc(count * sizeof(typename T::type), "dsts buf");
+                EXPECT_NE(dsts[r], nullptr);
                 UCC_CHECK(ucc_mc_memcpy(dsts[r], ctxs[r]->args->dst.info.buffer,
                                         count * sizeof(typename T::type), UCC_MEMORY_TYPE_HOST,
                                         mem_type));
@@ -112,7 +111,7 @@ class test_allreduce : public UccCollArgs, public testing::Test {
         }
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
-                UCC_CHECK(ucc_mc_free((void*)dsts[r], UCC_MEMORY_TYPE_HOST));
+                ucc_free(dsts[r]);
             }
         }
         return true;

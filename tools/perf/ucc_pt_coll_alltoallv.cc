@@ -35,18 +35,14 @@ ucc_status_t ucc_pt_coll_alltoallv::init_coll_args(size_t count,
     ucc_status_t st      = UCC_OK;
 
     args = coll_args;
-    UCCCHECK_GOTO(ucc_mc_alloc((void**)&args.src.info_v.counts,
-                               comm_size * sizeof(uint32_t),
-                               UCC_MEMORY_TYPE_HOST), exit, st);
-    UCCCHECK_GOTO(ucc_mc_alloc((void**)&args.src.info_v.displacements,
-                               comm_size * sizeof(uint32_t),
-                               UCC_MEMORY_TYPE_HOST), free_src_count, st);
-    UCCCHECK_GOTO(ucc_mc_alloc((void**)&args.dst.info_v.counts,
-                               comm_size * sizeof(uint32_t),
-                               UCC_MEMORY_TYPE_HOST), free_src_displ, st);
-    UCCCHECK_GOTO(ucc_mc_alloc((void**)&args.dst.info_v.displacements,
-                               comm_size * sizeof(uint32_t),
-                               UCC_MEMORY_TYPE_HOST), free_dst_count, st);
+    args.src.info_v.counts = (ucc_count_t *) ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");
+    UCC_MALLOC_CHECK_GOTO(args.src.info_v.counts, exit, st);
+    args.src.info_v.displacements = (ucc_aint_t *) ucc_malloc(comm_size * sizeof(uint32_t), "displacements buf");
+    UCC_MALLOC_CHECK_GOTO(args.src.info_v.displacements, free_src_count, st);
+    args.dst.info_v.counts = (ucc_count_t *) ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");
+    UCC_MALLOC_CHECK_GOTO(args.dst.info_v.counts, free_src_displ, st);
+    args.dst.info_v.displacements = (ucc_aint_t *) ucc_malloc(comm_size * sizeof(uint32_t), "displacements buf");
+    UCC_MALLOC_CHECK_GOTO(args.dst.info_v.displacements, free_dst_count, st);
     UCCCHECK_GOTO(ucc_mc_alloc(&args.dst.info_v.buffer, size,
                                args.dst.info_v.mem_type), free_dst_displ, st);
     if (!UCC_IS_INPLACE(args)) {
@@ -63,13 +59,13 @@ ucc_status_t ucc_pt_coll_alltoallv::init_coll_args(size_t count,
 free_dst:
     ucc_mc_free(args.dst.info_v.buffer, args.dst.info_v.mem_type);
 free_dst_displ:
-    ucc_mc_free(args.dst.info_v.displacements, UCC_MEMORY_TYPE_HOST);
+    ucc_free(args.dst.info_v.displacements);
 free_dst_count:
-    ucc_mc_free(args.dst.info_v.counts, UCC_MEMORY_TYPE_HOST);
+    ucc_free(args.dst.info_v.counts);
 free_src_displ:
-    ucc_mc_free(args.src.info_v.displacements, UCC_MEMORY_TYPE_HOST);
+    ucc_free(args.src.info_v.displacements);
 free_src_count:
-    ucc_mc_free(args.src.info_v.counts, UCC_MEMORY_TYPE_HOST);
+    ucc_free(args.src.info_v.counts);
 exit:
     return st;
 }
@@ -80,10 +76,10 @@ void ucc_pt_coll_alltoallv::free_coll_args(ucc_coll_args_t &args)
         ucc_mc_free(args.src.info_v.buffer, args.src.info_v.mem_type);
     }
     ucc_mc_free(args.dst.info_v.buffer, args.dst.info_v.mem_type);
-    ucc_mc_free(args.dst.info_v.counts, UCC_MEMORY_TYPE_HOST);
-    ucc_mc_free(args.dst.info_v.displacements, UCC_MEMORY_TYPE_HOST);
-    ucc_mc_free(args.src.info_v.counts, UCC_MEMORY_TYPE_HOST);
-    ucc_mc_free(args.src.info_v.displacements, UCC_MEMORY_TYPE_HOST);
+    ucc_free(args.dst.info_v.counts);
+    ucc_free(args.dst.info_v.displacements);
+    ucc_free(args.src.info_v.counts);
+    ucc_free(args.src.info_v.displacements);
 }
 
 double ucc_pt_coll_alltoallv::get_bus_bw(double time_us)

@@ -28,8 +28,8 @@ void init_buffer(void *_buf, size_t count, ucc_datatype_t dt,
 {
     void *buf = NULL;
     if (mt == UCC_MEMORY_TYPE_CUDA) {
-        UCC_CHECK(ucc_mc_alloc(&buf, count * ucc_dt_size(dt),
-                               UCC_MEMORY_TYPE_HOST));
+        buf = ucc_malloc(count * ucc_dt_size(dt), "buf");
+        UCC_MALLOC_CHECK(buf);
     } else if (mt == UCC_MEMORY_TYPE_HOST) {
         buf = _buf;
     } else {
@@ -75,7 +75,7 @@ void init_buffer(void *_buf, size_t count, ucc_datatype_t dt,
     if (UCC_MEMORY_TYPE_HOST != mt) {
         UCC_CHECK(ucc_mc_memcpy(_buf, buf, count * ucc_dt_size(dt),
                                 mt, UCC_MEMORY_TYPE_HOST));
-        UCC_CHECK(ucc_mc_free(buf, UCC_MEMORY_TYPE_HOST));
+        ucc_free(buf);
     }
 }
 

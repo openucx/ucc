@@ -108,8 +108,8 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     UCC_ALLOC_COPY_BUF(check_sbuf, UCC_MEMORY_TYPE_HOST, sbuf, _mt,
                        sncounts * dt_size);
     UCC_CHECK(ucc_mc_alloc(&rbuf, rncounts * dt_size, _mt));
-    UCC_CHECK(ucc_mc_alloc(&check_rbuf, rncounts * dt_size,
-                           UCC_MEMORY_TYPE_HOST));
+    check_rbuf = ucc_malloc(rncounts * dt_size, "check rbuf");
+    UCC_MALLOC_CHECK(check_rbuf);
 
     args.src.info_v.buffer = sbuf;
     args.src.info_v.datatype = TEST_DT;
