@@ -1,7 +1,7 @@
 #!/bin/bash -eEx
 set -o pipefail
 
-function err_report () {
+function err_report() {
     echo "Exited with ERROR in line $1"
     exit 1
 }
@@ -28,7 +28,12 @@ HEAD_NODE=$(head -1 "$HOSTFILE")
 export HEAD_NODE
 
 DOCKER_CONTAINER_NAME="torch_ucc"
-DOCKER_IMAGE_NAME="${UCC_DOCKER_IMAGE_NAME}:${BUILD_ID}"
+
+if [ "${ENABLE_VALGRIND}" = "yes" ]; then
+    DOCKER_IMAGE_NAME="${UCC_DOCKER_IMAGE_NAME_VALGRIND}:${BUILD_ID}"
+else
+    DOCKER_IMAGE_NAME="${UCC_DOCKER_IMAGE_NAME}:${BUILD_ID}"
+fi
 
 DOCKER_RUN_ARGS="\
 --pull always \
