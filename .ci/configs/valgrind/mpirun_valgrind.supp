@@ -1,0 +1,30 @@
+{
+   PMPI_Cond
+   Memcheck:Cond
+   ...
+   fun:PMPI_*
+}
+{
+   PMPI_Addr8
+   Memcheck:Addr8
+   ...
+   fun:PMPI_*
+}
+{
+   PMPI_Leak
+   Memcheck:Leak
+   ...
+   fun:PMPI_*
+}
+{
+   PMPI_Addr1
+   Memcheck:Addr1
+   ...
+   fun:PMPI_*
+}
+{
+   ompi_mpi_finalize_Leak
+   Memcheck:Leak
+   ...
+   fun:ompi_mpi_finalize
+}
