@@ -12,6 +12,11 @@
 
 extern ucs_profile_context_t *ucc_profile_ctx;
 
+
+#undef UCC_PROFILE_FUNC
+#undef UCC_PROFILE_REQUEST_NEW
+#undef UCC_PROFILE_REQUEST_EVENT
+#undef UCC_PROFILE_REQUEST_FREE
 /**
  * Create a profiled function. Uses default profile context.
  *

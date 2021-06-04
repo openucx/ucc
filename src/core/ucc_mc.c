@@ -8,7 +8,13 @@
 #include "ucc_mc.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
+
+#ifdef HAVE_PROFILING_MC
 #include "utils/profile/ucc_profile.h"
+#else
+#include "utils/profile/ucc_profile_off.h"
+#endif
+#define UCC_MC_PROFILE_FUNC UCC_PROFILE_FUNC
 
 static const ucc_mc_ops_t *mc_ops[UCC_MEMORY_TYPE_LAST];
 static const ucc_ee_ops_t *ee_ops[UCC_EE_LAST];
@@ -111,15 +117,15 @@ ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr)
     return UCC_OK;
 }
 
-UCC_PROFILE_FUNC(ucc_status_t, ucc_mc_alloc, (**h_ptr, size, mem_type),
-                 ucc_mc_buffer_header_t **h_ptr, size_t size,
-                 ucc_memory_type_t mem_type)
+UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_alloc, (h_ptr, size, mem_type),
+                    ucc_mc_buffer_header_t **h_ptr, size_t size,
+                    ucc_memory_type_t mem_type)
 {
     UCC_CHECK_MC_AVAILABLE(mem_type);
     return mc_ops[mem_type]->mem_alloc(h_ptr, size);
 }
 
-UCC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce,
+UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce,
                  (src1, src2, dst, count, dt, op, mem_type),
                  const void *src1, const void *src2, void *dst,
                  size_t count, ucc_datatype_t dt,
@@ -133,11 +139,11 @@ UCC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce,
     return mc_ops[mem_type]->reduce(src1, src2, dst, count, dt, op);
 }
 
-UCC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce_multi,
-                 (src1, src2, dst, size, count, stride, dtype, op, mem_type),
-                 void *src1, void *src2, void *dst, size_t size, size_t count,
-                 size_t stride, ucc_datatype_t dtype, ucc_reduction_op_t op,
-                 ucc_memory_type_t mem_type)
+UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce_multi,
+                    (src1, src2, dst, size, count, stride, dtype, op, mem_type),
+                    void *src1, void *src2, void *dst, size_t size,
+                    size_t count, size_t stride, ucc_datatype_t dtype,
+                    ucc_reduction_op_t op, ucc_memory_type_t mem_type)
 {
     if (count == 0) {
         return UCC_OK;
@@ -153,9 +159,10 @@ ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *h_ptr)
     return mc_ops[h_ptr->mt]->mem_free(h_ptr);
 }
 
-UCC_PROFILE_FUNC(ucc_status_t, ucc_mc_memcpy, (dst, src, len, dst_mem, src_mem),
-                 void *dst, const void *src, size_t len,
-                 ucc_memory_type_t dst_mem, ucc_memory_type_t src_mem)
+UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_memcpy,
+                    (dst, src, len, dst_mem, src_mem), void *dst,
+                    const void *src, size_t len, ucc_memory_type_t dst_mem,
+                    ucc_memory_type_t src_mem)
 
 {
     ucc_memory_type_t mt;

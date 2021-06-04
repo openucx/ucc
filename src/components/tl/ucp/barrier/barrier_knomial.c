@@ -96,7 +96,7 @@ UCC_KN_PHASE_PROXY:
 completion:
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.super.status = UCC_OK;
-    UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_barrier_kn_done", 0);
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_barrier_kn_done", 0);
 out:
     return task->super.super.status;
 }
@@ -107,7 +107,7 @@ ucc_status_t ucc_tl_ucp_barrier_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team = task->team;
     ucc_status_t       status;
 
-    UCC_PROFILE_REQUEST_EVENT(coll_task, "ucp_barrier_kn_start", 0);
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_barrier_kn_start", 0);
     task->barrier.phase = UCC_KN_PHASE_INIT;
     ucc_knomial_pattern_init(team->size, team->rank,
                              ucc_min(UCC_TL_UCP_TEAM_LIB(team)->

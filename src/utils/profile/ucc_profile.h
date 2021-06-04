@@ -16,7 +16,6 @@
 #  include "ucc_profile_off.h"
 #endif
 
-
 /**
  * Initialize profiling system.
  *

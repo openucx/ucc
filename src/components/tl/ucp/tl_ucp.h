@@ -18,6 +18,17 @@
 #define UCC_TL_UCP_DEFAULT_SCORE 10
 #endif
 
+#ifdef HAVE_PROFILING_TL_UCP
+#include "utils/profile/ucc_profile.h"
+#else
+#include "utils/profile/ucc_profile_off.h"
+#endif
+
+#define UCC_TL_UCP_PROFILE_FUNC UCC_PROFILE_FUNC
+#define UCC_TL_UCP_PROFILE_REQUEST_NEW UCC_PROFILE_REQUEST_NEW
+#define UCC_TL_UCP_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
+#define UCC_TL_UCP_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
+
 typedef struct ucc_tl_ucp_iface {
     ucc_tl_iface_t super;
 } ucc_tl_ucp_iface_t;

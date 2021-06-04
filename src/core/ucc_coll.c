@@ -11,7 +11,7 @@
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_coll_utils.h"
-#include "utils/profile/ucc_profile.h"
+#include "utils/profile/ucc_profile_core.h"
 #include "schedule/ucc_schedule.h"
 
 /* NOLINTNEXTLINE  */
@@ -118,9 +118,9 @@ static ucc_status_t ucc_coll_args_check_mem_type(ucc_coll_args_t *coll_args,
     };
 }
 
-UCC_PROFILE_FUNC(ucc_status_t, ucc_collective_init, (coll_args, request, team),
-                 ucc_coll_args_t *coll_args, ucc_coll_req_h *request,
-                 ucc_team_h team)
+UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
+                      (coll_args, request, team), ucc_coll_args_t *coll_args,
+                      ucc_coll_req_h *request, ucc_team_h team)
 {
     ucc_cl_team_t         *cl_team;
     ucc_coll_task_t       *task;
@@ -166,8 +166,8 @@ ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ev)
     return task->triggered_post(ee, ev, task);
 }
 
-UCC_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
-                 ucc_coll_req_h request)
+UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
+                      ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
     return task->finalize(task);
