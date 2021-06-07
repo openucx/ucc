@@ -18,7 +18,7 @@ static ucc_config_field_t ucc_context_config_table[] = {
      "An optimization hint of how many endpoints will be created on this context",
      ucc_offsetof(ucc_context_config_t, estimated_num_eps), UCC_CONFIG_TYPE_UINT},
 
-    {"LOCK_FREE_PROGRESS_Q", "0",
+    {"LOCK_FREE_PROGRESS_Q", "1",
      "Enable lock free progress queue optimization",
      ucc_offsetof(ucc_context_config_t, lock_free_progress_q), UCC_CONFIG_TYPE_UINT},
 
