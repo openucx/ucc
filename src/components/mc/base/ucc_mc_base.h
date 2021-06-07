@@ -46,7 +46,9 @@ typedef struct ucc_mem_attr {
     void              *base_address;
 
     /**
-     * Length of the whole allocation to which the provided buffer belongs to.
+     * If UCC_MEM_ATTR_FIELD_ALLOC_LENGTH is set this parameter should be equal
+     * to known allocation length. On output length of the whole allocation
+     * to which the provided buffer belongs to is returned.
      * If the md not support querying allocation length, then the length passed
      * to ucc_mc_cuda_mem_query is returned as is.
      */
@@ -71,8 +73,7 @@ typedef struct ucc_mc_config {
 extern ucc_config_field_t ucc_mc_config_table[];
 
 typedef struct ucc_mc_ops {
-    ucc_status_t (*mem_query)(const void *ptr, size_t length,
-                              ucc_mem_attr_t *mem_attr);
+    ucc_status_t (*mem_query)(const void *ptr, ucc_mem_attr_t *mem_attr);
     ucc_status_t (*mem_alloc)(void **ptr, size_t size);
     ucc_status_t (*mem_free)(void *ptr);
     ucc_status_t (*reduce)(const void *src1, const void *src2, void *dst,

@@ -156,13 +156,14 @@ void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
     ucc_mem_attr_t mem_attr;
     ucc_status_t status;
 
-    if (addr == NULL|| length == 0) {
+    if ((addr == NULL) || (length == 0)) {
         return;
     }
 
-    mem_attr.field_mask = UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
-                          UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
-    status = ucc_mc_query(addr, length, &mem_attr);
+    mem_attr.field_mask   = UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
+                            UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
+    mem_attr.alloc_length = length;
+    status = ucc_mc_get_mem_attr(addr, &mem_attr);
     if (ucc_likely(status == UCC_OK)) {
         base_address = mem_attr.base_address;
         alloc_length = mem_attr.alloc_length;

@@ -119,16 +119,9 @@ static ucc_status_t ucc_mc_cpu_memcpy(void *dst, const void *src, size_t len,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cpu_mem_query(const void *ptr, size_t length,
-                                        ucc_mem_attr_t *mem_attr)
+static ucc_status_t ucc_mc_cpu_mem_query(const void *ptr, //NOLINT
+                                         ucc_mem_attr_t *mem_attr) //NOLINT
 {
-    if (ptr == NULL || length == 0) {
-        mem_attr->mem_type     = UCC_MEMORY_TYPE_HOST;
-        mem_attr->base_address = NULL;
-        mem_attr->alloc_length = 0;
-        return UCC_OK;
-    }
-
     /* not supposed to be used */
     mc_error(&ucc_mc_cpu.super, "host memory component shouldn't be used for"
                                 "mem type detection");
