@@ -15,7 +15,6 @@
 #include <ucc/api/ucc_status.h>
 #include <stdio.h>
 
-
 BEGIN_C_DECLS
 
 /** Unified Collective Communications (UCC) Library Specification
@@ -195,7 +194,7 @@ typedef enum {
  *
  *  Description
  *
- *  @ref ucc_datatype_t represents the datatypes supported by the UCC library's
+ *  @ref ucc_datatype_t represents the datatypes supported by the UCC library’s
  *  collective and reduction operations. The standard operations are signed and
  *  unsigned integers of various sizes, float 16, 32, and 64, and user-defined
  *  datatypes. The UCC_DT_USERDEFINED represents the user-defined datatype. The
@@ -234,7 +233,7 @@ typedef enum {
  *
  *  Description
  *
- *  @ref ucc_thread_mode_t is used to initialize the UCC library's thread mode.
+ *  @ref ucc_thread_mode_t is used to initialize the UCC library’s thread mode.
  *  The UCC library can be configured in three thread modes UCC_THREAD_SINGLE,
  *  UCC_THREAD_FUNNELED, and UCC_LIB_THREAD_MULTIPLE. In the UCC_THREAD_SINGLE
  *  mode, the user program must not be multithreaded. In the UCC_THREAD_FUNNELED
@@ -1383,18 +1382,18 @@ typedef enum ucc_memory_type {
 } ucc_memory_type_t;
 
 typedef struct ucc_coll_buffer_info_v {
-    void *                  buffer;
-    ucc_count_t *           counts;
-    ucc_aint_t *            displacements;
-    ucc_datatype_t          datatype;
-    ucc_memory_type_t       mem_type;
+    void             *buffer;
+    ucc_count_t      *counts;
+    ucc_aint_t       *displacements;
+    ucc_datatype_t    datatype;
+    ucc_memory_type_t mem_type;
 } ucc_coll_buffer_info_v_t;
 
 typedef struct ucc_coll_buffer_info {
-    void *                  buffer;
-    ucc_count_t             count;
-    ucc_datatype_t          datatype;
-    ucc_memory_type_t       mem_type;
+    void             *buffer;
+    ucc_count_t       count;
+    ucc_datatype_t    datatype;
+    ucc_memory_type_t mem_type;
 } ucc_coll_buffer_info_t;
 
 /**

@@ -218,7 +218,8 @@ protected:
     ucc_test_mpi_inplace_t inplace;
     ucc_coll_args_t args;
     ucc_coll_req_h req;
-    ucc_mc_buffer_header_t *sbuf_header, *rbuf_header, *check_sbuf_header; //, *check_rbuf_header;
+    ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header,
+        *check_sbuf_mc_header;
     void *sbuf;
     void *rbuf;
     void *check_sbuf;

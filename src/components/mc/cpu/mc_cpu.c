@@ -9,50 +9,37 @@
 #include "utils/ucc_malloc.h"
 #include <sys/types.h>
 
-static ucc_status_t ucc_mc_cpu_mem_alloc_pool_with_init(ucc_mc_buffer_header_t **ptr,
-                                                   size_t size);
-
 static ucc_config_field_t ucc_mc_cpu_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_mc_cpu_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_mc_config_table)},
 
-    {"ELEM_SIZE", "1048576", "The size of each element in mc cpu mpool",
-     ucc_offsetof(ucc_mc_cpu_config_t, cpu_elem_size),
+    {"MPOOL_ELEM_SIZE", "1Mb", "The size of each element in mc cpu mpool",
+     ucc_offsetof(ucc_mc_cpu_config_t, mpool_elem_size),
      UCC_CONFIG_TYPE_MEMUNITS},
 
-    {"MAX_ELEMS", "8", "The max amount of elements in mc cpu mpool",
-     ucc_offsetof(ucc_mc_cpu_config_t, cpu_max_elems), UCC_CONFIG_TYPE_UINT},
+    {"MPOOL_MAX_ELEMS", "8", "The max amount of elements in mc cpu mpool",
+     ucc_offsetof(ucc_mc_cpu_config_t, mpool_max_elems), UCC_CONFIG_TYPE_UINT},
 
     {NULL}
 
 };
 
-static ucc_status_t ucc_mc_cpu_init(ucc_thread_mode_t thread_mode)
+static ucc_status_t ucc_mc_cpu_init(const ucc_mc_params_t *mc_params)
 {
     ucc_strncpy_safe(ucc_mc_cpu.super.config->log_component.name,
                      ucc_mc_cpu.super.super.name,
                      sizeof(ucc_mc_cpu.super.config->log_component.name));
-    // spinlock assures 1 thread only initiates mpool and allocates its buffers
-    ucc_mc_cpu.tm = thread_mode;
+    ucc_mc_cpu.thread_mode = mc_params->thread_mode;
+    // lock assures single mpool initiation when multiple threads concurrently execute
+    // different collective operations thus concurrently entering init function.
     ucc_spinlock_init(&ucc_mc_cpu.mpool_init_spinlock, 0);
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cpu_finalize()
+static ucc_status_t ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
+                                         size_t                   size)
 {
-    if (ucc_mc_cpu.mpool_init_flag) {
-        ucc_mpool_cleanup(&ucc_mc_cpu.mpool, 1);
-        ucc_mc_cpu.mpool_init_flag     = 0;
-        ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_alloc_pool_with_init;
-    }
-    ucc_spinlock_destroy(&ucc_mc_cpu.mpool_init_spinlock);
-    return UCC_OK;
-}
-
-static ucc_status_t
-ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **ptr, size_t size)
-{
-    size_t size_with_h = size + sizeof(ucc_mc_buffer_header_t);
+    size_t        size_with_h = size + sizeof(ucc_mc_buffer_header_t);
     ucc_mc_buffer_header_t *h =
         (ucc_mc_buffer_header_t *)ucc_malloc(size_with_h, "mc cpu");
     if (ucc_unlikely(!h)) {
@@ -61,47 +48,49 @@ ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **ptr, size_t size)
         return UCC_ERR_NO_MEMORY;
     }
     h->from_pool = 0;
-    h->addr = PTR_OFFSET(h, sizeof(ucc_mc_buffer_header_t));
-    *ptr         = h;
+    h->addr      = PTR_OFFSET(h, sizeof(ucc_mc_buffer_header_t));
+    *h_ptr       = h;
+    mc_debug(&ucc_mc_cpu.super, "MC allocated %ld bytes with ucc_malloc", size);
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cpu_mem_alloc_pool(ucc_mc_buffer_header_t **ptr,
-                                         size_t                   size)
+static ucc_status_t ucc_mc_cpu_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
+                                              size_t                   size)
 {
     ucc_mc_buffer_header_t *h = NULL;
-    if (size <= MC_CPU_CONFIG->cpu_elem_size) {
+    if (size <= MC_CPU_CONFIG->mpool_elem_size) {
         h = (ucc_mc_buffer_header_t *)ucc_mpool_get(&ucc_mc_cpu.mpool);
     }
     if (!h) {
         // Slow path
-    	return ucc_mc_cpu_mem_alloc(ptr, size);
+        return ucc_mc_cpu_mem_alloc(h_ptr, size);
     }
-    *ptr = h;
+    mc_debug(&ucc_mc_cpu.super, "MC allocated %ld bytes from cpu mpool", size);
+    *h_ptr = h;
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cpu_chunk_alloc(ucc_mpool_t *mp, size_t *size_p,
+static ucc_status_t ucc_mc_cpu_chunk_alloc(ucc_mpool_t *mp, //NOLINT
+                                           size_t *size_p,
                                            void **chunk_p)
 {
-    *chunk_p = ucc_malloc(
-        *size_p, "mc cpu");
+    *chunk_p = ucc_malloc(*size_p, "mc cpu");
     if (!*chunk_p) {
         mc_error(&ucc_mc_cpu.super, "failed to allocate %zd bytes", *size_p);
         return UCC_ERR_NO_MEMORY;
     }
-
     return UCC_OK;
 }
 
-static void ucc_mc_cpu_chunk_init(ucc_mpool_t *mp, void *obj, void *chunk)
+static void ucc_mc_cpu_chunk_init(ucc_mpool_t *mp, //NOLINT
+                                  void *obj, void *chunk) //NOLINT
 {
     ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t *)obj;
     h->from_pool              = 1;
-    h->addr = PTR_OFFSET(h, sizeof(ucc_mc_buffer_header_t));
+    h->addr                   = PTR_OFFSET(h, sizeof(ucc_mc_buffer_header_t));
 }
 
-static void ucc_mc_cpu_chunk_release(ucc_mpool_t *mp, void *chunk)
+static void ucc_mc_cpu_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
 {
     ucc_free(chunk);
 }
@@ -111,49 +100,50 @@ static ucc_mpool_ops_t ucc_mc_ops = {.chunk_alloc   = ucc_mc_cpu_chunk_alloc,
                                      .obj_init      = ucc_mc_cpu_chunk_init,
                                      .obj_cleanup   = NULL};
 
-static ucc_status_t ucc_mc_cpu_mem_free(ucc_mc_buffer_header_t *ptr)
+static ucc_status_t ucc_mc_cpu_mem_free(ucc_mc_buffer_header_t *h_ptr)
 {
-    ucc_free(ptr);
+    ucc_free(h_ptr);
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cpu_mem_free_with_pool(ucc_mc_buffer_header_t *ptr)
+static ucc_status_t ucc_mc_cpu_mem_pool_free(ucc_mc_buffer_header_t *h_ptr)
 {
-    if (!ptr->from_pool) {
-    	return ucc_mc_cpu_mem_free(ptr);
+    if (!h_ptr->from_pool) {
+        return ucc_mc_cpu_mem_free(h_ptr);
     }
-    ucc_mpool_put(ptr);
+    ucc_mpool_put(h_ptr);
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cpu_mem_alloc_pool_with_init(ucc_mc_buffer_header_t **ptr,
-                                                   size_t size)
+static ucc_status_t
+ucc_mc_cpu_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr, size_t size)
 {
-	// spinlock assures 1 thread only initiates mpool and allocates its buffers
+    // lock assures single mpool initiation when multiple threads concurrently
+    // execute different collective operations each entering init function.
     ucc_spin_lock(&ucc_mc_cpu.mpool_init_spinlock);
 
-    if (MC_CPU_CONFIG->cpu_max_elems == 0) {
+    if (MC_CPU_CONFIG->mpool_max_elems == 0) {
         ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_alloc;
-        ucc_mc_cpu.super.ops.mem_free = ucc_mc_cpu_mem_free;
+        ucc_mc_cpu.super.ops.mem_free  = ucc_mc_cpu_mem_free;
         ucc_spin_unlock(&ucc_mc_cpu.mpool_init_spinlock);
-        return ucc_mc_cpu_mem_alloc(ptr, size);
+        return ucc_mc_cpu_mem_alloc(h_ptr, size);
     }
 
     if (!ucc_mc_cpu.mpool_init_flag) {
-        // TODO: currently only with thread multiple, need to change?
         ucc_status_t status = ucc_mpool_init(
             &ucc_mc_cpu.mpool, 0,
-            sizeof(ucc_mc_buffer_header_t) + MC_CPU_CONFIG->cpu_elem_size, 0,
-            UCC_CACHE_LINE_SIZE, 1, MC_CPU_CONFIG->cpu_max_elems, &ucc_mc_ops,
-            ucc_mc_cpu.tm, "mc cpu mpool buffers");
-        if (status != UCC_OK) {
+            sizeof(ucc_mc_buffer_header_t) + MC_CPU_CONFIG->mpool_elem_size, 0,
+            UCC_CACHE_LINE_SIZE, 1, MC_CPU_CONFIG->mpool_max_elems, &ucc_mc_ops,
+            ucc_mc_cpu.thread_mode, "mc cpu mpool buffers");
+        if (ucc_unlikely(status != UCC_OK)) {
+            ucc_spin_unlock(&ucc_mc_cpu.mpool_init_spinlock);
             return status;
         }
-        ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_alloc_pool;
+        ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_pool_alloc;
         ucc_mc_cpu.mpool_init_flag     = 1;
     }
     ucc_spin_unlock(&ucc_mc_cpu.mpool_init_spinlock);
-    return ucc_mc_cpu_mem_alloc_pool(ptr, size);
+    return ucc_mc_cpu_mem_pool_alloc(h_ptr, size);
 }
 
 static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
@@ -267,6 +257,17 @@ ucc_status_t ucc_ee_cpu_event_test(void *event) //NOLINT
     return UCC_OK;
 }
 
+static ucc_status_t ucc_mc_cpu_finalize()
+{
+    if (ucc_mc_cpu.mpool_init_flag) {
+        ucc_mpool_cleanup(&ucc_mc_cpu.mpool, 1);
+        ucc_mc_cpu.mpool_init_flag     = 0;
+        ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_pool_alloc_with_init;
+    }
+    ucc_spinlock_destroy(&ucc_mc_cpu.mpool_init_spinlock);
+    return UCC_OK;
+}
+
 ucc_mc_cpu_t ucc_mc_cpu = {
     .super.super.name       = "cpu mc",
     .super.ref_cnt          = 0,
@@ -275,8 +276,8 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.init             = ucc_mc_cpu_init,
     .super.finalize         = ucc_mc_cpu_finalize,
     .super.ops.mem_query    = ucc_mc_cpu_mem_query,
-    .super.ops.mem_alloc    = ucc_mc_cpu_mem_alloc_pool_with_init,
-    .super.ops.mem_free     = ucc_mc_cpu_mem_free_with_pool,
+    .super.ops.mem_alloc    = ucc_mc_cpu_mem_pool_alloc_with_init,
+    .super.ops.mem_free     = ucc_mc_cpu_mem_pool_free,
     .super.ops.reduce       = ucc_mc_cpu_reduce,
     .super.ops.reduce_multi = ucc_mc_cpu_reduce_multi,
     .super.ops.memcpy       = ucc_mc_cpu_memcpy,

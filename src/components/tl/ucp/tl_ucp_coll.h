@@ -18,16 +18,16 @@ extern const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
 
 typedef struct ucc_tl_ucp_task {
-    ucc_coll_task_t         super;
-    ucc_coll_args_t         args;
-    ucc_tl_ucp_team_t *     team;
-    uint32_t                send_posted;
-    uint32_t                send_completed;
-    uint32_t                recv_posted;
-    uint32_t                recv_completed;
-    uint32_t                tag;
-    uint32_t                n_polls;
-    ucc_tl_team_subset_t    subset;
+    ucc_coll_task_t      super;
+    ucc_coll_args_t      args;
+    ucc_tl_ucp_team_t *  team;
+    uint32_t             send_posted;
+    uint32_t             send_completed;
+    uint32_t             recv_posted;
+    uint32_t             recv_completed;
+    uint32_t             tag;
+    uint32_t             n_polls;
+    ucc_tl_team_subset_t subset;
     union {
         struct {
             int                     phase;
@@ -37,13 +37,13 @@ typedef struct ucc_tl_ucp_task {
             int                     phase;
             ucc_knomial_pattern_t   p;
             void                   *scratch;
-            ucc_mc_buffer_header_t *mc_header;
+            ucc_mc_buffer_header_t *scratch_mc_header;
         } allreduce_kn;
         struct {
             int                     phase;
             ucc_knomial_pattern_t   p;
             void                   *scratch;
-            ucc_mc_buffer_header_t *mc_header;
+            ucc_mc_buffer_header_t *scratch_mc_header;
         } reduce_scatter_kn;
         struct {
             int                     phase;

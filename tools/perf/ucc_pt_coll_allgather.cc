@@ -35,13 +35,14 @@ ucc_status_t ucc_pt_coll_allgather::init_coll_args(size_t count,
 
     args = coll_args;
     args.dst.info.count = count;
-    UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size_dst,
-                               args.dst.info.mem_type), exit, st);
+    UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size_dst, args.dst.info.mem_type),
+                  exit, st);
     args.dst.info.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
         args.src.info.count = count;
-        UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size_src,
-                                   args.src.info.mem_type), free_dst, st);
+        UCCCHECK_GOTO(
+            ucc_mc_alloc(&src_header, size_src, args.src.info.mem_type),
+            free_dst, st);
         args.src.info.buffer = src_header->addr;
     }
     return UCC_OK;

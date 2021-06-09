@@ -40,12 +40,12 @@ ucc_status_t ucc_pt_coll_alltoallv::init_coll_args(size_t count,
     UCC_MALLOC_CHECK_GOTO(args.dst.info_v.counts, free_src_displ, st);
     args.dst.info_v.displacements = (ucc_aint_t *) ucc_malloc(comm_size * sizeof(uint32_t), "displacements buf");
     UCC_MALLOC_CHECK_GOTO(args.dst.info_v.displacements, free_dst_count, st);
-    UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size,
-                               args.dst.info_v.mem_type), free_dst_displ, st);
+    UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size, args.dst.info_v.mem_type),
+                  free_dst_displ, st);
     args.dst.info_v.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
-        UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size,
-                                   args.src.info_v.mem_type), free_dst, st);
+        UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size, args.src.info_v.mem_type),
+                      free_dst, st);
         args.src.info_v.buffer = src_header->addr;
     }
     for (int i = 0; i < comm_size; i++) {

@@ -286,13 +286,16 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
     unsigned        major_version, minor_version, release_number;
     ucc_status_t    status;
     ucc_lib_info_t *lib;
+    ucc_mc_params_t mc_params = {
+        .thread_mode = params->thread_mode,
+    };
 
     *lib_p = NULL;
 
     if (UCC_OK != (status = ucc_constructor())) {
         return status;
     }
-    if (UCC_OK != (status = ucc_mc_init(params->thread_mode))) {
+    if (UCC_OK != (status = ucc_mc_init(&mc_params))) {
         return status;
     }
 

@@ -27,8 +27,8 @@ ucc_status_t ucc_pt_coll_bcast::init_coll_args(size_t count,
 
     args = coll_args;
     args.src.info.count = count;
-    UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size,
-                               args.src.info.mem_type), exit, st);
+    UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size, args.src.info.mem_type), exit,
+                  st);
     args.src.info.buffer = src_header->addr;
 exit:
     return st;

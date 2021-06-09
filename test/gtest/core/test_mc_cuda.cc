@@ -11,26 +11,32 @@ extern "C" {
 #include <cuda_runtime.h>
 #include <vector>
 
-void *mt_ucc_mc_cuda_calls(void * args)
+void *mt_ucc_mc_cuda_allocs(void *args)
 {
-	size_t *size = (size_t *) args;
-	int num_of_alloc_calls = 50;
-	std::vector<ucc_mc_buffer_header_t *> headers;
-	std::vector<void *> pointers;
+    // Final size will be:
+    // size * (quantifier^(num_of_allocs/2))
+    // and should be larger than mpool buffer size which is 1MB by default,
+    // to assure testing both fast and slow ucc_mc_alloc path.
+    // if num_of_allocs is changed, change quantifier accordingly.
+    int                                   quantifier    = 2;
+    size_t                                size          = 4;
+    int                                   num_of_allocs = 40;
+    std::vector<ucc_mc_buffer_header_t *> headers;
+    std::vector<void *>                   pointers;
+    headers.resize(num_of_allocs);
+    pointers.resize(num_of_allocs);
 
-	headers.resize(num_of_alloc_calls);
-	pointers.resize(num_of_alloc_calls);
-
-	for (int i = 0; i < num_of_alloc_calls; i++){
-		pointers[i] = NULL;
-		EXPECT_EQ(UCC_OK,
-			  ucc_mc_alloc(&headers[i], *size, UCC_MEMORY_TYPE_CUDA));
-		pointers[i] = headers[i]->addr;
-		EXPECT_EQ(cudaSuccess, cudaMemset(pointers[i], 0, *size));
-		EXPECT_EQ(UCC_OK, ucc_mc_free(headers[i], UCC_MEMORY_TYPE_CUDA));
-	}
-
-	return 0;
+    for (int i = 0; i < num_of_allocs; i++) {
+        EXPECT_EQ(UCC_OK,
+                  ucc_mc_alloc(&headers[i], size, UCC_MEMORY_TYPE_CUDA));
+        pointers[i] = headers[i]->addr;
+        EXPECT_EQ(cudaSuccess, cudaMemset(pointers[i], 0, size));
+        EXPECT_EQ(UCC_OK, ucc_mc_free(headers[i], UCC_MEMORY_TYPE_CUDA));
+        if (i % 2) {
+            size *= quantifier;
+        }
+    }
+    return 0;
 }
 
 class test_mc_cuda : public ucc::test {
@@ -39,13 +45,20 @@ class test_mc_cuda : public ucc::test {
     ucc_mc_buffer_header_t *mc_header;
     void *                  test_ptr;
     ucc_memory_type_t       test_mtype;
-    virtual void SetUp() override
+    void TestMCCudaSetUp(ucc_mc_params_t mc_params)
     {
         ucc::test::SetUp();
         ucc_constructor();
-        ucc_mc_init(UCC_THREAD_SINGLE);
+        ucc_mc_init(&mc_params);
         test_ptr   = NULL;
         test_mtype = UCC_MEMORY_TYPE_UNKNOWN;
+    }
+    virtual void SetUp() override
+    {
+        ucc_mc_params_t mc_params = {
+            .thread_mode = UCC_THREAD_SINGLE,
+        };
+        TestMCCudaSetUp(mc_params);
     }
     virtual void TearDown() override
     {
@@ -54,16 +67,15 @@ class test_mc_cuda : public ucc::test {
     }
 };
 
-class test_mc_cuda_mt : public test_mc_cuda{
-protected:
-  virtual void SetUp() override
-  {
-      ucc::test::SetUp();
-      ucc_constructor();
-      ucc_mc_init(UCC_THREAD_MULTIPLE);
-      test_ptr   = NULL;
-      test_mtype = UCC_MEMORY_TYPE_UNKNOWN;
-  }
+class test_mc_cuda_mt : public test_mc_cuda {
+  protected:
+    virtual void SetUp() override
+    {
+        ucc_mc_params_t mc_params = {
+            .thread_mode = UCC_THREAD_MULTIPLE,
+        };
+        TestMCCudaSetUp(mc_params);
+    }
 };
 
 UCC_TEST_F(test_mc_cuda, mc_cuda_load)
@@ -73,7 +85,7 @@ UCC_TEST_F(test_mc_cuda, mc_cuda_load)
 
 UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem)
 {
-	// mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1024 and is configurable at runtime.
+    // mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1MB and is configurable at runtime.
     EXPECT_EQ(UCC_OK,
               ucc_mc_alloc(&mc_header, TEST_ALLOC_SIZE, UCC_MEMORY_TYPE_CUDA));
     test_ptr = mc_header->addr;
@@ -83,19 +95,17 @@ UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem)
 
 UCC_TEST_F(test_mc_cuda_mt, can_alloc_and_free_mem_mt)
 {
-	// mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1024 and is configurable at runtime.
-	size_t size = 128;
-	int num_of_threads = 10;
-	std::vector<pthread_t> threads;
-	threads.resize(num_of_threads);
+    // mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1MB and is configurable at runtime.
+    int                    num_of_threads = 10;
+    std::vector<pthread_t> threads;
+    threads.resize(num_of_threads);
 
-	for (int i = 0; i < num_of_threads; i++) {
-		pthread_create(&threads[i], NULL, &mt_ucc_mc_cuda_calls, (void *)&size);
-		size = size*2;
-	}
-	for (int i = 0; i < num_of_threads; i++) {
-		pthread_join(threads[i], NULL);
-	}
+    for (int i = 0; i < num_of_threads; i++) {
+        pthread_create(&threads[i], NULL, &mt_ucc_mc_cuda_allocs, NULL);
+    }
+    for (int i = 0; i < num_of_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
 }
 
 UCC_TEST_F(test_mc_cuda, can_detect_host_mem)

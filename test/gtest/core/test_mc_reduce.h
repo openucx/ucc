@@ -184,7 +184,10 @@ class test_mc_reduce : public testing::Test {
     virtual void SetUp() override
     {
         ucc_constructor();
-        ucc_mc_init(UCC_THREAD_SINGLE);
+        ucc_mc_params_t mc_params = {
+            .thread_mode = UCC_THREAD_SINGLE,
+        };
+        ucc_mc_init(&mc_params);
         buf1_h = buf2_h = res_h = nullptr;
         buf1_d = buf2_d = res_d = nullptr;
     }
@@ -258,7 +261,9 @@ class test_mc_reduce : public testing::Test {
         ucc_mc_finalize();
     }
 
-    ucc_mc_buffer_header_t *buf1_h_mc_header, *buf2_h_mc_header, *res_h_mc_header, *buf1_d_mc_header, *buf2_d_mc_header, *res_d_mc_header;
+    ucc_mc_buffer_header_t *buf1_h_mc_header, *buf2_h_mc_header,
+        *res_h_mc_header, *buf1_d_mc_header, *buf2_d_mc_header,
+        *res_d_mc_header;
     typename T::type *buf1_h;
     typename T::type *buf2_h;
     typename T::type *res_h;

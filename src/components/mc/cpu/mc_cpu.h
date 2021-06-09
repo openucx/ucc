@@ -12,8 +12,8 @@
 
 typedef struct ucc_mc_cpu_config {
     ucc_mc_config_t super;
-    size_t          cpu_elem_size;
-    int             cpu_max_elems;
+    size_t          mpool_elem_size;
+    int             mpool_max_elems;
 } ucc_mc_cpu_config_t;
 
 typedef struct ucc_mc_cpu {
@@ -21,7 +21,7 @@ typedef struct ucc_mc_cpu {
     ucc_mpool_t       mpool;
     int               mpool_init_flag;
     ucc_spinlock_t    mpool_init_spinlock;
-    ucc_thread_mode_t tm;
+    ucc_thread_mode_t thread_mode;
 } ucc_mc_cpu_t;
 
 extern ucc_mc_cpu_t ucc_mc_cpu;

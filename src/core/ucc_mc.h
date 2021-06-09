@@ -16,7 +16,11 @@ typedef struct ucc_mc_buffer_header {
     void *addr;
 } ucc_mc_buffer_header_t;
 
-ucc_status_t ucc_mc_init(ucc_thread_mode_t thread_mode);
+typedef struct ucc_mc_params {
+    ucc_thread_mode_t thread_mode;
+} ucc_mc_params_t;
+
+ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params);
 
 ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);
 
@@ -27,10 +31,10 @@ ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);
  */
 ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr);
 
-ucc_status_t ucc_mc_alloc(ucc_mc_buffer_header_t **ptr, size_t len,
+ucc_status_t ucc_mc_alloc(ucc_mc_buffer_header_t **h_ptr, size_t len,
                           ucc_memory_type_t mem_type);
 
-ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *ptr,
+ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *h_ptr,
                          ucc_memory_type_t       mem_type);
 
 ucc_status_t ucc_mc_finalize();
@@ -87,7 +91,6 @@ ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
                                  size_t count, size_t size, size_t stride,
                                  ucc_datatype_t dtype, ucc_reduction_op_t op,
                                  ucc_memory_type_t mem_type);
-
 
 static inline ucc_status_t ucc_dt_reduce(const void *src1, const void *src2,
                                          void *dst, size_t count,
