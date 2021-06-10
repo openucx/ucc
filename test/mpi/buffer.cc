@@ -100,13 +100,15 @@ ucc_status_t compare_buffers(void *_rst, void *expected, size_t count,
                              ucc_datatype_t dt, ucc_memory_type_t mt)
 {
     ucc_status_t status = UCC_ERR_NO_MESSAGE;
+    ucc_mc_buffer_header_t *rst_mc_header;
     void *rst = NULL;
 
     if (UCC_MEMORY_TYPE_HOST == mt) {
         rst = _rst;
     } else if (UCC_MEMORY_TYPE_CUDA == mt) {
-        UCC_ALLOC_COPY_BUF(rst, UCC_MEMORY_TYPE_HOST, _rst, mt,
+        UCC_ALLOC_COPY_BUF(rst_mc_header, UCC_MEMORY_TYPE_HOST, _rst, mt,
                            count * ucc_dt_size(dt));
+        rst = rst_mc_header->addr;
     } else {
         std::cerr << "Unsupported mt\n";
         MPI_Abort(MPI_COMM_WORLD, -1);
@@ -123,7 +125,7 @@ ucc_status_t compare_buffers(void *_rst, void *expected, size_t count,
     }
 
     if (UCC_MEMORY_TYPE_HOST != mt) {
-        UCC_CHECK(ucc_mc_free(rst, UCC_MEMORY_TYPE_HOST));
+        UCC_CHECK(ucc_mc_free(rst_mc_header, UCC_MEMORY_TYPE_HOST));
     }
 
     return status;

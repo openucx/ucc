@@ -3,9 +3,6 @@
 #include <ucc/api/ucc.h>
 #include <utils/ucc_math.h>
 #include <utils/ucc_coll_utils.h>
-extern "C" {
-#include <core/ucc_mc.h>
-}
 
 ucc_pt_coll_allgatherv::ucc_pt_coll_allgatherv(int size, ucc_datatype_t dt,
                                                ucc_memory_type mt,
@@ -41,12 +38,15 @@ ucc_status_t ucc_pt_coll_allgatherv::init_coll_args(size_t count,
     UCC_MALLOC_CHECK_GOTO(args.dst.info_v.counts, exit, st);
     args.dst.info_v.displacements = (ucc_aint_t *) ucc_malloc(comm_size * sizeof(uint32_t), "displacements buf");
     UCC_MALLOC_CHECK_GOTO(args.dst.info_v.displacements, free_count, st);
-    UCCCHECK_GOTO(ucc_mc_alloc(&args.dst.info_v.buffer, size_dst,
-                               args.dst.info_v.mem_type), free_displ, st);
+    UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size_dst, args.dst.info_v.mem_type),
+                  free_displ, st);
+    args.dst.info_v.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
         args.src.info.count = count;
-        UCCCHECK_GOTO(ucc_mc_alloc(&args.src.info.buffer, size_src,
-                                   args.src.info.mem_type), free_dst, st);
+        UCCCHECK_GOTO(
+            ucc_mc_alloc(&src_header, size_src, args.src.info.mem_type),
+            free_dst, st);
+        args.src.info.buffer = src_header->addr;
     }
     for (int i = 0; i < comm_size; i++) {
         ((uint32_t*)args.dst.info_v.counts)[i] = count;
@@ -54,7 +54,7 @@ ucc_status_t ucc_pt_coll_allgatherv::init_coll_args(size_t count,
     }
     return UCC_OK;
 free_dst:
-    ucc_mc_free(args.dst.info_v.buffer, args.dst.info_v.mem_type);
+    ucc_mc_free(dst_header, args.dst.info_v.mem_type);
 free_displ:
     ucc_free(args.dst.info_v.displacements);
 free_count:
@@ -66,9 +66,9 @@ exit:
 void ucc_pt_coll_allgatherv::free_coll_args(ucc_coll_args_t &args)
 {
     if (!UCC_IS_INPLACE(args)) {
-        ucc_mc_free(args.src.info.buffer, args.src.info.mem_type);
+        ucc_mc_free(src_header, args.src.info.mem_type);
     }
-    ucc_mc_free(args.dst.info_v.buffer, args.dst.info_v.mem_type);
+    ucc_mc_free(dst_header, args.dst.info_v.mem_type);
     ucc_free(args.dst.info_v.counts);
     ucc_free(args.dst.info_v.displacements);
 }

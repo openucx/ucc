@@ -3,9 +3,6 @@
  * See file LICENSE for terms.
  */
 
-extern "C" {
-#include <core/ucc_mc.h>
-}
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
@@ -56,8 +53,9 @@ public:
             }
 
             ctxs[r]->rbuf_size = ucc_dt_size(dtype) * all_counts;
-            UCC_CHECK(ucc_mc_alloc(&coll->dst.info_v.buffer, ctxs[r]->rbuf_size,
-                      mem_type));
+            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header, ctxs[r]->rbuf_size,
+                                   mem_type));
+            coll->dst.info_v.buffer = ctxs[r]->dst_mc_header->addr;
             if (TEST_INPLACE == inplace) {
                 coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
@@ -66,8 +64,10 @@ public:
                                         ctxs[r]->init_buf, ucc_dt_size(dtype) * my_count,
                                         mem_type, UCC_MEMORY_TYPE_HOST));
             } else {
-                UCC_CHECK(ucc_mc_alloc(&coll->src.info.buffer,
-                          ucc_dt_size(dtype) * my_count, mem_type));
+                UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_mc_header,
+                                       ucc_dt_size(dtype) * my_count,
+                                       mem_type));
+                coll->src.info.buffer = ctxs[r]->src_mc_header->addr;
                 UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
                                         ucc_dt_size(dtype) * my_count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
@@ -80,9 +80,9 @@ public:
         for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
             ucc_coll_args_t* coll = ctx->args;
             if (coll->src.info.buffer) { /* no inplace */
-                UCC_CHECK(ucc_mc_free(coll->src.info.buffer, mem_type));
+                UCC_CHECK(ucc_mc_free(ctx->src_mc_header, mem_type));
             }
-            UCC_CHECK(ucc_mc_free(coll->dst.info.buffer, mem_type));
+            UCC_CHECK(ucc_mc_free(ctx->dst_mc_header, mem_type));
             free(coll->dst.info_v.displacements);
             free(coll->dst.info_v.counts);
             ucc_free(ctx->init_buf);
@@ -127,7 +127,7 @@ public:
         }
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             for (int r = 0; r < ctxs.size(); r++) {
-                ucc_free (dsts[r]);
+                ucc_free(dsts[r]);
             }
         }
         return ret;

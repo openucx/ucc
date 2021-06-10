@@ -9,7 +9,18 @@
 #include "ucc/api/ucc.h"
 #include "components/mc/base/ucc_mc_base.h"
 
-ucc_status_t ucc_mc_init();
+typedef struct ucc_mem_attr ucc_mem_attr_t;
+
+typedef struct ucc_mc_buffer_header {
+    int   from_pool;
+    void *addr;
+} ucc_mc_buffer_header_t;
+
+typedef struct ucc_mc_params {
+    ucc_thread_mode_t thread_mode;
+} ucc_mc_params_t;
+
+ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params);
 
 ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);
 
@@ -20,9 +31,11 @@ ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);
  */
 ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr);
 
-ucc_status_t ucc_mc_alloc(void **ptr, size_t len, ucc_memory_type_t mem_type);
+ucc_status_t ucc_mc_alloc(ucc_mc_buffer_header_t **h_ptr, size_t len,
+                          ucc_memory_type_t mem_type);
 
-ucc_status_t ucc_mc_free(void *ptr, ucc_memory_type_t mem_type);
+ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *h_ptr,
+                         ucc_memory_type_t       mem_type);
 
 ucc_status_t ucc_mc_finalize();
 

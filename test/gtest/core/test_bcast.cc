@@ -3,9 +3,6 @@
  * See file LICENSE for terms.
  */
 
-extern "C" {
-#include <core/ucc_mc.h>
-}
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
@@ -37,8 +34,9 @@ public:
 
             ctxs[r]->rbuf_size = ucc_dt_size(dtype) * count;
 
-            UCC_CHECK(ucc_mc_alloc(&coll->src.info.buffer, ctxs[r]->rbuf_size,
+            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_mc_header, ctxs[r]->rbuf_size,
                                    mem_type));
+            coll->src.info.buffer = ctxs[r]->src_mc_header->addr;
             if (r == root) {
                 ctxs[r]->init_buf = ucc_malloc(ctxs[r]->rbuf_size, "init buf");
                 EXPECT_NE(ctxs[r]->init_buf, nullptr);
@@ -57,7 +55,7 @@ public:
         for (auto r = 0; r < ctxs.size(); r++) {
             gtest_ucc_coll_ctx_t *ctx = ctxs[r];
             ucc_coll_args_t* coll = ctx->args;
-            UCC_CHECK(ucc_mc_free(coll->src.info.buffer, mem_type));
+            UCC_CHECK(ucc_mc_free(ctx->src_mc_header, mem_type));
             if (r == coll->root) {
                 ucc_free(ctx->init_buf);
             }

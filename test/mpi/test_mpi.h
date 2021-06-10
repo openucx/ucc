@@ -56,12 +56,12 @@ END_C_DECLS
 
 extern int test_rand_seed;
 
-#define UCC_ALLOC_COPY_BUF(_new_buf, _new_mtype, _old_buf, _old_mtype, _size) \
-{                                                                             \
-    UCC_CHECK(ucc_mc_alloc(&(_new_buf), _size, _new_mtype));                  \
-    UCC_CHECK(ucc_mc_memcpy(_new_buf, _old_buf, _size,                        \
-              _new_mtype, _old_mtype));                                       \
-}
+#define UCC_ALLOC_COPY_BUF(_new_buf, _new_mtype, _old_buf, _old_mtype, _size)  \
+    {                                                                          \
+        UCC_CHECK(ucc_mc_alloc(&(_new_buf), _size, _new_mtype));               \
+        UCC_CHECK(ucc_mc_memcpy(_new_buf->addr, _old_buf, _size, _new_mtype,   \
+                                _old_mtype));                                  \
+    }
 
 #ifdef HAVE_CUDA
 #define CUDA_CHECK(_call) {                                         \
@@ -218,6 +218,8 @@ protected:
     ucc_test_mpi_inplace_t inplace;
     ucc_coll_args_t args;
     ucc_coll_req_h req;
+    ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header,
+        *check_sbuf_mc_header;
     void *sbuf;
     void *rbuf;
     void *check_sbuf;

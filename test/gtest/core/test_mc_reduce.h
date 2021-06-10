@@ -184,7 +184,10 @@ class test_mc_reduce : public testing::Test {
     virtual void SetUp() override
     {
         ucc_constructor();
-        ucc_mc_init();
+        ucc_mc_params_t mc_params = {
+            .thread_mode = UCC_THREAD_SINGLE,
+        };
+        ucc_mc_init(&mc_params);
         buf1_h = buf2_h = res_h = nullptr;
         buf1_d = buf2_d = res_d = nullptr;
     }
@@ -194,9 +197,12 @@ class test_mc_reduce : public testing::Test {
         size_t n_bytes = COUNT*sizeof(typename T::type);
         mem_type = mtype;
 
-        ucc_mc_alloc((void**)&res_h, n_bytes, UCC_MEMORY_TYPE_HOST);
-        ucc_mc_alloc((void**)&buf1_h, n_bytes, UCC_MEMORY_TYPE_HOST);
-        ucc_mc_alloc((void**)&buf2_h, n * n_bytes, UCC_MEMORY_TYPE_HOST);
+        ucc_mc_alloc(&res_h_mc_header, n_bytes, UCC_MEMORY_TYPE_HOST);
+        res_h = (typename T::type *)res_h_mc_header->addr;
+        ucc_mc_alloc(&buf1_h_mc_header, n_bytes, UCC_MEMORY_TYPE_HOST);
+        buf1_h = (typename T::type *)buf1_h_mc_header->addr;
+        ucc_mc_alloc(&buf2_h_mc_header, n * n_bytes, UCC_MEMORY_TYPE_HOST);
+        buf2_h = (typename T::type *)buf2_h_mc_header->addr;
 
         for (int i = 0; i < COUNT; i++) {
             res_h[i] = (typename T::type)(0);
@@ -210,9 +216,12 @@ class test_mc_reduce : public testing::Test {
             }
         }
         if (mtype != UCC_MEMORY_TYPE_HOST) {
-            ucc_mc_alloc((void**)&res_d, n_bytes, mtype);
-            ucc_mc_alloc((void**)&buf1_d, n_bytes, mtype);
-            ucc_mc_alloc((void**)&buf2_d, n*n_bytes, mtype);
+            ucc_mc_alloc(&res_d_mc_header, n_bytes, mtype);
+            res_d = (typename T::type *)res_d_mc_header->addr;
+            ucc_mc_alloc(&buf1_d_mc_header, n_bytes, mtype);
+            buf1_d = (typename T::type *)buf1_d_mc_header->addr;
+            ucc_mc_alloc(&buf2_d_mc_header, n * n_bytes, mtype);
+            buf2_d = (typename T::type *)buf2_d_mc_header->addr;
             ucc_mc_memcpy(res_d, res_h, n_bytes, mtype, UCC_MEMORY_TYPE_HOST);
             ucc_mc_memcpy(buf1_d, buf1_h, n_bytes, mtype, UCC_MEMORY_TYPE_HOST);
             ucc_mc_memcpy(buf2_d, buf2_h, n * n_bytes, mtype,
@@ -225,22 +234,22 @@ class test_mc_reduce : public testing::Test {
     ucc_status_t free_bufs(ucc_memory_type_t mtype)
     {
         if (buf1_h != nullptr) {
-            ucc_mc_free((void*)buf1_h, UCC_MEMORY_TYPE_HOST);
+            ucc_mc_free(buf1_h_mc_header, UCC_MEMORY_TYPE_HOST);
         }
         if (buf2_h != nullptr) {
-            ucc_mc_free((void*)buf2_h, UCC_MEMORY_TYPE_HOST);
+            ucc_mc_free(buf2_h_mc_header, UCC_MEMORY_TYPE_HOST);
         }
         if (res_h != nullptr) {
-            ucc_mc_free((void*)res_h, UCC_MEMORY_TYPE_HOST);
+            ucc_mc_free(res_h_mc_header, UCC_MEMORY_TYPE_HOST);
         }
         if (buf1_d != nullptr) {
-            ucc_mc_free((void*)buf1_d, mtype);
+            ucc_mc_free(buf1_d_mc_header, mtype);
         }
         if (buf2_d != nullptr) {
-            ucc_mc_free((void*)buf2_d, mtype);
+            ucc_mc_free(buf2_d_mc_header, mtype);
         }
         if (res_d != nullptr) {
-            ucc_mc_free((void*)res_d, mtype);
+            ucc_mc_free(res_d_mc_header, mtype);
         }
 
         return UCC_OK;
@@ -251,6 +260,10 @@ class test_mc_reduce : public testing::Test {
         free_bufs(mem_type);
         ucc_mc_finalize();
     }
+
+    ucc_mc_buffer_header_t *buf1_h_mc_header, *buf2_h_mc_header,
+        *res_h_mc_header, *buf1_d_mc_header, *buf2_d_mc_header,
+        *res_d_mc_header;
     typename T::type *buf1_h;
     typename T::type *buf2_h;
     typename T::type *res_h;

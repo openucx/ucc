@@ -10,6 +10,7 @@
 #include "tl_ucp.h"
 #include "schedule/ucc_schedule.h"
 #include "coll_patterns/recursive_knomial.h"
+#include "components/mc/base/ucc_mc_base.h"
 #include "tl_ucp_tag.h"
 
 #define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 1
@@ -19,7 +20,7 @@ extern const char
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t      super;
     ucc_coll_args_t      args;
-    ucc_tl_ucp_team_t   *team;
+    ucc_tl_ucp_team_t *  team;
     uint32_t             send_posted;
     uint32_t             send_completed;
     uint32_t             recv_posted;
@@ -29,26 +30,28 @@ typedef struct ucc_tl_ucp_task {
     ucc_tl_team_subset_t subset;
     union {
         struct {
-            int                   phase;
-            ucc_knomial_pattern_t p;
+            int                     phase;
+            ucc_knomial_pattern_t   p;
         } barrier;
         struct {
-            int                   phase;
-            ucc_knomial_pattern_t p;
-            void                 *scratch;
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+            void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
         } allreduce_kn;
         struct {
-            int                   phase;
-            ucc_knomial_pattern_t p;
-            void                 *scratch;
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+            void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
         } reduce_scatter_kn;
         struct {
-            int                   phase;
-            ucc_knomial_pattern_t p;
+            int                     phase;
+            ucc_knomial_pattern_t   p;
         } allgather_kn;
         struct {
-            ucc_rank_t            dist;
-            uint32_t              radix;
+            ucc_rank_t              dist;
+            uint32_t                radix;
         } bcast_kn;
     };
 } ucc_tl_ucp_task_t;

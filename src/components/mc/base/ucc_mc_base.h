@@ -11,7 +11,13 @@
 #include "utils/ucc_component.h"
 #include "utils/ucc_class.h"
 #include "utils/ucc_parser.h"
+#include "utils/ucc_mpool.h"
 #include "core/ucc_global_opts.h"
+#include "core/ucc_mc.h"
+
+typedef struct ucc_mc_buffer_header ucc_mc_buffer_header_t;
+
+typedef struct ucc_mc_params ucc_mc_params_t;
 
 /**
  * UCC memory attributes field mask
@@ -74,8 +80,8 @@ extern ucc_config_field_t ucc_mc_config_table[];
 
 typedef struct ucc_mc_ops {
     ucc_status_t (*mem_query)(const void *ptr, ucc_mem_attr_t *mem_attr);
-    ucc_status_t (*mem_alloc)(void **ptr, size_t size);
-    ucc_status_t (*mem_free)(void *ptr);
+    ucc_status_t (*mem_alloc)(ucc_mc_buffer_header_t **h_ptr, size_t size);
+    ucc_status_t (*mem_free)(ucc_mc_buffer_header_t *h_ptr);
     ucc_status_t (*reduce)(const void *src1, const void *src2, void *dst,
                            size_t count, ucc_datatype_t dt,
                            ucc_reduction_op_t op);
@@ -104,9 +110,9 @@ typedef struct ucc_mc_base {
     ucc_memory_type_t               type;
     ucc_mc_config_t                *config;
     ucc_config_global_list_entry_t  config_table;
-    ucc_status_t                   (*init)();
+    ucc_status_t                   (*init)(const ucc_mc_params_t *mc_params);
     ucc_status_t                   (*finalize)();
-    const ucc_mc_ops_t              ops;
+    ucc_mc_ops_t                    ops;
     const ucc_ee_ops_t              ee_ops;
 } ucc_mc_base_t;
 

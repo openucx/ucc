@@ -192,7 +192,7 @@ ucc_tl_ucp_reduce_scatter_knomial_finalize(ucc_coll_task_t *coll_task)
     uint8_t            node_type = task->reduce_scatter_kn.p.node_type;
     ucc_memory_type_t  mem_type  = task->args.src.info.mem_type;
     if (UCC_IS_INPLACE(task->args) || (KN_NODE_PROXY == node_type)) {
-        ucc_mc_free(task->reduce_scatter_kn.scratch, mem_type);
+        ucc_mc_free(task->reduce_scatter_kn.scratch_mc_header, mem_type);
     }
     return ucc_tl_ucp_coll_finalize(coll_task);
 }
@@ -224,8 +224,10 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
 
     if (UCC_IS_INPLACE(task->args) ||
         (KN_NODE_PROXY == task->reduce_scatter_kn.p.node_type)) {
-        status =
-            ucc_mc_alloc(&task->reduce_scatter_kn.scratch, data_size, mem_type);
+        status = ucc_mc_alloc(&task->reduce_scatter_kn.scratch_mc_header,
+                              data_size, mem_type);
+        task->reduce_scatter_kn.scratch =
+            task->reduce_scatter_kn.scratch_mc_header->addr;
         if (UCC_OK != status) {
             return status;
         }
