@@ -190,9 +190,9 @@ ucc_tl_ucp_reduce_scatter_knomial_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     uint8_t            node_type = task->reduce_scatter_kn.p.node_type;
-    ucc_memory_type_t  mem_type  = task->args.src.info.mem_type;
+
     if (UCC_IS_INPLACE(task->args) || (KN_NODE_PROXY == node_type)) {
-        ucc_mc_free(task->reduce_scatter_kn.scratch_mc_header, mem_type);
+        ucc_mc_free(task->reduce_scatter_kn.scratch_mc_header);
     }
     return ucc_tl_ucp_coll_finalize(coll_task);
 }

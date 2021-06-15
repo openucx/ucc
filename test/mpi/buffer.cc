@@ -125,7 +125,7 @@ ucc_status_t compare_buffers(void *_rst, void *expected, size_t count,
     }
 
     if (UCC_MEMORY_TYPE_HOST != mt) {
-        UCC_CHECK(ucc_mc_free(rst_mc_header, UCC_MEMORY_TYPE_HOST));
+        UCC_CHECK(ucc_mc_free(rst_mc_header));
     }
 
     return status;

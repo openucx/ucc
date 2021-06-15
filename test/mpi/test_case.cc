@@ -159,13 +159,13 @@ TestCase::~TestCase()
         UCC_CHECK(ucc_collective_finalize(req));
     }
     if (sbuf) {
-        UCC_CHECK(ucc_mc_free(sbuf_mc_header, mem_type));
+        UCC_CHECK(ucc_mc_free(sbuf_mc_header));
     }
     if (rbuf) {
-        UCC_CHECK(ucc_mc_free(rbuf_mc_header, mem_type));
+        UCC_CHECK(ucc_mc_free(rbuf_mc_header));
     }
     if (check_sbuf) {
-        UCC_CHECK(ucc_mc_free(check_sbuf_mc_header, mem_type));
+        UCC_CHECK(ucc_mc_free(check_sbuf_mc_header));
     }
     if (check_rbuf) {
         ucc_free(check_rbuf);

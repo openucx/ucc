@@ -36,7 +36,7 @@ exit:
 
 void ucc_pt_coll_bcast::free_coll_args(ucc_coll_args_t &args)
 {
-    ucc_mc_free(src_header, args.src.info.mem_type);
+    ucc_mc_free(src_header);
 }
 
 double ucc_pt_coll_bcast::get_bus_bw(double time_us)

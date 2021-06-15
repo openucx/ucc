@@ -71,9 +71,9 @@ class test_allreduce : public UccCollArgs, public testing::Test {
         for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
             ucc_coll_args_t* coll = ctx->args;
             if (coll->src.info.buffer) { /* no inplace */
-                UCC_CHECK(ucc_mc_free(ctx->src_mc_header, mem_type));
+                UCC_CHECK(ucc_mc_free(ctx->src_mc_header));
             }
-            UCC_CHECK(ucc_mc_free(ctx->dst_mc_header, mem_type));
+            UCC_CHECK(ucc_mc_free(ctx->dst_mc_header));
             ucc_free(ctx->init_buf);
             free(coll);
             free(ctx);
@@ -200,4 +200,3 @@ TYPED_TEST(test_allreduce, multiple_cuda_inplace) {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE);
 }
 #endif
-

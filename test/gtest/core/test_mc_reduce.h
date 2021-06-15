@@ -234,22 +234,22 @@ class test_mc_reduce : public testing::Test {
     ucc_status_t free_bufs(ucc_memory_type_t mtype)
     {
         if (buf1_h != nullptr) {
-            ucc_mc_free(buf1_h_mc_header, UCC_MEMORY_TYPE_HOST);
+            ucc_mc_free(buf1_h_mc_header);
         }
         if (buf2_h != nullptr) {
-            ucc_mc_free(buf2_h_mc_header, UCC_MEMORY_TYPE_HOST);
+            ucc_mc_free(buf2_h_mc_header);
         }
         if (res_h != nullptr) {
-            ucc_mc_free(res_h_mc_header, UCC_MEMORY_TYPE_HOST);
+            ucc_mc_free(res_h_mc_header);
         }
         if (buf1_d != nullptr) {
-            ucc_mc_free(buf1_d_mc_header, mtype);
+            ucc_mc_free(buf1_d_mc_header);
         }
         if (buf2_d != nullptr) {
-            ucc_mc_free(buf2_d_mc_header, mtype);
+            ucc_mc_free(buf2_d_mc_header);
         }
         if (res_d != nullptr) {
-            ucc_mc_free(res_d_mc_header, mtype);
+            ucc_mc_free(res_d_mc_header);
         }
 
         return UCC_OK;

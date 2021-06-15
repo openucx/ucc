@@ -54,7 +54,7 @@ ucc_status_t ucc_pt_coll_allgatherv::init_coll_args(size_t count,
     }
     return UCC_OK;
 free_dst:
-    ucc_mc_free(dst_header, args.dst.info_v.mem_type);
+    ucc_mc_free(dst_header);
 free_displ:
     ucc_free(args.dst.info_v.displacements);
 free_count:
@@ -66,9 +66,9 @@ exit:
 void ucc_pt_coll_allgatherv::free_coll_args(ucc_coll_args_t &args)
 {
     if (!UCC_IS_INPLACE(args)) {
-        ucc_mc_free(src_header, args.src.info.mem_type);
+        ucc_mc_free(src_header);
     }
-    ucc_mc_free(dst_header, args.dst.info_v.mem_type);
+    ucc_mc_free(dst_header);
     ucc_free(args.dst.info_v.counts);
     ucc_free(args.dst.info_v.displacements);
 }
