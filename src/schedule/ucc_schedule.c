@@ -75,7 +75,6 @@ ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
 ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx)
 {
     ucc_status_t status;
-
     status             = ucc_coll_task_init(&schedule->super);
     schedule->ctx      = ctx;
     schedule->n_tasks  = 0;

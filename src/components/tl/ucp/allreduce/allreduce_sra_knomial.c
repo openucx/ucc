@@ -106,11 +106,11 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_event_manager_subscribe(&rs_task->em, UCC_EVENT_COMPLETED, task,
                                 ucc_task_start_handler);
 
-    schedule->super.post     = ucc_tl_ucp_allreduce_sra_knomial_start;
-    schedule->super.progress = NULL;
-    schedule->super.finalize = ucc_tl_ucp_allreduce_sra_knomial_finalize;
+    schedule->super.post           = ucc_tl_ucp_allreduce_sra_knomial_start;
+    schedule->super.progress       = NULL;
+    schedule->super.finalize       = ucc_tl_ucp_allreduce_sra_knomial_finalize;
     schedule->super.triggered_post = ucc_tl_ucp_triggered_post;
-    *task_h                  = &schedule->super;
+    *task_h                        = &schedule->super;
     return UCC_OK;
 out:
     ucc_tl_ucp_put_schedule(schedule);

@@ -22,9 +22,9 @@
 ucc_status_t
 ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t     *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t     *team  = task->team;
-    ucc_kn_radix_t         radix = task->reduce_scatter_kn.p.radix;
+    ucc_tl_ucp_task_t     *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t     *team = task->team;
+    ucc_kn_radix_t         radix     = task->reduce_scatter_kn.p.radix;
     uint8_t                node_type = task->reduce_scatter_kn.p.node_type;
     ucc_knomial_pattern_t *p         = &task->reduce_scatter_kn.p;
     void                  *scratch   = task->reduce_scatter_kn.scratch;
@@ -42,8 +42,14 @@ ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_status_t           status;
     ucc_kn_radix_t         loop_step;
     size_t                 block_count, peer_seg_count, local_seg_count;
-    void                  *reduce_data, *local_data;
+    void                  *reduce_data, *local_data, *scratch_offset;
+    int                    sra_offload;
+    ucc_memory_type_t      sra_mem_type;
 
+    sra_offload     = (mem_type == UCC_MEMORY_TYPE_CUDA &&
+                      UCC_TL_UCP_TEAM_LIB(team)->cfg.allreduce_sra_kn_offload);
+    sra_mem_type    = (sra_offload) ? UCC_MEMORY_TYPE_HOST : mem_type;
+    scratch_offset  = PTR_OFFSET(scratch, data_size);
     local_seg_count = 0;
     block_count     = ucc_sra_kn_compute_block_count(count, rank, p);
     UCC_KN_GOTO_PHASE(task->reduce_scatter_kn.phase);
@@ -58,8 +64,8 @@ ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     if (KN_NODE_PROXY == node_type) {
         peer = ucc_knomial_pattern_get_extra(p, rank);
         UCPCHECK_GOTO(
-            ucc_tl_ucp_recv_nb(scratch, data_size, mem_type, peer, team, task),
-            task, out);
+            ucc_tl_ucp_recv_nb(scratch, data_size, sra_mem_type, peer, team,
+            		           task), task, out);
     }
 
 UCC_KN_PHASE_EXTRA:
@@ -71,10 +77,19 @@ UCC_KN_PHASE_EXTRA:
         if (KN_NODE_EXTRA == node_type) {
             goto out;
         } else {
-            if (UCC_OK != (status = ucc_dt_reduce(sbuf, scratch, rbuf, count,
-                                                  dt, mem_type, &task->args))) {
+        	if (sra_offload) {
+                status = ucc_mc_memcpy(scratch_offset, sbuf, data_size,
+                                   sra_mem_type, mem_type);
+                if (ucc_unlikely(UCC_OK != status)) {
+                    return status;
+                }
+                sbuf = rbuf = scratch_offset;
+            }
+            status = ucc_dt_reduce(sbuf, scratch, rbuf, count, dt, sra_mem_type,
+        		                                               &task->args);
+            if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TL_TEAM_LIB(task->team),
-                         "failed to perform dt reduction");
+                     "failed to perform dt reduction");
                 task->super.super.status = status;
                 return status;
             }
@@ -84,9 +99,9 @@ UCC_KN_PHASE_EXTRA:
         step_radix  = ucc_sra_kn_compute_step_radix(rank, size, p);
         block_count = ucc_sra_kn_compute_block_count(count, rank, p);
         sbuf        = (p->iteration == 0)
-                          ? ((KN_NODE_PROXY == node_type) ? task->args.dst.info.buffer
-                                                          : task->args.src.info.buffer)
-                          : task->reduce_scatter_kn.scratch;
+                          ? ((KN_NODE_PROXY == node_type) ? rbuf
+                                                          : sbuf)
+                          : scratch;
         for (loop_step = 1; loop_step < radix; loop_step++) {
             peer = ucc_knomial_pattern_get_loop_peer(p, rank, size, loop_step);
             if (peer == UCC_KN_PEER_NULL)
@@ -100,16 +115,15 @@ UCC_KN_PHASE_EXTRA:
                 block_count, step_radix, peer_seg_index);
             UCPCHECK_GOTO(
                 ucc_tl_ucp_send_nb(PTR_OFFSET(sbuf, peer_seg_offset * dt_size),
-                                   peer_seg_count * dt_size, mem_type, peer,
-                                   team, task),
-                task, out);
+                    peer_seg_count * dt_size,
+                    (p->iteration == 0 && node_type != KN_NODE_PROXY)
+                    ? mem_type : sra_mem_type, peer, team, task), task, out);
         }
 
         local_seg_index = ucc_sra_kn_compute_seg_index(rank, p->radix_pow, p);
         local_seg_count = ucc_sra_kn_compute_seg_size(block_count, step_radix,
                                                       local_seg_index);
-
-        rbuf = task->reduce_scatter_kn.scratch;
+        rbuf = scratch; // if sra_offload - rbuf will be HOST scratch
         if (p->iteration != 0) {
             rbuf = PTR_OFFSET(rbuf, block_count * dt_size);
         }
@@ -118,7 +132,7 @@ UCC_KN_PHASE_EXTRA:
             if (peer == UCC_KN_PEER_NULL)
                 continue;
             UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(rbuf, local_seg_count * dt_size,
-                                             mem_type, peer, team, task),
+                                             sra_mem_type, peer, team, task),
                           task, out);
             rbuf = PTR_OFFSET(rbuf, local_seg_count * dt_size);
         }
@@ -128,14 +142,23 @@ UCC_KN_PHASE_EXTRA:
             return task->super.super.status;
         }
         if (task->send_posted > p->iteration * (radix - 1)) {
-            sbuf       = (p->iteration == 0) ? ((KN_NODE_PROXY == node_type)
-                                                    ? task->args.dst.info.buffer
-                                                    : task->args.src.info.buffer)
-                                             : task->reduce_scatter_kn.scratch;
+        	if (p->iteration==0){
+        		if (KN_NODE_PROXY == node_type) {
+        			if (sra_offload) {
+        				sbuf = scratch_offset;
+        			} else {
+        				sbuf = task->args.dst.info.buffer;
+        			}
+        		} else {
+        			sbuf = task->args.src.info.buffer;
+        		}
+        	} else {
+        		sbuf = scratch;
+        	}
             rbuf       = (p->iteration != 0)
-                             ? PTR_OFFSET(task->reduce_scatter_kn.scratch,
+                             ? PTR_OFFSET(scratch,
                                     block_count * dt_size)
-                             : task->reduce_scatter_kn.scratch;
+                             : scratch;
             step_radix = ucc_sra_kn_compute_step_radix(rank, size, p);
             local_seg_index =
                 ucc_sra_kn_compute_seg_index(rank, p->radix_pow, p);
@@ -144,12 +167,21 @@ UCC_KN_PHASE_EXTRA:
             local_seg_offset = ucc_sra_kn_compute_seg_offset(
                 block_count, step_radix, local_seg_index);
             local_data  = PTR_OFFSET(sbuf, local_seg_offset * dt_size);
-            reduce_data = task->reduce_scatter_kn.scratch;
+            if (sra_offload && p->iteration == 0 &&
+                               node_type != KN_NODE_PROXY) {
+                status = ucc_mc_memcpy(scratch_offset, local_data,
+                            local_seg_count * dt_size, sra_mem_type, mem_type);
+                if (ucc_unlikely(status != UCC_OK)) {
+                	return status;
+                }
+                local_data = scratch_offset;
+            }
+            reduce_data = scratch;
             if (UCC_OK != (status = ucc_dt_reduce_multi(
                                local_data, rbuf, reduce_data,
                                task->send_posted - p->iteration * (radix - 1),
                                local_seg_count, local_seg_count * dt_size, dt,
-                               mem_type, &task->args))) {
+                               sra_mem_type, &task->args))) {
                 tl_error(UCC_TL_TEAM_LIB(task->team),
                          "failed to perform dt reduction");
                 task->super.super.status = status;
@@ -158,12 +190,9 @@ UCC_KN_PHASE_EXTRA:
         }
         ucc_knomial_pattern_next_iteration(p);
     }
-
     offset = ucc_sra_kn_get_offset(count, dt_size, rank, size, radix);
     status = ucc_mc_memcpy(PTR_OFFSET(task->args.dst.info.buffer, offset),
-                           task->reduce_scatter_kn.scratch,
-                           local_seg_count * dt_size, mem_type, mem_type);
-
+                 scratch, local_seg_count * dt_size, mem_type, sra_mem_type);
     if (UCC_OK != status) {
         return status;
     }
@@ -189,11 +218,13 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
                              task->reduce_scatter_kn.p.radix,
                              &task->reduce_scatter_kn.p);
     node_type = task->reduce_scatter_kn.p.node_type;
-    if (!(UCC_IS_INPLACE(task->args) || (KN_NODE_PROXY == node_type))) {
+    if (!(UCC_IS_INPLACE(task->args) || KN_NODE_PROXY == node_type) && !(task->args.src.info.mem_type == UCC_MEMORY_TYPE_CUDA &&
+            UCC_TL_UCP_TEAM_LIB(team)->cfg.allreduce_sra_kn_offload &&
+            (task->reduce_scatter_kn.p.n_extra == 0 || node_type != KN_NODE_EXTRA ||
+                                        UCC_IS_INPLACE(task->args)))) {
         task->reduce_scatter_kn.scratch = task->args.dst.info.buffer;
     }
     task->reduce_scatter_kn.phase = UCC_KN_PHASE_INIT;
-
     status = ucc_tl_ucp_reduce_scatter_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -205,10 +236,15 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
 ucc_status_t
 ucc_tl_ucp_reduce_scatter_knomial_finalize(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    uint8_t            node_type = task->reduce_scatter_kn.p.node_type;
-
-    if (UCC_IS_INPLACE(task->args) || (KN_NODE_PROXY == node_type)) {
+    ucc_tl_ucp_task_t     *task        = ucc_derived_of(coll_task,
+                                                        ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t     *team        = task->team;
+    ucc_knomial_pattern_t *p           = &task->reduce_scatter_kn.p;
+    ucc_memory_type_t      mem_type    = task->args.src.info.mem_type;
+    if ((mem_type == UCC_MEMORY_TYPE_CUDA &&
+           UCC_TL_UCP_TEAM_LIB(team)->cfg.allreduce_sra_kn_offload &&
+           (p->n_extra == 0 || p->node_type != KN_NODE_EXTRA)) ||
+           (UCC_IS_INPLACE(task->args) || KN_NODE_PROXY == p->node_type)) {
         ucc_mc_free(task->reduce_scatter_kn.scratch_mc_header);
     }
     return ucc_tl_ucp_coll_finalize(coll_task);
@@ -218,16 +254,17 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_coll_task_t **task_h, ucc_kn_radix_t radix)
 {
-    ucc_tl_ucp_team_t *tl_team   = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_rank_t         size      = tl_team->size;
-    ucc_rank_t         rank      = tl_team->rank;
-    size_t             count     = coll_args->args.src.info.count;
-    ucc_datatype_t     dt        = coll_args->args.src.info.datatype;
-    size_t             dt_size   = ucc_dt_size(dt);
-    size_t             data_size = count * dt_size;
-    ucc_memory_type_t  mem_type  = coll_args->args.src.info.mem_type;
-    ucc_tl_ucp_task_t *task;
-    ucc_status_t       status;
+    ucc_tl_ucp_team_t     *tl_team   = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_rank_t             size      = tl_team->size;
+    ucc_rank_t             rank      = tl_team->rank;
+    size_t                 count     = coll_args->args.src.info.count;
+    ucc_datatype_t         dt        = coll_args->args.src.info.datatype;
+    size_t                 dt_size   = ucc_dt_size(dt);
+    size_t                 data_size = count * dt_size;
+    ucc_memory_type_t      mem_type  = coll_args->args.src.info.mem_type;
+    ucc_knomial_pattern_t *p;
+    ucc_tl_ucp_task_t     *task;
+    ucc_status_t           status;
 
     task                 = ucc_tl_ucp_init_task(coll_args, team);
     task->super.post     = ucc_tl_ucp_reduce_scatter_knomial_start;
@@ -236,21 +273,33 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
 
     ucc_assert(task->args.src.info.mem_type == task->args.dst.info.mem_type);
     ucc_knomial_pattern_init(size, rank, radix, &task->reduce_scatter_kn.p);
+    p = &task->reduce_scatter_kn.p;
 
-    if (UCC_IS_INPLACE(task->args) ||
-        (KN_NODE_PROXY == task->reduce_scatter_kn.p.node_type)) {
+    if (mem_type == UCC_MEMORY_TYPE_CUDA &&
+        UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sra_kn_offload &&
+        (p->n_extra == 0 || p->node_type != KN_NODE_EXTRA ||
+                                    UCC_IS_INPLACE(task->args))) {
+        status = ucc_mc_alloc(&task->reduce_scatter_kn.scratch_mc_header,
+                              data_size * 2, UCC_MEMORY_TYPE_HOST);
+        task->reduce_scatter_kn.scratch = task->reduce_scatter_kn.
+                                                scratch_mc_header->addr;
+        if (UCC_OK != status) {
+            return status;
+    	}
+    }
+    else if (UCC_IS_INPLACE(task->args) ||
+        (KN_NODE_PROXY == p->node_type)) {
         status = ucc_mc_alloc(&task->reduce_scatter_kn.scratch_mc_header,
                               data_size, mem_type);
-        task->reduce_scatter_kn.scratch =
-            task->reduce_scatter_kn.scratch_mc_header->addr;
+        task->reduce_scatter_kn.scratch = task->reduce_scatter_kn.
+                                                scratch_mc_header->addr;
         if (UCC_OK != status) {
             return status;
         }
-        if (UCC_IS_INPLACE(task->args)) {
-            task->args.src.info.buffer = task->args.dst.info.buffer;
-        }
     }
-
+    if (UCC_IS_INPLACE(task->args)) {
+        task->args.src.info.buffer = task->args.dst.info.buffer;
+    }
     *task_h = &task->super;
     return UCC_OK;
 }
