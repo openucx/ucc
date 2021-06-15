@@ -374,3 +374,108 @@ ucc_status_t ucc_tl_nccl_bcast_init(ucc_tl_nccl_task_t *task)
     task->super.post     = ucc_tl_nccl_bcast_start;
     return UCC_OK;
 }
+
+ucc_status_t ucc_tl_nccl_reduce_scatter_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_tl_nccl_team_t *team   = task->team;
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
+    void               *dst    = task->args.dst.info.buffer;
+    void               *src    = task->args.src.info.buffer;
+    ucc_status_t        status = UCC_OK;
+    ncclDataType_t      dt     = ucc_to_nccl_dtype[
+                                    task->args.src.info.datatype];
+    ncclRedOp_t         op     = ucc_to_nccl_reduce_op[
+                                    task->args.reduce.predefined_op];
+    size_t              count  = task->args.src.info.count / team->size;
+
+    task->super.super.status = UCC_INPROGRESS;
+    if (UCC_IS_INPLACE(task->args)) {
+        src = task->args.dst.info.buffer;
+        dst = PTR_OFFSET(src, team->rank * count * ucc_dt_size(task->args.src.info.datatype));
+    }
+    NCCLCHECK_GOTO(ncclReduceScatter(src, dst, count, dt, op, team->nccl_comm,
+                                     stream),
+                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
+exit_coll:
+    if (status == UCC_OK) {
+        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+    } else if (ucc_unlikely(status < 0)) {
+        task->super.super.status = status;
+    }
+    return status;
+}
+
+ucc_status_t ucc_tl_nccl_reduce_scatter_init(ucc_tl_nccl_task_t *task)
+{
+    if ((task->args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
+        (ucc_to_nccl_reduce_op[task->args.reduce.predefined_op] ==
+         ncclOpUnsupported)) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "reduction operation is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    if (UCC_OK != ucc_nccl_check_dt_supported(task->args.src.info.datatype,
+                                              task->args.src.info.datatype)) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "dataype is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    task->super.post     = ucc_tl_nccl_reduce_scatter_start;
+    task->super.progress = ucc_tl_nccl_collective_progress;
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_nccl_reduce_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_tl_nccl_team_t *team   = task->team;
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
+    void               *dst    = task->args.dst.info.buffer;
+    void               *src    = task->args.src.info.buffer;
+    ucc_status_t        status = UCC_OK;
+    ncclDataType_t      dt     = ucc_to_nccl_dtype[
+                                    task->args.src.info.datatype];
+    ncclRedOp_t         op     = ucc_to_nccl_reduce_op[
+                                    task->args.reduce.predefined_op];
+    size_t              count  = task->args.src.info.count;
+
+    task->super.super.status = UCC_INPROGRESS;
+    if (UCC_IS_INPLACE(task->args) && (task->args.root == team->rank)) {
+        src = task->args.dst.info.buffer;
+    }
+    NCCLCHECK_GOTO(ncclReduce(src, dst, count, dt, op, task->args.root,
+                              team->nccl_comm, stream),
+                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
+exit_coll:
+    if (status == UCC_OK) {
+        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+    } else if (ucc_unlikely(status < 0)) {
+        task->super.super.status = status;
+    }
+    return status;
+}
+
+ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
+{
+    if ((task->args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
+        (ucc_to_nccl_reduce_op[task->args.reduce.predefined_op] ==
+         ncclOpUnsupported)) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "reduction operation is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    if (UCC_OK != ucc_nccl_check_dt_supported(task->args.src.info.datatype,
+                                              task->args.src.info.datatype)) {
+        tl_error(UCC_TL_TEAM_LIB(task->team),
+                 "dataype is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    task->super.post     = ucc_tl_nccl_reduce_start;
+    task->super.progress = ucc_tl_nccl_collective_progress;
+    return UCC_OK;
+}

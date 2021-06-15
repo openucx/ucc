@@ -21,4 +21,8 @@ ucc_status_t ucc_tl_nccl_alltoallv_init(ucc_tl_nccl_task_t *task);
 
 ucc_status_t ucc_tl_nccl_bcast_init(ucc_tl_nccl_task_t *task);
 
+ucc_status_t ucc_tl_nccl_reduce_scatter_init(ucc_tl_nccl_task_t *task);
+
+ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task);
+
 #endif
