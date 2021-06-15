@@ -165,7 +165,7 @@
 #define REDUCE_FN_DECLARE(_type)                                               \
     ucc_status_t ucc_mc_cpu_reduce_multi_##_type(                              \
         const void *src1, const void *src2, void *dst, size_t size,            \
-        size_t count, size_t stride, ucc_datatype_t dt, ucc_reduction_op_t op)
+        size_t count, size_t stride, ucc_reduction_op_t op)
 REDUCE_FN_DECLARE(int8);
 REDUCE_FN_DECLARE(int16);
 REDUCE_FN_DECLARE(int32);
