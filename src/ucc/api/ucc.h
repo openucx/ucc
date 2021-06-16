@@ -1382,19 +1382,36 @@ typedef enum ucc_memory_type {
     UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
 } ucc_memory_type_t;
 
+/**
+ *  @ingroup UCC_COLLECTIVES_DT
+ */
 typedef struct ucc_coll_buffer_info_v {
-    void             *buffer;
-    ucc_count_t      *counts;
-    ucc_aint_t       *displacements;
-    ucc_datatype_t    datatype;
-    ucc_memory_type_t mem_type;
+    void             *buffer; /*!< Starting address of the send/recv buffer */
+    ucc_count_t      *counts; /*!< Array of counts of type @ref ucc_count_t
+                                describing the total number of elements */
+    ucc_aint_t       *displacements; /*!< Displacement array of team size and
+                                       type @ref ucc_aint_t. Entry i specifies
+                                       the displacement relative to the start
+                                       address for the incoming data(
+                                       outgoing data) for the team member i. For
+                                       send buffer the data is fetched from this
+                                       displacement and for receive buffer the
+                                       incoming data is placed at this
+                                       displacement. */
+    ucc_datatype_t    datatype; /*!< Datatype of each buffer element */
+    ucc_memory_type_t mem_type; /*!< Memory type of buffer as defined by @ref
+                                  ucc_memory_type */
 } ucc_coll_buffer_info_v_t;
 
+/**
+ *  @ingroup UCC_COLLECTIVES_DT
+ */
 typedef struct ucc_coll_buffer_info {
-    void             *buffer;
-    ucc_count_t       count;
-    ucc_datatype_t    datatype;
-    ucc_memory_type_t mem_type;
+    void             *buffer;   /*!< Starting address of the send/recv buffer */
+    ucc_count_t       count;    /*!< Total number of elements in the buffer */
+    ucc_datatype_t    datatype; /*!< Datatype of each buffer element */
+    ucc_memory_type_t mem_type; /*!< Memory type of buffer as defined by @ref
+                                  ucc_memory_type */
 } ucc_coll_buffer_info_t;
 
 /**
