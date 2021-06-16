@@ -157,36 +157,36 @@ static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
     switch(dt) {
     case UCC_DT_INT8:
         return ucc_mc_cpu_reduce_multi_int8(src1, src2, dst, size, count,
-                                            stride, dt, op);
+                                            stride, op);
     case UCC_DT_INT16:
         return ucc_mc_cpu_reduce_multi_int16(src1, src2, dst, size, count,
-                                             stride, dt, op);
+                                             stride, op);
     case UCC_DT_INT32:
         return ucc_mc_cpu_reduce_multi_int32(src1, src2, dst, size, count,
-                                             stride, dt, op);
+                                             stride, op);
     case UCC_DT_INT64:
         return ucc_mc_cpu_reduce_multi_int64(src1, src2, dst, size, count,
-                                             stride, dt, op);
+                                             stride, op);
     case UCC_DT_UINT8:
         return ucc_mc_cpu_reduce_multi_uint8(src1, src2, dst, size, count,
-                                             stride, dt, op);
+                                             stride, op);
     case UCC_DT_UINT16:
         return ucc_mc_cpu_reduce_multi_uint16(src1, src2, dst, size, count,
-                                              stride, dt, op);
+                                              stride, op);
     case UCC_DT_UINT32:
         return ucc_mc_cpu_reduce_multi_uint32(src1, src2, dst, size, count,
-                                              stride, dt, op);
+                                              stride, op);
     case UCC_DT_UINT64:
         return ucc_mc_cpu_reduce_multi_uint64(src1, src2, dst, size, count,
-                                              stride, dt, op);
+                                              stride, op);
     case UCC_DT_FLOAT32:
         ucc_assert(4 == sizeof(float));
         return ucc_mc_cpu_reduce_multi_float(src1, src2, dst, size, count,
-                                             stride, dt, op);
+                                             stride, op);
     case UCC_DT_FLOAT64:
         ucc_assert(8 == sizeof(double));
         return ucc_mc_cpu_reduce_multi_double(src1, src2, dst, size, count,
-                                              stride, dt, op);
+                                              stride, op);
     default:
         mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%d)", dt);
         return UCC_ERR_NOT_SUPPORTED;

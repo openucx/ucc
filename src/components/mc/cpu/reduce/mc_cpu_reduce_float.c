@@ -8,8 +8,7 @@
 
 ucc_status_t ucc_mc_cpu_reduce_multi_float(const void *src1, const void *src2,
                                            void *dst, size_t size, size_t count,
-                                           size_t stride, ucc_datatype_t dt,
-                                           ucc_reduction_op_t op)
+                                           size_t stride, ucc_reduction_op_t op)
 {
     DO_DT_REDUCE_FLOAT(float, op, src1, src2, dst, size, count, stride);
     return UCC_OK;
