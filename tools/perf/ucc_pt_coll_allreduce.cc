@@ -45,7 +45,7 @@ ucc_status_t ucc_pt_coll_allreduce::init_coll_args(size_t count,
     }
     return UCC_OK;
 free_dst:
-    ucc_mc_free(dst_header, args.dst.info.mem_type);
+    ucc_mc_free(dst_header);
 exit:
     return st;
 }
@@ -53,9 +53,9 @@ exit:
 void ucc_pt_coll_allreduce::free_coll_args(ucc_coll_args_t &args)
 {
     if (!UCC_IS_INPLACE(args)) {
-        ucc_mc_free(src_header, args.src.info.mem_type);
+        ucc_mc_free(src_header);
     }
-    ucc_mc_free(dst_header, args.dst.info.mem_type);
+    ucc_mc_free(dst_header);
 }
 
 double ucc_pt_coll_allreduce::get_bus_bw(double time_us)

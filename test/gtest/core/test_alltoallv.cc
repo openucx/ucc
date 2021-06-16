@@ -123,10 +123,10 @@ public:
     {
         for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
             ucc_coll_args_t* coll = ctx->args;
-            UCC_CHECK(ucc_mc_free(ctx->src_mc_header, mem_type));
+            UCC_CHECK(ucc_mc_free(ctx->src_mc_header));
             free(coll->src.info_v.counts);
             free(coll->src.info_v.displacements);
-            UCC_CHECK(ucc_mc_free(ctx->dst_mc_header, mem_type));
+            UCC_CHECK(ucc_mc_free(ctx->dst_mc_header));
             free(coll->dst.info_v.counts);
             free(coll->dst.info_v.displacements);
             ucc_free(ctx->init_buf);
@@ -224,7 +224,7 @@ class test_alltoallv_3 : public test_alltoallv<uint32_t>,
 
 
 UCC_TEST_P(test_alltoallv_2, multiple)
-{    
+{
     ucc_memory_type_t           mem_type = std::get<0>(GetParam());
     gtest_ucc_inplace_t         inplace  = std::get<1>(GetParam());
     const ucc_datatype_t        dtype    = (ucc_datatype_t)std::get<2>(GetParam());

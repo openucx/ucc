@@ -250,6 +250,7 @@ static ucc_status_t ucc_mc_cuda_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
         return UCC_ERR_NO_MEMORY;
     }
     h->from_pool = 0;
+    h->mt        = UCC_MEMORY_TYPE_CUDA;
     *h_ptr       = h;
     mc_debug(&ucc_mc_cuda.super, "MC allocated %ld bytes with cudaMalloc", size);
     return UCC_OK;
@@ -302,6 +303,7 @@ static void ucc_mc_cuda_chunk_init(ucc_mpool_t *mp, //NOLINT
                  MC_CUDA_CONFIG->mpool_elem_size, st, cudaGetErrorString(st));
     }
     h->from_pool = 1;
+    h->mt        = UCC_MEMORY_TYPE_CUDA;
 }
 
 static void ucc_mc_cuda_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT

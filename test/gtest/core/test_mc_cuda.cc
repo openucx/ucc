@@ -31,7 +31,7 @@ void *mt_ucc_mc_cuda_allocs(void *args)
                   ucc_mc_alloc(&headers[i], size, UCC_MEMORY_TYPE_CUDA));
         pointers[i] = headers[i]->addr;
         EXPECT_EQ(cudaSuccess, cudaMemset(pointers[i], 0, size));
-        EXPECT_EQ(UCC_OK, ucc_mc_free(headers[i], UCC_MEMORY_TYPE_CUDA));
+        EXPECT_EQ(UCC_OK, ucc_mc_free(headers[i]));
         if (i % 2) {
             size *= quantifier;
         }
@@ -90,7 +90,7 @@ UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem)
               ucc_mc_alloc(&mc_header, TEST_ALLOC_SIZE, UCC_MEMORY_TYPE_CUDA));
     test_ptr = mc_header->addr;
     EXPECT_EQ(cudaSuccess, cudaMemset(test_ptr, 0, TEST_ALLOC_SIZE));
-    EXPECT_EQ(UCC_OK, ucc_mc_free(mc_header, UCC_MEMORY_TYPE_CUDA));
+    EXPECT_EQ(UCC_OK, ucc_mc_free(mc_header));
 }
 
 UCC_TEST_F(test_mc_cuda_mt, can_alloc_and_free_mem_mt)

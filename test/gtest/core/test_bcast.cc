@@ -55,7 +55,7 @@ public:
         for (auto r = 0; r < ctxs.size(); r++) {
             gtest_ucc_coll_ctx_t *ctx = ctxs[r];
             ucc_coll_args_t* coll = ctx->args;
-            UCC_CHECK(ucc_mc_free(ctx->src_mc_header, mem_type));
+            UCC_CHECK(ucc_mc_free(ctx->src_mc_header));
             if (r == coll->root) {
                 ucc_free(ctx->init_buf);
             }

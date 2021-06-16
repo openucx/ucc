@@ -49,6 +49,7 @@ static ucc_status_t ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
     }
     h->from_pool = 0;
     h->addr      = PTR_OFFSET(h, sizeof(ucc_mc_buffer_header_t));
+    h->mt        = UCC_MEMORY_TYPE_HOST;
     *h_ptr       = h;
     mc_debug(&ucc_mc_cpu.super, "MC allocated %ld bytes with ucc_malloc", size);
     return UCC_OK;
@@ -88,6 +89,7 @@ static void ucc_mc_cpu_chunk_init(ucc_mpool_t *mp, //NOLINT
     ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t *)obj;
     h->from_pool              = 1;
     h->addr                   = PTR_OFFSET(h, sizeof(ucc_mc_buffer_header_t));
+    h->mt                     = UCC_MEMORY_TYPE_HOST;
 }
 
 static void ucc_mc_cpu_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT

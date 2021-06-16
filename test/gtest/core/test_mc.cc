@@ -30,7 +30,7 @@ void *mt_ucc_mc_cpu_allocs(void *args)
                   ucc_mc_alloc(&headers[i], size, UCC_MEMORY_TYPE_HOST));
         pointers[i] = headers[i]->addr;
         memset(pointers[i], 0, size);
-        EXPECT_EQ(UCC_OK, ucc_mc_free(headers[i], UCC_MEMORY_TYPE_HOST));
+        EXPECT_EQ(UCC_OK, ucc_mc_free(headers[i]));
         if (i % 2) {
             size *= quantifier;
         }
@@ -78,7 +78,7 @@ UCC_TEST_F(test_mc, can_alloc_and_free_host_mem)
     EXPECT_EQ(UCC_OK, ucc_mc_alloc(&h, size, UCC_MEMORY_TYPE_HOST));
     ptr = h->addr;
     memset(ptr, 0, size);
-    EXPECT_EQ(UCC_OK, ucc_mc_free(h, UCC_MEMORY_TYPE_HOST));
+    EXPECT_EQ(UCC_OK, ucc_mc_free(h));
     ucc_mc_finalize();
 }
 

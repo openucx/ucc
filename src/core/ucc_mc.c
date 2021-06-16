@@ -141,11 +141,10 @@ ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
                                           dtype, op);
 }
 
-ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *h_ptr,
-                         ucc_memory_type_t       mem_type)
+ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *h_ptr)
 {
-    UCC_CHECK_MC_AVAILABLE(mem_type);
-    return mc_ops[mem_type]->mem_free(h_ptr);
+    UCC_CHECK_MC_AVAILABLE(h_ptr->mt);
+    return mc_ops[h_ptr->mt]->mem_free(h_ptr);
 }
 
 ucc_status_t ucc_mc_memcpy(void *dst, const void *src, size_t len,
