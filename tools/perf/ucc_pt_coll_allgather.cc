@@ -9,9 +9,10 @@ ucc_pt_coll_allgather::ucc_pt_coll_allgather(int size, ucc_datatype_t dt,
                                              bool is_inplace):
     comm_size(size)
 {
-    has_inplace_= true;
+    has_inplace_  = true;
     has_reduction_= false;
-    has_range_ = true;
+    has_range_    = true;
+    has_bw_       = true;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLGATHER;
@@ -52,16 +53,19 @@ exit:
     return st;
 }
 
+float ucc_pt_coll_allgather::get_bw(float time_ms, int grsize,
+                                    ucc_coll_args_t args)
+{
+    float N = grsize;
+    float S = N * args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
+
+    return (S / time_ms) * ((N - 1) / N) / 1000.0;
+}
+
 void ucc_pt_coll_allgather::free_coll_args(ucc_coll_args_t &args)
 {
     if (!UCC_IS_INPLACE(args)) {
         ucc_mc_free(src_header);
     }
     ucc_mc_free(dst_header);
-}
-
-double ucc_pt_coll_allgather::get_bus_bw(double time_us)
-{
-    //TODO
-    return 0.0;
 }
