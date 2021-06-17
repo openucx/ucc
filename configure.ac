@@ -145,6 +145,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_MPIRUN], [false])
      AM_CONDITIONAL([HAVE_MPICC], [false])
      AM_CONDITIONAL([HAVE_MPICXX], [false])
+     AM_CONDITIONAL([HAVE_PROFILING],[false])
     ],
     [
      AM_CONDITIONAL([DOCS_ONLY], [false])
@@ -155,25 +156,12 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/cuda.m4])
      m4_include([config/m4/nccl.m4])
      m4_include([config/m4/mpi.m4])
+     m4_include([config/m4/configure.m4])
      m4_include([test/gtest/configure.m4])
 
      mc_modules=":cpu"
      tl_modules=""
      AC_MSG_RESULT([MPI perftest: ${mpi_enable}])
-     AC_ARG_ENABLE([debug],
-              AS_HELP_STRING([--enable-debug], [Enable extra debugging code (default is NO).]),
-              [], [enable_debug=no])
-
-     if test $enable_debug = yes; then
-        AC_DEFINE([ENABLE_DEBUG], [1], [Enable debugging code])
-        CFLAGS="$CFLAGS -O0 -g3"
-        CXXFLAGS="$CXXFLAGS -O0 -g3"
-        AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_TRACE_POLL], [Highest log level])
-     else
-        AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_INFO], [Highest log level])
-        CFLAGS="$CFLAGS -O3 -g -DNDEBUG"
-        CXXFLAGS="$CXXFLAGS -O3 -g -DNDEBUG"
-     fi
 
      CHECK_UCX
      AC_MSG_RESULT([UCX support: $ucx_happy])
@@ -234,5 +222,8 @@ AC_MSG_NOTICE([      C++ compiler:   ${CXX} ${CXXFLAGS} ${BASE_CXXFLAGS}])
 AC_MSG_NOTICE([          Perftest:   ${mpi_enable}])
 AC_MSG_NOTICE([        MC modules:   <$(echo ${mc_modules}|tr ':' ' ') >])
 AC_MSG_NOTICE([        TL modules:   <$(echo ${tl_modules}|tr ':' ' ') >])
+AS_IF([test "x$enable_profiling" = xyes],[
+AC_MSG_NOTICE([ Profiling modules:   <$(echo ${prof_modules}|tr ':' ' ') >])
+])
 ])
 AC_MSG_NOTICE([=========================================================])

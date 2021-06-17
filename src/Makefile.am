@@ -32,39 +32,41 @@ nobase_dist_libucc_la_HEADERS =	\
 	ucc/api/ucc_version.h           \
 	ucc/api/ucc_status.h
 
-noinst_HEADERS =                     \
-	core/ucc_global_opts.h           \
-	core/ucc_lib.h                   \
-	core/ucc_context.h               \
-	core/ucc_mc.h                    \
-	core/ucc_team.h                  \
-	core/ucc_ee.h                    \
-	core/ucc_progress_queue.h        \
-	schedule/ucc_schedule.h          \
-	coll_score/ucc_coll_score.h      \
-	utils/ucc_compiler_def.h         \
-	utils/ucc_log.h                  \
-	utils/ucc_parser.h               \
-	utils/ucc_component.h            \
-	utils/ucc_datastruct.h           \
-	utils/ucc_math.h                 \
-	utils/ucc_coll_utils.h           \
-	utils/ucc_list.h                 \
-	utils/ucc_lock_free_queue.h      \
-	utils/ucc_string.h               \
-	utils/ucc_queue.h                \
-	utils/ucc_proc_info.h            \
-	utils/khash.h                    \
-	utils/ucc_spinlock.h             \
-	utils/ucc_mpool.h                \
-	components/base/ucc_base_iface.h \
-	components/cl/ucc_cl.h           \
-	components/cl/ucc_cl_log.h       \
-	components/cl/ucc_cl_type.h      \
-	components/tl/ucc_tl.h           \
-	components/tl/ucc_tl_log.h       \
-	components/mc/base/ucc_mc_base.h \
-	components/mc/ucc_mc_log.h       \
+noinst_HEADERS =                      \
+	core/ucc_global_opts.h            \
+	core/ucc_lib.h                    \
+	core/ucc_context.h                \
+	core/ucc_mc.h                     \
+	core/ucc_team.h                   \
+	core/ucc_ee.h                     \
+	core/ucc_progress_queue.h         \
+	schedule/ucc_schedule.h           \
+	coll_score/ucc_coll_score.h       \
+	utils/ucc_compiler_def.h          \
+	utils/ucc_log.h                   \
+	utils/ucc_parser.h                \
+	utils/ucc_component.h             \
+	utils/ucc_datastruct.h            \
+	utils/ucc_math.h                  \
+	utils/ucc_coll_utils.h            \
+	utils/ucc_list.h                  \
+	utils/ucc_string.h                \
+	utils/ucc_queue.h                 \
+	utils/ucc_proc_info.h             \
+	utils/khash.h                     \
+	utils/ucc_spinlock.h              \
+	utils/ucc_mpool.h                 \
+	utils/profile/ucc_profile.h       \
+	utils/profile/ucc_profile_on.h    \
+	utils/profile/ucc_profile_off.h   \
+	components/base/ucc_base_iface.h  \
+	components/cl/ucc_cl.h            \
+	components/cl/ucc_cl_log.h        \
+	components/cl/ucc_cl_type.h       \
+	components/tl/ucc_tl.h            \
+	components/tl/ucc_tl_log.h        \
+	components/mc/base/ucc_mc_base.h  \
+	components/mc/ucc_mc_log.h        \
 	coll_patterns/recursive_knomial.h \
 	coll_patterns/sra_knomial.h
 
@@ -92,6 +94,7 @@ libucc_la_SOURCES =                  \
 	utils/ucc_string.c               \
 	utils/ucc_coll_utils.c           \
 	utils/ucc_parser.c               \
+	utils/profile/ucc_profile.c      \
 	components/base/ucc_base_iface.c \
 	components/cl/ucc_cl.c           \
 	components/tl/ucc_tl.c           \

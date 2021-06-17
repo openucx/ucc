@@ -1,0 +1,66 @@
+/**
+ * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ *
+ * See file LICENSE for terms.
+ */
+
+#ifndef UCC_PROFILE_ON_H_
+#define UCC_PROFILE_ON_H_
+
+#include "core/ucc_global_opts.h"
+#include <ucs/profile/profile_on.h>
+
+extern ucs_profile_context_t *ucc_profile_ctx;
+
+
+#undef UCC_PROFILE_FUNC
+#undef UCC_PROFILE_REQUEST_NEW
+#undef UCC_PROFILE_REQUEST_EVENT
+#undef UCC_PROFILE_REQUEST_FREE
+/**
+ * Create a profiled function. Uses default profile context.
+ *
+ * Usage:
+ *  UCC_PROFILE_FUNC(<retval>, <name>, (a, b), int a, char b)
+ *
+ * @param _ret_type   Function return type.
+ * @param _name       Function name.
+ * @param _arglist    List of argument *names* only.
+ * @param ...         Argument declarations (with types).
+ */
+#define UCC_PROFILE_FUNC(_ret_type, _name, _arglist, ...) \
+    _UCS_PROFILE_CTX_FUNC(ucc_profile_ctx, _ret_type, _name, _arglist, ## __VA_ARGS__)
+
+
+/*
+ * Profile a new request allocation.
+ *
+ * @param _req      Request pointer.
+ * @param _name     Allocation site name.
+ * @param _param32  Custom 32-bit parameter.
+ */
+#define UCC_PROFILE_REQUEST_NEW(_req, _name, _param32) \
+    UCS_PROFILE_CTX_RECORD(ucc_profile_ctx, UCS_PROFILE_TYPE_REQUEST_NEW, \
+                           (_name), (_param32), (uintptr_t)(_req));
+
+/*
+ * Profile a request progress event.
+ *
+ * @param _req      Request pointer.
+ * @param _name     Event name.
+ * @param _param32  Custom 32-bit parameter.
+ */
+#define UCC_PROFILE_REQUEST_EVENT(_req, _name, _param32) \
+    UCS_PROFILE_CTX_RECORD(ucc_profile_ctx, UCS_PROFILE_TYPE_REQUEST_EVENT, \
+                           (_name), (_param32), (uintptr_t)(_req));
+
+/*
+ * Profile a request release.
+ *
+ * @param _req      Request pointer.
+ */
+#define UCC_PROFILE_REQUEST_FREE(_req) \
+    UCS_PROFILE_CTX_RECORD(ucc_profile_ctx, UCS_PROFILE_TYPE_REQUEST_FREE, \
+                           "", 0, (uintptr_t)(_req));
+
+#endif

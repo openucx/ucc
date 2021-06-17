@@ -166,6 +166,8 @@ UCC_KN_PHASE_EXTRA:
     }
 UCC_KN_PHASE_PROXY: /* unused label */
 out:
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_scatter_kn_done",
+                                     0);
     task->super.super.status = UCC_OK;
     return task->super.super.status;
 }
@@ -175,8 +177,10 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team = task->team;
     ucc_status_t       status;
-    task->super.super.status = UCC_INPROGRESS;
 
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_scatter_kn_start",
+                                     0);
+    task->super.super.status = UCC_INPROGRESS;
     status = ucc_tl_ucp_reduce_scatter_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {
         ucc_progress_enqueue(UCC_TL_UCP_TEAM_CORE_CTX(team)->pq, &task->super);
