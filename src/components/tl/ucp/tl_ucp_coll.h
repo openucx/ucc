@@ -89,8 +89,7 @@ static inline ucc_schedule_t *ucc_tl_ucp_get_schedule(ucc_tl_ucp_team_t *team)
     ucc_schedule_t       *schedule = ucc_mpool_get(&ctx->req_mp);
 
     UCC_TL_UCP_PROFILE_REQUEST_NEW(schedule, "tl_ucp_task", 0);
-    ucc_schedule_init(schedule, UCC_TL_UCP_TEAM_CORE_CTX(team));
-
+    ucc_schedule_init(schedule, UCC_TL_CORE_CTX(team));
     return schedule;
 }
 

@@ -35,7 +35,6 @@ void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
 static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
                                                 ucc_team_t *team)
 {
-    ucc_status_t status;
     if ((team->params.mask & UCC_TEAM_PARAM_FIELD_EP) &&
         (team->params.mask & UCC_TEAM_PARAM_FIELD_EP_RANGE) &&
         (team->params.ep_range == UCC_COLLECTIVE_EP_RANGE_CONTIG)) {
@@ -54,44 +53,10 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
                   sizeof(ucc_cl_team_t *) * context->n_cl_ctx);
         return UCC_ERR_NO_MEMORY;
     }
-    team->state = UCC_TEAM_ALLOC_ID;
-    /* If we don't have team id provided by user then we will have to
-       perform internal team id allocation. We need a service team for that
-       to run service allreduce.
-       TODO: we might also need service team if other CLs require if (e.g. hier),
-       need to add proper query interface */
-    if (team->id == 0) {
-        /* id team->id == 0 then external id was not provided,
-           (external id has high bit set) - start service team creation */
-        ucc_base_team_params_t b_params;
-        ucc_base_team_t       *b_team;
-        status = ucc_tl_context_get(context, "ucp", &context->service_ctx);
-        if (UCC_OK != status) {
-            ucc_warn("TL UCP context is not available, "
-                     "service team can not be created");
-            goto error;
-        }
-        memcpy(&b_params, &team->params, sizeof(ucc_team_params_t));
-        b_params.rank     = team->rank;
-        b_params.scope    = UCC_CL_LAST + 1; // CORE scopre id - never overlaps with CL type
-        b_params.scope_id = 0;
-        b_params.id       = 0;
-        status = UCC_TL_CTX_IFACE(context->service_ctx)
-            ->team.create_post(&context->service_ctx->super, &b_params, &b_team);
-        if (UCC_OK != status) {
-            ucc_error("tl ucp service team create post failed");
-            goto error;
-        }
-        team->service_team = ucc_derived_of(b_team, ucc_tl_team_t);
-        team->state = UCC_TEAM_SERVICE_TEAM;
-    }
+    team->state                   = UCC_TEAM_ADDR_EXCHANGE;
     team->last_team_create_posted = -1;
     team->status                  = UCC_INPROGRESS;
     return UCC_OK;
-
-error:
-    free(team->cl_teams);
-    return status;
 }
 
 ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts,
@@ -130,19 +95,16 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
                  (unsigned long long)team_size);
         return UCC_ERR_INVALID_PARAM;
     }
-    team = ucc_malloc(sizeof(ucc_team_t), "ucc_team");
+    team = ucc_calloc(1, sizeof(ucc_team_t), "ucc_team");
     if (!team) {
         ucc_error("failed to allocate %zd bytes for ucc team",
                   sizeof(ucc_team_t));
         return UCC_ERR_NO_MEMORY;
     }
-    team->n_cl_teams   = 0;
+
     team->num_contexts = num_contexts;
-    team->service_team = NULL;
-    team->task         = NULL;
-    team->id           = 0;
-    team->size         = 0;
-    team->contexts     =
+    team->size         = team_size;
+    team->contexts =
         ucc_malloc(sizeof(ucc_context_t *) * num_contexts, "ucc_team_ctx");
     if (!team->contexts) {
         ucc_error("failed to allocate %zd bytes for ucc team contexts array",
@@ -172,6 +134,32 @@ static inline ucc_status_t
 ucc_team_create_service_team(ucc_context_t *context, ucc_team_t *team)
 {
     ucc_status_t status;
+    /* TODO: check if service team is required by CLs/TLs */
+    if (!team->service_team) {
+        ucc_base_team_params_t b_params;
+        ucc_base_team_t *      b_team;
+        status = ucc_tl_context_get(context, "ucp", &context->service_ctx);
+        if (UCC_OK != status) {
+            ucc_warn("TL UCP context is not available, "
+                     "service team can not be created");
+            return status;
+        }
+        memcpy(&b_params, &team->params, sizeof(ucc_team_params_t));
+        b_params.rank = team->rank;
+        b_params.scope =
+            UCC_CL_LAST + 1; // CORE scopre id - never overlaps with CL type
+        b_params.scope_id = 0;
+        b_params.id       = 0;
+        b_params.team     = team;
+        status            = UCC_TL_CTX_IFACE(context->service_ctx)
+                     ->team.create_post(&context->service_ctx->super, &b_params,
+                                        &b_team);
+        if (UCC_OK != status) {
+            ucc_error("tl ucp service team create post failed");
+            return status;
+        }
+        team->service_team = ucc_derived_of(b_team, ucc_tl_team_t);
+    }
     status = UCC_TL_CTX_IFACE(context->service_ctx)
         ->team.create_test(&team->service_team->super);
     if (status < 0) {
@@ -204,6 +192,7 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
     memcpy(&b_params.params, &team->params, sizeof(ucc_team_params_t));
     b_params.rank = team->rank;
     b_params.id   = team->id;
+    b_params.team = team;
     for (i = team->last_team_create_posted + 1; i < context->n_cl_ctx; i++) {
         cl_iface = UCC_CL_CTX_IFACE(context->cl_ctx[i]);
         status   = cl_iface->team.create_post(&context->cl_ctx[i]->super,
@@ -235,11 +224,64 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
     return UCC_OK;
 }
 
+static inline ucc_status_t ucc_team_exchange(ucc_context_t *context,
+                                             ucc_team_t *   team)
+{
+    ucc_status_t status;
+    if (!context->addr_storage.storage) {
+        /* There is no addresses collected on the context
+           (can be, e.g., if user did not pass OOB for ctx
+           creation). Need to exchange addresses here*/
+        return ucc_core_addr_exchange(context, NULL, &team->params.oob,
+                                      &team->addr_storage);
+    }
+    /* We only need to exchange ctx_ranks and build map to ctx array */
+    ucc_assert(context->addr_storage.storage);
+    if (!team->ctx_ranks) {
+        team->ctx_ranks =
+            ucc_malloc(team->size * sizeof(ucc_rank_t), "ctx_ranks");
+        if (!team->ctx_ranks) {
+            ucc_error("failed to allocate %zd bytes for ctx ranks array",
+                      team->size * sizeof(ucc_rank_t));
+            return UCC_ERR_NO_MEMORY;
+        }
+        status = team->params.oob.allgather(
+            &context->rank, team->ctx_ranks, sizeof(ucc_rank_t),
+            team->params.oob.coll_info, &team->oob_req);
+        if (UCC_OK != status) {
+            ucc_error("failed to start oob allgather for proc info exchange");
+            ucc_free(team->ctx_ranks);
+            return status;
+        }
+    }
+    status = team->params.oob.req_test(team->oob_req);
+    if (status < 0) {
+        team->params.oob.req_free(team->oob_req);
+        ucc_error("oob req test failed during team proc info exchange");
+        return status;
+    } else if (UCC_INPROGRESS == status) {
+        return status;
+    }
+    team->params.oob.req_free(team->oob_req);
+    ucc_assert(team->size >= 2);
+    team->ctx_map = ucc_ep_map_from_array(&team->ctx_ranks, team->size,
+                                          context->addr_storage.size, 1);
+    ucc_debug("team %p rank %d, ctx_rank %d, map_type %d", team, team->rank,
+              context->rank, team->ctx_map.type);
+    return UCC_OK;
+}
+
 ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
                                          ucc_team_t    *team)
 {
     ucc_status_t status = UCC_OK;
     switch (team->state) {
+    case UCC_TEAM_ADDR_EXCHANGE:
+        status = ucc_team_exchange(context, team);
+        if (UCC_OK != status) {
+            goto out;
+        }
+        team->state = UCC_TEAM_SERVICE_TEAM;
     case UCC_TEAM_SERVICE_TEAM:
         status = ucc_team_create_service_team(context, team);
         if (UCC_OK != status) {
@@ -304,6 +346,9 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
         }
         team->cl_teams[i] = NULL;
     }
+    /* ucc_topo_cleanup(team->topo); */
+    ucc_free(team->addr_storage.storage);
+    ucc_free(team->ctx_ranks);
     ucc_team_relase_id(team);
     ucc_free(team->cl_teams);
     ucc_free(team->contexts);
@@ -356,7 +401,7 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
     uint64_t        *local, *global;
     ucc_status_t     status;
     int              pos, i;
-
+    /* TODO: check if team id is required by CLs/TLs */
     if (team->id > 0) {
         ucc_assert(UCC_TEAM_ID_IS_EXTERNAL(team));
         return UCC_OK;

@@ -87,7 +87,7 @@ UCC_CLASS_DECLARE(ucc_tl_context_t, ucc_tl_lib_t *, ucc_context_t *);
 typedef struct ucc_tl_team {
     ucc_base_team_t super;
 } ucc_tl_team_t;
-UCC_CLASS_DECLARE(ucc_tl_team_t, ucc_tl_context_t *);
+UCC_CLASS_DECLARE(ucc_tl_team_t, ucc_tl_context_t *, ucc_team_t *);
 
 #define UCC_TL_IFACE_DECLARE(_name, _NAME)                                     \
     UCC_BASE_IFACE_DECLARE(TL_, tl_, _name, _NAME)

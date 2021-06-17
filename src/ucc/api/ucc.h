@@ -1029,7 +1029,7 @@ typedef enum {
  */
 struct ucc_ep_map_strided {
     uint64_t    start;
-    uint64_t    stride;
+    int64_t     stride;
 };
 
 /**

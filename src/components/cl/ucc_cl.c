@@ -166,10 +166,12 @@ ucc_status_t ucc_cl_lib_config_read(ucc_cl_iface_t *iface,
                                 (ucc_base_config_t **)cl_config);
 }
 
-UCC_CLASS_INIT_FUNC(ucc_cl_team_t, ucc_cl_context_t *cl_context)
+UCC_CLASS_INIT_FUNC(ucc_cl_team_t, ucc_cl_context_t *cl_context,
+                    ucc_team_t *team)
 {
     UCC_CLASS_CALL_BASE_INIT();
     self->super.context = &cl_context->super;
+    self->super.team    = team;
     return UCC_OK;
 }
 

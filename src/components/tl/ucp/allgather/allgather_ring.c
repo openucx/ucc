@@ -82,7 +82,7 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
 
     status = ucc_tl_ucp_allgather_ring_progress(&task->super);
     if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_UCP_TEAM_CORE_CTX(team)->pq, &task->super);
+        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
         return UCC_OK;
     }
     return ucc_task_complete(coll_task);

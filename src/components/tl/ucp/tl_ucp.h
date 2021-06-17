@@ -63,8 +63,6 @@ typedef struct ucc_tl_ucp_lib {
 UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
 
-typedef struct ucc_tl_ucp_addr_storage ucc_tl_ucp_addr_storage_t;
-
 typedef struct ucc_tl_ucp_ep_close_state {
     void      *close_req;
 } ucc_tl_ucp_ep_close_state_t;
@@ -89,7 +87,6 @@ typedef struct ucc_tl_ucp_team {
     ucc_status_t               status;
     ucc_rank_t                 size;
     ucc_rank_t                 rank;
-    ucc_tl_ucp_addr_storage_t *addr_storage;
     uint32_t                   id;
     uint32_t                   scope;
     uint32_t                   scope_id;
@@ -110,9 +107,6 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 
 #define UCC_TL_UCP_TEAM_CTX(_team)                                             \
     (ucc_derived_of((_team)->super.super.context, ucc_tl_ucp_context_t))
-
-#define UCC_TL_UCP_TEAM_CORE_CTX(_team)                                        \
-    ((_team)->super.super.context->ucc_context)
 
 #define UCC_TL_UCP_WORKER(_team) UCC_TL_UCP_TEAM_CTX(_team)->ucp_worker
 

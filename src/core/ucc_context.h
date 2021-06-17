@@ -28,10 +28,18 @@ typedef struct ucc_team_id_pool {
 } ucc_team_id_pool_t;
 
 typedef struct ucc_context_id {
-    ucc_host_id_t host_id;
-    pid_t         pid;
-    uint32_t      seq_num;
+    ucc_proc_info_t pi;
+    uint32_t        seq_num;
 } ucc_context_id_t;
+
+#define UCC_CTX_ID_EQUAL(_id1, _id2) (UCC_PROC_INFO_EQUAL((_id1).pi, (_id2).pi) \
+                                      && (_id1).seq_num == (_id2).seq_num)
+typedef struct ucc_addr_storage {
+    void      *storage;
+    void      *oob_req;
+    size_t     addr_len;
+    ucc_rank_t size;
+} ucc_addr_storage_t;
 
 typedef struct ucc_context {
     ucc_lib_info_t          *lib;
@@ -50,6 +58,9 @@ typedef struct ucc_context {
     ucc_progress_queue_t    *pq;
     ucc_team_id_pool_t       ids;
     ucc_context_id_t         id;
+    ucc_addr_storage_t       addr_storage;
+    ucc_rank_t               rank; /*< rank of a process in the "global" (with
+                                     OOB) context */
 } ucc_context_t;
 
 typedef struct ucc_context_config {
@@ -72,9 +83,27 @@ typedef struct ucc_context_config {
 ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
                                            ucc_context_progress_fn_t fn,
                                            void *progress_arg);
+
 void         ucc_context_progress_deregister(ucc_context_t *ctx,
                                              ucc_context_progress_fn_t fn,
                                              void *progress_arg);
+/* Performs address exchange between the processes group defined by OOB.
+   This function can be used either at context creation time
+   (if ctx is global) or at team creation time. The corresponding oob
+   arguments must be provided (c_oob for context and t_oob for team).
+   The function is non-blocking and can return UCC_INPROGRESS.
+   If caller needs a blocking behavior then the function
+   must be called until UCC_OK is returned.
+
+   The addresses are stored in the addr_storage data structure.
+
+   The addressing data of rank "i" (according to OOB) can be accessed
+   with UCC_ADDR_STORAGE_RANK_HEADER macro defined below.
+*/
+ucc_status_t ucc_core_addr_exchange(ucc_context_t          *context,
+                                    ucc_context_oob_coll_t *c_oob,
+                                    ucc_team_oob_coll_t    *t_oob,
+                                    ucc_addr_storage_t     *addr_storage);
 
 /* UCC context packed address layout:
    --------------------------------------------------------------------------
@@ -83,6 +112,7 @@ void         ucc_context_progress_deregister(ucc_context_t *ctx,
    each component can extract its own addressing using offset into data.
    Offset is found by id. */
 typedef struct ucc_context_addr_header {
+    ucc_context_id_t ctx_id;
     int n_components; // Number of CL/TL components whose address is packed
     struct {
         unsigned long id;     // id of component computed during framework load
@@ -102,4 +132,7 @@ typedef struct ucc_context_addr_header {
 #define UCC_CONTEXT_ADDR_DATA(_header)                                         \
     PTR_OFFSET(_header, UCC_CONTEXT_ADDR_HEADER_SIZE(_header->n_components))
 
+#define UCC_ADDR_STORAGE_RANK_HEADER(_storage, _rank)                          \
+    (ucc_context_addr_header_t *)PTR_OFFSET((_storage)->storage,               \
+                                            (_storage)->addr_len *(_rank))
 #endif

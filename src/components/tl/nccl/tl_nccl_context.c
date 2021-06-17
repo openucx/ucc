@@ -47,8 +47,10 @@ UCC_CLASS_DEFINE(ucc_tl_nccl_context_t, ucc_tl_context_t);
 
 ucc_status_t
 ucc_tl_nccl_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                             ucc_base_ctx_attr_t      *attr)    /* NOLINT */
+                             ucc_base_ctx_attr_t      *attr)
 {
-    /* TODO */
-    return UCC_ERR_NOT_IMPLEMENTED;
+    if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
+        attr->attr.ctx_addr_len = 0;
+    }
+    return UCC_OK;
 }
