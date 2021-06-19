@@ -506,7 +506,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         goto error_ctx_create;
     }
     ctx->id.pi      = ucc_local_proc;
-    ctx->id.seq_num = ucc_context_seq_num++;
+    ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         do {
             /* UCC context create is blocking fn, so we can wait here for the

@@ -9,14 +9,15 @@ extern "C" {
 constexpr ucc_lib_params_t UccProcess::default_lib_params;
 constexpr ucc_context_params_t UccProcess::default_ctx_params;
 constexpr int UccJob::staticTeamSizes[];
+
 UccProcess::UccProcess(const ucc_lib_params_t &lib_params,
-                       const ucc_context_params_t &ctx_params)
+                       const ucc_context_params_t &_ctx_params)
 {
     ucc_lib_config_h     lib_config;
-    ucc_context_config_h ctx_config;
     ucc_status_t         status;
     std::stringstream    err_msg;
 
+    ctx_params = _ctx_params;
     status = ucc_lib_config_read(NULL, NULL, &lib_config);
     if (status != UCC_OK) {
         err_msg << "ucc_lib_config_read failed";
@@ -28,20 +29,8 @@ UccProcess::UccProcess(const ucc_lib_params_t &lib_params,
         err_msg << "ucc_init failed";
         goto exit_err;
     }
-    status = ucc_context_config_read(lib_h, NULL, &ctx_config);
-    if (status != UCC_OK) {
-        err_msg << "ucc_context_config_read failed";
-        goto free_lib;
-    }
-    status = ucc_context_create(lib_h, &ctx_params, ctx_config, &ctx_h);
-    ucc_context_config_release(ctx_config);
-    if (status != UCC_OK) {
-        err_msg << "ucc_context_create failed";
-        goto free_lib;
-    }
     return;
-free_lib:
-    ucc_finalize(lib_h);
+
 exit_err:
     err_msg << ": "<< ucc_status_string(status) << " (" << status << ")";
     throw std::runtime_error(err_msg.str());
@@ -190,6 +179,7 @@ void UccTeam::init_team()
     while (!all_done) {
         all_done = 1;
         for (int i = 0; i < n_procs; i++) {
+            ucc_context_progress(procs[i].p.get()->ctx_h);
             status = ucc_team_create_test(procs[i].team);
             ASSERT_GE(status, 0);
             if (UCC_INPROGRESS == status) {
@@ -251,14 +241,9 @@ UccTeam::~UccTeam()
     destroy_team();
 }
 
-UccJob::UccJob(int _n_procs) : n_procs(_n_procs)
-{
-    for (int i = 0; i < n_procs; i++) {
-        procs.push_back(std::make_shared<UccProcess>());
-    }
-}
+UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
+    ta(_n_procs), n_procs(_n_procs), ctx_mode(_ctx_mode)
 
-UccJob::UccJob(int _n_procs, ucc_job_env_t vars) : n_procs(_n_procs)
 {
     ucc_job_env_t env_bkp;
     char *var;
@@ -275,14 +260,141 @@ UccJob::UccJob(int _n_procs, ucc_job_env_t vars) : n_procs(_n_procs)
         procs.push_back(std::make_shared<UccProcess>());
     }
 
+    create_context();
     for (auto &v : env_bkp) {
         /*restore original env */
         setenv(v.first.c_str(), v.second.c_str(), 1);
     }
+
+}
+
+void thread_allgather(void *src_buf, void *recv_buf, size_t size,
+                      ThreadAllgatherReq *ta_req)
+{
+    ThreadAllgather *ta = ta_req->ta;
+    while (ta->ready_count > ta->n_procs) {
+        std::this_thread::yield();
+    }
+    ta->lock.lock();
+    if (!ta->buffer) {
+        ucc_assert(0 == ta->ready_count);
+        ta->buffer = malloc(size * ta->n_procs);
+        ta->ready_count = 0;
+    }
+    memcpy((void*)((ptrdiff_t)ta->buffer + size * ta_req->rank),
+           src_buf, size);
+    ta->ready_count++;
+    ta->lock.unlock();
+    while (ta->ready_count < ta->n_procs) {
+        std::this_thread::yield();
+    }
+    memcpy(recv_buf, ta->buffer, size * ta->n_procs);
+
+    ta->lock.lock();
+    ta->ready_count++;
+    if (ta->ready_count == 2 * ta->n_procs) {
+        free(ta->buffer);
+        ta->buffer = NULL;
+        ta->ready_count = 0;
+    }
+    ta->lock.unlock();
+    ta_req->status = UCC_OK;
+}
+
+ucc_status_t thread_allgather_start(void *src_buf, void *recv_buf, size_t size,
+                                    void *coll_info, void **request)
+{
+    ThreadAllgatherReq *ta_req = (ThreadAllgatherReq*)coll_info;
+    *request = coll_info;
+    while (ta_req->status != UCC_OPERATION_INITIALIZED) {
+        std::this_thread::yield();
+    }
+
+    ta_req->status = UCC_INPROGRESS;
+    ta_req->t = std::thread(thread_allgather, src_buf,
+                            recv_buf, size, ta_req);
+    return UCC_OK;
+}
+
+ucc_status_t thread_allgather_req_test(void *request)
+{
+    ThreadAllgatherReq *ta_req = (ThreadAllgatherReq*)request;
+    return ta_req->status;
+}
+
+ucc_status_t thread_allgather_req_free(void *request)
+{
+    ThreadAllgatherReq *ta_req = (ThreadAllgatherReq*)request;
+    ta_req->t.join();
+    ta_req->status = UCC_OPERATION_INITIALIZED;
+    return UCC_OK;
+}
+
+void proc_context_create(UccProcess_h proc, int id, ThreadAllgather *ta, bool is_global)
+{
+    ucc_status_t status;
+    ucc_context_config_h ctx_config;
+    std::stringstream    err_msg;
+
+    status = ucc_context_config_read(proc->lib_h, NULL, &ctx_config);
+    if (status != UCC_OK) {
+        err_msg << "ucc_context_config_read failed";
+        goto exit_err;
+    }
+    if (is_global) {
+        proc->ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_OOB;
+        proc->ctx_params.oob.allgather = thread_allgather_start;
+        proc->ctx_params.oob.req_test = thread_allgather_req_test;
+        proc->ctx_params.oob.req_free = thread_allgather_req_free;
+        proc->ctx_params.oob.coll_info = (void*) &ta->reqs[id];
+        proc->ctx_params.oob.participants = ta->n_procs;
+    }
+    status = ucc_context_create(proc->lib_h, &proc->ctx_params, ctx_config, &proc->ctx_h);
+    ucc_context_config_release(ctx_config);
+    if (status != UCC_OK) {
+        err_msg << "ucc_context_create failed";
+        goto exit_err;
+    }
+    return;
+
+exit_err:
+    err_msg << ": "<< ucc_status_string(status) << " (" << status << ")";
+    throw std::runtime_error(err_msg.str());
+}
+
+
+void UccJob::create_context()
+{
+    std::vector<std::thread> workers;
+    for (auto i = 0; i < procs.size(); i++) {
+        workers.push_back(std::thread(proc_context_create, procs[i], i, &ta,
+                                      ctx_mode == UCC_JOB_CTX_GLOBAL));
+    }
+    for (auto i = 0; i < procs.size(); i++) {
+        workers[i].join();
+    }
+}
+
+void thread_proc_destruct(std::vector<UccProcess_h> *procs, int i)
+{
+    ucc_assert(true == (*procs)[i].unique());
+    (*procs)[i] = NULL;
 }
 
 UccJob::~UccJob()
 {
+    staticTeams.clear();
+    if (ctx_mode == UCC_JOB_CTX_GLOBAL) {
+        std::vector<std::thread> workers;
+        for (int i = 0; i < n_procs; i++){
+            workers.push_back(std::thread(thread_proc_destruct, &procs, i));
+        }
+        for (int i = 0; i < n_procs; i++){
+            workers[i].join();
+        }
+    } else {
+        procs.clear();
+    }
 }
 
 UccJob* UccJob::staticUccJob = NULL;
