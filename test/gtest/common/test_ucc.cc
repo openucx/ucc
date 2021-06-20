@@ -548,3 +548,17 @@ void UccCollArgs::set_inplace(gtest_ucc_inplace_t _inplace)
 {
     inplace = _inplace;
 }
+
+void clear_buffer(void *_buf, size_t size, ucc_memory_type_t mt, uint8_t value)
+{
+    void *buf = _buf;
+    if (mt != UCC_MEMORY_TYPE_HOST) {
+        buf = ucc_malloc(size, "buf");
+        ASSERT_NE(0, (uintptr_t)buf);
+    }
+    memset(buf, value, size);
+    if (UCC_MEMORY_TYPE_HOST != mt) {
+        UCC_CHECK(ucc_mc_memcpy(_buf, buf, size, mt, UCC_MEMORY_TYPE_HOST));
+        ucc_free(buf);
+    }
+}
