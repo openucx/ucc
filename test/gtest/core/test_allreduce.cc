@@ -38,7 +38,10 @@ class test_allreduce : public UccCollArgs, public testing::Test {
             for (int i = 0; i < count; i++) {
                 typename T::type * ptr;
                 ptr = (typename T::type *)ctxs[r]->init_buf;
-                ptr[i] = (typename T::type)(2 * i + r + 1);
+                /* need to limit the init value so that "prod" operation
+                   would not grow too large. We have teams up to 16 procs
+                   in gtest, this would result in prod ~2**48 */
+                ptr[i] = (typename T::type)((i + r + 1) % 8);
             }
 
             UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header,
@@ -80,6 +83,23 @@ class test_allreduce : public UccCollArgs, public testing::Test {
         }
         ctxs.clear();
     }
+    void reset(UccCollCtxVec ctxs)
+    {
+        for (auto r = 0; r < ctxs.size(); r++) {
+            ucc_coll_args_t *coll  = ctxs[r]->args;
+            size_t           count = coll->dst.info.count;
+            ucc_datatype_t   dtype = coll->dst.info.datatype;
+            clear_buffer(coll->dst.info.buffer, count * ucc_dt_size(dtype),
+                         mem_type, 0);
+
+            if (TEST_INPLACE == inplace) {
+                UCC_CHECK(ucc_mc_memcpy(coll->dst.info.buffer,
+                                        ctxs[r]->init_buf,
+                                        ucc_dt_size(dtype) * count, mem_type,
+                                        UCC_MEMORY_TYPE_HOST));
+            }
+        }
+    }
     bool data_validate(UccCollCtxVec ctxs)
     {
         size_t count = (ctxs[0])->args->src.info.count;
@@ -119,69 +139,91 @@ class test_allreduce : public UccCollArgs, public testing::Test {
 
 TYPED_TEST_CASE(test_allreduce, ReductionTypesOps);
 
-#define TEST_DECLARE(_mem_type, _inplace)                                      \
-{                                                                              \
-    std::array<int,3> counts {1,2,4};                                          \
-    for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {                     \
-        for (int count : counts) {                                             \
-            UccTeam_h team = UccJob::getStaticTeams()[tid];                    \
-            int       size = team->procs.size();                               \
-            UccCollCtxVec ctxs;                                                \
-            this->set_mem_type(_mem_type);                                     \
-            this->set_inplace(_inplace);                                       \
-            this->data_init(size, TypeParam::dt, count, ctxs);                 \
-            UccReq    req(team, ctxs);                                         \
-            req.start();                                                       \
-            req.wait();                                                        \
-            EXPECT_EQ(true, this->data_validate(ctxs));                        \
-            this->data_fini(ctxs);                                             \
+#define TEST_DECLARE(_mem_type, _inplace, _repeat)                             \
+    {                                                                          \
+        std::array<int, 3> counts{4, 256, 65536};                              \
+        for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {                 \
+            for (int count : counts) {                                         \
+                UccTeam_h     team = UccJob::getStaticTeams()[tid];            \
+                int           size = team->procs.size();                       \
+                UccCollCtxVec ctxs;                                            \
+                this->set_mem_type(_mem_type);                                 \
+                this->set_inplace(_inplace);                                   \
+                this->data_init(size, TypeParam::dt, count, ctxs);             \
+                UccReq req(team, ctxs);                                        \
+                for (auto i = 0; i < _repeat; i++) {                           \
+                    req.start();                                               \
+                    req.wait();                                                \
+                    EXPECT_EQ(true, this->data_validate(ctxs));                \
+                    this->reset(ctxs);                                         \
+                }                                                              \
+                this->data_fini(ctxs);                                         \
+            }                                                                  \
         }                                                                      \
-    }                                                                          \
-}
+    }
 
 TYPED_TEST(test_allreduce, single_host) {
-    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE);
+    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 1);
+}
+
+TYPED_TEST(test_allreduce, single_host_persistent)
+{
+    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 3);
 }
 
 TYPED_TEST(test_allreduce, single_host_inplace) {
-    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE);
+    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 1);
+}
+
+TYPED_TEST(test_allreduce, single_host_persistent_inplace)
+{
+    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 3);
 }
 
 #ifdef HAVE_CUDA
 TYPED_TEST(test_allreduce, single_cuda) {
-    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE);
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 1);
+}
+
+TYPED_TEST(test_allreduce, single_cuda_persistent)
+{
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 3);
 }
 
 TYPED_TEST(test_allreduce, single_cuda_inplace) {
-    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE);
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 1);
+}
+
+TYPED_TEST(test_allreduce, single_cuda_persistent_inplace)
+{
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 3);
 }
 #endif
 
-
 #define TEST_DECLARE_MULTIPLE(_mem_type, _inplace)                             \
-{                                                                              \
-    std::array<int,3> counts {1,2,4};                                          \
-    for (int count : counts) {                                                 \
-        std::vector<UccReq>        reqs;                                       \
-        std::vector<UccCollCtxVec> ctxs;                                       \
-        for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {                 \
-            UccTeam_h       team = UccJob::getStaticTeams()[tid];              \
-            int             size = team->procs.size();                         \
-            UccCollCtxVec   ctx;                                               \
-            this->set_inplace(_inplace);                                       \
-            this->set_mem_type(_mem_type);                                     \
-            this->data_init(size, TypeParam::dt, count, ctx);                  \
-            reqs.push_back(UccReq(team, ctx));                                 \
-            ctxs.push_back(ctx);                                               \
+    {                                                                          \
+        std::array<int, 3> counts{4, 256, 65536};                              \
+        for (int count : counts) {                                             \
+            std::vector<UccReq>        reqs;                                   \
+            std::vector<UccCollCtxVec> ctxs;                                   \
+            for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {             \
+                UccTeam_h     team = UccJob::getStaticTeams()[tid];            \
+                int           size = team->procs.size();                       \
+                UccCollCtxVec ctx;                                             \
+                this->set_inplace(_inplace);                                   \
+                this->set_mem_type(_mem_type);                                 \
+                this->data_init(size, TypeParam::dt, count, ctx);              \
+                reqs.push_back(UccReq(team, ctx));                             \
+                ctxs.push_back(ctx);                                           \
+            }                                                                  \
+            UccReq::startall(reqs);                                            \
+            UccReq::waitall(reqs);                                             \
+            for (auto ctx : ctxs) {                                            \
+                EXPECT_EQ(true, this->data_validate(ctx));                     \
+                this->data_fini(ctx);                                          \
+            }                                                                  \
         }                                                                      \
-        UccReq::startall(reqs);                                                \
-        UccReq::waitall(reqs);                                                 \
-        for (auto ctx : ctxs) {                                                \
-            EXPECT_EQ(true, this->data_validate(ctx));                         \
-            this->data_fini(ctx);                                              \
-        }                                                                      \
-    }                                                                          \
-}
+    }
 
 TYPED_TEST(test_allreduce, multiple) {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE);

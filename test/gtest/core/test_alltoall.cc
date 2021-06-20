@@ -62,6 +62,23 @@ public:
             }
         }
     }
+    void reset(UccCollCtxVec ctxs)
+    {
+        for (auto r = 0; r < ctxs.size(); r++) {
+            ucc_coll_args_t *coll  = ctxs[r]->args;
+            size_t           count = coll->dst.info.count;
+            ucc_datatype_t   dtype = coll->dst.info.datatype;
+            clear_buffer(coll->dst.info.buffer, count * ucc_dt_size(dtype),
+                         mem_type, 0);
+            if (TEST_INPLACE == inplace) {
+                UCC_CHECK(
+                    ucc_mc_memcpy((void *)(ptrdiff_t)coll->dst.info.buffer,
+                                  ctxs[r]->init_buf, ucc_dt_size(dtype) * count,
+                                  mem_type, UCC_MEMORY_TYPE_HOST));
+            }
+        }
+    }
+
     void data_fini(UccCollCtxVec ctxs)
     {
         for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
@@ -140,6 +157,33 @@ UCC_TEST_P(test_alltoall_0, single)
     req.start();
     req.wait();
     EXPECT_EQ(true, data_validate(ctxs));
+    data_fini(ctxs);
+}
+
+UCC_TEST_P(test_alltoall_0, single_persistent)
+{
+    const int            team_id  = std::get<0>(GetParam());
+    const ucc_datatype_t dtype    = (ucc_datatype_t)std::get<1>(GetParam());
+    ucc_memory_type_t    mem_type = std::get<2>(GetParam());
+    gtest_ucc_inplace_t  inplace  = std::get<3>(GetParam());
+    const int            count    = std::get<4>(GetParam());
+    UccTeam_h            team     = UccJob::getStaticTeams()[team_id];
+    int                  size     = team->procs.size();
+    const int            n_calls  = 3;
+    UccCollCtxVec        ctxs;
+
+    this->set_inplace(inplace);
+    this->set_mem_type(mem_type);
+
+    data_init(size, (ucc_datatype_t)dtype, count, ctxs);
+    UccReq req(team, ctxs);
+
+    for (auto i = 0; i < n_calls; i++) {
+        req.start();
+        req.wait();
+        EXPECT_EQ(true, data_validate(ctxs));
+        reset(ctxs);
+    }
     data_fini(ctxs);
 }
 
