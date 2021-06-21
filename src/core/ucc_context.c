@@ -15,26 +15,32 @@
 static uint32_t ucc_context_seq_num = 0;
 static ucc_config_field_t ucc_context_config_table[] = {
     {"ESTIMATED_NUM_EPS", "0",
-     "An optimization hint of how many endpoints will be created on this context",
-     ucc_offsetof(ucc_context_config_t, estimated_num_eps), UCC_CONFIG_TYPE_UINT},
+     "An optimization hint of how many endpoints will be created on this "
+     "context",
+     ucc_offsetof(ucc_context_config_t, estimated_num_eps),
+     UCC_CONFIG_TYPE_UINT},
 
     {"LOCK_FREE_PROGRESS_Q", "1",
      "Enable lock free progress queue optimization",
-     ucc_offsetof(ucc_context_config_t, lock_free_progress_q), UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_context_config_t, lock_free_progress_q),
+     UCC_CONFIG_TYPE_UINT},
 
     {"ESTIMATED_NUM_PPN", "0",
      "An optimization hint of how many endpoints created on this context reside"
      " on the same node",
-     ucc_offsetof(ucc_context_config_t, estimated_num_ppn), UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_context_config_t, estimated_num_ppn),
+     UCC_CONFIG_TYPE_UINT},
 
     {"TEAM_IDS_POOL_SIZE", "32",
-     "Defines the size of the team_id_pool. The number of coexisting unique team ids "
-     "for a single process is team_ids_pool_size*64. This parameter is relevant when "
-     "internal team id allocation takes place.",
-     ucc_offsetof(ucc_context_config_t, team_ids_pool_size), UCC_CONFIG_TYPE_UINT},
+     "Defines the size of the team_id_pool. The number of coexisting unique "
+     "team ids for a single process is team_ids_pool_size*64. This parameter"
+     " is relevant when internal team id allocation takes place.",
+     ucc_offsetof(ucc_context_config_t, team_ids_pool_size),
+     UCC_CONFIG_TYPE_UINT},
 
     {NULL}
 };
+
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
                           ucc_context_config_t, &ucc_config_global_list);
 

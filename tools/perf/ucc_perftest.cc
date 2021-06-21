@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
         std::cerr << e.what() << std::endl;
         std::exit(1);
     }
-    st = comm->init();
+    st = comm->init(pt_config.bench.n_threads);
     if (st != UCC_OK) {
         delete comm;
         std::exit(1);
