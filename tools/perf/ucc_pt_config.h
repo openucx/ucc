@@ -41,6 +41,7 @@ struct ucc_pt_benchmark_config {
     int                n_iter_large;
     int                n_warmup_large;
     bool               full_print;
+    int                n_threads;
 };
 
 struct ucc_pt_config {

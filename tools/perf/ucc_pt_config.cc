@@ -15,6 +15,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.n_warmup_large = 20;
     bench.large_thresh   = 64 * 1024;
     bench.full_print     = false;
+    bench.n_threads      = 1;
 }
 
 const std::map<std::string, ucc_reduction_op_t> ucc_pt_op_map = {
@@ -57,7 +58,7 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
 {
     int c;
 
-    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:ihF")) != -1) {
+    while ((c = getopt(argc, argv, "c:b:e:d:m:t:n:w:o:ihF")) != -1) {
         switch (c) {
             case 'c':
                 if (ucc_pt_coll_map.count(optarg) == 0) {
@@ -108,6 +109,13 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
             case 'F':
                 bench.full_print = true;
                 break;
+            case 't':
+                std::stringstream(optarg) >> bench.n_threads;
+                if (bench.n_threads < 1) {
+                    std::cerr << "invalid thread num" << std::endl;
+                    return UCC_ERR_INVALID_PARAM;
+                }
+                break;
             case 'h':
             default:
                 print_help();
@@ -130,6 +138,7 @@ void ucc_pt_config::print_help()
     std::cout << "  -n <number>: number of iterations"<<std::endl;
     std::cout << "  -w <number>: number of warmup iterations"<<std::endl;
     std::cout << "  -F: enable full print"<<std::endl;
+    std::cout << "  -t <number>: number of threads" << std::endl;
     std::cout << "  -h: show this help message"<<std::endl;
     std::cout << std::endl;
 }
