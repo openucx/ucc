@@ -14,13 +14,24 @@ extern "C" {
 }
 #endif
 
-#include <assert.h>
-#include <stdio.h>
+#include "mc_cuda_reduce_ops.h"
 
 #define CUDA_REDUCE_WITH_OP(NAME, OP)                                          \
 template <typename T>                                                          \
 __global__ void UCC_REDUCE_CUDA_ ## NAME (const T *s1, const T *s2, T *d,      \
                                           size_t count)                        \
+{                                                                              \
+        size_t start = blockIdx.x * blockDim.x + threadIdx.x;                  \
+        size_t step  = blockDim.x * gridDim.x;                                 \
+        for (size_t i = start; i < count; i+=step) {                           \
+            d[i] = OP(s1[i], s2[i]);                                           \
+        }                                                                      \
+}                                                                              \
+
+#define CUDA_REDUCE_WITH_OP_SPECIALIZED(NAME, OP, TYPE)                        \
+template <>                                                                    \
+__global__ void UCC_REDUCE_CUDA_ ## NAME (const TYPE *s1, const TYPE *s2,      \
+                                          TYPE *d, size_t count)               \
 {                                                                              \
         size_t start = blockIdx.x * blockDim.x + threadIdx.x;                  \
         size_t step  = blockDim.x * gridDim.x;                                 \
@@ -39,6 +50,11 @@ CUDA_REDUCE_WITH_OP(LOR,  DO_OP_LOR)
 CUDA_REDUCE_WITH_OP(BOR,  DO_OP_BOR)
 CUDA_REDUCE_WITH_OP(LXOR, DO_OP_LXOR)
 CUDA_REDUCE_WITH_OP(BXOR, DO_OP_BXOR)
+
+CUDA_REDUCE_WITH_OP_SPECIALIZED(MAX, DO_OP_MAX_HALF, __half)
+CUDA_REDUCE_WITH_OP_SPECIALIZED(MIN, DO_OP_MIN_HALF, __half)
+CUDA_REDUCE_WITH_OP_SPECIALIZED(SUM, DO_OP_SUM_HALF, __half)
+CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_HALF, __half)
 
 #define LAUNCH_KERNEL(NAME, type, src1, src2, dest, count, s, b, t)            \
     do {                                                                       \
@@ -140,6 +156,9 @@ ucc_status_t ucc_mc_cuda_reduce(const void *src1, const void *src2, void *dst,
         case UCC_DT_INT64:
             DT_REDUCE_INT(int64_t, op, src1, src2, dst, count, stream, bk, th);
             break;
+        case UCC_DT_FLOAT16:
+            ucc_assert(2 == sizeof(__half));
+            DT_REDUCE_FLOAT(__half, op, src1, src2, dst, count, stream, bk, th);
         case UCC_DT_FLOAT32:
             ucc_assert(4 == sizeof(float));
             DT_REDUCE_FLOAT(float, op, src1, src2, dst, count, stream, bk, th);
