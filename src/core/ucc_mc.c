@@ -42,6 +42,7 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
     int            i, n_mcs;
     ucc_mc_base_t *mc;
     ucc_status_t   status;
+    ucc_mc_attr_t attr;
 
     memset(mc_ops, 0, UCC_MEMORY_TYPE_LAST * sizeof(ucc_mc_ops_t *));
     memset(ee_ops, 0, UCC_EE_LAST * sizeof(ucc_ee_ops_t *));
@@ -75,6 +76,18 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
                 continue;
             }
             ucc_debug("%s initialized", mc->super.name);
+        } else {
+            attr.field_mask = UCC_MC_ATTR_FIELD_THREAD_MODE;
+            status = mc->get_attr(&attr);
+            if (status != UCC_OK) {
+                return status;
+            }
+            if (attr.thread_mode < mc_params->thread_mode) {
+                ucc_warn("memory component %s was allready initilized with "
+                         "different thread mode: current tm %d, provided tm %d",
+                         mc->super.name, attr.thread_mode,
+                         mc_params->thread_mode);
+            }
         }
         mc->ref_cnt++;
         mc_ops[mc->type] = &mc->ops;

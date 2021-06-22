@@ -235,6 +235,14 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
     return UCC_OK;
 }
 
+static ucc_status_t ucc_mc_cuda_get_attr(ucc_mc_attr_t *mc_attr)
+{
+    if (mc_attr->field_mask & UCC_MC_ATTR_FIELD_THREAD_MODE) {
+        mc_attr->thread_mode = ucc_mc_cuda.thread_mode;
+    }
+    return UCC_OK;
+}
+
 static ucc_status_t ucc_mc_cuda_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
                                           size_t                   size)
 {
@@ -633,6 +641,7 @@ ucc_mc_cuda_t ucc_mc_cuda = {
     .super.ee_type          = UCC_EE_CUDA_STREAM,
     .super.type             = UCC_MEMORY_TYPE_CUDA,
     .super.init             = ucc_mc_cuda_init,
+    .super.get_attr         = ucc_mc_cuda_get_attr,
     .super.finalize         = ucc_mc_cuda_finalize,
     .super.ops.mem_query    = ucc_mc_cuda_mem_query,
     .super.ops.mem_alloc    = ucc_mc_cuda_mem_pool_alloc_with_init,

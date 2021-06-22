@@ -36,6 +36,14 @@ static ucc_status_t ucc_mc_cpu_init(const ucc_mc_params_t *mc_params)
     return UCC_OK;
 }
 
+static ucc_status_t ucc_mc_cpu_get_attr(ucc_mc_attr_t *mc_attr)
+{
+    if (mc_attr->field_mask & UCC_MC_ATTR_FIELD_THREAD_MODE) {
+        mc_attr->thread_mode = ucc_mc_cpu.thread_mode;
+    }
+    return UCC_OK;
+}
+
 static ucc_status_t ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
                                          size_t                   size)
 {
@@ -276,6 +284,7 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.type             = UCC_MEMORY_TYPE_HOST,
     .super.ee_type          = UCC_EE_CPU_THREAD,
     .super.init             = ucc_mc_cpu_init,
+    .super.get_attr         = ucc_mc_cpu_get_attr,
     .super.finalize         = ucc_mc_cpu_finalize,
     .super.ops.mem_query    = ucc_mc_cpu_mem_query,
     .super.ops.mem_alloc    = ucc_mc_cpu_mem_pool_alloc_with_init,

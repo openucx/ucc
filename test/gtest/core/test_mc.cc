@@ -82,7 +82,8 @@ UCC_TEST_F(test_mc, can_alloc_and_free_host_mem)
     ucc_mc_finalize();
 }
 
-UCC_TEST_F(test_mc, can_alloc_and_free_host_mem_mt)
+// Disabled because can't reinit mc with different thread mode
+UCC_TEST_F(test_mc, DISABLED_can_alloc_and_free_host_mem_mt)
 {
     // mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1MB and is configurable at runtime.
     int                    num_of_threads = 10;

@@ -59,6 +59,9 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                [CUDA_MAJOR_VERSION=`nvcc  --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 1`
                 AS_IF([test $CUDA_MAJOR_VERSION -lt 8],
                       [cuda_happy=no])])
+         AS_IF([test "x$enable_debug" = xyes],
+               [NVCC_CFLAGS="$NVCC_CFLAGS -O0 -g"],
+               [NVCC_CFLAGS="$NVCC_CFLAGS -O3 -g -DNDEBUG"])
          AS_IF([test "x$cuda_happy" = "xyes"],
                [AS_IF([test $CUDA_MAJOR_VERSION -eq 8],
                       [NVCC_ARCH="${ARCH5} ${ARCH6} ${ARCH8}"])
@@ -77,6 +80,7 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                [AC_SUBST([CUDA_CPPFLAGS], ["$CUDA_CPPFLAGS"])
                 AC_SUBST([CUDA_LDFLAGS], ["$CUDA_LDFLAGS"])
                 AC_SUBST([CUDA_LIBS], ["$CUDA_LIBS"])
+                AC_SUBST([NVCC_CFLAGS], ["$NVCC_CFLAGS"])
                 AC_DEFINE([HAVE_CUDA], 1, [Enable CUDA support])],
                [AS_IF([test "x$with_cuda" != "xguess"],
                       [AC_MSG_ERROR([CUDA support is requested but cuda packages cannot be found])],

@@ -93,7 +93,8 @@ UCC_TEST_F(test_mc_cuda, can_alloc_and_free_mem)
     EXPECT_EQ(UCC_OK, ucc_mc_free(mc_header));
 }
 
-UCC_TEST_F(test_mc_cuda_mt, can_alloc_and_free_mem_mt)
+// Disabled because can't reinit mc with different thread mode
+UCC_TEST_F(test_mc_cuda_mt, DISABLED_can_alloc_and_free_mem_mt)
 {
     // mpool will be used only if size is smaller than UCC_MC_CPU_ELEM_SIZE, which by default set to 1MB and is configurable at runtime.
     int                    num_of_threads = 10;
