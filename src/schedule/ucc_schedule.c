@@ -56,6 +56,7 @@ static ucc_status_t ucc_schedule_completed_handler(ucc_coll_task_t *parent_task,
     self->n_completed_tasks += 1;
     if (self->n_completed_tasks == self->n_tasks) {
         self->super.super.status = UCC_OK;
+        ucc_task_complete(&self->super);
     }
     return UCC_OK;
 }
