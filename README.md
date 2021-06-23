@@ -58,6 +58,42 @@ $./configure --prefix=<ucc-install-path> --with-docs-only
 $make docs
 ```
 
+### Open MPI and UCC collectives
+
+#### Compile UCX 
+```sh
+$ git clone https://github.com/openucx/ucx
+$ cd ucx
+$ ./autogen.sh; ./configure --prefix=<ucx-install-path>; make -j install
+```
+#### Compile UCC
+
+```sh
+$ git clone https://github.com/openucx/ucc
+$ cd ucc
+$ ./autogen.sh; ./configure --prefix=<ucc-install-path> --with-ucx=<ucx-install-path>; make -j install
+```
+
+#### Compile Open MPI 
+
+```sh
+$ git clone https://github.com/open-mpi/ompi
+$ cd ompi
+$ ./autogen.pl; ./configure --prefix=<ompi-install-path> --with-ucx=<ucx-install-path> --with-ucc=<ucx-install-path>; make -j install
+```
+
+### Run MPI programs
+
+```sh
+mpirun -np 2 --mca coll_ucc_enable 1 --mca coll_ucc_priority 100 ./my_mpi_app
+```
+
+### Run OpenSHMEM programs
+
+```sh
+mpirun -np 2 --mca scoll_ucc_enable 1 --mca scoll_ucc_priority 100 ./my_openshmem_app
+```
+
 ### Supported Transports
 * UCX/UCP
   - InfiniBand, ROCE, Cray Gemini and Aries, Shared Memory
