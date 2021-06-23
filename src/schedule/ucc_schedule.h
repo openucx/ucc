@@ -60,11 +60,15 @@ typedef struct ucc_coll_task {
 } ucc_coll_task_t;
 
 typedef struct ucc_context ucc_context_t;
+
+#define UCC_SCHEDULE_MAX_TASKS 8
+
 typedef struct ucc_schedule {
-    ucc_coll_task_t super;
-    int             n_completed_tasks;
-    int             n_tasks;
-    ucc_context_t  *ctx;
+    ucc_coll_task_t  super;
+    int              n_completed_tasks;
+    int              n_tasks;
+    ucc_context_t   *ctx;
+    ucc_coll_task_t *tasks[UCC_SCHEDULE_MAX_TASKS];
 } ucc_schedule_t;
 
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em);
@@ -78,6 +82,7 @@ void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule);
 ucc_status_t ucc_task_start_handler(ucc_coll_task_t *parent,
                                     ucc_coll_task_t *task);
+ucc_status_t ucc_schedule_finalize(ucc_coll_task_t *task);
 
 static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 {

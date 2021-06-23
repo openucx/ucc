@@ -68,7 +68,6 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx)
     status = ucc_coll_task_init(&schedule->super);
     schedule->super.handlers[UCC_EVENT_COMPLETED] =
         ucc_schedule_completed_handler;
-    schedule->n_completed_tasks = 0;
     schedule->ctx               = ctx;
     schedule->n_tasks           = 0;
     return status;
@@ -78,12 +77,13 @@ void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
 {
     ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED,
                                 &schedule->super);
-    task->schedule = schedule;
-    schedule->n_tasks++;
+    task->schedule                       = schedule;
+    schedule->tasks[schedule->n_tasks++] = task;
 }
 
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule)
 {
+    schedule->n_completed_tasks  = 0;
     schedule->super.super.status = UCC_INPROGRESS;
     return ucc_event_manager_notify(&schedule->super,
                                     UCC_EVENT_SCHEDULE_STARTED);
@@ -93,4 +93,22 @@ ucc_status_t ucc_task_start_handler(ucc_coll_task_t *parent, /* NOLINT */
                                     ucc_coll_task_t *task)
 {
     return task->post(task);
+}
+
+ucc_status_t ucc_schedule_finalize(ucc_coll_task_t *task)
+{
+    ucc_schedule_t *schedule       = ucc_derived_of(task, ucc_schedule_t);
+    ucc_status_t    status_overall = UCC_OK;
+    ucc_status_t    status;
+    int             i;
+
+    for (i = 0; i < schedule->n_tasks; i++) {
+        if (schedule->tasks[i]->finalize) {
+            status = schedule->tasks[i]->finalize(schedule->tasks[i]);
+            if (UCC_OK != status) {
+                status_overall = status;
+            }
+        }
+    }
+    return status_overall;
 }

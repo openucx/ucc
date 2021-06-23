@@ -71,7 +71,8 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_ring_start", 0);
-    task->super.super.status     = UCC_INPROGRESS;
+    ucc_tl_ucp_task_reset(task);
+
     if (!UCC_IS_INPLACE(task->args)) {
         status = ucc_mc_memcpy((void*)((ptrdiff_t)rbuf + data_size * team->rank),
                                sbuf, data_size, rmem, smem);

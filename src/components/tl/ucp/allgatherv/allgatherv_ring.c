@@ -70,7 +70,8 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     size_t             data_size, data_displ, rdt_size;
     ucc_status_t       status;
 
-    task->super.super.status     = UCC_INPROGRESS;
+    ucc_tl_ucp_task_reset(task);
+
     if (!UCC_IS_INPLACE(task->args)) {
         /* TODO replace local sendrecv with memcpy? */
         rdt_size   = ucc_dt_size(task->args.dst.info_v.datatype);
