@@ -43,18 +43,14 @@ UCC is BSD-style licensed, as found in the [LICENSE](LICENSE) file.
 ### Developer's Build 
 ```sh
 $./autogen.sh
-
 $./configure --prefix=<ucc-install-path> --with-ucx=<ucx-install-path>
-
 $make 
 ```
 
 ### Build Documentation 
 ```sh
 $./autogen.sh
-
 $./configure --prefix=<ucc-install-path> --with-docs-only
-
 $make docs
 ```
 
@@ -79,7 +75,7 @@ $ ./autogen.sh; ./configure --prefix=<ucc-install-path> --with-ucx=<ucx-install-
 ```sh
 $ git clone https://github.com/open-mpi/ompi
 $ cd ompi
-$ ./autogen.pl; ./configure --prefix=<ompi-install-path> --with-ucx=<ucx-install-path> --with-ucc=<ucx-install-path>; make -j install
+$ ./autogen.pl; ./configure --prefix=<ompi-install-path> --with-ucx=<ucx-install-path> --with-ucc=<ucc-install-path>; make -j install
 ```
 
 ### Run MPI programs
