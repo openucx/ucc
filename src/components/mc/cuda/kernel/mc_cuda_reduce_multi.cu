@@ -162,11 +162,13 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
                                       size_t stride, ucc_datatype_t dt,
                                       ucc_reduction_op_t op)
 {
-    cudaStream_t  stream = ucc_mc_cuda.stream;
     size_t        ld     = stride / ucc_dt_size(dt);
     int           th     = MC_CUDA_CONFIG->reduce_num_threads;;
     unsigned long bk     = (count + th - 1)/th;;
+    cudaStream_t  stream;
 
+    UCC_MC_CUDA_INIT_STREAM();
+    stream = ucc_mc_cuda.stream;
     if (MC_CUDA_CONFIG->reduce_num_blocks != UCC_ULUNITS_AUTO) {
         bk = ucc_min(bk, MC_CUDA_CONFIG->reduce_num_blocks);
     }
