@@ -42,16 +42,16 @@ UCC is BSD-style licensed, as found in the [LICENSE](LICENSE) file.
 
 ### Developer's Build 
 ```sh
-$./autogen.sh
-$./configure --prefix=<ucc-install-path> --with-ucx=<ucx-install-path>
-$make 
+$ ./autogen.sh
+$ ./configure --prefix=<ucc-install-path> --with-ucx=<ucx-install-path>
+$ make
 ```
 
 ### Build Documentation 
 ```sh
-$./autogen.sh
-$./configure --prefix=<ucc-install-path> --with-docs-only
-$make docs
+$ ./autogen.sh
+$ ./configure --prefix=<ucc-install-path> --with-docs-only
+$ make docs
 ```
 
 ### Open MPI and UCC collectives
@@ -78,16 +78,16 @@ $ cd ompi
 $ ./autogen.pl; ./configure --prefix=<ompi-install-path> --with-ucx=<ucx-install-path> --with-ucc=<ucc-install-path>; make -j install
 ```
 
-### Run MPI programs
+#### Run MPI programs
 
 ```sh
-mpirun -np 2 --mca coll_ucc_enable 1 --mca coll_ucc_priority 100 ./my_mpi_app
+$ mpirun -np 2 --mca coll_ucc_enable 1 --mca coll_ucc_priority 100 ./my_mpi_app
 ```
 
-### Run OpenSHMEM programs
+#### Run OpenSHMEM programs
 
 ```sh
-mpirun -np 2 --mca scoll_ucc_enable 1 --mca scoll_ucc_priority 100 ./my_openshmem_app
+$ mpirun -np 2 --mca scoll_ucc_enable 1 --mca scoll_ucc_priority 100 ./my_openshmem_app
 ```
 
 ### Supported Transports
