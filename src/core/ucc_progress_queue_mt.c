@@ -71,7 +71,7 @@ static int ucc_pq_mt_progress(ucc_progress_queue_t *pq)
         if (task->progress) {
             status = task->progress(task);
             if (ucc_unlikely(status < 0)) {
-                return status;
+                return ucc_task_error(task);
             }
         }
         if (UCC_INPROGRESS == task->super.status) {
