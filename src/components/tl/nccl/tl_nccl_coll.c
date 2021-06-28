@@ -79,10 +79,8 @@ ucc_status_t ucc_tl_nccl_collective_sync(ucc_tl_nccl_task_t *task,
             return UCC_ERR_NO_MESSAGE;
         }
     }
+
     status = task->super.progress(&task->super);
-    if (ucc_unlikely(status < 0)) {
-        return ucc_task_error(&task->super);
-    }
     if (status == UCC_INPROGRESS) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(task->team)->pq, &task->super);
         return UCC_OK;
