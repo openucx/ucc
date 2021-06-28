@@ -6,7 +6,6 @@
 
 #include "tl_ucp.h"
 #include "tl_ucp_ep.h"
-#include "tl_ucp_addr.h"
 #include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
 #include "utils/ucc_malloc.h"
@@ -15,13 +14,11 @@
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
-    ucc_status_t          status = UCC_OK;
     ucc_tl_ucp_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_ucp_context_t);
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params->team);
     /* TODO: init based on ctx settings and on params: need to check
              if all the necessary ranks mappings are provided */
-    self->addr_storage       = NULL;
     self->preconnect_task    = NULL;
     self->size               = params->params.oob.participants;
     self->scope              = params->scope;
@@ -30,22 +27,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->id                 = params->id;
     self->seq_num            = 0;
     self->status             = UCC_INPROGRESS;
-    status                   = ucc_tl_ucp_addr_exchange_start(ctx,
-                                                   params->params.oob,
-                                                  &self->addr_storage);
-    if (status == UCC_INPROGRESS) {
-        /* exchange started but not complete return UCC_OK from post */
-        status = UCC_OK;
-    }
     tl_info(tl_context->lib, "posted tl team: %p", self);
-    return status;
+    return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_team_t)
 {
-    if (self->addr_storage) {
-        ucc_tl_ucp_addr_storage_free(self->addr_storage);
-    }
     tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
 }
 
@@ -101,15 +88,6 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     ucc_status_t          status;
     if (team->status == UCC_OK) {
         return UCC_OK;
-    }
-    if (team->addr_storage &&
-        (team->addr_storage->state != UCC_TL_UCP_ADDR_EXCHANGE_COMPLETE)) {
-        status = ucc_tl_ucp_addr_exchange_test(team->addr_storage);
-        if (UCC_INPROGRESS == status) {
-            return UCC_INPROGRESS;
-        } else if (UCC_OK != status) {
-            return status;
-        }
     }
     if (team->size <= ctx->cfg.preconnect) {
         status = ucc_tl_ucp_team_preconnect(team);

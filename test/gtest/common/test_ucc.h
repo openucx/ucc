@@ -14,6 +14,8 @@ extern "C" {
 #include <vector>
 #include <tuple>
 #include <memory>
+#include <mutex>
+#include <thread>
 
 typedef struct {
     ucc_mc_buffer_header_t *dst_mc_header;
@@ -69,10 +71,44 @@ public:
     void set_inplace(gtest_ucc_inplace_t _inplace);
 };
 
+class ThreadAllgather;
+class ThreadAllgatherReq {
+public:
+    ThreadAllgather *ta;
+    int              rank;
+    ucc_status_t     status;
+    std::thread t;
+    ThreadAllgatherReq(ThreadAllgather *_ta, int _rank) :
+        ta(_ta), rank(_rank)
+        {
+            status = UCC_OPERATION_INITIALIZED;
+        };
+};
+
+class ThreadAllgather {
+public:
+    int        n_procs;
+    int        ready_count;
+    void      *buffer;
+    std::mutex lock;
+    std::vector<ThreadAllgatherReq> reqs;
+    ThreadAllgather(int _n_procs) : n_procs(_n_procs), ready_count(0), buffer(NULL) {
+        for (auto i = 0; i < _n_procs; i++) {
+            reqs.push_back(ThreadAllgatherReq(this, i));
+        }
+    };
+    ~ThreadAllgather() {
+        buffer = NULL;
+        ready_count = 0;
+    }
+};
+
+
 /* A single processes in a Job that runs UCC.
    It has context and lib object */
 class UccProcess {
 public:
+    ucc_context_params_t ctx_params;
     static constexpr ucc_lib_params_t default_lib_params = {
         .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE |
                 UCC_LIB_PARAM_FIELD_COLL_TYPES,
@@ -146,7 +182,12 @@ typedef std::vector<ucc_env_var_t> ucc_job_env_t;
 class UccJob {
     static UccJob* staticUccJob;
     static std::vector<UccTeam_h> staticTeams;
+    ThreadAllgather ta;
 public:
+    typedef enum {
+        UCC_JOB_CTX_LOCAL,
+        UCC_JOB_CTX_GLOBAL /*< ucc ctx create with OOB */
+    } ucc_job_ctx_mode_t;
     static const int nStaticTeams     = 3;
     static const int staticUccJobSize = 16;
     static constexpr int staticTeamSizes[nStaticTeams] = {2, 11, 16};
@@ -154,12 +195,13 @@ public:
     static UccJob* getStaticJob();
     static const std::vector<UccTeam_h> &getStaticTeams();
     int n_procs;
-    UccJob(int _n_procs = 2);
-    UccJob(int _n_procs, ucc_job_env_t vars);
+    UccJob(int _n_procs = 2, ucc_job_ctx_mode_t _ctx_mode = UCC_JOB_CTX_GLOBAL,
+           ucc_job_env_t vars = ucc_job_env_t());
     ~UccJob();
     std::vector<UccProcess_h> procs;
     UccTeam_h create_team(int n_procs);
-
+    void create_context();
+    ucc_job_ctx_mode_t ctx_mode;
 };
 
 class UccReq {
@@ -185,4 +227,3 @@ public:
 };
 
 #endif
-

@@ -1,6 +1,5 @@
 #include "tl_ucp.h"
 #include "tl_ucp_ep.h"
-#include "tl_ucp_addr.h"
 
 //NOLINTNEXTLINE
 static void ucc_tl_ucp_err_handler(void *arg, ucp_ep_h ep, ucs_status_t status)
@@ -10,11 +9,9 @@ static void ucc_tl_ucp_err_handler(void *arg, ucp_ep_h ep, ucs_status_t status)
 }
 
 static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
-                                                 ucp_ep_h *ep, char *addr_array,
-                                                 size_t max_addrlen, ucc_rank_t rank)
+                                                 ucp_ep_h             *ep,
+                                                 void *ucp_address)
 {
-    ucc_tl_ucp_addr_t  *address = (ucc_tl_ucp_addr_t *)(addr_array +
-                                                        max_addrlen * rank);
     ucp_ep_params_t ep_params;
     ucs_status_t    status;
     if (*ep) {
@@ -22,7 +19,7 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
         return UCC_OK;
     }
     ep_params.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
-    ep_params.address    = (ucp_address_t*)address->addr;
+    ep_params.address    = (ucp_address_t *)ucp_address;
 
     if (!UCC_TL_CTX_HAS_OOB(ctx)) {
         ep_params.err_mode        = UCP_ERR_HANDLING_MODE_PEER;
@@ -41,16 +38,19 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team, ucc_rank_t team_rank,
-                                        ucc_context_id_t key, ucp_ep_h *ep)
+ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t         *team,
+                                        ucc_rank_t                 team_rank,
+                                        ucc_context_addr_header_t *h,
+                                        ucp_ep_h                  *ep)
 {
     ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
     ucc_status_t          status;
-    status = ucc_tl_ucp_connect_ep(ctx, ep,
-                                   (char*)team->addr_storage->addresses,
-                                   team->addr_storage->max_addrlen, team_rank);
+    status = ucc_tl_ucp_connect_ep(
+        ctx, ep,
+        ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), team->super.super.team,
+                             team_rank, ucc_tl_ucp.super.super.id));
     if (UCC_OK == status) {
-        tl_ucp_hash_put(ctx->ep_hash, key, *ep);
+        tl_ucp_hash_put(ctx->ep_hash, h->ctx_id, *ep);
     }
     return status;
 }

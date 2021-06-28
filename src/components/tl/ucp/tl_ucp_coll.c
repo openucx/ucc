@@ -185,7 +185,7 @@ ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, //NOLINT
         ucc_tl_ucp_put_task(ev_task);
         return UCC_OK;
     }
-    ucc_progress_enqueue(UCC_TL_UCP_TEAM_CORE_CTX(ev_task->team)->pq, &ev_task->super);
+    ucc_progress_enqueue(UCC_TL_CORE_CTX(ev_task->team)->pq, &ev_task->super);
 
     return UCC_OK;
 }

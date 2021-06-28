@@ -177,10 +177,12 @@ ucc_status_t ucc_tl_team_destroy_multiple(ucc_team_multiple_req_t *req)
     return UCC_OK;
 }
 
-UCC_CLASS_INIT_FUNC(ucc_tl_team_t, ucc_tl_context_t *tl_context)
+UCC_CLASS_INIT_FUNC(ucc_tl_team_t, ucc_tl_context_t *tl_context,
+                    ucc_team_t *team)
 {
     UCC_CLASS_CALL_BASE_INIT();
     self->super.context = &tl_context->super;
+    self->super.team    = team;
     return UCC_OK;
 }
 

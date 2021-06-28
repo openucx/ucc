@@ -3,6 +3,7 @@
  * See file LICENSE for terms.
  */
 #include "test_context.h"
+#include "../common/test_ucc.h"
 #include <vector>
 #include <algorithm>
 #include <random>
@@ -73,4 +74,19 @@ UCC_TEST_F(test_context_get_attr, addr)
     attr.mask = UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
     EXPECT_EQ(UCC_OK, ucc_context_get_attr(ctx_h, &attr));
     EXPECT_EQ(true, ((attr.ctx_addr_len == 0) || (NULL != attr.ctx_addr)));
+}
+
+
+UCC_TEST_F(test_context, global)
+{
+    /* Create and cleanup several Jobs (ucc contextss) with OOB */
+    UccJob job3(3, UccJob::UCC_JOB_CTX_GLOBAL);
+    job3.cleanup();
+
+    UccJob job11(11, UccJob::UCC_JOB_CTX_GLOBAL);
+    job11.cleanup();
+
+    UccJob job16(16, UccJob::UCC_JOB_CTX_GLOBAL);
+    job16.cleanup();
+
 }
