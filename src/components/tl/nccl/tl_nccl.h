@@ -69,10 +69,15 @@ typedef struct ucc_tl_nccl_task {
     ucc_coll_task_t     super;
     ucc_status_t        host_status;
     ucc_status_t       *dev_status;
-    ucc_tl_nccl_team_t *team;
-    ucc_coll_args_t     args;
     cudaEvent_t         completed;
 } ucc_tl_nccl_task_t;
+
+#define TASK_TEAM(_task)                                                       \
+    (ucc_derived_of((_task)->super.team, ucc_tl_nccl_team_t))
+#define TASK_CTX(_task)                                                        \
+    (ucc_derived_of((_task)->super.team->context, ucc_tl_nccl_context_t))
+#define TASK_LIB(_task)                                                        \
+    (ucc_derived_of((_task)->super.team->context->lib, ucc_tl_nccl_lib_t))
 
 #define UCC_TL_NCCL_SUPPORTED_COLLS                         \
     (UCC_COLL_TYPE_ALLTOALL  | UCC_COLL_TYPE_ALLTOALLV  |   \
