@@ -29,6 +29,7 @@ static ucc_test_mpi_root_t root_type = ROOT_RANDOM;
 static int root_value = 10;
 static ucc_thread_mode_t                   thread_mode  = UCC_THREAD_SINGLE;
 static int                                 iterations   = 1;
+static int                                 show_help    = 0;
 #ifdef HAVE_CUDA
 static test_set_cuda_device_t test_cuda_set_device = TEST_SET_DEV_NONE;
 #endif
@@ -66,7 +67,6 @@ void PrintHelp()
        "--set_device <value>:           0 - don't set, 1 - cuda_device = local_rank, 2 - cuda_device = local_rank % cuda_device_count"
        "\n"
        "--help:              Show help\n";
-    exit(1);
 }
 
 
@@ -131,6 +131,7 @@ static ucc_memory_type_t mtype_str_to_type(std::string mtype)
     } else {
         std::cerr << "incorrect memory type: " << mtype << std::endl;
         PrintHelp();
+        abort();
     }
     return mem_type;
 }
@@ -273,6 +274,7 @@ static void process_root(const char *arg)
 err:
     std::cerr << "incorrect root setting" << arg << std::endl;
     PrintHelp();
+    abort();
 }
 
 int init_rand_seed(int user_seed)
@@ -388,10 +390,12 @@ int ProcessArgs(int argc, char** argv)
             test_cuda_set_device = (test_set_cuda_device_t)std::stoi(optarg);
             break;
 #endif
-        case 'h': // -h or --help
+        case 'h':
+            show_help = 1;
+            break;
         case '?': // Unrecognized option
         default:
-            return 1;
+            return -1;
         }
     }
     return 0;
@@ -402,6 +406,7 @@ int main(int argc, char *argv[])
     std::chrono::steady_clock::time_point begin =
         std::chrono::steady_clock::now();
     int rank;
+    int ret;
     int failed = 0;
     int size, provided;
     int required = (thread_mode == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
@@ -415,16 +420,18 @@ int main(int argc, char *argv[])
     }
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (size < 2) {
-        std::cerr << "test requires at least 2 ranks\n";
-        MPI_Abort(MPI_COMM_WORLD, -1);
-    }
 
-    if (ProcessArgs(argc, argv)) {
-        if (0 == rank) {
+    ret = ProcessArgs(argc, argv);
+    if (ret || show_help) {
+        if (rank == 0) {
             PrintHelp();
         }
-        failed = -1;
+        failed = ret;
+        goto mpi_exit;
+    }
+
+    if (size < 2) {
+        std::cerr << "test requires at least 2 ranks\n";
         goto mpi_exit;
     }
 
