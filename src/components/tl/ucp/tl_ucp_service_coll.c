@@ -35,16 +35,14 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
             .mem_type = UCC_MEMORY_TYPE_HOST
         }
     };
-    status = ucc_coll_task_init(&task->super);
+    status = ucc_coll_task_init(&task->super, &args, team);
     if (status != UCC_OK) {
         goto free_task;
     }
     task->subset = subset;
-    task->team = tl_team;
     task->tag  = UCC_TL_UCP_SERVICE_TAG;
     task->n_polls = 10; // TODO need a var ?
     task->super.progress = ucc_tl_ucp_allreduce_knomial_progress;
-    memcpy(&task->args, &args, sizeof(ucc_coll_args_t));
     *task_p = &task->super;
     status = ucc_tl_ucp_allreduce_knomial_init_common(task);
     if (status != UCC_OK) {
