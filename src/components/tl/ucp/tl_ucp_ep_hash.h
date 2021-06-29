@@ -23,16 +23,16 @@ static inline uint32_t tl_ucp_ctx_id_hash_fn_impl(uint32_t h, uint32_t k)
 static inline khint32_t tl_ucp_ctx_id_hash_fn(ucc_context_id_t k)
 {
     uint32_t h = 0;
-    h = tl_ucp_ctx_id_hash_fn_impl(h, k.host_id);
-    h = tl_ucp_ctx_id_hash_fn_impl(h, k.pid);
+
+    h = tl_ucp_ctx_id_hash_fn_impl(h, k.pi.host_hash);
+    h = tl_ucp_ctx_id_hash_fn_impl(h, k.pi.pid);
     h = tl_ucp_ctx_id_hash_fn_impl(h, k.seq_num);
     return (khint32_t)h;
 }
 
-#define tl_ucp_ctx_id_equal_fn(_a, _b) (((_a).host_id == (_b).host_id) && \
-                                        ((_a).pid == (_b).pid) &&       \
-                                        ((_a).seq_num == (_b).seq_num))
-
+#define tl_ucp_ctx_id_equal_fn(_a, _b)                                         \
+    (((_a).pi.host_hash == (_b).pi.host_hash) &&                               \
+     ((_a).pi.pid == (_b).pi.pid) && ((_a).seq_num == (_b).seq_num))
 
 KHASH_INIT(tl_ucp_ep_hash, ucc_context_id_t, void*, 1, \
            tl_ucp_ctx_id_hash_fn, tl_ucp_ctx_id_equal_fn);

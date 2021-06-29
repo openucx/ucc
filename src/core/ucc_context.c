@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -328,21 +328,114 @@ err:
     return status;
 }
 
+ucc_status_t ucc_core_addr_exchange(ucc_context_t          *context,
+                                    ucc_context_oob_coll_t *c_oob,
+                                    ucc_team_oob_coll_t    *t_oob,
+                                    ucc_addr_storage_t     *addr_storage)
+{
+    ucc_team_oob_coll_t *oob;
+    ucc_context_attr_t   attr;
+    ucc_status_t         status;
+    int                  i;
+    size_t *             addr_lens;
+    size_t               max_addrlen;
+    ucc_assert(c_oob || t_oob);
+    oob = c_oob ? (ucc_team_oob_coll_t *)c_oob : t_oob;
+poll:
+    if (addr_storage->oob_req) {
+        status = oob->req_test(addr_storage->oob_req);
+        if (status < 0) {
+            oob->req_free(addr_storage->oob_req);
+            ucc_error("oob req test failed during team addr exchange");
+            return status;
+        } else if (UCC_INPROGRESS == status) {
+            return status;
+        }
+        oob->req_free(addr_storage->oob_req);
+        addr_storage->oob_req = NULL;
+    }
+    if (0 == addr_storage->addr_len) {
+        if (NULL == addr_storage->storage) {
+            addr_storage->size = oob->participants;
+            attr.mask          = UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
+                        UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
+            status = ucc_context_get_attr(context, &attr);
+            if (UCC_OK != status) {
+                ucc_error("failed to query ctx address");
+                return status;
+            }
+            addr_storage->storage = ucc_malloc(
+                addr_storage->size * sizeof(size_t), "max_addrlen_tmp");
+            if (!addr_storage->storage) {
+                ucc_error(
+                    "failed to allocate %zd bytes for max_addrlen tmp storage",
+                    addr_storage->size * sizeof(size_t));
+                return UCC_ERR_NO_MEMORY;
+            }
+
+            status = oob->allgather(&context->attr.ctx_addr_len,
+                                    addr_storage->storage, sizeof(size_t),
+                                    oob->coll_info, &addr_storage->oob_req);
+            if (UCC_OK != status) {
+                ucc_error("failed to start oob allgather");
+                return status;
+            }
+            goto poll;
+        }
+        addr_lens = (size_t *)addr_storage->storage;
+        ucc_assert(addr_storage->storage);
+        for (i = 0; i < addr_storage->size; i++) {
+            if (addr_lens[i] > addr_storage->addr_len) {
+                addr_storage->addr_len = addr_lens[i];
+            }
+        }
+        if (addr_storage->addr_len == 0 ) {
+            ucc_free(addr_storage->storage);
+            addr_storage->storage = NULL;
+            return UCC_OK;
+        }
+        max_addrlen = addr_storage->addr_len;
+        addr_storage->storage =
+            ucc_realloc(addr_storage->storage,
+                        (addr_storage->size + 1) * max_addrlen, "addr_storage");
+        if (!addr_storage->storage) {
+            ucc_error("failed to allocate %zd bytes for addr storage",
+                      addr_storage->size * max_addrlen);
+            return UCC_ERR_NO_MEMORY;
+        }
+        memcpy(
+            PTR_OFFSET(addr_storage->storage, max_addrlen * addr_storage->size),
+            context->attr.ctx_addr, context->attr.ctx_addr_len);
+        status = oob->allgather(
+            PTR_OFFSET(addr_storage->storage, max_addrlen * addr_storage->size),
+            addr_storage->storage, max_addrlen, oob->coll_info,
+            &addr_storage->oob_req);
+        if (UCC_OK != status) {
+            ucc_error("failed to start oob allgather");
+            return status;
+        }
+        goto poll;
+    }
+    ucc_assert(addr_storage->addr_len);
+    return UCC_OK;
+}
+
 ucc_status_t ucc_context_create(ucc_lib_h lib,
                                 const ucc_context_params_t *params,
                                 const ucc_context_config_h  config,
                                 ucc_context_h *context)
 {
-    ucc_base_context_params_t b_params;
-    ucc_base_context_t       *b_ctx;
-    ucc_cl_lib_t             *cl_lib;
-    ucc_context_t            *ctx;
-    ucc_status_t              status;
-    uint64_t                  i;
-    int                       num_cls;
+    ucc_base_context_params_t  b_params;
+    ucc_base_context_t        *b_ctx;
+    ucc_context_addr_header_t *h;
+    ucc_cl_lib_t              *cl_lib;
+    ucc_context_t             *ctx;
+    ucc_status_t               status;
+    uint64_t                   i;
+    int                        num_cls;
 
     num_cls = config->n_cl_cfg;
-    ctx     = ucc_malloc(sizeof(ucc_context_t), "ucc_context");
+    ctx     = ucc_calloc(1, sizeof(ucc_context_t), "ucc_context");
     if (!ctx) {
         ucc_error("failed to allocate %zd bytes for ucc_context",
                   sizeof(ucc_context_t));
@@ -350,10 +443,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         goto error;
     }
     ctx->lib           = lib;
-    ctx->service_ctx   = NULL;
     ctx->ids.pool_size = config->team_ids_pool_size;
-    ctx->ids.pool      = NULL;
-    memset(&ctx->attr, 0, sizeof(ctx->attr));
     ucc_list_head_init(&ctx->progress_list);
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
@@ -415,9 +505,28 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         ucc_error("failed to init progress queue for context %p", ctx);
         goto error_ctx_create;
     }
-    ctx->id.host_id = ucc_local_proc.host_id;
-    ctx->id.pid     = getpid();
-    ctx->id.seq_num = ucc_context_seq_num++;
+    ctx->id.pi      = ucc_local_proc;
+    ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
+    if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+        do {
+            /* UCC context create is blocking fn, so we can wait here for the
+               completion of addr exchange */
+            status = ucc_core_addr_exchange(ctx, &ctx->params.oob, NULL,
+                                            &ctx->addr_storage);
+            if (status < 0) {
+                ucc_error("failed to exchange addresses during context creation");
+                goto error_ctx_create;
+            }
+        } while (status == UCC_INPROGRESS);
+
+        for (i = 0; i < ctx->addr_storage.size; i++) {
+            h = UCC_ADDR_STORAGE_RANK_HEADER(&ctx->addr_storage, i);
+            if (UCC_CTX_ID_EQUAL(ctx->id, h->ctx_id)) {
+                ctx->rank = (ucc_rank_t)i;
+                break;
+            }
+        }
+    }
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;
     return UCC_OK;
@@ -469,6 +578,7 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
         tl_lib->iface->context.destroy(&tl_ctx->super);
     }
     ucc_progress_queue_finalize(context->pq);
+    ucc_free(context->addr_storage.storage);
     ucc_free(context->all_tls.names);
     ucc_free(context->tl_ctx);
     ucc_free(context->ids.pool);
@@ -634,6 +744,7 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
                           context->attr.ctx_addr_len);
                 return UCC_ERR_NO_MEMORY;
             }
+            h->ctx_id       = context->id;
             h->n_components = context->n_addr_packed;
             status          = ucc_context_pack_addr(context, NULL, NULL, h);
             if (UCC_OK != status) {

@@ -15,7 +15,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_team_t, ucc_base_context_t *cl_context,
     int                     i;
     ucc_status_t            status;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params->team);
     self->tl_teams = ucc_malloc(sizeof(ucc_tl_team_t *) * ctx->n_tl_ctxs,
                                 "cl_basic_tl_teams");
     if (!self->tl_teams) {

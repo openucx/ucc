@@ -104,4 +104,16 @@ static inline ucc_rank_t ucc_ep_map_eval(ucc_ep_map_t map, ucc_rank_t rank)
     return r;
 }
 
+/* Builds ucc_ep_map_t from the array of ucc_rank_t. The routine tries
+   to search for a strided pattern to optimize storage and map lookup.
+   @param [in] array       pointer to the array to build the map from
+   @param [in] size        size of the array
+   @param [in] full_size   if size == full_size and stride=1 is detected
+                           the map can be optimized to be FULL
+   @param [in] need_free   if set to 1 the input @array is freed and set
+                           to NULL in the case of strided pattern.
+                           User must check and free the array otherwise. */
+ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
+                                   ucc_rank_t full_size, int need_free);
+
 #endif

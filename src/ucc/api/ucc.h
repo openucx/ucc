@@ -415,7 +415,7 @@ typedef struct ucc_lib_attr {
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 
 ucc_status_t ucc_lib_config_read(const char *env_prefix, const char *filename,
@@ -488,7 +488,7 @@ void ucc_lib_config_print(const ucc_lib_config_h config, FILE *stream,
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 
 ucc_status_t ucc_lib_config_modify(ucc_lib_config_h config, const char *name,
@@ -514,7 +514,6 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
  *
  *  @brief The @ref ucc_init initializes the UCC library.
  *
- *
  *  @param [in]  params    user provided parameters to customize the library functionality
  *  @param [in]  config    UCC configuration descriptor allocated through
  *                         @ref ucc_lib_config_read "ucc_config_read()" routine.
@@ -531,12 +530,13 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
  *  threads, types of collective operations, and reductions supported.
  *  On success, the library object will be created and ucc_status_t will return
  *  UCC_OK. On error, the library object will not be created and corresponding
- *  error code as defined by ucc_status_t is returned.
+ *  error code as defined by @ref ucc_status_t is returned.
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
+
 static inline ucc_status_t ucc_init(const ucc_lib_params_t *params,
                                     const ucc_lib_config_h config,
                                     ucc_lib_h *lib_p)
@@ -564,7 +564,7 @@ static inline ucc_status_t ucc_init(const ucc_lib_params_t *params,
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 
 ucc_status_t ucc_finalize(ucc_lib_h lib_p);
@@ -588,7 +588,7 @@ ucc_status_t ucc_finalize(ucc_lib_h lib_p);
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 
 ucc_status_t ucc_lib_get_attr(ucc_lib_h lib_p, ucc_lib_attr_t *lib_attr);
@@ -728,7 +728,7 @@ typedef struct ucc_context_attr {
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 
 ucc_status_t ucc_context_config_read(ucc_lib_h lib_handle,
@@ -801,7 +801,7 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 
 ucc_status_t ucc_context_config_modify(ucc_context_config_h config,
@@ -814,8 +814,8 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_h config,
  *  @brief The @ref ucc_context_create routine creates the context handle.
  *
  *  @param [in]   lib_handle  Library handle
- *  @param [out]  params      Customizations for the communication context
- *  @param [out]  config      Configuration for the communication context to read
+ *  @param [in]   params      Customizations for the communication context
+ *  @param [in]   config      Configuration for the communication context to read
  *                            from environment
  *  @param [out]  context     Pointer to the newly created communication context
  *
@@ -823,17 +823,17 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_h config,
  *
  *  @b Description
  *
- *  The ucc_context_create creates the context and ucc_context_destroy
+ *  The @ref ucc_context_create creates the context and @ref ucc_context_destroy
  *  releases the resources and destroys the context state. The creation of
  *  context does not necessarily indicate its readiness to be used for
  *  collective or other group operations. On success, the context handle will be
  *  created and ucc_status_t will return UCC_OK. On error, the library object
- *  will not be created and corresponding error code as defined by ucc_status_t
- *  is returned.
+ *  will not be created and corresponding error code as defined by
+ *  @ref ucc_status_t is returned.
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 
 
@@ -849,16 +849,17 @@ ucc_status_t ucc_context_create(ucc_lib_h lib_handle,
  *  on the context handle.
  *
  *  @param [in]  context  Communication context handle to be progressed
+ *
  *  @parblock
  *
  *  @b Description
  *
- *  @ref ucc_context_progress routine progresses the operations on the
+ *  The @ref ucc_context_progress routine progresses the operations on the
  *  content handle. It does not block for lack of resources or communication.
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 
 ucc_status_t ucc_context_progress(ucc_context_h context);
@@ -881,7 +882,7 @@ ucc_status_t ucc_context_progress(ucc_context_h context);
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 
 ucc_status_t ucc_context_destroy(ucc_context_h context);
@@ -903,7 +904,7 @@ ucc_status_t ucc_context_destroy(ucc_context_h context);
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 
 ucc_status_t ucc_context_get_attr(ucc_context_h context,
@@ -1028,7 +1029,7 @@ typedef enum {
  */
 struct ucc_ep_map_strided {
     uint64_t    start;
-    uint64_t    stride;
+    int64_t     stride;
 };
 
 /**
@@ -1165,12 +1166,12 @@ typedef struct ucc_team_attr {
  *  new team handle. However, the team handle is not ready for posting
  *  the collective operation. ucc_team_create_test operation is used to learn
  *  the status of the new team handle. On error, the team handle will not
- *  be created and corresponding error code as defined by ucc_status_t is
+ *  be created and corresponding error code as defined by @ref ucc_status_t is
  *  returned.
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_team_create_post(ucc_context_h *contexts,
                                   uint32_t num_contexts,
@@ -1195,7 +1196,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts,
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_team_create_test(ucc_team_h team);
 
@@ -1223,7 +1224,7 @@ ucc_status_t ucc_team_create_test(ucc_team_h team);
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  *
  */
 ucc_status_t ucc_team_destroy(ucc_team_h team);
@@ -1246,7 +1247,7 @@ ucc_status_t ucc_team_destroy(ucc_team_h team);
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_team_get_attr(ucc_team_h team,
                                ucc_team_attr_t *team_attr);
@@ -1277,7 +1278,7 @@ ucc_status_t ucc_team_get_attr(ucc_team_h team,
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_team_create_from_parent(uint64_t my_ep, uint32_t included,
                                          ucc_team_h parent_team,
@@ -1300,7 +1301,7 @@ ucc_status_t ucc_team_create_from_parent(uint64_t my_ep, uint32_t included,
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_team_get_size(ucc_team_h team, uint32_t *size);
 
@@ -1322,7 +1323,7 @@ ucc_status_t ucc_team_get_size(ucc_team_h team, uint32_t *size);
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_team_get_my_ep(ucc_team_h team, uint64_t *ep);
 
@@ -1344,7 +1345,7 @@ ucc_status_t ucc_team_get_my_ep(ucc_team_h team, uint64_t *ep);
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_team_get_all_eps(ucc_team_h team, uint64_t **ep,
                                   uint64_t *num_eps);
@@ -1500,7 +1501,7 @@ typedef struct ucc_coll_args {
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
                                  ucc_coll_req_h *request, ucc_team_h team);
@@ -1522,7 +1523,7 @@ ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_collective_post(ucc_coll_req_h request);
 
@@ -1550,7 +1551,7 @@ ucc_status_t ucc_collective_post(ucc_coll_req_h request);
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_collective_init_and_post(ucc_coll_args_t *coll_args,
                                           ucc_coll_req_h *request,
@@ -1572,7 +1573,7 @@ ucc_status_t ucc_collective_init_and_post(ucc_coll_args_t *coll_args,
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 static inline ucc_status_t ucc_collective_test(ucc_coll_req_h request)
 {
@@ -1595,7 +1596,7 @@ static inline ucc_status_t ucc_collective_test(ucc_coll_req_h request)
  *
  *  @endparblock
  *
- *  @return Error code as defined by ucc_status_t
+ *  @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_collective_finalize(ucc_coll_req_h request);
 
@@ -1668,7 +1669,7 @@ typedef struct ucc_ee_params {
  *
  * @endparblock
  *
- * @return Error code as defined by ucc_status_t
+ * @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params_t *params,
                            ucc_ee_h *ee);
@@ -1693,7 +1694,7 @@ ucc_status_t ucc_ee_create(ucc_team_h team, const ucc_ee_params_t *params,
  *
  * @endparblock
  *
- * @return Error code as defined by ucc_status_t
+ * @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_ee_destroy(ucc_ee_h ee);
 
@@ -1718,7 +1719,7 @@ ucc_status_t ucc_ee_destroy(ucc_ee_h ee);
  *
  * @endparblock
  *
- * @return Error code as defined by ucc_status_t
+ * @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t **ev);
 
@@ -1741,7 +1742,7 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t **ev);
  *
  * @endparblock
  *
- * @return Error code as defined by ucc_status_t
+ * @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t *ev);
 
@@ -1764,7 +1765,7 @@ ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @endparblock
  *
- * @return Error code as defined by ucc_status_t
+ * @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t *ev);
 
@@ -1785,7 +1786,7 @@ ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @endparblock
  *
- * @return Error code as defined by ucc_status_t
+ * @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
 
@@ -1808,7 +1809,7 @@ ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @endparblock
  *
- * @return Error code as defined by ucc_status_t
+ * @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ee_event);
 

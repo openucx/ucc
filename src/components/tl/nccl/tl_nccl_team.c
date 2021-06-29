@@ -17,7 +17,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
         ucc_derived_of(tl_context, ucc_tl_nccl_context_t);
     ucc_status_t status;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params->team);
     self->oob       = params->params.oob;
     self->size      = self->oob.participants;
     self->rank      = params->rank;

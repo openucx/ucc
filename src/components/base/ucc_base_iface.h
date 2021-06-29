@@ -74,6 +74,7 @@ typedef struct ucc_base_context_iface {
                              ucc_base_ctx_attr_t      *attr);
 } ucc_base_context_iface_t;
 
+typedef struct ucc_team ucc_team_t;
 typedef struct ucc_base_team_params {
     ucc_team_params_t params;
     int               scope; /* Scope that allocates the team. When TL team is created
@@ -86,11 +87,14 @@ typedef struct ucc_base_team_params {
     ucc_rank_t        rank; /* Rank of a calling process in the TL/CL team. It is a uniq
                                process identifier within a team (not job) but it has the
                                property: it is always contig and in the range [0, team_size).*/
-    uint16_t          id;  /* core level team id */
+    uint16_t          id;   /* core level team id */
+    ucc_team_t *      team; /* core team pointer */
 } ucc_base_team_params_t;
 
 typedef struct ucc_base_team {
     ucc_base_context_t *context;
+    ucc_team_t *        team; /* core team pointer is stored on a CL/TL team
+                                 (which inherit from base) during class init. */
 } ucc_base_team_t;
 
 typedef struct ucc_coll_score ucc_coll_score_t;

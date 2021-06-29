@@ -3,6 +3,8 @@
 # Copyright (C) Huawei Technologies Co., Ltd. 2020.  All rights reserved.
 # $HEADER$
 #
+
+if !DOCS_ONLY
 SUBDIRS =      \
 	src        \
 	tools/info
@@ -18,6 +20,7 @@ SUBDIRS += test/gtest
 gtest:
 	@make -C test/gtest test
 endif
+endif #!DOCS_ONLY
 
 include $(srcdir)/docs/doxygen/doxygen.am
 
