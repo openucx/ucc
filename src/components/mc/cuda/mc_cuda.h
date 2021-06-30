@@ -67,7 +67,7 @@ typedef struct ucc_mc_cuda {
     ucc_mpool_t                    strm_reqs;
     ucc_mpool_t                    mpool;
     int                            mpool_init_flag;
-    ucc_spinlock_t                 mpool_init_spinlock;
+    ucc_spinlock_t                 init_spinlock;
     ucc_thread_mode_t              thread_mode;
     ucc_mc_cuda_strm_task_mode_t   strm_task_mode;
     ucc_mc_cuda_task_stream_type_t task_strm_type;
@@ -135,5 +135,22 @@ extern ucc_mc_cuda_t ucc_mc_cuda;
 
 #define MC_CUDA_CONFIG                                                         \
     (ucc_derived_of(ucc_mc_cuda.super.config, ucc_mc_cuda_config_t))
+
+#define UCC_MC_CUDA_INIT_STREAM() do {                                         \
+    if (ucc_mc_cuda.stream == NULL) {                                          \
+        cudaError_t cuda_st;                                                   \
+        ucc_spin_lock(&ucc_mc_cuda.init_spinlock);                             \
+        if (ucc_mc_cuda.stream == NULL) {                                      \
+            cuda_st = cudaStreamCreateWithFlags(&ucc_mc_cuda.stream,           \
+                                                cudaStreamNonBlocking);        \
+        }                                                                      \
+        ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);                           \
+        if(cuda_st != cudaSuccess) {                                           \
+            mc_error(&ucc_mc_cuda.super, "cuda failed with ret:%d(%s)",        \
+                     cuda_st, cudaGetErrorString(cuda_st));                    \
+            return UCC_ERR_NO_MESSAGE;                                         \
+        }                                                                      \
+    }                                                                          \
+} while(0)
 
 #endif

@@ -62,12 +62,22 @@ ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
     return UCC_OK;
 }
 
+static ucc_status_t
+ucc_schedule_error_handler(ucc_coll_task_t *parent_task, //NOLINT
+                           ucc_coll_task_t *task)
+{
+    task->super.status = parent_task->super.status;
+    return ucc_event_manager_notify(task, UCC_EVENT_ERROR);
+}
+
 ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx)
 {
     ucc_status_t status;
     status = ucc_coll_task_init(&schedule->super);
     schedule->super.handlers[UCC_EVENT_COMPLETED] =
         ucc_schedule_completed_handler;
+    schedule->super.handlers[UCC_EVENT_ERROR] =
+        ucc_schedule_error_handler;
     schedule->n_completed_tasks = 0;
     schedule->ctx               = ctx;
     schedule->n_tasks           = 0;
@@ -77,6 +87,8 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx)
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
 {
     ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED,
+                                &schedule->super);
+    ucc_event_manager_subscribe(&task->em, UCC_EVENT_ERROR,
                                 &schedule->super);
     task->schedule = schedule;
     schedule->n_tasks++;

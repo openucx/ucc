@@ -149,8 +149,11 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
     ucc_status_t status;
     int device, num_devices, mem_ops_attr;
     CUdevice cu_dev;
+    CUresult cu_st;
     cudaError_t cuda_st;
+    const char *cu_err_st_str;
 
+    ucc_mc_cuda.stream = NULL;
     ucc_strncpy_safe(ucc_mc_cuda.super.config->log_component.name,
                      ucc_mc_cuda.super.super.name,
                      sizeof(ucc_mc_cuda.super.config->log_component.name));
@@ -170,9 +173,6 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
             cfg->reduce_num_blocks = prop.maxGridSize[0];
         }
     }
-
-    CUDACHECK(cudaStreamCreateWithFlags(&ucc_mc_cuda.stream,
-              cudaStreamNonBlocking));
 
     /*create event pool */
     status = ucc_mpool_init(&ucc_mc_cuda.events, 0, sizeof(ucc_mc_cuda_event_t),
@@ -201,10 +201,17 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
         ucc_mc_cuda.strm_task_mode = UCC_MC_CUDA_TASK_MEM_OPS;
         ucc_mc_cuda.post_strm_task = ucc_mc_cuda_post_driver_stream_task;
 
-        CUDADRV_FUNC(cuCtxGetDevice(&cu_dev));
-        CUDADRV_FUNC(cuDeviceGetAttribute(&mem_ops_attr,
-                    CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS,
-                    cu_dev));
+        cu_st = cuCtxGetDevice(&cu_dev);
+        if (cu_st != CUDA_SUCCESS){
+            cuGetErrorString(cu_st, &cu_err_st_str);
+            mc_debug(&ucc_mc_cuda.super, "cuCtxGetDevice() failed: %s",
+                     cu_err_st_str);
+            mem_ops_attr = 0;
+        } else {
+            CUDADRV_FUNC(cuDeviceGetAttribute(&mem_ops_attr,
+                        CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS,
+                        cu_dev));
+        }
 
         if (cfg->strm_task_mode == UCC_MC_CUDA_TASK_AUTO) {
             if (mem_ops_attr == 0) {
@@ -223,7 +230,7 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
     ucc_mc_cuda.task_strm_type = cfg->task_strm_type;
     // lock assures single mpool initiation when multiple threads concurrently execute
     // different collective operations thus concurrently entering init function.
-    ucc_spinlock_init(&ucc_mc_cuda.mpool_init_spinlock, 0);
+    ucc_spinlock_init(&ucc_mc_cuda.init_spinlock, 0);
 
     return UCC_OK;
 }
@@ -361,12 +368,12 @@ ucc_mc_cuda_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
 {
     // lock assures single mpool initiation when multiple threads concurrently execute
     // different collective operations thus concurrently entering init function.
-    ucc_spin_lock(&ucc_mc_cuda.mpool_init_spinlock);
+    ucc_spin_lock(&ucc_mc_cuda.init_spinlock);
 
     if (MC_CUDA_CONFIG->mpool_max_elems == 0) {
         ucc_mc_cuda.super.ops.mem_alloc = ucc_mc_cuda_mem_alloc;
         ucc_mc_cuda.super.ops.mem_free  = ucc_mc_cuda_mem_free;
-        ucc_spin_unlock(&ucc_mc_cuda.mpool_init_spinlock);
+        ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);
         return ucc_mc_cuda_mem_alloc(h_ptr, size);
     }
 
@@ -376,13 +383,13 @@ ucc_mc_cuda_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
             UCC_CACHE_LINE_SIZE, 1, MC_CUDA_CONFIG->mpool_max_elems,
             &ucc_mc_ops, ucc_mc_cuda.thread_mode, "mc cuda mpool buffers");
         if (status != UCC_OK) {
-            ucc_spin_unlock(&ucc_mc_cuda.mpool_init_spinlock);
+            ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);
             return status;
         }
         ucc_mc_cuda.super.ops.mem_alloc = ucc_mc_cuda_mem_pool_alloc;
         ucc_mc_cuda.mpool_init_flag     = 1;
     }
-    ucc_spin_unlock(&ucc_mc_cuda.mpool_init_spinlock);
+    ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);
     return ucc_mc_cuda_mem_pool_alloc(h_ptr, size);
 }
 
@@ -394,6 +401,7 @@ static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
     ucc_assert(dst_mem == UCC_MEMORY_TYPE_CUDA ||
                src_mem == UCC_MEMORY_TYPE_CUDA);
 
+    UCC_MC_CUDA_INIT_STREAM();
     st = cudaMemcpyAsync(dst, src, len, cudaMemcpyDefault, ucc_mc_cuda.stream);
     if (ucc_unlikely(st != cudaSuccess)) {
         cudaGetLastError();
@@ -493,6 +501,7 @@ ucc_status_t ucc_ee_cuda_task_post(void *ee_stream, void **ee_req)
     ucc_status_t status;
     ucc_mc_cuda_config_t *cfg = MC_CUDA_CONFIG;
 
+    UCC_MC_CUDA_INIT_STREAM();
     req = ucc_mpool_get(&ucc_mc_cuda.strm_reqs);
     ucc_assert(req);
     req->status = UCC_MC_CUDA_TASK_POSTED;
@@ -605,13 +614,16 @@ ucc_status_t ucc_ee_cuda_event_test(void *event)
 
 static ucc_status_t ucc_mc_cuda_finalize()
 {
-    CUDACHECK(cudaStreamDestroy(ucc_mc_cuda.stream));
+    if (ucc_mc_cuda.stream != NULL) {
+        CUDACHECK(cudaStreamDestroy(ucc_mc_cuda.stream));
+        ucc_mc_cuda.stream = NULL;
+    }
     if (ucc_mc_cuda.mpool_init_flag) {
         ucc_mpool_cleanup(&ucc_mc_cuda.mpool, 1);
         ucc_mc_cuda.mpool_init_flag     = 0;
         ucc_mc_cuda.super.ops.mem_alloc = ucc_mc_cuda_mem_pool_alloc_with_init;
     }
-    ucc_spinlock_destroy(&ucc_mc_cuda.mpool_init_spinlock);
+    ucc_spinlock_destroy(&ucc_mc_cuda.init_spinlock);
     return UCC_OK;
 }
 

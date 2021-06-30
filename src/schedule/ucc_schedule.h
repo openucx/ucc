@@ -15,6 +15,7 @@
 typedef enum {
     UCC_EVENT_COMPLETED = 0,
     UCC_EVENT_SCHEDULE_STARTED,
+    UCC_EVENT_ERROR,
     UCC_EVENT_LAST
 } ucc_event_t;
 
@@ -78,6 +79,15 @@ void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule);
 ucc_status_t ucc_task_start_handler(ucc_coll_task_t *parent,
                                     ucc_coll_task_t *task);
+
+static inline ucc_status_t ucc_task_error(ucc_coll_task_t *task)
+{
+    ucc_status_t status = task->super.status;
+
+    ucc_assert(status < 0);
+    ucc_error("failure in task %p, %s", task, ucc_status_string(status));
+    return ucc_event_manager_notify(task, UCC_EVENT_ERROR);
+}
 
 static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 {
