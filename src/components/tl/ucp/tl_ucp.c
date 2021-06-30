@@ -52,6 +52,12 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"ALLREDUCE_SRA_KN_OFFLOAD", "0",
+     "SRA offload, 0 - off, 1 - offload from cuda to host or vise versa,"
+     "depending on the program's memory type at run time",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_offload),
+     UCC_CONFIG_TYPE_UINT},
+
     {"REDUCE_SCATTER_KN_RADIX", "4",
      "Radix of the knomial reduce-scatter algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatter_kn_radix),

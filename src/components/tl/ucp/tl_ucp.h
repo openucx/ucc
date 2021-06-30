@@ -41,6 +41,7 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t            barrier_kn_radix;
     uint32_t            allreduce_kn_radix;
     uint32_t            allreduce_sra_kn_radix;
+    uint32_t            allreduce_sra_kn_offload;
     uint32_t            reduce_scatter_kn_radix;
     uint32_t            allgather_kn_radix;
     uint32_t            bcast_kn_radix;
