@@ -138,7 +138,7 @@ extern ucc_mc_cuda_t ucc_mc_cuda;
 
 #define UCC_MC_CUDA_INIT_STREAM() do {                                         \
     if (ucc_mc_cuda.stream == NULL) {                                          \
-        cudaError_t cuda_st;                                                   \
+        cudaError_t cuda_st = cudaSuccess;                                     \
         ucc_spin_lock(&ucc_mc_cuda.init_spinlock);                             \
         if (ucc_mc_cuda.stream == NULL) {                                      \
             cuda_st = cudaStreamCreateWithFlags(&ucc_mc_cuda.stream,           \
