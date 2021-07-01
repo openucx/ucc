@@ -61,8 +61,16 @@ TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
 ucc_status_t TestAlltoall::check()
 {
-    size_t count = args.src.info.count;
-    MPI_Alltoall(inplace ? MPI_IN_PLACE : check_sbuf, count, ucc_dt_to_mpi(TEST_DT),
-                 check_rbuf, count, ucc_dt_to_mpi(TEST_DT), team.comm);
+    size_t      count = args.src.info.count;
+    MPI_Request req;
+    int         completed;
+
+    MPI_Ialltoall(inplace ? MPI_IN_PLACE : check_sbuf, count, ucc_dt_to_mpi(TEST_DT),
+                  check_rbuf, count, ucc_dt_to_mpi(TEST_DT), team.comm, &req);
+    do {
+        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
+        ucc_context_progress(team.ctx);
+    } while(!completed);
+
     return compare_buffers(rbuf, check_rbuf, count, TEST_DT, mem_type);
 }
