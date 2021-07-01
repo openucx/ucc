@@ -9,18 +9,6 @@
 #include "ucc/api/ucc.h"
 #include "components/mc/base/ucc_mc_base.h"
 
-typedef struct ucc_mem_attr ucc_mem_attr_t;
-
-typedef struct ucc_mc_buffer_header {
-    ucc_memory_type_t mt;
-    int               from_pool;
-    void             *addr;
-} ucc_mc_buffer_header_t;
-
-typedef struct ucc_mc_params {
-    ucc_thread_mode_t thread_mode;
-} ucc_mc_params_t;
-
 ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params);
 
 ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);

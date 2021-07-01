@@ -30,7 +30,7 @@ __global__ void UCC_REDUCE_CUDA_ ## NAME (const T *s1, const T *s2, T *d,      \
                 d[i] = OP(d[i], s2[i + j * ld]);                               \
             }                                                                  \
         }                                                                      \
-}                                                                              \
+}
 
 #define CUDA_REDUCE_WITH_OP_SPECIALIZED(NAME, OP, TYPE)                        \
 template <>                                                                    \
@@ -46,7 +46,7 @@ __global__ void UCC_REDUCE_CUDA_ ## NAME (const TYPE *s1, const TYPE *s2,      \
                 d[i] = OP(d[i], s2[i + j * ld]);                               \
             }                                                                  \
         }                                                                      \
-}                                                                              \
+}
 
 CUDA_REDUCE_WITH_OP(MAX,  DO_OP_MAX)
 CUDA_REDUCE_WITH_OP(MIN,  DO_OP_MIN)
@@ -73,7 +73,7 @@ CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_HALF, __half)
 #define DT_REDUCE_INT(type, op, src1_p, src2_p, dest_p, size, count, ld, s,    \
                       b, t) do {                                               \
         const type *sbuf1 = (type *)src1_p;                                    \
-        const type *sbuf2= (type *)src2_p;                                     \
+        const type *sbuf2 = (type *)src2_p;                                    \
         type *dest = (type *)dest_p;                                           \
         switch(op) {                                                           \
         case UCC_OP_MAX:                                                       \
