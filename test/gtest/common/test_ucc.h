@@ -226,4 +226,6 @@ public:
     static void startall(std::vector<UccReq> &reqs);
 };
 
+void clear_buffer(void *_buf, size_t size, ucc_memory_type_t mt, uint8_t value);
+
 #endif

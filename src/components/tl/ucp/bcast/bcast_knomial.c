@@ -82,11 +82,13 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_start(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_bcast_kn_start", 0);
+    ucc_tl_ucp_task_reset(task);
+
     task->bcast_kn.radix =
         ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.bcast_kn_radix, team->size);
     CALC_DIST(team->size, task->bcast_kn.radix, task->bcast_kn.dist);
-    task->super.super.status = UCC_INPROGRESS;
-    status                   = ucc_tl_ucp_bcast_knomial_progress(&task->super);
+
+    status = ucc_tl_ucp_bcast_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
         return UCC_OK;

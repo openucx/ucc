@@ -48,6 +48,7 @@ typedef struct ucc_tl_ucp_task {
         struct {
             int                     phase;
             ucc_knomial_pattern_t   p;
+            void                   *sbuf;
         } allgather_kn;
         struct {
             ucc_rank_t              dist;
@@ -55,6 +56,15 @@ typedef struct ucc_tl_ucp_task {
         } bcast_kn;
     };
 } ucc_tl_ucp_task_t;
+
+static inline void ucc_tl_ucp_task_reset(ucc_tl_ucp_task_t *task)
+{
+    task->send_posted        = 0;
+    task->send_completed     = 0;
+    task->recv_posted        = 0;
+    task->recv_completed     = 0;
+    task->super.super.status = UCC_INPROGRESS;
+}
 
 static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
 {
@@ -64,16 +74,12 @@ static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
     UCC_TL_UCP_PROFILE_REQUEST_NEW(task, "tl_ucp_task", 0);
     task->super.super.status = UCC_OPERATION_INITIALIZED;
     task->super.flags        = 0;
-    task->send_posted        = 0;
-    task->send_completed     = 0;
-    task->recv_posted        = 0;
-    task->recv_completed     = 0;
     task->n_polls            = ctx->cfg.n_polls;
     task->team               = team;
     task->subset.map.type    = UCC_EP_MAP_FULL;
     task->subset.map.ep_num  = team->size;
     task->subset.myrank      = team->rank;
-
+    ucc_tl_ucp_task_reset(task);
     return task;
 }
 
