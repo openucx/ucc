@@ -62,10 +62,16 @@ ucc_status_t TestAllgather::check()
 {
     size_t       count = args.dst.info.count;
     MPI_Datatype dt    = ucc_dt_to_mpi(TEST_DT);
-    int          size;
+    int          size, completed;
+    MPI_Request  req;
 
     MPI_Comm_size(team.comm, &size);
-    MPI_Allgather(inplace ? MPI_IN_PLACE : check_sbuf, count, dt,
-                  check_rbuf, count, dt, team.comm);
+    MPI_Iallgather(inplace ? MPI_IN_PLACE : check_sbuf, count, dt,
+                   check_rbuf, count, dt, team.comm, &req);
+    do {
+        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
+        ucc_context_progress(team.ctx);
+    } while(!completed);
+
     return compare_buffers(rbuf, check_rbuf, count*size, TEST_DT, mem_type);
 }

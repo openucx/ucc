@@ -158,8 +158,16 @@ TestAlltoallv::~TestAlltoallv()
 
 ucc_status_t TestAlltoallv::check()
 {
-    MPI_Alltoallv(check_sbuf, scounts, sdispls, ucc_dt_to_mpi(TEST_DT), check_rbuf,
-                  rcounts, rdispls, ucc_dt_to_mpi(TEST_DT), team.comm);
+    MPI_Request req;
+    int         completed;
+
+    MPI_Ialltoallv(check_sbuf, scounts, sdispls, ucc_dt_to_mpi(TEST_DT), check_rbuf,
+                   rcounts, rdispls, ucc_dt_to_mpi(TEST_DT), team.comm, &req);
+    do {
+        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
+        ucc_context_progress(team.ctx);
+    } while(!completed);
+
     return compare_buffers(rbuf, check_rbuf, rncounts, TEST_DT, mem_type);
 }
 

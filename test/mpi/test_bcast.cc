@@ -52,9 +52,16 @@ ucc_status_t TestBcast::check()
 {
     size_t       count = args.src.info.count;
     MPI_Datatype dt    = ucc_dt_to_mpi(TEST_DT);
-    int          rank;
+    int          rank, completed;
+    MPI_Request  req;
+
     MPI_Comm_rank(team.comm, &rank);
-    MPI_Bcast((rank == root) ? check_sbuf : check_rbuf, count, dt, root, team.comm);
+    MPI_Ibcast((rank == root) ? check_sbuf : check_rbuf, count, dt, root, team.comm, &req);
+    do {
+        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
+        ucc_context_progress(team.ctx);
+    } while(!completed);
+
     return (rank == root) ? UCC_OK :
         compare_buffers(sbuf, check_rbuf, count, TEST_DT, mem_type);
 }

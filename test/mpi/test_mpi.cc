@@ -135,8 +135,15 @@ ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm)
     team_params.ep_range           = UCC_COLLECTIVE_EP_RANGE_CONTIG;
 
     UCC_CHECK(ucc_team_create_post(&ctx, 1, &team_params, &team));
+    MPI_Request req;
+    int tmp;
+    int completed;
+    MPI_Irecv(&tmp, 1, MPI_INT, rank, 123, comm, &req);
     while (UCC_INPROGRESS == (status = ucc_team_create_test(team))) {
+        ucc_context_progress(ctx);
+        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
     };
+    MPI_Send(&tmp, 1, MPI_INT, rank, 123, comm);
     if (status < 0) {
         std::cerr << "*** UCC TEST FAIL: ucc_team_create_test failed\n";
         MPI_Abort(MPI_COMM_WORLD, -1);

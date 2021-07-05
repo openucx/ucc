@@ -61,9 +61,17 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
 ucc_status_t TestAllreduce::check()
 {
-    size_t count = args.src.info.count;
-    MPI_Allreduce(inplace ? MPI_IN_PLACE : check_sbuf, check_rbuf, count,
-                  ucc_dt_to_mpi(dt), ucc_op_to_mpi(op), team.comm);
+    size_t      count = args.src.info.count;
+    MPI_Request req;
+    int         completed;
+
+    MPI_Iallreduce(inplace ? MPI_IN_PLACE : check_sbuf, check_rbuf, count,
+                   ucc_dt_to_mpi(dt), ucc_op_to_mpi(op), team.comm, &req);
+    do {
+        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
+        ucc_context_progress(team.ctx);
+    } while(!completed);
+
     return compare_buffers(rbuf, check_rbuf, count, dt, mem_type);
 }
 
