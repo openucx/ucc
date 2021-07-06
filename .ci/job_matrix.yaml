@@ -32,27 +32,29 @@ runs_on_dockers:
     cloud: 'swx-k8s',
     nodeLabel: 'dockerserver && swx-clx01',
   }
-  - {
-    file: '.ci/Dockerfile.fedora33',
-    name: 'fedora33',
-    tag: 'latest',
-    arch: 'x86_64',
-    uri: 'x86_64/fedora33',
-    build_args: '--rm --no-cache',
-    cloud: 'swx-k8s',
-  }
+#  - {
+#    file: '.ci/Dockerfile.fedora33',
+#    name: 'fedora33',
+#    tag: 'latest',
+#    arch: 'x86_64',
+#    uri: 'x86_64/fedora33',
+#    build_args: '--rm --no-cache',
+#    cloud: 'swx-k8s',
+#  }
 
 # bare metal
 runs_on_agents:
   - nodeLabel: 'swx-clx01'
 
+timeout_minutes: 180
+
 steps:
   #============================================================================
-  - name: Check Code Format
-    containerSelector: "{name:'fedora33'}"
-    run: |
-      echo "INFO: check code format"
-      ${SRC_DIR}/ucc/.ci/scripts/check_code_format.sh
+#  - name: Check Code Format
+#    containerSelector: "{name:'fedora33'}"
+#    run: |
+#      echo "INFO: check code format"
+#      ${SRC_DIR}/ucc/.ci/scripts/check_code_format.sh
   #============================================================================
   - name: Run UCC tests
     containerSelector: "{name:'centos8'}"
@@ -61,38 +63,39 @@ steps:
       hostname
       cat /proc/1/cgroup
       pip3 list | grep torch
+      sleep 20000
       ${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh
-  #============================================================================
-  - name: Run Torch-UCC tests (UCC)
-    containerSelector: "{name:'centos8'}"
-    run: |
-      echo "INFO: Run Torch-UCC tests (UCC)"
-      hostname
-      cat /proc/1/cgroup
-      pip3 list | grep torch
-      ${SRC_DIR}/ucc/.ci/scripts/run_tests_torch_ucc.sh
-  #============================================================================
-  - name: Run docker containers
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    run: |
-      echo "INFO: Run docker containers"
-      ${WORKSPACE}/.ci/scripts/run_docker.sh
-  #============================================================================
-  - name: Run UCC MPI tests
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    run: |
-      echo "INFO: Run UCC MPI tests"
-      ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
-  #============================================================================
-  - name: Run DLRM tests (UCC/GPU)
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    run: |
-      echo "INFO: Run DLRM tests (UCC/GPU)"
-      ${WORKSPACE}/.ci/scripts/run_dlrm_docker.sh
-  #============================================================================
-  - name: Stop docker containers
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    run: |
-      echo "INFO: Stop docker containers"
-      ${WORKSPACE}/.ci/scripts/stop_docker.sh
-  #============================================================================
+#  #============================================================================
+#  - name: Run Torch-UCC tests (UCC)
+#    containerSelector: "{name:'centos8'}"
+#    run: |
+#      echo "INFO: Run Torch-UCC tests (UCC)"
+#      hostname
+#      cat /proc/1/cgroup
+#      pip3 list | grep torch
+#      ${SRC_DIR}/ucc/.ci/scripts/run_tests_torch_ucc.sh
+#  #============================================================================
+#  - name: Run docker containers
+#    agentSelector: "{nodeLabel: 'swx-clx01'}"
+#    run: |
+#      echo "INFO: Run docker containers"
+#      ${WORKSPACE}/.ci/scripts/run_docker.sh
+#  #============================================================================
+#  - name: Run UCC MPI tests
+#    agentSelector: "{nodeLabel: 'swx-clx01'}"
+#    run: |
+#      echo "INFO: Run UCC MPI tests"
+#      ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
+#  #============================================================================
+#  - name: Run DLRM tests (UCC/GPU)
+#    agentSelector: "{nodeLabel: 'swx-clx01'}"
+#    run: |
+#      echo "INFO: Run DLRM tests (UCC/GPU)"
+#      ${WORKSPACE}/.ci/scripts/run_dlrm_docker.sh
+#  #============================================================================
+#  - name: Stop docker containers
+#    agentSelector: "{nodeLabel: 'swx-clx01'}"
+#    run: |
+#      echo "INFO: Stop docker containers"
+#      ${WORKSPACE}/.ci/scripts/stop_docker.sh
+#  #============================================================================
