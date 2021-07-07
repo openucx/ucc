@@ -43,6 +43,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
     nreqs    = (posts > gsize || posts == 0) ? gsize : posts;
     rdt_size = ucc_dt_size(task->args.src.info_v.datatype);
     sdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+
     while ((task->send_posted < gsize || task->recv_posted < gsize) &&
            (polls++ < task->n_polls)) {
         ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker);
@@ -85,6 +86,12 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team = task->team;
+    ucc_rank_t        grank = team->rank;
+    ptrdiff_t         sbuf  = (ptrdiff_t)task->args.src.info_v.buffer;
+    ptrdiff_t         rbuf  = (ptrdiff_t)task->args.dst.info_v.buffer;
+    ucc_memory_type_t smem  = task->args.src.info_v.mem_type;
+    ucc_memory_type_t rmem  = task->args.dst.info_v.mem_type;
+    size_t            rdt_size, sdt_size, data_size, data_displ;
 
     task->super.super.status = UCC_INPROGRESS;
     task->n_polls            = ucc_min(1, task->n_polls);
@@ -107,10 +114,35 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_start(ucc_coll_task_t *coll_task)
         }
     }
 
+    /* blocking self send/recv */
+    if ((UCC_TL_UCP_TEAM_CTX(team)->cfg.blocking_a2a_self_copy)) {
+        rdt_size   = ucc_dt_size(task->args.src.info_v.datatype);
+        data_size  = ucc_coll_args_get_count(&task->args,
+                        task->args.dst.info_v.counts, grank) * rdt_size;
+        data_displ = ucc_coll_args_get_displacement(&task->args,
+                         task->args.dst.info_v.displacements, grank) * rdt_size;
+        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)(rbuf + data_displ),
+                                         data_size, rmem, grank, team, task),
+                                         task, error);
+
+        sdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+        data_size  = ucc_coll_args_get_count(&task->args,
+                        task->args.src.info_v.counts, grank) * sdt_size;
+        data_displ = ucc_coll_args_get_displacement(&task->args,
+                        task->args.src.info_v.displacements, grank) * sdt_size;
+
+        UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(sbuf + data_displ),
+                                         data_size, smem, grank, team, task),
+                                         task, error);
+        while (UCC_OK == ucc_tl_ucp_test(task));
+    }
+
     ucc_tl_ucp_alltoallv_pairwise_progress(&task->super);
     if (UCC_INPROGRESS == task->super.super.status) {
         ucc_progress_enqueue(UCC_TL_UCP_TEAM_CORE_CTX(team)->pq, &task->super);
         return UCC_OK;
     }
     return ucc_task_complete(coll_task);
+error:
+    return task->super.super.status;
 }
