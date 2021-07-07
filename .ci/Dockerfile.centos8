@@ -6,8 +6,8 @@ ENV SRC_DIR=${NVIDIA_ROOT_DIR}/src
 ENV PKG_DIR=${NVIDIA_ROOT_DIR}/pkg
 ENV BIN_DIR=${NVIDIA_ROOT_DIR}/bin
 ENV WORKLOADS_DIR=${NVIDIA_ROOT_DIR}/workloads
-ENV TORCH_UCC_GITHUB_URL=https://github.com/openucx/torch-ucc.git
-ENV TORCH_UCC_BRANCH=master
+ENV TORCH_UCC_GITHUB_URL=https://github.com/facebookresearch/torch_ucc.git
+ENV TORCH_UCC_BRANCH=main
 ENV CUDA_HOME=/usr/local/cuda
 ENV UCX_GITHUB_URL=https://github.com/openucx/ucx.git
 ENV UCX_BRANCH=master
@@ -19,7 +19,6 @@ RUN yum groupinstall -y \
     'Development Tools' \
     'Infiniband Support'
 RUN yum config-manager --set-enabled powertools && yum install -y \
-    cmake \
     numactl \
     numactl-devel \
     openmpi \
@@ -29,12 +28,16 @@ RUN yum config-manager --set-enabled powertools && yum install -y \
     protobuf-devel \
     python36-devel \
     rdma-core-devel \
-    vim
+    vim \
+    wget
 # Remove old UCX
 RUN rpm -e --nodeps ucx
 ENV PATH=/usr/lib64/openmpi/bin:$PATH
 RUN echo "export PATH=\"/usr/lib64/openmpi/bin:\$PATH\"" >> /etc/bashrc && \
     export LD_LIBRARY_PATH=\"/usr/lib64/openmpi/lib:\${LD_LIBRARY_PATH}\" >> /etc/bashrc
+RUN cd /tmp && wget https://github.com/Kitware/CMake/releases/download/v3.20.4/cmake-3.20.4-linux-x86_64.sh && \
+    chmod +x /tmp/cmake-3.20.4-linux-x86_64.sh && /tmp/cmake-3.20.4-linux-x86_64.sh --skip-license --prefix=/usr && \
+    rm -f /tmp/cmake-3.20.4-linux-x86_64.sh
 #==============================================================================
 # Configure SSH
 RUN mkdir -p /var/run/sshd && \
