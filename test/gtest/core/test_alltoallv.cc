@@ -53,6 +53,8 @@ public:
                 ((T*)coll->src.info_v.displacements)[i] = buf_count;
                 buf_count += rank_count;
             }
+            /* Force at least 1 zero count for bigger coverage of corner cases */
+            ((T*)coll->src.info_v.counts)[(r + 1) % nprocs] = 0;
 
             UCC_CHECK(ucc_mc_alloc(&ctxs[r]->init_buf,
                                    buf_count * ucc_dt_size(dtype),
@@ -78,6 +80,7 @@ public:
                 ((T*)coll->dst.info_v.displacements)[i] = buf_count;
                 buf_count += rank_count;
             }
+            ((T*)coll->dst.info_v.counts)[(r - 1 + nprocs) % nprocs] = 0;
             ctxs[r]->rbuf_size = buf_count * ucc_dt_size(dtype);
             UCC_CHECK(ucc_mc_alloc(&coll->dst.info_v.buffer,
                                    buf_count * ucc_dt_size(dtype),
