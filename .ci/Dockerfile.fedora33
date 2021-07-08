@@ -1,4 +1,4 @@
-FROM fedora:33
+FROM harbor.mellanox.com/torch-ucc/fedora:33
 
 RUN dnf install -y \
     autoconf \
