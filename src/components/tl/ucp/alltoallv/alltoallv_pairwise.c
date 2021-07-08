@@ -54,7 +54,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
             data_displ = ucc_coll_args_get_displacement(&task->args,
                             task->args.dst.info_v.displacements,
                             peer) * rdt_size;
-            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)(rbuf + data_displ),
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nz((void *)(rbuf + data_displ),
                                              data_size, rmem, peer, team, task),
                           task, out);
             polls = 0;
@@ -67,7 +67,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
             data_displ = ucc_coll_args_get_displacement(&task->args,
                             task->args.src.info_v.displacements,
                             peer) * sdt_size;
-            UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(sbuf + data_displ),
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nz((void *)(sbuf + data_displ),
                                              data_size, smem, peer, team, task),
                           task, out);
             polls = 0;
