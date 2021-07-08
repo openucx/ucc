@@ -119,6 +119,39 @@ static inline ucc_status_t ucc_tl_ucp_recv_nb(void *buffer, size_t msglen,
     return UCC_OK;
 }
 
+/* Non-Zero recv: if msglen == 0 then it is a no-op */
+static inline ucc_status_t ucc_tl_ucp_recv_nz(void *buffer, size_t msglen,
+                                              ucc_memory_type_t mtype,
+                                              ucc_rank_t dest_group_rank,
+                                              ucc_tl_ucp_team_t *team,
+                                              ucc_tl_ucp_task_t *task)
+{
+    if (msglen == 0) {
+        task->recv_posted++;
+        task->recv_completed++;
+        return UCC_OK;
+    }
+    return ucc_tl_ucp_recv_nb(buffer, msglen, mtype,
+                              dest_group_rank, team, task);
+}
+
+/* Non-Zero send: if msglen == 0 then it is a no-op */
+static inline ucc_status_t ucc_tl_ucp_send_nz(void *buffer, size_t msglen,
+                                              ucc_memory_type_t mtype,
+                                              ucc_rank_t dest_group_rank,
+                                              ucc_tl_ucp_team_t *team,
+                                              ucc_tl_ucp_task_t *task)
+{
+    if (msglen == 0) {
+        task->send_posted++;
+        task->send_completed++;
+        return UCC_OK;
+    }
+    return ucc_tl_ucp_send_nb(buffer, msglen, mtype,
+                              dest_group_rank, team, task);
+}
+
+
 #define UCPCHECK_GOTO(_cmd, _task, _label)                                     \
     do {                                                                       \
         ucc_status_t _status = (_cmd);                                         \
