@@ -31,6 +31,7 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t            bcast_kn_radix;
     uint32_t            alltoall_pairwise_num_posts;
     uint32_t            alltoallv_pairwise_num_posts;
+    uint32_t            triggered_post_lazy;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {

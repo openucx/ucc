@@ -43,6 +43,13 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"TRIGGERED_POST_LAZY", "0",
+     "Never start actual UCP communication during triggered_post call. "
+     "It will be started later from ucc_context_progress when the EE event"
+     "dependency is satisfied.",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, triggered_post_lazy),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {

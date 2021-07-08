@@ -152,8 +152,10 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
 
 ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_task_t *ev_task  = ucc_tl_ucp_get_task(task->team);
+    ucc_tl_ucp_task_t *task    = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_task_t *ev_task = ucc_tl_ucp_get_task(task->team);
+    uint32_t is_lazy           = UCC_TL_UCP_TEAM_LIB(ev_task->team)->
+        cfg.triggered_post_lazy;
     ucc_status_t status;
 
     ucc_coll_task_init(&ev_task->super);
@@ -175,7 +177,7 @@ ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_
     if (status != UCC_OK) {
         return status;
     }
-    if (ev_task->super.super.status == UCC_OK) {
+    if (!is_lazy && (ev_task->super.super.status == UCC_OK)) {
         ucc_tl_ucp_event_trigger_complete(&ev_task->super, coll_task);
         ucc_tl_ucp_put_task(ev_task);
         return UCC_OK;

@@ -11,7 +11,7 @@
 typedef struct ucc_progress_queue ucc_progress_queue_t;
 struct ucc_progress_queue {
     void (*enqueue)(ucc_progress_queue_t *pq, ucc_coll_task_t *task);
-    void (*dequeue)(ucc_progress_queue_t *pq, ucc_coll_task_t **task, int is_first_call);
+    void (*dequeue)(ucc_progress_queue_t *pq, ucc_coll_task_t **task);
     int  (*progress)(ucc_progress_queue_t *pq);
     void (*finalize)(ucc_progress_queue_t *pq);
 };
