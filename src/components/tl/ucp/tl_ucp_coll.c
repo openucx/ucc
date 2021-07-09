@@ -76,6 +76,7 @@ ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_task,
     tl_info(task->team->super.super.context->lib,
             "event triggered. ev_task:%p coll_task:%p", parent_task, coll_task);
 
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_start_triggered_task", 0);
     coll_task->ee_task = parent_task->ee_task;
     status = coll_task->post(coll_task);
     if (ucc_unlikely(status != UCC_OK)) {
