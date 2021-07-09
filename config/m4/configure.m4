@@ -7,9 +7,10 @@ AC_DEFUN([ENABLE_MODULE_PROFILING],
 [
     AS_IF([test "x$with_profiling" = xall],
         [
-            prof_modules=":core:mc:tl_ucp"
+            prof_modules=":core:mc:tl_ucp:tl_nccl"
             AC_DEFINE([HAVE_PROFILING_CORE], [1], [Enable profiling for CORE])
             AC_DEFINE([HAVE_PROFILING_TL_UCP], [1], [Enable profiling for TL UCP])
+            AC_DEFINE([HAVE_PROFILING_TL_NCCL], [1], [Enable profiling for TL NCCL])
             AC_DEFINE([HAVE_PROFILING_MC], [1], [Enable profiling for MC])
         ],
         [
@@ -29,6 +30,12 @@ AC_DEFUN([ENABLE_MODULE_PROFILING],
             *tl_ucp*)
                 prof_modules="${prof_modules}:tl_ucp"
                 AC_DEFINE([HAVE_PROFILING_TL_UCP], [1], [Enable profiling for TL UCP])
+                ;;
+            esac
+            case $1 in
+            *tl_nccl*)
+                prof_modules="${prof_modules}:tl_nccl"
+                AC_DEFINE([HAVE_PROFILING_TL_NCCL], [1], [Enable profiling for TL NCCL])
                 ;;
             esac
         ])

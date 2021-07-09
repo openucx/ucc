@@ -194,8 +194,9 @@ ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1] = {
     [UCC_MEMORY_TYPE_UNKNOWN]      = UCS_MEMORY_TYPE_UNKNOWN
 };
 
-void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
-                                 size_t length, ucc_memory_type_t mem_type)
+UCC_TL_UCP_PROFILE_FUNC_VOID(ucc_tl_ucp_pre_register_mem, (team, addr, length,
+                             mem_type), ucc_tl_ucp_team_t *team, void *addr,
+                             size_t length, ucc_memory_type_t mem_type)
 {
     void *base_address  = addr;
     size_t alloc_length = length;
