@@ -63,6 +63,11 @@ ucc_status_t ucc_tl_nccl_collective_progress(ucc_coll_task_t *coll_task)
     ucc_status_t status;
 
     status = ucc_mc_ee_event_test(task->completed, UCC_EE_CUDA_STREAM);
+#ifdef HAVE_PROFILING_TL_NCCL
+    if (status == UCC_OK) {
+        UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_coll_done", 0);
+    }
+#endif
     coll_task->super.status = status;
     return status;
 }
@@ -87,6 +92,7 @@ ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
         task->super.super.status = UCC_OK;
         return UCC_OK;
     }
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_alltoall_start", 0);
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
     for (peer = 0; peer < gsize; peer++) {
         NCCLCHECK_GOTO(ncclSend((void *)(sbuf + peer * data_size), data_size,
@@ -140,6 +146,7 @@ ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
     task->super.super.status = UCC_INPROGRESS;
     sdt_size = ucc_dt_size(task->args.src.info_v.datatype);
     rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_alltoallv_start", 0);
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
     for (peer = 0; peer < team->size; peer++) {
         count = ucc_coll_args_get_count(&task->args,
@@ -210,6 +217,7 @@ ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
     size_t              count  = task->args.src.info.count;
 
     task->super.super.status = UCC_INPROGRESS;
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_allreduce_start", 0);
     NCCLCHECK_GOTO(ncclAllReduce(src, dst, count, dt, op, team->nccl_comm,
                                  stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
@@ -261,6 +269,7 @@ ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
                count * ucc_dt_size(task->args.dst.info.datatype) * team->rank);
     }
     task->super.super.status = UCC_INPROGRESS;
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_allgather_start", 0);
     NCCLCHECK_GOTO(ncclAllGather(src, dst, count, dt, team->nccl_comm, stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
     status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
@@ -306,6 +315,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
     task->super.super.status = UCC_INPROGRESS;
     sdt_size = ucc_dt_size(task->args.src.info.datatype);
     rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_allgatherv_start", 0);
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
     count = task->args.src.info.count;
     if (count != 0) {
@@ -370,6 +380,7 @@ ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
     ucc_rank_t          root   = task->args.root;
 
     task->super.super.status = UCC_INPROGRESS;
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_bcast_start", 0);
     NCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->nccl_comm,
                                  stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
