@@ -16,18 +16,20 @@ class ucc_pt_comm {
     ucc_pt_comm_config cfg;
     ucc_lib_h lib;
     ucc_context_h context;
-    ucc_team_h team;
+    int                n_threads;
+    ucc_team_h *       teams;
     ucc_pt_bootstrap *bootstrap;
     void set_gpu_device();
 public:
     ucc_pt_comm(ucc_pt_comm_config config);
     int get_rank();
     int get_size();
-    ucc_team_h get_team();
+    int           get_n_threads();
+    ucc_team_h    get_team(int thread_id);
     ucc_context_h get_context();
     ~ucc_pt_comm();
-    ucc_status_t init();
-    ucc_status_t barrier();
+    ucc_status_t init(int n_threads);
+    ucc_status_t barrier(int thread_id);
     ucc_status_t allreduce(float* in, float *out, size_t size,
                            ucc_reduction_op_t op);
     ucc_status_t finalize();

@@ -40,29 +40,71 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
     }
 }
 
+typedef struct test_args {
+    ucc_pt_comm *    comm;
+    ucc_coll_args_t *args;
+    int              nwarmup;
+    int              niter;
+} test_args_t;
+
+typedef struct thread_args {
+    test_args_t *            test_args;
+    std::chrono::nanoseconds time;
+    int                      thread_id;
+    ucc_status_t             st;
+} thread_args_t;
+
+void *run_single_test(void *arg);
+
 ucc_status_t ucc_pt_benchmark::run_bench() noexcept
 {
-    size_t min_count = coll->has_range() ? config.min_count : 1;
-    size_t max_count = coll->has_range() ? config.max_count : 1;
-    ucc_status_t st;
-    ucc_coll_args_t args;
-    std::chrono::nanoseconds time;
+    size_t                 min_count = coll->has_range() ? config.min_count : 1;
+    size_t                 max_count = coll->has_range() ? config.max_count : 1;
+    ucc_status_t           st;
+    ucc_coll_args_t        args;
+    test_args_t            test_args;
+    int                    i, n_threads = comm->get_n_threads();
+    std::vector<pthread_t> threads;
+    threads.resize(n_threads);
+    std::vector<thread_args_t> threads_args;
+    threads_args.resize(n_threads);
 
     print_header();
     for (size_t cnt = min_count; cnt <= max_count; cnt *= 2) {
         size_t coll_size = cnt * ucc_dt_size(config.dt);
-        int iter = config.n_iter_small;
-        int warmup = config.n_warmup_small;
+        int    iter      = config.n_iter_small;
+        int    warmup    = config.n_warmup_small;
         if (coll_size >= config.large_thresh) {
-            iter = config.n_iter_large;
+            iter   = config.n_iter_large;
             warmup = config.n_warmup_large;
         }
         UCCCHECK_GOTO(coll->init_coll_args(cnt, args), exit_err, st);
-        UCCCHECK_GOTO(run_single_test(args, warmup, iter, time), free_coll, st);
+        test_args = (test_args_t){comm, &args, warmup, iter};
+        if (n_threads > 1) {
+            for (i = 0; i < n_threads; i++) {
+                threads_args.at(i).thread_id = i;
+                threads_args.at(i).test_args = &test_args;
+                pthread_create(&threads[i], NULL, &run_single_test,
+                               (void *)&threads_args[i]);
+            }
+            for (i = 0; i < n_threads; i++) {
+                pthread_join(threads[i], NULL);
+                UCCCHECK_GOTO(threads_args[i].st, free_coll, st);
+            }
+        }
+        else {
+            threads_args[0].thread_id = 0;
+            threads_args[0].test_args = &test_args;
+            run_single_test((void *)&threads_args[0]);
+            UCCCHECK_GOTO(threads_args[0].st, free_coll, st);
+        }
         coll->free_coll_args(args);
-        print_time(cnt, time);
+        for (i = 1; i < n_threads; i++) {
+            threads_args[0].time += threads_args[i].time;
+        }
+        threads_args[0].time /= n_threads;
+        print_time(cnt, threads_args[0].time);
     }
-
     return UCC_OK;
 free_coll:
     coll->free_coll_args(args);
@@ -70,21 +112,25 @@ exit_err:
     return st;
 }
 
-ucc_status_t ucc_pt_benchmark::run_single_test(ucc_coll_args_t args,
-                                               int nwarmup, int niter,
-                                               std::chrono::nanoseconds &time)
-                                               noexcept
+void *run_single_test(void *arg)
+
 {
-    ucc_team_h    team = comm->get_team();
-    ucc_context_h ctx  = comm->get_context();
+    thread_args_t *thread_args = (thread_args_t *)arg;
+    ucc_team_h     team =
+        thread_args->test_args->comm->get_team(thread_args->thread_id);
+    ucc_context_h  ctx  = thread_args->test_args->comm->get_context();
     ucc_status_t  st   = UCC_OK;
     ucc_coll_req_h req;
 
-    UCCCHECK_GOTO(comm->barrier(), exit_err, st);
-    time = std::chrono::nanoseconds::zero();
-    for (int i = 0; i < nwarmup + niter; i++) {
+    UCCCHECK_GOTO(thread_args->test_args->comm->barrier(thread_args->thread_id),
+                  exit_err, st);
+    thread_args->time = std::chrono::nanoseconds::zero();
+    for (int i = 0; i < thread_args->test_args->nwarmup +
+         thread_args->test_args->niter; i++) {
         auto s = std::chrono::high_resolution_clock::now();
-        UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
+        UCCCHECK_GOTO(
+            ucc_collective_init(thread_args->test_args->args, &req, team),
+            exit_err, st);
         UCCCHECK_GOTO(ucc_collective_post(req), free_req, st);
         st = ucc_collective_test(req);
         while (st == UCC_INPROGRESS) {
@@ -96,19 +142,24 @@ ucc_status_t ucc_pt_benchmark::run_single_test(ucc_coll_args_t args,
         if (st != UCC_OK) {
             goto exit_err;
         }
-        if (i >= nwarmup) {
-            time += std::chrono::duration_cast<std::chrono::nanoseconds>(f - s);
+        if (i >= thread_args->test_args->nwarmup) {
+            thread_args->time +=
+                std::chrono::duration_cast<std::chrono::nanoseconds>(f - s);
         }
-        UCCCHECK_GOTO(comm->barrier(), exit_err, st);
+        UCCCHECK_GOTO(
+            thread_args->test_args->comm->barrier(thread_args->thread_id),
+            exit_err, st);
     }
-    if (niter != 0) {
-        time /= niter;
+    if (thread_args->test_args->niter) {
+        thread_args->time /= thread_args->test_args->niter;
     }
-    return UCC_OK;
+    thread_args->st = st;
+    return 0;
 free_req:
     ucc_collective_finalize(req);
 exit_err:
-    return st;
+    thread_args->st = st;
+    return 0;
 }
 
 void ucc_pt_benchmark::print_header()
@@ -116,6 +167,9 @@ void ucc_pt_benchmark::print_header()
     if (comm->get_rank() == 0) {
         std::ios iostate(nullptr);
         iostate.copyfmt(std::cout);
+        std::cout << std::left << std::setw(24)
+                  << "Number of threads: " << std::to_string(config.n_threads)
+                  << std::endl;
         std::cout << std::left << std::setw(24)
                   << "Collective: " << ucc_coll_type_str(config.coll_type)
                   << std::endl;
