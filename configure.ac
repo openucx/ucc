@@ -202,6 +202,10 @@ AC_CONFIG_FILES([
                  test/mpi/Makefile
                  tools/info/Makefile
                  tools/perf/Makefile
+                 cmake/Makefile
+                 cmake/ucc-config-version.cmake
+                 cmake/ucc-config.cmake
+                 cmake/ucc-targets.cmake
                  ])
 AC_OUTPUT
 
