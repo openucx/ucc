@@ -91,6 +91,7 @@ ucc_status_t ucc_cl_basic_team_destroy(ucc_base_team_t *cl_team)
             status = team->team_create_req->descs[i].status;
         }
     }
+
     ucc_team_multiple_req_free(team->team_create_req);
     ucc_coll_score_free_map(team->score_map);
     ucc_free(team->tl_teams);

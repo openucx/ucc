@@ -18,6 +18,10 @@ if HAVE_NCCL
 tl_dirs += components/tl/nccl
 endif
 
+if HAVE_DPU
+tl_dirs += components/tl/dpu
+endif
+
 SUBDIRS = . $(cl_dirs) $(tl_dirs) $(mc_dirs)
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =
