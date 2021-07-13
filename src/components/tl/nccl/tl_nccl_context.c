@@ -8,11 +8,12 @@
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
 
-ucc_status_t ucc_tl_nccl_collective_progress(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_nccl_event_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_status_t status;
 
+    ucc_assert(task->completed != NULL);
     status = ucc_mc_ee_event_test(task->completed, UCC_EE_CUDA_STREAM);
     coll_task->super.status = status;
     return status;
@@ -22,7 +23,7 @@ static void ucc_tl_nccl_req_mpool_obj_init(ucc_mpool_t *mp, void *obj,
                                            void *chunk)
 {
     ucc_tl_nccl_task_t *req = (ucc_tl_nccl_task_t*) obj;
-    req->super.progress = ucc_tl_nccl_collective_progress;
+    req->super.progress = ucc_tl_nccl_event_collective_progress;
 }
 
 

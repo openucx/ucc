@@ -154,7 +154,8 @@ ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task
         post_event->ev_type = UCC_EVENT_COLLECTIVE_POST;
         post_event->ev_context_size = 0;
         post_event->req = &coll_task->super;
-        ucc_ee_set_event_internal(coll_task->ee, post_event, &coll_task->ee->event_out_queue);
+        ucc_ee_set_event_internal(coll_task->ee, post_event,
+                                  &coll_task->ee->event_out_queue);
     }
     return status;
 }
@@ -175,9 +176,13 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     task->team                 = nccl_team;
     task->super.finalize       = ucc_tl_nccl_coll_finalize;
     task->super.triggered_post = ucc_tl_nccl_triggered_post;
-    status = ucc_mc_ee_create_event((void **)&task->completed, UCC_EE_CUDA_STREAM);
-    if (ucc_unlikely(status != UCC_OK)) {
-        goto free_task;
+    task->completed            = NULL;
+    if (nccl_ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
+        status = ucc_mc_ee_create_event((void **)&task->completed,
+                                         UCC_EE_CUDA_STREAM);
+        if (ucc_unlikely(status != UCC_OK)) {
+            goto free_task;
+        }
     }
     switch (coll_args->args.coll_type)
     {
@@ -213,7 +218,9 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     return status;
 
 free_event:
-    cudaEventDestroy(task->completed);
+    if (task->completed) {
+        cudaEventDestroy(task->completed);
+    }
 free_task:
     ucc_mpool_put(task);
     return status;
