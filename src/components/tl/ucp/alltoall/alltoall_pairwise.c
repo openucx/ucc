@@ -79,9 +79,29 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team = task->team;
+    ptrdiff_t          sbuf = (ptrdiff_t)task->args.src.info.buffer;
+    ptrdiff_t          rbuf = (ptrdiff_t)task->args.dst.info.buffer;
+    ucc_memory_type_t  smem = task->args.src.info.mem_type;
+    ucc_memory_type_t  rmem = task->args.dst.info.mem_type;
+    ucc_rank_t        grank = team->rank;
+    size_t data_size;
+
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_alltoall_pairwise_start", 0);
     ucc_tl_ucp_task_reset(task);
+
+    /* blocking self send/recv */
+    if ((UCC_TL_UCP_TEAM_CTX(team)->cfg.blocking_a2a_self_copy)) {
+        data_size = (size_t)task->args.src.info.count *
+                    ucc_dt_size(task->args.src.info.datatype);
+        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)(rbuf + grank * data_size),
+                                          data_size, rmem, grank, team, task),
+                                          task, error);
+        UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(sbuf + grank * data_size),
+                                          data_size, smem, grank, team, task),
+                                          task, error);
+        while (UCC_INPROGRESS == ucc_tl_ucp_test(task));
+    }
 
     ucc_tl_ucp_alltoall_pairwise_progress(&task->super);
     if (UCC_INPROGRESS == task->super.super.status) {
@@ -89,6 +109,9 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_start(ucc_coll_task_t *coll_task)
         return UCC_OK;
     }
     return ucc_task_complete(coll_task);
+error:
+    return task->super.super.status;
+
 }
 
 ucc_status_t ucc_tl_ucp_alltoall_pairwise_init_common(ucc_tl_ucp_task_t *task)
