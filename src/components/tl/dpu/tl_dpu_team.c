@@ -221,6 +221,7 @@ ucc_status_t ucc_tl_dpu_team_destroy(ucc_base_team_t *tl_team)
     ucp_request_param_t         req_param;
  
     hangup.coll_id  = team->coll_id;
+    hangup.coll_type = UCC_COLL_TYPE_LAST;
     hangup.dtype    = UCC_DT_USERDEFINED;
     hangup.op       = UCC_OP_USERDEFINED;
     hangup.count_in      = 0;

@@ -595,6 +595,12 @@ int dpu_hc_wait(dpu_hc_t *hc, unsigned int cntr)
     return 0;
 }
 
+ucc_coll_type_t dpu_hc_get_coll_type(dpu_hc_t *hc)
+{
+    dpu_sync_t *lsync = (dpu_sync_t*)hc->mem_segs.sync.base;
+    return lsync->coll_type;
+}
+
 ucc_datatype_t dpu_hc_get_dtype(dpu_hc_t *hc)
 {
     dpu_sync_t *lsync = (dpu_sync_t*)hc->mem_segs.sync.base;

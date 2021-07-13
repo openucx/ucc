@@ -122,7 +122,8 @@ typedef struct ucc_tl_dpu {
     ucc_tl_dpu_config_t config;
 } ucc_tl_dpu_t;
 
-#define UCC_TL_DPU_SUPPORTED_COLLS  UCC_COLL_TYPE_ALLREDUCE
+#define UCC_TL_DPU_SUPPORTED_COLLS \
+    (UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_ALLTOALL)
 
 #define UCC_TL_DPU_TEAM_LIB(_team)                                          \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_dpu_lib_t))

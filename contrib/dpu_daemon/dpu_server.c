@@ -34,6 +34,73 @@ typedef struct {
 
 static thread_sync_t *thread_sync = NULL;
 
+ void dpu_coll_init_allreduce(thread_ctx_t *ctx, ucc_coll_req_h *request) {
+    size_t count = dpu_hc_get_count_total(ctx->hc);
+    size_t dt_size = dpu_ucc_dt_size(dpu_hc_get_dtype(ctx->hc));
+    size_t block = count / ctx->nthreads;
+    size_t offset = block * ctx->idx;
+
+    if(ctx->idx < (count % ctx->nthreads)) {
+        offset += ctx->idx;
+        block++;
+    } else {
+        offset += (count % ctx->nthreads);
+    }
+    
+    ucc_coll_args_t coll_args = {
+        .coll_type = UCC_COLL_TYPE_ALLREDUCE,
+        .mask      = UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS,
+        .src.info = {
+            .buffer   = ctx->hc->mem_segs.put.base + offset * dt_size,
+            .count    = block,
+            .datatype = dpu_hc_get_dtype(ctx->hc),
+            .mem_type = UCC_MEMORY_TYPE_HOST,
+        },
+        .dst.info = {
+            .buffer     = ctx->hc->mem_segs.get.base + offset * dt_size,
+            .count      = block,
+            .datatype   = dpu_hc_get_dtype(ctx->hc),
+            .mem_type   = UCC_MEMORY_TYPE_HOST,
+        },
+        .reduce = {
+            .predefined_op = dpu_hc_get_op(ctx->hc),
+        }
+    };
+
+    UCC_CHECK(ucc_collective_init(&coll_args, request, ctx->comm.team));
+}
+
+ void dpu_coll_init_alltoall(thread_ctx_t *ctx, ucc_coll_req_h *request) {
+    /* Multithreading not supported */
+    if(ctx->idx > 0) {
+        *request = NULL;
+        return;
+    }
+
+    size_t count = dpu_hc_get_count_total(ctx->hc);
+    size_t dt_size = dpu_ucc_dt_size(dpu_hc_get_dtype(ctx->hc));
+    size_t block = count;
+    size_t offset = 0;
+    
+    ucc_coll_args_t coll_args = {
+        .coll_type = UCC_COLL_TYPE_ALLTOALL,
+        .src.info = {
+            .buffer   = ctx->hc->mem_segs.put.base + offset * dt_size,
+            .count    = block,
+            .datatype = dpu_hc_get_dtype(ctx->hc),
+            .mem_type = UCC_MEMORY_TYPE_HOST,
+        },
+        .dst.info = {
+            .buffer     = ctx->hc->mem_segs.get.base + offset * dt_size,
+            .count      = block,
+            .datatype   = dpu_hc_get_dtype(ctx->hc),
+            .mem_type   = UCC_MEMORY_TYPE_HOST,
+        },
+    };
+
+    UCC_CHECK(ucc_collective_init(&coll_args, request, ctx->comm.team));
+}
+
 void *dpu_worker(void *arg)
 {
     thread_ctx_t *ctx = (thread_ctx_t*)arg;
@@ -67,55 +134,31 @@ void *dpu_worker(void *arg)
                 thread_sync[i].g_itt++;
             }
         }
-    
-        int offset, block;
-        int count = dpu_hc_get_count_total(ctx->hc);
-        int ready = 0;
-        int dt_size = dpu_ucc_dt_size(dpu_hc_get_dtype(ctx->hc));
-
-        block = count / ctx->nthreads;
-        offset = block * ctx->idx;
-        if(ctx->idx < (count % ctx->nthreads)) {
-            offset += ctx->idx;
-            block++;
-        } else {
-            offset += (count % ctx->nthreads);
-        }
         
-        ucc_coll_args_t coll = {
-            .mask      = UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS,
-            .coll_type = UCC_COLL_TYPE_ALLREDUCE,
-            .src.info = {
-                .buffer   = ctx->hc->mem_segs.put.base + offset * dt_size,
-                .count    = block * dt_size,
-                .datatype = dpu_hc_get_dtype(ctx->hc),
-                .mem_type = UCC_MEMORY_TYPE_HOST,
-            },
-            .dst.info = {
-                .buffer     = ctx->hc->mem_segs.get.base + offset * dt_size,
-                .count      = block * dt_size,
-                .datatype   = dpu_hc_get_dtype(ctx->hc),
-                .mem_type = UCC_MEMORY_TYPE_HOST,
-            },
-            .reduce = {
-                .predefined_op = dpu_hc_get_op(ctx->hc),
-            },
-        };
-
-        if (coll.reduce.predefined_op == UCC_OP_USERDEFINED &&
-			coll.src.info.datatype    == UCC_DT_USERDEFINED) {
+        ucc_coll_type_t coll_type = dpu_hc_get_coll_type(ctx->hc);
+        //fprintf(stderr, "Requested coll type: %d\n", coll_type);
+        if (coll_type == UCC_COLL_TYPE_ALLREDUCE) {
+            dpu_coll_init_allreduce(ctx, &request);
+        } else if (coll_type == UCC_COLL_TYPE_ALLTOALL) {
+            dpu_coll_init_alltoall(ctx, &request);
+        } else if (coll_type == UCC_COLL_TYPE_LAST) {
+            fprintf(stderr, "Received hangup, exiting loop\n");
+            break;
+        } else {
+            fprintf(stderr, "Unsupported coll type: %d\n", coll_type);
             break;
         }
 
-        UCC_CHECK(ucc_collective_init(&coll, &request, ctx->comm.team));
-        UCC_CHECK(ucc_collective_post(request));
-        while (UCC_OK != ucc_collective_test(request)) {
-            ucc_context_progress(ctx->comm.ctx);
+        if (request != NULL) {
+            UCC_CHECK(ucc_collective_post(request));
+            while (UCC_OK != ucc_collective_test(request)) {
+                ucc_context_progress(ctx->comm.ctx);
+            }
+            UCC_CHECK(ucc_collective_finalize(request));
         }
-        UCC_CHECK(ucc_collective_finalize(request));
-
         thread_sync[ctx->idx].l_itt++;
 
+        int ready = 0;
         if (ctx->idx == 0) {
             while (ready != ctx->nthreads) {
                 ready = 0;
@@ -129,6 +172,7 @@ void *dpu_worker(void *arg)
                 }
             }
     
+        
             dpu_hc_reply(ctx->hc, ctx->itt);
         }
     }

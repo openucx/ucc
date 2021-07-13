@@ -97,6 +97,7 @@ int dpu_hc_reply(dpu_hc_t *hc, unsigned int itt);
 int dpu_hc_wait(dpu_hc_t *hc, unsigned int itt);
 unsigned int        dpu_hc_get_count_total(dpu_hc_t *hc);
 unsigned int        dpu_hc_get_count_in(dpu_hc_t *hc);
+ucc_coll_type_t     dpu_hc_get_coll_type(dpu_hc_t *hc);
 ucc_datatype_t      dpu_hc_get_dtype(dpu_hc_t *hc);
 ucc_reduction_op_t  dpu_hc_get_op(dpu_hc_t *hc);
 

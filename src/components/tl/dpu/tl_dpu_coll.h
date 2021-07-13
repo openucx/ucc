@@ -15,6 +15,11 @@
 ucc_status_t ucc_tl_dpu_allreduce_progress(ucc_coll_task_t *coll_task);
 ucc_status_t ucc_tl_dpu_allreduce_start(ucc_coll_task_t *coll_task);
 ucc_status_t ucc_tl_dpu_allreduce_init(ucc_tl_dpu_task_t *coll_task);
+
+ucc_status_t ucc_tl_dpu_alltoall_progress(ucc_coll_task_t *coll_task);
+ucc_status_t ucc_tl_dpu_alltoall_start(ucc_coll_task_t *coll_task);
+ucc_status_t ucc_tl_dpu_alltoall_init(ucc_tl_dpu_task_t *coll_task);
+
 ucc_status_t ucc_tl_dpu_coll_init(ucc_base_coll_args_t  *coll_args,
                                   ucc_base_team_t       *team,
                                   ucc_coll_task_t      **task_h);
