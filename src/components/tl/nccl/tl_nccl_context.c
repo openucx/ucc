@@ -19,6 +19,14 @@ ucc_status_t ucc_tl_nccl_event_collective_progress(ucc_coll_task_t *coll_task)
     return status;
 }
 
+ucc_status_t ucc_tl_nccl_driver_collective_progress(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+
+    coll_task->super.status = task->host_status;
+    return coll_task->super.status;
+}
+
 static void ucc_tl_nccl_req_mpool_obj_init(ucc_mpool_t *mp, void *obj,
                                            void *chunk)
 {
@@ -59,12 +67,12 @@ static void ucc_tl_nccl_req_mapped_mpool_obj_init(ucc_mpool_t *mp, void *obj,
 {
     ucc_tl_nccl_task_t *req = (ucc_tl_nccl_task_t*) obj;
     cudaError_t st;
-    st = cudaHostGetDevicePointer((void**)(&req->dev_status),
-                                  (void *)&req->super.super.status, 0);
+    st = cudaHostGetDevicePointer((void **)(&req->dev_status),
+                                  (void *)&req->host_status, 0);
     if (st != cudaSuccess) {
         req->super.super.status = UCC_ERR_NO_MESSAGE;
     }
-    req->super.progress = NULL;
+    req->super.progress = ucc_tl_nccl_driver_collective_progress;
 }
 
 static ucc_mpool_ops_t ucc_tl_nccl_req_mapped_mpool_ops = {
