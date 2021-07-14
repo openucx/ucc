@@ -247,6 +247,14 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
 {
     ucc_job_env_t env_bkp;
     char *var;
+
+    /* NCCL TL is disabled since it currently can not support non-blocking
+       team creation. */
+    vars.push_back({"UCC_TL_NCCL_TUNE", "0"});
+    /* GDR is temporarily disabled due to known issue that may result
+       in a hang in the destruction flow */
+    vars.push_back({"UCX_IB_GPU_DIRECT_RDMA", "no"});
+
     for (auto &v : vars) {
         var = std::getenv(v.first.c_str());
         if (var) {
@@ -383,17 +391,16 @@ void thread_proc_destruct(std::vector<UccProcess_h> *procs, int i)
 
 UccJob::~UccJob()
 {
-    staticTeams.clear();
-    if (ctx_mode == UCC_JOB_CTX_GLOBAL) {
-        std::vector<std::thread> workers;
-        for (int i = 0; i < n_procs; i++){
-            workers.push_back(std::thread(thread_proc_destruct, &procs, i));
-        }
-        for (int i = 0; i < n_procs; i++){
-            workers[i].join();
-        }
-    } else {
-        procs.clear();
+    std::vector<std::thread> workers;
+
+    if (this == UccJob::staticUccJob) {
+        staticTeams.clear();
+    }
+    for (int i = 0; i < n_procs; i++){
+        workers.push_back(std::thread(thread_proc_destruct, &procs, i));
+    }
+    for (int i = 0; i < n_procs; i++){
+        workers[i].join();
     }
 }
 
@@ -423,7 +430,6 @@ const std::vector<UccTeam_h> &UccJob::getStaticTeams()
 
 void UccJob::cleanup()
 {
-    staticTeams.clear();
     if (staticUccJob) {
         delete staticUccJob;
     }
