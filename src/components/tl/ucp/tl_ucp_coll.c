@@ -90,8 +90,8 @@ ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_task,
         ucc_assert(coll_task->super.status == UCC_INPROGRESS);
         if (coll_task->ee_task) {
             ucc_event_manager_init(&coll_task->em);
-            coll_task->handlers[UCC_EVENT_COMPLETED] = ucc_tl_ucp_triggered_coll_complete;
-            ucc_event_manager_subscribe(&coll_task->em, UCC_EVENT_COMPLETED, coll_task);
+            ucc_event_manager_subscribe(&coll_task->em, UCC_EVENT_COMPLETED, coll_task,
+                                        ucc_tl_ucp_triggered_coll_complete);
         }
     }
 
@@ -173,8 +173,8 @@ ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, //NOLINT
             "triggered post. ev_task:%p coll_task:%p", &ev_task->super, coll_task);
     ev_task->super.progress = ucc_tl_ucp_ee_wait_for_event_trigger;
     ucc_event_manager_init(&ev_task->super.em);
-    coll_task->handlers[UCC_EVENT_COMPLETED] = ucc_tl_ucp_event_trigger_complete;
-    ucc_event_manager_subscribe(&ev_task->super.em, UCC_EVENT_COMPLETED, coll_task);
+    ucc_event_manager_subscribe(&ev_task->super.em, UCC_EVENT_COMPLETED, coll_task,
+                                ucc_tl_ucp_event_trigger_complete);
 
     status = ucc_tl_ucp_ee_wait_for_event_trigger(&ev_task->super);
     if (ucc_unlikely(status != UCC_OK)) {
