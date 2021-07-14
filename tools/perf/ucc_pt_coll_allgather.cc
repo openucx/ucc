@@ -35,7 +35,7 @@ ucc_status_t ucc_pt_coll_allgather::init_coll_args(size_t count,
     ucc_status_t st;
 
     args = coll_args;
-    args.dst.info.count = count;
+    args.dst.info.count = count * comm_size;
     UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size_dst, args.dst.info.mem_type),
                   exit, st);
     args.dst.info.buffer = dst_header->addr;
