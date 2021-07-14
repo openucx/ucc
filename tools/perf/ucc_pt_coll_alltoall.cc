@@ -25,20 +25,20 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(int size, ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_alltoall::init_coll_args(size_t count,
+ucc_status_t ucc_pt_coll_alltoall::init_coll_args(size_t single_rank_count,
                                                   ucc_coll_args_t &args)
 {
     size_t       dt_size = ucc_dt_size(coll_args.src.info.datatype);
-    size_t       size    = comm_size * count * dt_size;
+    size_t       size    = comm_size * single_rank_count * dt_size;
     ucc_status_t st      = UCC_OK;
 
     args = coll_args;
-    args.dst.info.count = count;
+    args.dst.info.count = single_rank_count * comm_size;
     UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size, args.dst.info.mem_type), exit,
                   st);
     args.dst.info.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
-        args.src.info.count = count;
+        args.src.info.count = single_rank_count * comm_size;
         UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size, args.src.info.mem_type),
                       free_dst, st);
         args.src.info.buffer = src_header->addr;
@@ -62,7 +62,7 @@ float ucc_pt_coll_alltoall::get_bw(float time_ms, int grsize,
                                    ucc_coll_args_t args)
 {
     float N = grsize;
-    float S = N * args.src.info.count * ucc_dt_size(args.src.info.datatype);
+    float S = args.src.info.count * ucc_dt_size(args.src.info.datatype);
 
     return (S / time_ms) * ((N - 1) / N) / 1000.0;
 }
