@@ -15,52 +15,54 @@ using Param_1 = std::tuple<int, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
 class test_allgather : public UccCollArgs, public ucc::test
 {
 public:
-    void data_init(int nprocs, ucc_datatype_t dtype, size_t count,
-                   UccCollCtxVec &ctxs)
-    {
-        ctxs.resize(nprocs);
-        for (auto r = 0; r < nprocs; r++) {
-            ucc_coll_args_t *coll = (ucc_coll_args_t*)
-                    calloc(1, sizeof(ucc_coll_args_t));
-            ctxs[r] = (gtest_ucc_coll_ctx_t*)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
-            ctxs[r]->args = coll;
+  void data_init(int nprocs, ucc_datatype_t dtype, size_t single_rank_count,
+                 UccCollCtxVec &ctxs)
+  {
+      ctxs.resize(nprocs);
+      for (auto r = 0; r < nprocs; r++) {
+          ucc_coll_args_t *coll =
+              (ucc_coll_args_t *)calloc(1, sizeof(ucc_coll_args_t));
+          ctxs[r] =
+              (gtest_ucc_coll_ctx_t *)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
+          ctxs[r]->args = coll;
 
-            coll->mask = 0;
-            coll->flags = 0;
-            coll->coll_type = UCC_COLL_TYPE_ALLGATHER;
-            coll->src.info.mem_type = mem_type;
-            coll->src.info.count   = (ucc_count_t)count;
-            coll->src.info.datatype = dtype;
-            coll->dst.info.mem_type = mem_type;
-            coll->dst.info.count   = (ucc_count_t)count;
-            coll->dst.info.datatype = dtype;
+          coll->mask              = 0;
+          coll->flags             = 0;
+          coll->coll_type         = UCC_COLL_TYPE_ALLGATHER;
+          coll->src.info.mem_type = mem_type;
+          coll->src.info.count    = (ucc_count_t)single_rank_count;
+          coll->src.info.datatype = dtype;
+          coll->dst.info.mem_type = mem_type;
+          coll->dst.info.count    = (ucc_count_t)single_rank_count * nprocs;
+          coll->dst.info.datatype = dtype;
 
-            UCC_CHECK(ucc_mc_alloc(&ctxs[r]->init_buf,
-                                   ucc_dt_size(dtype) * count,
-                                   UCC_MEMORY_TYPE_HOST));
-            uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
-            for (int i = 0; i < ucc_dt_size(dtype) * count; i++) {
-                sbuf[i] = r;
-            }
+          ctxs[r]->init_buf =
+              ucc_malloc(ucc_dt_size(dtype) * single_rank_count, "init buf");
+          EXPECT_NE(ctxs[r]->init_buf, nullptr);
+          uint8_t *sbuf = (uint8_t *)ctxs[r]->init_buf;
+          for (int i = 0; i < ucc_dt_size(dtype) * single_rank_count; i++) {
+              sbuf[i] = r;
+          }
 
-            ctxs[r]->rbuf_size = ucc_dt_size(dtype) * count * nprocs;
-            UCC_CHECK(ucc_mc_alloc(&coll->dst.info.buffer, ctxs[r]->rbuf_size,
-                      mem_type));
-            if (TEST_INPLACE == inplace) {
-                coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-                coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-                UCC_CHECK(ucc_mc_memcpy((void*)((ptrdiff_t)coll->dst.info.buffer +
-                                        r * count * ucc_dt_size(dtype)),
-                                        ctxs[r]->init_buf, ucc_dt_size(dtype) * count,
-                                        mem_type, UCC_MEMORY_TYPE_HOST));
-            } else {
-                UCC_CHECK(ucc_mc_alloc(&coll->src.info.buffer,
-                          ucc_dt_size(dtype) * count, mem_type));
-                UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
-                                        ucc_dt_size(dtype) * count, mem_type,
-                                        UCC_MEMORY_TYPE_HOST));
-            }
-        }
+          ctxs[r]->rbuf_size = ucc_dt_size(dtype) * single_rank_count * nprocs;
+          UCC_CHECK(ucc_mc_alloc(&coll->dst.info.buffer, ctxs[r]->rbuf_size,
+                    mem_type));
+          if (TEST_INPLACE == inplace) {
+              coll->mask |= UCC_COLL_ARGS_FIELD_FLAGS;
+              coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+              UCC_CHECK(ucc_mc_memcpy(
+                  (void *)((ptrdiff_t)coll->dst.info.buffer +
+                           r * single_rank_count * ucc_dt_size(dtype)),
+                  ctxs[r]->init_buf, ucc_dt_size(dtype) * single_rank_count,
+                  mem_type, UCC_MEMORY_TYPE_HOST));
+          } else {
+              UCC_CHECK(ucc_mc_alloc(&coll->src.info.buffer,
+                        ucc_dt_size(dtype) * single_rank_count, mem_type));
+              UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
+                                      ucc_dt_size(dtype) * single_rank_count,
+                                      mem_type, UCC_MEMORY_TYPE_HOST));
+          }
+      }
     }
     void data_fini(UccCollCtxVec ctxs)
     {
