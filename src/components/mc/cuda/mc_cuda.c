@@ -617,6 +617,11 @@ ucc_status_t ucc_ee_cuda_event_test(void *event)
     ucc_mc_cuda_event_t *cuda_event = event;
 
     cu_err = cudaEventQuery(cuda_event->event);
+
+    if (ucc_unlikely((cu_err != cudaSuccess) &&
+                     (cu_err != cudaErrorNotReady))) {
+        CUDACHECK(cu_err);
+    }
     return cuda_error_to_ucc_status(cu_err);
 }
 

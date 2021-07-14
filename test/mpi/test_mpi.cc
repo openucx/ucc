@@ -230,6 +230,7 @@ int ucc_coll_is_rooted(ucc_coll_type_t c)
     case UCC_COLL_TYPE_ALLTOALL:
     case UCC_COLL_TYPE_ALLTOALLV:
     case UCC_COLL_TYPE_BARRIER:
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
         return 0;
     default:
         return 1;
@@ -301,7 +302,8 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                     for (auto mt : mtypes) {
                         for (auto m : msgsizes) {
                             if (c == UCC_COLL_TYPE_ALLREDUCE ||
-                                c == UCC_COLL_TYPE_REDUCE) {
+                                c == UCC_COLL_TYPE_REDUCE ||
+                                c == UCC_COLL_TYPE_REDUCE_SCATTER) {
                                 for (auto dt : dtypes) {
                                     for (auto op : ops) {
                                         auto tc = TestCase::init(c, team, r, m,

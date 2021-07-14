@@ -24,6 +24,12 @@ std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
     case UCC_COLL_TYPE_ALLREDUCE:
         return std::make_shared<TestAllreduce>(msgsize, inplace, dt,
                                                op, mt, _team, max_size);
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        return std::make_shared<TestReduceScatter>(msgsize, inplace, dt,
+                                                   op, mt, _team, max_size);
+    case UCC_COLL_TYPE_REDUCE:
+        return std::make_shared<TestReduce>(msgsize, inplace, root, dt, op, mt,
+                                            _team, max_size);
     case UCC_COLL_TYPE_ALLGATHER:
         return std::make_shared<TestAllgather>(msgsize, inplace, mt, _team,
                                                max_size);
@@ -62,7 +68,9 @@ void TestCase::wait()
         mpi_progress();
         status = test();
         if (status < 0) {
-            std::cerr << "error during coll test\n";
+            std::cerr << "error during coll test: "
+                      << ucc_status_string(status)
+                      << " ("<<status<<")" << std::endl;
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
         ucc_context_progress(team.ctx);

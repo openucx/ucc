@@ -61,5 +61,5 @@ ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t         *map,
             return UCC_OK;
         }
     }
-    return UCC_ERR_NOT_FOUND;
+    return UCC_ERR_NOT_SUPPORTED;
 }
