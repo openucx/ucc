@@ -149,6 +149,11 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
         task->cb = coll_args->cb;
         task->flags |= UCC_COLL_TASK_FLAG_CB;
     }
+    if (ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
+        char coll_debug_str[256];
+        ucc_coll_str(&op_args, coll_debug_str, sizeof(coll_debug_str));
+        ucc_debug("coll_init: %s, req %p", coll_debug_str, task);
+    }
     *request = &task->super;
     return UCC_OK;
 }
@@ -156,12 +161,16 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
 ucc_status_t ucc_collective_post(ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
+
+    ucc_debug("coll_post: req %p", task);
     return task->post(task);
 }
 
 ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ev)
 {
     ucc_coll_task_t *task = ucc_derived_of(ev->req, ucc_coll_task_t);
+
+    ucc_debug("coll_triggered_post: req %p", task);
     task->ee = ee;
     return task->triggered_post(ee, ev, task);
 }
@@ -170,5 +179,7 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
                       ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
+
+    ucc_debug("coll_finalize: req %p", task);
     return task->finalize(task);
 }

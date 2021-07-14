@@ -49,7 +49,8 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
 ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    tl_info(UCC_TASK_LIB(task), "finalizing ev_task %p", task);
+
+    tl_trace(UCC_TASK_LIB(task), "finalizing task %p", task);
     ucc_tl_ucp_put_task(task);
     return UCC_OK;
 }
@@ -60,8 +61,8 @@ ucc_tl_ucp_triggered_coll_complete(ucc_coll_task_t *parent_task, //NOLINT
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
 
-    tl_info(UCC_TASK_LIB(task), "triggered collective complete. task:%p",
-            coll_task);
+    tl_trace(UCC_TASK_LIB(task), "triggered collective complete. task:%p",
+             coll_task);
     return ucc_mc_ee_task_end(coll_task->ee_task, coll_task->ee->ee_type);
 }
 
@@ -72,8 +73,8 @@ ucc_tl_ucp_event_trigger_complete(ucc_coll_task_t *parent_task,
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_status_t status;
 
-    tl_info(UCC_TASK_LIB(task), "event triggered. ev_task:%p coll_task:%p",
-            parent_task, coll_task);
+    tl_trace(UCC_TASK_LIB(task), "event triggered. ev_task:%p coll_task:%p",
+             parent_task, coll_task);
 
     coll_task->ee_task = parent_task->ee_task;
     status = coll_task->post(coll_task);
@@ -112,8 +113,8 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
             task->super.ee_task = NULL;
         } else if (UCC_OK == ucc_ee_get_event_internal(task->super.ee, &ev,
                                                 &task->super.ee->event_in_queue)) {
-            tl_info(UCC_TASK_LIB(task), "triggered event arrived. ev_task:%p",
-                    coll_task);
+            tl_trace(UCC_TASK_LIB(task), "triggered event arrived. ev_task:%p",
+                     coll_task);
             task->super.ev = ev;
             task->super.ee_task = NULL;
         } else {
@@ -167,7 +168,7 @@ ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, //NOLINT
     ev_task->super.finalize       = ucc_tl_ucp_coll_finalize;
     ev_task->super.super.status   = UCC_INPROGRESS;
 
-    tl_info(UCC_TASK_LIB(task), "triggered post. ev_task:%p coll_task:%p",
+    tl_trace(UCC_TASK_LIB(task), "triggered post. ev_task:%p coll_task:%p",
             &ev_task->super, coll_task);
     ev_task->super.progress = ucc_tl_ucp_ee_wait_for_event_trigger;
     ucc_event_manager_init(&ev_task->super.em);
@@ -224,7 +225,7 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
         ucc_tl_ucp_put_task(task);
         return status;
     }
-    tl_info(team->context->lib, "init coll req %p", task);
+    tl_trace(team->context->lib, "init coll req %p", task);
     *task_h = &task->super;
     return status;
 }
