@@ -263,11 +263,14 @@ ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
     size_t              count  = task->args.dst.info.count;
 
     if (UCC_IS_INPLACE(task->args)) {
-        src = (void*)((ptrdiff_t)task->args.dst.info.buffer +
-               count * ucc_dt_size(task->args.dst.info.datatype) * team->rank);
+        src = (void *)((ptrdiff_t)task->args.dst.info.buffer +
+                       (count / team->size) *
+                           ucc_dt_size(task->args.dst.info.datatype) *
+                           team->rank);
     }
     task->super.super.status = UCC_INPROGRESS;
-    NCCLCHECK_GOTO(ncclAllGather(src, dst, count, dt, team->nccl_comm, stream),
+    NCCLCHECK_GOTO(ncclAllGather(src, dst, count / team->size, dt,
+                                 team->nccl_comm, stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:

@@ -29,7 +29,7 @@ public:
             coll->src.info.count   = (ucc_count_t)count;
             coll->src.info.datatype = dtype;
             coll->dst.info.mem_type = mem_type;
-            coll->dst.info.count   = (ucc_count_t)count;
+            coll->dst.info.count    = (ucc_count_t)count * nprocs;
             coll->dst.info.datatype = dtype;
 
             ctxs[r]->init_buf = ucc_malloc(ucc_dt_size(dtype) * count, "init buf");
@@ -78,10 +78,10 @@ public:
     {
         for (auto r = 0; r < ctxs.size(); r++) {
             ucc_coll_args_t *coll  = ctxs[r]->args;
-            size_t           count = coll->dst.info.count;
+            size_t           count = coll->dst.info.count / ctxs.size();
             ucc_datatype_t   dtype = coll->dst.info.datatype;
-            clear_buffer(coll->dst.info.buffer, count * ucc_dt_size(dtype),
-                         mem_type, 0);
+            clear_buffer(coll->dst.info.buffer,
+                         count * ucc_dt_size(dtype) * ctxs.size(), mem_type, 0);
             if (TEST_INPLACE == inplace) {
                 UCC_CHECK(
                     ucc_mc_memcpy((void *)((ptrdiff_t)coll->dst.info.buffer +
