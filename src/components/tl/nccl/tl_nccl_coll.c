@@ -65,21 +65,21 @@ ucc_status_t ucc_tl_nccl_collective_sync(ucc_tl_nccl_task_t *task,
     ucc_status_t           status = UCC_OK;
     CUresult cu_status;
 
+    task->host_status = task->super.super.status;
     if (ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
         status = ucc_mc_ee_event_post(stream, task->completed,
                                       UCC_EE_CUDA_STREAM);
         if (ucc_unlikely(status != UCC_OK)) {
             return status;
         }
-        status = task->super.progress(&task->super);
     } else {
         cu_status = cuStreamWriteValue32(stream, (CUdeviceptr)task->dev_status,
                                          UCC_OK, 0);
         if (ucc_unlikely(cu_status != CUDA_SUCCESS)) {
             return UCC_ERR_NO_MESSAGE;
         }
-        status = task->super.super.status;
     }
+    status = task->super.progress(&task->super);
     if (ucc_unlikely(status < 0)) {
         return ucc_task_error(&task->super);
     }
