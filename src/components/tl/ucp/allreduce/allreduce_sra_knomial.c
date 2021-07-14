@@ -88,9 +88,8 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
     }
     ucc_schedule_add_task(schedule, task);
     ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
-                                task);
-    task->handlers[UCC_EVENT_SCHEDULE_STARTED] = ucc_task_start_handler;
-    rs_task                                    = task;
+                                task, ucc_task_start_handler);
+    rs_task = task;
 
     /* 2nd step of allreduce: knomial allgather. 2nd task subscribes
      to completion event of reduce_scatter task. */
@@ -104,8 +103,8 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
     }
 
     ucc_schedule_add_task(schedule, task);
-    ucc_event_manager_subscribe(&rs_task->em, UCC_EVENT_COMPLETED, task);
-    task->handlers[UCC_EVENT_COMPLETED] = ucc_task_start_handler;
+    ucc_event_manager_subscribe(&rs_task->em, UCC_EVENT_COMPLETED, task,
+                                ucc_task_start_handler);
 
     schedule->super.post     = ucc_tl_ucp_allreduce_sra_knomial_start;
     schedule->super.progress = NULL;

@@ -123,7 +123,7 @@ static ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
     ucc_tl_nccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_status_t       status = UCC_OK ;
 
-    tl_info(UCC_TL_TEAM_LIB(task->team), "finalizing coll task %p", task);
+    tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
     if (task->completed) {
         ucc_mc_ee_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
     }
@@ -139,15 +139,14 @@ ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task
 
     ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
     coll_task->ee = ee;
-    tl_info(task->team->super.super.context->lib, "triggered post. task:%p", coll_task);
+    tl_info(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
 
     status = coll_task->post(coll_task);
     if (ucc_likely(status == UCC_OK)) {
         /* TODO: mpool */
         post_event = ucc_malloc(sizeof(ucc_ev_t), "event");
         if (ucc_unlikely(post_event == NULL)) {
-            tl_error(task->team->super.super.context->lib,
-                    "failed to allocate memory for event");
+            tl_error(UCC_TASK_LIB(task), "failed to allocate memory for event");
             return UCC_ERR_NO_MEMORY;
         }
 
@@ -164,16 +163,14 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *team,
                                    ucc_coll_task_t **task_h)
 {
-    ucc_tl_nccl_team_t    *nccl_team = ucc_derived_of(team, ucc_tl_nccl_team_t);
     ucc_tl_nccl_context_t *nccl_ctx  = ucc_derived_of(team->context,
                                                       ucc_tl_nccl_context_t);
     ucc_tl_nccl_task_t    *task;
     ucc_status_t status;
 
     task = ucc_mpool_get(&nccl_ctx->req_mp);
-    ucc_coll_task_init(&task->super);
-    memcpy(&task->args, &coll_args->args, sizeof(ucc_coll_args_t));
-    task->team                 = nccl_team;
+    ucc_coll_task_init(&task->super, &coll_args->args, team);
+
     task->super.finalize       = ucc_tl_nccl_coll_finalize;
     task->super.triggered_post = ucc_tl_nccl_triggered_post;
     task->completed            = NULL;
@@ -205,7 +202,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
         status = ucc_tl_nccl_bcast_init(task);
         break;
     default:
-        tl_error(UCC_TL_TEAM_LIB(task->team),
+        tl_error(UCC_TASK_LIB(task),
                  "collective %d is not supported by nccl tl",
                  coll_args->args.coll_type);
         status = UCC_ERR_NOT_SUPPORTED;
@@ -213,7 +210,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     if (ucc_unlikely(status != UCC_OK)) {
         goto free_event;
     }
-    tl_info(UCC_TL_TEAM_LIB(task->team), "init coll task %p", task);
+    tl_info(UCC_TASK_LIB(task), "init coll task %p", task);
     *task_h = &task->super;
     return status;
 
