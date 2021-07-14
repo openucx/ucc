@@ -1,0 +1,8 @@
+#
+# Copyright (C) NVIDIA Corporation. 2021.  ALL RIGHTS RESERVED.
+#
+
+set(UCC_LIBRARIES "@prefix@/lib")
+set(UCC_INCLUDE_DIRS "@prefix@/include")
+
+include("${CMAKE_CURRENT_LIST_DIR}/ucc-targets.cmake")
