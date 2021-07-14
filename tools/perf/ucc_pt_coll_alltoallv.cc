@@ -11,6 +11,7 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(int size, ucc_datatype_t dt,
     has_inplace_= true;
     has_reduction_= false;
     has_range_ = true;
+    has_bw_ = false;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLTOALLV;
@@ -79,10 +80,4 @@ void ucc_pt_coll_alltoallv::free_coll_args(ucc_coll_args_t &args)
     ucc_free(args.dst.info_v.displacements);
     ucc_free(args.src.info_v.counts);
     ucc_free(args.src.info_v.displacements);
-}
-
-double ucc_pt_coll_alltoallv::get_bus_bw(double time_us)
-{
-    //TODO
-    return 0.0;
 }

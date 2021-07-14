@@ -20,7 +20,8 @@ class ucc_pt_benchmark {
 
     ucc_status_t barrier();
     void print_header();
-    void print_time(size_t count, std::chrono::nanoseconds time);
+    void print_time(size_t count, ucc_coll_args_t args,
+                    std::chrono::nanoseconds time);
 public:
     ucc_pt_benchmark(ucc_pt_benchmark_config cfg, ucc_pt_comm *communcator);
     ucc_status_t run_bench() noexcept;

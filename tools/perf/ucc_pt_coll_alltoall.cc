@@ -8,9 +8,10 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(int size, ucc_datatype_t dt,
                                            ucc_memory_type mt, bool is_inplace):
     comm_size(size)
 {
-    has_inplace_= true;
+    has_inplace_  = true;
     has_reduction_= false;
-    has_range_ = true;
+    has_range_    = true;
+    has_bw_       = true;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLTOALL;
@@ -57,8 +58,11 @@ void ucc_pt_coll_alltoall::free_coll_args(ucc_coll_args_t &args)
     ucc_mc_free(dst_header);
 }
 
-double ucc_pt_coll_alltoall::get_bus_bw(double time_us)
+float ucc_pt_coll_alltoall::get_bw(float time_ms, int grsize,
+                                   ucc_coll_args_t args)
 {
-    //TODO
-    return 0.0;
+    float N = grsize;
+    float S = N * args.src.info.count * ucc_dt_size(args.src.info.datatype);
+
+    return (S / time_ms) * ((N - 1) / N) / 1000.0;
 }
