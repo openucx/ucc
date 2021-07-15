@@ -18,6 +18,7 @@ protected:
     bool has_reduction_;
     bool has_range_;
     bool has_bw_;
+    bool is_root_;
     ucc_coll_args_t coll_args;
     ucc_mc_buffer_header_t *dst_header;
     ucc_mc_buffer_header_t *src_header;
@@ -33,6 +34,7 @@ public:
     bool has_inplace();
     bool has_range();
     bool has_bw();
+    bool is_root();
     virtual ~ucc_pt_coll() {};
 };
 
@@ -97,6 +99,15 @@ public:
 class ucc_pt_coll_bcast: public ucc_pt_coll {
 public:
     ucc_pt_coll_bcast(ucc_datatype_t dt, ucc_memory_type mt);
+    ucc_status_t init_coll_args(size_t count, ucc_coll_args_t &args) override;
+    void free_coll_args(ucc_coll_args_t &args) override;
+    float get_bw(float time_ms, int grsize, ucc_coll_args_t args) override;
+};
+
+class ucc_pt_coll_reduce: public ucc_pt_coll {
+public:
+    ucc_pt_coll_reduce(ucc_datatype_t dt, ucc_memory_type mt,
+                       ucc_reduction_op_t op, bool is_inplace, bool is_root);
     ucc_status_t init_coll_args(size_t count, ucc_coll_args_t &args) override;
     void free_coll_args(ucc_coll_args_t &args) override;
     float get_bw(float time_ms, int grsize, ucc_coll_args_t args) override;

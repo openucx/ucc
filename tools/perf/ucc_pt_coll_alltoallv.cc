@@ -8,10 +8,11 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(int size, ucc_datatype_t dt,
                                              ucc_memory_type mt, bool is_inplace):
     comm_size(size)
 {
-    has_inplace_= true;
-    has_reduction_= false;
-    has_range_ = true;
-    has_bw_ = false;
+    has_inplace_   = true;
+    has_reduction_ = false;
+    has_range_     = true;
+    has_bw_        = false;
+    is_root_       = false;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLTOALLV;

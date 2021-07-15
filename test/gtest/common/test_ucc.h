@@ -120,6 +120,7 @@ public:
                       UCC_COLL_TYPE_ALLREDUCE |
                       UCC_COLL_TYPE_ALLGATHER |
                       UCC_COLL_TYPE_ALLGATHERV |
+                      UCC_COLL_TYPE_REDUCE |
                       UCC_COLL_TYPE_BCAST
     };
     static constexpr ucc_context_params_t default_ctx_params = {

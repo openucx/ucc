@@ -6,10 +6,11 @@
 
 ucc_pt_coll_barrier::ucc_pt_coll_barrier()
 {
-    has_inplace_= false;
+    has_inplace_   = false;
     has_reduction_ = false;
-    has_range_ = false;
-    has_bw_ = false;
+    has_range_     = false;
+    has_bw_        = false;
+    is_root_       = false;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_BARRIER;

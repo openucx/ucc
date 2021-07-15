@@ -52,6 +52,15 @@ typedef struct ucc_tl_ucp_task {
             ucc_rank_t              dist;
             uint32_t                radix;
         } bcast_kn;
+        struct {
+            ucc_rank_t              dist;
+            ucc_rank_t              max_dist;
+            int                     children_per_cycle;
+            uint32_t                radix;
+            int                     phase;
+            void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+        } reduce_kn;
     };
 } ucc_tl_ucp_task_t;
 

@@ -8,6 +8,7 @@ static size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX;
 
 static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
                                              UCC_COLL_TYPE_BCAST,
+                                             UCC_COLL_TYPE_REDUCE,
                                              UCC_COLL_TYPE_ALLREDUCE,
                                              UCC_COLL_TYPE_ALLGATHER,
                                              UCC_COLL_TYPE_ALLGATHERV,
@@ -53,7 +54,7 @@ void PrintHelp()
 {
     std::cout <<
        "--colls      <c1,c2,..>:        list of collectives: "
-            "barrier, allreduce, allgather, allgatherv, bcast, alltoall, "
+            "barrier, allreduce, allgather, allgatherv, bcast, alltoall, alltoallv "
             "reduce, reduce_scatter\n"
        "--teams      <t1,t2,..>:        list of teams: world,half,reverse,odd_even\n"
        "--mtypes     <m1,m2,..>:        list of mtypes: host,cuda\n"
@@ -111,6 +112,8 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
         return UCC_COLL_TYPE_ALLGATHERV;
     } else if (coll == "bcast") {
         return UCC_COLL_TYPE_BCAST;
+    } else if (coll == "reduce") {
+            return UCC_COLL_TYPE_REDUCE;
     } else if (coll == "alltoall") {
         return UCC_COLL_TYPE_ALLTOALL;
     } else if (coll == "alltoallv") {

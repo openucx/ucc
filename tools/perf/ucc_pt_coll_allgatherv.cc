@@ -9,10 +9,11 @@ ucc_pt_coll_allgatherv::ucc_pt_coll_allgatherv(int size, ucc_datatype_t dt,
                                                bool is_inplace):
     comm_size(size)
 {
-    has_inplace_= true;
-    has_reduction_= false;
-    has_range_ = true;
-    has_bw_ = false;
+    has_inplace_   = true;
+    has_reduction_ = false;
+    has_range_     = true;
+    has_bw_        = false;
+    is_root_       = false;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLGATHERV;

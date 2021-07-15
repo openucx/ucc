@@ -44,6 +44,7 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t            reduce_scatter_kn_radix;
     uint32_t            allgather_kn_radix;
     uint32_t            bcast_kn_radix;
+    uint32_t            reduce_kn_radix;
     uint32_t            alltoall_pairwise_num_posts;
     uint32_t            alltoallv_pairwise_num_posts;
 } ucc_tl_ucp_lib_config_t;
@@ -96,7 +97,7 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
     (UCC_COLL_TYPE_ALLTOALL  | UCC_COLL_TYPE_ALLTOALLV  |  \
      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |  \
      UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BCAST      |  \
-     UCC_COLL_TYPE_BARRIER)
+     UCC_COLL_TYPE_BARRIER   | UCC_COLL_TYPE_REDUCE)
 
 #define UCC_TL_UCP_TEAM_LIB(_team)                                             \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_ucp_lib_t))
