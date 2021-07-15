@@ -93,6 +93,11 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_context_config_t, pre_reg_mem),
      UCC_CONFIG_TYPE_UINT},
 
+    {"ALLTOALLV_USE_IPC", "0",
+     "Use CUDA IPC for ALLTOALLV",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, alltoall_use_ipc),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_ucp_lib_t, ucc_base_lib_t,
@@ -127,6 +132,10 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           size_t count, ucc_reduction_op_t op,
                                           ucc_tl_team_subset_t subset,
                                           ucc_coll_task_t **task);
+ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
+                                          void *rbuf, size_t count,
+                                          ucc_tl_team_subset_t subset,
+                                          ucc_coll_task_t **task_p);
 
 ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task);
 
@@ -148,28 +157,41 @@ ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1] = {
     [UCC_MEMORY_TYPE_UNKNOWN]      = UCS_MEMORY_TYPE_UNKNOWN
 };
 
-void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
-                                 size_t length, ucc_memory_type_t mem_type)
+void ucc_tl_ucp_get_alloc_info(void *ptr, size_t length,
+                               void **base_address, size_t *alloc_length)
 {
-    void *base_address  = addr;
-    size_t alloc_length = length;
     ucc_mem_attr_t mem_attr;
     ucc_status_t status;
 
-    if ((addr == NULL) || (length == 0)) {
-        return;
+    *base_address  = ptr;
+    *alloc_length = length;
+    if (length == 0) {
+        *base_address = NULL;
     }
 
     mem_attr.field_mask   = UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
                             UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
     mem_attr.alloc_length = length;
-    status = ucc_mc_get_mem_attr(addr, &mem_attr);
+    status = ucc_mc_get_mem_attr(ptr, &mem_attr);
     if (ucc_likely(status == UCC_OK)) {
-        base_address = mem_attr.base_address;
-        alloc_length = mem_attr.alloc_length;
-    } else {
-        tl_warn(UCC_TL_TEAM_LIB(team), "failed to query base addr and len");
+        *base_address = mem_attr.base_address;
+        *alloc_length = mem_attr.alloc_length;
     }
+
+}
+
+void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
+                                 size_t length, ucc_memory_type_t mem_type)
+{
+    ucc_status_t status;
+    void *base_address;
+    size_t alloc_length;
+
+    if ((addr == NULL) || (length == 0)) {
+        return;
+    }
+
+    ucc_tl_ucp_get_alloc_info(addr, length, &base_address, &alloc_length);
 
     status = ucc_tl_ucp_populate_rcache(base_address, alloc_length,
                                         ucc_memtype_to_ucs[mem_type],
@@ -182,6 +204,7 @@ void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
 __attribute__((constructor)) static void tl_ucp_iface_init(void)
 {
     ucc_tl_ucp.super.scoll.allreduce = ucc_tl_ucp_service_allreduce;
+    ucc_tl_ucp.super.scoll.allgather = ucc_tl_ucp_service_allgather;
     ucc_tl_ucp.super.scoll.test      = ucc_tl_ucp_service_test;
     ucc_tl_ucp.super.scoll.cleanup   = ucc_tl_ucp_service_cleanup;
     ucc_tl_ucp.super.scoll.update_id = ucc_tl_ucp_service_update_id;

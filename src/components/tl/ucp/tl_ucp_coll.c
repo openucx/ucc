@@ -15,6 +15,7 @@
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
 #include "bcast/bcast.h"
+
 const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
         UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR};
@@ -64,6 +65,7 @@ ucc_tl_ucp_triggered_coll_complete(ucc_coll_task_t *parent_task, //NOLINT
     tl_info(task->team->super.super.context->lib,
         "triggered collective complete. task:%p", coll_task);
     return ucc_mc_ee_task_end(coll_task->ee_task, coll_task->ee->ee_type);
+    //CUDACHECK(cudaStreamSynchronize((cudaStream_t)coll_task->ee->ee_context));
 }
 
 static ucc_status_t
@@ -143,6 +145,11 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
         post_event->ev_context_size = 0;
         post_event->req = &coll_task->triggered_task->super;
         ucc_ee_set_event_internal(coll_task->ee, post_event, &coll_task->ee->event_out_queue);
+
+        coll_task->triggered_task->ee = task->super.ee;
+        status = coll_task->triggered_task->early_triggered_post(coll_task->triggered_task);
+        assert(status == UCC_OK);
+
     }
 
     if (task->super.ee_task == NULL ||
@@ -168,6 +175,9 @@ ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, //NOLINT
     ev_task->super.flags          = UCC_COLL_TASK_FLAG_INTERNAL;
     ev_task->super.finalize       = ucc_tl_ucp_coll_finalize;
     ev_task->super.super.status   = UCC_INPROGRESS;
+
+
+//    int k=1; while(k);
 
     tl_info(task->team->super.super.context->lib,
             "triggered post. ev_task:%p coll_task:%p", &ev_task->super, coll_task);

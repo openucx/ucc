@@ -32,6 +32,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     ucp_context_h       ucp_context;
     ucp_worker_h        ucp_worker;
     ucs_status_t        status;
+    int                 i;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_ucp_config->super.tl_lib,
                               params->context);
@@ -125,8 +126,21 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     }
     self->ep_hash = kh_init(tl_ucp_ep_hash);
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
-    return UCC_OK;
 
+    for (i = 0; i < MAX_CUDA_IPC_PEERS; i++) {
+        ucc_status =  ucc_cuda_ipc_create_cache(&self->ipc_cache[i], "ipc-cache");
+        if (ucc_status != UCC_OK) {
+            tl_error(self->super.super.lib,
+                     "failed to create ipc cache");
+            goto err_ipc_cache;
+        }
+    }
+
+    return UCC_OK;
+err_ipc_cache:
+    for (i = i-1; i >=0; i++) {
+        ucc_cuda_ipc_destroy_cache(self->ipc_cache[i]);
+    }
 err_thread_mode:
     ucp_worker_destroy(ucp_worker);
 err_worker_create:
@@ -167,6 +181,8 @@ static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
     ucc_status_t status;
+    int i;
+
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
     while (UCC_OK != (status = ucc_tl_ucp_close_eps(self))) {
         //TODO can we hang the runtime this way ?
@@ -181,6 +197,11 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     if (UCC_TL_CTX_HAS_OOB(self)) {
         ucc_tl_ucp_context_barrier(self, &UCC_TL_CTX_OOB(self));
     }
+
+    for (i = 0; i < MAX_CUDA_IPC_PEERS; i++) {
+        ucc_cuda_ipc_destroy_cache(self->ipc_cache[i]);
+    }
+
     ucc_context_progress_deregister(
         self->super.super.ucc_context,
         (ucc_context_progress_fn_t)ucp_worker_progress, self->ucp_worker);

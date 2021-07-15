@@ -8,6 +8,7 @@
 #include "tl_ucp_coll.h"
 #include "tl_ucp_tag.h"
 #include "allreduce/allreduce.h"
+#include "allgather/allgather.h"
 
 ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, ucc_datatype_t dt,
@@ -63,15 +64,74 @@ free_task:
     return status;
 }
 
+ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
+                                          void *rbuf, size_t count,
+                                          ucc_tl_team_subset_t subset,
+                                          ucc_coll_task_t **task_p)
+{
+    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
+    ucc_status_t status;
+
+    ucc_coll_args_t args = {
+        .coll_type            = UCC_COLL_TYPE_ALLGATHER,
+        .src.info = {
+            .buffer   = sbuf,
+            .count    = count,
+            .datatype = UCC_DT_INT8,
+            .mem_type = UCC_MEMORY_TYPE_HOST
+        },
+        .dst.info = {
+            .buffer   = rbuf,
+            .count    = count,
+            .datatype = UCC_DT_INT8,
+            .mem_type = UCC_MEMORY_TYPE_HOST
+        }
+    };
+
+    status = ucc_coll_task_init(&task->super);
+    if (status != UCC_OK) {
+        goto free_task;
+    }
+    task->subset = subset;
+    task->tag  = UCC_TL_UCP_SERVICE_TAG;
+    task->n_polls = 10; // TODO need a var ?
+    task->super.post     = ucc_tl_ucp_allgather_ring_start;
+    task->super.progress = ucc_tl_ucp_allgather_ring_progress;
+    task->super.finalize = ucc_tl_ucp_coll_finalize;
+    memcpy(&task->args, &args, sizeof(ucc_coll_args_t));
+    *task_p = &task->super;
+
+    status = ucc_tl_ucp_allgather_ring_start(&task->super);
+    if (status != UCC_OK) {
+        goto finalize_coll;
+    }
+
+    return status;
+finalize_coll:
+   ucc_tl_ucp_coll_finalize(*task_p);
+free_task:
+    ucc_tl_ucp_put_task(task);
+    return status;
+}
+
 ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task)
 {
     return task->super.status;
 }
 
 
-void ucc_tl_ucp_service_cleanup(ucc_coll_task_t *task)
+void ucc_tl_ucp_service_cleanup(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_allreduce_knomial_finalize(task);
+    ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    switch (task->args.coll_type) {
+    case UCC_COLL_TYPE_ALLREDUCE:
+        ucc_tl_ucp_allreduce_knomial_finalize(coll_task);
+        break;
+    default:
+        ucc_tl_ucp_coll_finalize(coll_task);
+        break;
+    }
 }
 
 void ucc_tl_ucp_service_update_id(ucc_base_team_t *team, uint16_t id) {

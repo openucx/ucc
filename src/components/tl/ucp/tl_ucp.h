@@ -11,8 +11,10 @@
 #include "core/ucc_ee.h"
 #include "utils/ucc_mpool.h"
 #include "tl_ucp_ep_hash.h"
+#include "tl_ucp_cuda_ipc.h"
 #include <ucp/api/ucp.h>
 #include <ucs/memory/memory_type.h>
+#include <cuda_runtime.h>
 
 #ifndef UCC_TL_UCP_DEFAULT_SCORE
 #define UCC_TL_UCP_DEFAULT_SCORE 10
@@ -28,6 +30,25 @@
 #define UCC_TL_UCP_PROFILE_REQUEST_NEW UCC_PROFILE_REQUEST_NEW
 #define UCC_TL_UCP_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
 #define UCC_TL_UCP_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
+#define MAX_CUDA_IPC_PEERS (8)
+
+#define CUDACHECK(cmd) do {                                                    \
+        cudaError_t e = cmd;                                                   \
+        if(e != cudaSuccess) {                                                 \
+            printf("cuda failed with ret:%d(%s)", e,     \
+                     cudaGetErrorString(e));                                   \
+            return UCC_ERR_NO_MESSAGE;                                         \
+        }                                                                      \
+} while(0)
+
+#define CUDACHECK_NO_RET(cmd) do {                                                    \
+        cudaError_t e = cmd;                                                   \
+        if(e != cudaSuccess) {                                                 \
+            printf("cuda failed with ret:%d(%s)", e,     \
+                     cudaGetErrorString(e));                                   \
+        }                                                                      \
+} while(0)
+
 
 typedef struct ucc_tl_ucp_iface {
     ucc_tl_iface_t super;
@@ -54,6 +75,7 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                n_polls;
     uint32_t                oob_npolls;
     uint32_t                pre_reg_mem;
+    uint32_t                alltoall_use_ipc;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
@@ -77,6 +99,8 @@ typedef struct ucc_tl_ucp_context {
     ucc_tl_ucp_ep_close_state_t ep_close_state;
     ucc_mpool_t                 req_mp;
     tl_ucp_ep_hash_t           *ep_hash;
+    ucc_cuda_ipc_cache_t       *ipc_cache[MAX_CUDA_IPC_PEERS];
+
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -117,4 +141,6 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 
 void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
                                  size_t length, ucc_memory_type_t mem_type);
+void ucc_tl_ucp_get_alloc_info(void *ptr, size_t length,
+                               void **base_address, size_t *alloc_length);
 #endif

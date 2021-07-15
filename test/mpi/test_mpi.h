@@ -154,10 +154,11 @@ typedef struct ucc_test_team {
     ucc_test_mpi_team_t type;
     MPI_Comm comm;
     ucc_team_h team;
+    ucc_ee_h ee;
     ucc_context_h ctx;
     ucc_test_team(ucc_test_mpi_team_t _type, MPI_Comm _comm,
-                  ucc_team_h _team, ucc_context_h _ctx) :
-    type(_type), comm(_comm), team(_team), ctx(_ctx) {};
+                  ucc_team_h _team, ucc_ee_h _ee, ucc_context_h _ctx) :
+    type(_type), comm(_comm), team(_team), ee(_ee), ctx(_ctx) {};
 } ucc_test_team_t;
 
 class UccTestMpi {

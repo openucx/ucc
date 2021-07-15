@@ -46,6 +46,7 @@ typedef struct ucc_coll_task {
     ucc_coll_req_t               super;
     uint32_t                     flags;
     ucc_coll_post_fn_t           post;
+    ucc_coll_post_fn_t           early_triggered_post;;
     ucc_coll_triggered_post_fn_t triggered_post;
     ucc_coll_finalize_fn_t       finalize;
     ucc_coll_callback_t          cb;

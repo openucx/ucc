@@ -13,6 +13,7 @@ END_C_DECLS
 #include <assert.h>
 #include <random>
 #include <pthread.h>
+#include <cuda_runtime.h>
 
 static ucc_status_t oob_allgather(void *sbuf, void *rbuf, size_t msglen,
                                   void *coll_info, void **req)
@@ -156,7 +157,20 @@ void UccTestMpi::create_team(ucc_test_mpi_team_t t)
 {
     MPI_Comm comm = create_mpi_comm(t);
     ucc_team_h team = create_ucc_team(comm);
-    teams.push_back(ucc_test_team_t(t, comm, team, ctx));
+    ucc_ee_params_t ee_params;
+    ucc_ee_h ee;
+    cudaStream_t cudaStrm;
+
+    ee_params.ee_type = UCC_EE_CUDA_STREAM;
+    CUDA_CHECK(cudaStreamCreateWithFlags(&cudaStrm,
+                cudaStreamNonBlocking));
+    ee_params.ee_context = (void *) cudaStrm;
+    ee_params.ee_context_size = sizeof(cudaStream_t);
+
+    UCC_CHECK(ucc_ee_create(team, &ee_params, &ee));
+
+
+    teams.push_back(ucc_test_team_t(t, comm, team, ee, ctx));
 }
 
 void UccTestMpi::destroy_team(ucc_test_team_t &team)
