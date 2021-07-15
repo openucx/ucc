@@ -8,18 +8,26 @@
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em)
 {
     int i;
-    for (i = 0; i < UCC_EVENT_LAST; i++) {
-        em->listeners_size[i] = 0;
+    for (i = 0; i < MAX_LISTENERS; i++) {
+        em->listeners[i].task = NULL;
     }
     return UCC_OK;
 }
 
 void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
-                                 ucc_coll_task_t *task)
+                                 ucc_coll_task_t *task,
+                                 ucc_task_event_handler_p handler)
 {
-    ucc_assert(em->listeners_size[event] < MAX_LISTENERS);
-    em->listeners[event][em->listeners_size[event]] = task;
-    em->listeners_size[event]++;
+    int i;
+    for (i = 0; i < MAX_LISTENERS; i++) {
+        if (!em->listeners[i].task) {
+            em->listeners[i].task    = task;
+            em->listeners[i].event   = event;
+            em->listeners[i].handler = handler;
+            break;
+        }
+    }
+    ucc_assert(i < MAX_LISTENERS);
 }
 
 ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task)
@@ -31,6 +39,26 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task)
     return ucc_event_manager_init(&task->em);
 }
 
+static ucc_status_t
+ucc_task_error_handler(ucc_coll_task_t *parent_task,
+                       ucc_coll_task_t *task)
+{
+    ucc_event_manager_t *em = &parent_task->em;
+    ucc_coll_task_t     *listener;
+    int                 i;
+
+    task->super.status = parent_task->super.status;
+    for (i = 0; i < MAX_LISTENERS; i++) {
+        listener = em->listeners[i].task;
+        if (listener &&
+            listener->super.status != parent_task->super.status) {
+            /* status has not been propagated yet */
+            ucc_task_error_handler(task, listener);
+        }
+    }
+    return UCC_OK;
+}
+
 ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event)
 {
@@ -39,11 +67,17 @@ ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
     ucc_status_t        status;
     int                 i;
 
-    for (i = 0; i < em->listeners_size[event]; i++) {
-        task   = em->listeners[event][i];
-        status = task->handlers[event](parent_task, task);
-        if (ucc_unlikely(status != UCC_OK)) {
-            return status;
+    for (i = 0; i < MAX_LISTENERS; i++) {
+        task = em->listeners[i].task;
+        if (task) {
+            if (UCC_EVENT_ERROR == event) {
+                ucc_task_error_handler(parent_task, task);
+            } else if (em->listeners[i].event == event) {
+                status = em->listeners[i].handler(parent_task, task);
+                if (ucc_unlikely(status != UCC_OK)) {
+                    return status;
+                }
+            }
         }
     }
     return UCC_OK;
@@ -62,34 +96,20 @@ ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
     return UCC_OK;
 }
 
-static ucc_status_t
-ucc_schedule_error_handler(ucc_coll_task_t *parent_task, //NOLINT
-                           ucc_coll_task_t *task)
-{
-    task->super.status = parent_task->super.status;
-    return ucc_event_manager_notify(task, UCC_EVENT_ERROR);
-}
-
 ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx)
 {
     ucc_status_t status;
-    status = ucc_coll_task_init(&schedule->super);
-    schedule->super.handlers[UCC_EVENT_COMPLETED] =
-        ucc_schedule_completed_handler;
-    schedule->super.handlers[UCC_EVENT_ERROR] =
-        ucc_schedule_error_handler;
-    schedule->n_completed_tasks = 0;
-    schedule->ctx               = ctx;
-    schedule->n_tasks           = 0;
+
+    status             = ucc_coll_task_init(&schedule->super);
+    schedule->ctx      = ctx;
+    schedule->n_tasks  = 0;
     return status;
 }
 
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
 {
     ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED,
-                                &schedule->super);
-    ucc_event_manager_subscribe(&task->em, UCC_EVENT_ERROR,
-                                &schedule->super);
+                            &schedule->super, ucc_schedule_completed_handler);
     task->schedule                       = schedule;
     schedule->tasks[schedule->n_tasks++] = task;
 }
