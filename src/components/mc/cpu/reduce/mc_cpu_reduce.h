@@ -8,6 +8,8 @@
 #define UCC_MC_CPU_REDUCE_H_
 
 #include "utils/ucc_math.h"
+#include "mc_cpu.h"
+
 #define OP_1(_s1, _s2, _i, _sc, _OP) _OP(_s1[_i], _s2[_i])
 #define OP_2(_s1, _s2, _i, _sc, _OP)                                           \
     _OP((OP_1(_s1, _s2, _i, _sc, _OP)), _s2[_i + 1 * _sc])
@@ -22,6 +24,16 @@
 #define OP_7(_s1, _s2, _i, _sc, _OP)                                           \
     _OP((OP_6(_s1, _s2, _i, _sc, _OP)), _s2[_i + 6 * _sc])
 
+#ifdef _OPENMP
+#define OP_N(_d, _s1, _s2, _sc, _OP, _n)                                        \
+    do {                                                                        \
+        size_t _i;                                                              \
+_Pragma("omp parallel for simd num_threads(MC_CPU_CONFIG->reduce_num_threads)") \
+        for (_i = 0; _i < count; _i++) {                                        \
+            _d[_i] = OP_##_n(_s1, _s2, _i, _sc, _OP);                           \
+        }                                                                       \
+    } while (0)
+#else
 #define OP_N(_d, _s1, _s2, _sc, _OP, _n)                                       \
     do {                                                                       \
         size_t _i;                                                             \
@@ -29,6 +41,7 @@
             _d[_i] = OP_##_n(_s1, _s2, _i, _sc, _OP);                          \
         }                                                                      \
     } while (0)
+#endif
 
 #define DO_DT_REDUCE_WITH_OP(s1, s2, d, size, count, stride, OP)               \
     do {                                                                       \

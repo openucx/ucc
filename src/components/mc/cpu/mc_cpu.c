@@ -20,6 +20,10 @@ static ucc_config_field_t ucc_mc_cpu_config_table[] = {
     {"MPOOL_MAX_ELEMS", "8", "The max amount of elements in mc cpu mpool",
      ucc_offsetof(ucc_mc_cpu_config_t, mpool_max_elems), UCC_CONFIG_TYPE_UINT},
 
+    {"REDUCE_NUM_THREADS", "1", "Number of OMP threads used for reduction",
+     ucc_offsetof(ucc_mc_cpu_config_t, reduce_num_threads),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}
 
 };

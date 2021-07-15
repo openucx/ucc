@@ -69,6 +69,8 @@ AC_MSG_RESULT([git sha: $ucc_git_sha])
 CFLAGS_save="$CFLAGS"
 AC_PROG_CC
 AC_PROG_CXX
+: ${enable_openmp=no}
+AC_OPENMP
 AM_PROG_AS
 AC_PROG_LN_S
 AC_PROG_MKDIR_P
@@ -76,6 +78,7 @@ AC_PROG_INSTALL
 AC_PROG_LIBTOOL
 AC_HEADER_STDC
 CFLAGS="$CFLAGS_save"
+AC_MSG_RESULT([OMP: $enable_openmp])
 
 #
 # Check if 'ln' supports creating relative links

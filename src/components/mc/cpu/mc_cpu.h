@@ -14,6 +14,7 @@ typedef struct ucc_mc_cpu_config {
     ucc_mc_config_t super;
     size_t          mpool_elem_size;
     int             mpool_max_elems;
+    int             reduce_num_threads;
 } ucc_mc_cpu_config_t;
 
 typedef struct ucc_mc_cpu {
