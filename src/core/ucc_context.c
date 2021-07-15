@@ -447,8 +447,10 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
                                 const ucc_context_config_h  config,
                                 ucc_context_h *context)
 {
+    uint32_t                   topo_required = 0;
     ucc_base_context_params_t  b_params;
     ucc_base_context_t        *b_ctx;
+    ucc_base_ctx_attr_t        attr;
     ucc_cl_lib_t              *cl_lib;
     ucc_context_t             *ctx;
     ucc_status_t               status;
@@ -506,6 +508,16 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         }
         ctx->cl_ctx[ctx->n_cl_ctx] = ucc_derived_of(b_ctx, ucc_cl_context_t);
         ctx->n_cl_ctx++;
+        memset(&attr, 0, sizeof(attr));
+        status = cl_lib->iface->context.get_attr(b_ctx, &attr);
+        if (status != UCC_OK) {
+            ucc_error("failed to query context attributes for %s",
+                      cl_lib->iface->super.name);
+            goto error_ctx_create;
+        }
+        if (attr.topo_required) {
+            topo_required = 1;
+        }
     }
     if (0 == ctx->n_cl_ctx) {
         ucc_error("no CL context created in ucc_context_create");
@@ -542,13 +554,23 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         } while (status == UCC_INPROGRESS);
 
         ctx->rank = ctx->addr_storage.rank;
+
+        if (topo_required) {
+            /* At least one available CL context reported it needs topo info */
+            status = ucc_topo_init(&ctx->addr_storage, &ctx->topo);
+            if (UCC_OK != status) {
+                ucc_free(ctx->addr_storage.storage);
+                ucc_error("failed to init ctx topo");
+                goto error_ctx_create;
+            }
+        }
     }
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;
     return UCC_OK;
 
 error_ctx_create:
-    for (i = i - 1; i >= 0; i--) {
+    for (i = 0; i < ctx->n_cl_ctx; i++) {
         config->configs[i]->cl_lib->iface->context.destroy(
             &ctx->cl_ctx[i]->super);
     }

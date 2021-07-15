@@ -156,5 +156,6 @@ ucc_tl_nccl_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
         attr->attr.ctx_addr_len = 0;
     }
+    attr->topo_required = 0;
     return UCC_OK;
 }
