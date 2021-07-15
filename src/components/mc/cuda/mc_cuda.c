@@ -124,6 +124,12 @@ ucc_status_t ucc_mc_cuda_post_kernel_stream_task(uint32_t *status,
                                                  int blocking_wait,
                                                  cudaStream_t stream);
 
+ucc_status_t ucc_mc_cuda_enqueue_kernel_stream_task(uint32_t *status,
+                                                    cudaStream_t stream);
+
+ucc_status_t ucc_mc_cuda_sync_kernel_stream_task(uint32_t *status,
+                                                 cudaStream_t stream);
+
 static ucc_status_t ucc_mc_cuda_post_driver_stream_task(uint32_t *status,
                                                         int blocking_wait,
                                                         cudaStream_t stream)
@@ -194,6 +200,8 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
         return status;
     }
 
+    ucc_mc_cuda.enqueue_strm_task = ucc_mc_cuda_enqueue_kernel_stream_task;
+    ucc_mc_cuda.sync_strm_task    = ucc_mc_cuda_sync_kernel_stream_task;
     if (cfg->strm_task_mode == UCC_MC_CUDA_TASK_KERNEL) {
         ucc_mc_cuda.strm_task_mode = UCC_MC_CUDA_TASK_KERNEL;
         ucc_mc_cuda.post_strm_task = ucc_mc_cuda_post_kernel_stream_task;
@@ -552,6 +560,89 @@ free_req:
     return status;
 }
 
+ucc_status_t ucc_ee_cuda_task_enqueue(void *ee_stream, void **ee_req)
+{
+    ucc_mc_cuda_stream_request_t *req;
+    ucc_mc_cuda_event_t *cuda_event;
+    ucc_status_t status;
+
+    UCC_MC_CUDA_INIT_STREAM();
+    req = ucc_mpool_get(&ucc_mc_cuda.strm_reqs);
+    ucc_assert(req);
+    req->status = UCC_MC_CUDA_TASK_POSTED;
+    req->stream = (cudaStream_t)ee_stream;
+
+    if (ucc_mc_cuda.task_strm_type == UCC_MC_CUDA_USER_STREAM) {
+        status = ucc_mc_cuda.enqueue_strm_task(req->dev_status,
+                                               req->stream);
+        if (ucc_unlikely(status != UCC_OK)) {
+            goto free_req;
+        }
+    } else {
+        cuda_event = ucc_mpool_get(&ucc_mc_cuda.events);
+        ucc_assert(cuda_event);
+        CUDACHECK(cudaEventRecord(cuda_event->event, req->stream));
+        CUDACHECK(cudaStreamWaitEvent(ucc_mc_cuda.stream, cuda_event->event, 0));
+        status = ucc_mc_cuda.enqueue_strm_task(req->dev_status,
+                                               ucc_mc_cuda.stream);
+        if (ucc_unlikely(status != UCC_OK)) {
+            goto free_event;
+        }
+    }
+
+    *ee_req = (void *) req;
+
+    mc_info(&ucc_mc_cuda.super, "CUDA stream task enqueued on \"%s\" stream. req:%p",
+            task_stream_types[ucc_mc_cuda.task_strm_type], req);
+
+    return UCC_OK;
+
+free_event:
+    ucc_mpool_put(cuda_event);
+free_req:
+    ucc_mpool_put(req);
+    return status;
+}
+
+ucc_status_t ucc_ee_cuda_task_sync(void *ee_req)
+{
+    ucc_mc_cuda_stream_request_t *req;
+    ucc_mc_cuda_event_t *cuda_event;
+    ucc_status_t status;
+
+    UCC_MC_CUDA_INIT_STREAM();
+    req = (ucc_mc_cuda_stream_request_t*)ee_req;
+
+    if (ucc_mc_cuda.task_strm_type == UCC_MC_CUDA_USER_STREAM) {
+        status = ucc_mc_cuda.sync_strm_task(req->dev_status, req->stream);
+        if (ucc_unlikely(status != UCC_OK)) {
+            goto free_req;
+        }
+    } else {
+        cuda_event = ucc_mpool_get(&ucc_mc_cuda.events);
+        ucc_assert(cuda_event);
+        status = ucc_mc_cuda.sync_strm_task(req->dev_status,
+                                            ucc_mc_cuda.stream);
+        if (ucc_unlikely(status != UCC_OK)) {
+            goto free_event;
+        }
+        CUDACHECK(cudaEventRecord(cuda_event->event, ucc_mc_cuda.stream));
+        CUDACHECK(cudaStreamWaitEvent(req->stream, cuda_event->event, 0));
+        ucc_mpool_put(cuda_event);
+    }
+
+    mc_info(&ucc_mc_cuda.super, "CUDA stream task synced on \"%s\" stream. req:%p",
+            task_stream_types[ucc_mc_cuda.task_strm_type], req);
+
+    return UCC_OK;
+
+free_event:
+    ucc_mpool_put(cuda_event);
+free_req:
+    ucc_mpool_put(req);
+    return status;
+}
+
 ucc_status_t ucc_ee_cuda_task_query(void *ee_req)
 {
     ucc_mc_cuda_stream_request_t *req = ee_req;
@@ -658,6 +749,8 @@ ucc_mc_cuda_t ucc_mc_cuda = {
         },
     .super.ee_ops.ee_task_post     = ucc_ee_cuda_task_post,
     .super.ee_ops.ee_task_query    = ucc_ee_cuda_task_query,
+    .super.ee_ops.ee_task_enqueue  = ucc_ee_cuda_task_enqueue,
+    .super.ee_ops.ee_task_sync     = ucc_ee_cuda_task_sync,
     .super.ee_ops.ee_task_end      = ucc_ee_cuda_task_end,
     .super.ee_ops.ee_create_event  = ucc_ee_cuda_create_event,
     .super.ee_ops.ee_destroy_event = ucc_ee_cuda_destroy_event,

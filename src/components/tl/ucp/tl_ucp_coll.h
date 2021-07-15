@@ -52,6 +52,12 @@ typedef struct ucc_tl_ucp_task {
             ucc_rank_t              dist;
             uint32_t                radix;
         } bcast_kn;
+        struct {
+            void                   *info;
+            void                   *peer_map_addr[8];
+            uint32_t                coll_id;
+            uint32_t                n;
+        } alltoall_intra;
     };
 } ucc_tl_ucp_task_t;
 
@@ -130,6 +136,7 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
     task->super.finalize = ucc_tl_ucp_coll_finalize;
     task->super.triggered_post = ucc_tl_ucp_triggered_post;
+    task->super.early_triggered_post = NULL;
     return task;
 }
 

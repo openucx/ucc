@@ -77,15 +77,34 @@ ucc_status_t ucc_pt_benchmark::run_single_test(ucc_coll_args_t args,
 {
     ucc_team_h    team = comm->get_team();
     ucc_context_h ctx  = comm->get_context();
+    ucc_ee_h      ee   = comm->get_ee();;
     ucc_status_t  st   = UCC_OK;
     ucc_coll_req_h req;
+    ucc_ev_t event, *post_event;
 
     UCCCHECK_GOTO(comm->barrier(), exit_err, st);
     time = std::chrono::nanoseconds::zero();
     for (int i = 0; i < nwarmup + niter; i++) {
         auto s = std::chrono::high_resolution_clock::now();
         UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
+#if 0
         UCCCHECK_GOTO(ucc_collective_post(req), free_req, st);
+#else
+        event.ev_type = UCC_EVENT_COMPUTE_COMPLETE;
+        //CUDACHECK(cudaEventCreateWithFlags(&cudaEvent, cudaEventDisableTiming));
+        event.ev_context = NULL;
+        event.ev_context_size = 0;
+        event.req = req;
+        UCCCHECK_GOTO(ucc_collective_triggered_post(ee, &event), exit_err, st);
+
+        while (UCC_OK != ucc_ee_get_event(ee, &post_event)) {
+            //fprintf(stdout, "waiting for post event \n");
+            ucc_context_progress(ctx);
+        }
+
+        //printf("POST EVENT DONE Done. req:%p\n", post_event->req);
+
+#endif
         st = ucc_collective_test(req);
         while (st == UCC_INPROGRESS) {
             UCCCHECK_GOTO(ucc_context_progress(ctx), free_req, st);

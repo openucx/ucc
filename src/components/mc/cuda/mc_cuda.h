@@ -49,6 +49,12 @@ typedef ucc_status_t (*ucc_mc_cuda_task_post_fn) (uint32_t *dev_status,
                                                   int blocking_wait,
                                                   cudaStream_t stream);
 
+typedef ucc_status_t (*ucc_mc_cuda_task_enqueue_fn) (uint32_t *dev_status,
+                                                  cudaStream_t stream);
+
+typedef ucc_status_t (*ucc_mc_cuda_task_sync_fn) (uint32_t *dev_status,
+                                                  cudaStream_t stream);
+
 typedef struct ucc_mc_cuda_config {
     ucc_mc_config_t                super;
     unsigned long                  reduce_num_blocks;
@@ -72,6 +78,8 @@ typedef struct ucc_mc_cuda {
     ucc_mc_cuda_strm_task_mode_t   strm_task_mode;
     ucc_mc_cuda_task_stream_type_t task_strm_type;
     ucc_mc_cuda_task_post_fn       post_strm_task;
+    ucc_mc_cuda_task_enqueue_fn    enqueue_strm_task;
+    ucc_mc_cuda_task_sync_fn       sync_strm_task;
 } ucc_mc_cuda_t;
 
 typedef struct ucc_cuda_mc_event {

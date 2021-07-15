@@ -46,6 +46,11 @@ ucc_team_h ucc_pt_comm::get_team()
     return team;
 }
 
+ucc_ee_h ucc_pt_comm::get_ee()
+{
+    return ee;
+}
+
 ucc_context_h ucc_pt_comm::get_context()
 {
     return context;
@@ -60,6 +65,7 @@ ucc_status_t ucc_pt_comm::init()
     ucc_team_params_t team_params;
     ucc_status_t st;
     std::string cfg_mod;
+    ucc_ee_params_t ee_params;
 
     if (cfg.mt != UCC_MEMORY_TYPE_HOST) {
         set_gpu_device();
@@ -97,6 +103,17 @@ ucc_status_t ucc_pt_comm::init()
         st = ucc_team_create_test(team);
     } while(st == UCC_INPROGRESS);
     UCCCHECK_GOTO(st, free_ctx, st);
+
+#if 1
+    ee_params.ee_type = UCC_EE_CUDA_STREAM;
+    CUDACHECK(cudaStreamCreateWithFlags(&cudaStrm,
+                cudaStreamNonBlocking));
+    ee_params.ee_context = (void *) cudaStrm;
+    ee_params.ee_context_size = sizeof(cudaStream_t);
+
+    UCCCHECK_GOTO(ucc_ee_create(team, &ee_params, &ee), free_ctx, st);
+
+#endif
     ucc_context_config_release(ctx_config);
     ucc_lib_config_release(lib_config);
     return UCC_OK;

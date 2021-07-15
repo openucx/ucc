@@ -47,7 +47,27 @@ std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
 
 void TestCase::run()
 {
-    UCC_CHECK(ucc_collective_post(req));
+    ucc_ev_t event, *post_event;
+    if (args.coll_type == UCC_COLL_TYPE_ALLTOALLV) {
+        event.ev_type = UCC_EVENT_COMPUTE_COMPLETE;
+        //CUDACHECK(cudaEventCreateWithFlags(&cudaEvent, cudaEventDisableTiming));
+        event.ev_context = NULL;
+        event.ev_context_size = 0;
+        event.req = req;
+        UCC_CHECK(ucc_collective_triggered_post(team.ee, &event));
+
+        while (UCC_OK != ucc_ee_get_event(team.ee, &post_event)) {
+            //fprintf(stdout, "waiting for post event \n");
+            ucc_context_progress(team.ctx);
+        }
+
+        // printf("POST EVENT DONE Done. req:%p\n", post_event->req);
+
+
+
+    } else {
+        UCC_CHECK(ucc_collective_post(req));
+    }
 }
 
 ucc_status_t TestCase::test()

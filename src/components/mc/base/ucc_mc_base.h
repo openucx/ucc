@@ -115,6 +115,8 @@ typedef struct ucc_mc_ops {
 
 typedef struct ucc_ee_ops {
     ucc_status_t (*ee_task_post)(void *ee_context, void **ee_req);
+    ucc_status_t (*ee_task_enqueue)(void *ee_context, void **ee_req);
+    ucc_status_t (*ee_task_sync)(void *ee_req);
     ucc_status_t (*ee_task_query)(void *ee_req);
     ucc_status_t (*ee_task_end)(void *ee_req);
     ucc_status_t (*ee_create_event)(void **event);

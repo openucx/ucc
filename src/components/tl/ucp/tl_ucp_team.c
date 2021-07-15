@@ -11,6 +11,7 @@
 #include "utils/ucc_malloc.h"
 #include "coll_score/ucc_coll_score.h"
 
+#include <sys/shm.h>
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
@@ -27,6 +28,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->id                 = params->id;
     self->seq_num            = 0;
     self->status             = UCC_INPROGRESS;
+    self->oob                = params->params.oob;
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
@@ -86,6 +88,8 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     ucc_tl_ucp_team_t    *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
     ucc_status_t          status;
+    int i, j;
+
     if (team->status == UCC_OK) {
         return UCC_OK;
     }
@@ -98,6 +102,66 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
         }
     }
 
+    {
+        int shm_id = 0;
+        int *shm_ids = ucc_malloc(team->size*sizeof(int), "shm_ids");
+        size_t control_size = NODE_GROUP_SIZE * MAX_ALLTOALLV_CONCURRENT * sizeof(mem_info_t);
+
+        if (!shm_ids) {
+            tl_error(tl_team->context->lib, "failed to alloc shmids");
+            return UCC_ERR_NO_MEMORY;
+
+        }
+        if (IS_NODE_LEADER(team)) {
+            shm_id = shmget(IPC_PRIVATE, control_size, IPC_CREAT | 0666);
+            if (shm_id < 0) {
+                tl_error(tl_team->context->lib, "Failed to shmget with IPC_PRIVATE, "
+                         "size %zd, IPC_CREAT; errno %d:%s", control_size,
+                         errno, strerror(errno));
+                return UCC_ERR_NO_MESSAGE;
+            }
+            team->a2av = shmat(shm_id, NULL, 0);
+            if (team->a2av == (void *) -1) {
+                tl_error(tl_team->context->lib, "Failed to shmat errno:%d(%s)", errno, strerror(errno));
+                return UCC_ERR_NO_MEMORY;
+            }
+            shmctl(shm_id, IPC_RMID, NULL);
+            memset(team->a2av, 0, control_size);
+
+        }
+
+        for (i = 0; i < MAX_ALLTOALLV_CONCURRENT; i++) {
+            for (j = 0; j < NODE_GROUP_SIZE; j++) {
+                CUDACHECK(cudaEventCreateWithFlags(&team->event[i][j], cudaEventDisableTiming | cudaEventInterprocess));
+                CUDACHECK(cudaIpcGetEventHandle((cudaIpcEventHandle_t *)&team->ipc_event_handle[i][j], team->event[i][j]));
+
+            }
+
+        }
+
+        for (i = 0; i < MAX_ALLTOALLV_CONCURRENT; i++) {
+            for (j = 0; j < NODE_GROUP_SIZE; j++) {
+                team->ipc_event[i][j] = (cudaEvent_t) NULL;
+            }
+        }
+
+        void *req;
+        status = team->oob.allgather(&shm_id, shm_ids, sizeof(int), team->oob.coll_info, &req);
+        ucc_assert(UCC_OK == status);
+        while (UCC_OK != team->oob.req_test(req)) {
+            ucc_context_progress(UCC_TL_CORE_CTX(team));
+        }
+        team->oob.req_free(req);
+        shm_id = shm_ids[NODE_LEADER_RANK(team)];
+        ucc_free(shm_ids);
+        if (!IS_NODE_LEADER(team)) {
+            team->a2av = shmat(shm_id, NULL, 0);
+            if (team->a2av == (void *) -1) {
+                tl_error(tl_team->context->lib, "Failed to shmat errno:%d(%s)", errno, strerror(errno));
+                return UCC_ERR_NO_MEMORY;
+            }
+        }
+    }
     tl_info(tl_team->context->lib, "initialized tl team: %p", team);
     team->status = UCC_OK;
     return UCC_OK;

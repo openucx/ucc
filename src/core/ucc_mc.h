@@ -109,4 +109,9 @@ static inline ucc_status_t ucc_dt_reduce_multi(void *src1, void *src2,
     }
 }
 
+ucc_status_t ucc_mc_ee_task_enqueue(void *ee_context, ucc_ee_type_t ee_type,
+                                    void **ee_task);
+
+ucc_status_t ucc_mc_ee_task_sync(void *ee_task, ucc_ee_type_t ee_type);
+
 #endif

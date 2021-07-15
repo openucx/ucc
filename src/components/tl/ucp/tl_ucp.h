@@ -11,8 +11,10 @@
 #include "core/ucc_ee.h"
 #include "utils/ucc_mpool.h"
 #include "tl_ucp_ep_hash.h"
+#include "tl_ucp_cuda_ipc.h"
 #include <ucp/api/ucp.h>
 #include <ucs/memory/memory_type.h>
+#include <cuda_runtime.h>
 
 #ifndef UCC_TL_UCP_DEFAULT_SCORE
 #define UCC_TL_UCP_DEFAULT_SCORE 10
@@ -28,6 +30,44 @@
 #define UCC_TL_UCP_PROFILE_REQUEST_NEW UCC_PROFILE_REQUEST_NEW
 #define UCC_TL_UCP_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
 #define UCC_TL_UCP_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
+#define MAX_CUDA_IPC_PEERS (8)
+
+#define CUDACHECK(cmd) do {                                                    \
+        cudaError_t e = cmd;                                                   \
+        if(e != cudaSuccess) {                                                 \
+            printf("cuda: %s failed with ret:%d(%s)\n", UCS_PP_MAKE_STRING(cmd), e,     \
+                     cudaGetErrorString(e));                                   \
+            return UCC_ERR_NO_MESSAGE;                                         \
+        }                                                                      \
+} while(0)
+
+#define CUDACHECK_NO_RET(cmd) do {                                                    \
+        cudaError_t e = cmd;                                                   \
+        if(e != cudaSuccess) {                                                 \
+            printf("cuda:%s failed with ret:%d(%s)\n", UCS_PP_MAKE_STRING(cmd), e,     \
+                     cudaGetErrorString(e));                                   \
+        }                                                                      \
+} while(0)
+
+
+#define MAX_ALLTOALLV_CONCURRENT 8
+#define NODE_GROUP_SIZE 8
+#define INTRA_PPN NODE_GROUP_SIZE
+
+#define IS_NODE_LEADER(_team) (((_team)->rank % NODE_GROUP_SIZE) == 0)
+#define NODE_RANK(_team) ((_team)->rank % NODE_GROUP_SIZE)
+#define NODE_LEADER_RANK(_team) ((_team)->rank - NODE_RANK(_team))
+#define IS_RANK_LOCAL(_team, _rank) (((_team)->rank / NODE_GROUP_SIZE) == ((_rank) / NODE_GROUP_SIZE))
+typedef struct {
+    void  *d_ptr;
+    size_t size;
+    cudaIpcMemHandle_t handle;
+    cudaIpcEventHandle_t ev_handle[INTRA_PPN];
+    size_t offset;
+    size_t displ[INTRA_PPN];
+    uint32_t seq_num[2];
+} mem_info_t;
+
 
 typedef struct ucc_tl_ucp_iface {
     ucc_tl_iface_t super;
@@ -54,6 +94,9 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                n_polls;
     uint32_t                oob_npolls;
     uint32_t                pre_reg_mem;
+    uint32_t                alltoall_use_ipc;
+    size_t                  alltoallv_ipc_thresh;
+    uint32_t                alltoallv_ipc_overlap;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
@@ -77,6 +120,8 @@ typedef struct ucc_tl_ucp_context {
     ucc_tl_ucp_ep_close_state_t ep_close_state;
     ucc_mpool_t                 req_mp;
     tl_ucp_ep_hash_t           *ep_hash;
+    ucc_cuda_ipc_cache_t       *ipc_cache[MAX_CUDA_IPC_PEERS];
+
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -92,6 +137,11 @@ typedef struct ucc_tl_ucp_team {
     uint32_t                   scope_id;
     uint32_t                   seq_num;
     ucc_tl_ucp_task_t         *preconnect_task;
+    mem_info_t                *a2av;
+    cudaEvent_t                event[MAX_ALLTOALLV_CONCURRENT][NODE_GROUP_SIZE];
+    cudaIpcEventHandle_t       ipc_event_handle[MAX_ALLTOALLV_CONCURRENT][NODE_GROUP_SIZE];
+    cudaEvent_t                ipc_event[MAX_ALLTOALLV_CONCURRENT][NODE_GROUP_SIZE];
+    ucc_team_oob_coll_t        oob;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
@@ -117,4 +167,6 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 
 void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
                                  size_t length, ucc_memory_type_t mem_type);
+void ucc_tl_ucp_get_alloc_info(void *ptr, size_t length,
+                               void **base_address, size_t *alloc_length);
 #endif

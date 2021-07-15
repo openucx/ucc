@@ -15,6 +15,7 @@
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
 #include "bcast/bcast.h"
+
 const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
         UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR};
@@ -63,6 +64,7 @@ ucc_tl_ucp_triggered_coll_complete(ucc_coll_task_t *parent_task, //NOLINT
     tl_info(UCC_TASK_LIB(task), "triggered collective complete. task:%p",
             coll_task);
     return ucc_mc_ee_task_end(coll_task->ee_task, coll_task->ee->ee_type);
+    //CUDACHECK(cudaStreamSynchronize((cudaStream_t)coll_task->ee->ee_context));
 }
 
 static ucc_status_t
@@ -104,6 +106,7 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
     ucc_status_t status;
     ucc_ev_t *ev;
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team = TASK_TEAM(task);
 
     if (task->super.ev == NULL) {
         if (task->super.ee->ee_type == UCC_EE_CUDA_STREAM) {
@@ -122,8 +125,35 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
     }
 
     if (task->super.ee_task == NULL) {
-        status = ucc_mc_ee_task_post(task->super.ee->ee_context,
-                                     task->super.ee->ee_type, &task->super.ee_task);
+        /*
+         * run early triggered post if it's there
+         * currently only alltoallv supports it and skip for all other collectives
+         */
+        if (UCC_TL_UCP_TEAM_CTX(team)->cfg.alltoallv_ipc_overlap) {
+            status = ucc_mc_ee_task_enqueue(task->super.ee->ee_context,
+                                            task->super.ee->ee_type,
+                                            &task->super.ee_task);
+            if (ucc_unlikely(status != UCC_OK)) {
+                tl_error(UCC_TASK_LIB(task), "error in ee task enqueue");
+                task->super.super.status = status;
+                return status;
+            }
+        }
+        if (coll_task->triggered_task->early_triggered_post) {
+            coll_task->triggered_task->ee = task->super.ee;
+            status = coll_task->triggered_task->early_triggered_post(coll_task->triggered_task);
+            assert(status == UCC_OK);
+        }
+
+
+        if (UCC_TL_UCP_TEAM_CTX(team)->cfg.alltoallv_ipc_overlap) {
+            status = ucc_mc_ee_task_sync(task->super.ee_task,
+                                         task->super.ee->ee_type);
+        } else {
+            status = ucc_mc_ee_task_post(task->super.ee->ee_context,
+                                         task->super.ee->ee_type,
+                                         &task->super.ee_task);
+        }
         if (ucc_unlikely(status != UCC_OK)) {
             tl_error(UCC_TASK_LIB(task), "error in ee task post");
             task->super.super.status = status;
