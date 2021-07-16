@@ -131,6 +131,7 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
     task->super.finalize = ucc_tl_ucp_coll_finalize;
     task->super.triggered_post = ucc_tl_ucp_triggered_post;
+    task->super.early_triggered_post = NULL;
     return task;
 }
 

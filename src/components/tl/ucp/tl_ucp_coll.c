@@ -146,9 +146,15 @@ static ucc_status_t ucc_tl_ucp_ee_wait_for_event_trigger(ucc_coll_task_t *coll_t
         post_event->req = &coll_task->triggered_task->super;
         ucc_ee_set_event_internal(coll_task->ee, post_event, &coll_task->ee->event_out_queue);
 
-        coll_task->triggered_task->ee = task->super.ee;
-        status = coll_task->triggered_task->early_triggered_post(coll_task->triggered_task);
-        assert(status == UCC_OK);
+/*
+* run early triggered post if it's there
+* currently only alltoallv supports it and skip for all other collectives
+*/
+        if (coll_task->triggered_task->early_triggered_post) {
+            coll_task->triggered_task->ee = task->super.ee;
+            status = coll_task->triggered_task->early_triggered_post(coll_task->triggered_task);
+            assert(status == UCC_OK);
+        }
 
     }
 

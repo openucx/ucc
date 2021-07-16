@@ -154,7 +154,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_early_triggered_post(ucc_coll_task_t 
 
         if (rank == team->rank) {
             dst = (ptrdiff_t)task->args.dst.info_v.buffer +
-                    peer_info->offset + peer_info->displ[intra_rank];
+                    + peer_info->displ[intra_rank];
         } else {
             dst = (ptrdiff_t) task->alltoall_intra.peer_map_addr[peer] +
                     peer_info->offset + peer_info->displ[intra_rank];
