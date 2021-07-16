@@ -166,7 +166,9 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_early_triggered_post(ucc_coll_task_t 
                             task->args.src.info_v.displacements, rank)* sdt_size;
 
         //printf("SNED [%d: %d] sdispl:%ld rdispl:(%ld:%ld) size:%ld \n", team->rank, rank, data_displ, peer_info->offset, peer_info->displ[intra_rank], data_size);
-        CUDACHECK(cudaMemcpyAsync((void *)dst, (void *)(sbuf + data_displ), data_size, cudaMemcpyDeviceToDevice, (cudaStream_t)coll_task->ee->ee_context));
+        if (data_size != 0) {
+            CUDACHECK(cudaMemcpyAsync((void *)dst, (void *)(sbuf + data_displ), data_size, cudaMemcpyDeviceToDevice, (cudaStream_t)coll_task->ee->ee_context));
+        }
         task->send_completed++;
         task->recv_completed++;
         task->send_posted++;
@@ -195,23 +197,23 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task)
         mem_info_t my_info;
         mem_info_t *peer_info;
         void *mapped_addr;
+        size_t total_counts;
         ucc_rank_t intra_rank_start = ucs_align_down(team->rank, INTRA_PPN);
         ucc_rank_t intra_rank_end   = ucs_min(intra_rank_start + INTRA_PPN, team->size) - 1;
 
 
-        ucc_tl_ucp_get_alloc_info(task->args.dst.info_v.buffer,
-                                  (ucc_coll_args_get_total_count(&task->args,
-                                   task->args.dst.info_v.counts, team->size ) *
-                                   ucc_dt_size(task->args.dst.info_v.datatype)),
-                                   &base_address, &alloc_length);
-
-        CUDACHECK(cudaIpcGetMemHandle((cudaIpcMemHandle_t *) &my_info.handle, base_address));
-
         rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+        total_counts = ucc_coll_args_get_total_count(&task->args, task->args.dst.info_v.counts, team->size);
+        ucc_tl_ucp_get_alloc_info(task->args.dst.info_v.buffer, total_counts * rdt_size,  &base_address, &alloc_length);
+
+        if (base_address != NULL) {
+            CUDACHECK(cudaIpcGetMemHandle((cudaIpcMemHandle_t *) &my_info.handle, base_address));
+        }
 
         my_info.d_ptr  = base_address;
         my_info.size   = alloc_length;
         my_info.offset = task->args.dst.info_v.buffer - base_address;
+
         for (i = intra_rank_start, j = 0; i <= intra_rank_end; i++, j++) {
             my_info.displ[j] =  ucc_coll_args_get_displacement(&task->args,
                                 task->args.dst.info_v.displacements,i) * rdt_size;
@@ -253,7 +255,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task)
 
         //printf("[%d] intra_rank_start: %d intra_rank_end:%d", team->rank, intra_rank_start, intra_rank_end);
         for (i=intra_rank_start,j = 0 ; i <= intra_rank_end; i++, j++) {
-            if (i != team->rank) {
+            if (i != team->rank && peer_info[j].d_ptr) {
                 //tl_warn(UCC_TL_TEAM_LIB(team), "opening memhandl for [%d:%d]", team->rank, i);
                 status = ucc_cuda_ipc_map_memhandle(peer_info[j].d_ptr, peer_info[j].size,
                                                 peer_info[j].handle, &mapped_addr,

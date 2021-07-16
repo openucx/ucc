@@ -35,7 +35,7 @@
 #define CUDACHECK(cmd) do {                                                    \
         cudaError_t e = cmd;                                                   \
         if(e != cudaSuccess) {                                                 \
-            printf("cuda failed with ret:%d(%s)", e,     \
+            printf("cuda: %s failed with ret:%d(%s)\n", UCS_PP_MAKE_STRING(cmd), e,     \
                      cudaGetErrorString(e));                                   \
             return UCC_ERR_NO_MESSAGE;                                         \
         }                                                                      \
@@ -44,7 +44,7 @@
 #define CUDACHECK_NO_RET(cmd) do {                                                    \
         cudaError_t e = cmd;                                                   \
         if(e != cudaSuccess) {                                                 \
-            printf("cuda failed with ret:%d(%s)", e,     \
+            printf("cuda:%s failed with ret:%d(%s)\n", UCS_PP_MAKE_STRING(cmd), e,     \
                      cudaGetErrorString(e));                                   \
         }                                                                      \
 } while(0)

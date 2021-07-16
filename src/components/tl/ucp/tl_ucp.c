@@ -167,6 +167,7 @@ void ucc_tl_ucp_get_alloc_info(void *ptr, size_t length,
     *alloc_length = length;
     if (length == 0) {
         *base_address = NULL;
+        return;
     }
 
     mem_attr.field_mask   = UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
