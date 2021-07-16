@@ -50,6 +50,24 @@
 } while(0)
 
 
+#define MAX_ALLTOALLV_CONCURRENT 8
+#define NODE_GROUP_SIZE 4
+#define INTRA_PPN NODE_GROUP_SIZE
+
+#define IS_NODE_LEADER(_team) (((_team)->rank % NODE_GROUP_SIZE) == 0)
+#define NODE_RANK(_team) ((_team)->rank % NODE_GROUP_SIZE)
+#define NODE_LEADER_RANK(_team) ((_team)->rank - NODE_RANK(_team))
+#define IS_RANK_LOCAL(_team, _rank) (((_team)->rank / NODE_GROUP_SIZE) == ((_rank) / NODE_GROUP_SIZE))
+typedef struct {
+    void  *d_ptr;
+    size_t size;
+    cudaIpcMemHandle_t handle;
+    size_t offset;
+    size_t displ[INTRA_PPN];
+    uint32_t seq_num;
+} mem_info_t;
+
+
 typedef struct ucc_tl_ucp_iface {
     ucc_tl_iface_t super;
 } ucc_tl_ucp_iface_t;
@@ -76,6 +94,7 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                oob_npolls;
     uint32_t                pre_reg_mem;
     uint32_t                alltoall_use_ipc;
+    size_t                  alltoallv_ipc_thresh;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
@@ -116,6 +135,8 @@ typedef struct ucc_tl_ucp_team {
     uint32_t                   scope_id;
     uint32_t                   seq_num;
     ucc_tl_ucp_task_t         *preconnect_task;
+    mem_info_t                *a2av;
+    ucc_team_oob_coll_t        oob;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
