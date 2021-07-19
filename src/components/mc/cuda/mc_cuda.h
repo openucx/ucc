@@ -89,8 +89,9 @@ ucc_status_t ucc_mc_cuda_reduce(const void *src1, const void *src2,
                                 ucc_reduction_op_t op);
 
 ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
-                                      void *dst, size_t size, size_t count,
-                                      size_t stride, ucc_datatype_t dt,
+                                      void *dst, size_t n_vectors,
+                                      size_t count, size_t stride,
+                                      ucc_datatype_t dt,
                                       ucc_reduction_op_t op);
 
 extern ucc_mc_cuda_t ucc_mc_cuda;
