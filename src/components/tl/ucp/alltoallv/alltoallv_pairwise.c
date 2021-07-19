@@ -135,12 +135,12 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_early_triggered_post(ucc_coll_task_t 
     int rank, j, peer;
     ptrdiff_t dst;
 
+    task->alltoall_intra.n = 0;
     if (task->alltoall_intra.info == NULL) {
         return UCC_OK;
     }
 
     ipc_thresh = UCC_TL_UCP_TEAM_CTX(team)->cfg.alltoallv_ipc_thresh;
-    task->alltoall_intra.n = 0;
     sdt_size = ucc_dt_size(task->args.src.info_v.datatype);
     for (j=0; j < INTRA_PPN; j++) {
         rank = team->rank + j;
@@ -190,7 +190,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task)
             task->args.dst.info_v.mem_type == UCC_MEMORY_TYPE_CUDA) {
         ucc_status_t status;
         void *base_address;
-        size_t alloc_length, rdt_size, ipc_thresh;
+        size_t alloc_length, sdt_size, rdt_size, ipc_thresh;
         int i, j;
         mem_info_t *my_info;
         mem_info_t *peer_info;
@@ -204,6 +204,8 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task)
         my_info = &peer_info[NODE_RANK(team)];
 
         rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+        sdt_size = ucc_dt_size(task->args.src.info_v.datatype);
+
         total_counts = ucc_coll_args_get_total_count(&task->args, task->args.dst.info_v.counts, team->size);
         ucc_tl_ucp_get_alloc_info(task->args.dst.info_v.buffer, total_counts * rdt_size,  &base_address, &alloc_length);
 
@@ -234,7 +236,9 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task)
             while (pi[j].seq_num != (task->tag + 1));
         }
         for (i=intra_rank_start,j = 0 ; i <= intra_rank_end; i++, j++) {
-            if (i != team->rank && peer_info[j].d_ptr && task->args.dst.info_v.counts[j] * rdt_size >= ipc_thresh) {
+            if (i != team->rank && peer_info[j].d_ptr &&
+                 (ucc_coll_args_get_count(&task->args, task->args.src.info_v.counts, i) *
+                 sdt_size) >= ipc_thresh) {
                 //tl_warn(UCC_TL_TEAM_LIB(team), "opening memhandl for [%d:%d]", team->rank, i);
                 status = ucc_cuda_ipc_map_memhandle(peer_info[j].d_ptr, peer_info[j].size,
                                                     peer_info[j].handle, &mapped_addr,

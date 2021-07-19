@@ -128,6 +128,10 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
         shm_id = shm_ids[NODE_LEADER_RANK(team)];
         ucc_free(shm_ids);
         team->a2av = shmat(shm_id, NULL, 0);
+        if (team->a2av == (void *) -1) {
+            tl_error(tl_team->context->lib, "Failed to shmat errno:%d(%s)", errno, strerror(errno));
+            return UCC_ERR_NO_MEMORY;
+        }
         if (IS_NODE_LEADER(team)) {
             shmctl(shm_id, IPC_RMID, NULL);
         }
