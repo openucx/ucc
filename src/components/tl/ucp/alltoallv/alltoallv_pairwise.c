@@ -51,15 +51,17 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
     nreqs    = (posts > gsize || posts == 0) ? gsize : posts;
     rdt_size = ucc_dt_size(task->args.src.info_v.datatype);
     sdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
-    while ((task->send_posted < to_post || task->recv_posted < to_post) &&
+    while ((task->send_posted < gsize || task->recv_posted < gsize) &&
            (polls++ < task->n_polls)) {
         ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker);
-        while ((task->recv_posted < to_post) &&
+        while ((task->recv_posted < gsize) &&
                ((task->recv_posted - task->recv_completed) < nreqs)) {
             peer       = get_recv_peer(grank, gsize, task->recv_posted);
             data_size  = ucc_coll_args_get_count(&task->args,
                             task->args.dst.info_v.counts, peer) * rdt_size;
             if (IS_RANK_LOCAL(team, peer) && data_size >= ipc_thresh && to_post != gsize) {
+                task->recv_posted++;
+                task->recv_completed++;
                 continue;
             }
 
@@ -73,12 +75,14 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
 
             polls = 0;
         }
-        while ((task->send_posted < to_post) &&
+        while ((task->send_posted < gsize) &&
                ((task->send_posted - task->send_completed) < nreqs)) {
             peer       = get_send_peer(grank, gsize, task->send_posted);
             data_size  = ucc_coll_args_get_count(&task->args,
                             task->args.src.info_v.counts, peer) * sdt_size;
             if (IS_RANK_LOCAL(team, peer) && data_size >= ipc_thresh && to_post != gsize) {
+                task->send_posted++;
+                task->send_completed++;
                 continue;
             }
             data_displ = ucc_coll_args_get_displacement(&task->args,
@@ -91,7 +95,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
             polls = 0;
         }
     }
-    if ((task->send_posted < to_post) || (task->recv_posted < to_post)) {
+    if ((task->send_posted < gsize) || (task->recv_posted < gsize)) {
         return task->super.super.status;
     }
     task->super.super.status = ucc_tl_ucp_test(task);
@@ -224,14 +228,10 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task)
         my_info->seq_num = (task->tag + 1);
 
         //printf("[%d] intra_rank_start: %d intra_rank_end:%d", team->rank, intra_rank_start, intra_rank_end);
-        int ready = 0;
-        while (!ready) {
-            ready = 1;
-            for (i=intra_rank_start,j = 0 ; i <= intra_rank_end; i++, j++) {
-                if (peer_info[j].seq_num != (task->tag + 1)) {
-                    ready=0;
-                }
-            }
+
+        for (j = 0; j < NODE_GROUP_SIZE; j++) {
+            volatile mem_info_t *pi = peer_info;
+            while (pi[j].seq_num != (task->tag + 1));
         }
         for (i=intra_rank_start,j = 0 ; i <= intra_rank_end; i++, j++) {
             if (i != team->rank && peer_info[j].d_ptr && task->args.dst.info_v.counts[j] * rdt_size >= ipc_thresh) {

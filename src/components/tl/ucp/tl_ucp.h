@@ -51,7 +51,7 @@
 
 
 #define MAX_ALLTOALLV_CONCURRENT 8
-#define NODE_GROUP_SIZE 4
+#define NODE_GROUP_SIZE 8
 #define INTRA_PPN NODE_GROUP_SIZE
 
 #define IS_NODE_LEADER(_team) (((_team)->rank % NODE_GROUP_SIZE) == 0)
