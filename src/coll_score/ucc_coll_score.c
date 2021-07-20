@@ -26,6 +26,12 @@ ucc_status_t ucc_coll_score_alloc(ucc_coll_score_t **score)
     return UCC_OK;
 }
 
+static inline void ucc_msg_range_free(ucc_msg_range_t *r)
+{
+    ucc_list_destruct(&r->fallback, ucc_msg_range_fb_t, ucc_free, list_elem);
+    ucc_free(r);
+}
+
 static inline ucc_status_t
 coll_score_add_range(ucc_coll_score_t *score, ucc_coll_type_t coll_type,
                      ucc_memory_type_t mem_type, size_t start, size_t end,
@@ -44,6 +50,9 @@ coll_score_add_range(ucc_coll_score_t *score, ucc_coll_type_t coll_type,
         ucc_error("failed to allocate %zd bytes for ucc_msg_range", sizeof(*r));
         return UCC_ERR_NO_MEMORY;
     }
+
+    ucc_list_head_init(&r->fallback);
+
     r->start   = start;
     r->end     = end;
     r->score   = msg_score;
@@ -65,7 +74,7 @@ coll_score_add_range(ucc_coll_score_t *score, ucc_coll_type_t coll_type,
         (ucc_container_of(next, ucc_msg_range_t, list_elem)->start < r->end)) {
         ucc_error("attempt to add overlaping range");
         ucc_list_del(&r->list_elem);
-        ucc_free(r);
+        ucc_msg_range_free(r);
         return UCC_ERR_INVALID_PARAM;
     }
     return UCC_OK;
@@ -93,37 +102,165 @@ void ucc_coll_score_free(ucc_coll_score_t *score)
     }
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
         for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
-            ucc_list_destruct(&score->scores[i][j], ucc_msg_range_t, ucc_free,
-                              list_elem);
+            ucc_list_destruct(&score->scores[i][j], ucc_msg_range_t,
+                              ucc_msg_range_free, list_elem);
         }
     }
     ucc_free(score);
 }
 
+static ucc_status_t ucc_fallback_alloc(ucc_score_t              score,
+                                       ucc_base_coll_init_fn_t  init,
+                                       ucc_base_team_t         *team,
+                                       ucc_msg_range_fb_t     **_fb)
+{
+    ucc_msg_range_fb_t *fb = ucc_malloc(sizeof(*fb), "fallback");
+
+    if (ucc_unlikely(!fb)) {
+        ucc_error("failed to allocate %zd bytes for fallback", sizeof(*fb));
+        return UCC_ERR_NO_MEMORY;
+    }
+    fb->score = score;
+    fb->init  = init;
+    fb->team  = team;
+    *_fb      = fb;
+    return UCC_OK;
+}
+
+static inline void ucc_fallback_insert(ucc_list_link_t *list,
+                                       ucc_msg_range_fb_t *fb)
+{
+    ucc_list_link_t    *insert_pos;
+    ucc_msg_range_fb_t *f;
+
+    insert_pos = list;
+    ucc_list_for_each(f, list, list_elem) {
+        if (fb->score == f->score && fb->init == f->init &&
+            fb->team == f->team) {
+            /* same fallback: skip */
+            return;
+        }
+        if (fb->score < f->score) {
+            insert_pos = &f->list_elem;
+        } else {
+            break;
+        }
+    }
+    ucc_list_insert_after(insert_pos, &fb->list_elem);
+}
+
+static ucc_status_t ucc_fallback_copy(const ucc_msg_range_t *in,
+                                      ucc_msg_range_t       *out)
+{
+    ucc_msg_range_fb_t *fb_in, *fb;
+    ucc_status_t        status;
+
+    ucc_list_for_each(fb_in, &in->fallback, list_elem) {
+        status =
+            ucc_fallback_alloc(fb_in->score, fb_in->init, fb_in->team, &fb);
+        if (ucc_unlikely(UCC_OK != status)) {
+            return status;
+        }
+        ucc_fallback_insert(&out->fallback, fb);
+    }
+    return UCC_OK;
+}
+
+static ucc_status_t ucc_msg_range_dup(const ucc_msg_range_t *in,
+                                      ucc_msg_range_t      **out)
+{
+    ucc_msg_range_t *r = ucc_malloc(sizeof(*r), "msg_range");
+
+    if (ucc_unlikely(!r)) {
+        ucc_error("failed to allocate %zd bytes for msgrange", sizeof(*r));
+        return UCC_ERR_NO_MEMORY;
+    }
+    memcpy(r, in, sizeof(*r));
+    ucc_list_head_init(&r->fallback);
+    *out = r;
+    return ucc_fallback_copy(in, r);
+}
+
+#define MSG_RANGE_DUP(_r)                                                      \
+    ({                                                                         \
+        ucc_msg_range_t *_dup;                                                 \
+        status = ucc_msg_range_dup(_r, &_dup);                                 \
+        if (UCC_OK != status) {                                                \
+            goto out;                                                          \
+        }                                                                      \
+        _dup;                                                                  \
+    })
+
+static ucc_status_t ucc_msg_range_add_fallback(const ucc_msg_range_t *in,
+                                               ucc_msg_range_t       *out)
+{
+    ucc_msg_range_fb_t *fb;
+    ucc_status_t        status;
+
+    if (in->init == out->init && in->team == out->team) {
+        return UCC_OK;
+    }
+
+    status = ucc_fallback_alloc(in->score, in->init, in->team, &fb);
+    if (ucc_unlikely(UCC_OK != status)) {
+        return status;
+    }
+    status = ucc_fallback_copy(in, out);
+    ucc_fallback_insert(&out->fallback, fb);
+    return status;
+}
+
+#define ADD_FALLBACK(_in, _out)                                                \
+    do {                                                                       \
+        status = ucc_msg_range_add_fallback(_in, _out);                        \
+        if (UCC_OK != status) {                                                \
+            goto out;                                                          \
+        }                                                                      \
+    } while (0)
+
 static ucc_status_t ucc_score_list_dup(ucc_list_link_t *src,
                                        ucc_list_link_t *dst)
 {
     ucc_msg_range_t *range, *r;
+    ucc_status_t     status;
+
     ucc_list_head_init(dst);
-    /* progress registered progress fns */
     ucc_list_for_each(range, src, list_elem) {
-        r = ucc_malloc(sizeof(*r), "ucc_msga_range");
-        if (!r) {
-            ucc_error("failed to allocate %zd bytes for ucc_msg_range",
-                      sizeof(*r));
-            goto error;
-        }
-        memcpy(r, range, sizeof(*r));
+        r = MSG_RANGE_DUP(range);
         ucc_list_add_tail(dst, &r->list_elem);
     }
     return UCC_OK;
-error:
+out:
     ucc_list_for_each_safe(range, r, dst, list_elem) {
         ucc_list_del(&range->list_elem);
-        ucc_free(range);
+        ucc_msg_range_free(range);
     }
     ucc_assert(ucc_list_is_empty(dst));
     return UCC_ERR_NO_MEMORY;
+}
+
+static inline int ucc_msg_range_fb_compare(ucc_msg_range_t *r1,
+                                           ucc_msg_range_t *r2)
+{
+    ucc_list_link_t    *l1, *l2;
+    ucc_msg_range_fb_t *fb1, *fb2;
+
+    l1 = &r1->fallback;
+    l2 = &r2->fallback;
+
+    if (ucc_list_length(l1) != ucc_list_length(l2)) {
+        return 0;
+    }
+
+    fb2 = ucc_list_head(l2, ucc_msg_range_fb_t, list_elem);
+    ucc_list_for_each(fb1, l1, list_elem) {
+        if (fb1->score != fb2->score || fb1->init != fb2->init ||
+            fb1->team != fb2->team) {
+            return 0;
+        }
+        fb2 = ucc_list_next(&fb2->list_elem, ucc_msg_range_fb_t, list_elem);
+    }
+    return 1;
 }
 
 static ucc_status_t ucc_coll_score_merge_one(ucc_list_link_t *list1,
@@ -149,7 +286,7 @@ static ucc_status_t ucc_coll_score_merge_one(ucc_list_link_t *list1,
     }
     status = ucc_score_list_dup(list2, &lst2);
     if (UCC_OK != status) {
-        goto destruct;
+        goto out;
     }
 
     while (!(ucc_list_is_empty(&lst1) && ucc_list_is_empty(&lst2))) {
@@ -174,72 +311,59 @@ static ucc_status_t ucc_coll_score_merge_one(ucc_list_link_t *list1,
                 ucc_list_del(&r1->list_elem);
                 ucc_list_del(&r2->list_elem);
                 ucc_list_add_tail(out, &best->list_elem);
-                ucc_free(left);
+                ADD_FALLBACK(left, best);
+                ucc_msg_range_free(left);
                 continue;
             }
             left = (r1->end < r2->end) ? r1 : r2;
+            right        = (left == r1) ? r2 : r1;
+            new          = MSG_RANGE_DUP(right);
+            right->start = new->end = left->end;
+            ucc_list_del(&left->list_elem);
+            if (left->score < new->score) {
+                SWAP(left, new, void *);
+            }
+            ADD_FALLBACK(new, left);
+            ucc_msg_range_free(new);
+
+            ucc_list_add_tail(out, &left->list_elem);
+            continue;
         }
         right = (left == r1) ? r2 : r1;
         if (left->end <= right->start) {
             /* ranges don't overlap - copy over */
             ucc_list_del(&left->list_elem);
             ucc_list_add_tail(out, &left->list_elem);
-        } else if (left->end < right->end) {
-            if (left->score >= right->score) {
-                right->start = left->end;
-                ucc_list_del(&left->list_elem);
-                ucc_list_add_tail(out, &left->list_elem);
-            } else {
-                ucc_list_del(&left->list_elem);
-                if (right->start > left->start) {
-                    /* non zero overlap leftover */
-                    left->end = right->start;
-                    ucc_list_add_tail(out, &left->list_elem);
-                } else {
-                    ucc_free(left);
-                }
-            }
         } else {
-            if (left->score >= right->score) {
-                /* just drop inner range with lower score */
-                ucc_list_del(&right->list_elem);
-                ucc_free(right);
-            } else {
-                new = ucc_malloc(sizeof(*new), "ucc_msg_range");
-                if (!new) {
-                    ucc_error("failed to allocate %zd bytes for ucc_msg_range",
-                              sizeof(*new));
-                    status = UCC_ERR_NO_MEMORY;
-                    goto destruct;
-                }
-                memcpy(new, left, sizeof(*new));
-                new->end = right->start;
-                ucc_list_add_tail(out, &new->list_elem);
-                ucc_list_del(&right->list_elem);
-                ucc_list_add_tail(out, &right->list_elem);
-                left->start = right->end;
-            }
+            new      = MSG_RANGE_DUP(left);
+            new->end = right->start;
+            ucc_list_add_tail(out, &new->list_elem);
+            left->start = right->start;
         }
     }
-    /* Merge consequtive ranges with the same score and same init fn
+    /* Merge consequtive ranges with the same score, same init fn,
+       same team and same fallback sequence
        if any have been produced by the algorithm above */
+
     ucc_list_for_each_safe(range, temp, out, list_elem) {
         if (range->list_elem.next != out) {
             next = ucc_container_of(range->list_elem.next, ucc_msg_range_t,
                                     list_elem);
             if (range->score == next->score && range->end == next->start &&
-                range->init == next->init && range->team == next->team) {
+                range->init == next->init && range->team == next->team &&
+                1 == ucc_msg_range_fb_compare(range, next)) {
                 next->start = range->start;
                 ucc_list_del(&range->list_elem);
-                ucc_free(range);
+                ucc_msg_range_free(range);
             }
         }
     }
     return UCC_OK;
-destruct:
-    ucc_list_destruct(&lst2, ucc_msg_range_t, ucc_free, list_elem);
-    ucc_list_destruct(&lst1, ucc_msg_range_t, ucc_free, list_elem);
-    ucc_list_destruct(out, ucc_msg_range_t, ucc_free, list_elem);
+
+out:
+    ucc_list_destruct(&lst2, ucc_msg_range_t, ucc_msg_range_free, list_elem);
+    ucc_list_destruct(&lst1, ucc_msg_range_t, ucc_msg_range_free, list_elem);
+    ucc_list_destruct(out, ucc_msg_range_t, ucc_msg_range_free, list_elem);
     return status;
 }
 
@@ -683,27 +807,16 @@ error:
     return status;
 }
 
-#define MSG_RANGE_DUP(_src)                                                    \
-    ({                                                                         \
-        ucc_msg_range_t *_dup = ucc_malloc(sizeof(*_dup), "ucc_msg_range");    \
-        if (!_dup) {                                                           \
-            ucc_error("failed to allocate %zd bytes for ucc_msg_range",        \
-                      sizeof(*_dup));                                          \
-            status = UCC_ERR_NO_MEMORY;                                        \
-            goto out;                                                          \
-        }                                                                      \
-        memcpy(_dup, _src, sizeof(*_dup));                                     \
-        _dup;                                                                  \
-    })
-
 static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
                                               ucc_list_link_t *src,
                                               ucc_score_t      default_score)
 {
-    ucc_list_link_t *s = src->next;
-    ucc_list_link_t *d = dest->next;
-    ucc_msg_range_t *range, *tmp, *next, *rs, *rd, *new;
-    ucc_status_t status;
+    ucc_list_link_t    *s = src->next;
+    ucc_list_link_t    *d = dest->next;
+    ucc_msg_range_t    *range, *tmp, *next, *rs, *rd, *new;
+    ucc_msg_range_fb_t *fb;
+    ucc_status_t        status;
+
     if (ucc_list_is_empty(src) || ucc_list_is_empty(dest)) {
         return UCC_OK;
     }
@@ -746,6 +859,15 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
                     rd->score = rs->score;
                 }
                 if (rs->init) {
+                    if (rs->init != rd->init) {
+                        /* User setting overrides existing init fn. Save it as a fallback */
+                        status = ucc_fallback_alloc(rd->score, rd->init,
+                                                    rd->team, &fb);
+                        if (ucc_unlikely(UCC_OK != status)) {
+                            goto out;
+                        }
+                        ucc_fallback_insert(&rd->fallback, fb);
+                    }
                     rd->init = rs->init;
                     rd->team = rs->team;
                 }
@@ -758,6 +880,15 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
                     new->score = rs->score;
                 }
                 if (rs->init) {
+                    if (rs->init != rd->init) {
+                        /* User setting overrides existing init fn. Save it as a fallback */
+                        status = ucc_fallback_alloc(rd->score, rd->init,
+                                                    rd->team, &fb);
+                        if (ucc_unlikely(UCC_OK != status)) {
+                            goto out;
+                        }
+                        ucc_fallback_insert(&new->fallback, fb);
+                    }
                     new->init = rs->init;
                     new->team = rs->team;
                 }
@@ -769,6 +900,15 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
                     rd->score = rs->score;
                 }
                 if (rs->init) {
+                    if (rs->init != rd->init) {
+                        /* User setting overrides existing init fn. Save it as a fallback */
+                        status = ucc_fallback_alloc(rd->score, rd->init,
+                                                    rd->team, &fb);
+                        if (ucc_unlikely(UCC_OK != status)) {
+                            goto out;
+                        }
+                        ucc_fallback_insert(&rd->fallback, fb);
+                    }
                     rd->init = rs->init;
                     rd->team = rs->team;
                 }
@@ -789,11 +929,12 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
     ucc_list_for_each_safe(range, tmp, dest, list_elem) {
         if (0 == range->score) {
             ucc_list_del(&range->list_elem);
-            ucc_free(range);
+            ucc_msg_range_free(range);
         }
     }
 
-    /* Merge consequtive ranges with the same score and same init fn
+    /* Merge consequtive ranges with the same score, same init fn,
+       same team and same fallback sequence
        if any have been produced by the algorithm above */
     ucc_list_for_each_safe(range, tmp, dest, list_elem) { //NOLINT
         if (range->list_elem.next != dest) {
@@ -801,10 +942,11 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
                                     list_elem);
             //NOLINTNEXTLINE
             if (range->score == next->score && range->end == next->start &&
-                range->init == next->init && range->team == next->team) {
+                range->init == next->init && range->team == next->team &&
+                1 == ucc_msg_range_fb_compare(range, next)) {
                 next->start = range->start;
                 ucc_list_del(&range->list_elem);
-                ucc_free(range);
+                ucc_msg_range_free(range);
             }
         }
     }

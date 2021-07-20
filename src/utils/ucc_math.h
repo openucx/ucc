@@ -57,11 +57,11 @@ static inline unsigned long ucc_str_hash_djb2(const char *str)
    unique elements */
 int ucc_sort_uniq(int *array, int len, int inverse);
 
-#define SWAP(_x, _y)                                                           \
+#define SWAP(_x, _y, _type)                                                    \
     do {                                                                       \
-        int _tmp = (_x);                                                       \
-        (_x)     = (_y);                                                       \
-        (_y)     = _tmp;                                                       \
+        _type _tmp = (_x);                                                     \
+        (_x)       = (_y);                                                     \
+        (_y)       = _tmp;                                                     \
     } while (0)
 
 #define ucc_div_round_up(_n, _d) (((_n) + (_d) - 1) / (_d))

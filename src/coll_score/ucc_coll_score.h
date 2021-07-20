@@ -19,8 +19,16 @@
 
 #define UCC_MSG_MAX UINT64_MAX
 
+typedef struct ucc_msg_range_fb {
+    ucc_list_link_t          list_elem;
+    ucc_score_t              score;
+    ucc_base_coll_init_fn_t  init;
+    ucc_base_team_t         *team;
+} ucc_msg_range_fb_t;
+
 typedef struct ucc_msg_range {
     ucc_list_link_t         list_elem;
+    ucc_list_link_t         fallback;
     size_t                  start;
     size_t                  end;
     ucc_score_t             score;
@@ -134,9 +142,9 @@ ucc_status_t ucc_coll_score_build_map(ucc_coll_score_t *score,
 
 void         ucc_coll_score_free_map(ucc_score_map_t *map);
 
-/* Selects the "init" function from score map based on coll_args */
-ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t         *map,
-                                       ucc_base_coll_args_t    *args,
-                                       ucc_base_coll_init_fn_t *init,
-                                       ucc_base_team_t        **team);
+/* Initializes task based on args selection and score map.
+   Checks fallbacks if necessary. */
+ucc_status_t ucc_coll_score_map_init(ucc_score_map_t      *map,
+                                     ucc_base_coll_args_t *bargs,
+                                     ucc_coll_task_t     **task);
 #endif

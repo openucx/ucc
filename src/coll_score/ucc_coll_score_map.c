@@ -29,16 +29,17 @@ void ucc_coll_score_free_map(ucc_score_map_t *map)
     ucc_free(map);
 }
 
-ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t         *map,
-                                       ucc_base_coll_args_t    *bargs,
-                                       ucc_base_coll_init_fn_t *init,
-                                       ucc_base_team_t        **team)
+static
+ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t      *map,
+                                       ucc_base_coll_args_t *bargs,
+                                       ucc_msg_range_t     **range)
 {
     ucc_memory_type_t mt      = ucc_coll_args_mem_type(bargs);
     unsigned          ct      = ucc_ilog2(bargs->args.coll_type);
     size_t            msgsize = ucc_coll_args_msgsize(bargs);
     ucc_list_link_t  *list;
-    ucc_msg_range_t  *range;
+    ucc_msg_range_t  *r;
+
     if (mt == UCC_MEMORY_TYPE_ASSYMETRIC) {
         /* TODO */
         return UCC_ERR_NOT_SUPPORTED;
@@ -54,12 +55,43 @@ ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t         *map,
         msgsize = 0;
     }
     list = &map->score->scores[ct][mt];
-    ucc_list_for_each(range, list, list_elem) {
-        if (msgsize >= range->start && msgsize < range->end) {
-            *init = range->init;
-            *team = range->team;
+    ucc_list_for_each(r, list, list_elem) {
+        if (msgsize >= r->start && msgsize < r->end) {
+            *range = r;
             return UCC_OK;
         }
     }
     return UCC_ERR_NOT_SUPPORTED;
+}
+
+ucc_status_t ucc_coll_score_map_init(ucc_score_map_t      *map,
+                                     ucc_base_coll_args_t *bargs,
+                                     ucc_coll_task_t     **task)
+{
+    ucc_msg_range_t    *r;
+    ucc_msg_range_fb_t *fb;
+    ucc_status_t        status;
+    ucc_base_team_t    *team;
+
+    status = ucc_coll_score_map_lookup(map, bargs, &r);
+    if (UCC_OK != status) {
+        return status;
+    }
+
+    team   = r->team;
+    status = r->init(bargs, team, task);
+    fb     = ucc_list_head(&r->fallback, ucc_msg_range_fb_t, list_elem);
+
+    while (&fb->list_elem != &r->fallback &&
+           (status == UCC_ERR_NOT_SUPPORTED ||
+            status == UCC_ERR_NOT_IMPLEMENTED)) {
+        ucc_debug("coll is not supported for %s, fallback %s",
+                  team->context->lib->log_component.name,
+                  fb->team->context->lib->log_component.name);
+        team   = fb->team;
+        status = fb->init(bargs, team, task);
+        fb     = ucc_list_next(&fb->list_elem, ucc_msg_range_fb_t, list_elem);
+    }
+
+    return status;
 }
