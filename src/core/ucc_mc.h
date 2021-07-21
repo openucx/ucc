@@ -64,19 +64,19 @@ ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
 
 /**
  * Performs reduction of multiple vectors and stores result to dst
- * @param [in]  src1     First vector reduction operand
- * @param [in]  src2     Array of vector reduction operands
- * @param [out] dst      dst = src1 (op) src2{0} (op) src2{1} (op) ...
+ * @param [in]  src1      First vector reduction operand
+ * @param [in]  src2      Array of vector reduction operands
+ * @param [out] dst       dst = src1 (op) src2{0} (op) src2{1} (op) ...
  *                                               (op) src2{size-1}
- * @param [in]  count    Number of elements in dst
- * @param [in]  size     Number of vectors in src2
- * @param [in]  stride   Offset between vectors in src2
- * @param [in]  dtype    Vectors elements datatype
- * @param [in]  op       Reduction operation
- * @param [in]  mem_type Vectors memory type
+ * @param [in]  n_vectors Number of vectors in src2
+ * @param [in]  count     Number of elements in dst
+ * @param [in]  stride    Offset between vectors in src2
+ * @param [in]  dtype     Vectors elements datatype
+ * @param [in]  op        Reduction operation
+ * @param [in]  mem_type  Vectors memory type
  */
 ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
-                                 size_t count, size_t size, size_t stride,
+                                 size_t n_vectors, size_t count, size_t stride,
                                  ucc_datatype_t dtype, ucc_reduction_op_t op,
                                  ucc_memory_type_t mem_type);
 
@@ -95,7 +95,7 @@ static inline ucc_status_t ucc_dt_reduce(const void *src1, const void *src2,
 }
 
 static inline ucc_status_t ucc_dt_reduce_multi(void *src1, void *src2,
-                                               void *dst, size_t size,
+                                               void *dst, size_t n_vectors,
                                                size_t count, size_t stride,
                                                ucc_datatype_t dt,
                                                ucc_memory_type_t mem_type,
@@ -104,7 +104,7 @@ static inline ucc_status_t ucc_dt_reduce_multi(void *src1, void *src2,
     if (args->mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) {
         return UCC_ERR_NOT_SUPPORTED; //TODO
     } else {
-        return ucc_mc_reduce_multi(src1, src2, dst, size, count, stride,
+        return ucc_mc_reduce_multi(src1, src2, dst, n_vectors, count, stride,
                                    dt, args->reduce.predefined_op, mem_type);
     }
 }
