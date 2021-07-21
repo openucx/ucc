@@ -104,4 +104,5 @@ typedef struct ucc_cl_lib_attr {
 #define UCC_CL_TEAM_IFACE(_cl_team)                                            \
     (ucc_derived_of((_cl_team)->super.context->lib, ucc_cl_lib_t))->iface
 
+#define UCC_CL_TEAM_LIB(_cl_team) (_cl_team)->super.super.context->lib
 #endif

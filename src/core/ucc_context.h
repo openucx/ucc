@@ -64,6 +64,7 @@ typedef struct ucc_context {
     ucc_rank_t               rank; /*< rank of a process in the "global" (with
                                      OOB) context */
     ucc_topo_t              *topo;
+    uint64_t                 cl_flags;
 } ucc_context_t;
 
 typedef struct ucc_context_config {

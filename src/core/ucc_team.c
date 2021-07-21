@@ -134,7 +134,6 @@ static inline ucc_status_t
 ucc_team_create_service_team(ucc_context_t *context, ucc_team_t *team)
 {
     ucc_status_t status;
-    /* TODO: check if service team is required by CLs/TLs */
     if (!team->service_team) {
         ucc_base_team_params_t b_params;
         ucc_base_team_t *      b_team;
@@ -292,15 +291,24 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
         }
         team->state = UCC_TEAM_SERVICE_TEAM;
     case UCC_TEAM_SERVICE_TEAM:
-        status = ucc_team_create_service_team(context, team);
-        if (UCC_OK != status) {
-            goto out;
+        if ((context->cl_flags & UCC_BASE_LIB_FLAG_SERVICE_TEAM_REQUIRED) ||
+            ((context->cl_flags & UCC_BASE_LIB_FLAG_TEAM_ID_REQUIRED) &&
+             (team->id == 0))) {
+            /* We need service team either when it is explicitely required
+               by any CL/TL (e.g. CL/HIER) or if TEAM_ID is required but
+               not provided by the user */
+            status = ucc_team_create_service_team(context, team);
+            if (UCC_OK != status) {
+                goto out;
+            }
         }
         team->state = UCC_TEAM_ALLOC_ID;
     case UCC_TEAM_ALLOC_ID:
-        status = ucc_team_alloc_id(team);
-        if (UCC_OK != status) {
-            goto out;
+        if (context->cl_flags & UCC_BASE_LIB_FLAG_TEAM_ID_REQUIRED) {
+            status = ucc_team_alloc_id(team);
+            if (UCC_OK != status) {
+                goto out;
+            }
         }
         team->state = UCC_TEAM_CL_CREATE;
         if (team->service_team) {
@@ -479,7 +487,7 @@ static void ucc_team_relase_id(ucc_team_t *team)
 {
     ucc_context_t *ctx = team->contexts[0];
     /* release the id pool bit if it was not provided by user */
-    if (!UCC_TEAM_ID_IS_EXTERNAL(team)) {
+    if (0 != team->id && !UCC_TEAM_ID_IS_EXTERNAL(team)) {
         set_id_bit(ctx->ids.pool, team->id);
     }
 }

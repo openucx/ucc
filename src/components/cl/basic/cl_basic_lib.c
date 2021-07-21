@@ -45,6 +45,7 @@ static inline ucc_status_t check_tl_lib_attr(const ucc_base_lib_t *lib,
     attr->super.attr.thread_mode =
         ucc_min(attr->super.attr.thread_mode, tl_attr.super.attr.thread_mode);
     attr->super.attr.coll_types |= tl_attr.super.attr.coll_types;
+    attr->super.flags           |= tl_attr.super.flags;
     return UCC_OK;
 }
 
@@ -61,6 +62,7 @@ ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
     attr->tls                    = &cl_lib->tls;
     attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
     attr->super.attr.coll_types  = 0;
+    attr->super.flags            = 0;
     if (tls->count == 1 && !strcmp(tls->names[0], "all")) {
         /* Check all available components, since CL_BASIC_TLS == "all" */
         for (i = 0; i < ucc_global_config.tl_framework.n_components; i++) {

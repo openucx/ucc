@@ -30,5 +30,6 @@ ucc_status_t ucc_tl_nccl_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
     ucc_tl_lib_attr_t *attr      = ucc_derived_of(base_attr, ucc_tl_lib_attr_t);
     attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
     attr->super.attr.coll_types  = UCC_TL_NCCL_SUPPORTED_COLLS;
+    attr->super.flags            = 0;
     return UCC_OK;
 }
