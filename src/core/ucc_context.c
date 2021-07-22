@@ -33,6 +33,11 @@ static ucc_config_field_t ucc_context_config_table[] = {
      "internal team id allocation takes place.",
      ucc_offsetof(ucc_context_config_t, team_ids_pool_size), UCC_CONFIG_TYPE_UINT},
 
+    {"INTERNAL_OOB", "1",
+     "Use internal OOB transport for team creation. Available for ucc_context "
+     "is configured with OOB (global mode). 0 - disable, 1 - try, 2 - force.",
+     ucc_offsetof(ucc_context_config_t, internal_oob), UCC_CONFIG_TYPE_UINT},
+
     {NULL}
 };
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
@@ -576,6 +581,58 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
             }
         }
     }
+    if (config->internal_oob) {
+        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+            ucc_base_team_params_t t_params;
+            ucc_base_team_t *      b_team;
+            status = ucc_tl_context_get(ctx, "ucp", &ctx->service_ctx);
+            if (UCC_OK != status) {
+                if (config->internal_oob == 2) {
+                    ucc_error("TL UCP context is not available, service team can "
+                              "not be created but was force requested");
+                    goto error_ctx_create;
+                }
+                ucc_debug("TL UCP context is not available, "
+                          "service team can not be created");
+            } else {
+                t_params.params.mask = UCC_TEAM_PARAM_FIELD_EP |
+                    UCC_TEAM_PARAM_FIELD_EP_RANGE |
+                    UCC_TEAM_PARAM_FIELD_OOB;
+                t_params.params.oob.allgather = ctx->params.oob.allgather;
+                t_params.params.oob.req_test = ctx->params.oob.req_test;
+                t_params.params.oob.req_free = ctx->params.oob.req_free;
+                t_params.params.oob.coll_info = ctx->params.oob.coll_info;
+                t_params.params.oob.participants = ctx->params.oob.participants;
+                t_params.params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+                t_params.params.ep = ctx->rank;
+                t_params.rank = ctx->rank;
+                t_params.scope = UCC_CL_LAST + 1; // CORE scopre id - never overlaps with CL type
+                t_params.scope_id = 0;
+                t_params.id       = 0;
+                t_params.team     = NULL;
+                status            = UCC_TL_CTX_IFACE(ctx->service_ctx)
+                    ->team.create_post(&ctx->service_ctx->super, &t_params,
+                                       &b_team);
+                if (UCC_OK != status) {
+                    ucc_error("ctx service team create post failed");
+                    goto error_ctx_create;
+                }
+                do {
+                    status = UCC_TL_CTX_IFACE(ctx->service_ctx)
+                        ->team.create_test(b_team);
+                } while (UCC_INPROGRESS == status);
+                if (status < 0) {
+                    ucc_error("failed to create ctx service team");
+                    goto error_ctx_create;
+                }
+                ctx->service_team = ucc_derived_of(b_team, ucc_tl_team_t);
+            }
+        } else if (config->internal_oob == 2) {
+            ucc_error("UCC_INTERNAL_OOB was force requested for context "
+                      "without OOB");
+            goto error_ctx_create;
+        }
+    }
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;
     return UCC_OK;
@@ -607,7 +664,18 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     ucc_tl_context_t *tl_ctx;
     ucc_tl_lib_t     *tl_lib;
     int               i;
+    ucc_status_t      status;
 
+    if (context->service_team) {
+        while (UCC_INPROGRESS == (status = UCC_TL_CTX_IFACE(context->service_ctx)
+                                  ->team.destroy(&context->service_team->super))) {
+            ucc_context_progress(context);
+        }
+        if (status < 0) {
+            ucc_error("failed to destroy ctx service team");
+        }
+        ucc_tl_context_put(context->service_ctx);
+    }
     if (UCC_OK != ucc_context_free_attr(&context->attr)) {
         ucc_error("failed to free context attributes");
     }

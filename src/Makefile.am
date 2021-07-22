@@ -42,6 +42,7 @@ noinst_HEADERS =                      \
 	core/ucc_progress_queue.h         \
 	core/ucc_topo.h                   \
 	core/ucc_sbgp.h                   \
+	core/ucc_service_coll.h           \
 	schedule/ucc_schedule.h           \
 	coll_score/ucc_coll_score.h       \
 	utils/ucc_compiler_def.h          \
@@ -87,6 +88,7 @@ libucc_la_SOURCES =                  \
 	core/ucc_progress_queue_mt.c     \
 	core/ucc_topo.c                  \
 	core/ucc_sbgp.c                  \
+	core/ucc_service_coll.c          \
 	schedule/ucc_schedule.c          \
 	coll_score/ucc_coll_score.c      \
 	coll_score/ucc_coll_score_map.c  \

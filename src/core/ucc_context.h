@@ -16,6 +16,7 @@ typedef struct ucc_lib_info          ucc_lib_info_t;
 typedef struct ucc_cl_context        ucc_cl_context_t;
 typedef struct ucc_tl_context        ucc_tl_context_t;
 typedef struct ucc_cl_context_config ucc_cl_context_config_t;
+typedef struct ucc_tl_team           ucc_tl_team_t;
 
 typedef unsigned (*ucc_context_progress_fn_t)(void *progress_arg);
 typedef struct ucc_context_progress {
@@ -65,6 +66,7 @@ typedef struct ucc_context {
                                      OOB) context */
     ucc_topo_t              *topo;
     uint64_t                 cl_flags;
+    ucc_tl_team_t           *service_team;
 } ucc_context_t;
 
 typedef struct ucc_context_config {
@@ -75,6 +77,7 @@ typedef struct ucc_context_config {
     uint32_t                  estimated_num_eps;
     uint32_t                  estimated_num_ppn;
     uint32_t                  lock_free_progress_q;
+    uint32_t                  internal_oob;
 } ucc_context_config_t;
 
 /* Any internal UCC component (TL, CL, etc) may register its own

@@ -88,7 +88,7 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      UCC_CONFIG_TYPE_UINT},
 
     {"OOB_NPOLLS", "20",
-     "Number of polling cycles for oob allgather request",
+     "Number of polling cycles for oob allgather and service coll request",
      ucc_offsetof(ucc_tl_ucp_context_config_t, oob_npolls),
      UCC_CONFIG_TYPE_UINT},
 
@@ -131,6 +131,10 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           size_t count, ucc_reduction_op_t op,
                                           ucc_tl_team_subset_t subset,
                                           ucc_coll_task_t **task);
+
+ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf, void *rbuf,
+                                          size_t msgsize, ucc_tl_team_subset_t subset,
+                                          ucc_coll_task_t **task_p);
 
 ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task);
 
@@ -186,8 +190,7 @@ void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
 __attribute__((constructor)) static void tl_ucp_iface_init(void)
 {
     ucc_tl_ucp.super.scoll.allreduce = ucc_tl_ucp_service_allreduce;
-    ucc_tl_ucp.super.scoll.test      = ucc_tl_ucp_service_test;
-    ucc_tl_ucp.super.scoll.cleanup   = ucc_tl_ucp_service_cleanup;
+    ucc_tl_ucp.super.scoll.allgather = ucc_tl_ucp_service_allgather;
     ucc_tl_ucp.super.scoll.update_id = ucc_tl_ucp_service_update_id;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLREDUCE)] =
         ucc_tl_ucp_allreduce_algs;

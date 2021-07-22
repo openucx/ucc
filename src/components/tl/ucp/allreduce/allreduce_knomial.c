@@ -85,9 +85,9 @@ UCC_KN_PHASE_EXTRA:
     while(!ucc_knomial_pattern_loop_done(p)) {
         for (loop_step = 1; loop_step < radix; loop_step++) {
             peer = ucc_knomial_pattern_get_loop_peer(p, rank, size, loop_step);
-            peer = ucc_ep_map_eval(task->subset.map, peer);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
+            peer = ucc_ep_map_eval(task->subset.map, peer);
             if ((p->iteration == 0) && (KN_NODE_PROXY != node_type) &&
                 !UCC_IS_INPLACE(*args)) {
                 send_buf = sbuf;
@@ -103,9 +103,9 @@ UCC_KN_PHASE_EXTRA:
         recv_offset = 0;
         for (loop_step = 1; loop_step < radix; loop_step++) {
             peer = ucc_knomial_pattern_get_loop_peer(p, rank, size, loop_step);
-            peer = ucc_ep_map_eval(task->subset.map, peer);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
+            peer = ucc_ep_map_eval(task->subset.map, peer);
             UCPCHECK_GOTO(
                 ucc_tl_ucp_recv_nb((void *)((ptrdiff_t)scratch + recv_offset),
                                    data_size, mem_type, peer, team, task),
