@@ -85,6 +85,7 @@ gtest_SOURCES =                     \
 	core/test_allreduce.cc          \
 	core/test_schedule.cc           \
 	core/test_topo.cc               \
+	core/test_service_coll.cc       \
 	utils/test_string.cc            \
 	utils/test_ep_map.cc            \
 	utils/test_lock_free_queue.cc   \
