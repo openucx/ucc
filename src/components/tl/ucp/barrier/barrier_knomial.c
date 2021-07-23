@@ -20,7 +20,7 @@
 ucc_status_t ucc_tl_ucp_barrier_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t     *team       = task->team;
+    ucc_tl_ucp_team_t     *team       = TASK_TEAM(task);
     ucc_kn_radix_t         radix      = task->barrier.p.radix;
     uint8_t                node_type  = task->barrier.p.node_type;
     ucc_knomial_pattern_t *p          = &task->barrier.p;
@@ -104,7 +104,7 @@ out:
 ucc_status_t ucc_tl_ucp_barrier_knomial_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team = task->team;
+    ucc_tl_ucp_team_t *team = TASK_TEAM(task);
     ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_barrier_kn_start", 0);

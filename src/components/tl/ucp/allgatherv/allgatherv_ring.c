@@ -15,12 +15,13 @@
 ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task     = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team     = task->team;
+    ucc_coll_args_t   *args     = &coll_task->args;
+    ucc_tl_ucp_team_t *team     = TASK_TEAM(task);
     ucc_rank_t         grank    = team->rank;
     ucc_rank_t         gsize    = team->size;
-    ptrdiff_t          rbuf     = (ptrdiff_t)task->args.dst.info_v.buffer;
-    ucc_memory_type_t  rmem     = task->args.dst.info_v.mem_type;
-    size_t             rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+    ptrdiff_t          rbuf     = (ptrdiff_t)args->dst.info_v.buffer;
+    ucc_memory_type_t  rmem     = args->dst.info_v.mem_type;
+    size_t             rdt_size = ucc_dt_size(args->dst.info_v.datatype);
     ucc_rank_t         sendto   = (grank + 1) % gsize;
     ucc_rank_t         recvfrom = (grank - 1 + gsize) % gsize;
     ucc_rank_t         send_idx, recv_idx;
@@ -31,20 +32,22 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
     }
     while (task->send_posted < gsize) {
         send_idx = (grank - task->send_posted + 1 + gsize) % gsize;
-        data_displ = ucc_coll_args_get_displacement(&task->args,
-                        task->args.dst.info_v.displacements, send_idx) *
-                        rdt_size;
-        data_size = ucc_coll_args_get_count(&task->args,
-                        task->args.dst.info_v.counts, send_idx) * rdt_size;
+        data_displ = ucc_coll_args_get_displacement(
+                         args, args->dst.info_v.displacements, send_idx) *
+                     rdt_size;
+        data_size =
+            ucc_coll_args_get_count(args, args->dst.info_v.counts, send_idx) *
+            rdt_size;
         UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(rbuf + data_displ), data_size,
                                          rmem, sendto, team, task),
                       task, out);
         recv_idx = (grank - task->recv_posted + gsize) % gsize;
-        data_displ = ucc_coll_args_get_displacement(&task->args,
-                        task->args.dst.info_v.displacements, recv_idx) *
-                        rdt_size;
-        data_size = ucc_coll_args_get_count(&task->args,
-                        task->args.dst.info_v.counts, recv_idx) * rdt_size;
+        data_displ = ucc_coll_args_get_displacement(
+                         args, args->dst.info_v.displacements, recv_idx) *
+                     rdt_size;
+        data_size =
+            ucc_coll_args_get_count(args, args->dst.info_v.counts, recv_idx) *
+            rdt_size;
         UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)(rbuf + data_displ), data_size,
                                          rmem, recvfrom, team, task),
                       task, out);
@@ -61,26 +64,28 @@ out:
 ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team  = task->team;
-    ptrdiff_t          sbuf  = (ptrdiff_t)task->args.src.info.buffer;
-    ptrdiff_t          rbuf  = (ptrdiff_t)task->args.dst.info_v.buffer;
-    ucc_memory_type_t  smem  = task->args.src.info.mem_type;
-    ucc_memory_type_t  rmem  = task->args.dst.info_v.mem_type;
+    ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
+    ptrdiff_t          sbuf  = (ptrdiff_t)coll_task->args.src.info.buffer;
+    ptrdiff_t          rbuf  = (ptrdiff_t)coll_task->args.dst.info_v.buffer;
+    ucc_memory_type_t  smem  = coll_task->args.src.info.mem_type;
+    ucc_memory_type_t  rmem  = coll_task->args.dst.info_v.mem_type;
     ucc_rank_t         grank = team->rank;
     size_t             data_size, data_displ, rdt_size;
     ucc_status_t       status;
 
     ucc_tl_ucp_task_reset(task);
 
-    if (!UCC_IS_INPLACE(task->args)) {
+    if (!UCC_IS_INPLACE(coll_task->args)) {
         /* TODO replace local sendrecv with memcpy? */
-        rdt_size   = ucc_dt_size(task->args.dst.info_v.datatype);
+        rdt_size   = ucc_dt_size(coll_task->args.dst.info_v.datatype);
         data_displ = ucc_coll_args_get_displacement(
-                        &task->args, task->args.dst.info_v.displacements,
-                        grank) * rdt_size;
-        data_size  = ucc_coll_args_get_count(
-                        &task->args, task->args.dst.info_v.counts,
-                        grank) *rdt_size;
+                         &coll_task->args,
+                         coll_task->args.dst.info_v.displacements, grank) *
+                     rdt_size;
+        data_size =
+            ucc_coll_args_get_count(&coll_task->args,
+                                    coll_task->args.dst.info_v.counts, grank) *
+            rdt_size;
         UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)rbuf + data_displ, data_size,
                                          rmem, grank, team, task),
                       task, error);

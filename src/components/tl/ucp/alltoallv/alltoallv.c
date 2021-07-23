@@ -15,7 +15,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_init(ucc_tl_ucp_task_t *task)
 {
     ucc_status_t status;
 
-    ALLTOALLV_TASK_CHECK(task->args, task->team);
+    ALLTOALLV_TASK_CHECK(task->super.args, TASK_TEAM(task));
     status = ucc_tl_ucp_alltoallv_pairwise_init_common(task);
 out:
     return status;

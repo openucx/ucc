@@ -20,7 +20,7 @@ typedef enum {
 } ucc_event_t;
 
 typedef struct ucc_coll_task ucc_coll_task_t;
-
+typedef struct ucc_base_team ucc_base_team_t;
 typedef ucc_status_t (*ucc_task_event_handler_p)(ucc_coll_task_t *parent,
                                                  ucc_coll_task_t *task);
 typedef ucc_status_t (*ucc_coll_post_fn_t)(ucc_coll_task_t *task);
@@ -45,6 +45,8 @@ enum {
 typedef struct ucc_coll_task {
     ucc_coll_req_t               super;
     uint32_t                     flags;
+    ucc_coll_args_t              args;
+    ucc_base_team_t             *team;
     ucc_coll_post_fn_t           post;
     ucc_coll_triggered_post_fn_t triggered_post;
     ucc_coll_finalize_fn_t       finalize;
@@ -78,7 +80,8 @@ typedef struct ucc_schedule {
 
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em);
 
-ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task);
+ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task, ucc_coll_args_t *args,
+                                ucc_base_team_t *team);
 
 void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
                                  ucc_coll_task_t *task,
@@ -87,7 +90,8 @@ void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
 ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event);
 
-ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx);
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_coll_args_t *args,
+                               ucc_base_team_t *team);
 
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
 
@@ -121,4 +125,9 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
     }
     return status;
 }
+
+#define UCC_TASK_LIB(_task) (((ucc_coll_task_t *)_task)->team->context->lib)
+#define UCC_TASK_CORE_CTX(_task)                                               \
+    (((ucc_coll_task_t *)_task)->team->context->ucc_context)
+
 #endif

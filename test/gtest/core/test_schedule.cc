@@ -32,9 +32,9 @@ UCC_TEST_F(test_schedule, single_handler)
 {
     std::vector<ucc_coll_task_t> tasks(2);
 
-    EXPECT_EQ(UCC_OK, ucc_coll_task_init((ucc_coll_task_t*)this));
+    EXPECT_EQ(UCC_OK, ucc_coll_task_init((ucc_coll_task_t *)this, NULL, NULL));
     for (auto &t :  tasks) {
-        EXPECT_EQ(UCC_OK, ucc_coll_task_init(&t));
+        EXPECT_EQ(UCC_OK, ucc_coll_task_init(&t, NULL, NULL));
         ucc_event_manager_subscribe(&t.em, UCC_EVENT_COMPLETED,
                                     (ucc_coll_task_t*)this,
                                     test_schedule::handler_1);
@@ -56,9 +56,9 @@ UCC_TEST_F(test_schedule, different_handlers)
 {
     std::vector<ucc_coll_task_t> tasks(2);
 
-    EXPECT_EQ(UCC_OK, ucc_coll_task_init((ucc_coll_task_t*)this));
+    EXPECT_EQ(UCC_OK, ucc_coll_task_init((ucc_coll_task_t *)this, NULL, NULL));
     for (auto &t :  tasks) {
-        EXPECT_EQ(UCC_OK, ucc_coll_task_init(&t));
+        EXPECT_EQ(UCC_OK, ucc_coll_task_init(&t, NULL, NULL));
     }
     ucc_event_manager_subscribe(&tasks[0].em, UCC_EVENT_COMPLETED,
                                 (ucc_coll_task_t*)this,
