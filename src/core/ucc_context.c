@@ -15,31 +15,35 @@
 static uint32_t ucc_context_seq_num = 0;
 static ucc_config_field_t ucc_context_config_table[] = {
     {"ESTIMATED_NUM_EPS", "0",
-     "An optimization hint of how many endpoints will be created on this context",
-     ucc_offsetof(ucc_context_config_t, estimated_num_eps), UCC_CONFIG_TYPE_UINT},
+     "An optimization hint of how many endpoints will be created on this "
+     "context",
+     ucc_offsetof(ucc_context_config_t, estimated_num_eps),
+     UCC_CONFIG_TYPE_UINT},
 
     {"LOCK_FREE_PROGRESS_Q", "0",
      "Enable lock free progress queue optimization",
-     ucc_offsetof(ucc_context_config_t, lock_free_progress_q), UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_context_config_t, lock_free_progress_q),
+     UCC_CONFIG_TYPE_UINT},
 
     {"ESTIMATED_NUM_PPN", "0",
      "An optimization hint of how many endpoints created on this context reside"
      " on the same node",
-     ucc_offsetof(ucc_context_config_t, estimated_num_ppn), UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_context_config_t, estimated_num_ppn),
+     UCC_CONFIG_TYPE_UINT},
 
     {"TEAM_IDS_POOL_SIZE", "32",
-     "Defines the size of the team_id_pool. The number of coexisting unique team ids "
-     "for a single process is team_ids_pool_size*64. This parameter is relevant when "
-     "internal team id allocation takes place.",
-     ucc_offsetof(ucc_context_config_t, team_ids_pool_size), UCC_CONFIG_TYPE_UINT},
+     "Defines the size of the team_id_pool. The number of coexisting unique "
+     "team ids for a single process is team_ids_pool_size*64. This parameter "
+     "is relevant when internal team id allocation takes place.",
+     ucc_offsetof(ucc_context_config_t, team_ids_pool_size),
+     UCC_CONFIG_TYPE_UINT},
 
     {"INTERNAL_OOB", "1",
      "Use internal OOB transport for team creation. Available for ucc_context "
      "is configured with OOB (global mode). 0 - disable, 1 - try, 2 - force.",
      ucc_offsetof(ucc_context_config_t, internal_oob), UCC_CONFIG_TYPE_UINT},
 
-    {NULL}
-};
+    {NULL}};
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
                           ucc_context_config_t, &ucc_config_global_list);
 
@@ -588,38 +592,40 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
             status = ucc_tl_context_get(ctx, "ucp", &ctx->service_ctx);
             if (UCC_OK != status) {
                 if (config->internal_oob == 2) {
-                    ucc_error("TL UCP context is not available, service team can "
-                              "not be created but was force requested");
+                    ucc_error(
+                        "TL UCP context is not available, service team can "
+                        "not be created but was force requested");
                     goto error_ctx_create;
                 }
                 ucc_debug("TL UCP context is not available, "
                           "service team can not be created");
             } else {
                 t_params.params.mask = UCC_TEAM_PARAM_FIELD_EP |
-                    UCC_TEAM_PARAM_FIELD_EP_RANGE |
-                    UCC_TEAM_PARAM_FIELD_OOB;
-                t_params.params.oob.allgather = ctx->params.oob.allgather;
-                t_params.params.oob.req_test = ctx->params.oob.req_test;
-                t_params.params.oob.req_free = ctx->params.oob.req_free;
-                t_params.params.oob.coll_info = ctx->params.oob.coll_info;
+                                       UCC_TEAM_PARAM_FIELD_EP_RANGE |
+                                       UCC_TEAM_PARAM_FIELD_OOB;
+                t_params.params.oob.allgather    = ctx->params.oob.allgather;
+                t_params.params.oob.req_test     = ctx->params.oob.req_test;
+                t_params.params.oob.req_free     = ctx->params.oob.req_free;
+                t_params.params.oob.coll_info    = ctx->params.oob.coll_info;
                 t_params.params.oob.participants = ctx->params.oob.participants;
                 t_params.params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
-                t_params.params.ep = ctx->rank;
-                t_params.rank = ctx->rank;
-                t_params.scope = UCC_CL_LAST + 1; // CORE scopre id - never overlaps with CL type
+                t_params.params.ep       = ctx->rank;
+                t_params.rank            = ctx->rank;
+                /* CORE scope id - never overlaps with CL type */
+                t_params.scope    = UCC_CL_LAST + 1;
                 t_params.scope_id = 0;
                 t_params.id       = 0;
                 t_params.team     = NULL;
                 status            = UCC_TL_CTX_IFACE(ctx->service_ctx)
-                    ->team.create_post(&ctx->service_ctx->super, &t_params,
-                                       &b_team);
+                             ->team.create_post(&ctx->service_ctx->super,
+                                                &t_params, &b_team);
                 if (UCC_OK != status) {
                     ucc_error("ctx service team create post failed");
                     goto error_ctx_create;
                 }
                 do {
                     status = UCC_TL_CTX_IFACE(ctx->service_ctx)
-                        ->team.create_test(b_team);
+                                 ->team.create_test(b_team);
                 } while (UCC_INPROGRESS == status);
                 if (status < 0) {
                     ucc_error("failed to create ctx service team");
@@ -667,8 +673,9 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     ucc_status_t      status;
 
     if (context->service_team) {
-        while (UCC_INPROGRESS == (status = UCC_TL_CTX_IFACE(context->service_ctx)
-                                  ->team.destroy(&context->service_team->super))) {
+        while (UCC_INPROGRESS ==
+               (status = UCC_TL_CTX_IFACE(context->service_ctx)
+                             ->team.destroy(&context->service_team->super))) {
             ucc_context_progress(context);
         }
         if (status < 0) {

@@ -68,8 +68,10 @@ ucc_get_team_ep_header(ucc_context_t *context, ucc_team_t *team,
     ucc_addr_storage_t *storage      = context->addr_storage.storage
                                            ? &context->addr_storage
                                            : &team->addr_storage;
-    ucc_rank_t          storage_rank = context->addr_storage.storage
-        ? (team ? ucc_ep_map_eval(team->ctx_map, rank) : rank) : rank;
+    ucc_rank_t          storage_rank =
+        context->addr_storage.storage
+                     ? (team ? ucc_ep_map_eval(team->ctx_map, rank) : rank)
+                     : rank;
 
     return UCC_ADDR_STORAGE_RANK_HEADER(storage, storage_rank);
 }

@@ -41,8 +41,8 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     if ((team->bp.params.mask & UCC_TEAM_PARAM_FIELD_EP) &&
         (team->bp.params.mask & UCC_TEAM_PARAM_FIELD_EP_RANGE) &&
         (team->bp.params.ep_range == UCC_COLLECTIVE_EP_RANGE_CONTIG)) {
-        team->rank =
-            team->bp.params.ep; //TODO need to make sure we don't exceed rank size
+        /* TODO need to make sure we don't exceed rank size */
+        team->rank = team->bp.params.ep;
     } else {
         ucc_error(
             "rank value of a process is not provided via ucc_team_params.ep "
@@ -51,13 +51,11 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (context->service_team)  {
+    if (context->service_team) {
         /* User internal service team for OOB */
-        ucc_tl_team_subset_t subset = {
-            .myrank     = team->rank,
-            .map.ep_num = team->size,
-            .map.type   = UCC_EP_MAP_FULL
-        };
+        ucc_tl_team_subset_t subset = {.myrank     = team->rank,
+                                       .map.ep_num = team->size,
+                                       .map.type   = UCC_EP_MAP_FULL};
         status = ucc_internal_oob_init(team, subset, &team->bp.params.oob);
         if (UCC_OK != status) {
             return status;
@@ -261,8 +259,7 @@ static inline ucc_status_t ucc_team_exchange(ucc_context_t *context,
         /* There is no addresses collected on the context
            (can be, e.g., if user did not pass OOB for ctx
            creation). Need to exchange addresses here*/
-        return ucc_core_addr_exchange(context, NULL, &oob,
-                                      &team->addr_storage);
+        return ucc_core_addr_exchange(context, NULL, &oob, &team->addr_storage);
     }
     /* We only need to exchange ctx_ranks and build map to ctx array */
     ucc_assert(context->addr_storage.storage);
@@ -274,9 +271,9 @@ static inline ucc_status_t ucc_team_exchange(ucc_context_t *context,
                       team->size * sizeof(ucc_rank_t));
             return UCC_ERR_NO_MEMORY;
         }
-        status = oob.allgather(
-            &context->rank, team->ctx_ranks, sizeof(ucc_rank_t),
-            oob.coll_info, &team->oob_req);
+        status =
+            oob.allgather(&context->rank, team->ctx_ranks, sizeof(ucc_rank_t),
+                          oob.coll_info, &team->oob_req);
         if (UCC_OK != status) {
             ucc_error("failed to start oob allgather for proc info exchange");
             ucc_free(team->ctx_ranks);
@@ -466,14 +463,12 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
     global = ctx->ids.pool + ctx->ids.pool_size;
 
     if (!team->sreq) {
-        ucc_tl_team_subset_t subset = {
-            .map.type   = UCC_EP_MAP_FULL,
-            .map.ep_num = team->size,
-            .myrank     = team->rank
-        };
+        ucc_tl_team_subset_t subset = {.map.type   = UCC_EP_MAP_FULL,
+                                       .map.ep_num = team->size,
+                                       .myrank     = team->rank};
         status = ucc_service_allreduce(team, local, global, UCC_DT_UINT64,
-                                       ctx->ids.pool_size, UCC_OP_BAND,
-                                       subset, &team->sreq);
+                                       ctx->ids.pool_size, UCC_OP_BAND, subset,
+                                       &team->sreq);
         if (status < 0) {
             return status;
         }

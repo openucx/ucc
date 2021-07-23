@@ -45,7 +45,7 @@ static inline ucc_status_t check_tl_lib_attr(const ucc_base_lib_t *lib,
     attr->super.attr.thread_mode =
         ucc_min(attr->super.attr.thread_mode, tl_attr.super.attr.thread_mode);
     attr->super.attr.coll_types |= tl_attr.super.attr.coll_types;
-    attr->super.flags           |= tl_attr.super.flags;
+    attr->super.flags |= tl_attr.super.flags;
     return UCC_OK;
 }
 

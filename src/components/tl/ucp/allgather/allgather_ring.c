@@ -77,9 +77,9 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_reset(task);
 
     if (!UCC_IS_INPLACE(coll_task->args)) {
-        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size *
-                                          task->subset.myrank),
-                               sbuf, data_size, rmem, smem);
+        status =
+            ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * task->subset.myrank),
+                          sbuf, data_size, rmem, smem);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }

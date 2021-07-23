@@ -84,16 +84,14 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
 
     {"NPOLLS", "10",
      "Number of ucp progress polling cycles for p2p requests testing",
-     ucc_offsetof(ucc_tl_ucp_context_config_t, n_polls),
-     UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_tl_ucp_context_config_t, n_polls), UCC_CONFIG_TYPE_UINT},
 
     {"OOB_NPOLLS", "20",
      "Number of polling cycles for oob allgather and service coll request",
      ucc_offsetof(ucc_tl_ucp_context_config_t, oob_npolls),
      UCC_CONFIG_TYPE_UINT},
 
-    {"PRE_REG_MEM", "0",
-     "Pre Register collective memory region with UCX",
+    {"PRE_REG_MEM", "0", "Pre Register collective memory region with UCX",
      ucc_offsetof(ucc_tl_ucp_context_config_t, pre_reg_mem),
      UCC_CONFIG_TYPE_UINT},
 
@@ -132,9 +130,10 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           ucc_tl_team_subset_t subset,
                                           ucc_coll_task_t **task);
 
-ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf, void *rbuf,
-                                          size_t msgsize, ucc_tl_team_subset_t subset,
-                                          ucc_coll_task_t **task_p);
+ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
+                                          void *rbuf, size_t msgsize,
+                                          ucc_tl_team_subset_t subset,
+                                          ucc_coll_task_t    **task_p);
 
 ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task);
 
