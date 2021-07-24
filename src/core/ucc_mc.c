@@ -153,7 +153,7 @@ UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce,
 }
 
 UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce_multi,
-                    (src1, src2, dst, size, count, stride, dtype, op, mem_type),
+                    (src1, src2, dst, n_vectors, count, stride, dtype, op, mem_type),
                     void *src1, void *src2, void *dst, size_t n_vectors,
                     size_t count, size_t stride, ucc_datatype_t dtype,
                     ucc_reduction_op_t op, ucc_memory_type_t mem_type)
