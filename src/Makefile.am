@@ -44,6 +44,7 @@ noinst_HEADERS =                      \
 	core/ucc_sbgp.h                   \
 	core/ucc_service_coll.h           \
 	schedule/ucc_schedule.h           \
+	schedule/ucc_schedule_pipelined.h \
 	coll_score/ucc_coll_score.h       \
 	utils/ucc_compiler_def.h          \
 	utils/ucc_log.h                   \
@@ -73,37 +74,38 @@ noinst_HEADERS =                      \
 	coll_patterns/recursive_knomial.h \
 	coll_patterns/sra_knomial.h
 
-libucc_la_SOURCES =                  \
-	core/ucc_lib.c                   \
-	core/ucc_constructor.c           \
-	core/ucc_global_opts.c           \
-	core/ucc_version.c               \
-	core/ucc_context.c               \
-	core/ucc_mc.c                    \
-	core/ucc_team.c                  \
-	core/ucc_ee.c                    \
-	core/ucc_coll.c                  \
-	core/ucc_progress_queue.c        \
-	core/ucc_progress_queue_st.c     \
-	core/ucc_progress_queue_mt.c     \
-	core/ucc_topo.c                  \
-	core/ucc_sbgp.c                  \
-	core/ucc_service_coll.c          \
-	schedule/ucc_schedule.c          \
-	coll_score/ucc_coll_score.c      \
-	coll_score/ucc_coll_score_map.c  \
-	utils/ucc_component.c            \
-	utils/ucc_status.c               \
-	utils/ucc_mpool.c                \
-	utils/ucc_math.c                 \
-	utils/ucc_proc_info.c            \
-	utils/ucc_string.c               \
-	utils/ucc_coll_utils.c           \
-	utils/ucc_parser.c               \
-	utils/profile/ucc_profile.c      \
-	components/base/ucc_base_iface.c \
-	components/cl/ucc_cl.c           \
-	components/tl/ucc_tl.c           \
+libucc_la_SOURCES =                   \
+	core/ucc_lib.c                    \
+	core/ucc_constructor.c            \
+	core/ucc_global_opts.c            \
+	core/ucc_version.c                \
+	core/ucc_context.c                \
+	core/ucc_mc.c                     \
+	core/ucc_team.c                   \
+	core/ucc_ee.c                     \
+	core/ucc_coll.c                   \
+	core/ucc_progress_queue.c         \
+	core/ucc_progress_queue_st.c      \
+	core/ucc_progress_queue_mt.c      \
+	core/ucc_topo.c                   \
+	core/ucc_sbgp.c                   \
+	core/ucc_service_coll.c           \
+	schedule/ucc_schedule.c           \
+	schedule/ucc_schedule_pipelined.c \
+	coll_score/ucc_coll_score.c       \
+	coll_score/ucc_coll_score_map.c   \
+	utils/ucc_component.c             \
+	utils/ucc_status.c                \
+	utils/ucc_mpool.c                 \
+	utils/ucc_math.c                  \
+	utils/ucc_proc_info.c             \
+	utils/ucc_string.c                \
+	utils/ucc_coll_utils.c            \
+	utils/ucc_parser.c                \
+	utils/profile/ucc_profile.c       \
+	components/base/ucc_base_iface.c  \
+	components/cl/ucc_cl.c            \
+	components/tl/ucc_tl.c            \
 	components/mc/base/ucc_mc_base.c
 
 libucc_ladir = $(includedir)

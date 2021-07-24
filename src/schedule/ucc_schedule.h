@@ -15,6 +15,7 @@
 typedef enum {
     UCC_EVENT_COMPLETED = 0,
     UCC_EVENT_SCHEDULE_STARTED,
+    UCC_EVENT_TASK_STARTED,
     UCC_EVENT_ERROR,
     UCC_EVENT_LAST
 } ucc_event_t;
@@ -64,6 +65,9 @@ typedef struct ucc_coll_task {
         /* used for lf mt progress queue */
         ucc_lf_queue_elem_t          lf_elem;
     };
+    uint8_t n_deps;
+    uint8_t n_deps_satisfied;
+    uint8_t n_deps_base;
 } ucc_coll_task_t;
 
 typedef struct ucc_context ucc_context_t;
