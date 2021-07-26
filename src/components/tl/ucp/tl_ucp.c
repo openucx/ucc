@@ -127,12 +127,12 @@ ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
 ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, ucc_datatype_t dt,
                                           size_t count, ucc_reduction_op_t op,
-                                          ucc_tl_team_subset_t subset,
+                                          ucc_team_subset_t subset,
                                           ucc_coll_task_t **task);
 
 ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, size_t msgsize,
-                                          ucc_tl_team_subset_t subset,
+                                          ucc_team_subset_t subset,
                                           ucc_coll_task_t    **task_p);
 
 ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task);

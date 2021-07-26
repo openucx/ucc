@@ -53,9 +53,9 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
 
     if (context->service_team) {
         /* User internal service team for OOB */
-        ucc_tl_team_subset_t subset = {.myrank     = team->rank,
-                                       .map.ep_num = team->size,
-                                       .map.type   = UCC_EP_MAP_FULL};
+        ucc_team_subset_t subset = {.myrank     = team->rank,
+                                    .map.ep_num = team->size,
+                                    .map.type   = UCC_EP_MAP_FULL};
         status = ucc_internal_oob_init(team, subset, &team->bp.params.oob);
         if (UCC_OK != status) {
             return status;
@@ -463,9 +463,9 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
     global = ctx->ids.pool + ctx->ids.pool_size;
 
     if (!team->sreq) {
-        ucc_tl_team_subset_t subset = {.map.type   = UCC_EP_MAP_FULL,
-                                       .map.ep_num = team->size,
-                                       .myrank     = team->rank};
+        ucc_team_subset_t subset = {.map.type   = UCC_EP_MAP_FULL,
+                                    .map.ep_num = team->size,
+                                    .myrank     = team->rank};
         status = ucc_service_allreduce(team, local, global, UCC_DT_UINT64,
                                        ctx->ids.pool_size, UCC_OP_BAND, subset,
                                        &team->sreq);
