@@ -424,7 +424,14 @@ const std::vector<UccTeam_h> &UccJob::getStaticTeams()
         for (auto ts : teamSizes) {
             staticTeams.push_back(getStaticJob()->create_team(ts));
         }
+        /* Create one more team with reversed ranks order */
+        std::vector<int> ranks;
+        for (auto r = staticUccJobSize - 1; r >= 0; r--) {
+            ranks.push_back(r);
+        }
+        staticTeams.push_back(getStaticJob()->create_team(ranks));
     }
+
     return staticTeams;
 }
 
@@ -441,6 +448,16 @@ UccTeam_h UccJob::create_team(int _n_procs)
     std::vector<UccProcess_h> team_procs;
     for (int i=0; i<_n_procs; i++) {
         team_procs.push_back(procs[i]);
+    }
+    return std::make_shared<UccTeam>(team_procs);
+}
+
+UccTeam_h UccJob::create_team(std::vector<int> &ranks)
+{
+    EXPECT_GE(n_procs, ranks.size());
+    std::vector<UccProcess_h> team_procs;
+    for (int i=0; i<ranks.size(); i++) {
+        team_procs.push_back(procs[ranks[i]]);
     }
     return std::make_shared<UccTeam>(team_procs);
 }

@@ -202,6 +202,7 @@ public:
     ~UccJob();
     std::vector<UccProcess_h> procs;
     UccTeam_h create_team(int n_procs);
+    UccTeam_h create_team(std::vector<int> &ranks);
     void create_context();
     ucc_job_ctx_mode_t ctx_mode;
 };

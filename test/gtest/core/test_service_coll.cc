@@ -114,6 +114,7 @@ class test_scoll_allreduce
 
 UCC_TEST_P(test_scoll_allreduce, allreduce)
 {
+    /* Reversed team of size staticUccJobSize - last one in static teawms array */
     auto team = UccJob::getStaticTeams().back();
     ASSERT_EQ(team.get()->procs.size(), 16);
     std::vector<int>       subset = GetParam();
@@ -186,6 +187,7 @@ class test_scoll_allgather
 
 UCC_TEST_P(test_scoll_allgather, allgather)
 {
+    /* Reversed team of size staticUccJobSize - last one in static teawms array */
     auto team = UccJob::getStaticTeams().back();
     ASSERT_EQ(team.get()->procs.size(), 16);
     std::vector<int>       subset = GetParam();

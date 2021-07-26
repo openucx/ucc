@@ -17,7 +17,7 @@ uint64_t ucc_service_coll_map_cb(uint64_t ep, void *cb_ctx)
 }
 
 static inline ucc_status_t
-ucc_service_coll_req_init(ucc_team_t *team, ucc_tl_team_subset_t subset,
+ucc_service_coll_req_init(ucc_team_t *team, ucc_tl_team_subset_t *subset,
                           ucc_tl_team_t          **service_team,
                           ucc_service_coll_req_t **_req)
 {
@@ -32,13 +32,13 @@ ucc_service_coll_req_init(ucc_team_t *team, ucc_tl_team_subset_t subset,
         return UCC_ERR_NO_MEMORY;
     }
     req->team   = team;
-    req->subset = subset;
+    req->subset = *subset;
 
     if (ctx->service_team) {
-        *service_team        = ctx->service_team;
-        subset.map.type      = UCC_EP_MAP_CB;
-        subset.map.cb.cb     = ucc_service_coll_map_cb;
-        subset.map.cb.cb_ctx = req;
+        *service_team         = ctx->service_team;
+        subset->map.type      = UCC_EP_MAP_CB;
+        subset->map.cb.cb     = ucc_service_coll_map_cb;
+        subset->map.cb.cb_ctx = req;
     } else {
         ucc_assert(team->service_team);
         *service_team = team->service_team;
@@ -58,7 +58,7 @@ ucc_status_t ucc_service_allreduce(ucc_team_t *team, void *sbuf, void *rbuf,
     ucc_tl_iface_t *tl_iface;
     ucc_status_t    status;
 
-    status = ucc_service_coll_req_init(team, subset, &steam, req);
+    status = ucc_service_coll_req_init(team, &subset, &steam, req);
     if (UCC_OK != status) {
         return status;
     }
@@ -84,7 +84,7 @@ ucc_status_t ucc_service_allgather(ucc_team_t *team, void *sbuf, void *rbuf,
     ucc_tl_iface_t *tl_iface;
     ucc_status_t    status;
 
-    status = ucc_service_coll_req_init(team, subset, &steam, req);
+    status = ucc_service_coll_req_init(team, &subset, &steam, req);
     if (UCC_OK != status) {
         return status;
     }
