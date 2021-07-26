@@ -105,6 +105,9 @@ ucc_status_t ucc_task_start_handler(ucc_coll_task_t *parent,
                                     ucc_coll_task_t *task);
 ucc_status_t ucc_schedule_finalize(ucc_coll_task_t *task);
 
+ucc_status_t ucc_dependency_handler(ucc_coll_task_t *parent, /* NOLINT */
+                                    ucc_coll_task_t *task);
+
 static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 {
     ucc_status_t status = task->super.status;
@@ -128,6 +131,15 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         task->finalize(task);
     }
     return status;
+}
+
+static inline void ucc_task_subscribe_dep(ucc_coll_task_t *target,
+                                          ucc_coll_task_t *subscriber,
+                                          ucc_event_t      event)
+{
+    ucc_event_manager_subscribe(&target->em, event, subscriber,
+                                ucc_dependency_handler);
+    subscriber->n_deps++;
 }
 
 #define UCC_TASK_LIB(_task) (((ucc_coll_task_t *)_task)->team->context->lib)

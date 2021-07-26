@@ -28,9 +28,9 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     uint8_t                node_type  = task->allgather_kn.p.node_type;
     ucc_knomial_pattern_t *p          = &task->allgather_kn.p;
     void                  *rbuf       = args->dst.info.buffer;
-    ucc_memory_type_t      mem_type   = args->src.info.mem_type;
-    size_t                 count      = args->src.info.count;
-    ucc_datatype_t         dt         = args->src.info.datatype;
+    ucc_memory_type_t      mem_type   = args->dst.info.mem_type;
+    size_t                 count      = args->dst.info.count;
+    ucc_datatype_t         dt         = args->dst.info.datatype;
     size_t                 dt_size    = ucc_dt_size(dt);
     size_t                 data_size  = count * dt_size;
     ucc_rank_t             size       = team->size;
@@ -140,8 +140,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_assert(args->src.info.mem_type == args->dst.info.mem_type);
 
     ucc_knomial_pattern_init_backward(size, rank, radix, &task->allgather_kn.p);
-    offset = ucc_sra_kn_get_offset(args->src.info.count,
-                                   ucc_dt_size(args->src.info.datatype), rank,
+    offset = ucc_sra_kn_get_offset(args->dst.info.count,
+                                   ucc_dt_size(args->dst.info.datatype), rank,
                                    size, radix);
     if (!UCC_IS_INPLACE(*args)) {
         status = ucc_mc_memcpy(

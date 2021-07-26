@@ -38,6 +38,7 @@ typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 #define UCC_ULUNITS_AUTO                UCS_ULUNITS_AUTO
 #define UCC_CONFIG_TYPE_BITMAP          UCS_CONFIG_TYPE_BITMAP
 #define UCC_CONFIG_TYPE_MEMUNITS        UCS_CONFIG_TYPE_MEMUNITS
+#define UCC_CONFIG_TYPE_BOOL            UCS_CONFIG_TYPE_BOOL
 
 static inline ucc_status_t
 ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,

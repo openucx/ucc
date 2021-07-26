@@ -60,9 +60,6 @@ ucc_status_t ucc_schedule_pipelined_init(
     ucc_schedule_frag_setup_fn_t frag_setup, int n_frags, int n_frags_total,
     int sequential, ucc_schedule_pipelined_t *schedule_p);
 
-ucc_status_t ucc_dependency_handler(ucc_coll_task_t *parent, /* NOLINT */
-                                    ucc_coll_task_t *task);
-
 ucc_status_t ucc_schedule_pipelined_post(ucc_coll_task_t *task);
 
 ucc_status_t ucc_schedule_pipelined_finalize(ucc_coll_task_t *task);
