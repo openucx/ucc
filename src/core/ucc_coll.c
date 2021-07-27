@@ -17,16 +17,6 @@
 #include "coll_score/ucc_coll_score.h"
 #include "ucc_ee.h"
 
-/* NOLINTNEXTLINE  */
-static ucc_cl_team_t *ucc_select_cl_team(ucc_coll_args_t *coll_args,
-                                         ucc_team_t *team)
-{
-    /* TODO1: collective CL selection logic will be there.
-       for now just return 1st CL on a list
-       TODO2: remove NOLINT once TODO1 is done */
-    return team->cl_teams[0];
-}
-
 #define UCC_BUFFER_INFO_CHECK_MEM_TYPE(_info) do {                             \
     if ((_info).mem_type == UCC_MEMORY_TYPE_UNKNOWN) {                         \
         ucc_mem_attr_t mem_attr;                                               \
@@ -162,7 +152,6 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
                       (coll_args, request, team), ucc_coll_args_t *coll_args,
                       ucc_coll_req_h *request, ucc_team_h team)
 {
-    ucc_cl_team_t         *cl_team;
     ucc_coll_task_t       *task;
     ucc_base_coll_args_t   op_args;
     ucc_status_t           status;
@@ -182,13 +171,13 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     op_args.mask = 0;
     memcpy(&op_args.args, coll_args, sizeof(ucc_coll_args_t));
     op_args.team = team;
+
     op_args.args.flags = 0;
     UCC_COPY_PARAM_BY_FIELD(&op_args.args, coll_args, UCC_COLL_ARGS_FIELD_FLAGS,
                             flags);
 
-    cl_team      = ucc_select_cl_team(coll_args, team);
-    status =
-        UCC_CL_TEAM_IFACE(cl_team)->coll.init(&op_args, &cl_team->super, &task);
+    status = ucc_coll_init(team->score_map, &op_args, &task);
+
     if (UCC_ERR_NOT_SUPPORTED == status) {
         ucc_debug("failed to init collective: not supported");
         return status;
