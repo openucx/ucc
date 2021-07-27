@@ -101,6 +101,7 @@ typedef struct ucc_team_multiple_req {
         ucc_tl_team_t           *team;
         ucc_base_team_params_t   param;
         ucc_status_t             status;
+        uint64_t                 args[2];
     } descs[1];
 } ucc_team_multiple_req_t;
 
