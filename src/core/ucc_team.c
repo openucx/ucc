@@ -57,6 +57,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     }
     team->bp.rank                 = team->rank;
     team->bp.team                 = team;
+    team->bp.map.type             = UCC_EP_MAP_FULL;
     team->state                   = UCC_TEAM_ADDR_EXCHANGE;
     team->last_team_create_posted = -1;
     team->status                  = UCC_INPROGRESS;
@@ -210,6 +211,7 @@ ucc_team_create_service_team(ucc_context_t *context, ucc_team_t *team)
         b_params.scope_id = 0;
         b_params.id       = 0;
         b_params.team     = team;
+        b_params.map.type = UCC_EP_MAP_FULL;
         status            = UCC_TL_CTX_IFACE(context->service_ctx)
                      ->team.create_post(&context->service_ctx->super, &b_params,
                                         &b_team);

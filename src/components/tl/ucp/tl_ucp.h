@@ -96,6 +96,7 @@ typedef struct ucc_tl_ucp_team {
     uint32_t                   scope_id;
     uint32_t                   seq_num;
     ucc_tl_ucp_task_t         *preconnect_task;
+    ucc_ep_map_t               map; /*< map to the core ucc team */
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

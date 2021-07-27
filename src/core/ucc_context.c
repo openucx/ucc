@@ -618,6 +618,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
                 t_params.scope_id = 0;
                 t_params.id       = 0;
                 t_params.team     = NULL;
+                t_params.map.type = UCC_EP_MAP_FULL;
                 status            = UCC_TL_CTX_IFACE(ctx->service_ctx)
                              ->team.create_post(&ctx->service_ctx->super,
                                                 &t_params, &b_team);
