@@ -47,8 +47,14 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     UCC_KN_GOTO_PHASE(task->allreduce_kn.phase);
 
     if (KN_NODE_EXTRA == node_type) {
+
         peer = ucc_ep_map_eval(task->subset.map,
                                ucc_knomial_pattern_get_proxy(p, rank));
+        if (task->tag == UCC_TL_UCP_SERVICE_TAG) {
+            printf("service ar task %p, rank %d, pid %d, extra send recv, peer %d\n",
+                   task, rank, getpid(), peer);
+        }
+
         UCPCHECK_GOTO(
             ucc_tl_ucp_send_nb(sbuf, data_size, mem_type, peer, team, task),
             task, out);
@@ -58,8 +64,14 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     }
 
     if (KN_NODE_PROXY == node_type) {
+
         peer = ucc_ep_map_eval(task->subset.map,
                                ucc_knomial_pattern_get_extra(p, rank));
+        if (task->tag == UCC_TL_UCP_SERVICE_TAG) {
+            printf("service ar task %p, rank %d, pid %d, proxy recv, peer %d\n",
+                   task, rank, getpid(), peer);
+        }
+
         UCPCHECK_GOTO(
             ucc_tl_ucp_recv_nb(scratch, data_size, mem_type, peer, team, task),
             task, out);
@@ -94,6 +106,11 @@ UCC_KN_PHASE_EXTRA:
             } else {
                 send_buf = rbuf;
             }
+            if (task->tag == UCC_TL_UCP_SERVICE_TAG) {
+                printf("service ar task %p, rank %d, pid %d, loop send, peer %d\n",
+                       task, rank, getpid(), peer);
+            }
+
             UCPCHECK_GOTO(
                 ucc_tl_ucp_send_nb(send_buf, data_size, mem_type, peer, team,
                                    task),
@@ -106,6 +123,11 @@ UCC_KN_PHASE_EXTRA:
             peer = ucc_ep_map_eval(task->subset.map, peer);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
+            if (task->tag == UCC_TL_UCP_SERVICE_TAG) {
+                printf("service ar task %p, rank %d, pid %d, loop recv, peer %d\n",
+                       task, rank, getpid(), peer);
+            }
+
             UCPCHECK_GOTO(
                 ucc_tl_ucp_recv_nb((void *)((ptrdiff_t)scratch + recv_offset),
                                    data_size, mem_type, peer, team, task),
@@ -171,6 +193,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         rank      = task->subset.myrank;
     ucc_status_t       status;
 
+
     task->allreduce_kn.phase = UCC_KN_PHASE_INIT;
     ucc_assert(coll_task->args.src.info.mem_type ==
                coll_task->args.dst.info.mem_type);
@@ -178,6 +201,11 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
                              ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
                                      cfg.allreduce_kn_radix, size),
                              &task->allreduce_kn.p);
+    if (task->tag == UCC_TL_UCP_SERVICE_TAG) {
+        printf("start ar task %p, rank %d, node type %d, radix %d\n",
+               task, rank, task->allreduce_kn.p.node_type, task->allreduce_kn.p.radix);
+    }
+
     ucc_tl_ucp_task_reset(task);
     task->super.super.status = UCC_INPROGRESS;
     status = ucc_tl_ucp_allreduce_knomial_progress(&task->super);
@@ -198,6 +226,16 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
         ucc_min(TASK_LIB(task)->cfg.allreduce_kn_radix, size);
     ucc_status_t       status;
 
+    if (task->tag == UCC_TL_UCP_SERVICE_TAG) {
+        static int __service_ar = 0;
+        printf("AR INIT: ts %d pid %d team rank %d, subset rank %d, subset map %d, service ar start id %d, msgsize %zd, task %p, \n",
+               getpid(), size, TASK_TEAM(task)->rank, task->subset.myrank,
+               task->subset.map.type, __service_ar++,
+               ucc_dt_size(task->super.args.src.info.datatype) *
+               task->super.args.src.info.count, task);
+    }
+
+
     task->super.post     = ucc_tl_ucp_allreduce_knomial_start;
     task->super.progress = ucc_tl_ucp_allreduce_knomial_progress;
     task->super.finalize = ucc_tl_ucp_allreduce_knomial_finalize;
@@ -216,6 +254,11 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_status_t st, global_st;
+
+    if (task->tag == UCC_TL_UCP_SERVICE_TAG) {
+        printf("service ar task %p, rank %d, pid %d complete\n",
+               task, task->subset.myrank, getpid());
+    }
 
     global_st = ucc_mc_free(task->allreduce_kn.scratch_mc_header);
     if (ucc_unlikely(global_st != UCC_OK)) {
