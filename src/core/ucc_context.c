@@ -339,6 +339,7 @@ ucc_status_t ucc_core_addr_exchange(ucc_context_t          *context,
     int                  i;
     size_t *             addr_lens;
     size_t               max_addrlen;
+
     ucc_assert(c_oob || t_oob);
     oob = c_oob ? (ucc_team_oob_coll_t *)c_oob : t_oob;
 poll:
@@ -417,6 +418,27 @@ poll:
         goto poll;
     }
     ucc_assert(addr_storage->addr_len);
+
+    {
+        /* Compute storage rank and check proc info uniqeness */
+        ucc_rank_t r = UCC_RANK_MAX;
+        ucc_context_addr_header_t *h;
+
+        for (i = 0; i < addr_storage->size; i++) {
+            h = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, i);
+            if (UCC_CTX_ID_EQUAL(context->id, h->ctx_id)) {
+                /* We should find local id only once. However, due to node hashing
+                   there is tiny chance of collision: check it */
+                if (r != UCC_RANK_MAX) {
+                    ucc_error("proc info collision: %d %d", r, i);
+                    return UCC_ERR_NO_MESSAGE;
+                }
+                r = (ucc_rank_t)i;
+            }
+        }
+        addr_storage->rank = r;
+    }
+
     return UCC_OK;
 }
 
@@ -427,7 +449,6 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
 {
     ucc_base_context_params_t  b_params;
     ucc_base_context_t        *b_ctx;
-    ucc_context_addr_header_t *h;
     ucc_cl_lib_t              *cl_lib;
     ucc_context_t             *ctx;
     ucc_status_t               status;
@@ -507,6 +528,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     }
     ctx->id.pi      = ucc_local_proc;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
+    ctx->rank = UCC_RANK_MAX;
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         do {
             /* UCC context create is blocking fn, so we can wait here for the
@@ -519,13 +541,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
             }
         } while (status == UCC_INPROGRESS);
 
-        for (i = 0; i < ctx->addr_storage.size; i++) {
-            h = UCC_ADDR_STORAGE_RANK_HEADER(&ctx->addr_storage, i);
-            if (UCC_CTX_ID_EQUAL(ctx->id, h->ctx_id)) {
-                ctx->rank = (ucc_rank_t)i;
-                break;
-            }
-        }
+        ctx->rank = ctx->addr_storage.rank;
     }
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;

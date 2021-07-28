@@ -39,6 +39,7 @@ typedef struct ucc_addr_storage {
     void      *oob_req;
     size_t     addr_len;
     ucc_rank_t size;
+    ucc_rank_t rank;
 } ucc_addr_storage_t;
 
 typedef struct ucc_context {
