@@ -20,11 +20,14 @@ static inline uint32_t tl_ucp_ctx_id_hash_fn_impl(uint32_t h, uint32_t k)
     return h;
 }
 
+/* Collisions are handled in khash implementation */
 static inline khint32_t tl_ucp_ctx_id_hash_fn(ucc_context_id_t k)
 {
     uint32_t h = 0;
 
-    h = tl_ucp_ctx_id_hash_fn_impl(h, k.pi.host_hash);
+    ucc_assert(sizeof(k.pi.host_hash) == 8);
+    h = tl_ucp_ctx_id_hash_fn_impl(h,
+                                   kh_int64_hash_func(k.pi.host_hash));
     h = tl_ucp_ctx_id_hash_fn_impl(h, k.pi.pid);
     h = tl_ucp_ctx_id_hash_fn_impl(h, k.seq_num);
     return (khint32_t)h;
