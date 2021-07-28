@@ -9,8 +9,8 @@
 #include "config.h"
 #include "ucc/api/ucc.h"
 #include <unistd.h>
-#include <stdint.h>
-typedef uint32_t ucc_host_id_t;
+
+typedef uint64_t ucc_host_id_t;
 typedef uint32_t ucc_socket_id_t;
 
 typedef struct ucc_proc_info {
@@ -21,14 +21,13 @@ typedef struct ucc_proc_info {
 } ucc_proc_info_t;
 
 extern ucc_proc_info_t ucc_local_proc;
-extern char ucc_local_hostname[128];
 
 #define UCC_PROC_INFO_EQUAL(_pi1, _pi2)                                        \
     (((_pi1).host_hash == (_pi2).host_hash) &&                                 \
      ((_pi1).pid == (_pi2).pid)) //TODO maybe need tid ?
+
 ucc_status_t ucc_local_proc_info_init();
 
-static inline const char*  ucc_hostname() {
-    return ucc_local_hostname;
-}
+const char*  ucc_hostname();
+
 #endif
