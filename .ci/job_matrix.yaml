@@ -56,23 +56,18 @@ steps:
       echo "INFO: check code format"
       ${SRC_DIR}/ucc/.ci/scripts/check_code_format.sh
   #============================================================================
-  # TODO temporarily excluded because UCC unit tests corrupts the CI cluster
-  #- name: Run UCC tests
-  #  containerSelector: "{name:'centos8'}"
-  #  run: |
-  #    echo "INFO: Run UCC tests"
-  #    hostname
-  #    cat /proc/1/cgroup
-  #    pip3 list | grep torch
-  #    ${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh
+  - name: Run UCC tests
+    containerSelector: "{name:'centos8'}"
+    run: |
+      echo "INFO: Run UCC tests"
+      hostname
+      ${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh
   #============================================================================
   - name: Run Torch-UCC tests (UCC)
     containerSelector: "{name:'centos8'}"
     run: |
       echo "INFO: Run Torch-UCC tests (UCC)"
       hostname
-      cat /proc/1/cgroup
-      pip3 list | grep torch
       ${SRC_DIR}/ucc/.ci/scripts/run_tests_torch_ucc.sh
   #============================================================================
   - name: Run docker containers
