@@ -93,4 +93,9 @@ static inline void *ucc_get_team_ep_addr(ucc_context_t *context,
     return addr;
 }
 
+static inline ucc_rank_t ucc_get_ctx_rank(ucc_team_t *team, ucc_rank_t team_rank)
+{
+    return ucc_ep_map_eval(team->ctx_map, team_rank);
+}
+
 #endif

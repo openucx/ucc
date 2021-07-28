@@ -121,9 +121,25 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                       (ucc_context_progress_fn_t)ucp_worker_progress,
                       self->ucp_worker)) {
         tl_error(self->super.super.lib, "failed to register progress function");
+        ucc_status = UCC_ERR_NO_MESSAGE;
         goto err_thread_mode;
     }
-    self->ep_hash = kh_init(tl_ucp_ep_hash);
+
+    if (params->context->addr_storage.storage) {
+        /* Global ctx mode, we will have ctx_map so can use array for eps */
+        self->eps = ucc_calloc(params->context->addr_storage.size,
+                               sizeof(ucp_ep_h), "ucp_eps");
+        if (self->eps) {
+            tl_error(self->super.super.lib,
+                     "failed to allocate %zd bytes for ucp_eps",
+                     params->context->addr_storage.size * sizeof(ucp_ep_h));
+            ucc_status = UCC_ERR_NO_MEMORY;
+            goto err_thread_mode;
+        }
+    } else {
+        self->eps     = NULL;
+        self->ep_hash = kh_init(tl_ucp_ep_hash);
+    }
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 
@@ -177,7 +193,11 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
             break;
         }
     }
-    kh_destroy(tl_ucp_ep_hash, self->ep_hash);
+    if (self->eps) {
+        ucc_free(self->eps);
+    } else {
+        kh_destroy(tl_ucp_ep_hash, self->ep_hash);
+    }
     if (UCC_TL_CTX_HAS_OOB(self)) {
         ucc_tl_ucp_context_barrier(self, &UCC_TL_CTX_OOB(self));
     }
