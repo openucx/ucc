@@ -267,7 +267,7 @@ static ucc_status_t ucc_mc_cuda_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
     h->from_pool = 0;
     h->mt        = UCC_MEMORY_TYPE_CUDA;
     *h_ptr       = h;
-    mc_debug(&ucc_mc_cuda.super, "MC allocated %ld bytes with cudaMalloc", size);
+    mc_trace(&ucc_mc_cuda.super, "allocated %ld bytes with cudaMalloc", size);
     return UCC_OK;
 }
 
@@ -286,7 +286,7 @@ static ucc_status_t ucc_mc_cuda_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
         return UCC_ERR_NO_MEMORY;
     }
     *h_ptr = h;
-    mc_debug(&ucc_mc_cuda.super, "MC allocated %ld bytes from cuda mpool", size);
+    mc_trace(&ucc_mc_cuda.super, "allocated %ld bytes from cuda mpool", size);
     return UCC_OK;
 }
 

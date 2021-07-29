@@ -59,7 +59,7 @@ static ucc_status_t ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
     h->addr      = PTR_OFFSET(h, sizeof(ucc_mc_buffer_header_t));
     h->mt        = UCC_MEMORY_TYPE_HOST;
     *h_ptr       = h;
-    mc_debug(&ucc_mc_cpu.super, "MC allocated %ld bytes with ucc_malloc", size);
+    mc_trace(&ucc_mc_cpu.super, "allocated %ld bytes with ucc_malloc", size);
     return UCC_OK;
 }
 
@@ -74,7 +74,7 @@ static ucc_status_t ucc_mc_cpu_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
         // Slow path
         return ucc_mc_cpu_mem_alloc(h_ptr, size);
     }
-    mc_debug(&ucc_mc_cpu.super, "MC allocated %ld bytes from cpu mpool", size);
+    mc_trace(&ucc_mc_cpu.super, "allocated %ld bytes from cpu mpool", size);
     *h_ptr = h;
     return UCC_OK;
 }

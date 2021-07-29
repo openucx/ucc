@@ -229,3 +229,86 @@ ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
     }
     return map;
 }
+
+static inline int
+ucc_coll_args_is_rooted(const ucc_base_coll_args_t *bargs)
+{
+    ucc_coll_type_t ct = bargs->args.coll_type;
+    if (ct == UCC_COLL_TYPE_REDUCE || ct == UCC_COLL_TYPE_BCAST ||
+        ct == UCC_COLL_TYPE_GATHER || ct == UCC_COLL_TYPE_SCATTER ||
+        ct == UCC_COLL_TYPE_FANIN || ct == UCC_COLL_TYPE_FANOUT ||
+        ct == UCC_COLL_TYPE_GATHERV || ct == UCC_COLL_TYPE_SCATTERV) {
+        return 1;
+    }
+    return 0;
+}
+
+static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
+{
+    switch((int)ct) {
+    case UCC_MEMORY_TYPE_HOST:
+        return "Host";
+    case UCC_MEMORY_TYPE_CUDA:
+        return "Cuda";
+    case UCC_MEMORY_TYPE_CUDA_MANAGED:
+        return "CudaManaged";
+    case UCC_MEMORY_TYPE_ROCM:
+        return "Rocm";
+    case UCC_MEMORY_TYPE_ROCM_MANAGED:
+        return "RocmManaged";
+    case UCC_MEMORY_TYPE_ASSYMETRIC:
+        return "assymetric";
+    case UCC_MEMORY_TYPE_NOT_APPLY:
+        return "n/a";
+    default:
+        break;
+    }
+    return "invalid";
+}
+
+void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len)
+{
+    ucc_team_t     *team  = args->team;
+    ucc_coll_type_t ct    = args->args.coll_type;
+    size_t          left  = len;
+    char            tmp[64];
+
+    ucc_snprintf_safe(str, left, "team id %u size %u rank %u ctx_rank %u: %s %s inplace=%u",
+                      team->id, team->size, team->rank,
+                      ucc_ep_map_eval(team->ctx_map, team->rank),
+                      ucc_coll_type_str(ct),
+                      ucc_mem_type_str(ucc_coll_args_mem_type(args)),
+                      UCC_IS_INPLACE(args->args));
+
+    if (ucc_coll_args_is_rooted(args)) {
+        ucc_snprintf_safe(tmp, sizeof(tmp), " root=%u", (ucc_rank_t)args->args.root);
+        left = len - strlen(str);
+        strncat(str, tmp, left);
+    }
+
+    if (ct ==  UCC_COLL_TYPE_ALLTOALLV) {
+        size_t sbytes = ucc_coll_args_get_total_count(&args->args,
+                           args->args.src.info_v.counts, team->size ) *
+                           ucc_dt_size(args->args.src.info_v.datatype);
+        size_t rbytes = ucc_coll_args_get_total_count(&args->args,
+                           args->args.dst.info_v.counts, team->size ) *
+                           ucc_dt_size(args->args.dst.info_v.datatype);
+        ucc_snprintf_safe(tmp, sizeof(tmp), " sbytes=%zd rbytes=%zd",
+                          sbytes, rbytes);
+    } else {
+        ucc_snprintf_safe(tmp, sizeof(tmp), " bytes=%zd",
+                          ucc_coll_args_msgsize(args));
+    }
+    left = len - strlen(str);
+    strncat(str, tmp, left);
+
+    if (ct == UCC_COLL_TYPE_ALLREDUCE ||
+        ct == UCC_COLL_TYPE_REDUCE) {
+        ucc_snprintf_safe(tmp, sizeof(tmp), " %s %s",
+                          ucc_datatype_str(args->args.src.info.datatype),
+                          (args->args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ?
+                          "userdefined" : ucc_reduction_op_str(args->args.reduce.predefined_op));
+        left = len - strlen(str);
+        strncat(str, tmp, left);
+    }
+}
