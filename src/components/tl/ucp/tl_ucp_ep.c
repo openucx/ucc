@@ -40,19 +40,14 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
 
 ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t         *team,
                                         ucc_rank_t                 team_rank,
-                                        ucc_context_addr_header_t *h,
                                         ucp_ep_h                  *ep)
 {
     ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_status_t          status;
-    status = ucc_tl_ucp_connect_ep(
-        ctx, ep,
-        ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), team->super.super.team,
-                             team_rank, ucc_tl_ucp.super.super.id));
-    if (UCC_OK == status) {
-        tl_ucp_hash_put(ctx->ep_hash, h->ctx_id, *ep);
-    }
-    return status;
+    void                 *addr;
+
+    addr = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), team->super.super.team,
+                                team_rank, ucc_tl_ucp.super.super.id);
+    return ucc_tl_ucp_connect_ep(ctx, ep, addr);
 }
 
 ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx)

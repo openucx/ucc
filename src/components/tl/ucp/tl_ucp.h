@@ -77,6 +77,7 @@ typedef struct ucc_tl_ucp_context {
     ucc_tl_ucp_ep_close_state_t ep_close_state;
     ucc_mpool_t                 req_mp;
     tl_ucp_ep_hash_t           *ep_hash;
+    ucp_ep_h                   *eps;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
