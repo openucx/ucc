@@ -8,6 +8,7 @@ extern "C" {
 }
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
+#include "utils/ucc_malloc.h"
 
 using Param_0 = std::tuple<int, int, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
 using Param_1 = std::tuple<int, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
