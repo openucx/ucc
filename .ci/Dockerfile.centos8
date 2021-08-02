@@ -78,6 +78,10 @@ RUN ${SRC_DIR}/ucc/.ci/scripts/install_torch.sh
 #==============================================================================
 # Install workloads
 WORKDIR ${WORKLOADS_DIR}
+
+# TODO W/A for https://github.com/onnx/onnx/issues/3621
+RUN pip3 install https://github.com/onnx/onnx/files/6911243/onnx-1.10.0.tar.gz
+
 RUN git clone https://github.com/facebookresearch/dlrm.git && \
     cd ${WORKLOADS_DIR}/dlrm && \
     pip3 install -r ${WORKLOADS_DIR}/dlrm/requirements.txt && \
