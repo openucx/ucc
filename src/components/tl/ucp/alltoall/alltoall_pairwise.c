@@ -40,7 +40,7 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_progress(ucc_coll_task_t *coll_task)
 
     posts     = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoall_pairwise_num_posts;
     nreqs     = (posts > gsize || posts == 0) ? gsize : posts;
-    data_size = (size_t)coll_task->args.src.info.count *
+    data_size = (size_t)(coll_task->args.src.info.count / gsize) *
                 ucc_dt_size(coll_task->args.src.info.datatype);
     while ((task->send_posted < gsize || task->recv_posted < gsize) &&
            (polls++ < task->n_polls)) {
