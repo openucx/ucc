@@ -104,7 +104,13 @@ ucc_status_t ucc_service_allgather(ucc_team_t *team, void *sbuf, void *rbuf,
 
 ucc_status_t ucc_service_coll_test(ucc_service_coll_req_t *req)
 {
-    return ucc_collective_test(&req->task->super);
+    ucc_status_t status;
+
+    status = ucc_collective_test(&req->task->super);
+    if (UCC_INPROGRESS == status) {
+        ucc_context_progress(req->team->contexts[0]);
+    }
+    return status;
 }
 
 ucc_status_t ucc_service_coll_finalize(ucc_service_coll_req_t *req)
