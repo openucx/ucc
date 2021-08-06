@@ -23,7 +23,7 @@ ucc_status_t ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
     ucc_memory_type_t  rmem       = coll_task->args.dst.info.mem_type;
     size_t             count      = coll_task->args.dst.info.count;
     ucc_datatype_t     dt         = coll_task->args.dst.info.datatype;
-    size_t             data_size  = (count / team->size) * ucc_dt_size(dt);
+    size_t             data_size  = (count / group_size) * ucc_dt_size(dt);
     ucc_rank_t         sendto     = (group_rank + 1) % group_size;
     ucc_rank_t         recvfrom   = (group_rank - 1 + group_size) % group_size;
     int                step;
@@ -70,7 +70,8 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     ucc_memory_type_t  smem      = coll_task->args.src.info.mem_type;
     ucc_memory_type_t  rmem      = coll_task->args.dst.info.mem_type;
     ucc_datatype_t     dt        = coll_task->args.dst.info.datatype;
-    size_t             data_size = (count / team->size) * ucc_dt_size(dt);
+    size_t             data_size = (count / task->subset.map.ep_num) *
+        ucc_dt_size(dt);
     ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_ring_start", 0);

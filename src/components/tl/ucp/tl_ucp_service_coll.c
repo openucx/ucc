@@ -83,7 +83,7 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
                                          .datatype = UCC_DT_UINT8,
                                          .mem_type = UCC_MEMORY_TYPE_HOST},
                             .dst.info = {.buffer   = rbuf,
-                                         .count    = msgsize,
+                                         .count    = msgsize * subset.map.ep_num,
                                          .datatype = UCC_DT_UINT8,
                                          .mem_type = UCC_MEMORY_TYPE_HOST}};
 
