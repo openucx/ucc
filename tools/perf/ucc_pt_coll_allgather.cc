@@ -26,21 +26,21 @@ ucc_pt_coll_allgather::ucc_pt_coll_allgather(int size, ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_allgather::init_coll_args(size_t count,
-                                                  ucc_coll_args_t &args)
+ucc_status_t ucc_pt_coll_allgather::init_coll_args(size_t single_rank_count,
+                                                   ucc_coll_args_t &args)
 {
     size_t dt_size  = ucc_dt_size(coll_args.src.info.datatype);
-    size_t size_src = count * dt_size;
-    size_t size_dst = comm_size * count * dt_size;
+    size_t       size_src = single_rank_count * dt_size;
+    size_t       size_dst = comm_size * single_rank_count * dt_size;
     ucc_status_t st;
 
     args = coll_args;
-    args.dst.info.count = count;
+    args.dst.info.count = single_rank_count * comm_size;
     UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size_dst, args.dst.info.mem_type),
                   exit, st);
     args.dst.info.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
-        args.src.info.count = count;
+        args.src.info.count = single_rank_count;
         UCCCHECK_GOTO(
             ucc_mc_alloc(&src_header, size_src, args.src.info.mem_type),
             free_dst, st);
