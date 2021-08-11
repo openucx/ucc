@@ -4,7 +4,8 @@
 //NOLINTNEXTLINE
 static void ucc_tl_ucp_err_handler(void *arg, ucp_ep_h ep, ucs_status_t status)
 {
-    /* Dummy fn - we don't expect errors in disconnect flow */
+    /* In case we don't have OOB barrier, errors are expected.
+     * This cb will suppress UCX from raising errors*/
     ;
 }
 
@@ -50,39 +51,47 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t         *team,
     return ucc_tl_ucp_connect_ep(ctx, ep, addr);
 }
 
-ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx)
+void ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx)
 {
-    ucc_tl_ucp_ep_close_state_t *state = &ctx->ep_close_state;
-    ucp_ep_h                     ep;
-    ucs_status_t                 status;
-    if (state->close_req) {
-        ucp_worker_progress(ctx->ucp_worker);
-        status = ucp_request_check_status(state->close_req);
-        if (status != UCS_OK) {
-            return UCC_INPROGRESS;
-        }
-        ucp_request_free(state->close_req);
-    }
-    ep = tl_ucp_hash_pop(ctx->ep_hash);
-    while (ep) {
-        state->close_req =
-            ucp_ep_close_nb(ep, UCP_EP_CLOSE_MODE_FLUSH);
-        if (ucc_unlikely(UCS_PTR_IS_ERR(state->close_req))) {
-            tl_error(ctx->super.super.lib, "failed to start ep close, ep %p",
-                     ep);
-        }
-        status = UCS_PTR_STATUS(state->close_req);
-        /* try progress once */
-        if (status != UCS_OK) {
-            ucp_worker_progress(ctx->ucp_worker);
-            status = ucp_request_check_status(state->close_req);
-            if (status != UCS_OK) {
-                return UCC_INPROGRESS;
-            }
-            ucp_request_free(state->close_req);
-        }
-        ep = tl_ucp_hash_pop(ctx->ep_hash);
-    }
-    state->close_req = NULL;
-    return UCC_OK;
+     ucp_ep_h                     ep;
+     ucs_status_t                 status;
+     void **                      close_reqs;
+     void *                       close_req;
+     int                          i, close_reqs_counter = 0;
+
+     close_reqs = (void **)ucc_malloc(sizeof(void *) * kh_size(ctx->ep_hash),
+                                      "ep close requests array");
+     if (!close_reqs) {
+         tl_error(ctx->super.super.lib, "Unable to allocate memory");
+         return;
+     }
+     ep = tl_ucp_hash_pop(ctx->ep_hash);
+     while (ep) {
+         close_req = ucp_ep_close_nb(ep, UCP_EP_CLOSE_MODE_FLUSH);
+         if (UCS_PTR_IS_PTR(close_req)) {
+             close_reqs[close_reqs_counter] = close_req;
+             close_reqs_counter++;
+         }
+         else if ((UCS_PTR_STATUS(close_req) != UCS_OK) &&
+                  UCC_TL_CTX_HAS_OOB(ctx)) {
+             tl_error(ctx->super.super.lib, "failed to close properly, ep %p, error - %s",
+                      ep, ucc_status_string(ucs_status_to_ucc_status(UCS_PTR_STATUS(close_req))));
+             // In case we have no OOB, we have no barrier to sync closure, and we can ignore errors, which are expected
+         }
+         ep = tl_ucp_hash_pop(ctx->ep_hash);
+     }
+     for (i = 0; i < close_reqs_counter; i++) {
+         close_req = close_reqs[i];
+         // TODO: Should we put a timer? in UCX, some examples have timer, and some don't
+         do {
+             ucp_worker_progress(ctx->ucp_worker);
+             status = ucp_request_check_status(close_req);
+         } while (status == UCS_INPROGRESS && close_req);
+         if (close_req) {
+             close_reqs[i] = NULL;
+             ucp_request_free(close_req);
+         }
+     }
+     close_req = NULL;
+     ucc_free(close_reqs);
 }
