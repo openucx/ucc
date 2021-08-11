@@ -36,7 +36,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_ucp_config->super.tl_lib,
                               params->context);
     memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
-    self->ep_close_state.close_req = NULL;
     status = ucp_config_read(params->prefix, NULL, &ucp_config);
     if (UCS_OK != status) {
         tl_error(self->super.super.lib, "failed to read ucp configuration, %s",
@@ -170,6 +169,7 @@ static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
                                  &req)) {
         ucc_assert(req);
         while (UCC_OK != (status = oob->req_test(req))) {
+            ucp_worker_progress(ctx->ucp_worker);
             if (status < 0) {
                 tl_error(ctx->super.super.lib, "failed to test oob req");
                 break;
@@ -182,17 +182,8 @@ static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
-    ucc_status_t status;
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
-    while (UCC_OK != (status = ucc_tl_ucp_close_eps(self))) {
-        //TODO can we hang the runtime this way ?
-        if (status < 0) {
-            tl_error(self->super.super.lib,
-                     "failed to close ucp endpoint: %s",
-                     ucc_status_string(status));
-            break;
-        }
-    }
+    ucc_tl_ucp_close_eps(self);
     if (self->eps) {
         ucc_free(self->eps);
     } else {
