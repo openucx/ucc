@@ -28,6 +28,8 @@ extern ucc_proc_info_t ucc_local_proc;
 
 ucc_status_t ucc_local_proc_info_init();
 
+uint64_t ucc_get_system_id();
+
 const char*  ucc_hostname();
 
 #endif
