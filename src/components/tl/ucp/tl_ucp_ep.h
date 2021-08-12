@@ -19,7 +19,7 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t         *team,
                                         ucc_rank_t                 team_rank,
                                         ucp_ep_h                  *ep);
 
-ucc_status_t ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx);
+void ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx);
 
 static inline ucc_context_addr_header_t *
 ucc_tl_ucp_get_team_ep_header(ucc_tl_ucp_team_t *team, ucc_rank_t rank)
