@@ -63,10 +63,6 @@ typedef struct ucc_tl_ucp_lib {
 UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
 
-typedef struct ucc_tl_ucp_ep_close_state {
-    void      *close_req;
-} ucc_tl_ucp_ep_close_state_t;
-
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t            super;
     ucc_tl_ucp_context_config_t cfg;
@@ -74,7 +70,6 @@ typedef struct ucc_tl_ucp_context {
     ucp_worker_h                ucp_worker;
     size_t                      ucp_addrlen;
     ucp_address_t              *worker_address;
-    ucc_tl_ucp_ep_close_state_t ep_close_state;
     ucc_mpool_t                 req_mp;
     tl_ucp_ep_hash_t           *ep_hash;
     ucp_ep_h                   *eps;
