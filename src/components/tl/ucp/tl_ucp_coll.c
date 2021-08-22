@@ -18,7 +18,7 @@
 #include "reduce/reduce.h"
 const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
-        UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR};
+        UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR, UCC_TL_UCP_BCAST_DEFAULT_ALG_SELECT_STR};
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
@@ -241,6 +241,8 @@ static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
     switch (coll_type) {
     case UCC_COLL_TYPE_ALLREDUCE:
         return ucc_tl_ucp_allreduce_alg_from_str(str);
+    case UCC_COLL_TYPE_BCAST:
+        return ucc_tl_ucp_bcast_alg_from_str(str);
     default:
         break;
     }
@@ -269,6 +271,19 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
         default:
             status = UCC_ERR_INVALID_PARAM;
             break;
+        };
+        break;
+    case UCC_COLL_TYPE_BCAST:
+        switch (alg_id) {
+        case UCC_TL_UCP_BCAST_ALG_KNOMIAL:
+        	*init = ucc_tl_ucp_bcast_knomial_init;
+            break;
+        case UCC_TL_UCP_BCAST_ALG_SAG_KNOMIAL:
+            *init = ucc_tl_ucp_bcast_sag_knomial_init;
+            break;
+        default:
+           status = UCC_ERR_INVALID_PARAM;
+           break;
         };
         break;
     default:
