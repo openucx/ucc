@@ -3,6 +3,10 @@
 #include "ucc_log.h"
 #include <limits.h>
 #include <stdint.h>
+#include "config.h"
+#ifdef HAVE_UCS_GET_SYSTEM_ID
+#include <ucs/sys/uid.h>
+#endif
 
 ucc_proc_info_t ucc_local_proc;
 static char ucc_local_hostname[HOST_NAME_MAX];
@@ -10,6 +14,14 @@ static char ucc_local_hostname[HOST_NAME_MAX];
 const char*  ucc_hostname()
 {
     return ucc_local_hostname;
+}
+
+uint64_t ucc_get_system_id(){
+#ifdef HAVE_UCS_GET_SYSTEM_ID
+    return ucs_get_system_id();
+#else
+    return ucc_str_hash_djb2(ucc_local_hostname);
+#endif
 }
 
 ucc_status_t ucc_local_proc_info_init()
@@ -21,8 +33,7 @@ ucc_status_t ucc_local_proc_info_init()
     } else {
         strtok(ucc_local_hostname, ".");
         ucc_assert(sizeof(ucc_host_id_t) >= sizeof(unsigned long));
-        //TODO: switch to ucs_machine_guid when it is available
-        ucc_local_proc.host_hash = ucc_str_hash_djb2(ucc_local_hostname);
+        ucc_local_proc.host_hash = ucc_get_system_id();
     }
     ucc_local_proc.pid       = getpid();
     ucc_local_proc.socket_id = -1;
