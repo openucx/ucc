@@ -27,6 +27,10 @@ UCC is a collective communication operations API and library that is flexible, c
 Thanks for your interest in contributing to UCC, please see our technical and
 legal guidelines in the [contributing](CONTRIBUTING.md) file.
 
+All contributors have to comply with ["Membership Voluntary
+Consensus Standard"](https://ucfconsortium.org/policy/)  and ["Export Compliant
+Contribution Submissions"](https://ucfconsortium.org/policy/) policies.
+
 ## License
 UCC is BSD-style licensed, as found in the [LICENSE](LICENSE) file.
 
