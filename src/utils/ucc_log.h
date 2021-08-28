@@ -72,6 +72,8 @@ static inline const char* ucc_coll_type_str(ucc_coll_type_t ct)
         return "Gather";
     case UCC_COLL_TYPE_SCATTER:
         return "Scatter";
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        return "Reduce_Scatter";
     case UCC_COLL_TYPE_FANIN:
         return "Fanin";
     case UCC_COLL_TYPE_FANOUT:
