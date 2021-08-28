@@ -396,3 +396,45 @@ ucc_status_t ucc_tl_nccl_bcast_init(ucc_tl_nccl_task_t *task)
     task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
+
+ucc_status_t ucc_tl_nccl_reduce_scatter_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
+    void               *dst    = args->dst.info.buffer;
+    void               *src    =
+        UCC_IS_INPLACE(*args) ? args->dst.info.buffer : args->src.info.buffer;
+    ucc_status_t        status = UCC_OK;
+    ncclDataType_t      dt     = ucc_to_nccl_dtype[args->src.info.datatype];
+    ncclRedOp_t         op = ucc_to_nccl_reduce_op[args->reduce.predefined_op];
+    size_t              count = args->dst.info.count;
+
+    task->super.super.status = UCC_INPROGRESS;
+    NCCLCHECK_GOTO(ncclReduceScatter(src, dst, count, dt, op, team->nccl_comm,
+                                 stream),
+                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    status = ucc_tl_nccl_collective_sync(task, stream);
+exit_coll:
+    return status;
+}
+
+ucc_status_t ucc_tl_nccl_reduce_scatter_init(ucc_tl_nccl_task_t *task)
+{
+    if ((task->super.args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
+        (ucc_to_nccl_reduce_op[task->super.args.reduce.predefined_op] ==
+         ncclOpUnsupported)) {
+        tl_error(UCC_TASK_LIB(task), "reduction operation is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    if (UCC_OK !=
+        ucc_nccl_check_dt_supported(task->super.args.src.info.datatype,
+                                    task->super.args.src.info.datatype)) {
+        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    task->super.post     = ucc_tl_nccl_reduce_scatter_start;
+    return UCC_OK;
+}
