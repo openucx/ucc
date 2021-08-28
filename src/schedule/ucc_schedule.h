@@ -20,16 +20,21 @@ typedef enum {
 } ucc_event_t;
 
 typedef struct ucc_coll_task ucc_coll_task_t;
-
+typedef struct ucc_base_team ucc_base_team_t;
 typedef ucc_status_t (*ucc_task_event_handler_p)(ucc_coll_task_t *parent,
                                                  ucc_coll_task_t *task);
 typedef ucc_status_t (*ucc_coll_post_fn_t)(ucc_coll_task_t *task);
 typedef ucc_status_t (*ucc_coll_triggered_post_fn_t)(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *task);
 typedef ucc_status_t (*ucc_coll_finalize_fn_t)(ucc_coll_task_t *task);
 
+typedef struct ucc_em_listener {
+    ucc_coll_task_t          *task;
+    ucc_task_event_handler_p  handler;
+    ucc_event_t               event;
+} ucc_em_listener_t;
+
 typedef struct ucc_event_manager {
-    ucc_coll_task_t *listeners[UCC_EVENT_LAST][MAX_LISTENERS];
-    int              listeners_size[UCC_EVENT_LAST];
+    ucc_em_listener_t listeners[MAX_LISTENERS];
 } ucc_event_manager_t;
 
 enum {
@@ -40,12 +45,13 @@ enum {
 typedef struct ucc_coll_task {
     ucc_coll_req_t               super;
     uint32_t                     flags;
+    ucc_coll_args_t              args;
+    ucc_base_team_t             *team;
     ucc_coll_post_fn_t           post;
     ucc_coll_triggered_post_fn_t triggered_post;
     ucc_coll_finalize_fn_t       finalize;
     ucc_coll_callback_t          cb;
     ucc_event_manager_t          em;
-    ucc_task_event_handler_p     handlers[UCC_EVENT_LAST];
     ucc_status_t               (*progress)(struct ucc_coll_task *self);
     struct ucc_schedule         *schedule;
     ucc_ee_h                     ee;
@@ -61,33 +67,39 @@ typedef struct ucc_coll_task {
 } ucc_coll_task_t;
 
 typedef struct ucc_context ucc_context_t;
+
+#define UCC_SCHEDULE_MAX_TASKS 8
+
 typedef struct ucc_schedule {
-    ucc_coll_task_t super;
-    int             n_completed_tasks;
-    int             n_tasks;
-    ucc_context_t  *ctx;
+    ucc_coll_task_t  super;
+    int              n_completed_tasks;
+    int              n_tasks;
+    ucc_context_t   *ctx;
+    ucc_coll_task_t *tasks[UCC_SCHEDULE_MAX_TASKS];
 } ucc_schedule_t;
 
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em);
-ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task);
+
+ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task, ucc_coll_args_t *args,
+                                ucc_base_team_t *team);
+
 void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
-                                 ucc_coll_task_t *task);
+                                 ucc_coll_task_t *task,
+                                 ucc_task_event_handler_p handler);
+
 ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event);
-ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_context_t *ctx);
+
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_coll_args_t *args,
+                               ucc_base_team_t *team);
+
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
+
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule);
+
 ucc_status_t ucc_task_start_handler(ucc_coll_task_t *parent,
                                     ucc_coll_task_t *task);
-
-static inline ucc_status_t ucc_task_error(ucc_coll_task_t *task)
-{
-    ucc_status_t status = task->super.status;
-
-    ucc_assert(status < 0);
-    ucc_error("failure in task %p, %s", task, ucc_status_string(status));
-    return ucc_event_manager_notify(task, UCC_EVENT_ERROR);
-}
+ucc_status_t ucc_schedule_finalize(ucc_coll_task_t *task);
 
 static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 {
@@ -99,6 +111,9 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         /* error in task status */
         ucc_error("failure in task %p, %s", task,
                   ucc_status_string(task->super.status));
+        ucc_assert(task->super.status < 0);
+        ucc_event_manager_notify(task, UCC_EVENT_ERROR);
+        status = task->super.status;
     }
 
     if (task->flags & UCC_COLL_TASK_FLAG_CB) {
@@ -110,4 +125,9 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
     }
     return status;
 }
+
+#define UCC_TASK_LIB(_task) (((ucc_coll_task_t *)_task)->team->context->lib)
+#define UCC_TASK_CORE_CTX(_task)                                               \
+    (((ucc_coll_task_t *)_task)->team->context->ucc_context)
+
 #endif

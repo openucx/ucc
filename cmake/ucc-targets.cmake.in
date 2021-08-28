@@ -1,0 +1,13 @@
+#
+# Copyright (C) NVIDIA Corporation. 2021.  ALL RIGHTS RESERVED.
+#
+
+set(prefix "@prefix@")
+set(exec_prefix "@exec_prefix@")
+
+add_library(ucc::ucc SHARED IMPORTED)
+
+set_target_properties(ucc::ucc PROPERTIES
+  IMPORTED_LOCATION "@libdir@/libucc.so"
+  INTERFACE_INCLUDE_DIRECTORIES "@includedir@"
+)

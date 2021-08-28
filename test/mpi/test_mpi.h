@@ -207,6 +207,9 @@ public:
         test_max_size = _max_size;
     }
     void create_teams(std::vector<ucc_test_mpi_team_t> &test_teams);
+    void progress_ctx() {
+        ucc_context_progress(ctx);
+    }
 };
 
 class TestCase {

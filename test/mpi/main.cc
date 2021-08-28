@@ -408,10 +408,11 @@ int main(int argc, char *argv[])
     int rank;
     int ret;
     int failed = 0;
-    int size, provided;
+    int size, provided, completed;
     int required = (thread_mode == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
         : MPI_THREAD_MULTIPLE;
     UccTestMpi *test;
+    MPI_Request req;
 
     MPI_Init_thread(&argc, &argv, required, &provided);
     if (provided != required) {
@@ -467,8 +468,13 @@ int main(int argc, char *argv[])
         test->run_all();
     }
     std::cout << std::flush;
-    MPI_Allreduce(MPI_IN_PLACE, test->results.data(), test->results.size(),
-                  MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Iallreduce(MPI_IN_PLACE, test->results.data(), test->results.size(),
+                   MPI_INT, MPI_MIN, MPI_COMM_WORLD, &req);
+    do {
+        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
+        test->progress_ctx();
+    } while(!completed);
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     if (0 == rank) {

@@ -8,9 +8,10 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(int size, ucc_datatype_t dt,
                                            ucc_memory_type mt, bool is_inplace):
     comm_size(size)
 {
-    has_inplace_= true;
+    has_inplace_  = true;
     has_reduction_= false;
-    has_range_ = true;
+    has_range_    = true;
+    has_bw_       = true;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLTOALL;
@@ -24,20 +25,20 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(int size, ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_alltoall::init_coll_args(size_t count,
+ucc_status_t ucc_pt_coll_alltoall::init_coll_args(size_t single_rank_count,
                                                   ucc_coll_args_t &args)
 {
     size_t       dt_size = ucc_dt_size(coll_args.src.info.datatype);
-    size_t       size    = comm_size * count * dt_size;
+    size_t       size    = comm_size * single_rank_count * dt_size;
     ucc_status_t st      = UCC_OK;
 
     args = coll_args;
-    args.dst.info.count = count;
+    args.dst.info.count = single_rank_count * comm_size;
     UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size, args.dst.info.mem_type), exit,
                   st);
     args.dst.info.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
-        args.src.info.count = count;
+        args.src.info.count = single_rank_count * comm_size;
         UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size, args.src.info.mem_type),
                       free_dst, st);
         args.src.info.buffer = src_header->addr;
@@ -57,8 +58,11 @@ void ucc_pt_coll_alltoall::free_coll_args(ucc_coll_args_t &args)
     ucc_mc_free(dst_header);
 }
 
-double ucc_pt_coll_alltoall::get_bus_bw(double time_us)
+float ucc_pt_coll_alltoall::get_bw(float time_ms, int grsize,
+                                   ucc_coll_args_t args)
 {
-    //TODO
-    return 0.0;
+    float N = grsize;
+    float S = args.src.info.count * ucc_dt_size(args.src.info.datatype);
+
+    return (S / time_ms) * ((N - 1) / N) / 1000.0;
 }

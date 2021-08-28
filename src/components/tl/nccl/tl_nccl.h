@@ -28,8 +28,16 @@ typedef struct ucc_tl_nccl_lib_config {
     ucc_tl_lib_config_t super;
 } ucc_tl_nccl_lib_config_t;
 
+typedef enum ucc_tl_nccl_completion_sync_type {
+    UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT,
+    UCC_TL_NCCL_COMPLETION_SYNC_TYPE_MEMOPS,
+    UCC_TL_NCCL_COMPLETION_SYNC_TYPE_AUTO,
+    UCC_TL_NCCL_COMPLETION_SYNC_TYPE_LAST
+} ucc_tl_nccl_completion_sync_type_t;
+
 typedef struct ucc_tl_nccl_context_config {
-    ucc_tl_context_config_t super;
+    ucc_tl_context_config_t            super;
+    ucc_tl_nccl_completion_sync_type_t sync_type;
 } ucc_tl_nccl_context_config_t;
 
 typedef struct ucc_tl_nccl_lib {
@@ -59,10 +67,17 @@ typedef struct ucc_tl_nccl_team {
 
 typedef struct ucc_tl_nccl_task {
     ucc_coll_task_t     super;
-    ucc_tl_nccl_team_t *team;
-    ucc_coll_args_t     args;
+    ucc_status_t        host_status;
+    ucc_status_t       *dev_status;
     cudaEvent_t         completed;
 } ucc_tl_nccl_task_t;
+
+#define TASK_TEAM(_task)                                                       \
+    (ucc_derived_of((_task)->super.team, ucc_tl_nccl_team_t))
+#define TASK_CTX(_task)                                                        \
+    (ucc_derived_of((_task)->super.team->context, ucc_tl_nccl_context_t))
+#define TASK_LIB(_task)                                                        \
+    (ucc_derived_of((_task)->super.team->context->lib, ucc_tl_nccl_lib_t))
 
 #define UCC_TL_NCCL_SUPPORTED_COLLS                         \
     (UCC_COLL_TYPE_ALLTOALL  | UCC_COLL_TYPE_ALLTOALLV  |   \

@@ -9,9 +9,10 @@ ucc_pt_coll_allgather::ucc_pt_coll_allgather(int size, ucc_datatype_t dt,
                                              bool is_inplace):
     comm_size(size)
 {
-    has_inplace_= true;
+    has_inplace_  = true;
     has_reduction_= false;
-    has_range_ = true;
+    has_range_    = true;
+    has_bw_       = true;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLGATHER;
@@ -25,21 +26,21 @@ ucc_pt_coll_allgather::ucc_pt_coll_allgather(int size, ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_allgather::init_coll_args(size_t count,
-                                                  ucc_coll_args_t &args)
+ucc_status_t ucc_pt_coll_allgather::init_coll_args(size_t single_rank_count,
+                                                   ucc_coll_args_t &args)
 {
     size_t dt_size  = ucc_dt_size(coll_args.src.info.datatype);
-    size_t size_src = count * dt_size;
-    size_t size_dst = comm_size * count * dt_size;
+    size_t       size_src = single_rank_count * dt_size;
+    size_t       size_dst = comm_size * single_rank_count * dt_size;
     ucc_status_t st;
 
     args = coll_args;
-    args.dst.info.count = count;
+    args.dst.info.count = single_rank_count * comm_size;
     UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size_dst, args.dst.info.mem_type),
                   exit, st);
     args.dst.info.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
-        args.src.info.count = count;
+        args.src.info.count = single_rank_count;
         UCCCHECK_GOTO(
             ucc_mc_alloc(&src_header, size_src, args.src.info.mem_type),
             free_dst, st);
@@ -52,16 +53,19 @@ exit:
     return st;
 }
 
+float ucc_pt_coll_allgather::get_bw(float time_ms, int grsize,
+                                    ucc_coll_args_t args)
+{
+    float N = grsize;
+    float S = N * args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
+
+    return (S / time_ms) * ((N - 1) / N) / 1000.0;
+}
+
 void ucc_pt_coll_allgather::free_coll_args(ucc_coll_args_t &args)
 {
     if (!UCC_IS_INPLACE(args)) {
         ucc_mc_free(src_header);
     }
     ucc_mc_free(dst_header);
-}
-
-double ucc_pt_coll_allgather::get_bus_bw(double time_us)
-{
-    //TODO
-    return 0.0;
 }

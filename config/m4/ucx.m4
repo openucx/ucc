@@ -56,6 +56,16 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
         [
             ucx_happy="no"
         ])
+        
+        AC_CHECK_HEADERS([ucs/sys/uid.h],
+        [
+            AC_CHECK_LIB([ucs], [ucs_get_system_id],
+            [
+                AC_DEFINE([HAVE_UCS_GET_SYSTEM_ID], 1, [Enable use of ucs unique machine identifier])
+            ],
+            [],[-luct -lucm -lucp])
+        ],
+        [])
 
         AS_IF([test "x$ucx_happy" = "xyes"],
         [

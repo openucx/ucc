@@ -57,32 +57,56 @@ static inline ucc_status_t ucc_nccl_check_dt_supported(ucc_datatype_t dt1,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_nccl_collective_progress(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_nccl_collective_sync(ucc_tl_nccl_task_t *task,
+                                         cudaStream_t stream)
 {
-    ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_status_t status;
+    ucc_tl_nccl_context_t *ctx    = TASK_CTX(task);
+    ucc_status_t           status = UCC_OK;
+    CUresult cu_status;
 
-    status = ucc_mc_ee_event_test(task->completed, UCC_EE_CUDA_STREAM);
-    coll_task->super.status = status;
-    return status;
+    task->host_status = task->super.super.status;
+    if (ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
+        status = ucc_mc_ee_event_post(stream, task->completed,
+                                      UCC_EE_CUDA_STREAM);
+        if (ucc_unlikely(status != UCC_OK)) {
+            return status;
+        }
+    } else {
+        cu_status = cuStreamWriteValue32(stream, (CUdeviceptr)task->dev_status,
+                                         UCC_OK, 0);
+        if (ucc_unlikely(cu_status != CUDA_SUCCESS)) {
+            return UCC_ERR_NO_MESSAGE;
+        }
+    }
+
+    status = task->super.progress(&task->super);
+    if (status == UCC_INPROGRESS) {
+        ucc_progress_enqueue(UCC_TL_CORE_CTX(TASK_TEAM(task))->pq,
+                             &task->super);
+        return UCC_OK;
+    }
+
+    return ucc_task_complete(&task->super);
 }
 
 ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_tl_nccl_team_t *team   = task->team;
+    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     ucc_rank_t          gsize  = team->size;
     ucc_status_t        status = UCC_OK;
-    ptrdiff_t           sbuf   = (ptrdiff_t)task->args.src.info.buffer;
-    ptrdiff_t           rbuf   = (ptrdiff_t)task->args.dst.info.buffer;
+    ptrdiff_t           sbuf   = (ptrdiff_t)args->src.info.buffer;
+    ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info.buffer;
     size_t data_size;
     ucc_rank_t peer;
 
     task->super.super.status = UCC_INPROGRESS;
-    data_size = (size_t)task->args.src.info.count *
-                ucc_dt_size(task->args.src.info.datatype);
+    data_size                = (size_t)(args->src.info.count / gsize) *
+                ucc_dt_size(args->src.info.datatype);
+    ucc_assert(args->src.info.count % gsize == 0);
     if (data_size == 0) {
         task->super.super.status = UCC_OK;
         return UCC_OK;
@@ -97,66 +121,57 @@ ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
+    status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
-    if (status == UCC_OK) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (ucc_unlikely(status < 0)) {
-        task->super.super.status = status;
-    }
     return status;
 }
 
 ucc_status_t ucc_tl_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_IS_INPLACE(task->args)) {
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "inplace alltoallv is not supported");
+    if (UCC_IS_INPLACE(task->super.args)) {
+        tl_error(UCC_TASK_LIB(task), "inplace alltoallv is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((task->args.src.info.datatype == UCC_DT_USERDEFINED) ||
-        (task->args.dst.info.datatype == UCC_DT_USERDEFINED)) {
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "user defined datatype is not supported");
+    if ((task->super.args.src.info.datatype == UCC_DT_USERDEFINED) ||
+        (task->super.args.dst.info.datatype == UCC_DT_USERDEFINED)) {
+        tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post     = ucc_tl_nccl_alltoall_start;
-    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 
 ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_tl_nccl_team_t *team   = task->team;
+    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     ucc_status_t        status = UCC_OK;
-    ptrdiff_t           sbuf   = (ptrdiff_t)task->args.src.info_v.buffer;
-    ptrdiff_t           rbuf   = (ptrdiff_t)task->args.dst.info_v.buffer;
+    ptrdiff_t           sbuf   = (ptrdiff_t)args->src.info_v.buffer;
+    ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info_v.buffer;
     size_t sdt_size, rdt_size, count, displ;
     ucc_rank_t peer;
 
     task->super.super.status = UCC_INPROGRESS;
-    sdt_size = ucc_dt_size(task->args.src.info_v.datatype);
-    rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+    sdt_size                 = ucc_dt_size(args->src.info_v.datatype);
+    rdt_size                 = ucc_dt_size(args->dst.info_v.datatype);
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
     for (peer = 0; peer < team->size; peer++) {
-        count = ucc_coll_args_get_count(&task->args,
-                                        task->args.src.info_v.counts, peer);
+        count = ucc_coll_args_get_count(args, args->src.info_v.counts, peer);
         if (count != 0) {
-            displ = ucc_coll_args_get_displacement(&task->args,
-                        task->args.src.info_v.displacements, peer);
+            displ = ucc_coll_args_get_displacement(
+                args, args->src.info_v.displacements, peer);
             NCCLCHECK_GOTO(ncclSend((void *)(sbuf + displ * sdt_size),
                                     count * sdt_size, ncclChar, peer,
                                     team->nccl_comm, stream),
                         exit_coll, status, UCC_TL_TEAM_LIB(team));
         }
-        count = ucc_coll_args_get_count(&task->args,
-                                        task->args.dst.info_v.counts, peer);
+        count = ucc_coll_args_get_count(args, args->dst.info_v.counts, peer);
         if (count != 0) {
-            displ = ucc_coll_args_get_displacement(&task->args,
-                        task->args.dst.info_v.displacements, peer);
+            displ = ucc_coll_args_get_displacement(
+                args, args->dst.info_v.displacements, peer);
             NCCLCHECK_GOTO(ncclRecv((void *)(rbuf + displ * rdt_size),
                                     count * rdt_size, ncclChar, peer,
                                     team->nccl_comm, stream),
@@ -164,150 +179,128 @@ ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
         }
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
+    status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
-    if (status == UCC_OK) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (ucc_unlikely(status < 0)) {
-        task->super.super.status = status;
-    }
     return status;
 }
 
 ucc_status_t ucc_tl_nccl_alltoallv_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_IS_INPLACE(task->args)) {
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "inplace alltoall is not supported");
+    if (UCC_IS_INPLACE(task->super.args)) {
+        tl_error(UCC_TASK_LIB(task), "inplace alltoall is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((task->args.src.info_v.datatype == UCC_DT_USERDEFINED) ||
-        (task->args.dst.info_v.datatype == UCC_DT_USERDEFINED)) {
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "user defined datatype is not supported");
+    if ((task->super.args.src.info_v.datatype == UCC_DT_USERDEFINED) ||
+        (task->super.args.dst.info_v.datatype == UCC_DT_USERDEFINED)) {
+        tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post     = ucc_tl_nccl_alltoallv_start;
-    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 
 ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_tl_nccl_team_t *team   = task->team;
+    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
-    void               *dst    = task->args.dst.info.buffer;
-    void               *src    = UCC_IS_INPLACE(task->args) ?
-                                    task->args.dst.info.buffer:
-                                    task->args.src.info.buffer;
+    void               *dst    = args->dst.info.buffer;
+    void               *src    =
+        UCC_IS_INPLACE(*args) ? args->dst.info.buffer : args->src.info.buffer;
     ucc_status_t        status = UCC_OK;
-    ncclDataType_t      dt     = ucc_to_nccl_dtype[
-                                    task->args.src.info.datatype];
-    ncclRedOp_t         op     = ucc_to_nccl_reduce_op[
-                                    task->args.reduce.predefined_op];
-    size_t              count  = task->args.src.info.count;
+    ncclDataType_t      dt     = ucc_to_nccl_dtype[args->src.info.datatype];
+    ncclRedOp_t         op = ucc_to_nccl_reduce_op[args->reduce.predefined_op];
+    size_t              count = args->src.info.count;
 
     task->super.super.status = UCC_INPROGRESS;
     NCCLCHECK_GOTO(ncclAllReduce(src, dst, count, dt, op, team->nccl_comm,
                                  stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
-    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
+    status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
-    if (status == UCC_OK) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (ucc_unlikely(status < 0)) {
-        task->super.super.status = status;
-    }
     return status;
 }
 
 ucc_status_t ucc_tl_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
 {
-    if ((task->args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
-        (ucc_to_nccl_reduce_op[task->args.reduce.predefined_op] ==
+    if ((task->super.args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
+        (ucc_to_nccl_reduce_op[task->super.args.reduce.predefined_op] ==
          ncclOpUnsupported)) {
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "reduction operation is not supported");
+        tl_error(UCC_TASK_LIB(task), "reduction operation is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if (UCC_OK != ucc_nccl_check_dt_supported(task->args.src.info.datatype,
-                                              task->args.src.info.datatype)) {
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "dataype is not supported");
+    if (UCC_OK !=
+        ucc_nccl_check_dt_supported(task->super.args.src.info.datatype,
+                                    task->super.args.src.info.datatype)) {
+        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post     = ucc_tl_nccl_allreduce_start;
-    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 
 ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_tl_nccl_team_t *team   = task->team;
+    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
-    void               *dst    = task->args.dst.info.buffer;
-    void               *src    = task->args.src.info.buffer;
-    ncclDataType_t      dt     = ucc_to_nccl_dtype[
-                                    task->args.dst.info.datatype];
+    void               *dst    = args->dst.info.buffer;
+    void               *src    = args->src.info.buffer;
+    ncclDataType_t      dt     = ucc_to_nccl_dtype[args->dst.info.datatype];
     ucc_status_t        status = UCC_OK;
-    size_t              count  = task->args.dst.info.count;
+    size_t              count  = args->dst.info.count;
 
-    if (UCC_IS_INPLACE(task->args)) {
-        src = (void*)((ptrdiff_t)task->args.dst.info.buffer +
-               count * ucc_dt_size(task->args.dst.info.datatype) * team->rank);
+    if (UCC_IS_INPLACE(*args)) {
+        src = (void *)((ptrdiff_t)args->dst.info.buffer + (count / team->size) *
+                       ucc_dt_size(args->dst.info.datatype) * team->rank);
     }
     task->super.super.status = UCC_INPROGRESS;
-    NCCLCHECK_GOTO(ncclAllGather(src, dst, count, dt, team->nccl_comm, stream),
+    NCCLCHECK_GOTO(ncclAllGather(src, dst, count / team->size, dt,
+                                 team->nccl_comm, stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
-    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
+    status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
-    if (status == UCC_OK) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (ucc_unlikely(status < 0)) {
-        task->super.super.status = status;
-    }
     return status;
 }
 
 ucc_status_t ucc_tl_nccl_allgather_init(ucc_tl_nccl_task_t *task)
 {
-    ucc_datatype_t dt1 = UCC_IS_INPLACE(task->args) ?
-                            task->args.dst.info.datatype :
-                            task->args.src.info.datatype;
-    ucc_datatype_t dt2 = task->args.dst.info.datatype;
+    ucc_datatype_t dt1 = UCC_IS_INPLACE(task->super.args)
+                             ? task->super.args.dst.info.datatype
+                             : task->super.args.src.info.datatype;
+    ucc_datatype_t dt2 = task->super.args.dst.info.datatype;
 
     if (UCC_OK != ucc_nccl_check_dt_supported(dt1, dt2)) {
         /* TODO: can we use ncclChar if datatype is not supported? */
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "dataype is not supported");
+        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post     = ucc_tl_nccl_allgather_start;
-    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 
 ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_tl_nccl_team_t *team   = task->team;
+    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     ucc_status_t        status = UCC_OK;
-    void               *sbuf   = task->args.src.info.buffer;
-    ptrdiff_t           rbuf   = (ptrdiff_t)task->args.dst.info_v.buffer;
+    void               *sbuf   = args->src.info.buffer;
+    ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info_v.buffer;
     size_t sdt_size, rdt_size, count, displ;
     ucc_rank_t peer;
 
     task->super.super.status = UCC_INPROGRESS;
-    sdt_size = ucc_dt_size(task->args.src.info.datatype);
-    rdt_size = ucc_dt_size(task->args.dst.info_v.datatype);
+    sdt_size                 = ucc_dt_size(args->src.info.datatype);
+    rdt_size                 = ucc_dt_size(args->dst.info_v.datatype);
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    count = task->args.src.info.count;
+    count = args->src.info.count;
     if (count != 0) {
         for (peer = 0; peer < team->size; peer++) {
             NCCLCHECK_GOTO(ncclSend(sbuf, count * sdt_size, ncclChar, peer,
@@ -316,11 +309,10 @@ ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
         }
     }
     for (peer = 0; peer < team->size; peer++) {
-        count = ucc_coll_args_get_count(&task->args,
-                                        task->args.dst.info_v.counts, peer);
+        count = ucc_coll_args_get_count(args, args->dst.info_v.counts, peer);
         if (count != 0) {
-            displ = ucc_coll_args_get_displacement(&task->args,
-                        task->args.dst.info_v.displacements, peer);
+            displ = ucc_coll_args_get_displacement(
+                args, args->dst.info_v.displacements, peer);
             NCCLCHECK_GOTO(ncclRecv((void *)(rbuf + displ * rdt_size),
                                     count * rdt_size, ncclChar, peer,
                                     team->nccl_comm, stream),
@@ -328,72 +320,58 @@ ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
         }
     }
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
+    status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
-    if (status == UCC_OK) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (ucc_unlikely(status < 0)) {
-        task->super.super.status = status;
-    }
     return status;
 }
 
 ucc_status_t ucc_tl_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_IS_INPLACE(task->args)) {
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "inplace allgatherv is not supported");
+    if (UCC_IS_INPLACE(task->super.args)) {
+        tl_error(UCC_TASK_LIB(task), "inplace allgatherv is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((task->args.src.info_v.datatype == UCC_DT_USERDEFINED) ||
-        (task->args.dst.info_v.datatype == UCC_DT_USERDEFINED)) {
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "user defined datatype is not supported");
+    if ((task->super.args.src.info_v.datatype == UCC_DT_USERDEFINED) ||
+        (task->super.args.dst.info_v.datatype == UCC_DT_USERDEFINED)) {
+        tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post     = ucc_tl_nccl_allgatherv_start;
-    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 
 ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_tl_nccl_team_t *team   = task->team;
+    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
-    void               *src    = task->args.src.info.buffer;
-    ncclDataType_t      dt     = ucc_to_nccl_dtype[
-                                    task->args.src.info.datatype];
+    void               *src    = args->src.info.buffer;
+    ncclDataType_t      dt     = ucc_to_nccl_dtype[args->src.info.datatype];
     ucc_status_t        status = UCC_OK;
-    size_t              count  = task->args.src.info.count;
-    ucc_rank_t          root   = task->args.root;
+    size_t              count  = args->src.info.count;
+    ucc_rank_t          root   = args->root;
 
     task->super.super.status = UCC_INPROGRESS;
     NCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->nccl_comm,
                                  stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
-    status = ucc_mc_ee_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
+    status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
-    if (status == UCC_OK) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-    } else if (ucc_unlikely(status < 0)) {
-        task->super.super.status = status;
-    }
     return status;
 }
 
 ucc_status_t ucc_tl_nccl_bcast_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_OK != ucc_nccl_check_dt_supported(task->args.src.info.datatype,
-                                              task->args.src.info.datatype)) {
+    if (UCC_OK !=
+        ucc_nccl_check_dt_supported(task->super.args.src.info.datatype,
+                                    task->super.args.src.info.datatype)) {
         /* TODO: can we use ncclChar if datatype is not supported? */
-        tl_error(UCC_TL_TEAM_LIB(task->team),
-                 "dataype is not supported");
+        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post     = ucc_tl_nccl_bcast_start;
-    task->super.progress = ucc_tl_nccl_collective_progress;
     return UCC_OK;
 }
 

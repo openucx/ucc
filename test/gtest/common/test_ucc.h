@@ -16,6 +16,7 @@ extern "C" {
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <atomic>
 
 typedef struct {
     ucc_mc_buffer_header_t *dst_mc_header;
@@ -87,10 +88,10 @@ public:
 
 class ThreadAllgather {
 public:
-    int        n_procs;
-    int        ready_count;
-    void      *buffer;
-    std::mutex lock;
+    int               n_procs;
+    std::atomic<int>  ready_count;
+    void             *buffer;
+    std::mutex        lock;
     std::vector<ThreadAllgatherReq> reqs;
     ThreadAllgather(int _n_procs) : n_procs(_n_procs), ready_count(0), buffer(NULL) {
         for (auto i = 0; i < _n_procs; i++) {
@@ -225,5 +226,7 @@ public:
     static void waitall(std::vector<UccReq> &reqs);
     static void startall(std::vector<UccReq> &reqs);
 };
+
+void clear_buffer(void *_buf, size_t size, ucc_memory_type_t mt, uint8_t value);
 
 #endif

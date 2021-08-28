@@ -42,6 +42,7 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
     int            i, n_mcs;
     ucc_mc_base_t *mc;
     ucc_status_t   status;
+    ucc_mc_attr_t attr;
 
     memset(mc_ops, 0, UCC_MEMORY_TYPE_LAST * sizeof(ucc_mc_ops_t *));
     memset(ee_ops, 0, UCC_EE_LAST * sizeof(ucc_ee_ops_t *));
@@ -75,6 +76,18 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
                 continue;
             }
             ucc_debug("%s initialized", mc->super.name);
+        } else {
+            attr.field_mask = UCC_MC_ATTR_FIELD_THREAD_MODE;
+            status = mc->get_attr(&attr);
+            if (status != UCC_OK) {
+                return status;
+            }
+            if (attr.thread_mode < mc_params->thread_mode) {
+                ucc_warn("memory component %s was allready initilized with "
+                         "different thread mode: current tm %d, provided tm %d",
+                         mc->super.name, attr.thread_mode,
+                         mc_params->thread_mode);
+            }
         }
         mc->ref_cnt++;
         mc_ops[mc->type] = &mc->ops;
@@ -140,8 +153,8 @@ UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce,
 }
 
 UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce_multi,
-                    (src1, src2, dst, size, count, stride, dtype, op, mem_type),
-                    void *src1, void *src2, void *dst, size_t size,
+                    (src1, src2, dst, n_vectors, count, stride, dtype, op, mem_type),
+                    void *src1, void *src2, void *dst, size_t n_vectors,
                     size_t count, size_t stride, ucc_datatype_t dtype,
                     ucc_reduction_op_t op, ucc_memory_type_t mem_type)
 {
@@ -149,7 +162,7 @@ UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce_multi,
         return UCC_OK;
     }
     UCC_CHECK_MC_AVAILABLE(mem_type);
-    return mc_ops[mem_type]->reduce_multi(src1, src2, dst, size, count, stride,
+    return mc_ops[mem_type]->reduce_multi(src1, src2, dst, n_vectors, count, stride,
                                           dtype, op);
 }
 

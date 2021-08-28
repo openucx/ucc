@@ -82,9 +82,16 @@ ucc_status_t TestAllgatherv::check()
 {
     size_t       count = counts[0];
     MPI_Datatype dt    = ucc_dt_to_mpi(TEST_DT);
-    int          size;
+    int          size, completed;
+    MPI_Request  req;
+
     MPI_Comm_size(team.comm, &size);
-    MPI_Allgatherv((inplace == TEST_INPLACE) ? MPI_IN_PLACE : check_sbuf, count, dt,
-                   check_rbuf, (int*)counts, (int*)displacements, dt, team.comm);
+    MPI_Iallgatherv((inplace == TEST_INPLACE) ? MPI_IN_PLACE : check_sbuf, count, dt,
+                    check_rbuf, (int*)counts, (int*)displacements, dt, team.comm, &req);
+    do {
+        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
+        ucc_context_progress(team.ctx);
+    } while(!completed);
+
     return compare_buffers(rbuf, check_rbuf, count*size, TEST_DT, mem_type);
 }

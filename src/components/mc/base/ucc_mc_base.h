@@ -13,11 +13,16 @@
 #include "utils/ucc_parser.h"
 #include "utils/ucc_mpool.h"
 #include "core/ucc_global_opts.h"
-#include "core/ucc_mc.h"
 
-typedef struct ucc_mc_buffer_header ucc_mc_buffer_header_t;
+typedef struct ucc_mc_params {
+    ucc_thread_mode_t thread_mode;
+} ucc_mc_params_t;
 
-typedef struct ucc_mc_params ucc_mc_params_t;
+typedef struct ucc_mc_buffer_header {
+    ucc_memory_type_t mt;
+    int               from_pool;
+    void             *addr;
+} ucc_mc_buffer_header_t;
 
 /**
  * UCC memory attributes field mask
@@ -62,6 +67,21 @@ typedef struct ucc_mem_attr {
 
 } ucc_mem_attr_t;
 
+/**
+ * UCC memory component attributes field mask
+ */
+typedef enum ucc_mc_attr_field {
+    UCC_MC_ATTR_FIELD_THREAD_MODE = UCC_BIT(0)
+}  ucc_mc_attr_field_t;
+
+typedef struct ucc_mc_attr {
+    /**
+     * Mask of valid fields in this structure, using bits from
+     * @ref ucc_mc_attr_field_t.
+     */
+    uint64_t          field_mask;
+    ucc_thread_mode_t thread_mode;
+} ucc_mc_attr_t;
 
 /**
  * Array of string names for each memory type
@@ -86,7 +106,7 @@ typedef struct ucc_mc_ops {
                            size_t count, ucc_datatype_t dt,
                            ucc_reduction_op_t op);
     ucc_status_t (*reduce_multi)(const void *src1, const void *src2, void *dst,
-                                 size_t count, size_t size, size_t stride,
+                                 size_t n_vectors, size_t count, size_t stride,
                                  ucc_datatype_t dt, ucc_reduction_op_t op);
     ucc_status_t (*memcpy)(void *dst, const void *src, size_t len,
                            ucc_memory_type_t dst_mem,
@@ -111,6 +131,7 @@ typedef struct ucc_mc_base {
     ucc_mc_config_t                *config;
     ucc_config_global_list_entry_t  config_table;
     ucc_status_t                   (*init)(const ucc_mc_params_t *mc_params);
+    ucc_status_t                   (*get_attr)(ucc_mc_attr_t *mc_attr);
     ucc_status_t                   (*finalize)();
     ucc_mc_ops_t                    ops;
     const ucc_ee_ops_t              ee_ops;

@@ -70,5 +70,5 @@ AS_IF([test "x$enable_debug" = xyes],
     AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_TRACE_POLL], [Highest log level])],
     [CFLAGS="$CFLAGS -O3 -g -DNDEBUG"
     CXXFLAGS="$CXXFLAGS -O3 -g -DNDEBUG"
-    AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_INFO], [Highest log level])
+    AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_DEBUG], [Highest log level])
     ])

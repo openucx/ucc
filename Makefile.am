@@ -7,7 +7,8 @@
 if !DOCS_ONLY
 SUBDIRS =      \
 	src        \
-	tools/info
+	tools/info \
+	cmake
 
 if HAVE_MPICXX
 SUBDIRS +=     \

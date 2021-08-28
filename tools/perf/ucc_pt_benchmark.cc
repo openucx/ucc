@@ -59,8 +59,8 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
         }
         UCCCHECK_GOTO(coll->init_coll_args(cnt, args), exit_err, st);
         UCCCHECK_GOTO(run_single_test(args, warmup, iter, time), free_coll, st);
+        print_time(cnt, args, time);
         coll->free_coll_args(args);
-        print_time(cnt, time);
     }
 
     return UCC_OK;
@@ -153,25 +153,35 @@ void ucc_pt_benchmark::print_header()
         std::cout << std::endl;
         std::cout << std::setw(12) << "Count"
                   << std::setw(12) << "Size"
-                  << std::setw(24) << "Time, us"
-                  << std::endl;
-        std::cout << std::setw(36) << "avg" <<
-                     std::setw(12) << "min" <<
-                     std::setw(12) << "max" <<
-                     std::endl;
+                  << std::setw(24) << "Time, us";
+        if (config.full_print) {
+            std::cout << std::setw(42) << "Bandwidth, GB/s";
+        }
+        std::cout << std::endl;
+        std::cout << std::setw(36) << "avg"
+                  << std::setw(12) << "min"
+                  << std::setw(12) << "max";
+        if (config.full_print) {
+            std::cout << std::setw(12) << "avg"
+                      << std::setw(12) << "max"
+                      << std::setw(12) << "min";
+        }
+        std::cout << std::endl;
     }
 }
 
-void ucc_pt_benchmark::print_time(size_t count, std::chrono::nanoseconds time)
+void ucc_pt_benchmark::print_time(size_t count, ucc_coll_args_t args,
+                                  std::chrono::nanoseconds time)
 {
     float  time_ms = time.count() / 1000.0;
     size_t size    = count * ucc_dt_size(config.dt);
+    int    gsize  = comm->get_size();
     float time_avg, time_min, time_max;
 
     comm->allreduce(&time_ms, &time_min, 1, UCC_OP_MIN);
     comm->allreduce(&time_ms, &time_max, 1, UCC_OP_MAX);
     comm->allreduce(&time_ms, &time_avg, 1, UCC_OP_SUM);
-    time_avg /= comm->get_size();
+    time_avg /= gsize;
 
     if (comm->get_rank() == 0) {
         std::ios iostate(nullptr);
@@ -185,8 +195,23 @@ void ucc_pt_benchmark::print_time(size_t count, std::chrono::nanoseconds time)
                                         "N/A")
                   << std::setw(12) << time_avg
                   << std::setw(12) << time_min
-                  << std::setw(12) << time_max
-                  << std::endl;
+                  << std::setw(12) << time_max;
+
+        if (config.full_print) {
+            if (!coll->has_bw()) {
+                std::cout << std::setw(12) << "N/A"
+                          << std::setw(12) << "N/A"
+                          << std::setw(12) << "N/A";
+            } else {
+                std::cout << std::setw(12) << coll->get_bw(time_avg, gsize,
+                                                           args)
+                          << std::setw(12) << coll->get_bw(time_min, gsize,
+                                                           args)
+                          << std::setw(12) << coll->get_bw(time_max, gsize,
+                                                           args);
+            }
+        }
+        std::cout << std::endl;
         std::cout.copyfmt(iostate);
     }
 }

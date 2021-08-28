@@ -30,7 +30,7 @@ __global__ void UCC_REDUCE_CUDA_ ## NAME (const T *s1, const T *s2, T *d,      \
                 d[i] = OP(d[i], s2[i + j * ld]);                               \
             }                                                                  \
         }                                                                      \
-}                                                                              \
+}
 
 #define CUDA_REDUCE_WITH_OP_SPECIALIZED(NAME, OP, TYPE)                        \
 template <>                                                                    \
@@ -46,7 +46,7 @@ __global__ void UCC_REDUCE_CUDA_ ## NAME (const TYPE *s1, const TYPE *s2,      \
                 d[i] = OP(d[i], s2[i + j * ld]);                               \
             }                                                                  \
         }                                                                      \
-}                                                                              \
+}
 
 CUDA_REDUCE_WITH_OP(MAX,  DO_OP_MAX)
 CUDA_REDUCE_WITH_OP(MIN,  DO_OP_MIN)
@@ -73,7 +73,7 @@ CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_HALF, __half)
 #define DT_REDUCE_INT(type, op, src1_p, src2_p, dest_p, size, count, ld, s,    \
                       b, t) do {                                               \
         const type *sbuf1 = (type *)src1_p;                                    \
-        const type *sbuf2= (type *)src2_p;                                     \
+        const type *sbuf2 = (type *)src2_p;                                    \
         type *dest = (type *)dest_p;                                           \
         switch(op) {                                                           \
         case UCC_OP_MAX:                                                       \
@@ -158,8 +158,9 @@ extern "C" {
 #endif
 
 ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
-                                      void *dst, size_t size, size_t count,
-                                      size_t stride, ucc_datatype_t dt,
+                                      void *dst, size_t n_vectors,
+                                      size_t count, size_t stride,
+                                      ucc_datatype_t dt,
                                       ucc_reduction_op_t op)
 {
     size_t        ld     = stride / ucc_dt_size(dt);
@@ -175,30 +176,30 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
     switch (dt)
     {
         case UCC_DT_INT16:
-            DT_REDUCE_INT(int16_t, op, src1, src2, dst, size, count, ld, stream,
-                          bk, th);
+            DT_REDUCE_INT(int16_t, op, src1, src2, dst, n_vectors, count, ld,
+                          stream, bk, th);
             break;
         case UCC_DT_INT32:
-            DT_REDUCE_INT(int32_t, op, src1, src2, dst, size, count, ld, stream,
-                          bk, th);
+            DT_REDUCE_INT(int32_t, op, src1, src2, dst, n_vectors, count, ld,
+                          stream, bk, th);
             break;
         case UCC_DT_INT64:
-            DT_REDUCE_INT(int64_t, op, src1, src2, dst, size, count, ld, stream,
-                         bk, th);
+            DT_REDUCE_INT(int64_t, op, src1, src2, dst, n_vectors, count, ld,
+                          stream, bk, th);
             break;
         case UCC_DT_FLOAT16:
             ucc_assert(2 == sizeof(__half));
-            DT_REDUCE_FLOAT(__half, op, src1, src2, dst, size, count, ld,
+            DT_REDUCE_FLOAT(__half, op, src1, src2, dst, n_vectors, count, ld,
                             stream, bk, th);
             break;
         case UCC_DT_FLOAT32:
             ucc_assert(4 == sizeof(float));
-            DT_REDUCE_FLOAT(float, op, src1, src2, dst, size, count, ld, stream,
-                            bk, th);
+            DT_REDUCE_FLOAT(float, op, src1, src2, dst, n_vectors, count, ld,
+                            stream, bk, th);
             break;
         case UCC_DT_FLOAT64:
             ucc_assert(8 == sizeof(double));
-            DT_REDUCE_FLOAT(double, op, src1, src2, dst, size, count, ld,
+            DT_REDUCE_FLOAT(double, op, src1, src2, dst, n_vectors, count, ld,
                             stream, bk, th);
             break;
         default:

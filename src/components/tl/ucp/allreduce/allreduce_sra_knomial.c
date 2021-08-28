@@ -50,10 +50,12 @@ ucc_status_t
 ucc_tl_ucp_allreduce_sra_knomial_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_schedule_t *schedule = ucc_derived_of(coll_task, ucc_schedule_t);
-
+    ucc_status_t    status;
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(schedule, "ucp_allreduce_sra_kn_done", 0);
+
+    status = ucc_schedule_finalize(coll_task);
     ucc_tl_ucp_put_schedule(schedule);
-    return UCC_OK;
+    return status;
 }
 
 ucc_status_t
@@ -84,12 +86,10 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
                  "failed to init reduce_scatter_knomial task");
         goto out;
     }
-    task->flags = UCC_COLL_TASK_FLAG_INTERNAL;
     ucc_schedule_add_task(schedule, task);
     ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
-                                task);
-    task->handlers[UCC_EVENT_SCHEDULE_STARTED] = ucc_task_start_handler;
-    rs_task                                    = task;
+                                task, ucc_task_start_handler);
+    rs_task = task;
 
     /* 2nd step of allreduce: knomial allgather. 2nd task subscribes
      to completion event of reduce_scatter task. */
@@ -101,15 +101,16 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
                  "failed to init allgather_knomial task");
         goto out;
     }
-    task->flags = UCC_COLL_TASK_FLAG_INTERNAL;
-    ucc_schedule_add_task(schedule, task);
-    ucc_event_manager_subscribe(&rs_task->em, UCC_EVENT_COMPLETED, task);
-    task->handlers[UCC_EVENT_COMPLETED] = ucc_task_start_handler;
 
-    schedule->super.post     = ucc_tl_ucp_allreduce_sra_knomial_start;
-    schedule->super.progress = NULL;
-    schedule->super.finalize = ucc_tl_ucp_allreduce_sra_knomial_finalize;
-    *task_h                  = &schedule->super;
+    ucc_schedule_add_task(schedule, task);
+    ucc_event_manager_subscribe(&rs_task->em, UCC_EVENT_COMPLETED, task,
+                                ucc_task_start_handler);
+
+    schedule->super.post           = ucc_tl_ucp_allreduce_sra_knomial_start;
+    schedule->super.progress       = NULL;
+    schedule->super.finalize       = ucc_tl_ucp_allreduce_sra_knomial_finalize;
+    schedule->super.triggered_post = ucc_tl_ucp_triggered_post;
+    *task_h                        = &schedule->super;
     return UCC_OK;
 out:
     ucc_tl_ucp_put_schedule(schedule);

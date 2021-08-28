@@ -116,4 +116,5 @@ static inline ucc_rank_t ucc_ep_map_eval(ucc_ep_map_t map, ucc_rank_t rank)
 ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
                                    ucc_rank_t full_size, int need_free);
 
+void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len);
 #endif

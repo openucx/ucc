@@ -50,7 +50,8 @@ public:
                 ((T*)coll->src.info_v.displacements)[i] = buf_count;
                 buf_count += rank_count;
             }
-
+            /* Force at least 1 zero count for bigger coverage of corner cases */
+            ((T*)coll->src.info_v.counts)[(r + 1) % nprocs] = 0;
             ctxs[r]->init_buf = ucc_malloc(buf_count * ucc_dt_size(dtype), "init buf");
             EXPECT_NE(ctxs[r]->init_buf, nullptr);
             for (int i = 0; i < nprocs; i++) {
@@ -74,10 +75,19 @@ public:
                 ((T*)coll->dst.info_v.displacements)[i] = buf_count;
                 buf_count += rank_count;
             }
+            ((T*)coll->dst.info_v.counts)[(r - 1 + nprocs) % nprocs] = 0;
             ctxs[r]->rbuf_size = buf_count * ucc_dt_size(dtype);
             UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header,
                                    buf_count * ucc_dt_size(dtype), mem_type));
             coll->dst.info_v.buffer = ctxs[r]->dst_mc_header->addr;
+        }
+    }
+    void reset(UccCollCtxVec ctxs)
+    {
+        for (auto r = 0; r < ctxs.size(); r++) {
+            ucc_coll_args_t *coll = ctxs[r]->args;
+            clear_buffer(coll->dst.info_v.buffer, ctxs[r]->rbuf_size, mem_type,
+                         0);
         }
     }
     bool  data_validate(UccCollCtxVec ctxs)
@@ -165,6 +175,34 @@ UCC_TEST_P(test_alltoallv_0, single)
     data_fini(ctxs);
 }
 
+UCC_TEST_P(test_alltoallv_0, single_persistent)
+{
+    const int            team_id  = std::get<0>(GetParam());
+    ucc_memory_type_t    mem_type = std::get<1>(GetParam());
+    gtest_ucc_inplace_t  inplace  = std::get<2>(GetParam());
+    const ucc_datatype_t dtype    = (ucc_datatype_t)std::get<3>(GetParam());
+    UccTeam_h            team     = UccJob::getStaticTeams()[team_id];
+    int                  size     = team->procs.size();
+    const int            n_calls  = 3;
+    UccCollCtxVec        ctxs;
+
+    coll_mask = UCC_COLL_ARGS_FIELD_FLAGS;
+    coll_flags =
+        UCC_COLL_ARGS_FLAG_COUNT_64BIT | UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT;
+    set_inplace(inplace);
+    set_mem_type(mem_type);
+
+    data_init(size, (ucc_datatype_t)dtype, 1, ctxs);
+    UccReq req(team, ctxs);
+
+    for (auto i = 0; i < n_calls; i++) {
+        req.start();
+        req.wait();
+        EXPECT_EQ(true, data_validate(ctxs));
+        reset(ctxs);
+    }
+    data_fini(ctxs);
+}
 
 class test_alltoallv_1 : public test_alltoallv <uint32_t>,
         public ::testing::WithParamInterface<Param_0> {};

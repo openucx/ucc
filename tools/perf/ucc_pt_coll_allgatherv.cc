@@ -12,6 +12,7 @@ ucc_pt_coll_allgatherv::ucc_pt_coll_allgatherv(int size, ucc_datatype_t dt,
     has_inplace_= true;
     has_reduction_= false;
     has_range_ = true;
+    has_bw_ = false;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLGATHERV;
@@ -71,10 +72,4 @@ void ucc_pt_coll_allgatherv::free_coll_args(ucc_coll_args_t &args)
     ucc_mc_free(dst_header);
     ucc_free(args.dst.info_v.counts);
     ucc_free(args.dst.info_v.displacements);
-}
-
-double ucc_pt_coll_allgatherv::get_bus_bw(double time_us)
-{
-    //TODO
-    return 0.0;
 }

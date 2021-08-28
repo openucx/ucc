@@ -46,6 +46,8 @@ runs_on_dockers:
 runs_on_agents:
   - nodeLabel: 'swx-clx01'
 
+timeout_minutes: 120
+
 steps:
   #============================================================================
   - name: Check Code Format
@@ -59,8 +61,6 @@ steps:
     run: |
       echo "INFO: Run UCC tests"
       hostname
-      cat /proc/1/cgroup
-      pip3 list | grep torch
       ${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh
   #============================================================================
   - name: Run Torch-UCC tests (UCC)
@@ -68,8 +68,6 @@ steps:
     run: |
       echo "INFO: Run Torch-UCC tests (UCC)"
       hostname
-      cat /proc/1/cgroup
-      pip3 list | grep torch
       ${SRC_DIR}/ucc/.ci/scripts/run_tests_torch_ucc.sh
   #============================================================================
   - name: Run docker containers

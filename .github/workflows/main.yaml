@@ -30,3 +30,10 @@ jobs:
     - name: Run ucc_info
       run: |
         /tmp/ucc/install/bin/ucc_info -vc
+    - name: Run CMake tests
+      run: |
+        set -e
+        cmake -S test/cmake -B /tmp/cmake-ucc -DCMAKE_PREFIX_PATH=/tmp/ucc/install
+        cd /tmp/cmake-ucc
+        cmake --build .
+        ./test_ucc

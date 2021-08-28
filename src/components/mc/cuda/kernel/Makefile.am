@@ -3,7 +3,7 @@
 #
 
 NVCC = nvcc
-NVCCFLAGS = ${AM_CPPFLAGS} ${UCS_CPPFLAGS} -I${UCC_TOP_BUILDDIR} -I${UCC_TOP_SRCDIR}/src -I${UCC_TOP_BUILDDIR}/src --compiler-options -fno-rtti,-fno-exceptions
+NVCCFLAGS = ${AM_CPPFLAGS} ${UCS_CPPFLAGS} ${NVCC_CFLAGS} -I${UCC_TOP_BUILDDIR} -I${UCC_TOP_SRCDIR}/src -I${UCC_TOP_BUILDDIR}/src --compiler-options -fno-rtti,-fno-exceptions
 
 LINK = $(LIBTOOL) --mode=link $(CC) -o $@
 
