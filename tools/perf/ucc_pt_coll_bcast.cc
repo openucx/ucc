@@ -4,14 +4,14 @@
 #include <utils/ucc_math.h>
 #include <utils/ucc_coll_utils.h>
 
-ucc_pt_coll_bcast::ucc_pt_coll_bcast(ucc_datatype_t dt,
-                                             ucc_memory_type mt)
+ucc_pt_coll_bcast::ucc_pt_coll_bcast(ucc_datatype_t dt, ucc_memory_type mt,
+                                     ucc_pt_comm *communicator)
 {
     has_inplace_   = false;
     has_reduction_ = false;
     has_range_     = true;
     has_bw_        = true;
-    is_root_       = false;
+    comm           = communicator;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_BCAST;

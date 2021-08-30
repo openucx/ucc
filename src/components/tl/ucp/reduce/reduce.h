@@ -19,17 +19,14 @@ enum {
 
 #define UCC_REDUCE_KN_CHECK_PHASE(_p)                                          \
     case _p:                                                                   \
-        goto _p;                                                               \
-        break;
+        goto _p;
 
-/* UCC_REDUCE_KN_CHECK_PHASE(UCC_REDUCE_KN_PHASE_LOOP);               \ */
 #define UCC_REDUCE_KN_GOTO_PHASE(_phase)                                       \
     do {                                                                       \
         switch (_phase) {                                                      \
             UCC_REDUCE_KN_CHECK_PHASE(UCC_REDUCE_KN_PHASE_MULTI);              \
             UCC_REDUCE_KN_CHECK_PHASE(UCC_REDUCE_KN_PHASE_PROGRESS);           \
-        case UCC_REDUCE_KN_PHASE_INIT:                                         \
-            break;                                                             \
+            UCC_REDUCE_KN_CHECK_PHASE(UCC_REDUCE_KN_PHASE_INIT);               \
         };                                                                     \
     } while (0)
 

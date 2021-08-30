@@ -5,13 +5,14 @@
 #include <utils/ucc_coll_utils.h>
 
 ucc_pt_coll_reduce::ucc_pt_coll_reduce(ucc_datatype_t dt, ucc_memory_type mt,
-                        ucc_reduction_op_t op, bool is_inplace, bool is_root)
+                        ucc_reduction_op_t op, bool is_inplace,
+                        ucc_pt_comm *communicator)
 {
     has_inplace_   = true;
     has_reduction_ = true;
     has_range_     = true;
     has_bw_        = true;
-    is_root_       = is_root;
+    comm           = communicator;
 
     coll_args.coll_type = UCC_COLL_TYPE_REDUCE;
     coll_args.mask = 0;
@@ -37,19 +38,20 @@ ucc_status_t ucc_pt_coll_reduce::init_coll_args(size_t count,
 
     args = coll_args;
     args.src.info.count = count;
-    if (is_root_) {
+    bool is_root = (comm->get_rank() == args.root);
+    if (is_root) {
         UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size, args.dst.info.mem_type),
                       exit, st_dst);
         args.dst.info.buffer = dst_header->addr;
     }
-    if (!is_root_ || !UCC_IS_INPLACE(args)) {
+    if (!is_root || !UCC_IS_INPLACE(args)) {
         UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size, args.src.info.mem_type),
                       free_dst, st_src);
         args.src.info.buffer = src_header->addr;
     }
     return UCC_OK;
 free_dst:
-    if (is_root_ && st_dst == UCC_OK) {
+    if (is_root && st_dst == UCC_OK) {
         ucc_mc_free(dst_header);
     }
     return st_src;
@@ -59,10 +61,11 @@ exit:
 
 void ucc_pt_coll_reduce::free_coll_args(ucc_coll_args_t &args)
 {
-    if (!is_root_ || !UCC_IS_INPLACE(args)) {
+	bool is_root = (comm->get_rank() == args.root);
+    if (!is_root || !UCC_IS_INPLACE(args)) {
         ucc_mc_free(src_header);
     }
-    if (is_root_) {
+    if (is_root) {
         ucc_mc_free(dst_header);
     }
 }

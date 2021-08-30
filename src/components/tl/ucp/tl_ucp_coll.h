@@ -17,6 +17,14 @@
 extern const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
 
+#define CALC_DIST(_size, _radix, _dist)                                        \
+    do {                                                                       \
+        _dist = 1;                                                             \
+        while (_dist * _radix < _size) {                                       \
+            _dist *= _radix;                                                   \
+        }                                                                      \
+    } while (0)
+
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t      super;
     uint32_t             send_posted;

@@ -87,7 +87,7 @@ class test_reduce : public UccCollArgs, public testing::Test {
             if (r == root) {
                 UCC_CHECK(ucc_mc_free(ctxs[r]->dst_mc_header));
             }
-            if (coll->src.info.buffer) { /* no inplace */
+            if (r != root || !inplace) {
             	UCC_CHECK(ucc_mc_free(ctxs[r]->src_mc_header));
             }
             ucc_free(ctxs[r]->init_buf);

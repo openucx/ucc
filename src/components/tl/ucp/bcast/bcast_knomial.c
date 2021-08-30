@@ -11,14 +11,6 @@
 #include "tl_ucp_sendrecv.h"
 #include "utils/ucc_math.h"
 
-#define CALC_DIST(_size, _radix, _dist)                                        \
-    do {                                                                       \
-        _dist = 1;                                                             \
-        while (_dist * _radix < _size) {                                       \
-            _dist *= _radix;                                                   \
-        }                                                                      \
-    } while (0)
-
 ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);

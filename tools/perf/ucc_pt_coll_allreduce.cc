@@ -7,13 +7,14 @@
 ucc_pt_coll_allreduce::ucc_pt_coll_allreduce(ucc_datatype_t dt,
                                              ucc_memory_type mt,
                                              ucc_reduction_op_t op,
-                                             bool is_inplace)
+                                             bool is_inplace,
+                                             ucc_pt_comm *communicator)
 {
     has_inplace_   = true;
     has_reduction_ = true;
     has_range_     = true;
     has_bw_        = true;
-    is_root_       = false;
+    comm           = communicator;
 
     coll_args.coll_type = UCC_COLL_TYPE_ALLREDUCE;
     coll_args.mask = 0;

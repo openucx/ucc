@@ -19,8 +19,3 @@ bool ucc_pt_coll::has_bw()
 {
     return has_bw_;
 }
-
-bool ucc_pt_coll::is_root()
-{
-    return is_root_;
-}

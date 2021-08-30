@@ -4,16 +4,16 @@
 #include <utils/ucc_math.h>
 #include <utils/ucc_coll_utils.h>
 
-ucc_pt_coll_allgather::ucc_pt_coll_allgather(int size, ucc_datatype_t dt,
+ucc_pt_coll_allgather::ucc_pt_coll_allgather(ucc_datatype_t dt,
                                              ucc_memory_type mt,
-                                             bool is_inplace):
-    comm_size(size)
+                                             bool is_inplace,
+                                             ucc_pt_comm *communicator)
 {
     has_inplace_   = true;
     has_reduction_ = false;
     has_range_     = true;
     has_bw_        = true;
-    is_root_       = false;
+    comm           = communicator;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLGATHER;
@@ -31,12 +31,12 @@ ucc_status_t ucc_pt_coll_allgather::init_coll_args(size_t single_rank_count,
                                                    ucc_coll_args_t &args)
 {
     size_t dt_size  = ucc_dt_size(coll_args.src.info.datatype);
-    size_t       size_src = single_rank_count * dt_size;
-    size_t       size_dst = comm_size * single_rank_count * dt_size;
+    size_t size_src = single_rank_count * dt_size;
+    size_t size_dst = comm->get_size() * single_rank_count * dt_size;
     ucc_status_t st;
 
     args = coll_args;
-    args.dst.info.count = single_rank_count * comm_size;
+    args.dst.info.count = single_rank_count * comm->get_size();
     UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size_dst, args.dst.info.mem_type),
                   exit, st);
     args.dst.info.buffer = dst_header->addr;
