@@ -366,7 +366,7 @@ poll:
     }
     if (0 == addr_storage->addr_len) {
         if (NULL == addr_storage->storage) {
-            addr_storage->size = oob->participants;
+            addr_storage->size = oob->n_oob_eps;
             attr.mask          = UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
                         UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
             status = ucc_context_get_attr(context, &attr);
@@ -475,6 +475,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
+    ctx->rank          = UCC_RANK_MAX;
     ctx->lib           = lib;
     ctx->ids.pool_size = config->team_ids_pool_size;
     ucc_list_head_init(&ctx->progress_list);
@@ -485,6 +486,9 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     b_params.estimated_num_ppn = config->estimated_num_ppn;
     b_params.prefix            = lib->full_prefix;
     b_params.thread_mode       = lib->attr.thread_mode;
+    if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+        ctx->rank = params->oob.oob_ep;
+    }
     status = ucc_create_tl_contexts(ctx, config, b_params);
     if (UCC_OK != status) {
         /* only critical error could have happened - bail */
@@ -560,7 +564,6 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     }
     ctx->id.pi      = ucc_local_proc;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
-    ctx->rank = UCC_RANK_MAX;
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         do {
             /* UCC context create is blocking fn, so we can wait here for the
@@ -573,8 +576,6 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
             }
         } while (status == UCC_INPROGRESS);
 
-        ctx->rank = ctx->addr_storage.rank;
-
         if (topo_required) {
             /* At least one available CL context reported it needs topo info */
             status = ucc_topo_init(&ctx->addr_storage, &ctx->topo);
@@ -584,6 +585,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
                 goto error_ctx_create;
             }
         }
+        ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
     }
     if (config->internal_oob) {
         if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
@@ -607,7 +609,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
                 t_params.params.oob.req_test     = ctx->params.oob.req_test;
                 t_params.params.oob.req_free     = ctx->params.oob.req_free;
                 t_params.params.oob.coll_info    = ctx->params.oob.coll_info;
-                t_params.params.oob.participants = ctx->params.oob.participants;
+                t_params.params.oob.n_oob_eps    = ctx->params.oob.n_oob_eps;
                 t_params.params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
                 t_params.params.ep       = ctx->rank;
                 t_params.rank            = ctx->rank;

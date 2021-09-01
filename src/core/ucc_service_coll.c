@@ -166,13 +166,14 @@ ucc_status_t ucc_internal_oob_init(ucc_team_t          *team,
         return UCC_ERR_NO_MEMORY;
     }
 
-    ci->team          = team;
-    ci->subset        = subset;
-    oob->coll_info    = ci;
-    oob->allgather    = ucc_internal_oob_allgather;
-    oob->req_test     = ucc_internal_oob_test;
-    oob->req_free     = ucc_internal_oob_free;
-    oob->participants = (uint32_t)subset.map.ep_num;
+    ci->team       = team;
+    ci->subset     = subset;
+    oob->coll_info = ci;
+    oob->allgather = ucc_internal_oob_allgather;
+    oob->req_test  = ucc_internal_oob_test;
+    oob->req_free  = ucc_internal_oob_free;
+    oob->n_oob_eps = (uint32_t)subset.map.ep_num;
+    oob->oob_ep    = (uint32_t)subset.myrank;
 
     return UCC_OK;
 }

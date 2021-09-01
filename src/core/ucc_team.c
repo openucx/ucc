@@ -95,17 +95,31 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
         team_size = (ucc_rank_t)params->team_size;
         //TODO check it is not too big
     }
+
     if (params->mask & UCC_TEAM_PARAM_FIELD_OOB) {
-        if (team_size > 0 && params->oob.participants != team_size) {
+        if (team_size > 0 && params->oob.n_oob_eps != team_size) {
             ucc_error(
                 "inconsistent team_sizes provided as params.team_size %llu "
-                "and params.oob.participants %llu",
+                "and params.oob.n_oob_eps %llu",
                 (unsigned long long)params->team_size,
-                (unsigned long long)params->oob.participants);
+                (unsigned long long)params->oob.n_oob_eps);
             return UCC_ERR_INVALID_PARAM;
         }
-        team_size = (ucc_rank_t)params->oob.participants;
+        team_size = (ucc_rank_t)params->oob.n_oob_eps;
         //TODO check it is not too big
+    }
+
+    if (params->mask & UCC_TEAM_PARAM_FIELD_EP_MAP) {
+        if (team_size > 0 && params->ep_map.ep_num != team_size) {
+            ucc_error(
+                "inconsistent team_sizes provided as params.team_size %llu "
+                "and/or params.oob.n_oob_eps %llu and/or ep_map.ep_num %llu",
+                (unsigned long long)params->team_size,
+                (unsigned long long)params->oob.n_oob_eps,
+                (unsigned long long)params->ep_map.ep_num);
+            return UCC_ERR_INVALID_PARAM;
+        }
+        team_size = (ucc_rank_t)params->ep_map.ep_num;
     }
     if (team_size < 2) {
         ucc_warn("minimal size of UCC team is 2, provided %llu",
@@ -263,35 +277,39 @@ static inline ucc_status_t ucc_team_exchange(ucc_context_t *context,
     }
     /* We only need to exchange ctx_ranks and build map to ctx array */
     ucc_assert(context->addr_storage.storage);
-    if (!team->ctx_ranks) {
-        team->ctx_ranks =
-            ucc_malloc(team->size * sizeof(ucc_rank_t), "ctx_ranks");
+    if (team->bp.params.mask & UCC_TEAM_PARAM_FIELD_EP_MAP) {
+        team->ctx_map = team->bp.params.ep_map;
+    } else {
         if (!team->ctx_ranks) {
-            ucc_error("failed to allocate %zd bytes for ctx ranks array",
-                      team->size * sizeof(ucc_rank_t));
-            return UCC_ERR_NO_MEMORY;
+            team->ctx_ranks =
+                ucc_malloc(team->size * sizeof(ucc_rank_t), "ctx_ranks");
+            if (!team->ctx_ranks) {
+                ucc_error("failed to allocate %zd bytes for ctx ranks array",
+                          team->size * sizeof(ucc_rank_t));
+                return UCC_ERR_NO_MEMORY;
+            }
+            status =
+                oob.allgather(&context->rank, team->ctx_ranks, sizeof(ucc_rank_t),
+                              oob.coll_info, &team->oob_req);
+            if (UCC_OK != status) {
+                ucc_error("failed to start oob allgather for proc info exchange");
+                ucc_free(team->ctx_ranks);
+                return status;
+            }
         }
-        status =
-            oob.allgather(&context->rank, team->ctx_ranks, sizeof(ucc_rank_t),
-                          oob.coll_info, &team->oob_req);
-        if (UCC_OK != status) {
-            ucc_error("failed to start oob allgather for proc info exchange");
-            ucc_free(team->ctx_ranks);
+        status = oob.req_test(team->oob_req);
+        if (status < 0) {
+            oob.req_free(team->oob_req);
+            ucc_error("oob req test failed during team proc info exchange");
+            return status;
+        } else if (UCC_INPROGRESS == status) {
             return status;
         }
-    }
-    status = oob.req_test(team->oob_req);
-    if (status < 0) {
         oob.req_free(team->oob_req);
-        ucc_error("oob req test failed during team proc info exchange");
-        return status;
-    } else if (UCC_INPROGRESS == status) {
-        return status;
+        ucc_assert(team->size >= 2);
+        team->ctx_map = ucc_ep_map_from_array(&team->ctx_ranks, team->size,
+                                              context->addr_storage.size, 1);
     }
-    oob.req_free(team->oob_req);
-    ucc_assert(team->size >= 2);
-    team->ctx_map = ucc_ep_map_from_array(&team->ctx_ranks, team->size,
-                                          context->addr_storage.size, 1);
     ucc_debug("team %p rank %d, ctx_rank %d, map_type %d", team, team->rank,
               context->rank, team->ctx_map.type);
     return UCC_OK;
