@@ -12,8 +12,7 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
                                      ucc_datatype_t _dt, ucc_reduction_op_t _op,
                                      ucc_memory_type_t _mt,
                                      ucc_test_team_t &_team, size_t _max_size) :
-    TestCase(_team, _mt, _msgsize, _inplace, _max_size),
-    recvcounts(nullptr)
+    TestCase(_team, _mt, _msgsize, _inplace, _max_size)
 {
     size_t dt_size = ucc_dt_size(_dt);
     size_t count = _msgsize/dt_size;
@@ -32,27 +31,28 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize, _mt));
-    rbuf       = rbuf_mc_header->addr;
-    check_rbuf = ucc_malloc(_msgsize, "check rbuf");
-    UCC_MALLOC_CHECK(check_rbuf);
-    recvcounts = (int*)ucc_malloc(comm_size * sizeof(*recvcounts));
-    UCC_MALLOC_CHECK(recvcounts);
-
-    for (int i = 0; i < comm_size; i++) {
-        recvcounts[i] = count / comm_size;
-    }
-
     if (TEST_NO_INPLACE == inplace) {
+        args.dst.info.count = count / comm_size;
+
+        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize / comm_size, _mt));
+        rbuf       = rbuf_mc_header->addr;
+        check_rbuf = ucc_malloc( _msgsize / comm_size, "check rbuf");
+        UCC_MALLOC_CHECK(check_rbuf);
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
         sbuf = sbuf_mc_header->addr;
         init_buffer(sbuf, count, dt, _mt, rank);
         UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST, sbuf,
                            _mt, _msgsize);
         check_sbuf = check_sbuf_mc_header->addr;
-    } else {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+  } else {
+        args.mask           = UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags          = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        args.dst.info.count = count;
+
+        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize, _mt));
+        rbuf       = rbuf_mc_header->addr;
+        check_rbuf = ucc_malloc(_msgsize, "check rbuf");
+        UCC_MALLOC_CHECK(check_rbuf);
         init_buffer(rbuf, count, dt, _mt, rank);
         init_buffer(check_rbuf, count, dt, UCC_MEMORY_TYPE_HOST, rank);
     }
@@ -66,7 +66,6 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
     args.src.info.mem_type    = _mt;
 
     args.dst.info.buffer      = rbuf;
-    args.dst.info.count       = count;
     args.dst.info.datatype    = _dt;
     args.dst.info.mem_type    = _mt;
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
@@ -75,24 +74,23 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
 ucc_status_t TestReduceScatter::check()
 {
     int comm_rank, comm_size;
+    size_t block_size, block_count;
 
     MPI_Comm_rank(team.comm, &comm_rank);
     MPI_Comm_size(team.comm, &comm_size);
-    MPI_Reduce_scatter(inplace ? MPI_IN_PLACE : check_sbuf, check_rbuf,
-                       recvcounts, ucc_dt_to_mpi(dt), ucc_op_to_mpi(op),
-                       team.comm);
+    block_size  = msgsize / comm_size;
+    block_count = block_size / ucc_dt_size(dt);
+    MPI_Reduce_scatter_block(inplace ? MPI_IN_PLACE : check_sbuf, check_rbuf,
+                             block_count, ucc_dt_to_mpi(dt), ucc_op_to_mpi(op),
+                             team.comm);
     if (inplace) {
-        return compare_buffers(PTR_OFFSET(rbuf, comm_rank * msgsize/comm_size),
-                               check_rbuf, recvcounts[0], dt, mem_type);
+        return compare_buffers(PTR_OFFSET(rbuf, comm_rank * block_size),
+                               check_rbuf, block_count, dt, mem_type);
     }
-    return compare_buffers(rbuf, check_rbuf, recvcounts[0], dt, mem_type);
+    return compare_buffers(rbuf, check_rbuf, block_count, dt, mem_type);
 }
 
-TestReduceScatter::~TestReduceScatter() {
-    if (recvcounts) {
-        ucc_free(recvcounts);
-    }
-}
+TestReduceScatter::~TestReduceScatter() {}
 
 std::string TestReduceScatter::str() {
     return std::string("tc=")+ucc_coll_type_str(args.coll_type) +

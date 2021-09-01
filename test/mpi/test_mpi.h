@@ -347,7 +347,6 @@ public:
 class TestReduceScatter : public TestCase {
     ucc_datatype_t dt;
     ucc_reduction_op_t op;
-    int *recvcounts;
 public:
     TestReduceScatter(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
                       ucc_datatype_t _dt, ucc_reduction_op_t _op,

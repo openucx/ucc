@@ -52,7 +52,9 @@ static std::vector<std::string> str_split(const char *value, const char *delimit
 void PrintHelp()
 {
     std::cout <<
-       "--colls      <c1,c2,..>:        list of collectives: barrier,allreduce,allgather,allgatherv,bcast,alltoall,alltoallv\n"
+       "--colls      <c1,c2,..>:        list of collectives: "
+            "barrier, allreduce, allgather, allgatherv, bcast, alltoall, "
+            "reduce, reduce_scatter\n"
        "--teams      <t1,t2,..>:        list of teams: world,half,reverse,odd_even\n"
        "--mtypes     <m1,m2,..>:        list of mtypes: host,cuda\n"
        "--dtypes     <d1,d2,..>:        list of dtypes: (u)int8(16,32,64),float32(64)\n"
