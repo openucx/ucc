@@ -53,22 +53,21 @@ class test_reduce : public UccCollArgs, public testing::Test {
             }
 
             if (r == root) {
-			    coll->dst.info.mem_type = mem_type;
-			    coll->dst.info.count   = (ucc_count_t)count;
-			    coll->dst.info.datatype = dt;
-			    UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header,
-			                           ucc_dt_size(dt) * count, mem_type));
-			    coll->dst.info.buffer = ctxs[r]->dst_mc_header->addr;
-			    if (inplace) {
-			        UCC_CHECK(ucc_mc_memcpy(coll->dst.info.buffer,
-			    		  ctxs[r]->init_buf, ucc_dt_size(dt) * count, mem_type,
-			              UCC_MEMORY_TYPE_HOST));
-			    }
+                coll->dst.info.mem_type = mem_type;
+                coll->dst.info.count   = (ucc_count_t)count;
+                coll->dst.info.datatype = dt;
+                UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header,
+                                       ucc_dt_size(dt) * count, mem_type));
+                coll->dst.info.buffer = ctxs[r]->dst_mc_header->addr;
+                if (inplace) {
+                UCC_CHECK(ucc_mc_memcpy(coll->dst.info.buffer,
+                          ctxs[r]->init_buf, ucc_dt_size(dt) * count, mem_type,
+                          UCC_MEMORY_TYPE_HOST));
+                }
             }
             if (inplace) {
                 coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-
             }
             if (r != root || !inplace) {
                 UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_mc_header,
@@ -169,8 +168,7 @@ TYPED_TEST(test_reduce, single_host) {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 1);
 }
 
-TYPED_TEST(test_reduce, single_host_persistent)
-{
+TYPED_TEST(test_reduce, single_host_persistent) {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 3);
 }
 
@@ -178,8 +176,7 @@ TYPED_TEST(test_reduce, single_host_inplace) {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 1);
 }
 
-TYPED_TEST(test_reduce, single_host_persistent_inplace)
-{
+TYPED_TEST(test_reduce, single_host_persistent_inplace) {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 3);
 }
 
@@ -188,8 +185,7 @@ TYPED_TEST(test_reduce, single_cuda) {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 1);
 }
 
-TYPED_TEST(test_reduce, single_cuda_persistent)
-{
+TYPED_TEST(test_reduce, single_cuda_persistent) {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 3);
 }
 
@@ -197,8 +193,7 @@ TYPED_TEST(test_reduce, single_cuda_inplace) {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 1);
 }
 
-TYPED_TEST(test_reduce, single_cuda_persistent_inplace)
-{
+TYPED_TEST(test_reduce, single_cuda_persistent_inplace) {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 3);
 }
 #endif

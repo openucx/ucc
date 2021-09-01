@@ -30,7 +30,7 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
 ucc_status_t ucc_pt_coll_alltoall::init_coll_args(size_t single_rank_count,
                                                   ucc_coll_args_t &args)
 {
-	int          comm_size = comm->get_size();
+    int          comm_size = comm->get_size();
     size_t       dt_size   = ucc_dt_size(coll_args.src.info.datatype);
     size_t       size      = comm_size * single_rank_count * dt_size;
     ucc_status_t st        = UCC_OK;

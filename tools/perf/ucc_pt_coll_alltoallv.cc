@@ -30,7 +30,7 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
 ucc_status_t ucc_pt_coll_alltoallv::init_coll_args(size_t count,
                                                    ucc_coll_args_t &args)
 {
-	int          comm_size = comm->get_size();
+    int          comm_size = comm->get_size();
     size_t       dt_size   = ucc_dt_size(coll_args.src.info_v.datatype);
     size_t       size      = comm_size * count * dt_size;
     ucc_status_t st        = UCC_OK;

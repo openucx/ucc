@@ -32,12 +32,12 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_datatype_t     dt        = args->src.info.datatype;
     size_t             count     = args->src.info.count;
     size_t             data_size = count * ucc_dt_size(dt);
-    ucc_rank_t vpeer, peer, vroot_at_level, root_at_level, pos;
-    uint32_t   i;
+    void              *received_vectors =
+                           PTR_OFFSET(task->reduce_kn.scratch, data_size);
+    void              *scratch_offset;
+    ucc_rank_t         vpeer, peer, vroot_at_level, root_at_level, pos;
+    uint32_t           i;
     ucc_status_t       status;
-    void      *received_vectors =
-                   PTR_OFFSET(task->reduce_kn.scratch, data_size);
-    void      *scratch_offset;
 
 UCC_REDUCE_KN_PHASE_PROGRESS:
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
@@ -48,14 +48,14 @@ UCC_REDUCE_KN_PHASE_PROGRESS:
 
 UCC_REDUCE_KN_PHASE_INIT:
 
-    while (task->bcast_kn.dist <= task->reduce_kn.max_dist) {
-        if (vrank % task->bcast_kn.dist == 0) {
-            pos = (vrank / task->bcast_kn.dist) % radix;
+    while (task->reduce_kn.dist <= task->reduce_kn.max_dist) {
+        if (vrank % task->reduce_kn.dist == 0) {
+            pos = (vrank / task->reduce_kn.dist) % radix;
             if (pos == 0) {
                 scratch_offset = received_vectors;
                 task->reduce_kn.children_per_cycle = 0;
                 for (i = 1; i < radix; i++) {
-                    vpeer = vrank + i * task->bcast_kn.dist;
+                    vpeer = vrank + i * task->reduce_kn.dist;
                     if (vpeer >= team_size) {
                     	break;
                     } else {
@@ -71,7 +71,7 @@ UCC_REDUCE_KN_PHASE_INIT:
                 goto UCC_REDUCE_KN_PHASE_PROGRESS;
             UCC_REDUCE_KN_PHASE_MULTI:
                 if (task->reduce_kn.children_per_cycle) {
-                    status = ucc_dt_reduce_multi((task->bcast_kn.dist == 1) ?
+                    status = ucc_dt_reduce_multi((task->reduce_kn.dist == 1) ?
                                      args->src.info.buffer : rbuf,
                                      received_vectors, rbuf,
                                      task->reduce_kn.children_per_cycle,
@@ -84,14 +84,14 @@ UCC_REDUCE_KN_PHASE_INIT:
                     }
                 }
             } else {
-                vroot_at_level = vrank - pos * task->bcast_kn.dist;
+                vroot_at_level = vrank - pos * task->reduce_kn.dist;
                 root_at_level  = (vroot_at_level + root) % team_size;
                 UCPCHECK_GOTO(ucc_tl_ucp_send_nb(task->reduce_kn.scratch,
                                   data_size, mtype, root_at_level, team, task),
                                   task, out);
             }
         }
-        task->bcast_kn.dist *= radix;
+        task->reduce_kn.dist *= radix;
         SAVE_STATE(UCC_REDUCE_KN_PHASE_INIT);
         goto UCC_REDUCE_KN_PHASE_PROGRESS;
     }
@@ -118,7 +118,6 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
         (vrank % radix != 0 || vrank == team_size - 1);
     ucc_status_t       status;
 
-
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_kn_start", 0);
     ucc_tl_ucp_task_reset(task);
 
@@ -130,7 +129,7 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
     	task->reduce_kn.scratch = args->src.info.buffer;
     }
 
-    CALC_DIST(team->size, radix, task->reduce_kn.max_dist);
+    CALC_KN_TREE_DIST(team->size, radix, task->reduce_kn.max_dist);
     task->reduce_kn.dist = 1;
     task->reduce_kn.phase = UCC_REDUCE_KN_PHASE_INIT;
 
