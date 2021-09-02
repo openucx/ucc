@@ -6,13 +6,12 @@
 
 ucc_pt_coll_reduce::ucc_pt_coll_reduce(ucc_datatype_t dt, ucc_memory_type mt,
                         ucc_reduction_op_t op, bool is_inplace,
-                        ucc_pt_comm *communicator)
+                        ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
 {
     has_inplace_   = true;
     has_reduction_ = true;
     has_range_     = true;
     has_bw_        = true;
-    comm           = communicator;
 
     coll_args.coll_type = UCC_COLL_TYPE_REDUCE;
     coll_args.mask = 0;
@@ -61,7 +60,7 @@ exit:
 
 void ucc_pt_coll_reduce::free_coll_args(ucc_coll_args_t &args)
 {
-	bool is_root = (comm->get_rank() == args.root);
+    bool is_root = (comm->get_rank() == args.root);
     if (!is_root || !UCC_IS_INPLACE(args)) {
         ucc_mc_free(src_header);
     }

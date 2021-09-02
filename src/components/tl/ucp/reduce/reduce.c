@@ -30,7 +30,10 @@ ucc_status_t ucc_tl_ucp_reduce_init(ucc_tl_ucp_task_t *task)
 
     task->reduce_kn.radix =
         ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_kn_radix, team->size);
+    CALC_KN_TREE_DIST(team->size, task->reduce_kn.radix,
+                      task->reduce_kn.max_dist);
     isleaf = (vrank % task->reduce_kn.radix != 0 || vrank == team_size - 1);
+    task->reduce_kn.scratch_mc_header = NULL;
 
     if (!isleaf) {
     	/* scratch of size radix to fit up to radix - 1 recieved vectors

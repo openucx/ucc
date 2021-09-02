@@ -23,7 +23,7 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team = TASK_TEAM(task);
     ucc_rank_t         myrank    = team->rank;
     ucc_rank_t         team_size = team->size;
-    ucc_rank_t         root      = (uint32_t)args->root;
+    ucc_rank_t         root      = (ucc_rank_t)args->root;
     uint32_t           radix     = task->reduce_kn.radix;
     ucc_rank_t         vrank     = (myrank - root + team_size) % team_size;
     void              *rbuf      = (myrank == root) ? args->dst.info.buffer :
@@ -69,7 +69,7 @@ UCC_REDUCE_KN_PHASE_INIT:
                 }
                 SAVE_STATE(UCC_REDUCE_KN_PHASE_MULTI);
                 goto UCC_REDUCE_KN_PHASE_PROGRESS;
-            UCC_REDUCE_KN_PHASE_MULTI:
+UCC_REDUCE_KN_PHASE_MULTI:
                 if (task->reduce_kn.children_per_cycle) {
                     status = ucc_dt_reduce_multi((task->reduce_kn.dist == 1) ?
                                      args->src.info.buffer : rbuf,
@@ -110,7 +110,7 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
     ucc_coll_args_t   *args      = &coll_task->args;
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
     uint32_t           radix     = task->reduce_kn.radix;
-    ucc_rank_t         root      = (uint32_t)args->root;
+    ucc_rank_t         root      = (ucc_rank_t)args->root;
     ucc_rank_t         myrank    = team->rank;
     ucc_rank_t         team_size = team->size;
     ucc_rank_t         vrank     = (myrank - root + team_size) % team_size;
@@ -129,7 +129,6 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
     	task->reduce_kn.scratch = args->src.info.buffer;
     }
 
-    CALC_KN_TREE_DIST(team->size, radix, task->reduce_kn.max_dist);
     task->reduce_kn.dist = 1;
     task->reduce_kn.phase = UCC_REDUCE_KN_PHASE_INIT;
 
@@ -145,17 +144,8 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task      =
         ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args      = &coll_task->args;
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    uint32_t           radix     = task->reduce_kn.radix;
-    ucc_rank_t         myrank    = team->rank;
-    ucc_rank_t         root      = (uint32_t)args->root;
-    ucc_rank_t         team_size = team->size;
-    ucc_rank_t         vrank     = (myrank - root + team_size) % team_size;
-    int                isleaf    =
-        (vrank % radix != 0 || vrank == team_size - 1);
 
-    if (!isleaf) {
+    if (task->reduce_kn.scratch_mc_header) {
         ucc_mc_free(task->reduce_kn.scratch_mc_header);
     }
     return ucc_tl_ucp_coll_finalize(coll_task);

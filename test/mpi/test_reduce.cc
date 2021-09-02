@@ -28,16 +28,16 @@ TestReduce::TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     }
 
     if (rank == root) {
-    	UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize, _mt));
-    	rbuf = rbuf_mc_header->addr;
+        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize, _mt));
+        rbuf = rbuf_mc_header->addr;
         check_rbuf = ucc_malloc(_msgsize, "check rbuf");
         UCC_MALLOC_CHECK(check_rbuf);
-    	args.dst.info.buffer   = rbuf;
-    	args.dst.info.mem_type = _mt;
+        args.dst.info.buffer   = rbuf;
+        args.dst.info.mem_type = _mt;
     }
     if (rank != root || !inplace) {
-    	UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
-    	sbuf = sbuf_mc_header->addr;
+        UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
+        sbuf = sbuf_mc_header->addr;
     }
     if (inplace) {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;

@@ -5,15 +5,14 @@
 #include <utils/ucc_coll_utils.h>
 
 ucc_pt_coll_allgather::ucc_pt_coll_allgather(ucc_datatype_t dt,
-                                             ucc_memory_type mt,
-                                             bool is_inplace,
-                                             ucc_pt_comm *communicator)
+                         ucc_memory_type mt, bool is_inplace,
+                         ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
+
 {
     has_inplace_   = true;
     has_reduction_ = false;
     has_range_     = true;
     has_bw_        = true;
-    comm           = communicator;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLGATHER;

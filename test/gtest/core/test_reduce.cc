@@ -4,11 +4,6 @@
  * See file LICENSE for terms.
  */
 
-/**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
- * See file LICENSE for terms.
- */
-
 #include "test_mc_reduce.h"
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
@@ -60,9 +55,9 @@ class test_reduce : public UccCollArgs, public testing::Test {
                                        ucc_dt_size(dt) * count, mem_type));
                 coll->dst.info.buffer = ctxs[r]->dst_mc_header->addr;
                 if (inplace) {
-                UCC_CHECK(ucc_mc_memcpy(coll->dst.info.buffer,
-                          ctxs[r]->init_buf, ucc_dt_size(dt) * count, mem_type,
-                          UCC_MEMORY_TYPE_HOST));
+                    UCC_CHECK(ucc_mc_memcpy(coll->dst.info.buffer,
+                              ctxs[r]->init_buf, ucc_dt_size(dt) * count,
+                              mem_type, UCC_MEMORY_TYPE_HOST));
                 }
             }
             if (inplace) {
