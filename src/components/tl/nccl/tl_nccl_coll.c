@@ -215,9 +215,9 @@ ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
     void               *src    =
         UCC_IS_INPLACE(*args) ? args->dst.info.buffer : args->src.info.buffer;
     ucc_status_t        status = UCC_OK;
-    ncclDataType_t      dt     = ucc_to_nccl_dtype[args->src.info.datatype];
+    ncclDataType_t      dt     = ucc_to_nccl_dtype[args->dst.info.datatype];
     ncclRedOp_t         op = ucc_to_nccl_reduce_op[args->reduce.predefined_op];
-    size_t              count = args->src.info.count;
+    size_t              count = args->dst.info.count;
 
     task->super.super.status = UCC_INPROGRESS;
     NCCLCHECK_GOTO(ncclAllReduce(src, dst, count, dt, op, team->nccl_comm,
@@ -237,8 +237,8 @@ ucc_status_t ucc_tl_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
         return UCC_ERR_NOT_SUPPORTED;
     }
     if (UCC_OK !=
-        ucc_nccl_check_dt_supported(task->super.args.src.info.datatype,
-                                    task->super.args.src.info.datatype)) {
+        ucc_nccl_check_dt_supported(task->super.args.dst.info.datatype,
+                                    task->super.args.dst.info.datatype)) {
         tl_error(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -429,25 +429,30 @@ ucc_status_t ucc_tl_nccl_reduce_scatter_init(ucc_tl_nccl_task_t *task)
 
 ucc_status_t ucc_tl_nccl_reduce_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args   = &coll_task->args;
-    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
-    ucc_ee_h            ee     = coll_task->ee;
-    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
-    void               *dst    = args->dst.info.buffer;
-    void               *src    = args->src.info.buffer;
-    ucc_status_t        status = UCC_OK;
-    ncclDataType_t      dt     = ucc_to_nccl_dtype[
-                                    args->dst.info.datatype];
-    ncclRedOp_t         op     = ucc_to_nccl_reduce_op[
-                                    args->reduce.predefined_op];
-    size_t              count  = args->dst.info.count;
+    ucc_tl_nccl_task_t *task    = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t    *args    = &coll_task->args;
+    ucc_tl_nccl_team_t *team    = TASK_TEAM(task);
+    ucc_ee_h            ee      = coll_task->ee;
+    cudaStream_t        stream  = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
+    void               *dst     = args->dst.info.buffer;
+    void               *src     = args->src.info.buffer;
+    ucc_datatype_t      ucc_dt  = args->src.info.datatype;
+    size_t              count   = args->src.info.count;
+    ncclRedOp_t         op      = ucc_to_nccl_reduce_op[
+                                     args->reduce.predefined_op];
+    ucc_status_t        status  = UCC_OK;
+    ncclDataType_t      nccl_dt;
 
-    task->super.super.status = UCC_INPROGRESS;
-    if (UCC_IS_INPLACE(*args) && (args->root == team->rank)) {
-        src = args->dst.info.buffer;
+    if (args->root == team->rank) {
+        ucc_dt = task->super.args.dst.info.datatype;
+        count = task->super.args.dst.info.count;
+        if (UCC_IS_INPLACE(*args)) {
+            src = args->dst.info.buffer;
+        }
     }
-    NCCLCHECK_GOTO(ncclReduce(src, dst, count, dt, op, args->root,
+    nccl_dt = ucc_to_nccl_dtype[ucc_dt];
+    task->super.super.status = UCC_INPROGRESS;
+    NCCLCHECK_GOTO(ncclReduce(src, dst, count, nccl_dt, op, args->root,
                               team->nccl_comm, stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
     status = ucc_tl_nccl_collective_sync(task, stream);
@@ -457,15 +462,19 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
 {
+    ucc_datatype_t dt = (task->super.args.root == TASK_TEAM(task)->rank) ?
+                           task->super.args.dst.info.datatype:
+                           task->super.args.src.info.datatype;
+
     if ((task->super.args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
         (ucc_to_nccl_reduce_op[task->super.args.reduce.predefined_op] ==
          ncclOpUnsupported)) {
         tl_error(UCC_TASK_LIB(task), "reduction operation is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
+
     if (UCC_OK !=
-        ucc_nccl_check_dt_supported(task->super.args.dst.info.datatype,
-                                    task->super.args.dst.info.datatype)) {
+        ucc_nccl_check_dt_supported(dt, dt)) {
         tl_error(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }

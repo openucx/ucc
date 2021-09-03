@@ -32,7 +32,7 @@ class test_reduce : public UccCollArgs, public testing::Test {
             coll->reduce.predefined_op = T::redop;
             coll->root = root;
             coll->src.info.mem_type = mem_type;
-            coll->src.info.count   = (ucc_count_t)count;
+            coll->src.info.count = (ucc_count_t)count;
             coll->src.info.datatype = dt;
 
             ctxs[r]->init_buf = ucc_malloc(ucc_dt_size(dt) * count,
@@ -49,7 +49,7 @@ class test_reduce : public UccCollArgs, public testing::Test {
 
             if (r == root) {
                 coll->dst.info.mem_type = mem_type;
-                coll->dst.info.count   = (ucc_count_t)count;
+                coll->dst.info.count = (ucc_count_t)count;
                 coll->dst.info.datatype = dt;
                 UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header,
                                        ucc_dt_size(dt) * count, mem_type));

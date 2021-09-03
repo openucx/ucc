@@ -33,13 +33,15 @@ TestReduce::TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         check_rbuf = ucc_malloc(_msgsize, "check rbuf");
         UCC_MALLOC_CHECK(check_rbuf);
         args.dst.info.buffer   = rbuf;
+        args.dst.info.count    = count;
+        args.dst.info.datatype = _dt;
         args.dst.info.mem_type = _mt;
     }
-    if (rank != root || !inplace) {
+    if ((rank != root) || (inplace == TEST_NO_INPLACE)) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
         sbuf = sbuf_mc_header->addr;
     }
-    if (inplace) {
+    if (inplace == TEST_INPLACE) {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }

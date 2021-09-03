@@ -25,6 +25,7 @@ ucc_pt_coll_reduce::ucc_pt_coll_reduce(ucc_datatype_t dt, ucc_memory_type mt,
     coll_args.root = 0;
     coll_args.src.info.datatype = dt;
     coll_args.src.info.mem_type = mt;
+    coll_args.dst.info.datatype = dt;
     coll_args.dst.info.mem_type = mt;
 }
 
@@ -37,6 +38,7 @@ ucc_status_t ucc_pt_coll_reduce::init_coll_args(size_t count,
 
     args = coll_args;
     args.src.info.count = count;
+    args.dst.info.count = count;
     bool is_root = (comm->get_rank() == args.root);
     if (is_root) {
         UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size, args.dst.info.mem_type),
@@ -76,4 +78,3 @@ float ucc_pt_coll_reduce::get_bw(float time_ms, int grsize,
 
     return S / time_ms / 1000.0;
 }
-

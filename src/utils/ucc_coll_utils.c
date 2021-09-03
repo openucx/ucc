@@ -148,8 +148,8 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
     case UCC_COLL_TYPE_FANOUT:
         return 0;
     case UCC_COLL_TYPE_BCAST:
-    case UCC_COLL_TYPE_ALLREDUCE:
         return args->src.info.count * ucc_dt_size(args->src.info.datatype);
+    case UCC_COLL_TYPE_ALLREDUCE:
     case UCC_COLL_TYPE_ALLTOALL:
     case UCC_COLL_TYPE_ALLGATHER:
     case UCC_COLL_TYPE_REDUCE_SCATTER:
