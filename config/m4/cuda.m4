@@ -53,10 +53,12 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                [AC_CHECK_LIB([cudart], [cudaGetDeviceCount],
                              [CUDA_LIBS="$CUDA_LIBS -lcudart"], [cuda_happy="no"])])
          # Check for NVCC
+         AC_ARG_VAR(NVCC, [NVCC compiler command])
          AS_IF([test "x$cuda_happy" = "xyes"],
-               [AC_CHECK_PROG(cuda_happy, [nvcc], ["yes"], ["no"])])
+               [AC_PATH_PROG([NVCC], [nvcc], [notfound], [$PATH:$check_cuda_dir/bin])])
+         AS_IF([test "$NVCC" = "notfound"], [cuda_happy="no"])
          AS_IF([test "x$cuda_happy" = "xyes"],
-               [CUDA_MAJOR_VERSION=`nvcc  --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 1`
+               [CUDA_MAJOR_VERSION=`$NVCC  --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 1`
                 AS_IF([test $CUDA_MAJOR_VERSION -lt 8],
                       [cuda_happy=no])])
          AS_IF([test "x$enable_debug" = xyes],
