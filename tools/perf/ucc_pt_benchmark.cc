@@ -5,35 +5,36 @@
 #include "utils/ucc_coll_utils.h"
 
 ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
-                                   ucc_pt_comm *communcator):
+                                   ucc_pt_comm *communicator):
     config(cfg),
-    comm(communcator)
+    comm(communicator)
 {
     switch (cfg.coll_type) {
     case UCC_COLL_TYPE_ALLGATHER:
-        coll = new ucc_pt_coll_allgather(comm->get_size(), cfg.dt, cfg.mt,
-                                         cfg.inplace);
+        coll = new ucc_pt_coll_allgather(cfg.dt, cfg.mt, cfg.inplace, comm);
         break;
     case UCC_COLL_TYPE_ALLGATHERV:
-        coll = new ucc_pt_coll_allgatherv(comm->get_size(), cfg.dt, cfg.mt,
-                                          cfg.inplace);
+        coll = new ucc_pt_coll_allgatherv(cfg.dt, cfg.mt, cfg.inplace, comm);
         break;
     case UCC_COLL_TYPE_ALLREDUCE:
-        coll = new ucc_pt_coll_allreduce(cfg.dt, cfg.mt, cfg.op, cfg.inplace);
+        coll = new ucc_pt_coll_allreduce(cfg.dt, cfg.mt, cfg.op, cfg.inplace,
+                                         comm);
         break;
     case UCC_COLL_TYPE_ALLTOALL:
-        coll = new ucc_pt_coll_alltoall(comm->get_size(), cfg.dt, cfg.mt,
-                                        cfg.inplace);
+        coll = new ucc_pt_coll_alltoall(cfg.dt, cfg.mt, cfg.inplace, comm);
         break;
     case UCC_COLL_TYPE_ALLTOALLV:
-        coll = new ucc_pt_coll_alltoallv(comm->get_size(), cfg.dt, cfg.mt,
-                                         cfg.inplace);
+        coll = new ucc_pt_coll_alltoallv(cfg.dt, cfg.mt, cfg.inplace, comm);
         break;
     case UCC_COLL_TYPE_BARRIER:
-        coll = new ucc_pt_coll_barrier();
+        coll = new ucc_pt_coll_barrier(comm);
         break;
     case UCC_COLL_TYPE_BCAST:
-        coll = new ucc_pt_coll_bcast(cfg.dt, cfg.mt);
+        coll = new ucc_pt_coll_bcast(cfg.dt, cfg.mt, comm);
+        break;
+    case UCC_COLL_TYPE_REDUCE:
+        coll = new ucc_pt_coll_reduce(cfg.dt, cfg.mt, cfg.op, cfg.inplace,
+                                      comm);
         break;
     default:
         throw std::runtime_error("not supported collective");

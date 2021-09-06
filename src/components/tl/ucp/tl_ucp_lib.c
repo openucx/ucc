@@ -23,6 +23,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
         self->cfg.reduce_scatter_kn_radix = tl_ucp_config->kn_radix;
         self->cfg.allgather_kn_radix      = tl_ucp_config->kn_radix;
         self->cfg.bcast_kn_radix          = tl_ucp_config->kn_radix;
+        self->cfg.reduce_kn_radix         = tl_ucp_config->kn_radix;
     }
     tl_info(&self->super, "initialized lib object: %p", self);
     return UCC_OK;

@@ -4,12 +4,13 @@
 #include <utils/ucc_math.h>
 #include <utils/ucc_coll_utils.h>
 
-ucc_pt_coll_barrier::ucc_pt_coll_barrier()
+ucc_pt_coll_barrier::ucc_pt_coll_barrier(ucc_pt_comm *communicator) :
+                                          ucc_pt_coll(communicator)
 {
-    has_inplace_= false;
+    has_inplace_   = false;
     has_reduction_ = false;
-    has_range_ = false;
-    has_bw_ = false;
+    has_range_     = false;
+    has_bw_        = false;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_BARRIER;

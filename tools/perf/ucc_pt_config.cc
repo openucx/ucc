@@ -32,6 +32,7 @@ const std::map<std::string, ucc_coll_type_t> ucc_pt_coll_map = {
     {"alltoallv", UCC_COLL_TYPE_ALLTOALLV},
     {"barrier", UCC_COLL_TYPE_BARRIER},
     {"bcast", UCC_COLL_TYPE_BCAST},
+    {"reduce", UCC_COLL_TYPE_REDUCE},
 };
 
 const std::map<std::string, ucc_memory_type_t> ucc_pt_memtype_map = {

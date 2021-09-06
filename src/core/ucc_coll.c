@@ -80,12 +80,17 @@ static ucc_status_t ucc_coll_args_check_mem_type(ucc_coll_args_t *coll_args,
         }
         return UCC_OK;
     case UCC_COLL_TYPE_GATHER:
+    	// TODO: Check logic for Gather once implemented
     case UCC_COLL_TYPE_REDUCE:
-        if (UCC_IS_ROOT(*coll_args, rank)) {
-            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info);
-        }
-        if (!(UCC_IS_INPLACE(*coll_args) && UCC_IS_ROOT(*coll_args, rank))) {
+        if (!UCC_IS_ROOT(*coll_args, rank)) {
             UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
+        } else {
+            UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info);
+            if (UCC_IS_INPLACE(*coll_args)) {
+                coll_args->src.info.mem_type = coll_args->dst.info.mem_type;
+        	} else {
+                UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
+        	}
         }
         return UCC_OK;
     case UCC_COLL_TYPE_GATHERV:

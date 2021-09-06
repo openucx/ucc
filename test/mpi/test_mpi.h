@@ -309,6 +309,17 @@ public:
     ucc_status_t check();
 };
 
+class TestReduce : public TestCase {
+	ucc_datatype_t dt;
+	ucc_reduction_op_t op;
+public:
+    TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
+               ucc_datatype_t _dt, ucc_reduction_op_t _op,
+               ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
+               size_t _max_size);
+    ucc_status_t check();
+};
+
 class TestAlltoall : public TestCase {
 public:
     TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
@@ -353,18 +364,6 @@ public:
                       ucc_memory_type_t _mt, ucc_test_team_t &team,
                       size_t _max_size);
     ~TestReduceScatter();
-    ucc_status_t check();
-    std::string str();
-};
-
-class TestReduce : public TestCase {
-    ucc_datatype_t dt;
-    ucc_reduction_op_t op;
-public:
-    TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t inplace, int _root,
-               ucc_datatype_t _dt, ucc_reduction_op_t _op,
-               ucc_memory_type_t _mt, ucc_test_team_t &team,
-               size_t _max_size);
     ucc_status_t check();
     std::string str();
 };

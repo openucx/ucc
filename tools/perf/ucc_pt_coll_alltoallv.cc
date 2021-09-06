@@ -4,14 +4,14 @@
 #include <utils/ucc_math.h>
 #include <utils/ucc_coll_utils.h>
 
-ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(int size, ucc_datatype_t dt,
-                                             ucc_memory_type mt, bool is_inplace):
-    comm_size(size)
+ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
+                         ucc_memory_type mt, bool is_inplace,
+                         ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
 {
-    has_inplace_= true;
-    has_reduction_= false;
-    has_range_ = true;
-    has_bw_ = false;
+    has_inplace_   = true;
+    has_reduction_ = false;
+    has_range_     = true;
+    has_bw_        = false;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_ALLTOALLV;
@@ -28,9 +28,10 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(int size, ucc_datatype_t dt,
 ucc_status_t ucc_pt_coll_alltoallv::init_coll_args(size_t count,
                                                    ucc_coll_args_t &args)
 {
-    size_t       dt_size = ucc_dt_size(coll_args.src.info_v.datatype);
-    size_t       size    = comm_size * count * dt_size;
-    ucc_status_t st      = UCC_OK;
+    int          comm_size = comm->get_size();
+    size_t       dt_size   = ucc_dt_size(coll_args.src.info_v.datatype);
+    size_t       size      = comm_size * count * dt_size;
+    ucc_status_t st        = UCC_OK;
 
     args = coll_args;
     args.src.info_v.counts = (ucc_count_t *) ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");

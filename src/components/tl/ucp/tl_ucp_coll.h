@@ -17,6 +17,14 @@
 extern const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
 
+#define CALC_KN_TREE_DIST(_size, _radix, _dist)                                        \
+    do {                                                                       \
+        _dist = 1;                                                             \
+        while (_dist * _radix < _size) {                                       \
+            _dist *= _radix;                                                   \
+        }                                                                      \
+    } while (0)
+
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t      super;
     uint32_t             send_posted;
@@ -52,6 +60,15 @@ typedef struct ucc_tl_ucp_task {
             ucc_rank_t              dist;
             uint32_t                radix;
         } bcast_kn;
+        struct {
+            ucc_rank_t              dist;
+            ucc_rank_t              max_dist;
+            int                     children_per_cycle;
+            uint32_t                radix;
+            int                     phase;
+            void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+        } reduce_kn;
     };
 } ucc_tl_ucp_task_t;
 

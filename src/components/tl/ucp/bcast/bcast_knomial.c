@@ -11,14 +11,6 @@
 #include "tl_ucp_sendrecv.h"
 #include "utils/ucc_math.h"
 
-#define CALC_DIST(_size, _radix, _dist)                                        \
-    do {                                                                       \
-        _dist = 1;                                                             \
-        while (_dist * _radix < _size) {                                       \
-            _dist *= _radix;                                                   \
-        }                                                                      \
-    } while (0)
-
 ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
@@ -86,7 +78,7 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_start(ucc_coll_task_t *coll_task)
 
     task->bcast_kn.radix =
         ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.bcast_kn_radix, team->size);
-    CALC_DIST(team->size, task->bcast_kn.radix, task->bcast_kn.dist);
+    CALC_KN_TREE_DIST(team->size, task->bcast_kn.radix, task->bcast_kn.dist);
 
     status = ucc_tl_ucp_bcast_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {
