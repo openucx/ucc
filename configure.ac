@@ -126,7 +126,7 @@ AS_IF([test "x$with_docs_only" = xyes],
     [AS_MESSAGE([Documents only requested])
      AS_IF([DX_TEST_FEATURE(doc)],
            [],
-           [AC_MSG_ERROR([--with-only-docs was requested, but doxygen was not found])])
+           [AC_MSG_ERROR([--with-docs-only was requested, but doxygen was not found])])
      UCC_DX_ENABLE_CHECK([html])
      UCC_DX_ENABLE_CHECK([man])
      UCC_DX_ENABLE_CHECK([pdf])
