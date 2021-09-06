@@ -78,6 +78,7 @@ TestAllgatherv::~TestAllgatherv() {
         ucc_free(displacements);
     }
 }
+
 ucc_status_t TestAllgatherv::check()
 {
     size_t       count = counts[0];

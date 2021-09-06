@@ -252,6 +252,6 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR) {
         memcpy(attr->attr.ctx_addr, ctx->worker_address, ctx->ucp_addrlen);
     }
-
+    attr->topo_required = 0;
     return UCC_OK;
 }

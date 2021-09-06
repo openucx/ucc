@@ -6,6 +6,7 @@
 
 #include "test_mpi.h"
 #include "mpi_util.h"
+
 TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                              ucc_datatype_t _dt, ucc_reduction_op_t _op,
                              ucc_memory_type_t _mt, ucc_test_team_t &_team,

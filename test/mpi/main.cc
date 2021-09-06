@@ -52,7 +52,9 @@ static std::vector<std::string> str_split(const char *value, const char *delimit
 void PrintHelp()
 {
     std::cout <<
-       "--colls      <c1,c2,..>:        list of collectives: barrier,allreduce,allgather,allgatherv,bcast,alltoall,alltoallv\n"
+       "--colls      <c1,c2,..>:        list of collectives: "
+            "barrier, allreduce, allgather, allgatherv, bcast, alltoall, "
+            "reduce, reduce_scatter\n"
        "--teams      <t1,t2,..>:        list of teams: world,half,reverse,odd_even\n"
        "--mtypes     <m1,m2,..>:        list of mtypes: host,cuda\n"
        "--dtypes     <d1,d2,..>:        list of dtypes: (u)int8(16,32,64),float32(64)\n"
@@ -113,6 +115,10 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
         return UCC_COLL_TYPE_ALLTOALL;
     } else if (coll == "alltoallv") {
         return UCC_COLL_TYPE_ALLTOALLV;
+    } else if (coll == "reduce_scatter") {
+        return UCC_COLL_TYPE_REDUCE_SCATTER;
+    } else if (coll == "reduce") {
+        return UCC_COLL_TYPE_REDUCE;
     } else {
         std::cerr << "incorrect coll type: " << coll << std::endl;
         PrintHelp();
