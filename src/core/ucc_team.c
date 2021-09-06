@@ -178,6 +178,15 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
     ucc_status_t           status;
     ucc_base_team_params_t b_params;
 
+    if (context->topo && !team->topo) {
+        /* Context->topo is not NULL if any of the enabled CLs
+           reported topo_required through the lib_attr */
+        status = ucc_team_topo_init(team, context->topo, &team->topo);
+        if (UCC_OK != status) {
+            ucc_warn("failed to init team topo");
+        }
+    }
+
     if (team->last_team_create_posted >= 0) {
         cl_iface = UCC_CL_CTX_IFACE(context->cl_ctx[team->last_team_create_posted]);
         b_team   = &team->cl_teams[team->last_team_create_posted]->super;
@@ -346,7 +355,7 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
         }
         team->cl_teams[i] = NULL;
     }
-    /* ucc_topo_cleanup(team->topo); */
+    ucc_team_topo_cleanup(team->topo);
     ucc_free(team->addr_storage.storage);
     ucc_free(team->ctx_ranks);
     ucc_team_relase_id(team);

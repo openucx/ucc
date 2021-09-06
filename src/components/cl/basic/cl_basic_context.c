@@ -64,12 +64,36 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_context_t)
 UCC_CLASS_DEFINE(ucc_cl_basic_context_t, ucc_cl_context_t);
 
 ucc_status_t
-ucc_cl_basic_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
+ucc_cl_basic_get_context_attr(const ucc_base_context_t *context,
                               ucc_base_ctx_attr_t      *attr)
 {
+    const ucc_cl_basic_context_t *ctx =
+        ucc_derived_of(context, ucc_cl_basic_context_t);
+    ucc_base_ctx_attr_t tl_attr;
+    ucc_status_t        status;
+    int                 i;
+
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
         attr->attr.ctx_addr_len = 0;
     }
-    // attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR - nothing to do
+
+    /* CL BASIC reports topo_required if any of the TL available
+       TL contexts needs it */
+    attr->topo_required = 0;
+    for (i = 0; i < ctx->n_tl_ctxs; i++) {
+        memset(&tl_attr, 0, sizeof(tl_attr));
+        status = UCC_TL_CTX_IFACE(ctx->tl_ctxs[i])
+                     ->context.get_attr(&ctx->tl_ctxs[i]->super, &tl_attr);
+        if (UCC_OK != status) {
+            cl_error(ctx->super.super.lib, "failed to get %s ctx attr",
+                     UCC_TL_CTX_IFACE(ctx->tl_ctxs[i])->super.name);
+            return status;
+        }
+        if (tl_attr.topo_required) {
+            attr->topo_required = 1;
+            break;
+        }
+    }
+
     return UCC_OK;
 }
