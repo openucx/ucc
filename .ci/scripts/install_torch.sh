@@ -33,5 +33,5 @@ set -o pipefail
 #conda install pytorch cudatoolkit=11.0 -c pytorch-nightly
 
 pip3 install --default-timeout=900 numpy
-pip3 install --default-timeout=900 --pre torch -f https://download.pytorch.org/whl/nightly/cu110/torch_nightly.html
+pip3 install --default-timeout=900 --pre torch -f https://download.pytorch.org/whl/nightly/cu113/torch_nightly.html
 pip3 install "git+https://github.com/mlperf/logging.git@0.7.1"
