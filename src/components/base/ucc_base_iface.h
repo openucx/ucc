@@ -63,6 +63,7 @@ typedef struct ucc_base_context {
 
 typedef struct ucc_base_ctx_attr_t {
     ucc_context_attr_t attr;
+    uint32_t           topo_required;
 } ucc_base_ctx_attr_t;
 
 typedef struct ucc_base_context_iface {

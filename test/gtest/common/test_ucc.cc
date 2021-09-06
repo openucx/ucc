@@ -396,10 +396,10 @@ UccJob::~UccJob()
     if (this == UccJob::staticUccJob) {
         staticTeams.clear();
     }
-    for (int i = 0; i < n_procs; i++){
+    for (int i = 0; i < n_procs; i++) {
         workers.push_back(std::thread(thread_proc_destruct, &procs, i));
     }
-    for (int i = 0; i < n_procs; i++){
+    for (int i = 0; i < n_procs; i++) {
         workers[i].join();
     }
 }
