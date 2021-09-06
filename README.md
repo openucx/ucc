@@ -54,7 +54,7 @@ $ make
 ### Build Documentation 
 ```sh
 $ ./autogen.sh
-$ ./configure --prefix=<ucc-install-path> --with-only-docs
+$ ./configure --prefix=<ucc-install-path> --with-docs-only
 $ make docs
 ```
 
