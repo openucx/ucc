@@ -37,6 +37,11 @@ ncclRedOp_t ucc_to_nccl_reduce_op[] = {
     [UCC_OP_PROD]        = (ncclRedOp_t)ncclProd,
     [UCC_OP_MAX]         = (ncclRedOp_t)ncclMax,
     [UCC_OP_MIN]         = (ncclRedOp_t)ncclMin,
+#if NCCL_VERSION_CODE < NCCL_VERSION(2,10,3)
+    [UCC_OP_AVG]         = (ncclRedOp_t)ncclOpUnsupported,
+#else
+    [UCC_OP_AVG]         = (ncclRedOp_t)ncclAvg,
+#endif
     [UCC_OP_LAND]        = (ncclRedOp_t)ncclOpUnsupported,
     [UCC_OP_LOR]         = (ncclRedOp_t)ncclOpUnsupported,
     [UCC_OP_LXOR]        = (ncclRedOp_t)ncclOpUnsupported,

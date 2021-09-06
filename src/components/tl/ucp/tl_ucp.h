@@ -112,6 +112,17 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 
 #define UCC_TL_CTX_OOB(_ctx) ((_ctx)->super.super.ucc_context->params.oob)
 
+// TODO remove once AVG is implemented
+#define CHECK_AVG_OP(_args, _team)                                             \
+    do {                                                                       \
+        if (_args.reduce.predefined_op == UCC_OP_AVG) {                        \
+            tl_error(UCC_TL_TEAM_LIB(_team),                                   \
+                     "Average reduction is not supported yet");                \
+            status = UCC_ERR_NOT_SUPPORTED;                                    \
+            goto out;                                                          \
+        }                                                                      \
+    } while (0)
+
 void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
                                  size_t length, ucc_memory_type_t mem_type);
 #endif
