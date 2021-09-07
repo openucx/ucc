@@ -15,6 +15,7 @@
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
 #include "bcast/bcast.h"
+#include "reduce/reduce.h"
 const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
         UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR};
@@ -217,6 +218,9 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
         break;
     case UCC_COLL_TYPE_BCAST:
         status = ucc_tl_ucp_bcast_init(task);
+        break;
+    case UCC_COLL_TYPE_REDUCE:
+        status = ucc_tl_ucp_reduce_init(task);
         break;
     default:
         status = UCC_ERR_NOT_SUPPORTED;

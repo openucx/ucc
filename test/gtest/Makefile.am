@@ -81,6 +81,7 @@ gtest_SOURCES =                     \
 	core/test_allgather.cc          \
 	core/test_allgatherv.cc         \
 	core/test_bcast.cc              \
+	core/test_reduce.cc             \
 	core/test_allreduce.cc          \
 	core/test_schedule.cc           \
 	core/test_topo.cc               \
