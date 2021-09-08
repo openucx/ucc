@@ -233,13 +233,13 @@ ucc_status_t ucc_tl_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
     if ((task->super.args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
         (ucc_to_nccl_reduce_op[task->super.args.reduce.predefined_op] ==
          ncclOpUnsupported)) {
-        tl_error(UCC_TASK_LIB(task), "reduction operation is not supported");
+        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     if (UCC_OK !=
         ucc_nccl_check_dt_supported(task->super.args.dst.info.datatype,
                                     task->super.args.dst.info.datatype)) {
-        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
+        tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post     = ucc_tl_nccl_allreduce_start;
@@ -414,13 +414,13 @@ ucc_status_t ucc_tl_nccl_reduce_scatter_init(ucc_tl_nccl_task_t *task)
     if ((task->super.args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
         (ucc_to_nccl_reduce_op[task->super.args.reduce.predefined_op] ==
          ncclOpUnsupported)) {
-        tl_error(UCC_TASK_LIB(task), "reduction operation is not supported");
+        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     if (UCC_OK !=
         ucc_nccl_check_dt_supported(task->super.args.dst.info.datatype,
                                     task->super.args.dst.info.datatype)) {
-        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
+        tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post     = ucc_tl_nccl_reduce_scatter_start;
@@ -469,13 +469,13 @@ ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
     if ((task->super.args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
         (ucc_to_nccl_reduce_op[task->super.args.reduce.predefined_op] ==
          ncclOpUnsupported)) {
-        tl_error(UCC_TASK_LIB(task), "reduction operation is not supported");
+        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (UCC_OK !=
         ucc_nccl_check_dt_supported(dt, dt)) {
-        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
+        tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post     = ucc_tl_nccl_reduce_start;
