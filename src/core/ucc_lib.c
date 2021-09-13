@@ -220,7 +220,7 @@ static int ucc_tl_is_required(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface)
     for (i = 0; i < lib->n_cl_libs_opened; i++) {
         ucc_config_names_array_t *tls = lib->cl_attrs[i].tls;
         if ((tls->count == 1 && !strcmp(tls->names[0], "all")) ||
-            ucc_config_names_search(*tls, tl_iface->super.name) >= 0) {
+            ucc_config_names_search(tls, tl_iface->super.name) >= 0) {
             return 1;
         }
     }

@@ -23,7 +23,6 @@ typedef ucs_config_field_t             ucc_config_field_t;
 typedef ucs_config_names_array_t       ucc_config_names_array_t;
 typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 
-#define ucc_config_names_search         ucs_config_names_search
 #define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
 #define UCC_CONFIG_REGISTER_TABLE       UCS_CONFIG_REGISTER_TABLE
 #define UCC_CONFIG_REGISTER_TABLE_ENTRY UCS_CONFIG_REGISTER_TABLE_ENTRY
@@ -115,4 +114,17 @@ ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
                                         const ucc_config_names_array_t *src);
 
 void ucc_config_names_array_free(ucc_config_names_array_t *array);
+
+static inline int ucc_config_names_search(ucc_config_names_array_t *config_names,
+                                          const char *str)
+{
+#ifdef UCS_CONFIG_NAMES_SEARCH_V2
+    return ucs_config_names_search(config_names, str);
+#elif UCS_CONFIG_NAMES_SEARCH_V1
+    return ucs_config_names_search(*config_names, str);
+#else
+    #error Unsupported signature of ucs_config_names_search
+#endif
+}
+
 #endif
