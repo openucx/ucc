@@ -144,7 +144,11 @@ typedef enum {
     UCC_OP_BOR              = UCC_BIT(9),
     UCC_OP_BXOR             = UCC_BIT(10),
     UCC_OP_MAXLOC           = UCC_BIT(11),
-    UCC_OP_MINLOC           = UCC_BIT(12)
+    UCC_OP_MINLOC           = UCC_BIT(12),
+    UCC_OP_AVG              = UCC_BIT(13) /*!< Perform an average operation, i.e.
+                                               a sum across all ranks, divided by
+                                               the number of ranks.
+                                               Supported only for floating-point values */
 } ucc_reduction_op_t;
 
 /**

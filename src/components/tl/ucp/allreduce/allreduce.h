@@ -45,7 +45,8 @@ ucc_status_t ucc_tl_ucp_allreduce_init(ucc_tl_ucp_task_t *task);
 
 #define ALLREDUCE_TASK_CHECK(_args, _team)                                     \
     CHECK_USERDEFINED_OP((_args), (_team));                                    \
-    CHECK_SAME_MEMTYPE((_args), (_team));
+    CHECK_SAME_MEMTYPE((_args), (_team));                                      \
+    CHECK_AVG_OP((_args), (_team));
 
 ucc_status_t ucc_tl_ucp_allreduce_knomial_init(ucc_base_coll_args_t *coll_args,
                                                ucc_base_team_t *     team,
