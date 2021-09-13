@@ -92,24 +92,6 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
 
             AC_SUBST(UCX_LIBADD, "-lucp -lucm")
             AC_SUBST(UCS_LIBADD, "-lucs")
-
-            AC_TRY_COMPILE([#include <ucs/config/parser.h>],
-            [
-                ucs_config_names_array_t array;
-                const char *str = "aaa";
-                ucs_config_names_search(array, str);
-            ],
-            [AC_DEFINE([UCS_CONFIG_NAMES_SEARCH_V1], 1, [ucs_config_names_search with array by value])],
-            [])
-
-            AC_TRY_COMPILE([#include <ucs/config/parser.h>],
-            [
-                ucs_config_names_array_t array;
-                const char *str = "aaa";
-                ucs_config_names_search(&array, str);
-            ],
-            [AC_DEFINE([UCS_CONFIG_NAMES_SEARCH_V2], 1, [ucs_config_names_search with array by ptr])],
-            [])
         ],
         [
             AS_IF([test "x$with_ucx" != "xguess"],
