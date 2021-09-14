@@ -30,17 +30,19 @@ ucc_pt_bootstrap_mpi::ucc_pt_bootstrap_mpi()
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-    context_oob.coll_info    = (void*)MPI_COMM_WORLD;
-    context_oob.allgather    = mpi_oob_allgather;
-    context_oob.req_test     = mpi_oob_allgather_test;
-    context_oob.req_free     = mpi_oob_allgather_free;
-    context_oob.participants = size;
+    context_oob.coll_info = (void*)MPI_COMM_WORLD;
+    context_oob.allgather = mpi_oob_allgather;
+    context_oob.req_test  = mpi_oob_allgather_test;
+    context_oob.req_free  = mpi_oob_allgather_free;
+    context_oob.n_oob_eps = size;
+    context_oob.oob_ep    = rank;
 
-    team_oob.coll_info    = (void*)MPI_COMM_WORLD;
-    team_oob.allgather    = mpi_oob_allgather;
-    team_oob.req_test     = mpi_oob_allgather_test;
-    team_oob.req_free     = mpi_oob_allgather_free;
-    team_oob.participants = size;
+    team_oob.coll_info = (void*)MPI_COMM_WORLD;
+    team_oob.allgather = mpi_oob_allgather;
+    team_oob.req_test  = mpi_oob_allgather_test;
+    team_oob.req_free  = mpi_oob_allgather_free;
+    team_oob.n_oob_eps = size;
+    team_oob.oob_ep    = rank;
 }
 
 int ucc_pt_bootstrap_mpi::get_rank()

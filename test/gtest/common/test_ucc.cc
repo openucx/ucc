@@ -10,15 +10,16 @@ constexpr ucc_lib_params_t UccProcess::default_lib_params;
 constexpr ucc_context_params_t UccProcess::default_ctx_params;
 constexpr int UccJob::staticTeamSizes[];
 
-UccProcess::UccProcess(const ucc_lib_params_t &lib_params,
+UccProcess::UccProcess(int _job_rank, const ucc_lib_params_t &lib_params,
                        const ucc_context_params_t &_ctx_params)
 {
     ucc_lib_config_h     lib_config;
     ucc_status_t         status;
     std::stringstream    err_msg;
 
+    job_rank   = _job_rank;
     ctx_params = _ctx_params;
-    status = ucc_lib_config_read(NULL, NULL, &lib_config);
+    status     = ucc_lib_config_read(NULL, NULL, &lib_config);
     if (status != UCC_OK) {
         err_msg << "ucc_lib_config_read failed";
         goto exit_err;
@@ -151,25 +152,39 @@ ucc_status_t UccTeam::req_free(void *request)
     return UCC_OK;
 }
 
-void UccTeam::init_team()
+uint64_t rank_map_cb(uint64_t ep, void *cb_ctx) {
+    UccTeam *team = (UccTeam*)cb_ctx;
+    return (uint64_t)team->procs[(int)ep].p.get()->job_rank;
+}
+
+void UccTeam::init_team(bool use_team_ep_map)
 {
     ucc_team_params_t                    team_params;
     std::vector<allgather_coll_info_t *> cis;
     ucc_status_t                         status;
     for (int i = 0; i < n_procs; i++) {
         cis.push_back(new allgather_coll_info);
-        cis.back()->self             = this;
-        cis.back()->my_rank          = i;
-        team_params.oob.allgather    = allgather;
-        team_params.oob.req_test     = req_test;
-        team_params.oob.req_free     = req_free;
-        team_params.oob.coll_info    = (void *)cis.back();
-        team_params.oob.participants = n_procs;
-        team_params.ep               = i;
-        team_params.ep_range         = UCC_COLLECTIVE_EP_RANGE_CONTIG;
-        team_params.mask             = UCC_TEAM_PARAM_FIELD_OOB |
-            UCC_TEAM_PARAM_FIELD_EP  |
-            UCC_TEAM_PARAM_FIELD_EP_RANGE ;
+        cis.back()->self     = this;
+        cis.back()->my_rank  = i;
+        team_params.ep       = i;
+        team_params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+        team_params.mask     = UCC_TEAM_PARAM_FIELD_EP  |
+                               UCC_TEAM_PARAM_FIELD_EP_RANGE;
+        if (use_team_ep_map) {
+            team_params.mask |= UCC_TEAM_PARAM_FIELD_EP_MAP;
+            team_params.ep_map.type      = UCC_EP_MAP_CB;
+            team_params.ep_map.ep_num    = n_procs;
+            team_params.ep_map.cb.cb     = rank_map_cb;
+            team_params.ep_map.cb.cb_ctx = (void*)this;
+        } else {
+            team_params.oob.allgather = allgather;
+            team_params.oob.req_test  = req_test;
+            team_params.oob.req_free  = req_free;
+            team_params.oob.coll_info = (void *)cis.back();
+            team_params.oob.n_oob_eps = n_procs;
+            team_params.oob.oob_ep    = i;
+            team_params.mask         |= UCC_TEAM_PARAM_FIELD_OOB;
+        }
         EXPECT_EQ(UCC_OK,
                   ucc_team_create_post(&(procs[i].p.get()->ctx_h), 1, &team_params,
                                        &(procs[i].team)));
@@ -221,7 +236,7 @@ void UccTeam::progress()
     }
 }
 
-UccTeam::UccTeam(std::vector<UccProcess_h> &_procs)
+UccTeam::UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map)
 {
     n_procs = _procs.size();
     ag.resize(n_procs);
@@ -232,7 +247,7 @@ UccTeam::UccTeam(std::vector<UccProcess_h> &_procs)
         a.phase = AG_INIT;
     }
     copy_complete_count = 0;
-    init_team();
+    init_team(use_team_ep_map);
     // test_allgather(128);
 }
 
@@ -265,7 +280,7 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
         setenv(v.first.c_str(), v.second.c_str(), 1);
     }
     for (int i = 0; i < n_procs; i++) {
-        procs.push_back(std::make_shared<UccProcess>());
+        procs.push_back(std::make_shared<UccProcess>(i));
     }
 
     create_context();
@@ -352,10 +367,11 @@ void proc_context_create(UccProcess_h proc, int id, ThreadAllgather *ta, bool is
     if (is_global) {
         proc->ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_OOB;
         proc->ctx_params.oob.allgather = thread_allgather_start;
-        proc->ctx_params.oob.req_test = thread_allgather_req_test;
-        proc->ctx_params.oob.req_free = thread_allgather_req_free;
+        proc->ctx_params.oob.req_test  = thread_allgather_req_test;
+        proc->ctx_params.oob.req_free  = thread_allgather_req_free;
         proc->ctx_params.oob.coll_info = (void*) &ta->reqs[id];
-        proc->ctx_params.oob.participants = ta->n_procs;
+        proc->ctx_params.oob.n_oob_eps = ta->n_procs;
+        proc->ctx_params.oob.oob_ep    = id;
     }
     status = ucc_context_create(proc->lib_h, &proc->ctx_params, ctx_config, &proc->ctx_h);
     ucc_context_config_release(ctx_config);
@@ -424,7 +440,14 @@ const std::vector<UccTeam_h> &UccJob::getStaticTeams()
         for (auto ts : teamSizes) {
             staticTeams.push_back(getStaticJob()->create_team(ts));
         }
+        /* Create one more team with reversed ranks order */
+        std::vector<int> ranks;
+        for (auto r = staticUccJobSize - 1; r >= 0; r--) {
+            ranks.push_back(r);
+        }
+        staticTeams.push_back(getStaticJob()->create_team(ranks, true));
     }
+
     return staticTeams;
 }
 
@@ -443,6 +466,16 @@ UccTeam_h UccJob::create_team(int _n_procs)
         team_procs.push_back(procs[i]);
     }
     return std::make_shared<UccTeam>(team_procs);
+}
+
+UccTeam_h UccJob::create_team(std::vector<int> &ranks, bool use_team_ep_map)
+{
+    EXPECT_GE(n_procs, ranks.size());
+    std::vector<UccProcess_h> team_procs;
+    for (int i=0; i<ranks.size(); i++) {
+        team_procs.push_back(procs[ranks[i]]);
+    }
+    return std::make_shared<UccTeam>(team_procs, use_team_ep_map);
 }
 
 

@@ -639,15 +639,26 @@ enum ucc_context_attr_field {
  *
  * @brief OOB collective operation for creating the context
  */
-typedef struct ucc_context_oob_coll {
+typedef struct ucc_oob_coll {
     ucc_status_t    (*allgather)(void *src_buf, void *recv_buf, size_t size,
                                  void *allgather_info,  void **request);
     ucc_status_t    (*req_test)(void *request);
     ucc_status_t    (*req_free)(void *request);
-    uint32_t        participants;
     void            *coll_info;
-}  ucc_context_oob_coll_t;
+    uint32_t        n_oob_eps; /*!< Number of endpoints participating in the
+                                    oob operation (e.g., number of processes
+                                    representing a ucc team) */
+    uint32_t        oob_ep; /*!< Integer value that represents the position
+                                 of the calling processes in the given oob op:
+                                 the data specified by "src_buf" will be placed
+                                 at the offset "oob_ep*size" in the "recv_buf".
+                                 oob_ep must be uniq at every calling process
+                                 and shuold be in the range [0:n_oob_eps). */
 
+}  ucc_oob_coll_t;
+
+typedef ucc_oob_coll_t ucc_context_oob_coll_t;
+typedef ucc_oob_coll_t ucc_team_oob_coll_t;
 /**
  *
  *  @ingroup UCC_CONTEXT_DT
@@ -995,19 +1006,6 @@ typedef struct ucc_team_p2p_conn {
     ucc_status_t    (*req_test)(void *request);
     ucc_status_t    (*req_free)(void *request);
 } ucc_team_p2p_conn_t;
-
-/**
- *
- *  @ingroup UCC_TEAM_DT
- */
-typedef struct  ucc_team_oob_coll {
-    ucc_status_t    (*allgather)(void *src_buf, void *recv_buf, size_t size,
-                                 void *allgather_info,  void **request);
-    ucc_status_t    (*req_test)(void *request);
-    ucc_status_t    (*req_free)(void *request);
-    uint32_t         participants;
-    void             *coll_info;
-}  ucc_team_oob_coll_t;
 
 /**
  *

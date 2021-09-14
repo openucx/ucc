@@ -20,7 +20,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     /* TODO: init based on ctx settings and on params: need to check
              if all the necessary ranks mappings are provided */
     self->preconnect_task    = NULL;
-    self->size               = params->params.oob.participants;
+    self->size               = params->params.oob.n_oob_eps;
     self->scope              = params->scope;
     self->scope_id           = params->scope_id;
     self->rank               = params->rank;

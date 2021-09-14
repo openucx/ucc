@@ -11,11 +11,12 @@
 #include "utils/ucc_coll_utils.h"
 #include "ucc_context.h"
 #include "utils/ucc_math.h"
+#include "components/base/ucc_base_iface.h"
 
-typedef struct ucc_context ucc_context_t;
-typedef struct ucc_cl_team ucc_cl_team_t;
-typedef struct ucc_tl_team ucc_tl_team_t;
-typedef struct ucc_coll_task ucc_coll_task_t;
+typedef struct ucc_context          ucc_context_t;
+typedef struct ucc_cl_team          ucc_cl_team_t;
+typedef struct ucc_tl_team          ucc_tl_team_t;
+typedef struct ucc_service_coll_req ucc_service_coll_req_t;
 typedef enum {
     UCC_TEAM_ADDR_EXCHANGE,
     UCC_TEAM_SERVICE_TEAM,
@@ -24,23 +25,24 @@ typedef enum {
 } ucc_team_state_t;
 
 typedef struct ucc_team {
-    ucc_status_t       status;
-    ucc_team_state_t   state;
-    ucc_context_t **   contexts;
-    uint32_t           num_contexts;
-    ucc_team_params_t  params;
-    ucc_cl_team_t **   cl_teams;
-    int                n_cl_teams;
-    int                last_team_create_posted;
-    uint16_t           id; /*< context-uniq team identifier */
-    ucc_rank_t         rank;
-    ucc_rank_t         size;
-    ucc_tl_team_t *    service_team;
-    ucc_coll_task_t *  task;
-    ucc_addr_storage_t addr_storage; /*< addresses of team endpoints */
-    ucc_rank_t *       ctx_ranks;
-    void *             oob_req;
-    ucc_ep_map_t       ctx_map; /*< map to the ctx ranks, defined if CTX
+    ucc_status_t            status;
+    ucc_team_state_t        state;
+    ucc_context_t **        contexts;
+    uint32_t                num_contexts;
+    ucc_base_team_params_t  bp;
+    ucc_team_oob_coll_t     runtime_oob;
+    ucc_cl_team_t **        cl_teams;
+    int                     n_cl_teams;
+    int                     last_team_create_posted;
+    uint16_t                id; /*< context-uniq team identifier */
+    ucc_rank_t              rank;
+    ucc_rank_t              size;
+    ucc_tl_team_t *         service_team;
+    ucc_service_coll_req_t *sreq;
+    ucc_addr_storage_t      addr_storage; /*< addresses of team endpoints */
+    ucc_rank_t *            ctx_ranks;
+    void *                  oob_req;
+    ucc_ep_map_t            ctx_map; /*< map to the ctx ranks, defined if CTX
                                   type is global (oob provided) */
     ucc_team_topo_t   *topo;
 } ucc_team_t;
@@ -66,9 +68,10 @@ ucc_get_team_ep_header(ucc_context_t *context, ucc_team_t *team,
     ucc_addr_storage_t *storage      = context->addr_storage.storage
                                            ? &context->addr_storage
                                            : &team->addr_storage;
-    ucc_rank_t          storage_rank = context->addr_storage.storage
-                                           ? ucc_ep_map_eval(team->ctx_map, rank)
-                                           : rank;
+    ucc_rank_t          storage_rank =
+        context->addr_storage.storage
+                     ? (team ? ucc_ep_map_eval(team->ctx_map, rank) : rank)
+                     : rank;
 
     return UCC_ADDR_STORAGE_RANK_HEADER(storage, storage_rank);
 }

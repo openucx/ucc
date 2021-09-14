@@ -41,9 +41,10 @@ static ucc_status_t oob_allgather_free(void *req)
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_local) {
     ucc_lib_config_h lib_config;
     ucc_context_config_h ctx_config;
-    int size;
+    int size, rank;
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     /* Init ucc library */
     ucc_lib_params_t lib_params = {
@@ -57,11 +58,12 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_loc
     };
     if (!is_local) {
         ctx_params.mask            |= UCC_CONTEXT_PARAM_FIELD_OOB;
-        ctx_params.oob.allgather    = oob_allgather;
-        ctx_params.oob.req_test     = oob_allgather_test;
-        ctx_params.oob.req_free     = oob_allgather_free;
-        ctx_params.oob.coll_info    = (void*)MPI_COMM_WORLD;
-        ctx_params.oob.participants = size;
+        ctx_params.oob.allgather = oob_allgather;
+        ctx_params.oob.req_test  = oob_allgather_test;
+        ctx_params.oob.req_free  = oob_allgather_free;
+        ctx_params.oob.coll_info = (void*)MPI_COMM_WORLD;
+        ctx_params.oob.n_oob_eps = size;
+        ctx_params.oob.oob_ep    = rank;
     }
     UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
     UCC_CHECK(ucc_init(&lib_params, lib_config, &lib));
@@ -126,13 +128,14 @@ ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm)
     team_params.mask               = UCC_TEAM_PARAM_FIELD_EP       |
         UCC_TEAM_PARAM_FIELD_EP_RANGE |
         UCC_TEAM_PARAM_FIELD_OOB;
-    team_params.oob.allgather      = oob_allgather;
-    team_params.oob.req_test       = oob_allgather_test;
-    team_params.oob.req_free       = oob_allgather_free;
-    team_params.oob.coll_info      = (void*)comm;
-    team_params.oob.participants   = size;
-    team_params.ep                 = rank;
-    team_params.ep_range           = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+    team_params.oob.allgather = oob_allgather;
+    team_params.oob.req_test  = oob_allgather_test;
+    team_params.oob.req_free  = oob_allgather_free;
+    team_params.oob.coll_info = (void*)comm;
+    team_params.oob.n_oob_eps = size;
+    team_params.oob.oob_ep    = rank;
+    team_params.ep            = rank;
+    team_params.ep_range      = UCC_COLLECTIVE_EP_RANGE_CONTIG;
 
     UCC_CHECK(ucc_team_create_post(&ctx, 1, &team_params, &team));
     MPI_Request req;

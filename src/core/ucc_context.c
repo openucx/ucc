@@ -15,26 +15,35 @@
 static uint32_t ucc_context_seq_num = 0;
 static ucc_config_field_t ucc_context_config_table[] = {
     {"ESTIMATED_NUM_EPS", "0",
-     "An optimization hint of how many endpoints will be created on this context",
-     ucc_offsetof(ucc_context_config_t, estimated_num_eps), UCC_CONFIG_TYPE_UINT},
+     "An optimization hint of how many endpoints will be created on this "
+     "context",
+     ucc_offsetof(ucc_context_config_t, estimated_num_eps),
+     UCC_CONFIG_TYPE_UINT},
 
     {"LOCK_FREE_PROGRESS_Q", "0",
      "Enable lock free progress queue optimization",
-     ucc_offsetof(ucc_context_config_t, lock_free_progress_q), UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_context_config_t, lock_free_progress_q),
+     UCC_CONFIG_TYPE_UINT},
 
     {"ESTIMATED_NUM_PPN", "0",
      "An optimization hint of how many endpoints created on this context reside"
      " on the same node",
-     ucc_offsetof(ucc_context_config_t, estimated_num_ppn), UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_context_config_t, estimated_num_ppn),
+     UCC_CONFIG_TYPE_UINT},
 
     {"TEAM_IDS_POOL_SIZE", "32",
-     "Defines the size of the team_id_pool. The number of coexisting unique team ids "
-     "for a single process is team_ids_pool_size*64. This parameter is relevant when "
-     "internal team id allocation takes place.",
-     ucc_offsetof(ucc_context_config_t, team_ids_pool_size), UCC_CONFIG_TYPE_UINT},
+     "Defines the size of the team_id_pool. The number of coexisting unique "
+     "team ids for a single process is team_ids_pool_size*64. This parameter "
+     "is relevant when internal team id allocation takes place.",
+     ucc_offsetof(ucc_context_config_t, team_ids_pool_size),
+     UCC_CONFIG_TYPE_UINT},
 
-    {NULL}
-};
+    {"INTERNAL_OOB", "1",
+     "Use internal OOB transport for team creation. Available for ucc_context "
+     "is configured with OOB (global mode). 0 - disable, 1 - try, 2 - force.",
+     ucc_offsetof(ucc_context_config_t, internal_oob), UCC_CONFIG_TYPE_UINT},
+
+    {NULL}};
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
                           ucc_context_config_t, &ucc_config_global_list);
 
@@ -357,7 +366,7 @@ poll:
     }
     if (0 == addr_storage->addr_len) {
         if (NULL == addr_storage->storage) {
-            addr_storage->size = oob->participants;
+            addr_storage->size = oob->n_oob_eps;
             attr.mask          = UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
                         UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
             status = ucc_context_get_attr(context, &attr);
@@ -450,7 +459,8 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     uint32_t                   topo_required = 0;
     ucc_base_context_params_t  b_params;
     ucc_base_context_t        *b_ctx;
-    ucc_base_ctx_attr_t        attr;
+    ucc_base_ctx_attr_t        c_attr;
+    ucc_base_lib_attr_t        l_attr;
     ucc_cl_lib_t              *cl_lib;
     ucc_context_t             *ctx;
     ucc_status_t               status;
@@ -465,6 +475,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
+    ctx->rank          = UCC_RANK_MAX;
     ctx->lib           = lib;
     ctx->ids.pool_size = config->team_ids_pool_size;
     ucc_list_head_init(&ctx->progress_list);
@@ -475,6 +486,9 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     b_params.estimated_num_ppn = config->estimated_num_ppn;
     b_params.prefix            = lib->full_prefix;
     b_params.thread_mode       = lib->attr.thread_mode;
+    if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+        ctx->rank = params->oob.oob_ep;
+    }
     status = ucc_create_tl_contexts(ctx, config, b_params);
     if (UCC_OK != status) {
         /* only critical error could have happened - bail */
@@ -491,6 +505,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         goto error_ctx;
     }
     ctx->n_cl_ctx = 0;
+    ctx->cl_flags = 0;
     for (i = 0; i < num_cls; i++) {
         cl_lib = config->configs[i]->cl_lib;
         status = cl_lib->iface->context.create(
@@ -508,16 +523,25 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         }
         ctx->cl_ctx[ctx->n_cl_ctx] = ucc_derived_of(b_ctx, ucc_cl_context_t);
         ctx->n_cl_ctx++;
-        memset(&attr, 0, sizeof(attr));
-        status = cl_lib->iface->context.get_attr(b_ctx, &attr);
+
+        memset(&c_attr, 0, sizeof(c_attr));
+        status = cl_lib->iface->context.get_attr(b_ctx, &c_attr);
         if (status != UCC_OK) {
             ucc_error("failed to query context attributes for %s",
                       cl_lib->iface->super.name);
             goto error_ctx_create;
         }
-        if (attr.topo_required) {
+        if (c_attr.topo_required) {
             topo_required = 1;
         }
+
+        memset(&l_attr, 0, sizeof(l_attr));
+        status = cl_lib->iface->lib.get_attr(&cl_lib->super, &l_attr);
+        if (UCC_OK != status) {
+            ucc_error("failed to query lib %s attr", cl_lib->iface->super.name);
+            goto error_ctx_create;
+        }
+        ctx->cl_flags |= l_attr.flags;
     }
     if (0 == ctx->n_cl_ctx) {
         ucc_error("no CL context created in ucc_context_create");
@@ -540,7 +564,6 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     }
     ctx->id.pi      = ucc_local_proc;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
-    ctx->rank = UCC_RANK_MAX;
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         do {
             /* UCC context create is blocking fn, so we can wait here for the
@@ -553,8 +576,6 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
             }
         } while (status == UCC_INPROGRESS);
 
-        ctx->rank = ctx->addr_storage.rank;
-
         if (topo_required) {
             /* At least one available CL context reported it needs topo info */
             status = ucc_topo_init(&ctx->addr_storage, &ctx->topo);
@@ -563,6 +584,61 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
                 ucc_error("failed to init ctx topo");
                 goto error_ctx_create;
             }
+        }
+        ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
+    }
+    if (config->internal_oob) {
+        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+            ucc_base_team_params_t t_params;
+            ucc_base_team_t *      b_team;
+            status = ucc_tl_context_get(ctx, "ucp", &ctx->service_ctx);
+            if (UCC_OK != status) {
+                if (config->internal_oob == 2) {
+                    ucc_error(
+                        "TL UCP context is not available, service team can "
+                        "not be created but was force requested");
+                    goto error_ctx_create;
+                }
+                ucc_debug("TL UCP context is not available, "
+                          "service team can not be created");
+            } else {
+                t_params.params.mask = UCC_TEAM_PARAM_FIELD_EP |
+                                       UCC_TEAM_PARAM_FIELD_EP_RANGE |
+                                       UCC_TEAM_PARAM_FIELD_OOB;
+                t_params.params.oob.allgather    = ctx->params.oob.allgather;
+                t_params.params.oob.req_test     = ctx->params.oob.req_test;
+                t_params.params.oob.req_free     = ctx->params.oob.req_free;
+                t_params.params.oob.coll_info    = ctx->params.oob.coll_info;
+                t_params.params.oob.n_oob_eps    = ctx->params.oob.n_oob_eps;
+                t_params.params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+                t_params.params.ep       = ctx->rank;
+                t_params.rank            = ctx->rank;
+                /* CORE scope id - never overlaps with CL type */
+                t_params.scope    = UCC_CL_LAST + 1;
+                t_params.scope_id = 0;
+                t_params.id       = 0;
+                t_params.team     = NULL;
+                status            = UCC_TL_CTX_IFACE(ctx->service_ctx)
+                             ->team.create_post(&ctx->service_ctx->super,
+                                                &t_params, &b_team);
+                if (UCC_OK != status) {
+                    ucc_error("ctx service team create post failed");
+                    goto error_ctx_create;
+                }
+                do {
+                    status = UCC_TL_CTX_IFACE(ctx->service_ctx)
+                                 ->team.create_test(b_team);
+                } while (UCC_INPROGRESS == status);
+                if (status < 0) {
+                    ucc_error("failed to create ctx service team");
+                    goto error_ctx_create;
+                }
+                ctx->service_team = ucc_derived_of(b_team, ucc_tl_team_t);
+            }
+        } else if (config->internal_oob == 2) {
+            ucc_error("UCC_INTERNAL_OOB was force requested for context "
+                      "without OOB");
+            goto error_ctx_create;
         }
     }
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
@@ -596,7 +672,19 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     ucc_tl_context_t *tl_ctx;
     ucc_tl_lib_t     *tl_lib;
     int               i;
+    ucc_status_t      status;
 
+    if (context->service_team) {
+        while (UCC_INPROGRESS ==
+               (status = UCC_TL_CTX_IFACE(context->service_ctx)
+                             ->team.destroy(&context->service_team->super))) {
+            ucc_context_progress(context);
+        }
+        if (status < 0) {
+            ucc_error("failed to destroy ctx service team");
+        }
+        ucc_tl_context_put(context->service_ctx);
+    }
     if (UCC_OK != ucc_context_free_attr(&context->attr)) {
         ucc_error("failed to free context attributes");
     }
