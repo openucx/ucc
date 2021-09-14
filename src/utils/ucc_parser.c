@@ -41,3 +41,17 @@ void ucc_config_names_array_free(ucc_config_names_array_t *array)
     }
     ucc_free(array->names);
 }
+
+
+int ucc_config_names_search(ucc_config_names_array_t *config_names,
+                            const char *str) {
+    unsigned i;
+
+    for (i = 0; i < config_names->count; ++i) {
+        if (!strcmp(config_names->names[i], str)) {
+           return i;
+        }
+    }
+
+    return -1;
+}
