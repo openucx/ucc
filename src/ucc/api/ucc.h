@@ -1370,7 +1370,14 @@ typedef enum {
     UCC_COLL_ARGS_FLAG_PERSISTENT           = UCC_BIT(1), /*!< If set, the
                                                             collective is
                                                             considered
-                                                            persistent.*/
+                                                            persistent.
+                                                            Only, the
+                                                            persistent
+                                                            collective
+                                                            can be called
+                                                            multiple times with
+                                                            the same request.
+                                                           */
     UCC_COLL_ARGS_FLAG_COUNT_64BIT          = UCC_BIT(2), /*!< If set, the count
                                                             is 64bit, otherwise,
                                                             it is 32 bit. */
