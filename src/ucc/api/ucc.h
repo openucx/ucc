@@ -1363,12 +1363,40 @@ ucc_status_t ucc_team_get_all_eps(ucc_team_h team, uint64_t **ep,
  *  @ingroup UCC_COLLECTIVES_DT
  */
 typedef enum {
-    UCC_COLL_ARGS_FLAG_IN_PLACE             = UCC_BIT(0),
-    UCC_COLL_ARGS_FLAG_PERSISTENT           = UCC_BIT(1),
-    UCC_COLL_ARGS_FLAG_COUNT_64BIT          = UCC_BIT(2),
-    UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT  = UCC_BIT(3),
-    UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER    = UCC_BIT(4),
-    UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER    = UCC_BIT(5)
+    UCC_COLL_ARGS_FLAG_IN_PLACE             = UCC_BIT(0), /*!< If set, the
+                                                            output buffer is
+                                                            identical to the
+                                                            input buffer.*/
+    UCC_COLL_ARGS_FLAG_PERSISTENT           = UCC_BIT(1), /*!< If set, the
+                                                            collective is
+                                                            considered
+                                                            persistent.
+                                                            Only, the
+                                                            persistent
+                                                            collective
+                                                            can be called
+                                                            multiple times with
+                                                            the same request.
+                                                           */
+    UCC_COLL_ARGS_FLAG_COUNT_64BIT          = UCC_BIT(2), /*!< If set, the count
+                                                            is 64bit, otherwise,
+                                                            it is 32 bit. */
+    UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT  = UCC_BIT(3), /*!< If set, the
+                                                            displacement is
+                                                            64bit, otherwise, it
+                                                            is 32 bit. */
+    UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER    = UCC_BIT(4), /*!< If set, the src
+                                                            buffer is considered
+                                                            contiguous.
+                                                            Particularly, useful
+                                                            for alltoallv
+                                                            operation.*/
+    UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER    = UCC_BIT(5)  /*!<If set, the dst
+                                                            buffer is considered
+                                                            contiguous.
+                                                            Particularly, useful
+                                                            for alltoallv
+                                                            operation. */
 } ucc_coll_args_flags_t;
 
 /**
