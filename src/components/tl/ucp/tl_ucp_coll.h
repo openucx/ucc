@@ -57,6 +57,7 @@ typedef struct ucc_tl_ucp_task {
 //            ucc_rank_t              dist;
             ucc_rank_t              recv_dist;
 //            ucc_rank_t              vroot;
+            ptrdiff_t               send_offset;
         } scatter_kn;
         struct {
             int                     phase;
