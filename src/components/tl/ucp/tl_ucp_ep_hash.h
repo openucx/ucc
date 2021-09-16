@@ -40,7 +40,11 @@ static inline khint32_t tl_ucp_ctx_id_hash_fn(ucc_context_id_t k)
 KHASH_INIT(tl_ucp_ep_hash, ucc_context_id_t, void*, 1, \
            tl_ucp_ctx_id_hash_fn, tl_ucp_ctx_id_equal_fn);
 
+KHASH_INIT(tl_ucp_rinfo_hash, ucc_context_id_t, void **, 1,
+           tl_ucp_ctx_id_hash_fn, tl_ucp_ctx_id_equal_fn);
+
 #define tl_ucp_ep_hash_t khash_t(tl_ucp_ep_hash)
+#define tl_ucp_rinfo_hash_t khash_t(tl_ucp_rinfo_hash)
 
 static inline void* tl_ucp_hash_get(tl_ucp_ep_hash_t *h, ucc_context_id_t key)
 {
@@ -63,6 +67,28 @@ static inline void tl_ucp_hash_put(tl_ucp_ep_hash_t *h, ucc_context_id_t key,
     kh_value(h, k) = value;
 }
 
+static inline void **tl_ucp_rinfo_hash_get(tl_ucp_rinfo_hash_t *h,
+                                           ucc_context_id_t     key)
+{
+    khiter_t k;
+    void *   value;
+    k = kh_get(tl_ucp_rinfo_hash, h, key);
+    if (k == kh_end(h)) {
+        return NULL;
+    }
+    value = kh_value(h, k);
+    return value;
+}
+
+static inline void tl_ucp_rinfo_hash_put(tl_ucp_rinfo_hash_t *h,
+                                         ucc_context_id_t key, void **value)
+{
+    int      ret;
+    khiter_t k;
+    k              = kh_put(tl_ucp_rinfo_hash, h, key, &ret);
+    kh_value(h, k) = value;
+}
+
 static inline void* tl_ucp_hash_pop(tl_ucp_ep_hash_t *h)
 {
     void    *ep = NULL;
@@ -79,5 +105,23 @@ static inline void* tl_ucp_hash_pop(tl_ucp_ep_hash_t *h)
         kh_del(tl_ucp_ep_hash, h, k);
     }
     return ep;
+}
+
+static inline void **tl_ucp_hash_rinfo_pop(tl_ucp_rinfo_hash_t *h)
+{
+    void **  rinfo = NULL;
+    khiter_t k;
+    k = kh_begin(h);
+    while (k != kh_end(h)) {
+        if (kh_exist(h, k)) {
+            rinfo = kh_value(h, k);
+            break;
+        }
+        k++;
+    }
+    if (rinfo) {
+        kh_del(tl_ucp_rinfo_hash, h, k);
+    }
+    return rinfo;
 }
 #endif

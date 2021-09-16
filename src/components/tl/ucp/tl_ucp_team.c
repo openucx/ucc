@@ -23,6 +23,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->preconnect_task    = NULL;
     self->seq_num            = 0;
     self->status             = UCC_INPROGRESS;
+
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
@@ -82,7 +83,7 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
 
 ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
 {
-    ucc_tl_ucp_team_t    *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_team_t *   team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
     ucc_status_t          status;
 
@@ -93,8 +94,35 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
         status = ucc_tl_ucp_team_preconnect(team);
         if (UCC_INPROGRESS == status) {
             return UCC_INPROGRESS;
-        } else if (UCC_OK != status) {
+        }
+        else if (UCC_OK != status) {
             goto err_preconnect;
+        }
+    }
+
+    if (ctx->remote_info) {
+        ucc_context_id_t key = ucc_tl_ucp_get_rank_key(team, team->rank);
+        ucc_tl_ucp_remote_info_t **local =
+            (ucc_tl_ucp_remote_info_t **)tl_ucp_rinfo_hash_get(ctx->rinfo_hash,
+                                                               key);
+        if (NULL == local) {
+            for (int i = 0; i < team->size; i++) {
+                key = ucc_tl_ucp_get_rank_key(team, i);
+                tl_ucp_rinfo_hash_put(ctx->rinfo_hash, key,
+                                      (void **)&ctx->remote_info[i]);
+                if (i == team->rank) {
+                    for (int j = 0; j < ctx->n_rinfo_segs; j++) {
+                        team->va_base[j]     = ctx->remote_info[i][j].va_base;
+                        team->base_length[j] = ctx->remote_info[i][j].len;
+                    }
+                }
+            }
+        }
+        else {
+            for (int i = 0; i < ctx->n_rinfo_segs; i++) {
+                team->va_base[i]     = local[0][i].va_base;
+                team->base_length[i] = local[0][i].len;
+            }
         }
     }
 
@@ -152,3 +180,5 @@ err:
     ucc_coll_score_free(score);
     return status;
 }
+
+

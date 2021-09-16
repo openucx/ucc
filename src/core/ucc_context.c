@@ -266,6 +266,7 @@ static inline void ucc_copy_context_params(ucc_context_params_t *dst,
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_ID, ctx_id);
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_SYNC_TYPE,
                             sync_type);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS, mem_params);
 }
 
 static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
