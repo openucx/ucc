@@ -1021,7 +1021,7 @@ typedef enum {
 
     /**
       * When set to this value, the collective participants shall invoke the operation
-      * in the any order.
+      * in any order.
       */
     UCC_COLLECTIVE_POST_UNORDERED           = 1,
 
@@ -1033,7 +1033,7 @@ typedef enum {
 
     /**
       * When set to this value, the collective participants shall initialize the operation
-      * in the any order.
+      * in any order.
       */
     UCC_COLLECTIVE_INIT_UNORDERED           = 3,
 
@@ -1045,7 +1045,7 @@ typedef enum {
 
     /**
       * When set to this value, the collective participants shall initialize and
-      * invoke the operation in the any order.
+      * invoke the operation in any order.
       */
     UCC_COLLECTIVE_INIT_AND_POST_UNORDERED  = 5
 } ucc_post_ordering_t;
