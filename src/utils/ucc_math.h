@@ -64,4 +64,6 @@ int ucc_sort_uniq(int *array, int len, int inverse);
         (_y)     = _tmp;                                                       \
     } while (0)
 
+#define ucc_div_round_up(_n, _d) (((_n) + (_d) - 1) / (_d))
+
 #endif

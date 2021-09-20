@@ -29,11 +29,12 @@ ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     uint8_t                node_type = task->reduce_scatter_kn.p.node_type;
     ucc_knomial_pattern_t *p         = &task->reduce_scatter_kn.p;
     void                  *scratch   = task->reduce_scatter_kn.scratch;
-    void                  *sbuf      = args->src.info.buffer;
     void                  *rbuf      = args->dst.info.buffer;
     ucc_memory_type_t      mem_type  = args->dst.info.mem_type;
     size_t                 count     = args->dst.info.count;
     ucc_datatype_t         dt        = args->dst.info.datatype;
+    void                  *sbuf      = UCC_IS_INPLACE(*args) ?
+        rbuf : args->src.info.buffer;
     size_t                 dt_size   = ucc_dt_size(dt);
     size_t                 data_size = count * dt_size;
     ucc_rank_t             size      = team->size;
@@ -84,8 +85,8 @@ UCC_KN_PHASE_EXTRA:
         step_radix  = ucc_sra_kn_compute_step_radix(rank, size, p);
         block_count = ucc_sra_kn_compute_block_count(count, rank, p);
         sbuf        = (p->iteration == 0)
-                          ? ((KN_NODE_PROXY == node_type) ? args->dst.info.buffer
-                                                          : args->src.info.buffer)
+            ? ((KN_NODE_PROXY == node_type || UCC_IS_INPLACE(*args)) ?
+               args->dst.info.buffer : args->src.info.buffer)
                           : task->reduce_scatter_kn.scratch;
         for (loop_step = 1; loop_step < radix; loop_step++) {
             peer = ucc_knomial_pattern_get_loop_peer(p, rank, size, loop_step);
@@ -129,8 +130,8 @@ UCC_KN_PHASE_EXTRA:
         }
         if (task->send_posted > p->iteration * (radix - 1)) {
             sbuf       = (p->iteration == 0)
-                             ? ((KN_NODE_PROXY == node_type) ? args->dst.info.buffer
-                                                             : args->src.info.buffer)
+                ? ((KN_NODE_PROXY == node_type  || UCC_IS_INPLACE(*args)) ?
+                   args->dst.info.buffer : args->src.info.buffer)
                              : task->reduce_scatter_kn.scratch;
             rbuf       = (p->iteration != 0)
                              ? PTR_OFFSET(task->reduce_scatter_kn.scratch,
@@ -247,9 +248,6 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
             task->reduce_scatter_kn.scratch_mc_header->addr;
         if (UCC_OK != status) {
             return status;
-        }
-        if (UCC_IS_INPLACE(coll_args->args)) {
-            task->super.args.src.info.buffer = coll_args->args.dst.info.buffer;
         }
     }
 

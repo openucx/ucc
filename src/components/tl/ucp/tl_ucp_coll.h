@@ -8,7 +8,7 @@
 #define UCC_TL_UCP_COLL_H_
 
 #include "tl_ucp.h"
-#include "schedule/ucc_schedule.h"
+#include "schedule/ucc_schedule_pipelined.h"
 #include "coll_patterns/recursive_knomial.h"
 #include "components/mc/base/ucc_mc_base.h"
 #include "tl_ucp_tag.h"
@@ -116,12 +116,29 @@ static inline ucc_schedule_t *ucc_tl_ucp_get_schedule(ucc_tl_ucp_team_t *team)
     ucc_tl_ucp_context_t *ctx      = UCC_TL_UCP_TEAM_CTX(team);
     ucc_schedule_t       *schedule = ucc_mpool_get(&ctx->req_mp);
 
-    UCC_TL_UCP_PROFILE_REQUEST_NEW(schedule, "tl_ucp_task", 0);
+    UCC_TL_UCP_PROFILE_REQUEST_NEW(schedule, "tl_ucp_sched", 0);
     ucc_schedule_init(schedule, NULL, &team->super.super);
     return schedule;
 }
 
+static inline ucc_schedule_pipelined_t *
+ucc_tl_ucp_get_schedule_pipelined(ucc_tl_ucp_team_t *team)
+{
+    ucc_tl_ucp_context_t     *ctx      = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_schedule_pipelined_t *schedule = ucc_mpool_get(&ctx->req_mp);
+
+    UCC_TL_UCP_PROFILE_REQUEST_NEW(schedule, "tl_ucp_sched_p", 0);
+    return schedule;
+}
+
 static inline void ucc_tl_ucp_put_schedule(ucc_schedule_t *schedule)
+{
+    UCC_TL_UCP_PROFILE_REQUEST_FREE(schedule);
+    ucc_mpool_put(schedule);
+}
+
+static inline void
+ucc_tl_ucp_put_schedule_pipelined(ucc_schedule_pipelined_t *schedule)
 {
     UCC_TL_UCP_PROFILE_REQUEST_FREE(schedule);
     ucc_mpool_put(schedule);

@@ -34,10 +34,12 @@ void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
 ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task, ucc_coll_args_t *args,
                                 ucc_base_team_t *team)
 {
-    task->super.status = UCC_OPERATION_INITIALIZED;
-    task->ee           = NULL;
-    task->flags        = 0;
-    task->team         = team;
+    task->super.status     = UCC_OPERATION_INITIALIZED;
+    task->ee               = NULL;
+    task->flags            = 0;
+    task->team             = team;
+    task->n_deps           = 0;
+    task->n_deps_satisfied = 0;
     if (args) {
         memcpy(&task->args, args, sizeof(*args));
     }

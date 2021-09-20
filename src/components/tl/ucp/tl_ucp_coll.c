@@ -60,9 +60,7 @@ static ucc_status_t
 ucc_tl_ucp_triggered_coll_complete(ucc_coll_task_t *parent_task, //NOLINT
                                    ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-
-    tl_trace(UCC_TASK_LIB(task), "triggered collective complete. task:%p",
+    tl_trace(UCC_TASK_LIB(coll_task), "triggered collective complete. task:%p",
              coll_task);
     return ucc_mc_ee_task_end(coll_task->ee_task, coll_task->ee->ee_type);
 }
