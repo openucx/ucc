@@ -31,9 +31,9 @@ ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     void                  *scratch   = task->reduce_scatter_kn.scratch;
     void                  *sbuf      = args->src.info.buffer;
     void                  *rbuf      = args->dst.info.buffer;
-    ucc_memory_type_t      mem_type  = args->src.info.mem_type;
-    size_t                 count     = args->src.info.count;
-    ucc_datatype_t         dt        = args->src.info.datatype;
+    ucc_memory_type_t      mem_type  = args->dst.info.mem_type;
+    size_t                 count     = args->dst.info.count;
+    ucc_datatype_t         dt        = args->dst.info.datatype;
     size_t                 dt_size   = ucc_dt_size(dt);
     size_t                 data_size = count * dt_size;
     ucc_rank_t             size      = team->size;
@@ -222,11 +222,11 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
     ucc_tl_ucp_team_t *tl_team   = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         size      = tl_team->size;
     ucc_rank_t         rank      = tl_team->rank;
-    size_t             count     = coll_args->args.src.info.count;
-    ucc_datatype_t     dt        = coll_args->args.src.info.datatype;
+    size_t             count     = coll_args->args.dst.info.count;
+    ucc_datatype_t     dt        = coll_args->args.dst.info.datatype;
     size_t             dt_size   = ucc_dt_size(dt);
     size_t             data_size = count * dt_size;
-    ucc_memory_type_t  mem_type  = coll_args->args.src.info.mem_type;
+    ucc_memory_type_t  mem_type  = coll_args->args.dst.info.mem_type;
     ucc_tl_ucp_task_t *task;
     ucc_status_t       status;
 
@@ -264,7 +264,7 @@ ucc_tl_ucp_reduce_scatter_knomial_init(ucc_base_coll_args_t *coll_args,
 {
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         size    = tl_team->size;
-    size_t             count   = coll_args->args.src.info.count;
+    size_t             count   = coll_args->args.dst.info.count;
     ucc_kn_radix_t     radix;
 
     radix = ucc_min(UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.reduce_scatter_kn_radix,

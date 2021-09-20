@@ -18,9 +18,9 @@
 
 ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args = &coll_task->args;
-    ucc_tl_ucp_team_t *team = TASK_TEAM(task);
+    ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_coll_args_t   *args      = &coll_task->args;
+    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
     ucc_rank_t         myrank    = team->rank;
     ucc_rank_t         team_size = team->size;
     ucc_rank_t         root      = (ucc_rank_t)args->root;
@@ -28,16 +28,26 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t         vrank     = (myrank - root + team_size) % team_size;
     void              *rbuf      = (myrank == root) ? args->dst.info.buffer :
                                                       task->reduce_kn.scratch;
-    ucc_memory_type_t  mtype     = args->src.info.mem_type;
-    ucc_datatype_t     dt        = args->src.info.datatype;
-    size_t             count     = args->src.info.count;
-    size_t             data_size = count * ucc_dt_size(dt);
-    void              *received_vectors =
-                           PTR_OFFSET(task->reduce_kn.scratch, data_size);
-    void              *scratch_offset;
+    ucc_memory_type_t  mtype;
+    ucc_datatype_t     dt;
+    size_t             count, data_size;
+    void              *received_vectors, *scratch_offset;
     ucc_rank_t         vpeer, peer, vroot_at_level, root_at_level, pos;
     uint32_t           i;
     ucc_status_t       status;
+
+    if (root == myrank) {
+        count = args->dst.info.count;
+        data_size = count * ucc_dt_size(args->dst.info.datatype);
+        mtype = args->dst.info.mem_type;
+        dt = args->dst.info.datatype;
+    } else {
+        count = args->src.info.count;
+        data_size = count * ucc_dt_size(args->src.info.datatype);
+        mtype = args->src.info.mem_type;
+        dt = args->src.info.datatype;
+    }
+    received_vectors = PTR_OFFSET(task->reduce_kn.scratch, data_size);
 
 UCC_REDUCE_KN_PHASE_PROGRESS:
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {

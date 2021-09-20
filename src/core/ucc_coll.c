@@ -37,7 +37,41 @@ static ucc_cl_team_t *ucc_select_cl_team(ucc_coll_args_t *coll_args,
     }                                                                          \
 } while(0)
 
+#define UCC_BUFFER_INFO_CHECK_DATATYPE(_info1, _info2) do {                    \
+    if ((_info1).datatype != (_info2).datatype) {                              \
+        ucc_error("datatype missmatch");                                       \
+        return UCC_ERR_INVALID_PARAM;                                          \
+    }                                                                          \
+} while(0)
+
 #define UCC_IS_ROOT(_args, _myrank) ((_args).root == (_myrank))
+
+#if ENABLE_DEBUG == 1
+static ucc_status_t ucc_check_coll_args(const ucc_coll_args_t *coll_args,
+                                        ucc_rank_t rank)
+{
+    switch (coll_args->coll_type) {
+    case UCC_COLL_TYPE_ALLREDUCE:
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        if (!UCC_IS_INPLACE(*coll_args)) {
+            UCC_BUFFER_INFO_CHECK_DATATYPE(coll_args->src.info,
+                                           coll_args->dst.info);
+        }
+        break;
+    case UCC_COLL_TYPE_REDUCE:
+        if (!UCC_IS_INPLACE(*coll_args) && UCC_IS_ROOT(*coll_args, rank)) {
+            UCC_BUFFER_INFO_CHECK_DATATYPE(coll_args->src.info,
+                                           coll_args->dst.info);
+        }
+        break;
+    default:
+        return UCC_OK;
+    }
+    return UCC_OK;
+}
+#else
+#define ucc_check_coll_args(...) UCC_OK
+#endif
 
 static ucc_status_t ucc_coll_args_check_mem_type(ucc_coll_args_t *coll_args,
                                                  ucc_rank_t rank)
@@ -86,9 +120,7 @@ static ucc_status_t ucc_coll_args_check_mem_type(ucc_coll_args_t *coll_args,
             UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
         } else {
             UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info);
-            if (UCC_IS_INPLACE(*coll_args)) {
-                coll_args->src.info.mem_type = coll_args->dst.info.mem_type;
-        	} else {
+            if (!UCC_IS_INPLACE(*coll_args)) {
                 UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
         	}
         }
@@ -131,11 +163,18 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     ucc_coll_task_t       *task;
     ucc_base_coll_args_t   op_args;
     ucc_status_t           status;
+
     status = ucc_coll_args_check_mem_type(coll_args, team->rank);
     if (ucc_unlikely(status != UCC_OK)) {
         ucc_error("memory type detection failed");
         return status;
     }
+    status = ucc_check_coll_args(coll_args, team->rank);
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_error("collective arguments check failed");
+        return status;
+    }
+
     /* TO discuss: maybe we want to pass around user pointer ? */
     op_args.mask = 0;
     memcpy(&op_args.args, coll_args, sizeof(ucc_coll_args_t));
