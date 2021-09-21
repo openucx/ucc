@@ -117,6 +117,8 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 
 #define UCC_TL_CTX_OOB(_ctx) ((_ctx)->super.super.ucc_context->params.oob)
 
+#define IS_SERVICE_TEAM(_team) ((_team)->scope == UCC_CL_LAST + 1)
+
 // TODO remove once AVG is implemented
 #define CHECK_AVG_OP(_args, _team)                                             \
     do {                                                                       \
