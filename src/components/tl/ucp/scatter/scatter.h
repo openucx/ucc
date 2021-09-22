@@ -8,28 +8,6 @@
 #include "../tl_ucp.h"
 #include "../tl_ucp_coll.h"
 
-/* A set of convenience macros used to implement sw based progress
-   of the scatter algorithm that uses kn pattern */
-//enum {
-//    UCC_SCATTER_KN_PHASE_INIT,
-//    UCC_SCATTER_KN_PHASE_LOOP, /* main loop of recursive k-ing */
-//};
-
-/*
-#define UCC_SCATTER_KN_CHECK_PHASE(_p)                                        \
-    case _p:                                                                  \
-        goto _p;
-
-#define UCC_SCATTER_KN_GOTO_PHASE(_phase)                                     \
-    do {                                                                      \
-        switch (_phase) {                                                     \
-            UCC_SCATTER_KN_CHECK_PHASE(UCC_SCATTER_KN_PHASE_LOOP);            \
-        case UCC_SCATTER_KN_PHASE_INIT:                                       \
-            break;                                                            \
-        };                                                                    \
-    } while (0)
-    */
-
 /* Base interface signature: uses scatter_kn_radix from config. */
 
 ucc_status_t

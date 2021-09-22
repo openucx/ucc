@@ -19,8 +19,8 @@
         task->allgather_kn.phase = _phase;                                     \
     } while (0)
 
-#define VRANK(_rank, _root, _team_size) (((_rank) - (_root) + (_team_size)) % (_team_size))
-#define INV_VRANK(_rank, _root, _team_size) (((_rank) + (_root)) % (_team_size))
+//#define VRANK(_rank, _root, _team_size) (((_rank) - (_root) + (_team_size)) % (_team_size))
+//#define INV_VRANK(_rank, _root, _team_size) (((_rank) + (_root)) % (_team_size))
 
 /* #define VRANK(_rank, _root, _team_size) ((_rank) + (_root) - (_root)) */
 /* #define INV_VRANK(_rank, _root, _team_size) ((_rank) + (_root) - (_root)) */

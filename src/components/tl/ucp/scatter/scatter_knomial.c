@@ -48,12 +48,6 @@ ucc_rank_t calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
     return dist;
 }
 
-#define VRANK(_rank, _root, _team_size) (((_rank) - (_root) + (_team_size)) % (_team_size))
-#define INV_VRANK(_rank, _root, _team_size) (((_rank) + (_root)) % (_team_size))
-
-/* #define VRANK(_rank, _root, _team_size) ((_rank) + (_root) - (_root)) */
-/* #define INV_VRANK(_rank, _root, _team_size) ((_rank) + (_root) - (_root)) */
-
 ucc_status_t
 ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
@@ -90,8 +84,6 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
         goto out;
     }
 
-
-
     while (!ucc_knomial_pattern_loop_done(p)) {
         step_radix  = ucc_sra_kn_compute_step_radix(rank, size, p);
         block_count = ucc_sra_kn_compute_block_count(count, rank, p);
@@ -111,13 +103,13 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
                     continue;
                 vpeer = ucc_knomial_pattern_loop_rank(p, peer);
                 vroot = ucc_knomial_pattern_loop_rank(p, root);
-                peer_recv_dist = calc_recv_dist(team_size, vpeer, radix, vroot);
+                peer_recv_dist =
+                    calc_recv_dist(team_size, vpeer, radix, vroot);
                 if (peer_recv_dist < task->scatter_kn.recv_dist) {
-               	/* printf(" RECV, rank = %d, root = %d, task->scatter_kn.recv_dist = %d, peer_recv_dist = %d, peer = %d, vpeer = %d, p->iter = %d, len %zd \n", */
-                /*        rank, root, task->scatter_kn.recv_dist, peer_recv_dist, peer, vpeer, p->iteration, local_seg_count * dt_size); */
-                    UCPCHECK_GOTO(
-                        ucc_tl_ucp_recv_nb(rbuf, local_seg_count * dt_size,
-                                           mem_type, INV_VRANK(peer, (ucc_rank_t)args->root, size), team, task), task, out);
+                    UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(rbuf,
+                                  local_seg_count * dt_size, mem_type,
+                                  INV_VRANK(peer, (ucc_rank_t)args->root,
+                                  size), team, task), task, out);
                     goto UCC_SCATTER_KN_PHASE_LOOP;
                 }
             }
@@ -136,23 +128,16 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
                     block_count, step_radix, peer_seg_index);
                 peer_seg_offset = ucc_sra_kn_compute_seg_offset(
                     block_count, step_radix, peer_seg_index);
-               /* printf("SEND rank = %d, root = %d, task->recv_posted = %d, peer = %d, p->iter = %d, offset %zd, len %zd \n", */
-               /*        rank, root, task->recv_posted, peer, p->iteration, */
-               /*        peer_seg_offset * dt_size + task->scatter_kn.send_offset, */
-               /*        peer_seg_count * dt_size); */
-                UCPCHECK_GOTO(
-                    ucc_tl_ucp_send_nb(PTR_OFFSET(sbuf,
-                                       peer_seg_offset * dt_size + task->scatter_kn.send_offset),
-                                       peer_seg_count * dt_size, mem_type,
-                                       INV_VRANK(peer, (ucc_rank_t)args->root, size), team, task), task, out);
+                UCPCHECK_GOTO(ucc_tl_ucp_send_nb(PTR_OFFSET(sbuf,
+                    peer_seg_offset * dt_size + task->scatter_kn.send_offset),
+                    peer_seg_count * dt_size, mem_type, INV_VRANK(peer,
+                    (ucc_rank_t)args->root, size), team, task), task, out);
             }
-            local_seg_index = ucc_sra_kn_compute_seg_index(rank, p->radix_pow, p);
+            local_seg_index =
+                ucc_sra_kn_compute_seg_index(rank, p->radix_pow, p);
             offset = ucc_sra_kn_compute_seg_offset(
                 block_count, step_radix, local_seg_index);
             task->scatter_kn.send_offset += offset * dt_size;
-            /* printf("AFTER SEND: rank %d, block_count %zd, local_seg_index %d, offset %zd, total send offset %zd\n", */
-                   /* rank, block_count, (int)local_seg_index, offset, task->scatter_kn.send_offset); */
-
         }
 
 UCC_SCATTER_KN_PHASE_LOOP:
@@ -160,16 +145,13 @@ UCC_SCATTER_KN_PHASE_LOOP:
             SAVE_STATE(UCC_SCATTER_KN_PHASE_LOOP);
             return task->super.super.status;
         }
-//        SAVE_STATE(UCC_SCATTER_KN_PHASE_INIT);
-//        task->scatter_kn.dist *= radix;
         ucc_knomial_pattern_next_iteration(p);
     }
 
 
-    ucc_sra_kn_get_offset_and_seglen(count, dt_size, rank, size, radix, &offset, &local_seg_count);
-    // check of need to do memcpy at root? and not needed if offset == 0
+    ucc_sra_kn_get_offset_and_seglen(count, dt_size, rank, size, radix,
+                                     &offset, &local_seg_count);
     if (offset != 0) {
-        /* printf("rank %d, memcpy offset %zd, len %zd\n", rank, offset, local_seg_count *dt_size); */
         status = ucc_mc_memcpy(PTR_OFFSET(args->dst.info.buffer, offset),
                                PTR_OFFSET(rbuf, task->scatter_kn.send_offset),
                                local_seg_count * dt_size, mem_type, mem_type);
@@ -195,18 +177,17 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_reset(task);
 
 
-    ucc_knomial_pattern_init(team->size, VRANK(team->rank, coll_task->args.root, team->size),
-                             task->scatter_kn.p.radix,
-                             &task->scatter_kn.p);
+    ucc_knomial_pattern_init(team->size, VRANK(team->rank,
+                             coll_task->args.root, team->size),
+                             task->scatter_kn.p.radix, &task->scatter_kn.p);
     task->scatter_kn.phase = UCC_SCATTER_KN_PHASE_INIT;
-//    task->scatter_kn.dist  = 1;
-    vroot = ucc_knomial_pattern_loop_rank(p, VRANK(coll_task->args.root, coll_task->args.root, team->size));
-    vrank = ucc_knomial_pattern_loop_rank(p, VRANK(team->rank, coll_task->args.root, team->size));
+    vroot = ucc_knomial_pattern_loop_rank(p, VRANK(coll_task->args.root,
+                                          coll_task->args.root, team->size));
+    vrank = ucc_knomial_pattern_loop_rank(p, VRANK(team->rank,
+                                          coll_task->args.root, team->size));
     task->scatter_kn.recv_dist = calc_recv_dist(team->size - p->n_extra, vrank,
                                                 p->radix, vroot);
     task->scatter_kn.send_offset = 0;
-   /* printf("rank = %d, vrank = %d, root = %ld, vroot = %d, recv_dst = %d, radix = %d \n", */
-   /* 		team->rank, vrank, coll_task->args.root, vroot, task->scatter_kn.recv_dist, p->radix); */
 
     status = ucc_tl_ucp_scatter_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {
