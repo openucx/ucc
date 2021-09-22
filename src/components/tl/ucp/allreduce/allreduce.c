@@ -26,7 +26,7 @@ ucc_base_coll_alg_info_t
 ucc_status_t ucc_tl_ucp_allreduce_init(ucc_tl_ucp_task_t *task)
 {
     ucc_status_t status;
-    ALLREDUCE_TASK_CHECK(task->super.args, TASK_TEAM(task));
+    ALLREDUCE_TASK_CHECK(TASK_ARGS(task), TASK_TEAM(task));
     status = ucc_tl_ucp_allreduce_knomial_init_common(task);
 out:
     return status;

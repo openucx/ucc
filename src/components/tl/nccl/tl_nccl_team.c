@@ -169,7 +169,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     ucc_status_t status;
 
     task = ucc_mpool_get(&nccl_ctx->req_mp);
-    ucc_coll_task_init(&task->super, &coll_args->args, team);
+    ucc_coll_task_init(&task->super, coll_args, team);
     task->super.finalize       = ucc_tl_nccl_coll_finalize;
     task->super.triggered_post = ucc_tl_nccl_triggered_post;
     task->completed            = NULL;

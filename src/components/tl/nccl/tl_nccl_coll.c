@@ -97,7 +97,7 @@ ucc_status_t ucc_tl_nccl_collective_sync(ucc_tl_nccl_task_t *task,
 ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
     ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
@@ -133,12 +133,12 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_IS_INPLACE(task->super.args)) {
+    if (UCC_IS_INPLACE(TASK_ARGS(task))) {
         tl_error(UCC_TASK_LIB(task), "inplace alltoallv is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((task->super.args.src.info.datatype == UCC_DT_USERDEFINED) ||
-        (task->super.args.dst.info.datatype == UCC_DT_USERDEFINED)) {
+    if ((TASK_ARGS(task).src.info.datatype == UCC_DT_USERDEFINED) ||
+        (TASK_ARGS(task).dst.info.datatype == UCC_DT_USERDEFINED)) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -149,7 +149,7 @@ ucc_status_t ucc_tl_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
 ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
     ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
@@ -191,12 +191,12 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_alltoallv_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_IS_INPLACE(task->super.args)) {
+    if (UCC_IS_INPLACE(TASK_ARGS(task))) {
         tl_error(UCC_TASK_LIB(task), "inplace alltoall is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((task->super.args.src.info_v.datatype == UCC_DT_USERDEFINED) ||
-        (task->super.args.dst.info_v.datatype == UCC_DT_USERDEFINED)) {
+    if ((TASK_ARGS(task).src.info_v.datatype == UCC_DT_USERDEFINED) ||
+        (TASK_ARGS(task).dst.info_v.datatype == UCC_DT_USERDEFINED)) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -207,7 +207,7 @@ ucc_status_t ucc_tl_nccl_alltoallv_init(ucc_tl_nccl_task_t *task)
 ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
     ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
@@ -230,15 +230,15 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
 {
-    if ((task->super.args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
-        (ucc_to_nccl_reduce_op[task->super.args.reduce.predefined_op] ==
+    if ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
+        (ucc_to_nccl_reduce_op[TASK_ARGS(task).reduce.predefined_op] ==
          ncclOpUnsupported)) {
         tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     if (UCC_OK !=
-        ucc_nccl_check_dt_supported(task->super.args.dst.info.datatype,
-                                    task->super.args.dst.info.datatype)) {
+        ucc_nccl_check_dt_supported(TASK_ARGS(task).dst.info.datatype,
+                                    TASK_ARGS(task).dst.info.datatype)) {
         tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -249,7 +249,7 @@ ucc_status_t ucc_tl_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
 ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
     ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
@@ -274,10 +274,10 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_allgather_init(ucc_tl_nccl_task_t *task)
 {
-    ucc_datatype_t dt1 = UCC_IS_INPLACE(task->super.args)
-                             ? task->super.args.dst.info.datatype
-                             : task->super.args.src.info.datatype;
-    ucc_datatype_t dt2 = task->super.args.dst.info.datatype;
+    ucc_datatype_t dt1 = UCC_IS_INPLACE(TASK_ARGS(task))
+                             ? TASK_ARGS(task).dst.info.datatype
+                             : TASK_ARGS(task).src.info.datatype;
+    ucc_datatype_t dt2 = TASK_ARGS(task).dst.info.datatype;
 
     if (UCC_OK != ucc_nccl_check_dt_supported(dt1, dt2)) {
         /* TODO: can we use ncclChar if datatype is not supported? */
@@ -291,7 +291,7 @@ ucc_status_t ucc_tl_nccl_allgather_init(ucc_tl_nccl_task_t *task)
 ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
     ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
@@ -332,12 +332,12 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_IS_INPLACE(task->super.args)) {
+    if (UCC_IS_INPLACE(TASK_ARGS(task))) {
         tl_error(UCC_TASK_LIB(task), "inplace allgatherv is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((task->super.args.src.info_v.datatype == UCC_DT_USERDEFINED) ||
-        (task->super.args.dst.info_v.datatype == UCC_DT_USERDEFINED)) {
+    if ((TASK_ARGS(task).src.info_v.datatype == UCC_DT_USERDEFINED) ||
+        (TASK_ARGS(task).dst.info_v.datatype == UCC_DT_USERDEFINED)) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -348,7 +348,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
 ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
     ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
@@ -370,8 +370,8 @@ exit_coll:
 ucc_status_t ucc_tl_nccl_bcast_init(ucc_tl_nccl_task_t *task)
 {
     if (UCC_OK !=
-        ucc_nccl_check_dt_supported(task->super.args.src.info.datatype,
-                                    task->super.args.src.info.datatype)) {
+        ucc_nccl_check_dt_supported(TASK_ARGS(task).src.info.datatype,
+                                    TASK_ARGS(task).src.info.datatype)) {
         /* TODO: can we use ncclChar if datatype is not supported? */
         tl_error(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
@@ -383,7 +383,7 @@ ucc_status_t ucc_tl_nccl_bcast_init(ucc_tl_nccl_task_t *task)
 ucc_status_t ucc_tl_nccl_reduce_scatter_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args   = &coll_task->args;
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
     ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
@@ -411,15 +411,15 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_reduce_scatter_init(ucc_tl_nccl_task_t *task)
 {
-    if ((task->super.args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
-        (ucc_to_nccl_reduce_op[task->super.args.reduce.predefined_op] ==
+    if ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
+        (ucc_to_nccl_reduce_op[TASK_ARGS(task).reduce.predefined_op] ==
          ncclOpUnsupported)) {
         tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     if (UCC_OK !=
-        ucc_nccl_check_dt_supported(task->super.args.dst.info.datatype,
-                                    task->super.args.dst.info.datatype)) {
+        ucc_nccl_check_dt_supported(TASK_ARGS(task).dst.info.datatype,
+                                    TASK_ARGS(task).dst.info.datatype)) {
         tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -430,7 +430,7 @@ ucc_status_t ucc_tl_nccl_reduce_scatter_init(ucc_tl_nccl_task_t *task)
 ucc_status_t ucc_tl_nccl_reduce_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task    = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args    = &coll_task->args;
+    ucc_coll_args_t    *args    = &TASK_ARGS(task);
     ucc_tl_nccl_team_t *team    = TASK_TEAM(task);
     ucc_ee_h            ee      = coll_task->ee;
     cudaStream_t        stream  = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
@@ -444,8 +444,8 @@ ucc_status_t ucc_tl_nccl_reduce_start(ucc_coll_task_t *coll_task)
     ncclDataType_t      nccl_dt;
 
     if (args->root == team->rank) {
-        ucc_dt = task->super.args.dst.info.datatype;
-        count = task->super.args.dst.info.count;
+        ucc_dt = TASK_ARGS(task).dst.info.datatype;
+        count = TASK_ARGS(task).dst.info.count;
         if (UCC_IS_INPLACE(*args)) {
             src = args->dst.info.buffer;
         }
@@ -462,12 +462,12 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
 {
-    ucc_datatype_t dt = (task->super.args.root == TASK_TEAM(task)->rank) ?
-                           task->super.args.dst.info.datatype:
-                           task->super.args.src.info.datatype;
+    ucc_datatype_t dt = (TASK_ARGS(task).root == TASK_TEAM(task)->rank) ?
+                           TASK_ARGS(task).dst.info.datatype:
+                           TASK_ARGS(task).src.info.datatype;
 
-    if ((task->super.args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
-        (ucc_to_nccl_reduce_op[task->super.args.reduce.predefined_op] ==
+    if ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
+        (ucc_to_nccl_reduce_op[TASK_ARGS(task).reduce.predefined_op] ==
          ncclOpUnsupported)) {
         tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
         return UCC_ERR_NOT_SUPPORTED;

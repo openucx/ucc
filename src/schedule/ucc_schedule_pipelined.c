@@ -134,7 +134,7 @@ ucc_status_t ucc_schedule_pipelined_init(
                   n_frags, UCC_SCHEDULE_PIPELINED_MAX_FRAGS);
         return UCC_ERR_INVALID_PARAM;
     }
-    ucc_schedule_init(&schedule->super, &coll_args->args, team);
+    ucc_schedule_init(&schedule->super, coll_args, team);
     schedule->super.n_tasks        = n_frags_total;
     schedule->n_frags              = n_frags;
     schedule->sequential           = sequential;

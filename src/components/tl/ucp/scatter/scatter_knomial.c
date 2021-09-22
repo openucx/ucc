@@ -53,7 +53,7 @@ ucc_status_t
 ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t       *args = &coll_task->args;
+    ucc_coll_args_t       *args = &TASK_ARGS(task);
     ucc_tl_ucp_team_t     *team = TASK_TEAM(task);
     ucc_kn_radix_t         radix     = task->scatter_kn.p.radix;
     uint8_t                node_type = task->scatter_kn.p.node_type;
@@ -185,20 +185,19 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t     *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t     *team = TASK_TEAM(task);
     ucc_knomial_pattern_t *p    = &task->scatter_kn.p;
-    ucc_rank_t             vrank, vroot;
+    ucc_rank_t             vrank, vroot, root;
     ucc_status_t           status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_scatter_kn_start", 0);
     ucc_tl_ucp_task_reset(task);
 
-    ucc_knomial_pattern_init(team->size, VRANK(team->rank,
-                             coll_task->args.root, team->size),
+    root = coll_task->bargs.args.root;
+    ucc_knomial_pattern_init(team->size, VRANK(team->rank, root, team->size),
                              task->scatter_kn.p.radix, &task->scatter_kn.p);
     task->scatter_kn.phase = UCC_SCATTER_KN_PHASE_INIT;
-    vroot = ucc_knomial_pattern_loop_rank(p, VRANK(coll_task->args.root,
-                                          coll_task->args.root, team->size));
-    vrank = ucc_knomial_pattern_loop_rank(p, VRANK(team->rank,
-                                          coll_task->args.root, team->size));
+    vroot = ucc_knomial_pattern_loop_rank(p, VRANK(root, root, team->size));
+    vrank = ucc_knomial_pattern_loop_rank(p, VRANK(team->rank, root,
+                                                   team->size));
     task->scatter_kn.recv_dist = calc_recv_dist(team->size - p->n_extra, vrank,
                                                 p->radix, vroot);
     task->scatter_kn.send_offset = 0;

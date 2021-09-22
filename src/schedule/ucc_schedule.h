@@ -10,6 +10,7 @@
 #include "utils/ucc_log.h"
 #include "utils/ucc_lock_free_queue.h"
 #include "utils/ucc_coll_utils.h"
+#include "components/base/ucc_base_iface.h"
 
 #define MAX_LISTENERS 4
 
@@ -47,8 +48,8 @@ enum {
 typedef struct ucc_coll_task {
     ucc_coll_req_t               super;
     uint32_t                     flags;
-    ucc_coll_args_t              args;
-    ucc_base_team_t             *team;
+    ucc_base_coll_args_t         bargs;
+    ucc_base_team_t             *team; //CL/TL team pointer
     ucc_coll_post_fn_t           post;
     ucc_coll_triggered_post_fn_t triggered_post;
     ucc_coll_finalize_fn_t       finalize;
@@ -87,8 +88,8 @@ typedef struct ucc_schedule {
 
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em);
 
-ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task, ucc_coll_args_t *args,
-                                ucc_base_team_t *team);
+ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
+                                ucc_base_coll_args_t *args, ucc_base_team_t *team);
 
 void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
                                  ucc_coll_task_t *task,
@@ -97,7 +98,7 @@ void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
 ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event);
 
-ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_coll_args_t *args,
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_base_coll_args_t *bargs,
                                ucc_base_team_t *team);
 
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);

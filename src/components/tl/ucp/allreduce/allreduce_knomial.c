@@ -22,7 +22,7 @@
 ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t       *args = &coll_task->args;
+    ucc_coll_args_t       *args = &TASK_ARGS(task);
     ucc_tl_ucp_team_t     *team = TASK_TEAM(task);
     ucc_kn_radix_t         radix     = task->allreduce_kn.p.radix;
     uint8_t                node_type = task->allreduce_kn.p.node_type;
@@ -172,8 +172,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
 
     task->allreduce_kn.phase = UCC_KN_PHASE_INIT;
-    ucc_assert(coll_task->args.src.info.mem_type ==
-               coll_task->args.dst.info.mem_type);
+    ucc_assert(TASK_ARGS(task).src.info.mem_type ==
+               TASK_ARGS(task).dst.info.mem_type);
     ucc_knomial_pattern_init(size, rank,
                              ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
                                      cfg.allreduce_kn_radix, size),
@@ -190,8 +190,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
 {
-    size_t             count     = task->super.args.dst.info.count;
-    ucc_datatype_t     dt        = task->super.args.dst.info.datatype;
+    size_t             count     = TASK_ARGS(task).dst.info.count;
+    ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
     size_t             data_size = count * ucc_dt_size(dt);
     ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
     ucc_kn_radix_t     radix =
@@ -203,7 +203,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
     task->super.finalize = ucc_tl_ucp_allreduce_knomial_finalize;
     status               = ucc_mc_alloc(&task->allreduce_kn.scratch_mc_header,
                           (radix - 1) * data_size,
-                          task->super.args.dst.info.mem_type);
+                          TASK_ARGS(task).dst.info.mem_type);
     task->allreduce_kn.scratch = task->allreduce_kn.scratch_mc_header->addr;
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TASK_LIB(task), "failed to allocate scratch buffer");

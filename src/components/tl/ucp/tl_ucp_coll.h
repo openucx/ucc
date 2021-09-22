@@ -90,6 +90,7 @@ typedef struct ucc_tl_ucp_task {
     (ucc_derived_of((_task)->super.team->context, ucc_tl_ucp_context_t))
 #define TASK_LIB(_task)                                                        \
     (ucc_derived_of((_task)->super.team->context->lib, ucc_tl_ucp_lib_t))
+#define TASK_ARGS(_task) (_task)->super.bargs.args
 
 static inline void ucc_tl_ucp_task_reset(ucc_tl_ucp_task_t *task)
 {
@@ -171,7 +172,7 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
 
-    ucc_coll_task_init(&task->super, &coll_args->args, team);
+    ucc_coll_task_init(&task->super, coll_args, team);
     task->tag            = tl_team->seq_num;
     tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
     task->super.finalize = ucc_tl_ucp_coll_finalize;

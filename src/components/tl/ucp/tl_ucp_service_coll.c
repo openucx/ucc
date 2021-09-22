@@ -16,27 +16,30 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           ucc_team_subset_t subset,
                                           ucc_coll_task_t **task_p)
 {
-    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
-    ucc_status_t status;
-    ucc_coll_args_t args = {
-        .coll_type            = UCC_COLL_TYPE_ALLREDUCE,
-        .mask                 = UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS,
-        .reduce.predefined_op = op,
-        .src.info = {
-            .buffer   = sbuf,
-            .count    = count,
-            .datatype = dt,
-            .mem_type = UCC_MEMORY_TYPE_HOST
-        },
-        .dst.info = {
-            .buffer   = rbuf,
-            .count    = count,
-            .datatype = dt,
-            .mem_type = UCC_MEMORY_TYPE_HOST
+    ucc_tl_ucp_team_t   *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_task_t   *task    = ucc_tl_ucp_get_task(tl_team);
+    ucc_base_coll_args_t bargs   = {
+        .args = {
+            .coll_type            = UCC_COLL_TYPE_ALLREDUCE,
+            .mask                 = UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS,
+            .reduce.predefined_op = op,
+            .src.info = {
+                .buffer   = sbuf,
+                .count    = count,
+                .datatype = dt,
+                .mem_type = UCC_MEMORY_TYPE_HOST
+            },
+            .dst.info = {
+                .buffer   = rbuf,
+                .count    = count,
+                .datatype = dt,
+                .mem_type = UCC_MEMORY_TYPE_HOST
+            }
         }
     };
-    status = ucc_coll_task_init(&task->super, &args, team);
+    ucc_status_t status;
+
+    status = ucc_coll_task_init(&task->super, &bargs, team);
     if (status != UCC_OK) {
         goto free_task;
     }
@@ -69,25 +72,28 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
                                           ucc_team_subset_t subset,
                                           ucc_coll_task_t **task_p)
 {
-    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
-    ucc_status_t       status;
-
-    int in_place =
+    ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_task_t   *task     = ucc_tl_ucp_get_task(tl_team);
+    int                  in_place =
         (sbuf == PTR_OFFSET(rbuf, msgsize * ucc_ep_map_eval(subset.map,
                                                             subset.myrank)));
-    ucc_coll_args_t args = {.coll_type = UCC_COLL_TYPE_ALLGATHER,
-                            .mask = in_place ? UCC_COLL_ARGS_FLAG_IN_PLACE : 0,
-                            .src.info = {.buffer   = sbuf,
-                                         .count    = msgsize,
-                                         .datatype = UCC_DT_UINT8,
-                                         .mem_type = UCC_MEMORY_TYPE_HOST},
-                            .dst.info = {.buffer   = rbuf,
-                                         .count    = msgsize * subset.map.ep_num,
-                                         .datatype = UCC_DT_UINT8,
-                                         .mem_type = UCC_MEMORY_TYPE_HOST}};
+    ucc_base_coll_args_t bargs    = {
+        .args = {
+            .coll_type = UCC_COLL_TYPE_ALLGATHER,
+            .mask      = in_place ? UCC_COLL_ARGS_FLAG_IN_PLACE : 0,
+            .src.info = {.buffer   = sbuf,
+                         .count    = msgsize,
+                         .datatype = UCC_DT_UINT8,
+                         .mem_type = UCC_MEMORY_TYPE_HOST},
+            .dst.info = {.buffer   = rbuf,
+                         .count    = msgsize * subset.map.ep_num,
+                         .datatype = UCC_DT_UINT8,
+                         .mem_type = UCC_MEMORY_TYPE_HOST}
+        }
+    };
+    ucc_status_t       status;
 
-    status               = ucc_coll_task_init(&task->super, &args, team);
+    status               = ucc_coll_task_init(&task->super, &bargs, team);
     if (status != UCC_OK) {
         goto free_task;
     }

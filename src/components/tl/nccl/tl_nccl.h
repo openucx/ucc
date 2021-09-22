@@ -78,6 +78,7 @@ typedef struct ucc_tl_nccl_task {
     (ucc_derived_of((_task)->super.team->context, ucc_tl_nccl_context_t))
 #define TASK_LIB(_task)                                                        \
     (ucc_derived_of((_task)->super.team->context->lib, ucc_tl_nccl_lib_t))
+#define TASK_ARGS(_task) (_task)->super.bargs.args
 
 #define UCC_TL_NCCL_SUPPORTED_COLLS                                            \
     (UCC_COLL_TYPE_ALLTOALL       | UCC_COLL_TYPE_ALLTOALLV  |                 \

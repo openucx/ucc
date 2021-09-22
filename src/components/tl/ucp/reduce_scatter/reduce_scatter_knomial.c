@@ -23,7 +23,7 @@ ucc_status_t
 ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t       *args  = &coll_task->args;
+    ucc_coll_args_t       *args  = &TASK_ARGS(task);
     ucc_tl_ucp_team_t     *team  = TASK_TEAM(task);
     ucc_kn_radix_t         radix = task->reduce_scatter_kn.p.radix;
     uint8_t                node_type = task->reduce_scatter_kn.p.node_type;
@@ -178,7 +178,7 @@ out:
 ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args = &coll_task->args;
+    ucc_coll_args_t   *args = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team = TASK_TEAM(task);
     ucc_status_t       status;
     uint8_t            node_type;
@@ -210,7 +210,7 @@ ucc_tl_ucp_reduce_scatter_knomial_finalize(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     uint8_t            node_type = task->reduce_scatter_kn.p.node_type;
 
-    if (UCC_IS_INPLACE(coll_task->args) || (KN_NODE_PROXY == node_type)) {
+    if (UCC_IS_INPLACE(TASK_ARGS(task)) || (KN_NODE_PROXY == node_type)) {
         ucc_mc_free(task->reduce_scatter_kn.scratch_mc_header);
     }
     return ucc_tl_ucp_coll_finalize(coll_task);

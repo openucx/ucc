@@ -60,7 +60,7 @@ ucc_tl_ucp_allreduce_sra_knomial_frag_finalize(ucc_coll_task_t *task)
 static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_setup(
     ucc_schedule_pipelined_t *schedule_p, ucc_schedule_t *frag, int frag_num)
 {
-    ucc_coll_args_t *args    = &schedule_p->super.super.args;
+    ucc_coll_args_t *args    = &schedule_p->super.super.bargs.args;
     ucc_datatype_t   dt      = args->src.info.datatype;
     size_t           dt_size = ucc_dt_size(dt);
     ucc_coll_args_t *targs;
@@ -74,7 +74,7 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_setup(
         offset -= left - frag_num;
     }
 
-    targs = &frag->tasks[0]->args; //REDUCE_SCATTER
+    targs = &frag->tasks[0]->bargs.args; //REDUCE_SCATTER
     targs->src.info.buffer =
         PTR_OFFSET(args->src.info.buffer, offset * dt_size);
     targs->dst.info.buffer =
@@ -82,7 +82,7 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_setup(
     targs->src.info.count = frag_count;
     targs->dst.info.count = frag_count;
 
-    targs                  = &frag->tasks[1]->args; //ALLGATHER
+    targs                  = &frag->tasks[1]->bargs.args; //ALLGATHER
     targs->src.info.buffer = NULL;
     targs->dst.info.buffer =
         PTR_OFFSET(args->dst.info.buffer, offset * dt_size);
@@ -105,7 +105,8 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
     ucc_status_t         status;
     ucc_kn_radix_t       radix, cfg_radix;
 
-    ucc_schedule_init(schedule, &coll_args->args, team);
+
+    ucc_schedule_init(schedule, coll_args, team);
     cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sra_kn_radix;
     radix = ucc_knomial_pattern_get_min_radix(cfg_radix, tl_team->size, count);
 

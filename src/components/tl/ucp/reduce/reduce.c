@@ -13,7 +13,7 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_finalize(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_ucp_reduce_init(ucc_tl_ucp_task_t *task)
 {
-    ucc_coll_args_t   *args      = &task->super.args;
+    ucc_coll_args_t   *args      = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
     ucc_rank_t         myrank    = team->rank;
     ucc_rank_t         team_size = team->size;

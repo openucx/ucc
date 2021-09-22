@@ -27,10 +27,10 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
-    ptrdiff_t          sbuf  = (ptrdiff_t)coll_task->args.src.info.buffer;
-    ptrdiff_t          rbuf  = (ptrdiff_t)coll_task->args.dst.info.buffer;
-    ucc_memory_type_t  smem  = coll_task->args.src.info.mem_type;
-    ucc_memory_type_t  rmem  = coll_task->args.dst.info.mem_type;
+    ptrdiff_t          sbuf  = (ptrdiff_t)TASK_ARGS(task).src.info.buffer;
+    ptrdiff_t          rbuf  = (ptrdiff_t)TASK_ARGS(task).dst.info.buffer;
+    ucc_memory_type_t  smem  = TASK_ARGS(task).src.info.mem_type;
+    ucc_memory_type_t  rmem  = TASK_ARGS(task).dst.info.mem_type;
     ucc_rank_t         grank = team->rank;
     ucc_rank_t         gsize = team->size;
     ucc_rank_t         peer;
@@ -40,8 +40,8 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_progress(ucc_coll_task_t *coll_task)
 
     posts     = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoall_pairwise_num_posts;
     nreqs     = (posts > gsize || posts == 0) ? gsize : posts;
-    data_size = (size_t)(coll_task->args.src.info.count / gsize) *
-                ucc_dt_size(coll_task->args.src.info.datatype);
+    data_size = (size_t)(TASK_ARGS(task).src.info.count / gsize) *
+                ucc_dt_size(TASK_ARGS(task).src.info.datatype);
     while ((task->send_posted < gsize || task->recv_posted < gsize) &&
            (polls++ < task->n_polls)) {
         ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker);
@@ -94,7 +94,7 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_start(ucc_coll_task_t *coll_task)
 ucc_status_t ucc_tl_ucp_alltoall_pairwise_init_common(ucc_tl_ucp_task_t *task)
 {
     ucc_tl_ucp_team_t *team = TASK_TEAM(task);
-    ucc_coll_args_t   *args = &task->super.args;
+    ucc_coll_args_t   *args = &TASK_ARGS(task);
     size_t data_size;
 
     task->super.post     = ucc_tl_ucp_alltoall_pairwise_start;
