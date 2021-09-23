@@ -5,6 +5,7 @@
 #include "ucc_schedule.h"
 #include "utils/ucc_compiler_def.h"
 #include "components/base/ucc_base_iface.h"
+#include "coll_score/ucc_coll_score.h"
 
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em)
 {

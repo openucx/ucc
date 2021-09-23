@@ -53,7 +53,7 @@ UCC_TEST_F(test_score, add_range_sorted)
     ucc_msg_range_t *range;
     size_t           expected[4] = {0, 20, 50, 100};
     size_t *         e           = expected;
-    ucc_list_for_each(range, list, list_elem)
+    ucc_list_for_each(range, list, super.list_elem)
     {
         EXPECT_EQ(*e, range->start);
         e++;
@@ -89,10 +89,10 @@ ucc_status_t test_score::check_range(ucc_coll_score_t *   score,
     if (check.size() != ucc_list_length(list)) {
         return UCC_ERR_NO_MESSAGE;
     }
-    ucc_list_for_each(range, list, list_elem)
+    ucc_list_for_each(range, list, super.list_elem)
     {
         if (range->start != std::get<0>(*r) || range->end != std::get<1>(*r) ||
-            range->score != std::get<2>(*r)) {
+            range->super.score != std::get<2>(*r)) {
             return UCC_ERR_NO_MESSAGE;
         }
         r++;
@@ -105,16 +105,16 @@ ucc_status_t test_score::check_fallback(ucc_coll_score_t *   score,
                                         ucc_memory_type_t    m,
                                         std::vector<std::vector<fallback_t> > check)
 {
-    ucc_list_link_t    *list = &score->scores[ucc_ilog2(c)][m];
-    auto                fb   = check.begin();
-    ucc_list_link_t    *fallback;
-    ucc_msg_range_t    *range;
-    ucc_msg_range_fb_t *fb_r;
+    ucc_list_link_t  *list = &score->scores[ucc_ilog2(c)][m];
+    auto              fb   = check.begin();
+    ucc_list_link_t  *fallback;
+    ucc_msg_range_t  *range;
+    ucc_coll_entry_t *fb_r;
 
     if (check.size() != ucc_list_length(list)) {
         return UCC_ERR_NO_MESSAGE;
     }
-    ucc_list_for_each(range, list, list_elem)
+    ucc_list_for_each(range, list, super.list_elem)
     {
         fallback = &range->fallback;
 

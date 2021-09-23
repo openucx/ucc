@@ -5,6 +5,8 @@
  */
 #include "ucc_coll_score.h"
 #include "utils/ucc_coll_utils.h"
+#include "schedule/ucc_schedule.h"
+
 typedef struct ucc_score_map {
     ucc_coll_score_t *score;
 } ucc_score_map_t;
@@ -55,7 +57,7 @@ ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t      *map,
         msgsize = 0;
     }
     list = &map->score->scores[ct][mt];
-    ucc_list_for_each(r, list, list_elem) {
+    ucc_list_for_each(r, list, super.list_elem) {
         if (msgsize >= r->start && msgsize < r->end) {
             *range = r;
             return UCC_OK;
@@ -64,23 +66,23 @@ ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t      *map,
     return UCC_ERR_NOT_SUPPORTED;
 }
 
-ucc_status_t ucc_coll_score_map_init(ucc_score_map_t      *map,
-                                     ucc_base_coll_args_t *bargs,
-                                     ucc_coll_task_t     **task)
+ucc_status_t ucc_coll_init(ucc_score_map_t      *map,
+                           ucc_base_coll_args_t *bargs,
+                           ucc_coll_task_t     **task)
 {
-    ucc_msg_range_t    *r;
-    ucc_msg_range_fb_t *fb;
-    ucc_status_t        status;
-    ucc_base_team_t    *team;
+    ucc_msg_range_t  *r;
+    ucc_coll_entry_t *fb;
+    ucc_base_team_t  *team;
+    ucc_status_t      status;
 
     status = ucc_coll_score_map_lookup(map, bargs, &r);
     if (UCC_OK != status) {
         return status;
     }
 
-    team   = r->team;
-    status = r->init(bargs, team, task);
-    fb     = ucc_list_head(&r->fallback, ucc_msg_range_fb_t, list_elem);
+    team   = r->super.team;
+    status = r->super.init(bargs, team, task);
+    fb     = ucc_list_head(&r->fallback, ucc_coll_entry_t, list_elem);
 
     while (&fb->list_elem != &r->fallback &&
            (status == UCC_ERR_NOT_SUPPORTED ||
@@ -90,7 +92,7 @@ ucc_status_t ucc_coll_score_map_init(ucc_score_map_t      *map,
                   fb->team->context->lib->log_component.name);
         team   = fb->team;
         status = fb->init(bargs, team, task);
-        fb     = ucc_list_next(&fb->list_elem, ucc_msg_range_fb_t, list_elem);
+        fb     = ucc_list_next(&fb->list_elem, ucc_coll_entry_t, list_elem);
     }
 
     return status;

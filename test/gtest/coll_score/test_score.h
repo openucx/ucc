@@ -29,7 +29,7 @@ typedef std::tuple<ucc_score_t, uint64_t>       fallback_t;
                           [UCC_MEMORY_TYPE_##_mt]                              \
                               .next;                                           \
         ucc_msg_range_t *range =                                               \
-            ucc_container_of(l, ucc_msg_range_t, list_elem);                   \
+            ucc_container_of(l, ucc_msg_range_t, super.list_elem);             \
         range;                                                                 \
     })
 

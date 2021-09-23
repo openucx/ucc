@@ -4,6 +4,7 @@
  */
 #include "ucc_schedule.h"
 #include "ucc_schedule_pipelined.h"
+#include "coll_score/ucc_coll_score.h"
 
 static ucc_status_t ucc_frag_start_handler(ucc_coll_task_t *parent,
                                            ucc_coll_task_t *task)

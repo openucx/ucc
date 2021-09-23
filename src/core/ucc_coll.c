@@ -14,6 +14,7 @@
 #include "utils/ucc_time.h"
 #include "utils/profile/ucc_profile_core.h"
 #include "schedule/ucc_schedule.h"
+#include "coll_score/ucc_coll_score.h"
 
 /* NOLINTNEXTLINE  */
 static ucc_cl_team_t *ucc_select_cl_team(ucc_coll_args_t *coll_args,
@@ -212,6 +213,7 @@ ucc_status_t ucc_collective_post(ucc_coll_req_h request)
     if (UCC_COLL_TIMEOUT_REQUIRED(task->args)) {
         task->start_time = ucc_get_time();
     }
+
     return task->post(task);
 }
 
