@@ -1391,12 +1391,21 @@ typedef enum {
                                                             Particularly, useful
                                                             for alltoallv
                                                             operation.*/
-    UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER    = UCC_BIT(5)  /*!<If set, the dst
+    UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER    = UCC_BIT(5), /*!<If set, the dst
                                                             buffer is considered
                                                             contiguous.
                                                             Particularly, useful
                                                             for alltoallv
                                                             operation. */
+    UCC_COLL_ARGS_FLAG_TIMEOUT              = UCC_BIT(6)  /*!<If set and the elapsed
+                                                            time after @ref ucc_collective_post
+                                                            (or @ref ucc_collective_triggered_post)
+                                                            is greater than @ref ucc_coll_args_t.timeout,
+                                                            the library returns UCC_ERR_TIMED_OUT
+                                                            on the calling thread.
+                                                            Note, the status is not guaranteed
+                                                            to be global on all the processes
+                                                            participating in the collective.*/
 } ucc_coll_args_flags_t;
 
 /**
@@ -1521,6 +1530,7 @@ typedef struct ucc_coll_args {
     ucc_error_type_t                error_type; /*!< Error type */
     ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
     ucc_coll_callback_t             cb;
+    double                          timeout; /*!< Timeout in seconds */
 } ucc_coll_args_t;
 
 /**

@@ -225,7 +225,7 @@ public:
     UccReq(UccTeam_h _team, UccCollCtxVec args);
     ~UccReq();
     void start(void);
-    void wait();
+    ucc_status_t wait();
     ucc_status_t test(void);
     static void waitall(std::vector<UccReq> &reqs);
     static void startall(std::vector<UccReq> &reqs);

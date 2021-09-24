@@ -9,6 +9,7 @@
 #include "utils/ucc_list.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_lock_free_queue.h"
+#include "utils/ucc_coll_utils.h"
 
 #define MAX_LISTENERS 4
 
@@ -68,6 +69,8 @@ typedef struct ucc_coll_task {
     uint8_t n_deps;
     uint8_t n_deps_satisfied;
     uint8_t n_deps_base;
+    double  start_time; /* timestamp of the start time:
+                           either post or triggered_post */
 } ucc_coll_task_t;
 
 typedef struct ucc_context ucc_context_t;
@@ -116,8 +119,16 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
     } else {
         /* error in task status */
-        ucc_error("failure in task %p, %s", task,
-                  ucc_status_string(task->super.status));
+        if (UCC_ERR_TIMED_OUT == status) {
+            //char coll_str[256];
+            //            ucc_coll_str(&task->bargs, coll_str, sizeof(coll_str));
+            //TODO: coll str desc will printed when rebased on top of fallback PR
+            ucc_warn("timeout %g sec has expired on task %p",
+                     task->args.timeout, task);
+        } else {
+            ucc_error("failure in task %p, %s", task,
+                      ucc_status_string(task->super.status));
+        }
         ucc_assert(task->super.status < 0);
         ucc_event_manager_notify(task, UCC_EVENT_ERROR);
         status = task->super.status;
