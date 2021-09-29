@@ -25,7 +25,7 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
                               ucc_base_team_t *team, ucc_coll_task_t **task_h);
 
 #define UCC_TL_UCP_BCAST_DEFAULT_ALG_SELECT_STR              \
-    "bcast:0-4k:@0#bcast:4k-inf:@1"
+    "bcast:0-32k:@0#bcast:32k-inf:@1"
 
 static inline int ucc_tl_ucp_bcast_alg_from_str(const char *str)
 {

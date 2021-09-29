@@ -29,12 +29,13 @@ enum {
     UCC_SCATTER_KN_PHASE_LOOP, /* main loop of recursive k-ing */
 };
 
+/* Calculates for each rank at which distance it should recieve */
 ucc_rank_t calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
                                      ucc_rank_t radix, ucc_rank_t root)
 {
-	if (rank == root) {
-		return 0;
-	}
+    if (rank == root) {
+        return 0;
+    }
     ucc_rank_t root_base;
     ucc_rank_t dist = 1;
     GET_BASE_PEER(radix, root, dist, root_base);
@@ -77,7 +78,7 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     root = VRANK(root, root, size);
 
     if (task->scatter_kn.phase == UCC_SCATTER_KN_PHASE_LOOP) {
-    	goto UCC_SCATTER_KN_PHASE_LOOP;
+        goto UCC_SCATTER_KN_PHASE_LOOP;
     }
 
     if (KN_NODE_EXTRA == node_type) {
@@ -94,6 +95,13 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
         local_seg_count = ucc_sra_kn_compute_seg_size(block_count, step_radix,
                                                       local_seg_index);
 
+        /*
+         Each rank's recieve (beside's root) must only happen once,
+         and at its correct distance which is previously calclulated and saved
+         in task->scatter_kn.recv_dist.
+         Receive will only occur in the following iteration to that of
+         it's parent's send.
+        */
         if (rank != root && task->scatter_kn.recv_dist == p->radix_pow &&
                                                       task->recv_posted == 0) {
             for (loop_step = 1; loop_step < radix; loop_step++) {
@@ -115,6 +123,14 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
             }
         }
 
+
+        /*
+         Each non leaf rank will send per iteration to up to radix - 1
+         "children" who are within it's current distance.
+         Distance is initialized to 1 and each iteration is multiplied by radix.
+         Each rank's send (besides leaf ranks) happens only after it's recieve
+         from previous iteration has completed.
+        */
         if (root == rank || (task->recv_posted > 0 &&
                              task->recv_posted == task->recv_completed)) {
             for (loop_step = 1; loop_step < radix; loop_step++) {
@@ -222,6 +238,9 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_init_r(
     ucc_knomial_pattern_init(size, rank, radix, &task->scatter_kn.p);
 
     /* In place currently not supported */
+    if (UCC_IS_INPLACE(coll_args->args)) {
+    	return UCC_ERR_NOT_SUPPORTED;
+    }
 
     *task_h = &task->super;
     return UCC_OK;

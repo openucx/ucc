@@ -16,7 +16,7 @@
 #include "../scatter/scatter.h"
 #include "../allgather/allgather.h"
 
-/* SRA - scatter-allgather knomial algorithm
+/* SAG - scatter-allgather knomial algorithm
    1. The algorithm performs collective bcast operation for large messages
       as a sequence of K-nomial Scatter followed by K-nomial
       (with the same radix K) allgather.
@@ -49,8 +49,8 @@ ucc_tl_ucp_bcast_sag_knomial_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_schedule_t *schedule = ucc_derived_of(coll_task, ucc_schedule_t);
     ucc_status_t    status;
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(schedule, "ucp_bcast_sag_kn_done", 0);
 
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(schedule, "ucp_bcast_sag_kn_done", 0);
     status = ucc_schedule_finalize(coll_task);
     ucc_tl_ucp_put_schedule(schedule);
     return status;
@@ -94,7 +94,7 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
 
     /* 2nd step of bcast: knomial allgather. 2nd task subscribes
      to completion event of scatter task. */
-    args.args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
+    args.args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
     args.args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     status = ucc_tl_ucp_allgather_knomial_init_r(&args, team, &task, radix);
     if (UCC_OK != status) {

@@ -19,12 +19,6 @@
         task->allgather_kn.phase = _phase;                                     \
     } while (0)
 
-//#define VRANK(_rank, _root, _team_size) (((_rank) - (_root) + (_team_size)) % (_team_size))
-//#define INV_VRANK(_rank, _root, _team_size) (((_rank) + (_root)) % (_team_size))
-
-/* #define VRANK(_rank, _root, _team_size) ((_rank) + (_root) - (_root)) */
-/* #define INV_VRANK(_rank, _root, _team_size) ((_rank) + (_root) - (_root)) */
-
 ucc_status_t ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
@@ -48,6 +42,11 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_kn_radix_t         loop_step;
     size_t                 block_count, peer_seg_count, local_seg_count;
 
+    /* Bcast will first call scatter and then allgather.
+       In case of non-full tree with "extra" ranks, scatter will give each rank
+       a new virtual rank number - "vrank".
+       As such allgather must keep to this ranking to be aligned with scatter.
+    */
     if (coll_task->args.coll_type == UCC_COLL_TYPE_BCAST) {
         broot = coll_task->args.root;
         rank = VRANK(rank, broot, size);

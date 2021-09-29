@@ -12,8 +12,8 @@ ucc_base_coll_alg_info_t
         [UCC_TL_UCP_BCAST_ALG_KNOMIAL] =
             {.id   = UCC_TL_UCP_BCAST_ALG_KNOMIAL,
              .name = "knomial",
-             .desc =
-                 "recursive k-ing with arbitrary radix (latency oriented alg)"},
+             .desc = "bcast over knomial tree with arbitrary radix "
+                     "(latency oriented alg)"},
         [UCC_TL_UCP_BCAST_ALG_SAG_KNOMIAL] =
             {.id   = UCC_TL_UCP_BCAST_ALG_SAG_KNOMIAL,
              .name = "sag_knomial",
@@ -38,8 +38,9 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_init(ucc_base_coll_args_t *coll_args,
 {
     ucc_tl_ucp_task_t *task;
     ucc_status_t       status;
-    task                 = ucc_tl_ucp_init_task(coll_args, team);
-    status               = ucc_tl_ucp_bcast_init(task);
-    *task_h              = &task->super;
+
+    task    = ucc_tl_ucp_init_task(coll_args, team);
+    status  = ucc_tl_ucp_bcast_init(task);
+    *task_h = &task->super;
     return status;
 }
