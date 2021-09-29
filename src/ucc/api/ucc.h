@@ -620,7 +620,9 @@ enum ucc_context_params_field {
     UCC_CONTEXT_PARAM_FIELD_TYPE              = UCC_BIT(0),
     UCC_CONTEXT_PARAM_FIELD_SYNC_TYPE         = UCC_BIT(1),
     UCC_CONTEXT_PARAM_FIELD_OOB               = UCC_BIT(2),
-    UCC_CONTEXT_PARAM_FIELD_ID                = UCC_BIT(3)
+    UCC_CONTEXT_PARAM_FIELD_ID                = UCC_BIT(3),
+    UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS        = UCC_BIT(4),
+    UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS_TYPE   = UCC_BIT(5)
 };
 
 /**
@@ -659,6 +661,58 @@ typedef struct ucc_oob_coll {
 
 typedef ucc_oob_coll_t ucc_context_oob_coll_t;
 typedef ucc_oob_coll_t ucc_team_oob_coll_t;
+
+/**
+ *
+ *  @ingroup UCC_CONTEXT_DT
+ */
+typedef enum {
+    UCC_MEM_SYMMETRIC_SEGMENTS  = 0,
+    UCC_MEM_ASYMMETRIC_SEGMENTS = 1
+} ucc_mem_map_type_t;
+
+/**
+ *
+ *  @ingroup UCC_CONTEXT_DT
+ */
+typedef enum  {
+    UCC_MEM_CONSTRAINT_SYMMETRIC   = UCC_BIT(0),
+    UCC_MEM_CONSTRAINT_PERSISTENT  = UCC_BIT(1),
+    UCC_MEM_CONSTRAINT_ALIGN32     = UCC_BIT(2),
+    UCC_MEM_CONSTRAINT_ALIGN64     = UCC_BIT(3),
+    UCC_MEM_CONSTRAINT_ALIGN128    = UCC_BIT(4),
+    UCC_MEM_CONSTRAINT_ALIGN256    = UCC_BIT(5)
+} ucc_mem_constraints_t;
+
+/**
+ *
+ *  @ingroup UCC_CONTEXT_DT
+ */
+typedef enum {
+    UCC_MEM_HINT_REMOTE_ATOMICS    = UCC_BIT(0),
+    UCC_MEM_HINT_REMOTE_COUNTERS   = UCC_BIT(1)
+} ucc_mem_hints_t;
+
+/**
+ *
+ *  @ingroup UCC_CONTEXT_DT
+ */
+typedef struct ucc_mem_map {
+    void *   address; /*!< the address of a buffer to be attached to the NIC. If address is NULL, a buffer will be allocated based on the provided hints and constraints */
+    size_t   len;     /*!< the length of the buffer */
+    uint64_t hints;   /*!< optional hints on where to allocate memory for use in collective operations */
+    uint64_t constraints; /*!< requirements pertaining to the memory to be allocated */
+} ucc_mem_map_t;
+
+/**
+ *
+ * @ingroup UCC_CONTEXT_DT
+ */
+typedef struct ucc_mem_map_params {
+    ucc_mem_map_t *segments;   /*!< array of ucc_mem_map elements */
+    uint64_t       n_segments; /*!< the number of ucc_mem_map elements */
+} ucc_mem_map_params_t;
+
 /**
  *
  *  @ingroup UCC_CONTEXT_DT
@@ -687,6 +741,8 @@ typedef struct ucc_context_params {
     ucc_coll_sync_type_t    sync_type;
     ucc_context_oob_coll_t  oob;
     uint64_t                ctx_id;
+    ucc_mem_map_type_t      mem_params_type;
+    ucc_mem_map_params_t    mem_params;
 } ucc_context_params_t;
 
 /**
@@ -962,38 +1018,6 @@ enum ucc_team_attr_field {
     UCC_TEAM_ATTR_FIELD_SYNC_TYPE              = UCC_BIT(4),
     UCC_TEAM_ATTR_FIELD_MEM_PARAMS             = UCC_BIT(5)
 };
-
-/**
- *
- *  @ingroup UCC_TEAM_DT
- */
-typedef enum  {
-    UCC_MEM_CONSTRAINT_SYMMETRIC   = UCC_BIT(0),
-    UCC_MEM_CONSTRAINT_PERSISTENT  = UCC_BIT(1),
-    UCC_MEM_CONSTRAINT_ALIGN32     = UCC_BIT(2),
-    UCC_MEM_CONSTRAINT_ALIGN64     = UCC_BIT(3),
-    UCC_MEM_CONSTRAINT_ALIGN128    = UCC_BIT(4),
-} ucc_mem_constraints_t;
-
-/**
- *
- *  @ingroup UCC_TEAM_DT
- */
-typedef enum {
-    UCC_MEM_HINT_REMOTE_ATOMICS    = 0,
-    UCC_MEM_HINT_REMOTE_COUNTERS
-} ucc_mem_hints_t;
-
-/**
- *
- *  @ingroup UCC_TEAM_DT
- */
-typedef struct ucc_mem_map_params {
-    void                    *address;
-    size_t                  len;
-    ucc_mem_hints_t         hints;
-    ucc_mem_constraints_t   constraints;
-} ucc_mem_map_params_t;
 
 /**
  *
@@ -1519,7 +1543,7 @@ typedef enum {
                                                             Particularly, useful
                                                             for alltoallv
                                                             operation. */
-    UCC_COLL_ARGS_FLAG_TIMEOUT              = UCC_BIT(6)  /*!<If set and the elapsed
+    UCC_COLL_ARGS_FLAG_TIMEOUT              = UCC_BIT(6), /*!<If set and the elapsed
                                                             time after @ref ucc_collective_post
                                                             (or @ref ucc_collective_triggered_post)
                                                             is greater than @ref ucc_coll_args_t.timeout,
@@ -1528,6 +1552,12 @@ typedef enum {
                                                             Note, the status is not guaranteed
                                                             to be global on all the processes
                                                             participating in the collective.*/
+    UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7)  /*!< If set, both src
+                                                            and dst buffers 
+                                                            reside in a memory 
+                                                            mapped region. 
+                                                            Useful for one-sided
+                                                            collectives. */
 } ucc_coll_args_flags_t;
 
 /**
@@ -1591,7 +1621,9 @@ enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS           = UCC_BIT(1),
     UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS          = UCC_BIT(2),
     UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(3),
-    UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(4)
+    UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(4),
+    UCC_COLL_ARGS_FIELD_PSYNC                           = UCC_BIT(5),
+    UCC_COLL_ARGS_FIELD_PWORK                           = UCC_BIT(6)
 };
 
 /**
@@ -1651,6 +1683,8 @@ typedef struct ucc_coll_args {
                                              collectives */
     ucc_error_type_t                error_type; /*!< Error type */
     ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
+    void                           *pSync; /*!< pSync array for one-sided collectives */
+    void                           *pWrk; /*!< pWrk array for one-sided reductions */
     ucc_coll_callback_t             cb;
     double                          timeout; /*!< Timeout in seconds */
 } ucc_coll_args_t;
