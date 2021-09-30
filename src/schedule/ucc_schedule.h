@@ -67,11 +67,12 @@ typedef struct ucc_coll_task {
         /* used for lf mt progress queue */
         ucc_lf_queue_elem_t          lf_elem;
     };
-    uint8_t n_deps;
-    uint8_t n_deps_satisfied;
-    uint8_t n_deps_base;
-    double  start_time; /* timestamp of the start time:
-                           either post or triggered_post */
+    uint8_t  n_deps;
+    uint8_t  n_deps_satisfied;
+    uint8_t  n_deps_base;
+    double   start_time; /* timestamp of the start time:
+                            either post or triggered_post */
+    uint32_t seq_num;
 } ucc_coll_task_t;
 
 typedef struct ucc_context ucc_context_t;
@@ -123,8 +124,8 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         if (UCC_ERR_TIMED_OUT == status) {
             char coll_str[256];
             ucc_coll_str(&task->bargs, coll_str, sizeof(coll_str));
-            ucc_warn("timeout %g sec has expired on task %p, %s",
-                     task->bargs.args.timeout, task, coll_str);
+            ucc_warn("timeout %g sec has expired on task %p, seq_num %u, %s",
+                     task->bargs.args.timeout, task, task->seq_num, coll_str);
         } else {
             ucc_error("failure in task %p, %s", task,
                       ucc_status_string(task->super.status));
