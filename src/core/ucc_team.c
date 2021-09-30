@@ -38,19 +38,6 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
 {
     ucc_status_t status;
 
-    if ((team->bp.params.mask & UCC_TEAM_PARAM_FIELD_EP) &&
-        (team->bp.params.mask & UCC_TEAM_PARAM_FIELD_EP_RANGE) &&
-        (team->bp.params.ep_range == UCC_COLLECTIVE_EP_RANGE_CONTIG)) {
-        /* TODO need to make sure we don't exceed rank size */
-        team->rank = team->bp.params.ep;
-    } else {
-        ucc_error(
-            "rank value of a process is not provided via ucc_team_params.ep "
-            "with ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG. "
-            "not supported yet...");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
     if (context->service_team) {
         /* User internal service team for OOB */
         ucc_team_subset_t subset = {.myrank     = team->rank,
@@ -80,7 +67,8 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
                                   const ucc_team_params_t *params,
                                   ucc_team_h *new_team)
 {
-    ucc_rank_t   team_size = 0;
+    uint64_t     team_size = 0;
+    uint64_t     team_rank = UINT64_MAX;
     ucc_team_t  *team;
     ucc_status_t status;
 
@@ -92,8 +80,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     }
 
     if (params->mask & UCC_TEAM_PARAM_FIELD_TEAM_SIZE) {
-        team_size = (ucc_rank_t)params->team_size;
-        //TODO check it is not too big
+        team_size = params->team_size;
     }
 
     if (params->mask & UCC_TEAM_PARAM_FIELD_OOB) {
@@ -105,8 +92,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
                 (unsigned long long)params->oob.n_oob_eps);
             return UCC_ERR_INVALID_PARAM;
         }
-        team_size = (ucc_rank_t)params->oob.n_oob_eps;
-        //TODO check it is not too big
+        team_size = params->oob.n_oob_eps;
     }
 
     if (params->mask & UCC_TEAM_PARAM_FIELD_EP_MAP) {
@@ -119,13 +105,50 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
                 (unsigned long long)params->ep_map.ep_num);
             return UCC_ERR_INVALID_PARAM;
         }
-        team_size = (ucc_rank_t)params->ep_map.ep_num;
+        team_size = params->ep_map.ep_num;
     }
     if (team_size < 2) {
         ucc_warn("minimal size of UCC team is 2, provided %llu",
                  (unsigned long long)team_size);
         return UCC_ERR_INVALID_PARAM;
     }
+
+    if ((params->mask & UCC_TEAM_PARAM_FIELD_EP) &&
+        (params->mask & UCC_TEAM_PARAM_FIELD_EP_RANGE) &&
+        (params->ep_range == UCC_COLLECTIVE_EP_RANGE_CONTIG)) {
+        if ((params->mask & UCC_TEAM_PARAM_FIELD_OOB) &&
+            (params->oob.oob_ep != params->ep)) {
+            ucc_error(
+                "inconsistent EP value is provided as params.ep %llu "
+                "and params.oob.oob_ep %llu",
+                (unsigned long long)params->ep,
+                (unsigned long long)params->oob.oob_ep);
+            return UCC_ERR_INVALID_PARAM;
+        }
+        team_rank = params->ep;
+    } else if (params->mask & UCC_TEAM_PARAM_FIELD_OOB) {
+        team_rank = params->oob.oob_ep;
+    }
+
+    if (team_rank == UINT64_MAX) {
+        /* Neither EP nor OOB_EP is provided, can't assign the rank */
+        ucc_error("either UCC_TEAM_PARAM_FIELD_EP(RANGE) "
+                  "or UCC_TEAM_PARAM_FIELD_OOB must be provided");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    if (team_size > (uint64_t)UCC_RANK_MAX) {
+        ucc_error("team size is too large: %llu, max supported %u",
+                  (unsigned long long)team_size, UCC_RANK_MAX);
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    if (team_rank > (uint64_t)UCC_RANK_MAX) {
+        ucc_error("team rank is too large: %llu, max supported %u",
+                  (unsigned long long)team_rank, UCC_RANK_MAX);
+        return UCC_ERR_INVALID_PARAM;
+    }
+
     team = ucc_calloc(1, sizeof(ucc_team_t), "ucc_team");
     if (!team) {
         ucc_error("failed to allocate %zd bytes for ucc team",
@@ -134,7 +157,8 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     }
     team->runtime_oob  = params->oob;
     team->num_contexts = num_contexts;
-    team->size         = team_size;
+    team->size         = (ucc_rank_t)team_size;
+    team->rank         = (ucc_rank_t)team_rank;
     team->seq_num      = 0;
     team->contexts =
         ucc_malloc(sizeof(ucc_context_t *) * num_contexts, "ucc_team_ctx");

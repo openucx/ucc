@@ -163,7 +163,7 @@ class UccTeam {
         UccTeam *self;
     } allgather_coll_info_t;
     std::vector<struct allgather_data> ag;
-    void init_team(bool use_team_ep_map);
+    void init_team(bool use_team_ep_map, bool use_ep_range);
     void destroy_team();
     void test_allgather(size_t msglen);
     static ucc_status_t allgather(void *src_buf, void *recv_buf, size_t size,
@@ -175,7 +175,8 @@ public:
     int n_procs;
     void progress();
     std::vector<proc> procs;
-    UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map = false);
+    UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map = false,
+            bool use_ep_range = true);
     ~UccTeam();
 };
 typedef std::shared_ptr<UccTeam> UccTeam_h;
@@ -203,8 +204,10 @@ public:
            ucc_job_env_t vars = ucc_job_env_t());
     ~UccJob();
     std::vector<UccProcess_h> procs;
-    UccTeam_h create_team(int n_procs);
-    UccTeam_h create_team(std::vector<int> &ranks, bool use_team_ep_map = false);
+    UccTeam_h create_team(int n_procs, bool use_team_ep_map = false,
+                          bool use_ep_range = true);
+    UccTeam_h create_team(std::vector<int> &ranks, bool use_team_ep_map = false,
+                          bool use_ep_range = true);
     void create_context();
     ucc_job_ctx_mode_t ctx_mode;
 };

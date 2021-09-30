@@ -78,3 +78,9 @@ UCC_TEST_F(test_team, team_create_multiple_preconnect_ctx_global)
     /* shuffle vector so that teams are destroyed in different order */
     std::shuffle(teams.begin(), teams.end(), std::default_random_engine());
 }
+
+UCC_TEST_F(test_team, team_create_no_ep)
+{
+    UccTeam_h team = UccJob::getStaticJob()->create_team(
+        UccJob::staticUccJobSize, false, false);
+}
