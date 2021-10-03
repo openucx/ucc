@@ -263,14 +263,10 @@ ucc_tl_ucp_reduce_scatter_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         size    = tl_team->size;
     size_t             count   = coll_args->args.dst.info.count;
-    ucc_kn_radix_t     radix;
+    ucc_kn_radix_t     radix, cfg_radix;
 
-    radix = ucc_min(UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.reduce_scatter_kn_radix,
-                    size);
-    if (((count + radix - 1) / radix * (radix - 1) > count) ||
-        ((radix - 1) > count)) {
-        radix = 2;
-    }
+    cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.reduce_scatter_kn_radix;
+    radix = ucc_knomial_pattern_get_min_radix(cfg_radix, size, count);
     return ucc_tl_ucp_reduce_scatter_knomial_init_r(coll_args, team, task_h,
                                                     radix);
 }

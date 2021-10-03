@@ -123,7 +123,6 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
             }
         }
 
-
         /*
          Each non leaf rank will send per iteration to up to radix - 1
          "children" who are within it's current distance.
@@ -164,7 +163,6 @@ UCC_SCATTER_KN_PHASE_LOOP:
         ucc_knomial_pattern_next_iteration(p);
     }
 
-
     ucc_sra_kn_get_offset_and_seglen(count, dt_size, rank, size, radix,
                                      &offset, &local_seg_count);
     if (offset != 0) {
@@ -172,7 +170,8 @@ UCC_SCATTER_KN_PHASE_LOOP:
                                PTR_OFFSET(rbuf, task->scatter_kn.send_offset),
                                local_seg_count * dt_size, mem_type, mem_type);
         if (UCC_OK != status) {
-            return status;
+            task->super.super.status = status;
+            return task->super.super.status;
         }
     }
 out:
@@ -191,7 +190,6 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_scatter_kn_start", 0);
     ucc_tl_ucp_task_reset(task);
-
 
     ucc_knomial_pattern_init(team->size, VRANK(team->rank,
                              coll_task->args.root, team->size),
@@ -228,6 +226,11 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_init_r(
     ucc_rank_t         rank      = tl_team->rank;
     ucc_tl_ucp_task_t *task;
 
+    /* In place currently not supported */
+    if (UCC_IS_INPLACE(coll_args->args)) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     task                 = ucc_tl_ucp_init_task(coll_args, team);
     task->super.post     = ucc_tl_ucp_scatter_knomial_start;
     task->super.progress = ucc_tl_ucp_scatter_knomial_progress;
@@ -235,12 +238,8 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_init_r(
 
     ucc_assert(coll_args->args.src.info.mem_type ==
                coll_args->args.dst.info.mem_type);
-    ucc_knomial_pattern_init(size, rank, radix, &task->scatter_kn.p);
 
-    /* In place currently not supported */
-    if (UCC_IS_INPLACE(coll_args->args)) {
-    	return UCC_ERR_NOT_SUPPORTED;
-    }
+    ucc_knomial_pattern_init(size, rank, radix, &task->scatter_kn.p);
 
     *task_h = &task->super;
     return UCC_OK;
@@ -254,14 +253,10 @@ ucc_tl_ucp_scatter_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         size    = tl_team->size;
     size_t             count   = coll_args->args.src.info.count;
-    ucc_kn_radix_t     radix;
+    ucc_kn_radix_t     radix, cfg_radix;
 
-    radix = ucc_min(UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.bcast_kn_radix, size);
-    radix = 2;
-    if (((count + radix - 1) / radix * (radix - 1) > count) ||
-        ((radix - 1) > count)) {
-        radix = 2;
-    }
+    cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.scatter_kn_radix;
+    radix = ucc_knomial_pattern_get_min_radix(cfg_radix, size, count);
     return ucc_tl_ucp_scatter_knomial_init_r(coll_args, team, task_h,
                                                     radix);
 }

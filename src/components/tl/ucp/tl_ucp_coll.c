@@ -276,7 +276,7 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
     case UCC_COLL_TYPE_BCAST:
         switch (alg_id) {
         case UCC_TL_UCP_BCAST_ALG_KNOMIAL:
-        	*init = ucc_tl_ucp_bcast_knomial_init;
+            *init = ucc_tl_ucp_bcast_knomial_init;
             break;
         case UCC_TL_UCP_BCAST_ALG_SAG_KNOMIAL:
             *init = ucc_tl_ucp_bcast_sag_knomial_init;
