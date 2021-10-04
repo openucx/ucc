@@ -20,7 +20,8 @@ alltoallv =                        \
 bcast =                   \
 	bcast/bcast.h         \
 	bcast/bcast.c         \
-	bcast/bcast_knomial.c
+	bcast/bcast_knomial.c \
+	bcast/bcast_sag_knomial.c
 
 allreduce =                           \
 	allreduce/allreduce.h             \
@@ -48,6 +49,10 @@ reduce_scatter =	                        \
 	reduce_scatter/reduce_scatter.h         \
 	reduce_scatter/reduce_scatter_knomial.c
 
+scatter =	                   \
+	scatter/scatter.h          \
+	scatter/scatter_knomial.c
+
 sources =                 \
 	tl_ucp.h              \
 	tl_ucp.c              \
@@ -66,7 +71,8 @@ sources =                 \
 	$(allgatherv)         \
 	$(bcast)              \
 	$(reduce)             \
-	$(reduce_scatter)
+	$(reduce_scatter)     \
+	$(scatter)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

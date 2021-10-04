@@ -13,17 +13,23 @@
 #include "components/mc/base/ucc_mc_base.h"
 #include "tl_ucp_tag.h"
 
-#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 1
+#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 2
 extern const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
 
-#define CALC_KN_TREE_DIST(_size, _radix, _dist)                                        \
-    do {                                                                       \
-        _dist = 1;                                                             \
-        while (_dist * _radix < _size) {                                       \
-            _dist *= _radix;                                                   \
-        }                                                                      \
+#define CALC_KN_TREE_DIST(_size, _radix, _dist)                               \
+    do {                                                                      \
+        _dist = 1;                                                            \
+        while (_dist * _radix < _size) {                                      \
+            _dist *= _radix;                                                  \
+        }                                                                     \
     } while (0)
+
+#define VRANK(_rank, _root, _team_size)                                       \
+    (((_rank) - (_root) + (_team_size)) % (_team_size))
+
+#define INV_VRANK(_rank, _root, _team_size)                                   \
+    (((_rank) + (_root)) % (_team_size))
 
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t   super;
@@ -51,6 +57,12 @@ typedef struct ucc_tl_ucp_task {
             void                   *scratch;
             ucc_mc_buffer_header_t *scratch_mc_header;
         } reduce_scatter_kn;
+        struct {
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+            ucc_rank_t              recv_dist;
+            ptrdiff_t               send_offset;
+        } scatter_kn;
         struct {
             int                     phase;
             ucc_knomial_pattern_t   p;

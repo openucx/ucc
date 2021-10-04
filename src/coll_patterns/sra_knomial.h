@@ -79,12 +79,12 @@ static inline size_t ucc_sra_kn_compute_block_count(size_t     count,
 static inline void
 ucc_sra_kn_get_offset_and_seglen(size_t count, size_t dt_size, ucc_rank_t rank,
                                  ucc_rank_t size, ucc_kn_radix_t radix,
-                                 ptrdiff_t *offset, int *seglen)
+                                 ptrdiff_t *offset, size_t *seglen)
 {
     ptrdiff_t             _offset     = 0;
     size_t                block_count = count;
     ucc_rank_t            step_radix  = 0;
-    ucc_rank_t            my_seg_len  = 0;
+    size_t                my_seg_len  = 0;
     ucc_rank_t            k, r, peer, my_si;
     size_t                my_seg_offset;
     ucc_knomial_pattern_t p;

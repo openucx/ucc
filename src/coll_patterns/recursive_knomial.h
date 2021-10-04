@@ -151,6 +151,19 @@ ucc_knomial_pattern_next_iteration_backward(ucc_knomial_pattern_t *p)
     p->radix_pow /= p->radix;
 }
 
+static inline ucc_kn_radix_t
+ucc_knomial_pattern_get_min_radix(ucc_kn_radix_t cfg_radix,
+                                  ucc_rank_t team_size, size_t count)
+{
+	ucc_kn_radix_t radix = ucc_min(cfg_radix, team_size);
+
+    if (((count + radix - 1) / radix * (radix - 1) > count) ||
+        ((radix - 1) > count)) {
+    	radix = 2;
+    }
+    return radix;
+}
+
 /* A set of convenience macros used to implement sw based progress
    of the algorithms that use kn pattern */
 enum {

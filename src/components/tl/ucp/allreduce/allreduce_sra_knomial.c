@@ -103,16 +103,11 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
     ucc_base_coll_args_t args     = *coll_args;
     ucc_coll_task_t     *task, *rs_task;
     ucc_status_t         status;
-    ucc_kn_radix_t       radix;
+    ucc_kn_radix_t       radix, cfg_radix;
 
     ucc_schedule_init(schedule, &coll_args->args, team);
-    radix = ucc_min(UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sra_kn_radix,
-                    tl_team->size);
-
-    if (((count + radix - 1) / radix * (radix - 1) > count) ||
-        ((radix - 1) > count)) {
-        radix = 2;
-    }
+    cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sra_kn_radix;
+    radix = ucc_knomial_pattern_get_min_radix(cfg_radix, tl_team->size, count);
 
     /* 1st step of allreduce: knomial reduce_scatter */
     status = ucc_tl_ucp_reduce_scatter_knomial_init_r(&args, team, &task, radix);
