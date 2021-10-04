@@ -51,47 +51,56 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t         *team,
     return ucc_tl_ucp_connect_ep(ctx, ep, addr);
 }
 
+/* Finds next non-NULL ep in the storage and returns that handle
+   for closure. In case of "hash" storage it pops the item,
+   in case of "array" sets it to NULL */
+static inline ucp_ep_h get_next_ep_to_close(ucc_tl_ucp_context_t *ctx, int *i)
+{
+    ucp_ep_h   ep = NULL;
+    ucc_rank_t size;
+
+    if (ctx->eps) {
+        size = (ucc_rank_t)ctx->super.super.ucc_context->params.oob.n_oob_eps;
+        while (NULL == ep && (*i) < size) {
+            ep           = ctx->eps[*i];
+            ctx->eps[*i] = NULL;
+            (*i)++;
+        }
+    } else {
+        ep = tl_ucp_hash_pop(ctx->ep_hash);
+    }
+    return ep;
+}
+
 void ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx)
 {
+     int                          i = 0;
      ucp_ep_h                     ep;
      ucs_status_t                 status;
-     void **                      close_reqs;
-     void *                       close_req;
-     int                          i, close_reqs_counter = 0;
+     ucs_status_ptr_t             close_req;
+     ucp_request_param_t          param;
 
-     close_reqs = (void **)ucc_malloc(sizeof(void *) * kh_size(ctx->ep_hash),
-                                      "ep close requests array");
-     if (!close_reqs) {
-         tl_error(ctx->super.super.lib, "Unable to allocate memory");
-         return;
-     }
-     ep = tl_ucp_hash_pop(ctx->ep_hash);
+     param.op_attr_mask = UCP_OP_ATTR_FIELD_FLAGS;
+     param.flags        = 0; // 0 means FLUSH
+     ep                 = get_next_ep_to_close(ctx, &i);
      while (ep) {
-         close_req = ucp_ep_close_nb(ep, UCP_EP_CLOSE_MODE_FLUSH);
+         close_req = ucp_ep_close_nbx(ep, &param);
+
          if (UCS_PTR_IS_PTR(close_req)) {
-             close_reqs[close_reqs_counter] = close_req;
-             close_reqs_counter++;
-         }
-         else if ((UCS_PTR_STATUS(close_req) != UCS_OK) &&
-                  UCC_TL_CTX_HAS_OOB(ctx)) {
-             tl_error(ctx->super.super.lib, "failed to close properly, ep %p, error - %s",
-                      ep, ucc_status_string(ucs_status_to_ucc_status(UCS_PTR_STATUS(close_req))));
-             // In case we have no OOB, we have no barrier to sync closure, and we can ignore errors, which are expected
-         }
-         ep = tl_ucp_hash_pop(ctx->ep_hash);
-     }
-     for (i = 0; i < close_reqs_counter; i++) {
-         close_req = close_reqs[i];
-         // TODO: Should we put a timer? in UCX, some examples have timer, and some don't
-         do {
-             ucp_worker_progress(ctx->ucp_worker);
-             status = ucp_request_check_status(close_req);
-         } while (status == UCS_INPROGRESS && close_req);
-         if (close_req) {
-             close_reqs[i] = NULL;
+             do {
+                 ucp_worker_progress(ctx->ucp_worker);
+                 status = ucp_request_check_status(close_req);
+             } while (status == UCS_INPROGRESS);
              ucp_request_free(close_req);
+         } else {
+             status = UCS_PTR_STATUS(close_req);
          }
+         ucc_assert(status <= UCS_OK);
+         if (status != UCS_OK) {
+             tl_error(ctx->super.super.lib,
+                      "error during ucp ep close, ep %p, status %s",
+                      ep, ucs_status_string(status));
+         }
+         ep = get_next_ep_to_close(ctx, &i);
      }
-     close_req = NULL;
-     ucc_free(close_reqs);
 }

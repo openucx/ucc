@@ -125,14 +125,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         goto err_thread_mode;
     }
 
-    if (params->context->addr_storage.storage) {
+    if (params->context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         /* Global ctx mode, we will have ctx_map so can use array for eps */
-        self->eps = ucc_calloc(params->context->addr_storage.size,
+        self->eps = ucc_calloc(params->context->params.oob.n_oob_eps,
                                sizeof(ucp_ep_h), "ucp_eps");
-        if (self->eps) {
+        if (!self->eps) {
             tl_error(self->super.super.lib,
                      "failed to allocate %zd bytes for ucp_eps",
-                     params->context->addr_storage.size * sizeof(ucp_ep_h));
+                     params->context->params.oob.n_oob_eps * sizeof(ucp_ep_h));
             ucc_status = UCC_ERR_NO_MEMORY;
             goto err_thread_mode;
         }
