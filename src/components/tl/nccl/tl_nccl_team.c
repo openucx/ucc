@@ -169,8 +169,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     ucc_status_t status;
 
     task = ucc_mpool_get(&nccl_ctx->req_mp);
-    ucc_coll_task_init(&task->super, &coll_args->args, team);
-
+    ucc_coll_task_init(&task->super, coll_args, team);
     task->super.finalize       = ucc_tl_nccl_coll_finalize;
     task->super.triggered_post = ucc_tl_nccl_triggered_post;
     task->completed            = NULL;
@@ -181,6 +180,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
             goto free_task;
         }
     }
+
     switch (coll_args->args.coll_type)
     {
     case UCC_COLL_TYPE_ALLGATHER:
@@ -222,7 +222,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
 
 free_event:
     if (task->completed) {
-        cudaEventDestroy(task->completed);
+        ucc_mc_ee_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
     }
 free_task:
     ucc_mpool_put(task);

@@ -64,7 +64,7 @@ static inline ucc_status_t sbgp_create_socket(ucc_team_topo_t *topo,
             sbgp->group_rank = nlr_pos;
         if (sock_rank == nlr_pos)
             sbgp->group_rank = 0;
-        SWAP(local_ranks[nlr_pos], local_ranks[0]);
+        SWAP(local_ranks[nlr_pos], local_ranks[0], int);
     }
     if (sock_size > 1) {
         sbgp->status = UCC_SBGP_ENABLED;
@@ -314,7 +314,7 @@ static ucc_status_t sbgp_create_socket_leaders(ucc_team_topo_t *topo,
                     sbgp->group_rank = nlr_pos;
                 if (sl_rank == nlr_pos)
                     sbgp->group_rank = 0;
-                SWAP(sbgp->rank_map[nlr_pos], sbgp->rank_map[0]);
+                SWAP(sbgp->rank_map[nlr_pos], sbgp->rank_map[0], int);
             }
 
             sbgp->group_size = n_socket_leaders;

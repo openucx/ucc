@@ -29,12 +29,12 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
             task->progress(task);
         }
         if (UCC_INPROGRESS == task->super.status) {
-            if (UCC_COLL_TIMEOUT_REQUIRED(task->args)) {
+            if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
                 if (timestamp < 0) {
                     timestamp = ucc_get_time();
                 }
                 if (ucc_unlikely(timestamp - task->start_time >
-                                 task->args.timeout)) {
+                                 task->bargs.args.timeout)) {
                     task->super.status = UCC_ERR_TIMED_OUT;
                     ucc_list_del(&task->list_elem);
                     ucc_task_complete(task);

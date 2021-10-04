@@ -5,6 +5,7 @@
 #include "ucc_schedule.h"
 #include "utils/ucc_compiler_def.h"
 #include "components/base/ucc_base_iface.h"
+#include "coll_score/ucc_coll_score.h"
 
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em)
 {
@@ -31,7 +32,8 @@ void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
     ucc_assert(i < MAX_LISTENERS);
 }
 
-ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task, ucc_coll_args_t *args,
+ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
+                                ucc_base_coll_args_t *bargs,
                                 ucc_base_team_t *team)
 {
     task->super.status     = UCC_OPERATION_INITIALIZED;
@@ -40,8 +42,8 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task, ucc_coll_args_t *args,
     task->team             = team;
     task->n_deps           = 0;
     task->n_deps_satisfied = 0;
-    if (args) {
-        memcpy(&task->args, args, sizeof(*args));
+    if (bargs) {
+        memcpy(&task->bargs, bargs, sizeof(*bargs));
     }
     ucc_lf_queue_init_elem(&task->lf_elem);
     return ucc_event_manager_init(&task->em);
@@ -104,12 +106,12 @@ ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
     return UCC_OK;
 }
 
-ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_coll_args_t *args,
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_base_coll_args_t *bargs,
                                ucc_base_team_t *team)
 {
     ucc_status_t status;
 
-    status            = ucc_coll_task_init(&schedule->super, args, team);
+    status            = ucc_coll_task_init(&schedule->super, bargs, team);
     schedule->ctx     = team->context->ucc_context;
     schedule->n_tasks = 0;
     return status;

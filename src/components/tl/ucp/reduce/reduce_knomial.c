@@ -19,7 +19,7 @@
 ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args      = &coll_task->args;
+    ucc_coll_args_t   *args      = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
     ucc_rank_t         myrank    = team->rank;
     ucc_rank_t         team_size = team->size;
@@ -117,7 +117,7 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task      =
         ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args      = &coll_task->args;
+    ucc_coll_args_t   *args      = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
     uint32_t           radix     = task->reduce_kn.radix;
     ucc_rank_t         root      = (ucc_rank_t)args->root;

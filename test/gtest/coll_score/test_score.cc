@@ -53,7 +53,7 @@ UCC_TEST_F(test_score, add_range_sorted)
     ucc_msg_range_t *range;
     size_t           expected[4] = {0, 20, 50, 100};
     size_t *         e           = expected;
-    ucc_list_for_each(range, list, list_elem)
+    ucc_list_for_each(range, list, super.list_elem)
     {
         EXPECT_EQ(*e, range->start);
         e++;
@@ -89,13 +89,47 @@ ucc_status_t test_score::check_range(ucc_coll_score_t *   score,
     if (check.size() != ucc_list_length(list)) {
         return UCC_ERR_NO_MESSAGE;
     }
-    ucc_list_for_each(range, list, list_elem)
+    ucc_list_for_each(range, list, super.list_elem)
     {
         if (range->start != std::get<0>(*r) || range->end != std::get<1>(*r) ||
-            range->score != std::get<2>(*r)) {
+            range->super.score != std::get<2>(*r)) {
             return UCC_ERR_NO_MESSAGE;
         }
         r++;
+    }
+    return UCC_OK;
+}
+
+ucc_status_t test_score::check_fallback(ucc_coll_score_t *   score,
+                                        ucc_coll_type_t      c,
+                                        ucc_memory_type_t    m,
+                                        std::vector<std::vector<fallback_t> > check)
+{
+    ucc_list_link_t  *list = &score->scores[ucc_ilog2(c)][m];
+    auto              fb   = check.begin();
+    ucc_list_link_t  *fallback;
+    ucc_msg_range_t  *range;
+    ucc_coll_entry_t *fb_r;
+
+    if (check.size() != ucc_list_length(list)) {
+        return UCC_ERR_NO_MESSAGE;
+    }
+    ucc_list_for_each(range, list, super.list_elem)
+    {
+        fallback = &range->fallback;
+
+        if (fb->size() != ucc_list_length(fallback)) {
+            return UCC_ERR_NO_MESSAGE;
+        }
+        auto f = fb->begin();
+        ucc_list_for_each(fb_r, fallback, list_elem) {
+            if (fb_r->score != std::get<0>(*f) ||
+                (uint64_t)fb_r->init != std::get<1>(*f)) {
+                return UCC_ERR_NO_MESSAGE;
+            }
+            f++;
+        }
+        fb++;
     }
     return UCC_OK;
 }
@@ -231,4 +265,53 @@ UCC_TEST_F(test_score_merge, same_score)
     EXPECT_EQ(UCC_OK,
               check_range(merge, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST,
                           RLIST({RANGE(0, 200, 100)})));
+}
+
+UCC_TEST_F(test_score_merge, fallback_single)
+{
+    init_score(score1, RLIST({RANGE(0, 100, 100), RANGE(200, 300, 5)}),
+               UCC_COLL_TYPE_BARRIER, 0x1, 0x2);
+    init_score(score2, RLIST({RANGE(0, 100, 200), RANGE(250, 350, 3)}),
+               UCC_COLL_TYPE_BARRIER, 0x3, 0x4);
+    EXPECT_EQ(UCC_OK, ucc_coll_score_merge(score1, score2, &merge, 1));
+    /* First range overlaps intirely with 200 being higer score: fallback must be init=0x1.
+       Second range overlaps into 3 pieces: 2 w/o fallback and 1 with fallback init=0x3
+       since its score (3) is smaller */
+    EXPECT_EQ(UCC_OK,
+              check_fallback(merge, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST,
+                             FB_LLIST({FB_LIST({FB(100, 0x1)}), FB_LIST({}),
+                                       FB_LIST({FB(3, 0x3)}), FB_LIST({})})));
+}
+
+UCC_TEST_F(test_score_merge, fallback_multiple)
+{
+    /* Same range has 5 different scores. There must be 4 fallbask ordered by score */
+    init_score(score1, RLIST({RANGE(0, 100, 100)}), UCC_COLL_TYPE_BARRIER, 0x1,
+               0x2);
+    init_score(score2, RLIST({RANGE(0, 100, 300)}), UCC_COLL_TYPE_BARRIER, 0x3,
+               0x4);
+    EXPECT_EQ(UCC_OK, ucc_coll_score_merge(score1, score2, &merge, 1));
+
+    score1 = merge;
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score2));
+    init_score(score2, RLIST({RANGE(0, 100, 500)}), UCC_COLL_TYPE_BARRIER, 0x5,
+               0x6);
+    EXPECT_EQ(UCC_OK, ucc_coll_score_merge(score1, score2, &merge, 1));
+
+    score1 = merge;
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score2));
+    init_score(score2, RLIST({RANGE(0, 100, 400)}), UCC_COLL_TYPE_BARRIER, 0x7,
+               0x8);
+    EXPECT_EQ(UCC_OK, ucc_coll_score_merge(score1, score2, &merge, 1));
+
+    score1 = merge;
+    ASSERT_EQ(UCC_OK, ucc_coll_score_alloc(&score2));
+    init_score(score2, RLIST({RANGE(0, 100, 600)}), UCC_COLL_TYPE_BARRIER, 0x9,
+               0x10);
+    EXPECT_EQ(UCC_OK, ucc_coll_score_merge(score1, score2, &merge, 1));
+
+    EXPECT_EQ(UCC_OK, check_fallback(
+                          merge, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST,
+                          FB_LLIST({FB_LIST({FB(500, 0x5), FB(400, 0x7),
+                                             FB(300, 0x3), FB(100, 0x1)})})));
 }

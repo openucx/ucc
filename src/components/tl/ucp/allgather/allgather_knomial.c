@@ -22,7 +22,7 @@
 ucc_status_t ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t       *args  = &coll_task->args;
+    ucc_coll_args_t       *args  = &TASK_ARGS(task);
     ucc_tl_ucp_team_t     *team  = TASK_TEAM(task);
     ucc_kn_radix_t         radix = task->allgather_kn.p.radix;
     uint8_t                node_type  = task->allgather_kn.p.node_type;
@@ -47,8 +47,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
        a new virtual rank number - "vrank".
        As such allgather must keep to this ranking to be aligned with scatter.
     */
-    if (coll_task->args.coll_type == UCC_COLL_TYPE_BCAST) {
-        broot = coll_task->args.root;
+    if (coll_task->bargs.args.coll_type == UCC_COLL_TYPE_BCAST) {
+        broot = coll_task->bargs.args.root;
         rank = VRANK(rank, broot, size);
     }
 
@@ -140,7 +140,7 @@ out:
 ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args  = &coll_task->args;
+    ucc_coll_args_t   *args  = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
     ucc_rank_t         size  = team->size;
     ucc_rank_t         rank  = team->rank;
@@ -151,8 +151,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
     ucc_tl_ucp_task_reset(task);
-    if (coll_task->args.coll_type == UCC_COLL_TYPE_BCAST) {
-        broot = coll_task->args.root;
+    if (coll_task->bargs.args.coll_type == UCC_COLL_TYPE_BCAST) {
+        broot = coll_task->bargs.args.root;
         rank = VRANK(rank, broot, size);
     }
 

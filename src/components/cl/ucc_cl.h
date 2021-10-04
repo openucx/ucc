@@ -12,6 +12,7 @@
 #include "components/base/ucc_base_iface.h"
 #include "ucc_cl_type.h"
 #include "utils/ucc_parser.h"
+#include "core/ucc_context.h"
 
 /** CL (collective layer) is an internal collective interface reflecting the
     public UCC API and extensions to support modularity, the composition of

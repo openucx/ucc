@@ -14,14 +14,15 @@ class test_score_str : public test_score {
                           [UCC_MEMORY_TYPE_##_mt]                              \
                               .next;                                           \
         ucc_msg_range_t *range =                                               \
-            ucc_container_of(l, ucc_msg_range_t, list_elem);                   \
-        range->score;                                                          \
+            ucc_container_of(l, ucc_msg_range_t, super.list_elem);             \
+        range->super.score;                                                    \
     })
 
 UCC_TEST_F(test_score_str, check_valid)
 {
     std::string       str = "alltoall:cuda:10";
     ucc_coll_score_t *score;
+
     EXPECT_EQ(UCC_OK, ucc_coll_score_alloc_from_str(str.c_str(), &score, 0,
                                                     NULL, NULL, NULL));
     EXPECT_EQ(10, SCORE(score, ALLTOALL, CUDA));

@@ -15,7 +15,7 @@
 ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task     = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args     = &coll_task->args;
+    ucc_coll_args_t   *args     = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team     = TASK_TEAM(task);
     ucc_rank_t         grank    = team->rank;
     ucc_rank_t         gsize    = team->size;
@@ -65,26 +65,26 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
-    ptrdiff_t          sbuf  = (ptrdiff_t)coll_task->args.src.info.buffer;
-    ptrdiff_t          rbuf  = (ptrdiff_t)coll_task->args.dst.info_v.buffer;
-    ucc_memory_type_t  smem  = coll_task->args.src.info.mem_type;
-    ucc_memory_type_t  rmem  = coll_task->args.dst.info_v.mem_type;
+    ptrdiff_t          sbuf  = (ptrdiff_t)TASK_ARGS(task).src.info.buffer;
+    ptrdiff_t          rbuf  = (ptrdiff_t)TASK_ARGS(task).dst.info_v.buffer;
+    ucc_memory_type_t  smem  = TASK_ARGS(task).src.info.mem_type;
+    ucc_memory_type_t  rmem  = TASK_ARGS(task).dst.info_v.mem_type;
     ucc_rank_t         grank = team->rank;
     size_t             data_size, data_displ, rdt_size;
     ucc_status_t       status;
 
     ucc_tl_ucp_task_reset(task);
 
-    if (!UCC_IS_INPLACE(coll_task->args)) {
+    if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
         /* TODO replace local sendrecv with memcpy? */
-        rdt_size   = ucc_dt_size(coll_task->args.dst.info_v.datatype);
+        rdt_size   = ucc_dt_size(TASK_ARGS(task).dst.info_v.datatype);
         data_displ = ucc_coll_args_get_displacement(
-                         &coll_task->args,
-                         coll_task->args.dst.info_v.displacements, grank) *
+                        &TASK_ARGS(task),
+                         TASK_ARGS(task).dst.info_v.displacements, grank) *
                      rdt_size;
         data_size =
-            ucc_coll_args_get_count(&coll_task->args,
-                                    coll_task->args.dst.info_v.counts, grank) *
+            ucc_coll_args_get_count(&TASK_ARGS(task),
+                                    TASK_ARGS(task).dst.info_v.counts, grank) *
             rdt_size;
         UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)rbuf + data_displ, data_size,
                                          rmem, grank, team, task),

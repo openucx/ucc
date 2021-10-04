@@ -10,14 +10,19 @@
 #define UCC_BASE_IFACE_H_
 #include "ucc/api/ucc.h"
 #include "core/ucc_lib.h"
-#include "core/ucc_context.h"
 #include "utils/ucc_component.h"
 #include "utils/ucc_parser.h"
 #include "utils/ucc_class.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_coll_utils.h"
-#include "schedule/ucc_schedule.h"
+
+typedef struct ucc_team ucc_team_t;
+typedef struct ucc_context ucc_context_t;
+typedef struct ucc_coll_score ucc_coll_score_t;
+typedef struct ucc_coll_task ucc_coll_task_t;
+
+
 
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
@@ -81,7 +86,7 @@ typedef struct ucc_base_context_iface {
                              ucc_base_ctx_attr_t      *attr);
 } ucc_base_context_iface_t;
 
-typedef struct ucc_team ucc_team_t;
+
 typedef struct ucc_base_team_params {
     ucc_team_params_t params;
     int               scope; /* Scope that allocates the team. When TL team is created
@@ -104,7 +109,6 @@ typedef struct ucc_base_team {
                                  (which inherit from base) during class init. */
 } ucc_base_team_t;
 
-typedef struct ucc_coll_score ucc_coll_score_t;
 typedef struct ucc_base_team_iface {
     ucc_status_t (*create_post)(ucc_base_context_t *context,
                                 const ucc_base_team_params_t *params,
@@ -113,8 +117,6 @@ typedef struct ucc_base_team_iface {
     ucc_status_t (*destroy)(ucc_base_team_t *team);
     ucc_status_t (*get_scores)(ucc_base_team_t *team, ucc_coll_score_t **score);
 } ucc_base_team_iface_t;
-
-typedef struct ucc_team ucc_team_t;
 
 typedef struct ucc_base_coll_args {
     uint64_t        mask;
