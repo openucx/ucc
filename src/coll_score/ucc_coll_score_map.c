@@ -82,8 +82,11 @@ ucc_status_t ucc_coll_init(ucc_score_map_t      *map,
 
     team   = r->super.team;
     status = r->super.init(bargs, team, task);
-    fb     = ucc_list_head(&r->fallback, ucc_coll_entry_t, list_elem);
+    if (UCC_OK == status) {
+        return UCC_OK;
+    }
 
+    fb = ucc_list_head(&r->fallback, ucc_coll_entry_t, list_elem);
     while (&fb->list_elem != &r->fallback &&
            (status == UCC_ERR_NOT_SUPPORTED ||
             status == UCC_ERR_NOT_IMPLEMENTED)) {

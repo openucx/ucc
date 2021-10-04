@@ -10,14 +10,12 @@
 #define UCC_BASE_IFACE_H_
 #include "ucc/api/ucc.h"
 #include "core/ucc_lib.h"
-//#include "core/ucc_context.h"
 #include "utils/ucc_component.h"
 #include "utils/ucc_parser.h"
 #include "utils/ucc_class.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_coll_utils.h"
-//#include "schedule/ucc_schedule.h"
 
 typedef struct ucc_team ucc_team_t;
 typedef struct ucc_context ucc_context_t;

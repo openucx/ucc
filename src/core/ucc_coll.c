@@ -210,7 +210,7 @@ ucc_status_t ucc_collective_post(ucc_coll_req_h request)
 
     ucc_debug("coll_post: req %p", task);
 
-    if (UCC_COLL_TIMEOUT_REQUIRED(task->args)) {
+    if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
         task->start_time = ucc_get_time();
     }
 
@@ -223,7 +223,7 @@ ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ev)
 
     ucc_debug("coll_triggered_post: req %p", task);
     task->ee = ee;
-    if (UCC_COLL_TIMEOUT_REQUIRED(task->args)) {
+    if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
         task->start_time = ucc_get_time();
     }
     return task->triggered_post(ee, ev, task);

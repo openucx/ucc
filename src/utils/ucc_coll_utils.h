@@ -30,15 +30,15 @@
     (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
      ((_args).flags & UCC_COLL_ARGS_FLAG_IN_PLACE))
 
-#define UCC_COLL_TIMEOUT_REQUIRED(_args) \
-    (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
-     ((_args).flags & UCC_COLL_ARGS_FLAG_TIMEOUT))
+#define UCC_COLL_TIMEOUT_REQUIRED(_task)                       \
+    (((_task)->bargs.args.mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
+     ((_task)->bargs.args.flags & UCC_COLL_ARGS_FLAG_TIMEOUT))
 
-#define UCC_COLL_SET_TIMEOUT(_task, _timeout) do {           \
-        (_task)->args.mask   |= UCC_COLL_ARGS_FIELD_FLAGS;   \
-        (_task)->args.flags  |= UCC_COLL_ARGS_FLAG_TIMEOUT;  \
-        (_task)->args.timeout = _timeout;                    \
-        (_task)->start_time   = ucc_get_time();              \
+#define UCC_COLL_SET_TIMEOUT(_task, _timeout) do {                 \
+        (_task)->bargs.args.mask   |= UCC_COLL_ARGS_FIELD_FLAGS;   \
+        (_task)->bargs.args.flags  |= UCC_COLL_ARGS_FLAG_TIMEOUT;  \
+        (_task)->bargs.args.timeout = _timeout;                    \
+        (_task)->start_time   = ucc_get_time();                    \
     } while(0)
 
 static inline size_t

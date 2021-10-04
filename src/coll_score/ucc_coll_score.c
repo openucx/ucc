@@ -119,6 +119,7 @@ static ucc_status_t ucc_fallback_alloc(ucc_score_t              score,
 
     fb = ucc_malloc(sizeof(*fb), "fallback");
     if (ucc_unlikely(!fb)) {
+        *_fb = NULL;
         ucc_error("failed to allocate %zd bytes for fallback", sizeof(*fb));
         return UCC_ERR_NO_MEMORY;
     }
@@ -181,6 +182,7 @@ static ucc_status_t ucc_msg_range_dup(const ucc_msg_range_t *in,
 
     r = ucc_malloc(sizeof(*r), "msg_range");
     if (ucc_unlikely(!r)) {
+        *out = NULL;
         ucc_error("failed to allocate %zd bytes for msgrange", sizeof(*r));
         return UCC_ERR_NO_MEMORY;
     }
