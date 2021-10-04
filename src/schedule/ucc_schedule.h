@@ -121,11 +121,10 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
     } else {
         /* error in task status */
         if (UCC_ERR_TIMED_OUT == status) {
-            //char coll_str[256];
-            //            ucc_coll_str(&task->bargs, coll_str, sizeof(coll_str));
-            //TODO: coll str desc will printed when rebased on top of fallback PR
-            ucc_warn("timeout %g sec has expired on task %p",
-                     task->bargs.args.timeout, task);
+            char coll_str[256];
+            ucc_coll_str(&task->bargs, coll_str, sizeof(coll_str));
+            ucc_warn("timeout %g sec has expired on task %p, %s",
+                     task->bargs.args.timeout, task, coll_str);
         } else {
             ucc_error("failure in task %p, %s", task,
                       ucc_status_string(task->super.status));
