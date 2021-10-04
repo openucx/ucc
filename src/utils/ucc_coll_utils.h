@@ -10,6 +10,7 @@
 #include "ucc_datastruct.h"
 #include "ucc_math.h"
 #include <string.h>
+#include "utils/ucc_time.h"
 
 #define UCC_COLL_TYPE_NUM (ucc_ilog2(UCC_COLL_TYPE_LAST - 1) + 1)
 
@@ -28,6 +29,17 @@
 #define UCC_IS_INPLACE(_args) \
     (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
      ((_args).flags & UCC_COLL_ARGS_FLAG_IN_PLACE))
+
+#define UCC_COLL_TIMEOUT_REQUIRED(_args) \
+    (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
+     ((_args).flags & UCC_COLL_ARGS_FLAG_TIMEOUT))
+
+#define UCC_COLL_SET_TIMEOUT(_task, _timeout) do {           \
+        (_task)->args.mask   |= UCC_COLL_ARGS_FIELD_FLAGS;   \
+        (_task)->args.flags  |= UCC_COLL_ARGS_FLAG_TIMEOUT;  \
+        (_task)->args.timeout = _timeout;                    \
+        (_task)->start_time   = ucc_get_time();              \
+    } while(0)
 
 static inline size_t
 ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,

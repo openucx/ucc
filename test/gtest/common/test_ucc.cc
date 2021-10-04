@@ -531,22 +531,23 @@ ucc_status_t UccReq::test()
     ucc_status_t status = UCC_OK;
     for (auto r : reqs) {
         status = ucc_collective_test(r);
-        if (UCC_OK != status) {
+        if (UCC_OK != status && UCC_OPERATION_INITIALIZED != status) {
             break;
         }
     }
     return status;
 }
 
-void UccReq::wait()
+ucc_status_t UccReq::wait()
 {
     ucc_status_t status;
     while (UCC_OK != (status = test())) {
         if (status < 0) {
-            return;
+            break;
         }
         team->progress();
     }
+    return status;
 }
 
 void UccReq::waitall(std::vector<UccReq> &reqs)
