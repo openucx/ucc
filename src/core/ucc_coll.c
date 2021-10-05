@@ -181,6 +181,10 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     op_args.mask = 0;
     memcpy(&op_args.args, coll_args, sizeof(ucc_coll_args_t));
     op_args.team = team;
+    op_args.args.flags = 0;
+    UCC_COPY_PARAM_BY_FIELD(&op_args.args, coll_args, UCC_COLL_ARGS_FIELD_FLAGS,
+                            flags);
+
     cl_team      = ucc_select_cl_team(coll_args, team);
     status =
         UCC_CL_TEAM_IFACE(cl_team)->coll.init(&op_args, &cl_team->super, &task);
