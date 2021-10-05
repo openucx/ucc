@@ -135,6 +135,7 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
     team->runtime_oob  = params->oob;
     team->num_contexts = num_contexts;
     team->size         = team_size;
+    team->seq_num      = 0;
     team->contexts =
         ucc_malloc(sizeof(ucc_context_t *) * num_contexts, "ucc_team_ctx");
     if (!team->contexts) {
