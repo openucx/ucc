@@ -35,6 +35,13 @@ typedef int                        ucc_score_t;
 #define UCC_MASK     UCS_MASK
 #define UCC_EMPTY_STATEMENT {}
 
+#define UCC_COPY_PARAM_BY_FIELD(_dst, _src, _FIELD, _field)                    \
+    do {                                                                       \
+        if ((_src)->mask & (_FIELD)) {                                         \
+            (_dst)->_field = (_src)->_field;                                   \
+        }                                                                      \
+    } while (0)
+
 static inline ucc_status_t ucs_status_to_ucc_status(ucs_status_t status)
 {
     switch (status) {
