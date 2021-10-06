@@ -1014,13 +1014,13 @@ typedef struct ucc_team_p2p_conn {
 typedef enum {
 
     /**
-      * When set to this value, the collective participants shall invoke the operation
+      * When set to this value, the collective participants shall post the operation
       * in the same order.
       */
     UCC_COLLECTIVE_POST_ORDERED             = 0,
 
     /**
-      * When set to this value, the collective participants shall invoke the operation
+      * When set to this value, the collective participants shall post the operation
       * in any order.
       */
     UCC_COLLECTIVE_POST_UNORDERED           = 1,
@@ -1039,13 +1039,13 @@ typedef enum {
 
     /**
       * When set to this value, the collective participants shall initialize and
-      * invoke the operation in the same order.
+      * post the operation in the same order.
       */
     UCC_COLLECTIVE_INIT_AND_POST_ORDERED    = 4,
 
     /**
       * When set to this value, the collective participants shall initialize and
-      * invoke the operation in any order.
+      * post the operation in any order.
       */
     UCC_COLLECTIVE_INIT_AND_POST_UNORDERED  = 5
 } ucc_post_ordering_t;
@@ -1188,19 +1188,16 @@ typedef struct ucc_team_params {
      *
      * - When both are not provided. The library is responsible for generating the ep,
      * which can be then queried via the @ref ucc_team_get_attr interface. This
-     * requires, however,
-     * ucc_params_t ep_map to be set and context created by @ref ucc_oob_coll.
-     * The behavior is
-     * undefined, when neither @ref ucc_team_params.ep or @ref
-     * ucc_team_params.ep_map, or @ref ucc_team_params.oob is not set.
+     * requires, however, ucc_params_t ep_map to be set and context created by
+     * @ref ucc_oob_coll. The behavior is undefined, when neither @ref
+     * ucc_team_params.ep or @ref ucc_team_params.ep_map, or @ref
+     * ucc_team_params.oob is not set.
      *
      * - When @ref ucc_team_params.ep is provided and @ref ucc_team_params.oob is
-     * not provided. The “ep” is the unique integer
-     * for the participant.
+     * not provided. The “ep” is the unique integer for the participant.
      *
      * - When @ref ucc_oob_coll.oob_ep is provided and @ref ucc_team_params.ep
-     * is not provided. The “ep” will be
-     * equivalent to @ref ucc_oob_coll.oob_ep.
+     * is not provided. The “ep” will be equivalent to @ref ucc_oob_coll.oob_ep.
      *
      * - When both are provided, the @ref ucc_oob_coll.oob_ep and @ref
      * ucc_team_params_t.ep should be same. Otherwise, it
