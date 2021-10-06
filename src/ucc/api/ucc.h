@@ -1012,8 +1012,42 @@ typedef struct ucc_team_p2p_conn {
  *  @ingroup UCC_TEAM_DT
  */
 typedef enum {
-    UCC_COLLECTIVE_POST_ORDERED     = 0,
-    UCC_COLLECTIVE_POST_UNORDERED   = 1
+
+    /**
+      * When set to this value, the collective participants shall post the operation
+      * in the same order.
+      */
+    UCC_COLLECTIVE_POST_ORDERED             = 0,
+
+    /**
+      * When set to this value, the collective participants shall post the operation
+      * in any order.
+      */
+    UCC_COLLECTIVE_POST_UNORDERED           = 1,
+
+    /**
+      * When set to this value, the collective participants shall initialize the operation
+      * in the same order.
+      */
+    UCC_COLLECTIVE_INIT_ORDERED             = 2,
+
+    /**
+      * When set to this value, the collective participants shall initialize the operation
+      * in any order.
+      */
+    UCC_COLLECTIVE_INIT_UNORDERED           = 3,
+
+    /**
+      * When set to this value, the collective participants shall initialize and
+      * post the operation in the same order.
+      */
+    UCC_COLLECTIVE_INIT_AND_POST_ORDERED    = 4,
+
+    /**
+      * When set to this value, the collective participants shall initialize and
+      * post the operation in any order.
+      */
+    UCC_COLLECTIVE_INIT_AND_POST_UNORDERED  = 5
 } ucc_post_ordering_t;
 
 /**
@@ -1097,22 +1131,110 @@ typedef struct ucc_ep_map_t {
  *  the fields is not set, the fields are not defined.
  *
  *
+ *
  *  @endparblock
  *
  */
 typedef struct ucc_team_params {
+
     uint64_t                mask;
+    /** @ref ucc_team_params.ordering is set to one the values defined by @ref
+      *  ucc_post_ordering_t
+      */
     ucc_post_ordering_t     ordering;
+
+    /** @ref ucc_team_params.outstanding_colls represents the number of outstanding non-blocking
+      * calls the user expects to post to the team. If the user posts more non-blocking
+      * calls than set, the behavior is undefined. If not set, there is no limit on
+      * the number of outstanding calls to be posted.
+      */
     uint64_t                outstanding_colls;
+
+    /** @ref ucc_team_params.ep The endpoint is a non-negative unique integer identifying the
+      * participant in the collective. If ep is not set, and @ref ucc_team_params.oob is not set, the
+      * library generates the ep. The generated ep can be queried using the @ref
+      * ucc_team_get_attr interface.
+      */
     uint64_t                ep;
+
+    /** @ref ucc_team_params.ep_list The endpoint list provides the list of eps participating to
+     *  create the team.
+     */
     uint64_t                *ep_list;
+
+    /** @ref ucc_team_params.ep_range can be either contiguous or not
+     *  contiguous. It is a hint to the library.
+     */
     ucc_ep_range_type_t     ep_range;
+
+    /** @ref ucc_team_params.team_size The team size is the number of participants in the team. If
+      * @ref ucc_team_params.oob is provided, the team size and @ref
+      * ucc_oob_coll.n_oob_eps should be the same.
+      */
     uint64_t                team_size;
+
+    /**
+      * @ref ucc_team_params.sync_type The options for sync_type are provided by @ref
+      * ucc_coll_sync_type_t
+      */
     ucc_coll_sync_type_t    sync_type;
+
+   /** @ref ucc_team_params.oob The signature of the function is defined by @ref
+     * ucc_oob_coll_t
+     * . The oob is used for exchanging information between the team
+     * participants during team creation. The user is
+     * responsible for implementing the oob operation. The relation between @ref
+     * ucc_team_params.ep and @ref ucc_oob_coll.oob_ep is defined as below:
+     *
+     * - When both are not provided. The library is responsible for generating the ep,
+     * which can be then queried via the @ref ucc_team_get_attr interface. This
+     * requires, however, ucc_params_t ep_map to be set and context created by
+     * @ref ucc_oob_coll. The behavior is undefined, when neither @ref
+     * ucc_team_params.ep or @ref ucc_team_params.ep_map, or @ref
+     * ucc_team_params.oob is not set.
+     *
+     * - When @ref ucc_team_params.ep is provided and @ref ucc_team_params.oob is
+     * not provided. The “ep” is the unique integer for the participant.
+     *
+     * - When @ref ucc_oob_coll.oob_ep is provided and @ref ucc_team_params.ep
+     * is not provided. The “ep” will be equivalent to @ref ucc_oob_coll.oob_ep.
+     *
+     * - When both are provided, the @ref ucc_oob_coll.oob_ep and @ref
+     * ucc_team_params_t.ep should be same. Otherwise, it
+     * is undefined.
+     */
     ucc_team_oob_coll_t     oob;
+
+    /** @ref ucc_team_params.p2p_conn is a callback function for the gathering
+      * the point-to-point communication information.
+      */
     ucc_team_p2p_conn_t     p2p_conn;
+
+    /** @ref ucc_team_params.mem_params provides an ability to attach a buffer
+      * to the team. This can be used as input/output or control buffer for the
+      * team. Typically, it can be useful for one-sided collective
+      * implementation.
+      */
     ucc_mem_map_params_t    mem_params;
+
+    /** @ref ucc_team_params.ep_map provides a mapping between @ref
+      * ucc_oob_coll.oob_ep used by
+      * the team and @ref ucc_oob_coll.oob_ep
+      * used by the context. The mapping options are defined by @ref
+      * ucc_ep_map_t. The definition is valid only when context is created with
+      * an @ref ucc_oob_coll.
+      */
     ucc_ep_map_t            ep_map;
+
+    /** @ref ucc_team_params.id
+      * The team id is a unique integer identifying the team that is active. The
+      * integer is unique within the process and not the job .i.e., any two active
+      * non-overlapping teams can have the same id. This semantic helps to avoid a
+      * global information exchange .i.e, the processes or threads not
+      * participating in the particular, need not participate in the team
+      * creation. If not provided, the team id is created internally. For the MPI
+      * programming model, this can be inherited from the MPI communicator id.
+      */
     uint64_t                id;
 } ucc_team_params_t;
 
