@@ -161,21 +161,21 @@ ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)
     return status;
 }
 
-ucc_status_t ucc_cl_basic_team_get_scores(ucc_base_team_t *cl_team,
+ucc_status_t ucc_cl_basic_team_get_scores(ucc_base_team_t   *cl_team,
                                           ucc_coll_score_t **score)
 {
     ucc_cl_basic_team_t *team = ucc_derived_of(cl_team, ucc_cl_basic_team_t);
     ucc_base_lib_t      *lib  = UCC_CL_TEAM_LIB(team);
     ucc_status_t         status;
 
-    status =  ucc_coll_score_dup(team->score, score);
+    status = ucc_coll_score_dup(team->score, score);
     if (UCC_OK != status) {
         return status;
     }
     if (strlen(lib->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->score_str, *score, cl_team->team->size,
-            NULL, cl_team, UCC_CL_BASIC_DEFAULT_SCORE, NULL);
+            lib->score_str, *score, cl_team->team->size, NULL, cl_team,
+            UCC_CL_BASIC_DEFAULT_SCORE, NULL);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&

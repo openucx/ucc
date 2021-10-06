@@ -10,8 +10,8 @@
 #include "utils/ucc_coll_utils.h"
 
 ucc_status_t ucc_cl_hier_coll_init(ucc_base_coll_args_t *coll_args,
-                                    ucc_base_team_t *team,
-                                    ucc_coll_task_t **task)
+                                   ucc_base_team_t      *team,
+                                   ucc_coll_task_t     **task)
 {
     return UCC_ERR_NOT_IMPLEMENTED;
 }

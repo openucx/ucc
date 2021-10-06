@@ -146,5 +146,5 @@ ucc_status_t ucc_coll_init(ucc_score_map_t      *map,
                            ucc_coll_task_t     **task);
 
 ucc_status_t ucc_coll_score_dup(const ucc_coll_score_t *in,
-                                ucc_coll_score_t **out);
+                                ucc_coll_score_t      **out);
 #endif

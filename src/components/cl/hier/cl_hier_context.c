@@ -9,13 +9,13 @@
 
 UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
                     const ucc_base_context_params_t *params,
-                    const ucc_base_config_t *config)
+                    const ucc_base_config_t         *config)
 {
     const ucc_cl_context_config_t *cl_config =
         ucc_derived_of(config, ucc_cl_context_config_t);
-    ucc_config_names_array_t      *tls       = &cl_config->cl_lib->tls;
-    ucc_status_t status;
-    int          i;
+    ucc_config_names_array_t *tls = &cl_config->cl_lib->tls;
+    ucc_status_t              status;
+    int                       i;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_config->cl_lib,
                               params->context);
@@ -23,11 +23,11 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
         tls = &params->context->all_tls;
     }
 
-    self->tl_ctxs = ucc_malloc(sizeof(ucc_tl_context_t*) * tls->count,
-                               "cl_hier_tl_ctxs");
+    self->tl_ctxs =
+        ucc_malloc(sizeof(ucc_tl_context_t *) * tls->count, "cl_hier_tl_ctxs");
     if (!self->tl_ctxs) {
         cl_error(cl_config->cl_lib, "failed to allocate %zd bytes for tl_ctxs",
-                 sizeof(ucc_tl_context_t**) * tls->count);
+                 sizeof(ucc_tl_context_t **) * tls->count);
         return UCC_ERR_NO_MEMORY;
     }
     self->n_tl_ctxs = 0;
@@ -65,7 +65,7 @@ UCC_CLASS_DEFINE(ucc_cl_hier_context_t, ucc_cl_context_t);
 
 ucc_status_t
 ucc_cl_hier_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                              ucc_base_ctx_attr_t      *attr)
+                             ucc_base_ctx_attr_t      *attr)
 {
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
         attr->attr.ctx_addr_len = 0;

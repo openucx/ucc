@@ -16,7 +16,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_lib_t, const ucc_base_lib_params_t *params,
 {
     const ucc_cl_hier_lib_config_t *cl_hier_config =
         ucc_derived_of(config, ucc_cl_hier_lib_config_t);
-    int i;
+    int          i;
     ucc_status_t status;
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_lib_t, &ucc_cl_hier.super,
                               &cl_hier_config->super);
@@ -67,7 +67,7 @@ static inline ucc_status_t check_tl_lib_attr(const ucc_base_lib_t *lib,
 }
 
 ucc_status_t ucc_cl_hier_get_lib_attr(const ucc_base_lib_t *lib,
-                                       ucc_base_lib_attr_t  *base_attr)
+                                      ucc_base_lib_attr_t  *base_attr)
 {
     ucc_cl_lib_attr_t *attr   = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
     ucc_cl_lib_t *     cl_lib = ucc_derived_of(lib, ucc_cl_lib_t);

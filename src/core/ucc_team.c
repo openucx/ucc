@@ -349,26 +349,23 @@ static ucc_status_t ucc_team_build_score_map(ucc_team_t *team)
     int               i;
 
     ucc_assert(team->n_cl_teams > 0);
-    status =
-        UCC_CL_TEAM_IFACE(team->cl_teams[0])
-        ->team.get_scores(&team->cl_teams[0]->super, &score);
+    status = UCC_CL_TEAM_IFACE(team->cl_teams[0])
+                 ->team.get_scores(&team->cl_teams[0]->super, &score);
     if (UCC_OK != status) {
         ucc_error("failed to get cl %s scores",
                   UCC_CL_TEAM_IFACE(team->cl_teams[0])->super.name);
         return status;
     }
     for (i = 1; i < team->n_cl_teams; i++) {
-        status =
-            UCC_CL_TEAM_IFACE(team->cl_teams[i])
-            ->team.get_scores(&team->cl_teams[i]->super, &score_next);
+        status = UCC_CL_TEAM_IFACE(team->cl_teams[i])
+                     ->team.get_scores(&team->cl_teams[i]->super, &score_next);
         if (UCC_OK != status) {
             ucc_error("failed to get cl %s scores",
                       UCC_CL_TEAM_IFACE(team->cl_teams[i])->super.name);
             ucc_coll_score_free(score);
             return status;
         }
-        status =
-            ucc_coll_score_merge(score, score_next, &score_merge, 1);
+        status = ucc_coll_score_merge(score, score_next, &score_merge, 1);
         if (UCC_OK != status) {
             ucc_error("failed to merge scores");
             ucc_coll_score_free(score);
