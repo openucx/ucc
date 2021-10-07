@@ -157,7 +157,7 @@ uint64_t rank_map_cb(uint64_t ep, void *cb_ctx) {
     return (uint64_t)team->procs[(int)ep].p.get()->job_rank;
 }
 
-void UccTeam::init_team(bool use_team_ep_map)
+void UccTeam::init_team(bool use_team_ep_map, bool use_ep_range)
 {
     ucc_team_params_t                    team_params;
     std::vector<allgather_coll_info_t *> cis;
@@ -166,10 +166,14 @@ void UccTeam::init_team(bool use_team_ep_map)
         cis.push_back(new allgather_coll_info);
         cis.back()->self     = this;
         cis.back()->my_rank  = i;
-        team_params.ep       = i;
-        team_params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
-        team_params.mask     = UCC_TEAM_PARAM_FIELD_EP  |
-                               UCC_TEAM_PARAM_FIELD_EP_RANGE;
+        if (use_ep_range) {
+            team_params.ep       = i;
+            team_params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+            team_params.mask     = UCC_TEAM_PARAM_FIELD_EP  |
+                UCC_TEAM_PARAM_FIELD_EP_RANGE;
+        } else {
+            team_params.mask = 0;
+        }
         if (use_team_ep_map) {
             team_params.mask |= UCC_TEAM_PARAM_FIELD_EP_MAP;
             team_params.ep_map.type      = UCC_EP_MAP_CB;
@@ -236,7 +240,8 @@ void UccTeam::progress()
     }
 }
 
-UccTeam::UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map)
+UccTeam::UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map,
+                 bool use_ep_range)
 {
     n_procs = _procs.size();
     ag.resize(n_procs);
@@ -247,7 +252,7 @@ UccTeam::UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map)
         a.phase = AG_INIT;
     }
     copy_complete_count = 0;
-    init_team(use_team_ep_map);
+    init_team(use_team_ep_map, use_ep_range);
     // test_allgather(128);
 }
 
@@ -458,24 +463,26 @@ void UccJob::cleanup()
     }
 }
 
-UccTeam_h UccJob::create_team(int _n_procs)
+UccTeam_h UccJob::create_team(int _n_procs, bool use_team_ep_map,
+                          bool use_ep_range)
 {
     EXPECT_GE(n_procs, _n_procs);
     std::vector<UccProcess_h> team_procs;
     for (int i=0; i<_n_procs; i++) {
         team_procs.push_back(procs[i]);
     }
-    return std::make_shared<UccTeam>(team_procs);
+    return std::make_shared<UccTeam>(team_procs, use_team_ep_map, use_ep_range);
 }
 
-UccTeam_h UccJob::create_team(std::vector<int> &ranks, bool use_team_ep_map)
+UccTeam_h UccJob::create_team(std::vector<int> &ranks, bool use_team_ep_map,
+                              bool use_ep_range)
 {
     EXPECT_GE(n_procs, ranks.size());
     std::vector<UccProcess_h> team_procs;
     for (int i=0; i<ranks.size(); i++) {
         team_procs.push_back(procs[ranks[i]]);
     }
-    return std::make_shared<UccTeam>(team_procs, use_team_ep_map);
+    return std::make_shared<UccTeam>(team_procs, use_team_ep_map, use_ep_range);
 }
 
 
