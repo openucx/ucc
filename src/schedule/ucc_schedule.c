@@ -42,6 +42,7 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
     task->team             = team;
     task->n_deps           = 0;
     task->n_deps_satisfied = 0;
+    task->bargs.args.mask  = 0;
     if (bargs) {
         memcpy(&task->bargs, bargs, sizeof(*bargs));
     }
