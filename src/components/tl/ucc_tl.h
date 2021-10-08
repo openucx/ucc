@@ -127,4 +127,6 @@ typedef struct ucc_tl_lib_attr {
 
 #define UCC_TL_CORE_CTX(_tl_team) ((_tl_team)->super.super.context->ucc_context)
 
+#define UCC_TL_CTX_OOB(_ctx) ((_ctx)->super.super.ucc_context->params.oob)
+
 #endif

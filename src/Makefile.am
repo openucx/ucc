@@ -18,6 +18,10 @@ if HAVE_NCCL
 tl_dirs += components/tl/nccl
 endif
 
+if HAVE_SHARP
+tl_dirs += components/tl/sharp
+endif
+
 SUBDIRS = . $(cl_dirs) $(tl_dirs) $(mc_dirs)
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =
@@ -60,6 +64,7 @@ noinst_HEADERS =                      \
 	utils/khash.h                     \
 	utils/ucc_spinlock.h              \
 	utils/ucc_mpool.h                 \
+	utils/ucc_rcache.h                \
 	utils/profile/ucc_profile.h       \
 	utils/profile/ucc_profile_on.h    \
 	utils/profile/ucc_profile_off.h   \
