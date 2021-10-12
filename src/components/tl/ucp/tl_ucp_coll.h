@@ -163,9 +163,6 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
 
 ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task);
 
-ucc_status_t ucc_tl_ucp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
-                                       ucc_coll_task_t *coll_task);
-
 static inline ucc_tl_ucp_task_t *
 ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
 {
@@ -176,7 +173,7 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     task->tag            = tl_team->seq_num;
     tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
     task->super.finalize = ucc_tl_ucp_coll_finalize;
-    task->super.triggered_post = ucc_tl_ucp_triggered_post;
+    task->super.triggered_post = ucc_triggered_post;
     return task;
 }
 

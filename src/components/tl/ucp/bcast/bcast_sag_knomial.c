@@ -106,7 +106,7 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
     schedule->super.post           = ucc_tl_ucp_bcast_sag_knomial_start;
     schedule->super.progress       = NULL;
     schedule->super.finalize       = ucc_tl_ucp_bcast_sag_knomial_finalize;
-    schedule->super.triggered_post = ucc_tl_ucp_triggered_post;
+    schedule->super.triggered_post = ucc_triggered_post;
     *task_h                        = &schedule->super;
     return UCC_OK;
 out:
