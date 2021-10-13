@@ -621,8 +621,7 @@ enum ucc_context_params_field {
     UCC_CONTEXT_PARAM_FIELD_SYNC_TYPE         = UCC_BIT(1),
     UCC_CONTEXT_PARAM_FIELD_OOB               = UCC_BIT(2),
     UCC_CONTEXT_PARAM_FIELD_ID                = UCC_BIT(3),
-    UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS        = UCC_BIT(4),
-    UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS_TYPE   = UCC_BIT(5)
+    UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS        = UCC_BIT(4)
 };
 
 /**
@@ -661,15 +660,6 @@ typedef struct ucc_oob_coll {
 
 typedef ucc_oob_coll_t ucc_context_oob_coll_t;
 typedef ucc_oob_coll_t ucc_team_oob_coll_t;
-
-/**
- *
- *  @ingroup UCC_CONTEXT_DT
- */
-typedef enum {
-    UCC_MEM_SYMMETRIC_SEGMENTS  = 0,
-    UCC_MEM_ASYMMETRIC_SEGMENTS = 1
-} ucc_mem_map_type_t;
 
 /**
  *
@@ -741,7 +731,6 @@ typedef struct ucc_context_params {
     ucc_coll_sync_type_t    sync_type;
     ucc_context_oob_coll_t  oob;
     uint64_t                ctx_id;
-    ucc_mem_map_type_t      mem_params_type;
     ucc_mem_map_params_t    mem_params;
 } ucc_context_params_t;
 
