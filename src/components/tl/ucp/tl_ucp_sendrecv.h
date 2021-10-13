@@ -3,10 +3,12 @@
  *
  * See file LICENSE for terms.
  */
+
 #include "config.h"
 
 #ifndef UCC_TL_UCP_SENDRECV_H_
 #define UCC_TL_UCP_SENDRECV_H_
+
 #include "tl_ucp_tag.h"
 #include "tl_ucp_ep.h"
 #include "utils/ucc_compiler_def.h"
@@ -16,15 +18,16 @@ extern ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1];
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data);
+
 void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
                                    const ucp_tag_recv_info_t *info,
                                    void *user_data);
 
-#define UCC_TL_UCP_MAKE_TAG(_tag, _rank, _id, _scope_id, _scope)       \
-    ((((uint64_t) (_tag))      << UCC_TL_UCP_TAG_BITS_OFFSET)      |   \
-     (((uint64_t) (_rank))     << UCC_TL_UCP_SENDER_BITS_OFFSET)   |   \
-     (((uint64_t) (_scope))    << UCC_TL_UCP_SCOPE_BITS_OFFSET)    |   \
-     (((uint64_t) (_scope_id)) << UCC_TL_UCP_SCOPE_ID_BITS_OFFSET) |   \
+#define UCC_TL_UCP_MAKE_TAG(_tag, _rank, _id, _scope_id, _scope)               \
+    ((((uint64_t) (_tag))      << UCC_TL_UCP_TAG_BITS_OFFSET)      |           \
+     (((uint64_t) (_rank))     << UCC_TL_UCP_SENDER_BITS_OFFSET)   |           \
+     (((uint64_t) (_scope))    << UCC_TL_UCP_SCOPE_BITS_OFFSET)    |           \
+     (((uint64_t) (_scope_id)) << UCC_TL_UCP_SCOPE_ID_BITS_OFFSET) |           \
      (((uint64_t) (_id))       << UCC_TL_UCP_ID_BITS_OFFSET))
 
 #define UCC_TL_UCP_MAKE_SEND_TAG(_tag, _rank, _id, _scope_id, _scope)          \
@@ -50,7 +53,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
                      ucs_status_string(UCS_PTR_STATUS(ucp_status)));           \
             ucp_request_cancel(UCC_TL_UCP_WORKER(team), ucp_status);           \
             ucp_request_free(ucp_status);                                      \
-            return UCC_ERR_NO_MESSAGE;                                         \
+            return ucs_status_to_ucc_status(UCS_PTR_STATUS(ucp_status));       \
         }                                                                      \
     } while (0)
 
@@ -81,7 +84,7 @@ static inline ucc_status_t ucc_tl_ucp_send_nb(void *buffer, size_t msglen,
     req_param.user_data   = (void *)task;
     ucp_status = ucp_tag_send_nbx(ep, buffer, 1, ucp_tag, &req_param);
     task->send_posted++;
-    if (UCC_OK != ucp_status) {
+    if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
     } else {
         task->send_completed++;
@@ -111,7 +114,7 @@ static inline ucc_status_t ucc_tl_ucp_recv_nb(void *buffer, size_t msglen,
     ucp_status = ucp_tag_recv_nbx(UCC_TL_UCP_WORKER(team), buffer, 1, ucp_tag,
                                   ucp_tag_mask, &req_param);
     task->recv_posted++;
-    if (UCC_OK != ucp_status) {
+    if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
     } else {
         task->recv_completed++;
