@@ -126,6 +126,9 @@ class test_allreduce : public UccCollArgs, public testing::Test {
             for (int r = 1; r < ctxs.size(); r++) {
                 res = T::do_op(res, ((typename T::type *)((ctxs[r])->init_buf))[i]);
             }
+            if (T::redop == UCC_OP_AVG) {
+                res = res / (typename T::type)ctxs.size();
+            }
             for (int r = 0; r < ctxs.size(); r++) {
                 T::assert_equal(res, dsts[r][i]);
             }
@@ -269,6 +272,49 @@ TYPED_TEST(test_allreduce_alg, sra_knomial_pipelined) {
     }
 
     for (auto count : {65536, 123567}) {
+        for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+            for (auto m : mt) {
+                this->set_mem_type(m);
+                this->set_inplace(inplace);
+                this->data_init(n_procs, TypeParam::dt, count, ctxs);
+                UccReq req(team, ctxs);
+
+                for (auto i = 0; i < repeat; i++) {
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->reset(ctxs);
+                }
+                this->data_fini(ctxs);
+            }
+        }
+    }
+}
+
+template <typename T>
+class test_allreduce_avg_order : public test_allreduce<T> {
+};
+
+using test_allreduce_avg_order_type =
+    ::testing::Types<ReductionTest<UCC_DT_FLOAT32, avg>,
+                     ReductionTest<UCC_DT_FLOAT64, avg>>;
+TYPED_TEST_CASE(test_allreduce_avg_order, test_allreduce_avg_order_type);
+
+TYPED_TEST(test_allreduce_avg_order, avg_post_op)
+{
+    int           n_procs = 15;
+    ucc_job_env_t env     = {{"UCC_TL_UCP_REDUCE_AVG_PRE_OP", "0"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 3;
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+
+    for (auto count : {4, 256, 65536}) {
         for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
             for (auto m : mt) {
                 this->set_mem_type(m);

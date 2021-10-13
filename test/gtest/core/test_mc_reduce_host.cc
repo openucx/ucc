@@ -31,3 +31,41 @@ TYPED_TEST(test_mc_reduce, ucc_reduce_multi_host) {
         TypeParam::assert_equal(res, this->res_h[i]);
     }
 }
+
+TYPED_TEST(test_mc_reduce_alpha, ucc_reduce_multi_alpha_host) {
+    const int num_vec = 3;
+    const double alpha = 0.7;
+    this->alloc_bufs(UCC_MEMORY_TYPE_HOST, num_vec);
+    ucc_mc_reduce_multi_alpha(this->buf1_h, this->buf2_h, this->res_h, num_vec,
+                              this->COUNT, this->COUNT*sizeof(*this->buf2_h),
+                              TypeParam::dt, TypeParam::redop, UCC_OP_PROD, alpha,
+                              UCC_MEMORY_TYPE_HOST);
+    for (int i = 0; i < this->COUNT; i++) {
+        typename TypeParam::type res = TypeParam::do_op(this->buf1_h[i],
+                                                        this->buf2_h[i]);
+        for (int j = 1; j < num_vec; j++) {
+            res = TypeParam::do_op(this->buf2_h[i + j * this->COUNT], res);
+        }
+        res *= (typename TypeParam::type)alpha;
+        TypeParam::assert_equal(res, this->res_h[i]);
+    }
+}
+
+TYPED_TEST(test_mc_reduce_alpha, ucc_reduce_multi_alpha_host_many_vectors) {
+    const int num_vec = 20;
+    const double alpha = 0.7;
+    this->alloc_bufs(UCC_MEMORY_TYPE_HOST, num_vec);
+    ucc_mc_reduce_multi_alpha(this->buf1_h, this->buf2_h, this->res_h, num_vec,
+                              this->COUNT, this->COUNT*sizeof(*this->buf2_h),
+                              TypeParam::dt, TypeParam::redop, UCC_OP_PROD, alpha,
+                              UCC_MEMORY_TYPE_HOST);
+    for (int i = 0; i < this->COUNT; i++) {
+        typename TypeParam::type res = TypeParam::do_op(this->buf1_h[i],
+                                                        this->buf2_h[i]);
+        for (int j = 1; j < num_vec; j++) {
+            res = TypeParam::do_op(this->buf2_h[i + j * this->COUNT], res);
+        }
+        res *= (typename TypeParam::type)alpha;
+        TypeParam::assert_equal(res, this->res_h[i]);
+    }
+}

@@ -55,6 +55,7 @@ typedef struct ucc_tl_ucp_lib_config {
     int                 allreduce_sra_kn_seq;
     size_t              allreduce_sra_kn_frag_thresh;
     size_t              allreduce_sra_kn_frag_size;
+    int                 reduce_avg_pre_op;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {
@@ -123,16 +124,6 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 
 #define IS_SERVICE_TEAM(_team) ((_team)->scope == UCC_CL_LAST + 1)
 
-// TODO remove once AVG is implemented
-#define CHECK_AVG_OP(_args, _team)                                             \
-    do {                                                                       \
-        if (_args.reduce.predefined_op == UCC_OP_AVG) {                        \
-            tl_error(UCC_TL_TEAM_LIB(_team),                                   \
-                     "Average reduction is not supported yet");                \
-            status = UCC_ERR_NOT_SUPPORTED;                                    \
-            goto out;                                                          \
-        }                                                                      \
-    } while (0)
 
 void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
                                  size_t length, ucc_memory_type_t mem_type);

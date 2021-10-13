@@ -18,7 +18,8 @@ static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
 static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
                                              UCC_DT_FLOAT32, UCC_DT_FLOAT64};
-static std::vector<ucc_reduction_op_t> ops = {UCC_OP_SUM, UCC_OP_MAX};
+static std::vector<ucc_reduction_op_t>     ops    = {UCC_OP_SUM, UCC_OP_MAX,
+                                              UCC_OP_AVG};
 static std::vector<ucc_test_mpi_team_t> teams = {TEAM_WORLD, TEAM_REVERSE,
                                                  TEAM_SPLIT_HALF, TEAM_SPLIT_ODD_EVEN};
 static std::vector<ucc_test_vsize_flag_t> counts_vsize = {TEST_FLAG_VSIZE_32BIT,
@@ -197,6 +198,8 @@ static ucc_reduction_op_t op_str_to_type(std::string op)
         return UCC_OP_BOR;
     } else if (op == "bxor") {
         return UCC_OP_BXOR;
+    } else if (op == "avg") {
+        return UCC_OP_AVG;
     } else {
         std::cerr << "incorrect op: " << op << std::endl;
         PrintHelp();

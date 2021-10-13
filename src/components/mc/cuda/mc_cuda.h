@@ -94,6 +94,12 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
                                       ucc_datatype_t dt,
                                       ucc_reduction_op_t op);
 
+ucc_status_t
+ucc_mc_cuda_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
+                               size_t n_vectors, size_t count, size_t stride,
+                               ucc_datatype_t dt, ucc_reduction_op_t reduce_op,
+                               ucc_reduction_op_t vector_op, double alpha);
+
 extern ucc_mc_cuda_t ucc_mc_cuda;
 #define CUDACHECK(cmd) do {                                                    \
         cudaError_t e = cmd;                                                   \

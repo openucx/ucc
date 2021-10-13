@@ -95,9 +95,17 @@ public:
     }
 };
 
-template<typename T>
-class prod {
-public:
+template <typename T> class avg {
+  public:
+    const static ucc_reduction_op_t redop = UCC_OP_AVG;
+    T operator()(T arg1, T arg2)
+    {
+        return arg1 + arg2;
+    }
+};
+
+template <typename T> class prod {
+  public:
     const static ucc_reduction_op_t redop = UCC_OP_PROD;
     T operator()(T arg1, T arg2) {
         return arg1 * arg2;
@@ -274,43 +282,33 @@ class test_mc_reduce : public testing::Test {
 
 };
 
-using ReductionTypesOps = ::testing::Types<ReductionTest<UCC_DT_INT16, max>,
-                                           ReductionTest<UCC_DT_INT32, max>,
-                                           ReductionTest<UCC_DT_INT64, max>,
-                                           ReductionTest<UCC_DT_INT16, min>,
-                                           ReductionTest<UCC_DT_INT32, min>,
-                                           ReductionTest<UCC_DT_INT64, min>,
-                                           ReductionTest<UCC_DT_INT16, sum>,
-                                           ReductionTest<UCC_DT_INT32, sum>,
-                                           ReductionTest<UCC_DT_INT64, sum>,
-                                           ReductionTest<UCC_DT_INT16, prod>,
-                                           ReductionTest<UCC_DT_INT32, prod>,
-                                           ReductionTest<UCC_DT_INT64, prod>,
-                                           ReductionTest<UCC_DT_INT16, land>,
-                                           ReductionTest<UCC_DT_INT32, land>,
-                                           ReductionTest<UCC_DT_INT64, land>,
-                                           ReductionTest<UCC_DT_INT16, band>,
-                                           ReductionTest<UCC_DT_INT32, band>,
-                                           ReductionTest<UCC_DT_INT64, band>,
-                                           ReductionTest<UCC_DT_INT16, lor>,
-                                           ReductionTest<UCC_DT_INT32, lor>,
-                                           ReductionTest<UCC_DT_INT64, lor>,
-                                           ReductionTest<UCC_DT_INT16, bor>,
-                                           ReductionTest<UCC_DT_INT32, bor>,
-                                           ReductionTest<UCC_DT_INT64, bor>,
-                                           ReductionTest<UCC_DT_INT16, lxor>,
-                                           ReductionTest<UCC_DT_INT32, lxor>,
-                                           ReductionTest<UCC_DT_INT64, lxor>,
-                                           ReductionTest<UCC_DT_INT16, bxor>,
-                                           ReductionTest<UCC_DT_INT32, bxor>,
-                                           ReductionTest<UCC_DT_INT64, bxor>,
-                                           ReductionTest<UCC_DT_FLOAT32, max>,
-                                           ReductionTest<UCC_DT_FLOAT64, max>,
-                                           ReductionTest<UCC_DT_FLOAT32, min>,
-                                           ReductionTest<UCC_DT_FLOAT64, min>,
-                                           ReductionTest<UCC_DT_FLOAT32, sum>,
-                                           ReductionTest<UCC_DT_FLOAT64, sum>,
-                                           ReductionTest<UCC_DT_FLOAT32, prod>,
-                                           ReductionTest<UCC_DT_FLOAT64, prod>>;
+template<typename T>
+class test_mc_reduce_alpha : public test_mc_reduce<T> {};
+
+using ReductionTypesOps = ::testing::Types<
+    ReductionTest<UCC_DT_INT16, max>, ReductionTest<UCC_DT_INT32, max>,
+    ReductionTest<UCC_DT_INT64, max>, ReductionTest<UCC_DT_INT16, min>,
+    ReductionTest<UCC_DT_INT32, min>, ReductionTest<UCC_DT_INT64, min>,
+    ReductionTest<UCC_DT_INT16, sum>, ReductionTest<UCC_DT_INT32, sum>,
+    ReductionTest<UCC_DT_INT64, sum>, ReductionTest<UCC_DT_INT16, prod>,
+    ReductionTest<UCC_DT_INT32, prod>, ReductionTest<UCC_DT_INT64, prod>,
+    ReductionTest<UCC_DT_INT16, land>, ReductionTest<UCC_DT_INT32, land>,
+    ReductionTest<UCC_DT_INT64, land>, ReductionTest<UCC_DT_INT16, band>,
+    ReductionTest<UCC_DT_INT32, band>, ReductionTest<UCC_DT_INT64, band>,
+    ReductionTest<UCC_DT_INT16, lor>, ReductionTest<UCC_DT_INT32, lor>,
+    ReductionTest<UCC_DT_INT64, lor>, ReductionTest<UCC_DT_INT16, bor>,
+    ReductionTest<UCC_DT_INT32, bor>, ReductionTest<UCC_DT_INT64, bor>,
+    ReductionTest<UCC_DT_INT16, lxor>, ReductionTest<UCC_DT_INT32, lxor>,
+    ReductionTest<UCC_DT_INT64, lxor>, ReductionTest<UCC_DT_INT16, bxor>,
+    ReductionTest<UCC_DT_INT32, bxor>, ReductionTest<UCC_DT_INT64, bxor>,
+    ReductionTest<UCC_DT_FLOAT32, max>, ReductionTest<UCC_DT_FLOAT64, max>,
+    ReductionTest<UCC_DT_FLOAT32, min>, ReductionTest<UCC_DT_FLOAT64, min>,
+    ReductionTest<UCC_DT_FLOAT32, sum>, ReductionTest<UCC_DT_FLOAT64, sum>,
+    ReductionTest<UCC_DT_FLOAT32, avg>, ReductionTest<UCC_DT_FLOAT64, avg>,
+    ReductionTest<UCC_DT_FLOAT32, prod>, ReductionTest<UCC_DT_FLOAT64, prod>>;
+
+using ReductionAlphaTypesOps = ::testing::Types<
+    ReductionTest<UCC_DT_FLOAT32, avg>, ReductionTest<UCC_DT_FLOAT64, avg>>;
 
 TYPED_TEST_CASE(test_mc_reduce, ReductionTypesOps);
+TYPED_TEST_CASE(test_mc_reduce_alpha, ReductionAlphaTypesOps);

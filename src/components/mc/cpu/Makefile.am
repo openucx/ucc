@@ -2,20 +2,22 @@
 # Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
 #
 
-sources =                         \
-	mc_cpu.h                      \
-	mc_cpu.c                      \
-	reduce/mc_cpu_reduce.h        \
-	reduce/mc_cpu_reduce_int8.c   \
-	reduce/mc_cpu_reduce_int16.c  \
-	reduce/mc_cpu_reduce_int32.c  \
-	reduce/mc_cpu_reduce_int64.c  \
-	reduce/mc_cpu_reduce_uint8.c  \
-	reduce/mc_cpu_reduce_uint16.c \
-	reduce/mc_cpu_reduce_uint32.c \
-	reduce/mc_cpu_reduce_uint64.c \
-	reduce/mc_cpu_reduce_float.c  \
-	reduce/mc_cpu_reduce_double.c
+sources =                                    \
+	mc_cpu.h                                 \
+	mc_cpu.c                                 \
+	reduce/mc_cpu_reduce.h                   \
+	reduce/mc_cpu_reduce_int8.c              \
+	reduce/mc_cpu_reduce_int16.c             \
+	reduce/mc_cpu_reduce_int32.c             \
+	reduce/mc_cpu_reduce_int64.c             \
+	reduce/mc_cpu_reduce_uint8.c             \
+	reduce/mc_cpu_reduce_uint16.c            \
+	reduce/mc_cpu_reduce_uint32.c            \
+	reduce/mc_cpu_reduce_uint64.c            \
+	reduce/mc_cpu_reduce_float.c             \
+	reduce/mc_cpu_reduce_double.c            \
+	reduce_alpha/mc_cpu_reduce_alpha_float.c \
+	reduce_alpha/mc_cpu_reduce_alpha_double.c
 
 
 module_LTLIBRARIES        = libucc_mc_cpu.la

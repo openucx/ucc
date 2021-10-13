@@ -57,7 +57,7 @@ ucc_status_t ucc_mc_memcpy(void *dst, const void *src, size_t len,
  * @param [out] dst      dst = src1 (op) src2{0}
  * @param [in]  count    Number of elements in dst
  * @param [in]  dtype    Vectors elements datatype
- * @param [in]  op       Reduction operation
+ * @param [in]  op       Reduction operation - Avg == Sum
  * @param [in]  mem_type Vectors memory type
  */
 ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
@@ -74,13 +74,34 @@ ucc_status_t ucc_mc_reduce(const void *src1, const void *src2, void *dst,
  * @param [in]  count     Number of elements in dst
  * @param [in]  stride    Offset between vectors in src2
  * @param [in]  dtype     Vectors elements datatype
- * @param [in]  op        Reduction operation
+ * @param [in]  op        Reduction operation - Avg == Sum
  * @param [in]  mem_type  Vectors memory type
  */
 ucc_status_t ucc_mc_reduce_multi(void *src1, void *src2, void *dst,
                                  size_t n_vectors, size_t count, size_t stride,
                                  ucc_datatype_t dtype, ucc_reduction_op_t op,
                                  ucc_memory_type_t mem_type);
+
+/**
+ * Performs reduction of multiple vectors and stores result to dst,
+ * and then performs vector_op between dst vector and alpha
+ * @param [in]  src1      First vector reduction operand
+ * @param [in]  src2      Array of vector reduction operands
+ * @param [out] dst       dst = (src1 (op) src2{0} (op) src2{1} (op) ...
+ *                                         (op) src2{size-1}) (op) alpha
+ * @param [in]  n_vectors Number of vectors in src2
+ * @param [in]  count     Number of elements in dst
+ * @param [in]  stride    Offset between vectors in src2
+ * @param [in]  dtype     Vectors elements datatype
+ * @param [in]  reduce_op Reduction operation - Avg == Sum
+ * @param [in]  vector_op Vector operation between dst and alpha
+ * @param [in]  alpha     Value for vector_op
+ * @param [in]  mem_type  Vectors memory type
+ */
+ucc_status_t ucc_mc_reduce_multi_alpha(
+    void *src1, void *src2, void *dst, size_t n_vectors, size_t count,
+    size_t stride, ucc_datatype_t dtype, ucc_reduction_op_t reduce_op,
+    ucc_reduction_op_t vector_op, double alpha, ucc_memory_type_t mem_type);
 
 static inline ucc_status_t ucc_dt_reduce(const void *src1, const void *src2,
                                          void *dst, size_t count,
@@ -96,12 +117,10 @@ static inline ucc_status_t ucc_dt_reduce(const void *src1, const void *src2,
     }
 }
 
-static inline ucc_status_t ucc_dt_reduce_multi(void *src1, void *src2,
-                                               void *dst, size_t n_vectors,
-                                               size_t count, size_t stride,
-                                               ucc_datatype_t dt,
-                                               ucc_memory_type_t mem_type,
-                                               ucc_coll_args_t *args)
+static inline ucc_status_t
+ucc_dt_reduce_multi(void *src1, void *src2, void *dst, size_t n_vectors,
+                    size_t count, size_t stride, ucc_datatype_t dt,
+                    ucc_memory_type_t mem_type, ucc_coll_args_t *args)
 {
     if (args->mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) {
         return UCC_ERR_NOT_SUPPORTED; //TODO
@@ -109,6 +128,20 @@ static inline ucc_status_t ucc_dt_reduce_multi(void *src1, void *src2,
         return ucc_mc_reduce_multi(src1, src2, dst, n_vectors, count, stride,
                                    dt, args->reduce.predefined_op, mem_type);
     }
+}
+
+static inline ucc_status_t
+ucc_dt_reduce_multi_alpha(void *src1, void *src2, void *dst, size_t n_vectors,
+                          size_t count, size_t stride, ucc_datatype_t dt,
+                          ucc_reduction_op_t vector_op, double alpha,
+                          ucc_memory_type_t mem_type, ucc_coll_args_t *args)
+{
+    if (args->mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) {
+        return UCC_ERR_NOT_SUPPORTED; //TODO
+    }
+    return ucc_mc_reduce_multi_alpha(src1, src2, dst, n_vectors, count,
+                                     stride, dt, args->reduce.predefined_op,
+                                     vector_op, alpha, mem_type);
 }
 
 #endif

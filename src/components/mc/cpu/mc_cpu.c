@@ -196,7 +196,8 @@ static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
         return ucc_mc_cpu_reduce_multi_double(src1, src2, dst, n_vectors,
                                               count, stride, op);
     default:
-        mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%d)", dt);
+        mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
+                 ucc_datatype_str(dt));
         return UCC_ERR_NOT_SUPPORTED;
     }
     return UCC_OK;
@@ -207,6 +208,31 @@ static ucc_status_t ucc_mc_cpu_reduce(const void *src1, const void *src2,
                                       ucc_datatype_t dt, ucc_reduction_op_t op)
 {
     return ucc_mc_cpu_reduce_multi(src1, src2, dst, 1, count, 0, dt, op);
+}
+
+static ucc_status_t
+ucc_mc_cpu_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
+                              size_t n_vectors, size_t count, size_t stride,
+                              ucc_datatype_t dt, ucc_reduction_op_t reduce_op,
+                              ucc_reduction_op_t vector_op, double alpha)
+{
+    switch (dt) {
+    case UCC_DT_FLOAT32:
+        ucc_assert(4 == sizeof(float));
+        return ucc_mc_cpu_reduce_multi_alpha_float(src1, src2, dst, n_vectors,
+                                                   count, stride, reduce_op,
+                                                   vector_op, (float)alpha);
+    case UCC_DT_FLOAT64:
+        ucc_assert(8 == sizeof(double));
+        return ucc_mc_cpu_reduce_multi_alpha_double(src1, src2, dst, n_vectors,
+                                                    count, stride, reduce_op,
+                                                    vector_op, alpha);
+    default:
+        mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
+                 ucc_datatype_str(dt));
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    return UCC_OK;
 }
 
 static ucc_status_t ucc_mc_cpu_memcpy(void *dst, const void *src, size_t len,
@@ -279,20 +305,21 @@ static ucc_status_t ucc_mc_cpu_finalize()
 }
 
 ucc_mc_cpu_t ucc_mc_cpu = {
-    .super.super.name       = "cpu mc",
-    .super.ref_cnt          = 0,
-    .super.type             = UCC_MEMORY_TYPE_HOST,
-    .super.ee_type          = UCC_EE_CPU_THREAD,
-    .super.init             = ucc_mc_cpu_init,
-    .super.get_attr         = ucc_mc_cpu_get_attr,
-    .super.finalize         = ucc_mc_cpu_finalize,
-    .super.ops.mem_query    = ucc_mc_cpu_mem_query,
-    .super.ops.mem_alloc    = ucc_mc_cpu_mem_pool_alloc_with_init,
-    .super.ops.mem_free     = ucc_mc_cpu_mem_pool_free,
-    .super.ops.reduce       = ucc_mc_cpu_reduce,
-    .super.ops.reduce_multi = ucc_mc_cpu_reduce_multi,
-    .super.ops.memcpy       = ucc_mc_cpu_memcpy,
-    .super.ops.flush        = NULL,
+    .super.super.name             = "cpu mc",
+    .super.ref_cnt                = 0,
+    .super.type                   = UCC_MEMORY_TYPE_HOST,
+    .super.ee_type                = UCC_EE_CPU_THREAD,
+    .super.init                   = ucc_mc_cpu_init,
+    .super.get_attr               = ucc_mc_cpu_get_attr,
+    .super.finalize               = ucc_mc_cpu_finalize,
+    .super.ops.mem_query          = ucc_mc_cpu_mem_query,
+    .super.ops.mem_alloc          = ucc_mc_cpu_mem_pool_alloc_with_init,
+    .super.ops.mem_free           = ucc_mc_cpu_mem_pool_free,
+    .super.ops.reduce             = ucc_mc_cpu_reduce,
+    .super.ops.reduce_multi       = ucc_mc_cpu_reduce_multi,
+    .super.ops.reduce_multi_alpha = ucc_mc_cpu_reduce_multi_alpha,
+    .super.ops.memcpy             = ucc_mc_cpu_memcpy,
+    .super.ops.flush              = NULL,
     .super.config_table =
         {
             .name   = "CPU memory component",

@@ -108,6 +108,18 @@ static inline int ucc_knomial_pattern_loop_done(ucc_knomial_pattern_t *p)
 }
 
 static inline int
+ucc_knomial_pattern_loop_first_iteration(ucc_knomial_pattern_t *p)
+{
+    return p->iteration == 0;
+}
+
+static inline int
+ucc_knomial_pattern_loop_last_iteration(ucc_knomial_pattern_t *p)
+{
+    return p->iteration == p->pow_radix_sup - 1;
+}
+
+static inline int
 ucc_knomial_pattern_loop_done_backward(ucc_knomial_pattern_t *p)
 {
     return p->iteration == UINT8_MAX;

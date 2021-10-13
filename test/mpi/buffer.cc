@@ -82,7 +82,7 @@ void init_buffer(void *_buf, size_t count, ucc_datatype_t dt,
 template<typename T>
 static inline bool is_equal(T a, T b, T epsilon)
 {
-    return fabs(a - b) <= ( (fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
+    return fabs(a - b) <= ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
 }
 
 template<typename T>
@@ -129,4 +129,27 @@ ucc_status_t compare_buffers(void *_rst, void *expected, size_t count,
     }
 
     return status;
+}
+
+template <typename T> void divide_buffers_fp(T *b, size_t divider, size_t count)
+{
+    for (size_t i = 0; i < count; i++) {
+        b[i] = b[i] / (T)divider;
+    }
+}
+
+ucc_status_t divide_buffer(void *expected, size_t divider, size_t count,
+                           ucc_datatype_t dt)
+{
+    if (dt == UCC_DT_FLOAT32) {
+        divide_buffers_fp<float>((float *)expected, divider, count);
+    }
+    else if (dt == UCC_DT_FLOAT64) {
+        divide_buffers_fp<double>((double *)expected, divider, count);
+    }
+    else {
+        std::cerr << "Unsupported dt for avg\n";
+        return UCC_ERR_NO_MESSAGE;
+    }
+    return UCC_OK;
 }

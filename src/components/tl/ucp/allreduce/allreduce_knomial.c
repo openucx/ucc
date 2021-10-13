@@ -5,14 +5,12 @@
  */
 
 #include "config.h"
-#include "tl_ucp.h"
 #include "allreduce.h"
 #include "core/ucc_progress_queue.h"
 #include "tl_ucp_sendrecv.h"
 #include "coll_patterns/recursive_knomial.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
-#include "core/ucc_mc.h"
 
 #define SAVE_STATE(_phase)                                                     \
     do {                                                                       \
@@ -24,23 +22,26 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t     *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t       *args = &TASK_ARGS(task);
     ucc_tl_ucp_team_t     *team = TASK_TEAM(task);
-    ucc_kn_radix_t         radix     = task->allreduce_kn.p.radix;
-    uint8_t                node_type = task->allreduce_kn.p.node_type;
-    ucc_knomial_pattern_t *p         = &task->allreduce_kn.p;
-    void                  *scratch   = task->allreduce_kn.scratch;
-    void                  *sbuf      = args->src.info.buffer;
-    void                  *rbuf      = args->dst.info.buffer;
-    ucc_memory_type_t      mem_type  = args->dst.info.mem_type;
-    size_t                 count     = args->dst.info.count;
-    ucc_datatype_t         dt        = args->dst.info.datatype;
-    size_t                 data_size = count * ucc_dt_size(dt);
-    ucc_rank_t             size      = (ucc_rank_t)task->subset.map.ep_num;
-    ucc_rank_t             rank      = task->subset.myrank;
+    int                    avg_pre_op = UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op;
+    ucc_kn_radix_t         radix      = task->allreduce_kn.p.radix;
+    uint8_t                node_type  = task->allreduce_kn.p.node_type;
+    ucc_knomial_pattern_t *p          = &task->allreduce_kn.p;
+    void                  *scratch    = task->allreduce_kn.scratch;
+    void                  *sbuf       = args->src.info.buffer;
+    void                  *rbuf       = args->dst.info.buffer;
+    ucc_memory_type_t      mem_type   = args->dst.info.mem_type;
+    size_t                 count      = args->dst.info.count;
+    ucc_datatype_t         dt         = args->dst.info.datatype;
+    size_t                 data_size  = count * ucc_dt_size(dt);
+    ucc_rank_t             size       = (ucc_rank_t)task->subset.map.ep_num;
+    ucc_rank_t             rank       = task->subset.myrank;
     void                  *send_buf;
     ptrdiff_t              recv_offset;
     ucc_rank_t             peer;
     ucc_status_t           status;
     ucc_kn_radix_t         loop_step;
+    int                    is_avg;
+
     if (UCC_IS_INPLACE(*args)) {
         sbuf = rbuf;
     }
@@ -88,8 +89,8 @@ UCC_KN_PHASE_EXTRA:
             if (peer == UCC_KN_PEER_NULL)
                 continue;
             peer = ucc_ep_map_eval(task->subset.map, peer);
-            if ((p->iteration == 0) && (KN_NODE_PROXY != node_type) &&
-                !UCC_IS_INPLACE(*args)) {
+            if ((ucc_knomial_pattern_loop_first_iteration(p)) &&
+                (KN_NODE_PROXY != node_type) && !UCC_IS_INPLACE(*args)) {
                 send_buf = sbuf;
             } else {
                 send_buf = rbuf;
@@ -120,18 +121,20 @@ UCC_KN_PHASE_EXTRA:
         }
 
         if (task->send_posted > p->iteration * (radix - 1)) {
-            if ((p->iteration == 0) && (KN_NODE_PROXY != node_type) &&
-                !UCC_IS_INPLACE(*args)) {
+            if ((ucc_knomial_pattern_loop_first_iteration(p)) &&
+                (KN_NODE_PROXY != node_type) && !UCC_IS_INPLACE(*args)) {
                 send_buf = sbuf;
             } else {
                 send_buf = rbuf;
             }
-            if (ucc_unlikely(
-                    UCC_OK !=
-                    (status = ucc_dt_reduce_multi(
-                         send_buf, scratch, rbuf,
-                         task->send_posted - p->iteration * (radix - 1), count,
-                         data_size, dt, mem_type, args)))) {
+            is_avg = args->reduce.predefined_op == UCC_OP_AVG &&
+                     (avg_pre_op ? ucc_knomial_pattern_loop_first_iteration(p)
+                                 : ucc_knomial_pattern_loop_last_iteration(p));
+            status = ucc_tl_ucp_reduce_multi(
+                send_buf, scratch, rbuf,
+                task->send_posted - p->iteration * (radix - 1), count,
+                data_size, dt, mem_type, task, is_avg);
+            if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.super.status = status;
                 return status;
