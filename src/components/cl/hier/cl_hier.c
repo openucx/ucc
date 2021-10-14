@@ -19,6 +19,10 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NODE]),
      UCC_CONFIG_TYPE_STRING_ARRAY},
 
+    {"NODE_LEADERS_SBGP_TLS", "ucp", "TLS to be used for NODE_LEADERS subgroup",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NODE_LEADERS]),
+     UCC_CONFIG_TYPE_STRING_ARRAY},
+
     {"NET_SBGP_TLS", "ucp", "TLS to be used for NET subgroup",
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NET]),
      UCC_CONFIG_TYPE_STRING_ARRAY},

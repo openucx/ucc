@@ -11,6 +11,17 @@
 #include "components/tl/ucc_tl.h"
 #include "coll_score/ucc_coll_score.h"
 
+#ifdef HAVE_PROFILING_CL_HIER
+#include "utils/profile/ucc_profile.h"
+#else
+#include "utils/profile/ucc_profile_off.h"
+#endif
+
+#define UCC_CL_HIER_PROFILE_FUNC UCC_PROFILE_FUNC
+#define UCC_CL_HIER_PROFILE_REQUEST_NEW UCC_PROFILE_REQUEST_NEW
+#define UCC_CL_HIER_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
+#define UCC_CL_HIER_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
+
 #ifndef UCC_CL_HIER_DEFAULT_SCORE
 #define UCC_CL_HIER_DEFAULT_SCORE 50
 #endif
@@ -23,9 +34,11 @@ extern ucc_cl_hier_iface_t ucc_cl_hier;
 
 typedef enum {
     UCC_HIER_SBGP_NODE,
+    UCC_HIER_SBGP_NODE_LEADERS,
     UCC_HIER_SBGP_NET,
     UCC_HIER_SBGP_LAST,
 } ucc_hier_sbgp_type_t;
+//DO we need it? Potential use case: different hier sbgps over same sbgp
 
 typedef struct ucc_cl_hier_lib_config {
     ucc_cl_lib_config_t super;
@@ -98,5 +111,15 @@ ucc_status_t ucc_cl_hier_coll_init(ucc_base_coll_args_t *coll_args,
 
 #define UCC_CL_HIER_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_cl_hier_lib_t))
+
+#define SBGP_ENABLED(_team, _sbgp)                          \
+    ((_team)->sbgps[UCC_HIER_SBGP_ ## _sbgp].state == UCC_HIER_SBGP_ENABLED)
+
+#define SBGP_EXISTS(_team, _sbgp)                                       \
+    ((NULL != (_team)->sbgps[UCC_HIER_SBGP_ ## _sbgp].sbgp) &&          \
+    ((_team)->sbgps[UCC_HIER_SBGP_ ## _sbgp].sbgp->status != UCC_SBGP_NOT_EXISTS))
+
+#define SCORE_MAP(_team, _sbgp)                 \
+    (_team)->sbgps[UCC_HIER_SBGP_ ## _sbgp].score_map
 
 #endif

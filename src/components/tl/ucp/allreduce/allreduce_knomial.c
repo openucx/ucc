@@ -159,6 +159,7 @@ UCC_KN_PHASE_PROXY:
 completion:
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.super.status = UCC_OK;
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_kn_done", 0);
 out:
     return task->super.super.status;
 }
@@ -171,6 +172,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         rank      = task->subset.myrank;
     ucc_status_t       status;
 
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_kn_start", 0);
     task->allreduce_kn.phase = UCC_KN_PHASE_INIT;
     ucc_assert(TASK_ARGS(task).src.info.mem_type ==
                TASK_ARGS(task).dst.info.mem_type);

@@ -8,6 +8,7 @@
 #include "utils/ucc_malloc.h"
 #include "core/ucc_team.h"
 #include "core/ucc_service_coll.h"
+#include "allreduce/allreduce.h"
 
 #define SBGP_SET(_team, _sbgp, _enable)                                        \
     _team->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp_type = UCC_SBGP_##_sbgp;          \
@@ -19,8 +20,9 @@
    Next step is to enable sbgps based on the requested hierarchical algs. */
 static void ucc_cl_hier_enable_sbgps(ucc_cl_hier_team_t *team)
 {
-    SBGP_SET(team, NODE, ENABLED);
-    SBGP_SET(team, NET, ENABLED);
+    SBGP_SET(team, NET,            DISABLED);
+    SBGP_SET(team, NODE,           ENABLED);
+    SBGP_SET(team, NODE_LEADERS,   ENABLED);
 }
 
 UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
@@ -48,6 +50,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
         hs        = &self->sbgps[i];
         hs->score = NULL;
+        hs->sbgp  = NULL;
         if (hs->state == UCC_HIER_SBGP_ENABLED) {
             hs->sbgp =
                 ucc_team_topo_get_sbgp(params->team->topo, hs->sbgp_type);
@@ -281,19 +284,35 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
 ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
                                          ucc_coll_score_t **score_p)
 {
-    ucc_cl_hier_team_t *team = ucc_derived_of(cl_team, ucc_cl_hier_team_t);
-    ucc_base_lib_t     *lib  = UCC_CL_TEAM_LIB(team);
+    ucc_cl_hier_team_t *team  = ucc_derived_of(cl_team, ucc_cl_hier_team_t);
+    ucc_base_lib_t     *lib   = UCC_CL_TEAM_LIB(team);
+    ucc_memory_type_t   mt[2] = {UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA};
     ucc_coll_score_t   *score;
     ucc_status_t        status;
+    int                 i;
 
     status = ucc_coll_score_alloc(&score);
     if (UCC_OK != status) {
         cl_error(lib, "faild to alloc score_t");
         return status;
     }
+
+    for (i = 0; i < 2; i++) {
+        status = ucc_coll_score_add_range(score, UCC_COLL_TYPE_ALLREDUCE,
+                                          mt[i], 0, 2048,
+                                          UCC_CL_HIER_DEFAULT_SCORE,
+                                          ucc_cl_hier_allreduce_rab_init,
+                                          cl_team);
+        if (UCC_OK != status) {
+            cl_error(lib, "faild to add range to score_t");
+            return status;
+        }
+    }
+
     if (strlen(lib->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->score_str, score, cl_team->team->size, NULL, cl_team,
+            lib->score_str, score, cl_team->team->size,
+            ucc_cl_hier_coll_init, cl_team,
             UCC_CL_HIER_DEFAULT_SCORE, NULL);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
