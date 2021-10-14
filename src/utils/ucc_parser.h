@@ -114,8 +114,18 @@ ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
 ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
                                         const ucc_config_names_array_t *src);
 
+ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
+                                          const ucc_config_names_array_t *src);
+
 void ucc_config_names_array_free(ucc_config_names_array_t *array);
 
 int ucc_config_names_search(ucc_config_names_array_t *config_names,
                             const char *str);
+
+static inline
+int ucc_config_names_array_is_all(const ucc_config_names_array_t *array)
+{
+    return (array->count == 1) && (0 == strcmp(array->names[0], "all"));
+}
+
 #endif

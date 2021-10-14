@@ -232,7 +232,7 @@ static ucc_status_t ucc_msg_range_add_fallback(const ucc_msg_range_t *in,
     } while (0)
 
 static ucc_status_t ucc_score_list_dup(const ucc_list_link_t *src,
-                                       ucc_list_link_t *      dst)
+                                       ucc_list_link_t       *dst)
 {
     ucc_msg_range_t *range, *r;
     ucc_status_t     status;

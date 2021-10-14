@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -15,11 +15,11 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_cl_hier_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_cl_lib_config_table)},
 
-    {"NODE_SBGP_TLS", "ucp,nccl", "TLS to be used for NODE subgroup",
+    {"NODE_SBGP_TLS", "ucp", "TLS to be used for NODE subgroup",
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NODE]),
      UCC_CONFIG_TYPE_STRING_ARRAY},
 
-    {"NET_SBGP_TLS", "ucp,nccl", "TLS to be used for NET subgroup",
+    {"NET_SBGP_TLS", "ucp", "TLS to be used for NET subgroup",
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NET]),
      UCC_CONFIG_TYPE_STRING_ARRAY},
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -13,7 +13,9 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
 {
     const ucc_cl_context_config_t *cl_config =
         ucc_derived_of(config, ucc_cl_context_config_t);
-    ucc_config_names_array_t *tls = &cl_config->cl_lib->tls;
+    ucc_cl_hier_lib_t        *lib = ucc_derived_of(cl_config->cl_lib,
+                                                   ucc_cl_hier_lib_t);
+    ucc_config_names_array_t *tls = &lib->tls;
     ucc_status_t              status;
     int                       i;
 

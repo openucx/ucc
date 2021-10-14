@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -53,7 +53,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
                 ucc_team_topo_get_sbgp(params->team->topo, hs->sbgp_type);
             if (hs->sbgp->status != UCC_SBGP_ENABLED) {
                 /* SBGP of that type either not exists or the calling process
-                   is not part of part */
+                   is not part of subgroup */
                 cl_debug(cl_context->lib, "sbgp %s is not enabled",
                          ucc_sbgp_str(hs->sbgp_type));
                 hs->state = UCC_HIER_SBGP_DISABLED;
@@ -61,6 +61,11 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
             }
             hs->n_tls = 0;
             tls       = &lib->cfg.sbgp_tls[i];
+            if (ucc_config_names_array_is_all(tls)) {
+                /* All possible TLs are requested for this SBGP.
+                   Loop through all available CL_HIER tls that are stored on lib.*/
+                tls = &lib->tls;
+            }
             for (j = 0; j < tls->count; j++) {
                 status =
                     ucc_tl_context_get(ctx->super.super.ucc_context,
@@ -72,6 +77,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
                 } else {
                     hs->n_tls++;
                     n_sbgp_teams++;
+                    ucc_assert(hs->n_tls <= CL_HIER_MAX_SBGP_TLS);
                 }
             }
         }
@@ -88,8 +94,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
        for each hier sbgp we have n_tls potentially requested tl teams */
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
         hs = &self->sbgps[i];
-        for (t = 0; t < hs->n_tls; t++) {
-            if (hs->state == UCC_HIER_SBGP_ENABLED) {
+        if (hs->state == UCC_HIER_SBGP_ENABLED) {
+            for (t = 0; t < hs->n_tls; t++) {
                 d                         = &self->team_create_req->descs[j];
                 d->param.team             = params->team;
                 d->param.rank             = hs->sbgp->group_rank;

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -29,9 +29,8 @@ typedef enum {
 
 typedef struct ucc_cl_hier_lib_config {
     ucc_cl_lib_config_t super;
-    /* list of TLs that are used to create ucc_team for a given
-       sbgp. The result collective selection in that team will be
-       based on the correpsponding tl scores. */
+    /* List of TLs corresponding to the sbgp team,
+       which are selected based on the TL scores */
     ucc_config_names_array_t sbgp_tls[UCC_HIER_SBGP_LAST];
 } ucc_cl_hier_lib_config_t;
 
@@ -42,6 +41,7 @@ typedef struct ucc_cl_hier_context_config {
 typedef struct ucc_cl_hier_lib {
     ucc_cl_lib_t             super;
     ucc_cl_hier_lib_config_t cfg;
+    ucc_config_names_array_t tls; /*< Intersection of UCC_CL_HIER_TLS vs sbgp_tls */
 } ucc_cl_hier_lib_t;
 UCC_CLASS_DECLARE(ucc_cl_hier_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);

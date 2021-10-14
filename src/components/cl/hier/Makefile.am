@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
 #
 
 sources =              \
@@ -10,7 +10,7 @@ sources =              \
 	cl_hier_team.c    \
 	cl_hier_coll.c
 
-module_LTLIBRARIES          = libucc_cl_hier.la
+module_LTLIBRARIES         = libucc_cl_hier.la
 libucc_cl_hier_la_SOURCES  = $(sources)
 libucc_cl_hier_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS)
 libucc_cl_hier_la_CFLAGS   = $(BASE_CFLAGS)
