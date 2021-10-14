@@ -40,15 +40,14 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
 }
 
 ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t         *team,
-                                        ucc_rank_t                 team_rank,
+                                        ucc_rank_t                 core_rank,
                                         ucp_ep_h                  *ep)
 {
     ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
     void                 *addr;
 
     addr = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), team->super.super.team,
-                                ucc_ep_map_eval(team->map, team_rank),
-                                ucc_tl_ucp.super.super.id);
+                                core_rank, ucc_tl_ucp.super.super.id);
     return ucc_tl_ucp_connect_ep(ctx, ep, addr);
 }
 
