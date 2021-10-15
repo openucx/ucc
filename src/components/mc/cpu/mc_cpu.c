@@ -292,6 +292,7 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.ops.reduce       = ucc_mc_cpu_reduce,
     .super.ops.reduce_multi = ucc_mc_cpu_reduce_multi,
     .super.ops.memcpy       = ucc_mc_cpu_memcpy,
+    .super.ops.flush        = NULL,
     .super.config_table =
         {
             .name   = "CPU memory component",

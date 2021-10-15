@@ -25,6 +25,8 @@ ucc_status_t ucc_mc_alloc(ucc_mc_buffer_header_t **h_ptr, size_t len,
 
 ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *h_ptr);
 
+ucc_status_t ucc_mc_flush(ucc_memory_type_t mem_type);
+
 ucc_status_t ucc_mc_finalize();
 
 ucc_status_t ucc_mc_ee_task_post(void *ee_context, ucc_ee_type_t ee_type,

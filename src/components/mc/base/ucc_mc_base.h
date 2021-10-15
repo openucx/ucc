@@ -111,6 +111,7 @@ typedef struct ucc_mc_ops {
     ucc_status_t (*memcpy)(void *dst, const void *src, size_t len,
                            ucc_memory_type_t dst_mem,
                            ucc_memory_type_t src_mem);
+    ucc_status_t (*flush)();
  } ucc_mc_ops_t;
 
 typedef struct ucc_ee_ops {
