@@ -232,13 +232,11 @@ ucc_status_t ucc_tl_sharp_allreduce_start(ucc_coll_task_t *coll_task)
         return ucc_task_complete(coll_task);
     }
 
-    if (sharp_coll_req_test(task->req_handle) == 0) {
+    if (UCC_INPROGRESS == ucc_tl_sharp_collective_progress(coll_task)) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
         return UCC_OK;
     }
 
-    sharp_coll_req_free(task->req_handle);
-    coll_task->super.status = UCC_OK;
     return ucc_task_complete(coll_task);
 }
 
