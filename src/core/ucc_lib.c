@@ -18,7 +18,7 @@ UCS_CONFIG_DEFINE_ARRAY(cl_types, sizeof(ucc_cl_type_t),
                         UCS_CONFIG_TYPE_ENUM(ucc_cl_names));
 
 static ucc_config_field_t ucc_lib_config_table[] = {
-    {"CLS", "all", "Comma separated list of CL components to be used",
+    {"CLS", "basic", "Comma separated list of CL components to be used",
      ucc_offsetof(ucc_lib_config_t, cls), UCC_CONFIG_TYPE_ARRAY(cl_types)},
 
     {NULL}

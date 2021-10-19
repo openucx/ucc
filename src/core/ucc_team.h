@@ -12,6 +12,7 @@
 #include "ucc_context.h"
 #include "utils/ucc_math.h"
 #include "components/base/ucc_base_iface.h"
+#include "coll_score/ucc_coll_score.h"
 
 typedef struct ucc_context          ucc_context_t;
 typedef struct ucc_cl_team          ucc_cl_team_t;
@@ -45,6 +46,7 @@ typedef struct ucc_team {
     ucc_ep_map_t            ctx_map; /*< map to the ctx ranks, defined if CTX
                                   type is global (oob provided) */
     ucc_team_topo_t        *topo;
+    ucc_score_map_t        *score_map; /*< score map of CLs */
     uint32_t                seq_num;
 } ucc_team_t;
 

@@ -25,6 +25,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->scope_id           = params->scope_id;
     self->rank               = params->rank;
     self->id                 = params->id;
+    self->map                = params->map;
     self->seq_num            = 0;
     self->status             = UCC_INPROGRESS;
     tl_info(tl_context->lib, "posted tl team: %p", self);

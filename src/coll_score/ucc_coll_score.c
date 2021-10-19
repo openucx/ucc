@@ -231,8 +231,8 @@ static ucc_status_t ucc_msg_range_add_fallback(const ucc_msg_range_t *in,
         }                                                                      \
     } while (0)
 
-static ucc_status_t ucc_score_list_dup(ucc_list_link_t *src,
-                                       ucc_list_link_t *dst)
+static ucc_status_t ucc_score_list_dup(const ucc_list_link_t *src,
+                                       ucc_list_link_t       *dst)
 {
     ucc_msg_range_t *range, *r;
     ucc_status_t     status;
@@ -1034,4 +1034,28 @@ ucc_status_t ucc_coll_score_build_default(ucc_base_team_t        *team,
     }
     *score_p = score;
     return UCC_OK;
+}
+
+ucc_status_t ucc_coll_score_dup(const ucc_coll_score_t *in,
+                                ucc_coll_score_t **     out)
+{
+    ucc_coll_score_t *score;
+    ucc_status_t      status;
+    int               i, j;
+
+    status = ucc_coll_score_alloc(&score);
+    if (UCC_OK != status) {
+        return status;
+    }
+    for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
+        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
+            status =
+                ucc_score_list_dup(&in->scores[i][j], &score->scores[i][j]);
+            if (UCC_OK != status) {
+                return status;
+            }
+        }
+    }
+    *out = score;
+    return status;
 }

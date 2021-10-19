@@ -47,7 +47,8 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t         *team,
     void                 *addr;
 
     addr = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), team->super.super.team,
-                                team_rank, ucc_tl_ucp.super.super.id);
+                                ucc_ep_map_eval(team->map, team_rank),
+                                ucc_tl_ucp.super.super.id);
     return ucc_tl_ucp_connect_ep(ctx, ep, addr);
 }
 

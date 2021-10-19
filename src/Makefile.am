@@ -2,7 +2,8 @@
 # Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
 #
 
-cl_dirs = components/cl/basic
+cl_dirs = components/cl/basic \
+		  components/cl/hier
 tl_dirs =
 mc_dirs = components/mc/cpu
 

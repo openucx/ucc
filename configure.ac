@@ -202,6 +202,7 @@ AC_CONFIG_FILES([
                  src/ucc/api/ucc_version.h
                  src/core/ucc_version.c
                  src/components/cl/basic/Makefile
+                 src/components/cl/hier/Makefile
                  src/components/tl/ucp/Makefile
                  src/components/tl/nccl/Makefile
                  src/components/tl/sharp/Makefile

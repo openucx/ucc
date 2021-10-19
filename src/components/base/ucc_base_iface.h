@@ -101,6 +101,7 @@ typedef struct ucc_base_team_params {
                                property: it is always contig and in the range [0, team_size).*/
     uint16_t          id;   /* core level team id */
     ucc_team_t *      team; /* core team pointer */
+    ucc_ep_map_t      map;
 } ucc_base_team_params_t;
 
 typedef struct ucc_base_team {
