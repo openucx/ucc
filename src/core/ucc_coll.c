@@ -15,6 +15,7 @@
 #include "utils/profile/ucc_profile_core.h"
 #include "schedule/ucc_schedule.h"
 #include "coll_score/ucc_coll_score.h"
+#include "ucc_ee.h"
 
 /* NOLINTNEXTLINE  */
 static ucc_cl_team_t *ucc_select_cl_team(ucc_coll_args_t *coll_args,
@@ -214,7 +215,7 @@ ucc_status_t ucc_collective_post(ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
 
-    ucc_debug("coll_post: req %p", task);
+    ucc_debug("coll_post: req %p, seq_num %u", task, task->seq_num);
 
     if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
         task->start_time = ucc_get_time();
@@ -223,23 +224,157 @@ ucc_status_t ucc_collective_post(ucc_coll_req_h request)
     return task->post(task);
 }
 
-ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ev)
-{
-    ucc_coll_task_t *task = ucc_derived_of(ev->req, ucc_coll_task_t);
-
-    ucc_debug("coll_triggered_post: req %p", task);
-    task->ee = ee;
-    if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
-        task->start_time = ucc_get_time();
-    }
-    return task->triggered_post(ee, ev, task);
-}
-
 UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
                       ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
 
-    ucc_debug("coll_finalize: req %p", task);
+    ucc_debug("coll_finalize: req %p, seq_num %u", task, task->seq_num);
     return task->finalize(task);
+}
+
+static ucc_status_t ucc_triggered_task_finalize(ucc_coll_task_t *task)
+{
+    ucc_trace("finalizing triggered ev task %p", task);
+    ucc_free(task);
+    return UCC_OK;
+}
+
+static ucc_status_t ucc_triggered_coll_complete(ucc_coll_task_t *parent_task, //NOLINT
+                                                ucc_coll_task_t *task)
+{
+    ucc_trace("triggered collective complete, task %p, seq_num %u",
+              task, task->seq_num);
+    return ucc_mc_ee_task_end(task->ee_task, task->ee->ee_type);
+}
+
+static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
+                                         ucc_coll_task_t *task)
+{
+    ucc_status_t status;
+
+    ucc_trace("event triggered, ev_task %p, coll_task %p, seq_num %u",
+              parent_task, task, task->seq_num);
+
+    task->ee_task = parent_task->ee_task;
+    status        = task->post(task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_error("failed to post triggered coll, task %p, seq_num %u, %s",
+                  task, task->seq_num, ucc_status_string(status));
+        return status;
+    }
+
+    if (task->super.status == UCC_OK) {
+        return ucc_triggered_coll_complete(task, task);
+    } else {
+        ucc_assert(task->super.status == UCC_INPROGRESS);
+        if (task->ee_task) {
+            // TODO use CB instead of EM
+            ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED, task,
+                                        ucc_triggered_coll_complete);
+        }
+    }
+    return UCC_OK;
+}
+
+static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
+{
+    ucc_status_t status;
+    ucc_ev_t     post_event;
+    ucc_ev_t    *ev;
+
+    if (task->ev == NULL) {
+        if (task->ee->ee_type == UCC_EE_CUDA_STREAM) {
+            /* implicit event triggered */
+            task->ev = (ucc_ev_t *) 0xFFFF; /* dummy event */
+            task->ee_task = NULL;
+        } else if (UCC_OK == ucc_ee_get_event_internal(task->ee, &ev,
+                                                 &task->ee->event_in_queue)) {
+            ucc_trace("triggered event arrived, ev_task %p", task);
+            task->ev      = ev;
+            task->ee_task = NULL;
+        } else {
+            return UCC_OK;
+        }
+    }
+
+    if (task->ee_task == NULL) {
+        status = ucc_mc_ee_task_post(task->ee->ee_context,
+                                     task->ee->ee_type, &task->ee_task);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ucc_error("error in ee task post, %s", ucc_status_string(status));
+            task->super.status = status;
+            return status;
+        }
+
+        post_event.ev_type         = UCC_EVENT_COLLECTIVE_POST;
+        post_event.ev_context_size = 0;
+        post_event.req             = &task->triggered_task->super;
+        ucc_ee_set_event_internal(task->ee, &post_event,
+                                  &task->ee->event_out_queue);
+    }
+
+    if (task->ee_task == NULL ||
+        (UCC_OK == ucc_mc_ee_task_query(task->ee_task, task->ee->ee_type))) {
+        task->super.status = UCC_OK;
+    }
+    return task->super.status;
+}
+
+ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
+                                ucc_coll_task_t *task)
+{
+    ucc_coll_task_t *ev_task;
+    ucc_status_t     status;
+
+    task->ee = ee;
+    ev_task = ucc_malloc(sizeof(*ev_task), "ev_task");
+    if (!ev_task) {
+        ucc_error("failed to allocate %zd bytes for ev_task",
+                  sizeof(*ev_task));
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    ucc_coll_task_init(ev_task, NULL, task->team);
+    ev_task->ee             = ee;
+    ev_task->ev             = NULL;
+    ev_task->triggered_task = task;
+    ev_task->flags          = UCC_COLL_TASK_FLAG_INTERNAL;
+    ev_task->finalize       = ucc_triggered_task_finalize;
+    ev_task->progress       = ucc_trigger_test;
+    ev_task->super.status   = UCC_INPROGRESS;
+
+    if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
+        UCC_COLL_SET_TIMEOUT(ev_task, task->bargs.args.timeout);
+    }
+    ucc_event_manager_subscribe(&ev_task->em, UCC_EVENT_COMPLETED, task,
+                                ucc_trigger_complete);
+
+    status = ucc_trigger_test(ev_task);
+    if (ucc_unlikely(status < 0)) {
+        ucc_free(ev_task);
+        task->super.status = status;
+        ucc_task_complete(task);
+        return status;
+    }
+
+    if (ev_task->super.status == UCC_OK) {
+        ucc_trigger_complete(ev_task, task);
+        ucc_free(ev_task);
+    } else {
+        ucc_progress_enqueue(UCC_TASK_CORE_CTX(ev_task)->pq, ev_task);
+    }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ev)
+{
+    ucc_coll_task_t *task = ucc_derived_of(ev->req, ucc_coll_task_t);
+
+    ucc_debug("triggered_post: task %p, seq_num %u", task, task->seq_num);
+
+    if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
+        task->start_time = ucc_get_time();
+    }
+    return task->triggered_post(ee, ev, task);
 }
