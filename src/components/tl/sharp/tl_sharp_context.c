@@ -201,7 +201,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
     ucc_rcache_params_t rcache_params;
 
     if (!(params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB)) {
-        tl_error(self->super.super.lib, "Context OOB is required for SHARP");
+        tl_error(tl_sharp_config->super.tl_lib, "Context OOB is required for SHARP");
         status = UCC_ERR_INVALID_PARAM;
         goto err;
     }
