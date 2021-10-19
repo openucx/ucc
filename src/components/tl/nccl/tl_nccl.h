@@ -7,6 +7,7 @@
 #ifndef UCC_TL_NCCL_H_
 #define UCC_TL_NCCL_H_
 
+#include "components/mc/base/ucc_mc_base.h"
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
 #include "utils/ucc_mpool.h"
@@ -82,6 +83,7 @@ typedef struct ucc_tl_nccl_task {
     ucc_status_t        host_status;
     ucc_status_t       *dev_status;
     cudaEvent_t         completed;
+    ucc_mc_buffer_header_t *scratch_mc_header;
 } ucc_tl_nccl_task_t;
 
 #define TASK_TEAM(_task)                                                       \
@@ -96,7 +98,8 @@ typedef struct ucc_tl_nccl_task {
     (UCC_COLL_TYPE_ALLTOALL       | UCC_COLL_TYPE_ALLTOALLV  |                 \
      UCC_COLL_TYPE_ALLGATHER      | UCC_COLL_TYPE_ALLGATHERV |                 \
      UCC_COLL_TYPE_ALLREDUCE      | UCC_COLL_TYPE_BCAST      |                 \
-     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE)
+     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE     |                 \
+     UCC_COLL_TYPE_BARRIER)
 
 UCC_CLASS_DECLARE(ucc_tl_nccl_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

@@ -9,6 +9,7 @@
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
+#include "ucc/api/ucc.h"
 
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
@@ -127,7 +128,16 @@ static ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
     if (task->completed) {
         ucc_mc_ee_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
     }
+
+    if (task->scratch_mc_header) {
+        status = ucc_mc_free(task->scratch_mc_header);
+        if (ucc_unlikely(status != UCC_OK)) {
+            tl_error(UCC_TASK_LIB(task), "failed to free scratch buffer");
+        }
+    }
+
     UCC_TL_NCCL_PROFILE_REQUEST_FREE(task);
+
     ucc_mpool_put(task);
     return status;
 }
@@ -175,6 +185,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     task->super.finalize       = ucc_tl_nccl_coll_finalize;
     task->super.triggered_post = ucc_tl_nccl_triggered_post;
     task->completed            = NULL;
+    task->scratch_mc_header    = NULL;
     if (nccl_ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
         status = ucc_mc_ee_create_event((void **)&task->completed,
                                          UCC_EE_CUDA_STREAM);
@@ -208,6 +219,9 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
         break;
     case UCC_COLL_TYPE_REDUCE:
         status = ucc_tl_nccl_reduce_init(task);
+        break;
+    case UCC_COLL_TYPE_BARRIER:
+        status = ucc_tl_nccl_barrier_init(task);
         break;
     default:
         tl_error(UCC_TASK_LIB(task),
@@ -249,6 +263,19 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
+
+    // add barrier, which might be triggered from host memory type
+    // use lower score
+    ucc_coll_score_add_range(
+      score,
+      UCC_COLL_TYPE_BARRIER,
+      UCC_MEMORY_TYPE_HOST,
+      0,
+      UCC_MSG_MAX,
+      1,
+      ucc_tl_nccl_coll_init,
+      team);
+
     if (strlen(lib->super.super.score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             lib->super.super.score_str, score, team->size,

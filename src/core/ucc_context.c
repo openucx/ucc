@@ -886,4 +886,3 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
 
     return status;
 }
-

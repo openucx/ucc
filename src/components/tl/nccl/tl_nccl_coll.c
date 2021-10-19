@@ -7,6 +7,7 @@
 #include "tl_nccl_coll.h"
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
+#include "utils/ucc_compiler_def.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 
@@ -488,4 +489,28 @@ ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
     }
     task->super.post     = ucc_tl_nccl_reduce_start;
     return UCC_OK;
+}
+
+ucc_status_t ucc_tl_nccl_barrier_init(ucc_tl_nccl_task_t* task) {
+  // use 4-byte allreduce to accomplish barrier
+  ucc_coll_args_t    *args   = &TASK_ARGS(task);
+
+  args->mask |=
+      (UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS | UCC_COLL_ARGS_FIELD_FLAGS);
+  args->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+  args->reduce.predefined_op = UCC_OP_SUM;
+
+  ucc_status_t status = ucc_mc_alloc(
+      &task->scratch_mc_header, sizeof(float), UCC_MEMORY_TYPE_CUDA);
+  if (ucc_unlikely(status != UCC_OK)) {
+      return status;
+  }
+  args->dst.info.buffer = task->scratch_mc_header->addr;
+  args->src.info.buffer = args->dst.info.buffer;
+  args->dst.info.datatype = args->src.info.datatype = UCC_DT_FLOAT32;
+  args->dst.info.count = args->src.info.count = 1;
+
+  task->super.post = ucc_tl_nccl_allreduce_start;
+
+  return UCC_OK;
 }
