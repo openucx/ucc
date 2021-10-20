@@ -272,25 +272,29 @@ ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
 }
 
 static size_t ucc_tl_ucp_ctx_remote_pack(ucc_mem_map_params_t map,
-                                         uint64_t             max_segs,
-                                         uint64_t max_pack_size, uint32_t rank,
-                                         uint32_t size, void **my_pack,
-                                         size_t *my_pack_sizes, void **pack)
+                                         uint32_t rank, uint32_t size,
+                                         void **my_pack, size_t *my_pack_sizes,
+                                         void **pack)
 {
+    uint64_t  nsegs          = map.n_maps;
+    uint64_t  offset         = 0;
+    size_t    total          = 0;
+    size_t    pack_size      = 0;
+    size_t    section_offset = sizeof(uint64_t) * nsegs;
     void *    packed_data;
     void *    base;
     void *    keys;
     uint64_t *rvas;
     uint64_t *lens;
     uint64_t *key_sizes;
-    uint64_t  nsegs          = map.n_maps;
-    uint64_t  offset         = 0;
-    size_t    total          = 0;
-    size_t    section_offset = sizeof(uint64_t) * max_segs;
 
-    // pack the following data :
-    // rva, len, pack sizes, packed keys into one data object
-    total       = (sizeof(uint64_t) * 3 + max_pack_size) * max_segs;
+    for (int i = 0; i < nsegs; i++) {
+        pack_size += my_pack_sizes[i];
+    }
+
+    /* pack into one data object in following order: */
+    /* rva, len, pack sizes, packed keys */
+    total       = (sizeof(uint64_t) * 3 + pack_size) * nsegs;
     packed_data = calloc(total, size);
 
     base      = packed_data + rank * total;
@@ -299,19 +303,12 @@ static size_t ucc_tl_ucp_ctx_remote_pack(ucc_mem_map_params_t map,
     key_sizes = base + (section_offset * 2);
     keys      = base + (section_offset * 3);
 
-    for (int i = 0; i < max_segs; i++) {
-        if (i < nsegs) {
-            rvas[i]      = (uint64_t)map.maps[i].address;
-            lens[i]      = map.maps[i].len;
-            key_sizes[i] = my_pack_sizes[i];
-            memcpy(keys + offset, my_pack[i], my_pack_sizes[i]);
-            offset += my_pack_sizes[i];
-        }
-        else {
-            rvas[i]      = 0;
-            lens[i]      = 0;
-            key_sizes[i] = 0;
-        }
+    for (int i = 0; i < nsegs; i++) {
+        rvas[i]      = (uint64_t)map.maps[i].address;
+        lens[i]      = map.maps[i].len;
+        key_sizes[i] = my_pack_sizes[i];
+        memcpy(keys + offset, my_pack[i], my_pack_sizes[i]);
+        offset += my_pack_sizes[i];
     }
 
     *pack = packed_data;
@@ -351,35 +348,30 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t *ctx,
                                             ucc_mem_map_params_t  map,
                                             ucc_team_oob_coll_t   oob)
 {
+    uint32_t                   rank  = oob.oob_ep;
+    uint32_t                   size  = oob.n_oob_eps;
+    uint64_t                   nsegs = map.n_maps;
+    size_t                     total = 0;
     ucc_tl_ucp_remote_info_t **remote_info;
     ucp_mem_map_params_t       mmap_params;
     ucp_mem_h                  mh;
     ucs_status_t               status;
     ucc_status_t               ucc_status;
-    uint32_t                   rank  = oob.oob_ep;
-    uint32_t                   size  = oob.n_oob_eps;
-    uint64_t                   nsegs = map.n_maps;
-    uint64_t                   rsegs[size * 2]; // remote segments & total size
-    uint64_t                   send_rsegs[2];
-    void *                     packed_data; // all data to exchange
+    void *                     packed_data;
     void *                     my_pack[nsegs];
-    size_t                     total    = 0;
-    size_t                     max_segs = nsegs;
-    size_t                     max_pack_size;
     size_t                     my_pack_sizes[nsegs];
 
     ctx->rinfo_hash = kh_init(tl_ucp_rinfo_hash);
     remote_info     = (ucc_tl_ucp_remote_info_t **)malloc(
         sizeof(ucc_tl_ucp_remote_info_t *) * size);
 
-    // local setup
     remote_info[rank] = (ucc_tl_ucp_remote_info_t *)calloc(
         nsegs, sizeof(ucc_tl_ucp_remote_info_t));
 
     for (int i = 0; i < nsegs; i++) {
         void *addr = map.maps[i].address;
 
-        // TODO: perform allocation based on hints/constraints if addr NULL
+        /* TODO: perform allocation based on hints/constraints if addr NULL */
 
         mmap_params.field_mask =
             UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
@@ -389,7 +381,6 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t *ctx,
         status = ucp_mem_map(ctx->ucp_context, &mmap_params, &mh);
         remote_info[rank][i].mem_h = (void *)mh;
 
-        // pack our key here
         status =
             ucp_rkey_pack(ctx->ucp_context, mh, &my_pack[i], &my_pack_sizes[i]);
         if (UCS_OK != status) {
@@ -397,66 +388,42 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t *ctx,
                      "failed to pack UCP key with error code: %d", status);
             return UCC_ERR_NO_MESSAGE;
         }
-
-        total += my_pack_sizes[i];
     }
 
-    // exchange number of segments
-    send_rsegs[0] = nsegs;
-    send_rsegs[1] = total;
-    ucc_status    = ucc_tl_ucp_ctx_exchange_data(send_rsegs, rsegs,
-                                              sizeof(uint64_t) * 2, ctx, oob);
-    if (UCC_OK != ucc_status) {
-        return ucc_status;
-    }
+    total = ucc_tl_ucp_ctx_remote_pack(map, rank, size, my_pack, my_pack_sizes,
+                                       &packed_data);
 
-    // calc maximum number of segments and UCP packed key size
-    max_pack_size = total;
-    for (int i = 0, k = 0; i < size; i++, k += 2) {
-        if (rsegs[k] > max_segs) {
-            max_segs = rsegs[k];
-        }
-        if (rsegs[k + 1] > max_pack_size) {
-            max_pack_size = rsegs[k + 1];
-        }
-    }
-
-    // pack all data to be exchanged
-    total = ucc_tl_ucp_ctx_remote_pack(map, max_segs, max_pack_size, rank, size,
-                                       my_pack, my_pack_sizes, &packed_data);
-
-    // exchange info
     ucc_status = ucc_tl_ucp_ctx_exchange_data(packed_data + rank * total,
                                               packed_data, total, ctx, oob);
     if (UCC_OK != ucc_status) {
         return ucc_status;
     }
 
-    // unpack the exchanged data
     for (int i = 0, k = 0; i < size; i++, k += 2) {
         void *    base      = packed_data + i * total;
         uint64_t *rvas      = base;
-        uint64_t *lens      = base + sizeof(uint64_t) * max_segs;
-        uint64_t *key_sizes = base + (sizeof(uint64_t) * max_segs * 2);
-        void *    key       = base + (sizeof(uint64_t) * max_segs) * 3;
+        uint64_t *lens      = base + sizeof(uint64_t) * nsegs;
+        uint64_t *key_sizes = base + (sizeof(uint64_t) * nsegs * 2);
+        void *    key       = base + (sizeof(uint64_t) * nsegs) * 3;
         size_t    offset    = 0;
 
         if (i != rank) {
             remote_info[i] = (ucc_tl_ucp_remote_info_t *)calloc(
-                rsegs[k], sizeof(ucc_tl_ucp_remote_info_t));
+                nsegs, sizeof(ucc_tl_ucp_remote_info_t));
         }
 
-        for (int j = 0; j < max_segs; j++) {
-            if (j < rsegs[k]) {
-               remote_info[i][j].va_base    = (void *)rvas[j];
-               remote_info[i][j].len        = lens[j];
-               remote_info[i][j].packed_key = malloc(key_sizes[j]);
-               memcpy(remote_info[i][j].packed_key, key + offset,
-                      key_sizes[j]);
-               offset += key_sizes[j];
-            } else {
-               remote_info[i][j].va_base = 0;
-               remote_info[i][j].len     = 0;
+        for (int j = 0; j < nsegs; j++) {
+            if (j < nsegs) {
+                remote_info[i][j].va_base    = (void *)rvas[j];
+                remote_info[i][j].len        = lens[j];
+                remote_info[i][j].packed_key = malloc(key_sizes[j]);
+                memcpy(remote_info[i][j].packed_key, key + offset,
+                       key_sizes[j]);
+                offset += key_sizes[j];
+            }
+            else {
+                remote_info[i][j].va_base = 0;
+                remote_info[i][j].len     = 0;
             }
         }
     }

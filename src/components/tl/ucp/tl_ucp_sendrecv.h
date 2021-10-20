@@ -197,11 +197,9 @@ static inline ucc_status_t ucc_tl_ucp_flush(ucc_tl_ucp_team_t *team)
         ucp_worker_flush_nbx(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker, &req_param);
     if (UCS_OK != req) {
         if (UCS_PTR_IS_ERR(req)) {
-            return UCC_ERR_NO_MESSAGE;
+            return ucs_status_to_ucc_status(UCS_PTR_STATUS(req));
         }
-        else {
-            ucp_request_free(req);
-        }
+        ucp_request_free(req);
     }
     return UCC_OK;
 }
@@ -210,8 +208,8 @@ static inline ucc_status_t ucc_tl_ucp_ep_flush(ucc_rank_t dest_group_rank,
                                                ucc_tl_ucp_team_t *team,
                                                ucc_tl_ucp_task_t *task)
 {
-    ucc_status_t        status;
     ucp_request_param_t req_param = {0};
+    ucc_status_t        status;
     ucs_status_ptr_t    req;
     ucp_ep_h            ep;
 
@@ -221,9 +219,9 @@ static inline ucc_status_t ucc_tl_ucp_ep_flush(ucc_rank_t dest_group_rank,
     }
 
     req = ucp_ep_flush_nbx(ep, &req_param);
-    if (UCC_OK != req) {
+    if (UCS_OK != req) {
         if (UCS_PTR_IS_ERR(req)) {
-            return UCC_ERR_NO_MESSAGE;
+            return ucs_status_to_ucc_status(UCS_PTR_STATUS(req));
         }
         ucp_request_free(req);
     }
@@ -237,32 +235,33 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
                                              ucc_tl_ucp_task_t *task)
 {
     ucp_request_param_t req_param = {0};
+    int                 segment   = 0;
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
     ucp_rkey_h          rkey;
     uint64_t            rva;
-    int                 segment = 0;
 
-    // get the endpoint or create if doesn't exist
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
 
-    // resolve the p2p info
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
                                           &rva, &rkey, &segment);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
 
-    rva = rva + ((ptrdiff_t)target - (ptrdiff_t)team->va_base[segment]);
+    rva = (uint64_t)PTR_OFFSET(
+        rva, ((ptrdiff_t)target - (ptrdiff_t)team->va_base[segment]));
 
-    // issue operation
     ucp_status = ucp_put_nbx(ep, buffer, msglen, rva, rkey, &req_param);
 
-    if (UCC_OK != ucp_status) {
+    if (UCS_OK != ucp_status) {
+        if (UCS_PTR_IS_ERR(ucp_status)) {
+            return ucs_status_to_ucc_status(UCS_PTR_STATUS(ucp_status));
+        }
         ucp_request_free(ucp_status);
     }
     return UCC_OK;
@@ -275,33 +274,31 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
                                              ucc_tl_ucp_task_t *task)
 {
     ucp_request_param_t req_param = {0};
+    int                 segment   = 0;
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
     ucp_rkey_h          rkey;
     uint64_t            rva;
-    int                 segment = 0;
 
-    // get the endpoint or create if doesn't exist
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
 
-    // resolve the p2p info
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
                                           &rva, &rkey, &segment);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
-    rva = rva + ((ptrdiff_t)target - (ptrdiff_t)team->va_base[segment]);
+    rva = (uint64_t)PTR_OFFSET(
+        rva, ((ptrdiff_t)target - (ptrdiff_t)team->va_base[segment]));
 
-    // issue operation
     ucp_status = ucp_get_nbx(ep, buffer, msglen, rva, rkey, &req_param);
 
-    if (UCC_OK != ucp_status) {
+    if (UCS_OK != ucp_status) {
         if (UCS_PTR_IS_ERR(ucp_status)) {
-            return UCC_ERR_NO_MESSAGE;
+            return ucs_status_to_ucc_status(UCS_PTR_STATUS(ucp_status));
         }
         ucp_request_free(ucp_status);
     }
@@ -315,43 +312,39 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
                                                  ucc_tl_ucp_task_t *task)
 {
     ucp_request_param_t req_param = {0};
+    int                 segment   = 0;
+    uint64_t            one       = 1;
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
     ucp_rkey_h          rkey;
     uint64_t            rva;
-    int                 segment = 0;
-    uint64_t            one     = 1;
 
-    // get the endpoint or create if doesn't exist
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
 
-    /* resolve the p2p info */
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
                                           &rva, &rkey, &segment);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
 
-    rva = rva + ((ptrdiff_t)target - (ptrdiff_t)team->va_base[segment]);
+    rva = (uint64_t)PTR_OFFSET(
+        rva, ((ptrdiff_t)target - (ptrdiff_t)team->va_base[segment]));
 
     req_param.op_attr_mask = UCP_OP_ATTR_FIELD_DATATYPE;
     req_param.datatype     = ucp_dt_make_contig(sizeof(uint64_t));
 
-    // issue operation
     ucp_status = ucp_atomic_op_nbx(ep, UCP_ATOMIC_OP_ADD, &one, 1, rva, rkey,
                                    &req_param);
 
-    if (UCC_OK != ucp_status) {
+    if (UCS_OK != ucp_status) {
         if (UCS_PTR_IS_ERR(ucp_status)) {
-            abort();
+            return ucs_status_to_ucc_status(UCS_PTR_STATUS(ucp_status));
         }
-        else {
-            ucp_request_free(ucp_status);
-        }
+        ucp_request_free(ucp_status);
     }
     return UCC_OK;
 }
