@@ -287,3 +287,117 @@ UCC_TEST_F(test_topo, 2nodes)
     EXPECT_EQ(sbgp->map.strided.start, 1);
     EXPECT_EQ(sbgp->map.strided.stride, 5);
 }
+
+UCC_TEST_F(test_topo, 4nodes_half)
+{
+    const ucc_rank_t ctx_size  = 8;
+    const ucc_rank_t team_size = 4;
+    addr_storage     s(ctx_size);
+    ucc_sbgp_t *     sbgp;
+
+    /* simulates world proc array : 4 nodes, 2  ranks per node*/
+    SET_PI(s, 0, 0xaaa, 0, 0);
+    SET_PI(s, 1, 0xaaa, 1, 1);
+    SET_PI(s, 2, 0xbbb, 0, 2);
+    SET_PI(s, 3, 0xbbb, 1, 3);
+    SET_PI(s, 4, 0xccc, 0, 4);
+    SET_PI(s, 5, 0xccc, 1, 5);
+    SET_PI(s, 6, 0xddd, 0, 6);
+    SET_PI(s, 7, 0xddd, 1, 7);
+
+
+    /* team from the world */
+    team.size         = team_size;
+    team.ctx_map.type = UCC_EP_MAP_STRIDED;
+    team.ctx_map.strided.start = 0;
+    team.ctx_map.strided.stride = 1;
+    team.ctx_map.ep_num = 4;
+
+    team.rank = 1; // from rank 1 perspective
+    /* Init topo for such team */
+    EXPECT_EQ(UCC_OK, ucc_topo_init(&s.storage, &topo));
+    EXPECT_EQ(UCC_OK, ucc_team_topo_init(&team, topo, &team.topo));
+
+    /* NODE subgroup  - 2 ranks on the same node*/
+    sbgp = ucc_team_topo_get_sbgp(team.topo, UCC_SBGP_NODE);
+    EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
+    EXPECT_EQ(2, sbgp->group_size);
+    EXPECT_EQ(1, sbgp->group_rank);
+    EXPECT_EQ(sbgp->map.type, UCC_EP_MAP_STRIDED);
+    EXPECT_EQ(sbgp->map.strided.start, 0);
+    EXPECT_EQ(sbgp->map.strided.stride, 1);
+
+    /* NODE LEADERS subgroup - ranks 0 and 2. Rank 1 does not participate, so
+       the SBGP is disabled for him */
+    sbgp = ucc_team_topo_get_sbgp(team.topo, UCC_SBGP_NODE_LEADERS);
+    EXPECT_EQ(UCC_SBGP_DISABLED, sbgp->status);
+
+    /* RANK 2 perspective */
+    ucc_team_topo_cleanup(team.topo);
+    team.rank = 2;
+    EXPECT_EQ(UCC_OK, ucc_team_topo_init(&team, topo, &team.topo));
+    sbgp = ucc_team_topo_get_sbgp(team.topo, UCC_SBGP_NODE_LEADERS);
+    EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
+    EXPECT_EQ(2, sbgp->group_size);
+    EXPECT_EQ(1, sbgp->group_rank);
+    EXPECT_EQ(sbgp->map.type, UCC_EP_MAP_STRIDED);
+    EXPECT_EQ(sbgp->map.strided.start, 0);
+    EXPECT_EQ(sbgp->map.strided.stride, 2);
+}
+
+UCC_TEST_F(test_topo, 4sockets_half)
+{
+    const ucc_rank_t ctx_size  = 8;
+    const ucc_rank_t team_size = 4;
+    addr_storage     s(ctx_size);
+    ucc_sbgp_t *     sbgp;
+
+    /* simulates world proc array : 4 sockets, 2  ranks per socket*/
+    SET_PI(s, 0, 0xaaa, 0, 0);
+    SET_PI(s, 1, 0xaaa, 0, 1);
+    SET_PI(s, 2, 0xaaa, 2, 2);
+    SET_PI(s, 3, 0xaaa, 2, 3);
+    SET_PI(s, 4, 0xaaa, 3, 4);
+    SET_PI(s, 5, 0xaaa, 3, 5);
+    SET_PI(s, 6, 0xaaa, 4, 6);
+    SET_PI(s, 7, 0xaaa, 4, 7);
+
+
+    /* team from the world */
+    team.size         = team_size;
+    team.ctx_map.type = UCC_EP_MAP_STRIDED;
+    team.ctx_map.strided.start = 0;
+    team.ctx_map.strided.stride = 1;
+    team.ctx_map.ep_num = 4;
+
+    team.rank = 1; // from rank 1 perspective
+    /* Init topo for such team */
+    EXPECT_EQ(UCC_OK, ucc_topo_init(&s.storage, &topo));
+    EXPECT_EQ(UCC_OK, ucc_team_topo_init(&team, topo, &team.topo));
+
+    /* SOCKET subgroup  - 2 ranks on the same socket*/
+    sbgp = ucc_team_topo_get_sbgp(team.topo, UCC_SBGP_SOCKET);
+    EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
+    EXPECT_EQ(2, sbgp->group_size);
+    EXPECT_EQ(1, sbgp->group_rank);
+    EXPECT_EQ(sbgp->map.type, UCC_EP_MAP_STRIDED);
+    EXPECT_EQ(sbgp->map.strided.start, 0);
+    EXPECT_EQ(sbgp->map.strided.stride, 1);
+
+    /* SOCKET LEADERS subgroup - ranks 0 and 2. Rank 1 does not participate, so
+       the SBGP is disabled for him */
+    sbgp = ucc_team_topo_get_sbgp(team.topo, UCC_SBGP_SOCKET_LEADERS);
+    EXPECT_EQ(UCC_SBGP_DISABLED, sbgp->status);
+
+    /* RANK 2 perspective */
+    ucc_team_topo_cleanup(team.topo);
+    team.rank = 2;
+    EXPECT_EQ(UCC_OK, ucc_team_topo_init(&team, topo, &team.topo));
+    sbgp = ucc_team_topo_get_sbgp(team.topo, UCC_SBGP_SOCKET_LEADERS);
+    EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
+    EXPECT_EQ(2, sbgp->group_size);
+    EXPECT_EQ(1, sbgp->group_rank);
+    EXPECT_EQ(sbgp->map.type, UCC_EP_MAP_STRIDED);
+    EXPECT_EQ(sbgp->map.strided.start, 0);
+    EXPECT_EQ(sbgp->map.strided.stride, 2);
+}
