@@ -665,33 +665,9 @@ typedef ucc_oob_coll_t ucc_team_oob_coll_t;
  *
  *  @ingroup UCC_CONTEXT_DT
  */
-typedef enum  {
-    UCC_MEM_CONSTRAINT_SYMMETRIC   = UCC_BIT(0),
-    UCC_MEM_CONSTRAINT_PERSISTENT  = UCC_BIT(1),
-    UCC_MEM_CONSTRAINT_ALIGN32     = UCC_BIT(2),
-    UCC_MEM_CONSTRAINT_ALIGN64     = UCC_BIT(3),
-    UCC_MEM_CONSTRAINT_ALIGN128    = UCC_BIT(4),
-    UCC_MEM_CONSTRAINT_ALIGN256    = UCC_BIT(5)
-} ucc_mem_constraints_t;
-
-/**
- *
- *  @ingroup UCC_CONTEXT_DT
- */
-typedef enum {
-    UCC_MEM_HINT_REMOTE_ATOMICS    = UCC_BIT(0),
-    UCC_MEM_HINT_REMOTE_COUNTERS   = UCC_BIT(1)
-} ucc_mem_hints_t;
-
-/**
- *
- *  @ingroup UCC_CONTEXT_DT
- */
 typedef struct ucc_mem_map {
-    void *   address; /*!< the address of a buffer to be attached to the NIC. If address is NULL, a buffer will be allocated based on the provided hints and constraints */
+    void *   address; /*!< the address of a buffer to be attached to the NIC */
     size_t   len;     /*!< the length of the buffer */
-    uint64_t hints;   /*!< optional hints on where to allocate memory for use in collective operations */
-    uint64_t constraints; /*!< requirements pertaining to the memory to be allocated */
 } ucc_mem_map_t;
 
 /**
@@ -1611,8 +1587,7 @@ enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS          = UCC_BIT(2),
     UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(3),
     UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(4),
-    UCC_COLL_ARGS_FIELD_PSYNC                           = UCC_BIT(5),
-    UCC_COLL_ARGS_FIELD_PWORK                           = UCC_BIT(6)
+    UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER              = UCC_BIT(5)
 };
 
 /**
@@ -1672,8 +1647,7 @@ typedef struct ucc_coll_args {
                                              collectives */
     ucc_error_type_t                error_type; /*!< Error type */
     ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
-    void                           *pSync; /*!< pSync array for one-sided collectives */
-    void                           *pWrk; /*!< pWrk array for one-sided reductions */
+    void                           *global_work_buffer; /*!< scratch pad for one-sided collectives */
     ucc_coll_callback_t             cb;
     double                          timeout; /*!< Timeout in seconds */
 } ucc_coll_args_t;
