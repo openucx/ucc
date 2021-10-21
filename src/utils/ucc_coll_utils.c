@@ -3,6 +3,9 @@
  *
  * See file LICENSE for terms.
  */
+
+// (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
+
 #include "ucc_coll_utils.h"
 #include "components/base/ucc_base_iface.h"
 #include "core/ucc_team.h"
@@ -101,14 +104,10 @@ ucc_memory_type_t ucc_coll_args_mem_type(const ucc_base_coll_args_t *bargs)
         return UCC_MEMORY_TYPE_ASSYMETRIC;
     }
     switch (args->coll_type) {
+    case UCC_COLL_TYPE_BARRIER:
     case UCC_COLL_TYPE_FANIN:
     case UCC_COLL_TYPE_FANOUT:
         return UCC_MEMORY_TYPE_NOT_APPLY;
-    // TODO: RFC. mem_type could be garbage value as it's not required for barrier
-    case UCC_COLL_TYPE_BARRIER:
-      return (args->dst.info.mem_type < UCC_MEMORY_TYPE_UNKNOWN)
-          ? args->dst.info.mem_type
-          : UCC_MEMORY_TYPE_NOT_APPLY;
     case UCC_COLL_TYPE_BCAST:
         return args->src.info.mem_type;
     case UCC_COLL_TYPE_ALLTOALL:

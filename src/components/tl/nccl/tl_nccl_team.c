@@ -4,12 +4,13 @@
  * See file LICENSE for terms.
  */
 
+// (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
+
 #include "tl_nccl.h"
 #include "tl_nccl_coll.h"
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
-#include "ucc/api/ucc.h"
 
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)

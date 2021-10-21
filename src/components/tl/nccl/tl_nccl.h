@@ -4,6 +4,8 @@
  * See file LICENSE for terms.
  */
 
+// (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
+
 #ifndef UCC_TL_NCCL_H_
 #define UCC_TL_NCCL_H_
 

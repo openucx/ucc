@@ -4,6 +4,8 @@
  * See file LICENSE for terms.
  */
 
+// (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
+
 #include "tl_nccl_coll.h"
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
