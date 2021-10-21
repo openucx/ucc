@@ -200,7 +200,8 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     return UCC_OK;
 }
 
-ucc_status_t ucc_collective_post(ucc_coll_req_h request)
+UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
+                      ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
 

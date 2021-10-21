@@ -75,6 +75,7 @@ static ucc_status_t ucc_tl_sharp_coll_finalize(ucc_coll_task_t *coll_task)
     ucc_tl_sharp_task_t *task = ucc_derived_of(coll_task, ucc_tl_sharp_task_t);
 
     tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
+    UCC_TL_SHARP_PROFILE_REQUEST_FREE(task);
     ucc_mpool_put(task);
     return UCC_OK;
 }
@@ -96,6 +97,7 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
 
     task = ucc_mpool_get(&sharp_ctx->req_mp);
     ucc_coll_task_init(&task->super, coll_args, team);
+    UCC_TL_SHARP_PROFILE_REQUEST_NEW(task, "tl_sharp_task", 0);
 
     task->req_handle           = NULL;
     task->super.finalize       = ucc_tl_sharp_coll_finalize;

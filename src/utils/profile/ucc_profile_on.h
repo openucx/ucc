@@ -14,6 +14,7 @@ extern ucs_profile_context_t *ucc_profile_ctx;
 
 
 #undef UCC_PROFILE_FUNC
+#undef UCC_PROFILE_FUNC_VOID
 #undef UCC_PROFILE_REQUEST_NEW
 #undef UCC_PROFILE_REQUEST_EVENT
 #undef UCC_PROFILE_REQUEST_FREE
@@ -31,6 +32,19 @@ extern ucs_profile_context_t *ucc_profile_ctx;
 #define UCC_PROFILE_FUNC(_ret_type, _name, _arglist, ...) \
     _UCS_PROFILE_CTX_FUNC(ucc_profile_ctx, _ret_type, _name, _arglist, ## __VA_ARGS__)
 
+/**
+ * Create a profiled function whose return type is void. Uses default profile
+ * context.
+ *
+ * Usage:
+ *  UCC_PROFILE_FUNC_VOID(<name>, (a, b), int a, char b)
+ *
+ * @param _name       Function name.
+ * @param _arglist    List of argument *names* only.
+ * @param ...         Argument declarations (with types).
+ */
+#define UCC_PROFILE_FUNC_VOID(_name, _arglist, ...) \
+    _UCS_PROFILE_CTX_FUNC_VOID(ucc_profile_ctx, _name, _arglist, ## __VA_ARGS__)
 
 /*
  * Profile a new request allocation.

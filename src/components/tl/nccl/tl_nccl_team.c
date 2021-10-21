@@ -127,6 +127,7 @@ static ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
     if (task->completed) {
         ucc_mc_ee_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
     }
+    UCC_TL_NCCL_PROFILE_REQUEST_FREE(task);
     ucc_mpool_put(task);
     return status;
 }
@@ -170,6 +171,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
 
     task = ucc_mpool_get(&nccl_ctx->req_mp);
     ucc_coll_task_init(&task->super, coll_args, team);
+    UCC_TL_NCCL_PROFILE_REQUEST_NEW(task, "tl_nccl_task", 0);
     task->super.finalize       = ucc_tl_nccl_coll_finalize;
     task->super.triggered_post = ucc_tl_nccl_triggered_post;
     task->completed            = NULL;

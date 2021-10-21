@@ -8,6 +8,7 @@
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
 
+
 ucc_status_t ucc_tl_nccl_event_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
@@ -16,7 +17,12 @@ ucc_status_t ucc_tl_nccl_event_collective_progress(ucc_coll_task_t *coll_task)
     ucc_assert(task->completed != NULL);
     status = ucc_mc_ee_event_test(task->completed, UCC_EE_CUDA_STREAM);
     coll_task->super.status = status;
-    return status;
+#ifdef HAVE_PROFILING_TL_NCCL
+    if (coll_task->super.status == UCC_OK) {
+        UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_coll_done", 0);
+    }
+#endif
+    return coll_task->super.status;
 }
 
 ucc_status_t ucc_tl_nccl_driver_collective_progress(ucc_coll_task_t *coll_task)
@@ -24,6 +30,11 @@ ucc_status_t ucc_tl_nccl_driver_collective_progress(ucc_coll_task_t *coll_task)
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
 
     coll_task->super.status = task->host_status;
+#ifdef HAVE_PROFILING_TL_NCCL
+    if (coll_task->super.status == UCC_OK) {
+        UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_coll_done", 0);
+    }
+#endif
     return coll_task->super.status;
 }
 
