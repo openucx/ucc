@@ -3,9 +3,6 @@
  *
  * See file LICENSE for terms.
  */
-
-// (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
-
 #include "ucc_coll_utils.h"
 #include "components/base/ucc_base_iface.h"
 #include "core/ucc_team.h"
