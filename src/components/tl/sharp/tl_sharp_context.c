@@ -282,7 +282,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
        rcache_params.ops                = &ucc_tl_sharp_rcache_ops;
        rcache_params.flags              = 0;
 
-       status = ucc_rcache_create(&rcache_params, "SHARP", NULL, &self->rcache);
+       status = ucc_rcache_create(&rcache_params, "SHARP", &self->rcache);
        if (status != UCC_OK) {
            tl_error(self->super.super.lib, "failed to create rcache");
            status = UCC_ERR_NO_RESOURCE;
