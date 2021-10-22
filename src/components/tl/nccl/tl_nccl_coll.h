@@ -1,10 +1,9 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * See file LICENSE for terms.
  */
-
-// (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
 
 #ifndef UCC_TL_NCCL_COLL_H_
 #define UCC_TL_NCCL_COLL_H_

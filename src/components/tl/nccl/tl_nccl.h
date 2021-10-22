@@ -1,10 +1,9 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * See file LICENSE for terms.
  */
-
-// (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
 
 #ifndef UCC_TL_NCCL_H_
 #define UCC_TL_NCCL_H_
@@ -65,6 +64,7 @@ typedef struct ucc_tl_nccl_context {
     ucc_tl_context_t             super;
     ucc_tl_nccl_context_config_t cfg;
     ucc_mpool_t                  req_mp;
+    void                        *scratch_buf;
 } ucc_tl_nccl_context_t;
 UCC_CLASS_DECLARE(ucc_tl_nccl_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -85,7 +85,6 @@ typedef struct ucc_tl_nccl_task {
     ucc_status_t        host_status;
     ucc_status_t       *dev_status;
     cudaEvent_t         completed;
-    ucc_mc_buffer_header_t *scratch_mc_header;
 } ucc_tl_nccl_task_t;
 
 #define TASK_TEAM(_task)                                                       \
