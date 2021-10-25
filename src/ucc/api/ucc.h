@@ -632,7 +632,8 @@ enum ucc_context_attr_field {
     UCC_CONTEXT_ATTR_FIELD_TYPE               = UCC_BIT(0),
     UCC_CONTEXT_ATTR_FIELD_SYNC_TYPE          = UCC_BIT(1),
     UCC_CONTEXT_ATTR_FIELD_CTX_ADDR           = UCC_BIT(2),
-    UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN       = UCC_BIT(3)
+    UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN       = UCC_BIT(3),
+    UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE   = UCC_BIT(4)
 };
 
 /**
@@ -735,6 +736,7 @@ typedef struct ucc_context_attr {
     ucc_coll_sync_type_t    sync_type;
     ucc_context_addr_h      ctx_addr;
     ucc_context_addr_len_t  ctx_addr_len;
+    uint64_t                global_work_buffer_size;
 } ucc_context_attr_t;
 
 /**
@@ -969,6 +971,7 @@ enum ucc_team_params_field {
     UCC_TEAM_PARAM_FIELD_MEM_PARAMS             = UCC_BIT(9),
     UCC_TEAM_PARAM_FIELD_EP_MAP                 = UCC_BIT(10),
     UCC_TEAM_PARAM_FIELD_ID                     = UCC_BIT(11),
+    UCC_TEAM_PARAM_FIELD_FLAGS                  = UCC_BIT(12)
 };
 
 /**
@@ -982,6 +985,14 @@ enum ucc_team_attr_field {
     UCC_TEAM_ATTR_FIELD_EP_RANGE               = UCC_BIT(3),
     UCC_TEAM_ATTR_FIELD_SYNC_TYPE              = UCC_BIT(4),
     UCC_TEAM_ATTR_FIELD_MEM_PARAMS             = UCC_BIT(5)
+};
+
+/**
+ *
+ * @ingroup UCC_TEAM_DT
+ */
+enum ucc_team_flags {
+    UCC_TEAM_FLAG_COLL_WORK_BUFFER             = UCC_BIT(0)
 };
 
 /**
@@ -1127,6 +1138,7 @@ typedef struct ucc_ep_map_t {
 typedef struct ucc_team_params {
 
     uint64_t                mask;
+    uint64_t                flags;
     /** @ref ucc_team_params.ordering is set to one the values defined by @ref
       *  ucc_post_ordering_t
       */
