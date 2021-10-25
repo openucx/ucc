@@ -142,12 +142,32 @@ static ucc_status_t ucc_mc_cuda_post_driver_stream_task(uint32_t *status,
     return UCC_OK;
 }
 
+static ucc_status_t ucc_mc_cuda_flush_no_op()
+{
+    return UCC_OK;
+}
+
+static ucc_status_t ucc_mc_cuda_flush_not_supported()
+{
+    mc_error(&ucc_mc_cuda.super, "consistency api is not supported");
+    return UCC_ERR_NOT_SUPPORTED;
+}
+
+#if CUDA_VERSION >= 11030
+static ucc_status_t ucc_mc_cuda_flush_to_owner()
+{
+    CUDADRV_FUNC(cuFlushGPUDirectRDMAWrites(CU_FLUSH_GPU_DIRECT_RDMA_WRITES_TARGET_CURRENT_CTX,
+                                            CU_FLUSH_GPU_DIRECT_RDMA_WRITES_TO_OWNER));
+    return UCC_OK;
+}
+#endif
+
 static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
 {
     ucc_mc_cuda_config_t *cfg = MC_CUDA_CONFIG;
     struct cudaDeviceProp prop;
     ucc_status_t status;
-    int device, num_devices, mem_ops_attr;
+    int device, num_devices, mem_ops_attr, flush_attr, driver_ver;
     CUdevice cu_dev;
     CUresult cu_st;
     cudaError_t cuda_st;
@@ -173,6 +193,8 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
             cfg->reduce_num_blocks = prop.maxGridSize[0];
         }
     }
+    CUDADRV_FUNC(cuDriverGetVersion(&driver_ver));
+    mc_debug(&ucc_mc_cuda.super, "driver version %d", driver_ver);
 
     /*create event pool */
     status = ucc_mpool_init(&ucc_mc_cuda.events, 0, sizeof(ucc_mc_cuda_event_t),
@@ -226,8 +248,37 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
-
     ucc_mc_cuda.task_strm_type = cfg->task_strm_type;
+#if CUDA_VERSION >= 11030
+    if (driver_ver >= 11030) {
+        cu_st = cuCtxGetDevice(&cu_dev);
+        if (cu_st != CUDA_SUCCESS){
+            cuGetErrorString(cu_st, &cu_err_st_str);
+            mc_debug(&ucc_mc_cuda.super, "cuCtxGetDevice() failed: %s",
+                     cu_err_st_str);
+        } else {
+            CUDADRV_FUNC(cuDeviceGetAttribute(&flush_attr,
+                         CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_FLUSH_WRITES_OPTIONS,
+                         cu_dev));
+            if (flush_attr & CU_FLUSH_GPU_DIRECT_RDMA_WRITES_OPTION_HOST) {
+                CUDADRV_FUNC(cuDeviceGetAttribute(&flush_attr,
+                             CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WRITES_ORDERING,
+                             cu_dev));
+                if (CU_FLUSH_GPU_DIRECT_RDMA_WRITES_TO_OWNER > flush_attr) {
+                    ucc_mc_cuda.super.ops.flush = ucc_mc_cuda_flush_to_owner;
+                } else {
+                    ucc_mc_cuda.super.ops.flush = ucc_mc_cuda_flush_no_op;
+                }
+            } else {
+                mc_debug(&ucc_mc_cuda.super, "consistency api is not supported");
+            }
+        }
+    } else {
+        mc_debug(&ucc_mc_cuda.super,
+                 "cuFlushGPUDirectRDMAWrites is not supported "
+                 "with driver version %d", driver_ver);
+    }
+#endif
     // lock assures single mpool initiation when multiple threads concurrently execute
     // different collective operations thus concurrently entering init function.
     ucc_spinlock_init(&ucc_mc_cuda.init_spinlock, 0);
@@ -654,6 +705,7 @@ ucc_mc_cuda_t ucc_mc_cuda = {
     .super.ops.reduce       = ucc_mc_cuda_reduce,
     .super.ops.reduce_multi = ucc_mc_cuda_reduce_multi,
     .super.ops.memcpy       = ucc_mc_cuda_memcpy,
+    .super.ops.flush        = ucc_mc_cuda_flush_not_supported,
     .super.config_table =
         {
             .name   = "CUDA memory component",
