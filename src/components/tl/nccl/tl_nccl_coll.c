@@ -1,6 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
  */
@@ -224,7 +224,11 @@ ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
     size_t              count = args->dst.info.count;
 
     task->super.super.status = UCC_INPROGRESS;
-    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_allreduce_start", 0);
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task,
+                                      args->coll_type == UCC_COLL_TYPE_BARRIER
+                                          ? "nccl_barrier_start"
+                                          : "nccl_allreduce_start",
+                                      0);
     NCCLCHECK_GOTO(ncclAllReduce(src, dst, count, dt, op, team->nccl_comm,
                                  stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));

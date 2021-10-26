@@ -1,6 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
- * Copyright (c) Facebook, Inc. and its affiliates.
+ * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
  */
