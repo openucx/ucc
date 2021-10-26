@@ -93,7 +93,6 @@ typedef struct ucc_tl_ucp_context {
     ucc_mpool_t                 req_mp;
     tl_ucp_ep_hash_t *          ep_hash;
     ucp_ep_h *                  eps;
-    tl_ucp_rinfo_hash_t *       rinfo_hash;
     ucc_tl_ucp_remote_info_t ** remote_info;
     uint64_t                    n_rinfo_segs;
 } ucc_tl_ucp_context_t;

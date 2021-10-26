@@ -163,13 +163,9 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
                              ucc_rank_t peer, uint64_t *rva, ucp_rkey_h *rkey,
                              int *segment)
 {
-    ucc_tl_ucp_context_t *     ctx = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_context_id_t           key = ucc_tl_ucp_get_rank_key(team, peer);
-    ucc_tl_ucp_remote_info_t **remote_info;
-    *segment = 0;
-
-    remote_info = (ucc_tl_ucp_remote_info_t **)tl_ucp_rinfo_hash_get(
-        ctx->rinfo_hash, key);
+    ucc_tl_ucp_context_t *ctx    = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_ep_map_t *        ep_map = &team->super.super.team->ctx_map;
+    *segment                     = 0;
 
     for (int i = 0; i < ctx->n_rinfo_segs; i++) {
         if (va >= team->va_base[i] &&
@@ -179,12 +175,30 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
         }
     }
 
-    if (NULL == remote_info[0][*segment].rkey) {
-        ucp_ep_rkey_unpack(*ep, remote_info[0][*segment].packed_key,
-                           (ucp_rkey_h *)&remote_info[0][*segment].rkey);
+    if (ep_map->type == UCC_EP_MAP_STRIDED) {
+        peer = peer * ep_map->strided.stride + ep_map->strided.start;
     }
-    *rkey = remote_info[0][*segment].rkey;
-    *rva  = (uint64_t)remote_info[0][*segment].va_base;
+    else if (ep_map->type == UCC_EP_MAP_ARRAY) {
+        if (ep_map->array.elem_size == 4) {
+            uint32_t *index = ep_map->array.map;
+            peer            = index[peer];
+        }
+        else {
+            uint64_t *index = ep_map->array.map;
+            peer            = index[peer];
+        }
+    }
+    else if (ep_map->type == UCC_EP_MAP_CB) {
+        peer = (ucc_rank_t)ep_map->cb.cb(peer, ep_map->cb.cb_ctx);
+    }
+
+    if (NULL == ctx->remote_info[peer][*segment].rkey) {
+        ucp_ep_rkey_unpack(
+            *ep, ctx->remote_info[peer][*segment].packed_key,
+            (ucp_rkey_h *)&ctx->remote_info[peer][*segment].rkey);
+    }
+    *rkey = ctx->remote_info[peer][*segment].rkey;
+    *rva  = (uint64_t)ctx->remote_info[peer][*segment].va_base;
     return UCC_OK;
 }
 

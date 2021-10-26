@@ -40,8 +40,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK;
-    ucp_params.features = UCP_FEATURE_TAG | UCP_FEATURE_RMA |
-                          UCP_FEATURE_AMO32 | UCP_FEATURE_AMO64;
+
+    if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS) {
+        ucp_params.features =
+            UCP_FEATURE_TAG | UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
+    }
+    else {
+        ucp_params.features = UCP_FEATURE_TAG;
+    }
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
 
     if (params->estimated_num_ppn > 0) {
@@ -119,17 +125,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         goto err_thread_mode;
     }
 
-    self->rinfo_hash = NULL;
-    self->remote_info = NULL;
+    self->remote_info  = NULL;
     self->n_rinfo_segs = 0;
     if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS &&
         params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
-        ucc_status_t mm_status;
 
-        mm_status = ucc_tl_ucp_ctx_remote_populate(
+        ucc_status = ucc_tl_ucp_ctx_remote_populate(
             self, params->params.mem_params, params->params.oob);
-        if (UCC_OK != mm_status) {
-            return mm_status;
+        if (UCC_OK != ucc_status) {
+            tl_error(self->super.super.lib, "failed to gather RMA information");
+            return ucc_status;
         }
     }
 
@@ -191,24 +196,24 @@ static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
 
 ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
 {
-    ucc_tl_ucp_remote_info_t **rinfo;
+    ucc_tl_ucp_remote_info_t *rinfo;
+    ucc_rank_t                size = UCC_TL_CTX_OOB(ctx).n_oob_eps;
 
-    rinfo = (ucc_tl_ucp_remote_info_t **)tl_ucp_hash_rinfo_pop(ctx->rinfo_hash);
-    while (rinfo) {
-        for (int i = 0; i < ctx->n_rinfo_segs; i++) {
-            if (rinfo[0][i].rkey) {
-                ucp_rkey_destroy(rinfo[0][i].rkey);
+    for (int i = size - 1; i >= 0; i--) {
+        rinfo = ctx->remote_info[i];
+
+        for (int j = 0; j < ctx->n_rinfo_segs; j++) {
+            if (rinfo[j].rkey) {
+                ucp_rkey_destroy(rinfo[j].rkey);
             }
-            if (rinfo[0][i].mem_h) {
-                ucp_mem_unmap(ctx->ucp_context, rinfo[0][i].mem_h);
+            if (rinfo[j].mem_h) {
+                ucp_mem_unmap(ctx->ucp_context, rinfo[j].mem_h);
             }
-            if (rinfo[0][i].packed_key) {
-                free(rinfo[0][i].packed_key);
+            if (rinfo[j].packed_key) {
+                free(rinfo[j].packed_key);
             }
         }
-        free(rinfo[0]);
-        rinfo =
-            (ucc_tl_ucp_remote_info_t **)tl_ucp_hash_rinfo_pop(ctx->rinfo_hash);
+        free(rinfo);
     }
 
     return UCC_OK;
@@ -223,7 +228,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     } else {
         kh_destroy(tl_ucp_ep_hash, self->ep_hash);
     }
-    if (self->rinfo_hash) {
+    if (self->remote_info) {
         ucc_tl_ucp_rinfo_destroy(self);
     }
     if (UCC_TL_CTX_HAS_OOB(self)) {
@@ -271,48 +276,45 @@ ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
     return UCC_OK;
 }
 
-static size_t ucc_tl_ucp_ctx_remote_pack(ucc_mem_map_params_t map,
-                                         uint32_t rank, uint32_t size,
-                                         void **my_pack, size_t *my_pack_sizes,
-                                         void **pack)
+static ucc_status_t ucc_tl_ucp_ctx_remote_pack(
+    ucc_mem_map_params_t map, void **my_pack, size_t *my_pack_sizes,
+    size_t max_pack_size, size_t *total, void **pack, ucc_tl_ucp_context_t *ctx)
 {
     uint64_t  nsegs          = map.n_maps;
     uint64_t  offset         = 0;
-    size_t    total          = 0;
-    size_t    pack_size      = 0;
     size_t    section_offset = sizeof(uint64_t) * nsegs;
     void *    packed_data;
-    void *    base;
     void *    keys;
     uint64_t *rvas;
     uint64_t *lens;
     uint64_t *key_sizes;
-
-    for (int i = 0; i < nsegs; i++) {
-        pack_size += my_pack_sizes[i];
-    }
+    int       i;
 
     /* pack into one data object in following order: */
     /* rva, len, pack sizes, packed keys */
-    total       = (sizeof(uint64_t) * 3 + pack_size) * nsegs;
-    packed_data = calloc(total, size);
+    *total      = (sizeof(uint64_t) * 3 + max_pack_size) * nsegs;
+    packed_data = ucc_calloc(*total, 1, "ucp_packed_data");
+    if (NULL == packed_data) {
+        tl_error(ctx->super.super.lib,
+                 "failed to allocate %zu bytes to pack ucp data", *total);
+        return UCC_ERR_NO_MEMORY;
+    }
 
-    base      = packed_data + rank * total;
-    rvas      = base;
-    lens      = base + section_offset;
-    key_sizes = base + (section_offset * 2);
-    keys      = base + (section_offset * 3);
+    rvas      = packed_data;
+    lens      = PTR_OFFSET(packed_data, section_offset);
+    key_sizes = PTR_OFFSET(packed_data, (section_offset * 2));
+    keys      = PTR_OFFSET(packed_data, (section_offset * 3));
 
-    for (int i = 0; i < nsegs; i++) {
+    for (i = 0; i < nsegs; i++) {
         rvas[i]      = (uint64_t)map.maps[i].address;
         lens[i]      = map.maps[i].len;
         key_sizes[i] = my_pack_sizes[i];
-        memcpy(keys + offset, my_pack[i], my_pack_sizes[i]);
+        memcpy(PTR_OFFSET(keys, offset), my_pack[i], my_pack_sizes[i]);
         offset += my_pack_sizes[i];
     }
 
     *pack = packed_data;
-    return total;
+    return UCC_OK;
 }
 
 static ucc_status_t ucc_tl_ucp_ctx_exchange_data(void *sbuf, void *rbuf,
@@ -328,7 +330,7 @@ static ucc_status_t ucc_tl_ucp_ctx_exchange_data(void *sbuf, void *rbuf,
         tl_error(ctx->super.super.lib,
                  "oob.allgather failed with error code: %d", ucc_status);
 
-        return UCC_ERR_NO_MESSAGE;
+        return ucc_status;
     }
 
     while (UCC_INPROGRESS == (ucc_status = oob.req_test(req)))
@@ -337,41 +339,54 @@ static ucc_status_t ucc_tl_ucp_ctx_exchange_data(void *sbuf, void *rbuf,
         tl_error(ctx->super.super.lib,
                  "oob.allgather failed with error code: %d", ucc_status);
 
-        return UCC_ERR_NO_MESSAGE;
+        return ucc_status;
     }
     oob.req_free(req);
 
-    return UCC_OK;
+    return ucc_status;
 }
 
-ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t *ctx,
-                                            ucc_mem_map_params_t  map,
-                                            ucc_team_oob_coll_t   oob)
+ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
+                                            ucc_mem_map_params_t   map,
+                                            ucc_context_oob_coll_t oob)
 {
-    uint32_t                   rank  = oob.oob_ep;
-    uint32_t                   size  = oob.n_oob_eps;
-    uint64_t                   nsegs = map.n_maps;
-    size_t                     total = 0;
-    ucc_tl_ucp_remote_info_t **remote_info;
+    uint32_t                   rank             = oob.oob_ep;
+    uint32_t                   size             = oob.n_oob_eps;
+    uint64_t                   nsegs            = map.n_maps;
+    size_t                     total            = 0;
+    size_t                     local_pack_size  = 0;
+    void *                     global_pack_data = NULL;
+    size_t *                   total_pack_size  = NULL;
+    ucc_tl_ucp_remote_info_t **remote_info      = NULL;
+    void *                     packed_data      = NULL;
     ucp_mem_map_params_t       mmap_params;
     ucp_mem_h                  mh;
     ucs_status_t               status;
     ucc_status_t               ucc_status;
-    void *                     packed_data;
     void *                     my_pack[nsegs];
     size_t                     my_pack_sizes[nsegs];
+    int                        i;
 
-    ctx->rinfo_hash = kh_init(tl_ucp_rinfo_hash);
-    remote_info     = (ucc_tl_ucp_remote_info_t **)malloc(
-        sizeof(ucc_tl_ucp_remote_info_t *) * size);
+    remote_info = (ucc_tl_ucp_remote_info_t **)ucc_malloc(
+        sizeof(ucc_tl_ucp_remote_info_t *) * size, "ucp_ctx_remote_info");
+    if (NULL == remote_info) {
+        tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
+                 sizeof(ucc_tl_ucp_remote_info_t *) * size);
+        ucc_status = UCC_ERR_NO_MEMORY;
+        return ucc_status;
+    }
 
-    remote_info[rank] = (ucc_tl_ucp_remote_info_t *)calloc(
-        nsegs, sizeof(ucc_tl_ucp_remote_info_t));
+    remote_info[rank] = (ucc_tl_ucp_remote_info_t *)ucc_calloc(
+        nsegs, sizeof(ucc_tl_ucp_remote_info_t), "ucp_remote_info");
+    if (NULL == remote_info[rank]) {
+        tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
+                 sizeof(ucc_tl_ucp_remote_info_t));
+        ucc_status = UCC_ERR_NO_MEMORY;
+        goto fail_alloc_remote_segs;
+    }
 
-    for (int i = 0; i < nsegs; i++) {
+    for (i = 0; i < nsegs; i++) {
         void *addr = map.maps[i].address;
-
-        /* TODO: perform allocation based on hints/constraints if addr NULL */
 
         mmap_params.field_mask =
             UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
@@ -379,6 +394,12 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t *ctx,
         mmap_params.length  = map.maps[i].len;
 
         status = ucp_mem_map(ctx->ucp_context, &mmap_params, &mh);
+        if (UCS_OK != status) {
+            tl_error(ctx->super.super.lib,
+                     "ucp_mem_map failed with error code: %d", status);
+            ucc_status = ucs_status_to_ucc_status(status);
+            goto fail_mem_map;
+        }
         remote_info[rank][i].mem_h = (void *)mh;
 
         status =
@@ -386,53 +407,123 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t *ctx,
         if (UCS_OK != status) {
             tl_error(ctx->super.super.lib,
                      "failed to pack UCP key with error code: %d", status);
-            return UCC_ERR_NO_MESSAGE;
+            ucc_status = ucs_status_to_ucc_status(status);
+            goto fail_mem_map;
+        }
+        local_pack_size += my_pack_sizes[i];
+    }
+
+    total_pack_size =
+        (size_t *)ucc_malloc(sizeof(size_t) * size, "total_pack_size");
+    if (NULL == total_pack_size) {
+        tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
+                 sizeof(size_t) * size);
+        ucc_status = UCC_ERR_NO_MEMORY;
+        goto fail_mem_map;
+    }
+
+    ucc_status = ucc_tl_ucp_ctx_exchange_data(&local_pack_size, total_pack_size,
+                                              sizeof(size_t), ctx, oob);
+    if (UCC_OK != ucc_status) {
+        tl_error(ctx->super.super.lib,
+                 "failure in oob exchange of packed UCP key sizes");
+        ucc_status = UCC_ERR_NO_MESSAGE;
+        goto fail_pack;
+    }
+
+    for (i = 0; i < size; i++) {
+        if (total_pack_size[i] > local_pack_size) {
+            local_pack_size = total_pack_size[i];
         }
     }
 
-    total = ucc_tl_ucp_ctx_remote_pack(map, rank, size, my_pack, my_pack_sizes,
-                                       &packed_data);
-
-    ucc_status = ucc_tl_ucp_ctx_exchange_data(packed_data + rank * total,
-                                              packed_data, total, ctx, oob);
+    ucc_status =
+        ucc_tl_ucp_ctx_remote_pack(map, my_pack, my_pack_sizes, local_pack_size,
+                                   &total, &packed_data, ctx);
     if (UCC_OK != ucc_status) {
-        return ucc_status;
+        tl_error(ctx->super.super.lib, "failed to pack remote data");
+        goto fail_pack;
     }
 
-    for (int i = 0, k = 0; i < size; i++, k += 2) {
-        void *    base      = packed_data + i * total;
+    global_pack_data = ucc_malloc(total * size, "ucp_global_packed_data");
+    if (NULL == global_pack_data) {
+        tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
+                 sizeof(size_t) * size);
+        ucc_status = UCC_ERR_NO_MEMORY;
+        goto fail_pack;
+    }
+
+    ucc_status = ucc_tl_ucp_ctx_exchange_data(packed_data, global_pack_data,
+                                              total, ctx, oob);
+    if (UCC_OK != ucc_status) {
+        tl_error(ctx->super.super.lib,
+                 "failure in oob exchange of packed data");
+        goto fail_pack_exchange;
+    }
+
+    for (i = 0; i < size; i++) {
+        void *    base      = PTR_OFFSET(global_pack_data, i * total);
         uint64_t *rvas      = base;
-        uint64_t *lens      = base + sizeof(uint64_t) * nsegs;
-        uint64_t *key_sizes = base + (sizeof(uint64_t) * nsegs * 2);
-        void *    key       = base + (sizeof(uint64_t) * nsegs) * 3;
+        uint64_t *lens      = PTR_OFFSET(base, sizeof(uint64_t) * nsegs);
+        uint64_t *key_sizes = PTR_OFFSET(base, sizeof(uint64_t) * nsegs * 2);
+        void *    key       = PTR_OFFSET(base, sizeof(uint64_t) * nsegs * 3);
         size_t    offset    = 0;
+        int       j;
 
         if (i != rank) {
-            remote_info[i] = (ucc_tl_ucp_remote_info_t *)calloc(
-                nsegs, sizeof(ucc_tl_ucp_remote_info_t));
+            remote_info[i] = (ucc_tl_ucp_remote_info_t *)ucc_calloc(
+                nsegs, sizeof(ucc_tl_ucp_remote_info_t), "ucp_remote_info");
+            if (NULL == remote_info[i]) {
+
+                tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
+                         sizeof(size_t) * size);
+                ucc_status = UCC_ERR_NO_MEMORY;
+
+                for (j = i - 1; j >= 0; j--) {
+                    if (j != rank) {
+                        ucc_free(remote_info[j]);
+                    }
+                }
+                goto fail_pack_exchange;
+            }
         }
 
-        for (int j = 0; j < nsegs; j++) {
-            if (j < nsegs) {
-                remote_info[i][j].va_base    = (void *)rvas[j];
-                remote_info[i][j].len        = lens[j];
-                remote_info[i][j].packed_key = malloc(key_sizes[j]);
-                memcpy(remote_info[i][j].packed_key, key + offset,
-                       key_sizes[j]);
-                offset += key_sizes[j];
-            }
-            else {
-                remote_info[i][j].va_base = 0;
-                remote_info[i][j].len     = 0;
-            }
+        for (j = 0; j < nsegs; j++) {
+            remote_info[i][j].va_base = (void *)rvas[j];
+            remote_info[i][j].len     = lens[j];
+            remote_info[i][j].packed_key =
+                ucc_malloc(key_sizes[j], "ucp_packed_key");
+            memcpy(remote_info[i][j].packed_key, PTR_OFFSET(key, offset),
+                   key_sizes[j]);
+            offset += key_sizes[j];
         }
     }
 
-    free(packed_data);
+    ucc_free(global_pack_data);
+    ucc_free(total_pack_size);
+    ucc_free(packed_data);
     ctx->remote_info  = remote_info;
     ctx->n_rinfo_segs = nsegs;
 
     return UCC_OK;
+
+fail_pack_exchange:
+    ucc_free(global_pack_data);
+fail_pack:
+    ucc_free(total_pack_size);
+fail_mem_map:
+    for (i = nsegs; i >= 0; i--) {
+        if (remote_info[rank][i].mem_h) {
+            ucp_mem_unmap(ctx->ucp_context, remote_info[rank][i].mem_h);
+        }
+        if (remote_info[rank][i].packed_key) {
+            ucc_free(remote_info[rank][i].packed_key);
+        }
+    }
+    ucc_free(remote_info[rank]);
+fail_alloc_remote_segs:
+    ucc_free(remote_info);
+    return ucc_status;
 }
 
 ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
