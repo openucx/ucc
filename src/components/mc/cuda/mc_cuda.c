@@ -142,10 +142,6 @@ static ucc_status_t ucc_mc_cuda_post_driver_stream_task(uint32_t *status,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cuda_flush_no_op()
-{
-    return UCC_OK;
-}
 
 static ucc_status_t ucc_mc_cuda_flush_not_supported()
 {
@@ -154,6 +150,11 @@ static ucc_status_t ucc_mc_cuda_flush_not_supported()
 }
 
 #if CUDA_VERSION >= 11030
+static ucc_status_t ucc_mc_cuda_flush_no_op()
+{
+    return UCC_OK;
+}
+
 static ucc_status_t ucc_mc_cuda_flush_to_owner()
 {
     CUDADRV_FUNC(cuFlushGPUDirectRDMAWrites(CU_FLUSH_GPU_DIRECT_RDMA_WRITES_TARGET_CURRENT_CTX,
@@ -167,7 +168,7 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
     ucc_mc_cuda_config_t *cfg = MC_CUDA_CONFIG;
     struct cudaDeviceProp prop;
     ucc_status_t status;
-    int device, num_devices, mem_ops_attr, flush_attr, driver_ver;
+    int device, num_devices, attr, driver_ver;
     CUdevice cu_dev;
     CUresult cu_st;
     cudaError_t cuda_st;
@@ -228,21 +229,21 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
             cuGetErrorString(cu_st, &cu_err_st_str);
             mc_debug(&ucc_mc_cuda.super, "cuCtxGetDevice() failed: %s",
                      cu_err_st_str);
-            mem_ops_attr = 0;
+            attr = 0;
         } else {
-            CUDADRV_FUNC(cuDeviceGetAttribute(&mem_ops_attr,
+            CUDADRV_FUNC(cuDeviceGetAttribute(&attr,
                         CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS,
                         cu_dev));
         }
 
         if (cfg->strm_task_mode == UCC_MC_CUDA_TASK_AUTO) {
-            if (mem_ops_attr == 0) {
+            if (attr == 0) {
                 mc_info(&ucc_mc_cuda.super,
                         "CUDA MEM OPS are not supported or disabled");
                 ucc_mc_cuda.strm_task_mode = UCC_MC_CUDA_TASK_KERNEL;
                 ucc_mc_cuda.post_strm_task = ucc_mc_cuda_post_kernel_stream_task;
             }
-        } else if (mem_ops_attr == 0) {
+        } else if (attr == 0) {
             mc_error(&ucc_mc_cuda.super,
                      "CUDA MEM OPS are not supported or disabled");
             return UCC_ERR_NOT_SUPPORTED;
@@ -257,14 +258,15 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
             mc_debug(&ucc_mc_cuda.super, "cuCtxGetDevice() failed: %s",
                      cu_err_st_str);
         } else {
-            CUDADRV_FUNC(cuDeviceGetAttribute(&flush_attr,
+            attr = 0;
+            CUDADRV_FUNC(cuDeviceGetAttribute(&attr,
                          CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_FLUSH_WRITES_OPTIONS,
                          cu_dev));
-            if (flush_attr & CU_FLUSH_GPU_DIRECT_RDMA_WRITES_OPTION_HOST) {
-                CUDADRV_FUNC(cuDeviceGetAttribute(&flush_attr,
+            if (attr & CU_FLUSH_GPU_DIRECT_RDMA_WRITES_OPTION_HOST) {
+                CUDADRV_FUNC(cuDeviceGetAttribute(&attr,
                              CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WRITES_ORDERING,
                              cu_dev));
-                if (CU_FLUSH_GPU_DIRECT_RDMA_WRITES_TO_OWNER > flush_attr) {
+                if (CU_FLUSH_GPU_DIRECT_RDMA_WRITES_TO_OWNER > attr) {
                     ucc_mc_cuda.super.ops.flush = ucc_mc_cuda_flush_to_owner;
                 } else {
                     ucc_mc_cuda.super.ops.flush = ucc_mc_cuda_flush_no_op;
