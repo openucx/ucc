@@ -1659,7 +1659,7 @@ typedef struct ucc_coll_args {
                                              collectives */
     ucc_error_type_t                error_type; /*!< Error type */
     ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
-    void                           *global_work_buffer; /*!< scratch pad for one-sided collectives */
+    void                           *global_work_buffer; /*!< User allocated scratchpad buffer for one-sided collectives. The buffer provided should be at least the size returned by @ref ucc_context_get_attr with the field mask - UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE set to 1. */
     ucc_coll_callback_t             cb;
     double                          timeout; /*!< Timeout in seconds */
 } ucc_coll_args_t;
