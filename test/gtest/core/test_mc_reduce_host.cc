@@ -46,7 +46,11 @@ TYPED_TEST(test_mc_reduce_alpha, ucc_reduce_multi_alpha_host) {
         for (int j = 1; j < num_vec; j++) {
             res = TypeParam::do_op(this->buf2_h[i + j * this->COUNT], res);
         }
-        res *= (typename TypeParam::type)alpha;
+        if (TypeParam::dt == UCC_DT_BFLOAT16) {
+            float32tobfloat16(bfloat16tofloat32(&res)*(float)alpha, &res);
+        } else {
+            res *= (typename TypeParam::type)alpha;
+        }
         TypeParam::assert_equal(res, this->res_h[i]);
     }
 }
@@ -65,7 +69,11 @@ TYPED_TEST(test_mc_reduce_alpha, ucc_reduce_multi_alpha_host_many_vectors) {
         for (int j = 1; j < num_vec; j++) {
             res = TypeParam::do_op(this->buf2_h[i + j * this->COUNT], res);
         }
-        res *= (typename TypeParam::type)alpha;
+        if (TypeParam::dt == UCC_DT_BFLOAT16){
+            float32tobfloat16(bfloat16tofloat32(&res)*(float)alpha, &res);
+        } else {
+            res *= (typename TypeParam::type)alpha;
+        }
         TypeParam::assert_equal(res, this->res_h[i]);
     }
 }

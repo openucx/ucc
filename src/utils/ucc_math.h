@@ -66,4 +66,24 @@ int ucc_sort_uniq(int *array, int len, int inverse);
 
 #define ucc_div_round_up(_n, _d) (((_n) + (_d) - 1) / (_d))
 
+static inline float bfloat16tofloat32(const void *bfloat16_ptr)
+{
+    float res = 0;
+#if UCC_BIG_ENDIAN
+    ((uint16_t *)(&res))[0] = *((uint16_t *)bfloat16_ptr);
+#else
+    ((uint16_t *)(&res))[1] = *((uint16_t *)bfloat16_ptr);
+#endif
+    return res;
+}
+
+static inline void float32tobfloat16(float float_val, void *bfloat16_ptr)
+{
+#if UCC_BIG_ENDIAN
+    *((uint16_t *)bfloat16_ptr) = ((uint16_t *)(&float_val))[0];
+#else
+    *((uint16_t *)bfloat16_ptr) = ((uint16_t *)(&float_val))[1];
+#endif
+}
+
 #endif

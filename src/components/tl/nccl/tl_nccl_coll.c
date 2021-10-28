@@ -29,6 +29,11 @@ ncclDataType_t ucc_to_nccl_dtype[] = {
     [UCC_DT_FLOAT16]     = (ncclDataType_t)ncclFloat16,
     [UCC_DT_FLOAT32]     = (ncclDataType_t)ncclFloat32,
     [UCC_DT_FLOAT64]     = (ncclDataType_t)ncclFloat64,
+#if (CUDART_VERSION >= 11000) && (NCCL_VERSION_CODE >= NCCL_VERSION(2,10,3))
+    [UCC_DT_BFLOAT16]    = (ncclDataType_t)ncclBfloat16,
+#else
+    [UCC_DT_BFLOAT16]    = (ncclDataType_t)ncclDataTypeUnsupported,
+#endif
     [UCC_DT_USERDEFINED] = (ncclDataType_t)ncclDataTypeUnsupported,
     [UCC_DT_OPAQUE]      = (ncclDataType_t)ncclDataTypeUnsupported,
 };

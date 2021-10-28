@@ -201,6 +201,7 @@ REDUCE_FN_DECLARE(uint32);
 REDUCE_FN_DECLARE(uint64);
 REDUCE_FN_DECLARE(float);
 REDUCE_FN_DECLARE(double);
+REDUCE_FN_DECLARE(bfloat16);
 
 #define REDUCE_ALPHA_FN_DECLARE(_type)                                         \
     ucc_status_t ucc_mc_cpu_reduce_multi_alpha_##_type(                        \
@@ -209,4 +210,9 @@ REDUCE_FN_DECLARE(double);
         ucc_reduction_op_t vector_op, _type alpha)
 REDUCE_ALPHA_FN_DECLARE(float);
 REDUCE_ALPHA_FN_DECLARE(double);
+ucc_status_t
+ucc_mc_cpu_reduce_multi_alpha_bfloat16(const void *src1, const void *src2,
+                                       void *dst, size_t n_vectors, size_t count,
+                                       size_t stride, ucc_reduction_op_t reduce_op,
+                                       ucc_reduction_op_t vector_op, float alpha);
 #endif

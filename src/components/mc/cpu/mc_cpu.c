@@ -195,6 +195,9 @@ static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
         ucc_assert(8 == sizeof(double));
         return ucc_mc_cpu_reduce_multi_double(src1, src2, dst, n_vectors,
                                               count, stride, op);
+    case UCC_DT_BFLOAT16:
+        return ucc_mc_cpu_reduce_multi_bfloat16(src1, src2, dst, n_vectors,
+                                                count, stride, op);
     default:
         mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
                  ucc_datatype_str(dt));
@@ -227,6 +230,10 @@ ucc_mc_cpu_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
         return ucc_mc_cpu_reduce_multi_alpha_double(src1, src2, dst, n_vectors,
                                                     count, stride, reduce_op,
                                                     vector_op, alpha);
+    case UCC_DT_BFLOAT16:
+        return ucc_mc_cpu_reduce_multi_alpha_bfloat16(src1, src2, dst, n_vectors,
+                                                      count, stride, reduce_op,
+                                                      vector_op, (float)alpha);
     default:
         mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
                  ucc_datatype_str(dt));

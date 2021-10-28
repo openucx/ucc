@@ -97,6 +97,8 @@ static inline const char* ucc_datatype_str(ucc_datatype_t dt)
         return "uint16";
     case UCC_DT_FLOAT16:
         return "float16";
+    case UCC_DT_BFLOAT16:
+        return "bfloat16";
     case UCC_DT_INT32:
         return "int32";
     case UCC_DT_UINT32:
