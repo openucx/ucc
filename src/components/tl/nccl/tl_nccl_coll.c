@@ -499,7 +499,6 @@ ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
 ucc_status_t ucc_tl_nccl_barrier_init(ucc_tl_nccl_task_t *task)
 {
     /* use 4-byte allreduce to accomplish barrier */
-    ucc_status_t     status = UCC_OK;
     ucc_coll_args_t *args   = &TASK_ARGS(task);
 
     args->mask |= (UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS |

@@ -258,7 +258,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
     // use lower score
     status = ucc_coll_score_add_range(score, UCC_COLL_TYPE_BARRIER,
                                       UCC_MEMORY_TYPE_HOST, 0, UCC_MSG_MAX, 1,
-                                      ucc_tl_nccl_coll_init, team);
+                                      ucc_tl_nccl_coll_init, tl_team);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }

@@ -150,8 +150,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_context_t,
         return status;
     }
     // scratch buffer for barrier
-    cu_st = cudaMalloc(&self->scratch_buf, sizeof(float));
-    if (cu_st != cudaSuccess) {
+    cudaError_t cuda_st = cudaMalloc(&self->scratch_buf, sizeof(float));
+    if (cuda_st != cudaSuccess) {
         return UCC_ERR_NO_MEMORY;
     }
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
