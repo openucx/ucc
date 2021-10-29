@@ -547,6 +547,10 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR) {
         memcpy(attr->attr.ctx_addr, ctx->worker_address, ctx->ucp_addrlen);
     }
+    if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE) {
+        attr->attr.global_work_buffer_size =
+            ONESIDED_SYNC_SIZE + ONESIDED_REDUCE_SIZE;
+    }
     attr->topo_required = 0;
     return UCC_OK;
 }

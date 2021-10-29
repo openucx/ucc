@@ -31,6 +31,8 @@
 #define UCC_TL_UCP_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
 
 #define MAX_NR_SEGMENTS 32
+#define ONESIDED_SYNC_SIZE 1
+#define ONESIDED_REDUCE_SIZE 4
 
 typedef struct ucc_tl_ucp_iface {
     ucc_tl_iface_t super;
