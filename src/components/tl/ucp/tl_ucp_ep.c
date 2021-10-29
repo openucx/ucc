@@ -39,9 +39,8 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t         *team,
-                                        ucc_rank_t                 core_rank,
-                                        ucp_ep_h                  *ep)
+ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
+                                        ucc_rank_t core_rank, ucp_ep_h *ep)
 {
     ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
     void                 *addr;

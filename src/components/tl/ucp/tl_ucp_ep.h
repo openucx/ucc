@@ -44,8 +44,9 @@ static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team, ucc_rank_t
            which has scope == UCC_CL_LAST + 1*/
         ucc_assert((NULL != team->super.super.team) ||
                    IS_SERVICE_TEAM(team));
-        ctx_rank = team->super.super.team ?
-            ucc_get_ctx_rank(team->super.super.team, core_rank) : core_rank;
+        ctx_rank = team->super.super.team
+                       ? ucc_get_ctx_rank(team->super.super.team, core_rank)
+                       : core_rank;
         *ep      = ctx->eps[ctx_rank];
     } else {
         h   = ucc_tl_ucp_get_team_ep_header(team, core_rank);

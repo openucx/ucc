@@ -36,6 +36,6 @@ void         ucc_topo_cleanup(ucc_topo_t *topo);
 ucc_status_t ucc_team_topo_init(ucc_team_t *team, ucc_topo_t *topo,
                                 ucc_team_topo_t **team_topo);
 void         ucc_team_topo_cleanup(ucc_team_topo_t *team_topo);
-ucc_sbgp_t  *ucc_team_topo_get_sbgp(ucc_team_topo_t *topo, ucc_sbgp_type_t type);
-int          ucc_topo_is_single_node(ucc_team_topo_t *topo);
+ucc_sbgp_t *ucc_team_topo_get_sbgp(ucc_team_topo_t *topo, ucc_sbgp_type_t type);
+int         ucc_topo_is_single_node(ucc_team_topo_t *topo);
 #endif

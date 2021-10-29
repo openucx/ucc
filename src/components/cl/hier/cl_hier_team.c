@@ -20,9 +20,9 @@
    Next step is to enable sbgps based on the requested hierarchical algs. */
 static void ucc_cl_hier_enable_sbgps(ucc_cl_hier_team_t *team)
 {
-    SBGP_SET(team, NET,            DISABLED);
-    SBGP_SET(team, NODE,           ENABLED);
-    SBGP_SET(team, NODE_LEADERS,   ENABLED);
+    SBGP_SET(team, NET, DISABLED);
+    SBGP_SET(team, NODE, ENABLED);
+    SBGP_SET(team, NODE_LEADERS, ENABLED);
 }
 
 UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
@@ -311,11 +311,9 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
     }
 
     for (i = 0; i < 2; i++) {
-        status = ucc_coll_score_add_range(score, UCC_COLL_TYPE_ALLREDUCE,
-                                          mt[i], 0, 2048,
-                                          UCC_CL_HIER_DEFAULT_SCORE,
-                                          ucc_cl_hier_allreduce_rab_init,
-                                          cl_team);
+        status = ucc_coll_score_add_range(
+            score, UCC_COLL_TYPE_ALLREDUCE, mt[i], 0, 2048,
+            UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_allreduce_rab_init, cl_team);
         if (UCC_OK != status) {
             cl_error(lib, "faild to add range to score_t");
             return status;
@@ -324,9 +322,8 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
 
     if (strlen(lib->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->score_str, score, cl_team->team->size,
-            ucc_cl_hier_coll_init, cl_team,
-            UCC_CL_HIER_DEFAULT_SCORE, NULL);
+            lib->score_str, score, cl_team->team->size, ucc_cl_hier_coll_init,
+            cl_team, UCC_CL_HIER_DEFAULT_SCORE, NULL);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
