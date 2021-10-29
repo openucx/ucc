@@ -1,5 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
  */
@@ -209,6 +210,9 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     case UCC_COLL_TYPE_REDUCE:
         status = ucc_tl_nccl_reduce_init(task);
         break;
+    case UCC_COLL_TYPE_BARRIER:
+        status = ucc_tl_nccl_barrier_init(task);
+        break;
     default:
         tl_error(UCC_TASK_LIB(task),
                  "collective %d is not supported by nccl tl",
@@ -249,6 +253,16 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
+
+    // add barrier, which might be triggered from host memory type
+    // use lower score
+    status = ucc_coll_score_add_range(score, UCC_COLL_TYPE_BARRIER,
+                                      UCC_MEMORY_TYPE_HOST, 0, UCC_MSG_MAX, 1,
+                                      ucc_tl_nccl_coll_init, tl_team);
+    if (ucc_unlikely(UCC_OK != status)) {
+        return status;
+    }
+
     if (strlen(lib->super.super.score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             lib->super.super.score_str, score, team->size,

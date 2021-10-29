@@ -1,5 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
  */
@@ -7,6 +8,7 @@
 #ifndef UCC_TL_NCCL_H_
 #define UCC_TL_NCCL_H_
 
+#include "components/mc/base/ucc_mc_base.h"
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
 #include "utils/ucc_mpool.h"
@@ -62,6 +64,7 @@ typedef struct ucc_tl_nccl_context {
     ucc_tl_context_t             super;
     ucc_tl_nccl_context_config_t cfg;
     ucc_mpool_t                  req_mp;
+    void                        *scratch_buf;
 } ucc_tl_nccl_context_t;
 UCC_CLASS_DECLARE(ucc_tl_nccl_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -96,7 +99,8 @@ typedef struct ucc_tl_nccl_task {
     (UCC_COLL_TYPE_ALLTOALL       | UCC_COLL_TYPE_ALLTOALLV  |                 \
      UCC_COLL_TYPE_ALLGATHER      | UCC_COLL_TYPE_ALLGATHERV |                 \
      UCC_COLL_TYPE_ALLREDUCE      | UCC_COLL_TYPE_BCAST      |                 \
-     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE)
+     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE     |                 \
+     UCC_COLL_TYPE_BARRIER)
 
 UCC_CLASS_DECLARE(ucc_tl_nccl_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
