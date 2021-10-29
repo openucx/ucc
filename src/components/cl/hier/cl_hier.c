@@ -15,15 +15,19 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_cl_hier_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_cl_lib_config_table)},
 
-    {"NODE_SBGP_TLS", "ucp", "TLS to be used for NODE subgroup",
+    {"NODE_SBGP_TLS", "ucp", "TLS to be used for NODE subgroup.\n"
+     "NODE subgroup contains processes of a team located on the same node",
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NODE]),
      UCC_CONFIG_TYPE_STRING_ARRAY},
 
-    {"NODE_LEADERS_SBGP_TLS", "ucp", "TLS to be used for NODE_LEADERS subgroup",
+    {"NODE_LEADERS_SBGP_TLS", "ucp", "TLS to be used for NODE_LEADERS subgroup.\n"
+     "NODE_LEADERS subgroup contains processes of a team with local node rank equal 0",
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NODE_LEADERS]),
      UCC_CONFIG_TYPE_STRING_ARRAY},
 
-    {"NET_SBGP_TLS", "ucp", "TLS to be used for NET subgroup",
+    {"NET_SBGP_TLS", "ucp", "TLS to be used for NET subgroup.\n"
+     "NET subgroup contains processes of a team with identical local node rank.\n"
+     "This subgroup only exists for teams with equal number of processes across the nodes",
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NET]),
      UCC_CONFIG_TYPE_STRING_ARRAY},
 

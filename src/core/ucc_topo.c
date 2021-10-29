@@ -6,6 +6,7 @@
 #include "config.h"
 #include "ucc_topo.h"
 #include "ucc_context.h"
+#include "ucc_team.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_math.h"
 #include <string.h>
@@ -191,4 +192,16 @@ ucc_sbgp_t *ucc_team_topo_get_sbgp(ucc_team_topo_t *topo, ucc_sbgp_type_t type)
         }
     }
     return &topo->sbgps[type];
+}
+
+int ucc_topo_is_single_node(ucc_team_topo_t *topo)
+{
+    ucc_sbgp_t *sbgp;
+
+    sbgp = ucc_team_topo_get_sbgp(topo, UCC_SBGP_NODE);
+    if (UCC_SBGP_ENABLED == sbgp->status &&
+        sbgp->group_size == topo->team->size) {
+        return 1;
+    }
+    return 0;
 }

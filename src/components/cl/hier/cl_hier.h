@@ -10,6 +10,7 @@
 #include "components/cl/ucc_cl_log.h"
 #include "components/tl/ucc_tl.h"
 #include "coll_score/ucc_coll_score.h"
+#include "utils/ucc_mpool.h"
 
 #ifdef HAVE_PROFILING_CL_HIER
 #include "utils/profile/ucc_profile.h"
@@ -63,6 +64,7 @@ typedef struct ucc_cl_hier_context {
     ucc_cl_context_t   super;
     ucc_tl_context_t **tl_ctxs;
     unsigned           n_tl_ctxs;
+    ucc_mpool_t        sched_mp;
 } ucc_cl_hier_context_t;
 UCC_CLASS_DECLARE(ucc_cl_hier_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -96,6 +98,7 @@ typedef struct ucc_cl_hier_team {
     unsigned                 n_tl_teams;
     ucc_coll_score_t        *score;
     ucc_hier_sbgp_t          sbgps[UCC_HIER_SBGP_LAST];
+    ucc_hier_sbgp_type_t     top_sbgp;
 } ucc_cl_hier_team_t;
 UCC_CLASS_DECLARE(ucc_cl_hier_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

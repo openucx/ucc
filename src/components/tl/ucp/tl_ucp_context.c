@@ -12,13 +12,6 @@
 #include "schedule/ucc_schedule_pipelined.h"
 #include <limits.h>
 
-static ucc_mpool_ops_t ucc_tl_ucp_req_mpool_ops = {
-    .chunk_alloc   = ucc_mpool_hugetlb_malloc,
-    .chunk_release = ucc_mpool_hugetlb_free,
-    .obj_init      = NULL,
-    .obj_cleanup   = NULL
-};
-
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                     const ucc_base_context_params_t *params,
                     const ucc_base_config_t *config)
@@ -109,7 +102,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     ucc_status = ucc_mpool_init(
         &self->req_mp, 0,
         ucc_max(sizeof(ucc_tl_ucp_task_t), sizeof(ucc_schedule_pipelined_t)), 0,
-        UCC_CACHE_LINE_SIZE, 8, UINT_MAX, &ucc_tl_ucp_req_mpool_ops,
+        UCC_CACHE_LINE_SIZE, 8, UINT_MAX, NULL,
         params->thread_mode, "tl_ucp_req_mp");
     if (UCC_OK != ucc_status) {
         tl_error(self->super.super.lib,

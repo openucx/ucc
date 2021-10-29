@@ -9,14 +9,27 @@
 #include "utils/ucc_coll_utils.h"
 
 typedef enum ucc_sbgp_type_t {
-    UCC_SBGP_NUMA,
-    UCC_SBGP_SOCKET,
-    UCC_SBGP_NODE,
-    UCC_SBGP_NODE_LEADERS,
-    UCC_SBGP_NET,
-    UCC_SBGP_SOCKET_LEADERS,
-    UCC_SBGP_NUMA_LEADERS,
-    UCC_SBGP_FLAT,
+    UCC_SBGP_NUMA, /* Group of ranks on the same NUMA domain.
+                      This group does not exist if processes are
+                      not bound to a single NUMA node. */
+    UCC_SBGP_SOCKET,/* Group of ranks on the same SOCKET.
+                      This group does not exist if processes are
+                      not bound to a single SOCKET node. */
+    UCC_SBGP_NODE, /* Group of ranks on the same NODE. */
+    UCC_SBGP_NODE_LEADERS, /* Group of ranks with local_node_rank = 0.
+                              This group EXISTS when team spans at least 2 nodes.
+                              This group is ENABLED for procs with local_node_rank = 0.
+                              This group is DISABLED but EXISTS for procs with local_node_rank != 0*/
+    UCC_SBGP_NET, /* Group of ranks with the same local_node_rank.
+                     This group EXISTS when team spans at least 2 nodes AND
+                     the team has equal PPN across all the nodes.
+                     If EXISTS this group is ENABLED for all procs. */
+    UCC_SBGP_SOCKET_LEADERS, /* Group of ranks with local_socket_rank = 0.
+                              This group EXISTS when team spans at least 2 sockets.
+                              This group is ENABLED for procs with local_socket_rank = 0.
+                              This group is DISABLED but EXISTS for procs with local_socket_rank != 0 */
+    UCC_SBGP_NUMA_LEADERS, /* same as SOCKET_LEADERS but for NUMA node grouping */
+    UCC_SBGP_FLAT, /* Group contains ALL the ranks of the team */
     UCC_SBGP_LAST
 } ucc_sbgp_type_t;
 

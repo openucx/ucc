@@ -6,6 +6,7 @@
 
 #include "cl_hier.h"
 #include "utils/ucc_malloc.h"
+#include "cl_hier_coll.h"
 
 UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
                     const ucc_base_context_params_t *params,
@@ -45,18 +46,32 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
     }
     if (0 == self->n_tl_ctxs) {
         cl_error(cl_config->cl_lib, "no TL contexts are available");
-        ucc_free(self->tl_ctxs);
-        self->tl_ctxs = NULL;
-        return UCC_ERR_NOT_FOUND;
+        status = UCC_ERR_NOT_FOUND;
+        goto out;
     }
+
+    status = ucc_mpool_init(&self->sched_mp, 0, sizeof(ucc_cl_hier_schedule_t),
+                            0, UCC_CACHE_LINE_SIZE, 2, UINT_MAX, NULL,
+                            params->thread_mode, "cl_hier_sched_mp");
+    if (UCC_OK != status) {
+        cl_error(cl_config->cl_lib, "failed to initialize cl_hier_sched mpool");
+        goto out;
+    }
+
     cl_info(cl_config->cl_lib, "initialized cl context: %p", self);
     return UCC_OK;
+
+out:
+    ucc_free(self->tl_ctxs);
+    return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_hier_context_t)
 {
     int i;
     cl_info(self->super.super.lib, "finalizing cl context: %p", self);
+
+    ucc_mpool_cleanup(&self->sched_mp, 1);
     for (i = 0; i < self->n_tl_ctxs; i++) {
         ucc_tl_context_put(self->tl_ctxs[i]);
     }

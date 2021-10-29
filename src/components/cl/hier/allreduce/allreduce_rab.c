@@ -5,6 +5,7 @@
  */
 
 #include "allreduce.h"
+#include "../cl_hier_coll.h"
 
 #define MAX_AR_RAB_TASKS 3
 
@@ -22,9 +23,8 @@ static ucc_status_t ucc_cl_hier_allreduce_rab_finalize(ucc_coll_task_t *task)
     ucc_status_t    status;
 
     UCC_CL_HIER_PROFILE_REQUEST_EVENT(task, "cl_hier_allreduce_rab_finalize", 0);
-    UCC_CL_HIER_PROFILE_REQUEST_FREE(task);
     status = ucc_schedule_finalize(task);
-    ucc_free(schedule);
+    ucc_cl_hier_put_schedule(schedule);
     return status;
 }
 
@@ -35,18 +35,16 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
                          ucc_coll_task_t     **task)
 {
     ucc_cl_hier_team_t     *cl_team = ucc_derived_of(team, ucc_cl_hier_team_t);
-    ucc_hier_sbgp_type_t    top_sbgp;
     ucc_schedule_t         *schedule;
     ucc_status_t            status;
     ucc_base_coll_args_t    args;
     ucc_coll_task_t        *tasks[MAX_AR_RAB_TASKS];
     int                     n_tasks, i;
 
-    schedule = ucc_malloc(sizeof(*schedule), "hier ar rab schedule");
+    schedule = &ucc_cl_hier_get_schedule(cl_team)->super.super;
     if (ucc_unlikely(!schedule)) {
         return UCC_ERR_NO_MEMORY;
     }
-    UCC_CL_HIER_PROFILE_REQUEST_NEW(schedule, "cl_hier_allreduce_rab", 0);
 
     memcpy(&args, coll_args, sizeof(args));
     args.args.root = 0; /* TODO: we can select the rank closest to HCA */
@@ -56,17 +54,10 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
         goto out;
     }
 
-    if (SBGP_EXISTS(cl_team, NODE_LEADERS)) {
-        top_sbgp = UCC_HIER_SBGP_NODE_LEADERS;
-    } else {
-        ucc_assert(SBGP_EXISTS(cl_team, NODE));
-        top_sbgp = UCC_HIER_SBGP_NODE;
-    }
-
     if (SBGP_ENABLED(cl_team, NODE)) {
         ucc_assert(n_tasks == 0);
         /* can have only NODE sbgp, both above have been skipped */
-        if (top_sbgp == UCC_HIER_SBGP_NODE) {
+        if (cl_team->top_sbgp == UCC_HIER_SBGP_NODE) {
             args.args.coll_type = UCC_COLL_TYPE_ALLREDUCE;
         } else {
             args.args.coll_type = UCC_COLL_TYPE_REDUCE;
@@ -81,9 +72,10 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     }
 
     if (SBGP_ENABLED(cl_team, NODE_LEADERS)) {
-        ucc_assert(top_sbgp == UCC_HIER_SBGP_NODE_LEADERS);
+        ucc_assert(cl_team->top_sbgp == UCC_HIER_SBGP_NODE_LEADERS);
         args.args.coll_type = UCC_COLL_TYPE_ALLREDUCE;
-        status = ucc_coll_init(SCORE_MAP(cl_team, NODE_LEADERS), &args, &tasks[n_tasks]);
+        status = ucc_coll_init(SCORE_MAP(cl_team, NODE_LEADERS), &args,
+                               &tasks[n_tasks]);
         if (ucc_unlikely(UCC_OK != status)) {
             goto out;
         }
@@ -93,7 +85,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     /* For bcast src.buffer should point to origin dst.buffer of allreduce */
     args.args.src.info.buffer = args.args.dst.info.buffer;
 
-    if (SBGP_ENABLED(cl_team, NODE) && top_sbgp != UCC_HIER_SBGP_NODE) {
+    if (SBGP_ENABLED(cl_team, NODE) && cl_team->top_sbgp != UCC_HIER_SBGP_NODE) {
         args.args.coll_type = UCC_COLL_TYPE_BCAST;
         status = ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]);
         if (ucc_unlikely(UCC_OK != status)) {
@@ -102,14 +94,12 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
         n_tasks++;
     }
 
-    for (i = 0; i < n_tasks; i++) {
-        if (i == 0) {
-            ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
-                                        tasks[i], ucc_task_start_handler);
-        } else {
-            ucc_event_manager_subscribe(&tasks[i - 1]->em, UCC_EVENT_COMPLETED, tasks[i],
-                                        ucc_task_start_handler);
-        }
+    ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
+                                tasks[0], ucc_task_start_handler);
+    ucc_schedule_add_task(schedule, tasks[0]);
+    for (i = 1; i < n_tasks; i++) {
+        ucc_event_manager_subscribe(&tasks[i - 1]->em, UCC_EVENT_COMPLETED, tasks[i],
+                                    ucc_task_start_handler);
         ucc_schedule_add_task(schedule, tasks[i]);
     }
 
@@ -119,7 +109,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     return UCC_OK;
 
 out:
-    //TODO cleanup tasks
-    ucc_free(schedule);
+    for (i = 0; i < n_tasks; i++) {
+        tasks[i]->finalize(tasks[i]);
+    }
+    ucc_cl_hier_put_schedule(schedule);
     return status;
 }

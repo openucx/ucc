@@ -38,12 +38,18 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     ucc_team_subset_t          subset;
     struct ucc_team_team_desc *d;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params->team);
     if (!params->team->topo) {
         cl_info(cl_context->lib,
                 "can't create hier team without topology data");
         return UCC_ERR_INVALID_PARAM;
     }
+
+    if (ucc_topo_is_single_node(params->team->topo)) {
+        cl_debug(cl_context->lib, "skipping single node team");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params->team);
 
     ucc_cl_hier_enable_sbgps(self);
     n_sbgp_teams = 0;
@@ -277,6 +283,13 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
     }
     ucc_team_multiple_req_free(team->team_create_req);
     team->team_create_req = NULL;
+
+    if (SBGP_EXISTS(team, NODE_LEADERS)) {
+        team->top_sbgp = UCC_HIER_SBGP_NODE_LEADERS;
+    } else {
+        ucc_assert(SBGP_EXISTS(team, NODE));
+        team->top_sbgp = UCC_HIER_SBGP_NODE;
+    }
 
     return status;
 }

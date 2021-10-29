@@ -13,6 +13,7 @@ sources =             \
 	cl_hier_context.c \
 	cl_hier_team.c    \
 	cl_hier_coll.c    \
+	cl_hier_coll.h    \
 	$(allreduce)
 
 module_LTLIBRARIES         = libucc_cl_hier.la
