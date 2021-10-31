@@ -23,6 +23,8 @@ if HAVE_SHARP
 tl_dirs += components/tl/sharp
 endif
 
+tl_dirs += components/tl/shm
+
 SUBDIRS = . $(cl_dirs) $(tl_dirs) $(mc_dirs)
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =

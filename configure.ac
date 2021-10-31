@@ -204,6 +204,7 @@ AC_CONFIG_FILES([
                  src/components/cl/basic/Makefile
                  src/components/cl/hier/Makefile
                  src/components/tl/ucp/Makefile
+                 src/components/tl/shm/Makefile
                  src/components/tl/nccl/Makefile
                  src/components/tl/sharp/Makefile
                  src/components/mc/cpu/Makefile
