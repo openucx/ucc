@@ -49,7 +49,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
         return UCC_ERR_INVALID_PARAM;
     }
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params->team);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params);
 
     ucc_cl_hier_enable_sbgps(self);
     n_sbgp_teams = 0;
@@ -108,7 +108,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
                 d                         = &self->team_create_req->descs[j];
                 d->param.team             = params->team;
                 d->param.rank             = hs->sbgp->group_rank;
-                d->param.params.team_size = hs->sbgp->group_size;
+                d->param.size             = hs->sbgp->group_size;
                 d->param.params.mask =
                     UCC_TEAM_PARAM_FIELD_EP_RANGE | UCC_TEAM_PARAM_FIELD_EP |
                     UCC_TEAM_PARAM_FIELD_TEAM_SIZE | UCC_TEAM_PARAM_FIELD_OOB;
@@ -322,7 +322,8 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
 
     if (strlen(lib->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->score_str, score, cl_team->team->size, ucc_cl_hier_coll_init,
+            lib->score_str, score, UCC_CL_TEAM_SIZE(team),
+            ucc_cl_hier_coll_init,
             cl_team, UCC_CL_HIER_DEFAULT_SCORE, NULL);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */

@@ -84,7 +84,8 @@ UCC_CLASS_DECLARE(ucc_tl_context_t, ucc_tl_lib_t *, ucc_context_t *);
 typedef struct ucc_tl_team {
     ucc_base_team_t super;
 } ucc_tl_team_t;
-UCC_CLASS_DECLARE(ucc_tl_team_t, ucc_tl_context_t *, ucc_team_t *);
+UCC_CLASS_DECLARE(ucc_tl_team_t, ucc_tl_context_t *,
+                  const ucc_base_team_params_t *);
 
 #define UCC_TL_IFACE_DECLARE(_name, _NAME)                                     \
     UCC_BASE_IFACE_DECLARE(TL_, tl_, _name, _NAME)
@@ -130,4 +131,13 @@ typedef struct ucc_tl_lib_attr {
 
 #define UCC_TL_CTX_OOB(_ctx) ((_ctx)->super.super.ucc_context->params.oob)
 
+#define UCC_TL_TEAM_SIZE(_tl_team) (_tl_team)->super.super.params.size
+
+#define UCC_TL_TEAM_RANK(_tl_team) (_tl_team)->super.super.params.rank
+
+#define UCC_TL_CORE_TEAM(_tl_team) (_tl_team)->super.super.params.team
+
+#define UCC_TL_TEAM_MAP(_tl_team) (_tl_team)->super.super.params.map
+
+#define UCC_TL_TEAM_OOB(_tl_team) (_tl_team)->super.super.params.params.oob
 #endif

@@ -18,7 +18,7 @@ ucc_tl_ucp_reduce_multi(void *src1, void *src2, void *dst, size_t n_vectors,
     if (is_avg) {
         return ucc_dt_reduce_multi_alpha(
             src1, src2, dst, n_vectors, count, stride, dt, UCC_OP_PROD,
-            (double)1 / (double)TASK_TEAM(task)->size, mem_type,
+            (double)1 / (double)UCC_TL_TEAM_SIZE(TASK_TEAM(task)), mem_type,
             &TASK_ARGS(task));
     }
     return ucc_dt_reduce_multi(src1, src2, dst, n_vectors, count, stride,

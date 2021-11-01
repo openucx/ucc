@@ -615,6 +615,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
                 t_params.params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
                 t_params.params.ep       = ctx->rank;
                 t_params.rank            = ctx->rank;
+                t_params.size            = ctx->params.oob.n_oob_eps;
                 /* CORE scope id - never overlaps with CL type */
                 t_params.scope    = UCC_CL_LAST + 1;
                 t_params.scope_id = 0;

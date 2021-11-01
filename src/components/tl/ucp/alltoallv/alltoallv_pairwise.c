@@ -32,8 +32,8 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
     ptrdiff_t          rbuf  = (ptrdiff_t)TASK_ARGS(task).dst.info_v.buffer;
     ucc_memory_type_t  smem  = TASK_ARGS(task).src.info_v.mem_type;
     ucc_memory_type_t  rmem  = TASK_ARGS(task).dst.info_v.mem_type;
-    ucc_rank_t         grank = team->rank;
-    ucc_rank_t         gsize = team->size;
+    ucc_rank_t         grank = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         gsize = UCC_TL_TEAM_SIZE(team);
     int                polls = 0;
     ucc_rank_t         peer;
     int                posts, nreqs;//, count_stride, displ_stride;
@@ -112,6 +112,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_start(ucc_coll_task_t *coll_task)
 ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task)
 {
     ucc_tl_ucp_team_t *team = TASK_TEAM(task);
+    ucc_rank_t         size = UCC_TL_TEAM_SIZE(team);
     ucc_coll_args_t   *args = &TASK_ARGS(task);
 
     task->super.post     = ucc_tl_ucp_alltoallv_pairwise_start;
@@ -123,7 +124,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task)
             ucc_tl_ucp_pre_register_mem(
                 team, args->src.info_v.buffer,
                 (ucc_coll_args_get_total_count(args, args->src.info_v.counts,
-                                               team->size) *
+                                               size) *
                  ucc_dt_size(args->src.info_v.datatype)),
                 args->src.info_v.mem_type);
         }
@@ -132,7 +133,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task)
             ucc_tl_ucp_pre_register_mem(
                 team, args->dst.info_v.buffer,
                 (ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
-                                               team->size) *
+                                               size) *
                  ucc_dt_size(args->dst.info_v.datatype)),
                 args->dst.info_v.mem_type);
         }

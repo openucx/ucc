@@ -25,7 +25,7 @@ static inline ucc_context_addr_header_t *
 ucc_tl_ucp_get_team_ep_header(ucc_tl_ucp_team_t *team, ucc_rank_t core_rank)
 
 {
-    return ucc_get_team_ep_header(UCC_TL_CORE_CTX(team), team->super.super.team,
+    return ucc_get_team_ep_header(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
                                   core_rank);
 }
 
@@ -38,14 +38,13 @@ static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team, ucc_rank_t
     ucc_status_t               status;
     ucc_rank_t                 core_rank;
 
-    core_rank = ucc_ep_map_eval(team->map, rank);
+    core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), rank);
     if (ctx->eps) {
+        ucc_team_t *core_team = UCC_TL_CORE_TEAM(team);
         /* Core super.super.team ptr is NULL for service_team
            which has scope == UCC_CL_LAST + 1*/
-        ucc_assert((NULL != team->super.super.team) ||
-                   IS_SERVICE_TEAM(team));
-        ctx_rank = team->super.super.team
-                       ? ucc_get_ctx_rank(team->super.super.team, core_rank)
+        ucc_assert((NULL != core_team) || IS_SERVICE_TEAM(team));
+        ctx_rank = core_team ? ucc_get_ctx_rank(core_team, core_rank)
                        : core_rank;
         *ep      = ctx->eps[ctx_rank];
     } else {

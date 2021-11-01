@@ -73,10 +73,7 @@ typedef struct ucc_tl_nccl_team {
     ucc_tl_team_t        super;
     ncclUniqueId        *unique_id;
     void                *oob_req;
-    ucc_team_oob_coll_t  oob;
     ncclComm_t           nccl_comm;
-    ucc_rank_t           rank;
-    ucc_rank_t           size;
     cudaStream_t         stream;
 } ucc_tl_nccl_team_t;
 

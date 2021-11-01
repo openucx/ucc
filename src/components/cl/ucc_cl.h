@@ -85,7 +85,8 @@ UCC_CLASS_DECLARE(ucc_cl_context_t, ucc_cl_lib_t *, ucc_context_t *);
 typedef struct ucc_cl_team {
     ucc_base_team_t super;
 } ucc_cl_team_t;
-UCC_CLASS_DECLARE(ucc_cl_team_t, ucc_cl_context_t *, ucc_team_t *);
+UCC_CLASS_DECLARE(ucc_cl_team_t, ucc_cl_context_t *,
+                  const ucc_base_team_params_t *);
 
 typedef struct ucc_cl_lib_attr {
     ucc_base_lib_attr_t       super;
@@ -106,4 +107,9 @@ typedef struct ucc_cl_lib_attr {
     (ucc_derived_of((_cl_team)->super.context->lib, ucc_cl_lib_t))->iface
 
 #define UCC_CL_TEAM_LIB(_cl_team) (_cl_team)->super.super.context->lib
+
+#define UCC_CL_TEAM_SIZE(_cl_team) (_cl_team)->super.super.params.size
+
+#define UCC_CL_TEAM_RANK(_cl_team) (_cl_team)->super.super.params.rank
+
 #endif

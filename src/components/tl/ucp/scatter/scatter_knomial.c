@@ -64,10 +64,10 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_datatype_t         dt        = args->src.info.datatype;
     size_t                 dt_size   = ucc_dt_size(dt);
     ucc_rank_t             root      = (ucc_rank_t)args->root;
-    ucc_rank_t             size      = team->size;
-    ucc_rank_t             rank      = VRANK(team->rank, root, size);
+    ucc_rank_t             size      = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t             rank      = VRANK(UCC_TL_TEAM_RANK(team), root, size);
+    ucc_rank_t             team_size = size - p->n_extra;
     void                  *sbuf;
-    ucc_rank_t             team_size = team->size - p->n_extra;
     ucc_rank_t             peer, vroot, vpeer, peer_recv_dist;
     ucc_rank_t             step_radix, peer_seg_index, local_seg_index;
     ptrdiff_t              peer_seg_offset, offset;
@@ -184,6 +184,8 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t     *team = TASK_TEAM(task);
+    ucc_rank_t             size = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t             rank = UCC_TL_TEAM_RANK(team);
     ucc_knomial_pattern_t *p    = &task->scatter_kn.p;
     ucc_rank_t             vrank, vroot, root;
     ucc_status_t           status;
@@ -192,13 +194,12 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_reset(task);
 
     root = coll_task->bargs.args.root;
-    ucc_knomial_pattern_init(team->size, VRANK(team->rank, root, team->size),
+    ucc_knomial_pattern_init(size, VRANK(rank, root, size),
                              task->scatter_kn.p.radix, &task->scatter_kn.p);
     task->scatter_kn.phase = UCC_SCATTER_KN_PHASE_INIT;
-    vroot = ucc_knomial_pattern_loop_rank(p, VRANK(root, root, team->size));
-    vrank = ucc_knomial_pattern_loop_rank(p, VRANK(team->rank, root,
-                                                   team->size));
-    task->scatter_kn.recv_dist = calc_recv_dist(team->size - p->n_extra, vrank,
+    vroot = ucc_knomial_pattern_loop_rank(p, VRANK(root, root, size));
+    vrank = ucc_knomial_pattern_loop_rank(p, VRANK(rank, root, size));
+    task->scatter_kn.recv_dist = calc_recv_dist(size - p->n_extra, vrank,
                                                 p->radix, vroot);
     task->scatter_kn.send_offset = 0;
 
@@ -220,9 +221,9 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_init_r(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_coll_task_t **task_h, ucc_kn_radix_t radix)
 {
-    ucc_tl_ucp_team_t *tl_team   = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_rank_t         size      = tl_team->size;
-    ucc_rank_t         rank      = tl_team->rank;
+    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_rank_t         size    = UCC_TL_TEAM_SIZE(tl_team);
+    ucc_rank_t         rank    = UCC_TL_TEAM_RANK(tl_team);
     ucc_tl_ucp_task_t *task;
 
     /* In place currently not supported */
@@ -250,12 +251,11 @@ ucc_tl_ucp_scatter_knomial_init(ucc_base_coll_args_t *coll_args,
                                        ucc_coll_task_t **    task_h)
 {
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_rank_t         size    = tl_team->size;
     size_t             count   = coll_args->args.src.info.count;
     ucc_kn_radix_t     radix, cfg_radix;
 
     cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.scatter_kn_radix;
-    radix = ucc_knomial_pattern_get_min_radix(cfg_radix, size, count);
-    return ucc_tl_ucp_scatter_knomial_init_r(coll_args, team, task_h,
-                                                    radix);
+    radix = ucc_knomial_pattern_get_min_radix(cfg_radix,
+                                              UCC_TL_TEAM_SIZE(tl_team), count);
+    return ucc_tl_ucp_scatter_knomial_init_r(coll_args, team, task_h, radix);
 }

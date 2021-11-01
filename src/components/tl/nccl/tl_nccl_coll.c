@@ -103,7 +103,7 @@ ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
     ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
-    ucc_rank_t          gsize  = team->size;
+    ucc_rank_t          gsize  = UCC_TL_TEAM_SIZE(team);
     ucc_status_t        status = UCC_OK;
     ptrdiff_t           sbuf   = (ptrdiff_t)args->src.info.buffer;
     ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info.buffer;
@@ -167,7 +167,7 @@ ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
     rdt_size                 = ucc_dt_size(args->dst.info_v.datatype);
     UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_alltoallv_start", 0);
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    for (peer = 0; peer < team->size; peer++) {
+    for (peer = 0; peer < UCC_TL_TEAM_SIZE(team); peer++) {
         count = ucc_coll_args_get_count(args, args->src.info_v.counts, peer);
         if (count != 0) {
             displ = ucc_coll_args_get_displacement(
@@ -260,6 +260,8 @@ ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_coll_args_t    *args   = &TASK_ARGS(task);
     ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
+    ucc_rank_t          rank   = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t          size   = UCC_TL_TEAM_SIZE(team);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     void               *dst    = args->dst.info.buffer;
@@ -269,12 +271,12 @@ ucc_status_t ucc_tl_nccl_allgather_start(ucc_coll_task_t *coll_task)
     size_t              count  = args->dst.info.count;
 
     if (UCC_IS_INPLACE(*args)) {
-        src = (void *)((ptrdiff_t)args->dst.info.buffer + (count / team->size) *
-                       ucc_dt_size(args->dst.info.datatype) * team->rank);
+        src = (void *)((ptrdiff_t)args->dst.info.buffer + (count / size) *
+                       ucc_dt_size(args->dst.info.datatype) * rank);
     }
     task->super.super.status = UCC_INPROGRESS;
     UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_allgather_start", 0);
-    NCCLCHECK_GOTO(ncclAllGather(src, dst, count / team->size, dt,
+    NCCLCHECK_GOTO(ncclAllGather(src, dst, count / size, dt,
                                  team->nccl_comm, stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
     status = ucc_tl_nccl_collective_sync(task, stream);
@@ -303,6 +305,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_coll_args_t    *args   = &TASK_ARGS(task);
     ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
+    ucc_rank_t          size   = UCC_TL_TEAM_SIZE(team);
     ucc_ee_h            ee     = coll_task->ee;
     cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
     ucc_status_t        status = UCC_OK;
@@ -318,13 +321,13 @@ ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
     NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
     count = args->src.info.count;
     if (count != 0) {
-        for (peer = 0; peer < team->size; peer++) {
+        for (peer = 0; peer < size; peer++) {
             NCCLCHECK_GOTO(ncclSend(sbuf, count * sdt_size, ncclChar, peer,
                                     team->nccl_comm, stream),
                         exit_coll, status, UCC_TL_TEAM_LIB(team));
         }
     }
-    for (peer = 0; peer < team->size; peer++) {
+    for (peer = 0; peer < size; peer++) {
         count = ucc_coll_args_get_count(args, args->dst.info_v.counts, peer);
         if (count != 0) {
             displ = ucc_coll_args_get_displacement(
@@ -410,9 +413,10 @@ ucc_status_t ucc_tl_nccl_reduce_scatter_start(ucc_coll_task_t *coll_task)
     task->super.super.status = UCC_INPROGRESS;
     UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_reduce_scatter_start", 0);
     if (UCC_IS_INPLACE(*args)) {
-        count /= team->size;
+        count /= UCC_TL_TEAM_SIZE(team);
         src = args->dst.info.buffer;
-        dst = PTR_OFFSET(src, team->rank * count * ucc_dt_size(args->dst.info.datatype));
+        dst = PTR_OFFSET(src, UCC_TL_TEAM_RANK(team) * count
+                         * ucc_dt_size(args->dst.info.datatype));
     }
     NCCLCHECK_GOTO(ncclReduceScatter(src, dst, count, dt, op, team->nccl_comm,
                                      stream),
@@ -457,7 +461,7 @@ ucc_status_t ucc_tl_nccl_reduce_start(ucc_coll_task_t *coll_task)
     ncclDataType_t      nccl_dt;
 
     UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_reduce_start", 0);
-    if (args->root == team->rank) {
+    if (args->root == UCC_TL_TEAM_RANK(team)) {
         ucc_dt = TASK_ARGS(task).dst.info.datatype;
         count = TASK_ARGS(task).dst.info.count;
         if (UCC_IS_INPLACE(*args)) {
@@ -476,9 +480,8 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
 {
-    ucc_datatype_t dt = (TASK_ARGS(task).root == TASK_TEAM(task)->rank) ?
-                           TASK_ARGS(task).dst.info.datatype:
-                           TASK_ARGS(task).src.info.datatype;
+    ucc_tl_nccl_team_t *team = TASK_TEAM(task);
+    ucc_datatype_t dt;
 
     if ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
         (ucc_to_nccl_reduce_op[TASK_ARGS(task).reduce.predefined_op] ==
@@ -487,6 +490,9 @@ ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
         return UCC_ERR_NOT_SUPPORTED;
     }
 
+    dt = (TASK_ARGS(task).root == UCC_TL_TEAM_RANK(team))
+        ? TASK_ARGS(task).dst.info.datatype
+        : TASK_ARGS(task).src.info.datatype;
     if (UCC_OK !=
         ucc_nccl_check_dt_supported(dt, dt)) {
         tl_debug(UCC_TASK_LIB(task), "dataype is not supported");

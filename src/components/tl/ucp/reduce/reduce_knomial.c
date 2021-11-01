@@ -17,16 +17,18 @@
 
 ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_task_t *task       = ucc_derived_of(coll_task,
+                                                   ucc_tl_ucp_task_t);
     ucc_coll_args_t   *args       = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team       = TASK_TEAM(task);
-    int                avg_pre_op = UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op;
-    ucc_rank_t         myrank     = team->rank;
-    ucc_rank_t         team_size  = team->size;
+    int                avg_pre_op =
+        UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op;
+    ucc_rank_t         rank       = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         size       = UCC_TL_TEAM_SIZE(team);
     ucc_rank_t         root       = (ucc_rank_t)args->root;
     uint32_t           radix      = task->reduce_kn.radix;
-    ucc_rank_t         vrank      = (myrank - root + team_size) % team_size;
-    void              *rbuf       = (myrank == root) ? args->dst.info.buffer :
+    ucc_rank_t         vrank      = (rank - root + size) % size;
+    void              *rbuf       = (rank == root) ? args->dst.info.buffer :
                                                       task->reduce_kn.scratch;
     ucc_memory_type_t  mtype;
     ucc_datatype_t     dt;
@@ -37,7 +39,7 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
     int                is_avg;
 
-    if (root == myrank) {
+    if (root == rank) {
         count = args->dst.info.count;
         data_size = count * ucc_dt_size(args->dst.info.datatype);
         mtype = args->dst.info.mem_type;
@@ -67,11 +69,11 @@ UCC_REDUCE_KN_PHASE_INIT:
                 task->reduce_kn.children_per_cycle = 0;
                 for (i = 1; i < radix; i++) {
                     vpeer = vrank + i * task->reduce_kn.dist;
-                    if (vpeer >= team_size) {
+                    if (vpeer >= size) {
                     	break;
                     } else {
                         task->reduce_kn.children_per_cycle += 1;
-                        peer = (vpeer + root) % team_size;
+                        peer = (vpeer + root) % size;
                         UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(scratch_offset,
                                           data_size, mtype, peer, team, task),
                                           task, out);
@@ -102,7 +104,7 @@ UCC_REDUCE_KN_PHASE_MULTI:
                 }
             } else {
                 vroot_at_level = vrank - pos * task->reduce_kn.dist;
-                root_at_level  = (vroot_at_level + root) % team_size;
+                root_at_level  = (vroot_at_level + root) % size;
                 UCPCHECK_GOTO(ucc_tl_ucp_send_nb(task->reduce_kn.scratch,
                                   data_size, mtype, root_at_level, team, task),
                                   task, out);
@@ -128,17 +130,17 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
     uint32_t           radix     = task->reduce_kn.radix;
     ucc_rank_t         root      = (ucc_rank_t)args->root;
-    ucc_rank_t         myrank    = team->rank;
-    ucc_rank_t         team_size = team->size;
-    ucc_rank_t         vrank     = (myrank - root + team_size) % team_size;
+    ucc_rank_t         rank       = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         size       = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t         vrank     = (rank - root + size) % size;
     int                isleaf    =
-        (vrank % radix != 0 || vrank == team_size - 1);
+        (vrank % radix != 0 || vrank == size - 1);
     ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_kn_start", 0);
     ucc_tl_ucp_task_reset(task);
 
-    if (UCC_IS_INPLACE(*args) && (team->rank == root)) {
+    if (UCC_IS_INPLACE(*args) && (rank == root)) {
         args->src.info.buffer = args->dst.info.buffer;
     }
 
