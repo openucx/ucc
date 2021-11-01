@@ -2,6 +2,13 @@
 #include "ucc_malloc.h"
 #include "ucc_log.h"
 
+static ucc_mpool_ops_t ucc_default_mpool_ops = {
+    .chunk_alloc   = ucc_mpool_hugetlb_malloc,
+    .chunk_release = ucc_mpool_hugetlb_free,
+    .obj_init      = NULL,
+    .obj_cleanup   = NULL
+};
+
 static ucs_status_t
 ucc_mpool_chunk_alloc_wrapper(ucs_mpool_t *mp, size_t *size_p, void **chunk_p)
 {
@@ -45,15 +52,15 @@ ucc_status_t ucc_mpool_init(ucc_mpool_t *mp, size_t priv_size, size_t elem_size,
 
     ucc_spinlock_init(&mp->lock, 0);
     mp->tm                 = tm;
-    mp->ucc_ops            = ops;
+    mp->ucc_ops            = ops ? ops : &ucc_default_mpool_ops;
     ucs_ops->chunk_alloc   = ucc_mpool_chunk_alloc_wrapper;
     ucs_ops->chunk_release = ucc_mpool_chunk_release_wrapper;
     ucs_ops->obj_init      = NULL;
     ucs_ops->obj_cleanup   = NULL;
-    if (ops->obj_init != NULL) {
+    if (mp->ucc_ops->obj_init != NULL) {
         ucs_ops->obj_init = ucc_mpool_obj_init_wrapper;
     }
-    if (ops->obj_cleanup != NULL) {
+    if (mp->ucc_ops->obj_cleanup != NULL) {
         ucs_ops->obj_cleanup = ucc_mpool_obj_cleanup_wrapper;
     }
 
