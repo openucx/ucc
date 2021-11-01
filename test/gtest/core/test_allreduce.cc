@@ -53,6 +53,9 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 UCC_CHECK(ucc_mc_memcpy(coll->dst.info.buffer, ctxs[r]->init_buf,
                                         ucc_dt_size(dt) * count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
+                coll->src.info.mem_type = UCC_MEMORY_TYPE_UNKNOWN;
+                coll->src.info.count    = SIZE_MAX;
+                coll->src.info.datatype = (ucc_datatype_t)-1;
             } else {
                 UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_mc_header,
                                        ucc_dt_size(dt) * count, mem_type));
@@ -60,13 +63,12 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
                                         ucc_dt_size(dt) * count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
+                coll->src.info.mem_type = mem_type;
+                coll->src.info.count    = (ucc_count_t)count;
+                coll->src.info.datatype = dt;
             }
-            coll->src.info.mem_type = mem_type;
-            coll->src.info.count   = (ucc_count_t)count;
-            coll->src.info.datatype = dt;
-
             coll->dst.info.mem_type = mem_type;
-            coll->dst.info.count   = (ucc_count_t)count;
+            coll->dst.info.count    = (ucc_count_t)count;
             coll->dst.info.datatype = dt;
         }
     }
@@ -102,7 +104,7 @@ class test_allreduce : public UccCollArgs, public testing::Test {
     }
     bool data_validate(UccCollCtxVec ctxs)
     {
-        size_t count = (ctxs[0])->args->src.info.count;
+        size_t count = (ctxs[0])->args->dst.info.count;
         std::vector<typename T::type *> dsts(ctxs.size());
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {

@@ -61,12 +61,12 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_setup(
     ucc_schedule_pipelined_t *schedule_p, ucc_schedule_t *frag, int frag_num)
 {
     ucc_coll_args_t *args    = &schedule_p->super.super.bargs.args;
-    ucc_datatype_t   dt      = args->src.info.datatype;
+    ucc_datatype_t   dt      = args->dst.info.datatype;
     size_t           dt_size = ucc_dt_size(dt);
     ucc_coll_args_t *targs;
     int              n_frags    = schedule_p->super.n_tasks;
-    size_t           frag_count = args->src.info.count / n_frags;
-    size_t           left       = args->src.info.count % n_frags;
+    size_t           frag_count = args->dst.info.count / n_frags;
+    size_t           left       = args->dst.info.count % n_frags;
     size_t           offset     = frag_num * frag_count + left;
 
     if (frag_num < left) {
@@ -146,8 +146,8 @@ static inline void get_sra_n_frags(ucc_base_coll_args_t *coll_args,
 {
     //TODO make selection mem_type - specific
     ucc_tl_ucp_lib_config_t *cfg     = &UCC_TL_UCP_TEAM_LIB(team)->cfg;
-    size_t                   msgsize = coll_args->args.src.info.count *
-                     ucc_dt_size(coll_args->args.src.info.datatype);
+    size_t                   msgsize = coll_args->args.dst.info.count *
+                     ucc_dt_size(coll_args->args.dst.info.datatype);
     int min_num_frags;
 
     *n_frags = 1;

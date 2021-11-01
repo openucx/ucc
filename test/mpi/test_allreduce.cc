@@ -38,20 +38,25 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST, sbuf,
                            _mt, _msgsize);
         check_sbuf = check_sbuf_mc_header->addr;
+
+        args.src.info.buffer      = sbuf;
+        args.src.info.count       = count;
+        args.src.info.datatype    = _dt;
+        args.src.info.mem_type    = _mt;
     } else {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
         init_buffer(rbuf, count, dt, _mt, rank);
         init_buffer(check_rbuf, count, dt, UCC_MEMORY_TYPE_HOST, rank);
+
+        args.src.info.buffer      = NULL;
+        args.src.info.count       = SIZE_MAX;
+        args.src.info.datatype    = (ucc_datatype_t)-1;
+        args.src.info.mem_type    = UCC_MEMORY_TYPE_UNKNOWN;
     }
 
     args.mask                |= UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
     args.reduce.predefined_op = _op;
-
-    args.src.info.buffer      = sbuf;
-    args.src.info.count       = count;
-    args.src.info.datatype    = _dt;
-    args.src.info.mem_type    = _mt;
 
     args.dst.info.buffer      = rbuf;
     args.dst.info.count       = count;
@@ -62,7 +67,7 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
 ucc_status_t TestAllreduce::check()
 {
-    size_t      count = args.src.info.count;
+    size_t      count = args.dst.info.count;
     MPI_Request req;
     int         completed;
 

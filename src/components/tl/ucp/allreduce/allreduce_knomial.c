@@ -174,8 +174,9 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_kn_start", 0);
     task->allreduce_kn.phase = UCC_KN_PHASE_INIT;
-    ucc_assert(TASK_ARGS(task).src.info.mem_type ==
-               TASK_ARGS(task).dst.info.mem_type);
+    ucc_assert(UCC_IS_INPLACE(TASK_ARGS(task)) ||
+               (TASK_ARGS(task).src.info.mem_type ==
+               TASK_ARGS(task).dst.info.mem_type));
     ucc_knomial_pattern_init(size, rank,
                              ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
                                      cfg.allreduce_kn_radix, size),
