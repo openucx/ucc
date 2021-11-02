@@ -74,7 +74,7 @@ typedef struct ucc_mc_cuda {
     ucc_mc_cuda_task_post_fn       post_strm_task;
 } ucc_mc_cuda_t;
 
-typedef struct ucc_cuda_mc_event {
+typedef struct ucc_mc_cuda_event {
     cudaEvent_t    event;
 } ucc_mc_cuda_event_t;
 
