@@ -10,15 +10,16 @@ reduce =             \
 	reduce/reduce.h  \
 	reduce/reduce.c
 
-sources =            \
-	tl_shm.h         \
-	tl_shm.c         \
-	tl_shm_lib.c     \
-	tl_shm_context.c \
-	tl_shm_team.c    \
-	tl_shm_coll.h    \
-	tl_shm_coll.c    \
-	$(bcast)         \
+sources =                    \
+	tl_shm.h                 \
+	tl_shm.c                 \
+	tl_shm_lib.c             \
+	tl_shm_context.c         \
+	tl_shm_team.c            \
+	tl_shm_coll.h            \
+	tl_shm_coll.c            \
+	tl_shm_knomial_pattern.h \
+	$(bcast)                 \
 	$(reduce)
 
 module_LTLIBRARIES = libucc_tl_shm.la

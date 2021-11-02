@@ -15,7 +15,6 @@
 
 ucc_status_t ucc_tl_shm_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task)
 {
-    printf("shm_triggered_post\n");
     return UCC_OK;
 }
 
@@ -23,27 +22,8 @@ static ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task)
 {
 	ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
 	ucc_free(task);
-    printf("shm_coll_finalize\n");
     return UCC_OK;
 }
-
-/* data collectives: */
-
-//ucc_status_t ucc_tl_shm_coll_progress(ucc_coll_task_t *coll_task)
-//{
-//    ucc_tl_shm_task_t *task  = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
-//    task->super.super.status = UCC_OK;
-//    printf("shm_coll_progress\n");
-//    return UCC_OK;
-//}
-
-//ucc_status_t ucc_tl_shm_coll_start(ucc_coll_task_t *coll_task)
-//{
-//    ucc_tl_shm_task_t *task  = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
-//    task->super.super.status = UCC_OK;
-//    printf("shm_coll_start\n");
-//    return ucc_task_complete(coll_task);
-//}
 
 ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *team,

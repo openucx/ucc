@@ -17,6 +17,42 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_shm_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
 
+    {"N_CONCURRENT_COLLS", "2", "Number of concurrent collective calls",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, n_concurrent),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"CS", "128", "Control size of each section in shm segment",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, ctrl_size),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"DS", "4096", "Data size of each section in shm segment",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, data_size),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"GROUP_PAGE_SIZE", "4096", "Page size for group ctrls alignment", //change from cfg to detectable from system like in ucs
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, page_size),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"BCAST_ALG", "1", "bcast alg choice of write/read per level",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_alg),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"BCAST_KN_RADIX", "4", "bcast radix for knomial tree",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"NPOLLS", "100", "n_polls",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, n_polls),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"MAX_TREES_CACHED", "5", "max num of trees that can be cached on team",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, max_trees_cached),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"GROUP_MODE", "socket", "group mode - numa or socket",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, group_mode),
+     UCC_CONFIG_TYPE_STRING},
+
     {NULL}};
 
 static ucs_config_field_t ucc_tl_shm_context_config_table[] = {
