@@ -84,7 +84,7 @@ typedef struct ucc_tl_nccl_task {
     ucc_coll_task_t     super;
     ucc_status_t        host_status;
     ucc_status_t       *dev_status;
-    cudaEvent_t         completed;
+    void               *completed;
 } ucc_tl_nccl_task_t;
 
 #define TASK_TEAM(_task)                                                       \

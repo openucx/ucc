@@ -177,8 +177,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     task->super.triggered_post = ucc_tl_nccl_triggered_post;
     task->completed            = NULL;
     if (nccl_ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
-        status = ucc_mc_ee_create_event((void **)&task->completed,
-                                         UCC_EE_CUDA_STREAM);
+        status = ucc_mc_ee_create_event(&task->completed, UCC_EE_CUDA_STREAM);
         if (ucc_unlikely(status != UCC_OK)) {
             goto free_task;
         }
