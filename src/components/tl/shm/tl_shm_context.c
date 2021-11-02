@@ -16,21 +16,19 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_context_t,
 	    ucc_derived_of(config, ucc_tl_shm_context_config_t);
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_shm_config->super.tl_lib,
 	                              params->context);
-	printf("shm_context_create\n");
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_shm_context_t)
 {
-	printf("shm_context_cleanup\n");
+    tl_info(&self->super, "finalizing tl context: %p", self);
 }
 
-UCC_CLASS_DEFINE(ucc_tl_shm_context_t, ucc_tl_context_t); //?
+UCC_CLASS_DEFINE(ucc_tl_shm_context_t, ucc_tl_context_t);
 
 ucc_status_t
 ucc_tl_shm_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
                              ucc_base_ctx_attr_t      *attr)
 {
-	printf("shm_context_get_attr\n");
     return UCC_OK;
 }

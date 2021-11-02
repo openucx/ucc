@@ -11,6 +11,7 @@
 
 #include "components/base/ucc_base_iface.h"
 #include "core/ucc_context.h"
+#include "utils/ucc_sys.h"
 
 /** TL (transport layer) is an internal interface that provides a basic
     implementation of collectives and p2p primitives. It differs from CL in that

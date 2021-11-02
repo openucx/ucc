@@ -6,6 +6,7 @@
 
 #include "tl_shm.h"
 #include "tl_shm_coll.h"
+#include "tl_shm_knomial_pattern.h"
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
@@ -15,82 +16,97 @@
 
 #define SHM_MODE (IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR|S_IWOTH|S_IRGRP|S_IWGRP)
 
-static void ucc_shm_reduce_preprocess(ucc_tl_shm_team_t *team) {
-	int radix = SHMSEG_128B_RADIX; // TODO read from conf
-	team->shm_seg.ar64_logx_group_size = UINT_LOG_X(team->size, radix);
-	team->shm_seg.ar64_radix_array = (int *) ucc_malloc(team->size * sizeof(int));
-	team->shm_seg.ar2k_radix_array = (int *) ucc_malloc(team->size * sizeof(int));
-	team->shm_seg.ar64_bcol_to_node_group_list = (int *) ucc_malloc(team->size * sizeof(int));
-	memset(team->shm_seg.ar64_radix_array, 0, team->size * sizeof(int));
-	memset(team->shm_seg.ar2k_radix_array, 0, team->size * sizeof(int));
-	memset(team->shm_seg.ar64_bcol_to_node_group_list, 0, team->size * sizeof(int));
-	for (int i = 0; i < team->size; i++) {
-	    (team->shm_seg.ar64_bcol_to_node_group_list)[i] = i;
-	}
+#define MAX_INLINE(_CS, _data, _inline)                                       \
+    do {                                                                      \
+        _inline = _CS - ucc_offsetof(ucc_tl_shm_ctrl_t, _data);               \
+    } while (0)
 
-	/* Traverse the radix tree and create the 64b radix_array */
-	int array_length = 0, partner_rank = 0;
-	for (int level = 0; level < team->shm_seg.ar64_logx_group_size; level++) {
-	    if (ROOT_AT_LEVEL(team->rank, radix, level)) {
-            int k = 0;
-            for (k = 0, partner_rank = team->rank + NEXT_PARTNER(radix, level);//, array_length;//, array_length = 0; // should this be array length = 0 or remove?
-                 k < radix - 1 && partner_rank < team->size && array_length < team->size;
-                 k++, partner_rank += NEXT_PARTNER(radix, level), array_length++) {
-                (team->shm_seg.ar64_radix_array)[array_length] = (team->shm_seg.ar64_bcol_to_node_group_list)[partner_rank];
+static ucc_rank_t ucc_tl_shm_team_rank_to_group_id(ucc_tl_shm_team_t *team, ucc_rank_t r)
+{
+    for (i = 0; i < team->n_base_groups; i++) {
+        for (j = 0; j < team->base_groups[i]->group_size; j++) {
+            if (r == ucc_sbgp_rank2team(team->base_groups[i], j)) {
+                /* found team rank r in base group i */
+                return i;
             }
-        } else {
-            /* Compute radix^(level+1) */
-            int tmp = 1;
-            for(int i = 0; i < level + 1; i++) {
-                tmp*=radix;
-            }
-            team->shm_seg.my_ar64_node_root_rank = (unsigned int) ((team->rank / tmp) * tmp);
-            team->shm_seg.my_ar64_node_root_rank = (team->shm_seg.ar64_bcol_to_node_group_list)[team->shm_seg.my_ar64_node_root_rank];
-            break;
         }
     }
-	team->shm_seg.ar64_radix_array_length = array_length;
-    /* Setup the 2K radix array */
-    radix = SHMSEG_2K_RADIX;
-    team->shm_seg.ar2k_logx_group_size = UINT_LOG_X(team->size, radix);
-    /* Traverse the radix tree and create the 2K radix_array */
-    array_length = 0; partner_rank = 0;
-    for (int level = 0; level < team->shm_seg.ar2k_logx_group_size; level++) {
-        if (ROOT_AT_LEVEL(team->rank, radix, level)) {
-            int k=0;
-            for (k = 0, partner_rank = team->rank + NEXT_PARTNER(radix, level);
-                 k < radix-1 && partner_rank < team->size && array_length < team->size;
-                 k++, partner_rank += NEXT_PARTNER(radix, level), array_length++) {
-                (team->shm_seg.ar2k_radix_array)[array_length] = partner_rank;
-            }
-        } else {
-            /* Compute radix^(level+1) */
-            int tmp = 1;
-            for (int i = 0; i < level + 1; i++) {
-                tmp*=radix;
-            }
-            team->shm_seg.my_ar2k_root_rank = (unsigned int) ((team->rank / tmp) * tmp);
-            break;
+    ucc_assert(0);
+    return UCC_RANK_INVALID;
+}
+
+static ucc_status_t ucc_tl_shm_rank_group_id_map_init(ucc_tl_shm_team_t *team)
+{
+	ucc_rank_t  team_size = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t *ranks = ucc_malloc(team_size * sizeof(*ranks)); // dont need to free because happens in ucc_ep_map_from_array()?
+    if (!ranks) {
+        return UCC_ERR_NO_MEM;
+    }
+    for (i = 0; i < team_size; i++) {
+        ranks[i] = ucc_tl_shm_team_rank_to_group_id(team, i);
+    }
+    team->rank_group_id_map = ucc_ep_map_from_array(ranks, team_size, team_size, 1);
+    return UCC_OK;
+}
+
+static ucc_rank_t ucc_tl_team_rank_to_group_rank(ucc_tl_shm_team_t *team, ucc_rank_t r) {
+    ucc_rank_t group_id = ucc_ep_map_eval(team->rank_group_id_map, r);
+    for (i = 0; i < team->base_groups[group_id]->group_size; i++) {
+        if (ucc_sbgp_rank2team(team->base_groups[group_id], i) == r) {
+            return i;
         }
     }
-    team->shm_seg.ar2k_radix_array_length = array_length;
+    ucc_assert(0);
+    return UCC_RANK_INVALID;
+}
+
+static ucc_status_t ucc_tl_shm_group_rank_map_init(ucc_tl_shm_team_t *team)
+{
+    ucc_rank_t  team_size = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t *ranks = ucc_malloc(team_size * sizeof(*ranks)); // dont need to free because happens in ucc_ep_map_from_array()?
+    if (!ranks) {
+        return UCC_ERR_NO_MEM;
+    }
+    for (i = 0; i < team_size; i++) {
+        ranks[i] = tl_team_rank_to_group_rank(team, i);
+    }
+    team->group_rank_map = ucc_ep_map_from_array(ranks, team_size, team_size, 1);
+    return UCC_OK;
+}
+
+static inline void tree_to_team_ranks(ucc_kn_tree_t *tree, ucc_ep_map_t map)
+{
+    if (tree->parent != UCC_RANK_INVALID) {
+        tree->parent = ucc_ep_map_eval(map, tree->parent);
+    }
+    for (i=0; i<tree->n_childred; i++) {
+        tree->children[i] = ucc_ep_map_eval(map, tree->children[i]);
+    }
+}
+
+
+static ucc_tl_shm_init_segs(ucc_tl_shm_team_t *team) {
+    void *shmseg_base;
+    for (i = 0; i < team->n_concurrent; i++) {
+        shmseg_base = PTR_OFFSET(team->shm_buffer, (team->ctrl_size + team->data_size) * i);
+        team->segs[i].ctrl = shmseg_base;
+        team->segs[i].data = PTR_OFFSET(shmseg_base, team->ctrl_size);
+    }
 }
 
 static ucc_status_t ucc_shm_seg_alloc(ucc_tl_shm_team_t *team) {
-	size_t shmsize = 0, shmsize_2k = 0;
-	int shmid = -1, shmid_2k = -1;
-    ucc_rank_t team_rank = team->rank, team_size = team->size;
+    ucc_rank_t    team_rank = UCC_TL_TEAM_RANK(team), team_size = UCC_TL_TEAM_SIZE(team);
+    size_t        shmsize   = team->n_concurrent *
+                              (team->ctrl_size + team->data_size);
+    int           shmid     = -1;
+    ucc_team_oob_coll_t oob = UCC_TL_TEAM_OOB(self);
     ucc_status_t status;
 
-    team->allgather_dst = (int *) ucc_malloc(sizeof(int) * 2 * team_size);
-//    memset(team->allgather_dst, 0, team_size * sizeof(int) * 2);
-    team->allgather_src[0] = shmid;
-    team->allgather_src[1] = shmid_2k;
+    team->allgather_dst = (int *) ucc_malloc(sizeof(int) * team_size);
 
     /* LOWEST on node rank  within the comm will initiate the segment creation.
      * Everyone else will attach. */
     if (team_rank == 0) {
-        shmsize = (SHMEM_128b * team_size * 2) + (SHMEM_2K * team_size * 2);
         shmid = shmget(IPC_PRIVATE, shmsize, SHM_MODE);
         if (shmid < 0) {
             tl_error(team->super.super.context->lib,
@@ -98,63 +114,25 @@ static ucc_status_t ucc_shm_seg_alloc(ucc_tl_shm_team_t *team) {
                      shmid, shmsize, strerror(errno));
             return UCC_ERR_NO_RESOURCE;
         }
-        team->seg = (shmem_sync_t *) shmat(shmid, NULL, 0);
-        shmctl(shmid, IPC_RMID, NULL);
-        if (team->seg == (void *) -1) {
+        team->shm_buffer = (void *) shmat(shmid, NULL, 0);
+        if (team->shm_buffer == (void *) -1) {
         	shmid = -1;
-        	team->seg = NULL;
+        	team->shm_buffer = NULL;
             tl_error(team->super.super.context->lib,
                      "Root: shmat failed, errno: %s\n", strerror(errno));
-            status = team->oob.allgather(team->allgather_src, team->allgather_dst, sizeof(int) * 2,
-                                         team->oob.coll_info, &team->oob_req);
+            status = oob.allgather(&shmid, team->allgather_dst, sizeof(int),
+                                         oob.coll_info, &team->oob_req);
             if (UCC_OK != status) {
                 tl_error(team->super.super.context->lib, "allgather failed");
                 return status;
             }
             return UCC_ERR_NO_RESOURCE;
-        } else {
-            /* Initialize to base sequence number, for 128b segments
-             * The 2K area is data only, no need to initialize */
-            for (int i=0; i<team_size*2; i++) {
-                SHMEM_STATE((shmem_sync_t *)team->seg, i, SHMEM_ROOT) = 0;
-                SHMEM_STATE((shmem_sync_t *)team->seg, i, SHMEM_LEAF) = 0;
-            }
         }
-
-        /* 2k seg */
-        shmsize_2k = team_size * sizeof(shmem_sync_t);
-        shmid_2k = shmget(IPC_PRIVATE, shmsize_2k, SHM_MODE);
-        if (shmid_2k < 0) {
-            tl_error(team->super.super.context->lib,
-                "Root: shmget 2k failed, shmid_2k=%d, shmsize=%ld, errno %s\n",
-                shmid_2k, shmsize_2k, strerror(errno));
-            return UCC_ERR_NO_RESOURCE;
-        }
-        team->shm_seg.ar2k_sync_shmseg = (shmem_sync_t *) shmat(shmid_2k, NULL, 0);
-        shmctl(shmid_2k, IPC_RMID, NULL);
-        if (team->shm_seg.ar2k_sync_shmseg == (void *) -1) {
-            shmid_2k = -1;
-            team->shm_seg.ar2k_sync_shmseg = NULL;
-            tl_error(team->super.super.context->lib,
-                    "Root: shmat 2k failed, errno: %s\n", strerror(errno));
-            status = team->oob.allgather(team->allgather_src, team->allgather_dst, sizeof(int) * 2,
-                                         team->oob.coll_info, &team->oob_req);
-            if (UCC_OK != status) {
-                tl_error(team->super.super.context->lib, "allgather failed");
-                return status;
-            }
-            return UCC_ERR_NO_RESOURCE;
-        } else {
-            for (int i=0; i<team_size; i++) {
-                SHMEM_STATE((shmem_sync_t *)team->shm_seg.ar2k_sync_shmseg, i, SHMEM_ROOT) = 0;
-                SHMEM_STATE((shmem_sync_t *)team->shm_seg.ar2k_sync_shmseg, i, SHMEM_LEAF) = 0;
-            }
-        }
+        memset(team->shm_buffer, 0, shmsize);
+        shmctl(shmid, IPC_RMID, NULL);
     }
-    team->allgather_src[0] = shmid;
-    team->allgather_src[1] = shmid_2k;
-    status = team->oob.allgather(team->allgather_src, team->allgather_dst, sizeof(int) * 2,
-                                 team->oob.coll_info, &team->oob_req);
+    status = oob.allgather(&shmid, team->allgather_dst, sizeof(int),
+                                 oob.coll_info, &team->oob_req);
     if (UCC_OK != status) {
     	tl_error(team->super.super.context->lib, "allgather failed");
     	return status;
@@ -165,31 +143,97 @@ static ucc_status_t ucc_shm_seg_alloc(ucc_tl_shm_team_t *team) {
 UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
-	ucc_status_t status;
-	ucc_tl_shm_context_t *ctx =
+    ucc_status_t status;
+    int max_trees;
+    ucc_rank_t size, rank;
+    ucc_tl_shm_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_shm_context_t);
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params->team);
 
-    self->seq_num = 1;
-    self->status  = UCC_INPROGRESS;
-    self->size    = params->params.oob.n_oob_eps;
-    self->rank    = params->rank;
-    self->oob     = params->params.oob;
-    self->seg     = NULL;
-    self->shm_seg.ar2k_sync_shmseg = NULL;
-    self->shm_seg.ar64_radix_array = NULL;
-    self->shm_seg.ar2k_radix_array = NULL;
-    self->shm_seg.ar64_bcol_to_node_group_list = NULL;
+    size = UCC_TL_TEAM_SIZE(self);
+    rank = UCC_TL_TEAM_RANK(self);
+
+    self->seq_num      = 1;
+    self->status       = UCC_INPROGRESS;
+    self->shm_buffer   = NULL;
+    self->n_concurrent = UCC_TL_SHM_TEAM_LIB(self)->cfg.n_concurrent;
+    self->data_size    = UCC_TL_SHM_TEAM_LIB(self)->cfg.data_size * size;
+
+    self->segs = ucc_malloc(sizeof(ucc_tl_shm_seg_t) * self->n_concurrent;
+
+    if (!self->segs) {
+        return UCC_ERR_NO_MEM;
+    }
+
+    max_trees = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_trees_cached;
+    self->tree_cache = ucc_malloc(max_trees *
+                                  sizeof(ucc_tl_shm_tree_cache_keys_t) +
+                                  max_trees * (sizeof(ucc_tl_shm_tree_t) *
+                                  size) + sizeof(size_t));
+    if (!self->tree_cache) {
+        return UCC_ERR_NO_MEM;
+    }
+
+    self->tree_cache.trees = PTR_OFFSET(self->tree_cache, max_trees *
+                                 sizeof(ucc_tl_shm_tree_cache_keys_t));
+    &self->tree_cache.size = PTR_OFFSET(self->tree_cache.trees, max_trees * //needed?
+                                 (sizeof(ucc_tl_shm_tree_t) * size));
+
+    /* Subgrouping Extensions Required :
+       need a way to compute ALL socket/numa subgroups: TODO: Val
+    */
+
+    /* sbgp type gl is either SOCKET_LEADERS or NUMA_LEADERS depending on the config: grouping type */
+    self->leaders_group = ucc_topo_get_sbgp(self->topo, UCC_SBGP_SOCKET_LEADERS);
+
+    /* sbgp type is either SOCKET or NUMA depending on the config: grouping type */
+    self->n_base_groups = self->leaders_group->group_size;
+    ucc_assert(self->n_base_groups == self->topo->n_sockets);
+//    self->base_groups[i] = ucc_team_topo_get_sockets/numas(); //TODO val //what is this?
+    // the above call should return ALL socket/numa sbgps including size=1 subgroups */
+
+    if (UCC_OK != (status = ucc_tl_shm_rank_group_id_map_init(team))) {
+        return status;
+    }
+
+    if (UCC_OK != (status = ucc_tl_shm_group_rank_map_init(team))) {
+        return status;
+    }
+
+    /* Build ctrl_map */
+    size_t ctrl_size = 0;
+    uint64_t *rank_ctrl_offsets = ucc_malloc(size * sizeof(uint64_t));
+    uint64_t ctrl_offset = 0;
+    uint32_t cfg_ctrl_size = UCC_TL_SHM_TEAM_LIB(team)->cfg.ctrl_size;
+    size_t page_size = ucc_get_page_size();
+    uint32_t group_size;
+    ucc_rank_t team_rank;
+
+    for (int i = 0; i < team->n_base_groups; i++) {
+        group_size = team->base_groups[i]->group_size;
+        if (i > 1) {
+            ctrl_offset = ctrl_size;
+        }
+        ctrl_size += ucc_align_up(group_size * cfg_ctrl_size, page_size);
+        for (int j=0; j<team->base_groups[i]->group_size; j++) {
+            team_rank = ucc_sbgp_rank2team(team->base_groups[i], j);
+            rank_ctrl_offsets[team_rank] = ctrl_offset +
+                                           team_rank * cfg_ctrl_size;
+        }
+    }
+    self->ctrl_size = ctrl_size;
+
+    /* ucc_ep_map_from_array64 same as ucc_ep_map_from_array but for array of 8 byte values */
+    self->ctrl_map = ucc_ep_map_from_array64(rank_ctrl_offsets, size, size, 1);\
 
     status = ucc_shm_seg_alloc(self);
 
-    printf("shm_team_create\n");
     return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_shm_team_t)
 {
-    printf("shm_team_cleanup\n");
+    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
 }
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_shm_team_t, ucc_base_team_t);
@@ -203,60 +247,43 @@ ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
 {
 	ucc_tl_shm_team_t *team = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
 
-	if (team->seg) {
-		ucc_free(team->shm_seg_data);
-		if (shmdt(team->seg) == -1) {
+	if (team->shm_buffer) {
+		if (shmdt(team->shm_buffer) == -1) {
 			tl_error(team->super.super.context->lib, "shmdt failed");
 			return UCC_ERR_NO_MESSAGE;
 		}
 	}
-	if (team->shm_seg.ar2k_sync_shmseg) {
-		ucc_free(team->shm_seg.ar64_radix_array);
-		ucc_free(team->shm_seg.ar2k_radix_array);
-		ucc_free(team->shm_seg.ar64_bcol_to_node_group_list);
-        if (shmdt(team->shm_seg.ar2k_sync_shmseg) == -1) {
-            tl_error(team->super.super.context->lib, "shmdt 2k failed");
-            return UCC_ERR_NO_MESSAGE;
-        }
-    }
+
+	ucc_free(team->segs);
 	UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_shm_team_t)(tl_team);
-    printf("shm_team_destroy\n");
     return UCC_OK;
 }
 
 ucc_status_t ucc_tl_shm_team_create_test(ucc_base_team_t *tl_team)
 {
-	ucc_tl_shm_team_t *team = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
-	ucc_status_t status = team->oob.req_test(team->oob_req);
+	ucc_tl_shm_team_t   *team   = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
+	ucc_team_oob_coll_t  oob    = UCC_TL_TEAM_OOB(team);
+	ucc_status_t         status = oob.req_test(team->oob_req);
 	if (status == UCC_INPROGRESS) {
 	    return UCC_INPROGRESS;
 	}
 	if (status != UCC_OK) {
-        team->oob.req_free(team->oob_req);
+        oob.req_free(team->oob_req);
         tl_error(team->super.super.context->lib, "oob req test failed");
         return status;
     }
-	status = team->oob.req_free(team->oob_req);
+	status = oob.req_free(team->oob_req);
     if (status != UCC_OK) {
         tl_error(team->super.super.context->lib, "oob req free failed");
         return status;
     }
 
     /* Exchange keys */
-    int shmid = team->allgather_dst[0], shmid_2k = team->allgather_dst[1];
-    printf("allgather finished. rank = %d, shmid = %d\n", team->rank, shmid);
+    int shmid = team->allgather_dst[0];
 
-    if (team->rank > 0) {
-        team->seg = (shmem_sync_t *) shmat(shmid, NULL, 0);
-        if (team->seg == (void *) -1) {
-            tl_error(team->super.super.context->lib,
-                     "Child failed to attach to shmseg, errno: %s\n",
-                     strerror(errno));
-            return UCC_ERR_NO_RESOURCE;
-        }
-
-        team->shm_seg.ar2k_sync_shmseg = (shmem_sync_t *) shmat(shmid_2k, NULL, 0);
-        if (team->shm_seg.ar2k_sync_shmseg == (void *) -1) {
+    if (UCC_TL_TEAM_RANK(team) > 0) {
+        team->shm_buffer = (shmem_sync_t *) shmat(shmid, NULL, 0);
+        if (team->shm_buffer == (void *) -1) {
             tl_error(team->super.super.context->lib,
                      "Child failed to attach to shmseg, errno: %s\n",
                      strerror(errno));
@@ -264,34 +291,9 @@ ucc_status_t ucc_tl_shm_team_create_test(ucc_base_team_t *tl_team)
         }
     }
 
-	if (team->seg) {
-        team->shm_seg_data =
-            (ucc_shm_seg_data_t*) ucc_malloc(sizeof(*team->shm_seg_data));
-        memset(team->shm_seg_data, 0, sizeof(*team->shm_seg_data));
-
-        /* |--128b shmseg---|---128b shmseg---|---2K shmseg---|---2K shmseg---| */
-        team->shm_seg_data->ar128b_shmseg[0] = team->seg;
-        team->shm_seg_data->ar128b_shmseg[1] =
-        (void *) ((char *)team->seg + (SHMEM_128b * team->size));
-        team->shm_seg_data->ar2k_data_shmseg[0] =
-        (void *) ((char *)team->seg + ((SHMEM_128b * team->size) * 2));
-        team->shm_seg_data->ar2k_data_shmseg[1] =
-        (void *)((char *)team->shm_seg_data->ar2k_data_shmseg[0] +
-                 (SHMEM_2K * team->size));
-//        team->shm_seg_data->seq_num = 0;
-    } else {
-        tl_error(team->super.super.context->lib,
-                 "shm segment allocation failed\n");
-        return UCC_ERR_NO_MESSAGE;
-    }
-
-	if (team->shm_seg.ar2k_sync_shmseg) {
-        SHMEM_STATE(team->shm_seg.ar2k_sync_shmseg, team->rank, SHMEM_2K_OFFSET) = SHMEM_2K * team->rank;
-    }
-    ucc_shm_reduce_preprocess(team);
+    ucc_tl_shm_init_segs(team);
 	ucc_free(team->allgather_dst);
 	team->status = UCC_OK;
-    printf("shm_team_create_test\n");
     return UCC_OK;
 }
 
@@ -303,6 +305,5 @@ ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t   *tl_team,
 	                             ucc_tl_shm_coll_init,
 	                             UCC_TL_SHM_SUPPORTED_COLLS, NULL, 0, &score);
 	*score_p = score;
-    printf("shm_team_get_scores\n");
     return UCC_OK;
 }

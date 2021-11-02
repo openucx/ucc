@@ -70,6 +70,7 @@ noinst_HEADERS =                      \
 	utils/profile/ucc_profile_on.h    \
 	utils/profile/ucc_profile_off.h   \
 	utils/ucc_time.h                  \
+	utils/ucc_sys.h                   \
 	components/base/ucc_base_iface.h  \
 	components/cl/ucc_cl.h            \
 	components/cl/ucc_cl_log.h        \
