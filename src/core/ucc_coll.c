@@ -317,6 +317,10 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     ucc_coll_task_t *ev_task;
     ucc_status_t     status;
 
+    if (ev->ev_type != UCC_EVENT_COMPUTE_COMPLETE) {
+        ucc_error("event type %d is not supported", ev->ev_type);
+        return UCC_ERR_NOT_IMPLEMENTED;
+    }
     task->ee = ee;
     ev_task = ucc_malloc(sizeof(*ev_task), "ev_task");
     if (!ev_task) {

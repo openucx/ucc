@@ -119,8 +119,9 @@ static ucc_status_t ucc_fallback_alloc(ucc_score_t              score,
 
     fb = ucc_malloc(sizeof(*fb), "fallback");
     if (ucc_unlikely(!fb)) {
+        ucc_error("failed to allocate %zd bytes for fallback",
+                  sizeof(ucc_coll_entry_t));
         *_fb = NULL;
-        ucc_error("failed to allocate %zd bytes for fallback", sizeof(*fb));
         return UCC_ERR_NO_MEMORY;
     }
     fb->score = score;
@@ -140,6 +141,7 @@ static inline void ucc_fallback_insert(ucc_list_link_t  *list,
     ucc_list_for_each(f, list, list_elem) {
         if (fb->score == f->score && fb->init == f->init &&
             fb->team == f->team) {
+            ucc_free(fb);
             /* same fallback: skip */
             return;
         }
@@ -179,6 +181,7 @@ static ucc_status_t ucc_msg_range_dup(const ucc_msg_range_t *in,
                                       ucc_msg_range_t      **out)
 {
     ucc_msg_range_t *r;
+    ucc_status_t status;
 
     r = ucc_malloc(sizeof(*r), "msg_range");
     if (ucc_unlikely(!r)) {
@@ -188,8 +191,13 @@ static ucc_status_t ucc_msg_range_dup(const ucc_msg_range_t *in,
     }
     memcpy(r, in, sizeof(*r));
     ucc_list_head_init(&r->fallback);
+    status = ucc_fallback_copy(in, r);
+    if (status != UCC_OK) {
+        ucc_msg_range_free(r);
+        r = NULL;
+    }
     *out = r;
-    return ucc_fallback_copy(in, r);
+    return status;
 }
 
 #define MSG_RANGE_DUP(_r)                                                      \
