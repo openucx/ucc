@@ -45,7 +45,7 @@ typedef struct ucc_team {
     void *                  oob_req;
     ucc_ep_map_t            ctx_map; /*< map to the ctx ranks, defined if CTX
                                   type is global (oob provided) */
-    ucc_subset_topo_t      *topo;
+    ucc_topo_t             *topo;
     ucc_score_map_t        *score_map; /*< score map of CLs */
     uint32_t                seq_num;
 } ucc_team_t;

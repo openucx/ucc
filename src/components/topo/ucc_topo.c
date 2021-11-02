@@ -11,7 +11,7 @@
 #include <string.h>
 #include <limits.h>
 
-static int ucc_topo_compare_proc_info(const void *a, const void *b)
+static int ucc_compare_proc_info(const void *a, const void *b)
 {
     const ucc_proc_info_t *d1 = (const ucc_proc_info_t *)a;
     const ucc_proc_info_t *d2 = (const ucc_proc_info_t *)b;
@@ -25,7 +25,8 @@ static int ucc_topo_compare_proc_info(const void *a, const void *b)
     }
 }
 
-static ucc_status_t ucc_topo_compute_layout(ucc_topo_t *topo, ucc_rank_t size)
+static ucc_status_t ucc_context_topo_compute_layout(ucc_context_topo_t *topo,
+                                                    ucc_rank_t size)
 {
     ucc_rank_t       current_ppn  = 1;
     ucc_rank_t       min_ppn      = UCC_RANK_MAX;
@@ -44,7 +45,7 @@ static ucc_status_t ucc_topo_compute_layout(ucc_topo_t *topo, ucc_rank_t size)
         return UCC_ERR_NO_MEMORY;
     }
     memcpy(sorted, topo->procs, size * sizeof(ucc_proc_info_t));
-    qsort(sorted, size, sizeof(ucc_proc_info_t), ucc_topo_compare_proc_info);
+    qsort(sorted, size, sizeof(ucc_proc_info_t), ucc_compare_proc_info);
     current_hash = sorted[0].host_hash;
 
     for (i = 1; i < size; i++) {
@@ -91,10 +92,11 @@ static ucc_status_t ucc_topo_compute_layout(ucc_topo_t *topo, ucc_rank_t size)
     return UCC_OK;
 }
 
-ucc_status_t ucc_topo_init(ucc_addr_storage_t *storage, ucc_topo_t **_topo)
+ucc_status_t ucc_context_topo_init(ucc_addr_storage_t *storage,
+                                   ucc_context_topo_t **_topo)
 {
     ucc_context_addr_header_t *h;
-    ucc_topo_t                *topo;
+    ucc_context_topo_t        *topo;
     int                        i;
     ucc_status_t               status;
 
@@ -128,7 +130,7 @@ ucc_status_t ucc_topo_init(ucc_addr_storage_t *storage, ucc_topo_t **_topo)
             topo->sock_bound = 0;
         }
     }
-    status = ucc_topo_compute_layout(topo, storage->size);
+    status = ucc_context_topo_compute_layout(topo, storage->size);
     if (UCC_OK != status) {
         ucc_free(topo->procs);
         ucc_free(topo);
@@ -139,7 +141,7 @@ ucc_status_t ucc_topo_init(ucc_addr_storage_t *storage, ucc_topo_t **_topo)
     return UCC_OK;
 }
 
-void ucc_topo_cleanup(ucc_topo_t *topo)
+void ucc_context_topo_cleanup(ucc_context_topo_t *topo)
 {
     if (topo) {
         ucc_free(topo->procs);
@@ -147,10 +149,10 @@ void ucc_topo_cleanup(ucc_topo_t *topo)
     }
 }
 
-ucc_status_t ucc_subset_topo_init(ucc_subset_t set, ucc_topo_t *topo,
-                                  ucc_subset_topo_t **_subset_topo)
+ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *topo,
+                                  ucc_topo_t **_topo)
 {
-    ucc_subset_topo_t *subset_topo = malloc(sizeof(*subset_topo));
+    ucc_topo_t *subset_topo = malloc(sizeof(*subset_topo));
     int              i;
     if (!subset_topo) {
         return UCC_ERR_NO_MEMORY;
@@ -167,11 +169,11 @@ ucc_status_t ucc_subset_topo_init(ucc_subset_t set, ucc_topo_t *topo,
     subset_topo->max_ppn             = 0;
     subset_topo->all_sockets         = NULL;
 
-    *_subset_topo                    = subset_topo;
+    *_topo                    = subset_topo;
     return UCC_OK;
 }
 
-void ucc_subset_topo_cleanup(ucc_subset_topo_t *subset_topo)
+void ucc_topo_cleanup(ucc_topo_t *subset_topo)
 {
     int i;
     if (subset_topo) {
@@ -184,7 +186,7 @@ void ucc_subset_topo_cleanup(ucc_subset_topo_t *subset_topo)
     }
 }
 
-ucc_sbgp_t *ucc_subset_topo_get_sbgp(ucc_subset_topo_t *topo, ucc_sbgp_type_t type)
+ucc_sbgp_t *ucc_topo_get_sbgp(ucc_topo_t *topo, ucc_sbgp_type_t type)
 {
     if (topo->sbgps[type].status == UCC_SBGP_NOT_INIT) {
         if (UCC_OK != ucc_sbgp_create(topo, type)) {
@@ -195,11 +197,11 @@ ucc_sbgp_t *ucc_subset_topo_get_sbgp(ucc_subset_topo_t *topo, ucc_sbgp_type_t ty
     return &topo->sbgps[type];
 }
 
-int ucc_topo_is_single_node(ucc_subset_topo_t *topo)
+int ucc_context_topo_is_single_node(ucc_topo_t *topo)
 {
     ucc_sbgp_t *sbgp;
 
-    sbgp = ucc_subset_topo_get_sbgp(topo, UCC_SBGP_NODE);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     if (UCC_SBGP_ENABLED == sbgp->status &&
         sbgp->group_size == ucc_subset_size(&topo->set)) {
         return 1;
@@ -207,7 +209,7 @@ int ucc_topo_is_single_node(ucc_subset_topo_t *topo)
     return 0;
 }
 
-ucc_status_t ucc_subset_topo_get_all_sockets(ucc_subset_topo_t *topo, ucc_sbgp_t **sbgps)
+ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps)
 {
     if (!topo->all_sockets) {
         return ucc_sbgp_create_all_sockets(topo, sbgps);

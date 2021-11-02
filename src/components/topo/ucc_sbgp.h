@@ -43,7 +43,7 @@ typedef enum ucc_sbgp_status_t {
     UCC_SBGP_NOT_EXISTS,
 } ucc_sbgp_status_t;
 
-typedef struct ucc_subset_topo ucc_subset_topo_t;
+typedef struct ucc_topo ucc_topo_t;
 typedef struct ucc_sbgp_t {
     ucc_sbgp_type_t   type;
     ucc_sbgp_status_t status;
@@ -54,7 +54,7 @@ typedef struct ucc_sbgp_t {
 } ucc_sbgp_t;
 
 const char*  ucc_sbgp_str(ucc_sbgp_type_t type);
-ucc_status_t ucc_sbgp_create(ucc_subset_topo_t *topo, ucc_sbgp_type_t type);
+ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type);
 ucc_status_t ucc_sbgp_cleanup(ucc_sbgp_t *sbgp);
 
 static inline int ucc_sbgp_rank2team(ucc_sbgp_t *sbgp, int rank)
@@ -62,7 +62,7 @@ static inline int ucc_sbgp_rank2team(ucc_sbgp_t *sbgp, int rank)
     return ucc_ep_map_eval(sbgp->map, rank);
 }
 
-ucc_status_t ucc_sbgp_create_all_sockets(ucc_subset_topo_t *topo, ucc_sbgp_t **sbgps);
+ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps);
 
 void ucc_sbgp_print(ucc_sbgp_t *sbgp);
 #endif

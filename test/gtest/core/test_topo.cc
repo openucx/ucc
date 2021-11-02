@@ -28,16 +28,16 @@ class addr_storage {
 
 class test_topo : public ucc::test {
   public:
-    ucc_topo_t        *topo;
-    ucc_subset_topo_t *stopo;
+    ucc_context_topo_t *ctx_topo;
+    ucc_topo_t  *topo;
     test_topo()
     {
         ucc_constructor();
     }
     ~test_topo()
     {
-        ucc_subset_topo_cleanup(stopo);
         ucc_topo_cleanup(topo);
+        ucc_context_topo_cleanup(ctx_topo);
     }
 };
 
@@ -65,31 +65,31 @@ UCC_TEST_F(test_topo, single_node)
     set.map.type   = UCC_EP_MAP_FULL;
 
     /* Init topo for such subset */
-    EXPECT_EQ(UCC_OK, ucc_topo_init(&s.storage, &topo));
-    EXPECT_EQ(UCC_OK, ucc_subset_topo_init(set, topo, &stopo));
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
 
     /* Check subgroups */
 
     /* NODE subgroup  - ALL on the same node*/
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(sbgp->group_size, ctx_size);
     EXPECT_EQ(sbgp->group_rank, 0);
     EXPECT_EQ(sbgp->map.type, UCC_EP_MAP_FULL);
 
     /* NODE_LEADERS subgroup */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE_LEADERS);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
     EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgp->status);
 
     /* SOCKET subgroup - ALL on the same socket */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(sbgp->group_size, ctx_size);
     EXPECT_EQ(sbgp->group_rank, 0);
     EXPECT_EQ(sbgp->map.type, UCC_EP_MAP_FULL);
 
     /* SOCKET_LEADERS subgroup - just 1 socket - no socket_leaders group*/
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET_LEADERS);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
     EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgp->status);
 }
 
@@ -116,13 +116,13 @@ UCC_TEST_F(test_topo, node_reordered)
     set.map.array.elem_size = sizeof(ucc_rank_t);
 
     /* Init topo for such subset */
-    EXPECT_EQ(UCC_OK, ucc_topo_init(&s.storage, &topo));
-    EXPECT_EQ(UCC_OK, ucc_subset_topo_init(set, topo, &stopo));
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
 
     /* Check subgroups */
 
     /* NODE subgroup  - ALL on the same node*/
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(team_size, sbgp->group_size);
     EXPECT_EQ(2, sbgp->group_rank);
@@ -150,19 +150,19 @@ UCC_TEST_F(test_topo, 1node_2sockets)
     set.map.type   = UCC_EP_MAP_FULL;
 
     /* Init topo for such subset */
-    EXPECT_EQ(UCC_OK, ucc_topo_init(&s.storage, &topo));
-    EXPECT_EQ(UCC_OK, ucc_subset_topo_init(set, topo, &stopo));
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
 
     /* Check subgroups */
 
     /* NODE subgroup  - ALL on the same node*/
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(team_size, sbgp->group_size);
     EXPECT_EQ(3, sbgp->group_rank);
 
     /* SOCKET subgroup - must contain ranks 1, 3, 5 */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(sbgp->group_size, ctx_size / 2);
     EXPECT_EQ(sbgp->group_rank, 1); //rank 3 is rank 1 in subgroup 1, 3, 5
@@ -172,15 +172,15 @@ UCC_TEST_F(test_topo, 1node_2sockets)
 
     /* SOCKET_LEADERS subgroup - ranks 0 and 1. Rank 3 does not participate, so
        the SBGP is disabled for him */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET_LEADERS);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
     EXPECT_EQ(UCC_SBGP_DISABLED, sbgp->status);
 
-    ucc_subset_topo_cleanup(stopo);
+    ucc_topo_cleanup(topo);
     set.myrank = 1;
-    EXPECT_EQ(UCC_OK, ucc_subset_topo_init(set, topo, &stopo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
     /* SOCKET_LEADERS subgroup - ranks 0 and 1. Rank 1 is also rank 1
        in the SBGP*/
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET_LEADERS);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(sbgp->group_size, 2);
     EXPECT_EQ(sbgp->group_rank, 1);
@@ -216,11 +216,11 @@ UCC_TEST_F(test_topo, 2nodes)
     set.myrank     = 3; // from rank 1 perspective
 
     /* Init topo for such subset */
-    EXPECT_EQ(UCC_OK, ucc_topo_init(&s.storage, &topo));
-    EXPECT_EQ(UCC_OK, ucc_subset_topo_init(set, topo, &stopo));
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
 
     /* NODE subgroup  - ALL on the same node*/
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(5, sbgp->group_size);
     EXPECT_EQ(3, sbgp->group_rank);
@@ -229,7 +229,7 @@ UCC_TEST_F(test_topo, 2nodes)
     EXPECT_EQ(sbgp->map.strided.stride, 1);
 
     /* SOCKET subgroup - must contain ranks 1, 3, 5 */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(sbgp->group_size, 2);
     EXPECT_EQ(sbgp->group_rank, 1); //rank 3 is rank 1 in subgroup 1, 3, 5
@@ -239,24 +239,24 @@ UCC_TEST_F(test_topo, 2nodes)
 
     /* SOCKET_LEADERS subgroup - ranks 0 and 1. Rank 3 does not participate, so
        the SBGP is disabled for him */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET_LEADERS);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
     EXPECT_EQ(UCC_SBGP_DISABLED, sbgp->status);
 
     /* NODE LEADERS subgroup - ranks 0 and 5. Rank 3 does not participate, so
        the SBGP is disabled for him */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE_LEADERS);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
     EXPECT_EQ(UCC_SBGP_DISABLED, sbgp->status);
 
     /* NET subgroup - there is no process with local rank 3 on 2nd node */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NET);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NET);
     EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgp->status);
 
     /* RANK 6 perspective */
-    ucc_subset_topo_cleanup(stopo);
+    ucc_topo_cleanup(topo);
     set.myrank = 6;
-    EXPECT_EQ(UCC_OK, ucc_subset_topo_init(set, topo, &stopo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
     /* NODE subgroup  - ALL on the same node*/
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(3, sbgp->group_size);
     EXPECT_EQ(1, sbgp->group_rank);
@@ -265,11 +265,11 @@ UCC_TEST_F(test_topo, 2nodes)
     EXPECT_EQ(sbgp->map.strided.stride, 1);
 
     /* SOCKET subgroup - has only 1 rank on socket 1, so SBGP NOT EXISTS */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET);
     EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgp->status);
 
     /* SOCKET_LEADERS subgroup - ranks 5 and 6*/
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET_LEADERS);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(2, sbgp->group_size);
     EXPECT_EQ(1, sbgp->group_rank);
@@ -279,11 +279,11 @@ UCC_TEST_F(test_topo, 2nodes)
 
     /* NODE LEADERS subgroup - ranks 0 and 5. Rank 6 does not participate, so
        the SBGP is disabled for him */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE_LEADERS);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
     EXPECT_EQ(UCC_SBGP_DISABLED, sbgp->status);
 
     /* NET subgroup - ranks 1 and 6 (local ranks 0 on nodes) */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NET);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NET);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(2, sbgp->group_size);
     EXPECT_EQ(1, sbgp->group_rank);
@@ -317,11 +317,11 @@ UCC_TEST_F(test_topo, 4nodes_half)
 
     set.myrank = 1; // from rank 1 perspective
     /* Init topo for such subset */
-    EXPECT_EQ(UCC_OK, ucc_topo_init(&s.storage, &topo));
-    EXPECT_EQ(UCC_OK, ucc_subset_topo_init(set, topo, &stopo));
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
 
     /* NODE subgroup  - 2 ranks on the same node*/
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(2, sbgp->group_size);
     EXPECT_EQ(1, sbgp->group_rank);
@@ -331,14 +331,14 @@ UCC_TEST_F(test_topo, 4nodes_half)
 
     /* NODE LEADERS subgroup - ranks 0 and 2. Rank 1 does not participate, so
        the SBGP is disabled for him */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE_LEADERS);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
     EXPECT_EQ(UCC_SBGP_DISABLED, sbgp->status);
 
     /* RANK 2 perspective */
-    ucc_subset_topo_cleanup(stopo);
+    ucc_topo_cleanup(topo);
     set.myrank = 2;
-    EXPECT_EQ(UCC_OK, ucc_subset_topo_init(set, topo, &stopo));
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_NODE_LEADERS);
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(2, sbgp->group_size);
     EXPECT_EQ(1, sbgp->group_rank);
@@ -373,11 +373,11 @@ UCC_TEST_F(test_topo, 4sockets_half)
 
     set.myrank = 1; // from rank 1 perspective
     /* Init topo for such team */
-    EXPECT_EQ(UCC_OK, ucc_topo_init(&s.storage, &topo));
-    EXPECT_EQ(UCC_OK, ucc_subset_topo_init(set, topo, &stopo));
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
 
     /* SOCKET subgroup  - 2 ranks on the same socket*/
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(2, sbgp->group_size);
     EXPECT_EQ(1, sbgp->group_rank);
@@ -387,14 +387,14 @@ UCC_TEST_F(test_topo, 4sockets_half)
 
     /* SOCKET LEADERS subgroup - ranks 0 and 2. Rank 1 does not participate, so
        the SBGP is disabled for him */
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET_LEADERS);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
     EXPECT_EQ(UCC_SBGP_DISABLED, sbgp->status);
 
     /* RANK 2 perspective */
-    ucc_subset_topo_cleanup(stopo);
+    ucc_topo_cleanup(topo);
     set.myrank = 2;
-    EXPECT_EQ(UCC_OK, ucc_subset_topo_init(set, topo, &stopo));
-    sbgp = ucc_subset_topo_get_sbgp(stopo, UCC_SBGP_SOCKET_LEADERS);
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
     EXPECT_EQ(UCC_SBGP_ENABLED, sbgp->status);
     EXPECT_EQ(2, sbgp->group_size);
     EXPECT_EQ(1, sbgp->group_rank);

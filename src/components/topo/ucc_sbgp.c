@@ -20,7 +20,7 @@ const char*  ucc_sbgp_str(ucc_sbgp_type_t type)
     return ucc_sbgp_type_str[type];
 }
 
-static inline int ucc_rank_on_local_node(int team_rank, ucc_subset_topo_t *topo)
+static inline int ucc_rank_on_local_node(int team_rank, ucc_topo_t *topo)
 {
     ucc_proc_info_t *procs       = topo->topo->procs;
     ucc_rank_t       ctx_rank    = ucc_ep_map_eval(topo->set.map, team_rank);
@@ -29,7 +29,7 @@ static inline int ucc_rank_on_local_node(int team_rank, ucc_subset_topo_t *topo)
     return procs[ctx_rank].host_hash == procs[my_ctx_rank].host_hash;
 }
 
-static inline int ucc_rank_on_local_socket(int team_rank, ucc_subset_topo_t *topo)
+static inline int ucc_rank_on_local_socket(int team_rank, ucc_topo_t *topo)
 {
     ucc_rank_t       ctx_rank    = ucc_ep_map_eval(topo->set.map, team_rank);
     ucc_rank_t       my_ctx_rank = ucc_ep_map_eval(topo->set.map, topo->set.myrank);
@@ -44,7 +44,7 @@ static inline int ucc_rank_on_local_socket(int team_rank, ucc_subset_topo_t *top
 }
 
 
-static inline ucc_status_t sbgp_create_socket(ucc_subset_topo_t *topo,
+static inline ucc_status_t sbgp_create_socket(ucc_topo_t *topo,
                                               ucc_sbgp_t        *sbgp,
                                               ucc_rank_t         group_rank)
 {
@@ -98,7 +98,7 @@ static inline ucc_status_t sbgp_create_socket(ucc_subset_topo_t *topo,
     return UCC_OK;
 }
 
-static inline ucc_status_t sbgp_create_node(ucc_subset_topo_t *topo,
+static inline ucc_status_t sbgp_create_node(ucc_topo_t *topo,
                                             ucc_sbgp_t *     sbgp)
 {
     ucc_subset_t *set            = &topo->set;
@@ -176,7 +176,7 @@ static inline ucc_status_t sbgp_create_node(ucc_subset_topo_t *topo,
     return UCC_OK;
 }
 
-static ucc_status_t sbgp_create_node_leaders(ucc_subset_topo_t *topo,
+static ucc_status_t sbgp_create_node_leaders(ucc_topo_t *topo,
                                              ucc_sbgp_t *sbgp, int ctx_nlr)
 {
     ucc_subset_t *set              = &topo->set;
@@ -263,7 +263,7 @@ skip:
     return UCC_OK;
 }
 
-static ucc_status_t sbgp_create_socket_leaders(ucc_subset_topo_t *topo,
+static ucc_status_t sbgp_create_socket_leaders(ucc_topo_t *topo,
                                                ucc_sbgp_t *     sbgp)
 {
     ucc_subset_t   *set                = &topo->set;
@@ -354,7 +354,7 @@ static ucc_status_t sbgp_create_socket_leaders(ucc_subset_topo_t *topo,
     return UCC_OK;
 }
 
-ucc_status_t ucc_sbgp_create(ucc_subset_topo_t *topo, ucc_sbgp_type_t type)
+ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
 {
     ucc_status_t status = UCC_OK;
     ucc_sbgp_t * sbgp   = &topo->sbgps[type];
@@ -434,7 +434,7 @@ void ucc_sbgp_print(ucc_sbgp_t *sbgp)
     }
 }
 
-ucc_status_t ucc_sbgp_create_all_sockets(ucc_subset_topo_t *topo, ucc_sbgp_t **_sbgps)
+ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **_sbgps)
 {
     ucc_sbgp_t  *sbgps;
     ucc_sbgp_t  *sock_leaders_sbgp;
@@ -446,7 +446,7 @@ ucc_status_t ucc_sbgp_create_all_sockets(ucc_subset_topo_t *topo, ucc_sbgp_t **_
         return UCC_ERR_NOT_FOUND;
     }
 
-    sock_leaders_sbgp = ucc_subset_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
+    sock_leaders_sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
     n_socket_groups = sock_leaders_sbgp->group_size;
     ucc_assert(n_socket_groups >= 1);
 

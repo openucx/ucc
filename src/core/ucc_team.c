@@ -245,7 +245,7 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
            reported topo_required through the lib_attr */
         subset.map    = team->ctx_map;
         subset.myrank = team->rank;
-        status = ucc_subset_topo_init(subset, context->topo, &team->topo);
+        status = ucc_topo_init(subset, context->topo, &team->topo);
         if (UCC_OK != status) {
             ucc_warn("failed to init team topo");
         }
@@ -475,7 +475,7 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
         team->cl_teams[i] = NULL;
     }
 
-    ucc_subset_topo_cleanup(team->topo);
+    ucc_topo_cleanup(team->topo);
 
     if (team->contexts[0]->service_team) {
         ucc_internal_oob_finalize(&team->bp.params.oob);

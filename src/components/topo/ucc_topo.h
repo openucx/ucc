@@ -7,7 +7,7 @@
 #include "ucc_sbgp.h"
 #include "utils/ucc_proc_info.h"
 
-typedef struct ucc_topo {
+typedef struct ucc_context_topo {
     ucc_proc_info_t *procs;
     ucc_rank_t       n_procs;
     ucc_rank_t       nnodes;
@@ -15,11 +15,11 @@ typedef struct ucc_topo {
     ucc_rank_t       max_ppn;
     ucc_rank_t       max_n_sockets;
     uint32_t         sock_bound;
-} ucc_topo_t;
+} ucc_context_topo_t;
 
 typedef struct ucc_addr_storage ucc_addr_storage_t;
-typedef struct ucc_subset_topo {
-    ucc_topo_t   *topo;
+typedef struct ucc_topo {
+    ucc_context_topo_t   *topo;
     ucc_sbgp_t    sbgps[UCC_SBGP_LAST];
     ucc_sbgp_t   *all_sockets;
     ucc_rank_t    node_leader_rank;
@@ -28,15 +28,16 @@ typedef struct ucc_subset_topo {
     ucc_subset_t  set;
     ucc_rank_t    min_ppn;
     ucc_rank_t    max_ppn;
-} ucc_subset_topo_t;
+} ucc_topo_t;
 
-ucc_status_t ucc_topo_init(ucc_addr_storage_t *storage, ucc_topo_t **topo);
-void         ucc_topo_cleanup(ucc_topo_t *topo);
+ucc_status_t ucc_context_topo_init(ucc_addr_storage_t *storage,
+                                   ucc_context_topo_t **topo);
+void         ucc_context_topo_cleanup(ucc_context_topo_t *topo);
 
-ucc_status_t ucc_subset_topo_init(ucc_subset_t set, ucc_topo_t *topo,
-                                  ucc_subset_topo_t **subset_topo);
-void         ucc_subset_topo_cleanup(ucc_subset_topo_t *subset_topo);
-ucc_sbgp_t *ucc_subset_topo_get_sbgp(ucc_subset_topo_t *topo, ucc_sbgp_type_t type);
-int         ucc_topo_is_single_node(ucc_subset_topo_t *topo);
-ucc_status_t ucc_subset_topo_get_all_sockets(ucc_subset_topo_t *topo, ucc_sbgp_t **sbgps);
+ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *topo,
+                                  ucc_topo_t **subset_topo);
+void         ucc_topo_cleanup(ucc_topo_t *subset_topo);
+ucc_sbgp_t *ucc_topo_get_sbgp(ucc_topo_t *topo, ucc_sbgp_type_t type);
+int         ucc_topo_is_single_node(ucc_topo_t *topo);
+ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps);
 #endif
