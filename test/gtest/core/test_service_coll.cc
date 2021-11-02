@@ -15,7 +15,7 @@ class test_service_coll {
   public:
     int *                                 array;
     UccTeam_h                             team;
-    std::vector<ucc_team_subset_t>        subsets;
+    std::vector<ucc_subset_t>             subsets;
     std::vector<ucc_service_coll_req_t *> reqs;
     test_service_coll(std::vector<int> _subset, UccTeam_h _team)
     {

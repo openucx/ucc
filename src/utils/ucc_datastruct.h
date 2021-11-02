@@ -13,9 +13,9 @@
 typedef uint32_t ucc_rank_t;
 #define UCC_RANK_MAX UINT32_MAX
 
-typedef struct ucc_team_subset {
+typedef struct ucc_subset {
     ucc_ep_map_t map;
     ucc_rank_t   myrank;
-} ucc_team_subset_t ;
+} ucc_subset_t ;
 
 #endif

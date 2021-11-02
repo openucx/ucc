@@ -13,7 +13,7 @@
 ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, ucc_datatype_t dt,
                                           size_t count, ucc_reduction_op_t op,
-                                          ucc_team_subset_t subset,
+                                          ucc_subset_t subset,
                                           ucc_coll_task_t **task_p)
 {
     ucc_tl_ucp_team_t   *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
@@ -69,7 +69,7 @@ free_task:
 
 ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, size_t msgsize,
-                                          ucc_team_subset_t subset,
+                                          ucc_subset_t subset,
                                           ucc_coll_task_t **task_p)
 {
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);

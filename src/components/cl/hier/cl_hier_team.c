@@ -35,7 +35,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     ucc_status_t       status;
     ucc_hier_sbgp_t   *hs;
     ucc_config_names_array_t  *tls;
-    ucc_team_subset_t          subset;
+    ucc_subset_t               subset;
     struct ucc_team_team_desc *d;
 
     if (!params->team->topo) {
