@@ -5,7 +5,7 @@
 
 #include "config.h"
 #include "ucc_topo.h"
-#include "ucc_context.h"
+#include "core/ucc_context.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_math.h"
 #include <string.h>

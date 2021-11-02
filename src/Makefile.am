@@ -45,8 +45,6 @@ noinst_HEADERS =                      \
 	core/ucc_team.h                   \
 	core/ucc_ee.h                     \
 	core/ucc_progress_queue.h         \
-	core/ucc_topo.h                   \
-	core/ucc_sbgp.h                   \
 	core/ucc_service_coll.h           \
 	schedule/ucc_schedule.h           \
 	schedule/ucc_schedule_pipelined.h \
@@ -79,7 +77,9 @@ noinst_HEADERS =                      \
 	components/mc/base/ucc_mc_base.h  \
 	components/mc/ucc_mc_log.h        \
 	coll_patterns/recursive_knomial.h \
-	coll_patterns/sra_knomial.h
+	coll_patterns/sra_knomial.h       \
+	components/topo/ucc_topo.h        \
+	components/topo/ucc_sbgp.h
 
 libucc_la_SOURCES =                   \
 	core/ucc_lib.c                    \
@@ -94,8 +94,6 @@ libucc_la_SOURCES =                   \
 	core/ucc_progress_queue.c         \
 	core/ucc_progress_queue_st.c      \
 	core/ucc_progress_queue_mt.c      \
-	core/ucc_topo.c                   \
-	core/ucc_sbgp.c                   \
 	core/ucc_service_coll.c           \
 	schedule/ucc_schedule.c           \
 	schedule/ucc_schedule_pipelined.c \
@@ -113,6 +111,8 @@ libucc_la_SOURCES =                   \
 	components/base/ucc_base_iface.c  \
 	components/cl/ucc_cl.c            \
 	components/tl/ucc_tl.c            \
-	components/mc/base/ucc_mc_base.c
+	components/mc/base/ucc_mc_base.c  \
+	components/topo/ucc_topo.c        \
+	components/topo/ucc_sbgp.c
 
 libucc_ladir = $(includedir)

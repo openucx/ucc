@@ -10,7 +10,7 @@
 #include "ucc_progress_queue.h"
 #include "utils/ucc_list.h"
 #include "utils/ucc_proc_info.h"
-#include "ucc_topo.h"
+#include "components/topo/ucc_topo.h"
 
 typedef struct ucc_lib_info          ucc_lib_info_t;
 typedef struct ucc_cl_context        ucc_cl_context_t;
