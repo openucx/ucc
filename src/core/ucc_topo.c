@@ -165,6 +165,8 @@ ucc_status_t ucc_subset_topo_init(ucc_subset_t set, ucc_topo_t *topo,
     subset_topo->set                 = set;
     subset_topo->min_ppn             = UCC_RANK_MAX;
     subset_topo->max_ppn             = 0;
+    subset_topo->all_sockets         = NULL;
+
     *_subset_topo                    = subset_topo;
     return UCC_OK;
 }
@@ -203,4 +205,14 @@ int ucc_topo_is_single_node(ucc_subset_topo_t *topo)
         return 1;
     }
     return 0;
+}
+
+ucc_status_t ucc_subset_topo_get_all_sockets(ucc_subset_topo_t *topo, ucc_sbgp_t **sbgps)
+{
+    if (!topo->all_sockets) {
+        return ucc_sbgp_create_all_sockets(topo, sbgps);
+    }
+
+    *sbgps = topo->all_sockets;
+    return UCC_OK;
 }

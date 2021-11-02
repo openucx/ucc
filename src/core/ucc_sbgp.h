@@ -50,7 +50,6 @@ typedef struct ucc_sbgp_t {
     ucc_rank_t        group_size;
     ucc_rank_t        group_rank;
     ucc_rank_t       *rank_map;
-    ucc_subset_t     *set;
     ucc_ep_map_t      map;
 } ucc_sbgp_t;
 
@@ -63,6 +62,7 @@ static inline int ucc_sbgp_rank2team(ucc_sbgp_t *sbgp, int rank)
     return ucc_ep_map_eval(sbgp->map, rank);
 }
 
-void ucc_sbgp_print(ucc_sbgp_t *sbgp);
+ucc_status_t ucc_sbgp_create_all_sockets(ucc_subset_topo_t *topo, ucc_sbgp_t **sbgps);
 
+void ucc_sbgp_print(ucc_sbgp_t *sbgp);
 #endif

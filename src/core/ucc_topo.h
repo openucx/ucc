@@ -21,6 +21,7 @@ typedef struct ucc_addr_storage ucc_addr_storage_t;
 typedef struct ucc_subset_topo {
     ucc_topo_t   *topo;
     ucc_sbgp_t    sbgps[UCC_SBGP_LAST];
+    ucc_sbgp_t   *all_sockets;
     ucc_rank_t    node_leader_rank;
     ucc_rank_t    node_leader_rank_id;
     int           no_socket;
@@ -37,4 +38,5 @@ ucc_status_t ucc_subset_topo_init(ucc_subset_t set, ucc_topo_t *topo,
 void         ucc_subset_topo_cleanup(ucc_subset_topo_t *subset_topo);
 ucc_sbgp_t *ucc_subset_topo_get_sbgp(ucc_subset_topo_t *topo, ucc_sbgp_type_t type);
 int         ucc_topo_is_single_node(ucc_subset_topo_t *topo);
+ucc_status_t ucc_subset_topo_get_all_sockets(ucc_subset_topo_t *topo, ucc_sbgp_t **sbgps);
 #endif
