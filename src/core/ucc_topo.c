@@ -6,7 +6,6 @@
 #include "config.h"
 #include "ucc_topo.h"
 #include "ucc_context.h"
-#include "ucc_team.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_math.h"
 #include <string.h>
@@ -148,42 +147,42 @@ void ucc_topo_cleanup(ucc_topo_t *topo)
     }
 }
 
-ucc_status_t ucc_team_topo_init(ucc_team_t *team, ucc_topo_t *topo,
-                                ucc_team_topo_t **_team_topo)
+ucc_status_t ucc_subset_topo_init(ucc_subset_t set, ucc_topo_t *topo,
+                                  ucc_subset_topo_t **_subset_topo)
 {
-    ucc_team_topo_t *team_topo = malloc(sizeof(*team_topo));
+    ucc_subset_topo_t *subset_topo = malloc(sizeof(*subset_topo));
     int              i;
-    if (!team_topo) {
+    if (!subset_topo) {
         return UCC_ERR_NO_MEMORY;
     }
-    team_topo->topo = topo;
+    subset_topo->topo = topo;
     for (i = 0; i < UCC_SBGP_LAST; i++) {
-        team_topo->sbgps[i].status = UCC_SBGP_NOT_INIT;
+        subset_topo->sbgps[i].status = UCC_SBGP_NOT_INIT;
     }
-    team_topo->no_socket           = 0;
-    team_topo->node_leader_rank    = -1;
-    team_topo->node_leader_rank_id = 0;
-    team_topo->team                = team;
-    team_topo->min_ppn             = UCC_RANK_MAX;
-    team_topo->max_ppn             = 0;
-    *_team_topo                    = team_topo;
+    subset_topo->no_socket           = 0;
+    subset_topo->node_leader_rank    = -1;
+    subset_topo->node_leader_rank_id = 0;
+    subset_topo->set                 = set;
+    subset_topo->min_ppn             = UCC_RANK_MAX;
+    subset_topo->max_ppn             = 0;
+    *_subset_topo                    = subset_topo;
     return UCC_OK;
 }
 
-void ucc_team_topo_cleanup(ucc_team_topo_t *team_topo)
+void ucc_subset_topo_cleanup(ucc_subset_topo_t *subset_topo)
 {
     int i;
-    if (team_topo) {
+    if (subset_topo) {
         for (i = 0; i < UCC_SBGP_LAST; i++) {
-            if (team_topo->sbgps[i].status == UCC_SBGP_ENABLED) {
-                ucc_sbgp_cleanup(&team_topo->sbgps[i]);
+            if (subset_topo->sbgps[i].status == UCC_SBGP_ENABLED) {
+                ucc_sbgp_cleanup(&subset_topo->sbgps[i]);
             }
         }
-        free(team_topo);
+        free(subset_topo);
     }
 }
 
-ucc_sbgp_t *ucc_team_topo_get_sbgp(ucc_team_topo_t *topo, ucc_sbgp_type_t type)
+ucc_sbgp_t *ucc_subset_topo_get_sbgp(ucc_subset_topo_t *topo, ucc_sbgp_type_t type)
 {
     if (topo->sbgps[type].status == UCC_SBGP_NOT_INIT) {
         if (UCC_OK != ucc_sbgp_create(topo, type)) {
@@ -194,13 +193,13 @@ ucc_sbgp_t *ucc_team_topo_get_sbgp(ucc_team_topo_t *topo, ucc_sbgp_type_t type)
     return &topo->sbgps[type];
 }
 
-int ucc_topo_is_single_node(ucc_team_topo_t *topo)
+int ucc_topo_is_single_node(ucc_subset_topo_t *topo)
 {
     ucc_sbgp_t *sbgp;
 
-    sbgp = ucc_team_topo_get_sbgp(topo, UCC_SBGP_NODE);
+    sbgp = ucc_subset_topo_get_sbgp(topo, UCC_SBGP_NODE);
     if (UCC_SBGP_ENABLED == sbgp->status &&
-        sbgp->group_size == topo->team->size) {
+        sbgp->group_size == ucc_subset_size(&topo->set)) {
         return 1;
     }
     return 0;

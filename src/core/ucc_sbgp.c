@@ -5,7 +5,7 @@
 
 #include "ucc_sbgp.h"
 #include "ucc_topo.h"
-#include "ucc_team.h"
+#include "utils/ucc_log.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_compiler_def.h"
@@ -20,16 +20,40 @@ const char*  ucc_sbgp_str(ucc_sbgp_type_t type)
     return ucc_sbgp_type_str[type];
 }
 
-static inline ucc_status_t sbgp_create_socket(ucc_team_topo_t *topo,
+static inline int ucc_rank_on_local_node(int team_rank, ucc_subset_topo_t *topo)
+{
+    ucc_proc_info_t *procs       = topo->topo->procs;
+    ucc_rank_t       ctx_rank    = ucc_ep_map_eval(topo->set.map, team_rank);
+    ucc_rank_t       my_ctx_rank = ucc_ep_map_eval(topo->set.map, topo->set.myrank);
+
+    return procs[ctx_rank].host_hash == procs[my_ctx_rank].host_hash;
+}
+
+static inline int ucc_rank_on_local_socket(int team_rank, ucc_subset_topo_t *topo)
+{
+    ucc_rank_t       ctx_rank    = ucc_ep_map_eval(topo->set.map, team_rank);
+    ucc_rank_t       my_ctx_rank = ucc_ep_map_eval(topo->set.map, topo->set.myrank);
+    ucc_proc_info_t *proc        = &topo->topo->procs[ctx_rank];
+    ucc_proc_info_t *my_proc     = &topo->topo->procs[my_ctx_rank];
+
+    if (my_proc->socket_id == -1) {
+        return 0;
+    }
+    return proc->host_hash == my_proc->host_hash &&
+           proc->socket_id == my_proc->socket_id;
+}
+
+
+static inline ucc_status_t sbgp_create_socket(ucc_subset_topo_t *topo,
                                               ucc_sbgp_t *     sbgp)
 {
-    ucc_team_t *team       = sbgp->team;
-    ucc_sbgp_t *node_sbgp  = &topo->sbgps[UCC_SBGP_NODE];
-    ucc_rank_t  group_rank = team->rank;
-    ucc_rank_t  nlr        = topo->node_leader_rank;
-    ucc_rank_t  sock_rank = 0, sock_size = 0;
-    int         i, r, nlr_pos;
-    ucc_rank_t *local_ranks;
+    ucc_subset_t *set        = &topo->set;
+    ucc_sbgp_t   *node_sbgp  = &topo->sbgps[UCC_SBGP_NODE];
+    ucc_rank_t    group_rank = set->myrank;
+    ucc_rank_t    nlr        = topo->node_leader_rank;
+    ucc_rank_t    sock_rank = 0, sock_size = 0;
+    int           i, r, nlr_pos;
+    ucc_rank_t   *local_ranks;
 
     ucc_assert(node_sbgp->status == UCC_SBGP_ENABLED);
     local_ranks =
@@ -41,7 +65,7 @@ static inline ucc_status_t sbgp_create_socket(ucc_team_topo_t *topo,
     }
     for (i = 0; i < node_sbgp->group_size; i++) {
         r = ucc_ep_map_eval(node_sbgp->map, i);
-        if (ucc_rank_on_local_socket(r, team)) {
+        if (ucc_rank_on_local_socket(r, topo)) {
             local_ranks[sock_size] = r;
             if (r == group_rank) {
                 sock_rank = sock_size;
@@ -75,17 +99,17 @@ static inline ucc_status_t sbgp_create_socket(ucc_team_topo_t *topo,
     return UCC_OK;
 }
 
-static inline ucc_status_t sbgp_create_node(ucc_team_topo_t *topo,
+static inline ucc_status_t sbgp_create_node(ucc_subset_topo_t *topo,
                                             ucc_sbgp_t *     sbgp)
 {
-    ucc_team_t *team           = sbgp->team;
-    ucc_rank_t  group_size     = team->size;
-    ucc_rank_t  group_rank     = team->rank;
-    ucc_rank_t  max_local_size = 256;
-    ucc_rank_t  ctx_nlr        = topo->node_leader_rank_id;
-    ucc_rank_t  node_rank = 0, node_size = 0;
-    int         i;
-    ucc_rank_t *local_ranks, *tmp;
+    ucc_subset_t *set            = &topo->set;
+    ucc_rank_t    group_size     = ucc_subset_size(set);
+    ucc_rank_t    group_rank     = set->myrank;
+    ucc_rank_t    max_local_size = 256;
+    ucc_rank_t    ctx_nlr        = topo->node_leader_rank_id;
+    ucc_rank_t    node_rank = 0, node_size = 0;
+    int           i;
+    ucc_rank_t   *local_ranks, *tmp;
     local_ranks =
         ucc_malloc(max_local_size * sizeof(ucc_rank_t), "local_ranks");
     if (!local_ranks) {
@@ -94,7 +118,7 @@ static inline ucc_status_t sbgp_create_node(ucc_team_topo_t *topo,
         return UCC_ERR_NO_MEMORY;
     }
     for (i = 0; i < group_size; i++) {
-        if (ucc_rank_on_local_node(i, team)) {
+        if (ucc_rank_on_local_node(i, topo)) {
             if (node_size == max_local_size) {
                 max_local_size *= 2;
                 tmp = ucc_realloc(local_ranks,
@@ -153,17 +177,17 @@ static inline ucc_status_t sbgp_create_node(ucc_team_topo_t *topo,
     return UCC_OK;
 }
 
-static ucc_status_t sbgp_create_node_leaders(ucc_team_topo_t *topo,
+static ucc_status_t sbgp_create_node_leaders(ucc_subset_topo_t *topo,
                                              ucc_sbgp_t *sbgp, int ctx_nlr)
 {
-    ucc_team_t *team             = sbgp->team;
-    ucc_rank_t  comm_size        = team->size;
-    ucc_rank_t  comm_rank        = team->rank;
-    int         i_am_node_leader = 0;
-    ucc_rank_t  nnodes           = topo->topo->nnodes;
-    ucc_rank_t  n_node_leaders;
-    ucc_rank_t *nl_array_1, *nl_array_2;
-    int         i;
+    ucc_subset_t *set              = &topo->set;
+    ucc_rank_t    comm_size        = ucc_subset_size(set);
+    ucc_rank_t    comm_rank        = set->myrank;
+    int           i_am_node_leader = 0;
+    ucc_rank_t    nnodes           = topo->topo->nnodes;
+    ucc_rank_t    n_node_leaders;
+    ucc_rank_t   *nl_array_1, *nl_array_2;
+    int           i;
 
     if (topo->min_ppn != UCC_RANK_MAX && ctx_nlr >= topo->min_ppn) {
         sbgp->status = UCC_SBGP_NOT_EXISTS;
@@ -189,7 +213,7 @@ static ucc_status_t sbgp_create_node_leaders(ucc_team_topo_t *topo,
     }
 
     for (i = 0; i < comm_size; i++) {
-        ucc_rank_t    ctx_rank = ucc_ep_map_eval(team->ctx_map, i);
+        ucc_rank_t    ctx_rank = ucc_ep_map_eval(set->map, i);
         ucc_host_id_t host_id  = topo->topo->procs[ctx_rank].host_id;
         if (nl_array_1[host_id] == 0 || nl_array_1[host_id] == ctx_nlr) {
             nl_array_2[host_id] = i;
@@ -240,12 +264,12 @@ skip:
     return UCC_OK;
 }
 
-static ucc_status_t sbgp_create_socket_leaders(ucc_team_topo_t *topo,
+static ucc_status_t sbgp_create_socket_leaders(ucc_subset_topo_t *topo,
                                                ucc_sbgp_t *     sbgp)
 {
-    ucc_team_t     *team               = sbgp->team;
+    ucc_subset_t   *set                = &topo->set;
     ucc_sbgp_t     *node_sbgp          = &topo->sbgps[UCC_SBGP_NODE];
-    ucc_rank_t      comm_rank          = team->rank;
+    ucc_rank_t      comm_rank          = set->myrank;
     ucc_rank_t      nlr                = topo->node_leader_rank;
     int             i_am_socket_leader = (nlr == comm_rank);
     int             max_n_sockets      = topo->topo->max_n_sockets;
@@ -264,12 +288,12 @@ static ucc_status_t sbgp_create_socket_leaders(ucc_team_topo_t *topo,
         sl_array[i] = UCC_RANK_MAX;
     }
     nlr_sock_id =
-        topo->topo->procs[ucc_ep_map_eval(team->ctx_map, nlr)].socket_id;
+        topo->topo->procs[ucc_ep_map_eval(set->map, nlr)].socket_id;
     sl_array[nlr_sock_id] = nlr;
 
     for (i = 0; i < node_sbgp->group_size; i++) {
         ucc_rank_t      r         = ucc_ep_map_eval(node_sbgp->map, i);
-        ucc_rank_t      ctx_rank  = ucc_ep_map_eval(team->ctx_map, r);
+        ucc_rank_t      ctx_rank  = ucc_ep_map_eval(set->map, r);
         ucc_socket_id_t socket_id = topo->topo->procs[ctx_rank].socket_id;
         if (sl_array[socket_id] == UCC_RANK_MAX) {
             n_socket_leaders++;
@@ -331,13 +355,11 @@ static ucc_status_t sbgp_create_socket_leaders(ucc_team_topo_t *topo,
     return UCC_OK;
 }
 
-ucc_status_t ucc_sbgp_create(ucc_team_topo_t *topo, ucc_sbgp_type_t type)
+ucc_status_t ucc_sbgp_create(ucc_subset_topo_t *topo, ucc_sbgp_type_t type)
 {
     ucc_status_t status = UCC_OK;
-    ucc_team_t * team   = topo->team;
     ucc_sbgp_t * sbgp   = &topo->sbgps[type];
 
-    sbgp->team   = team;
     sbgp->type   = type;
     sbgp->status = UCC_SBGP_NOT_EXISTS;
 
@@ -387,7 +409,7 @@ ucc_status_t ucc_sbgp_create(ucc_team_topo_t *topo, ucc_sbgp_type_t type)
     };
     if (UCC_SBGP_ENABLED == sbgp->status && sbgp->rank_map) {
         sbgp->map = ucc_ep_map_from_array(&sbgp->rank_map, sbgp->group_size,
-                                          topo->team->size, 1);
+                                          ucc_subset_size(&topo->set), 1);
     }
     return status;
 }

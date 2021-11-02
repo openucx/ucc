@@ -18,4 +18,9 @@ typedef struct ucc_subset {
     ucc_rank_t   myrank;
 } ucc_subset_t ;
 
+static inline ucc_rank_t ucc_subset_size(ucc_subset_t *set)
+{
+    return (ucc_rank_t)set->map.ep_num;
+}
+
 #endif
