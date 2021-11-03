@@ -70,6 +70,7 @@ static inline ucc_status_t sbgp_create_socket(ucc_team_topo_t *topo,
         sbgp->status = UCC_SBGP_ENABLED;
     } else {
         sbgp->status = UCC_SBGP_NOT_EXISTS;
+        ucc_free(sbgp->rank_map);
     }
     return UCC_OK;
 }

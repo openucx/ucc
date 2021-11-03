@@ -32,14 +32,14 @@ public:
     };
     EpMap(const std::vector<ucc_rank_t> &ranks, uint64_t full,
           int need_free = 0) {
-        array = new ucc_rank_t[ranks.size()];
+        array = (ucc_rank_t*)malloc(sizeof(ucc_rank_t) * ranks.size());
         memcpy(array, ranks.data(), ranks.size() * sizeof(ucc_rank_t));
         map = ucc_ep_map_from_array(&array, ranks.size(),
                                     full, need_free);
     }
     ~EpMap() {
         if (array) {
-            delete[] array;
+            free(array);
         }
     }
     friend bool operator==(const EpMap &lhs, const EpMap &rhs) {

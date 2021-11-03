@@ -34,3 +34,15 @@ jobs:
         echo "Workspace: ${GITHUB_WORKSPACE}"
         cd ${GITHUB_WORKSPACE}
         run-clang-tidy-11 -p /tmp/
+        make clean
+        rm -rf /tmp/ucc
+    - name: Run gtest ASAN
+      continue-on-error: true
+      run: |
+        cd ${GITHUB_WORKSPACE}
+        ls -la
+        echo $PWD
+        ./autogen.sh
+        CC=clang-11 CXX=clang++-11 ./configure CFLAGS="-fsanitize=address" --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
+        make -j install
+        ./test/gtest/gtest

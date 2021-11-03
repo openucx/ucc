@@ -189,6 +189,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     ucc_context_progress_deregister(
         self->super.super.ucc_context,
         (ucc_context_progress_fn_t)ucp_worker_progress, self->ucp_worker);
+    if (self->worker_address) {
+        ucp_worker_release_address(self->ucp_worker, self->worker_address);
+    }
     ucp_worker_destroy(self->ucp_worker);
     ucc_mpool_cleanup(&self->req_mp, 1);
     ucp_cleanup(self->ucp_context);

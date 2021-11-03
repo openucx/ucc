@@ -66,7 +66,6 @@ class test_service_coll {
 class test_service_allreduce : public test_service_coll {
     std::vector<std::vector<int>> sbuf;
     std::vector<std::vector<int>> rbuf;
-    size_t                        count;
 
   public:
     test_service_allreduce(std::vector<int> _subset, size_t count,
@@ -136,7 +135,6 @@ INSTANTIATE_TEST_CASE_P(
 class test_service_allgather : public test_service_coll {
     std::vector<std::vector<int>> sbuf;
     std::vector<std::vector<int>> rbuf;
-    size_t                        count;
 
   public:
     test_service_allgather(std::vector<int> _subset, size_t count,
