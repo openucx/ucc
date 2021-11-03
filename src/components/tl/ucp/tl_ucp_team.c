@@ -94,8 +94,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
         status = ucc_tl_ucp_team_preconnect(team);
         if (UCC_INPROGRESS == status) {
             return UCC_INPROGRESS;
-        }
-        else if (UCC_OK != status) {
+        } else if (UCC_OK != status) {
             goto err_preconnect;
         }
     }

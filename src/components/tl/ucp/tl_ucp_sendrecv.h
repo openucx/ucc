@@ -163,9 +163,9 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
                              ucc_rank_t peer, uint64_t *rva, ucp_rkey_h *rkey,
                              int *segment)
 {
-    ucc_tl_ucp_context_t *ctx    = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_ep_map_t *        ep_map = &team->super.super.team->ctx_map;
-    *segment                     = 0;
+    ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_rank_t            core_rank;
+    *segment = 0;
 
     for (int i = 0; i < ctx->n_rinfo_segs; i++) {
         if (va >= team->va_base[i] &&
@@ -174,28 +174,16 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
             break;
         }
     }
-
-    if (ep_map->type == UCC_EP_MAP_STRIDED) {
-        peer = peer * ep_map->strided.stride + ep_map->strided.start;
-    }
-    else if (ep_map->type == UCC_EP_MAP_ARRAY) {
-        if (ep_map->array.elem_size == 4) {
-            uint32_t *index = ep_map->array.map;
-            peer            = index[peer];
-        }
-        else {
-            uint64_t *index = ep_map->array.map;
-            peer            = index[peer];
-        }
-    }
-    else if (ep_map->type == UCC_EP_MAP_CB) {
-        peer = (ucc_rank_t)ep_map->cb.cb(peer, ep_map->cb.cb_ctx);
-    }
-
+    core_rank = ucc_ep_map_eval(team->map, peer);
+    ucc_assert(team->super.super.params.team);
+    peer = ucc_get_ctx_rank(team->super.super.params.team, core_rank);
     if (NULL == ctx->remote_info[peer][*segment].rkey) {
-        ucp_ep_rkey_unpack(
+        ucs_status_t ucs_status = ucp_ep_rkey_unpack(
             *ep, ctx->remote_info[peer][*segment].packed_key,
             (ucp_rkey_h *)&ctx->remote_info[peer][*segment].rkey);
+        if (UCS_OK != ucs_status) {
+            return ucs_status_to_ucc_status(ucs_status);
+        }
     }
     *rkey = ctx->remote_info[peer][*segment].rkey;
     *rva  = (uint64_t)ctx->remote_info[peer][*segment].va_base;

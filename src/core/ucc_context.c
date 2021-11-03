@@ -890,6 +890,7 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
     }
 
     if (context_attr->mask & UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE) {
+        uint64_t            max_buffer_size = 0;
         int                 i;
         ucc_base_ctx_attr_t attr;
         ucc_tl_lib_t *      tl_lib;
@@ -905,13 +906,11 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
                 ucc_error("failed to obtain global work buffer size");
                 return status;
             }
-            /* currently only TL/UCP will return a value */
-            if (attr.attr.global_work_buffer_size > 0) {
-                break;
+            if (attr.attr.global_work_buffer_size > max_buffer_size) {
+                max_buffer_size = attr.attr.global_work_buffer_size;
             }
         }
-        context_attr->global_work_buffer_size =
-            attr.attr.global_work_buffer_size;
+        context_attr->global_work_buffer_size = max_buffer_size;
     }
 
     return status;
