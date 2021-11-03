@@ -465,8 +465,8 @@ ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
 
     for (i = 0; i < n_socket_groups; i++) {
         sl_rank = (n_socket_groups > 1)
-            ? ucc_sbgp_rank2team(sock_leaders_sbgp, i)
-            : ucc_sbgp_rank2team(&topo->sbgps[UCC_SBGP_NODE], 0);
+            ? ucc_ep_map_eval(sock_leaders_sbgp->map, i)
+            : ucc_ep_map_eval(topo->sbgps[UCC_SBGP_NODE].map, 0);
         status  = sbgp_create_socket(topo, &sbgps[i], sl_rank);
         if (UCC_OK != status) {
             ucc_error("failed to create socket sbgp for sl_rank %d:%u", i, sl_rank);

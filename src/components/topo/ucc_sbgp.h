@@ -54,14 +54,28 @@ typedef struct ucc_sbgp_t {
 } ucc_sbgp_t;
 
 const char*  ucc_sbgp_str(ucc_sbgp_type_t type);
+
+/* The call creates a required subgroup specified by @in type in
+   the topo->sbgps[type]. The created sbgp can be in either of 3 states:
+   - NOT_EXISTS: means for a given topo (ucc team layout) there is no such
+     grouping or the result group is of size 1. Example: 1) type == SBGP_SOCKET
+     but processes are not bound to sockets at all; 2) type == SBGP_NEODE_LEADERS
+     but team is entirely on single node.
+   - ENABLED: means the sbgp size >= 2 and calling process is part of that subgroup
+   - DISABLED: means the subgrouping exists for the given ucc team (topo) but
+     the calling process is NOT part of it.
+
+     Note: this function returns subgroup LOCAL to calling process when multiple
+     groups of the same time exist for a given topo. E.g., when team spans several
+     sockets there exist several socket subgroups but the function below will
+     initialize the sbgp which belongs to the calling process. */
 ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type);
+
 ucc_status_t ucc_sbgp_cleanup(ucc_sbgp_t *sbgp);
 
-static inline int ucc_sbgp_rank2team(ucc_sbgp_t *sbgp, int rank)
-{
-    return ucc_ep_map_eval(sbgp->map, rank);
-}
-
+/* Returns ALL existing socket subgroups on the node of the calling process.
+   If processes are not bound UCC_ERR_NOT_FOUND is returned.
+   Also returns subgroups of size 1 in contrast to ucc_sbgp_create. */
 ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
                                          int *n_sbgps);
 

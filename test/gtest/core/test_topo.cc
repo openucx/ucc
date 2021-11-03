@@ -43,7 +43,7 @@ class test_topo : public ucc::test {
     {
         EXPECT_EQ(sbgp->group_size, r.size());
         for (int i = 0; i < r.size(); i++) {
-            if (ucc_sbgp_rank2team(sbgp, i) != r[i]) {
+            if (ucc_ep_map_eval(sbgp->map, i) != r[i]) {
                 return false;
             }
         }
