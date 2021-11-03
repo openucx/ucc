@@ -62,7 +62,8 @@ static inline int ucc_sbgp_rank2team(ucc_sbgp_t *sbgp, int rank)
     return ucc_ep_map_eval(sbgp->map, rank);
 }
 
-ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps);
+ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                         int *n_sbgps);
 
 void ucc_sbgp_print(ucc_sbgp_t *sbgp);
 #endif

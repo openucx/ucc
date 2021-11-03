@@ -20,7 +20,8 @@ const char*  ucc_sbgp_str(ucc_sbgp_type_t type)
     return ucc_sbgp_type_str[type];
 }
 
-static inline int ucc_rank_on_local_node(int team_rank, ucc_topo_t *topo)
+static inline int ucc_rank_on_local_node(ucc_rank_t team_rank,
+                                         ucc_topo_t *topo)
 {
     ucc_proc_info_t *procs       = topo->topo->procs;
     ucc_rank_t       ctx_rank    = ucc_ep_map_eval(topo->set.map, team_rank);
@@ -29,24 +30,26 @@ static inline int ucc_rank_on_local_node(int team_rank, ucc_topo_t *topo)
     return procs[ctx_rank].host_hash == procs[my_ctx_rank].host_hash;
 }
 
-static inline int ucc_rank_on_local_socket(int team_rank, ucc_topo_t *topo)
+static inline int ucc_ranks_on_local_socket(ucc_rank_t rank1,
+                                            ucc_rank_t rank2,
+                                            ucc_topo_t *topo)
 {
-    ucc_rank_t       ctx_rank    = ucc_ep_map_eval(topo->set.map, team_rank);
-    ucc_rank_t       my_ctx_rank = ucc_ep_map_eval(topo->set.map, topo->set.myrank);
-    ucc_proc_info_t *proc        = &topo->topo->procs[ctx_rank];
-    ucc_proc_info_t *my_proc     = &topo->topo->procs[my_ctx_rank];
+    ucc_rank_t       ctx_rank1 = ucc_ep_map_eval(topo->set.map, rank1);
+    ucc_rank_t       ctx_rank2 = ucc_ep_map_eval(topo->set.map, rank2);
+    ucc_proc_info_t *proc1     = &topo->topo->procs[ctx_rank1];
+    ucc_proc_info_t *proc2     = &topo->topo->procs[ctx_rank2];
 
-    if (my_proc->socket_id == -1) {
+    if (!topo->topo->sock_bound) {
         return 0;
     }
-    return proc->host_hash == my_proc->host_hash &&
-           proc->socket_id == my_proc->socket_id;
+    return proc1->host_hash == proc2->host_hash &&
+           proc1->socket_id == proc2->socket_id;
 }
 
 
 static inline ucc_status_t sbgp_create_socket(ucc_topo_t *topo,
-                                              ucc_sbgp_t        *sbgp,
-                                              ucc_rank_t         group_rank)
+                                              ucc_sbgp_t *sbgp,
+                                              ucc_rank_t  group_rank)
 {
     ucc_sbgp_t   *node_sbgp  = &topo->sbgps[UCC_SBGP_NODE];
     ucc_rank_t    nlr        = topo->node_leader_rank;
@@ -64,7 +67,7 @@ static inline ucc_status_t sbgp_create_socket(ucc_topo_t *topo,
     }
     for (i = 0; i < node_sbgp->group_size; i++) {
         r = ucc_ep_map_eval(node_sbgp->map, i);
-        if (ucc_rank_on_local_socket(r, topo)) {
+        if (ucc_ranks_on_local_socket(r, group_rank, topo)) {
             local_ranks[sock_size] = r;
             if (r == group_rank) {
                 sock_rank = sock_size;
@@ -302,47 +305,47 @@ static ucc_status_t sbgp_create_socket_leaders(ucc_topo_t *topo,
             }
         }
     }
-
+    topo->n_sockets = n_socket_leaders;
     if (n_socket_leaders > 1) {
-        if (i_am_socket_leader) {
-            ucc_rank_t sl_rank = -1;
-            sbgp->rank_map =
-                ucc_malloc(sizeof(ucc_rank_t) * n_socket_leaders, "rank_map");
-            if (!sbgp->rank_map) {
-                ucc_error("failed to allocate %zd bytes for rank_map",
-                          n_socket_leaders * sizeof(ucc_rank_t));
-                ucc_free(sl_array);
-                return UCC_ERR_NO_MEMORY;
-            }
-            n_socket_leaders = 0;
-            for (i = 0; i < max_n_sockets; i++) {
-                if (sl_array[i] != UCC_RANK_MAX) {
-                    sbgp->rank_map[n_socket_leaders] = sl_array[i];
-                    if (comm_rank == sl_array[i]) {
-                        sl_rank = n_socket_leaders;
-                    }
-                    n_socket_leaders++;
+        ucc_rank_t sl_rank = -1;
+        sbgp->rank_map =
+            ucc_malloc(sizeof(ucc_rank_t) * n_socket_leaders, "rank_map");
+        if (!sbgp->rank_map) {
+            ucc_error("failed to allocate %zd bytes for rank_map",
+                      n_socket_leaders * sizeof(ucc_rank_t));
+            ucc_free(sl_array);
+            return UCC_ERR_NO_MEMORY;
+        }
+        n_socket_leaders = 0;
+        for (i = 0; i < max_n_sockets; i++) {
+            if (sl_array[i] != UCC_RANK_MAX) {
+                sbgp->rank_map[n_socket_leaders] = sl_array[i];
+                if (comm_rank == sl_array[i]) {
+                    sl_rank = n_socket_leaders;
                 }
+                n_socket_leaders++;
             }
-            int nlr_pos = -1;
-            for (i = 0; i < n_socket_leaders; i++) {
-                if (sbgp->rank_map[i] == nlr) {
-                    nlr_pos = i;
-                    break;
-                }
+        }
+        int nlr_pos = -1;
+        for (i = 0; i < n_socket_leaders; i++) {
+            if (sbgp->rank_map[i] == nlr) {
+                nlr_pos = i;
+                break;
             }
-            ucc_assert(sl_rank >= 0);
-            ucc_assert(nlr_pos >= 0);
-            sbgp->group_rank = sl_rank;
-            if (nlr_pos > 0) {
-                if (sl_rank == 0)
-                    sbgp->group_rank = nlr_pos;
-                if (sl_rank == nlr_pos)
-                    sbgp->group_rank = 0;
-                SWAP(sbgp->rank_map[nlr_pos], sbgp->rank_map[0], int);
-            }
+        }
+        ucc_assert(sl_rank >= 0);
+        ucc_assert(nlr_pos >= 0);
+        sbgp->group_rank = sl_rank;
+        if (nlr_pos > 0) {
+            if (sl_rank == 0)
+                sbgp->group_rank = nlr_pos;
+            if (sl_rank == nlr_pos)
+                sbgp->group_rank = 0;
+            SWAP(sbgp->rank_map[nlr_pos], sbgp->rank_map[0], int);
+        }
 
-            sbgp->group_size = n_socket_leaders;
+        sbgp->group_size = n_socket_leaders;
+        if (i_am_socket_leader) {
             sbgp->status     = UCC_SBGP_ENABLED;
         } else {
             sbgp->status = UCC_SBGP_DISABLED;
@@ -359,9 +362,9 @@ ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
     ucc_status_t status = UCC_OK;
     ucc_sbgp_t * sbgp   = &topo->sbgps[type];
 
-    sbgp->type   = type;
-    sbgp->status = UCC_SBGP_NOT_EXISTS;
-
+    sbgp->type     = type;
+    sbgp->status   = UCC_SBGP_NOT_EXISTS;
+    sbgp->rank_map = NULL;
     switch (type) {
     case UCC_SBGP_NODE:
         status = sbgp_create_node(topo, sbgp);
@@ -405,7 +408,7 @@ ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
         status = UCC_ERR_NOT_IMPLEMENTED;
         break;
     };
-    if (UCC_SBGP_ENABLED == sbgp->status && sbgp->rank_map) {
+    if (sbgp->rank_map) {
         sbgp->map = ucc_ep_map_from_array(&sbgp->rank_map, sbgp->group_size,
                                           ucc_subset_size(&topo->set), 1);
     }
@@ -434,7 +437,8 @@ void ucc_sbgp_print(ucc_sbgp_t *sbgp)
     }
 }
 
-ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **_sbgps)
+ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
+                                         int *n_sbgps)
 {
     ucc_sbgp_t  *sbgps;
     ucc_sbgp_t  *sock_leaders_sbgp;
@@ -447,14 +451,14 @@ ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **_sbgps)
     }
 
     sock_leaders_sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
-    n_socket_groups = sock_leaders_sbgp->group_size;
+    n_socket_groups   = topo->n_sockets;
     ucc_assert(n_socket_groups >= 1);
 
     if (topo->sbgps[UCC_SBGP_NODE].status != UCC_SBGP_ENABLED) {
         return UCC_ERR_NOT_FOUND;
     }
 
-    sbgps = ucc_malloc(n_socket_groups * sizeof(ucc_sbgp_t), "socket_sbgps");
+    sbgps = ucc_calloc(n_socket_groups, sizeof(ucc_sbgp_t), "socket_sbgps");
     if (!sbgps) {
         return UCC_ERR_NO_MEMORY;
     }
@@ -468,8 +472,13 @@ ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **_sbgps)
             ucc_error("failed to create socket sbgp for sl_rank %d:%u", i, sl_rank);
             goto error;
         }
+        if (sbgps[i].rank_map) {
+            sbgps[i].map = ucc_ep_map_from_array(&sbgps[i].rank_map, sbgps[i].group_size,
+                                                 ucc_subset_size(&topo->set), 1);
+        }
     }
     *_sbgps = sbgps;
+    *n_sbgps = n_socket_groups;
     return UCC_OK;
 error:
     ucc_free(sbgps);

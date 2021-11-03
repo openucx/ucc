@@ -149,40 +149,48 @@ void ucc_context_topo_cleanup(ucc_context_topo_t *topo)
     }
 }
 
-ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *topo,
+ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *ctx_topo,
                                   ucc_topo_t **_topo)
 {
-    ucc_topo_t *subset_topo = malloc(sizeof(*subset_topo));
+    ucc_topo_t *topo = ucc_malloc(sizeof(*topo), "topo");
     int              i;
-    if (!subset_topo) {
+    if (!topo) {
         return UCC_ERR_NO_MEMORY;
     }
-    subset_topo->topo = topo;
+    topo->topo = ctx_topo;
     for (i = 0; i < UCC_SBGP_LAST; i++) {
-        subset_topo->sbgps[i].status = UCC_SBGP_NOT_INIT;
+        topo->sbgps[i].status = UCC_SBGP_NOT_INIT;
     }
-    subset_topo->no_socket           = 0;
-    subset_topo->node_leader_rank    = -1;
-    subset_topo->node_leader_rank_id = 0;
-    subset_topo->set                 = set;
-    subset_topo->min_ppn             = UCC_RANK_MAX;
-    subset_topo->max_ppn             = 0;
-    subset_topo->all_sockets         = NULL;
+    topo->n_sockets           = -1;
+    topo->node_leader_rank    = -1;
+    topo->node_leader_rank_id = 0;
+    topo->set                 = set;
+    topo->min_ppn             = UCC_RANK_MAX;
+    topo->max_ppn             = 0;
+    topo->all_sockets         = NULL;
 
-    *_topo                    = subset_topo;
+    *_topo                    = topo;
     return UCC_OK;
 }
 
-void ucc_topo_cleanup(ucc_topo_t *subset_topo)
+void ucc_topo_cleanup(ucc_topo_t *topo)
 {
     int i;
-    if (subset_topo) {
+    if (topo) {
         for (i = 0; i < UCC_SBGP_LAST; i++) {
-            if (subset_topo->sbgps[i].status == UCC_SBGP_ENABLED) {
-                ucc_sbgp_cleanup(&subset_topo->sbgps[i]);
+            if (topo->sbgps[i].status == UCC_SBGP_ENABLED) {
+                ucc_sbgp_cleanup(&topo->sbgps[i]);
             }
         }
-        free(subset_topo);
+        if (topo->all_sockets) {
+            for (i = 0; i < topo->n_sockets; i++) {
+                if (topo->all_sockets[i].status == UCC_SBGP_ENABLED) {
+                    ucc_sbgp_cleanup(&topo->all_sockets[i]);
+                }
+            }
+            ucc_free(topo->all_sockets);
+        }
+        ucc_free(topo);
     }
 }
 
@@ -209,12 +217,14 @@ int ucc_context_topo_is_single_node(ucc_topo_t *topo)
     return 0;
 }
 
-ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps)
+ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps, int *n_sbgps)
 {
     if (!topo->all_sockets) {
-        return ucc_sbgp_create_all_sockets(topo, sbgps);
+        return ucc_sbgp_create_all_sockets(topo, sbgps, n_sbgps);
     }
 
     *sbgps = topo->all_sockets;
+    *n_sbgps = topo->n_sockets;
+
     return UCC_OK;
 }

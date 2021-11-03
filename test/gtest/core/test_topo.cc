@@ -39,6 +39,16 @@ class test_topo : public ucc::test {
         ucc_topo_cleanup(topo);
         ucc_context_topo_cleanup(ctx_topo);
     }
+    bool check_sbgp(ucc_sbgp_t *sbgp, std::vector<ucc_rank_t> r)
+    {
+        EXPECT_EQ(sbgp->group_size, r.size());
+        for (int i = 0; i < r.size(); i++) {
+            if (ucc_sbgp_rank2team(sbgp, i) != r[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
 };
 
 #define SET_PI(_s, _i, _host, _sock, _pid)                                     \
@@ -401,4 +411,108 @@ UCC_TEST_F(test_topo, 4sockets_half)
     EXPECT_EQ(sbgp->map.type, UCC_EP_MAP_STRIDED);
     EXPECT_EQ(sbgp->map.strided.start, 0);
     EXPECT_EQ(sbgp->map.strided.stride, 2);
+}
+
+UCC_TEST_F(test_topo, 4sockets_all)
+{
+    const ucc_rank_t ctx_size  = 16;
+    addr_storage     s(ctx_size);
+    ucc_sbgp_t *     sbgps;
+    ucc_subset_t     set;
+    int              n_sbgps;
+
+    /* simulates world proc array : 4 sockets, 2  ranks per socket*/
+    SET_PI(s, 0,  0xaaa, 0, 0);
+    SET_PI(s, 1,  0xaaa, 0, 1);
+    SET_PI(s, 2,  0xaaa, 2, 2);
+    SET_PI(s, 3,  0xaaa, 2, 3);
+    SET_PI(s, 4,  0xaaa, 3, 4);
+    SET_PI(s, 5,  0xaaa, 3, 5);
+    SET_PI(s, 6,  0xaaa, 4, 6);
+    SET_PI(s, 7,  0xaaa, 4, 7);
+    SET_PI(s, 8,  0xaaa, 0, 8);
+    SET_PI(s, 9,  0xaaa, 0, 9);
+    SET_PI(s, 10, 0xaaa, 2, 10);
+    SET_PI(s, 11, 0xaaa, 2, 11);
+    SET_PI(s, 12, 0xaaa, 3, 12);
+    SET_PI(s, 13, 0xaaa, 3, 13);
+    SET_PI(s, 14, 0xaaa, 4, 14);
+    SET_PI(s, 15, 0xaaa, 4, 15);
+
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+
+    /* world */
+    set.map.ep_num = 16;
+    set.map.type   = UCC_EP_MAP_FULL;
+
+    set.myrank = 1; // from rank 1 perspective
+    /* Init topo for such subset */
+
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+
+    EXPECT_EQ(UCC_OK, ucc_topo_get_all_sockets(topo, &sbgps, &n_sbgps));
+    EXPECT_EQ(4, n_sbgps);
+    EXPECT_EQ(true, check_sbgp(&sbgps[0], {0, 1, 8, 9}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[1], {2, 3, 10, 11}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[2], {4, 5, 12, 13}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[3], {6, 7, 14, 15}));
+
+    /* world subset, 3 procs from each socket re-ordered*/
+    ucc_topo_cleanup(topo);
+    ucc_rank_t ranks[] = {1, 9,  8,
+                          3, 2,  11,
+                          4, 13, 12,
+                          7, 14, 15};
+    set.map.ep_num = 12;
+    set.map.type   = UCC_EP_MAP_ARRAY;
+    set.map.array.map       = (void*)ranks;
+    set.map.array.elem_size = sizeof(ucc_rank_t);
+
+    set.myrank = 1; // from rank 1 perspective
+    /* Init topo for such subset */
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+
+    /* SOCKET subgroup  - 2 ranks on the same socket*/
+    EXPECT_EQ(UCC_OK, ucc_topo_get_all_sockets(topo, &sbgps, &n_sbgps));
+    EXPECT_EQ(4, n_sbgps);
+    EXPECT_EQ(true, check_sbgp(&sbgps[0], {0, 1, 2}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[1], {3, 4, 5}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[2], {6, 7, 8}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[3], {9, 10, 11}));
+
+    /* world subset, 1 proc from each socket*/
+    ucc_topo_cleanup(topo);
+    ucc_rank_t ranks2[] = {1, 2, 13, 7};
+    set.map.ep_num = 4;
+    set.map.type   = UCC_EP_MAP_ARRAY;
+    set.map.array.map       = (void*)ranks2;
+    set.map.array.elem_size = sizeof(ucc_rank_t);
+
+    set.myrank = 1; // from rank 1 perspective
+    /* Init topo for such subset */
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+
+    EXPECT_EQ(UCC_OK, ucc_topo_get_all_sockets(topo, &sbgps, &n_sbgps));
+    EXPECT_EQ(4, n_sbgps);
+    EXPECT_EQ(true, check_sbgp(&sbgps[0], {0}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[1], {1}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[2], {2}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[3], {3}));
+
+    /* world subset, 1 full socket + 1 proc from another socket */
+    ucc_topo_cleanup(topo);
+    ucc_rank_t ranks3[] = {0, 1, 2, 8, 9};
+    set.map.ep_num = 5;
+    set.map.type   = UCC_EP_MAP_ARRAY;
+    set.map.array.map       = (void*)ranks3;
+    set.map.array.elem_size = sizeof(ucc_rank_t);
+
+    set.myrank = 1; // from rank 1 perspective
+    /* Init topo for such subset */
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+
+    EXPECT_EQ(UCC_OK, ucc_topo_get_all_sockets(topo, &sbgps, &n_sbgps));
+    EXPECT_EQ(2, n_sbgps);
+    EXPECT_EQ(true, check_sbgp(&sbgps[0], {0, 1, 3, 4}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[1], {2}));
 }
