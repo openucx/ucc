@@ -667,7 +667,7 @@ typedef ucc_oob_coll_t ucc_team_oob_coll_t;
  *  @ingroup UCC_CONTEXT_DT
  */
 typedef struct ucc_mem_map {
-    void *   address; /*!< the address of a buffer to be attached to the NIC */
+    void *   address; /*!< the address of a buffer to be attached to a UCC context */
     size_t   len;     /*!< the length of the buffer */
 } ucc_mem_map_t;
 
@@ -992,7 +992,13 @@ enum ucc_team_attr_field {
  * @ingroup UCC_TEAM_DT
  */
 enum ucc_team_flags {
-    UCC_TEAM_FLAG_COLL_WORK_BUFFER             = UCC_BIT(0)
+    UCC_TEAM_FLAG_COLL_WORK_BUFFER             = UCC_BIT(0) /*< If set, this indicates
+                                                                the user will provide 
+                                                                a scratchpad buffer for 
+                                                                use in one-sided 
+                                                                collectives. Otherwise, 
+                                                                an internal buffer will
+                                                                used. */
 };
 
 /**
@@ -1659,7 +1665,15 @@ typedef struct ucc_coll_args {
                                              collectives */
     ucc_error_type_t                error_type; /*!< Error type */
     ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
-    void                           *global_work_buffer; /*!< User allocated scratchpad buffer for one-sided collectives. The buffer provided should be at least the size returned by @ref ucc_context_get_attr with the field mask - UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE set to 1. */
+    void                           *global_work_buffer; /*!< User allocated scratchpad 
+                                                             buffer for one-sided 
+                                                             collectives. The buffer 
+                                                             provided should be at least 
+                                                             the size returned by @ref 
+                                                             ucc_context_get_attr with 
+                                                             the field mask - 
+                                                             UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE 
+                                                             set to 1. */
     ucc_coll_callback_t             cb;
     double                          timeout; /*!< Timeout in seconds */
 } ucc_coll_args_t;
