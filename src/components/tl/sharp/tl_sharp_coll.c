@@ -59,16 +59,6 @@ int ucc_to_sharp_memtype[] = {
 
 static ucc_tl_sharp_reg_t ucc_tl_sharp_reg_null = { .mr = NULL };
 
-static inline ucc_status_t ucc_sharp_check_dt_supported(ucc_datatype_t dt1,
-                                                        ucc_datatype_t dt2)
-{
-    if ((dt1 != dt2) || (ucc_to_sharp_dtype[dt1] == SHARP_DTYPE_NULL)) {
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
-    return UCC_OK;
-}
-
 static ucc_status_t
 ucc_tl_sharp_mem_register(ucc_tl_sharp_context_t *ctx, void *addr,
                           size_t length, ucc_tl_sharp_reg_t **reg)
