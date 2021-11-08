@@ -142,6 +142,7 @@ ucc_status_t ucc_get_bound_socket_id(int *socketid)
     if (!socket_ids) {
         ucc_error("failed to allocate %zd bytes for socket_ids array",
                   nr_cpus * sizeof(int));
+        __sched_cpufree(cpuset);
         return UCC_ERR_NO_MEMORY;
     }
     /* Loop through all cpus, and check if I'm bound to the socket */
@@ -182,6 +183,7 @@ ucc_status_t ucc_get_bound_socket_id(int *socketid)
         }
         ucc_assert(((*socketid) >= 0) && ((*socketid) < nr_cpus));
     }
+    __sched_cpufree(cpuset);
     ucc_free(socket_ids);
     return UCC_OK;
 }
