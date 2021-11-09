@@ -149,6 +149,8 @@ static inline const char* ucc_reduction_op_str(ucc_reduction_op_t op)
         return "maxloc";
     case UCC_OP_MINLOC:
         return "minloc";
+    case UCC_OP_AVG:
+        return "avg";
     default:
         return NULL;
     }

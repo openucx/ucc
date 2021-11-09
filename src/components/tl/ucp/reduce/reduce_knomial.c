@@ -5,7 +5,6 @@
  */
 
 #include "config.h"
-#include "tl_ucp.h"
 #include "reduce.h"
 #include "core/ucc_progress_queue.h"
 #include "tl_ucp_sendrecv.h"
@@ -18,15 +17,16 @@
 
 ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args      = &TASK_ARGS(task);
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    ucc_rank_t         myrank    = team->rank;
-    ucc_rank_t         team_size = team->size;
-    ucc_rank_t         root      = (ucc_rank_t)args->root;
-    uint32_t           radix     = task->reduce_kn.radix;
-    ucc_rank_t         vrank     = (myrank - root + team_size) % team_size;
-    void              *rbuf      = (myrank == root) ? args->dst.info.buffer :
+    ucc_tl_ucp_task_t *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_coll_args_t   *args       = &TASK_ARGS(task);
+    ucc_tl_ucp_team_t *team       = TASK_TEAM(task);
+    int                avg_pre_op = UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op;
+    ucc_rank_t         myrank     = team->rank;
+    ucc_rank_t         team_size  = team->size;
+    ucc_rank_t         root       = (ucc_rank_t)args->root;
+    uint32_t           radix      = task->reduce_kn.radix;
+    ucc_rank_t         vrank      = (myrank - root + team_size) % team_size;
+    void              *rbuf       = (myrank == root) ? args->dst.info.buffer :
                                                       task->reduce_kn.scratch;
     ucc_memory_type_t  mtype;
     ucc_datatype_t     dt;
@@ -35,6 +35,7 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t         vpeer, peer, vroot_at_level, root_at_level, pos;
     uint32_t           i;
     ucc_status_t       status;
+    int                is_avg;
 
     if (root == myrank) {
         count = args->dst.info.count;
@@ -81,11 +82,17 @@ UCC_REDUCE_KN_PHASE_INIT:
                 goto UCC_REDUCE_KN_PHASE_PROGRESS;
 UCC_REDUCE_KN_PHASE_MULTI:
                 if (task->reduce_kn.children_per_cycle) {
-                    status = ucc_dt_reduce_multi((task->reduce_kn.dist == 1) ?
-                                     args->src.info.buffer : rbuf,
-                                     received_vectors, rbuf,
-                                     task->reduce_kn.children_per_cycle,
-                                     count, data_size, dt, mtype, args);
+                    is_avg = args->reduce.predefined_op == UCC_OP_AVG &&
+                             (avg_pre_op ? (task->reduce_kn.dist == 1)
+                                         : (task->reduce_kn.dist ==
+                                            task->reduce_kn.max_dist));
+
+                    status = ucc_tl_ucp_reduce_multi(
+                        (task->reduce_kn.dist == 1) ? args->src.info.buffer
+                                                    : rbuf,
+                        received_vectors, rbuf,
+                        task->reduce_kn.children_per_cycle, count, data_size,
+                        dt, mtype, task, is_avg);
                     if (ucc_unlikely(UCC_OK != status)) {
                         tl_error(UCC_TASK_LIB(task),
                                  "failed to perform dt reduction");

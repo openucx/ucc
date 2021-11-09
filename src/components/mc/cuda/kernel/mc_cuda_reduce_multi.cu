@@ -70,12 +70,13 @@ CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_HALF, __half)
                                                         size, count, ld);      \
     } while(0)
 
-#define DT_REDUCE_INT(type, op, src1_p, src2_p, dest_p, size, count, ld, s,    \
-                      b, t) do {                                               \
+#define DT_REDUCE_INT(type, op, src1_p, src2_p, dest_p, size, count, ld, s, b, \
+                      t)                                                       \
+    do {                                                                       \
         const type *sbuf1 = (type *)src1_p;                                    \
         const type *sbuf2 = (type *)src2_p;                                    \
-        type *dest = (type *)dest_p;                                           \
-        switch(op) {                                                           \
+        type *      dest  = (type *)dest_p;                                    \
+        switch (op) {                                                          \
         case UCC_OP_MAX:                                                       \
             LAUNCH_KERNEL(MAX, type, sbuf1, sbuf2, dest, size, count, ld, s,   \
                           b, t);                                               \
@@ -117,18 +118,21 @@ CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_HALF, __half)
                           b, t);                                               \
             break;                                                             \
         default:                                                               \
-            mc_error(&ucc_mc_cuda.super, "int dtype does not support "         \
-                                         "requested reduce op: %d", op);       \
+            mc_error(&ucc_mc_cuda.super,                                       \
+                     "int dtype does not support "                             \
+                     "requested reduce op: %s",                                \
+                     ucc_reduction_op_str(op));                                \
             return UCC_ERR_NOT_SUPPORTED;                                      \
         }                                                                      \
-    } while(0)
+    } while (0)
 
 #define DT_REDUCE_FLOAT(type, op, src1_p, src2_p, dest_p, size, count, ld, s,  \
-                        b, t) do {                                             \
+                        b, t)                                                  \
+    do {                                                                       \
         const type *sbuf1 = (const type *)src1_p;                              \
         const type *sbuf2 = (const type *)src2_p;                              \
-        type *dest = (type *)dest_p;                                           \
-        switch(op) {                                                           \
+        type *      dest  = (type *)dest_p;                                    \
+        switch (op) {                                                          \
         case UCC_OP_MAX:                                                       \
             LAUNCH_KERNEL(MAX, type, sbuf1, sbuf2, dest, size, count, ld, s,   \
                           b, t);                                               \
@@ -138,6 +142,7 @@ CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_HALF, __half)
                           b, t);                                               \
             break;                                                             \
         case UCC_OP_SUM:                                                       \
+        case UCC_OP_AVG:                                                       \
             LAUNCH_KERNEL(SUM, type, sbuf1, sbuf2, dest, size, count, ld, s,   \
                           b, t);                                               \
             break;                                                             \
@@ -146,12 +151,13 @@ CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_HALF, __half)
                           b, t);                                               \
             break;                                                             \
         default:                                                               \
-            mc_error(&ucc_mc_cuda.super, "float dtype does not support "       \
-                                         "requested reduce op: %d", op);       \
+            mc_error(&ucc_mc_cuda.super,                                       \
+                     "float dtype does not support "                           \
+                     "requested reduce op: %s",                                \
+                     ucc_reduction_op_str(op));                                \
             return UCC_ERR_NOT_SUPPORTED;                                      \
         }                                                                      \
-    } while(0)
-
+    } while (0)
 
 #ifdef __cplusplus
 extern "C" {
@@ -164,8 +170,8 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
                                       ucc_reduction_op_t op)
 {
     size_t        ld     = stride / ucc_dt_size(dt);
-    int           th     = MC_CUDA_CONFIG->reduce_num_threads;;
-    unsigned long bk     = (count + th - 1)/th;;
+    int           th     = MC_CUDA_CONFIG->reduce_num_threads;
+    unsigned long bk     = (count + th - 1)/th;
     cudaStream_t  stream;
 
     UCC_MC_CUDA_INIT_STREAM();
@@ -203,7 +209,8 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
                             stream, bk, th);
             break;
         default:
-            mc_error(&ucc_mc_cuda.super, "unsupported reduction type (%d)", dt);
+            mc_error(&ucc_mc_cuda.super, "unsupported reduction type (%s)", 
+                     ucc_datatype_str(dt));
             return UCC_ERR_NOT_SUPPORTED;
     }
     CUDACHECK(cudaGetLastError());

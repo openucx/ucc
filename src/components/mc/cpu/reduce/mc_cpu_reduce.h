@@ -125,14 +125,14 @@
         default:                                                               \
             mc_error(&ucc_mc_cpu.super,                                        \
                      "int dtype does not support "                             \
-                     "requested reduce op: %d",                                \
-                     op);                                                      \
+                     "requested reduce op: %s",                                \
+                     ucc_reduction_op_str(op));                                \
             return UCC_ERR_NOT_SUPPORTED;                                      \
         }                                                                      \
     } while (0)
 
-#define DO_DT_REDUCE_FLOAT(type, op, src1_p, src2_p, dest_p, size, count,      \
-                           stride)                                             \
+#define DO_DT_REDUCE_FLOAT(type, reduce_op, src1_p, src2_p, dest_p, size,      \
+                           count, stride)                                      \
     do {                                                                       \
         const type *restrict s1 = (const type *restrict)src1_p;                \
         const type *restrict s2 = (const type *restrict)src2_p;                \
@@ -140,7 +140,7 @@
         ucc_assert((ptrdiff_t)d <= (ptrdiff_t)src2_p ||                        \
                    (ptrdiff_t)d > (ptrdiff_t)src2_p + (size - 1) * stride +    \
                                       count * sizeof(type));                   \
-        switch (op) {                                                          \
+        switch (reduce_op) {                                                   \
         case UCC_OP_MAX:                                                       \
             DO_DT_REDUCE_WITH_OP(s1, s2, d, size, count, stride, DO_OP_MAX);   \
             break;                                                             \
@@ -148,6 +148,7 @@
             DO_DT_REDUCE_WITH_OP(s1, s2, d, size, count, stride, DO_OP_MIN);   \
             break;                                                             \
         case UCC_OP_SUM:                                                       \
+        case UCC_OP_AVG:                                                       \
             DO_DT_REDUCE_WITH_OP(s1, s2, d, size, count, stride, DO_OP_SUM);   \
             break;                                                             \
         case UCC_OP_PROD:                                                      \
@@ -156,8 +157,32 @@
         default:                                                               \
             mc_error(&ucc_mc_cpu.super,                                        \
                      "float dtype does not support "                           \
-                     "requested reduce op: %d",                                \
-                     op);                                                      \
+                     "requested reduce op: %s",                                \
+                     ucc_reduction_op_str(reduce_op));                         \
+            return UCC_ERR_NOT_SUPPORTED;                                      \
+        }                                                                      \
+    } while (0)
+
+#define VEC_OP(_d, OP)                                                         \
+    do {                                                                       \
+        size_t _i;                                                             \
+        for (_i = 0; _i < count; _i++) {                                       \
+            _d[_i] = OP(_d[_i], alpha);                                        \
+        }                                                                      \
+    } while (0)
+
+#define DO_VEC_OP(type, _d)                                                    \
+    do {                                                                       \
+        type *restrict d  = (type * restrict) _d;                              \
+        switch (vector_op) {                                                   \
+        case UCC_OP_PROD:                                                      \
+            VEC_OP(d, DO_OP_PROD);                                             \
+            break;                                                             \
+        default:                                                               \
+            mc_error(&ucc_mc_cpu.super,                                        \
+                     "reduce multi with alpha does not support "               \
+                     "requested vector op: %s",                                \
+                     ucc_reduction_op_str(vector_op));                         \
             return UCC_ERR_NOT_SUPPORTED;                                      \
         }                                                                      \
     } while (0)
@@ -176,4 +201,12 @@ REDUCE_FN_DECLARE(uint32);
 REDUCE_FN_DECLARE(uint64);
 REDUCE_FN_DECLARE(float);
 REDUCE_FN_DECLARE(double);
+
+#define REDUCE_ALPHA_FN_DECLARE(_type)                                         \
+    ucc_status_t ucc_mc_cpu_reduce_multi_alpha_##_type(                        \
+        const void *src1, const void *src2, void *dst, size_t n_vectors,       \
+        size_t count, size_t stride, ucc_reduction_op_t reduce_op,             \
+        ucc_reduction_op_t vector_op, _type alpha)
+REDUCE_ALPHA_FN_DECLARE(float);
+REDUCE_ALPHA_FN_DECLARE(double);
 #endif

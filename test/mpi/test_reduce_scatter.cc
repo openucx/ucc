@@ -75,6 +75,7 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
 
 ucc_status_t TestReduceScatter::check()
 {
+    ucc_status_t status;
     int comm_rank, comm_size;
     size_t block_size, block_count;
 
@@ -83,8 +84,15 @@ ucc_status_t TestReduceScatter::check()
     block_size  = msgsize / comm_size;
     block_count = block_size / ucc_dt_size(dt);
     MPI_Reduce_scatter_block(inplace ? MPI_IN_PLACE : check_sbuf, check_rbuf,
-                             block_count, ucc_dt_to_mpi(dt), ucc_op_to_mpi(op),
+                             block_count, ucc_dt_to_mpi(dt),
+                             op == UCC_OP_AVG ? MPI_SUM : ucc_op_to_mpi(op),
                              team.comm);
+    if (op == UCC_OP_AVG) {
+        status = divide_buffer(check_rbuf, team.team->size, block_count, dt);
+        if (status != UCC_OK) {
+            return status;
+        }
+    }
     if (inplace) {
         return compare_buffers(PTR_OFFSET(rbuf, comm_rank * block_size),
                                check_rbuf, block_count, dt, mem_type);

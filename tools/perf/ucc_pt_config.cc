@@ -18,10 +18,8 @@ ucc_pt_config::ucc_pt_config() {
 }
 
 const std::map<std::string, ucc_reduction_op_t> ucc_pt_op_map = {
-    {"sum", UCC_OP_SUM},
-    {"prod", UCC_OP_PROD},
-    {"min", UCC_OP_MIN},
-    {"max", UCC_OP_MAX},
+    {"sum", UCC_OP_SUM}, {"prod", UCC_OP_PROD}, {"min", UCC_OP_MIN},
+    {"max", UCC_OP_MAX}, {"avg", UCC_OP_AVG},
 };
 
 const std::map<std::string, ucc_coll_type_t> ucc_pt_coll_map = {

@@ -5,14 +5,12 @@
  */
 
 #include "config.h"
-#include "tl_ucp.h"
 #include "allreduce.h"
 #include "core/ucc_progress_queue.h"
 #include "tl_ucp_sendrecv.h"
 #include "coll_patterns/sra_knomial.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
-#include "core/ucc_mc.h"
 #include "../reduce_scatter/reduce_scatter.h"
 #include "../allgather/allgather.h"
 

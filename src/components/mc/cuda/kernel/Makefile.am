@@ -14,8 +14,9 @@ LINK = $(LIBTOOL) --mode=link $(CC) -o $@
 
 comp_noinst = libucc_mc_cuda_kernels.la
 
-libucc_mc_cuda_kernels_la_SOURCES  = mc_cuda_reduce.cu \
-                                     mc_cuda_reduce_multi.cu \
+libucc_mc_cuda_kernels_la_SOURCES  = mc_cuda_reduce.cu              \
+                                     mc_cuda_reduce_multi.cu        \
+                                     mc_cuda_reduce_multi_alpha.cu  \
                                      mc_cuda_wait_kernel.cu
 libucc_mc_cuda_kernels_la_CPPFLAGS =
 

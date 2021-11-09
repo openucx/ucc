@@ -108,6 +108,13 @@ typedef struct ucc_mc_ops {
     ucc_status_t (*reduce_multi)(const void *src1, const void *src2, void *dst,
                                  size_t n_vectors, size_t count, size_t stride,
                                  ucc_datatype_t dt, ucc_reduction_op_t op);
+    ucc_status_t (*reduce_multi_alpha)(const void *src1, const void *src2,
+                                       void *dst, size_t n_vectors,
+                                       size_t count, size_t stride,
+                                       ucc_datatype_t     dt,
+                                       ucc_reduction_op_t reduce_op,
+                                       ucc_reduction_op_t vector_op,
+                                       double             alpha);
     ucc_status_t (*memcpy)(void *dst, const void *src, size_t len,
                            ucc_memory_type_t dst_mem,
                            ucc_memory_type_t src_mem);

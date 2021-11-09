@@ -18,6 +18,7 @@ extern "C" {
 }
 BEGIN_C_DECLS
 #include "core/ucc_mc.h"
+#include "core/ucc_team.h"
 #include "utils/ucc_math.h"
 END_C_DECLS
 #ifdef HAVE_CUDA
@@ -373,4 +374,7 @@ void init_buffer(void *buf, size_t count, ucc_datatype_t dt,
 
 ucc_status_t compare_buffers(void *rst, void *expected, size_t count,
                              ucc_datatype_t dt, ucc_memory_type_t mt);
+
+ucc_status_t divide_buffer(void *expected, size_t divider, size_t count,
+                           ucc_datatype_t dt);
 #endif

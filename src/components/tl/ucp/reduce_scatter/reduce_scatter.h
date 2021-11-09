@@ -5,8 +5,7 @@
  */
 #ifndef REDUCE_SCATTER_H_
 #define REDUCE_SCATTER_H_
-#include "../tl_ucp.h"
-#include "../tl_ucp_coll.h"
+#include "../tl_ucp_reduce.h"
 
 /* Base interface signature: uses reduce_scatter_kn_radix from config. */
 

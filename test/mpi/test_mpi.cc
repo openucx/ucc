@@ -309,6 +309,12 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                 c == UCC_COLL_TYPE_REDUCE_SCATTER) {
                                 for (auto dt : dtypes) {
                                     for (auto op : ops) {
+                                        if (op == UCC_OP_AVG &&
+                                            !(dt == UCC_DT_FLOAT16 ||
+                                              dt == UCC_DT_FLOAT32 ||
+                                              dt == UCC_DT_FLOAT64)) {
+                                            continue;
+                                        }
                                         auto tc = TestCase::init(c, team, r, m,
                                                                  inplace, mt, s,
                                                                  dt, op);

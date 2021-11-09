@@ -4,7 +4,6 @@
  * See file LICENSE for terms.
  */
 #include "config.h"
-#include "tl_ucp.h"
 #include "reduce.h"
 
 ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *task);

@@ -70,13 +70,23 @@ ucc_status_t TestAllreduce::check()
     size_t      count = args.dst.info.count;
     MPI_Request req;
     int         completed;
+    ucc_status_t status;
 
     MPI_Iallreduce(inplace ? MPI_IN_PLACE : check_sbuf, check_rbuf, count,
-                   ucc_dt_to_mpi(dt), ucc_op_to_mpi(op), team.comm, &req);
+                   ucc_dt_to_mpi(dt),
+                   op == UCC_OP_AVG ? MPI_SUM : ucc_op_to_mpi(op), team.comm,
+                   &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
     } while(!completed);
+
+    if (op == UCC_OP_AVG) {
+        status = divide_buffer(check_rbuf, team.team->size, count, dt);
+        if (status != UCC_OK) {
+            return status;
+        }
+    }
 
     return compare_buffers(rbuf, check_rbuf, count, dt, mem_type);
 }

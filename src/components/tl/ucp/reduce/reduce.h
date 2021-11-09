@@ -5,9 +5,7 @@
  */
 #ifndef REDUCE_H_
 #define REDUCE_H_
-#include "../tl_ucp.h"
-#include "../tl_ucp_coll.h"
-#include "core/ucc_mc.h"
+#include "../tl_ucp_reduce.h"
 
 /* A set of convenience macros used to implement sw based progress
    of the reduce algorithm that uses kn pattern */
