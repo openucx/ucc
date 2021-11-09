@@ -35,10 +35,10 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
                          ucc_coll_task_t **task)
 {
     ucc_cl_hier_team_t  *cl_team = ucc_derived_of(team, ucc_cl_hier_team_t);
+    ucc_coll_task_t     *tasks[MAX_AR_RAB_TASKS] = {NULL};
     ucc_schedule_t      *schedule;
     ucc_status_t         status;
     ucc_base_coll_args_t args;
-    ucc_coll_task_t     *tasks[MAX_AR_RAB_TASKS];
     int                  n_tasks, i;
 
     schedule = &ucc_cl_hier_get_schedule(cl_team)->super.super;

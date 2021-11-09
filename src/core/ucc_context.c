@@ -165,6 +165,7 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
             if (!cl_cfg) {
                 ucc_error("required CL %s is not part of the context",
                           ucc_cl_names[required_cls[i]]);
+                ucc_free(required_cls);
                 return UCC_ERR_INVALID_PARAM;
             }
             status = ucc_config_parser_set_value(
@@ -174,6 +175,7 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
                 ucc_error("failed to modify CL \"%s\" configuration, name %s, "
                           "value %s",
                           cl_cfg->cl_lib->iface->super.name, name, value);
+                ucc_free(required_cls);
                 return status;
             }
         }

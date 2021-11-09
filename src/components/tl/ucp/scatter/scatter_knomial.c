@@ -58,7 +58,6 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_kn_radix_t         radix     = task->scatter_kn.p.radix;
     uint8_t                node_type = task->scatter_kn.p.node_type;
     ucc_knomial_pattern_t *p         = &task->scatter_kn.p;
-    void                  *sbuf      = args->src.info.buffer;
     void                  *rbuf      = args->dst.info.buffer;
     ucc_memory_type_t      mem_type  = args->src.info.mem_type;
     size_t                 count     = args->src.info.count;
@@ -67,6 +66,7 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t             root      = (ucc_rank_t)args->root;
     ucc_rank_t             size      = team->size;
     ucc_rank_t             rank      = VRANK(team->rank, root, size);
+    void                  *sbuf;
     ucc_rank_t             team_size = team->size - p->n_extra;
     ucc_rank_t             peer, vroot, vpeer, peer_recv_dist;
     ucc_rank_t             step_radix, peer_seg_index, local_seg_index;
