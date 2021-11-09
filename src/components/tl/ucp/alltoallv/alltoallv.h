@@ -30,8 +30,8 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task);
 
 #define ALLTOALLV_CHECK_USERDEFINED_DT(_args, _team)                \
     do {                                                            \
-        if ((_args.src.info_v.datatype == UCC_DT_USERDEFINED) ||    \
-            (_args.dst.info_v.datatype == UCC_DT_USERDEFINED)) {    \
+        if (!UCC_DT_IS_PREDEFINED((_args).src.info_v.datatype) ||   \
+            !UCC_DT_IS_PREDEFINED((_args).dst.info_v.datatype)) {   \
             tl_error(UCC_TL_TEAM_LIB(_team),                        \
                      "user defined datatype is not supported");     \
             status = UCC_ERR_NOT_SUPPORTED;                         \

@@ -8,6 +8,7 @@
 
 #include "config.h"
 #include "core/ucc_global_opts.h"
+#include "core/ucc_dt.h"
 #include <ucs/debug/log_def.h>
 
 #define UCC_LOG_LEVEL_ERROR UCS_LOG_LEVEL_ERROR
@@ -113,10 +114,6 @@ static inline const char* ucc_datatype_str(ucc_datatype_t dt)
         return "int128";
     case UCC_DT_UINT128:
         return "uint128";
-    case UCC_DT_USERDEFINED:
-        return "userdefined";
-    case UCC_DT_OPAQUE:
-        return "opaque";
     default:
         return NULL;
     }

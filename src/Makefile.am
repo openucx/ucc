@@ -48,6 +48,7 @@ noinst_HEADERS =                      \
 	core/ucc_topo.h                   \
 	core/ucc_sbgp.h                   \
 	core/ucc_service_coll.h           \
+	core/ucc_dt.h	                  \
 	schedule/ucc_schedule.h           \
 	schedule/ucc_schedule_pipelined.h \
 	coll_score/ucc_coll_score.h       \
@@ -97,6 +98,7 @@ libucc_la_SOURCES =                   \
 	core/ucc_topo.c                   \
 	core/ucc_sbgp.c                   \
 	core/ucc_service_coll.c           \
+	core/ucc_dt.c                     \
 	schedule/ucc_schedule.c           \
 	schedule/ucc_schedule_pipelined.c \
 	coll_score/ucc_coll_score.c       \

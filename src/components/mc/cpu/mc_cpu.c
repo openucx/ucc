@@ -196,7 +196,8 @@ static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
         return ucc_mc_cpu_reduce_multi_double(src1, src2, dst, n_vectors,
                                               count, stride, op);
     default:
-        mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%d)", dt);
+        mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
+                 ucc_datatype_str(dt));
         return UCC_ERR_NOT_SUPPORTED;
     }
     return UCC_OK;

@@ -114,6 +114,8 @@ typedef uint64_t ucc_aint_t;
 /* Reflects the definition in UCS - The i-th bit */
 #define UCC_BIT(i)               (1ul << (i))
 
+#define UCC_MASK(i)              (UCC_BIT(i) - 1)
+
 /* Reflects the definition in UCS */
 /**
  * @ingroup UCC_UTILS
@@ -156,6 +158,5 @@ typedef size_t ucc_context_addr_len_t;
  * the execution context and related queues.
  */
 typedef struct ucc_ee*      ucc_ee_h;
-
 
 #endif

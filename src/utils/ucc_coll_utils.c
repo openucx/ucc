@@ -158,7 +158,7 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
         return ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
                                              team->size) *
-               ucc_dt_size(args->dst.info.datatype);
+               ucc_dt_size(args->dst.info_v.datatype);
     case UCC_COLL_TYPE_ALLTOALLV:
     case UCC_COLL_TYPE_GATHERV:
     case UCC_COLL_TYPE_SCATTERV:
@@ -306,8 +306,7 @@ void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len)
         ct == UCC_COLL_TYPE_REDUCE) {
         ucc_snprintf_safe(tmp, sizeof(tmp), " %s %s",
                           ucc_datatype_str(args->args.src.info.datatype),
-                          (args->args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ?
-                          "userdefined" : ucc_reduction_op_str(args->args.reduce.predefined_op));
+                          ucc_reduction_op_str(args->args.op));
         left = len - strlen(str);
         strncat(str, tmp, left);
     }

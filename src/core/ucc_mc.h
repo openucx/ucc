@@ -8,6 +8,8 @@
 
 #include "ucc/api/ucc.h"
 #include "components/mc/base/ucc_mc_base.h"
+#include "core/ucc_dt.h"
+#include "utils/ucc_math.h"
 
 ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params);
 
@@ -88,12 +90,28 @@ static inline ucc_status_t ucc_dt_reduce(const void *src1, const void *src2,
                                          ucc_memory_type_t mem_type,
                                          ucc_coll_args_t *args)
 {
-    if (args->mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) {
+    if (!UCC_DT_IS_PREDEFINED(dt)) {
         return UCC_ERR_NOT_SUPPORTED; //TODO
     } else {
-        return ucc_mc_reduce(src1, src2, dst, count, dt,
-                             args->reduce.predefined_op, mem_type);
+        return ucc_mc_reduce(src1, src2, dst, count,
+                             dt, args->op, mem_type);
     }
+}
+
+
+static inline ucc_status_t ucc_mc_reduce_userdefined(void *src1, void *src2,
+                                                     void *dst, size_t n_vectors,
+                                                     size_t count, size_t stride,
+                                                     ucc_dt_generic_t *dt)
+{
+    int i;
+
+    dt->ops.reduce.cb(src1, src2, dst, count, dt->ops.reduce.ctx);
+    for (i = 1; i < n_vectors; i++) {
+        dt->ops.reduce.cb(PTR_OFFSET(src2, stride*i), dst, dst, count,
+                           dt->ops.reduce.ctx);
+    }
+    return UCC_OK;
 }
 
 static inline ucc_status_t ucc_dt_reduce_multi(void *src1, void *src2,
@@ -103,11 +121,13 @@ static inline ucc_status_t ucc_dt_reduce_multi(void *src1, void *src2,
                                                ucc_memory_type_t mem_type,
                                                ucc_coll_args_t *args)
 {
-    if (args->mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) {
-        return UCC_ERR_NOT_SUPPORTED; //TODO
+    if (!UCC_DT_IS_PREDEFINED(dt)) {
+        ucc_assert(UCC_DT_HAS_REDUCE(dt));
+        return ucc_mc_reduce_userdefined(src1, src2, dst, n_vectors, count,
+                                         stride, ucc_dt_to_generic(dt));
     } else {
         return ucc_mc_reduce_multi(src1, src2, dst, n_vectors, count, stride,
-                                   dt, args->reduce.predefined_op, mem_type);
+                                   dt, args->op, mem_type);
     }
 }
 
