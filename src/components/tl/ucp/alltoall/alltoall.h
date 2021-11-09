@@ -28,15 +28,15 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_init_common(ucc_tl_ucp_task_t *task);
         }                                                   \
     } while (0)
 
-#define ALLTOALL_CHECK_USERDEFINED_DT(_args, _team)             \
-    do {                                                        \
-        if ((_args.src.info.datatype == UCC_DT_USERDEFINED) ||  \
-            (_args.dst.info.datatype == UCC_DT_USERDEFINED)) {  \
-            tl_error(UCC_TL_TEAM_LIB(_team),                    \
-                     "user defined datatype is not supported"); \
-            status = UCC_ERR_NOT_SUPPORTED;                     \
-            goto out;                                           \
-        }                                                       \
+#define ALLTOALL_CHECK_USERDEFINED_DT(_args, _team  )             \
+    do {                                                          \
+        if (!UCC_DT_IS_PREDEFINED((_args).src.info.datatype) ||   \
+            !UCC_DT_IS_PREDEFINED((_args).dst.info.datatype)) {   \
+            tl_error(UCC_TL_TEAM_LIB(_team),                      \
+                     "user defined datatype is not supported");   \
+            status = UCC_ERR_NOT_SUPPORTED;                       \
+            goto out;                                             \
+        }                                                         \
     } while (0)
 
 #define ALLTOALL_TASK_CHECK(_args, _team)              \

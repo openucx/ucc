@@ -126,7 +126,7 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 // TODO remove once AVG is implemented
 #define CHECK_AVG_OP(_args, _team)                                             \
     do {                                                                       \
-        if (_args.reduce.predefined_op == UCC_OP_AVG) {                        \
+        if ((_args).op == UCC_OP_AVG) {                                        \
             tl_error(UCC_TL_TEAM_LIB(_team),                                   \
                      "Average reduction is not supported yet");                \
             status = UCC_ERR_NOT_SUPPORTED;                                    \

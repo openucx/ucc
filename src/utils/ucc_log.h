@@ -8,6 +8,8 @@
 
 #include "config.h"
 #include "core/ucc_global_opts.h"
+#include "core/ucc_op.h"
+#include "core/ucc_dt.h"
 #include <ucs/debug/log_def.h>
 
 #define UCC_LOG_LEVEL_ERROR UCS_LOG_LEVEL_ERROR
@@ -113,10 +115,6 @@ static inline const char* ucc_datatype_str(ucc_datatype_t dt)
         return "int128";
     case UCC_DT_UINT128:
         return "uint128";
-    case UCC_DT_USERDEFINED:
-        return "userdefined";
-    case UCC_DT_OPAQUE:
-        return "opaque";
     default:
         return NULL;
     }
@@ -124,33 +122,36 @@ static inline const char* ucc_datatype_str(ucc_datatype_t dt)
 
 static inline const char* ucc_reduction_op_str(ucc_reduction_op_t op)
 {
-    switch(op) {
-    case UCC_OP_SUM:
-        return "sum";
-    case UCC_OP_PROD:
-        return "prod";
-    case UCC_OP_MAX:
-        return "max";
-    case UCC_OP_MIN:
-        return "min";
-    case UCC_OP_LAND:
-        return "land";
-    case UCC_OP_LOR:
-        return "lor";
-    case UCC_OP_LXOR:
-        return "lxor";
-    case UCC_OP_BAND:
-        return "band";
-    case UCC_OP_BOR:
-        return "bor";
-    case UCC_OP_BXOR:
-        return "bxor";
-    case UCC_OP_MAXLOC:
-        return "maxloc";
-    case UCC_OP_MINLOC:
-        return "minloc";
-    default:
-        return NULL;
+    if (UCC_OP_IS_PREDEFINED(op)) {
+        switch(op) {
+        case UCC_OP_SUM:
+            return "sum";
+        case UCC_OP_PROD:
+            return "prod";
+        case UCC_OP_MAX:
+            return "max";
+        case UCC_OP_MIN:
+            return "min";
+        case UCC_OP_LAND:
+            return "land";
+        case UCC_OP_LOR:
+            return "lor";
+        case UCC_OP_LXOR:
+            return "lxor";
+        case UCC_OP_BAND:
+            return "band";
+        case UCC_OP_BOR:
+            return "bor";
+        case UCC_OP_BXOR:
+            return "bxor";
+        case UCC_OP_MAXLOC:
+            return "maxloc";
+        case UCC_OP_MINLOC:
+            return "minloc";
+        default:
+            return NULL;
+        }
     }
+    return "userdefined";
 }
 #endif

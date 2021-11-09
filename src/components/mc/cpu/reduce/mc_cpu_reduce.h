@@ -125,8 +125,8 @@
         default:                                                               \
             mc_error(&ucc_mc_cpu.super,                                        \
                      "int dtype does not support "                             \
-                     "requested reduce op: %d",                                \
-                     op);                                                      \
+                     "requested reduce op: %s",                                \
+                     ucc_reduction_op_str(op));                                \
             return UCC_ERR_NOT_SUPPORTED;                                      \
         }                                                                      \
     } while (0)
@@ -156,8 +156,8 @@
         default:                                                               \
             mc_error(&ucc_mc_cpu.super,                                        \
                      "float dtype does not support "                           \
-                     "requested reduce op: %d",                                \
-                     op);                                                      \
+                     "requested reduce op: %s",                                \
+                     ucc_reduction_op_str(op));                                \
             return UCC_ERR_NOT_SUPPORTED;                                      \
         }                                                                      \
     } while (0)

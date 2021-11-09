@@ -57,8 +57,6 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
         init_buffer(check_rbuf, count, dt, UCC_MEMORY_TYPE_HOST, rank);
     }
 
-    args.mask                |= UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
-    args.reduce.predefined_op = _op;
 
     if (inplace == TEST_NO_INPLACE) {
         args.src.info.buffer      = sbuf;
@@ -66,7 +64,7 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
         args.src.info.datatype    = _dt;
         args.src.info.mem_type    = _mt;
     }
-
+    args.op                   = _op;
     args.dst.info.buffer      = rbuf;
     args.dst.info.datatype    = _dt;
     args.dst.info.mem_type    = _mt;

@@ -26,17 +26,6 @@
 #define DO_OP_LXOR(_v1, _v2) ((!_v1) != (!_v2))
 #define DO_OP_BXOR(_v1, _v2) (_v1 ^ _v2)
 
-extern size_t ucc_dt_sizes[UCC_DT_USERDEFINED];
-static inline size_t ucc_dt_size(ucc_datatype_t dt)
-{
-    if (ucc_likely(dt < UCC_DT_USERDEFINED)) {
-        return ucc_dt_sizes[dt];
-    }
-    // TODO remove ucc_likely once custom datatype is implemented
-    return 0;
-}
-
-
 #define PTR_OFFSET(_ptr, _offset)                                              \
     ((void *)((ptrdiff_t)(_ptr) + (size_t)(_offset)))
 

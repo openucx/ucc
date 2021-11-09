@@ -14,38 +14,35 @@
 #include <sharp/api/sharp_coll.h>
 
 int ucc_to_sharp_dtype[] = {
-    [UCC_DT_INT8]        = SHARP_DTYPE_NULL,
-    [UCC_DT_INT16]       = SHARP_DTYPE_SHORT,
-    [UCC_DT_INT32]       = SHARP_DTYPE_INT,
-    [UCC_DT_INT64]       = SHARP_DTYPE_LONG,
-    [UCC_DT_INT128]      = SHARP_DTYPE_NULL,
-    [UCC_DT_UINT8]       = SHARP_DTYPE_NULL,
-    [UCC_DT_UINT16]      = SHARP_DTYPE_UNSIGNED_SHORT,
-    [UCC_DT_UINT32]      = SHARP_DTYPE_UNSIGNED,
-    [UCC_DT_UINT64]      = SHARP_DTYPE_UNSIGNED_LONG,
-    [UCC_DT_UINT128]     = SHARP_DTYPE_NULL,
-    [UCC_DT_FLOAT16]     = SHARP_DTYPE_FLOAT_SHORT,
-    [UCC_DT_FLOAT32]     = SHARP_DTYPE_FLOAT,
-    [UCC_DT_FLOAT64]     = SHARP_DTYPE_DOUBLE,
-    [UCC_DT_USERDEFINED] = SHARP_DTYPE_NULL,
-    [UCC_DT_OPAQUE]      = SHARP_DTYPE_NULL,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_INT8)]        = SHARP_DTYPE_NULL,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_INT16)]       = SHARP_DTYPE_SHORT,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_INT32)]       = SHARP_DTYPE_INT,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_INT64)]       = SHARP_DTYPE_LONG,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_INT128)]      = SHARP_DTYPE_NULL,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_UINT8)]       = SHARP_DTYPE_NULL,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_UINT16)]      = SHARP_DTYPE_UNSIGNED_SHORT,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_UINT32)]      = SHARP_DTYPE_UNSIGNED,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_UINT64)]      = SHARP_DTYPE_UNSIGNED_LONG,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_UINT128)]     = SHARP_DTYPE_NULL,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT16)]     = SHARP_DTYPE_FLOAT_SHORT,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT32)]     = SHARP_DTYPE_FLOAT,
+     [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT64)]     = SHARP_DTYPE_DOUBLE,
 };
 
 int ucc_to_sharp_reduce_op[] = {
-    [UCC_OP_USERDEFINED] = SHARP_OP_NULL,
-    [UCC_OP_SUM]         = SHARP_OP_SUM,
-    [UCC_OP_PROD]        = SHARP_OP_NULL,
-    [UCC_OP_MAX]         = SHARP_OP_MAX,
-    [UCC_OP_MIN]         = SHARP_OP_MIN,
-    [UCC_OP_LAND]        = SHARP_OP_LAND,
-    [UCC_OP_LOR]         = SHARP_OP_LOR,
-    [UCC_OP_LXOR]        = SHARP_OP_LXOR,
-    [UCC_OP_BAND]        = SHARP_OP_BAND,
-    [UCC_OP_BOR]         = SHARP_OP_BOR,
-    [UCC_OP_BXOR]        = SHARP_OP_BXOR,
-    [UCC_OP_MAXLOC]      = SHARP_OP_MAXLOC,
-    [UCC_OP_MINLOC]      = SHARP_OP_MINLOC,
-    [UCC_OP_AVG]         = SHARP_OP_NULL,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_SUM)]         = SHARP_OP_SUM,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_PROD)]        = SHARP_OP_NULL,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_MAX)]         = SHARP_OP_MAX,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_MIN)]         = SHARP_OP_MIN,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_LAND)]        = SHARP_OP_LAND,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_LOR)]         = SHARP_OP_LOR,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_LXOR)]        = SHARP_OP_LXOR,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_BAND)]        = SHARP_OP_BAND,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_BOR)]         = SHARP_OP_BOR,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_BXOR)]        = SHARP_OP_BXOR,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_MAXLOC)]      = SHARP_OP_MAXLOC,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_MINLOC)]      = SHARP_OP_MINLOC,
+    [UCC_OP_PREDEFINED_ID(UCC_OP_AVG)]         = SHARP_OP_NULL,
 };
 
 int ucc_to_sharp_memtype[] = {
@@ -181,8 +178,8 @@ ucc_status_t ucc_tl_sharp_allreduce_start(ucc_coll_task_t *coll_task)
     task->super.super.status = UCC_INPROGRESS;
     UCC_TL_SHARP_PROFILE_REQUEST_EVENT(coll_task, "sharp_allreduce_start", 0);
 
-    sharp_type = ucc_to_sharp_dtype[dt];
-    op_type    = ucc_to_sharp_reduce_op[args->reduce.predefined_op];
+    sharp_type = ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(dt)];
+    op_type    = ucc_to_sharp_reduce_op[UCC_OP_PREDEFINED_ID(args->op)];
     data_size  = ucc_dt_size(dt) * count;
 
     if (!UCC_IS_INPLACE(*args)) {
@@ -234,14 +231,15 @@ ucc_status_t ucc_tl_sharp_allreduce_init(ucc_tl_sharp_task_t *task)
 {
     ucc_coll_args_t *args = &TASK_ARGS(task);
 
-    if (args->mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) {
+    if (!UCC_OP_IS_PREDEFINED(args->op) ||
+        !UCC_DT_IS_PREDEFINED(args->dst.info.datatype)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (ucc_to_sharp_memtype[args->src.info.mem_type] == SHARP_MEM_TYPE_LAST ||
         ucc_to_sharp_memtype[args->dst.info.mem_type] == SHARP_MEM_TYPE_LAST ||
-        ucc_to_sharp_dtype[args->dst.info.datatype] == SHARP_DTYPE_NULL ||
-        ucc_to_sharp_reduce_op[args->reduce.predefined_op] == SHARP_OP_NULL) {
+        ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(args->dst.info.datatype)] == SHARP_DTYPE_NULL ||
+        ucc_to_sharp_reduce_op[UCC_OP_PREDEFINED_ID(args->op)] == SHARP_OP_NULL) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
