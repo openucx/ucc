@@ -87,6 +87,7 @@ gtest_SOURCES =                     \
 	core/test_topo.cc               \
 	core/test_service_coll.cc       \
 	core/test_timeout.cc            \
+	core/test_utils.cc              \
 	utils/test_string.cc            \
 	utils/test_ep_map.cc            \
 	utils/test_lock_free_queue.cc   \

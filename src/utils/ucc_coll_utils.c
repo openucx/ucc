@@ -158,7 +158,7 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
         return ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
                                              team->size) *
-               ucc_dt_size(args->dst.info.datatype);
+               ucc_dt_size(args->dst.info_v.datatype);
     case UCC_COLL_TYPE_ALLTOALLV:
     case UCC_COLL_TYPE_GATHERV:
     case UCC_COLL_TYPE_SCATTERV:
@@ -174,14 +174,14 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
                          ucc_dt_size(args->src.info.datatype);
     case UCC_COLL_TYPE_GATHER:
         return (root == team->rank)
-                   ? args->dst.info.count * ucc_dt_size(args->dst.info.datatype)
-                   : args->src.info.count * ucc_dt_size(args->src.info.datatype);
-//TODO should we multiply it by team_size ?
+                 ? args->dst.info.count * ucc_dt_size(args->dst.info.datatype)
+                 : args->src.info.count * ucc_dt_size(args->src.info.datatype) *
+                   team->size;
     case UCC_COLL_TYPE_SCATTER:
         return (root == team->rank)
-                   ? args->src.info.count * ucc_dt_size(args->src.info.datatype)
-                   : args->dst.info.count * ucc_dt_size(args->dst.info.datatype);
-//TODO should we multiply it by team_size ?
+                 ? args->src.info.count * ucc_dt_size(args->src.info.datatype)
+                 : args->dst.info.count * ucc_dt_size(args->dst.info.datatype) *
+                   team->size;
     default:
         break;
     }
