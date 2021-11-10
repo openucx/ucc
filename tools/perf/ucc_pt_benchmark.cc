@@ -36,6 +36,10 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
         coll = new ucc_pt_coll_reduce(cfg.dt, cfg.mt, cfg.op, cfg.inplace,
                                       comm);
         break;
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        coll = new ucc_pt_coll_reduce_scatter(cfg.dt, cfg.mt, cfg.op,
+                                              cfg.inplace, comm);
+        break;
     default:
         throw std::runtime_error("not supported collective");
     }
