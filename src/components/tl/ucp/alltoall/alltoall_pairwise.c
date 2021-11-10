@@ -31,8 +31,8 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_progress(ucc_coll_task_t *coll_task)
     ptrdiff_t          rbuf  = (ptrdiff_t)TASK_ARGS(task).dst.info.buffer;
     ucc_memory_type_t  smem  = TASK_ARGS(task).src.info.mem_type;
     ucc_memory_type_t  rmem  = TASK_ARGS(task).dst.info.mem_type;
-    ucc_rank_t         grank = team->rank;
-    ucc_rank_t         gsize = team->size;
+    ucc_rank_t         grank = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         gsize = UCC_TL_TEAM_SIZE(team);
     ucc_rank_t         peer;
     int                polls = 0;
     int                posts, nreqs;

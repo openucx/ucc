@@ -70,7 +70,8 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_kn_radix_t       radix, cfg_radix;
 
     cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.bcast_sag_kn_radix;
-    radix = ucc_knomial_pattern_get_min_radix(cfg_radix, tl_team->size, count);
+    radix = ucc_knomial_pattern_get_min_radix(cfg_radix,
+                                              UCC_TL_TEAM_SIZE(tl_team), count);
 
     /* 1st step of bcast: knomial scatter */
     args.args.dst.info.buffer   = args.args.src.info.buffer;

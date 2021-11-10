@@ -17,30 +17,30 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
     ucc_tl_nccl_context_t *ctx    =
         ucc_derived_of(tl_context, ucc_tl_nccl_context_t);
     ucc_status_t status;
+    ucc_rank_t size;
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params->team);
-    self->oob       = params->params.oob;
-    self->size      = self->oob.n_oob_eps;
-    self->rank      = params->rank;
-    self->unique_id = ucc_malloc(sizeof(ncclUniqueId) * (self->size + 1),
+    size = UCC_TL_TEAM_SIZE(self);
+    self->unique_id = ucc_malloc(sizeof(ncclUniqueId) * (size + 1),
                                  "tl_nccl_unique_id");
     if (!self->unique_id) {
         tl_error(ctx->super.super.lib,
                  "failed to allocate %zd bytes for unique_id array",
-                 sizeof(ncclUniqueId) * (self->size + 1));
+                 sizeof(ncclUniqueId) * (size + 1));
         return UCC_ERR_NO_MEMORY;
     }
-    if (self->rank == 0) {
+    if (UCC_TL_TEAM_RANK(self) == 0) {
         ncclResult_t st;
-        st = ncclGetUniqueId(&self->unique_id[self->size]);
+        st = ncclGetUniqueId(&self->unique_id[size]);
         if (st != ncclSuccess) {
             tl_error(ctx->super.super.lib, "failed to get unique id");
-            memset(&self->unique_id[self->size], 0, sizeof(ncclUniqueId));
+            memset(&self->unique_id[size], 0, sizeof(ncclUniqueId));
         }
     }
-    status = self->oob.allgather(&self->unique_id[self->size], self->unique_id,
-                                 sizeof(ncclUniqueId), self->oob.coll_info,
-                                 &self->oob_req);
+    status = UCC_TL_TEAM_OOB(self).allgather(
+        &self->unique_id[size], self->unique_id,
+        sizeof(ncclUniqueId), UCC_TL_TEAM_OOB(self).coll_info,
+        &self->oob_req);
     if (status != UCC_OK) {
         tl_error(ctx->super.super.lib, "failed to start oob allgather");
         goto free_unique_id;
@@ -76,16 +76,17 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
     ucc_status_t status;
     ncclResult_t nccl_status;
     ncclUniqueId errorid;
-    status = team->oob.req_test(team->oob_req);
+
+    status = UCC_TL_TEAM_OOB(team).req_test(team->oob_req);
     if (status == UCC_INPROGRESS) {
         return UCC_INPROGRESS;
     }
     if (status != UCC_OK) {
-        team->oob.req_free(team->oob_req);
+        UCC_TL_TEAM_OOB(team).req_free(team->oob_req);
         tl_error(tl_team->context->lib, "oob req test failed");
         goto free_unique_id;
     }
-    status = team->oob.req_free(team->oob_req);
+    status = UCC_TL_TEAM_OOB(team).req_free(team->oob_req);
     if (status != UCC_OK) {
         tl_error(tl_team->context->lib, "oob req free failed");
         goto free_unique_id;
@@ -100,8 +101,8 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
     CUDACHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
                    cudaStreamNonBlocking), free_unique_id, status,
                    tl_team->context->lib);
-    nccl_status = ncclCommInitRank(&team->nccl_comm,team->size,
-                                   team->unique_id[0], team->rank);
+    nccl_status = ncclCommInitRank(&team->nccl_comm, UCC_TL_TEAM_SIZE(team),
+                                   team->unique_id[0], UCC_TL_TEAM_RANK(team));
     if (nccl_status != ncclSuccess) {
         tl_info(tl_team->context->lib, "NCCL error %d %s",
                 nccl_status, ncclGetErrorString(nccl_status));
@@ -264,7 +265,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
 
     if (strlen(lib->super.super.score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->super.super.score_str, score, team->size,
+            lib->super.super.score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_nccl_coll_init, &team->super.super,
             UCC_TL_NCCL_DEFAULT_SCORE, NULL);
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */

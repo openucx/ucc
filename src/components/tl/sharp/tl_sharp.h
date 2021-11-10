@@ -86,10 +86,7 @@ UCC_CLASS_DECLARE(ucc_tl_sharp_context_t, const ucc_base_context_params_t *,
 typedef struct ucc_tl_sharp_team {
     ucc_tl_team_t          super;
     void                  *oob_req;
-    ucc_team_oob_coll_t    oob;
     struct sharp_coll_comm *sharp_comm;
-    ucc_rank_t             rank;
-    ucc_rank_t             size;
     ucc_tl_sharp_oob_ctx_t oob_ctx;
 } ucc_tl_sharp_team_t;
 

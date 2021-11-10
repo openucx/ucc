@@ -23,17 +23,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_INVALID_PARAM;
     }
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params->team);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
-    self->oob              = params->params.oob;
-    self->size             = self->oob.n_oob_eps;
-    self->rank             = params->rank;
     self->oob_ctx.ctx      = self;
     self->oob_ctx.ctx_oob  = NULL;
-    self->oob_ctx.team_oob = &self->oob;
+    self->oob_ctx.team_oob = &UCC_TL_TEAM_OOB(self);
 
-    comm_spec.rank              = self->rank;;
-    comm_spec.size              = self->size;
+    comm_spec.rank              = UCC_TL_TEAM_RANK(self);
+    comm_spec.size              = UCC_TL_TEAM_SIZE(self);
     comm_spec.group_world_ranks = NULL;
     comm_spec.oob_ctx           = &self->oob_ctx;
 
@@ -151,7 +148,7 @@ ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t   *tl_team,
 
     if (strlen(lib->super.super.score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->super.super.score_str, score, team->size,
+            lib->super.super.score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_sharp_coll_init, &team->super.super,
             UCC_TL_SHARP_DEFAULT_SCORE, NULL);
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */

@@ -56,6 +56,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
         return UCC_ERR_NO_MEMORY;
     }
     team->bp.rank                 = team->rank;
+    team->bp.size                 = team->size;
     team->bp.team                 = team;
     team->bp.map.type             = UCC_EP_MAP_FULL;
     team->state                   = UCC_TEAM_ADDR_EXCHANGE;

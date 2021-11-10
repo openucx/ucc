@@ -17,8 +17,8 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t *task     = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t   *args     = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team     = TASK_TEAM(task);
-    ucc_rank_t         grank    = team->rank;
-    ucc_rank_t         gsize    = team->size;
+    ucc_rank_t         grank    = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         gsize    = UCC_TL_TEAM_SIZE(team);
     ptrdiff_t          rbuf     = (ptrdiff_t)args->dst.info_v.buffer;
     ucc_memory_type_t  rmem     = args->dst.info_v.mem_type;
     size_t             rdt_size = ucc_dt_size(args->dst.info_v.datatype);
@@ -69,7 +69,7 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     ptrdiff_t          rbuf  = (ptrdiff_t)TASK_ARGS(task).dst.info_v.buffer;
     ucc_memory_type_t  smem  = TASK_ARGS(task).src.info.mem_type;
     ucc_memory_type_t  rmem  = TASK_ARGS(task).dst.info_v.mem_type;
-    ucc_rank_t         grank = team->rank;
+    ucc_rank_t         grank = UCC_TL_TEAM_RANK(team);
     size_t             data_size, data_displ, rdt_size;
     ucc_status_t       status;
 

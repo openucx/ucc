@@ -112,8 +112,8 @@ static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
     task->n_polls            = ctx->cfg.n_polls;
     task->super.team         = &team->super.super;
     task->subset.map.type    = UCC_EP_MAP_FULL;
-    task->subset.map.ep_num  = team->size;
-    task->subset.myrank      = team->rank;
+    task->subset.map.ep_num  = UCC_TL_TEAM_SIZE(team);
+    task->subset.myrank      = UCC_TL_TEAM_RANK(team);
     ucc_tl_ucp_task_reset(task);
     return task;
 }

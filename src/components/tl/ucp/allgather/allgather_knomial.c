@@ -33,8 +33,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_datatype_t         dt         = args->dst.info.datatype;
     size_t                 dt_size    = ucc_dt_size(dt);
     size_t                 data_size  = count * dt_size;
-    ucc_rank_t             size       = team->size;
-    ucc_rank_t             rank       = team->rank;
+    ucc_rank_t             rank       = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t             size       = UCC_TL_TEAM_SIZE(team);
     ucc_rank_t             broot      = 0;
     void                  *sbuf;
     ptrdiff_t              peer_seg_offset, local_seg_offset;
@@ -142,8 +142,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t   *args  = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
-    ucc_rank_t         size  = team->size;
-    ucc_rank_t         rank  = team->rank;
+    ucc_rank_t         rank       = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         size       = UCC_TL_TEAM_SIZE(team);
     ucc_kn_radix_t     radix = task->allgather_kn.p.radix;
     ucc_rank_t         broot = 0;
     ucc_status_t       status;
@@ -187,8 +187,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     ucc_coll_task_t **task_h, ucc_kn_radix_t radix)
 {
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_rank_t         size    = tl_team->size;
-    ucc_rank_t         rank    = tl_team->rank;
+    ucc_rank_t         rank    = UCC_TL_TEAM_RANK(tl_team);
+    ucc_rank_t         size    = UCC_TL_TEAM_SIZE(tl_team);
     ucc_rank_t         broot   = 0;
     ucc_tl_ucp_task_t *task;
 
@@ -210,7 +210,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
                                                ucc_coll_task_t     **task_h)
 {
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_rank_t         size    = tl_team->size;
+    ucc_rank_t         size    = UCC_TL_TEAM_SIZE(tl_team);
     ucc_kn_radix_t     radix;
 
     radix = ucc_min(UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allgather_kn_radix, size);

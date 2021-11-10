@@ -91,14 +91,8 @@ typedef struct ucc_tl_ucp_task ucc_tl_ucp_task_t;
 typedef struct ucc_tl_ucp_team {
     ucc_tl_team_t              super;
     ucc_status_t               status;
-    ucc_rank_t                 size;
-    ucc_rank_t                 rank;
-    uint32_t                   id;
-    uint32_t                   scope;
-    uint32_t                   scope_id;
     uint32_t                   seq_num;
     ucc_tl_ucp_task_t         *preconnect_task;
-    ucc_ep_map_t               map; /*< map to the core ucc team */
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
@@ -122,7 +116,7 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 
 #define UCC_TL_CTX_OOB(_ctx) ((_ctx)->super.super.ucc_context->params.oob)
 
-#define IS_SERVICE_TEAM(_team) ((_team)->scope == UCC_CL_LAST + 1)
+#define IS_SERVICE_TEAM(_team) ((_team)->super.super.params.scope == UCC_CL_LAST + 1)
 
 
 void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,

@@ -16,16 +16,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
 {
     ucc_tl_ucp_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_ucp_context_t);
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params->team);
+
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
              if all the necessary ranks mappings are provided */
     self->preconnect_task    = NULL;
-    self->size               = params->params.oob.n_oob_eps;
-    self->scope              = params->scope;
-    self->scope_id           = params->scope_id;
-    self->rank               = params->rank;
-    self->id                 = params->id;
-    self->map                = params->map;
     self->seq_num            = 0;
     self->status             = UCC_INPROGRESS;
     tl_info(tl_context->lib, "posted tl team: %p", self);
@@ -48,9 +43,12 @@ ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 
 static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
 {
-    ucc_rank_t src, dst;
+    ucc_rank_t src, dst, size, rank;
     ucc_status_t status;
     int i;
+
+    size = UCC_TL_TEAM_SIZE(team);
+    rank = UCC_TL_TEAM_RANK(team);
     if (!team->preconnect_task) {
         team->preconnect_task = ucc_tl_ucp_get_task(team);
         team->preconnect_task->tag = 0;
@@ -58,9 +56,9 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
     if (UCC_INPROGRESS == ucc_tl_ucp_test(team->preconnect_task)) {
         return UCC_INPROGRESS;
     }
-    for (i = team->preconnect_task->send_posted; i < team->size; i++) {
-        src = (team->rank - i + team->size) % team->size;
-        dst = (team->rank + i) % team->size;
+    for (i = team->preconnect_task->send_posted; i < size; i++) {
+        src = (rank - i + size) % size;
+        dst = (rank + i) % size;
         status = ucc_tl_ucp_send_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, src, team,
                                     team->preconnect_task);
         if (UCC_OK != status) {
@@ -76,7 +74,7 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
         }
     }
     tl_debug(UCC_TL_TEAM_LIB(team), "preconnected tl team: %p, num_eps %d",
-             team, team->size);
+             team, size);
     ucc_tl_ucp_put_task(team->preconnect_task);
     team->preconnect_task = NULL;
     return UCC_OK;
@@ -87,10 +85,11 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     ucc_tl_ucp_team_t    *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
     ucc_status_t          status;
+
     if (team->status == UCC_OK) {
         return UCC_OK;
     }
-    if (team->size <= ctx->cfg.preconnect) {
+    if (UCC_TL_TEAM_SIZE(team) <= ctx->cfg.preconnect) {
         status = ucc_tl_ucp_team_preconnect(team);
         if (UCC_INPROGRESS == status) {
             return UCC_INPROGRESS;
@@ -125,7 +124,7 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     }
     for (i = 0; i < UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR; i++) {
         status = ucc_coll_score_update_from_str(
-            ucc_tl_ucp_default_alg_select_str[i], score, team->size,
+            ucc_tl_ucp_default_alg_select_str[i], score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_ucp_coll_init, &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
             ucc_tl_ucp_alg_id_to_init);
         if (UCC_OK != status) {
@@ -137,7 +136,7 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     }
     if (strlen(lib->super.super.score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->super.super.score_str, score, team->size, NULL,
+            lib->super.super.score_str, score, UCC_TL_TEAM_SIZE(team), NULL,
             &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
             ucc_tl_ucp_alg_id_to_init);
 

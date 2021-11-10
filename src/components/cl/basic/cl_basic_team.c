@@ -16,7 +16,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_team_t, ucc_base_context_t *cl_context,
     int                     i;
     ucc_status_t            status;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params->team);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params);
     self->tl_teams = ucc_malloc(sizeof(ucc_tl_team_t *) * ctx->n_tl_ctxs,
                                 "cl_basic_tl_teams");
     if (!self->tl_teams) {
@@ -174,7 +174,7 @@ ucc_status_t ucc_cl_basic_team_get_scores(ucc_base_team_t   *cl_team,
     }
     if (strlen(lib->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->score_str, *score, cl_team->team->size, NULL, cl_team,
+            lib->score_str, *score, UCC_CL_TEAM_SIZE(team), NULL, cl_team,
             UCC_CL_BASIC_DEFAULT_SCORE, NULL);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */

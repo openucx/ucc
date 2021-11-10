@@ -49,7 +49,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
         if (ucc_unlikely(UCS_PTR_IS_ERR(ucp_status))) {                        \
             tl_error(UCC_TL_TEAM_LIB(team),                                    \
                      "tag %u; dest %d; team_id %u; errmsg %s", task->tag,      \
-                     dest_group_rank, team->id,                                \
+                     dest_group_rank, team->super.super.params.id,             \
                      ucs_status_string(UCS_PTR_STATUS(ucp_status)));           \
             ucp_request_cancel(UCC_TL_UCP_WORKER(team), ucp_status);           \
             ucp_request_free(ucp_status);                                      \
@@ -73,8 +73,10 @@ static inline ucc_status_t ucc_tl_ucp_send_nb(void *buffer, size_t msglen,
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
-    ucp_tag = UCC_TL_UCP_MAKE_SEND_TAG(task->tag, team->rank, team->id,
-                                       team->scope_id, team->scope);
+    ucp_tag = UCC_TL_UCP_MAKE_SEND_TAG(task->tag, UCC_TL_TEAM_RANK(team),
+                                       team->super.super.params.id,
+                                       team->super.super.params.scope_id,
+                                       team->super.super.params.scope);
     req_param.op_attr_mask =
         UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_DATATYPE |
         UCP_OP_ATTR_FIELD_USER_DATA | UCP_OP_ATTR_FIELD_MEMORY_TYPE;
@@ -103,7 +105,9 @@ static inline ucc_status_t ucc_tl_ucp_recv_nb(void *buffer, size_t msglen,
     ucp_tag_t           ucp_tag, ucp_tag_mask;
 
     UCC_TL_UCP_MAKE_RECV_TAG(ucp_tag, ucp_tag_mask, task->tag, dest_group_rank,
-                             team->id, team->scope_id, team->scope);
+                             team->super.super.params.id,
+                             team->super.super.params.scope_id,
+                             team->super.super.params.scope);
     req_param.op_attr_mask =
         UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_DATATYPE |
         UCP_OP_ATTR_FIELD_USER_DATA | UCP_OP_ATTR_FIELD_MEMORY_TYPE;
