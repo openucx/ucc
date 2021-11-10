@@ -21,7 +21,7 @@ jobs:
     - name: Build UCX
       run: |
         cd /tmp/ucx && ./autogen.sh
-        ./contrib/configure-release --without-java --disable-numa --prefix $PWD/install
+        ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
         make -j install
     - uses: actions/checkout@v1
     - name: Build UCC
