@@ -174,9 +174,9 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
             break;
         }
     }
-    core_rank = ucc_ep_map_eval(team->map, peer);
-    ucc_assert(team->super.super.params.team);
-    peer = ucc_get_ctx_rank(team->super.super.params.team, core_rank);
+    core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
+    ucc_assert(UCC_TL_CORE_TEAM(team));
+    peer = ucc_get_ctx_rank(UCC_TL_CORE_TEAM(team), core_rank);
     if (NULL == ctx->remote_info[peer][*segment].rkey) {
         ucs_status_t ucs_status = ucp_ep_rkey_unpack(
             *ep, ctx->remote_info[peer][*segment].packed_key,

@@ -107,7 +107,6 @@ typedef struct ucc_tl_ucp_team {
     ucc_status_t               status;
     uint32_t                   seq_num;
     ucc_tl_ucp_task_t         *preconnect_task;
-    ucc_ep_map_t               map; /*< map to the core ucc team */
     void *                     va_base[MAX_NR_SEGMENTS];
     size_t                     base_length[MAX_NR_SEGMENTS];
 } ucc_tl_ucp_team_t;
