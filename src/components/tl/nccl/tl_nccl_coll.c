@@ -11,6 +11,7 @@
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
+#include "allgatherv/allgatherv.h"
 
 #define ncclOpUnsupported (ncclNumOps + 1)
 #define ncclDataTypeUnsupported (ncclNumTypes + 1)
@@ -59,6 +60,10 @@ ncclRedOp_t ucc_to_nccl_reduce_op[] = {
     [UCC_OP_MINLOC]      = (ncclRedOp_t)ncclOpUnsupported,
 };
 
+const char
+    *ucc_tl_nccl_default_alg_select_str[UCC_TL_NCCL_N_DEFAULT_ALG_SELECT_STR] = {
+        UCC_TL_NCCL_ALLGATHERV_DEFAULT_ALG_SELECT_STR};
+
 static inline ucc_status_t ucc_nccl_check_dt_supported(ucc_datatype_t dt1,
                                                        ucc_datatype_t dt2)
 {
@@ -67,6 +72,82 @@ static inline ucc_status_t ucc_nccl_check_dt_supported(ucc_datatype_t dt1,
         return UCC_ERR_NOT_SUPPORTED;
     }
     return UCC_OK;
+}
+
+ucc_tl_nccl_task_t * ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
+                                           ucc_base_team_t *team)
+{
+    ucc_tl_nccl_context_t *nccl_ctx  = ucc_derived_of(team->context,
+                                                      ucc_tl_nccl_context_t);
+    ucc_tl_nccl_task_t    *task;
+    ucc_status_t           status;
+
+    task = ucc_mpool_get(&nccl_ctx->req_mp);
+    ucc_coll_task_init(&task->super, coll_args, team);
+    UCC_TL_NCCL_PROFILE_REQUEST_NEW(task, "tl_nccl_task", 0);
+    task->super.finalize       = ucc_tl_nccl_coll_finalize;
+    task->super.triggered_post = ucc_tl_nccl_triggered_post;
+    task->completed            = NULL;
+    task->scratch              = NULL;
+    if (nccl_ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
+        status = ucc_mc_ee_create_event(&task->completed, UCC_EE_CUDA_STREAM);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ucc_mpool_put(task);
+            return NULL;
+        }
+    }
+    return task;
+}
+
+void ucc_tl_nccl_free_task(ucc_tl_nccl_task_t *task)
+{
+    UCC_TL_NCCL_PROFILE_REQUEST_FREE(task);
+    ucc_mpool_put(task);
+}
+
+ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
+                                        ucc_coll_task_t *coll_task)
+{
+    ucc_tl_nccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_status_t status;
+    ucc_ev_t *post_event;
+
+    ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
+    coll_task->ee = ee;
+    tl_info(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
+
+    status = coll_task->post(coll_task);
+    if (ucc_likely(status == UCC_OK)) {
+        /* TODO: mpool */
+        post_event = ucc_malloc(sizeof(ucc_ev_t), "event");
+        if (ucc_unlikely(post_event == NULL)) {
+            tl_error(UCC_TASK_LIB(task), "failed to allocate memory for event");
+            return UCC_ERR_NO_MEMORY;
+        }
+
+        post_event->ev_type = UCC_EVENT_COLLECTIVE_POST;
+        post_event->ev_context_size = 0;
+        post_event->req = &coll_task->super;
+        ucc_ee_set_event_internal(coll_task->ee, post_event,
+                                  &coll_task->ee->event_out_queue);
+    }
+    return status;
+}
+
+ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_nccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_status_t       status = UCC_OK ;
+
+    tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
+    if (task->completed) {
+        ucc_mc_ee_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
+    }
+    if (task->scratch) {
+        ucc_mc_free(task->scratch);
+    }
+    ucc_tl_nccl_free_task(task);
+    return status;
 }
 
 ucc_status_t ucc_tl_nccl_collective_sync(ucc_tl_nccl_task_t *task,
@@ -305,50 +386,6 @@ ucc_status_t ucc_tl_nccl_allgather_init(ucc_tl_nccl_task_t *task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_nccl_allgatherv_start(ucc_coll_task_t *coll_task)
-{
-    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args   = &TASK_ARGS(task);
-    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
-    ucc_rank_t          size   = UCC_TL_TEAM_SIZE(team);
-    ucc_ee_h            ee     = coll_task->ee;
-    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
-    ucc_status_t        status = UCC_OK;
-    void               *sbuf   = args->src.info.buffer;
-    ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info_v.buffer;
-    size_t sdt_size, rdt_size, count, displ;
-    ucc_rank_t peer;
-
-    task->super.super.status = UCC_INPROGRESS;
-    sdt_size                 = ucc_dt_size(args->src.info.datatype);
-    rdt_size                 = ucc_dt_size(args->dst.info_v.datatype);
-    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_allgatherv_start", 0);
-    NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    count = args->src.info.count;
-    if (count != 0) {
-        for (peer = 0; peer < size; peer++) {
-            NCCLCHECK_GOTO(ncclSend(sbuf, count * sdt_size, ncclChar, peer,
-                                    team->nccl_comm, stream),
-                        exit_coll, status, UCC_TL_TEAM_LIB(team));
-        }
-    }
-    for (peer = 0; peer < size; peer++) {
-        count = ucc_coll_args_get_count(args, args->dst.info_v.counts, peer);
-        if (count != 0) {
-            displ = ucc_coll_args_get_displacement(
-                args, args->dst.info_v.displacements, peer);
-            NCCLCHECK_GOTO(ncclRecv((void *)(rbuf + displ * rdt_size),
-                                    count * rdt_size, ncclChar, peer,
-                                    team->nccl_comm, stream),
-                        exit_coll, status, UCC_TL_TEAM_LIB(team));
-        }
-    }
-    NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
-    status = ucc_tl_nccl_collective_sync(task, stream);
-exit_coll:
-    return status;
-}
-
 ucc_status_t ucc_tl_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
 {
     if (UCC_IS_INPLACE(TASK_ARGS(task))) {
@@ -360,7 +397,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post     = ucc_tl_nccl_allgatherv_start;
+    task->super.post = ucc_tl_nccl_allgatherv_p2p_start;
     return UCC_OK;
 }
 
@@ -525,4 +562,49 @@ ucc_status_t ucc_tl_nccl_barrier_init(ucc_tl_nccl_task_t *task)
     task->super.post = ucc_tl_nccl_allreduce_start;
 
     return UCC_OK;
+}
+
+static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
+{
+    switch (coll_type) {
+    case UCC_COLL_TYPE_ALLGATHERV:
+        return ucc_tl_nccl_allgatherv_alg_from_str(str);
+    default:
+        break;
+    }
+    return -1;
+}
+
+ucc_status_t ucc_tl_nccl_alg_id_to_init(int alg_id, const char *alg_id_str,
+                                        ucc_coll_type_t   coll_type,
+                                        ucc_memory_type_t mem_type, //NOLINT
+                                        ucc_base_coll_init_fn_t *init)
+{
+    ucc_status_t status = UCC_OK;
+    if (alg_id_str) {
+        alg_id = alg_id_from_str(coll_type, alg_id_str);
+    }
+
+    switch (coll_type) {
+    case UCC_COLL_TYPE_ALLGATHERV:
+        switch (alg_id) {
+        case UCC_TL_NCCL_ALLGATHERV_ALG_P2P:
+            *init = ucc_tl_nccl_allgatherv_p2p_init;
+            break;
+        case UCC_TL_NCCL_ALLGATHERV_ALG_BCOPY:
+            *init = ucc_tl_nccl_allgatherv_bcopy_init;
+            break;
+        case UCC_TL_NCCL_ALLGATHERV_ALG_BCAST:
+            *init = ucc_tl_nccl_allgatherv_bcast_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        };
+        break;
+    default:
+        status = UCC_ERR_NOT_SUPPORTED;
+        break;
+    }
+    return status;
 }
