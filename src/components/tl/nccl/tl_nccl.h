@@ -93,7 +93,12 @@ typedef struct ucc_tl_nccl_task {
     ucc_status_t            host_status;
     ucc_status_t           *dev_status;
     void                   *completed;
-    ucc_mc_buffer_header_t *scratch;
+    union {
+        struct {
+            ucc_mc_buffer_header_t *scratch;
+            size_t                  max_count;
+        } allgatherv_bcopy;
+    };
 } ucc_tl_nccl_task_t;
 
 #define TASK_TEAM(_task)                                                       \

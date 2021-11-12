@@ -115,38 +115,35 @@ out:
 
 ucc_status_t ucc_tl_nccl_allgatherv_bcopy_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_coll_args_t    *args   = &TASK_ARGS(task);
-    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
-    ucc_rank_t          size   = UCC_TL_TEAM_SIZE(team);
-    ucc_ee_h            ee     = coll_task->ee;
-    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context :
-                                                       team->stream;
-    ucc_status_t        status = UCC_OK;
-    void               *sbuf   = args->src.info.buffer;
-    ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info_v.buffer;
+    ucc_tl_nccl_task_t *task    = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t    *args    = &TASK_ARGS(task);
+    ucc_tl_nccl_team_t *team    = TASK_TEAM(task);
+    ucc_rank_t          size    = UCC_TL_TEAM_SIZE(team);
+    ucc_ee_h            ee      = coll_task->ee;
+    cudaStream_t        stream  = (ee) ? (cudaStream_t) ee->ee_context :
+                                                        team->stream;
+    ucc_status_t        status  = UCC_OK;
+    void               *sbuf    = args->src.info.buffer;
+    ptrdiff_t           rbuf    = (ptrdiff_t)args->dst.info_v.buffer;
+    void               *scratch = task->allgatherv_bcopy.scratch->addr;
     size_t              max_count, rdt_size, sdt_size, displ, scount, rcount;
     ucc_rank_t          peer;
 
     task->super.super.status = UCC_INPROGRESS;
     UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_allgatherv_start", 0);
+    max_count = task->allgatherv_bcopy.max_count;
     scount    = args->src.info.count;
     rdt_size  = ucc_dt_size(args->dst.info_v.datatype);
     sdt_size  = ucc_dt_size(args->src.info.datatype);
-    max_count = ucc_coll_args_get_count(args, args->dst.info_v.counts, 0);
-    for (peer = 1; peer < size; peer++) {
-        max_count = ucc_max(ucc_coll_args_get_count(args,
-                            args->dst.info_v.counts, 0), max_count);
-    }
     if (max_count * rdt_size > scount * sdt_size) {
-        CUDACHECK_GOTO(cudaMemcpyAsync(PTR_OFFSET(task->scratch->addr,
+        CUDACHECK_GOTO(cudaMemcpyAsync(PTR_OFFSET(scratch,
                                        max_count * rdt_size * size), sbuf,
                                        scount * sdt_size,
                                        cudaMemcpyDeviceToDevice, stream),
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
-        sbuf = PTR_OFFSET(task->scratch->addr, max_count * rdt_size * size);
+        sbuf = PTR_OFFSET(scratch, max_count * rdt_size * size);
     }
-    NCCLCHECK_GOTO(ncclAllGather(sbuf, task->scratch->addr, max_count * rdt_size,
+    NCCLCHECK_GOTO(ncclAllGather(sbuf, scratch, max_count * rdt_size,
                                  ncclChar, team->nccl_comm, stream),
                    exit_coll, status, UCC_TL_TEAM_LIB(team));
     for (peer = 0; peer < size; peer++) {
@@ -156,7 +153,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcopy_start(ucc_coll_task_t *coll_task)
                                                 args->dst.info_v.displacements,
                                                 peer);
         CUDACHECK_GOTO(cudaMemcpyAsync(PTR_OFFSET(rbuf, displ * rdt_size),
-                                       PTR_OFFSET(task->scratch->addr,
+                                       PTR_OFFSET(scratch,
                                                   peer * max_count * rdt_size),
                                        rcount * rdt_size,
                                        cudaMemcpyDeviceToDevice, stream),
@@ -190,16 +187,18 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcopy_init(ucc_base_coll_args_t *coll_args,
     max_count = ucc_coll_args_get_count(args, args->dst.info_v.counts, 0);
     for (peer = 1; peer < team->params.size; peer++) {
         max_count = ucc_max(ucc_coll_args_get_count(args,
-                            args->dst.info_v.counts, 0), max_count);
+                            args->dst.info_v.counts, peer), max_count);
     }
+    task->allgatherv_bcopy.max_count = max_count;
     if (max_count * rdt_size > args->src.info.count * sdt_size) {
-        status = ucc_mc_alloc(&task->scratch, (team->params.size + 1) *
-                              max_count *
+        status = ucc_mc_alloc(&task->allgatherv_bcopy.scratch,
+                              (team->params.size + 1) * max_count *
                               ucc_dt_size(args->dst.info_v.datatype),
                               UCC_MEMORY_TYPE_CUDA);
 
     } else {
-        status = ucc_mc_alloc(&task->scratch, max_count * team->params.size *
+        status = ucc_mc_alloc(&task->allgatherv_bcopy.scratch, max_count *
+                              team->params.size *
                               ucc_dt_size(args->dst.info_v.datatype),
                               UCC_MEMORY_TYPE_CUDA);
     }
