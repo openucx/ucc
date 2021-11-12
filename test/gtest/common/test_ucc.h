@@ -236,4 +236,9 @@ public:
 
 void clear_buffer(void *_buf, size_t size, ucc_memory_type_t mt, uint8_t value);
 
+#define PREDEFINED_DTYPES \
+    ::testing::Values(UCC_DT_INT8, UCC_DT_INT16, UCC_DT_INT32, UCC_DT_INT64, UCC_DT_INT128,\
+                      UCC_DT_UINT8, UCC_DT_UINT16, UCC_DT_UINT32, UCC_DT_UINT64, UCC_DT_UINT128,\
+                      UCC_DT_FLOAT16, UCC_DT_FLOAT32, UCC_DT_FLOAT64)
+
 #endif

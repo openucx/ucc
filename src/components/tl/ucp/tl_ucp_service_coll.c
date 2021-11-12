@@ -20,9 +20,8 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
     ucc_tl_ucp_task_t   *task    = ucc_tl_ucp_get_task(tl_team);
     ucc_base_coll_args_t bargs   = {
         .args = {
-            .coll_type            = UCC_COLL_TYPE_ALLREDUCE,
-            .mask                 = UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS,
-            .reduce.predefined_op = op,
+            .coll_type    = UCC_COLL_TYPE_ALLREDUCE,
+            .op           = op,
             .src.info = {
                 .buffer   = sbuf,
                 .count    = count,
@@ -43,8 +42,8 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
     if (status != UCC_OK) {
         goto free_task;
     }
-    task->subset = subset;
-    task->tag  = UCC_TL_UCP_SERVICE_TAG;
+    task->subset         = subset;
+    task->tag            = UCC_TL_UCP_SERVICE_TAG;
     task->n_polls        = UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.oob_npolls;
     task->super.progress = ucc_tl_ucp_allreduce_knomial_progress;
     task->super.finalize = ucc_tl_ucp_allreduce_knomial_finalize;

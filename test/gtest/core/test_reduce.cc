@@ -27,12 +27,11 @@ class test_reduce : public UccCollArgs, public testing::Test {
                           sizeof(gtest_ucc_coll_ctx_t));
             ctxs[r]->args = coll;
 
-            coll->mask = UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
             coll->coll_type = UCC_COLL_TYPE_REDUCE;
-            coll->reduce.predefined_op = T::redop;
-            coll->root = root;
+            coll->op        = T::redop;
+            coll->root      = root;
             coll->src.info.mem_type = mem_type;
-            coll->src.info.count = (ucc_count_t)count;
+            coll->src.info.count    = (ucc_count_t)count;
             coll->src.info.datatype = dt;
 
             ctxs[r]->init_buf = ucc_malloc(ucc_dt_size(dt) * count,

@@ -149,7 +149,7 @@ UCC_KN_PHASE_EXTRA:
                 block_count, step_radix, local_seg_index);
             local_data  = PTR_OFFSET(sbuf, local_seg_offset * dt_size);
             reduce_data = task->reduce_scatter_kn.scratch;
-            is_avg      = args->reduce.predefined_op == UCC_OP_AVG &&
+            is_avg      = args->op == UCC_OP_AVG &&
                      (avg_pre_op ? ucc_knomial_pattern_loop_first_iteration(p)
                                  : ucc_knomial_pattern_loop_last_iteration(p));
 

@@ -55,9 +55,7 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         args.src.info.mem_type    = UCC_MEMORY_TYPE_UNKNOWN;
     }
 
-    args.mask                |= UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
-    args.reduce.predefined_op = _op;
-
+    args.op                   = _op;
     args.dst.info.buffer      = rbuf;
     args.dst.info.count       = count;
     args.dst.info.datatype    = _dt;
