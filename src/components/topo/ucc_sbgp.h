@@ -59,7 +59,7 @@ const char*  ucc_sbgp_str(ucc_sbgp_type_t type);
    the topo->sbgps[type]. The created sbgp can be in either of 3 states:
    - NOT_EXISTS: means for a given topo (ucc team layout) there is no such
      grouping or the result group is of size 1. Example: 1) type == SBGP_SOCKET
-     but processes are not bound to sockets at all; 2) type == SBGP_NEODE_LEADERS
+     but processes are not bound to sockets at all; 2) type == SBGP_NODE_LEADERS
      but team is entirely on single node.
    - ENABLED: means the sbgp size >= 2 and calling process is part of that subgroup
    - DISABLED: means the subgrouping exists for the given ucc team (topo) but

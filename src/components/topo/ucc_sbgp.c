@@ -53,7 +53,7 @@ static inline ucc_status_t sbgp_create_socket(ucc_topo_t *topo,
 {
     ucc_sbgp_t   *node_sbgp  = &topo->sbgps[UCC_SBGP_NODE];
     ucc_rank_t    nlr        = topo->node_leader_rank;
-    ucc_rank_t    sock_rank = 0, sock_size = 0;
+    ucc_rank_t    sock_rank  = 0, sock_size = 0;
     int           i, r, nlr_pos;
     ucc_rank_t   *local_ranks;
 
@@ -102,7 +102,7 @@ static inline ucc_status_t sbgp_create_socket(ucc_topo_t *topo,
 }
 
 static inline ucc_status_t sbgp_create_node(ucc_topo_t *topo,
-                                            ucc_sbgp_t *     sbgp)
+                                            ucc_sbgp_t *sbgp)
 {
     ucc_subset_t *set            = &topo->set;
     ucc_rank_t    group_size     = ucc_subset_size(set);
@@ -473,11 +473,12 @@ ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
             goto error;
         }
         if (sbgps[i].rank_map) {
-            sbgps[i].map = ucc_ep_map_from_array(&sbgps[i].rank_map, sbgps[i].group_size,
+            sbgps[i].map = ucc_ep_map_from_array(&sbgps[i].rank_map,
+                                                 sbgps[i].group_size,
                                                  ucc_subset_size(&topo->set), 1);
         }
     }
-    *_sbgps = sbgps;
+    *_sbgps  = sbgps;
     *n_sbgps = n_socket_groups;
     return UCC_OK;
 error:
