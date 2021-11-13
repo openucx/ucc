@@ -50,8 +50,7 @@ ucc_service_coll_req_init(ucc_team_t *team, ucc_subset_t *subset,
 
 ucc_status_t ucc_service_allreduce(ucc_team_t *team, void *sbuf, void *rbuf,
                                    ucc_datatype_t dt, size_t count,
-                                   ucc_reduction_op_t       op,
-                                   ucc_subset_t             subset,
+                                   ucc_reduction_op_t op, ucc_subset_t subset,
                                    ucc_service_coll_req_t **req)
 {
     ucc_tl_team_t  *steam;
@@ -153,8 +152,7 @@ static ucc_status_t ucc_internal_oob_free(void *request)
     return ucc_service_coll_finalize(req);
 }
 
-ucc_status_t ucc_internal_oob_init(ucc_team_t          *team,
-                                   ucc_subset_t         subset,
+ucc_status_t ucc_internal_oob_init(ucc_team_t *team, ucc_subset_t subset,
                                    ucc_team_oob_coll_t *oob)
 {
     ucc_internal_oob_coll_info_t *ci;

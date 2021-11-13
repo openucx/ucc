@@ -8,7 +8,8 @@
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_coll_utils.h"
 
-typedef enum ucc_sbgp_type_t {
+typedef enum ucc_sbgp_type_t
+{
     UCC_SBGP_NUMA,           /* Group of ranks on the same NUMA domain.
                                 This group does not exist if processes are
                                 not bound to a single NUMA node. */
@@ -36,7 +37,8 @@ typedef enum ucc_sbgp_type_t {
     UCC_SBGP_LAST
 } ucc_sbgp_type_t;
 
-typedef enum ucc_sbgp_status_t {
+typedef enum ucc_sbgp_status_t
+{
     UCC_SBGP_NOT_INIT,
     UCC_SBGP_DISABLED,
     UCC_SBGP_ENABLED,

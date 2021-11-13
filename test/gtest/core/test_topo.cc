@@ -29,7 +29,7 @@ class addr_storage {
 class test_topo : public ucc::test {
   public:
     ucc_context_topo_t *ctx_topo;
-    ucc_topo_t  *topo;
+    ucc_topo_t *        topo;
     test_topo()
     {
         ucc_constructor();
@@ -119,9 +119,9 @@ UCC_TEST_F(test_topo, node_reordered)
     SET_PI(s, 3, 0xabcd, 0, 3);
 
     /* subset from the world */
-    set.map.ep_num = team_size;
-    set.myrank     = 2; //will build subgroups from rank 2 perspective
-    set.map.type   = UCC_EP_MAP_ARRAY;
+    set.map.ep_num          = team_size;
+    set.myrank              = 2; //will build subgroups from rank 2 perspective
+    set.map.type            = UCC_EP_MAP_ARRAY;
     set.map.array.map       = team_ranks;
     set.map.array.elem_size = sizeof(ucc_rank_t);
 
@@ -218,7 +218,6 @@ UCC_TEST_F(test_topo, 2nodes)
     SET_PI(s, 5, 0xbbb, 0, 5);
     SET_PI(s, 6, 0xbbb, 1, 6);
     SET_PI(s, 7, 0xbbb, 0, 7);
-
 
     /* subset from the world */
     set.map.ep_num = team_size;
@@ -320,9 +319,9 @@ UCC_TEST_F(test_topo, 4nodes_half)
     SET_PI(s, 7, 0xddd, 1, 7);
 
     /* subset from the world */
-    set.map.ep_num = 4;
-    set.map.type   = UCC_EP_MAP_STRIDED;
-    set.map.strided.start = 0;
+    set.map.ep_num         = 4;
+    set.map.type           = UCC_EP_MAP_STRIDED;
+    set.map.strided.start  = 0;
     set.map.strided.stride = 1;
 
     set.myrank = 1; // from rank 1 perspective
@@ -376,9 +375,9 @@ UCC_TEST_F(test_topo, 4sockets_half)
 
 
     /* team from the world */
-    set.map.ep_num = 4;
-    set.map.type   = UCC_EP_MAP_STRIDED;
-    set.map.strided.start = 0;
+    set.map.ep_num         = 4;
+    set.map.type           = UCC_EP_MAP_STRIDED;
+    set.map.strided.start  = 0;
     set.map.strided.stride = 1;
 
     set.myrank = 1; // from rank 1 perspective
@@ -415,23 +414,23 @@ UCC_TEST_F(test_topo, 4sockets_half)
 
 UCC_TEST_F(test_topo, 4sockets_all)
 {
-    const ucc_rank_t ctx_size  = 16;
+    const ucc_rank_t ctx_size = 16;
     addr_storage     s(ctx_size);
     ucc_sbgp_t *     sbgps;
     ucc_subset_t     set;
     int              n_sbgps;
 
     /* simulates world proc array : 4 sockets, 2  ranks per socket*/
-    SET_PI(s, 0,  0xaaa, 0, 0);
-    SET_PI(s, 1,  0xaaa, 0, 1);
-    SET_PI(s, 2,  0xaaa, 2, 2);
-    SET_PI(s, 3,  0xaaa, 2, 3);
-    SET_PI(s, 4,  0xaaa, 3, 4);
-    SET_PI(s, 5,  0xaaa, 3, 5);
-    SET_PI(s, 6,  0xaaa, 4, 6);
-    SET_PI(s, 7,  0xaaa, 4, 7);
-    SET_PI(s, 8,  0xaaa, 0, 8);
-    SET_PI(s, 9,  0xaaa, 0, 9);
+    SET_PI(s, 0, 0xaaa, 0, 0);
+    SET_PI(s, 1, 0xaaa, 0, 1);
+    SET_PI(s, 2, 0xaaa, 2, 2);
+    SET_PI(s, 3, 0xaaa, 2, 3);
+    SET_PI(s, 4, 0xaaa, 3, 4);
+    SET_PI(s, 5, 0xaaa, 3, 5);
+    SET_PI(s, 6, 0xaaa, 4, 6);
+    SET_PI(s, 7, 0xaaa, 4, 7);
+    SET_PI(s, 8, 0xaaa, 0, 8);
+    SET_PI(s, 9, 0xaaa, 0, 9);
     SET_PI(s, 10, 0xaaa, 2, 10);
     SET_PI(s, 11, 0xaaa, 2, 11);
     SET_PI(s, 12, 0xaaa, 3, 12);
@@ -459,13 +458,10 @@ UCC_TEST_F(test_topo, 4sockets_all)
 
     /* world subset, 3 procs from each socket re-ordered*/
     ucc_topo_cleanup(topo);
-    ucc_rank_t ranks[] = {1, 9,  8,
-                          3, 2,  11,
-                          4, 13, 12,
-                          7, 14, 15};
-    set.map.ep_num = 12;
-    set.map.type   = UCC_EP_MAP_ARRAY;
-    set.map.array.map       = (void*)ranks;
+    ucc_rank_t ranks[]      = {1, 9, 8, 3, 2, 11, 4, 13, 12, 7, 14, 15};
+    set.map.ep_num          = 12;
+    set.map.type            = UCC_EP_MAP_ARRAY;
+    set.map.array.map       = (void *)ranks;
     set.map.array.elem_size = sizeof(ucc_rank_t);
 
     set.myrank = 1; // from rank 1 perspective
@@ -482,10 +478,10 @@ UCC_TEST_F(test_topo, 4sockets_all)
 
     /* world subset, 1 proc from each socket*/
     ucc_topo_cleanup(topo);
-    ucc_rank_t ranks2[] = {1, 2, 13, 7};
-    set.map.ep_num = 4;
-    set.map.type   = UCC_EP_MAP_ARRAY;
-    set.map.array.map       = (void*)ranks2;
+    ucc_rank_t ranks2[]     = {1, 2, 13, 7};
+    set.map.ep_num          = 4;
+    set.map.type            = UCC_EP_MAP_ARRAY;
+    set.map.array.map       = (void *)ranks2;
     set.map.array.elem_size = sizeof(ucc_rank_t);
 
     set.myrank = 1; // from rank 1 perspective
@@ -501,10 +497,10 @@ UCC_TEST_F(test_topo, 4sockets_all)
 
     /* world subset, 1 full socket + 1 proc from another socket */
     ucc_topo_cleanup(topo);
-    ucc_rank_t ranks3[] = {0, 1, 2, 8, 9};
-    set.map.ep_num = 5;
-    set.map.type   = UCC_EP_MAP_ARRAY;
-    set.map.array.map       = (void*)ranks3;
+    ucc_rank_t ranks3[]     = {0, 1, 2, 8, 9};
+    set.map.ep_num          = 5;
+    set.map.type            = UCC_EP_MAP_ARRAY;
+    set.map.array.map       = (void *)ranks3;
     set.map.array.elem_size = sizeof(ucc_rank_t);
 
     set.myrank = 1; // from rank 1 perspective

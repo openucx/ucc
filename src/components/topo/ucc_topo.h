@@ -17,14 +17,14 @@ typedef struct ucc_context_topo {
     ucc_proc_info_t *procs;
     ucc_rank_t       n_procs;
     ucc_rank_t       nnodes;
-    ucc_rank_t       min_ppn; /*< smallest ppn value across the nodes
-                                  spanned by the group of processes
-                                  defined by ucc_addr_storage_t */
-    ucc_rank_t       max_ppn; /*< biggest ppn across the nodes */
+    ucc_rank_t       min_ppn;       /*< smallest ppn value across the nodes
+                                        spanned by the group of processes
+                                        defined by ucc_addr_storage_t */
+    ucc_rank_t       max_ppn;       /*< biggest ppn across the nodes */
     ucc_rank_t       max_n_sockets; /*< max number of different sockets
-                                      on a node */
-    uint32_t         sock_bound; /*< global flag, 1 if processes are bound
-                                   to sockets */
+                                        on a node */
+    uint32_t         sock_bound;    /*< global flag, 1 if processes are bound
+                                        to sockets */
 } ucc_context_topo_t;
 
 typedef struct ucc_addr_storage ucc_addr_storage_t;
@@ -40,20 +40,20 @@ typedef struct ucc_addr_storage ucc_addr_storage_t;
    It represents a subset of ranks and we can initialize ucc_topo_t
    for that subset, ie for a team. */
 typedef struct ucc_topo {
-    ucc_context_topo_t   *topo; /*< Cached pointer of the ctx topo */
-    ucc_sbgp_t    sbgps[UCC_SBGP_LAST]; /*< LOCAL sbgps initialized on demand */
-    ucc_sbgp_t   *all_sockets; /*< array of socket sbgps, init on demand */
-    int           n_sockets;
-    ucc_rank_t    node_leader_rank_id; /*< defines which rank on a node will be
-                                         node leader. Similar to local node rank.
-                                         currently set to 0, can be selected differently
-                                         in the future */
-    ucc_rank_t    node_leader_rank; /*< actual rank of the node leader in the original
-                                      (ucc_team) ranking */
-    ucc_subset_t  set; /*< subset of procs from the ucc_context_topo.
+    ucc_context_topo_t *topo;         /*< Cached pointer of the ctx topo */
+    ucc_sbgp_t  sbgps[UCC_SBGP_LAST]; /*< LOCAL sbgps initialized on demand */
+    ucc_sbgp_t *all_sockets;          /*< array of socket sbgps, init on demand */
+    int         n_sockets;
+    ucc_rank_t  node_leader_rank_id;  /*< defines which rank on a node will be
+                                          node leader. Similar to local node rank.
+                                          currently set to 0, can be selected differently
+                                          in the future */
+    ucc_rank_t   node_leader_rank;    /*< actual rank of the node leader in the original
+                                          (ucc_team) ranking */
+    ucc_subset_t set;     /*< subset of procs from the ucc_context_topo.
                          for ucc_team topo it is team->ctx_map */
-    ucc_rank_t    min_ppn; /*< min ppn across the nodes for a team */
-    ucc_rank_t    max_ppn; /*< max ppn across the nodes for a team */
+    ucc_rank_t   min_ppn; /*< min ppn across the nodes for a team */
+    ucc_rank_t   max_ppn; /*< max ppn across the nodes for a team */
 } ucc_topo_t;
 
 /* Initializes ctx level topo structure using addr_storage.
@@ -61,7 +61,7 @@ typedef struct ucc_topo {
    into array for each participating proc. The array is then sorted
    (see ucc_compare_proc_info in ucc_topo.c) that allows O(N) local
    subgroup discoveries */
-ucc_status_t ucc_context_topo_init(ucc_addr_storage_t *storage,
+ucc_status_t ucc_context_topo_init(ucc_addr_storage_t * storage,
                                    ucc_context_topo_t **topo);
 void         ucc_context_topo_cleanup(ucc_context_topo_t *topo);
 
@@ -72,7 +72,8 @@ void         ucc_topo_cleanup(ucc_topo_t *subset_topo);
 
 ucc_sbgp_t *ucc_topo_get_sbgp(ucc_topo_t *topo, ucc_sbgp_type_t type);
 
-int         ucc_topo_is_single_node(ucc_topo_t *topo);
+int ucc_topo_is_single_node(ucc_topo_t *topo);
 /* Returns the array of ALL existing socket subgroups of given topo */
-ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps, int *n_sbgps);
+ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                      int *n_sbgps);
 #endif

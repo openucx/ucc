@@ -26,13 +26,13 @@ static int ucc_compare_proc_info(const void *a, const void *b)
 }
 
 static ucc_status_t ucc_context_topo_compute_layout(ucc_context_topo_t *topo,
-                                                    ucc_rank_t size)
+                                                    ucc_rank_t          size)
 {
-    ucc_rank_t       current_ppn  = 1;
-    ucc_rank_t       min_ppn      = UCC_RANK_MAX;
-    ucc_rank_t       max_ppn      = 0;
-    ucc_rank_t       nnodes       = 1;
-    int              max_sockid   = 0;
+    ucc_rank_t       current_ppn = 1;
+    ucc_rank_t       min_ppn     = UCC_RANK_MAX;
+    ucc_rank_t       max_ppn     = 0;
+    ucc_rank_t       nnodes      = 1;
+    int              max_sockid  = 0;
     ucc_proc_info_t *sorted;
     ucc_host_id_t    current_hash, hash;
     int              i, j;
@@ -92,7 +92,7 @@ static ucc_status_t ucc_context_topo_compute_layout(ucc_context_topo_t *topo,
     return UCC_OK;
 }
 
-ucc_status_t ucc_context_topo_init(ucc_addr_storage_t *storage,
+ucc_status_t ucc_context_topo_init(ucc_addr_storage_t * storage,
                                    ucc_context_topo_t **_topo)
 {
     ucc_context_addr_header_t *h;
@@ -113,9 +113,8 @@ ucc_status_t ucc_context_topo_init(ucc_addr_storage_t *storage,
 
     topo->sock_bound = 1;
     topo->n_procs    = storage->size;
-    topo->procs =
-        (ucc_proc_info_t *)ucc_malloc(storage->size * sizeof(ucc_proc_info_t),
-            "topo_procs");
+    topo->procs      = (ucc_proc_info_t *)ucc_malloc(
+        storage->size * sizeof(ucc_proc_info_t), "topo_procs");
     if (!topo->procs) {
         ucc_error("failed to allocate %zd bytes for topo_procs",
                   storage->size * sizeof(ucc_proc_info_t));
@@ -150,10 +149,10 @@ void ucc_context_topo_cleanup(ucc_context_topo_t *topo)
 }
 
 ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *ctx_topo,
-                                  ucc_topo_t **_topo)
+                           ucc_topo_t **_topo)
 {
     ucc_topo_t *topo = ucc_malloc(sizeof(*topo), "topo");
-    int              i;
+    int         i;
     if (!topo) {
         return UCC_ERR_NO_MEMORY;
     }
@@ -169,7 +168,7 @@ ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *ctx_topo,
     topo->max_ppn             = 0;
     topo->all_sockets         = NULL;
 
-    *_topo                    = topo;
+    *_topo = topo;
     return UCC_OK;
 }
 
@@ -217,13 +216,14 @@ int ucc_context_topo_is_single_node(ucc_topo_t *topo)
     return 0;
 }
 
-ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps, int *n_sbgps)
+ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                      int *n_sbgps)
 {
     if (!topo->all_sockets) {
         return ucc_sbgp_create_all_sockets(topo, sbgps, n_sbgps);
     }
 
-    *sbgps = topo->all_sockets;
+    *sbgps   = topo->all_sockets;
     *n_sbgps = topo->n_sockets;
 
     return UCC_OK;

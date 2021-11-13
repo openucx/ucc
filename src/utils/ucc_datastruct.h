@@ -16,7 +16,7 @@ typedef uint32_t ucc_rank_t;
 typedef struct ucc_subset {
     ucc_ep_map_t map;
     ucc_rank_t   myrank;
-} ucc_subset_t ;
+} ucc_subset_t;
 
 static inline ucc_rank_t ucc_subset_size(ucc_subset_t *set)
 {

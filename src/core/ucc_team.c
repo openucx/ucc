@@ -245,7 +245,7 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
            reported topo_required through the lib_attr */
         subset.map    = team->ctx_map;
         subset.myrank = team->rank;
-        status = ucc_topo_init(subset, context->topo, &team->topo);
+        status        = ucc_topo_init(subset, context->topo, &team->topo);
         if (UCC_OK != status) {
             ucc_warn("failed to init team topo");
         }
