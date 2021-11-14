@@ -219,12 +219,14 @@ int ucc_context_topo_is_single_node(ucc_topo_t *topo)
 ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
                                       int *n_sbgps)
 {
+    ucc_status_t status = UCC_OK;
+
     if (!topo->all_sockets) {
-        return ucc_sbgp_create_all_sockets(topo, sbgps, n_sbgps);
+        status = ucc_sbgp_create_all_sockets(topo, &topo->all_sockets, n_sbgps);
     }
 
     *sbgps   = topo->all_sockets;
     *n_sbgps = topo->n_sockets;
 
-    return UCC_OK;
+    return status;
 }
