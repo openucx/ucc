@@ -45,7 +45,7 @@ typedef struct ucc_team {
     void *                  oob_req;
     ucc_ep_map_t            ctx_map; /*< map to the ctx ranks, defined if CTX
                                   type is global (oob provided) */
-    ucc_team_topo_t        *topo;
+    ucc_topo_t             *topo;
     ucc_score_map_t        *score_map; /*< score map of CLs */
     uint32_t                seq_num;
 } ucc_team_t;
@@ -103,29 +103,6 @@ static inline void *ucc_get_team_ep_addr(ucc_context_t *context,
 static inline ucc_rank_t ucc_get_ctx_rank(ucc_team_t *team, ucc_rank_t team_rank)
 {
     return ucc_ep_map_eval(team->ctx_map, team_rank);
-}
-
-static inline int ucc_rank_on_local_node(int team_rank, ucc_team_t *team)
-{
-    ucc_proc_info_t *procs       = team->topo->topo->procs;
-    ucc_rank_t       ctx_rank    = ucc_ep_map_eval(team->ctx_map, team_rank);
-    ucc_rank_t       my_ctx_rank = ucc_ep_map_eval(team->ctx_map, team->rank);
-
-    return procs[ctx_rank].host_hash == procs[my_ctx_rank].host_hash;
-}
-
-static inline int ucc_rank_on_local_socket(int team_rank, ucc_team_t *team)
-{
-    ucc_rank_t       ctx_rank    = ucc_ep_map_eval(team->ctx_map, team_rank);
-    ucc_rank_t       my_ctx_rank = ucc_ep_map_eval(team->ctx_map, team->rank);
-    ucc_proc_info_t *proc        = &team->topo->topo->procs[ctx_rank];
-    ucc_proc_info_t *my_proc     = &team->topo->topo->procs[my_ctx_rank];
-
-    if (my_proc->socket_id == -1) {
-        return 0;
-    }
-    return proc->host_hash == my_proc->host_hash &&
-           proc->socket_id == my_proc->socket_id;
 }
 
 #endif

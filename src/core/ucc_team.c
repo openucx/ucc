@@ -40,9 +40,9 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
 
     if (context->service_team) {
         /* User internal service team for OOB */
-        ucc_team_subset_t subset = {.myrank     = team->rank,
-                                    .map.ep_num = team->size,
-                                    .map.type   = UCC_EP_MAP_FULL};
+        ucc_subset_t subset = {.myrank     = team->rank,
+                               .map.ep_num = team->size,
+                               .map.type   = UCC_EP_MAP_FULL};
         status = ucc_internal_oob_init(team, subset, &team->bp.params.oob);
         if (UCC_OK != status) {
             return status;
@@ -240,9 +240,12 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
     ucc_status_t           status;
 
     if (context->topo && !team->topo) {
+        ucc_subset_t subset;
         /* Context->topo is not NULL if any of the enabled CLs
            reported topo_required through the lib_attr */
-        status = ucc_team_topo_init(team, context->topo, &team->topo);
+        subset.map    = team->ctx_map;
+        subset.myrank = team->rank;
+        status        = ucc_topo_init(subset, context->topo, &team->topo);
         if (UCC_OK != status) {
             ucc_warn("failed to init team topo");
         }
@@ -472,7 +475,7 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
         team->cl_teams[i] = NULL;
     }
 
-    ucc_team_topo_cleanup(team->topo);
+    ucc_topo_cleanup(team->topo);
 
     if (team->contexts[0]->service_team) {
         ucc_internal_oob_finalize(&team->bp.params.oob);
@@ -552,9 +555,9 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
     global = ctx->ids.pool + ctx->ids.pool_size;
 
     if (!team->sreq) {
-        ucc_team_subset_t subset = {.map.type   = UCC_EP_MAP_FULL,
-                                    .map.ep_num = team->size,
-                                    .myrank     = team->rank};
+        ucc_subset_t subset = {.map.type   = UCC_EP_MAP_FULL,
+                               .map.ep_num = team->size,
+                               .myrank     = team->rank};
         status = ucc_service_allreduce(team, local, global, UCC_DT_UINT64,
                                        ctx->ids.pool_size, UCC_OP_BAND, subset,
                                        &team->sreq);

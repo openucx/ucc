@@ -49,10 +49,10 @@ ucc_status_t ucc_tl_lib_config_read(ucc_tl_iface_t *iface,
 typedef struct ucc_tl_service_coll {
     ucc_status_t (*allreduce)(ucc_base_team_t *team, void *sbuf, void *rbuf,
                               ucc_datatype_t dt, size_t count,
-                              ucc_reduction_op_t op,
-                              ucc_team_subset_t subset, ucc_coll_task_t **task);
+                              ucc_reduction_op_t op, ucc_subset_t subset,
+                              ucc_coll_task_t **task);
     ucc_status_t (*allgather)(ucc_base_team_t *team, void *sbuf, void *rbuf,
-                              size_t msgsize, ucc_team_subset_t subset,
+                              size_t msgsize, ucc_subset_t subset,
                               ucc_coll_task_t **task);
     void         (*update_id)(ucc_base_team_t *team, uint16_t id);
 } ucc_tl_service_coll_t;

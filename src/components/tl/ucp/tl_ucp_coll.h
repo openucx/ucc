@@ -32,14 +32,14 @@ extern const char
     (((_rank) + (_root)) % (_team_size))
 
 typedef struct ucc_tl_ucp_task {
-    ucc_coll_task_t   super;
-    uint32_t          send_posted;
-    uint32_t          send_completed;
-    uint32_t          recv_posted;
-    uint32_t          recv_completed;
-    uint32_t          tag;
-    uint32_t          n_polls;
-    ucc_team_subset_t subset;
+    ucc_coll_task_t super;
+    uint32_t        send_posted;
+    uint32_t        send_completed;
+    uint32_t        recv_posted;
+    uint32_t        recv_completed;
+    uint32_t        tag;
+    uint32_t        n_polls;
+    ucc_subset_t    subset;
     union {
         struct {
             int                     phase;

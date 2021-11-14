@@ -10,7 +10,7 @@
 #include "ucc_progress_queue.h"
 #include "utils/ucc_list.h"
 #include "utils/ucc_proc_info.h"
-#include "ucc_topo.h"
+#include "components/topo/ucc_topo.h"
 
 typedef struct ucc_lib_info          ucc_lib_info_t;
 typedef struct ucc_cl_context        ucc_cl_context_t;
@@ -64,7 +64,7 @@ typedef struct ucc_context {
     ucc_addr_storage_t       addr_storage;
     ucc_rank_t               rank; /*< rank of a process in the "global" (with
                                      OOB) context */
-    ucc_topo_t              *topo;
+    ucc_context_topo_t      *topo;
     uint64_t                 cl_flags;
     ucc_tl_team_t           *service_team;
 } ucc_context_t;
