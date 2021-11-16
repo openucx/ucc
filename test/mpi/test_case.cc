@@ -6,17 +6,39 @@
 
 #include "test_mpi.h"
 
-std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
-                                         ucc_test_team_t &_team,
-                                         int root,
-                                         size_t msgsize,
-                                         ucc_test_mpi_inplace_t inplace,
-                                         ucc_memory_type_t mt,
-                                         size_t max_size,
-                                         ucc_datatype_t dt,
-                                         ucc_reduction_op_t op,
-                                         ucc_test_vsize_flag_t count_bits,
-                                         ucc_test_vsize_flag_t displ_bits)
+std::vector<std::shared_ptr<TestCase>>
+TestCase::init(ucc_coll_type_t _type, ucc_test_team_t &_team, int num_tests,
+               int root, size_t msgsize, ucc_test_mpi_inplace_t inplace,
+               ucc_memory_type_t mt, size_t max_size, ucc_datatype_t dt,
+               ucc_reduction_op_t op, ucc_test_vsize_flag_t count_bits,
+               ucc_test_vsize_flag_t displ_bits)
+{
+    std::vector<std::shared_ptr<TestCase>> tcs;
+
+    for (int i = 0; i < num_tests; i++) {
+        auto tc = init_single(_type, _team, root, msgsize, inplace, mt,
+                              max_size, dt, op, count_bits, displ_bits);
+        if (!tc) {
+            tcs.clear();
+            return tcs;
+        }
+        tcs.push_back(tc);
+    }
+    return tcs;
+}
+
+std::shared_ptr<TestCase> TestCase::init_single(
+        ucc_coll_type_t _type,
+        ucc_test_team_t &_team,
+        int root,
+        size_t msgsize,
+        ucc_test_mpi_inplace_t inplace,
+        ucc_memory_type_t mt,
+        size_t max_size,
+        ucc_datatype_t dt,
+        ucc_reduction_op_t op,
+        ucc_test_vsize_flag_t count_bits,
+        ucc_test_vsize_flag_t displ_bits)
 {
     switch(_type) {
     case UCC_COLL_TYPE_BARRIER:

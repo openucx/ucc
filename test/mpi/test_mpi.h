@@ -161,10 +161,72 @@ typedef struct ucc_test_team {
     type(_type), comm(_comm), team(_team), ctx(_ctx) {};
 } ucc_test_team_t;
 
+class TestCase {
+protected:
+    ucc_test_team_t team;
+    ucc_memory_type_t mem_type;
+    int root;
+    size_t msgsize;
+    ucc_test_mpi_inplace_t inplace;
+    ucc_coll_args_t args;
+    ucc_coll_req_h req;
+    ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header,
+        *check_sbuf_mc_header;
+    void *sbuf;
+    void *rbuf;
+    void *check_sbuf;
+    void *check_rbuf;
+    MPI_Request progress_request;
+    uint8_t     progress_buf[1];
+    size_t test_max_size;
+public:
+    void mpi_progress(void);
+    test_skip_cause_t test_skip;
+    static std::shared_ptr<TestCase> init_single(
+            ucc_coll_type_t _type,
+            ucc_test_team_t &_team,
+            int    root    = 0,
+            size_t msgsize = 0,
+            ucc_test_mpi_inplace_t inplace = TEST_NO_INPLACE,
+            ucc_memory_type_t mt = UCC_MEMORY_TYPE_HOST,
+            size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX,
+            ucc_datatype_t dt = UCC_DT_INT32,
+            ucc_reduction_op_t op = UCC_OP_SUM,
+            ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
+            ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT);
+    static std::vector<std::shared_ptr<TestCase>> init(
+            ucc_coll_type_t _type,
+            ucc_test_team_t &_team,
+            int num_tests,
+            int    root    = 0,
+            size_t msgsize = 0,
+            ucc_test_mpi_inplace_t inplace = TEST_NO_INPLACE,
+            ucc_memory_type_t mt = UCC_MEMORY_TYPE_HOST,
+            size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX,
+            ucc_datatype_t dt = UCC_DT_INT32,
+            ucc_reduction_op_t op = UCC_OP_SUM,
+            ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
+            ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT);
+    TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
+             size_t _msgsize = 0, ucc_test_mpi_inplace_t _inplace = TEST_NO_INPLACE,
+             size_t _max_size = TEST_UCC_RANK_BUF_SIZE_MAX);
+    virtual ~TestCase();
+    virtual void run();
+    virtual ucc_status_t check() = 0;
+    virtual std::string str();
+    virtual ucc_status_t test();
+    void wait();
+    ucc_status_t exec();
+    test_skip_cause_t skip_reduce(test_skip_cause_t cause, MPI_Comm comm);
+    test_skip_cause_t skip_reduce(int skip_cond, test_skip_cause_t cause,
+                                  MPI_Comm comm);
+};
+
 class UccTestMpi {
     ucc_thread_mode_t      tm;
     ucc_context_h          ctx;
     ucc_lib_h              lib;
+    int                    nt;
     ucc_test_mpi_inplace_t inplace;
     ucc_test_mpi_root_t    root_type;
     int                    root_value;
@@ -181,6 +243,8 @@ class UccTestMpi {
     std::vector<ucc_test_vsize_flag_t> counts_vsize;
     std::vector<ucc_test_vsize_flag_t> displs_vsize;
     size_t test_max_size;
+    std::vector<ucc_status_t> exec_tests(
+            std::vector<std::shared_ptr<TestCase>> tcs);
 public:
     std::vector<ucc_test_team_t> teams;
     void run_all_at_team(ucc_test_team_t &team, std::vector<ucc_status_t> &rst);
@@ -207,58 +271,13 @@ public:
     void set_max_size(size_t _max_size) {
         test_max_size = _max_size;
     }
+    void set_num_tests(int num_tests) {
+        nt = num_tests;
+    }
     void create_teams(std::vector<ucc_test_mpi_team_t> &test_teams);
     void progress_ctx() {
         ucc_context_progress(ctx);
     }
-};
-
-class TestCase {
-protected:
-    ucc_test_team_t team;
-    ucc_memory_type_t mem_type;
-    int root;
-    size_t msgsize;
-    ucc_test_mpi_inplace_t inplace;
-    ucc_coll_args_t args;
-    ucc_coll_req_h req;
-    ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header,
-        *check_sbuf_mc_header;
-    void *sbuf;
-    void *rbuf;
-    void *check_sbuf;
-    void *check_rbuf;
-    MPI_Request progress_request;
-    uint8_t     progress_buf[1];
-    void mpi_progress(void);
-    size_t test_max_size;
-    test_skip_cause_t test_skip;
-public:
-    static std::shared_ptr<TestCase> init(ucc_coll_type_t _type,
-                                          ucc_test_team_t &_team,
-                                          int    root    = 0,
-                                          size_t msgsize = 0,
-                                          ucc_test_mpi_inplace_t inplace = TEST_NO_INPLACE,
-                                          ucc_memory_type_t mt = UCC_MEMORY_TYPE_HOST,
-                                          size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX,
-                                          ucc_datatype_t dt = UCC_DT_INT32,
-                                          ucc_reduction_op_t op = UCC_OP_SUM,
-                                          ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
-                                          ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT);
-
-    TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
-             size_t _msgsize = 0, ucc_test_mpi_inplace_t _inplace = TEST_NO_INPLACE,
-             size_t _max_size = TEST_UCC_RANK_BUF_SIZE_MAX);
-    virtual ~TestCase();
-    virtual void run();
-    virtual ucc_status_t check() = 0;
-    virtual std::string str();
-    virtual ucc_status_t test();
-    void wait();
-    ucc_status_t exec();
-    test_skip_cause_t skip_reduce(test_skip_cause_t cause, MPI_Comm comm);
-    test_skip_cause_t skip_reduce(int skip_cond, test_skip_cause_t cause,
-                                  MPI_Comm comm);
 };
 
 class TestBarrier : public TestCase {

@@ -24,15 +24,15 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params->team);
 
+    self->rank   = params->rank;
+    self->oob    = params->params.oob;
+    self->size   = self->oob.n_oob_eps;
+    self->stream = NULL;
     if (self->size > UCC_TL_CUDA_MAX_PEERS) {
         tl_info(tl_context->lib, "team size is too large, max supported %d",
                 UCC_TL_CUDA_MAX_PEERS);
         return UCC_ERR_NOT_SUPPORTED;
     }
-    self->rank   = params->rank;
-    self->oob    = params->params.oob;
-    self->size   = self->oob.n_oob_eps;
-    self->stream = NULL;
     for (i = 0; i < self->size; i++) {
         if (!ucc_rank_on_local_node(i, params->team)) {
             tl_info(tl_context->lib, "rank %d is on different node, "
