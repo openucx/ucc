@@ -40,12 +40,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK;
-
+    ucp_params.features = UCP_FEATURE_TAG;
     if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS) {
-        ucp_params.features =
-            UCP_FEATURE_TAG | UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
-    } else {
-        ucp_params.features = UCP_FEATURE_TAG;
+        ucp_params.features |= UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
     }
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
 
@@ -365,7 +362,13 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
     size_t                     my_pack_sizes[nsegs];
     int                        i;
     int                        seg;
+    void *                     addr;
 
+    if (nsegs > MAX_NR_SEGMENTS) {
+        tl_error(ctx->super.super.lib, "cannot map more than %d segments",
+                 MAX_NR_SEGMENTS);
+        return UCC_ERR_INVALID_PARAM;
+    }
     remote_info = (ucc_tl_ucp_remote_info_t **)ucc_malloc(
         sizeof(ucc_tl_ucp_remote_info_t *) * size, "ucp_ctx_remote_info");
     if (NULL == remote_info) {
@@ -383,9 +386,9 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
         goto fail_alloc_remote_segs;
     }
 
+    memset(my_pack, 0, nsegs * sizeof(void *));
     for (i = 0; i < nsegs; i++) {
-        void *addr = map.segments[i].address;
-        my_pack[i] = NULL;
+        addr       = map.segments[i].address;
 
         mmap_params.field_mask =
             UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;

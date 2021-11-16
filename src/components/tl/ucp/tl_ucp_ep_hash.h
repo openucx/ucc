@@ -80,5 +80,4 @@ static inline void* tl_ucp_hash_pop(tl_ucp_ep_hash_t *h)
     }
     return ep;
 }
-
 #endif
