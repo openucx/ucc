@@ -29,23 +29,23 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, data_size),
      UCC_CONFIG_TYPE_UINT},
 
-    {"GROUP_PAGE_SIZE", "4096", "Page size for group ctrls alignment", //change from cfg to detectable from system like in ucs
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, page_size),
-     UCC_CONFIG_TYPE_UINT},
-
     {"BCAST_ALG", "1", "bcast alg choice of write/read per level",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_alg),
      UCC_CONFIG_TYPE_UINT},
 
-    {"BCAST_KN_RADIX", "4", "bcast radix for knomial tree",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),
+    {"BCAST_BASE_RADIX", "4", "bcast radix for base tree",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_base_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"BCAST_TOP_RADIX", "4", "bcast radix for top tree",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_top_radix),
      UCC_CONFIG_TYPE_UINT},
 
     {"NPOLLS", "100", "n_polls",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, n_polls),
      UCC_CONFIG_TYPE_UINT},
 
-    {"MAX_TREES_CACHED", "5", "max num of trees that can be cached on team",
+    {"MAX_TREES_CACHED", "8", "max num of trees that can be cached on team",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, max_trees_cached),
      UCC_CONFIG_TYPE_UINT},
 
