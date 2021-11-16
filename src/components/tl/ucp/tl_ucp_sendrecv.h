@@ -210,8 +210,7 @@ static inline ucc_status_t ucc_tl_ucp_flush(ucc_tl_ucp_team_t *team)
 }
 
 static inline ucc_status_t ucc_tl_ucp_ep_flush(ucc_rank_t dest_group_rank,
-                                               ucc_tl_ucp_team_t *team,
-                                               ucc_tl_ucp_task_t *task)
+                                               ucc_tl_ucp_team_t *team)
 {
     ucp_request_param_t req_param = {0};
     ucc_status_t        status;
@@ -327,8 +326,7 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
 
 static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
                                                  ucc_rank_t dest_group_rank,
-                                                 ucc_tl_ucp_team_t *team,
-                                                 ucc_tl_ucp_task_t *task)
+                                                 ucc_tl_ucp_team_t *team)
 {
     ucp_request_param_t req_param = {0};
     int                 segment   = 0;
