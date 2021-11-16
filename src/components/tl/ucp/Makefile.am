@@ -1,10 +1,13 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
 #
+if TL_UCP_ENABLED
+
 if BUILD_TL_COLL_PLUGINS
 SUBDIRS = .
 include makefile.coll_plugins.am
 endif
+
 barrier =                     \
 	barrier/barrier.h         \
 	barrier/barrier.c         \
@@ -87,3 +90,5 @@ libucc_tl_ucp_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(UCX_LDFLAGS
 libucc_tl_ucp_la_LIBADD   = $(UCX_LIBADD) $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 include $(top_srcdir)/config/module.am
+
+endif

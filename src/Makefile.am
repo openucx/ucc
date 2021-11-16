@@ -4,26 +4,17 @@
 
 cl_dirs = components/cl/basic \
 		  components/cl/hier
-tl_dirs =
-mc_dirs = components/mc/cpu
 
-if HAVE_UCX
-tl_dirs += components/tl/ucp
-endif
+mc_dirs = components/mc/cpu
 
 if HAVE_CUDA
 mc_dirs += components/mc/cuda
 endif
 
-if HAVE_NCCL
-tl_dirs += components/tl/nccl
-endif
+SUBDIRS = . $(cl_dirs) $(mc_dirs)
 
-if HAVE_SHARP
-tl_dirs += components/tl/sharp
-endif
+include components/tl/makefile.am
 
-SUBDIRS = . $(cl_dirs) $(tl_dirs) $(mc_dirs)
 lib_LTLIBRARIES  = libucc.la
 noinst_LIBRARIES =
 
