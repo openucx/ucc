@@ -10,6 +10,8 @@
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
 #include "utils/ucc_mpool.h"
+#include "utils/ucc_math.h"
+#include "tl_shm_knomial_pattern.h"
 
 #include <assert.h> //needed?
 #include <errno.h>
@@ -19,59 +21,16 @@
 #ifndef UCC_TL_SHM_DEFAULT_SCORE
 #define UCC_TL_SHM_DEFAULT_SCORE 20
 #endif
-//
-//#define SHMEM_128b 128
-//#define SHMEM_2K   4096
-///* Barrier uses offset 2 for progress */
-//#define SHMEM_AT_ITERATION 2
-//
-///* Allreduce up to 64b, uses 2-9 for data and 10 for progress aka. level */
-//#define SHMEM_DATA 2
-//#define SHMEM_AT_LEVEL 10
-//
-//#define SHMSEG_128B_RADIX 4
-//#define SHMSEG_2K_RADIX 2
-//
-//#define SHMEM_STATE(_var, _rank, _rw) (((_var) + (_rank))->state[(_rw)])
-//#define aSHMEM_STATE(_var, _rank, _rw) (void*)(&(((_var) + (_rank))->state[(_rw)]))
-//
-//#define SHMEM_LEAF 0
-//#define SHMEM_ROOT 1
-//
-///* Barrier uses offset 2 for progress */
-//#define SHMEM_AT_ITERATION 2
-//#define SHMSEG_BARRIER_RADIX 8
-//
-///* Allreduce for 33-2K, needs root/leaf for signaling,
-// * radix (iteration)
-// * offset into 2K seg
-// * and its on_node rank
-// */
-//#define SHMEM_2K_AT_RADIX_I  3
-//#define SHMEM_2K_OFFSET      4
-////#define SHMEM_2K_ONNODE_RANK 5 // not used in xccl, needed?
-//
-///* Shared memory segment sizes */
-//#define SHMEM_4K 4096
-//#define SHMEM_8K 8192
-///* Convenience macro's for setup */
-//#define ROOT_AT_LEVEL(_rank, _radix, _level) \
-//    !((_rank) & ((int) pow((_radix), (_level)+1)-1))
-//
-//#define NEXT_PARTNER(radix, level) \
-//    (pow(radix, level))
-//
-///* Used in allreduce */
-//#define IS_ROOT_AT_LEVEL(_rank, _level) !(((_rank) >> (_level)) & 1)
-//#define R_PARTNER_AT_LEVEL(rank, level) ((_rank) + (1 << (_level)))
-//
+
 #define BCOL_SHMSEG_PROBE_COUNT 100
 //TODO take arch code from ucs ??
-#define SHMSEG_WMB()  __asm__ __volatile__("": : :"memory") //why do we need bpth wmb and isync?
+#define SHMSEG_WMB()  __asm__ __volatile__("": : :"memory")
 #define SHMSEG_ISYNC() __asm__ __volatile__("": : :"memory")
 
 #define UCC_TL_SHM_SUPPORTED_COLLS                                             \
-    (UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE)
+    (UCC_COLL_TYPE_BCAST)// | UCC_COLL_TYPE_REDUCE)
+
+typedef struct ucc_kn_tree ucc_kn_tree_t;
 
 typedef struct ucc_tl_shm_iface {
     ucc_tl_iface_t super;
@@ -86,7 +45,8 @@ typedef struct ucc_tl_shm_lib_config {
     uint32_t             ctrl_size;
     uint32_t             page_size;
     uint32_t             bcast_alg;
-    uint32_t             bcast_kn_radix;
+    uint32_t             bcast_base_radix;
+    uint32_t             bcast_top_radix;
     uint32_t             max_trees_cached;
     uint32_t             n_polls;
     char                *group_mode;
@@ -122,45 +82,50 @@ typedef struct ucc_tl_shm_seg {
     volatile void *data; /* start of the data segments */
 } ucc_tl_shm_seg_t;
 
-typedef struct ucc_tl_shm_tree {ucc_kn_tree_t
+typedef struct ucc_tl_shm_tree {
     ucc_kn_tree_t *base_tree; /* tree for base group, always != NULL */
     ucc_kn_tree_t *top_tree;  /* tree for leaders group, can be NULL if the group
                                  does not exists or the process is not part of it */
-} ucc_tl_shm_tree_t
+} ucc_tl_shm_tree_t;
 
 typedef struct ucc_tl_shm_tree_cache_keys {
-    ucc_rank_t radix;
+    ucc_rank_t base_radix;
+    ucc_rank_t top_radix;
     ucc_rank_t root;
-    ucc_rank_t team_size;
-//    ucc_coll_type_t coll_type;
+    ucc_coll_type_t coll_type;
 } ucc_tl_shm_tree_cache_keys_t;
 
+typedef struct ucc_tl_shm_tree_cache_elems {
+	ucc_tl_shm_tree_cache_keys_t *keys;
+	ucc_tl_shm_tree_t            *tree;
+} ucc_tl_shm_tree_cache_elems_t;
+
 typedef struct ucc_tl_shm_tree_cache {
-	ucc_tl_shm_tree_cache_keys_t **keys;
-	ucc_tl_shm_tree_t            **trees;
-	size_t                         size;
+	size_t                           size;
+	ucc_tl_shm_tree_cache_elems_t  **elems;
 } ucc_tl_shm_tree_cache_t;
 
 typedef struct ucc_tl_shm_team {
-    ucc_tl_team_t           super;
-    void                   *oob_req;
-    ucc_tl_shm_seg_t       *segs;
-    uint32_t                seq_num;
-    uint32_t                n_base_groups;
-    uint32_t                my_group_id;
-    int                    *allgather_dst;
-    int                     n_concurrent;
-    ucc_sbgp_t             *base_groups;
-    ucc_sbgp_t             *leaders_group;
-    ucc_topo_t             *topo; //?
-    void                   *shm_buffer;
-    ucc_ep_map_t            group_rank_map;
-    ucc_ep_map_t            rank_group_id_map;
-    ucc_ep_map_t            ctrl_map;
-    size_t                  ctrl_size;
-    size_t                  data_size;
-    ucc_tl_shm_tree_cache_t tree_cache;
-    ucc_status_t            status;
+    ucc_tl_team_t            super;
+    void                    *oob_req;
+    ucc_tl_shm_seg_t        *segs;
+    uint32_t                 seq_num;
+    uint32_t                 n_base_groups;
+    uint32_t                 my_group_id;
+    int                     *allgather_dst;
+    int                      n_concurrent;
+    ucc_sbgp_t              *base_groups;
+    ucc_sbgp_t              *leaders_group;
+    ucc_topo_t              *topo;
+    void                    *shm_buffer;
+    ucc_ep_map_t             group_rank_map;
+    ucc_ep_map_t             rank_group_id_map;
+    ucc_ep_map_t             ctrl_map;
+    size_t                   ctrl_size;
+    size_t                   data_size;
+    size_t                   max_inline;
+    ucc_tl_shm_tree_cache_t *tree_cache;
+    ucc_status_t             status;
 } ucc_tl_shm_team_t;
 
 typedef enum {

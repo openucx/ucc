@@ -19,6 +19,7 @@ sources =                    \
 	tl_shm_coll.h            \
 	tl_shm_coll.c            \
 	tl_shm_knomial_pattern.h \
+	tl_shm_knomial_pattern.c \
 	$(bcast)                 \
 	$(reduce)
 

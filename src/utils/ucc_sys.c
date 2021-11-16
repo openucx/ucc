@@ -1,5 +1,7 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ *
  * See file LICENSE for terms.
  */
 
@@ -61,6 +63,39 @@ ucc_status_t ucc_sysv_free(void *addr)
     }
 
     return UCC_OK;
+/*
+ * If a certain system constant (name) is undefined on the underlying system the
+ * sysconf routine returns -1.  ucs_sysconf return the negative value
+ * a user and the user is responsible to define default value or abort.
+ *
+ * If an error occurs sysconf modified errno and ucs_sysconf aborts.
+ *
+ * Otherwise, a non-negative values is returned.
+ */
+static long ucc_sysconf(int name)
+{
+    long rc;
+    rc = sysconf(name);
+
+    return rc;
+}
+
+/**
+ * @return Regular page size on the system.
+ */
+size_t ucc_get_page_size()
+{
+    static long page_size = 0;
+    if (page_size == 0) {
+        page_size = ucc_sysconf(_SC_PAGESIZE);
+        if (page_size < 0) {
+            page_size = 4096;
+            ucc_debug("_SC_PAGESIZE undefined, setting default value to %ld",
+                      page_size);
+        }
+    }
+
+    return page_size;
 }
 
 /**

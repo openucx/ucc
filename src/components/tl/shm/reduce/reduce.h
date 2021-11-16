@@ -7,7 +7,7 @@
 #define REDUCE_H_
 #include "../tl_shm.h"
 #include "../tl_shm_coll.h"
-#include "core/ucc_mc.h"
+//#include "core/ucc_mc.h"
 
 ucc_status_t ucc_tl_shm_reduce_init(ucc_tl_shm_task_t *task);
 

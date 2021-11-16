@@ -10,22 +10,16 @@
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
+#include "utils/ucc_sys.h"
 #include <sys/stat.h> //make extern C?
-
-#define UINT_LOG_X(_val, _base) ((unsigned int) ceil(log((_val)) / log((_base))))
 
 #define SHM_MODE (IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR|S_IWOTH|S_IRGRP|S_IWGRP)
 
-#define MAX_INLINE(_CS, _data, _inline)                                       \
-    do {                                                                      \
-        _inline = _CS - ucc_offsetof(ucc_tl_shm_ctrl_t, _data);               \
-    } while (0)
-
-static ucc_rank_t ucc_tl_shm_team_rank_to_group_id(ucc_tl_shm_team_t *team, ucc_rank_t r)
+static inline ucc_rank_t ucc_tl_shm_team_rank_to_group_id(ucc_tl_shm_team_t *team, ucc_rank_t r)
 {
-    for (i = 0; i < team->n_base_groups; i++) {
-        for (j = 0; j < team->base_groups[i]->group_size; j++) {
-            if (r == ucc_sbgp_rank2team(team->base_groups[i], j)) {
+    for (int i = 0; i < team->n_base_groups; i++) {
+        for (int j = 0; j < team->base_groups[i].group_size; j++) {
+            if (r == ucc_ep_map_eval(team->base_groups[i].map, j)) {
                 /* found team rank r in base group i */
                 return i;
             }
@@ -35,24 +29,25 @@ static ucc_rank_t ucc_tl_shm_team_rank_to_group_id(ucc_tl_shm_team_t *team, ucc_
     return UCC_RANK_INVALID;
 }
 
-static ucc_status_t ucc_tl_shm_rank_group_id_map_init(ucc_tl_shm_team_t *team)
+static inline ucc_status_t ucc_tl_shm_rank_group_id_map_init(ucc_tl_shm_team_t *team)
 {
 	ucc_rank_t  team_size = UCC_TL_TEAM_SIZE(team);
-    ucc_rank_t *ranks = ucc_malloc(team_size * sizeof(*ranks)); // dont need to free because happens in ucc_ep_map_from_array()?
+    ucc_rank_t *ranks = (ucc_rank_t *) ucc_malloc(team_size * sizeof(*ranks));
     if (!ranks) {
-        return UCC_ERR_NO_MEM;
+        return UCC_ERR_NO_MEMORY;
     }
-    for (i = 0; i < team_size; i++) {
+    for (int i = 0; i < team_size; i++) {
         ranks[i] = ucc_tl_shm_team_rank_to_group_id(team, i);
     }
-    team->rank_group_id_map = ucc_ep_map_from_array(ranks, team_size, team_size, 1);
+    team->rank_group_id_map = ucc_ep_map_from_array(&ranks, team_size, team_size, 1);
     return UCC_OK;
 }
 
-static ucc_rank_t ucc_tl_team_rank_to_group_rank(ucc_tl_shm_team_t *team, ucc_rank_t r) {
+static inline ucc_rank_t ucc_tl_shm_team_rank_to_group_rank(ucc_tl_shm_team_t *team, ucc_rank_t r)
+{
     ucc_rank_t group_id = ucc_ep_map_eval(team->rank_group_id_map, r);
-    for (i = 0; i < team->base_groups[group_id]->group_size; i++) {
-        if (ucc_sbgp_rank2team(team->base_groups[group_id], i) == r) {
+    for (int i = 0; i < team->base_groups[group_id].group_size; i++) {
+        if (ucc_ep_map_eval(team->base_groups[group_id].map, i) == r) {
             return i;
         }
     }
@@ -60,46 +55,37 @@ static ucc_rank_t ucc_tl_team_rank_to_group_rank(ucc_tl_shm_team_t *team, ucc_ra
     return UCC_RANK_INVALID;
 }
 
-static ucc_status_t ucc_tl_shm_group_rank_map_init(ucc_tl_shm_team_t *team)
+static inline ucc_status_t ucc_tl_shm_group_rank_map_init(ucc_tl_shm_team_t *team)
 {
     ucc_rank_t  team_size = UCC_TL_TEAM_SIZE(team);
-    ucc_rank_t *ranks = ucc_malloc(team_size * sizeof(*ranks)); // dont need to free because happens in ucc_ep_map_from_array()?
+    ucc_rank_t *ranks = (ucc_rank_t *) ucc_malloc(team_size * sizeof(*ranks));
     if (!ranks) {
-        return UCC_ERR_NO_MEM;
+        return UCC_ERR_NO_MEMORY;
     }
-    for (i = 0; i < team_size; i++) {
-        ranks[i] = tl_team_rank_to_group_rank(team, i);
+    for (int i = 0; i < team_size; i++) {
+        ranks[i] = ucc_tl_shm_team_rank_to_group_rank(team, i);
     }
-    team->group_rank_map = ucc_ep_map_from_array(ranks, team_size, team_size, 1);
+    team->group_rank_map = ucc_ep_map_from_array(&ranks, team_size, team_size, 1);
     return UCC_OK;
 }
 
-static inline void tree_to_team_ranks(ucc_kn_tree_t *tree, ucc_ep_map_t map)
+static void ucc_tl_shm_init_segs(ucc_tl_shm_team_t *team)
 {
-    if (tree->parent != UCC_RANK_INVALID) {
-        tree->parent = ucc_ep_map_eval(map, tree->parent);
-    }
-    for (i=0; i<tree->n_childred; i++) {
-        tree->children[i] = ucc_ep_map_eval(map, tree->children[i]);
-    }
-}
-
-
-static ucc_tl_shm_init_segs(ucc_tl_shm_team_t *team) {
     void *shmseg_base;
-    for (i = 0; i < team->n_concurrent; i++) {
+    for (int i = 0; i < team->n_concurrent; i++) {
         shmseg_base = PTR_OFFSET(team->shm_buffer, (team->ctrl_size + team->data_size) * i);
         team->segs[i].ctrl = shmseg_base;
         team->segs[i].data = PTR_OFFSET(shmseg_base, team->ctrl_size);
     }
 }
 
-static ucc_status_t ucc_shm_seg_alloc(ucc_tl_shm_team_t *team) {
+static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
+{
     ucc_rank_t    team_rank = UCC_TL_TEAM_RANK(team), team_size = UCC_TL_TEAM_SIZE(team);
     size_t        shmsize   = team->n_concurrent *
                               (team->ctrl_size + team->data_size);
     int           shmid     = -1;
-    ucc_team_oob_coll_t oob = UCC_TL_TEAM_OOB(self);
+    ucc_team_oob_coll_t oob = UCC_TL_TEAM_OOB(team);
     ucc_status_t status;
 
     team->allgather_dst = (int *) ucc_malloc(sizeof(int) * team_size);
@@ -144,44 +130,57 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
     ucc_status_t status;
-    int max_trees;
-    ucc_rank_t size, rank;
+    int max_trees, n_sbgps;
+//    size_t tree_size;
+    ucc_rank_t size; //, rank;
+    uint32_t cfg_ctrl_size;
+    ucc_subset_t subset = {
+        .map    = UCC_TL_TEAM_MAP(self),
+        .myrank = UCC_TL_TEAM_RANK(self)
+    };
     ucc_tl_shm_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_shm_context_t);
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params->team);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     size = UCC_TL_TEAM_SIZE(self);
-    rank = UCC_TL_TEAM_RANK(self);
+    cfg_ctrl_size = UCC_TL_SHM_TEAM_LIB(self)->cfg.ctrl_size;
+//    rank = UCC_TL_TEAM_RANK(self);
 
     self->seq_num      = 1;
     self->status       = UCC_INPROGRESS;
     self->shm_buffer   = NULL;
     self->n_concurrent = UCC_TL_SHM_TEAM_LIB(self)->cfg.n_concurrent;
     self->data_size    = UCC_TL_SHM_TEAM_LIB(self)->cfg.data_size * size;
+    self->max_inline   = cfg_ctrl_size - ucc_offsetof(ucc_tl_shm_ctrl_t, data);
 
-    self->segs = ucc_malloc(sizeof(ucc_tl_shm_seg_t) * self->n_concurrent;
+    if (UCC_OK != (status = ucc_topo_init(subset, UCC_TL_CORE_CTX(self)->topo, &self->topo))) {
+        ucc_warn("failed to init team topo"); //needed?
+        return status;
+    }
+
+    if (UCC_TL_CORE_CTX(self)->topo->sock_bound != 1) {
+    	return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    self->segs = (ucc_tl_shm_seg_t *) ucc_malloc(sizeof(ucc_tl_shm_seg_t) * self->n_concurrent);
 
     if (!self->segs) {
-        return UCC_ERR_NO_MEM;
+        return UCC_ERR_NO_MEMORY;
     }
 
     max_trees = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_trees_cached;
-    self->tree_cache = ucc_malloc(max_trees *
-                                  sizeof(ucc_tl_shm_tree_cache_keys_t) +
-                                  max_trees * (sizeof(ucc_tl_shm_tree_t) *
-                                  size) + sizeof(size_t));
+//    tree_size = ucc_tl_shm_kn_tree_size(size,
+//               GET_MAX_RADIX(UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_top_radix,
+//                             UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_base_radix));
+    self->tree_cache = (ucc_tl_shm_tree_cache_t *) ucc_malloc(sizeof(size_t) +
+                       max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *));
     if (!self->tree_cache) {
-        return UCC_ERR_NO_MEM;
+        return UCC_ERR_NO_MEMORY;
     }
 
-    self->tree_cache.trees = PTR_OFFSET(self->tree_cache, max_trees *
-                                 sizeof(ucc_tl_shm_tree_cache_keys_t));
-    &self->tree_cache.size = PTR_OFFSET(self->tree_cache.trees, max_trees * //needed?
-                                 (sizeof(ucc_tl_shm_tree_t) * size));
-
-    /* Subgrouping Extensions Required :
-       need a way to compute ALL socket/numa subgroups: TODO: Val
-    */
+//    self->tree_cache->keys = PTR_OFFSET(self->tree_cache, sizeof(size_t));
+//    self->tree_cache->trees = PTR_OFFSET(self->tree_cache->keys,
+//                              max_trees * sizeof(ucc_tl_shm_tree_cache_keys_t));
 
     /* sbgp type gl is either SOCKET_LEADERS or NUMA_LEADERS depending on the config: grouping type */
     self->leaders_group = ucc_topo_get_sbgp(self->topo, UCC_SBGP_SOCKET_LEADERS);
@@ -189,34 +188,36 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     /* sbgp type is either SOCKET or NUMA depending on the config: grouping type */
     self->n_base_groups = self->leaders_group->group_size;
     ucc_assert(self->n_base_groups == self->topo->n_sockets);
-//    self->base_groups[i] = ucc_team_topo_get_sockets/numas(); //TODO val //what is this?
+
+    if (UCC_OK != (status = ucc_topo_get_all_sockets(self->topo, &self->base_groups, &n_sbgps))) { // send correct params and what should n_sbgrps be?
+    	return status;
+    }
     // the above call should return ALL socket/numa sbgps including size=1 subgroups */
 
-    if (UCC_OK != (status = ucc_tl_shm_rank_group_id_map_init(team))) {
+    if (UCC_OK != (status = ucc_tl_shm_rank_group_id_map_init(self))) {
         return status;
     }
 
-    if (UCC_OK != (status = ucc_tl_shm_group_rank_map_init(team))) {
+    if (UCC_OK != (status = ucc_tl_shm_group_rank_map_init(self))) {
         return status;
     }
 
     /* Build ctrl_map */
     size_t ctrl_size = 0;
-    uint64_t *rank_ctrl_offsets = ucc_malloc(size * sizeof(uint64_t));
+    uint64_t *rank_ctrl_offsets = (uint64_t *) ucc_malloc(size * sizeof(uint64_t));
     uint64_t ctrl_offset = 0;
-    uint32_t cfg_ctrl_size = UCC_TL_SHM_TEAM_LIB(team)->cfg.ctrl_size;
     size_t page_size = ucc_get_page_size();
     uint32_t group_size;
     ucc_rank_t team_rank;
 
-    for (int i = 0; i < team->n_base_groups; i++) {
-        group_size = team->base_groups[i]->group_size;
+    for (int i = 0; i < self->n_base_groups; i++) {
+        group_size = self->base_groups[i].group_size;
         if (i > 1) {
             ctrl_offset = ctrl_size;
         }
         ctrl_size += ucc_align_up(group_size * cfg_ctrl_size, page_size);
-        for (int j=0; j<team->base_groups[i]->group_size; j++) {
-            team_rank = ucc_sbgp_rank2team(team->base_groups[i], j);
+        for (int j=0; j < self->base_groups[i].group_size; j++) {
+            team_rank = ucc_ep_map_eval(self->base_groups[i].map, j);
             rank_ctrl_offsets[team_rank] = ctrl_offset +
                                            team_rank * cfg_ctrl_size;
         }
@@ -224,9 +225,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     self->ctrl_size = ctrl_size;
 
     /* ucc_ep_map_from_array64 same as ucc_ep_map_from_array but for array of 8 byte values */
-    self->ctrl_map = ucc_ep_map_from_array64(rank_ctrl_offsets, size, size, 1);\
+    self->ctrl_map = ucc_ep_map_from_array_64(&rank_ctrl_offsets, size, size, 1);
 
-    status = ucc_shm_seg_alloc(self);
+    status = ucc_tl_shm_seg_alloc(self);
 
     return status;
 }
@@ -239,10 +240,6 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_shm_team_t)
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_shm_team_t, ucc_base_team_t);
 UCC_CLASS_DEFINE(ucc_tl_shm_team_t, ucc_tl_team_t);
 
-ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
-                                   ucc_base_team_t *team,
-                                   ucc_coll_task_t **task);
-
 ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
 {
 	ucc_tl_shm_team_t *team = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
@@ -254,8 +251,16 @@ ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
 		}
 	}
 
-	ucc_free(team->segs);
-	UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_shm_team_t)(tl_team);
+    for (int i = 0; i < team->tree_cache->size; i++) {
+        ucc_free(team->tree_cache->elems[i]->tree);
+        ucc_free(team->tree_cache->elems[i]);
+    }
+    ucc_free(team->tree_cache);
+    ucc_free(team->group_rank_map.array.map); //free ucc_ep_map_t array like this?
+    ucc_free(team->rank_group_id_map.array.map);
+    ucc_free(team->ctrl_map.array.map);
+    ucc_free(team->segs);
+    UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_shm_team_t)(tl_team);
     return UCC_OK;
 }
 
@@ -282,7 +287,7 @@ ucc_status_t ucc_tl_shm_team_create_test(ucc_base_team_t *tl_team)
     int shmid = team->allgather_dst[0];
 
     if (UCC_TL_TEAM_RANK(team) > 0) {
-        team->shm_buffer = (shmem_sync_t *) shmat(shmid, NULL, 0);
+        team->shm_buffer = (void *) shmat(shmid, NULL, 0);
         if (team->shm_buffer == (void *) -1) {
             tl_error(team->super.super.context->lib,
                      "Child failed to attach to shmseg, errno: %s\n",
