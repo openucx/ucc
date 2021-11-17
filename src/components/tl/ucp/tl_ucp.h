@@ -53,9 +53,10 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t            allreduce_sra_kn_n_frags;
     uint32_t            allreduce_sra_kn_pipeline_depth;
     int                 allreduce_sra_kn_seq;
+    int                 allreduce_sra_kn_no_scratch;
+    int                 reduce_avg_pre_op;
     size_t              allreduce_sra_kn_frag_thresh;
     size_t              allreduce_sra_kn_frag_size;
-    int                 reduce_avg_pre_op;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {

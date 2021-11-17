@@ -136,4 +136,15 @@ static inline ptrdiff_t ucc_sra_kn_get_offset(size_t count, size_t dt_size,
     return offset;
 }
 
+static inline void ucc_sra_kn_peer_block_seg(ucc_knomial_pattern_t *p,
+                                             ucc_rank_t peer, ucc_rank_t step_radix,
+                                             size_t block_count, size_t *count,
+                                             size_t *offset)
+{
+    ucc_rank_t seg_index;
+
+    seg_index = ucc_sra_kn_compute_seg_index(peer, p->radix_pow, p);
+    *count = ucc_sra_kn_compute_seg_size(block_count, step_radix, seg_index);
+    *offset = ucc_sra_kn_compute_seg_offset(block_count, step_radix, seg_index);
+}
 #endif
