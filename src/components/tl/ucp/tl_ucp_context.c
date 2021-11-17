@@ -364,6 +364,13 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
     int                        seg;
     void *                     addr;
 
+    if (size < 2) {
+        tl_error(
+            ctx->super.super.lib,
+            "oob.n_oob_eps set to incorrect value for remote exchange (%d)",
+            size);
+        return UCC_ERR_INVALID_PARAM;
+    }
     if (nsegs > MAX_NR_SEGMENTS) {
         tl_error(ctx->super.super.lib, "cannot map more than %d segments",
                  MAX_NR_SEGMENTS);
