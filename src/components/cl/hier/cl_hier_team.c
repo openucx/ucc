@@ -35,7 +35,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     ucc_status_t       status;
     ucc_hier_sbgp_t   *hs;
     ucc_config_names_array_t  *tls;
-    ucc_team_subset_t          subset;
+    ucc_subset_t               subset;
     struct ucc_team_team_desc *d;
 
     if (!params->team->topo) {
@@ -58,8 +58,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
         hs->score = NULL;
         hs->sbgp  = NULL;
         if (hs->state == UCC_HIER_SBGP_ENABLED) {
-            hs->sbgp =
-                ucc_team_topo_get_sbgp(params->team->topo, hs->sbgp_type);
+            hs->sbgp = ucc_topo_get_sbgp(params->team->topo, hs->sbgp_type);
             if (hs->sbgp->status != UCC_SBGP_ENABLED) {
                 /* SBGP of that type either not exists or the calling process
                    is not part of subgroup */
