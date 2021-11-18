@@ -44,6 +44,7 @@ const std::map<std::string, ucc_datatype_t> ucc_pt_datatype_map = {
     {"int16", UCC_DT_INT16},
     {"uint16", UCC_DT_UINT16},
     {"float16", UCC_DT_FLOAT16},
+    {"bfloat16", UCC_DT_BFLOAT16},
     {"int32", UCC_DT_INT32},
     {"float32", UCC_DT_FLOAT32},
     {"int64", UCC_DT_INT64},

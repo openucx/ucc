@@ -56,6 +56,11 @@ CUDA_REDUCE_ALPHA_WITH_OP(SUM_WITH_PROD, DO_OP_SUM, DO_OP_PROD)
 CUDA_REDUCE_ALPHA_WITH_OP_SPECIALIZED(SUM_WITH_PROD, DO_OP_SUM_HALF, __half,
                                       DO_OP_PROD_HALF)
 
+#if CUDART_VERSION >= 11000
+CUDA_REDUCE_ALPHA_WITH_OP_SPECIALIZED(SUM_WITH_PROD, DO_OP_SUM_BFLOAT16,
+                                      __nv_bfloat16, DO_OP_PROD_BFLOAT16)
+#endif
+
 #define LAUNCH_KERNEL(NAME, type, src1, src2, dest, size, count, ld, alpha, s, \
                       b, t)                                                    \
     do {                                                                       \
@@ -129,6 +134,12 @@ ucc_mc_cuda_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
         DT_REDUCE_FLOAT(double, reduce_op, src1, src2, dst, n_vectors, count,
                         ld, alpha, vector_op, stream, bk, th);
         break;
+#if CUDART_VERSION >= 11000
+    case UCC_DT_BFLOAT16:
+        DT_REDUCE_FLOAT(__nv_bfloat16, reduce_op, src1, src2, dst, n_vectors,
+                        count, ld, alpha, vector_op, stream, bk, th);
+        break;
+#endif
     default:
         mc_error(&ucc_mc_cuda.super, "unsupported reduction type (%s)",
                  ucc_datatype_str(dt));

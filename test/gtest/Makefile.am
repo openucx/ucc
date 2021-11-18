@@ -91,6 +91,7 @@ gtest_SOURCES =                     \
 	utils/test_string.cc            \
 	utils/test_ep_map.cc            \
 	utils/test_lock_free_queue.cc   \
+	utils/test_math.cc              \
 	coll_score/test_score.cc        \
 	coll_score/test_score_str.cc    \
 	coll_score/test_score_update.cc

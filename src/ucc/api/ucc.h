@@ -210,7 +210,7 @@ typedef enum {
  *
  */
 typedef enum {
-    UCC_DT_INT8           = 0,
+    UCC_DT_INT8 = 0,
     UCC_DT_INT16,
     UCC_DT_INT32,
     UCC_DT_INT64,
@@ -223,6 +223,7 @@ typedef enum {
     UCC_DT_FLOAT16,
     UCC_DT_FLOAT32,
     UCC_DT_FLOAT64,
+    UCC_DT_BFLOAT16,
     UCC_DT_USERDEFINED,
     UCC_DT_OPAQUE
 } ucc_datatype_t;

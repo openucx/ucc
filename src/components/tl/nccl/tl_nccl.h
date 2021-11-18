@@ -13,6 +13,17 @@
 #include "components/tl/ucc_tl_log.h"
 #include "utils/ucc_mpool.h"
 
+#include <cuda_runtime.h>
+#if CUDART_VERSION >= 11000
+#ifndef __CUDA_BF16_TYPES_EXIST__
+#define __CUDA_BF16_TYPES_EXIST__
+#endif
+#endif
+// Until NCCL will provide run-time method to query ncclBfloat16 support, we will use this check.
+// In corner case NCCL was compiled with older version of CUDA than UCC, that doesn't support Bfloat16,
+// The program will crash. In case UCC was compiled with older version of CUDA that doesn't support
+// Bfloat16, but NCCL was compiled with newer version of CUDA that does support, we won't support
+// this NCCL datatype.
 #include <nccl.h>
 #include <cuda.h>
 

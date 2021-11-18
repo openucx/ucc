@@ -41,6 +41,8 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 /* need to limit the init value so that "prod" operation
                    would not grow too large. We have teams up to 16 procs
                    in gtest, this would result in prod ~2**48 */
+                /* bFloat16 will be assigned with the floats matching the
+                   uint16_t bit pattern*/
                 ptr[i] = (typename T::type)((i + r + 1) % 8);
             }
 
@@ -127,7 +129,12 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 res = T::do_op(res, ((typename T::type *)((ctxs[r])->init_buf))[i]);
             }
             if (T::redop == UCC_OP_AVG) {
-                res = res / (typename T::type)ctxs.size();
+                if (T::dt == UCC_DT_BFLOAT16){
+                    float32tobfloat16(bfloat16tofloat32(&res) / (float)ctxs.size(),
+                                      &res);
+                } else {
+                    res = res / (typename T::type)ctxs.size();
+                }
             }
             for (int r = 0; r < ctxs.size(); r++) {
                 T::assert_equal(res, dsts[r][i]);
@@ -297,7 +304,8 @@ class test_allreduce_avg_order : public test_allreduce<T> {
 
 using test_allreduce_avg_order_type =
     ::testing::Types<ReductionTest<UCC_DT_FLOAT32, avg>,
-                     ReductionTest<UCC_DT_FLOAT64, avg>>;
+                     ReductionTest<UCC_DT_FLOAT64, avg>,
+                     ReductionTest<UCC_DT_BFLOAT16, avg>>;
 TYPED_TEST_CASE(test_allreduce_avg_order, test_allreduce_avg_order_type);
 
 TYPED_TEST(test_allreduce_avg_order, avg_post_op)

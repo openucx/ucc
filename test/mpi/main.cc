@@ -169,6 +169,14 @@ static ucc_datatype_t dtype_str_to_type(std::string dtype)
         return UCC_DT_FLOAT32;
     } else if (dtype == "float64") {
         return UCC_DT_FLOAT64;
+    } else if (dtype == "bfloat16") {
+        return UCC_DT_BFLOAT16;
+    } else if (dtype == "float16") {
+        return UCC_DT_FLOAT16;
+    } else if (dtype == "int128") {
+        return UCC_DT_INT128;
+    } else if (dtype == "uint128") {
+        return UCC_DT_UINT128;
     } else {
         std::cerr << "incorrect dtype: " << dtype << std::endl;
         PrintHelp();

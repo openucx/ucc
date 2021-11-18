@@ -64,6 +64,13 @@ CUDA_REDUCE_WITH_OP_SPECIALIZED(MIN, DO_OP_MIN_HALF, __half)
 CUDA_REDUCE_WITH_OP_SPECIALIZED(SUM, DO_OP_SUM_HALF, __half)
 CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_HALF, __half)
 
+#if CUDART_VERSION >= 11000
+CUDA_REDUCE_WITH_OP_SPECIALIZED(MAX, DO_OP_MAX_BFLOAT16, __nv_bfloat16)
+CUDA_REDUCE_WITH_OP_SPECIALIZED(MIN, DO_OP_MIN_BFLOAT16, __nv_bfloat16)
+CUDA_REDUCE_WITH_OP_SPECIALIZED(SUM, DO_OP_SUM_BFLOAT16, __nv_bfloat16)
+CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_BFLOAT16, __nv_bfloat16)
+#endif
+
 #define LAUNCH_KERNEL(NAME, type, src1, src2, dest, size, count, ld, s, b, t)  \
     do {                                                                       \
         UCC_REDUCE_CUDA_ ## NAME<type> <<<b, t, 0, s>>>(src1, src2, dest,      \
@@ -208,6 +215,13 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
             DT_REDUCE_FLOAT(double, op, src1, src2, dst, n_vectors, count, ld,
                             stream, bk, th);
             break;
+#if CUDART_VERSION >= 11000
+        case UCC_DT_BFLOAT16:
+            ucc_assert(2 == sizeof(__nv_bfloat16));
+            DT_REDUCE_FLOAT(__nv_bfloat16, op, src1, src2, dst, n_vectors,
+                            count, ld, stream, bk, th);
+            break;
+#endif
         default:
             mc_error(&ucc_mc_cuda.super, "unsupported reduction type (%s)", 
                      ucc_datatype_str(dt));
