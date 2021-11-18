@@ -59,25 +59,19 @@ ucc_status_t ucc_tl_cuda_alltoall_setup(ucc_tl_cuda_task_t *task)
     ucc_tl_cuda_sync_t          *sync = TASK_SYNC(task, team->rank);
     volatile ucc_tl_cuda_sync_t *peer_sync;
     ucc_tl_cuda_cache_t         *cache;
-    ucc_mem_attr_t               mem_attr;
     ucc_status_t                 status;
     size_t                       data_len;
     ucc_rank_t                   i;
 
     data_len = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
-    mem_attr.field_mask   = UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
-                            UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
-    mem_attr.alloc_length = data_len;
-    status = ucc_mc_get_mem_attr(args->src.info.buffer, &mem_attr);
+    status = ucc_tl_cuda_mem_info_get(args->src.info.buffer, data_len, team,
+                                      &task->alltoall_ce.mem_info);
     if (ucc_unlikely(status != UCC_OK)) {
-        return status;
+        goto exit_err;
     }
-    sync->ptr    = mem_attr.base_address;
-    sync->length = mem_attr.alloc_length;
-    sync->offset = (ptrdiff_t)args->src.info.buffer - (ptrdiff_t)sync->ptr;
-    CUDACHECK_GOTO(cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sync->handle,
-                                       sync->ptr),
-                   exit_err, status, UCC_TL_TEAM_LIB(team));
+    sync->ptr = task->alltoall_ce.mem_info.ptr;
+    sync->length = task->alltoall_ce.mem_info.length;
+    sync->offset = task->alltoall_ce.mem_info.offset;
     CUDACHECK_GOTO(cudaEventRecord(sync->ipc_event_local, team->stream),
                    exit_err, status, UCC_TL_TEAM_LIB(team));
     __sync_synchronize();

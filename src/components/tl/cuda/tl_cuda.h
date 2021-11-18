@@ -108,6 +108,13 @@ typedef struct ucc_tl_cuda_sync_data {
     cudaEvent_t ipc_event_remote;
 } ucc_tl_cuda_sync_data_t;
 
+typedef struct ucc_tl_cuda_mem_info {
+    void               *ptr;
+    size_t              length;
+    size_t              offset;
+    cudaIpcMemHandle_t  handle;
+} ucc_tl_cuda_mem_info_t;
+
 typedef struct ucc_tl_cuda_sync {
     uint32_t                 seq_num[2];
     void                    *ptr;
@@ -142,8 +149,9 @@ typedef struct ucc_tl_cuda_task {
     uint32_t        coll_id;
     union {
         struct {
-            void *peer_map_addr[UCC_TL_CUDA_MAX_PEERS];
-            void *copy_done;
+            ucc_tl_cuda_mem_info_t mem_info;
+            void                   *peer_map_addr[UCC_TL_CUDA_MAX_PEERS];
+            void                   *copy_done;
         } alltoall_ce;
     };
 } ucc_tl_cuda_task_t;

@@ -8,6 +8,7 @@
 #define UCC_TL_CUDA_COLL_H_
 
 #include "tl_cuda.h"
+#include "core/ucc_mc.h"
 
 #define TASK_TEAM(_task)                                                       \
     (ucc_derived_of((_task)->super.team, ucc_tl_cuda_team_t))
@@ -57,6 +58,10 @@ ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
     task->coll_id = task->seq_num % max_concurrent;
     return task;
 }
+
+ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
+                                      ucc_tl_cuda_team_t *team,
+                                      ucc_tl_cuda_mem_info_t *mi);
 
 ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
                                     ucc_base_team_t *team,

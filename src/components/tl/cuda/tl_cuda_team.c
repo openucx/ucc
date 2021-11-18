@@ -239,6 +239,7 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
 {
     ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     ucc_tl_cuda_lib_t  *lib  = UCC_TL_CUDA_TEAM_LIB(team);
+    ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_CUDA;
     ucc_coll_score_t   *score;
     ucc_status_t        status;
 
@@ -246,7 +247,7 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
         ucc_coll_score_build_default(tl_team, UCC_TL_CUDA_DEFAULT_SCORE,
                                      ucc_tl_cuda_coll_init,
                                      UCC_TL_CUDA_SUPPORTED_COLLS,
-                                     NULL, 0, &score);
+                                     &mt, 1, &score);
     if (UCC_OK != status) {
         return status;
     }
