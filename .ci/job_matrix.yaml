@@ -64,7 +64,6 @@ steps:
   #============================================================================
   - name: Start docker
     agentSelector: "{nodeLabel: 'swx-clx01'}"
-    #containerSelector: "{name:'skip-container'}"
     run: |
       echo "INFO: Start docker containers"
       DOCKER_IMAGE_NAME="${UCC_DOCKER_IMAGE_NAME}:${BUILD_ID}"
