@@ -24,13 +24,16 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
     dt = _dt;
     args.coll_type = UCC_COLL_TYPE_REDUCE_SCATTER;
 
+
     if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT,
                     team.comm) ||
-        skip_reduce((count % comm_size != 0), TEST_SKIP_NOT_SUPPORTED,
+        skip_reduce((count < comm_size), TEST_SKIP_NOT_SUPPORTED,
                     team.comm)) {
         return;
     }
 
+    count   = count - (count % comm_size);
+    msgsize = _msgsize = count * dt_size;
     if (TEST_NO_INPLACE == inplace) {
         args.dst.info.count = count / comm_size;
 

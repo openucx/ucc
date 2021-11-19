@@ -129,4 +129,11 @@ ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
                                    ucc_rank_t full_size, int need_free);
 
 void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len);
+
+ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size);
+
+ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map);
+
+void ucc_ep_map_destroy_inverse(ucc_ep_map_t *inv_map);
+
 #endif
