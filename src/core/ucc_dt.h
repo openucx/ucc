@@ -15,8 +15,8 @@ typedef struct ucc_dt_generic {
 
 #define UCC_DT_PREDEFINED_ID(_dt) ((_dt) >> UCC_DATATYPE_SHIFT)
 
-#define UCC_DT_IS_GENERIC(_datatype)                                    \
-    (((_datatype) & UCC_DATATYPE_CLASS_MASK) == UCC_DATATYPE_GENERIC)
+#define UCC_DT_IS_GENERIC(_dt)                                    \
+    (((_dt) & UCC_DATATYPE_CLASS_MASK) == UCC_DATATYPE_GENERIC)
 
 #define UCC_DT_IS_PREDEFINED(_dt) \
     (((_dt) & UCC_DATATYPE_CLASS_MASK) == UCC_DATATYPE_PREDEFINED)
@@ -63,7 +63,4 @@ static inline size_t ucc_dt_size(ucc_datatype_t dt)
     // TODO remove ucc_likely once custom datatype is implemented
     return 0;
 }
-
-
-
 #endif

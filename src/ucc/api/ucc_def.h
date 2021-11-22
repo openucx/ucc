@@ -159,7 +159,7 @@ typedef size_t ucc_context_addr_len_t;
  */
 typedef struct ucc_ee*      ucc_ee_h;
 
-
+typedef struct ucc_dt_generic ucc_dt_generic_t;
 /**
  * @ingroup UCC_DATATYPES
  * @brief Helper enum for generic/predefined datatype representation
@@ -168,7 +168,7 @@ typedef struct ucc_ee*      ucc_ee_h;
 typedef enum {
     UCC_DATATYPE_PREDEFINED = 0,
     UCC_DATATYPE_GENERIC    = UCC_BIT(0),
-    UCC_DATATYPE_SHIFT      = 1,
+    UCC_DATATYPE_SHIFT      = 3,
     UCC_DATATYPE_CLASS_MASK = UCC_MASK(UCC_DATATYPE_SHIFT)
 } ucc_dt_type_t;
 

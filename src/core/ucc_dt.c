@@ -47,14 +47,8 @@ void ucc_dt_destroy(ucc_datatype_t datatype)
 {
     ucc_dt_generic_t *dt_gen;
 
-    switch (datatype & UCC_DATATYPE_CLASS_MASK) {
-    case UCC_DATATYPE_PREDEFINED:
-        break;
-    case UCC_DATATYPE_GENERIC:
+    if (UCC_DT_IS_GENERIC(datatype)) {
         dt_gen = ucc_dt_to_generic(datatype);
         ucc_free(dt_gen);
-        break;
-    default:
-        break;
     }
 }

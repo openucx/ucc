@@ -110,13 +110,17 @@ static inline ucc_status_t ucc_mc_reduce_userdefined(void *src1, void *src2,
                                                      size_t count, size_t stride,
                                                      ucc_dt_generic_t *dt)
 {
-    int i;
+    ucc_reduce_cb_params_t params = {
+        .src1      = src1,
+        .src2      = src2,
+        .dst       = dst,
+        .n_vectors = n_vectors,
+        .count     = count,
+        .stride    = stride,
+        .dt        = dt
+    };
 
-    dt->ops.reduce.cb(src1, src2, dst, count, dt->ops.reduce.ctx);
-    for (i = 1; i < n_vectors; i++) {
-        dt->ops.reduce.cb(PTR_OFFSET(src2, stride*i), dst, dst, count,
-                           dt->ops.reduce.ctx);
-    }
+    dt->ops.reduce.cb(&params);
     return UCC_OK;
 }
 
@@ -159,7 +163,7 @@ ucc_dt_reduce_multi_alpha(void *src1, void *src2, void *dst, size_t n_vectors,
 {
     /* reduce_multi is used for OP_AVG implementation that can only be
        used with predefined dtypes */
-    ucc_assert(!UCC_DT_IS_PREDEFINED(dt));
+    ucc_assert(UCC_DT_IS_PREDEFINED(dt));
     return ucc_mc_reduce_multi_alpha(src1, src2, dst, n_vectors, count,
                                      stride, dt, args->op,
                                      vector_op, alpha, mem_type);

@@ -157,6 +157,19 @@ typedef enum {
 } ucc_coll_type_t;
 
 /**
+ *  @ingroup UCC_COLLECTIVES_DT
+ */
+typedef enum ucc_memory_type {
+    UCC_MEMORY_TYPE_HOST,         /*!< Default system memory */
+    UCC_MEMORY_TYPE_CUDA,         /*!< NVIDIA CUDA memory */
+    UCC_MEMORY_TYPE_CUDA_MANAGED, /*!< NVIDIA CUDA managed memory */
+    UCC_MEMORY_TYPE_ROCM,         /*!< AMD ROCM memory */
+    UCC_MEMORY_TYPE_ROCM_MANAGED, /*!< AMD ROCM managed system memory */
+    UCC_MEMORY_TYPE_LAST,
+    UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
+} ucc_memory_type_t;
+
+/**
  *
  *  @ingroup UCC_DATATYPE
  *
@@ -167,11 +180,11 @@ typedef enum {
  *  Description
  *
  *  @ref ucc_datatype_t represents the datatypes supported by the UCC library’s
- *  collective and reduction operations. The standard operations (predefined)
+ *  collective and reduction operations. The predefined operations
  *  are signed and unsigned integers of various sizes, float 16, 32, and 64, and
- *  user-defined datatypes. User-defined datatypes cab created using
- *  @ref ucc_dt_create_generic call and can support user-defined reduction
- *  operations. Standard (predefined) reduction operations can be used only with
+ *  user-defined datatypes. User-defined datatypes are created using
+ *  @ref ucc_dt_create_generic interface and can support user-defined reduction
+ *  operations. Predefined reduction operations can be used only with
  *  predefined datatypes.
  *
  *  @endparblock
@@ -228,10 +241,37 @@ typedef enum {
 
 /**
  * @ingroup UCC_DATATYPE
+ * @brief Descriptor of user-defined reduction callback
+ *
+ * This structure is the argument to the reduce.cb callback. It must implement
+ * the reduction of n_vectors + 1 data vectors each containing "count" elements.
+ * First vector is "src1", other n_vectors have start address
+ * v_j = src2 + count * dt_extent * stride * j.
+ * The result is stored in dst, so that
+ * dst[i] = src1[i] + v0[i] + v1[i] + ... +v_nvecttors[i],
+ * for i \in [0:count), where "+" represents user-defined reduction of 2 elements
+ */
+
+typedef struct ucc_reduce_cb_params {
+    uint64_t          mask;      /*< for backward compatibility. currently ignored. */
+    void             *src1;      /*< input buffer */
+    void             *src2;      /*< input buffer: represents n_vectors buffers with
+                                   offset "stride" between them */
+    void             *dst;       /*< destination buffer */
+    size_t            n_vectors; /*< number of vetors from src2 to reduce */
+    size_t            count;     /*< number of elements in one vector */
+    size_t            stride;    /*< stride in bytes between the vectors in src2 */
+    ucc_dt_generic_t *dt;        /*< pointer to user-defined datatype used for
+                                     reduction */
+    void             *cb_ctx;    /*< user-defined context as defined
+                                   by @ref ucc_generic_dt_ops::reduce.cb_ctx */
+} ucc_reduce_cb_params_t;
+/**
+ * @ingroup UCC_DATATYPE
  * @brief UCC generic data type descriptor
  *
- * This structure provides a generic datatype descriptor that
- * is used to create user-defined datatypes.
+ * This structure provides a generic datatype descriptor that is used to create
+ * user-defined datatypes.
  */
 
 typedef struct ucc_generic_dt_ops {
@@ -314,7 +354,7 @@ typedef struct ucc_generic_dt_ops {
      * @param [in]  src            Source to unpack the data from.
      * @param [in]  length         Length to unpack.
      *
-     * @return UCS_OK or an error if unpacking failed.
+     * @return UCC_OK or an error if unpacking failed.
      */
     ucc_status_t (*unpack)(void *state, size_t offset, const void *src, size_t length);
 
@@ -340,18 +380,12 @@ typedef struct ucc_generic_dt_ops {
      *
      * The pointer refers to user-defined reduction routine.
      *
-     * @param [in]  src1     input buffer
-     * @param [in]  src2     input buffer
-     * @param [in]  dst      result buffer
-     * @param [in]  count    number of dtypes to reduce
-     * @param [in]  context  user-defined context as defined
-     *                       by @ref ucc_generic_dt_ops::reduce.ctx
+     * @param [in]  params reduction descriptor
      */
 
     struct {
-        void (*cb)(void *src1, void *src2, void *dst,
-                   ucc_count_t count, void *context);
-        void *ctx;
+        void (*cb)(const ucc_reduce_cb_params_t *params);
+        void *cb_ctx;
     } reduce;
 } ucc_generic_dt_ops_t;
 
@@ -360,13 +394,12 @@ typedef struct ucc_generic_dt_ops {
  * @ingroup UCC_DATATYPE
  * @brief Create a generic datatype.
  *
- * This routine creates a generic datatype object.
- * The generic datatype is described by the @a ops @ref ucc_generic_dt_ops_t
- * "object" which provides a table of routines defining the operations for
- * generic datatype manipulation. Typically, generic datatypes are used for
- * integration with datatype engines provided with MPI implementations (MPICH,
- * Open MPI, etc).
- * The application is responsible for releasing the @a datatype_p  object using
+ * This routine creates a generic datatype object. The generic datatype is
+ * described by the @a ops @ref ucc_generic_dt_ops_t "object" which provides
+ * a table of routines defining the operations for generic datatype manipulation.
+ * Typically, generic datatypes are used for integration with datatype engines
+ * provided with MPI implementations (MPICH, Open MPI, etc). The application
+ * is responsible for releasing the @a datatype_p  object using
  * @ref ucc_dt_destroy "ucc_dt_destroy()" routine.
  *
  * @param [in]  ops          Generic datatype function table as defined by
@@ -1710,19 +1743,6 @@ typedef enum {
                                                             Useful for one-sided
                                                             collectives. */
 } ucc_coll_args_flags_t;
-
-/**
- *  @ingroup UCC_COLLECTIVES_DT
- */
-typedef enum ucc_memory_type {
-    UCC_MEMORY_TYPE_HOST,         /*!< Default system memory */
-    UCC_MEMORY_TYPE_CUDA,         /*!< NVIDIA CUDA memory */
-    UCC_MEMORY_TYPE_CUDA_MANAGED, /*!< NVIDIA CUDA managed memory */
-    UCC_MEMORY_TYPE_ROCM,         /*!< AMD ROCM memory */
-    UCC_MEMORY_TYPE_ROCM_MANAGED, /*!< AMD ROCM managed system memory */
-    UCC_MEMORY_TYPE_LAST,
-    UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
-} ucc_memory_type_t;
 
 /**
  *  @ingroup UCC_COLLECTIVES_DT
