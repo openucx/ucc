@@ -7,6 +7,7 @@
 #include "config.h"
 #include "tl_ucp_reduce.h"
 #include "tl_ucp_sendrecv.h"
+#include "reduce_scatter.h"
 #include "core/ucc_progress_queue.h"
 #include "coll_patterns/sra_knomial.h"
 #include "utils/ucc_math.h"
@@ -279,9 +280,17 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
     size_t             dt_size   = ucc_dt_size(dt);
     size_t             data_size = count * dt_size;
     ucc_memory_type_t  mem_type  = coll_args->args.dst.info.mem_type;
-    ucc_tl_ucp_task_t *task;
-    ucc_status_t       status;
+    ucc_knomial_pattern_t p;
+    ucc_tl_ucp_task_t    *task;
+    ucc_status_t          status;
 
+    ucc_knomial_pattern_init(size, rank, radix, &p);
+    if (coll_args->args.coll_type == UCC_COLL_TYPE_REDUCE_SCATTER &&
+        p.n_extra > 0) {
+        /* ReduceScatter Knomial currently supports only full kn tree
+           case - no extra. fallback to ring. */
+        return ucc_tl_ucp_reduce_scatter_ring_init(coll_args, team, task_h);
+    }
     task                 = ucc_tl_ucp_init_task(coll_args, team);
     task->super.post     = ucc_tl_ucp_reduce_scatter_knomial_start;
     task->super.progress = ucc_tl_ucp_reduce_scatter_knomial_progress;
@@ -289,8 +298,8 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
 
     ucc_assert(coll_args->args.src.info.mem_type ==
                coll_args->args.dst.info.mem_type);
-    ucc_knomial_pattern_init(size, rank, radix, &task->reduce_scatter_kn.p);
     task->reduce_scatter_kn.scratch_mc_header = NULL;
+    task->reduce_scatter_kn.p                 = p;
     /* Scratch allocation can be skipped only when:
        allreduce_sra_no_scratch params is set to "Y" - we want to try avoiding
        scratch space allocation           &&
