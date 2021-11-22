@@ -20,7 +20,7 @@
 
 
 #define GET_COUNT(_args, _size)                                         \
-    ((_args).coll_type == UCC_COLL_TYPE_ALLREDUCE ?                     \
+    (((_args).coll_type == UCC_COLL_TYPE_ALLREDUCE || UCC_IS_INPLACE((_args))) ? \
      (_args).dst.info.count : (_args).dst.info.count * (_size))
 
 
@@ -296,8 +296,6 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
     task->super.progress = ucc_tl_ucp_reduce_scatter_knomial_progress;
     task->super.finalize = ucc_tl_ucp_reduce_scatter_knomial_finalize;
 
-    ucc_assert(coll_args->args.src.info.mem_type ==
-               coll_args->args.dst.info.mem_type);
     task->reduce_scatter_kn.scratch_mc_header = NULL;
     task->reduce_scatter_kn.p                 = p;
     /* Scratch allocation can be skipped only when:

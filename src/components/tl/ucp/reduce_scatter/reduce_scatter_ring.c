@@ -89,9 +89,13 @@ ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t         prevblock, recv_data_from;
     ucc_status_t       status;
     size_t              max_block_size, block_offset, frag_count, frag_offset;
-    int step;
+    int step, is_avg;
     void *tmp[3];
 
+    if (UCC_IS_INPLACE(*args)) {
+        sbuf = args->dst.info.buffer;
+        count /= size;
+    }
 
     sendto   = ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, sendto);
     recvfrom = ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, recvfrom);
@@ -122,10 +126,12 @@ ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
         if (task->recv_completed == size - 1) {
             reduce_target = PTR_OFFSET(args->dst.info.buffer, frag_offset* dt_size);
         }
-        if (UCC_OK != (status = ucc_dt_reduce_multi(
+        is_avg = (args->reduce.predefined_op == UCC_OP_AVG) &&
+            (task->recv_completed == (size - 1));
+        if (UCC_OK != (status = ucc_tl_ucp_reduce_multi(
                            tmp[0], PTR_OFFSET(sbuf, (block_offset + frag_offset) * dt_size),
                            reduce_target, 1, frag_count, 0, dt,
-                           mem_type, args))) {
+                           mem_type, task, is_avg))) {
             tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
             task->super.super.status = status;
             return status;
@@ -185,7 +191,10 @@ static ucc_status_t ucc_tl_ucp_reduce_scatter_ring_start(ucc_coll_task_t *coll_t
     void *tmp[2];
     ucc_rank_t send_block, recv_block;
 
-
+    if (UCC_IS_INPLACE(*args)) {
+        sbuf = args->dst.info.buffer;
+        count /= size;
+    }
     task->super.super.status = UCC_INPROGRESS;
     ucc_tl_ucp_task_reset(task);
     sendto   = ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, sendto);
@@ -275,6 +284,10 @@ ucc_tl_ucp_reduce_scatter_ring_init_subset(ucc_base_coll_args_t *coll_args,
     task->reduce_scatter_ring.n_frags = n_frags;
     task->reduce_scatter_ring.frag = frag;
 
+    if (UCC_IS_INPLACE(coll_args->args)) {
+        count /= size;
+    }
+
     max_segcount = ucc_ring_block_count(count, size, 0);
     //TODO need less mem - dvivide by n_frags
     to_alloc = max_segcount + (size > 2 ? 2*max_segcount : 0);
@@ -320,6 +333,10 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args
 
     if (UCC_TL_TEAM_SIZE(tl_team) == 2) {
         return ucc_tl_ucp_reduce_scatter_knomial_init(coll_args, team, task_h);
+    }
+    if (UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.reduce_avg_pre_op &&
+        coll_args->args.reduce.predefined_op == UCC_OP_AVG) {
+        return UCC_ERR_NOT_SUPPORTED;
     }
 
     schedule = ucc_tl_ucp_get_schedule(tl_team);
