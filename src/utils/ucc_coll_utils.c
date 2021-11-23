@@ -313,45 +313,53 @@ void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len)
 }
 
 
-static uint64_t ucc_ep_map_inverse_cb(uint64_t ep, void *cb_ctx) {
-    uint64_t size = (uint64_t)cb_ctx;
-    return size - ep - 1;
-}
-
 ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size)
 {
     ucc_ep_map_t map = {
-        .type = UCC_EP_MAP_CB,
-        .ep_num = size,
-        .cb.cb = ucc_ep_map_inverse_cb,
-        .cb.cb_ctx = (void*)(uintptr_t)size
+        .type           = UCC_EP_MAP_STRIDED,
+        .ep_num         = size,
+        .strided.start  = size - 1,
+        .strided.stride = -1
     };
     return map;
+}
+
+static inline int ucc_ep_map_is_reverse(ucc_ep_map_t *map)
+{
+    return (map->type == UCC_EP_MAP_STRIDED) &&
+        (map->strided.start == map->ep_num - 1) &&
+        (map->strided.stride == -1);
 }
 
 ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map)
 {
     ucc_ep_map_t inv;
-    ucc_rank_t          i;
+    ucc_rank_t   i;
 
-    inv.type = UCC_EP_MAP_ARRAY;
-    inv.ep_num = map.ep_num;
-    inv.array.elem_size = sizeof(ucc_rank_t);
-    inv.array.map = ucc_malloc(sizeof(ucc_rank_t) * map.ep_num, "inv_map");
-    if (!inv.array.map) {
-        ucc_error("failed to allocate %zd bytes for inv map\n",
-                  sizeof(ucc_rank_t) * map.ep_num);
-        return UCC_ERR_NO_MEMORY;
-    }
-    for (i = 0; i < map.ep_num; i++) {
-        ucc_rank_t r = (ucc_rank_t)ucc_ep_map_eval(map, i);
-        *((ucc_rank_t*)PTR_OFFSET(inv.array.map, sizeof(ucc_rank_t) * r)) = i;
+    if (ucc_ep_map_is_reverse(&map)) {
+        inv = map;
+    } else {
+        inv.type = UCC_EP_MAP_ARRAY;
+        inv.ep_num = map.ep_num;
+        inv.array.elem_size = sizeof(ucc_rank_t);
+        inv.array.map = ucc_malloc(sizeof(ucc_rank_t) * map.ep_num, "inv_map");
+        if (!inv.array.map) {
+            ucc_error("failed to allocate %zd bytes for inv map\n",
+                      sizeof(ucc_rank_t) * map.ep_num);
+            return UCC_ERR_NO_MEMORY;
+        }
+        for (i = 0; i < map.ep_num; i++) {
+            ucc_rank_t r = (ucc_rank_t)ucc_ep_map_eval(map, i);
+            *((ucc_rank_t*)PTR_OFFSET(inv.array.map, sizeof(ucc_rank_t) * r)) = i;
+        }
     }
     *inv_map = inv;
     return UCC_OK;
 }
 
-void ucc_ep_map_destroy_inverse(ucc_ep_map_t *inv_map)
+void ucc_ep_map_destroy(ucc_ep_map_t *map)
 {
-    ucc_free(inv_map->array.map);
+    if (map->type == UCC_EP_MAP_ARRAY) {
+        ucc_free(map->array.map);
+    }
 }

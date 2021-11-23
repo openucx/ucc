@@ -241,7 +241,7 @@ ucc_tl_ucp_reduce_scatter_ring_finalize(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
 
     if (task->reduce_scatter_ring.inv_map.type != UCC_EP_MAP_FULL) {
-        ucc_ep_map_destroy_inverse(&task->reduce_scatter_ring.inv_map);
+        ucc_ep_map_destroy(&task->reduce_scatter_ring.inv_map);
     }
     ucc_mc_free(task->reduce_scatter_ring.scratch_mc_header);
     return ucc_tl_ucp_coll_finalize(coll_task);
