@@ -132,10 +132,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     ucc_tl_shm_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_shm_context_t);
     ucc_status_t status;
-    int          max_trees, n_sbgps;
-    ucc_rank_t   size;
-    uint32_t     cfg_ctrl_size;
+    int          max_trees, n_sbgps, i, j;
+    ucc_rank_t   size, team_rank;
+    uint32_t     cfg_ctrl_size, group_size;
     ucc_subset_t subset;
+    size_t       ctrl_size, page_size;
+    uint64_t    *rank_ctrl_offsets;
+    uint64_t     ctrl_offset;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
@@ -143,7 +146,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     subset.myrank = UCC_TL_TEAM_RANK(self);
     size          = UCC_TL_TEAM_SIZE(self);
     cfg_ctrl_size = UCC_TL_SHM_TEAM_LIB(self)->cfg.ctrl_size;
-//    rank = UCC_TL_TEAM_RANK(self);
 
     self->seq_num      = 1;
     self->status       = UCC_INPROGRESS;
@@ -213,21 +215,25 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
         return status;
     }
 
-    /* Build ctrl_map */
-    size_t ctrl_size = 0;
-    uint64_t *rank_ctrl_offsets = (uint64_t *) ucc_malloc(size * sizeof(uint64_t));
-    uint64_t ctrl_offset = 0;
-    size_t page_size = ucc_get_page_size();
-    uint32_t group_size;
-    ucc_rank_t team_rank;
+    ctrl_size   = 0;
+    ctrl_offset = 0;
+    page_size   = ucc_get_page_size();
 
-    for (int i = 0; i < self->n_base_groups; i++) {
+    rank_ctrl_offsets = (uint64_t *) ucc_malloc(size * sizeof(uint64_t),
+                                                "ctrl_offsets");
+    if (!rank_ctrl_offsets) {
+        tl_error(ctx->super.super.lib, "failed to allocate %zd bytes for ctrl_offsets",
+                 size * sizeof(uint64_t));
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    for (i = 0; i < self->n_base_groups; i++) {
         group_size = self->base_groups[i].group_size;
         if (i > 1) {
             ctrl_offset = ctrl_size;
         }
         ctrl_size += ucc_align_up(group_size * cfg_ctrl_size, page_size);
-        for (int j=0; j < self->base_groups[i].group_size; j++) {
+        for (j=0; j < self->base_groups[i].group_size; j++) {
             team_rank = ucc_ep_map_eval(self->base_groups[i].map, j);
             rank_ctrl_offsets[team_rank] = ctrl_offset +
                                            team_rank * cfg_ctrl_size;
