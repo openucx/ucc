@@ -132,7 +132,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     ucc_tl_shm_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_shm_context_t);
     ucc_status_t status;
-    int          max_trees, n_sbgps, i, j;
+    int          n_sbgps, i, j; //, max_trees; (for cache)
     ucc_rank_t   size, team_rank;
     uint32_t     cfg_ctrl_size, group_size;
     ucc_subset_t subset;
@@ -176,24 +176,24 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
         goto err_segs;
     }
 
-    max_trees = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_trees_cached;
-//    tree_size = ucc_tl_shm_kn_tree_size(size,
-//               GET_MAX_RADIX(UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_top_radix,
-//                             UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_base_radix));
-    self->tree_cache = (ucc_tl_shm_tree_cache_t *)
-        ucc_malloc(sizeof(size_t) +
-                   max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *),
-                   "tree_cache");
-    if (!self->tree_cache) {
-        tl_error(ctx->super.super.lib, "failed to allocate %zd bytes for tree_cache",
-                 sizeof(size_t) + max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *));
-        status = UCC_ERR_NO_MEMORY;
-        goto err_tree;
-    }
-    self->tree_cache->size = 0;
-//    self->tree_cache->keys = PTR_OFFSET(self->tree_cache, sizeof(size_t));
-//    self->tree_cache->trees = PTR_OFFSET(self->tree_cache->keys,
-//                              max_trees * sizeof(ucc_tl_shm_tree_cache_keys_t));
+//    max_trees = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_trees_cached;
+////    tree_size = ucc_tl_shm_kn_tree_size(size,
+////               GET_MAX_RADIX(UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_top_radix,
+////                             UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_base_radix));
+//    self->tree_cache = (ucc_tl_shm_tree_cache_t *)
+//        ucc_malloc(sizeof(size_t) +
+//                   max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *),
+//                   "tree_cache");
+//    if (!self->tree_cache) {
+//        tl_error(ctx->super.super.lib, "failed to allocate %zd bytes for tree_cache",
+//                 sizeof(size_t) + max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *));
+//        status = UCC_ERR_NO_MEMORY;
+//        goto err_tree;
+//    }
+//    self->tree_cache->size = 0;
+////    self->tree_cache->keys = PTR_OFFSET(self->tree_cache, sizeof(size_t));
+////    self->tree_cache->trees = PTR_OFFSET(self->tree_cache->keys,
+////                              max_trees * sizeof(ucc_tl_shm_tree_cache_keys_t));
 
     /* sbgp type gl is either SOCKET_LEADERS or NUMA_LEADERS depending on the config: grouping type */
     self->leaders_group = ucc_topo_get_sbgp(self->topo, UCC_SBGP_SOCKET_LEADERS);
@@ -204,6 +204,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
 
     status = ucc_topo_get_all_sockets(self->topo,
                                       &self->base_groups, &n_sbgps);
+//    while(1) {}
     if (UCC_OK != status) {
         tl_error(ctx->super.super.lib, "failed to get all base subgroups");
         goto err_sockets;
@@ -218,9 +219,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
         goto err_group_rank_map;
     }
 
-    ctrl_size   = 0;
-    ctrl_offset = 0;
-    page_size   = ucc_get_page_size();
+    self->my_group_id = ucc_ep_map_eval(self->rank_group_id_map,
+                                        UCC_TL_TEAM_RANK(self));
+    ctrl_size         = 0;
+    ctrl_offset       = 0;
+    page_size         = ucc_get_page_size();
 
     rank_ctrl_offsets = (uint64_t *) ucc_malloc(size * sizeof(uint64_t),
                                                 "ctrl_offsets");
@@ -262,9 +265,10 @@ err_group_rank_map:
     ucc_free(self->rank_group_id_map.array.map); //TODO switch to ucc_ep_map_destroy once
                                                  // it is merged to master upstream
 err_sockets:
-    ucc_free(self->tree_cache);
-err_tree:
-    ucc_free(self->segs);
+//    ucc_free(self->tree_cache);
+    return status; //remember to remove
+//err_tree:
+//    ucc_free(self->segs);
 err_segs:
     ucc_topo_cleanup(self->topo);
 
@@ -276,7 +280,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_shm_team_t)
     tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
 }
 
- UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_shm_team_t, ucc_base_team_t);
+UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_shm_team_t, ucc_base_team_t);
 UCC_CLASS_DEFINE(ucc_tl_shm_team_t, ucc_tl_team_t);
 
 ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
@@ -290,11 +294,11 @@ ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
 		}
 	}
 
-    for (int i = 0; i < team->tree_cache->size; i++) {
-        ucc_free(team->tree_cache->elems[i]->tree);
-        ucc_free(team->tree_cache->elems[i]);
-    }
-    ucc_free(team->tree_cache);
+//    for (int i = 0; i < team->tree_cache->size; i++) {
+//        ucc_free(team->tree_cache->elems[i]->tree);
+//        ucc_free(team->tree_cache->elems[i]);
+//    }
+//    ucc_free(team->tree_cache);
     ucc_free(team->group_rank_map.array.map); //free ucc_ep_map_t array like this?
     ucc_free(team->rank_group_id_map.array.map);
     ucc_free(team->ctrl_map.array.map);

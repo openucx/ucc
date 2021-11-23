@@ -22,6 +22,9 @@ ucc_status_t ucc_tl_shm_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
 static ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task)
 {
 	ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
+	ucc_free(task->tree->base_tree);
+	ucc_free(task->tree->top_tree);
+	ucc_free(task->tree);
 	ucc_free(task);
     return UCC_OK;
 }
@@ -56,6 +59,5 @@ ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
     tl_trace(team->context->lib, "init coll req %p", task);
 
 	*task_h = &task->super;
-    printf("shm_team_coll_init\n");
     return UCC_OK;
 }

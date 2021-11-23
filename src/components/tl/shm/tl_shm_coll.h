@@ -15,7 +15,7 @@ typedef struct ucc_tl_shm_task {
         struct {
             ucc_tl_shm_seg_t  *seg;
             ucc_tl_shm_tree_t *tree;
-            void              *src;
+//            void              *src;
             uint32_t           seq_num;
         };
     };
@@ -84,18 +84,18 @@ static inline int ucc_tl_shm_cache_tree_lookup(ucc_tl_shm_team_t *team,
                                                ucc_rank_t root,
                                                ucc_coll_type_t coll_type,
                                                ucc_tl_shm_tree_t **tree) {
-    ucc_tl_shm_tree_cache_t *team_cache = team->tree_cache;
-    for (int i = 0; i < team_cache->size; i++) {
-    	ucc_tl_shm_tree_cache_elems_t *elems = PTR_OFFSET(team_cache->elems,
-                                sizeof(ucc_tl_shm_tree_cache_elems_t *) * i);
-        if (elems->keys->base_radix == base_radix &&
-            elems->keys->top_radix == top_radix &&
-            elems->keys->root == root &&
-            elems->keys->coll_type == coll_type) {
-        	*tree = elems->tree;
-        	return 1;
-        }
-    }
+//    ucc_tl_shm_tree_cache_t *team_cache = team->tree_cache;
+//    for (int i = 0; i < team_cache->size; i++) {
+//    	ucc_tl_shm_tree_cache_elems_t *elems = PTR_OFFSET(team_cache->elems,
+//                                sizeof(ucc_tl_shm_tree_cache_elems_t *) * i);
+//        if (elems->keys->base_radix == base_radix &&
+//            elems->keys->top_radix == top_radix &&
+//            elems->keys->root == root &&
+//            elems->keys->coll_type == coll_type) {
+//        	*tree = elems->tree;
+//        	return 1;
+//        }
+//    }
     return 0;
 }
 
@@ -105,27 +105,31 @@ static inline void ucc_tl_shm_cache_tree(ucc_tl_shm_team_t *team,
                                          ucc_rank_t root,
                                          ucc_coll_type_t coll_type,
                                          ucc_tl_shm_tree_t *tree) {
-    ucc_tl_shm_tree_cache_t *team_cache = team->tree_cache;
-    ucc_tl_shm_tree_cache_elems_t **elem_ptr;
-    if (team_cache->size < UCC_TL_SHM_TEAM_LIB(team)->cfg.max_trees_cached) {
-        ucc_tl_shm_tree_cache_elems_t *cache_elems =
-            (ucc_tl_shm_tree_cache_elems_t *)
-            ucc_malloc(sizeof(ucc_tl_shm_tree_cache_keys_t) +
-            sizeof(ucc_tl_shm_tree_t *));
-
-        cache_elems->tree = tree;
-        cache_elems->keys->base_radix = base_radix;
-        cache_elems->keys->top_radix = top_radix;
-        cache_elems->keys->root = root;
-        cache_elems->keys->coll_type = coll_type;
-        elem_ptr = (ucc_tl_shm_tree_cache_elems_t **)
-                   PTR_OFFSET(&team_cache->elems[0],
-                   team_cache->size * sizeof(ucc_tl_shm_tree_cache_elems_t *));
-        *elem_ptr = cache_elems;
-        team_cache->size++;
-    } else {
-    	ucc_free(tree);
-    }
+//    ucc_tl_shm_tree_cache_t *team_cache = team->tree_cache;
+//    ucc_tl_shm_tree_cache_elems_t **elem_ptr;
+//    if (team->tree_cache->size < UCC_TL_SHM_TEAM_LIB(team)->cfg.max_trees_cached) {
+//        ucc_tl_shm_tree_cache_elems_t *cache_elems =
+//            (ucc_tl_shm_tree_cache_elems_t *)
+//            ucc_malloc(sizeof(ucc_tl_shm_tree_cache_keys_t) +
+//            sizeof(ucc_tl_shm_tree_t *));
+//
+//        cache_elems->tree = tree;
+//        cache_elems->keys->base_radix = base_radix;
+//        cache_elems->keys->top_radix = top_radix;
+//        cache_elems->keys->root = root;
+//        cache_elems->keys->coll_type = coll_type;
+//        elem_ptr = (ucc_tl_shm_tree_cache_elems_t **)
+//                   PTR_OFFSET(&team_cache->elems[0],
+//                   team_cache->size * sizeof(ucc_tl_shm_tree_cache_elems_t *));
+//        *elem_ptr = cache_elems;
+//        team_cache->size++;
+//    } else {
+//    	ucc_free(tree);
+//    }
+//	ucc_free(tree->base_tree);
+//	ucc_free(tree->top_tree);
+//	ucc_free(tree);
+	return;
 }
 
 #endif
