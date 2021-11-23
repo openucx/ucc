@@ -206,12 +206,15 @@ ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task)
 	ucc_coll_args_t    args  = TASK_ARGS(task);
 	ucc_rank_t         base_radix = UCC_TL_SHM_TEAM_LIB(team)->cfg.bcast_base_radix;
 	ucc_rank_t         top_radix  = UCC_TL_SHM_TEAM_LIB(team)->cfg.bcast_top_radix;
-	ucc_status_t status;
+	ucc_status_t       status;
 
     task->super.post = ucc_tl_shm_bcast_start;
     task->seq_num    = team->seq_num++;
-    *task->seg       = team->segs[task->seq_num % team->n_concurrent]; //should be *task->seg = ... or teask->seg = &...?
-    if (UCC_OK != (status = ucc_tl_shm_tree_init_bcast(team, args.root, base_radix, top_radix, &task->tree))) {
+    task->seg        = &team->segs[task->seq_num % team->n_concurrent];
+    status = ucc_tl_shm_tree_init_bcast(team, args.root, base_radix,
+                                        top_radix, &task->tree);
+    if (ucc_unlikely(UCC_OK != status)) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to init shm tree");
     	return status;
     }
 //    task->super.progress = ucc_tl_shm_bcast_progress;
