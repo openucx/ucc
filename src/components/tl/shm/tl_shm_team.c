@@ -185,7 +185,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
                  sizeof(size_t) + max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *));
         return UCC_ERR_NO_MEMORY;
     }
-
+    self->tree_cache->size = 0;
 //    self->tree_cache->keys = PTR_OFFSET(self->tree_cache, sizeof(size_t));
 //    self->tree_cache->trees = PTR_OFFSET(self->tree_cache->keys,
 //                              max_trees * sizeof(ucc_tl_shm_tree_cache_keys_t));
@@ -197,10 +197,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     self->n_base_groups = self->leaders_group->group_size;
     ucc_assert(self->n_base_groups == self->topo->n_sockets);
 
-    if (UCC_OK != (status = ucc_topo_get_all_sockets(self->topo, &self->base_groups, &n_sbgps))) { // send correct params and what should n_sbgrps be?
+    status = ucc_topo_get_all_sockets(self->topo,
+                                      &self->base_groups, &n_sbgps);
+    if (UCC_OK != status) {
+        tl_error(ctx->super.super.lib, "failed to get all base subgroups");
     	return status;
     }
-    // the above call should return ALL socket/numa sbgps including size=1 subgroups */
+    /* the above call should return ALL socket/numa sbgps including size=1 subgroups */
 
     if (UCC_OK != (status = ucc_tl_shm_rank_group_id_map_init(self))) {
         return status;
