@@ -88,7 +88,6 @@ ucc_tl_nccl_task_t * ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
     task->super.finalize           = ucc_tl_nccl_coll_finalize;
     task->super.triggered_post     = ucc_tl_nccl_triggered_post;
     task->completed                = NULL;
-    task->allgatherv_bcopy.scratch = NULL;
     if (nccl_ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
         status = ucc_mc_ee_create_event(&task->completed, UCC_EE_CUDA_STREAM);
         if (ucc_unlikely(status != UCC_OK)) {
@@ -142,9 +141,6 @@ ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
     tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
     if (task->completed) {
         ucc_mc_ee_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
-    }
-    if (task->allgatherv_bcopy.scratch) {
-        ucc_mc_free(task->allgatherv_bcopy.scratch);
     }
     ucc_tl_nccl_free_task(task);
     return status;

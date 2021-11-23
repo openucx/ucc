@@ -14,7 +14,7 @@ ucc_base_coll_alg_info_t
         [UCC_TL_NCCL_ALLGATHERV_ALG_P2P] =
             {.id   = UCC_TL_NCCL_ALLGATHERV_ALG_P2P,
              .name = "p2p",
-             .desc = "allgatherv based nccl on point to point"},
+             .desc = "allgatherv based on nccl point-to-point"},
         [UCC_TL_NCCL_ALLGATHERV_ALG_BCOPY] =
             {.id   = UCC_TL_NCCL_ALLGATHERV_ALG_BCOPY,
              .name = "bcopy",
@@ -58,7 +58,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_p2p_start(ucc_coll_task_t *coll_task)
                                                        team->stream;
     ucc_status_t        status = UCC_OK;
     void               *sbuf   = args->src.info.buffer;
-    ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info_v.buffer;
+    void               *rbuf   = args->dst.info_v.buffer;
     size_t sdt_size, rdt_size, count, displ;
     ucc_rank_t peer;
 
@@ -80,7 +80,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_p2p_start(ucc_coll_task_t *coll_task)
         if (count != 0) {
             displ = ucc_coll_args_get_displacement(
                 args, args->dst.info_v.displacements, peer);
-            NCCLCHECK_GOTO(ncclRecv((void *)(rbuf + displ * rdt_size),
+            NCCLCHECK_GOTO(ncclRecv(PTR_OFFSET(rbuf, displ * rdt_size),
                                     count * rdt_size, ncclChar, peer,
                                     team->nccl_comm, stream),
                         exit_coll, status, UCC_TL_TEAM_LIB(team));
@@ -124,7 +124,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcopy_start(ucc_coll_task_t *coll_task)
                                                         team->stream;
     ucc_status_t        status  = UCC_OK;
     void               *sbuf    = args->src.info.buffer;
-    ptrdiff_t           rbuf    = (ptrdiff_t)args->dst.info_v.buffer;
+    void               *rbuf    = args->dst.info_v.buffer;
     void               *scratch = task->allgatherv_bcopy.scratch->addr;
     size_t              max_count, rdt_size, sdt_size, displ, scount, rcount;
     ucc_rank_t          peer;
@@ -162,6 +162,14 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcopy_start(ucc_coll_task_t *coll_task)
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
     return status;
+}
+
+ucc_status_t ucc_tl_nccl_allgatherv_bcopy_finalize(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+
+    ucc_mc_free(task->allgatherv_bcopy.scratch);
+    return ucc_tl_nccl_coll_finalize(coll_task);
 }
 
 ucc_status_t ucc_tl_nccl_allgatherv_bcopy_init(ucc_base_coll_args_t *coll_args,
@@ -206,7 +214,8 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcopy_init(ucc_base_coll_args_t *coll_args,
         ucc_tl_nccl_free_task(task);
         return status;
     }
-    task->super.post = ucc_tl_nccl_allgatherv_bcopy_start;
+    task->super.post     = ucc_tl_nccl_allgatherv_bcopy_start;
+    task->super.finalize = ucc_tl_nccl_allgatherv_bcopy_finalize;
     *task_h = &task->super;
 out:
     return status;
