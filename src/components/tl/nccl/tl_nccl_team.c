@@ -120,68 +120,16 @@ free_unique_id:
     return status;
 }
 
-static ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
-{
-    ucc_tl_nccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_status_t       status = UCC_OK ;
-
-    tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
-    if (task->completed) {
-        ucc_mc_ee_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
-    }
-    UCC_TL_NCCL_PROFILE_REQUEST_FREE(task);
-    ucc_mpool_put(task);
-    return status;
-}
-
-ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *coll_task)
-{
-    ucc_tl_nccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_status_t status;
-    ucc_ev_t *post_event;
-
-    ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
-    coll_task->ee = ee;
-    tl_info(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
-
-    status = coll_task->post(coll_task);
-    if (ucc_likely(status == UCC_OK)) {
-        /* TODO: mpool */
-        post_event = ucc_malloc(sizeof(ucc_ev_t), "event");
-        if (ucc_unlikely(post_event == NULL)) {
-            tl_error(UCC_TASK_LIB(task), "failed to allocate memory for event");
-            return UCC_ERR_NO_MEMORY;
-        }
-
-        post_event->ev_type = UCC_EVENT_COLLECTIVE_POST;
-        post_event->ev_context_size = 0;
-        post_event->req = &coll_task->super;
-        ucc_ee_set_event_internal(coll_task->ee, post_event,
-                                  &coll_task->ee->event_out_queue);
-    }
-    return status;
-}
-
 ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *team,
                                    ucc_coll_task_t **task_h)
 {
-    ucc_tl_nccl_context_t *nccl_ctx  = ucc_derived_of(team->context,
-                                                      ucc_tl_nccl_context_t);
-    ucc_tl_nccl_task_t    *task;
-    ucc_status_t status;
+    ucc_tl_nccl_task_t *task;
+    ucc_status_t        status;
 
-    task = ucc_mpool_get(&nccl_ctx->req_mp);
-    ucc_coll_task_init(&task->super, coll_args, team);
-    UCC_TL_NCCL_PROFILE_REQUEST_NEW(task, "tl_nccl_task", 0);
-    task->super.finalize       = ucc_tl_nccl_coll_finalize;
-    task->super.triggered_post = ucc_tl_nccl_triggered_post;
-    task->completed            = NULL;
-    if (nccl_ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
-        status = ucc_mc_ee_create_event(&task->completed, UCC_EE_CUDA_STREAM);
-        if (ucc_unlikely(status != UCC_OK)) {
-            goto free_task;
-        }
+    task = ucc_tl_nccl_init_task(coll_args, team);
+    if (ucc_unlikely(!task)) {
+        return UCC_ERR_NO_MESSAGE;
     }
 
     switch (coll_args->args.coll_type)
@@ -220,18 +168,14 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
         status = UCC_ERR_NOT_SUPPORTED;
     }
     if (ucc_unlikely(status != UCC_OK)) {
-        goto free_event;
+        goto free_task;
     }
     tl_info(UCC_TASK_LIB(task), "init coll task %p", task);
     *task_h = &task->super;
     return status;
 
-free_event:
-    if (task->completed) {
-        ucc_mc_ee_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
-    }
 free_task:
-    ucc_mpool_put(task);
+    ucc_tl_nccl_free_task(task);
     return status;
 }
 
@@ -243,6 +187,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
     ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_CUDA;
     ucc_coll_score_t   *score;
     ucc_status_t        status;
+    int                 i;
 
     /* There can be a different logic for different coll_type/mem_type.
        Right now just init everything the same way. */
@@ -252,6 +197,19 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
                            &mt, 1, &score);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
+    }
+
+    for (i = 0; i < UCC_TL_NCCL_N_DEFAULT_ALG_SELECT_STR; i++) {
+        status = ucc_coll_score_update_from_str(
+            ucc_tl_nccl_default_alg_select_str[i], score, UCC_TL_TEAM_SIZE(team),
+            ucc_tl_nccl_coll_init, &team->super.super, UCC_TL_NCCL_DEFAULT_SCORE,
+            ucc_tl_nccl_alg_id_to_init);
+        if (ucc_unlikely(UCC_OK != status)) {
+            tl_error(tl_team->context->lib,
+                     "failed to apply default coll select setting: %s",
+                     ucc_tl_nccl_default_alg_select_str[i]);
+            goto err;
+        }
     }
 
     // add barrier, which might be triggered from host memory type
@@ -267,7 +225,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
         status = ucc_coll_score_update_from_str(
             lib->super.super.score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_nccl_coll_init, &team->super.super,
-            UCC_TL_NCCL_DEFAULT_SCORE, NULL);
+            UCC_TL_NCCL_DEFAULT_SCORE, ucc_tl_nccl_alg_id_to_init);
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {
