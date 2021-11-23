@@ -129,20 +129,19 @@ static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
 UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
-    ucc_status_t status;
-    int max_trees, n_sbgps;
-//    size_t tree_size;
-    ucc_rank_t size; //, rank;
-    uint32_t cfg_ctrl_size;
-    ucc_subset_t subset = {
-        .map    = UCC_TL_TEAM_MAP(self),
-        .myrank = UCC_TL_TEAM_RANK(self)
-    };
     ucc_tl_shm_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_shm_context_t);
+    ucc_status_t status;
+    int          max_trees, n_sbgps;
+    ucc_rank_t   size;
+    uint32_t     cfg_ctrl_size;
+    ucc_subset_t subset;
+
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
-    size = UCC_TL_TEAM_SIZE(self);
+    subset.map    = UCC_TL_TEAM_MAP(self);
+    subset.myrank = UCC_TL_TEAM_RANK(self);
+    size          = UCC_TL_TEAM_SIZE(self);
     cfg_ctrl_size = UCC_TL_SHM_TEAM_LIB(self)->cfg.ctrl_size;
 //    rank = UCC_TL_TEAM_RANK(self);
 
@@ -153,18 +152,23 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     self->data_size    = UCC_TL_SHM_TEAM_LIB(self)->cfg.data_size * size;
     self->max_inline   = cfg_ctrl_size - ucc_offsetof(ucc_tl_shm_ctrl_t, data);
 
-    if (UCC_OK != (status = ucc_topo_init(subset, UCC_TL_CORE_CTX(self)->topo, &self->topo))) {
-        ucc_warn("failed to init team topo"); //needed?
+    if (UCC_OK != (status = ucc_topo_init(subset, UCC_TL_CORE_CTX(self)->topo,
+                                          &self->topo))) {
+        tl_error(ctx->super.super.lib, "failed to init team topo");
         return status;
     }
 
     if (UCC_TL_CORE_CTX(self)->topo->sock_bound != 1) {
+        /* TODO: we have just 1 base group and no top group. */
     	return UCC_ERR_NOT_SUPPORTED;
     }
 
-    self->segs = (ucc_tl_shm_seg_t *) ucc_malloc(sizeof(ucc_tl_shm_seg_t) * self->n_concurrent);
+    self->segs = (ucc_tl_shm_seg_t *) ucc_malloc(sizeof(ucc_tl_shm_seg_t) *
+                                                 self->n_concurrent, "shm_segs");
 
     if (!self->segs) {
+        tl_error(ctx->super.super.lib, "failed to allocate %zd bytes for shm_segs",
+                 sizeof(ucc_tl_shm_seg_t) * self->n_concurrent);
         return UCC_ERR_NO_MEMORY;
     }
 
@@ -172,9 +176,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
 //    tree_size = ucc_tl_shm_kn_tree_size(size,
 //               GET_MAX_RADIX(UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_top_radix,
 //                             UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_base_radix));
-    self->tree_cache = (ucc_tl_shm_tree_cache_t *) ucc_malloc(sizeof(size_t) +
-                       max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *));
+    self->tree_cache = (ucc_tl_shm_tree_cache_t *)
+        ucc_malloc(sizeof(size_t) +
+                   max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *),
+                   "tree_cache");
     if (!self->tree_cache) {
+        tl_error(ctx->super.super.lib, "failed to allocate %zd bytes for tree_cache",
+                 sizeof(size_t) + max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *));
         return UCC_ERR_NO_MEMORY;
     }
 
