@@ -204,7 +204,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
 
     status = ucc_topo_get_all_sockets(self->topo,
                                       &self->base_groups, &n_sbgps);
-//    while(1) {}
     if (UCC_OK != status) {
         tl_error(ctx->super.super.lib, "failed to get all base subgroups");
         goto err_sockets;
