@@ -161,12 +161,16 @@ err_cfg:
 static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
                                        ucc_context_oob_coll_t *oob)
 {
-    char        *rbuf = ucc_malloc(sizeof(char) * oob->n_oob_eps,
-                                   "tmp_barrier");
+    char        *rbuf;
     ucc_status_t status;
     char         sbuf;
     void        *req;
 
+    if (ucc_unlikely(oob->n_oob_eps < 2)) {
+        return;
+    }
+
+    rbuf = ucc_malloc(sizeof(char) * oob->n_oob_eps, "tmp_barrier");
     if (!rbuf) {
         tl_error(ctx->super.super.lib,
                  "failed to allocate %zd bytes for tmp barrier array",
