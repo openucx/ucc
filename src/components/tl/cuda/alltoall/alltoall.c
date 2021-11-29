@@ -7,6 +7,8 @@
 #include "alltoall.h"
 #include "core/ucc_mc.h"
 
+ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task);
+
 ucc_status_t ucc_tl_cuda_alltoall_ce_start(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *task);
@@ -25,15 +27,10 @@ ucc_status_t ucc_tl_cuda_alltoall_init(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NO_MEMORY;
     }
 
-    status = ucc_mc_ee_create_event((void**)&task->alltoall_ce.copy_done,
-                                    UCC_EE_CUDA_STREAM);
+    status = ucc_tl_cuda_alltoall_ce_init(task);
     if (ucc_unlikely(status != UCC_OK)) {
         goto free_task;
     }
-
-    task->super.post     = ucc_tl_cuda_alltoall_ce_start;
-    task->super.progress = ucc_tl_cuda_alltoall_ce_progress;
-    task->super.finalize = ucc_tl_cuda_alltoall_ce_finalize;
 
     *task_p = &task->super;
     return UCC_OK;

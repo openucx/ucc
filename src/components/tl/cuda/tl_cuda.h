@@ -38,6 +38,13 @@
         (ucc_tl_cuda_sync_t*)_sync;                                            \
     })
 
+#define UCC_TL_CUDA_TEAM_BARRIER(_team, _id)                                   \
+    ({                                                                         \
+        size_t _bar_size = sizeof(ucc_tl_cuda_shm_barrier_t);                  \
+        void *_bar = PTR_OFFSET(_team->bar, _bar_size * (_id));                \
+        (ucc_tl_cuda_shm_barrier_t*)_bar;                                      \
+    })
+
 #ifdef HAVE_PROFILING_TL_CUDA
 #include "utils/profile/ucc_profile.h"
 #else
@@ -99,6 +106,13 @@ typedef struct ucc_tl_cuda_context {
 UCC_CLASS_DECLARE(ucc_tl_cuda_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_tl_cuda_shm_barrier {
+    ucc_rank_t size;
+    ucc_rank_t count;
+    int        sense;
+    int        local_sense[UCC_TL_CUDA_MAX_PEERS];
+} ucc_tl_cuda_shm_barrier_t;
+
 typedef struct ucc_tl_cuda_rank_id {
     int device;
     int shm;
@@ -128,28 +142,31 @@ typedef struct ucc_tl_cuda_sync {
 } ucc_tl_cuda_sync_t;
 
 typedef struct ucc_tl_cuda_team {
-    ucc_tl_team_t          super;
-    ucc_rank_t             rank;
-    ucc_rank_t             size;
-    uint32_t               seq_num;
-    ucc_tl_cuda_sync_t    *sync;
-    cudaStream_t           stream;
-    ucc_tl_cuda_rank_id_t *ids;
-    ucc_team_oob_coll_t    oob;
-    void                  *oob_req;
-    ucc_status_t           status;
+    ucc_tl_team_t              super;
+    ucc_rank_t                 rank;
+    ucc_rank_t                 size;
+    uint32_t                   seq_num;
+    ucc_tl_cuda_sync_t        *sync;
+    ucc_tl_cuda_shm_barrier_t *bar;
+    cudaStream_t               stream;
+    ucc_tl_cuda_rank_id_t     *ids;
+    ucc_team_oob_coll_t        oob;
+    void                      *oob_req;
+    ucc_status_t               status;
 } ucc_tl_cuda_team_t;
 
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
 typedef struct ucc_tl_cuda_task {
-    ucc_coll_task_t super;
-    uint32_t        seq_num;
-    uint32_t        coll_id;
+    ucc_coll_task_t            super;
+    uint32_t                   seq_num;
+    uint32_t                   coll_id;
+    ucc_tl_cuda_shm_barrier_t *bar;
     union {
         struct {
-            ucc_tl_cuda_mem_info_t mem_info;
+            int                     stage;
+            ucc_tl_cuda_mem_info_t  mem_info;
             void                   *peer_map_addr[UCC_TL_CUDA_MAX_PEERS];
             void                   *copy_done;
         } alltoall_ce;

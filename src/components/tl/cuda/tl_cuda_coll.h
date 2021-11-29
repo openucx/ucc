@@ -21,6 +21,12 @@
         UCC_TL_CUDA_TEAM_SYNC(_team, _rank, (_task)->coll_id);                 \
     })
 
+#define TASK_BAR(_task)                                                        \
+    ({                                                                         \
+        ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                          \
+        UCC_TL_CUDA_TEAM_BARRIER(_team, (_task)->coll_id);                     \
+    })
+
 static inline void ucc_tl_cuda_task_reset(ucc_tl_cuda_task_t *task)
 {
     task->super.super.status = UCC_INPROGRESS;
@@ -41,7 +47,13 @@ static inline ucc_tl_cuda_task_t *ucc_tl_cuda_task_get(ucc_tl_cuda_team_t *team)
 
 static inline void ucc_tl_cuda_task_put(ucc_tl_cuda_task_t *task)
 {
+    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, team->rank);
+    uint32_t max_concurrent;
+
     UCC_TL_CUDA_PROFILE_REQUEST_FREE(task);
+    max_concurrent = UCC_TL_CUDA_TEAM_LIB(team)->cfg.max_concurrent;
+    sync->seq_num[0] += max_concurrent;
     ucc_mpool_put(task);
 }
 
@@ -68,5 +80,14 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
                                     ucc_coll_task_t **task_h);
 
 ucc_status_t ucc_tl_cuda_coll_finalize(ucc_coll_task_t *coll_task);
+
+ucc_status_t ucc_tl_cuda_shm_barrier_init(ucc_rank_t size, ucc_rank_t rank,
+                                          ucc_tl_cuda_shm_barrier_t *barrier);
+
+ucc_status_t ucc_tl_cuda_shm_barrier_start(ucc_rank_t rank,
+                                           ucc_tl_cuda_shm_barrier_t *barrier);
+
+ucc_status_t ucc_tl_cuda_shm_barrier_test(ucc_rank_t rank,
+                                          ucc_tl_cuda_shm_barrier_t *barrier);
 
 #endif

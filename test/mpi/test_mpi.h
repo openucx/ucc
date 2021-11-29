@@ -212,6 +212,8 @@ public:
              size_t _max_size = TEST_UCC_RANK_BUF_SIZE_MAX);
     virtual ~TestCase();
     virtual void run();
+    virtual ucc_status_t set_input() = 0;
+    virtual ucc_status_t reset_sbuf() = 0;
     virtual ucc_status_t check() = 0;
     virtual std::string str();
     virtual ucc_status_t test();
@@ -284,6 +286,8 @@ class TestBarrier : public TestCase {
     ucc_status_t status;
 public:
     TestBarrier(ucc_test_team_t &team);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     ucc_status_t check();
     std::string str();
     void run();
@@ -298,6 +302,8 @@ public:
                   ucc_datatype_t _dt, ucc_reduction_op_t _op,
                   ucc_memory_type_t _mt, ucc_test_team_t &team,
                   size_t _max_size);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     ucc_status_t check();
     std::string str();
 };
@@ -307,6 +313,8 @@ public:
     TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
                   ucc_memory_type_t _mt, ucc_test_team_t &team,
                   size_t _max_size);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     ucc_status_t check();
 };
 
@@ -318,6 +326,8 @@ public:
                    ucc_memory_type_t _mt, ucc_test_team_t &team,
                    size_t _max_size);
     ~TestAllgatherv();
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     ucc_status_t check() override;
 };
 
@@ -326,6 +336,8 @@ public:
     TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
               ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
               size_t _max_size);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     ucc_status_t check();
 };
 
@@ -337,6 +349,8 @@ public:
                ucc_datatype_t _dt, ucc_reduction_op_t _op,
                ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
                size_t _max_size);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     ucc_status_t check();
 };
 
@@ -345,6 +359,8 @@ public:
     TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                  ucc_memory_type_t _mt, ucc_test_team_t &_team,
                  size_t _max_size);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     ucc_status_t check();
 };
 
@@ -370,6 +386,8 @@ public:
                   size_t _max_size,
                   ucc_test_vsize_flag_t count_bits,
                   ucc_test_vsize_flag_t displ_bits);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     ucc_status_t check();
     std::string str();
     ~TestAlltoallv();
@@ -383,6 +401,8 @@ public:
                       ucc_datatype_t _dt, ucc_reduction_op_t _op,
                       ucc_memory_type_t _mt, ucc_test_team_t &team,
                       size_t _max_size);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     ~TestReduceScatter();
     ucc_status_t check();
     std::string str();

@@ -18,7 +18,7 @@ ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
     mi->ptr    = mem_attr.base_address;
     mi->length = mem_attr.alloc_length;
     mi->offset = (ptrdiff_t)ptr - (ptrdiff_t)mi->ptr;
-    CUDACHECK_GOTO(cudaIpcGetMemHandle(&mi->handle,mi->ptr), exit, status,
+    CUDACHECK_GOTO(cudaIpcGetMemHandle(&mi->handle, mi->ptr), exit, status,
                    UCC_TL_TEAM_LIB(team));
 exit:
     return status;
@@ -43,4 +43,37 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
     default:
         return UCC_ERR_NOT_SUPPORTED;
     }
+}
+
+ucc_status_t ucc_tl_cuda_shm_barrier_init(ucc_rank_t size, ucc_rank_t rank,
+                                          ucc_tl_cuda_shm_barrier_t *barrier)
+{
+    if (rank == 0) {
+        barrier->size = size;
+        barrier->count = 0;
+        barrier->sense = 0;
+    }
+    barrier->local_sense[rank] = 1;
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_cuda_shm_barrier_start(ucc_rank_t rank,
+                                           ucc_tl_cuda_shm_barrier_t *barrier)
+{
+    ucc_rank_t pos = ucc_atomic_fadd32(&barrier->count, 1);
+    if (pos == barrier->size - 1) {
+        barrier->count = 0;
+        barrier->sense = barrier->local_sense[rank];
+    }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_cuda_shm_barrier_test(ucc_rank_t rank,
+                                          ucc_tl_cuda_shm_barrier_t *barrier)
+{
+    if (barrier->sense != barrier->local_sense[rank]) {
+        return UCC_INPROGRESS;
+    }
+    barrier->local_sense[rank] = 1 - barrier->local_sense[rank];
+    return UCC_OK;
 }

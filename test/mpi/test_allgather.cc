@@ -20,8 +20,6 @@ TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
 
-    args.coll_type = UCC_COLL_TYPE_ALLGATHER;
-
     if (TEST_SKIP_NONE != skip_reduce(test_max_size < (_msgsize*size),
                                       TEST_SKIP_MEM_LIMIT, team.comm)) {
         return;
@@ -33,31 +31,55 @@ TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     UCC_MALLOC_CHECK(check_rbuf);
     if (TEST_NO_INPLACE == inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
+        UCC_CHECK(ucc_mc_alloc(&check_sbuf_mc_header, _msgsize,
+                               UCC_MEMORY_TYPE_HOST));
         sbuf = sbuf_mc_header->addr;
-        init_buffer(sbuf, single_rank_count, TEST_DT, _mt, rank);
-        UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST, sbuf,
-                           _mt, _msgsize);
         check_sbuf = check_sbuf_mc_header->addr;
     } else {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
-        init_buffer(
-            (void *)((ptrdiff_t)rbuf + rank * single_rank_count * dt_size),
-            single_rank_count, TEST_DT, _mt, rank);
-        init_buffer((void *)((ptrdiff_t)check_rbuf +
-                             rank * single_rank_count * dt_size),
-                    single_rank_count, TEST_DT, UCC_MEMORY_TYPE_HOST, rank);
     }
 
-    args.src.info.buffer   = sbuf;
-    args.src.info.count    = single_rank_count;
-    args.src.info.datatype = TEST_DT;
-    args.src.info.mem_type = _mt;
+    args.coll_type         = UCC_COLL_TYPE_ALLGATHER;
+    if (TEST_NO_INPLACE == inplace) {
+        args.src.info.buffer   = sbuf;
+        args.src.info.count    = single_rank_count;
+        args.src.info.datatype = TEST_DT;
+        args.src.info.mem_type = _mt;
+    }
     args.dst.info.buffer   = rbuf;
     args.dst.info.count    = single_rank_count * size;
     args.dst.info.datatype = TEST_DT;
     args.dst.info.mem_type = _mt;
+    UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
+}
+
+ucc_status_t TestAllgather::set_input()
+{
+    size_t dt_size = ucc_dt_size(TEST_DT);
+    size_t single_rank_count = msgsize / dt_size;
+    size_t single_rank_size = single_rank_count * dt_size;
+    int rank;
+    void *buf, *check_buf;
+
+    MPI_Comm_rank(team.comm, &rank);
+    if (inplace == TEST_NO_INPLACE) {
+        buf       = sbuf;
+        check_buf = check_sbuf;
+    } else {
+        buf       = PTR_OFFSET(rbuf, rank * single_rank_size);
+        check_buf = PTR_OFFSET(check_rbuf, rank * single_rank_size);
+    }
+    init_buffer(buf, single_rank_count, TEST_DT, mem_type, rank);
+    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, single_rank_size,
+                            UCC_MEMORY_TYPE_HOST, mem_type));
+    return UCC_OK;
+}
+
+ucc_status_t TestAllgather::reset_sbuf()
+{
+    return UCC_OK;
 }
 
 ucc_status_t TestAllgather::check()

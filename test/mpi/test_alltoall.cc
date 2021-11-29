@@ -35,29 +35,64 @@ TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     UCC_MALLOC_CHECK(check_rbuf);
     if (TEST_NO_INPLACE == inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize * nprocs, _mt));
+        UCC_CHECK(ucc_mc_alloc(&check_sbuf_mc_header, _msgsize * nprocs,
+                               UCC_MEMORY_TYPE_HOST));
         sbuf = sbuf_mc_header->addr;
-        init_buffer(sbuf, single_rank_count * nprocs, TEST_DT, _mt, rank);
-        UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST, sbuf,
-                           _mt, _msgsize * nprocs);
         check_sbuf = check_sbuf_mc_header->addr;
     } else {
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
-        init_buffer(rbuf, single_rank_count * nprocs, TEST_DT, _mt, rank);
-        init_buffer(check_rbuf, single_rank_count * nprocs, TEST_DT,
-                    UCC_MEMORY_TYPE_HOST, rank);
     }
 
-    args.src.info.buffer      = sbuf;
-    args.src.info.count       = single_rank_count * nprocs;
-    args.src.info.datatype    = TEST_DT;
-    args.src.info.mem_type    = _mt;
+    if (TEST_NO_INPLACE == inplace) {
+        args.src.info.buffer      = sbuf;
+        args.src.info.count       = single_rank_count * nprocs;
+        args.src.info.datatype    = TEST_DT;
+        args.src.info.mem_type    = _mt;
+    }
 
     args.dst.info.buffer      = rbuf;
     args.dst.info.count       = single_rank_count * nprocs;
     args.dst.info.datatype    = TEST_DT;
     args.dst.info.mem_type    = _mt;
+    UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
+}
+
+ucc_status_t TestAlltoall::set_input()
+{
+    size_t dt_size = ucc_dt_size(TEST_DT);
+    size_t single_rank_count = msgsize / dt_size;
+    void *buf, *check_buf;
+    int rank, nprocs;
+
+    MPI_Comm_rank(team.comm, &rank);
+    MPI_Comm_size(team.comm, &nprocs);
+    if (TEST_NO_INPLACE == inplace) {
+        buf = sbuf;
+        check_buf = check_sbuf;
+    } else {
+        buf = rbuf;
+        check_buf = rbuf;
+    }
+    init_buffer(buf, single_rank_count * nprocs, TEST_DT, mem_type, rank);
+    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, single_rank_count * nprocs * dt_size,
+                            UCC_MEMORY_TYPE_HOST, mem_type));
+    return UCC_OK;
+}
+
+ucc_status_t TestAlltoall::reset_sbuf()
+{
+    size_t dt_size = ucc_dt_size(TEST_DT);
+    size_t single_rank_count = msgsize / dt_size;
+    int rank, nprocs;
+
+    MPI_Comm_rank(team.comm, &rank);
+    MPI_Comm_size(team.comm, &nprocs);
+    if (TEST_NO_INPLACE == inplace) {
+        init_buffer(sbuf, single_rank_count * nprocs, TEST_DT, mem_type, 0);
+    }
+    return UCC_OK;
 }
 
 ucc_status_t TestAlltoall::check()

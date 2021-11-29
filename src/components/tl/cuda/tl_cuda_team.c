@@ -41,8 +41,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         }
     }
 
+    // ctrl_size = (sizeof(ucc_tl_cuda_sync_t) + sizeof(ucc_tl_cuda_sync_data_t) *
+    //             (self->size - 1)) * self->size * lib->cfg.max_concurrent;
     ctrl_size = (sizeof(ucc_tl_cuda_sync_t) + sizeof(ucc_tl_cuda_sync_data_t) *
-                (self->size - 1)) * self->size * lib->cfg.max_concurrent;
+                (self->size - 1)) * self->size * lib->cfg.max_concurrent +
+                sizeof(ucc_tl_cuda_shm_barrier_t) * lib->cfg.max_concurrent;
+
     shm_id = -1;
     self->sync = (void*)-1;
     if (self->rank == 0) {
@@ -88,7 +92,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     }
     tl_info(tl_context->lib, "posted tl team: %p", self);
 
-    self->seq_num   = 1;
+    self->seq_num = 0;
     return UCC_OK;
 
 free_devices:
@@ -159,6 +163,7 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
                                               ucc_tl_cuda_lib_t);
     ucc_status_t status;
     ucc_tl_cuda_sync_t *sync;
+    ucc_tl_cuda_shm_barrier_t *bar;
     volatile ucc_tl_cuda_sync_t *peer_sync;
     int i, j, peer_access, dev, peer_dev, shm_id;
 
@@ -199,6 +204,17 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
             goto exit_err;
         }
     }
+    team->bar = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(team, 0,
+                                                       lib->cfg.max_concurrent);
+    for (i = 0; i < lib->cfg.max_concurrent; i++) {
+        bar = UCC_TL_CUDA_TEAM_BARRIER(team, i);
+        status = ucc_tl_cuda_shm_barrier_init(team->size, team->rank, bar);
+        if (status != UCC_OK) {
+            tl_error(tl_team->context->lib, "failed to init shm barrier %d\n",
+                     status);
+            goto exit_err;
+        }
+    }
     CUDACHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
                                              cudaStreamNonBlocking),
                    exit_err, status, tl_team->context->lib);
@@ -213,8 +229,8 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
                                              sync->ipc_event_local),
                        exit_err, status, tl_team->context->lib);
         sync->status = UCC_OK;
+        sync->seq_num[0] = i;
         __sync_synchronize();
-        asm volatile("": : :"memory");
         for (j = 0; j < team->size; j++) {
             if (j == team->rank) {
                 continue;

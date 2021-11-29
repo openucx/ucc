@@ -15,7 +15,7 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
     TestCase(_team, _mt, _msgsize, _inplace, _max_size)
 {
     size_t dt_size = ucc_dt_size(_dt);
-    size_t count = _msgsize/dt_size;
+    size_t count = _msgsize / dt_size;
     int rank, comm_size;
 
     MPI_Comm_rank(team.comm, &rank);
@@ -39,10 +39,9 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
         check_rbuf = ucc_malloc( _msgsize / comm_size, "check rbuf");
         UCC_MALLOC_CHECK(check_rbuf);
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
-        sbuf = sbuf_mc_header->addr;
-        init_buffer(sbuf, count, dt, _mt, rank);
-        UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST, sbuf,
-                           _mt, _msgsize);
+        UCC_CHECK(ucc_mc_alloc(&check_sbuf_mc_header, _msgsize,
+                               UCC_MEMORY_TYPE_HOST));
+        sbuf       = sbuf_mc_header->addr;
         check_sbuf = check_sbuf_mc_header->addr;
   } else {
         args.mask           = UCC_COLL_ARGS_FIELD_FLAGS;
@@ -53,10 +52,7 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
         rbuf       = rbuf_mc_header->addr;
         check_rbuf = ucc_malloc(_msgsize, "check rbuf");
         UCC_MALLOC_CHECK(check_rbuf);
-        init_buffer(rbuf, count, dt, _mt, rank);
-        init_buffer(check_rbuf, count, dt, UCC_MEMORY_TYPE_HOST, rank);
     }
-
 
     if (inplace == TEST_NO_INPLACE) {
         args.src.info.buffer      = sbuf;
@@ -68,7 +64,34 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
     args.dst.info.buffer      = rbuf;
     args.dst.info.datatype    = _dt;
     args.dst.info.mem_type    = _mt;
+    UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
+}
+
+ucc_status_t TestReduceScatter::set_input()
+{
+    size_t dt_size = ucc_dt_size(dt);
+    size_t count   = msgsize / dt_size;
+    void *buf, *check_buf;
+    int rank;
+
+    MPI_Comm_rank(team.comm, &rank);
+    if (TEST_NO_INPLACE == inplace) {
+        buf = sbuf;
+        check_buf = check_sbuf;
+    } else {
+        buf = rbuf;
+        check_buf = check_rbuf;
+    }
+    init_buffer(buf, count, dt, mem_type, rank);
+    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
+                            UCC_MEMORY_TYPE_HOST, mem_type));
+    return UCC_OK;
+}
+
+ucc_status_t TestReduceScatter::reset_sbuf()
+{
+    return UCC_OK;
 }
 
 ucc_status_t TestReduceScatter::check()
