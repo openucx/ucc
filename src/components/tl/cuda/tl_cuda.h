@@ -31,8 +31,8 @@
     ({                                                                         \
         size_t _ctrl_size_rank = (sizeof(ucc_tl_cuda_sync_t)  +                \
                                   sizeof(ucc_tl_cuda_sync_data_t) *            \
-                                  ((_team)->size - 1)) ;                       \
-        size_t _ctrl_size = _ctrl_size_rank * (_team)->size;                   \
+                                  (UCC_TL_TEAM_SIZE(_team) - 1)) ;             \
+        size_t _ctrl_size = _ctrl_size_rank * UCC_TL_TEAM_SIZE(_team);         \
         void *_sync = PTR_OFFSET(_team->sync, _ctrl_size * (_id) +             \
                                  _ctrl_size_rank * (_rank));                   \
         (ucc_tl_cuda_sync_t*)_sync;                                            \
@@ -143,8 +143,6 @@ typedef struct ucc_tl_cuda_sync {
 
 typedef struct ucc_tl_cuda_team {
     ucc_tl_team_t              super;
-    ucc_rank_t                 rank;
-    ucc_rank_t                 size;
     uint32_t                   seq_num;
     ucc_tl_cuda_sync_t        *sync;
     ucc_tl_cuda_shm_barrier_t *bar;

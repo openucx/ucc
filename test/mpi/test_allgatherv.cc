@@ -92,22 +92,19 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 ucc_status_t TestAllgatherv::set_input()
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
-    size_t single_rank_count, single_rank_size
     int rank;
     void *buf, *check_buf;
 
     MPI_Comm_rank(team.comm, &rank);
-    single_rank_count = counts[rank];
-    single_rank_size = single_rank_count * dt_size;
     if (inplace == TEST_NO_INPLACE) {
         buf       = sbuf;
         check_buf = check_sbuf;
     } else {
-        buf       = PTR_OFFSET(rbuf, rank * single_rank_size);
-        check_buf = PTR_OFFSET(check_rbuf, rank * single_rank_size);
+        buf       = PTR_OFFSET(rbuf, displacements[rank] * dt_size);
+        check_buf = PTR_OFFSET(check_rbuf, displacements[rank] * dt_size);
     }
-    init_buffer(buf, single_rank_count, TEST_DT, mem_type, rank);
-    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, single_rank_size,
+    init_buffer(buf, counts[rank], TEST_DT, mem_type, rank);
+    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, counts[rank] * dt_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));
     return UCC_OK;
 }

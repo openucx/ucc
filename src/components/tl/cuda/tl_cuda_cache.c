@@ -311,7 +311,7 @@ ucc_tl_cuda_cache_t* ucc_tl_cuda_get_cache(ucc_tl_cuda_team_t *team,
     ucc_tl_cuda_cache_t *cache;
     ucc_status_t status;
 
-    h = ucc_get_team_ep_header(UCC_TL_CORE_CTX(team), team->super.super.team,
+    h = ucc_get_team_ep_header(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
                                rank);
     cache = tl_cuda_hash_get(ctx->ipc_cache, h->ctx_id);
     if (ucc_unlikely(NULL == cache)) {

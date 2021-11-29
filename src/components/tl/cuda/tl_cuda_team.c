@@ -22,34 +22,33 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     int shm_id, i, j;
     size_t ctrl_size;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params->team);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
-    self->rank   = params->rank;
     self->oob    = params->params.oob;
-    self->size   = self->oob.n_oob_eps;
     self->stream = NULL;
-    if (self->size > UCC_TL_CUDA_MAX_PEERS) {
+    if (UCC_TL_TEAM_SIZE(self) > UCC_TL_CUDA_MAX_PEERS) {
         tl_info(tl_context->lib, "team size is too large, max supported %d",
                 UCC_TL_CUDA_MAX_PEERS);
         return UCC_ERR_NOT_SUPPORTED;
     }
-    for (i = 0; i < self->size; i++) {
-        if (!ucc_rank_on_local_node(i, params->team)) {
-            tl_info(tl_context->lib, "rank %d is on different node, "
-                    "multinode isn't supported", i);
-            return UCC_ERR_NOT_SUPPORTED;
-        }
-    }
 
-    // ctrl_size = (sizeof(ucc_tl_cuda_sync_t) + sizeof(ucc_tl_cuda_sync_data_t) *
-    //             (self->size - 1)) * self->size * lib->cfg.max_concurrent;
+    //TODO: add check using team topo
+    // for (i = 0; i < self->size; i++) {
+    //     if (!ucc_rank_on_local_node(i, params->team)) {
+    //         tl_info(tl_context->lib, "rank %d is on different node, "
+    //                 "multinode isn't supported", i);
+    //         return UCC_ERR_NOT_SUPPORTED;
+    //     }
+    // }
+
     ctrl_size = (sizeof(ucc_tl_cuda_sync_t) + sizeof(ucc_tl_cuda_sync_data_t) *
-                (self->size - 1)) * self->size * lib->cfg.max_concurrent +
+                (UCC_TL_TEAM_SIZE(self) - 1)) * UCC_TL_TEAM_SIZE(self) *
+                lib->cfg.max_concurrent +
                 sizeof(ucc_tl_cuda_shm_barrier_t) * lib->cfg.max_concurrent;
 
     shm_id = -1;
     self->sync = (void*)-1;
-    if (self->rank == 0) {
+    if (UCC_TL_TEAM_RANK(self) == 0) {
         shm_id = shmget(IPC_PRIVATE, ctrl_size, IPC_CREAT | 0666);
         if (shm_id < 0) {
             tl_error(tl_context->lib, "failed to shmget with IPC_PRIVATE, "
@@ -68,22 +67,23 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         }
         memset(self->sync, 0, ctrl_size);
         for (i = 0; i < lib->cfg.max_concurrent; i++) {
-            for (j = 0; j < self->size; j++) {
+            for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
                 sync = UCC_TL_CUDA_TEAM_SYNC(self, j, i);
                 sync->status = UCC_INPROGRESS;
             }
         }
     }
 
-    self->ids = ucc_malloc((self->size + 1) * sizeof(*(self->ids)), "ids");
+    self->ids = ucc_malloc((UCC_TL_TEAM_SIZE(self) + 1) * sizeof(*(self->ids)),
+                           "ids");
     if (!self->ids) {
         tl_error(tl_context->lib, "failed to alloc ranks id");
         status = UCC_ERR_NO_MEMORY;
         goto free_shmdt;
     }
-    self->ids[self->size].device = ctx->device;
-    self->ids[self->size].shm    = shm_id;
-    status = self->oob.allgather(&self->ids[self->size], self->ids,
+    self->ids[UCC_TL_TEAM_SIZE(self)].device = ctx->device;
+    self->ids[UCC_TL_TEAM_SIZE(self)].shm    = shm_id;
+    status = self->oob.allgather(&self->ids[UCC_TL_TEAM_SIZE(self)], self->ids,
                                  sizeof(ucc_tl_cuda_rank_id_t),
                                  self->oob.coll_info, &self->oob_req);
     if (UCC_OK != status) {
@@ -120,8 +120,8 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
     if (self->ids) {
         if (self->sync != (void*)-1) {
             for (i = 0; i < lib->cfg.max_concurrent; i++) {
-                for (j = 0; j < self->size; j++) {
-                    if (j == self->rank) {
+                for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
+                    if (j == UCC_TL_TEAM_RANK(self)) {
                         continue;
                     }
                     sync = UCC_TL_CUDA_TEAM_SYNC(self, j, i);
@@ -129,14 +129,14 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
                         cudaEventDestroy(sync->data[j].ipc_event_remote);
                     }
                 }
-                sync = UCC_TL_CUDA_TEAM_SYNC(self, self->rank, i);
+                sync = UCC_TL_CUDA_TEAM_SYNC(self, UCC_TL_TEAM_RANK(self), i);
                 if (sync->ipc_event_local) {
                     cudaEventDestroy(sync->ipc_event_local);
                 }
             }
             shmdt(self->sync);
         }
-        if (self->rank == 0) {
+        if (UCC_TL_TEAM_RANK(self) == 0) {
             shmctl(self->ids[0].shm, IPC_RMID, NULL);
         }
         ucc_free(self->ids);
@@ -179,23 +179,23 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     }
     team->oob.req_free(team->oob_req);
     team->oob_req = NULL;
-    dev = team->ids[team->rank].device;
-    for (i = 0; i < team->size; i++) {
-        if (i != team->rank) {
+    dev = team->ids[UCC_TL_TEAM_RANK(team)].device;
+    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
+        if (i != UCC_TL_TEAM_RANK(team)) {
             peer_dev = team->ids[i].device;
             CUDACHECK_GOTO(cudaDeviceCanAccessPeer(&peer_access, dev, peer_dev),
                            exit_err, status, tl_team->context->lib);
             if (!peer_access) {
                 tl_info(tl_team->context->lib,
                         "dev %d rank %d is not accesible from dev %d rank %d",
-                        peer_dev, i, dev, team->rank);
+                        peer_dev, i, dev, UCC_TL_TEAM_RANK(team));
                 status = UCC_ERR_NOT_SUPPORTED;
                 goto exit_err;
             }
         }
     }
     shm_id = team->ids[0].shm;
-    if (team->rank != 0) {
+    if (UCC_TL_TEAM_RANK(team) != 0) {
         team->sync = shmat(shm_id, NULL, 0);
         if (team->sync == (void *)-1) {
             tl_error(tl_team->context->lib, "failed to shamt errno: %d (%s)",
@@ -208,7 +208,8 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
                                                        lib->cfg.max_concurrent);
     for (i = 0; i < lib->cfg.max_concurrent; i++) {
         bar = UCC_TL_CUDA_TEAM_BARRIER(team, i);
-        status = ucc_tl_cuda_shm_barrier_init(team->size, team->rank, bar);
+        status = ucc_tl_cuda_shm_barrier_init(UCC_TL_TEAM_SIZE(team),
+                                              UCC_TL_TEAM_RANK(team), bar);
         if (status != UCC_OK) {
             tl_error(tl_team->context->lib, "failed to init shm barrier %d\n",
                      status);
@@ -220,7 +221,7 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
                    exit_err, status, tl_team->context->lib);
 
     for (i = 0; i < lib->cfg.max_concurrent; i++) {
-        sync = UCC_TL_CUDA_TEAM_SYNC(team, team->rank, i);
+        sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
         CUDACHECK_GOTO(cudaEventCreateWithFlags(&sync->ipc_event_local,
                                                 cudaEventDisableTiming |
                                                 cudaEventInterprocess),
@@ -231,8 +232,8 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
         sync->status = UCC_OK;
         sync->seq_num[0] = i;
         __sync_synchronize();
-        for (j = 0; j < team->size; j++) {
-            if (j == team->rank) {
+        for (j = 0; j < UCC_TL_TEAM_SIZE(team); j++) {
+            if (j == UCC_TL_TEAM_RANK(team)) {
                 continue;
             }
             peer_sync = UCC_TL_CUDA_TEAM_SYNC(team, j, i);
@@ -270,7 +271,7 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
 
     if (strlen(lib->super.super.score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->super.super.score_str, score, team->size,
+            lib->super.super.score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_cuda_coll_init, &team->super.super,
             UCC_TL_CUDA_DEFAULT_SCORE, NULL);
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
