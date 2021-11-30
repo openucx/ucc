@@ -118,6 +118,9 @@ ucc_status_t ucc_cl_hier_coll_init(ucc_base_coll_args_t *coll_args,
 #define SBGP_ENABLED(_team, _sbgp)                                             \
     ((_team)->sbgps[UCC_HIER_SBGP_##_sbgp].state == UCC_HIER_SBGP_ENABLED)
 
+#define SBGP_RANK(_team, _sbgp)                                                \
+    ((_team)->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp->group_rank)
+
 #define SBGP_EXISTS(_team, _sbgp)                                              \
     ((NULL != (_team)->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp) &&                   \
      ((_team)->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp->status !=                    \
