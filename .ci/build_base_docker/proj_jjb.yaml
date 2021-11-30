@@ -1,0 +1,65 @@
+- job-template:
+    name: "{jjb_proj}"
+    project-type: pipeline
+    properties:
+      - github:
+          url: "{jjb_git}"
+      - build-discarder:
+          days-to-keep: 30
+          num-to-keep: 20
+      - inject:
+          keep-system-variables: true
+          properties-content: |
+            jjb_proj={jjb_proj}
+    description: Do NOT edit this job through the Web GUI !
+    concurrent: true
+    sandbox: true
+    parameters:
+      - string:
+          name: "sha1"
+          default: "master"
+          description: "Commit to be checked, set by PR"
+      - bool:
+          name: "build_dockers"
+          default: true
+          description: "Rebuild docker containers"
+      - string:
+          name: "conf_file"
+          default: ".ci/build_base_docker/job_matrix.yaml"
+          description: "Regex to select job config file"
+      - string:
+          name: "script"
+          default: "{jjb_jenkinsfile}"
+          description: "Jenkinsfile to load on trigger"
+      - string:
+          name: "DEBUG"
+          default: 0
+          description: "Enable debug prints and traces, valid values are 0-9"
+      - string:
+          name: "UCC_VERSION"
+          default: "1.0.0"
+          description: "UCC version"
+    triggers:
+        - timed: 0 0 * * *
+    pipeline-scm:
+      scm:
+        - git:
+            url: "{jjb_git}"
+            credentials-id: '549927eb-7f38-4a8f-997a-81dd63605782'
+            branches: [ '$sha1' ]
+            shallow-clone: true
+            depth: 10
+            refspec: "+refs/heads/*:refs/remotes/origin/* +refs/pull/*:refs/remotes/origin/pr/*"
+            browser: githubweb
+            browser-url: "{jjb_git}"
+      script-path: "$script"
+
+- project:
+    name: proj_name
+    jjb_email: 'anatolyv@nvidia.com'
+    jjb_proj: 'ucc_build_docker'
+    jjb_git: 'git@github.com:openucx/ucc.git'
+    jjb_owner: 'anatolyv'
+    jjb_jenkinsfile: '.ci/Jenkinsfile.shlib'
+    jobs:
+      - "{jjb_proj}"

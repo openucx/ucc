@@ -47,3 +47,39 @@ RUN mkdir -p /var/run/sshd && \
     ssh-keygen -A &&  \
     rm -f /run/nologin
 #==============================================================================
+
+#==============================================================================
+RUN mkdir -p ${SRC_DIR} && \
+    mkdir -p ${PKG_DIR} && \
+    mkdir -p ${BIN_DIR} && \
+    mkdir -p ${WORKLOADS_DIR}
+
+RUN git clone ${TORCH_UCC_GITHUB_URL} ${SRC_DIR} && \
+    cd ${SRC_DIR} && \
+    git checkout ${TORCH_UCC_BRANCH}
+
+RUN mkdir -p ${SRC_DIR}/ucx && \
+    git clone --recursive ${UCX_GITHUB_URL} ${SRC_DIR}/ucx && \
+    cd ${SRC_DIR}/ucx && \
+    git checkout ${UCX_BRANCH}
+
+COPY . ${SRC_DIR}/ucc
+#==============================================================================
+# Build UCX
+RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucx.sh
+ENV PATH=${UCX_INSTALL_DIR}/bin:${PATH}
+#==============================================================================
+# Configure Python
+RUN ${SRC_DIR}/ucc/.ci/scripts/configure_python.sh
+#==============================================================================
+# Install PyTorch
+RUN ${SRC_DIR}/ucc/.ci/scripts/install_torch.sh
+#==============================================================================
+# Install workloads
+WORKDIR ${WORKLOADS_DIR}
+RUN git clone https://github.com/facebookresearch/dlrm.git && \
+    cd ${WORKLOADS_DIR}/dlrm && \
+    pip3 install -r ${WORKLOADS_DIR}/dlrm/requirements.txt && \
+    pip3 install tensorboard
+RUN git clone https://github.com/facebookresearch/param.git && \
+    pip3 install -r ${WORKLOADS_DIR}/param/requirements.txt
