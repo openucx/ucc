@@ -258,7 +258,7 @@ typedef struct ucc_reduce_cb_params {
     void             *src2;      /*< input buffer: represents n_vectors buffers with
                                    offset "stride" between them */
     void             *dst;       /*< destination buffer */
-    size_t            n_vectors; /*< number of vetors from src2 to reduce */
+    size_t            n_vectors; /*< number of vectors from src2 to reduce */
     size_t            count;     /*< number of elements in one vector */
     size_t            stride;    /*< stride in bytes between the vectors in src2 */
     ucc_dt_generic_t *dt;        /*< pointer to user-defined datatype used for
@@ -384,7 +384,7 @@ typedef struct ucc_generic_dt_ops {
      */
 
     struct {
-        void (*cb)(const ucc_reduce_cb_params_t *params);
+        ucc_status_t (*cb)(const ucc_reduce_cb_params_t *params);
         void *cb_ctx;
     } reduce;
 } ucc_generic_dt_ops_t;

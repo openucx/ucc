@@ -120,9 +120,8 @@ static inline ucc_status_t ucc_mc_reduce_userdefined(void *src1, void *src2,
         .dt        = dt
     };
 
-    dt->ops.reduce.cb(&params);
-    return UCC_OK;
-}
+    return dt->ops.reduce.cb(&params);}
+
 
 static inline ucc_status_t ucc_dt_reduce(void *src1, void *src2,
                                          void *dst, size_t count,

@@ -117,7 +117,7 @@ static inline const char* ucc_datatype_str(ucc_datatype_t dt)
     case UCC_DT_UINT128:
         return "uint128";
     default:
-        return NULL;
+        return "userdefined";
     }
 }
 
