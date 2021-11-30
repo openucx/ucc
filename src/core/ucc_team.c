@@ -559,7 +559,8 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
                                .map.ep_num = team->size,
                                .myrank     = team->rank};
         status = ucc_service_allreduce(team, local, global, UCC_DT_UINT64,
-                                       ctx->ids.pool_size, UCC_OP_BAND, subset,
+                                       ctx->ids.pool_size,
+                                       UCC_OP_BAND, subset,
                                        &team->sreq);
         if (status < 0) {
             return status;

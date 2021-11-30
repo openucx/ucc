@@ -20,8 +20,7 @@ ucc_pt_coll_allreduce::ucc_pt_coll_allreduce(ucc_datatype_t dt,
         coll_args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
-    coll_args.mask |= UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
-    coll_args.reduce.predefined_op = op;
+    coll_args.op                = op;
     coll_args.src.info.datatype = dt;
     coll_args.dst.info.datatype = dt;
     coll_args.src.info.mem_type = mt;

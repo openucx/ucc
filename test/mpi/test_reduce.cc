@@ -50,9 +50,7 @@ TestReduce::TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                        (inplace && rank == root) ? rbuf : sbuf, _mt, _msgsize);
     check_sbuf = check_sbuf_mc_header->addr;
 
-    args.mask                |= UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
-    args.reduce.predefined_op = _op;
-
+    args.op                   = _op;
     args.src.info.buffer      = sbuf;
     args.src.info.count       = count;
     args.src.info.datatype    = _dt;

@@ -12,8 +12,8 @@ ucc_status_t ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task)
 {
-    if ((TASK_ARGS(task).src.info.datatype == UCC_DT_USERDEFINED) ||
-        (TASK_ARGS(task).dst.info.datatype == UCC_DT_USERDEFINED)) {
+    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).src.info.datatype) ||
+        !UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info.datatype))) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }

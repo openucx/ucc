@@ -17,30 +17,27 @@
 #define ncclDataTypeUnsupported (ncclNumTypes + 1)
 
 ncclDataType_t ucc_to_nccl_dtype[] = {
-    [UCC_DT_INT8]        = (ncclDataType_t)ncclInt8,
-    [UCC_DT_INT16]       = (ncclDataType_t)ncclDataTypeUnsupported,
-    [UCC_DT_INT32]       = (ncclDataType_t)ncclInt32,
-    [UCC_DT_INT64]       = (ncclDataType_t)ncclInt64,
-    [UCC_DT_INT128]      = (ncclDataType_t)ncclDataTypeUnsupported,
-    [UCC_DT_UINT8]       = (ncclDataType_t)ncclUint8,
-    [UCC_DT_UINT16]      = (ncclDataType_t)ncclDataTypeUnsupported,
-    [UCC_DT_UINT32]      = (ncclDataType_t)ncclUint32,
-    [UCC_DT_UINT64]      = (ncclDataType_t)ncclUint64,
-    [UCC_DT_UINT128]     = (ncclDataType_t)ncclDataTypeUnsupported,
-    [UCC_DT_FLOAT16]     = (ncclDataType_t)ncclFloat16,
-    [UCC_DT_FLOAT32]     = (ncclDataType_t)ncclFloat32,
-    [UCC_DT_FLOAT64]     = (ncclDataType_t)ncclFloat64,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_INT8)]     = (ncclDataType_t)ncclInt8,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_INT16)]    = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_INT32)]    = (ncclDataType_t)ncclInt32,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_INT64)]    = (ncclDataType_t)ncclInt64,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_INT128)]   = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_UINT8)]    = (ncclDataType_t)ncclUint8,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_UINT16)]   = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_UINT32)]   = (ncclDataType_t)ncclUint32,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_UINT64)]   = (ncclDataType_t)ncclUint64,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_UINT128)]  = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT16)]  = (ncclDataType_t)ncclFloat16,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT32)]  = (ncclDataType_t)ncclFloat32,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT64)]  = (ncclDataType_t)ncclFloat64,
 #if (CUDART_VERSION >= 11000) && (NCCL_VERSION_CODE >= NCCL_VERSION(2,10,3))
-    [UCC_DT_BFLOAT16]    = (ncclDataType_t)ncclBfloat16,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = (ncclDataType_t)ncclBfloat16,
 #else
-    [UCC_DT_BFLOAT16]    = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = (ncclDataType_t)ncclDataTypeUnsupported,
 #endif
-    [UCC_DT_USERDEFINED] = (ncclDataType_t)ncclDataTypeUnsupported,
-    [UCC_DT_OPAQUE]      = (ncclDataType_t)ncclDataTypeUnsupported,
 };
 
 ncclRedOp_t ucc_to_nccl_reduce_op[] = {
-    [UCC_OP_USERDEFINED] = (ncclRedOp_t)ncclOpUnsupported,
     [UCC_OP_SUM]         = (ncclRedOp_t)ncclSum,
     [UCC_OP_PROD]        = (ncclRedOp_t)ncclProd,
     [UCC_OP_MAX]         = (ncclRedOp_t)ncclMax,
@@ -67,8 +64,9 @@ const char
 static inline ucc_status_t ucc_nccl_check_dt_supported(ucc_datatype_t dt1,
                                                        ucc_datatype_t dt2)
 {
-    if (ucc_unlikely((dt1 != dt2) ||
-                     (ucc_to_nccl_dtype[dt1] == ncclDataTypeUnsupported))) {
+    if (ucc_unlikely((dt1 != dt2) || !UCC_DT_IS_PREDEFINED(dt1) ||
+                     (ucc_to_nccl_dtype[UCC_DT_PREDEFINED_ID(dt1)]
+                      == ncclDataTypeUnsupported))) {
         return UCC_ERR_NOT_SUPPORTED;
     }
     return UCC_OK;
@@ -222,8 +220,8 @@ ucc_status_t ucc_tl_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
         tl_error(UCC_TASK_LIB(task), "inplace alltoallv is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((TASK_ARGS(task).src.info.datatype == UCC_DT_USERDEFINED) ||
-        (TASK_ARGS(task).dst.info.datatype == UCC_DT_USERDEFINED)) {
+    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).src.info.datatype) ||
+        !UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info.datatype))) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -281,8 +279,8 @@ ucc_status_t ucc_tl_nccl_alltoallv_init(ucc_tl_nccl_task_t *task)
         tl_error(UCC_TASK_LIB(task), "inplace alltoall is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((TASK_ARGS(task).src.info_v.datatype == UCC_DT_USERDEFINED) ||
-        (TASK_ARGS(task).dst.info_v.datatype == UCC_DT_USERDEFINED)) {
+    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).src.info_v.datatype) ||
+        !UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info_v.datatype))) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -302,7 +300,7 @@ ucc_status_t ucc_tl_nccl_allreduce_start(ucc_coll_task_t *coll_task)
         UCC_IS_INPLACE(*args) ? args->dst.info.buffer : args->src.info.buffer;
     ucc_status_t        status = UCC_OK;
     ncclDataType_t      dt     = ucc_to_nccl_dtype[args->dst.info.datatype];
-    ncclRedOp_t         op = ucc_to_nccl_reduce_op[args->reduce.predefined_op];
+    ncclRedOp_t         op = ucc_to_nccl_reduce_op[args->op];
     size_t              count = args->dst.info.count;
 
     task->super.super.status = UCC_INPROGRESS;
@@ -321,18 +319,18 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
 {
-    if ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
-        (ucc_to_nccl_reduce_op[TASK_ARGS(task).reduce.predefined_op] ==
-         ncclOpUnsupported)) {
-        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
     if (UCC_OK !=
         ucc_nccl_check_dt_supported(TASK_ARGS(task).dst.info.datatype,
                                     TASK_ARGS(task).dst.info.datatype)) {
         tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
+
+    if (ucc_to_nccl_reduce_op[TASK_ARGS(task).op] == ncclOpUnsupported) {
+        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     task->super.post     = ucc_tl_nccl_allreduce_start;
     return UCC_OK;
 }
@@ -388,8 +386,8 @@ ucc_status_t ucc_tl_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
         tl_error(UCC_TASK_LIB(task), "inplace allgatherv is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((TASK_ARGS(task).src.info_v.datatype == UCC_DT_USERDEFINED) ||
-        (TASK_ARGS(task).dst.info_v.datatype == UCC_DT_USERDEFINED)) {
+    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).src.info_v.datatype) ||
+        !UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info_v.datatype))) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -444,8 +442,7 @@ ucc_status_t ucc_tl_nccl_reduce_scatter_start(ucc_coll_task_t *coll_task)
     void               *src    = args->src.info.buffer;
     ucc_status_t        status = UCC_OK;
     ncclDataType_t      dt     = ucc_to_nccl_dtype[args->dst.info.datatype];
-    ncclRedOp_t         op     = ucc_to_nccl_reduce_op[
-                                    args->reduce.predefined_op];
+    ncclRedOp_t         op     = ucc_to_nccl_reduce_op[args->op];
     size_t              count  = args->dst.info.count;
 
     task->super.super.status = UCC_INPROGRESS;
@@ -466,18 +463,18 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_reduce_scatter_init(ucc_tl_nccl_task_t *task)
 {
-    if ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
-        (ucc_to_nccl_reduce_op[TASK_ARGS(task).reduce.predefined_op] ==
-         ncclOpUnsupported)) {
-        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
     if (UCC_OK !=
         ucc_nccl_check_dt_supported(TASK_ARGS(task).dst.info.datatype,
                                     TASK_ARGS(task).dst.info.datatype)) {
         tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
+
+    if (ucc_to_nccl_reduce_op[TASK_ARGS(task).op] == ncclOpUnsupported) {
+        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     task->super.post     = ucc_tl_nccl_reduce_scatter_start;
     return UCC_OK;
 }
@@ -493,8 +490,7 @@ ucc_status_t ucc_tl_nccl_reduce_start(ucc_coll_task_t *coll_task)
     void               *src     = args->src.info.buffer;
     ucc_datatype_t      ucc_dt  = args->src.info.datatype;
     size_t              count   = args->src.info.count;
-    ncclRedOp_t         op      = ucc_to_nccl_reduce_op[
-                                     args->reduce.predefined_op];
+    ncclRedOp_t         op      = ucc_to_nccl_reduce_op[args->op];
     ucc_status_t        status  = UCC_OK;
     ncclDataType_t      nccl_dt;
 
@@ -521,21 +517,21 @@ ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
     ucc_tl_nccl_team_t *team = TASK_TEAM(task);
     ucc_datatype_t dt;
 
-    if ((TASK_ARGS(task).mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ||
-        (ucc_to_nccl_reduce_op[TASK_ARGS(task).reduce.predefined_op] ==
-         ncclOpUnsupported)) {
-        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
     dt = (TASK_ARGS(task).root == UCC_TL_TEAM_RANK(team))
         ? TASK_ARGS(task).dst.info.datatype
         : TASK_ARGS(task).src.info.datatype;
+
     if (UCC_OK !=
         ucc_nccl_check_dt_supported(dt, dt)) {
         tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
+
+    if (ucc_to_nccl_reduce_op[TASK_ARGS(task).op] == ncclOpUnsupported) {
+        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     task->super.post     = ucc_tl_nccl_reduce_start;
     return UCC_OK;
 }
@@ -545,10 +541,9 @@ ucc_status_t ucc_tl_nccl_barrier_init(ucc_tl_nccl_task_t *task)
     /* use 4-byte allreduce to accomplish barrier */
     ucc_coll_args_t *args   = &TASK_ARGS(task);
 
-    args->mask |= (UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS |
-                   UCC_COLL_ARGS_FIELD_FLAGS);
+    args->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
     args->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-    args->reduce.predefined_op = UCC_OP_SUM;
+    args->op     = UCC_OP_SUM;
 
     args->dst.info.buffer   = TASK_CTX(task)->scratch_buf;
     args->src.info.buffer   = args->dst.info.buffer;

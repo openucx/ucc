@@ -84,7 +84,7 @@ UCC_REDUCE_KN_PHASE_INIT:
                 goto UCC_REDUCE_KN_PHASE_PROGRESS;
 UCC_REDUCE_KN_PHASE_MULTI:
                 if (task->reduce_kn.children_per_cycle) {
-                    is_avg = args->reduce.predefined_op == UCC_OP_AVG &&
+                    is_avg = args->op == UCC_OP_AVG &&
                              (avg_pre_op ? (task->reduce_kn.dist == 1)
                                          : (task->reduce_kn.dist ==
                                             task->reduce_kn.max_dist));

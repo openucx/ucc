@@ -49,8 +49,6 @@ static inline void ucc_copy_lib_params(ucc_lib_params_t *dst,
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_LIB_PARAM_FIELD_REDUCTION_TYPES,
                             reduction_types);
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_LIB_PARAM_FIELD_SYNC_TYPE, sync_type);
-    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_LIB_PARAM_FIELD_REDUCTION_WRAPPER,
-                            reduction_wrapper);
 }
 
 /* Core logic for the selection of CL components:

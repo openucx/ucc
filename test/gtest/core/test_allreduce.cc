@@ -29,9 +29,8 @@ class test_allreduce : public UccCollArgs, public testing::Test {
             ctxs[r] = (gtest_ucc_coll_ctx_t*)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
             ctxs[r]->args = coll;
 
-            coll->mask = UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
             coll->coll_type = UCC_COLL_TYPE_ALLREDUCE;
-            coll->reduce.predefined_op = T::redop;
+            coll->op        = T::redop;
 
             ctxs[r]->init_buf = ucc_malloc(ucc_dt_size(dt) * count, "init buf");
             EXPECT_NE(ctxs[r]->init_buf, nullptr);

@@ -305,8 +305,7 @@ void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len)
         ct == UCC_COLL_TYPE_REDUCE) {
         ucc_snprintf_safe(tmp, sizeof(tmp), " %s %s",
                           ucc_datatype_str(args->args.src.info.datatype),
-                          (args->args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ?
-                          "userdefined" : ucc_reduction_op_str(args->args.reduce.predefined_op));
+                          ucc_reduction_op_str(args->args.op));
         left = len - strlen(str);
         strncat(str, tmp, left);
     }

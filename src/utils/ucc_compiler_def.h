@@ -17,7 +17,6 @@
 #include <assert.h>
 #endif
 
-
 #define ucc_offsetof      ucs_offsetof
 #define ucc_container_of  ucs_container_of
 #define ucc_derived_of    ucs_derived_of
@@ -32,7 +31,6 @@ typedef int                        ucc_score_t;
 #define _UCC_PP_MAKE_STRING(x) #x
 #define UCC_PP_MAKE_STRING(x)  _UCC_PP_MAKE_STRING(x)
 #define UCC_PP_QUOTE UCS_PP_QUOTE
-#define UCC_MASK     UCS_MASK
 #define UCC_EMPTY_STATEMENT {}
 
 #define UCC_COPY_PARAM_BY_FIELD(_dst, _src, _FIELD, _field)                    \

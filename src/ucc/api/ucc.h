@@ -35,6 +35,14 @@ BEGIN_C_DECLS
   */
 
 /**
+  * @defgroup UCC_DATATYPE Datatypes data-structures and functions
+  * @{
+  * Datatypes data-structures and functions
+  * @}
+  *
+  */
+
+/**
   * @defgroup UCC_LIB Library initialization and finalization routines
   * @{
   * Library initialization and finalization routines
@@ -115,46 +123,6 @@ BEGIN_C_DECLS
  *
  *  @ingroup UCC_LIB_INIT_DT
  *
- *  @brief Enumeration representing the UCC reduction operations
- *
- *  @parblock
- *
- *
- *  Description
- *
- *  @ref ucc_reduction_op_t  represents the UCC reduction operations. It is used by the
- *  library initialization routine @ref ucc_init to request the operations expected by the user.
- *  It is used by the @ref ucc_lib_attr_t to communicate the operations supported by
- *  the library. The user-defined reductions are represented by
- *  UCC_OP_USERDEFINED.
- *
- *  @endparblock
- *
- */
-typedef enum {
-    UCC_OP_USERDEFINED      = UCC_BIT(0), /*!< User defined reduction operation */
-    UCC_OP_SUM              = UCC_BIT(1), /*!< Predefined addition operation */
-    UCC_OP_PROD             = UCC_BIT(2),
-    UCC_OP_MAX              = UCC_BIT(3),
-    UCC_OP_MIN              = UCC_BIT(4),
-    UCC_OP_LAND             = UCC_BIT(5),
-    UCC_OP_LOR              = UCC_BIT(6),
-    UCC_OP_LXOR             = UCC_BIT(7),
-    UCC_OP_BAND             = UCC_BIT(8),
-    UCC_OP_BOR              = UCC_BIT(9),
-    UCC_OP_BXOR             = UCC_BIT(10),
-    UCC_OP_MAXLOC           = UCC_BIT(11),
-    UCC_OP_MINLOC           = UCC_BIT(12),
-    UCC_OP_AVG              = UCC_BIT(13) /*!< Perform an average operation, i.e.
-                                               a sum across all ranks, divided by
-                                               the number of ranks.
-                                               Supported only for floating-point values */
-} ucc_reduction_op_t;
-
-/**
- *
- *  @ingroup UCC_LIB_INIT_DT
- *
  *  @brief Enumeration representing the collective operations
  *
  *  @parblock
@@ -189,8 +157,21 @@ typedef enum {
 } ucc_coll_type_t;
 
 /**
+ *  @ingroup UCC_COLLECTIVES_DT
+ */
+typedef enum ucc_memory_type {
+    UCC_MEMORY_TYPE_HOST,         /*!< Default system memory */
+    UCC_MEMORY_TYPE_CUDA,         /*!< NVIDIA CUDA memory */
+    UCC_MEMORY_TYPE_CUDA_MANAGED, /*!< NVIDIA CUDA managed memory */
+    UCC_MEMORY_TYPE_ROCM,         /*!< AMD ROCM memory */
+    UCC_MEMORY_TYPE_ROCM_MANAGED, /*!< AMD ROCM managed system memory */
+    UCC_MEMORY_TYPE_LAST,
+    UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
+} ucc_memory_type_t;
+
+/**
  *
- *  @ingroup UCC_LIB_INIT_DT
+ *  @ingroup UCC_DATATYPE
  *
  *  @brief Enumeration representing the UCC library's datatype
  *
@@ -199,34 +180,281 @@ typedef enum {
  *  Description
  *
  *  @ref ucc_datatype_t represents the datatypes supported by the UCC library’s
- *  collective and reduction operations. The standard operations are signed and
- *  unsigned integers of various sizes, float 16, 32, and 64, and user-defined
- *  datatypes. The UCC_DT_USERDEFINED represents the user-defined datatype. The
- *  UCC_DT_OPAQUE is used to represent the user-defined datatypes for
- *  user-defined reductions. When UCC_DT_OPAQUE is used, the library passes the
- *  data to the user-defined reductions without any modifications.
+ *  collective and reduction operations. The predefined operations
+ *  are signed and unsigned integers of various sizes, float 16, 32, and 64, and
+ *  user-defined datatypes. User-defined datatypes are created using
+ *  @ref ucc_dt_create_generic interface and can support user-defined reduction
+ *  operations. Predefined reduction operations can be used only with
+ *  predefined datatypes.
+ *
+ *  @endparblock
+ *
+ */
+typedef uint64_t ucc_datatype_t;
+
+#define   UCC_DT_INT8      UCC_PREDEFINED_DT(0)
+#define   UCC_DT_INT16     UCC_PREDEFINED_DT(1)
+#define   UCC_DT_INT32     UCC_PREDEFINED_DT(2)
+#define   UCC_DT_INT64     UCC_PREDEFINED_DT(3)
+#define   UCC_DT_INT128    UCC_PREDEFINED_DT(4)
+#define   UCC_DT_UINT8     UCC_PREDEFINED_DT(5)
+#define   UCC_DT_UINT16    UCC_PREDEFINED_DT(6)
+#define   UCC_DT_UINT32    UCC_PREDEFINED_DT(7)
+#define   UCC_DT_UINT64    UCC_PREDEFINED_DT(8)
+#define   UCC_DT_UINT128   UCC_PREDEFINED_DT(9)
+#define   UCC_DT_FLOAT16   UCC_PREDEFINED_DT(10)
+#define   UCC_DT_FLOAT32   UCC_PREDEFINED_DT(11)
+#define   UCC_DT_FLOAT64   UCC_PREDEFINED_DT(12)
+#define   UCC_DT_BFLOAT16  UCC_PREDEFINED_DT(13)
+#define   UCC_DT_PREDEFINED_LAST  14
+
+/**
+ * @ingroup UCC_DATATYPE
+ */
+enum ucc_generic_dt_ops_field {
+    UCC_GENERIC_DT_OPS_FIELD_FLAGS             = UCC_BIT(0),
+};
+
+/**
+ * @ingroup UCC_DATATYPE
+ * @brief Flags that can be specified for generic datatype
+ *
+ */
+
+typedef enum {
+    UCC_GENERIC_DT_OPS_FLAG_CONTIG             = UCC_BIT(0), /*!< If set, the created datatype
+                                                                  represents a contiguous memory
+                                                                  region with the size specified
+                                                                  in @ref contig_size field of
+                                                                  @ref ucc_generic_dt_ops */
+    UCC_GENERIC_DT_OPS_FLAG_REDUCE             = UCC_BIT(1), /*!< If set, the created datatype
+                                                                  has user-defined reduction
+                                                                  operation associated with it.
+                                                                  reduce.cb and reduce.ctx fields
+                                                                  of @ref ucc_generic_dt_ops must
+                                                                  be initialized. Collective operations
+                                                                  that involve reduction (allreduce,
+                                                                  reduce, reduce_scatter/v) can use
+                                                                  user-defined data-types only when
+                                                                  this flag is set. */
+} ucc_generic_dt_ops_flags_t;
+
+/**
+ * @ingroup UCC_DATATYPE
+ * @brief Descriptor of user-defined reduction callback
+ *
+ * This structure is the argument to the reduce.cb callback. It must implement
+ * the reduction of n_vectors + 1 data vectors each containing "count" elements.
+ * First vector is "src1", other n_vectors have start address
+ * v_j = src2 + count * dt_extent * stride * j.
+ * The result is stored in dst, so that
+ * dst[i] = src1[i] + v0[i] + v1[i] + ... +v_nvecttors[i],
+ * for i \in [0:count), where "+" represents user-defined reduction of 2 elements
+ */
+
+typedef struct ucc_reduce_cb_params {
+    uint64_t          mask;      /*< for backward compatibility. currently ignored. */
+    void             *src1;      /*< input buffer */
+    void             *src2;      /*< input buffer: represents n_vectors buffers with
+                                   offset "stride" between them */
+    void             *dst;       /*< destination buffer */
+    size_t            n_vectors; /*< number of vectors from src2 to reduce */
+    size_t            count;     /*< number of elements in one vector */
+    size_t            stride;    /*< stride in bytes between the vectors in src2 */
+    ucc_dt_generic_t *dt;        /*< pointer to user-defined datatype used for
+                                     reduction */
+    void             *cb_ctx;    /*< user-defined context as defined
+                                   by @ref ucc_generic_dt_ops::reduce.cb_ctx */
+} ucc_reduce_cb_params_t;
+/**
+ * @ingroup UCC_DATATYPE
+ * @brief UCC generic data type descriptor
+ *
+ * This structure provides a generic datatype descriptor that is used to create
+ * user-defined datatypes.
+ */
+
+typedef struct ucc_generic_dt_ops {
+    uint64_t mask;
+    uint64_t flags;
+    size_t   contig_size; /*!< size of the datatype if @ref UCC_GENERIC_DT_OPS_FLAG_CONTIG is set */
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Start a packing request.
+     *
+     * The pointer refers to application defined start-to-pack routine.
+     *
+     * @param [in]  context        User-defined context.
+     * @param [in]  buffer         Buffer to pack.
+     * @param [in]  count          Number of elements to pack into the buffer.
+     *
+     * @return  A custom state that is passed to the subsequent
+     *          @ref ucc_generic_dt_ops::pack "pack()" routine.
+     */
+    void* (*start_pack)(void *context, const void *buffer, size_t count);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Start an unpacking request.
+     *
+     * The pointer refers to application defined start-to-unpack routine.
+     *
+     * @param [in]  context        User-defined context.
+     * @param [in]  buffer         Buffer to unpack to.
+     * @param [in]  count          Number of elements to unpack in the buffer.
+     *
+     * @return  A custom state that is passed later to the subsequent
+     *          @ref ucc_generic_dt_ops::unpack "unpack()" routine.
+     */
+    void* (*start_unpack)(void *context, void *buffer, size_t count);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Get the total size of packed data.
+     *
+     * The pointer refers to user defined routine that returns the size of data
+     * in a packed format.
+     *
+     * @param [in]  state          State as returned by
+     *                             @ref ucc_generic_dt_ops::start_pack
+     *                             "start_pack()" routine.
+     *
+     * @return  The size of the data in a packed form.
+     */
+    size_t (*packed_size)(void *state);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Pack data.
+     *
+     * The pointer refers to application defined pack routine.
+     *
+     * @param [in]  state          State as returned by
+     *                             @ref ucc_generic_dt_ops::start_pack
+     *                             "start_pack()" routine.
+     * @param [in]  offset         Virtual offset in the output stream.
+     * @param [in]  dest           Destination buffer to pack the data.
+     * @param [in]  max_length     Maximum length to pack.
+     *
+     * @return The size of the data that was written to the destination buffer.
+     *         Must be less than or equal to @e max_length.
+     */
+    size_t (*pack) (void *state, size_t offset, void *dest, size_t max_length);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Unpack data.
+     *
+     * The pointer refers to application defined unpack routine.
+     *
+     * @param [in]  state          State as returned by
+     *                             @ref ucc_generic_dt_ops::start_unpack
+     *                             "start_unpack()" routine.
+     * @param [in]  offset         Virtual offset in the input stream.
+     * @param [in]  src            Source to unpack the data from.
+     * @param [in]  length         Length to unpack.
+     *
+     * @return UCC_OK or an error if unpacking failed.
+     */
+    ucc_status_t (*unpack)(void *state, size_t offset, const void *src, size_t length);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Finish packing/unpacking.
+     *
+     * The pointer refers to application defined finish routine.
+     *
+     * @param [in]  state          State as returned by
+     *                             @ref ucc_generic_dt_ops::start_pack
+     *                             "start_pack()"
+     *                             and
+     *                             @ref ucc_generic_dt_ops::start_unpack
+     *                             "start_unpack()"
+     *                             routines.
+     */
+    void (*finish)(void *state);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief User-defined reduction callback
+     *
+     * The pointer refers to user-defined reduction routine.
+     *
+     * @param [in]  params reduction descriptor
+     */
+
+    struct {
+        ucc_status_t (*cb)(const ucc_reduce_cb_params_t *params);
+        void *cb_ctx;
+    } reduce;
+} ucc_generic_dt_ops_t;
+
+
+/**
+ * @ingroup UCC_DATATYPE
+ * @brief Create a generic datatype.
+ *
+ * This routine creates a generic datatype object. The generic datatype is
+ * described by the @a ops @ref ucc_generic_dt_ops_t "object" which provides
+ * a table of routines defining the operations for generic datatype manipulation.
+ * Typically, generic datatypes are used for integration with datatype engines
+ * provided with MPI implementations (MPICH, Open MPI, etc). The application
+ * is responsible for releasing the @a datatype_p  object using
+ * @ref ucc_dt_destroy "ucc_dt_destroy()" routine.
+ *
+ * @param [in]  ops          Generic datatype function table as defined by
+ *                           @ref ucc_generic_dt_ops_t .
+ * @param [in]  context      Application defined context passed to this
+ *                           routine.  The context is passed as a parameter
+ *                           to the routines in the @a ops table.
+ * @param [out] datatype_p   A pointer to datatype object.
+ *
+ * @return Error code as defined by @ref ucc_status_t
+ */
+ucc_status_t ucc_dt_create_generic(const ucc_generic_dt_ops_t *ops, void *context,
+                                   ucc_datatype_t *datatype_p);
+
+/**
+ * @ingroup UCC_DATATYPE
+ * @brief Destroy generic datatype
+ */
+void ucc_dt_destroy(ucc_datatype_t datatype);
+
+/**
+ *
+ *  @ingroup UCC_LIB_INIT_DT
+ *
+ *  @brief Enumeration representing the UCC reduction operations
+ *
+ *  @parblock
+ *
+ *
+ *  Description
+ *
+ *  @ref ucc_reduction_op_t  represents the UCC reduction operations. It is used by the
+ *  library initialization routine @ref ucc_init to request the operations expected by the user.
+ *  It is used by the @ref ucc_lib_attr_t to communicate the operations supported by
+ *  the library.
  *
  *  @endparblock
  *
  */
 typedef enum {
-    UCC_DT_INT8 = 0,
-    UCC_DT_INT16,
-    UCC_DT_INT32,
-    UCC_DT_INT64,
-    UCC_DT_INT128,
-    UCC_DT_UINT8,
-    UCC_DT_UINT16,
-    UCC_DT_UINT32,
-    UCC_DT_UINT64,
-    UCC_DT_UINT128,
-    UCC_DT_FLOAT16,
-    UCC_DT_FLOAT32,
-    UCC_DT_FLOAT64,
-    UCC_DT_BFLOAT16,
-    UCC_DT_USERDEFINED,
-    UCC_DT_OPAQUE
-} ucc_datatype_t;
+    UCC_OP_SUM,
+    UCC_OP_PROD,
+    UCC_OP_MAX,
+    UCC_OP_MIN,
+    UCC_OP_LAND,
+    UCC_OP_LOR,
+    UCC_OP_LXOR,
+    UCC_OP_BAND,
+    UCC_OP_BOR,
+    UCC_OP_BXOR,
+    UCC_OP_MAXLOC,
+    UCC_OP_MINLOC,
+    UCC_OP_AVG,
+    UCC_OP_LAST
+} ucc_reduction_op_t;
 
 /**
  *
@@ -285,32 +513,6 @@ typedef enum {
 
 
 /**
- *  @ingroup UCC_COLLECTIVES
- *
- *  @brief The reduction wrapper provides an interface for the UCC library to invoke
- *         user-defined custom reduction callback
- *
- *  @param [in]  invec          The input elements to be reduced by the user function
- *  @param [in]  inoutvec       The input elements to be reduced and output of the reduction
- *  @param [in]  count          The number of elements of type "dtype" to be reduced
- *  @param [in]  dtype          Datatype specified in the coll_args
- *  @param [in]  custom_op      A pointer to the user defined reduction passed to the coll_args as custom_reduction_op
- *
- *
- *  @parblock
- *
- *  @b Description
- *
- *  This function is called by the UCC library when it needs to perform a non-standard
- *  user-defined reduction operaion during allreduce/reduce collective.
- *
- *  @endparblock
- */
-typedef void(*ucc_reduction_wrapper_t)(void *invec, void *inoutvec,
-                                       ucc_count_t *count, void *dtype,
-                                       void *custom_reduction_op);
-
-/**
  * @brief UCC library initialization parameters
  */
 
@@ -322,8 +524,7 @@ enum ucc_lib_params_field{
     UCC_LIB_PARAM_FIELD_THREAD_MODE         = UCC_BIT(0),
     UCC_LIB_PARAM_FIELD_COLL_TYPES          = UCC_BIT(1),
     UCC_LIB_PARAM_FIELD_REDUCTION_TYPES     = UCC_BIT(2),
-    UCC_LIB_PARAM_FIELD_SYNC_TYPE           = UCC_BIT(3),
-    UCC_LIB_PARAM_FIELD_REDUCTION_WRAPPER   = UCC_BIT(4)
+    UCC_LIB_PARAM_FIELD_SYNC_TYPE           = UCC_BIT(3)
 };
 
 /**
@@ -363,7 +564,6 @@ typedef struct ucc_lib_params {
     uint64_t                coll_types;
     uint64_t                reduction_types;
     ucc_coll_sync_type_t    sync_type;
-    ucc_reduction_wrapper_t reduction_wrapper;
 } ucc_lib_params_t;
 
 /**
@@ -1547,19 +1747,6 @@ typedef enum {
 /**
  *  @ingroup UCC_COLLECTIVES_DT
  */
-typedef enum ucc_memory_type {
-    UCC_MEMORY_TYPE_HOST,         /*!< Default system memory */
-    UCC_MEMORY_TYPE_CUDA,         /*!< NVIDIA CUDA memory */
-    UCC_MEMORY_TYPE_CUDA_MANAGED, /*!< NVIDIA CUDA managed memory */
-    UCC_MEMORY_TYPE_ROCM,         /*!< AMD ROCM memory */
-    UCC_MEMORY_TYPE_ROCM_MANAGED, /*!< AMD ROCM managed system memory */
-    UCC_MEMORY_TYPE_LAST,
-    UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
-} ucc_memory_type_t;
-
-/**
- *  @ingroup UCC_COLLECTIVES_DT
- */
 typedef struct ucc_coll_buffer_info_v {
     void             *buffer; /*!< Starting address of the send/recv buffer */
     ucc_count_t      *counts; /*!< Array of counts of type @ref ucc_count_t
@@ -1602,11 +1789,9 @@ typedef enum {
  */
 enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_FLAGS                           = UCC_BIT(0),
-    UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS           = UCC_BIT(1),
-    UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS          = UCC_BIT(2),
-    UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(3),
-    UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(4),
-    UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER              = UCC_BIT(5)
+    UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(1),
+    UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(2),
+    UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER              = UCC_BIT(3)
 };
 
 /**
@@ -1653,14 +1838,11 @@ typedef struct ucc_coll_args {
         ucc_coll_buffer_info_t      info;   /*!< Buffer info for the collective */
         ucc_coll_buffer_info_v_t    info_v; /*!< Buffer info for the collective */
     } dst;
-    struct {
-        ucc_reduction_op_t          predefined_op; /*!< Reduction operation, if
-                                                        reduce or all-reduce
-                                                        operation selected */
-        void                       *custom_op; /*!< User defined
-                                                    reduction operation */
-        void                       *custom_dtype;
-    } reduce;
+    ucc_reduction_op_t              op; /*!< Predefined reduction operation, if
+                                             reduce, allreduce, reduce_scatter
+                                             operation is selected.
+                                             The field is only specified for collectives
+                                             that use pre-defined datatypes */
     uint64_t                        flags;
     uint64_t                        root; /*!< Root endpoint for rooted
                                              collectives */
