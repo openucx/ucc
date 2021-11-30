@@ -38,8 +38,8 @@ ucc_base_coll_alg_info_t
 
 #define CHECK_USERDEFINED_DT(_args, _team)                                     \
     do {                                                                       \
-        if (((_args).src.info.datatype == UCC_DT_USERDEFINED) ||               \
-            ((_args).dst.info_v.datatype == UCC_DT_USERDEFINED)) {             \
+        if (!UCC_DT_IS_PREDEFINED((_args).src.info.datatype) ||                \
+            !UCC_DT_IS_PREDEFINED((_args).dst.info_v.datatype)) {              \
             tl_error(UCC_TL_TEAM_LIB((_team)),                                 \
                      "user defined datatype is not supported");                \
             status = UCC_ERR_NOT_SUPPORTED;                                    \
