@@ -132,7 +132,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     ucc_tl_shm_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_shm_context_t);
     ucc_status_t status;
-    int          n_sbgps, i, j; //, max_trees; (for cache)
+    int          n_sbgps, i, j, max_trees;
     ucc_rank_t   size, team_rank;
     uint32_t     cfg_ctrl_size, group_size;
     ucc_subset_t subset;
@@ -176,27 +176,29 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
         goto err_segs;
     }
 
-//    max_trees = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_trees_cached;
-////    tree_size = ucc_tl_shm_kn_tree_size(size,
-////               GET_MAX_RADIX(UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_top_radix,
-////                             UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_base_radix));
-//    self->tree_cache = (ucc_tl_shm_tree_cache_t *)
+    max_trees = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_trees_cached;
+//    tree_size = ucc_tl_shm_kn_tree_size(size,
+//               GET_MAX_RADIX(UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_top_radix,
+//                             UCC_TL_SHM_TEAM_LIB(self)->cfg.bcast_base_radix));
+    self->tree_cache = (ucc_tl_shm_tree_cache_t *) ucc_malloc(sizeof(ucc_tl_shm_tree_cache_t), "tree_cache");
+    self->tree_cache->elems = (ucc_tl_shm_tree_cache_elems_t *) ucc_malloc(max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t));
 //        ucc_malloc(sizeof(size_t) +
 //                   max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *),
 //                   "tree_cache");
-//    if (!self->tree_cache) {
-//        tl_error(ctx->super.super.lib, "failed to allocate %zd bytes for tree_cache",
-//                 sizeof(size_t) + max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *));
-//        status = UCC_ERR_NO_MEMORY;
-//        goto err_tree;
-//    }
-//    self->tree_cache->size = 0;
-////    self->tree_cache->keys = PTR_OFFSET(self->tree_cache, sizeof(size_t));
-////    self->tree_cache->trees = PTR_OFFSET(self->tree_cache->keys,
-////                              max_trees * sizeof(ucc_tl_shm_tree_cache_keys_t));
+    if (!self->tree_cache) {
+        tl_error(ctx->super.super.lib, "failed to allocate %zd bytes for tree_cache",
+                 sizeof(size_t) + max_trees * sizeof(ucc_tl_shm_tree_cache_elems_t *));
+        status = UCC_ERR_NO_MEMORY;
+        goto err_tree;
+    }
+    self->tree_cache->size = 0;
+//    self->tree_cache->keys = PTR_OFFSET(self->tree_cache, sizeof(size_t));
+//    self->tree_cache->trees = PTR_OFFSET(self->tree_cache->keys,
+//                              max_trees * sizeof(ucc_tl_shm_tree_cache_keys_t));
 
     /* sbgp type gl is either SOCKET_LEADERS or NUMA_LEADERS depending on the config: grouping type */
     self->leaders_group = ucc_topo_get_sbgp(self->topo, UCC_SBGP_SOCKET_LEADERS);
+    //TODO: check leaders group status - if not exist then base group size 1 with UCC_SBGP_NODE (into base groups). DO same thing if leaders group == team size
 
     /* sbgp type is either SOCKET or NUMA depending on the config: grouping type */
     self->n_base_groups = self->leaders_group->group_size;
@@ -264,10 +266,10 @@ err_group_rank_map:
     ucc_free(self->rank_group_id_map.array.map); //TODO switch to ucc_ep_map_destroy once
                                                  // it is merged to master upstream
 err_sockets:
-//    ucc_free(self->tree_cache);
-    return status; //remember to remove
-//err_tree:
-//    ucc_free(self->segs);
+    ucc_free(self->tree_cache);
+//    return status; //remember to remove
+err_tree:
+    ucc_free(self->segs);
 err_segs:
     ucc_topo_cleanup(self->topo);
 
@@ -293,11 +295,13 @@ ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
 		}
 	}
 
-//    for (int i = 0; i < team->tree_cache->size; i++) {
-//        ucc_free(team->tree_cache->elems[i]->tree);
-//        ucc_free(team->tree_cache->elems[i]);
-//    }
-//    ucc_free(team->tree_cache);
+    for (int i = 0; i < team->tree_cache->size; i++) {
+        ucc_free(team->tree_cache->elems[i].tree->top_tree);
+        ucc_free(team->tree_cache->elems[i].tree->base_tree);
+        ucc_free(team->tree_cache->elems[i].tree);
+    }
+    ucc_free(team->tree_cache->elems);
+    ucc_free(team->tree_cache);
     ucc_free(team->group_rank_map.array.map); //free ucc_ep_map_t array like this?
     ucc_free(team->rank_group_id_map.array.map);
     ucc_free(team->ctrl_map.array.map);

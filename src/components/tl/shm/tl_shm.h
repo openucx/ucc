@@ -96,13 +96,13 @@ typedef struct ucc_tl_shm_tree_cache_keys {
 } ucc_tl_shm_tree_cache_keys_t;
 
 typedef struct ucc_tl_shm_tree_cache_elems {
-	ucc_tl_shm_tree_cache_keys_t *keys;
+	ucc_tl_shm_tree_cache_keys_t  keys;
 	ucc_tl_shm_tree_t            *tree;
 } ucc_tl_shm_tree_cache_elems_t;
 
 typedef struct ucc_tl_shm_tree_cache {
-	size_t                           size;
-	ucc_tl_shm_tree_cache_elems_t  **elems;
+	size_t                         size;
+	ucc_tl_shm_tree_cache_elems_t *elems;
 } ucc_tl_shm_tree_cache_t;
 
 typedef struct ucc_tl_shm_team {
