@@ -111,6 +111,7 @@ static inline ucc_status_t ucc_mc_reduce_userdefined(void *src1, void *src2,
                                                      ucc_dt_generic_t *dt)
 {
     ucc_reduce_cb_params_t params = {
+        .mask      = 0,
         .src1      = src1,
         .src2      = src2,
         .dst       = dst,
