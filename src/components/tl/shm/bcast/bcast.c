@@ -14,7 +14,7 @@ ucc_status_t ucc_tl_shm_bcast_write(ucc_tl_shm_team_t *team, ucc_tl_shm_seg_t *s
 	ucc_rank_t team_rank = UCC_TL_TEAM_RANK(team);
     uint32_t seq_num = task->seq_num;
     uint32_t n_polls = UCC_TL_SHM_TEAM_LIB(team)->cfg.n_polls;
-    ucc_tl_shm_ctrl_t *my_ctrl; //, *ctrl;
+    ucc_tl_shm_ctrl_t *my_ctrl;
     void *src;
 
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, team_rank);
@@ -32,7 +32,7 @@ ucc_status_t ucc_tl_shm_bcast_write(ucc_tl_shm_team_t *team, ucc_tl_shm_seg_t *s
             if (my_ctrl->pi == seq_num) {
                 SHMSEG_ISYNC();
                 src = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team, team_rank);
-                ucc_tl_shm_copy_to_children(seg, team, tree, seq_num, is_inline, src, data_size); //why group_type?
+                ucc_tl_shm_copy_to_children(seg, team, tree, seq_num, is_inline, src, data_size);
                 /* copy out to user dest is done in the end of base bcast alg */
                 return UCC_OK;
             }
@@ -49,7 +49,7 @@ ucc_status_t ucc_tl_shm_bcast_read(ucc_tl_shm_team_t *team, ucc_tl_shm_seg_t *se
 	ucc_rank_t team_rank = UCC_TL_TEAM_RANK(team);
 	uint32_t seq_num = task->seq_num;
     uint32_t n_polls = UCC_TL_SHM_TEAM_LIB(team)->cfg.n_polls;
-    void *my_data, *src, *dst;
+    void *src, *dst;
     ucc_tl_shm_ctrl_t *parent_ctrl, *my_ctrl;
     ucc_rank_t parent;
 
@@ -57,21 +57,19 @@ ucc_status_t ucc_tl_shm_bcast_read(ucc_tl_shm_team_t *team, ucc_tl_shm_seg_t *se
 
     if (is_op_root) {
         /* Only global op root needs to copy the data from user src to its shm */
-        my_data = ucc_tl_shm_get_data(seg, team, team_rank);
-        dst = is_inline ? my_ctrl->data : my_data;
+        dst = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team, team_rank);
         memcpy(dst, TASK_ARGS(task).src.info.buffer, data_size);
         SHMSEG_WMB();
         ucc_tl_shm_signal_to_children(seg, team, seq_num, tree);
     } else {
-        parent = tree->parent == UCC_RANK_INVALID ? task->tree->top_tree->parent : tree->parent;
+        parent = (tree->parent == UCC_RANK_INVALID) ? task->tree->top_tree->parent : tree->parent;
         for (int i = 0; i < n_polls; i++){
             if (my_ctrl->pi == seq_num) {
                 parent_ctrl = ucc_tl_shm_get_ctrl(seg, team, parent);
                 SHMSEG_ISYNC();
                 if (tree->n_children) {
                     src = is_inline ? parent_ctrl->data : ucc_tl_shm_get_data(seg, team, parent);
-                    my_data = ucc_tl_shm_get_data(seg, team, team_rank);
-                    dst = is_inline ? my_ctrl->data : my_data;
+                    dst = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team, team_rank);
                     memcpy(dst, src, data_size);
                     SHMSEG_WMB();
                     ucc_tl_shm_signal_to_children(seg, team, seq_num, tree);
@@ -100,7 +98,7 @@ ucc_status_t ucc_tl_shm_tree_init_bcast(ucc_tl_shm_team_t *team,
     ucc_rank_t leaders_size = team->leaders_group->group_size;
     ucc_rank_t root_group = ucc_ep_map_eval(team->rank_group_id_map, root);
     ucc_sbgp_t *sbgp = &team->base_groups[team->my_group_id];
-    ucc_rank_t local_rank;
+    ucc_rank_t local_rank, leader_rank, leader_group_id;
     int i;
 
     if (ucc_tl_shm_cache_tree_lookup(team, base_radix, top_radix, root, UCC_COLL_TYPE_BCAST, tree_p) == 1) {
@@ -172,13 +170,18 @@ ucc_status_t ucc_tl_shm_tree_init_bcast(ucc_tl_shm_team_t *team,
                   by the root itself to save 1 extra copy in SM */
                 ucc_rank_t ranks[leaders_size]; //Can be allocated on stack
                 for (i = 0; i < leaders_size; i++) {
-                    ucc_rank_t leader_rank = ucc_ep_map_eval(team->leaders_group->map, i);
-                    ucc_rank_t leader_group_id = ucc_ep_map_eval(team->rank_group_id_map, leader_rank);
+                    leader_rank = ucc_ep_map_eval(team->leaders_group->map, i);
+                    leader_group_id = ucc_ep_map_eval(team->rank_group_id_map, leader_rank);
                     if (leader_group_id == root_group) {
                         tree_root = i;
-                        ucc_assert(team_rank == root);
+//                        if (team_rank != root) {
+//                        	while(1) {}
+//                        }
+//                        ucc_assert(team_rank == root);
                         ranks[i] = root;
-                        rank = i;
+                        if (team_rank == root) {
+                            rank = i;
+                        }
                     } else {
                         ranks[i] = leader_rank;
                     }
@@ -446,7 +449,6 @@ ucc_status_t ucc_tl_shm_bcast_start(ucc_coll_task_t *coll_task)
     return ucc_task_complete(coll_task);
 }
 
-
 ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task)
 {
 	ucc_tl_shm_team_t *team  = TASK_TEAM(task);
@@ -460,6 +462,9 @@ ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task)
     task->seg        = &team->segs[task->seq_num % team->n_concurrent];
     status = ucc_tl_shm_tree_init_bcast(team, args.root, base_radix,
                                         top_radix, &task->tree_in_cache, &task->tree);
+//    if (args.root == 3) {
+//        while(1) {}
+//    }
     if (ucc_unlikely(UCC_OK != status)) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to init shm tree");
     	return status;
