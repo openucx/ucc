@@ -124,13 +124,14 @@ static inline void ucc_tl_ucp_put_task(ucc_tl_ucp_task_t *task)
     ucc_mpool_put(task);
 }
 
-static inline ucc_schedule_t *ucc_tl_ucp_get_schedule(ucc_tl_ucp_team_t *team)
+static inline ucc_schedule_t *ucc_tl_ucp_get_schedule(ucc_tl_ucp_team_t *team,
+                                                      ucc_base_coll_args_t *args)
 {
     ucc_tl_ucp_context_t *ctx      = UCC_TL_UCP_TEAM_CTX(team);
     ucc_schedule_t       *schedule = ucc_mpool_get(&ctx->req_mp);
 
     UCC_TL_UCP_PROFILE_REQUEST_NEW(schedule, "tl_ucp_sched", 0);
-    ucc_schedule_init(schedule, NULL, &team->super.super);
+    ucc_schedule_init(schedule, args, &team->super.super);
     return schedule;
 }
 
