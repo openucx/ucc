@@ -266,6 +266,7 @@ static inline void ucc_copy_context_params(ucc_context_params_t *dst,
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_ID, ctx_id);
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_SYNC_TYPE,
                             sync_type);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS, mem_params);
 }
 
 static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
@@ -886,6 +887,30 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
             context->attr.ctx_addr = (ucc_context_addr_h)h;
         }
         context_attr->ctx_addr = context->attr.ctx_addr;
+    }
+
+    if (context_attr->mask & UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE) {
+        uint64_t            max_buffer_size = 0;
+        int                 i;
+        ucc_base_ctx_attr_t attr;
+        ucc_tl_lib_t *      tl_lib;
+
+        attr.attr.mask = UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE;
+        attr.attr.global_work_buffer_size = 0;
+        for (i = 0; i < context->n_tl_ctx; i++) {
+            tl_lib =
+                ucc_derived_of(context->tl_ctx[i]->super.lib, ucc_tl_lib_t);
+            status = tl_lib->iface->context.get_attr(&context->tl_ctx[i]->super,
+                                                     &attr);
+            if (UCC_OK != status) {
+                ucc_error("failed to obtain global work buffer size");
+                return status;
+            }
+            if (attr.attr.global_work_buffer_size > max_buffer_size) {
+                max_buffer_size = attr.attr.global_work_buffer_size;
+            }
+        }
+        context_attr->global_work_buffer_size = max_buffer_size;
     }
 
     return status;

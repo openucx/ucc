@@ -23,6 +23,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->preconnect_task    = NULL;
     self->seq_num            = 0;
     self->status             = UCC_INPROGRESS;
+
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
@@ -82,7 +83,7 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
 
 ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
 {
-    ucc_tl_ucp_team_t    *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_team_t *   team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
     ucc_status_t          status;
 
@@ -95,6 +96,15 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
             return UCC_INPROGRESS;
         } else if (UCC_OK != status) {
             goto err_preconnect;
+        }
+    }
+
+    if (ctx->remote_info) {
+        ucc_rank_t rank = ctx->super.super.ucc_context->rank;
+
+        for (int i = 0; i < ctx->n_rinfo_segs; i++) {
+            team->va_base[i]     = ctx->remote_info[rank][i].va_base;
+            team->base_length[i] = ctx->remote_info[rank][i].len;
         }
     }
 
@@ -152,3 +162,5 @@ err:
     ucc_coll_score_free(score);
     return status;
 }
+
+
