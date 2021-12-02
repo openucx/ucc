@@ -27,7 +27,7 @@
 #define SHMSEG_WMB()  __asm__ __volatile__("": : :"memory")
 #define SHMSEG_ISYNC() __asm__ __volatile__("": : :"memory")
 
-#define UCC_TL_SHM_SUPPORTED_COLLS                                             \
+#define UCC_TL_SHM_SUPPORTED_COLLS                                            \
     (UCC_COLL_TYPE_BCAST)// | UCC_COLL_TYPE_REDUCE)
 
 typedef struct ucc_kn_tree ucc_kn_tree_t;
@@ -89,9 +89,9 @@ typedef struct ucc_tl_shm_tree {
 } ucc_tl_shm_tree_t;
 
 typedef struct ucc_tl_shm_tree_cache_keys {
-    ucc_rank_t base_radix;
-    ucc_rank_t top_radix;
-    ucc_rank_t root;
+    ucc_rank_t      base_radix;
+    ucc_rank_t      top_radix;
+    ucc_rank_t      root;
     ucc_coll_type_t coll_type;
 } ucc_tl_shm_tree_cache_keys_t;
 
@@ -128,22 +128,22 @@ typedef struct ucc_tl_shm_team {
     ucc_status_t             status;
 } ucc_tl_shm_team_t;
 
-typedef enum {
-    UCC_TL_SHM_BASE_GROUP,
-    UCC_TL_SHM_LEADERS_GROUP,
-} ucc_tl_shm_group_t; // needed?
+//typedef enum {
+//    UCC_TL_SHM_BASE_GROUP,
+//    UCC_TL_SHM_LEADERS_GROUP,
+//} ucc_tl_shm_group_t; // needed?
 
 
 UCC_CLASS_DECLARE(ucc_tl_shm_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
-#define TASK_TEAM(_task)                                                       \
+#define TASK_TEAM(_task)                                                      \
     (ucc_derived_of((_task)->super.team, ucc_tl_shm_team_t))
-#define TASK_CTX(_task)                                                        \
+#define TASK_CTX(_task)                                                       \
     (ucc_derived_of((_task)->super.team->context, ucc_tl_shm_context_t))
-#define TASK_LIB(_task)                                                        \
+#define TASK_LIB(_task)                                                       \
     (ucc_derived_of((_task)->super.team->context->lib, ucc_tl_shm_lib_t))
-#define UCC_TL_SHM_TEAM_LIB(_team)                                             \
+#define UCC_TL_SHM_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_shm_lib_t))
 #define TASK_ARGS(_task) (_task)->super.bargs.args
 

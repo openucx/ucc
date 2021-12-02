@@ -69,6 +69,7 @@ int ucc_tl_shm_cache_tree_lookup(ucc_tl_shm_team_t *team,
                                  ucc_rank_t root, ucc_coll_type_t coll_type,
                                  ucc_tl_shm_tree_t **tree) {
     ucc_tl_shm_tree_cache_elems_t *elems = team->tree_cache->elems;
+
     for (int i = 0; i < team->tree_cache->size; i++) {
         if (elems[i].keys.base_radix == base_radix &&
             elems[i].keys.top_radix == top_radix &&
@@ -86,6 +87,7 @@ int ucc_tl_shm_cache_tree(ucc_tl_shm_team_t *team, ucc_rank_t base_radix,
                           ucc_coll_type_t coll_type, ucc_tl_shm_tree_t *tree) {
     size_t size = team->tree_cache->size;
     ucc_tl_shm_tree_cache_elems_t *elem = &team->tree_cache->elems[size];
+
     if (size < UCC_TL_SHM_TEAM_LIB(team)->cfg.max_trees_cached) {
         elem->tree = tree;
         elem->keys.base_radix = base_radix;

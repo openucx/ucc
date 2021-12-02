@@ -64,11 +64,13 @@ static inline void ucc_tl_shm_copy_to_children(ucc_tl_shm_seg_t *seg,
                                     size_t data_size)
 {
     ucc_tl_shm_ctrl_t *ctrl;
-    void *dst;
+    void              *dst;
+    int                i;
 
-    for (int i =0 ;i < tree->n_children; i++) {
+    for (i =0 ;i < tree->n_children; i++) {
         ctrl = ucc_tl_shm_get_ctrl(seg, team, tree->children[i]);
-        dst = is_inline ? ctrl->data : ucc_tl_shm_get_data(seg, team, tree->children[i]);
+        dst = is_inline ? ctrl->data : ucc_tl_shm_get_data(seg, team,
+                                                           tree->children[i]);
         memcpy(dst, src, data_size);
         SHMSEG_WMB();
         ctrl->pi = seq_num;
@@ -81,7 +83,8 @@ static inline void ucc_tl_shm_signal_to_children(ucc_tl_shm_seg_t *seg,
                                       ucc_kn_tree_t *tree)
 {
     ucc_tl_shm_ctrl_t *ctrl;
-    for (int i =0 ;i < tree->n_children; i++) {
+    int                i;
+    for (i =0 ;i < tree->n_children; i++) {
         ctrl = ucc_tl_shm_get_ctrl(seg, team, tree->children[i]);
         ctrl->pi = seq_num;
     }

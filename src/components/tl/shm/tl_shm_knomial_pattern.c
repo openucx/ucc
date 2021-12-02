@@ -35,7 +35,9 @@ void ucc_tl_shm_kn_tree_init(ucc_rank_t size, /* group size */
                     vpeer = vrank + i * dist;
                     if (vpeer < size) {
                         peer = (vpeer + root) % size;
-                        peer_ptr = (ucc_rank_t *) PTR_OFFSET(&tree_p->children[0], sizeof(ucc_rank_t) * n_children);
+                        peer_ptr = (ucc_rank_t *)
+                                   PTR_OFFSET(&tree_p->children[0],
+                                              sizeof(ucc_rank_t) * n_children);
                         *peer_ptr = peer;
                         n_children++;
                     } else if (coll_type == UCC_COLL_TYPE_REDUCE) {

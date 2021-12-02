@@ -29,7 +29,8 @@ static inline size_t ucc_tl_shm_kn_tree_size(size_t size, ucc_rank_t radix)
 	return log_size * (radix - 1);
 }
 
-static inline void ucc_tl_shm_tree_to_team_ranks(ucc_kn_tree_t *tree, ucc_ep_map_t map)
+static inline void ucc_tl_shm_tree_to_team_ranks(ucc_kn_tree_t *tree,
+                                                 ucc_ep_map_t   map)
 {
     if (tree->parent != UCC_RANK_INVALID) {
         tree->parent = ucc_ep_map_eval(map, tree->parent);
