@@ -96,15 +96,13 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
     ucc_base_team_t *team, ucc_schedule_t **frag_p)
 {
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_schedule_t      *schedule = ucc_tl_ucp_get_schedule(tl_team);
+    ucc_schedule_t      *schedule = ucc_tl_ucp_get_schedule(tl_team, coll_args);
     size_t               count    = coll_args->args.dst.info.count;
     ucc_base_coll_args_t args     = *coll_args;
     ucc_coll_task_t     *task, *rs_task;
     ucc_status_t         status;
     ucc_kn_radix_t       radix, cfg_radix;
 
-
-    ucc_schedule_init(schedule, coll_args, team);
     cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sra_kn_radix;
     radix = ucc_knomial_pattern_get_min_radix(cfg_radix,
                                               UCC_TL_TEAM_SIZE(tl_team), count);
