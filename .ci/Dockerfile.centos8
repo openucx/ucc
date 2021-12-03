@@ -1,43 +1,9 @@
-FROM harbor.mellanox.com/torch-ucc/ucc/1.0.0/x86_64/centos8/cuda11.4.2:base
+ARG CUDA_VER='11.4.2'
+FROM harbor.mellanox.com/torch-ucc/ucc/1.0.0/x86_64/centos8/cuda${CUDA_VER}:base
 
-#==============================================================================
-RUN mkdir -p ${SRC_DIR} && \
-    mkdir -p ${PKG_DIR} && \
-    mkdir -p ${BIN_DIR} && \
-    mkdir -p ${WORKLOADS_DIR}
-
-RUN git clone ${TORCH_UCC_GITHUB_URL} ${SRC_DIR} && \
-    cd ${SRC_DIR} && \
-    git checkout ${TORCH_UCC_BRANCH}
-
-RUN mkdir -p ${SRC_DIR}/ucx && \
-    git clone --recursive ${UCX_GITHUB_URL} ${SRC_DIR}/ucx && \
-    cd ${SRC_DIR}/ucx && \
-    git checkout ${UCX_BRANCH}
-
-COPY . ${SRC_DIR}/ucc
-#==============================================================================
-# Build UCX
-RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucx.sh
-ENV PATH=${UCX_INSTALL_DIR}/bin:${PATH}
-#==============================================================================
-# Configure Python
-RUN ${SRC_DIR}/ucc/.ci/scripts/configure_python.sh
 #==============================================================================
 # Build UCC
 RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucc.sh
-#==============================================================================
-# Install PyTorch
-RUN ${SRC_DIR}/ucc/.ci/scripts/install_torch.sh
-#==============================================================================
-# Install workloads
-WORKDIR ${WORKLOADS_DIR}
-RUN git clone https://github.com/facebookresearch/dlrm.git && \
-    cd ${WORKLOADS_DIR}/dlrm && \
-    pip3 install -r ${WORKLOADS_DIR}/dlrm/requirements.txt && \
-    pip3 install tensorboard
-RUN git clone https://github.com/facebookresearch/param.git && \
-    pip3 install -r ${WORKLOADS_DIR}/param/requirements.txt
 #==============================================================================
 # Install torch_ucc (UCC version) python module and build a wheel package
 RUN ${SRC_DIR}/ucc/.ci/scripts/install_torch_ucc.sh

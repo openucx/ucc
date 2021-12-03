@@ -1,0 +1,42 @@
+---
+job: 'ucc_build_docker'
+
+step_allow_single_selector: true
+
+registry_host: 'harbor.mellanox.com'
+registry_path: '/torch-ucc'
+registry_auth: '05d98651-e11c-4a57-9cc6-52df79014b89'
+
+volumes:
+  - { mountPath: '/hpc/local', hostPath: '/hpc/local' }
+  - { mountPath: '/auto/sw_tools', hostPath: '/auto/sw_tools' }
+  - { mountPath: '/.autodirect/mtrswgwork', hostPath: '/.autodirect/mtrswgwork' }
+  - { mountPath: '/.autodirect/sw/release', hostPath: '/.autodirect/sw/release' }
+
+env:
+  CUDA_VER: '11.4.2'
+  UCC_URI_SUFFIX: 'ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}'
+  UCC_DOCKER_IMAGE_NAME: '${registry_host}${registry_path}/${UCC_URI_SUFFIX}'
+  NVIDIA_ROOT_DIR: '/opt/nvidia'
+  SRC_DIR: '${NVIDIA_ROOT_DIR}/src'
+  BIN_DIR: '${NVIDIA_ROOT_DIR}/bin'
+  DOCKER_OPT: '--pull always --network=host --uts=host --ipc=host --ulimit stack=67108864 --ulimit memlock=-1 --security-opt seccomp=unconfined --cap-add=SYS_ADMIN --device=/dev/infiniband/ --gpus all --user root'
+
+docker_opt: "$DOCKER_OPT"
+
+kubernetes:
+  cloud: 'swx-k8s'
+
+runs_on_dockers:
+  - {
+    file: '.ci/build_base_docker/Dockerfile.centos8.base',
+    name: 'centos8',
+    tag: 'base',
+    arch: 'x86_64',
+    uri: '${UCC_URI_SUFFIX}',
+    build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}',
+    cloud: 'swx-k8s'
+  }
+
+timeout_minutes: 120
+
