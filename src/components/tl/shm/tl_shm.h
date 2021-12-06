@@ -49,6 +49,7 @@ typedef struct ucc_tl_shm_lib_config {
     uint32_t             bcast_top_radix;
     uint32_t             max_trees_cached;
     uint32_t             n_polls;
+    uint32_t             base_tree_only;
     char                *group_mode;
 } ucc_tl_shm_lib_config_t;
 

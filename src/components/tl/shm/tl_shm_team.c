@@ -237,8 +237,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
                                             UCC_SBGP_SOCKET_LEADERS);
 
     if (self->leaders_group->status == UCC_SBGP_NOT_EXISTS ||
-                self->leaders_group->group_size == team_size) {
-        //TODO: check leaders group status - if not exist then base group size 1 with UCC_SBGP_NODE (into base groups). DO same thing if leaders group == team size
+        self->leaders_group->group_size == team_size ||
+        UCC_TL_SHM_TEAM_LIB(self)->cfg.base_tree_only) {
     	self->leaders_group->group_size = 0;
     	self->base_groups = ucc_topo_get_sbgp(self->topo, UCC_SBGP_NODE);
     	self->n_base_groups = 1;

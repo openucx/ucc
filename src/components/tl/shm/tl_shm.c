@@ -49,6 +49,11 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
      ucc_offsetof(ucc_tl_shm_lib_config_t, max_trees_cached),
      UCC_CONFIG_TYPE_UINT},
 
+    {"BASE_TREE_ONLY", "0", "disabling topo, "
+     "focing all processes to be on same socket/numa",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, base_tree_only),
+     UCC_CONFIG_TYPE_UINT},
+
     {"GROUP_MODE", "socket", "group mode - numa or socket",
      ucc_offsetof(ucc_tl_shm_lib_config_t, group_mode),
      UCC_CONFIG_TYPE_STRING},
