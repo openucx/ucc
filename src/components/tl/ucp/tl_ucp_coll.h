@@ -13,7 +13,8 @@
 #include "components/mc/base/ucc_mc_base.h"
 #include "tl_ucp_tag.h"
 
-#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 3
+#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 7
+
 extern const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
 
@@ -57,6 +58,13 @@ typedef struct ucc_tl_ucp_task {
             void                   *scratch;
             ucc_mc_buffer_header_t *scratch_mc_header;
         } reduce_scatter_kn;
+        struct {
+            void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ep_map_t            inv_map;
+            int                     n_frags;
+            int                     frag;
+        } reduce_scatter_ring;
         struct {
             int                     phase;
             ucc_knomial_pattern_t   p;

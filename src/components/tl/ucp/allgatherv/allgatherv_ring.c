@@ -12,7 +12,7 @@
 #include "utils/ucc_coll_utils.h"
 #include "tl_ucp_sendrecv.h"
 
-ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task     = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t   *args     = &TASK_ARGS(task);
@@ -61,7 +61,7 @@ out:
     return task->super.super.status;
 }
 
-ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
@@ -107,4 +107,24 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     return ucc_task_complete(coll_task);
 error:
     return task->super.super.status;
+}
+
+ucc_status_t
+ucc_tl_ucp_allgatherv_ring_init(ucc_base_coll_args_t *coll_args,
+                                ucc_base_team_t  *team,
+                                ucc_coll_task_t **task_h)
+{
+    ucc_tl_ucp_task_t    *task = ucc_tl_ucp_init_task(coll_args, team);
+
+    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info_v.datatype)) ||
+        (!UCC_IS_INPLACE(TASK_ARGS(task)) &&
+         (!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).src.info.datatype)))) {
+        tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    task->super.post     = ucc_tl_ucp_allgatherv_ring_start;
+    task->super.progress = ucc_tl_ucp_allgatherv_ring_progress;
+    *task_h              = &task->super;
+
+    return UCC_OK;
 }

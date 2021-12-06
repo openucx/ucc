@@ -57,9 +57,11 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t            allreduce_sra_kn_n_frags;
     uint32_t            allreduce_sra_kn_pipeline_depth;
     int                 allreduce_sra_kn_seq;
+    int                 allreduce_sra_kn_no_scratch;
+    int                 reduce_avg_pre_op;
+    int                 reduce_scatter_ring_bidirectional;
     size_t              allreduce_sra_kn_frag_thresh;
     size_t              allreduce_sra_kn_frag_size;
-    int                 reduce_avg_pre_op;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {
@@ -115,11 +117,12 @@ typedef struct ucc_tl_ucp_team {
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
-#define UCC_TL_UCP_SUPPORTED_COLLS                                             \
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
-     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
-     UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_BARRIER |   \
-     UCC_COLL_TYPE_REDUCE)
+#define UCC_TL_UCP_SUPPORTED_COLLS                         \
+    (UCC_COLL_TYPE_ALLTOALL  | UCC_COLL_TYPE_ALLTOALLV  |  \
+     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |  \
+     UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BCAST      |  \
+     UCC_COLL_TYPE_BARRIER   | UCC_COLL_TYPE_REDUCE     |  \
+     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
 
 #define UCC_TL_UCP_TEAM_LIB(_team)                                             \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_ucp_lib_t))
