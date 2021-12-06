@@ -33,9 +33,9 @@
    6. If the allreduce is INPLACE or if a rank serves as a PROXY then the algorithm
       requires allocation of a scratch buffer of the size equal to input buffer.
    7. After the completion of reduce-scatter phase the local result (at non EXTRA
-      ranks) will be located in dst buffer at offset the can be commputed by the
-      routine from coll_patterns/sra_knomial.h: ucc_sra_kn_get_offset.
+      ranks) will be located in dst buffer at offset defined by ucc_kn_rsx_pattern.
  */
+
 static ucc_status_t
 ucc_tl_ucp_allreduce_sra_knomial_frag_start(ucc_coll_task_t *task)
 {
@@ -86,7 +86,6 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_setup(
         PTR_OFFSET(args->dst.info.buffer, offset * dt_size);
     targs->src.info.count = 0;
     targs->dst.info.count = frag_count;
-
     return UCC_OK;
 }
 
