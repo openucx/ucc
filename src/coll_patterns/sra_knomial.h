@@ -9,27 +9,20 @@
 
 #include "recursive_knomial.h"
 
-static inline ucc_rank_t ucc_sra_kn_compute_step_radix(ucc_rank_t rank,
-                                                       ucc_rank_t size,
-                                                       ucc_knomial_pattern_t *p)
+static inline ucc_rank_t ucc_kn_compute_step_radix(ucc_rank_t rank,
+                                                   ucc_rank_t size,
+                                                   ucc_knomial_pattern_t *p)
 {
-    ucc_rank_t step_radix = 0;
-    ucc_rank_t k, peer;
+    int n_full = ucc_kn_pattern_n_full(p);
 
-    for (k = 1; k < p->radix; k++) {
-        peer = ucc_knomial_pattern_get_loop_peer(p, rank, size, k);
-        if (peer == UCC_KN_PEER_NULL)
-            continue;
-        step_radix += 1;
-    }
-    step_radix += 1;
-    return step_radix;
+    return p->radix_pow * p->radix >= p->size ? (n_full > 1 ? n_full : p->radix)
+        : p->radix;
 }
 
 // segment index in exchange group of tree
-static inline ucc_rank_t ucc_sra_kn_compute_seg_index(ucc_rank_t peer,
-                                                      ucc_rank_t kpow_num,
-                                                      ucc_knomial_pattern_t *p)
+static inline ucc_rank_t ucc_kn_compute_seg_index(ucc_rank_t peer,
+                                                  ucc_rank_t kpow_num,
+                                                  ucc_knomial_pattern_t *p)
 {
     ucc_rank_t peer_base, peer_position, peer_base_rank, peer_index;
 
@@ -42,98 +35,292 @@ static inline ucc_rank_t ucc_sra_kn_compute_seg_index(ucc_rank_t peer,
     return peer_index;
 }
 
-// segment size
-static inline size_t ucc_sra_kn_compute_seg_size(size_t         block_count,
-                                                 ucc_kn_radix_t radix,
-                                                 ucc_rank_t     si)
+static inline size_t vector_block_offset(ucc_knomial_pattern_t *p, ucc_rank_t rank)
 {
-    return block_count / radix + (si < (block_count % radix) ? 1 : 0);
-}
-
-// segment offset in exhange group of tree
-static inline size_t ucc_sra_kn_compute_seg_offset(size_t         block_count,
-                                                   ucc_kn_radix_t radix,
-                                                   ucc_rank_t     si)
-{
-    return (block_count / radix) * si +
-           ((si < (block_count % radix)) ? si : (block_count % radix));
-}
-
-static inline size_t ucc_sra_kn_compute_block_count(size_t     count,
-                                                    ucc_rank_t rank,
-                                                    ucc_knomial_pattern_t *p)
-{
-    size_t     block_count = count;
-    ucc_rank_t k_pow       = 1;
-    ucc_rank_t i, my_si, my_seg_len;
-
-    for (i = 0; i < p->iteration; i++) {
-        my_si       = ucc_sra_kn_compute_seg_index(rank, k_pow, p);
-        my_seg_len  = ucc_sra_kn_compute_seg_size(block_count, p->radix, my_si);
-        block_count = my_seg_len;
-        k_pow *= p->radix;
+    size_t offset = 0;
+    //TODO switch to prefix sum
+    if (p->is64) {
+        for (int i = 0; i < rank; i++) {
+            offset += ((uint64_t*)p->counts)[i];
+        }
+    } else {
+        for (int i = 0; i < rank; i++) {
+            offset += ((uint32_t*)p->counts)[i];
+        }
     }
-    return block_count;
+    return offset;
+}
+
+static inline ucc_rank_t
+ucc_knx_rank(ucc_rank_t rank, ucc_rank_t size, ucc_kn_radix_t radix)
+{
+    ucc_rank_t            offset      = 0;
+    ucc_rank_t            block_count;
+    ucc_kn_radix_t        step_radix;
+    ucc_rank_t            my_si;
+    ucc_knomial_pattern_t p;
+
+    ucc_knomial_pattern_init(size, rank, radix, &p);
+    if (KN_NODE_EXTRA == p.node_type) {
+        return UCC_RANK_INVALID;
+    }
+    block_count = size - p.n_extra;
+    while (!ucc_knomial_pattern_loop_done(&p)) {
+        step_radix = ucc_kn_compute_step_radix(rank, size, &p);
+        my_si      = ucc_kn_compute_seg_index(rank, p.radix_pow, &p);
+        offset += ucc_buffer_block_offset(block_count, step_radix, my_si);
+        block_count = ucc_buffer_block_count(block_count, step_radix, my_si);
+        ucc_knomial_pattern_next_iteration(&p);
+    }
+    return offset;
+}
+
+typedef struct ucc_kn_seg_desc {
+    ucc_rank_t seg_size;
+    ucc_rank_t seg_offset;
+    ucc_rank_t seg_start_rank_loop;
+    ucc_rank_t seg_end_rank_loop;
+    ucc_rank_t seg_start;
+    ucc_rank_t seg_end;
+} ucc_kn_seg_desc_t;
+
+static inline void ucc_kn_seg_desc_compute(ucc_knomial_pattern_t *p,
+                                           ucc_kn_seg_desc_t *seg, ucc_rank_t peer)
+{
+    ucc_rank_t step_radix = ucc_kn_compute_step_radix(p->rank, p->size, p);
+    ucc_rank_t seg_index  = ucc_kn_compute_seg_index(peer, p->radix_pow, p);
+
+    /* size of the peer's segment in "loop ranks" - ie how many ranks are
+       aggregated under this segment */
+    seg->seg_size            = p->block_size / step_radix;
+    /* offset of the peer's segment in "loop ranks" */
+    seg->seg_offset          = seg->seg_size * seg_index;
+    /* start and end position of the segment in "loop ranks" */
+    seg->seg_start_rank_loop = seg->seg_offset + p->block_offset;
+    seg->seg_end_rank_loop   = seg->seg_start_rank_loop + seg->seg_size;
+    /* start and end position of the segment in the original "ranks" */
+    seg->seg_start = ucc_knomial_pattern_loop_rank_inv(p, seg->seg_start_rank_loop);
+    seg->seg_end   = ucc_knomial_pattern_loop_rank_inv(p, seg->seg_end_rank_loop);
+}
+
+/* ========================= ALLGAHTER ============================  */
+
+static inline void
+ucc_kn_ag_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
+                       size_t count, ucc_knomial_pattern_t *p)
+{
+    ucc_knomial_pattern_init(size, rank, radix, p);
+    p->type         = KN_PATTERN_ALLGATHER;
+    p->count        = count;
+    p->block_size   = p->radix_pow * radix;
+    p->block_offset = ucc_knomial_pattern_loop_rank(p, rank) / p->block_size * p->block_size;
 }
 
 static inline void
-ucc_sra_kn_get_offset_and_seglen(size_t count, size_t dt_size, ucc_rank_t rank,
-                                 ucc_rank_t size, ucc_kn_radix_t radix,
-                                 ptrdiff_t *offset, size_t *seglen)
+ucc_kn_agv_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
+                        ucc_count_t *counts, int is64, ucc_knomial_pattern_t *p)
 {
-    ptrdiff_t             _offset     = 0;
-    size_t                block_count = count;
-    ucc_rank_t            step_radix  = 0;
-    size_t                my_seg_len  = 0;
-    ucc_rank_t            k, r, peer, my_si;
-    size_t                my_seg_offset;
-    ucc_knomial_pattern_t p;
-    ucc_knomial_pattern_init(size, rank, radix, &p);
+    ucc_knomial_pattern_init(size, rank, radix, p);
+    p->type         = KN_PATTERN_ALLGATHERV;
+    p->counts       = counts;
+    p->is64         = is64;
+    p->block_size   = p->radix_pow * radix;
+    p->block_offset = ucc_knomial_pattern_loop_rank(p, rank) / p->block_size * p->block_size;
+}
 
-    if (KN_NODE_EXTRA == p.node_type) {
-        if (offset)
-            *offset = 0;
-        if (seglen)
-            *seglen = count;
+static inline void
+ucc_kn_agx_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
+                       size_t count, ucc_knomial_pattern_t *p)
+{
+    ucc_knomial_pattern_init_backward(size, rank, radix, p);
+    p->type  = KN_PATTERN_ALLGATHERX;
+    p->count = count;
+    if (p->node_type != KN_NODE_EXTRA) {
+        p->block_size   = ucc_kn_compute_step_radix(p->rank, p->size, p);
+        p->knx_rank     = ucc_knx_rank(rank, size, radix);
+        p->block_offset = p->knx_rank / p->block_size * p->block_size;
+    }
+}
+
+static inline void ucc_kn_ag_pattern_peer_seg(ucc_rank_t peer,
+                                              ucc_knomial_pattern_t *p,
+                                              size_t *peer_seg_count,
+                                              size_t *peer_seg_offset)
+{
+    ucc_kn_seg_desc_t s;
+
+    ucc_kn_seg_desc_compute(p, &s, peer);
+
+    if (p->type == KN_PATTERN_ALLGATHER) {
+        /* sum counts between 2 ranks */
+        *peer_seg_offset = ucc_buffer_block_offset(p->count, p->size, s.seg_start);
+        *peer_seg_count = ucc_buffer_block_offset(p->count, p->size, s.seg_end) - *peer_seg_offset;
+    } else if (p->type == KN_PATTERN_ALLGATHERX) {
+        /* sum counts between 2 ranks */
+        *peer_seg_offset = ucc_buffer_block_offset(p->count, p->size - p->n_extra, s.seg_start_rank_loop);
+        *peer_seg_count = ucc_buffer_block_offset(p->count, p->size - p->n_extra, s.seg_end_rank_loop) - *peer_seg_offset;
+    } else {
+        *peer_seg_offset = vector_block_offset(p, s.seg_start);
+        /* sum counts between 2 ranks */
+        *peer_seg_count = vector_block_offset(p, s.seg_end) - *peer_seg_offset;
+    }
+}
+
+static inline void ucc_kn_ag_pattern_next_iter(ucc_knomial_pattern_t *p)
+{
+    ucc_rank_t rank;
+    if (p->type == KN_PATTERN_ALLGATHERX) {
+        rank = p->knx_rank;
+        ucc_knomial_pattern_next_iteration_backward(p);
+    } else {
+        rank = ucc_knomial_pattern_loop_rank(p, p->rank);
+        ucc_knomial_pattern_next_iteration(p);
+    }
+    if (!ucc_knomial_pattern_loop_done(p)) {
+        p->block_size *= ucc_kn_compute_step_radix(p->rank, p->size, p);
+        p->block_offset = rank / p->block_size * p->block_size;
+    }
+}
+
+/* ========================= REDUCE-SCATTER ============================  */
+
+static inline void
+ucc_kn_rs_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
+                       size_t count, ucc_knomial_pattern_t *p)
+{
+    ucc_knomial_pattern_init_backward(size, rank, radix, p);
+    p->type              = KN_PATTERN_REDUCE_SCATTER;
+    p->count             = count;
+    p->block_size_counts = count;
+    p->block_size        = size - p->n_extra;
+}
+
+static inline void
+ucc_kn_rsx_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
+                       size_t count, ucc_knomial_pattern_t *p)
+{
+    ucc_knomial_pattern_init(size, rank, radix, p);
+    p->type              = KN_PATTERN_REDUCE_SCATTERX;
+    p->count             = count;
+    p->block_size_counts = count;
+    p->block_size        = size - p->n_extra;
+}
+
+static inline void
+ucc_kn_rsv_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
+                        ucc_count_t *counts, int is64, ucc_knomial_pattern_t *p)
+{
+    int i;
+
+    ucc_knomial_pattern_init_backward(size, rank, radix, p);
+    p->type              = KN_PATTERN_REDUCE_SCATTERV;
+    p->counts            = counts;
+    p->block_size_counts = 0;
+    p->block_size        = size - p->n_extra;
+    if (is64) {
+        for (i = 0; i < size; i++) {
+            p->block_size_counts += ((uint64_t*)counts)[i];
+        }
+    } else {
+        for (i = 0; i < size; i++) {
+            p->block_size_counts += ((uint32_t*)counts)[i];
+        }
+    }
+    p->count = p->block_size_counts;;
+    p->is64  = is64;
+}
+
+
+static inline void ucc_kn_rs_pattern_peer_seg(ucc_rank_t peer,
+                                              ucc_knomial_pattern_t *p,
+                                              size_t *peer_seg_count,
+                                              size_t *peer_seg_offset)
+{
+    ucc_kn_seg_desc_t s;
+    ucc_rank_t        block_offset_inv;
+    /* offset of the segment in counts of datatypes from the
+       start of the buffer */
+    size_t peer_seg_offset_base;
+    /* offset of the current block in counts of datatypes from the
+       start of the buffer */
+    size_t block_offset_counts;
+
+    ucc_kn_seg_desc_compute(p, &s, peer);
+
+     block_offset_inv = ucc_knomial_pattern_loop_rank_inv(p, p->block_offset);
+
+    if (p->type == KN_PATTERN_REDUCE_SCATTER) {
+        peer_seg_offset_base = ucc_buffer_block_offset(p->count, p->size, s.seg_start);
+        *peer_seg_count      = ucc_buffer_block_offset(p->count, p->size, s.seg_end) -
+            peer_seg_offset_base;
+        block_offset_counts = ucc_buffer_block_offset(p->count, p->size, block_offset_inv);
+    } else if (p->type == KN_PATTERN_REDUCE_SCATTERX) {
+        peer_seg_offset_base = ucc_buffer_block_offset(p->count, p->size - p->n_extra, s.seg_start_rank_loop);
+        *peer_seg_count = ucc_buffer_block_offset(p->count, p->size - p->n_extra, s.seg_end_rank_loop) -
+            peer_seg_offset_base;
+        block_offset_counts = ucc_buffer_block_offset(p->count, p->size-p->n_extra, p->block_offset);
+    } else {
+        ucc_assert(p->type == KN_PATTERN_REDUCE_SCATTERV);
+        peer_seg_offset_base = vector_block_offset(p, s.seg_start);
+        /* sum counts between 2 ranks */
+        *peer_seg_count = vector_block_offset(p, s.seg_end) -
+            peer_seg_offset_base;
+
+        block_offset_counts = vector_block_offset(p, block_offset_inv);
+    }
+
+    ucc_assert(peer_seg_offset_base >= block_offset_counts);
+    *peer_seg_offset = peer_seg_offset_base - block_offset_counts;
+
+}
+
+static inline void ucc_kn_rs_pattern_next_iter(ucc_knomial_pattern_t *p)
+{
+    ucc_kn_seg_desc_t s;
+    size_t            offset;
+
+    ucc_kn_seg_desc_compute(p, &s, p->rank);
+    ucc_kn_rs_pattern_peer_seg(p->rank, p, &p->block_size_counts, &offset);
+    p->block_size    = s.seg_size;
+    p->block_offset += s.seg_offset;
+
+    if (p->type == KN_PATTERN_REDUCE_SCATTERX) {
+        ucc_knomial_pattern_next_iteration(p);
         return;
     }
-    while (!ucc_knomial_pattern_loop_done(&p)) {
-        r = 0;
-        for (k = 1; k < p.radix; k++) {
-            peer = ucc_knomial_pattern_get_loop_peer(&p, rank, size, k);
-            if (peer == UCC_KN_PEER_NULL)
-                continue;
-            r++;
-        }
-        step_radix = r + 1;
-        my_si      = ucc_sra_kn_compute_seg_index(rank, p.radix_pow, &p);
-        my_seg_offset =
-            ucc_sra_kn_compute_seg_offset(block_count, step_radix, my_si);
-        _offset += my_seg_offset * dt_size;
-        if (p.iteration < p.pow_radix_sup - 1) {
-            block_count =
-                ucc_sra_kn_compute_seg_size(block_count, step_radix, my_si);
-        }
-        ucc_knomial_pattern_next_iteration(&p);
-    }
-    if (step_radix) {
-        my_seg_len =
-            ucc_sra_kn_compute_seg_size(block_count, step_radix, my_si);
-    }
-    if (offset)
-        *offset = _offset;
-    if (seglen)
-        *seglen = my_seg_len;
+    ucc_knomial_pattern_next_iteration_backward(p);
 }
 
-static inline ptrdiff_t ucc_sra_kn_get_offset(size_t count, size_t dt_size,
-                                              ucc_rank_t rank, ucc_rank_t size,
-                                              ucc_kn_radix_t radix)
+static inline void ucc_kn_rs_pattern_extra_seg(ucc_knomial_pattern_t *p,
+                                               size_t *seg_count, size_t *seg_offset)
 {
-    ptrdiff_t offset;
-    ucc_sra_kn_get_offset_and_seglen(count, dt_size, rank, size, radix, &offset,
-                                     NULL);
-    return offset;
+    /* offset is size of my data */
+    if (p->type == KN_PATTERN_REDUCE_SCATTER) {
+        *seg_offset = ucc_buffer_block_count(p->count, p->size, p->rank);
+        *seg_count  = ucc_buffer_block_count(p->count, p->size,
+                                             ucc_knomial_pattern_get_extra(p, p->rank));
+    } else {
+        *seg_offset = p->is64 ? ((uint64_t*)p->counts)[p->rank] : ((uint32_t*)p->counts)[p->rank];
+        *seg_count  = p->is64
+            ? ((uint64_t*)p->counts)[ucc_knomial_pattern_get_extra(p, p->rank)]
+            : ((uint32_t*)p->counts)[ucc_knomial_pattern_get_extra(p, p->rank)];
+    }
 }
+
+
+static inline void ucc_kn_rsx_pattern_dst(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
+                                          size_t count, size_t *dst_offset, size_t *dst_count)
+{
+    ucc_knomial_pattern_t p;
+
+    ucc_kn_agx_pattern_init(size, rank, radix, count, &p);
+    if (p.node_type == KN_NODE_EXTRA) {
+        *dst_offset = *dst_count = 0;
+    }
+
+    *dst_offset = ucc_buffer_block_offset(count, p.size - p.n_extra, p.knx_rank);
+    *dst_count  = ucc_buffer_block_count(count, p.size - p.n_extra,  p.knx_rank);
+}
+
 
 #endif
