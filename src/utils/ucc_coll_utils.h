@@ -41,6 +41,9 @@
         (_task)->start_time   = ucc_get_time();                    \
     } while(0)
 
+#define UCC_COLL_ARGS64(_args) (((_args)->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&\
+                                ((_args)->flags & UCC_COLL_ARGS_FLAG_COUNT_64BIT))
+
 static inline size_t
 ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
                         ucc_rank_t idx)
@@ -129,4 +132,35 @@ ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
                                    ucc_rank_t full_size, int need_free);
 
 void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len);
+
+/* Creates a rank map that reverses rank order, ie
+   rank r -> size - 1 - r */
+ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size);
+
+/* Creates an inverse mapping for a given map */
+ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map);
+
+void ucc_ep_map_destroy(ucc_ep_map_t *map);
+
+static inline size_t ucc_buffer_block_count(size_t     total_count,
+                                            ucc_rank_t n_blocks,
+                                            ucc_rank_t block)
+{
+    size_t block_count = total_count / n_blocks;
+    size_t left        = total_count % n_blocks;
+
+    return (block < left) ? block_count + 1 : block_count;
+}
+
+static inline size_t ucc_buffer_block_offset(size_t     total_count,
+                                             ucc_rank_t n_blocks,
+                                             ucc_rank_t block)
+{
+    size_t block_count = total_count / n_blocks;
+    size_t left        = total_count % n_blocks;
+    size_t offset      = block * block_count + left;
+
+    return (block < left) ? offset - (left - block) : offset;
+}
+
 #endif
