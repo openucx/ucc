@@ -50,7 +50,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     }
 
     team->cl_teams = ucc_malloc(sizeof(ucc_cl_team_t *) * context->n_cl_ctx);
-    if (!team) {
+    if (!team->cl_teams) {
         ucc_error("failed to allocate %zd bytes for cl teams array",
                   sizeof(ucc_cl_team_t *) * context->n_cl_ctx);
         return UCC_ERR_NO_MEMORY;
