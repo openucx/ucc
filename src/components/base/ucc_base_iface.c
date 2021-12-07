@@ -44,6 +44,7 @@ ucc_status_t ucc_base_config_read(const char *full_prefix,
     if (!cfg) {
         ucc_error("failed to allocate %zd bytes for cl context config",
                   cfg_entry->size);
+        return UCC_ERR_NO_MEMORY;
     }
     cfg->cfg_entry = cfg_entry;
     status = ucc_config_parser_fill_opts(cfg, cfg_entry->table, full_prefix,
