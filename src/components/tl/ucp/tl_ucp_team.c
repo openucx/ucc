@@ -119,16 +119,29 @@ err_preconnect:
 ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
                                         ucc_coll_score_t **score_p)
 {
-    ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_lib_t  *lib  = UCC_TL_UCP_TEAM_LIB(team);
-    ucc_coll_score_t  *score;
-    ucc_status_t       status;
-    unsigned           i;
+    ucc_tl_ucp_team_t    *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_tl_ucp_lib_t     *lib  = UCC_TL_UCP_TEAM_LIB(team);
+    int                   mt_n = 0;
+    ucc_memory_type_t     mem_types[UCC_MEMORY_TYPE_LAST];
+    ucc_coll_score_t     *score;
+    ucc_status_t          status;
+    unsigned              i;
+
+    for (i = 0; i < UCC_MEMORY_TYPE_LAST; i++) {
+        if (ctx->ucp_memory_types & UCC_BIT(ucc_memtype_to_ucs[i])) {
+            tl_debug(tl_team->context->lib,
+                     "enable support for memory type %s",
+                     ucc_memory_type_names[i]);
+            mem_types[mt_n++] = i;
+        }
+    }
+
     /* There can be a different logic for different coll_type/mem_type.
        Right now just init everything the same way. */
     status = ucc_coll_score_build_default(tl_team, UCC_TL_UCP_DEFAULT_SCORE,
                               ucc_tl_ucp_coll_init, UCC_TL_UCP_SUPPORTED_COLLS,
-                              NULL, 0, &score);
+                              mem_types, mt_n, &score);
     if (UCC_OK != status) {
         return status;
     }
@@ -162,5 +175,3 @@ err:
     ucc_coll_score_free(score);
     return status;
 }
-
-

@@ -14,8 +14,6 @@
 #include "utils/ucc_compiler_def.h"
 #include "components/mc/base/ucc_mc_base.h"
 
-extern ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1];
-
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data);
 
