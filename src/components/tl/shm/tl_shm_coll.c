@@ -27,7 +27,8 @@ static ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task)
 	    ucc_free(task->tree->top_tree);
 	    ucc_free(task->tree);
 	}
-	ucc_free(task);
+	UCC_TL_SHM_PROFILE_REQUEST_FREE(task);
+    ucc_mpool_put(task);
     return UCC_OK;
 }
 
@@ -35,9 +36,10 @@ ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *team,
                                    ucc_coll_task_t **task_h)
 {
-	ucc_status_t status = UCC_OK;
-	ucc_tl_shm_task_t *task =
-                (ucc_tl_shm_task_t *) ucc_malloc(sizeof(ucc_tl_shm_task_t));
+    ucc_status_t          status = UCC_OK;
+    ucc_tl_shm_context_t *ctx    = ucc_derived_of(team->context, ucc_tl_shm_context_t);
+    ucc_tl_shm_task_t    *task   = ucc_mpool_get(&ctx->req_mp);
+    UCC_TL_SHM_PROFILE_REQUEST_NEW(task, "tl_shm_task", 0);
 	ucc_coll_task_init(&task->super, coll_args, team);
 
 	task->super.finalize = ucc_tl_shm_coll_finalize;

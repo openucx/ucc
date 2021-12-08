@@ -22,6 +22,18 @@
 #define UCC_TL_SHM_DEFAULT_SCORE 20
 #endif
 
+#ifdef HAVE_PROFILING_TL_SHM
+#include "utils/profile/ucc_profile.h"
+#else
+#include "utils/profile/ucc_profile_off.h"
+#endif
+
+#define UCC_TL_SHM_PROFILE_FUNC UCC_PROFILE_FUNC
+#define UCC_TL_SHM_PROFILE_FUNC_VOID UCC_PROFILE_FUNC_VOID
+#define UCC_TL_SHM_PROFILE_REQUEST_NEW UCC_PROFILE_REQUEST_NEW
+#define UCC_TL_SHM_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
+#define UCC_TL_SHM_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
+
 #define BCOL_SHMSEG_PROBE_COUNT 100
 //TODO take arch code from ucs ??
 #define SHMSEG_WMB()  __asm__ __volatile__("": : :"memory")
@@ -67,7 +79,7 @@ UCC_CLASS_DECLARE(ucc_tl_shm_lib_t, const ucc_base_lib_params_t *,
 typedef struct ucc_tl_shm_context {
     ucc_tl_context_t            super;
     ucc_tl_shm_context_config_t cfg;
-//    ucc_mpool_t                  req_mp;
+    ucc_mpool_t                  req_mp;
 } ucc_tl_shm_context_t;
 UCC_CLASS_DECLARE(ucc_tl_shm_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);

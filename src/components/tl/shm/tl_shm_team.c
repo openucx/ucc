@@ -226,11 +226,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
 
     self->tree_cache->size = 0;
 
-    self->tree_cache->elems = (ucc_tl_shm_tree_cache_elems_t *)
-                              ucc_malloc(max_trees *
-                                         sizeof(ucc_tl_shm_tree_cache_elems_t),
-                                         "tree_cache elems");
-
     /* sbgp type gl is either SOCKET_LEADERS or NUMA_LEADERS
      * depending on the config: grouping type */
     self->leaders_group = ucc_topo_get_sbgp(self->topo,
@@ -350,7 +345,7 @@ ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
     }
     ucc_free(team->tree_cache->elems);
     ucc_free(team->tree_cache);
-    ucc_free(team->group_rank_map.array.map); //free ucc_ep_map_t array like this?
+    ucc_free(team->group_rank_map.array.map);
     ucc_free(team->rank_group_id_map.array.map);
     ucc_free(team->ctrl_map.array.map);
     ucc_free(team->segs);
