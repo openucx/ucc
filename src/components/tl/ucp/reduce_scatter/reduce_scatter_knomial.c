@@ -39,7 +39,7 @@
         })
 
 #define GET_DATA_BUF(_args)   ({                                 \
-    void *_buf;                                                         \
+            void *_buf = NULL;                                          \
     switch ((_args)->coll_type) {                                       \
     case UCC_COLL_TYPE_ALLREDUCE:                                       \
     case UCC_COLL_TYPE_REDUCE_SCATTER:                                  \
