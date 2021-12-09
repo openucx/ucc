@@ -50,6 +50,10 @@ noinst_HEADERS =                      \
 	schedule/ucc_schedule.h           \
 	schedule/ucc_schedule_pipelined.h \
 	coll_score/ucc_coll_score.h       \
+	utils/arch/aarch64/cpu.h          \
+	utils/arch/ppc64/cpu.h            \
+	utils/arch/x86_64/cpu.h           \
+	utils/arch/cpu.h                  \
 	utils/ucc_compiler_def.h          \
 	utils/ucc_log.h                   \
 	utils/ucc_parser.h                \

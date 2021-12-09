@@ -7,6 +7,7 @@
 #include "mc_cpu.h"
 #include "reduce/mc_cpu_reduce.h"
 #include "utils/ucc_malloc.h"
+#include "utils/arch/cpu.h"
 #include <sys/types.h>
 
 static ucc_config_field_t ucc_mc_cpu_config_table[] = {

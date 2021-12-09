@@ -84,6 +84,5 @@ static inline ucs_status_t ucc_status_to_ucs_status(ucc_status_t status)
 #define ucc_assert(_cond)
 #endif
 
-#define UCC_CACHE_LINE_SIZE 128 //TODO detect it
 #define ucc_for_each_bit ucs_for_each_bit
 #endif
