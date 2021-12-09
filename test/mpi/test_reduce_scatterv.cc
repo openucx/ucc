@@ -27,6 +27,8 @@ TestReduceScatterv::TestReduceScatterv(size_t _msgsize,
 
 
     if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT,
+                    team.comm) ||
+        skip_reduce(_inplace, TEST_SKIP_NOT_SUPPORTED,
                     team.comm)) {
         return;
     }

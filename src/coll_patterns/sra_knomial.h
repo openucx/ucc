@@ -271,7 +271,6 @@ static inline void ucc_kn_rs_pattern_peer_seg(ucc_rank_t peer,
 
     ucc_assert(peer_seg_offset_base >= block_offset_counts);
     *peer_seg_offset = peer_seg_offset_base - block_offset_counts;
-
 }
 
 static inline void ucc_kn_rs_pattern_next_iter(ucc_knomial_pattern_t *p)
@@ -322,5 +321,32 @@ static inline void ucc_kn_rsx_pattern_dst(ucc_rank_t size, ucc_rank_t rank, ucc_
     *dst_count  = ucc_buffer_block_count(count, p.size - p.n_extra,  p.knx_rank);
 }
 
+static inline size_t ucc_kn_rs_max_seg_count(ucc_knomial_pattern_t *p)
+{
+    size_t count, seg_count, offset;
+    if (KN_NODE_EXTRA == p->node_type) {
+        return 0;
+    }
+
+    if (p->type == KN_PATTERN_REDUCE_SCATTERV) {
+        ucc_kn_radix_t radix = ucc_kn_compute_step_radix(p->rank, p->size, p);
+        ucc_rank_t step_size = (p->size - p->n_extra) / radix;
+        ucc_rank_t start, end, i;
+
+        ucc_assert((p->size - p->n_extra) % radix == 0);
+        count = 0;
+        for (i = 0; i < radix; i++) {
+            start = ucc_knomial_pattern_loop_rank_inv(p, i * step_size);
+            end   = ucc_knomial_pattern_loop_rank_inv(p, (i+1) * step_size);
+            seg_count = vector_block_offset(p, end) - vector_block_offset(p, start);
+            if (seg_count > count) {
+                count = seg_count;
+            }
+        }
+    } else {
+        ucc_kn_rs_pattern_peer_seg(0, p, &count, &offset);
+    }
+    return count;
+}
 
 #endif

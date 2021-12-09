@@ -73,13 +73,15 @@ ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t             recvfrom   = (rank - 1 + size) % size;
     ucc_rank_t         prevblock, recv_data_from;
     ucc_status_t       status;
-    size_t              max_block_size, block_offset, frag_count, frag_offset;
+    size_t              max_block_size, block_offset, frag_count, frag_offset, final_offset;
     int step, is_avg;
     void *tmp[3];
 
+    final_offset = 0;
     if (UCC_IS_INPLACE(*args)) {
         sbuf = args->dst.info.buffer;
         count /= size;
+        final_offset = ucc_buffer_block_offset(count, size, UCC_TL_TEAM_RANK(team));
     }
 
     sendto   = ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, sendto);
@@ -109,7 +111,8 @@ ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
         ucc_ring_frag_count(task, count, prevblock, &frag_count);
         ucc_ring_frag_block_offset(task, count, prevblock, &block_offset, &frag_offset);
         if (task->recv_completed == size - 1) {
-            reduce_target = PTR_OFFSET(args->dst.info.buffer, frag_offset* dt_size);
+            reduce_target = PTR_OFFSET(args->dst.info.buffer,
+                                       (frag_offset + final_offset) * dt_size);
         }
         is_avg = (args->op == UCC_OP_AVG) &&
             (task->recv_completed == (size - 1));

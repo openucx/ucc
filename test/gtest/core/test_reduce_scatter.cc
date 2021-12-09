@@ -114,15 +114,17 @@ class test_reduce_scatter : public UccCollArgs, public testing::Test {
     }
     bool data_validate(UccCollCtxVec ctxs)
     {
-        size_t total_count, rcount;
+        size_t total_count, rcount, offset;
         std::vector<typename T::type *> dsts(ctxs.size());
 
         if (TEST_INPLACE != inplace) {
+            offset = 0;
             total_count = (ctxs[0])->args->src.info.count;
             rcount = (ctxs[0])->args->dst.info.count;
         } else {
             total_count = (ctxs[0])->args->dst.info.count;
             rcount = total_count / ctxs.size();
+            offset = rcount * sizeof(typename T::type);
         }
 
         ucc_assert(rcount * ctxs.size() == total_count);
@@ -130,13 +132,14 @@ class test_reduce_scatter : public UccCollArgs, public testing::Test {
             for (int r = 0; r < ctxs.size(); r++) {
                 dsts[r] = (typename T::type *) ucc_malloc(rcount * sizeof(typename T::type), "dsts buf");
                 EXPECT_NE(dsts[r], nullptr);
-                UCC_CHECK(ucc_mc_memcpy(dsts[r], ctxs[r]->args->dst.info.buffer,
+                UCC_CHECK(ucc_mc_memcpy(dsts[r],
+                                        PTR_OFFSET(ctxs[r]->args->dst.info.buffer, offset * r),
                                         rcount * sizeof(typename T::type), UCC_MEMORY_TYPE_HOST,
                                         mem_type));
             }
         } else {
             for (int r = 0; r < ctxs.size(); r++) {
-                dsts[r] = (typename T::type *)(ctxs[r]->args->dst.info.buffer);
+                dsts[r] = (typename T::type *)(PTR_OFFSET(ctxs[r]->args->dst.info.buffer, offset * r));
             }
         }
 
@@ -164,7 +167,7 @@ TYPED_TEST_CASE(test_reduce_scatter, ReductionTypesOps);
 
 #define TEST_DECLARE(_mem_type, _inplace, _repeat)                             \
     {                                                                          \
-        std::array<int, 3> counts{4, 256, 65536};                              \
+        std::array<int, 1> counts{123};                              \
         for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {                 \
             for (int count : counts) {                                         \
                 UccTeam_h     team = UccJob::getStaticTeams()[tid];            \

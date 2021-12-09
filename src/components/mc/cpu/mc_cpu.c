@@ -60,7 +60,8 @@ static ucc_status_t ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
     h->addr      = PTR_OFFSET(h, sizeof(ucc_mc_buffer_header_t));
     h->mt        = UCC_MEMORY_TYPE_HOST;
     *h_ptr       = h;
-    mc_trace(&ucc_mc_cpu.super, "allocated %ld bytes with ucc_malloc", size);
+    mc_trace(&ucc_mc_cpu.super, "allocated %ld bytes with ucc_malloc, h_ptr %p",
+             size, h);
     return UCC_OK;
 }
 
@@ -75,7 +76,7 @@ static ucc_status_t ucc_mc_cpu_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
         // Slow path
         return ucc_mc_cpu_mem_alloc(h_ptr, size);
     }
-    mc_trace(&ucc_mc_cpu.super, "allocated %ld bytes from cpu mpool", size);
+    mc_trace(&ucc_mc_cpu.super, "allocated %ld bytes from cpu mpool, h_ptr %p", size, h);
     *h_ptr = h;
     return UCC_OK;
 }
@@ -119,6 +120,8 @@ static ucc_status_t ucc_mc_cpu_mem_free(ucc_mc_buffer_header_t *h_ptr)
 
 static ucc_status_t ucc_mc_cpu_mem_pool_free(ucc_mc_buffer_header_t *h_ptr)
 {
+    mc_trace(&ucc_mc_cpu.super, "releasing header %p, from_pool %d",
+             h_ptr, h_ptr->from_pool);
     if (!h_ptr->from_pool) {
         return ucc_mc_cpu_mem_free(h_ptr);
     }
