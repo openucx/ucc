@@ -19,6 +19,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     ucc_tl_ucp_context_config_t *tl_ucp_config =
         ucc_derived_of(config, ucc_tl_ucp_context_config_t);
     ucc_status_t        ucc_status = UCC_OK;
+    ucp_context_attr_t  context_attr;
     ucp_worker_params_t worker_params;
     ucp_worker_attr_t   worker_attr;
     ucp_params_t        ucp_params;
@@ -65,6 +66,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         goto err_cfg;
     }
 
+    context_attr.field_mask = UCP_ATTR_FIELD_MEMORY_TYPES;
+    status = ucp_context_query(ucp_context, &context_attr);
+    if (UCS_OK != status) {
+        tl_error(self->super.super.lib,
+                 "failed to query supported memory types, %s",
+                 ucs_status_string(status));
+        ucc_status = ucs_status_to_ucc_status(status);
+        goto err_worker_create;
+    }
+    self->ucp_memory_types = context_attr.memory_types;
     worker_params.field_mask = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
     switch (params->thread_mode) {
     case UCC_THREAD_SINGLE:
