@@ -14,6 +14,7 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 #include "allgather.h"
+#include "allgatherv/allgatherv.h"
 
 #define SAVE_STATE(_phase)                                                     \
     do {                                                                       \
@@ -244,6 +245,9 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     if (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHER) {
         ucc_kn_ag_pattern_init(size, rank, radix, coll_args->args.dst.info.count, &p);
     } else if (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHERV) {
+        if (!UCC_IS_DST_CONTIG(coll_args->args)) {
+            return ucc_tl_ucp_allgatherv_ring_init(coll_args, team, task_h);
+        }
         ucc_kn_agv_pattern_init(size, rank, radix, coll_args->args.dst.info_v.counts,
                                 UCC_COLL_ARGS64(&coll_args->args), &p);
     } else {

@@ -20,7 +20,7 @@ extern ucc_base_coll_alg_info_t
 ucc_tl_ucp_allgatherv_algs[UCC_TL_UCP_ALLGATHERV_ALG_LAST + 1];
 
 #define UCC_TL_UCP_ALLGATHERV_DEFAULT_ALG_SELECT_STR                            \
-    "allgatherv:@knomial"
+    "allgatherv:0-1k:@knomial#allgatherv:1k-inf:@ring"
 
 static inline int ucc_tl_ucp_allgatherv_alg_from_str(const char *str)
 {

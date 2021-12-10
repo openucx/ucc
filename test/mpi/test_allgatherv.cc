@@ -60,17 +60,16 @@ TestAllgatherv::TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     check_rbuf = ucc_malloc(_msgsize*size, "check rbuf");
     UCC_MALLOC_CHECK(check_rbuf);
     fill_counts_and_displacements(size, count, counts, displacements);
-
+    args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
+    args.flags |= UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
     if (TEST_NO_INPLACE == inplace) {
-        args.mask = 0;
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, counts[rank] * dt_size, _mt));
         UCC_CHECK(ucc_mc_alloc(&check_sbuf_mc_header, counts[rank] * dt_size,
                                UCC_MEMORY_TYPE_HOST));
         sbuf = sbuf_mc_header->addr;
         check_sbuf = check_sbuf_mc_header->addr;
     } else {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 
     args.coll_type = UCC_COLL_TYPE_ALLGATHERV;
