@@ -159,10 +159,12 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/sharp.m4])
      m4_include([config/m4/mpi.m4])
      m4_include([config/m4/configure.m4])
+     m4_include([config/m4/tl_coll_plugins.m4])
      m4_include([test/gtest/configure.m4])
 
      mc_modules=":cpu"
      tl_modules=""
+     tlcp_modules=""
      AC_MSG_RESULT([MPI perftest: ${mpi_enable}])
 
      CHECK_UCX
@@ -196,6 +198,7 @@ CFLAGS="$CFLAGS -std=gnu11"
 CPPFLAGS="$CPPFLAGS $UCS_CPPFLAGS $includes"
 LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
 
+CHECK_TL_COLL_PLUGINS
 AC_CONFIG_FILES([
                  Makefile
                  src/Makefile
@@ -236,6 +239,7 @@ AC_MSG_NOTICE([      C++ compiler:   ${CXX} ${CXXFLAGS} ${BASE_CXXFLAGS}])
 AC_MSG_NOTICE([          Perftest:   ${mpi_enable}])
 AC_MSG_NOTICE([        MC modules:   <$(echo ${mc_modules}|tr ':' ' ') >])
 AC_MSG_NOTICE([        TL modules:   <$(echo ${tl_modules}|tr ':' ' ') >])
+AC_MSG_NOTICE([      TLCP modules:   <$(echo ${tlcp_modules}|tr ':' ' ') >])
 AS_IF([test "x$enable_profiling" = xyes],[
 AC_MSG_NOTICE([ Profiling modules:   <$(echo ${prof_modules}|tr ':' ' ') >])
 ])

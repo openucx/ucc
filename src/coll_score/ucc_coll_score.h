@@ -119,6 +119,9 @@ ucc_status_t ucc_coll_score_update_from_str(const char *            str,
                                             ucc_score_t             def_score,
                                             ucc_alg_id_to_init_fn_t alg_fn);
 
+ucc_status_t ucc_coll_score_merge_in(ucc_coll_score_t **dst,
+                                     ucc_coll_score_t *src);
+
 ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
                                    ucc_coll_score_t *update,
                                    ucc_score_t       default_score);

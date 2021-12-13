@@ -119,14 +119,17 @@ err_preconnect:
 ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
                                         ucc_coll_score_t **score_p)
 {
-    ucc_tl_ucp_team_t    *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_tl_ucp_lib_t     *lib  = UCC_TL_UCP_TEAM_LIB(team);
-    int                   mt_n = 0;
-    ucc_memory_type_t     mem_types[UCC_MEMORY_TYPE_LAST];
-    ucc_coll_score_t     *score;
-    ucc_status_t          status;
-    unsigned              i;
+    ucc_tl_ucp_team_t          *team    = ucc_derived_of(tl_team,
+                                                      ucc_tl_ucp_team_t);
+    ucc_component_framework_t  *plugins = &ucc_tl_ucp.super.coll_plugins;
+    ucc_tl_ucp_context_t       *ctx     = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_tl_ucp_lib_t           *lib     = UCC_TL_UCP_TEAM_LIB(team);
+    int                         mt_n    = 0;
+    ucc_memory_type_t           mem_types[UCC_MEMORY_TYPE_LAST];
+    ucc_coll_score_t           *score, *tlcp_score;
+    ucc_tl_coll_plugin_iface_t *tlcp;
+    ucc_status_t                status;
+    unsigned                    i;
 
     for (i = 0; i < UCC_MEMORY_TYPE_LAST; i++) {
         if (ctx->ucp_memory_types & UCC_BIT(ucc_memtype_to_ucs[i])) {
@@ -166,6 +169,19 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {
+            goto err;
+        }
+    }
+
+    for (i = 0; i < plugins->n_components; i++) {
+        tlcp = ucc_derived_of(plugins->components[i],
+                              ucc_tl_coll_plugin_iface_t);
+        status = tlcp->get_scores(tl_team, &tlcp_score);
+        if (UCC_OK != status) {
+            goto err;
+        }
+        status = ucc_coll_score_merge_in(&score, tlcp_score);
+        if (UCC_OK != status) {
             goto err;
         }
     }
