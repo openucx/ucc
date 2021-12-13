@@ -149,6 +149,7 @@ ucc_status_t ucc_pt_comm::allreduce(float* in, float* out, size_t size,
     ucc_coll_args_t args;
     ucc_coll_req_h req;
 
+    args.mask                 = 0;
     args.coll_type            = UCC_COLL_TYPE_ALLREDUCE;
     args.op                   = op;
     args.src.info.buffer      = in;
