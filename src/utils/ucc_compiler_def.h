@@ -25,6 +25,11 @@
 #define ucc_likely        ucs_likely
 #define ucc_unlikely      ucs_unlikely
 
+/**
+ * Prevent compiler from reordering instructions
+ */
+#define ucc_compiler_fence()       asm volatile(""::: "memory")
+
 typedef ucs_log_component_config_t ucc_log_component_config_t;
 typedef int                        ucc_score_t;
 

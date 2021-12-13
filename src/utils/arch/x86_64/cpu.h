@@ -8,6 +8,8 @@
 #ifndef UCC_X86_64_H_
 #define UCC_X86_64_H_
 
+#include "utils/ucc_compiler_def.h"
+
 #define UCC_ARCH_CACHE_LINE_SIZE 64
 
 /**
@@ -18,5 +20,8 @@
 #define ucc_memory_bus_store_fence()  asm volatile ("sfence" ::: "memory")
 #define ucc_memory_bus_load_fence()   asm volatile ("lfence" ::: "memory")
 
+#define ucc_memory_cpu_fence()        ucc_compiler_fence()
+#define ucc_memory_cpu_store_fence()  ucc_compiler_fence()
+#define ucc_memory_cpu_load_fence()   ucc_compiler_fence()
 
 #endif

@@ -16,4 +16,11 @@
 #define ucc_memory_bus_store_fence()  ucc_memory_bus_fence()
 #define ucc_memory_bus_load_fence()   ucc_memory_bus_fence()
 
+#define ucc_memory_cpu_fence()        ucc_memory_bus_fence()
+#define ucc_memory_cpu_store_fence()  asm volatile ("lwsync \n" \
+                                                    ::: "memory")
+#define ucc_memory_cpu_load_fence()   asm volatile ("lwsync \n" \
+                                                    "isync  \n" \
+                                                    ::: "memory")
+
 #endif

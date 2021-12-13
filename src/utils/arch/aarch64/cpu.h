@@ -1,5 +1,5 @@
 /**
-* Copyright (C) Mellanox Technologies Ltd. 2001-2015.  ALL RIGHTS RESERVED.
+* Copyright (C) Mellanox Technologies Ltd. 2001-2021.  ALL RIGHTS RESERVED.
 * Copyright (C) ARM Ltd. 2016-2020.  ALL RIGHTS RESERVED.
 * Copyright (C) Stony Brook University. 2016-2020.  ALL RIGHTS RESERVED.
 *
@@ -30,5 +30,9 @@
 #define ucc_memory_bus_fence()        ucc_aarch64_dmb(oshsy)
 #define ucc_memory_bus_store_fence()  ucc_aarch64_dmb(oshst)
 #define ucc_memory_bus_load_fence()   ucc_aarch64_dmb(oshld)
+
+#define ucc_memory_cpu_fence()        ucc_aarch64_dmb(ish)
+#define ucc_memory_cpu_store_fence()  ucc_aarch64_dmb(ishst)
+#define ucc_memory_cpu_load_fence()   ucc_aarch64_dmb(ishld)
 
 #endif
