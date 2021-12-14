@@ -43,7 +43,7 @@ ucc_status_t ucc_mpool_init(ucc_mpool_t *mp, size_t priv_size, size_t elem_size,
                             ucc_mpool_ops_t *ops, ucc_thread_mode_t tm,
                             const char *name)
 {
-    ucs_mpool_ops_t *ucs_ops = ucc_malloc(sizeof(*ucs_ops), "mpool_ops");
+    ucs_mpool_ops_t *ucs_ops = ucc_calloc(1, sizeof(*ucs_ops), "mpool_ops");
     if (!ucs_ops) {
         ucc_error("failed to allocate %zd bytes for mpool ucs ops",
                   sizeof(*ucs_ops));
@@ -55,8 +55,6 @@ ucc_status_t ucc_mpool_init(ucc_mpool_t *mp, size_t priv_size, size_t elem_size,
     mp->ucc_ops            = ops ? ops : &ucc_default_mpool_ops;
     ucs_ops->chunk_alloc   = ucc_mpool_chunk_alloc_wrapper;
     ucs_ops->chunk_release = ucc_mpool_chunk_release_wrapper;
-    ucs_ops->obj_init      = NULL;
-    ucs_ops->obj_cleanup   = NULL;
     if (mp->ucc_ops->obj_init != NULL) {
         ucs_ops->obj_init = ucc_mpool_obj_init_wrapper;
     }
