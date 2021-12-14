@@ -154,4 +154,15 @@ static inline int ucc_topo_n_numas(ucc_topo_t *topo)
     return sbgp->group_size;
 }
 
+static inline ucc_rank_t ucc_topo_nnodes(ucc_topo_t *topo)
+{
+    ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+
+    if (sbgp->status == UCC_SBGP_NOT_EXISTS) {
+        ucc_assert(ucc_topo_is_single_node(topo));
+        return 1;
+    }
+    return sbgp->group_size;
+}
+
 #endif
