@@ -92,6 +92,8 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
 
             AC_SUBST(UCX_LIBADD, "-lucp -lucm")
             AC_SUBST(UCS_LIBADD, "-lucs")
+            AC_CHECK_MEMBERS([ucs_mpool_ops_t.obj_str], [], [],
+                            [[#include <ucs/datastruct/mpool.h>]])
         ],
         [
             AS_IF([test "x$with_ucx" != "xguess"],
