@@ -201,6 +201,11 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
                                           ucc_subset_t      subset,
                                           ucc_coll_task_t **task_p);
 
+ucc_status_t ucc_tl_ucp_service_bcast(ucc_base_team_t *team, void *buf,
+                                      size_t msgsize, ucc_rank_t root,
+                                      ucc_subset_t      subset,
+                                      ucc_coll_task_t **task_p);
+
 ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_ucp_service_cleanup(ucc_coll_task_t *task);
@@ -257,6 +262,7 @@ __attribute__((constructor)) static void tl_ucp_iface_init(void)
 {
     ucc_tl_ucp.super.scoll.allreduce = ucc_tl_ucp_service_allreduce;
     ucc_tl_ucp.super.scoll.allgather = ucc_tl_ucp_service_allgather;
+    ucc_tl_ucp.super.scoll.bcast     = ucc_tl_ucp_service_bcast;
     ucc_tl_ucp.super.scoll.update_id = ucc_tl_ucp_service_update_id;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLREDUCE)] =
         ucc_tl_ucp_allreduce_algs;

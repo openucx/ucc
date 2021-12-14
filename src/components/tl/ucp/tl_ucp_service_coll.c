@@ -9,6 +9,7 @@
 #include "tl_ucp_tag.h"
 #include "allreduce/allreduce.h"
 #include "allgather/allgather.h"
+#include "bcast/bcast.h"
 
 ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, ucc_datatype_t dt,
@@ -103,6 +104,51 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
     task->super.finalize = ucc_tl_ucp_coll_finalize;
 
     status = ucc_tl_ucp_allgather_ring_start(&task->super);
+    if (status != UCC_OK) {
+        goto finalize_coll;
+    }
+
+    *task_p = &task->super;
+    return status;
+finalize_coll:
+    ucc_tl_ucp_coll_finalize(*task_p);
+free_task:
+    ucc_tl_ucp_put_task(task);
+    return status;
+}
+
+ucc_status_t ucc_tl_ucp_service_bcast(ucc_base_team_t *team, void *buf,
+                                      size_t msgsize, ucc_rank_t root,
+                                      ucc_subset_t      subset,
+                                      ucc_coll_task_t **task_p)
+{
+    ucc_tl_ucp_team_t   *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_task_t   *task    = ucc_tl_ucp_get_task(tl_team);
+    ucc_base_coll_args_t bargs   = {
+        .args = {
+            .coll_type    = UCC_COLL_TYPE_BCAST,
+            .src.info = {
+                .buffer   = buf,
+                .count    = msgsize,
+                .datatype = UCC_DT_INT8,
+                .mem_type = UCC_MEMORY_TYPE_HOST
+            },
+            .root         = root
+        }
+    };
+    ucc_status_t status;
+
+    status = ucc_coll_task_init(&task->super, &bargs, team);
+    if (status != UCC_OK) {
+        goto free_task;
+    }
+    task->subset         = subset;
+    task->tag            = UCC_TL_UCP_SERVICE_TAG;
+    task->n_polls        = UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.oob_npolls;
+    task->super.progress = ucc_tl_ucp_bcast_knomial_progress;
+    task->super.finalize = ucc_tl_ucp_coll_finalize;
+    task->bcast_kn.radix = 2;
+    status = ucc_tl_ucp_bcast_knomial_start(&task->super);
     if (status != UCC_OK) {
         goto finalize_coll;
     }
