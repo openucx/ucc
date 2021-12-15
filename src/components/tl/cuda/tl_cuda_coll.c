@@ -24,15 +24,6 @@ exit:
     return status;
 }
 
-ucc_status_t ucc_tl_cuda_coll_finalize(ucc_coll_task_t *coll_task)
-{
-    ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-
-    tl_trace(UCC_TASK_LIB(task), "finalizing task %p", task);
-    ucc_tl_cuda_task_put(task);
-    return UCC_OK;
-}
-
 ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *team,
                                    ucc_coll_task_t **task_h)
@@ -53,6 +44,7 @@ ucc_status_t ucc_tl_cuda_shm_barrier_init(ucc_rank_t size, ucc_rank_t rank,
         barrier->count = 0;
         barrier->sense = 0;
     }
+    barrier->state[rank]       = UCC_OK;
     barrier->local_sense[rank] = 1;
     return UCC_OK;
 }
@@ -61,8 +53,11 @@ ucc_status_t ucc_tl_cuda_shm_barrier_start(ucc_rank_t rank,
                                            ucc_tl_cuda_shm_barrier_t *barrier)
 {
     ucc_rank_t pos = ucc_atomic_fadd32(&barrier->count, 1);
+
+    barrier->state[rank] = UCC_INPROGRESS;
     if (pos == barrier->size - 1) {
         barrier->count = 0;
+        __sync_synchronize();
         barrier->sense = barrier->local_sense[rank];
     }
     return UCC_OK;
@@ -74,6 +69,7 @@ ucc_status_t ucc_tl_cuda_shm_barrier_test(ucc_rank_t rank,
     if (barrier->sense != barrier->local_sense[rank]) {
         return UCC_INPROGRESS;
     }
+    barrier->state[rank]       = UCC_OK;
     barrier->local_sense[rank] = 1 - barrier->local_sense[rank];
     return UCC_OK;
 }

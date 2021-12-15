@@ -106,11 +106,14 @@ typedef struct ucc_tl_cuda_context {
 UCC_CLASS_DECLARE(ucc_tl_cuda_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+typedef uint32_t ucc_tl_cuda_sync_state_t;
+
 typedef struct ucc_tl_cuda_shm_barrier {
-    ucc_rank_t size;
-    ucc_rank_t count;
-    int        sense;
-    int        local_sense[UCC_TL_CUDA_MAX_PEERS];
+    ucc_rank_t   size;
+    ucc_rank_t   count;
+    int          sense;
+    ucc_status_t state[UCC_TL_CUDA_MAX_PEERS];
+    int          local_sense[UCC_TL_CUDA_MAX_PEERS];
 } ucc_tl_cuda_shm_barrier_t;
 
 typedef struct ucc_tl_cuda_rank_id {
@@ -145,6 +148,7 @@ typedef struct ucc_tl_cuda_team {
     ucc_tl_team_t              super;
     uint32_t                   seq_num;
     ucc_tl_cuda_sync_t        *sync;
+    ucc_tl_cuda_sync_state_t  *sync_state;
     ucc_tl_cuda_shm_barrier_t *bar;
     cudaStream_t               stream;
     ucc_tl_cuda_rank_id_t     *ids;

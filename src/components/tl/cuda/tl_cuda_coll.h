@@ -47,13 +47,13 @@ static inline ucc_tl_cuda_task_t *ucc_tl_cuda_task_get(ucc_tl_cuda_team_t *team)
 
 static inline void ucc_tl_cuda_task_put(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
-    uint32_t max_concurrent;
+    // ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    // ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
+    // uint32_t max_concurrent;
 
     UCC_TL_CUDA_PROFILE_REQUEST_FREE(task);
-    max_concurrent = UCC_TL_CUDA_TEAM_LIB(team)->cfg.max_concurrent;
-    sync->seq_num[0] += max_concurrent;
+    // max_concurrent = UCC_TL_CUDA_TEAM_LIB(team)->cfg.max_concurrent;
+    // sync->seq_num[0] += max_concurrent;
     ucc_mpool_put(task);
 }
 
@@ -69,6 +69,32 @@ ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
     task->seq_num = team->seq_num++;
     task->coll_id = task->seq_num % max_concurrent;
     return task;
+}
+
+static inline ucc_status_t ucc_tl_cuda_get_sync(ucc_tl_cuda_task_t *task)
+{
+    ucc_tl_cuda_team_t       *team  = TASK_TEAM(task);
+    ucc_tl_cuda_sync_state_t *state = &team->sync_state[task->coll_id];
+
+    if ((UCC_TL_TEAM_RANK(team) == 0) && (*state == 0)) {
+        *state = task->seq_num;
+    }
+    if ((*state != task->seq_num) ||
+        (task->bar->state[UCC_TL_TEAM_RANK(team)] != UCC_OK)) {
+        return UCC_INPROGRESS;
+    }
+    return UCC_OK;
+}
+
+static inline void ucc_tl_cuda_put_sync(ucc_tl_cuda_task_t *task)
+{
+    ucc_tl_cuda_team_t       *team  = TASK_TEAM(task);
+    ucc_tl_cuda_sync_state_t *state = &team->sync_state[task->coll_id];
+
+    if (UCC_TL_TEAM_RANK(team) == 0) {
+        ucc_assert(*state == task->seq_num);
+        *state = 0;
+    }
 }
 
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,

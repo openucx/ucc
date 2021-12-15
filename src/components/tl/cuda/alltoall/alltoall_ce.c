@@ -120,11 +120,10 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
     ucc_status_t        status;
 
     if (task->alltoall_ce.stage == ALLTOALL_CE_STAGE_SYNC) {
-        if (sync->seq_num[0] != task->seq_num) {
+        if (ucc_tl_cuda_get_sync(task) != UCC_OK) {
             task->super.super.status = UCC_INPROGRESS;
             return task->super.super.status;
         }
@@ -157,6 +156,9 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
     }
     task->super.super.status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team),
                                                             task->bar);
+    if (task->super.super.status == UCC_OK) {
+        ucc_tl_cuda_put_sync(task);
+    }
     return task->super.super.status;
 }
 

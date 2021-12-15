@@ -44,7 +44,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     ctrl_size = (sizeof(ucc_tl_cuda_sync_t) + sizeof(ucc_tl_cuda_sync_data_t) *
                 (UCC_TL_TEAM_SIZE(self) - 1)) * UCC_TL_TEAM_SIZE(self) *
                 lib->cfg.max_concurrent +
-                sizeof(ucc_tl_cuda_shm_barrier_t) * lib->cfg.max_concurrent;
+                sizeof(ucc_tl_cuda_shm_barrier_t) * lib->cfg.max_concurrent +
+                sizeof(ucc_tl_cuda_sync_state_t) * lib->cfg.max_concurrent;
 
     shm_id = -1;
     self->sync = (void*)-1;
@@ -92,7 +93,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     }
     tl_info(tl_context->lib, "posted tl team: %p", self);
 
-    self->seq_num = 0;
+    self->seq_num = 1;
     return UCC_OK;
 
 free_devices:
@@ -206,6 +207,9 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     }
     team->bar = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(team, 0,
                                                        lib->cfg.max_concurrent);
+    team->sync_state = (ucc_tl_cuda_sync_state_t*)PTR_OFFSET(team->bar,
+                            sizeof(ucc_tl_cuda_shm_barrier_t) *
+                            lib->cfg.max_concurrent);
     for (i = 0; i < lib->cfg.max_concurrent; i++) {
         bar = UCC_TL_CUDA_TEAM_BARRIER(team, i);
         status = ucc_tl_cuda_shm_barrier_init(UCC_TL_TEAM_SIZE(team),
