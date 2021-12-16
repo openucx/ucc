@@ -302,11 +302,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     return UCC_OK;
 
 err_seg_alloc:
-    ucc_free(self->ctrl_map.array.map);
+//    ucc_free(self->ctrl_map.array.map);
 err_offsets:
-    ucc_free(self->group_rank_map.array.map);
+//    ucc_free(self->group_rank_map.array.map);
 err_group_rank_map:
-    ucc_free(self->rank_group_id_map.array.map); //TODO switch to ucc_ep_map_destroy once
+//    ucc_free(self->rank_group_id_map.array.map); //TODO switch to ucc_ep_map_destroy once
                                                  // it is merged to master upstream
 err_sockets:
     ucc_free(self->tree_cache);
@@ -345,9 +345,9 @@ ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
     }
     ucc_free(team->tree_cache->elems);
     ucc_free(team->tree_cache);
-    ucc_free(team->group_rank_map.array.map);
-    ucc_free(team->rank_group_id_map.array.map);
-    ucc_free(team->ctrl_map.array.map);
+//    ucc_free(team->group_rank_map.array.map);
+//    ucc_free(team->rank_group_id_map.array.map);
+//    ucc_free(team->ctrl_map.array.map);
     ucc_free(team->segs);
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_shm_team_t)(tl_team);
     return UCC_OK;

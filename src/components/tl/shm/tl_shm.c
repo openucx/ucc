@@ -41,6 +41,18 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
      ucc_offsetof(ucc_tl_shm_lib_config_t, bcast_top_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"REDUCE_ALG", "1", "reduce alg choice of write/read per level",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, reduce_alg),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"REDUCE_BASE_RADIX", "4", "reduce radix for base tree",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, reduce_base_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"REDUCE_TOP_RADIX", "4", "reduce radix for top tree",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, reduce_top_radix),
+     UCC_CONFIG_TYPE_UINT},
+
     {"NPOLLS", "100", "n_polls",
      ucc_offsetof(ucc_tl_shm_lib_config_t, n_polls),
      UCC_CONFIG_TYPE_UINT},
@@ -50,9 +62,14 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
      UCC_CONFIG_TYPE_UINT},
 
     {"BASE_TREE_ONLY", "0", "disabling topo, "
-     "focing all processes to be on same socket/numa",
+     "forcing all processes to be on same socket/numa",
      ucc_offsetof(ucc_tl_shm_lib_config_t, base_tree_only),
      UCC_CONFIG_TYPE_UINT},
+
+//    {"SET_PERF_PARAMS", "0", "changing defaul/user settings to optimal "
+//     "perf settings",
+//     ucc_offsetof(ucc_tl_shm_lib_config_t, set_perf_params),
+//     UCC_CONFIG_TYPE_UINT},
 
     {"GROUP_MODE", "socket", "group mode - numa or socket",
      ucc_offsetof(ucc_tl_shm_lib_config_t, group_mode),

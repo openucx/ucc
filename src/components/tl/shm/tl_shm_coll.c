@@ -19,6 +19,42 @@ ucc_status_t ucc_tl_shm_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     return UCC_OK;
 }
 
+//void ucc_tl_shm_set_params(ucc_tl_shm_task_t *task, ucc_coll_type_t coll_type)
+//{
+//	ucc_tl_shm_team_t *team = TASK_TEAM(task);
+//	ucc_coll_args_t    args = TASK_ARGS(task);
+//	ucc_rank_t         team_size = UCC_TL_TEAM_SIZE(team);
+//	ucc_rank_t         rank = UCC_TL_TEAM_RANK(team);
+//	size_t             data_size;
+//
+//    //TODO: add get arch and branching besed on arch
+//    if (coll_type == UCC_COLL_TYPE_REDUCE && rank == args.root) {
+//        data_size = args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
+//    } else {
+//        data_size = args.src.info.count * ucc_dt_size(args.src.info.datatype);
+//    }
+//
+//    if (team_size == 28 && coll_type == UCC_COLL_TYPE_BCAST && TASK_LIB(task)->cfg.set_perf_params) { //TODO: add other ppn options and reduce and do I need cfg.set_best_params?
+//    	if data_size < 256 {
+//    	    task->progress_alg = 0; // WRITE
+//            task->base_tree_only = 1; //needed in team creation
+//            task->base_radx = 4;
+////            CS = 128; // in team creation
+////            DS = 4096; // in team creation
+//    	} else {
+//    		task->progress_alg = 1; //WR
+//    		task->base_tree_only = 0; //needed in team creation
+//    		task->base_radix = 4;
+////    		CS = 128; // in team creation
+////    		DS = 4096; // in team creation
+//    	}
+//    } else {
+//        task->progress_alg   = TASK_LIB(task)->cfg.bcast_alg;
+//        task->base_tree_only = TASK_LIB(task)->cfg.base_tree_only;
+//        task->base_radx      = TASK_LIB(task)->cfg.bcast_base_radix;
+//    }
+//}
+
 static ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task)
 {
 	ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
@@ -33,33 +69,46 @@ static ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task)
 }
 
 ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
-                                   ucc_base_team_t *team,
-                                   ucc_coll_task_t **task_h)
+                                  ucc_base_team_t *team,
+                                  ucc_coll_task_t **task_h)
 {
-    ucc_status_t          status = UCC_OK;
-    ucc_tl_shm_context_t *ctx    = ucc_derived_of(team->context, ucc_tl_shm_context_t);
-    ucc_tl_shm_task_t    *task   = ucc_mpool_get(&ctx->req_mp);
+    ucc_status_t          status    = UCC_OK;
+    ucc_tl_shm_context_t *ctx       = ucc_derived_of(team->context,
+                                                     ucc_tl_shm_context_t);
+    ucc_tl_shm_task_t    *task      = ucc_mpool_get(&ctx->req_mp);
+    ucc_coll_type_t       coll_type = coll_args->args.coll_type;
     UCC_TL_SHM_PROFILE_REQUEST_NEW(task, "tl_shm_task", 0);
 	ucc_coll_task_init(&task->super, coll_args, team);
 
 	task->super.finalize = ucc_tl_shm_coll_finalize;
 
-    switch (coll_args->args.coll_type) {
+    switch (coll_type) {
     case UCC_COLL_TYPE_BCAST:
+//        ucc_tl_shm_set_params(task, coll_type);
         status = ucc_tl_shm_bcast_init(task);
+        if (ucc_unlikely(status != UCC_OK)) {
+        	ucc_mpool_put(task);
+//        	tl_error(team->context->lib, "bcast init failed");
+            return status;
+        }
         break;
     case UCC_COLL_TYPE_REDUCE:
+//        ucc_tl_shm_set_params(task, coll_type);
         status = ucc_tl_shm_reduce_init(task);
+        if (ucc_unlikely(status != UCC_OK)) {
+        	ucc_mpool_put(task);
+//        	tl_error(team->context->lib, "reduce init failed");
+            return status;
+        }
         break;
     default:
-    	ucc_free(task);
+    	tl_error(team->context->lib,
+                 "collective %d is not supported by shm tl",
+                 coll_args->args.coll_type);
+    	ucc_mpool_put(task);
     	return UCC_ERR_NOT_SUPPORTED;
     }
-    if (ucc_unlikely(status != UCC_OK)) {
-    	ucc_free(task);
-    	tl_error(team->context->lib, "bcast init failed");
-        return status;
-    }
+
     tl_trace(team->context->lib, "init coll req %p", task);
 
 	*task_h = &task->super;
@@ -150,6 +199,7 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team,
 
     shm_tree->base_tree = NULL;
     shm_tree->top_tree = NULL;
+    local_rank = 0;
     for (i = 0; i < sbgp->group_size; i++) {
     	if (ucc_ep_map_eval(sbgp->map, i) == team_rank) {
     		local_rank = i;
@@ -214,7 +264,7 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team,
                     }
                 }
                 ucc_tl_shm_kn_tree_init(leaders_size, tree_root, rank,
-                                        coll_type, top_radix,
+                                        top_radix, coll_type,
                                         top_tree);
                 /* Convert the tree to origin TL/TEAM ranks from the BASE_GROUP ranks*/
                 ucc_ep_map_t map = {

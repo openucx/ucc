@@ -373,6 +373,7 @@ ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task)
 	ucc_tl_shm_team_t *team = TASK_TEAM(task);
 	ucc_coll_args_t    args = TASK_ARGS(task);
 	ucc_rank_t   base_radix = UCC_TL_SHM_TEAM_LIB(team)->cfg.bcast_base_radix;
+//	ucc_rank_t   base_radix = task->base_radix;
 	ucc_rank_t   top_radix  = UCC_TL_SHM_TEAM_LIB(team)->cfg.bcast_top_radix;
 	ucc_status_t status;
 
@@ -389,6 +390,7 @@ ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task)
     }
 
     switch(TASK_LIB(task)->cfg.bcast_alg) {
+//    switch(task->progress_alg) {
         case BCAST_WW:
         	task->super.progress = ucc_tl_shm_bcast_ww_progress;
             break;
