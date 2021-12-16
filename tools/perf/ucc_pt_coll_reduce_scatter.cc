@@ -21,8 +21,7 @@ ucc_pt_coll_reduce_scatter::ucc_pt_coll_reduce_scatter(ucc_datatype_t dt,
         coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 
-    coll_args.mask |= UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
-    coll_args.reduce.predefined_op = op;
+    coll_args.op                = op;
     coll_args.src.info.datatype = dt;
     coll_args.src.info.mem_type = mt;
     coll_args.dst.info.datatype = dt;
@@ -35,20 +34,15 @@ ucc_status_t ucc_pt_coll_reduce_scatter::init_coll_args(size_t count,
     size_t size;
     ucc_status_t st;
 
-    if (count % comm->get_size() != 0) {
-        std::cerr << "UCC perftest error: count is not divisible by team size\n";
-        st = UCC_ERR_INVALID_PARAM;
-        goto exit;
-    }
     args = coll_args;
     src_header = nullptr;
     dst_header = nullptr;
     if (UCC_IS_INPLACE(args)) {
         args.src.info.count = 0;
-        args.dst.info.count = count;
+        args.dst.info.count = count * comm->get_size();
     } else {
-        args.src.info.count = count;
-        args.dst.info.count = count / comm->get_size();
+        args.src.info.count = count * comm->get_size();
+        args.dst.info.count = count;
     }
 
     size = args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
