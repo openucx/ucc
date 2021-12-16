@@ -35,6 +35,12 @@ int ucc_tl_shm_cache_tree(ucc_tl_shm_team_t *team, ucc_rank_t base_radix,
                           ucc_rank_t top_radix, ucc_rank_t root,
                           ucc_coll_type_t coll_type, ucc_tl_shm_tree_t *tree);
 
+ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team, ucc_rank_t root,
+                                  ucc_rank_t base_radix, ucc_rank_t top_radix,
+                                  int *tree_in_cache,
+                                  ucc_coll_type_t coll_type,
+                                  ucc_tl_shm_tree_t **tree_p);
+
 static inline ucc_tl_shm_ctrl_t *ucc_tl_shm_get_ctrl(ucc_tl_shm_seg_t *seg,
                                  ucc_tl_shm_team_t *team,
                                  ucc_rank_t rank /* rank within a TL team */)
@@ -68,6 +74,7 @@ static inline void ucc_tl_shm_copy_to_children(ucc_tl_shm_seg_t *seg,
     int                i;
 
     for (i =0 ;i < tree->n_children; i++) {
+//    for (i = tree->n_children - 1 ;i >= 0; i--) {
         ctrl = ucc_tl_shm_get_ctrl(seg, team, tree->children[i]);
         dst = is_inline ? ctrl->data : ucc_tl_shm_get_data(seg, team,
                                                            tree->children[i]);
@@ -84,7 +91,8 @@ static inline void ucc_tl_shm_signal_to_children(ucc_tl_shm_seg_t *seg,
 {
     ucc_tl_shm_ctrl_t *ctrl;
     int                i;
-    for (i =0 ;i < tree->n_children; i++) {
+    for (i = 0; i < tree->n_children; i++) {
+//    for (i = tree->n_children - 1; i >= 0; i--) {
         ctrl = ucc_tl_shm_get_ctrl(seg, team, tree->children[i]);
         ctrl->pi = seq_num;
     }
