@@ -6,6 +6,7 @@
 
 #include "tl_cuda.h"
 #include "tl_cuda_coll.h"
+#include "tl_cuda_topo.h"
 #include "core/ucc_team.h"
 #include "coll_score/ucc_coll_score.h"
 #include <sys/shm.h>
@@ -26,6 +27,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
 
     self->oob    = params->params.oob;
     self->stream = NULL;
+    self->topo   = NULL;
     if (UCC_TL_TEAM_SIZE(self) > UCC_TL_CUDA_MAX_PEERS) {
         tl_info(tl_context->lib, "team size is too large, max supported %d",
                 UCC_TL_CUDA_MAX_PEERS);
@@ -118,6 +120,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
     int i, j;
 
     tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+    if (self->topo) {
+        ucc_tl_cuda_topo_destroy(self->topo);
+    }
     if (self->ids) {
         if (self->sync != (void*)-1) {
             for (i = 0; i < lib->cfg.max_concurrent; i++) {
@@ -166,7 +171,7 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     ucc_tl_cuda_sync_t *sync;
     ucc_tl_cuda_shm_barrier_t *bar;
     volatile ucc_tl_cuda_sync_t *peer_sync;
-    int i, j, peer_access, dev, peer_dev, shm_id;
+    int i, j, shm_id;
 
     if (team->oob_req == NULL) {
         return UCC_OK;
@@ -180,20 +185,12 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     }
     team->oob.req_free(team->oob_req);
     team->oob_req = NULL;
-    dev = team->ids[UCC_TL_TEAM_RANK(team)].device;
-    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
-        if (i != UCC_TL_TEAM_RANK(team)) {
-            peer_dev = team->ids[i].device;
-            CUDACHECK_GOTO(cudaDeviceCanAccessPeer(&peer_access, dev, peer_dev),
-                           exit_err, status, tl_team->context->lib);
-            if (!peer_access) {
-                tl_info(tl_team->context->lib,
-                        "dev %d rank %d is not accesible from dev %d rank %d",
-                        peer_dev, i, dev, UCC_TL_TEAM_RANK(team));
-                status = UCC_ERR_NOT_SUPPORTED;
-                goto exit_err;
-            }
-        }
+    status = ucc_tl_cuda_topo_create(team, &team->topo);
+    if (status != UCC_OK) {
+        goto exit_err;
+    }
+    if (UCC_TL_TEAM_LIB(team)->log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
+        ucc_tl_cuda_topo_print(team, team->topo);
     }
     shm_id = team->ids[0].shm;
     if (UCC_TL_TEAM_RANK(team) != 0) {

@@ -62,7 +62,6 @@ static void ucc_tl_cuda_cache_purge(ucc_tl_cuda_cache_t *cache)
 ucc_status_t ucc_tl_cuda_create_cache(ucc_tl_cuda_cache_t **cache,
                                       const char *name)
 {
-
     ucc_status_t status;
     ucc_tl_cuda_cache_t *cache_desc;
     int ret;
@@ -274,7 +273,8 @@ err:
 
 
 #else
-    CUDACHECK(cudaIpcOpenMemHandle(mapped_addr, mem_handle, cudaIpcMemLazyEnablePeerAccess));
+    CUDACHECK_NORET(cudaIpcOpenMemHandle(mapped_addr, mem_handle,
+                                         cudaIpcMemLazyEnablePeerAccess));
     return UCC_OK;
 #endif
 }
@@ -298,7 +298,7 @@ ucc_status_t ucc_tl_cuda_unmap_memhandle(uintptr_t d_bptr, void *mapped_addr,
 
     pthread_rwlock_unlock(&cache->lock);
 #else
-   CUDACHECK(cudaIpcCloseMemHandle(mapped_addr));
+   CUDACHECK_NORET(cudaIpcCloseMemHandle(mapped_addr));
 #endif
    return UCC_OK;
 }

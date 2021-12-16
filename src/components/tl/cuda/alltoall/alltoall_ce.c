@@ -7,6 +7,7 @@
 #include "alltoall.h"
 #include "core/ucc_mc.h"
 #include "tl_cuda_cache.h"
+#include "tl_cuda_topo.h"
 
 enum {
     ALLTOALL_CE_STAGE_SYNC, /*< Wait for free SYNC segment */
@@ -34,11 +35,11 @@ ucc_status_t ucc_tl_cuda_alltoall_setup(ucc_tl_cuda_task_t *task)
     ucc_status_t                 status;
     ucc_rank_t                   i;
 
-    sync->ptr = task->alltoall_ce.mem_info.ptr;
-    sync->length = task->alltoall_ce.mem_info.length;
-    sync->offset = task->alltoall_ce.mem_info.offset;
-    memcpy(&sync->handle, &task->alltoall_ce.mem_info.handle,
-           sizeof(cudaIpcMemHandle_t));
+    memcpy(&sync->mem_info_src, &task->alltoall_ce.mem_info_src,
+           sizeof(ucc_tl_cuda_mem_info_t));
+    memcpy(&sync->mem_info_dst, &task->alltoall_ce.mem_info_dst,
+           sizeof(ucc_tl_cuda_mem_info_t));
+
     CUDACHECK_GOTO(cudaEventRecord(sync->ipc_event_local, team->stream),
                    exit_err, status, UCC_TL_TEAM_LIB(team));
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
@@ -52,7 +53,8 @@ ucc_status_t ucc_tl_cuda_alltoall_setup(ucc_tl_cuda_task_t *task)
     }
 
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
-        if (i == UCC_TL_TEAM_RANK(team)) {
+        if (i == UCC_TL_TEAM_RANK(team) ||
+            !ucc_tl_cuda_topo_is_direct(team, team->topo, UCC_TL_TEAM_RANK(team), i)) {
             continue;
         }
         peer_sync = TASK_SYNC(task, i);
@@ -61,9 +63,19 @@ ucc_status_t ucc_tl_cuda_alltoall_setup(ucc_tl_cuda_task_t *task)
             status = UCC_ERR_NO_MESSAGE;
             goto exit_err;
         }
-        status = ucc_tl_cuda_map_memhandle(peer_sync->ptr, peer_sync->length,
-                                           peer_sync->handle,
-                                           &task->alltoall_ce.peer_map_addr[i],
+        status = ucc_tl_cuda_map_memhandle(peer_sync->mem_info_src.ptr,
+                                           peer_sync->mem_info_src.length,
+                                           peer_sync->mem_info_src.handle,
+                                           &task->alltoall_ce.peer_map_addr_src[i],
+                                           cache);
+        if (UCC_OK != status) {
+            ucc_error("ucc_cuda_ipc_map_memhandle failed");
+            return UCC_ERR_INVALID_PARAM;
+        }
+        status = ucc_tl_cuda_map_memhandle(peer_sync->mem_info_dst.ptr,
+                                           peer_sync->mem_info_dst.length,
+                                           peer_sync->mem_info_dst.handle,
+                                           &task->alltoall_ce.peer_map_addr_dst[i],
                                            cache);
         if (UCC_OK != status) {
             ucc_error("ucc_cuda_ipc_map_memhandle failed");
@@ -80,35 +92,57 @@ static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     ucc_coll_args_t    *args = &TASK_ARGS(task);
-    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
+    ucc_rank_t          rank = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
     ucc_tl_cuda_sync_t *peer_sync;
     size_t send_len;
-    ucc_rank_t i, peer;
+    ucc_rank_t i, peer, psrc, pdst;
     void *src, *dst;
     ucc_status_t status;
 
     send_len = (args->src.info.count / UCC_TL_TEAM_SIZE(team)) *
                ucc_dt_size(args->src.info.datatype);
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
-        peer = (UCC_TL_TEAM_RANK(team) + i) % UCC_TL_TEAM_SIZE(team);
+        peer = (rank + i) % UCC_TL_TEAM_SIZE(team);
+        if (!ucc_tl_cuda_topo_is_direct(team, team->topo, rank, peer)) {
+            continue;
+        }
         peer_sync = TASK_SYNC(task, peer);
-        if (peer == UCC_TL_TEAM_RANK(team)) {
+        if (peer == rank) {
             src = args->src.info.buffer;
         } else {
-            src = PTR_OFFSET(task->alltoall_ce.peer_map_addr[peer],
-                             peer_sync->offset);
+            src = PTR_OFFSET(task->alltoall_ce.peer_map_addr_src[peer],
+                             peer_sync->mem_info_src.offset);
             CUDACHECK_GOTO(cudaStreamWaitEvent(team->stream,
                                                sync->data[peer].ipc_event_remote,
                                                0),
                            exit, status, UCC_TASK_LIB(task));
         }
-        src = PTR_OFFSET(src, UCC_TL_TEAM_RANK(team) * send_len);
+        src = PTR_OFFSET(src, rank * send_len);
         dst = PTR_OFFSET(args->dst.info.buffer, peer * send_len);
         CUDACHECK_GOTO(cudaMemcpyAsync(dst, src, send_len,
                                        cudaMemcpyDeviceToDevice, team->stream),
                        exit, status, UCC_TASK_LIB(task));
     }
 
+    for (i = 0; i < team->topo->num_proxies; i++) {
+        if (team->topo->proxies[i].proxy == rank) {
+            psrc = team->topo->proxies[i].src;
+            pdst = team->topo->proxies[i].dst;
+            peer_sync = TASK_SYNC(task, psrc);
+            src = PTR_OFFSET(task->alltoall_ce.peer_map_addr_src[psrc],
+                             peer_sync->mem_info_src.offset);
+            src = PTR_OFFSET(src, pdst * send_len);
+            peer_sync = TASK_SYNC(task, pdst);
+            dst = PTR_OFFSET(task->alltoall_ce.peer_map_addr_dst[pdst],
+                             peer_sync->mem_info_dst.offset);
+            dst = PTR_OFFSET(dst, psrc * send_len);
+            CUDACHECK_GOTO(cudaMemcpyAsync(dst, src, send_len,
+                                           cudaMemcpyDeviceToDevice,
+                                           team->stream),
+                           exit, status, UCC_TASK_LIB(task));
+        }
+    }
     status = ucc_mc_ee_event_post(team->stream, task->alltoall_ce.copy_done,
                                   UCC_EE_CUDA_STREAM);
 exit:
@@ -191,7 +225,12 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
 
     data_len = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
     status = ucc_tl_cuda_mem_info_get(args->src.info.buffer, data_len, team,
-                                      &task->alltoall_ce.mem_info);
+                                      &task->alltoall_ce.mem_info_src);
+    if (ucc_unlikely(status != UCC_OK)) {
+        goto exit_err;
+    }
+    status = ucc_tl_cuda_mem_info_get(args->dst.info.buffer, data_len, team,
+                                      &task->alltoall_ce.mem_info_dst);
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;
     }

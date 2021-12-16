@@ -134,19 +134,30 @@ typedef struct ucc_tl_cuda_mem_info {
 
 typedef struct ucc_tl_cuda_sync {
     uint32_t                 seq_num[2];
-    void                    *ptr;
-    size_t                   length;
-    size_t                   offset;
-    cudaIpcMemHandle_t       handle;
+    ucc_tl_cuda_mem_info_t   mem_info_src;
+    ucc_tl_cuda_mem_info_t   mem_info_dst;
     cudaEvent_t              ipc_event_local;
     cudaIpcEventHandle_t     ev_handle;
     ucc_status_t             status;
     ucc_tl_cuda_sync_data_t  data[1];
 } ucc_tl_cuda_sync_t;
 
+typedef struct ucc_tl_cuda_proxy {
+    ucc_rank_t proxy;
+    ucc_rank_t src;
+    ucc_rank_t dst;
+} ucc_tl_cuda_proxy_t;
+
+typedef struct ucc_tl_cuda_topo {
+    ucc_rank_t           num_proxies;
+    ucc_tl_cuda_proxy_t *proxies;
+    int                 *matrix;
+} ucc_tl_cuda_topo_t;
+
 typedef struct ucc_tl_cuda_team {
     ucc_tl_team_t              super;
     uint32_t                   seq_num;
+    ucc_tl_cuda_topo_t        *topo;
     ucc_tl_cuda_sync_t        *sync;
     ucc_tl_cuda_sync_state_t  *sync_state;
     ucc_tl_cuda_shm_barrier_t *bar;
@@ -168,8 +179,10 @@ typedef struct ucc_tl_cuda_task {
     union {
         struct {
             int                     stage;
-            ucc_tl_cuda_mem_info_t  mem_info;
-            void                   *peer_map_addr[UCC_TL_CUDA_MAX_PEERS];
+            ucc_tl_cuda_mem_info_t  mem_info_src;
+            ucc_tl_cuda_mem_info_t  mem_info_dst;
+            void                   *peer_map_addr_src[UCC_TL_CUDA_MAX_PEERS];
+            void                   *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
             void                   *copy_done;
         } alltoall_ce;
     };

@@ -16,6 +16,7 @@ sources =             \
 	tl_cuda_team.c    \
 	tl_cuda_coll.c    \
 	tl_cuda_cache.c   \
+	tl_cuda_topo.c    \
 	$(alltoall)
 
 module_LTLIBRARIES = libucc_tl_cuda.la
