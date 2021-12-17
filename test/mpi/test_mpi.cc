@@ -43,6 +43,7 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_loc
     ucc_lib_config_h     lib_config;
     ucc_context_config_h ctx_config;
     int                  size, rank;
+    long *               work_buf;
     ucc_mem_map_t        segments[3];
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -77,6 +78,8 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_loc
             segments[i].address = onesided_buffers[i];
             segments[i].len     = (1<<21) * size;
         }
+        work_buf = (long *)onesided_buffers[2];
+        work_buf[0] = -1;
         onesided_ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
         onesided_ctx_params.mem_params.segments   = segments;
         onesided_ctx_params.mem_params.n_segments = 3;
