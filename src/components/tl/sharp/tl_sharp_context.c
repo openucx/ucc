@@ -6,6 +6,7 @@
 
 #include <inttypes.h>
 #include "tl_sharp.h"
+#include "utils/arch/cpu.h"
 
 static ucc_mpool_ops_t ucc_tl_sharp_req_mpool_ops = {
     .chunk_alloc   = ucc_mpool_hugetlb_malloc,

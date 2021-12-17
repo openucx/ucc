@@ -25,6 +25,11 @@
 #define ucc_likely        ucs_likely
 #define ucc_unlikely      ucs_unlikely
 
+/**
+ * Prevent compiler from reordering instructions
+ */
+#define ucc_compiler_fence()       asm volatile(""::: "memory")
+
 typedef ucs_log_component_config_t ucc_log_component_config_t;
 typedef int                        ucc_score_t;
 
@@ -84,6 +89,5 @@ static inline ucs_status_t ucc_status_to_ucs_status(ucc_status_t status)
 #define ucc_assert(_cond)
 #endif
 
-#define UCC_CACHE_LINE_SIZE 128 //TODO detect it
 #define ucc_for_each_bit ucs_for_each_bit
 #endif

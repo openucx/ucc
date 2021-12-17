@@ -9,6 +9,7 @@
 #include "tl_ucp_coll.h"
 #include "tl_ucp_ep.h"
 #include "utils/ucc_math.h"
+#include "utils/arch/cpu.h"
 #include "schedule/ucc_schedule_pipelined.h"
 #include <limits.h>
 

@@ -6,6 +6,7 @@
 
 #include "cl_hier.h"
 #include "utils/ucc_malloc.h"
+#include "utils/arch/cpu.h"
 #include "cl_hier_coll.h"
 
 UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,

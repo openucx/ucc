@@ -8,7 +8,7 @@
 #include "tl_nccl.h"
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
-
+#include "utils/arch/cpu.h"
 
 ucc_status_t ucc_tl_nccl_event_collective_progress(ucc_coll_task_t *coll_task)
 {

@@ -6,6 +6,7 @@
 
 #include "mc_cuda.h"
 #include "utils/ucc_malloc.h"
+#include "utils/arch/cpu.h"
 #include <cuda_runtime.h>
 #include <cuda.h>
 
