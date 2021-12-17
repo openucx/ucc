@@ -12,6 +12,7 @@
 typedef struct ucc_service_coll_req {
     ucc_coll_task_t *task;
     ucc_team_t      *team;
+    void            *data;
     ucc_subset_t     subset;
 } ucc_service_coll_req_t;
 

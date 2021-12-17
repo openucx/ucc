@@ -38,4 +38,13 @@ ucc_rcache_get(ucc_rcache_t *rcache, void *address, size_t length,
                                        PROT_READ | PROT_WRITE, NULL, region_p));
 }
 
+static inline ucc_status_t
+ucc_rcache_get_arg(ucc_rcache_t *rcache, void *address, size_t length,
+                   void *arg, ucc_rcache_region_t **region_p)
+{
+    return ucs_status_to_ucc_status(ucs_rcache_get(
+                                       rcache, address, length,
+                                       PROT_READ | PROT_WRITE, arg, region_p));
+}
+
 #endif
