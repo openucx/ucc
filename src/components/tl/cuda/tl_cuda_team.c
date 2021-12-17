@@ -18,7 +18,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         ucc_derived_of(tl_context, ucc_tl_cuda_context_t);
     ucc_tl_cuda_lib_t     *lib =
         ucc_derived_of(tl_context->lib, ucc_tl_cuda_lib_t);
-    ucc_tl_cuda_sync_t *sync;
+    ucc_tl_cuda_shm_barrier_t *bar;
     ucc_status_t status;
     int shm_id, i, j;
     size_t ctrl_size;
@@ -34,14 +34,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    //TODO: add check using team topo
-    // for (i = 0; i < self->size; i++) {
-    //     if (!ucc_rank_on_local_node(i, params->team)) {
-    //         tl_info(tl_context->lib, "rank %d is on different node, "
-    //                 "multinode isn't supported", i);
-    //         return UCC_ERR_NOT_SUPPORTED;
-    //     }
-    // }
+    if (!ucc_topo_is_single_node(params->team->topo)) {
+        tl_info(tl_context->lib, "multinode team is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     ctrl_size = (sizeof(ucc_tl_cuda_sync_t) + sizeof(ucc_tl_cuda_sync_data_t) *
                 (UCC_TL_TEAM_SIZE(self) - 1)) * UCC_TL_TEAM_SIZE(self) *
@@ -61,6 +57,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
             goto exit_err;
         }
         self->sync = shmat(shm_id, NULL, 0);
+        self->bar  = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(self, 0,
+                                                       lib->cfg.max_concurrent);
         shmctl(shm_id, IPC_RMID, NULL);
         if (self->sync == (void *)-1) {
             tl_error(tl_context->lib, "failed to shmat errno: %d(%s)",
@@ -70,9 +68,15 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         }
         memset(self->sync, 0, ctrl_size);
         for (i = 0; i < lib->cfg.max_concurrent; i++) {
+            bar = UCC_TL_CUDA_TEAM_BARRIER(self, i);
             for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
-                sync = UCC_TL_CUDA_TEAM_SYNC(self, j, i);
-                sync->status = UCC_INPROGRESS;
+                status = ucc_tl_cuda_shm_barrier_init(UCC_TL_TEAM_SIZE(self),
+                                                      j, bar);
+                if (status != UCC_OK) {
+                    tl_error(tl_context->lib,
+                             "failed to initialize shm barrier");
+                    goto free_shmdt;
+                }
             }
         }
     }
@@ -175,6 +179,8 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
 
     if (team->oob_req == NULL) {
         return UCC_OK;
+    } else if (team->oob_req == (void*)0x1) {
+        goto barrier;
     }
     status = team->oob.req_test(team->oob_req);
     if (status == UCC_INPROGRESS) {
@@ -184,7 +190,7 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
         goto exit_err;
     }
     team->oob.req_free(team->oob_req);
-    team->oob_req = NULL;
+    team->oob_req = (void*)0x1;
     status = ucc_tl_cuda_topo_create(team, &team->topo);
     if (status != UCC_OK) {
         goto exit_err;
@@ -201,26 +207,15 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
             status = UCC_ERR_NO_MEMORY;
             goto exit_err;
         }
-    }
-    team->bar = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(team, 0,
+        team->bar = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(team, 0,
                                                        lib->cfg.max_concurrent);
+    }
     team->sync_state = (ucc_tl_cuda_sync_state_t*)PTR_OFFSET(team->bar,
                             sizeof(ucc_tl_cuda_shm_barrier_t) *
                             lib->cfg.max_concurrent);
-    for (i = 0; i < lib->cfg.max_concurrent; i++) {
-        bar = UCC_TL_CUDA_TEAM_BARRIER(team, i);
-        status = ucc_tl_cuda_shm_barrier_init(UCC_TL_TEAM_SIZE(team),
-                                              UCC_TL_TEAM_RANK(team), bar);
-        if (status != UCC_OK) {
-            tl_error(tl_team->context->lib, "failed to init shm barrier %d\n",
-                     status);
-            goto exit_err;
-        }
-    }
     CUDACHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
                                              cudaStreamNonBlocking),
                    exit_err, status, tl_team->context->lib);
-
     for (i = 0; i < lib->cfg.max_concurrent; i++) {
         sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
         CUDACHECK_GOTO(cudaEventCreateWithFlags(&sync->ipc_event_local,
@@ -230,21 +225,38 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
         CUDACHECK_GOTO(cudaIpcGetEventHandle(&sync->ev_handle,
                                              sync->ipc_event_local),
                        exit_err, status, tl_team->context->lib);
-        sync->status = UCC_OK;
         sync->seq_num[0] = i;
-        __sync_synchronize();
-        for (j = 0; j < UCC_TL_TEAM_SIZE(team); j++) {
+    }
+
+    bar = UCC_TL_CUDA_TEAM_BARRIER(team, 0);
+    status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), bar);
+    if (status != UCC_OK) {
+        tl_error(tl_team->context->lib, "failed to start shm barrier");
+        goto exit_err;
+    }
+
+barrier:
+    bar = UCC_TL_CUDA_TEAM_BARRIER(team, 0);
+    status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), bar);
+    if (status == UCC_INPROGRESS) {
+        return status;
+    } else if (status != UCC_OK) {
+        goto exit_err;
+    }
+
+    for (i = 0; i < lib->cfg.max_concurrent; i++) {
+        sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
+        for (j = 0 ; j < UCC_TL_TEAM_SIZE(team); j++) {
             if (j == UCC_TL_TEAM_RANK(team)) {
                 continue;
             }
             peer_sync = UCC_TL_CUDA_TEAM_SYNC(team, j, i);
-            while (peer_sync->status != UCC_OK);
             CUDACHECK_GOTO(cudaIpcOpenEventHandle(&sync->data[j].ipc_event_remote,
-                                                  peer_sync->ev_handle),
-                           exit_err, status, tl_team->context->lib);
+                                                peer_sync->ev_handle),
+                        exit_err, status, tl_team->context->lib);
         }
     }
-
+    team->oob_req = NULL;
     tl_info(tl_team->context->lib, "initialized tl team: %p", team);
     return UCC_OK;
 

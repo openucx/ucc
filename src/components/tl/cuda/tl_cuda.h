@@ -138,7 +138,6 @@ typedef struct ucc_tl_cuda_sync {
     ucc_tl_cuda_mem_info_t   mem_info_dst;
     cudaEvent_t              ipc_event_local;
     cudaIpcEventHandle_t     ev_handle;
-    ucc_status_t             status;
     ucc_tl_cuda_sync_data_t  data[1];
 } ucc_tl_cuda_sync_t;
 
@@ -165,7 +164,6 @@ typedef struct ucc_tl_cuda_team {
     ucc_tl_cuda_rank_id_t     *ids;
     ucc_team_oob_coll_t        oob;
     void                      *oob_req;
-    ucc_status_t               status;
 } ucc_tl_cuda_team_t;
 
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
