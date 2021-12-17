@@ -5,6 +5,7 @@
  */
 
 #include "tl_cuda.h"
+#include "utils/arch/cpu.h"
 #include <cuda_runtime.h>
 
 static ucc_mpool_ops_t ucc_tl_cuda_req_mpool_ops = {

@@ -1,5 +1,6 @@
 #include "tl_cuda_coll.h"
 #include "alltoall/alltoall.h"
+#include "utils/arch/cpu.h"
 
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
                                       ucc_tl_cuda_team_t *team,
@@ -57,7 +58,7 @@ ucc_status_t ucc_tl_cuda_shm_barrier_start(ucc_rank_t rank,
     barrier->state[rank] = UCC_INPROGRESS;
     if (pos == barrier->size - 1) {
         barrier->count = 0;
-        __sync_synchronize();
+        ucc_memory_bus_fence();
         barrier->sense = barrier->local_sense[rank];
     }
     return UCC_OK;

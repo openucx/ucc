@@ -9,6 +9,7 @@
 #include "tl_cuda_topo.h"
 #include "core/ucc_team.h"
 #include "coll_score/ucc_coll_score.h"
+#include "utils/arch/cpu.h"
 #include <sys/shm.h>
 
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
@@ -228,6 +229,7 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
         sync->seq_num[0] = i;
     }
 
+    ucc_memory_bus_fence();
     bar = UCC_TL_CUDA_TEAM_BARRIER(team, 0);
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), bar);
     if (status != UCC_OK) {

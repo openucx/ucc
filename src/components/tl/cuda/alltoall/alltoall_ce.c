@@ -8,6 +8,7 @@
 #include "core/ucc_mc.h"
 #include "tl_cuda_cache.h"
 #include "tl_cuda_topo.h"
+#include "utils/arch/cpu.h"
 
 enum {
     ALLTOALL_CE_STAGE_SYNC, /*< Wait for free SYNC segment */
@@ -42,6 +43,7 @@ ucc_status_t ucc_tl_cuda_alltoall_setup(ucc_tl_cuda_task_t *task)
 
     CUDACHECK_GOTO(cudaEventRecord(sync->ipc_event_local, team->stream),
                    exit_err, status, UCC_TL_TEAM_LIB(team));
+    ucc_memory_bus_fence();
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;
