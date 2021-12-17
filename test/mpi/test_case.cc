@@ -38,7 +38,9 @@ std::shared_ptr<TestCase> TestCase::init_single(
         ucc_datatype_t dt,
         ucc_reduction_op_t op,
         ucc_test_vsize_flag_t count_bits,
-        ucc_test_vsize_flag_t displ_bits)
+        ucc_test_vsize_flag_t displ_bits,
+        void * onesided_buffers[3],
+        bool is_onesided)
 {
     switch(_type) {
     case UCC_COLL_TYPE_BARRIER:
@@ -62,8 +64,13 @@ std::shared_ptr<TestCase> TestCase::init_single(
         return std::make_shared<TestReduce>(msgsize, inplace, dt, op, mt, root,
                                            _team, max_size);
     case UCC_COLL_TYPE_ALLTOALL:
-        return std::make_shared<TestAlltoall>(msgsize, inplace, mt, _team,
-                                              max_size);
+        if (is_onesided) {
+            return std::make_shared<TestAlltoall>(msgsize, inplace, mt, _team,
+                                                  max_size, onesided_buffers);
+        } else {
+            return std::make_shared<TestAlltoall>(msgsize, inplace, mt, _team,
+                                                  max_size);
+        }
     case UCC_COLL_TYPE_ALLTOALLV:
         return std::make_shared<TestAlltoallv>(msgsize, inplace, mt, _team,
                                                max_size, count_bits, displ_bits);
@@ -166,14 +173,17 @@ TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
     team(_team), mem_type(_mem_type),  msgsize(_msgsize), inplace(_inplace),
     test_max_size(_max_size)
 {
-    int rank;
-
     sbuf           = NULL;
     rbuf           = NULL;
-    check_buf      = NULL;
+    sbuf_mc_header = NULL;
+    rbuf_mc_header = NULL;
+    check_sbuf     = NULL;
+    check_rbuf     = NULL;
     test_skip      = TEST_SKIP_NONE;
     args.flags     = 0;
     args.mask      = 0;
+    int rank;
+
     args.coll_type = ct;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -191,10 +201,14 @@ TestCase::~TestCase()
         UCC_CHECK(ucc_collective_finalize(req));
     }
     if (sbuf) {
-        UCC_CHECK(ucc_mc_free(sbuf_mc_header));
+        if (sbuf_mc_header) {
+            UCC_CHECK(ucc_mc_free(sbuf_mc_header));
+        }
     }
     if (rbuf) {
-        UCC_CHECK(ucc_mc_free(rbuf_mc_header));
+        if (rbuf_mc_header) {
+            UCC_CHECK(ucc_mc_free(rbuf_mc_header));
+        }
     }
     if (check_buf) {
         ucc_free(check_buf);

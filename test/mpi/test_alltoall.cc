@@ -88,6 +88,55 @@ ucc_status_t TestAlltoall::reset_sbuf()
     return UCC_OK;
 }
 
+TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
+                           ucc_memory_type_t _mt, ucc_test_team_t &_team,
+                           size_t _max_size, void * buffers[3]) :
+    TestCase(_team, _mt, _msgsize, _inplace, _max_size)
+{
+    size_t dt_size           = ucc_dt_size(TEST_DT);
+    size_t single_rank_count = _msgsize / dt_size;
+    void * work_buf          = buffers[2];
+    int    rank;
+    int    nprocs;
+
+    MPI_Comm_rank(team.comm, &rank);
+    MPI_Comm_size(team.comm, &nprocs);
+
+    args.coll_type = UCC_COLL_TYPE_ALLTOALL;
+    args.mask =
+        UCC_COLL_ARGS_FIELD_FLAGS | UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
+    args.flags = UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+    sbuf       = buffers[0];
+    rbuf       = buffers[1];
+    if (TEST_SKIP_NONE != skip_reduce(test_max_size < (_msgsize * nprocs),
+                                      TEST_SKIP_MEM_LIMIT, team.comm)) {
+        return;
+    }
+    check_rbuf = ucc_malloc(_msgsize * nprocs, "check rbuf");
+    UCC_MALLOC_CHECK(check_rbuf);
+    if (TEST_NO_INPLACE == inplace) {
+        init_buffer(sbuf, single_rank_count * nprocs, TEST_DT, _mt, rank);
+        UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST, sbuf,
+                           _mt, _msgsize * nprocs);
+        check_sbuf = check_sbuf_mc_header->addr;
+    } else {
+        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+        init_buffer(rbuf, single_rank_count * nprocs, TEST_DT, _mt, rank);
+        init_buffer(check_rbuf, single_rank_count * nprocs, TEST_DT,
+                    UCC_MEMORY_TYPE_HOST, rank);
+    }
+    args.src.info.buffer    = sbuf;
+    args.src.info.count     = single_rank_count * nprocs;
+    args.src.info.datatype  = TEST_DT;
+    args.src.info.mem_type  = _mt;
+    args.dst.info.buffer    = rbuf;
+    args.dst.info.count     = single_rank_count * nprocs;
+    args.dst.info.datatype  = TEST_DT;
+    args.dst.info.mem_type  = _mt;
+    args.global_work_buffer = work_buf;
+    UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
+}
+
 ucc_status_t TestAlltoall::check()
 {
     int         size, completed;
