@@ -129,6 +129,7 @@ public:
     };
     ucc_lib_h            lib_h;
     ucc_context_h        ctx_h;
+    void *               onesided_buf[3];
     int                  job_rank;
     UccProcess(int _job_rank,
                const ucc_lib_params_t &lp = default_lib_params,
@@ -163,7 +164,7 @@ class UccTeam {
         UccTeam *self;
     } allgather_coll_info_t;
     std::vector<struct allgather_data> ag;
-    void init_team(bool use_team_ep_map, bool use_ep_range);
+    void init_team(bool use_team_ep_map, bool use_ep_range, bool is_onesided);
     void destroy_team();
     void test_allgather(size_t msglen);
     static ucc_status_t allgather(void *src_buf, void *recv_buf, size_t size,
@@ -176,7 +177,7 @@ public:
     void progress();
     std::vector<proc> procs;
     UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map = false,
-            bool use_ep_range = true);
+            bool use_ep_range = true, bool is_onesided = false);
     ~UccTeam();
 };
 typedef std::shared_ptr<UccTeam> UccTeam_h;
@@ -191,7 +192,8 @@ class UccJob {
 public:
     typedef enum {
         UCC_JOB_CTX_LOCAL,
-        UCC_JOB_CTX_GLOBAL /*< ucc ctx create with OOB */
+        UCC_JOB_CTX_GLOBAL, /*< ucc ctx create with OOB */
+        UCC_JOB_CTX_GLOBAL_ONESIDED
     } ucc_job_ctx_mode_t;
     static const int nStaticTeams     = 3;
     static const int staticUccJobSize = 16;
@@ -205,9 +207,9 @@ public:
     ~UccJob();
     std::vector<UccProcess_h> procs;
     UccTeam_h create_team(int n_procs, bool use_team_ep_map = false,
-                          bool use_ep_range = true);
+                          bool use_ep_range = true, bool is_onesided = false);
     UccTeam_h create_team(std::vector<int> &ranks, bool use_team_ep_map = false,
-                          bool use_ep_range = true);
+                          bool use_ep_range = true, bool is_onesided = false);
     void create_context();
     ucc_job_ctx_mode_t ctx_mode;
 };

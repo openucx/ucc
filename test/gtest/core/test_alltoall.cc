@@ -64,6 +64,65 @@ public:
             }
         }
     }
+    void data_init(int nprocs, UccJob *job, ucc_datatype_t dtype,
+                   size_t single_rank_count, UccCollCtxVec &ctxs)
+    {
+        void *sbuf;
+        void *rbuf;
+        void *work_buf;
+
+        ctxs.resize(nprocs);
+        for (auto i = 0; i < nprocs; i++) {
+            ucc_coll_args_t *coll =
+                (ucc_coll_args_t *)calloc(1, sizeof(ucc_coll_args_t));
+
+            ctxs[i] =
+                (gtest_ucc_coll_ctx_t *)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
+            ctxs[i]->args = coll;
+
+            work_buf = job->procs[i]->onesided_buf[0];
+            sbuf     = job->procs[i]->onesided_buf[1];
+            rbuf     = job->procs[i]->onesided_buf[2];
+
+            coll->mask = UCC_COLL_ARGS_FIELD_FLAGS |
+                         UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
+            coll->coll_type          = UCC_COLL_TYPE_ALLTOALL;
+            coll->src.info.mem_type  = mem_type;
+            coll->src.info.count     = (ucc_count_t)single_rank_count * nprocs;
+            coll->src.info.datatype  = dtype;
+            coll->dst.info.mem_type  = mem_type;
+            coll->dst.info.count     = (ucc_count_t)single_rank_count * nprocs;
+            coll->dst.info.datatype  = dtype;
+            coll->src.info.buffer    = sbuf;
+            coll->dst.info.buffer    = rbuf;
+            coll->flags              = UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS,
+            coll->global_work_buffer = work_buf;
+
+            ctxs[i]->init_buf = ucc_malloc(
+                ucc_dt_size(dtype) * single_rank_count * nprocs, "init buf");
+            EXPECT_NE(ctxs[i]->init_buf, nullptr);
+            for (int r = 0; r < nprocs; r++) {
+                size_t rank_size = ucc_dt_size(dtype) * single_rank_count;
+                alltoallx_init_buf(r, i,
+                                   (uint8_t *)ctxs[i]->init_buf + r * rank_size,
+                                   rank_size);
+            }
+
+            if (TEST_INPLACE == inplace) {
+                coll->mask |= UCC_COLL_ARGS_FIELD_FLAGS;
+                coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+                UCC_CHECK(ucc_mc_memcpy(
+                    coll->dst.info.buffer, ctxs[i]->init_buf,
+                    ucc_dt_size(dtype) * single_rank_count * nprocs, mem_type,
+                    UCC_MEMORY_TYPE_HOST));
+            } else {
+                UCC_CHECK(ucc_mc_memcpy(
+                    coll->src.info.buffer, ctxs[i]->init_buf,
+                    ucc_dt_size(dtype) * single_rank_count * nprocs, mem_type,
+                    UCC_MEMORY_TYPE_HOST));
+            }
+        }
+    }
     void reset(UccCollCtxVec ctxs)
     {
         for (auto r = 0; r < ctxs.size(); r++) {
@@ -80,7 +139,6 @@ public:
             }
         }
     }
-
     void data_fini(UccCollCtxVec ctxs)
     {
         for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
@@ -95,6 +153,16 @@ public:
         }
         ctxs.clear();
     }
+    void data_fini_onesided(UccCollCtxVec ctxs)
+    {
+        for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
+            ucc_coll_args_t* coll = ctx->args;
+            ucc_free(ctx->init_buf);
+            free(coll);
+            free(ctx);
+        }
+        ctxs.clear();
+    }   
     bool data_validate(UccCollCtxVec ctxs)
     {
         bool                   ret = true;
@@ -160,6 +228,31 @@ UCC_TEST_P(test_alltoall_0, single)
     req.wait();
     EXPECT_EQ(true, data_validate(ctxs));
     data_fini(ctxs);
+}
+
+UCC_TEST_P(test_alltoall_0, single_onesided)
+{
+    const int            team_id        = std::get<0>(GetParam());
+    const ucc_datatype_t dtype          = std::get<1>(GetParam());
+    ucc_memory_type_t    mem_type       = std::get<2>(GetParam());
+    gtest_ucc_inplace_t  inplace        = std::get<3>(GetParam());
+    const int            count          = std::get<4>(GetParam());
+    UccTeam_h            reference_team = UccJob::getStaticTeams()[team_id];
+    int                  size           = reference_team->procs.size();
+    ucc_job_env_t        env = {{"UCC_TL_UCP_TUNE", "alltoall:0-inf:@1"}};
+    UccJob               job(size, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
+    UccTeam_h            team = job.create_team(size, false, true, true);
+    UccCollCtxVec        ctxs;
+
+    this->set_inplace(inplace);
+    this->set_mem_type(mem_type);
+
+    data_init(size, &job, dtype, count, ctxs);
+    UccReq req(team, ctxs);
+    req.start();
+    req.wait();
+    EXPECT_EQ(true, data_validate(ctxs));
+    data_fini_onesided(ctxs);
 }
 
 UCC_TEST_P(test_alltoall_0, single_persistent)

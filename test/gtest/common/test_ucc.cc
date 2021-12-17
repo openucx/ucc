@@ -41,6 +41,11 @@ UccProcess::~UccProcess()
 {
     EXPECT_EQ(UCC_OK, ucc_context_destroy(ctx_h));
     EXPECT_EQ(UCC_OK, ucc_finalize(lib_h));
+    if (ctx_params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS) {
+        for (auto i = 0; i < 3; i++) {
+            ucc_free(onesided_buf[i]);
+        }
+    }
 }
 
 ucc_status_t UccTeam::allgather(void *src_buf, void *recv_buf, size_t size,
@@ -157,7 +162,7 @@ uint64_t rank_map_cb(uint64_t ep, void *cb_ctx) {
     return (uint64_t)team->procs[(int)ep].p.get()->job_rank;
 }
 
-void UccTeam::init_team(bool use_team_ep_map, bool use_ep_range)
+void UccTeam::init_team(bool use_team_ep_map, bool use_ep_range, bool is_onesided)
 {
     ucc_team_params_t                    team_params;
     std::vector<allgather_coll_info_t *> cis;
@@ -188,6 +193,10 @@ void UccTeam::init_team(bool use_team_ep_map, bool use_ep_range)
             team_params.oob.n_oob_eps = n_procs;
             team_params.oob.oob_ep    = i;
             team_params.mask         |= UCC_TEAM_PARAM_FIELD_OOB;
+        }
+        if (is_onesided) {
+            team_params.mask |= UCC_TEAM_PARAM_FIELD_FLAGS;
+            team_params.flags = UCC_TEAM_FLAG_COLL_WORK_BUFFER;
         }
         EXPECT_EQ(UCC_OK,
                   ucc_team_create_post(&(procs[i].p.get()->ctx_h), 1, &team_params,
@@ -241,7 +250,7 @@ void UccTeam::progress()
 }
 
 UccTeam::UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map,
-                 bool use_ep_range)
+                 bool use_ep_range, bool is_onesided)
 {
     n_procs = _procs.size();
     ag.resize(n_procs);
@@ -252,7 +261,7 @@ UccTeam::UccTeam(std::vector<UccProcess_h> &_procs, bool use_team_ep_map,
         a.phase = AG_INIT;
     }
     copy_complete_count = 0;
-    init_team(use_team_ep_map, use_ep_range);
+    init_team(use_team_ep_map, use_ep_range, is_onesided);
     // test_allgather(128);
 }
 
@@ -293,7 +302,6 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
         /*restore original env */
         setenv(v.first.c_str(), v.second.c_str(), 1);
     }
-
 }
 
 void thread_allgather(void *src_buf, void *recv_buf, size_t size,
@@ -391,13 +399,60 @@ exit_err:
     throw std::runtime_error(err_msg.str());
 }
 
+void proc_onesided_context_create(UccProcess_h proc, int id,
+                                  ThreadAllgather *ta)
+{
+    ucc_status_t         status;
+    ucc_context_config_h ctx_config;
+    std::stringstream    err_msg;
+    ucc_mem_map_t        map[3];
+
+    status = ucc_context_config_read(proc->lib_h, NULL, &ctx_config);
+    if (status != UCC_OK) {
+        err_msg << "ucc_context_config_read failed";
+        goto exit_err;
+    }
+    for (auto i = 0; i < 3; i++) {
+        proc->onesided_buf[i] = ucc_malloc(1 << 20, "onesided_buffer");
+        EXPECT_NE(proc->onesided_buf[i], nullptr);
+        map[i].address        = proc->onesided_buf[i];
+        map[i].len            = (1 << 20);
+    }
+    proc->ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_OOB;
+    proc->ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
+    proc->ctx_params.oob.allgather         = thread_allgather_start;
+    proc->ctx_params.oob.req_test          = thread_allgather_req_test;
+    proc->ctx_params.oob.req_free          = thread_allgather_req_free;
+    proc->ctx_params.oob.coll_info         = (void *)&ta->reqs[id];
+    proc->ctx_params.oob.n_oob_eps         = ta->n_procs;
+    proc->ctx_params.oob.oob_ep            = id;
+    proc->ctx_params.mem_params.segments   = map;
+    proc->ctx_params.mem_params.n_segments = 3;
+    status = ucc_context_create(proc->lib_h, &proc->ctx_params, ctx_config,
+                                &proc->ctx_h);
+    ucc_context_config_release(ctx_config);
+    if (status != UCC_OK) {
+        err_msg << "ucc_context_create for one-sided context failed";
+        goto exit_err;
+    }
+    return;
+
+exit_err:
+    err_msg << ": " << ucc_status_string(status) << " (" << status << ")";
+    throw std::runtime_error(err_msg.str());
+}
 
 void UccJob::create_context()
 {
     std::vector<std::thread> workers;
     for (auto i = 0; i < procs.size(); i++) {
-        workers.push_back(std::thread(proc_context_create, procs[i], i, &ta,
-                                      ctx_mode == UCC_JOB_CTX_GLOBAL));
+        if (ctx_mode == UCC_JOB_CTX_GLOBAL_ONESIDED) {
+            workers.push_back(
+                std::thread(proc_onesided_context_create, procs[i], i, &ta));
+        } else {
+            workers.push_back(std::thread(proc_context_create, procs[i], i, &ta,
+                                          ctx_mode == UCC_JOB_CTX_GLOBAL));
+        }
     }
     for (auto i = 0; i < procs.size(); i++) {
         workers[i].join();
@@ -464,27 +519,28 @@ void UccJob::cleanup()
 }
 
 UccTeam_h UccJob::create_team(int _n_procs, bool use_team_ep_map,
-                          bool use_ep_range)
+                              bool use_ep_range, bool is_onesided)
 {
     EXPECT_GE(n_procs, _n_procs);
     std::vector<UccProcess_h> team_procs;
-    for (int i=0; i<_n_procs; i++) {
+    for (int i = 0; i < _n_procs; i++) {
         team_procs.push_back(procs[i]);
     }
-    return std::make_shared<UccTeam>(team_procs, use_team_ep_map, use_ep_range);
+    return std::make_shared<UccTeam>(team_procs, use_team_ep_map, use_ep_range,
+                                     is_onesided);
 }
 
 UccTeam_h UccJob::create_team(std::vector<int> &ranks, bool use_team_ep_map,
-                              bool use_ep_range)
+                              bool use_ep_range, bool is_onesided)
 {
     EXPECT_GE(n_procs, ranks.size());
     std::vector<UccProcess_h> team_procs;
-    for (int i=0; i<ranks.size(); i++) {
+    for (int i = 0; i < ranks.size(); i++) {
         team_procs.push_back(procs[ranks[i]]);
     }
-    return std::make_shared<UccTeam>(team_procs, use_team_ep_map, use_ep_range);
+    return std::make_shared<UccTeam>(team_procs, use_team_ep_map, use_ep_range,
+                                     is_onesided);
 }
-
 
 UccReq::UccReq(UccTeam_h _team, ucc_coll_args_t *args) :
     team(_team)
