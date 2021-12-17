@@ -21,8 +21,8 @@ ucc_tl_cuda_cache_pgt_dir_alloc(const ucs_pgtable_t *pgtable)
     void *ptr;
     int ret;
 
-    ret = posix_memalign(&ptr, ucs_max(sizeof(void *), UCS_PGT_ENTRY_MIN_ALIGN),
-                             sizeof(ucs_pgt_dir_t));
+    ret = posix_memalign(&ptr, ucc_max(sizeof(void *), UCS_PGT_ENTRY_MIN_ALIGN),
+                         sizeof(ucs_pgt_dir_t));
     return (ret == 0) ? ptr : NULL;
 }
 
@@ -32,16 +32,15 @@ static void ucc_tl_cuda_cache_pgt_dir_release(const ucs_pgtable_t *pgtable,
     free(dir);
 }
 
-
 static void
 ucc_tl_cuda_cache_region_collect_callback(const ucs_pgtable_t *pgtable,
-                                           ucs_pgt_region_t *pgt_region,
-                                           void *arg)
+                                          ucs_pgt_region_t *pgt_region,
+                                          void *arg)
 {
     ucs_list_link_t *list = arg;
     ucc_tl_cuda_cache_region_t *region;
 
-    region = ucs_derived_of(pgt_region, ucc_tl_cuda_cache_region_t);
+    region = ucc_derived_of(pgt_region, ucc_tl_cuda_cache_region_t);
     ucs_list_add_tail(list, &region->list);
 }
 
@@ -68,13 +67,13 @@ ucc_status_t ucc_tl_cuda_create_cache(ucc_tl_cuda_cache_t **cache,
 
     cache_desc = ucc_malloc(sizeof(ucc_tl_cuda_cache_t), "ucc_tl_cuda_cache_t");
     if (cache_desc == NULL) {
-        ucs_error("failed to allocate memory for tl_cuda cache");
+        ucc_error("failed to allocate memory for tl_cuda cache");
         return UCC_ERR_NO_MEMORY;
     }
 
     ret = pthread_rwlock_init(&cache_desc->lock, NULL);
     if (ret) {
-        ucs_error("pthread_rwlock_init() failed: %m");
+        ucc_error("pthread_rwlock_init() failed: %m");
         status = UCC_ERR_INVALID_PARAM;
         goto err;
     }
@@ -99,10 +98,7 @@ err_destroy_rwlock:
 err:
     free(cache_desc);
     return status;
-
-    return UCC_OK;
 }
-
 
 void ucc_tl_cuda_destroy_cache(ucc_tl_cuda_cache_t *cache)
 {
@@ -115,7 +111,7 @@ void ucc_tl_cuda_destroy_cache(ucc_tl_cuda_cache_t *cache)
 
 #if ENABLE_CACHE
 static void ucc_tl_cuda_cache_invalidate_regions(ucc_tl_cuda_cache_t *cache,
-                                                  void *from, void *to)
+                                                 void *from, void *to)
 {
     ucs_list_link_t region_list;
     ucs_status_t status;
@@ -123,19 +119,19 @@ static void ucc_tl_cuda_cache_invalidate_regions(ucc_tl_cuda_cache_t *cache,
 
     ucs_list_head_init(&region_list);
     ucs_pgtable_search_range(&cache->pgtable, (ucs_pgt_addr_t)from,
-                             (ucs_pgt_addr_t)to,
+                             (ucs_pgt_addr_t)to - 1,
                              ucc_tl_cuda_cache_region_collect_callback,
                              &region_list);
     ucs_list_for_each_safe(region, tmp, &region_list, list) {
         status = ucs_pgtable_remove(&cache->pgtable, &region->super);
         if (status != UCS_OK) {
-            ucs_error("failed to remove address:%p from cache (%s)",
+            ucc_error("failed to remove address:%p from cache (%s)",
                       (void *)region->d_ptr, ucs_status_string(status));
         }
         CUDACHECK_NORET(cudaIpcCloseMemHandle(region->mapped_addr));
         free(region);
     }
-    ucs_trace("%s: closed memhandles in the range [%p..%p]",
+    ucc_trace("%s: closed memhandles in the range [%p..%p]",
               cache->name, from, to);
 }
 #endif
@@ -196,7 +192,7 @@ ucc_tl_cuda_map_memhandle(const void *d_ptr, size_t size,
     }
 
     cuerr = cudaIpcOpenMemHandle(mapped_addr, mem_handle,
-                                cudaIpcMemLazyEnablePeerAccess);
+                                 cudaIpcMemLazyEnablePeerAccess);
     if (cuerr != cudaSuccess) {
         if (cuerr == cudaErrorAlreadyMapped) {
             ucc_tl_cuda_cache_invalidate_regions(cache,
@@ -217,18 +213,25 @@ ucc_tl_cuda_map_memhandle(const void *d_ptr, size_t size,
                         status = UCC_ERR_INVALID_PARAM;
                         goto err;
                     }
+                } else {
+                    ucc_error("%s: failed to open ipc mem handle. addr:%p len:%lu",
+                              cache->name, d_ptr, size);
                 }
             }
             cudaGetLastError();
+        } else {
+            ucc_error("%s: failed to open ipc mem handle. addr:%p len:%lu",
+                      cache->name, d_ptr, size);
+            goto err;
         }
     }
 
     /*create new cache entry */
     ret = posix_memalign((void **)&region,
-                          ucs_max(sizeof(void *), UCS_PGT_ENTRY_MIN_ALIGN),
+                          ucc_max(sizeof(void *), UCS_PGT_ENTRY_MIN_ALIGN),
                           sizeof(ucc_tl_cuda_cache_region_t));
     if (ret != 0) {
-        ucs_warn("failed to allocate uct_tl_cuda_cache region");
+        ucc_warn("failed to allocate uct_tl_cuda_cache region");
         status = UCC_ERR_NO_MEMORY;
         goto err;
     }
@@ -253,8 +256,7 @@ ucc_tl_cuda_map_memhandle(const void *d_ptr, size_t size,
     }
 
     if (ucs_status != UCS_OK) {
-
-        ucs_error("%s: failed to insert region:"UCS_PGT_REGION_FMT" size:%lu :%s",
+        ucc_error("%s: failed to insert region:"UCS_PGT_REGION_FMT" size:%lu :%s",
                   cache->name, UCS_PGT_REGION_ARG(&region->super), size,
                   ucs_status_string(ucs_status));
         free(region);
@@ -279,7 +281,6 @@ err:
 #endif
 }
 
-
 ucc_status_t ucc_tl_cuda_unmap_memhandle(uintptr_t d_bptr, void *mapped_addr,
                                          ucc_tl_cuda_cache_t *cache)
 {
@@ -291,7 +292,7 @@ ucc_status_t ucc_tl_cuda_unmap_memhandle(uintptr_t d_bptr, void *mapped_addr,
     pthread_rwlock_wrlock(&cache->lock);
     pgt_region = ucs_pgtable_lookup(&cache->pgtable, d_bptr);
     ucc_assert(pgt_region != NULL);
-    region = ucs_derived_of(pgt_region, ucc_tl_cuda_cache_region_t);
+    region = ucc_derived_of(pgt_region, ucc_tl_cuda_cache_region_t);
 
     ucc_assert(region->refcount >= 1);
     region->refcount--;
