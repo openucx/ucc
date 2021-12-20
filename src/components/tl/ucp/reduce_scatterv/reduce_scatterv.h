@@ -7,15 +7,16 @@
 #define REDUCE_SCATTERV_H_
 #include "../reduce_scatter/reduce_scatter.h"
 
-enum {
+enum
+{
     UCC_TL_UCP_REDUCE_SCATTERV_ALG_KNOMIAL,
     UCC_TL_UCP_REDUCE_SCATTERV_ALG_LAST
 };
 
 extern ucc_base_coll_alg_info_t
-ucc_tl_ucp_reduce_scatterv_algs[UCC_TL_UCP_REDUCE_SCATTERV_ALG_LAST + 1];
+    ucc_tl_ucp_reduce_scatterv_algs[UCC_TL_UCP_REDUCE_SCATTERV_ALG_LAST + 1];
 
-#define UCC_TL_UCP_REDUCE_SCATTERV_DEFAULT_ALG_SELECT_STR                            \
+#define UCC_TL_UCP_REDUCE_SCATTERV_DEFAULT_ALG_SELECT_STR                      \
     "reduce_scatterv:@knomial"
 
 static inline int ucc_tl_ucp_reduce_scatterv_alg_from_str(const char *str)
@@ -31,7 +32,7 @@ static inline int ucc_tl_ucp_reduce_scatterv_alg_from_str(const char *str)
 
 ucc_status_t
 ucc_tl_ucp_reduce_scatterv_knomial_init(ucc_base_coll_args_t *coll_args,
-                                       ucc_base_team_t      *team,
-                                       ucc_coll_task_t     **task_h);
+                                        ucc_base_team_t *     team,
+                                        ucc_coll_task_t **    task_h);
 
 #endif

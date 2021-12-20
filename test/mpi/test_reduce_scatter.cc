@@ -24,11 +24,8 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
     dt = _dt;
     args.coll_type = UCC_COLL_TYPE_REDUCE_SCATTER;
 
-
-    if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT,
-                    team.comm) ||
-        skip_reduce((count < comm_size), TEST_SKIP_NOT_SUPPORTED,
-                    team.comm)) {
+    if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT, team.comm) ||
+        skip_reduce((count < comm_size), TEST_SKIP_NOT_SUPPORTED, team.comm)) {
         return;
     }
 

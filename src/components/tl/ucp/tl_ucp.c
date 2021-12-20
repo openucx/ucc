@@ -116,7 +116,8 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      UCC_CONFIG_TYPE_UINT},
 
     {"REDUCE_AVG_PRE_OP", "1",
-     "Reduce will perform division by team_size in early stages of the algorithm,\n"
+     "Reduce will perform division by team_size in early stages of the "
+     "algorithm,\n"
      "else - in result",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_avg_pre_op),
      UCC_CONFIG_TYPE_BOOL},

@@ -13,8 +13,8 @@ ucc_pt_coll_allgatherv::ucc_pt_coll_allgatherv(ucc_datatype_t dt,
     has_range_     = true;
     has_bw_        = false;
 
-    coll_args.mask      = UCC_COLL_ARGS_FIELD_FLAGS;
-    coll_args.flags    |= UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
+    coll_args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
+    coll_args.flags |= UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
     coll_args.coll_type = UCC_COLL_TYPE_ALLGATHERV;
     coll_args.src.info.datatype = dt;
     coll_args.src.info.mem_type = mt;

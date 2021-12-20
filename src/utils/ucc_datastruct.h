@@ -12,7 +12,7 @@
 #define UCC_LIST_HEAD UCS_LIST_HEAD
 typedef uint32_t ucc_rank_t;
 #define UCC_RANK_INVALID UINT32_MAX
-#define UCC_RANK_MAX (UCC_RANK_INVALID - 1)
+#define UCC_RANK_MAX     (UCC_RANK_INVALID - 1)
 
 typedef struct ucc_subset {
     ucc_ep_map_t map;

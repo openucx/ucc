@@ -33,8 +33,8 @@ public:
                 displs[i] = all_counts;
                 all_counts += counts[i];
             }
-            coll->mask      = UCC_COLL_ARGS_FIELD_FLAGS;
-            coll->flags    |= UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
+            coll->mask = UCC_COLL_ARGS_FIELD_FLAGS;
+            coll->flags |= UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
             coll->coll_type = UCC_COLL_TYPE_ALLGATHERV;
 
             coll->src.info.mem_type = mem_type;

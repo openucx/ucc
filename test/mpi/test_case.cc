@@ -50,8 +50,8 @@ std::shared_ptr<TestCase> TestCase::init_single(
         return std::make_shared<TestReduceScatter>(msgsize, inplace, dt,
                                                    op, mt, _team, max_size);
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
-        return std::make_shared<TestReduceScatterv>(msgsize, inplace, dt,
-                                                    op, mt, _team, max_size);
+        return std::make_shared<TestReduceScatterv>(msgsize, inplace, dt, op,
+                                                    mt, _team, max_size);
     case UCC_COLL_TYPE_ALLGATHER:
         return std::make_shared<TestAllgather>(msgsize, inplace, mt, _team,
                                                max_size);

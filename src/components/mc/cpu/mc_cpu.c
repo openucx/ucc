@@ -76,7 +76,8 @@ static ucc_status_t ucc_mc_cpu_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
         // Slow path
         return ucc_mc_cpu_mem_alloc(h_ptr, size);
     }
-    mc_trace(&ucc_mc_cpu.super, "allocated %ld bytes from cpu mpool, h_ptr %p", size, h);
+    mc_trace(&ucc_mc_cpu.super, "allocated %ld bytes from cpu mpool, h_ptr %p",
+             size, h);
     *h_ptr = h;
     return UCC_OK;
 }
@@ -120,8 +121,8 @@ static ucc_status_t ucc_mc_cpu_mem_free(ucc_mc_buffer_header_t *h_ptr)
 
 static ucc_status_t ucc_mc_cpu_mem_pool_free(ucc_mc_buffer_header_t *h_ptr)
 {
-    mc_trace(&ucc_mc_cpu.super, "releasing header %p, from_pool %d",
-             h_ptr, h_ptr->from_pool);
+    mc_trace(&ucc_mc_cpu.super, "releasing header %p, from_pool %d", h_ptr,
+             h_ptr->from_pool);
     if (!h_ptr->from_pool) {
         return ucc_mc_cpu_mem_free(h_ptr);
     }

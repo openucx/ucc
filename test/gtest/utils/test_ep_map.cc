@@ -11,14 +11,16 @@ extern "C" {
 
 class EpMap {
 public:
-    ucc_ep_map_t map;
-    ucc_rank_t  *array;
-    EpMap() {};
-    EpMap(ucc_ep_map_t _map) {
-        array = NULL;
-        map   = _map;
+  ucc_ep_map_t map;
+  ucc_rank_t * array;
+  EpMap(){};
+  EpMap(ucc_ep_map_t _map)
+  {
+      array = NULL;
+      map   = _map;
     };
-    EpMap(uint64_t full, bool reverse = false) {
+    EpMap(uint64_t full, bool reverse = false)
+    {
         array      = NULL;
         if (reverse) {
             map = ucc_ep_map_create_reverse(full);
@@ -102,8 +104,9 @@ UCC_TEST_F(test_ep_map, reverse)
 }
 
 class test_ep_map_inv : public test_ep_map {
-public:
-    void check_inv(EpMap map) {
+  public:
+    void check_inv(EpMap map)
+    {
         ucc_ep_map_t inv;
         EXPECT_EQ(UCC_OK, ucc_ep_map_create_inverse(map.map, &inv));
         for (int i = 0; i < map.map.ep_num; i++) {
@@ -130,7 +133,6 @@ UCC_TEST_F(test_ep_map_inv, strided)
     /* stride negative */
     check_inv(EpMap(100, -10, 5, 150));
 }
-
 
 UCC_TEST_F(test_ep_map_inv, random)
 {

@@ -89,7 +89,8 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
                            ? args->src.info.buffer : args->dst.info.buffer;
         rbuf        = args->dst.info.buffer;
 
-        ucc_kn_rs_pattern_peer_seg(rank, p, &local_seg_count, &local_seg_offset);
+        ucc_kn_rs_pattern_peer_seg(rank, p, &local_seg_count,
+                                   &local_seg_offset);
         /*
          Each rank's recieve (beside's root) must only happen once,
          and at its correct distance which is previously calclulated and saved
@@ -132,7 +133,8 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
                                                              loop_step);
                 if (peer == UCC_KN_PEER_NULL)
                     continue;
-                ucc_kn_rs_pattern_peer_seg(peer, p, &peer_seg_count, &peer_seg_offset);
+                ucc_kn_rs_pattern_peer_seg(peer, p, &peer_seg_count,
+                                           &peer_seg_offset);
                 UCPCHECK_GOTO(ucc_tl_ucp_send_nb(PTR_OFFSET(sbuf,
                     peer_seg_offset * dt_size + task->scatter_kn.send_offset),
                     peer_seg_count * dt_size, mem_type, INV_VRANK(peer,
@@ -149,11 +151,13 @@ UCC_SCATTER_KN_PHASE_LOOP:
         ucc_kn_rs_pattern_next_iter(p);
     }
 
-    ucc_kn_rsx_pattern_dst(size, rank, radix, count, &local_seg_offset, &local_seg_count);
+    ucc_kn_rsx_pattern_dst(size, rank, radix, count, &local_seg_offset,
+                           &local_seg_count);
     if (local_seg_offset != 0) {
-        status = ucc_mc_memcpy(PTR_OFFSET(args->dst.info.buffer, local_seg_offset * dt_size),
-                               PTR_OFFSET(rbuf, task->scatter_kn.send_offset),
-                               local_seg_count * dt_size, mem_type, mem_type);
+        status = ucc_mc_memcpy(
+            PTR_OFFSET(args->dst.info.buffer, local_seg_offset * dt_size),
+            PTR_OFFSET(rbuf, task->scatter_kn.send_offset),
+            local_seg_count * dt_size, mem_type, mem_type);
         if (UCC_OK != status) {
             task->super.super.status = status;
             return task->super.super.status;
@@ -181,7 +185,8 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)
     root = coll_task->bargs.args.root;
 
     ucc_kn_rsx_pattern_init(size, VRANK(rank, root, size), p->radix,
-                            TASK_ARGS(task).src.info.count, &task->scatter_kn.p);
+                            TASK_ARGS(task).src.info.count,
+                            &task->scatter_kn.p);
     task->scatter_kn.phase = UCC_SCATTER_KN_PHASE_INIT;
     vroot = ucc_knomial_pattern_loop_rank(p, VRANK(root, root, size));
     vrank = ucc_knomial_pattern_loop_rank(p, VRANK(rank, root, size));
@@ -225,8 +230,8 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_init_r(
     ucc_assert(coll_args->args.src.info.mem_type ==
                coll_args->args.dst.info.mem_type);
 
-    ucc_kn_rsx_pattern_init(size, rank, radix,
-                            coll_args->args.src.info.count, &task->scatter_kn.p);
+    ucc_kn_rsx_pattern_init(size, rank, radix, coll_args->args.src.info.count,
+                            &task->scatter_kn.p);
 
     *task_h = &task->super;
     return UCC_OK;

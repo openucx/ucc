@@ -195,7 +195,7 @@ public:
     } ucc_job_ctx_mode_t;
     static const int staticUccJobSize = 16;
     static constexpr int staticTeamSizes[] = {2, 11, staticUccJobSize};
-    static const int nStaticTeams     = sizeof(staticTeamSizes)/sizeof(int);
+    static const int     nStaticTeams = sizeof(staticTeamSizes) / sizeof(int);
     static void cleanup();
     static UccJob* getStaticJob();
     static const std::vector<UccTeam_h> &getStaticTeams();
