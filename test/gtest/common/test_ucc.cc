@@ -162,7 +162,8 @@ uint64_t rank_map_cb(uint64_t ep, void *cb_ctx) {
     return (uint64_t)team->procs[(int)ep].p.get()->job_rank;
 }
 
-void UccTeam::init_team(bool use_team_ep_map, bool use_ep_range, bool is_onesided)
+void UccTeam::init_team(bool use_team_ep_map, bool use_ep_range,
+                        bool is_onesided)
 {
     ucc_team_params_t                    team_params;
     std::vector<allgather_coll_info_t *> cis;
@@ -219,7 +220,6 @@ void UccTeam::init_team(bool use_team_ep_map, bool use_ep_range, bool is_oneside
         delete c;
     }
 }
-
 
 void UccTeam::destroy_team()
 {
@@ -415,10 +415,10 @@ void proc_onesided_context_create(UccProcess_h proc, int id,
     for (auto i = 0; i < 3; i++) {
         proc->onesided_buf[i] = ucc_malloc(1 << 20, "onesided_buffer");
         EXPECT_NE(proc->onesided_buf[i], nullptr);
-        map[i].address        = proc->onesided_buf[i];
-        map[i].len            = (1 << 20);
+        map[i].address = proc->onesided_buf[i];
+        map[i].len     = (1 << 20);
     }
-    proc->ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_OOB;
+    proc->ctx_params.mask = UCC_CONTEXT_PARAM_FIELD_OOB;
     proc->ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
     proc->ctx_params.oob.allgather         = thread_allgather_start;
     proc->ctx_params.oob.req_test          = thread_allgather_req_test;

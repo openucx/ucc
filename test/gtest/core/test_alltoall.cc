@@ -80,9 +80,9 @@ public:
                 (gtest_ucc_coll_ctx_t *)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
             ctxs[i]->args = coll;
 
-            sbuf     = job->procs[i]->onesided_buf[0];
-            rbuf     = job->procs[i]->onesided_buf[1];
-            work_buf = (long *)job->procs[i]->onesided_buf[2];
+            sbuf        = job->procs[i]->onesided_buf[0];
+            rbuf        = job->procs[i]->onesided_buf[1];
+            work_buf    = (long *)job->procs[i]->onesided_buf[2];
             work_buf[0] = -1; /* initialize for a2a algorithm */
 
             coll->mask = UCC_COLL_ARGS_FIELD_FLAGS |
@@ -156,14 +156,14 @@ public:
     }
     void data_fini_onesided(UccCollCtxVec ctxs)
     {
-        for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
-            ucc_coll_args_t* coll = ctx->args;
+        for (gtest_ucc_coll_ctx_t *ctx : ctxs) {
+            ucc_coll_args_t *coll = ctx->args;
             ucc_free(ctx->init_buf);
             free(coll);
             free(ctx);
         }
         ctxs.clear();
-    }   
+    }
     bool data_validate(UccCollCtxVec ctxs)
     {
         bool                   ret = true;
