@@ -41,8 +41,8 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
 
     posts    = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoallv_pairwise_num_posts;
     nreqs    = (posts > gsize || posts == 0) ? gsize : posts;
-    rdt_size = ucc_dt_size(TASK_ARGS(task).src.info_v.datatype);
-    sdt_size = ucc_dt_size(TASK_ARGS(task).dst.info_v.datatype);
+    rdt_size = ucc_dt_size(TASK_ARGS(task).dst.info_v.datatype);
+    sdt_size = ucc_dt_size(TASK_ARGS(task).src.info_v.datatype);
     while ((task->send_posted < gsize || task->recv_posted < gsize) &&
            (polls++ < task->n_polls)) {
         ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker);
