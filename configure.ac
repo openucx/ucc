@@ -140,8 +140,6 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_AARCH64_HI1620], [false])
      AM_CONDITIONAL([HAVE_UCX], [false])
      AM_CONDITIONAL([HAVE_CUDA], [false])
-     AM_CONDITIONAL([HAVE_NCCL], [false])
-     AM_CONDITIONAL([HAVE_SHARP], [false])
      AM_CONDITIONAL([HAVE_MPI], [false])
      AM_CONDITIONAL([HAVE_MPIRUN], [false])
      AM_CONDITIONAL([HAVE_MPICC], [false])
@@ -160,6 +158,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/mpi.m4])
      m4_include([config/m4/configure.m4])
      m4_include([config/m4/tl_coll_plugins.m4])
+     m4_include([config/m4/check_tls.m4])
      m4_include([test/gtest/configure.m4])
 
      mc_modules=":cpu"
@@ -171,8 +170,6 @@ AS_IF([test "x$with_docs_only" = xyes],
      AC_MSG_RESULT([UCX support: $ucx_happy])
      if test $ucx_happy != "yes"; then
          AC_MSG_ERROR([UCX is not available])
-     else
-         tl_modules="${tl_modules}:ucp"
      fi
 
      CHECK_CUDA
@@ -181,18 +178,11 @@ AS_IF([test "x$with_docs_only" = xyes],
          mc_modules="${mc_modules}:cuda"
      fi
 
-     CHECK_NCCL
-     AC_MSG_RESULT([NCCL support: $nccl_happy])
-     if test $nccl_happy = "yes"; then
-         tl_modules="${tl_modules}:nccl"
-     fi
 
-     CHECK_SHARP
-     AC_MSG_RESULT([SHARP support: $sharp_happy])
-     if test $sharp_happy = "yes"; then
-         tl_modules="${tl_modules}:sharp"
-     fi
+     CHECK_TLS
     ]) # Docs only
+
+
 
 CFLAGS="$CFLAGS -std=gnu11"
 CPPFLAGS="$CPPFLAGS $UCS_CPPFLAGS $includes"
@@ -206,9 +196,6 @@ AC_CONFIG_FILES([
                  src/core/ucc_version.c
                  src/components/cl/basic/Makefile
                  src/components/cl/hier/Makefile
-                 src/components/tl/ucp/Makefile
-                 src/components/tl/nccl/Makefile
-                 src/components/tl/sharp/Makefile
                  src/components/mc/cpu/Makefile
                  src/components/mc/cuda/Makefile
                  src/components/mc/cuda/kernel/Makefile

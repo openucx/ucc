@@ -56,7 +56,5 @@ AS_IF([test "x$with_sharp" != "xno"],
     [AC_MSG_WARN([SHARP was explicitly disabled])])
 
 sharp_checked=yes
-AM_CONDITIONAL([HAVE_SHARP], [test "x$sharp_happy" != xno])
 ])
-
 ])

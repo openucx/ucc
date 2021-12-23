@@ -2,6 +2,8 @@
 # Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
 #
 
+if TL_SHARP_ENABLED
+
 sources =             \
         tl_sharp.h         \
         tl_sharp.c         \
@@ -19,3 +21,5 @@ libucc_tl_sharp_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(SHARP_LDF
 libucc_tl_sharp_la_LIBADD   = $(SHARP_LIBADD) $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 include $(top_srcdir)/config/module.am
+
+endif
