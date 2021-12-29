@@ -3,6 +3,58 @@
  *
  * See file LICENSE for terms.
  */
+## 1.0.0 (TBD)
+
+### Features
+
+#### API
+- Added Avg reduce operation
+- Added nonblocking team destroy option
+- Added user-defined datatype definitions
+- Added Bfloat16 type
+- Clarify semantics of core abstractions including teams and context
+- Added timeout option
+
+#### Core
+- Added coll scoring and selection support
+- Added support for Triggered collectives
+- Added support for timeouts in collectives
+- Added support for team create without ep in post
+- Added support for multithreaded context progress
+- Added support for nonblocking team destroy
+
+#### CL 
+
+- Added support for hierarchical collectives
+- Added support for hierarchical allreduce collective operation
+- Added support for collectives based on one-sided communication routines
+
+
+#### TL
+- Added SHARP TL
+
+##### UCP
+
+- Added Bcast SAG algorithm for large messages 
+- Added Knomial based reduce algorithm 
+- Making allgather and alltoall agree with the API
+- Added SRA knomial allreduce algorithm
+- Added pairwise alltoall and alltoallv algorithms
+- Added allgather and allgatherv ring algorithms 
+- Added support for collective operations based on one-sided semantics
+- Added support for alltoall with one-sided transfer semantics
+- Bug fixes
+
+##### SHARP
+- Added support for switch based hardware collectives (SHARP)
+
+#### NCCL
+- Add support for NCCL allreduce, alltoall, alltoallv, barrier, reduce, reduce
+  scatter, allgather and allgatherv
+
+#### Tests
+- Updated tests to test the newly added algorithms and operations 
+
 
 ## 0.1.0 (TBD)
 
