@@ -399,8 +399,8 @@ exit_err:
     throw std::runtime_error(err_msg.str());
 }
 
-void proc_onesided_context_create(UccProcess_h proc, int id,
-                                  ThreadAllgather *ta)
+void proc_context_create_mem_params(UccProcess_h proc, int id,
+                                    ThreadAllgather *ta)
 {
     ucc_status_t         status;
     ucc_context_config_h ctx_config;
@@ -412,11 +412,12 @@ void proc_onesided_context_create(UccProcess_h proc, int id,
         err_msg << "ucc_context_config_read failed";
         goto exit_err;
     }
-    for (auto i = 0; i < 3; i++) {
-        proc->onesided_buf[i] = ucc_malloc(1 << 20, "onesided_buffer");
+    for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
+        proc->onesided_buf[i] =
+            ucc_malloc(UCC_TEST_MEM_SEGMENT_SIZE, "onesided_buffer");
         EXPECT_NE(proc->onesided_buf[i], nullptr);
         map[i].address = proc->onesided_buf[i];
-        map[i].len     = (1 << 20);
+        map[i].len     = UCC_TEST_MEM_SEGMENT_SIZE;
     }
     proc->ctx_params.mask = UCC_CONTEXT_PARAM_FIELD_OOB;
     proc->ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
@@ -448,7 +449,7 @@ void UccJob::create_context()
     for (auto i = 0; i < procs.size(); i++) {
         if (ctx_mode == UCC_JOB_CTX_GLOBAL_ONESIDED) {
             workers.push_back(
-                std::thread(proc_onesided_context_create, procs[i], i, &ta));
+                std::thread(proc_context_create_mem_params, procs[i], i, &ta));
         } else {
             workers.push_back(std::thread(proc_context_create, procs[i], i, &ta,
                                           ctx_mode == UCC_JOB_CTX_GLOBAL));

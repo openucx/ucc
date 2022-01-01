@@ -64,7 +64,7 @@ public:
             }
         }
     }
-    void data_init(int nprocs, UccJob *job, ucc_datatype_t dtype,
+    void data_init(int nprocs, UccTeam_h team, ucc_datatype_t dtype,
                    size_t single_rank_count, UccCollCtxVec &ctxs)
     {
         void *sbuf;
@@ -80,9 +80,9 @@ public:
                 (gtest_ucc_coll_ctx_t *)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
             ctxs[i]->args = coll;
 
-            sbuf        = job->procs[i]->onesided_buf[0];
-            rbuf        = job->procs[i]->onesided_buf[1];
-            work_buf    = (long *)job->procs[i]->onesided_buf[2];
+            sbuf        = team->procs[i].p->onesided_buf[0];
+            rbuf        = team->procs[i].p->onesided_buf[1];
+            work_buf    = (long *)team->procs[i].p->onesided_buf[2];
             work_buf[0] = -1; /* initialize for a2a algorithm */
 
             coll->mask = UCC_COLL_ARGS_FIELD_FLAGS |
@@ -240,15 +240,26 @@ UCC_TEST_P(test_alltoall_0, single_onesided)
     const int            count          = std::get<4>(GetParam());
     UccTeam_h            reference_team = UccJob::getStaticTeams()[team_id];
     int                  size           = reference_team->procs.size();
-    ucc_job_env_t        env = {{"UCC_TL_UCP_TUNE", "alltoall:0-inf:@1"}};
+    ucc_job_env_t        env       = {{"UCC_TL_UCP_TUNE", "alltoall:0-inf:@1"}};
+    bool                 is_contig = true;
     UccJob               job(size, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
-    UccTeam_h            team = job.create_team(size, false, true, true);
+    UccTeam_h            team;
+    std::vector<int>     reference_ranks;
     UccCollCtxVec        ctxs;
 
+    for (auto i = 0; i < reference_team->n_procs; i++) {
+        int rank = reference_team->procs[i].p->job_rank;
+        reference_ranks.push_back(rank);
+        if (is_contig && i > 0 &&
+            (rank - reference_ranks[i - 1] > 1 ||
+             reference_ranks[i - 1] - rank > 1)) {
+            is_contig = false;
+        }
+    }
+    team = job.create_team(reference_ranks, true, is_contig, true);
     this->set_inplace(inplace);
     this->set_mem_type(mem_type);
-
-    data_init(size, &job, dtype, count, ctxs);
+    data_init(size, team, dtype, count, ctxs);
     UccReq req(team, ctxs);
     req.start();
     req.wait();
