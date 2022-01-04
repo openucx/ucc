@@ -11,13 +11,6 @@
 
 ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task);
 
-ucc_status_t ucc_tl_shm_tree_init_bcast(ucc_tl_shm_team_t *team,
-                                        ucc_rank_t root,
-                                        ucc_rank_t base_radix,
-                                        ucc_rank_t top_radix,
-                                        int *tree_in_cache,
-                                        ucc_tl_shm_tree_t **tree_p);
-
 enum {
     BCAST_WW,
     BCAST_WR,

@@ -53,6 +53,22 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
      ucc_offsetof(ucc_tl_shm_lib_config_t, reduce_top_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"FANIN_BASE_RADIX", "4", "fanin radix for base tree",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, fanin_base_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"FANIN_TOP_RADIX", "4", "fanin radix for top tree",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, fanin_top_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"FANOUT_BASE_RADIX", "4", "fanout radix for base tree",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, fanout_base_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"FANOUT_TOP_RADIX", "4", "fanout radix for top tree",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, fanout_top_radix),
+     UCC_CONFIG_TYPE_UINT},
+
     {"NPOLLS", "100", "n_polls",
      ucc_offsetof(ucc_tl_shm_lib_config_t, n_polls),
      UCC_CONFIG_TYPE_UINT},
@@ -66,7 +82,7 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
      ucc_offsetof(ucc_tl_shm_lib_config_t, base_tree_only),
      UCC_CONFIG_TYPE_UINT},
 
-//    {"SET_PERF_PARAMS", "0", "changing defaul/user settings to optimal "
+//    {"SET_PERF_PARAMS", "1", "changing default/user settings to optimal "
 //     "perf settings",
 //     ucc_offsetof(ucc_tl_shm_lib_config_t, set_perf_params),
 //     UCC_CONFIG_TYPE_UINT},

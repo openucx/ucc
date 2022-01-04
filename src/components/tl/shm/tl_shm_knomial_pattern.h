@@ -9,7 +9,7 @@
 
 #include "tl_shm.h"
 
-#define CONDITION(_a, _b, _coll) _coll == UCC_COLL_TYPE_BCAST ? _a >= 1 : _a < _b /* coll_type can be bcast or reduce */
+#define CONDITION(_a, _b, _coll) _coll == UCC_COLL_TYPE_BCAST || _coll == UCC_COLL_TYPE_FANOUT ? _a >= 1 : _a < _b /* coll_type can be bcast or reduce */
 #define GET_MAX_RADIX(_r1, _r2) _r1 > _r2 ? _r1 : _r2
 
 typedef struct ucc_kn_tree {

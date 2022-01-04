@@ -41,7 +41,7 @@ void ucc_tl_shm_kn_tree_init(ucc_rank_t size, /* group size */
                                               sizeof(ucc_rank_t) * n_children);
                         *peer_ptr = peer;
                         n_children++;
-                    } else if (coll_type == UCC_COLL_TYPE_REDUCE) {
+                    } else if (coll_type == UCC_COLL_TYPE_REDUCE || coll_type == UCC_COLL_TYPE_FANIN) {
                         break;
                     }
 //                    i = coll_type == UCC_COLL_TYPE_BCAST ? i - 1 : i + 1;

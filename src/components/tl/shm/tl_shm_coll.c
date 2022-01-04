@@ -19,7 +19,7 @@ ucc_status_t ucc_tl_shm_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     return UCC_OK;
 }
 
-//void ucc_tl_shm_set_params(ucc_tl_shm_task_t *task, ucc_coll_type_t coll_type)
+//void ucc_tl_shm_set_coll_perf_params(ucc_tl_shm_task_t *task, ucc_coll_type_t coll_type)
 //{
 //	ucc_tl_shm_team_t *team = TASK_TEAM(task);
 //	ucc_coll_args_t    args = TASK_ARGS(task);

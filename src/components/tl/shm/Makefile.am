@@ -10,6 +10,14 @@ reduce =             \
 	reduce/reduce.h  \
 	reduce/reduce.c
 
+fanin =              \
+	fanin/fanin.h    \
+	fanin/fanin.c
+
+fanout =             \
+	fanout/fanout.h  \
+	fanout/fanout.c
+
 sources =                    \
 	tl_shm.h                 \
 	tl_shm.c                 \
@@ -21,7 +29,9 @@ sources =                    \
 	tl_shm_knomial_pattern.h \
 	tl_shm_knomial_pattern.c \
 	$(bcast)                 \
-	$(reduce)
+	$(reduce)                \
+	$(fanin)                 \
+	$(fanout)   
 
 module_LTLIBRARIES = libucc_tl_shm.la
 libucc_tl_shm_la_SOURCES  = $(sources)

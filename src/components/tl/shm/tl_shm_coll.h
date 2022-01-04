@@ -16,6 +16,7 @@ typedef struct ucc_tl_shm_task {
             ucc_tl_shm_seg_t  *seg;
             ucc_tl_shm_tree_t *tree;
             int                tree_in_cache;
+            int                progress_in_top_tree;
 //            int                base_tree_only;
             uint32_t           seq_num;
 //            uint32_t           progress_alg
@@ -45,7 +46,7 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team, ucc_rank_t root,
                                   ucc_coll_type_t coll_type,
                                   ucc_tl_shm_tree_t **tree_p);
 
-//void ucc_tl_shm_reset_params(ucc_tl_shm_team_t *team);
+//void ucc_tl_shm_set_coll_perf_params(ucc_tl_shm_task_t *task, ucc_coll_type_t coll_type);
 
 
 static inline ucc_tl_shm_ctrl_t *ucc_tl_shm_get_ctrl(ucc_tl_shm_seg_t *seg,
@@ -80,7 +81,7 @@ static inline void ucc_tl_shm_copy_to_children(ucc_tl_shm_seg_t *seg,
     void              *dst;
     int                i;
 
-    for (i =0 ;i < tree->n_children; i++) {
+    for (i = 0; i < tree->n_children; i++) {
 //    for (i = tree->n_children - 1 ;i >= 0; i--) {
         ctrl = ucc_tl_shm_get_ctrl(seg, team, tree->children[i]);
         dst = is_inline ? ctrl->data : ucc_tl_shm_get_data(seg, team,
