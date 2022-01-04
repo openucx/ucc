@@ -75,6 +75,15 @@ extern int test_rand_seed;
 }
 #endif
 
+#define UCC_TEST_N_MEM_SEGMENTS   3
+#define UCC_TEST_MEM_SEGMENT_SIZE (1 << 21)
+
+typedef enum {
+    MEM_SEND_SEGMENT,
+    MEM_RECV_SEGMENT,
+    MEM_WORK_SEGMENT
+} ucc_test_mem_segments;
+
 typedef enum {
     TEAM_WORLD,
     TEAM_REVERSE,
@@ -239,8 +248,7 @@ class UccTestMpi {
     void *                 onesided_buffers[3];
     void create_team(ucc_test_mpi_team_t t, bool is_onesided = false);
     void destroy_team(ucc_test_team_t &team);
-    ucc_team_h create_ucc_team(MPI_Comm comm);
-    ucc_team_h create_onesided_ucc_team(MPI_Comm comm);
+    ucc_team_h create_ucc_team(MPI_Comm comm, bool is_onesided = false);
     std::vector<size_t> msgsizes;
     std::vector<ucc_memory_type_t> mtypes;
     std::vector<ucc_datatype_t> dtypes;
@@ -271,7 +279,7 @@ public:
     }
     void set_count_vsizes(std::vector<ucc_test_vsize_flag_t> &_counts_vsize);
     void set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vsize);
-    void run_all();
+    void run_all(bool is_onesided = false);
     void set_root(ucc_test_mpi_root_t _root_type, int _root_value) {
         root_type = _root_type;
         root_value = _root_value;
@@ -365,7 +373,7 @@ class TestAlltoall : public TestCase {
 public:
     TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                  ucc_memory_type_t _mt, ucc_test_team_t &_team,
-                 size_t _max_size, void * buffers[3]);
+                 size_t _max_size, void ** buffers = nullptr);
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ucc_status_t check();

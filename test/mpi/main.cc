@@ -15,6 +15,7 @@ static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
                                              UCC_COLL_TYPE_ALLTOALL,
                                              UCC_COLL_TYPE_ALLTOALLV,
                                              UCC_COLL_TYPE_REDUCE_SCATTER};
+static std::vector<ucc_coll_type_t> onesided_colls = {UCC_COLL_TYPE_ALLTOALL};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
 static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
                                              UCC_DT_FLOAT32, UCC_DT_FLOAT64};
@@ -494,6 +495,11 @@ int main(int argc, char *argv[])
     for (auto &inpl : inplace) {
         test->set_inplace(inpl);
         test->run_all();
+    }
+    test->set_colls(onesided_colls);
+    for (auto &inpl : inplace) {
+        test->set_inplace(inpl);
+        test->run_all(true);
     }
     std::cout << std::flush;
     MPI_Iallreduce(MPI_IN_PLACE, test->results.data(), test->results.size(),

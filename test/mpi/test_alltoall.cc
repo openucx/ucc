@@ -11,11 +11,13 @@
 
 TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                            ucc_memory_type_t _mt, ucc_test_team_t &_team,
-                           size_t _max_size) :
+                           size_t _max_size, void ** buffers) :
     TestCase(_team, UCC_COLL_TYPE_ALLTOALL, _mt, _msgsize, _inplace, _max_size)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t single_rank_count = _msgsize / dt_size;
+    bool is_onesided = (buffers != nullptr);
+    void * work_buf;
     int rank;
     int nprocs;
 
@@ -27,16 +29,28 @@ TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize * nprocs, _mt));
-    rbuf      = rbuf_mc_header->addr;
+    if (!is_onesided) {
+        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize * nprocs, _mt));
+        rbuf      = rbuf_mc_header->addr;
+    } else {
+        sbuf     = buffers[MEM_SEND_SEGMENT];
+        rbuf     = buffers[MEM_RECV_SEGMENT];
+        work_buf = buffers[MEM_WORK_SEGMENT];
+    }
+
     check_buf = ucc_malloc(_msgsize * nprocs, "check buf");
     UCC_MALLOC_CHECK(check_buf);
     if (TEST_NO_INPLACE == inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize * nprocs, _mt));
         sbuf = sbuf_mc_header->addr;
     } else {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
+        args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+    }
+    if (is_onesided) {
+        args.mask |= UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
+        args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+        args.global_work_buffer = work_buf;
     }
 
     if (TEST_NO_INPLACE == inplace) {

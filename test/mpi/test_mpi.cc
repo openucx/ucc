@@ -38,12 +38,13 @@ static ucc_status_t oob_allgather_free(void *req)
     return UCC_OK;
 }
 
-UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_local) {
-    std::string          env = "UCC_TL_UCP_TUNE=alltoall:0-inf:@1";
+UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
+                       int is_local)
+{
     ucc_lib_config_h     lib_config;
     ucc_context_config_h ctx_config;
     int                  size, rank;
-    long *               work_buf;
+    long                *work_buf;
     ucc_mem_map_t        segments[3];
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -51,18 +52,15 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_loc
 
     /* Init ucc library */
     ucc_lib_params_t lib_params = {
-        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE,
-        .thread_mode = _tm,
+        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE, .thread_mode = _tm,
         /* .coll_types = coll_types, */
     };
     tm = _tm; //TODO check ucc provided
     /* Init ucc context for a specified UCC_TEST_TLS */
-    ucc_context_params_t ctx_params = {
-    };
-    ucc_context_params_t onesided_ctx_params = {
-    };
+    ucc_context_params_t ctx_params          = {};
+    ucc_context_params_t onesided_ctx_params = {};
     if (!is_local) {
-        ctx_params.mask            |= UCC_CONTEXT_PARAM_FIELD_OOB;
+        ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_OOB;
         ctx_params.oob.allgather = oob_allgather;
         ctx_params.oob.req_test  = oob_allgather_test;
         ctx_params.oob.req_free  = oob_allgather_free;
@@ -71,20 +69,19 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_loc
         ctx_params.oob.oob_ep    = rank;
 
         onesided_ctx_params = ctx_params;
-        for (auto i = 0; i < 3; i++) {
-            /* FIXME: what's the correct number here.. */
-            onesided_buffers[i] = ucc_malloc((1<<21) * size);
+        for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
+            onesided_buffers[i] = ucc_malloc(UCC_TEST_MEM_SEGMENT_SIZE * size);
             UCC_MALLOC_CHECK(onesided_buffers[i]);
             segments[i].address = onesided_buffers[i];
-            segments[i].len     = (1<<21) * size;
+            segments[i].len     = UCC_TEST_MEM_SEGMENT_SIZE * size;
         }
-        work_buf = (long *)onesided_buffers[2];
+        work_buf    = (long *)onesided_buffers[MEM_WORK_SEGMENT];
         work_buf[0] = -1;
         onesided_ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
         onesided_ctx_params.mem_params.segments   = segments;
-        onesided_ctx_params.mem_params.n_segments = 3;
+        onesided_ctx_params.mem_params.n_segments = UCC_TEST_N_MEM_SEGMENTS;
     } else {
-        for (auto i = 0; i < 3; i++) {
+        for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
             onesided_buffers[i] = NULL;
         }
     }
@@ -94,20 +91,22 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_loc
     UCC_CHECK(ucc_context_config_read(lib, NULL, &ctx_config));
     UCC_CHECK(ucc_context_create(lib, &ctx_params, ctx_config, &ctx));
 
-    putenv((char *)env.c_str());
+    setenv("UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided", 1);
     UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
     UCC_CHECK(ucc_init(&lib_params, lib_config, &onesided_lib));
     ucc_lib_config_release(lib_config);
     UCC_CHECK(ucc_context_config_read(onesided_lib, NULL, &ctx_config));
-    UCC_CHECK(ucc_context_create(onesided_lib, &onesided_ctx_params, ctx_config, &onesided_ctx));
+    UCC_CHECK(ucc_context_create(onesided_lib, &onesided_ctx_params, ctx_config,
+                                 &onesided_ctx));
     ucc_context_config_release(ctx_config);
+    unsetenv("UCC_TL_UCP_TUNE");
     set_msgsizes(8, ((1ULL) << 21), 8);
-    dtypes = {UCC_DT_INT32, UCC_DT_INT64, UCC_DT_FLOAT32, UCC_DT_FLOAT64};
-    ops = {UCC_OP_SUM, UCC_OP_MAX};
-    colls = {UCC_COLL_TYPE_BARRIER, UCC_COLL_TYPE_ALLREDUCE};
-    mtypes = {UCC_MEMORY_TYPE_HOST};
-    inplace = TEST_NO_INPLACE;
-    root_type = ROOT_RANDOM;
+    dtypes     = {UCC_DT_INT32, UCC_DT_INT64, UCC_DT_FLOAT32, UCC_DT_FLOAT64};
+    ops        = {UCC_OP_SUM, UCC_OP_MAX};
+    colls      = {UCC_COLL_TYPE_BARRIER, UCC_COLL_TYPE_ALLREDUCE};
+    mtypes     = {UCC_MEMORY_TYPE_HOST};
+    inplace    = TEST_NO_INPLACE;
+    root_type  = ROOT_RANDOM;
     root_value = 10;
     iterations = 1;
 }
@@ -155,8 +154,9 @@ UccTestMpi::~UccTestMpi()
     UCC_CHECK(ucc_finalize(onesided_lib));
 }
 
-ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm)
+ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm, bool is_onesided)
 {
+    ucc_context_h     team_ctx = ctx;
     int               rank, size;
     ucc_team_h        team;
     ucc_team_params_t team_params;
@@ -177,13 +177,19 @@ ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm)
     team_params.ep            = rank;
     team_params.ep_range      = UCC_COLLECTIVE_EP_RANGE_CONTIG;
 
-    UCC_CHECK(ucc_team_create_post(&ctx, 1, &team_params, &team));
+    if (is_onesided) {
+        team_params.mask |= UCC_TEAM_PARAM_FIELD_FLAGS;
+        team_params.flags = UCC_TEAM_FLAG_COLL_WORK_BUFFER;
+        team_ctx = onesided_ctx;
+    }
+    UCC_CHECK(ucc_team_create_post(&team_ctx, 1, &team_params, &team));
+
     MPI_Request req;
     int tmp;
     int completed;
     MPI_Irecv(&tmp, 1, MPI_INT, rank, 123, comm, &req);
     while (UCC_INPROGRESS == (status = ucc_team_create_test(team))) {
-        ucc_context_progress(ctx);
+        ucc_context_progress(team_ctx);
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
     };
     MPI_Send(&tmp, 1, MPI_INT, rank, 123, comm);
@@ -194,52 +200,12 @@ ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm)
     return team;
 }
 
-ucc_team_h UccTestMpi::create_onesided_ucc_team(MPI_Comm comm)
-{
-    int               rank, size;
-    ucc_team_h        team;
-    ucc_team_params_t team_params;
-    ucc_status_t      status;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    /* Create UCC TEAM for comm world */
-    team_params.mask               = UCC_TEAM_PARAM_FIELD_EP       |
-        UCC_TEAM_PARAM_FIELD_EP_RANGE |
-        UCC_TEAM_PARAM_FIELD_OOB | UCC_TEAM_PARAM_FIELD_FLAGS;
-    team_params.oob.allgather = oob_allgather;
-    team_params.oob.req_test  = oob_allgather_test;
-    team_params.oob.req_free  = oob_allgather_free;
-    team_params.oob.coll_info = (void*)comm;
-    team_params.oob.n_oob_eps = size;
-    team_params.oob.oob_ep    = rank;
-    team_params.ep            = rank;
-    team_params.ep_range      = UCC_COLLECTIVE_EP_RANGE_CONTIG;
-    team_params.flags = UCC_TEAM_FLAG_COLL_WORK_BUFFER;
-
-    UCC_CHECK(ucc_team_create_post(&onesided_ctx, 1, &team_params, &team));
-    MPI_Request req;
-    int tmp;
-    int completed;
-    MPI_Irecv(&tmp, 1, MPI_INT, rank, 123, comm, &req);
-    while (UCC_INPROGRESS == (status = ucc_team_create_test(team))) {
-        ucc_context_progress(onesided_ctx);
-        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
-    };
-    MPI_Send(&tmp, 1, MPI_INT, rank, 123, comm);
-    if (status < 0) {
-        std::cerr << "*** UCC TEST FAIL: ucc_team_create_onesided_test failed\n";
-        MPI_Abort(MPI_COMM_WORLD, -1);
-    }
-    return team;
-}
-
 void UccTestMpi::create_team(ucc_test_mpi_team_t t, bool is_onesided)
 {
     ucc_team_h team;
     MPI_Comm comm = create_mpi_comm(t);
     if (is_onesided) {
-        team = create_onesided_ucc_team(comm);
+        team = create_ucc_team(comm, true);
         onesided_teams.push_back(ucc_test_team_t(t, comm, team, onesided_ctx));
     } else {
         team = create_ucc_team(comm);
@@ -533,7 +499,7 @@ static void *thread_start(void *arg)
     return 0;
 }
 
-void UccTestMpi::run_all()
+void UccTestMpi::run_all(bool is_onesided)
 {
     if (UCC_THREAD_MULTIPLE == tm) {
         int                            n_threads = teams.size();
@@ -551,11 +517,14 @@ void UccTestMpi::run_all()
                            threads[i].rst.end());
         }
     } else {
-        for (auto &t : teams) {
-            run_all_at_team(t, results);
-        }
-        for (auto &t : onesided_teams) {
-            run_all_at_team(t, results);
+        if (!is_onesided) {
+            for (auto &t : teams) {
+                run_all_at_team(t, results);
+            }
+        } else {
+            for (auto &t : onesided_teams) {
+                run_all_at_team(t, results);
+            }
         }
     }
 }
