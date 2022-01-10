@@ -222,6 +222,7 @@ ucc_tl_cuda_map_memhandle(const void *d_ptr, size_t size,
         } else {
             ucc_error("%s: failed to open ipc mem handle. addr:%p len:%lu",
                       cache->name, d_ptr, size);
+            status = UCC_ERR_NO_MESSAGE;
             goto err;
         }
     }
