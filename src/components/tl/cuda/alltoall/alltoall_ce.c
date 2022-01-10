@@ -11,9 +11,10 @@
 #include "utils/arch/cpu.h"
 
 enum {
-    ALLTOALL_CE_STAGE_SYNC, /*< Wait for free SYNC segment */
-    ALLTOALL_CE_STAGE_COPY, /*< Wait for all copies to finish */
-    ALLTOALL_CE_STAGE_BAR,  /*< Wait for other ranks to finish */
+    ALLTOALL_CE_STAGE_SYNC,  /*< Wait for free SYNC segment */
+    ALLTOALL_CE_STAGE_SETUP, /*< Wait for memhandle setup to finish */
+    ALLTOALL_CE_STAGE_COPY,  /*< Wait for all copies to finish */
+    ALLTOALL_CE_STAGE_BAR,   /*< Wait for other ranks to finish */
 };
 
 ucc_status_t ucc_tl_cuda_alltoall_ce_finalize(ucc_coll_task_t *coll_task)
@@ -27,20 +28,16 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_finalize(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_cuda_alltoall_setup(ucc_tl_cuda_task_t *task)
+ucc_status_t ucc_tl_cuda_alltoall_setup_start(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
     ucc_tl_cuda_sync_t          *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
-    volatile ucc_tl_cuda_sync_t *peer_sync;
-    ucc_tl_cuda_cache_t         *cache;
     ucc_status_t                 status;
-    ucc_rank_t                   i;
 
     memcpy(&sync->mem_info_src, &task->alltoall_ce.mem_info_src,
            sizeof(ucc_tl_cuda_mem_info_t));
     memcpy(&sync->mem_info_dst, &task->alltoall_ce.mem_info_dst,
            sizeof(ucc_tl_cuda_mem_info_t));
-
     CUDACHECK_GOTO(cudaEventRecord(sync->ipc_event_local, team->stream),
                    exit_err, status, UCC_TL_TEAM_LIB(team));
     ucc_memory_bus_fence();
@@ -48,10 +45,24 @@ ucc_status_t ucc_tl_cuda_alltoall_setup(ucc_tl_cuda_task_t *task)
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;
     }
-    while (ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), task->bar) ==
-           UCC_INPROGRESS);
-    if (ucc_unlikely(status != UCC_OK)) {
-        goto exit_err;
+
+    return UCC_OK;
+
+exit_err:
+    return status;
+}
+
+ucc_status_t ucc_tl_cuda_alltoall_setup_test(ucc_tl_cuda_task_t *task)
+{
+    ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
+    volatile ucc_tl_cuda_sync_t *peer_sync;
+    ucc_tl_cuda_cache_t         *cache;
+    ucc_status_t                 status;
+    ucc_rank_t                   i;
+
+    status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), task->bar);
+    if (status != UCC_OK) {
+        return status;
     }
 
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
@@ -158,13 +169,22 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     ucc_status_t        status;
 
-    if (task->alltoall_ce.stage == ALLTOALL_CE_STAGE_SYNC) {
+    switch (task->alltoall_ce.stage)
+    {
+    case ALLTOALL_CE_STAGE_SYNC:
         if (ucc_tl_cuda_get_sync(task) != UCC_OK) {
             task->super.super.status = UCC_INPROGRESS;
             return task->super.super.status;
         }
-        status = ucc_tl_cuda_alltoall_setup(task);
-        if (ucc_unlikely(status != UCC_OK)) {
+        status = ucc_tl_cuda_alltoall_setup_start(task);
+        if (status != UCC_OK) {
+            task->super.super.status = status;
+            return task->super.super.status;
+        }
+        task->alltoall_ce.stage = ALLTOALL_CE_STAGE_SETUP;
+    case ALLTOALL_CE_STAGE_SETUP:
+        status =  ucc_tl_cuda_alltoall_setup_test(task);
+        if (status != UCC_OK) {
             task->super.super.status = status;
             return task->super.super.status;
         }
@@ -174,9 +194,7 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
             return task->super.super.status;
         }
         task->alltoall_ce.stage = ALLTOALL_CE_STAGE_COPY;
-    }
-
-    if(task->alltoall_ce.stage == ALLTOALL_CE_STAGE_COPY) {
+    case ALLTOALL_CE_STAGE_COPY:
         status = ucc_mc_ee_event_test(task->alltoall_ce.copy_done,
                                       UCC_EE_CUDA_STREAM);
         if (status != UCC_OK) {
@@ -189,6 +207,9 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
             return task->super.super.status;
         }
         task->alltoall_ce.stage = ALLTOALL_CE_STAGE_BAR;
+    default:
+        ucc_assert(task->alltoall_ce.stage == ALLTOALL_CE_STAGE_BAR);
+        break;
     }
     task->super.super.status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team),
                                                             task->bar);
@@ -245,6 +266,6 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     return UCC_OK;
 
 exit_err:
-    ucc_mc_ee_destroy_event(task->alltoall_ce.copy_done, UCC_MEMORY_TYPE_CUDA);
+    ucc_mc_ee_destroy_event(task->alltoall_ce.copy_done, UCC_EE_CUDA_STREAM);
     return status;
 }

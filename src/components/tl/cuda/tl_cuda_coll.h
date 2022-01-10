@@ -47,13 +47,7 @@ static inline ucc_tl_cuda_task_t *ucc_tl_cuda_task_get(ucc_tl_cuda_team_t *team)
 
 static inline void ucc_tl_cuda_task_put(ucc_tl_cuda_task_t *task)
 {
-    // ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    // ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
-    // uint32_t max_concurrent;
-
     UCC_TL_CUDA_PROFILE_REQUEST_FREE(task);
-    // max_concurrent = UCC_TL_CUDA_TEAM_LIB(team)->cfg.max_concurrent;
-    // sync->seq_num[0] += max_concurrent;
     ucc_mpool_put(task);
 }
 

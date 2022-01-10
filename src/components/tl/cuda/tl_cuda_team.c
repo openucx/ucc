@@ -54,7 +54,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
             tl_error(tl_context->lib, "failed to shmget with IPC_PRIVATE, "
                      "size %zd, IPC_CREAT errno: %d(%s)", ctrl_size,
                      errno, strerror(errno));
-            status = UCC_ERR_NO_MEMORY;
+            /* status is set to UCC_OK to let rank 0 proceed and notify
+              other ranks about error */
+            status = UCC_OK;
             goto exit_err;
         }
         self->sync = shmat(shm_id, NULL, 0);
@@ -200,10 +202,15 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
         ucc_tl_cuda_topo_print(team, team->topo);
     }
     shm_id = team->ids[0].shm;
+    if (shm_id < 0) {
+        tl_error(tl_team->context->lib, "failed to create shmem region");
+        status = UCC_ERR_NO_MEMORY;
+        goto exit_err;
+    }
     if (UCC_TL_TEAM_RANK(team) != 0) {
         team->sync = shmat(shm_id, NULL, 0);
         if (team->sync == (void *)-1) {
-            tl_error(tl_team->context->lib, "failed to shamt errno: %d (%s)",
+            tl_error(tl_team->context->lib, "failed to shmat errno: %d (%s)",
                      errno, strerror(errno));
             status = UCC_ERR_NO_MEMORY;
             goto exit_err;
