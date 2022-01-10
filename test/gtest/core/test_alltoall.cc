@@ -12,61 +12,11 @@ using Param_1 = std::tuple<ucc_datatype_t, ucc_memory_type_t, gtest_ucc_inplace_
 class test_alltoall : public UccCollArgs, public ucc::test
 {
 public:
-    void data_init(int nprocs, ucc_datatype_t dtype, size_t single_rank_count,
-                   UccCollCtxVec &ctxs)
+    void data_init(int nprocs, ucc_datatype_t dtype,
+                   size_t single_rank_count, UccCollCtxVec &ctxs,
+                   UccTeam_h team)
     {
-        ctxs.resize(nprocs);
-        for (auto i = 0; i < nprocs; i++) {
-            ucc_coll_args_t *coll = (ucc_coll_args_t*)
-                    calloc(1, sizeof(ucc_coll_args_t));
-
-            ctxs[i] = (gtest_ucc_coll_ctx_t*)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
-            ctxs[i]->args = coll;
-
-            coll->mask = 0;
-            coll->coll_type = UCC_COLL_TYPE_ALLTOALL;
-            coll->src.info.mem_type = mem_type;
-            coll->src.info.count    = (ucc_count_t)single_rank_count * nprocs;
-            coll->src.info.datatype = dtype;
-            coll->dst.info.mem_type = mem_type;
-            coll->dst.info.count    = (ucc_count_t)single_rank_count * nprocs;
-            coll->dst.info.datatype = dtype;
-
-            ctxs[i]->init_buf = ucc_malloc(
-                ucc_dt_size(dtype) * single_rank_count * nprocs, "init buf");
-            EXPECT_NE(ctxs[i]->init_buf, nullptr);
-           for (int r = 0; r < nprocs; r++) {
-                size_t rank_size = ucc_dt_size(dtype) * single_rank_count;
-                alltoallx_init_buf(r, i,
-                                   (uint8_t*)ctxs[i]->init_buf + r * rank_size,
-                                   rank_size);
-            }
-
-            UCC_CHECK(ucc_mc_alloc(
-                &ctxs[i]->dst_mc_header,
-                ucc_dt_size(dtype) * single_rank_count * nprocs, mem_type));
-            coll->dst.info.buffer = ctxs[i]->dst_mc_header->addr;
-            if (TEST_INPLACE == inplace) {
-                coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-                coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-                UCC_CHECK(ucc_mc_memcpy(coll->dst.info.buffer, ctxs[i]->init_buf,
-                                        ucc_dt_size(dtype) * single_rank_count * nprocs,
-                                        mem_type, UCC_MEMORY_TYPE_HOST));
-            } else {
-                UCC_CHECK(ucc_mc_alloc(
-                    &ctxs[i]->src_mc_header,
-                    ucc_dt_size(dtype) * single_rank_count * nprocs, mem_type));
-                coll->src.info.buffer = ctxs[i]->src_mc_header->addr;
-                UCC_CHECK(
-                    ucc_mc_memcpy(coll->src.info.buffer, ctxs[i]->init_buf,
-                                  ucc_dt_size(dtype) * single_rank_count * nprocs,
-                                  mem_type, UCC_MEMORY_TYPE_HOST));
-            }
-        }
-    }
-    void data_init(int nprocs, UccTeam_h team, ucc_datatype_t dtype,
-                   size_t single_rank_count, UccCollCtxVec &ctxs)
-    {
+        bool  is_onesided = (NULL != team);
         void *sbuf;
         void *rbuf;
         long *work_buf;
@@ -80,24 +30,14 @@ public:
                 (gtest_ucc_coll_ctx_t *)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
             ctxs[i]->args = coll;
 
-            sbuf        = team->procs[i].p->onesided_buf[0];
-            rbuf        = team->procs[i].p->onesided_buf[1];
-            work_buf    = (long *)team->procs[i].p->onesided_buf[2];
-            work_buf[0] = -1; /* initialize for a2a algorithm */
-
-            coll->mask = UCC_COLL_ARGS_FIELD_FLAGS |
-                         UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
-            coll->coll_type          = UCC_COLL_TYPE_ALLTOALL;
-            coll->src.info.mem_type  = mem_type;
-            coll->src.info.count     = (ucc_count_t)single_rank_count * nprocs;
-            coll->src.info.datatype  = dtype;
-            coll->dst.info.mem_type  = mem_type;
-            coll->dst.info.count     = (ucc_count_t)single_rank_count * nprocs;
-            coll->dst.info.datatype  = dtype;
-            coll->src.info.buffer    = sbuf;
-            coll->dst.info.buffer    = rbuf;
-            coll->flags              = UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS,
-            coll->global_work_buffer = work_buf;
+            coll->mask              = 0;
+            coll->coll_type         = UCC_COLL_TYPE_ALLTOALL;
+            coll->src.info.mem_type = mem_type;
+            coll->src.info.count    = (ucc_count_t)single_rank_count * nprocs;
+            coll->src.info.datatype = dtype;
+            coll->dst.info.mem_type = mem_type;
+            coll->dst.info.count    = (ucc_count_t)single_rank_count * nprocs;
+            coll->dst.info.datatype = dtype;
 
             ctxs[i]->init_buf = ucc_malloc(
                 ucc_dt_size(dtype) * single_rank_count * nprocs, "init buf");
@@ -108,7 +48,23 @@ public:
                                    (uint8_t *)ctxs[i]->init_buf + r * rank_size,
                                    rank_size);
             }
-
+            if (is_onesided) {
+                sbuf        = team->procs[i].p->onesided_buf[0];
+                rbuf        = team->procs[i].p->onesided_buf[1];
+                work_buf    = (long *)team->procs[i].p->onesided_buf[2];
+                work_buf[0] = -1; /* initialize for onesided a2a algorithm */
+                coll->mask  = UCC_COLL_ARGS_FIELD_FLAGS |
+                             UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
+                coll->src.info.buffer = sbuf;
+                coll->dst.info.buffer = rbuf;
+                coll->flags           = UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+                coll->global_work_buffer = work_buf;
+            } else {
+                UCC_CHECK(ucc_mc_alloc(
+                    &ctxs[i]->dst_mc_header,
+                    ucc_dt_size(dtype) * single_rank_count * nprocs, mem_type));
+                coll->dst.info.buffer = ctxs[i]->dst_mc_header->addr;
+            }
             if (TEST_INPLACE == inplace) {
                 coll->mask |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
@@ -117,12 +73,24 @@ public:
                     ucc_dt_size(dtype) * single_rank_count * nprocs, mem_type,
                     UCC_MEMORY_TYPE_HOST));
             } else {
+                if (!is_onesided) {
+                    UCC_CHECK(ucc_mc_alloc(&ctxs[i]->src_mc_header,
+                                           ucc_dt_size(dtype) *
+                                               single_rank_count * nprocs,
+                                           mem_type));
+                    coll->src.info.buffer = ctxs[i]->src_mc_header->addr;
+                }
                 UCC_CHECK(ucc_mc_memcpy(
                     coll->src.info.buffer, ctxs[i]->init_buf,
                     ucc_dt_size(dtype) * single_rank_count * nprocs, mem_type,
                     UCC_MEMORY_TYPE_HOST));
             }
         }
+    }
+    void data_init(int nprocs, ucc_datatype_t dtype, size_t single_rank_count,
+                   UccCollCtxVec &ctxs)
+    {
+        data_init(nprocs, dtype, single_rank_count, ctxs, NULL);
     }
     void reset(UccCollCtxVec ctxs)
     {
@@ -259,7 +227,7 @@ UCC_TEST_P(test_alltoall_0, single_onesided)
     team = job.create_team(reference_ranks, true, is_contig, true);
     this->set_inplace(inplace);
     this->set_mem_type(mem_type);
-    data_init(size, team, dtype, count, ctxs);
+    data_init(size, dtype, count, ctxs, team);
     UccReq req(team, ctxs);
     req.start();
     req.wait();

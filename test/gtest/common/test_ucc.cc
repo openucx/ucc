@@ -42,7 +42,7 @@ UccProcess::~UccProcess()
     EXPECT_EQ(UCC_OK, ucc_context_destroy(ctx_h));
     EXPECT_EQ(UCC_OK, ucc_finalize(lib_h));
     if (ctx_params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS) {
-        for (auto i = 0; i < 3; i++) {
+        for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
             ucc_free(onesided_buf[i]);
         }
     }
@@ -405,7 +405,7 @@ void proc_context_create_mem_params(UccProcess_h proc, int id,
     ucc_status_t         status;
     ucc_context_config_h ctx_config;
     std::stringstream    err_msg;
-    ucc_mem_map_t        map[3];
+    ucc_mem_map_t        map[UCC_TEST_N_MEM_SEGMENTS];
 
     status = ucc_context_config_read(proc->lib_h, NULL, &ctx_config);
     if (status != UCC_OK) {
@@ -428,7 +428,7 @@ void proc_context_create_mem_params(UccProcess_h proc, int id,
     proc->ctx_params.oob.n_oob_eps         = ta->n_procs;
     proc->ctx_params.oob.oob_ep            = id;
     proc->ctx_params.mem_params.segments   = map;
-    proc->ctx_params.mem_params.n_segments = 3;
+    proc->ctx_params.mem_params.n_segments = UCC_TEST_N_MEM_SEGMENTS;
     status = ucc_context_create(proc->lib_h, &proc->ctx_params, ctx_config,
                                 &proc->ctx_h);
     ucc_context_config_release(ctx_config);
