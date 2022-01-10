@@ -61,8 +61,7 @@ typedef struct ucc_knomial_pattern {
     ucc_rank_t     radix_pow;
     ucc_rank_t     full_pow_size;
     ucc_rank_t     block_size;
-    ucc_rank_t     knx_rank;
-    ucc_rank_t     block_offset;
+    size_t     block_offset;
     ucc_rank_t     rank;
     ucc_rank_t     size;
     size_t         block_size_counts;
@@ -116,7 +115,6 @@ static inline void ucc_knomial_pattern_init_impl(ucc_rank_t             size,
     p->radix_pow    = ucc_kn_pattern_radix_pow_init(p, backward);
     p->block_offset = 0;
     p->block_size   = 0;
-    p->knx_rank     = 0;
     if (rank < p->n_extra * 2) {
         p->node_type = (rank % 2) ? KN_NODE_EXTRA : KN_NODE_PROXY;
     }
