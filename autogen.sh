@@ -2,7 +2,7 @@
 
 # Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
 
-SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE:-$0}" )" &> /dev/null && pwd )"
 if [ $SCRIPT_DIR != `pwd` ]; then
     echo "autogen.sh script must be launched from the top of the source tree"
     exit 1
