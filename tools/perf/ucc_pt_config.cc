@@ -31,6 +31,7 @@ const std::map<std::string, ucc_coll_type_t> ucc_pt_coll_map = {
     {"barrier", UCC_COLL_TYPE_BARRIER},
     {"bcast", UCC_COLL_TYPE_BCAST},
     {"reduce", UCC_COLL_TYPE_REDUCE},
+    {"reduce_scatter", UCC_COLL_TYPE_REDUCE_SCATTER},
 };
 
 const std::map<std::string, ucc_memory_type_t> ucc_pt_memtype_map = {
