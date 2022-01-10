@@ -1194,10 +1194,10 @@ enum ucc_team_attr_field {
  */
 enum ucc_team_flags {
     UCC_TEAM_FLAG_COLL_WORK_BUFFER             = UCC_BIT(0) /*< If set, this indicates
-                                                                the user will provide
-                                                                a scratchpad buffer for
-                                                                use in one-sided
-                                                                collectives. Otherwise,
+                                                                the user will provide 
+                                                                a scratchpad buffer for 
+                                                                use in one-sided 
+                                                                collectives. Otherwise, 
                                                                 an internal buffer will
                                                                 used. */
 };
@@ -1696,13 +1696,7 @@ typedef enum {
     UCC_COLL_ARGS_FLAG_IN_PLACE             = UCC_BIT(0), /*!< If set, the
                                                             output buffer is
                                                             identical to the
-                                                            input buffer.
-                                                            Note, for inplace
-                                                            reduce scatter
-                                                            data is placed in
-                                                            output buffer with
-                                                            offset according
-                                                            to team id. */
+                                                            input buffer.*/
     UCC_COLL_ARGS_FLAG_PERSISTENT           = UCC_BIT(1), /*!< If set, the
                                                             collective is
                                                             considered
@@ -1743,9 +1737,9 @@ typedef enum {
                                                             to be global on all the processes
                                                             participating in the collective.*/
     UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7)  /*!< If set, both src
-                                                            and dst buffers
-                                                            reside in a memory
-                                                            mapped region.
+                                                            and dst buffers 
+                                                            reside in a memory 
+                                                            mapped region. 
                                                             Useful for one-sided
                                                             collectives. */
 } ucc_coll_args_flags_t;
@@ -1854,14 +1848,14 @@ typedef struct ucc_coll_args {
                                              collectives */
     ucc_error_type_t                error_type; /*!< Error type */
     ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
-    void                           *global_work_buffer; /*!< User allocated scratchpad
-                                                             buffer for one-sided
-                                                             collectives. The buffer
-                                                             provided should be at least
-                                                             the size returned by @ref
-                                                             ucc_context_get_attr with
-                                                             the field mask -
-                                                             UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE
+    void                           *global_work_buffer; /*!< User allocated scratchpad 
+                                                             buffer for one-sided 
+                                                             collectives. The buffer 
+                                                             provided should be at least 
+                                                             the size returned by @ref 
+                                                             ucc_context_get_attr with 
+                                                             the field mask - 
+                                                             UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE 
                                                              set to 1. */
     ucc_coll_callback_t             cb;
     double                          timeout; /*!< Timeout in seconds */
