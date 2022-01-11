@@ -196,9 +196,9 @@ ucc_tl_cuda_map_memhandle(const void *d_ptr, size_t size,
     if (cuerr != cudaSuccess) {
         if (cuerr == cudaErrorAlreadyMapped) {
             ucc_tl_cuda_cache_invalidate_regions(cache,
-                    (void *)ucs_align_down_pow2((uintptr_t)d_ptr,
+                    (void *)ucc_align_down_pow2((uintptr_t)d_ptr,
                     UCS_PGT_ADDR_ALIGN),
-                    (void *)ucs_align_up_pow2((uintptr_t)d_ptr + size,
+                    (void *)ucc_align_up_pow2((uintptr_t)d_ptr + size,
                     UCS_PGT_ADDR_ALIGN));
             cuerr = cudaIpcOpenMemHandle(mapped_addr, mem_handle,
                                          cudaIpcMemLazyEnablePeerAccess);
@@ -237,9 +237,9 @@ ucc_tl_cuda_map_memhandle(const void *d_ptr, size_t size,
         goto err;
     }
 
-    region->super.start = ucs_align_down_pow2((uintptr_t)d_ptr,
+    region->super.start = ucc_align_down_pow2((uintptr_t)d_ptr,
                                                UCS_PGT_ADDR_ALIGN);
-    region->super.end   = ucs_align_up_pow2  ((uintptr_t)d_ptr + size,
+    region->super.end   = ucc_align_up_pow2  ((uintptr_t)d_ptr + size,
                                                UCS_PGT_ADDR_ALIGN);
     region->d_ptr       = (void *)d_ptr;
     region->size        = size;

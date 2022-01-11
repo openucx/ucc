@@ -64,6 +64,7 @@ noinst_HEADERS =                      \
 	utils/profile/ucc_profile_on.h    \
 	utils/profile/ucc_profile_off.h   \
 	utils/ucc_time.h                  \
+	utils/ucc_sys.h                   \
 	components/base/ucc_base_iface.h  \
 	components/cl/ucc_cl.h            \
 	components/cl/ucc_cl_log.h        \
@@ -105,6 +106,7 @@ libucc_la_SOURCES =                   \
 	utils/ucc_coll_utils.c            \
 	utils/ucc_parser.c                \
 	utils/profile/ucc_profile.c       \
+	utils/ucc_sys.c                   \
 	components/base/ucc_base_iface.c  \
 	components/cl/ucc_cl.c            \
 	components/tl/ucc_tl.c            \

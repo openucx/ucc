@@ -10,6 +10,7 @@
 #include "core/ucc_team.h"
 #include "coll_score/ucc_coll_score.h"
 #include "utils/arch/cpu.h"
+#include "utils/ucc_sys.h"
 #include <sys/shm.h>
 
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
@@ -22,7 +23,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     ucc_tl_cuda_shm_barrier_t *bar;
     ucc_status_t status;
     int shm_id, i, j;
-    size_t ctrl_size;
+    size_t ctrl_size, alloc_size;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
@@ -46,6 +47,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
+    self->ids = ucc_malloc((UCC_TL_TEAM_SIZE(self) + 1) * sizeof(*(self->ids)),
+                            "ids");
+    if (!self->ids) {
+        tl_error(tl_context->lib, "failed to alloc ranks id");
+        return UCC_ERR_NO_MEMORY;
+    }
+
     ctrl_size = (sizeof(ucc_tl_cuda_sync_t) + sizeof(ucc_tl_cuda_sync_data_t) *
                 (UCC_TL_TEAM_SIZE(self) - 1)) * UCC_TL_TEAM_SIZE(self) *
                 lib->cfg.max_concurrent +
@@ -55,27 +63,17 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     shm_id = -1;
     self->sync = (void*)-1;
     if (UCC_TL_TEAM_RANK(self) == 0) {
-        shm_id = shmget(IPC_PRIVATE, ctrl_size, IPC_CREAT | 0666);
-        if (shm_id < 0) {
-            tl_error(tl_context->lib, "failed to shmget with IPC_PRIVATE, "
-                     "size %zd, IPC_CREAT errno: %d(%s)", ctrl_size,
-                     errno, strerror(errno));
-            /* status is set to UCC_OK to let rank 0 proceed and notify
-              other ranks about error */
-            status = UCC_OK;
-            goto exit_err;
-        }
-        self->sync = shmat(shm_id, NULL, 0);
-        self->bar  = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(self, 0,
-                                                       lib->cfg.max_concurrent);
-        shmctl(shm_id, IPC_RMID, NULL);
-        if (self->sync == (void *)-1) {
-            tl_error(tl_context->lib, "failed to shmat errno: %d(%s)",
-                     errno, strerror(errno));
-            status = UCC_ERR_NO_MEMORY;
-            goto free_shm;
+        alloc_size = ctrl_size;
+        status = ucc_sysv_alloc(&alloc_size, (void**)&self->sync, &shm_id);
+        if (status != UCC_OK) {
+            tl_error(tl_context->lib, "failed to alloc sysv segment");
+            /* proceed and notify other ranks about error */
+            shm_id = -1;
+            goto ids_exchange;
         }
         memset(self->sync, 0, ctrl_size);
+        self->bar  = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(self, 0,
+                                                       lib->cfg.max_concurrent);
         for (i = 0; i < lib->cfg.max_concurrent; i++) {
             bar = UCC_TL_CUDA_TEAM_BARRIER(self, i);
             for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
@@ -84,19 +82,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                 if (status != UCC_OK) {
                     tl_error(tl_context->lib,
                              "failed to initialize shm barrier");
-                    goto free_shmdt;
+                    ucc_sysv_free(self->sync);
+                    shm_id = -1;
+                    self->sync = (void*)(-1);
+                    /* proceed and notify other ranks about error */
+                    goto ids_exchange;
                 }
             }
         }
     }
-
-    self->ids = ucc_malloc((UCC_TL_TEAM_SIZE(self) + 1) * sizeof(*(self->ids)),
-                           "ids");
-    if (!self->ids) {
-        tl_error(tl_context->lib, "failed to alloc ranks id");
-        status = UCC_ERR_NO_MEMORY;
-        goto free_shmdt;
-    }
+ids_exchange:
     self->ids[UCC_TL_TEAM_SIZE(self)].device = ctx->device;
     self->ids[UCC_TL_TEAM_SIZE(self)].shm    = shm_id;
     status = self->oob.allgather(&self->ids[UCC_TL_TEAM_SIZE(self)], self->ids,
@@ -113,15 +108,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
 
 free_devices:
     ucc_free(self->ids);
-free_shmdt:
-    if (self->sync != (void*)-1) {
-        shmdt(self->sync);
-    }
-free_shm:
     if (shm_id != -1) {
-        shmctl(shm_id, IPC_RMID, NULL);
+        ucc_sysv_free(self->sync);
+        self->sync = (void*)(-1);
     }
-exit_err:
     return status;
 }
 
@@ -130,6 +120,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
     ucc_tl_cuda_lib_t *lib = ucc_derived_of(self->super.super.context->lib,
                                             ucc_tl_cuda_lib_t);
     ucc_tl_cuda_sync_t *sync;
+    cudaError_t st;
     int i, j;
 
     tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
@@ -145,23 +136,32 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
                     }
                     sync = UCC_TL_CUDA_TEAM_SYNC(self, j, i);
                     if (sync->data[j].ipc_event_remote) {
-                        cudaEventDestroy(sync->data[j].ipc_event_remote);
+                        st = cudaEventDestroy(sync->data[j].ipc_event_remote);
+                        if (st != cudaSuccess) {
+                            tl_warn(UCC_TL_TEAM_LIB(self), "cudaEventDestroy "
+                                    "failed: %d (%s)", st, cudaGetErrorName(st));
+                        }
                     }
                 }
                 sync = UCC_TL_CUDA_TEAM_SYNC(self, UCC_TL_TEAM_RANK(self), i);
                 if (sync->ipc_event_local) {
-                    cudaEventDestroy(sync->ipc_event_local);
+                    st = cudaEventDestroy(sync->ipc_event_local);
+                    if (st != cudaSuccess) {
+                        tl_warn(UCC_TL_TEAM_LIB(self), "cudaEventDestroy "
+                                "failed: %d (%s)", st, cudaGetErrorName(st));
+                    }
                 }
             }
-            shmdt(self->sync);
-        }
-        if (UCC_TL_TEAM_RANK(self) == 0) {
-            shmctl(self->ids[0].shm, IPC_RMID, NULL);
+            ucc_sysv_free(self->sync);
         }
         ucc_free(self->ids);
     }
     if (self->stream) {
-        cudaStreamDestroy(self->stream);
+        st = cudaStreamDestroy(self->stream);
+        if (st != cudaSuccess) {
+            tl_warn(UCC_TL_TEAM_LIB(self), "cudaStreamDestroy failed: %d (%s)",
+                    st, cudaGetErrorName(st));
+        }
     }
 }
 

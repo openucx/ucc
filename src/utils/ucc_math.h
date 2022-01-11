@@ -75,4 +75,19 @@ static inline void float32tobfloat16(float float_val, void *bfloat16_ptr)
 #endif
 }
 
+#define ucc_padding(_n, _alignment)                                            \
+    ( ((_alignment) - (_n) % (_alignment)) % (_alignment) )
+
+#define ucc_align_down(_n, _alignment)                                         \
+    ( (_n) - ((_n) % (_alignment)) )
+
+#define ucc_align_up(_n, _alignment)                                           \
+    ( (_n) + ucc_padding(_n, _alignment) )
+
+#define ucc_align_down_pow2(_n, _alignment)                                    \
+    ( (_n) & ~((_alignment) - 1) )
+
+#define ucc_align_up_pow2(_n, _alignment)                                      \
+    ucc_align_down_pow2((_n) + (_alignment) - 1, _alignment)
+
 #endif
