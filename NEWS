@@ -50,7 +50,7 @@
 
 #### NCCL
 - Add support for NCCL allreduce, alltoall, alltoallv, barrier, reduce, reduce
-  scatter, allgather and allgatherv
+  scatter, bcast, allgather and allgatherv
 
 #### Tests
 - Updated tests to test the newly added algorithms and operations 
