@@ -33,10 +33,9 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     UCC_MALLOC_CHECK(check_rbuf);
     if (TEST_NO_INPLACE == inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
-        sbuf = sbuf_mc_header->addr;
-        init_buffer(sbuf, count, dt, _mt, rank);
-        UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST, sbuf,
-                           _mt, _msgsize);
+        UCC_CHECK(ucc_mc_alloc(&check_sbuf_mc_header, _msgsize,
+                               UCC_MEMORY_TYPE_HOST));
+        sbuf       = sbuf_mc_header->addr;
         check_sbuf = check_sbuf_mc_header->addr;
 
         args.src.info.buffer      = sbuf;
@@ -44,11 +43,8 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         args.src.info.datatype    = _dt;
         args.src.info.mem_type    = _mt;
     } else {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
-        init_buffer(rbuf, count, dt, _mt, rank);
-        init_buffer(check_rbuf, count, dt, UCC_MEMORY_TYPE_HOST, rank);
-
+        args.mask                 = UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags                = UCC_COLL_ARGS_FLAG_IN_PLACE;
         args.src.info.buffer      = NULL;
         args.src.info.count       = SIZE_MAX;
         args.src.info.datatype    = (ucc_datatype_t)-1;
@@ -60,7 +56,34 @@ TestAllreduce::TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     args.dst.info.count       = count;
     args.dst.info.datatype    = _dt;
     args.dst.info.mem_type    = _mt;
+    UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
+}
+
+ucc_status_t TestAllreduce::set_input()
+{
+    size_t dt_size = ucc_dt_size(dt);
+    size_t count   = msgsize / dt_size;
+    int rank;
+    void *buf, *check_buf;
+
+    MPI_Comm_rank(team.comm, &rank);
+    if (TEST_NO_INPLACE == inplace) {
+        buf = sbuf;
+        check_buf = check_sbuf;
+    } else {
+        buf = rbuf;
+        check_buf = check_rbuf;
+    }
+    init_buffer(buf, count, dt, mem_type, rank);
+    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
+                            UCC_MEMORY_TYPE_HOST, mem_type));
+    return UCC_OK;
+}
+
+ucc_status_t TestAllreduce::reset_sbuf()
+{
+    return UCC_OK;
 }
 
 ucc_status_t TestAllreduce::check()

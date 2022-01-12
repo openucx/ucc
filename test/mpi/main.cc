@@ -33,6 +33,7 @@ static int root_value = 10;
 static ucc_thread_mode_t                   thread_mode  = UCC_THREAD_SINGLE;
 static int                                 iterations   = 1;
 static int                                 show_help    = 0;
+static int                                 num_tests    = 1;
 #ifdef HAVE_CUDA
 static test_set_cuda_device_t test_cuda_set_device = TEST_SET_DEV_NONE;
 #endif
@@ -69,8 +70,8 @@ void PrintHelp()
        "--max_size   <value>:           maximum send/recv buffer allocation size\n"
        "--count_bits <c1,c2,..>:        list of counts bits: 32,64          (alltoallv only)\n"
        "--displ_bits <d1,d2,..>:        list of displacements bits: 32,64   (alltoallv only)\n"
-       "--set_device <value>:           0 - don't set, 1 - cuda_device = local_rank, 2 - cuda_device = local_rank % cuda_device_count"
-       "\n"
+       "--set_device <value>:           0 - don't set, 1 - cuda_device = local_rank, 2 - cuda_device = local_rank % cuda_device_count\n"
+       "--num_tests  <value>:           number of tests to run in parallel\n"
        "--help:              Show help\n";
 }
 
@@ -332,7 +333,7 @@ void PrintInfo()
 
 int ProcessArgs(int argc, char** argv)
 {
-    const char *const short_opts  = "c:t:m:d:o:M:I:r:s:C:D:i:Z:ThS:";
+    const char *const short_opts  = "c:t:m:d:o:M:I:N:r:s:C:D:i:Z:ThS:";
     const option      long_opts[] = {
                                 {"colls", required_argument, nullptr, 'c'},
                                 {"teams", required_argument, nullptr, 't'},
@@ -348,6 +349,7 @@ int ProcessArgs(int argc, char** argv)
                                 {"displ_bits", required_argument, nullptr, 'D'},
                                 {"iter", required_argument, nullptr, 'i'},
                                 {"thread-multiple", no_argument, nullptr, 'T'},
+                                {"num_tests", required_argument, nullptr, 'N'},
 #ifdef HAVE_CUDA
                                 {"set_device", required_argument, nullptr, 'S'},
 #endif
@@ -405,6 +407,9 @@ int ProcessArgs(int argc, char** argv)
             break;
         case 'i':
             iterations = std::stoi(optarg);
+            break;
+        case 'N':
+            num_tests = std::stoi(optarg);
             break;
 #ifdef HAVE_CUDA
         case 'S':
@@ -471,6 +476,7 @@ int main(int argc, char *argv[])
     }
     test->create_teams(teams);
     test->set_iter(iterations);
+    test->set_num_tests(num_tests);
     test->set_colls(colls);
     test->set_dtypes(dtypes);
     test->set_mtypes(mtypes);

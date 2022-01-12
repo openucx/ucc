@@ -57,7 +57,7 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &nprocs);
 
-    args.coll_type = UCC_COLL_TYPE_ALLTOALLV;  
+    args.coll_type = UCC_COLL_TYPE_ALLTOALLV;
 
     if (TEST_SKIP_NONE != skip_reduce(test_max_size < (_msgsize * nprocs),
                                       TEST_SKIP_MEM_LIMIT, team.comm)) {
@@ -104,10 +104,9 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     }
 
     UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, sncounts * dt_size, _mt));
-    sbuf = sbuf_mc_header->addr;
-    init_buffer(sbuf, sncounts, TEST_DT, _mt, rank);
-    UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST, sbuf, _mt,
-                       sncounts * dt_size);
+    UCC_CHECK(ucc_mc_alloc(&check_sbuf_mc_header, sncounts * dt_size,
+                           UCC_MEMORY_TYPE_HOST));
+    sbuf       = sbuf_mc_header->addr;
     check_sbuf = check_sbuf_mc_header->addr;
     UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, rncounts * dt_size, _mt));
     rbuf       = rbuf_mc_header->addr;
@@ -123,7 +122,7 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     args.dst.info_v.mem_type = _mt;
 
     if (TEST_FLAG_VSIZE_64BIT == count_bits) {
-        args.src.info_v.counts = scounts64 = 
+        args.src.info_v.counts = scounts64 =
                 (ucc_count_t*)mpi_counts_to_ucc<uint64_t>(scounts, nprocs);
         args.dst.info_v.counts = rcounts64 =
                 (ucc_count_t*)mpi_counts_to_ucc<uint64_t>(rcounts, nprocs);
@@ -132,7 +131,7 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         args.dst.info_v.counts = (ucc_count_t*)rcounts;
     }
     if (TEST_FLAG_VSIZE_64BIT == displ_bits) {
-        args.src.info_v.displacements = sdispls64 = 
+        args.src.info_v.displacements = sdispls64 =
                 (ucc_aint_t*)mpi_counts_to_ucc<uint64_t>(sdispls, nprocs);
         args.dst.info_v.displacements = rdispls64 =
                 (ucc_aint_t*)mpi_counts_to_ucc<uint64_t>(rdispls, nprocs);
@@ -140,8 +139,26 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         args.src.info_v.displacements = (ucc_aint_t*)sdispls;
         args.dst.info_v.displacements = (ucc_aint_t*)rdispls;
     }
-
+    UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
+}
+
+ucc_status_t TestAlltoallv::set_input()
+{
+    int rank;
+    size_t dt_size = ucc_dt_size(TEST_DT);
+
+    MPI_Comm_rank(team.comm, &rank);
+    init_buffer(sbuf, sncounts, TEST_DT, mem_type, rank);
+    UCC_CHECK(ucc_mc_memcpy(check_sbuf, sbuf, sncounts * dt_size,
+                            UCC_MEMORY_TYPE_HOST, mem_type));
+
+    return UCC_OK;
+}
+
+ucc_status_t TestAlltoallv::reset_sbuf()
+{
+    return UCC_OK;
 }
 
 TestAlltoallv::~TestAlltoallv()
