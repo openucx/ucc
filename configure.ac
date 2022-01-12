@@ -177,13 +177,10 @@ AS_IF([test "x$with_docs_only" = xyes],
      if test $cuda_happy = "yes"; then
          mc_modules="${mc_modules}:cuda"
      fi
-
-
-     CHECK_TLS
     ]) # Docs only
 
 
-
+CHECK_TLS
 CFLAGS="$CFLAGS -std=gnu11"
 CPPFLAGS="$CPPFLAGS $UCS_CPPFLAGS $includes"
 LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
