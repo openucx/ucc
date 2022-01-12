@@ -136,7 +136,7 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
             tl_debug(tl_team->context->lib,
                      "enable support for memory type %s",
                      ucc_memory_type_names[i]);
-            mem_types[mt_n++] = i;
+            mem_types[mt_n++] = (ucc_memory_type_t)i;
         }
     }
 
