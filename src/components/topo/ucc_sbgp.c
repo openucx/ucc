@@ -238,8 +238,8 @@ skip:
     ucc_free(nl_array_2);
 
     if (n_node_leaders > 1) {
+        sbgp->group_size = n_node_leaders;
         if (i_am_node_leader) {
-            sbgp->group_size = n_node_leaders;
             sbgp->rank_map   = nl_array_1;
             sbgp->status     = UCC_SBGP_ENABLED;
         } else {

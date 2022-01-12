@@ -131,5 +131,4 @@ static inline int ucc_team_map_is_single_node(ucc_team_t *team,
     }
     return 1;
 }
-
 #endif
