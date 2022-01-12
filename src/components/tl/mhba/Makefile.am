@@ -1,6 +1,8 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
 #
+
+if TL_MHBA_ENABLED
 
 sources =             \
 	tl_mhba.h         \
@@ -27,3 +29,5 @@ libucc_tl_mhba_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed
 libucc_tl_mhba_la_LIBADD   = $(UCC_TOP_BUILDDIR)/src/libucc.la -libverbs -lmlx5
 
 include $(top_srcdir)/config/module.am
+
+endif

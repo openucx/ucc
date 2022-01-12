@@ -4,33 +4,10 @@
  */
 
 #include "tl_mhba_ib.h"
-#include <stdatomic.h>
+#include "utils/arch/cpu.h"
 
 #define SQ_WQE_SHIFT 6
 #define DS_SIZE      16 // size of a single Data Segment in the WQE
-#define mmio_flush_writes()                                                    \
-    asm volatile("sfence" ::: "memory") // TODO only for __x86_64__
-#define udma_to_device_barrier()                                               \
-    asm volatile("" ::: "memory") // TODO only for __x86_64__
-#define mmio_wc_start() mmio_flush_writes()
-
-#ifdef __CHECKER__
-#define __force __attribute__((force))
-#else
-#define __force
-#endif
-
-typedef void (*write64_fn_t)(void *, __be64);
-
-#define MAKE_WRITE(_NAME_, _SZ_)                                               \
-    static inline void _NAME_##_be(void *addr, __be##_SZ_ value)               \
-    {                                                                          \
-        atomic_store_explicit((_Atomic(uint##_SZ_##_t) *)addr,                 \
-                              (__force uint##_SZ_##_t)value,                   \
-                              memory_order_relaxed);                           \
-    }
-
-MAKE_WRITE(mmio_write32, 32)
 
 /* UMR pointer to KLMs/MTTs/RepeatBlock and BSFs location (when inline = 0) */
 struct mlx5_wqe_umr_pointer_seg {
@@ -38,65 +15,6 @@ struct mlx5_wqe_umr_pointer_seg {
     __be32 mkey;
     __be64 address;
 };
-
-static pthread_spinlock_t mmio_spinlock;
-
-static __attribute__((constructor)) void lock_constructor(void)
-{
-    pthread_spin_init(&mmio_spinlock, PTHREAD_PROCESS_PRIVATE);
-}
-
-static inline void mmio_wc_spinlock(pthread_spinlock_t *lock)
-{
-    pthread_spin_lock(lock);
-
-    // TODO remove code once OS is final in APU
-
-    //#if !defined(__i386__) && !defined(__x86_64__)
-    //	/* For x86 the serialization within the spin lock is enough to
-    //	 * strongly order WC and other memory types. */
-    //	mmio_wc_start();
-    //#endif
-}
-
-static inline void mmio_wc_spinunlock(pthread_spinlock_t *lock)
-{
-    /* It is possible that on x86 the atomic in the lock is strong enough
-     * to force-flush the WC buffers quickly, and this SFENCE can be
-     * omitted too. */
-    mmio_flush_writes();
-    pthread_spin_unlock(lock);
-}
-
-static void pthread_mmio_write64_be(void *addr, __be64 val)
-{
-    __be32 first_dword  = htobe32(be64toh(val) >> 32);
-    __be32 second_dword = htobe32(be64toh(val));
-
-    /* The WC spinlock, by definition, provides global ordering for all UC
-	   and WC stores within the critical region. */
-    mmio_wc_spinlock(&mmio_spinlock);
-    mmio_write32_be(addr, first_dword);
-    mmio_write32_be((void *)(ptrdiff_t)addr + 4, second_dword);
-    mmio_wc_spinunlock(&mmio_spinlock);
-}
-
-#define HAVE_FUNC_ATTRIBUTE_IFUNC 1 // TODO remove code once OS is final in APU
-
-#if HAVE_FUNC_ATTRIBUTE_IFUNC
-void mmio_write64_be(void *addr, __be64 val)
-    __attribute__((ifunc("resolve_mmio_write64_be")));
-static write64_fn_t
-resolve_mmio_write64_be(void); // TODO replace the indirect call to function
-#else
-__asm__(".type mmio_write64_be, %gnu_indirect_function");
-write64_fn_t resolve_mmio_write64_be(void) __asm__("mmio_write64_be");
-#endif
-
-write64_fn_t resolve_mmio_write64_be(void)
-{
-    return &pthread_mmio_write64_be;
-}
 
 ucc_status_t
 ucc_tl_mhba_ibv_qp_to_mlx5dv_qp(struct ibv_qp *                 umr_qp,
@@ -136,27 +54,18 @@ static inline void post_send_db(struct ucc_tl_mhba_internal_qp *mqp, int nreq,
      * Make sure that descriptors are written before
      * updating doorbell record and ringing the doorbell
      */
-    udma_to_device_barrier();
+    ucc_memory_bus_fence();
     mqp->qp.dbrec[MLX5_SND_DBR] = htobe32(mqp->sq_cur_post & 0xffff);
 
     /* Make sure that the doorbell write happens before the memcpy
 	 * to WC memory below
 	 */
-    mmio_wc_start();
+    ucc_memory_cpu_fence();
 
-    mmio_write64_be(mqp->qp.bf.reg + mqp->offset, *(__be64 *)ctrl);
+    *(__be64 *)PTR_OFFSET(mqp->qp.bf.reg, mqp->offset) = *(__be64 *)ctrl;
 
-    /*
-	 * use mmio_flush_writes() to ensure write combining buffers are
-	 * flushed out of the running CPU. This must be carried inside
-	 * the spinlock. Otherwise, there is a potential race. In the
-	 * race, CPU A writes doorbell 1, which is waiting in the WC
-	 * buffer. CPU B writes doorbell 2, and it's write is flushed
-	 * earlier. Since the mmio_flush_writes is CPU local, this will
-	 * result in the HCA seeing doorbell 2, followed by doorbell 1.
-	 * Flush before toggling bf_offset to be latency oriented.
-	 */
-    mmio_flush_writes();
+    ucc_memory_bus_store_fence();
+
     mqp->offset ^= mqp->qp.bf.size;
 }
 

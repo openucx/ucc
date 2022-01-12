@@ -11,6 +11,7 @@
 #include <limits.h>
 #include "tl_mhba_coll.h"
 #include "tl_mhba_pd.h"
+#include "utils/arch/cpu.h"
 
 UCC_CLASS_INIT_FUNC(ucc_tl_mhba_context_t,
                     const ucc_base_context_params_t *params,
