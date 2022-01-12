@@ -10,8 +10,7 @@ operations.
 **Invocation semantics**: The ucc\_collective\_init routine is a non-blocking
 collective operation to initialize the buffers, operation type, reduction type,
 and other information required for the collective operation. All participants of
-the team should call the initialize operation. The routine returns once the
-participants enter the collective initialize operation. The collective operation
+the team should call the initialize operation. The collective operation
 is invoked using a ucc\_collective\_post operation.
 ucc\_collective\_init\_and\_post operation initializes as well as post the
 collective operation.
@@ -20,10 +19,11 @@ collective operation.
 enumeration ucc\_coll\_type\_t. The semantics are briefly described here,
 however in most cases it agrees with the semantics of collective operations in
 the popular programming models such as MPI and OpenSHMEM. When they differ, the
-semantics changes are documented. All collective operations operate on the team.
-For the collective operations defined in the enumeration, all participants of
-the team participate in the collective operations. Further the team should be
-created with endpoints, where the “eps” should be ordered and contiguous.
+semantics changes are documented. All collective operations execute on the team.
+For the collective operations defined by ucc\_coll\_type\_t, all participants of
+the team are required to participate in the collective operations. Further the
+team should be created with endpoints, where the “eps” should be ordered and
+contiguous.
 
 UCC supports three types of collective operations: (a) UCC\_{ALLTOALL,ALLTOALLV,
 ALLGATHER, ALLGATHERV, ALLREDUCE, REDUCE_SCATTER,REDUCE_SCATTERV, BARRIER}
@@ -35,22 +35,28 @@ SCATTER, SCATTERV, FANOUT} where one participant contributes to the result, and
 all participants receive the result. The participant contributing to the result
 is designated as root.
 
-+ The UCC\_COLL\_TYPE\_BCAST operation moves the data from the src buffer of
-root participant to the dest buffer of all participants.
++ The UCC\_COLL\_TYPE\_BCAST operation moves the data from the root participant
+to all participants in the team.
 
 + The UCC\_COLL\_TYPE\_BARRIER synchronizes all participants of the collective
 operation. In this routine, first, each participant waits for all other
 participants to enter the operation. Then, once it learns the entry of all other
 participants into the operation, it exits the operation completing it locally.
 
-+ The UCC\_COLL\_TYPE\_FANIN gathers the data from all participants in the team
-to the root participant. Each participant sends the same amount of data to the
-root. The src buffer on root and dest buffer on non-root
-participants is not defined.
++ In the UCC\_COLL\_TYPE\_FAN\_IN operation, the root participant synchronizes
+with all participants of the team. In this operation, the non-root completes
+when it sends synchronizing message to the root and receives an acknowledgment.
+Unlike UCC\_COLL\_TYPE\_BARRIER, it doesn’t have to synchronize with the rest of
+the non-root participants. The root participant completes the operation when it
+receives synchronizing messages from all non-root participants of the team.
 
-+ The UCC\_COLL\_TYPE\_FANOUT scatters the data from the root to the all
-participants in the team. The root sends the same of data to all participants.
-The dest buffer on root and src buffer on non-root participants is not defined.
+
++ In the UCC\_COLL\_TYPE\_FAN\_OUT operation, the root participant sends a
+synchronizing message to all non-root participants. The root participant
+completes once it receives an acknowledgment for the synchronizing message from
+all non-root participants. The non-root participant completes once it receives a
+message from the root participant.
+
 
 + In the UCC\_COLL\_TYPE\_GATHER operation, each participant of the collective
 operation sends data to the root participant. All participants send the same
@@ -65,10 +71,22 @@ example, if the participants’ endpoints are ordered as “ep\_a” to “ep\_n
 data from the participant with ep_i is placed as an “ith” block on the receive
 buffer.
 
++ The UCC\_COLL\_TYPE\_ALLGATHER operation is similar to UCC\_COLL\_TYPE\_GATHER
+with one exception. Unlike in GATHER operation, the result is available at all
+participants’ receive buffer instead of only at the root participant.
+
+    Each participant sends the data of size "block_size" to all other participants
+in the collective operation. The size of the block is “dt\_elem\_size * count”.
+Here, the “count” represents the number of data elements. The "dt_elem_size"
+represents the size of the data element in bytes. The data on each participant
+is placed in the receive buffer ordered by the “ep” ordering. For example, if
+the participants’ endpoints are ordered as “ep\_a” to “ep\_n”, the data from the
+participant with ep_i is placed as an “ith” block on the receive buffer.
+
 + In the UCC\_COLL\_TYPE\_SCATTER operation, the root participant of the
 collective operation sends data to all other participants. It sends the same
 amount of data (block_size) to all participants. The size of the block
-(block_size) is “dt_elem_size * count”. The total amount of data received by the
+(block_size) is “dt_elem_size * count”. The total amount of data sent by the
 root is equal to block_size * num\_participants. Here, the “count” represents the
 number of data elements. The "dt_elem_size" represents the size of the data
 element in bytes. The "num_participants" define the number of participants in
@@ -98,9 +116,9 @@ participants. The size of src buffer and dst buffer is the same, which is equal
 to “dt_elem_size * count”. Here, the “count” represents the number of data
 elements. The "dt_elem_size" represents the size of the data element in bytes.
 
-+ The UCC\_COLL\_TYPE\_REDUCE\_SCATTER first performs a element-wise
-reduction on the src buffer and then scatters the result to the dst buffer. If
-the size of src buffer is “count * dt_elem_size”, where dt_elem_size is the
++ The UCC\_COLL\_TYPE\_REDUCE\_SCATTER first performs an element-wise
+reduction on the src buffer and then scatters the result to the dst buffer. The
+size of src buffer is “count * dt_elem_size”, where dt_elem_size is the
 number of bytes for the data type element and count is the number of elements of
 that datatype. Assuming the result can be divided into “n” blocks, the ith block
 is placed in the receive buffer of endpoint “i”. Like other collectives, for
