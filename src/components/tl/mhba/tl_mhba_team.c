@@ -79,9 +79,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
         ucc_derived_of(tl_context, ucc_tl_mhba_context_t);
     ucc_sbgp_t *  node, *net;
     size_t        storage_size;
-    int i,j,node_size;
-    void *ctrl_addr;
+    int           i, j, node_size, ppn, team_size, nnodes;
+    void         *ctrl_addr;
     ucc_tl_mhba_ctrl_t *rank_ctrl;
+    ucc_topo_t         *topo;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
@@ -91,16 +92,43 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
     node_size = node->group_size;
     net       = ucc_topo_get_sbgp(UCC_TL_CORE_TEAM(self)->topo,
                                   UCC_SBGP_NODE_LEADERS);
+    topo      = UCC_TL_CORE_TEAM(self)->topo;
+    nnodes    = ucc_topo_nnodes(topo);
 
     if (net->status == UCC_SBGP_NOT_EXISTS) {
         tl_debug(tl_context->lib, "disabling mhba for single node team");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (net->group_size == UCC_TL_TEAM_SIZE(self)) {
+    if (nnodes == UCC_TL_TEAM_SIZE(self)) {
         tl_debug(tl_context->lib, "disabling mhba for ppn=1 case, not supported so far");
         return UCC_ERR_NOT_SUPPORTED;
     }
+
+    if (!topo ||
+        ucc_topo_min_ppn(topo) != ucc_topo_max_ppn(topo)) {
+        tl_debug(tl_context->lib,
+                 "disabling mhba for team with non-uniform ppn, "
+                 "min_ppn %d, max_ppn %d",
+                 ucc_topo_min_ppn(topo), ucc_topo_max_ppn(topo));
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    ppn       = ucc_topo_max_ppn(topo);
+    team_size = UCC_TL_TEAM_SIZE(self);
+    ucc_assert(team_size  == ppn * nnodes);
+
+    for (i = 0; i < nnodes; i++) {
+        for (j = 1; j < ppn; j++) {
+            if (!ucc_team_ranks_on_same_node(i * ppn, i * ppn + j,
+                                             UCC_TL_CORE_TEAM(self))) {
+                tl_debug(tl_context->lib,
+                         "disabling mhba for team with non contiguous "
+                         "ranks-per-node placement");
+                return UCC_ERR_NOT_SUPPORTED;
+            }
+        }
+    }
+
 
     tl_info(tl_context->lib, "posted tl team: %p", self);
 
