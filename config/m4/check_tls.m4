@@ -7,6 +7,7 @@ AC_DEFUN([CHECK_TLS],[
     AC_ARG_WITH([tls],
         [AS_HELP_STRING([--with-tls=(tl1,tl2 | all)], [Enable build of TLs])],
         [TLS_REQUIRED=${with_tls}], [TLS_REQUIRED=all])
+    AS_IF([test "x$with_docs_only" = xyes], TLS_REQUIRED="")
     m4_include([config/m4/tls_list.m4])
 ])
 

@@ -13,6 +13,16 @@ TestBarrier::TestBarrier(ucc_test_team_t &team) : TestCase(team)
     UCC_CHECK(ucc_collective_init(&args, &req, team.team));
 }
 
+ucc_status_t TestBarrier::set_input()
+{
+    return UCC_OK;
+}
+
+ucc_status_t TestBarrier::reset_sbuf()
+{
+    return UCC_OK;
+}
+
 ucc_status_t TestBarrier::check()
 {
     return status;

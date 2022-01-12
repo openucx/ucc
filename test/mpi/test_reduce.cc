@@ -45,9 +45,8 @@ TestReduce::TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
-    init_buffer((inplace && rank == root) ? rbuf : sbuf, count, dt, _mt, rank);
-    UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST,
-                       (inplace && rank == root) ? rbuf : sbuf, _mt, _msgsize);
+    UCC_CHECK(ucc_mc_alloc(&check_sbuf_mc_header, _msgsize,
+                           UCC_MEMORY_TYPE_HOST));
     check_sbuf = check_sbuf_mc_header->addr;
 
     args.op                   = _op;
@@ -56,7 +55,33 @@ TestReduce::TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     args.src.info.datatype    = _dt;
     args.src.info.mem_type    = _mt;
     args.root                 = root;
+    UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
+}
+
+ucc_status_t TestReduce::set_input()
+{
+    size_t dt_size = ucc_dt_size(dt);
+    size_t count   = msgsize / dt_size;
+    int rank;
+    void *buf;
+
+    MPI_Comm_rank(team.comm, &rank);
+    if (inplace && rank == root) {
+        buf = rbuf;
+    } else {
+        buf = sbuf;
+    }
+
+    init_buffer(buf, count, dt, mem_type, rank);
+    UCC_CHECK(ucc_mc_memcpy(check_sbuf, buf, count * dt_size,
+                            UCC_MEMORY_TYPE_HOST, mem_type));
+    return UCC_OK;
+}
+
+ucc_status_t TestReduce::reset_sbuf()
+{
+    return UCC_OK;
 }
 
 ucc_status_t TestReduce::check()
