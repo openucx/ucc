@@ -12,11 +12,12 @@
 TestBcast::TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                      ucc_memory_type_t _mt, int _root, ucc_test_team_t &_team,
                      size_t _max_size) :
-    TestCase(_team, _mt, _msgsize, _inplace, _max_size)
+    TestCase(_team, UCC_COLL_TYPE_BCAST, _mt, _msgsize, _inplace, _max_size)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
-    size_t count = _msgsize / dt_size;
+    size_t count   = _msgsize / dt_size;
     int rank, size;
+
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
     root = _root;
@@ -26,15 +27,11 @@ TestBcast::TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
-    check_rbuf = ucc_malloc(_msgsize * size, "check rbuf");
-    UCC_MALLOC_CHECK(check_rbuf);
+    check_buf = ucc_malloc(_msgsize, "check buf");
+    UCC_MALLOC_CHECK(check_buf);
     UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
     sbuf = sbuf_mc_header->addr;
-    UCC_CHECK(
-        ucc_mc_alloc(&check_sbuf_mc_header, _msgsize, UCC_MEMORY_TYPE_HOST));
-    check_sbuf = check_sbuf_mc_header->addr;
 
-    args.coll_type         = UCC_COLL_TYPE_BCAST;
     args.src.info.buffer   = sbuf;
     args.src.info.count    = count;
     args.src.info.datatype = TEST_DT;
@@ -47,13 +44,13 @@ TestBcast::TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 ucc_status_t TestBcast::set_input()
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
-    size_t count = msgsize / dt_size;
-    int rank;
+    size_t count   = msgsize / dt_size;
+    int    rank;
 
     MPI_Comm_rank(team.comm, &rank);
     if (rank == root) {
         init_buffer(sbuf, count, TEST_DT, mem_type, rank);
-        UCC_CHECK(ucc_mc_memcpy(check_sbuf, sbuf, count * dt_size,
+        UCC_CHECK(ucc_mc_memcpy(check_buf, sbuf, count * dt_size,
                   UCC_MEMORY_TYPE_HOST, mem_type));
     }
     return UCC_OK;
@@ -72,12 +69,12 @@ ucc_status_t TestBcast::check()
     MPI_Request  req;
 
     MPI_Comm_rank(team.comm, &rank);
-    MPI_Ibcast((rank == root) ? check_sbuf : check_rbuf, count, dt, root, team.comm, &req);
+    MPI_Ibcast(check_buf, count, dt, root, team.comm, &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
     } while(!completed);
 
     return (rank == root) ? UCC_OK :
-        compare_buffers(sbuf, check_rbuf, count, TEST_DT, mem_type);
+        compare_buffers(sbuf, check_buf, count, TEST_DT, mem_type);
 }

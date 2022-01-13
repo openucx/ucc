@@ -159,20 +159,22 @@ test_skip_cause_t TestCase::skip_reduce(test_skip_cause_t cause, MPI_Comm comm)
     return skip_reduce(1, cause, comm);
 }
 
-TestCase::TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type,
+TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
+                   ucc_memory_type_t _mem_type,
                    size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                    size_t _max_size) :
     team(_team), mem_type(_mem_type),  msgsize(_msgsize), inplace(_inplace),
     test_max_size(_max_size)
 {
     int rank;
-    sbuf      = NULL;
-    rbuf      = NULL;
-    check_sbuf = NULL;
-    check_rbuf = NULL;
-    test_skip = TEST_SKIP_NONE;
-    args.flags = 0;
-    args.mask = 0;
+
+    sbuf           = NULL;
+    rbuf           = NULL;
+    check_buf      = NULL;
+    test_skip      = TEST_SKIP_NONE;
+    args.flags     = 0;
+    args.mask      = 0;
+    args.coll_type = ct;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Irecv((void*)progress_buf, 1, MPI_CHAR, rank, 0, MPI_COMM_WORLD,
@@ -194,10 +196,7 @@ TestCase::~TestCase()
     if (rbuf) {
         UCC_CHECK(ucc_mc_free(rbuf_mc_header));
     }
-    if (check_sbuf) {
-        UCC_CHECK(ucc_mc_free(check_sbuf_mc_header));
-    }
-    if (check_rbuf) {
-        ucc_free(check_rbuf);
+    if (check_buf) {
+        ucc_free(check_buf);
     }
 }

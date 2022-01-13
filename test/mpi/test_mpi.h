@@ -170,12 +170,10 @@ protected:
     ucc_test_mpi_inplace_t inplace;
     ucc_coll_args_t args;
     ucc_coll_req_h req;
-    ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header,
-        *check_sbuf_mc_header;
+    ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header;
     void *sbuf;
     void *rbuf;
-    void *check_sbuf;
-    void *check_rbuf;
+    void *check_buf;
     MPI_Request progress_request;
     uint8_t     progress_buf[1];
     size_t test_max_size;
@@ -207,7 +205,8 @@ public:
             ucc_reduction_op_t op = UCC_OP_SUM,
             ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
             ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT);
-    TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
+    TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
+             ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
              size_t _msgsize = 0, ucc_test_mpi_inplace_t _inplace = TEST_NO_INPLACE,
              size_t _max_size = TEST_UCC_RANK_BUF_SIZE_MAX);
     virtual ~TestCase();
