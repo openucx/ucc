@@ -1,4 +1,4 @@
-## Starting and Completing the Collectives
+## Types of Collective Operations
 
 A UCC collective operation is a group communication operation among the
 participants of the team. All participants of the team are required to call the
@@ -44,18 +44,17 @@ participants to enter the operation. Then, once it learns the entry of all other
 participants into the operation, it exits the operation completing it locally.
 
 + In the UCC\_COLL\_TYPE\_FAN\_IN operation, the root participant synchronizes
-with all participants of the team. In this operation, the non-root completes
-when it sends synchronizing message to the root and receives an acknowledgment.
-Unlike UCC\_COLL\_TYPE\_BARRIER, it doesn’t have to synchronize with the rest of
-the non-root participants. The root participant completes the operation when it
-receives synchronizing messages from all non-root participants of the team.
+with all participants of the team. The non-root completes when it sends
+synchronizing message to the root. Unlike UCC\_COLL\_TYPE\_BARRIER, it doesn’t
+have to synchronize with the rest of the non-root participants. The root
+participant completes the operation when it receives synchronizing messages from
+all non-root participants of the team.
 
 
-+ In the UCC\_COLL\_TYPE\_FAN\_OUT operation, the root participant sends a
-synchronizing message to all non-root participants. The root participant
-completes once it receives an acknowledgment for the synchronizing message from
-all non-root participants. The non-root participant completes once it receives a
-message from the root participant.
++ The UCC\_COLL\_TYPE\_FAN\_OUT operation is a synchronizing operation like
+UCC\_COLL\_TYPE\_FAN\_OUT. In this operation, the root participant sends a
+synchronizing message to all non-root participants and completes. The non-root
+participant completes once it receives a message from the root participant.
 
 
 + In the UCC\_COLL\_TYPE\_GATHER operation, each participant of the collective
@@ -65,7 +64,7 @@ amount of data (block\_size) to the root. The size of the block is
 to block_size * num\_participants. Here, the “count” represents the number of
 data elements. The
 "dt_elem_size" represents the size of the data element in bytes. The
-"num_participants" define the number of participants in the team. The data on
+"num_participants" represents the number of participants in the team. The data on
 the root is placed in the receive buffer ordered by the “ep” ordering. For
 example, if the participants’ endpoints are ordered as “ep\_a” to “ep\_n”, the
 data from the participant with ep_i is placed as an “ith” block on the receive
@@ -89,14 +88,14 @@ amount of data (block_size) to all participants. The size of the block
 (block_size) is “dt_elem_size * count”. The total amount of data sent by the
 root is equal to block_size * num\_participants. Here, the “count” represents the
 number of data elements. The "dt_elem_size" represents the size of the data
-element in bytes. The "num_participants" define the number of participants in
+element in bytes. The "num_participants" represents the number of participants in
 the team.
 
 + In the UCC\_COLL\_TYPE\_ALLTOALL collective operation, all participants
 exchange a fixed amount of the data. For a given participant, the size of data
 in src buffer is “size”, where size is dt\_elem\_size * count * num_participants.
 Here, the “count” represents the number of data elements. The "dt_elem_size"
-represents the size of the data element in bytes. The "num_participants" define
+represents the size of the data element in bytes. The "num_participants" represents
 the number of participants in the team. The size of src buffer is the same as
 the dest buffer, and it is the same across all participants. Each participant
 exchanges “dt\_elem\_size * count “ data with every participant of the collective.
@@ -116,13 +115,15 @@ participants. The size of src buffer and dst buffer is the same, which is equal
 to “dt_elem_size * count”. Here, the “count” represents the number of data
 elements. The "dt_elem_size" represents the size of the data element in bytes.
 
-+ The UCC\_COLL\_TYPE\_REDUCE\_SCATTER first performs an element-wise
-reduction on the src buffer and then scatters the result to the dst buffer. The
-size of src buffer is “count * dt_elem_size”, where dt_elem_size is the
-number of bytes for the data type element and count is the number of elements of
-that datatype. Assuming the result can be divided into “n” blocks, the ith block
-is placed in the receive buffer of endpoint “i”. Like other collectives, for
-this collective, the “ep” should be ordered and contiguous.
++ The UCC\_COLL\_TYPE\_REDUCE\_SCATTER first performs an element-wise reduction
+on the src buffer and then scatters the result to the dst buffer. The "size" of
+src buffer is “count * dt_elem_size”, where dt_elem_size is the number of bytes
+for the data type element and count is the number of elements of that datatype.
+It is the user’s responsibility to ensure that data and the result are
+equally divisible among the participants. Assuming that the result is
+divided into “n” blocks, the ith block is placed in the receive buffer
+of endpoint “i”. Like other collectives, for this collective, the “ep”
+should be ordered and contiguous.
 
 
 **INPLACE**: When INPLACE is set for UCC\_COLL\_TYPE\_REDUCE\_SCATTER,
