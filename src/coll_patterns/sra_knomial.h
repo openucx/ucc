@@ -19,7 +19,7 @@ static inline ucc_rank_t ucc_kn_compute_step_radix(ucc_rank_t             rank,
                                               : p->radix;
 }
 
-// segment index in exchange group of tree
+/* segment index in exchange group of tree */
 static inline ucc_rank_t ucc_kn_compute_seg_index(ucc_rank_t peer,
                                                   ucc_rank_t kpow_num,
                                                   ucc_knomial_pattern_t *p)
@@ -145,7 +145,7 @@ static inline void ucc_kn_agx_pattern_init(ucc_rank_t size, ucc_rank_t rank,
     p->type  = KN_PATTERN_ALLGATHERX;
     p->count = count;
     if (p->node_type != KN_NODE_EXTRA) {
-        p->block_size   = ucc_kn_compute_step_radix(p->rank, p->size, p);
+        p->block_size = ucc_kn_compute_step_radix(p->rank, p->size, p);
         ucc_knx_block(rank, size, radix, count, p->n_iters - 1,
                       &p->block_size_counts, &p->block_offset);
 
@@ -189,9 +189,11 @@ static inline void ucc_kn_ag_pattern_next_iter(ucc_knomial_pattern_t *p)
     ucc_rank_t rank;
     if (p->type == KN_PATTERN_ALLGATHERX) {
         ucc_knomial_pattern_next_iteration_backward(p);
+
         if (!ucc_knomial_pattern_loop_done(p)) {
             ucc_knx_block(p->rank, p->size, p->radix, p->count,
-                          p->n_iters - 1 - p->iteration, &p->block_size_counts, &p->block_offset);
+                          p->n_iters - 1 - p->iteration,
+                          &p->block_size_counts, &p->block_offset);
         }
     } else {
         rank = ucc_knomial_pattern_loop_rank(p, p->rank);
@@ -270,13 +272,11 @@ static inline void ucc_kn_rs_pattern_peer_seg(ucc_rank_t             peer,
     if (p->type == KN_PATTERN_REDUCE_SCATTERX) {
         ucc_rank_t step_radix = ucc_kn_compute_step_radix(p->rank, p->size, p);
         ucc_rank_t seg_index  = ucc_kn_compute_seg_index(peer, p->radix_pow, p);
-        /* *peer_seg_offset = p->block_offset + */
-            /* ucc_buffer_block_offset(p->block_size_counts, step_radix, seg_index); */
         *peer_seg_offset =
-            ucc_buffer_block_offset(p->block_size_counts, step_radix, seg_index);
+           ucc_buffer_block_offset(p->block_size_counts, step_radix, seg_index);
         *peer_seg_count =
-            ucc_buffer_block_count(p->block_size_counts, step_radix,
-                                   seg_index);
+           ucc_buffer_block_count(p->block_size_counts, step_radix,
+                                  seg_index);
     } else {
         ucc_kn_seg_desc_compute(p, &s, peer);
 
@@ -362,12 +362,13 @@ static inline void ucc_kn_rsx_pattern_dst(ucc_rank_t size, ucc_rank_t rank,
 static inline size_t ucc_kn_rs_max_seg_count(ucc_knomial_pattern_t *p)
 {
     size_t count, seg_count, offset;
+
     if (KN_NODE_EXTRA == p->node_type) {
         return 0;
     }
 
     if (p->type == KN_PATTERN_REDUCE_SCATTERV) {
-        ucc_kn_radix_t radix = ucc_kn_compute_step_radix(p->rank, p->size, p);
+        ucc_kn_radix_t radix   = ucc_kn_compute_step_radix(p->rank, p->size, p);
         ucc_rank_t     step_size = (p->size - p->n_extra) / radix;
         ucc_rank_t     start, end, i;
 

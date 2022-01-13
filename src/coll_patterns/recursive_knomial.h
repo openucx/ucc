@@ -109,7 +109,7 @@ static inline void ucc_knomial_pattern_init_impl(ucc_rank_t             size,
     n_full       = ucc_kn_pattern_n_full(p);
     p->n_extra   = size - n_full * p->full_pow_size;
     p->radix     = radix;
-    p->n_iters =
+    p->n_iters   =
         (p->n_extra && n_full == 1) ? p->pow_radix_sup - 1 : p->pow_radix_sup;
     p->iteration    = 0;
     p->radix_pow    = ucc_kn_pattern_radix_pow_init(p, backward);

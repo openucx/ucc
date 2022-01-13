@@ -217,7 +217,7 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
     case UCC_COLL_TYPE_ALLGATHERV:
         switch (alg_id) {
         case UCC_TL_UCP_ALLGATHERV_ALG_KNOMIAL:
-            /* the fn below handles both allgather and allgather */
+            /* the fn below handles both allgather and allgatherv */
             *init = ucc_tl_ucp_allgather_knomial_init;
             break;
         case UCC_TL_UCP_ALLGATHERV_ALG_RING:
