@@ -1856,7 +1856,8 @@ typedef struct ucc_coll_args {
                                                              ucc_context_get_attr with
                                                              the field mask -
                                                              UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE
-                                                             set to 1. */
+                                                             set to 1. The buffer must be initialized
+                                                             to 0. */
     ucc_coll_callback_t             cb;
     double                          timeout; /*!< Timeout in seconds */
 } ucc_coll_args_t;
