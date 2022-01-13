@@ -412,8 +412,10 @@ class TestReduceScatterv : public TestCase {
     ucc_datatype_t     dt;
     ucc_reduction_op_t op;
     int *              counts;
-
+    size_t             total;
   public:
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     TestReduceScatterv(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
                        ucc_datatype_t _dt, ucc_reduction_op_t _op,
                        ucc_memory_type_t _mt, ucc_test_team_t &team,

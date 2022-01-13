@@ -34,7 +34,7 @@ TestReduceScatterv::TestReduceScatterv(size_t                 _msgsize,
     UCC_MALLOC_CHECK(counts);
 
     size_t left  = count;
-    size_t total = 0;
+    total = 0;
     for (int i = 0; i < comm_size; i++) {
         size_t c = 2 + i * 2;
         if (left < c) {
@@ -53,28 +53,18 @@ TestReduceScatterv::TestReduceScatterv(size_t                 _msgsize,
     }
     ucc_assert(total == count);
 
+    check_sbuf = ucc_malloc(total * dt_size, "check rbuf");
+    UCC_MALLOC_CHECK(check_sbuf);
     if (TEST_NO_INPLACE == inplace) {
-
         UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, counts[rank] * dt_size, _mt));
         rbuf       = rbuf_mc_header->addr;
-        check_rbuf = ucc_malloc(counts[rank] * dt_size, "check rbuf");
-        UCC_MALLOC_CHECK(check_rbuf);
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
         sbuf = sbuf_mc_header->addr;
-        init_buffer(sbuf, count, dt, _mt, rank);
-        UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST, sbuf,
-                           _mt, _msgsize);
-        check_sbuf = check_sbuf_mc_header->addr;
     } else {
         args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
-
         UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize, _mt));
         rbuf       = rbuf_mc_header->addr;
-        check_rbuf = ucc_malloc(_msgsize, "check rbuf");
-        UCC_MALLOC_CHECK(check_rbuf);
-        init_buffer(rbuf, count, dt, _mt, rank);
-        init_buffer(check_rbuf, count, dt, UCC_MEMORY_TYPE_HOST, rank);
     }
 
     args.op = _op;
@@ -89,20 +79,51 @@ TestReduceScatterv::TestReduceScatterv(size_t                 _msgsize,
     args.dst.info_v.buffer   = rbuf;
     args.dst.info_v.datatype = _dt;
     args.dst.info_v.mem_type = _mt;
+    UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
+}
+
+ucc_status_t TestReduceScatterv::set_input()
+{
+    size_t dt_size = ucc_dt_size(dt);
+    int rank;
+    void *buf;
+
+    MPI_Comm_rank(team.comm, &rank);
+    if (inplace == TEST_NO_INPLACE) {
+        buf       = sbuf;
+    } else {
+        buf       = rbuf;
+    }
+    init_buffer(buf, total, dt, mem_type, rank);
+    UCC_CHECK(ucc_mc_memcpy(check_sbuf, buf, total * dt_size,
+                            UCC_MEMORY_TYPE_HOST, mem_type));
+    return UCC_OK;
+}
+
+ucc_status_t TestReduceScatterv::reset_sbuf()
+{
+    return UCC_OK;
 }
 
 ucc_status_t TestReduceScatterv::check()
 {
     ucc_status_t status;
-    int          comm_rank, comm_size;
+    int          comm_rank, comm_size, completed;
+    MPI_Request  req;
 
     MPI_Comm_rank(team.comm, &comm_rank);
     MPI_Comm_size(team.comm, &comm_size);
-    MPI_Reduce_scatter(inplace ? MPI_IN_PLACE : check_sbuf, check_rbuf, counts,
-                       ucc_dt_to_mpi(dt),
-                       op == UCC_OP_AVG ? MPI_SUM : ucc_op_to_mpi(op),
-                       team.comm);
+    MPI_Ireduce_scatter(MPI_IN_PLACE, check_sbuf, counts,
+                        ucc_dt_to_mpi(dt),
+                        op == UCC_OP_AVG ? MPI_SUM : ucc_op_to_mpi(op),
+                        team.comm, &req);
+
+    do {
+        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
+        ucc_context_progress(team.ctx);
+    } while(!completed);
+
     if (op == UCC_OP_AVG) {
         status =
             divide_buffer(check_rbuf, team.team->size, counts[comm_rank], dt);
@@ -110,12 +131,7 @@ ucc_status_t TestReduceScatterv::check()
             return status;
         }
     }
-    if (inplace) {
-        ucc_assert(0);
-        // return compare_buffers(PTR_OFFSET(rbuf, comm_rank * block_size),
-        //                        check_rbuf, block_count, dt, mem_type);
-    }
-    return compare_buffers(rbuf, check_rbuf, counts[comm_rank], dt, mem_type);
+    return compare_buffers(rbuf, check_sbuf, counts[comm_rank], dt, mem_type);
 }
 
 TestReduceScatterv::~TestReduceScatterv()
@@ -123,6 +139,8 @@ TestReduceScatterv::~TestReduceScatterv()
     if (counts) {
         ucc_free(counts);
     }
+    ucc_free(check_sbuf);
+    check_sbuf = NULL;
 }
 
 std::string TestReduceScatterv::str()
