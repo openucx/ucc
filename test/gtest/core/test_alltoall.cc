@@ -52,7 +52,6 @@ public:
                 sbuf        = team->procs[i].p->onesided_buf[0];
                 rbuf        = team->procs[i].p->onesided_buf[1];
                 work_buf    = (long *)team->procs[i].p->onesided_buf[2];
-                work_buf[0] = -1; /* initialize for onesided a2a algorithm */
                 coll->mask  = UCC_COLL_ARGS_FIELD_FLAGS |
                              UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
                 coll->src.info.buffer = sbuf;

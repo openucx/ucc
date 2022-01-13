@@ -414,7 +414,7 @@ void proc_context_create_mem_params(UccProcess_h proc, int id,
     }
     for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
         proc->onesided_buf[i] =
-            ucc_malloc(UCC_TEST_MEM_SEGMENT_SIZE, "onesided_buffer");
+            ucc_calloc(UCC_TEST_MEM_SEGMENT_SIZE, 1, "onesided_buffer");
         EXPECT_NE(proc->onesided_buf[i], nullptr);
         map[i].address = proc->onesided_buf[i];
         map[i].len     = UCC_TEST_MEM_SEGMENT_SIZE;
