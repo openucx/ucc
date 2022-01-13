@@ -234,6 +234,7 @@ int ucc_coll_is_rooted(ucc_coll_type_t c)
     case UCC_COLL_TYPE_ALLTOALLV:
     case UCC_COLL_TYPE_BARRIER:
     case UCC_COLL_TYPE_REDUCE_SCATTER:
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
         return 0;
     default:
         return 1;

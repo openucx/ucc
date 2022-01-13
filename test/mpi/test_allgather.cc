@@ -17,6 +17,8 @@ TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t single_rank_count = _msgsize / dt_size;
     int rank, size;
+
+    args.coll_type         = UCC_COLL_TYPE_ALLGATHER;
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
 
@@ -40,7 +42,7 @@ TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 
-    args.coll_type         = UCC_COLL_TYPE_ALLGATHER;
+
     if (TEST_NO_INPLACE == inplace) {
         args.src.info.buffer   = sbuf;
         args.src.info.count    = single_rank_count;

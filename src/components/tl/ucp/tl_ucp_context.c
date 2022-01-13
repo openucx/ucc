@@ -116,7 +116,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     ucc_status = ucc_mpool_init(
         &self->req_mp, 0,
-        ucc_max(sizeof(ucc_tl_ucp_task_t), sizeof(ucc_schedule_pipelined_t)), 0,
+        ucc_max(sizeof(ucc_tl_ucp_task_t), sizeof(ucc_tl_ucp_schedule_t)), 0,
         UCC_CACHE_LINE_SIZE, 8, UINT_MAX, NULL, params->thread_mode,
         "tl_ucp_req_mp");
     if (UCC_OK != ucc_status) {

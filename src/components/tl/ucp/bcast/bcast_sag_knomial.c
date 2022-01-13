@@ -33,8 +33,7 @@
       However, if they are used together as part of SAG bcast one has to
       provide the same radix for both routines.
    6. After the completion of scatter phase the local result (at non EXTRA
-      ranks) will be located in dst buffer at offset the can be commputed by the
-      routine from coll_patterns/sra_knomial.h: ucc_sra_kn_get_offset.
+      ranks) will be located in dst buffer at offset defined by ucc_kn_rsx_pattern.
  */
 ucc_status_t ucc_tl_ucp_bcast_sag_knomial_start(ucc_coll_task_t *coll_task)
 {
@@ -62,9 +61,10 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
                                       ucc_coll_task_t     **task_h)
 {
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_schedule_t      *schedule = ucc_tl_ucp_get_schedule(tl_team, coll_args);
     size_t               count    = coll_args->args.src.info.count;
     ucc_base_coll_args_t args     = *coll_args;
+    ucc_schedule_t      *schedule =
+        &ucc_tl_ucp_get_schedule(tl_team, coll_args)->super.super;
     ucc_coll_task_t     *task, *rs_task;
     ucc_status_t         status;
     ucc_kn_radix_t       radix, cfg_radix;

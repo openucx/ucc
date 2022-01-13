@@ -78,7 +78,9 @@ static inline const char* ucc_coll_type_str(ucc_coll_type_t ct)
     case UCC_COLL_TYPE_FANOUT:
         return "Fanout";
     case UCC_COLL_TYPE_REDUCE_SCATTER:
-        return "Reduce scatter";
+        return "ReduceScatter";
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        return "ReduceScatterV";
     default:
         break;
     }

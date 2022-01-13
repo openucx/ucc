@@ -89,8 +89,8 @@
         const type *restrict s2 = (const type *restrict)src2_p;                \
         type *restrict       d  = (type * restrict) dest_p;                    \
         ucc_assert((ptrdiff_t)d <= (ptrdiff_t)src2_p ||                        \
-                   (ptrdiff_t)d > (ptrdiff_t)src2_p + (size - 1) * stride +    \
-                                      count * sizeof(type));                   \
+                   (ptrdiff_t)d >= (ptrdiff_t)src2_p + (size - 1) * stride +   \
+                                       count * sizeof(type));                  \
         switch (op) {                                                          \
         case UCC_OP_MAX:                                                       \
             DO_DT_REDUCE_WITH_OP(s1, s2, d, size, count, stride, DO_OP_MAX);   \
@@ -138,8 +138,8 @@
         const type *restrict s2 = (const type *restrict)src2_p;                \
         type *restrict       d  = (type * restrict) dest_p;                    \
         ucc_assert((ptrdiff_t)d <= (ptrdiff_t)src2_p ||                        \
-                   (ptrdiff_t)d > (ptrdiff_t)src2_p + (size - 1) * stride +    \
-                                      count * sizeof(type));                   \
+                   (ptrdiff_t)d >= (ptrdiff_t)src2_p + (size - 1) * stride +   \
+                                       count * sizeof(type));                  \
         switch (reduce_op) {                                                   \
         case UCC_OP_MAX:                                                       \
             DO_DT_REDUCE_WITH_OP(s1, s2, d, size, count, stride, DO_OP_MAX);   \

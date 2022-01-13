@@ -23,6 +23,7 @@ ucc_test_mpi_SOURCES = \
 	test_alltoall.cc       \
 	test_alltoallv.cc      \
         test_reduce_scatter.cc \
+        test_reduce_scatterv.cc \
         test_reduce.cc
 
 CXX=$(MPICXX)

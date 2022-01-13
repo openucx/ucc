@@ -7,8 +7,18 @@
 #include "tl_ucp.h"
 #include "allgather.h"
 
-ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *task);
-ucc_status_t ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *task);
+ucc_base_coll_alg_info_t
+    ucc_tl_ucp_allgather_algs[UCC_TL_UCP_ALLGATHER_ALG_LAST + 1] = {
+        [UCC_TL_UCP_ALLGATHER_ALG_KNOMIAL] =
+            {.id   = UCC_TL_UCP_ALLGATHER_ALG_KNOMIAL,
+             .name = "knomial",
+             .desc = "recursive k-ing with arbitrary radix "},
+        [UCC_TL_UCP_ALLGATHER_ALG_RING] =
+            {.id   = UCC_TL_UCP_ALLGATHER_ALG_RING,
+             .name = "ring",
+             .desc = "O(N) ring"},
+        [UCC_TL_UCP_ALLGATHER_ALG_LAST] = {
+            .id = 0, .name = NULL, .desc = NULL}};
 
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task)
 {
