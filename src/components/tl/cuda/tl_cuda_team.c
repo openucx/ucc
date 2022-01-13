@@ -93,6 +93,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     }
 ids_exchange:
     self->ids[UCC_TL_TEAM_SIZE(self)].device = ctx->device;
+    self->ids[UCC_TL_TEAM_SIZE(self)].pci_id = ctx->device_id;
     self->ids[UCC_TL_TEAM_SIZE(self)].shm    = shm_id;
     status = self->oob.allgather(&self->ids[UCC_TL_TEAM_SIZE(self)], self->ids,
                                  sizeof(ucc_tl_cuda_rank_id_t),
@@ -125,7 +126,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
 
     tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
     if (self->topo) {
-        ucc_tl_cuda_topo_destroy(self->topo);
+        ucc_tl_cuda_team_topo_destroy(self->topo);
     }
     if (self->ids) {
         if (self->sync != (void*)-1) {
@@ -200,12 +201,12 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     }
     team->oob.req_free(team->oob_req);
     team->oob_req = (void*)0x1;
-    status = ucc_tl_cuda_topo_create(team, &team->topo);
+    status = ucc_tl_cuda_team_topo_create(&team->super, &team->topo);
     if (status != UCC_OK) {
         goto exit_err;
     }
     if (UCC_TL_TEAM_LIB(team)->log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
-        ucc_tl_cuda_topo_print(team, team->topo);
+        ucc_tl_cuda_team_topo_print(&team->super, team->topo);
     }
     shm_id = team->ids[0].shm;
     if (shm_id < 0) {
