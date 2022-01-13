@@ -13,7 +13,7 @@
 #include <sharp/api/version.h>
 #include <sharp/api/sharp_coll.h>
 
-int ucc_to_sharp_dtype[] = {
+enum sharp_datatype ucc_to_sharp_dtype[] = {
     [UCC_DT_PREDEFINED_ID(UCC_DT_INT8)]     = SHARP_DTYPE_NULL,
     [UCC_DT_PREDEFINED_ID(UCC_DT_INT16)]    = SHARP_DTYPE_SHORT,
     [UCC_DT_PREDEFINED_ID(UCC_DT_INT32)]    = SHARP_DTYPE_INT,
@@ -31,7 +31,7 @@ int ucc_to_sharp_dtype[] = {
     [UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = SHARP_DTYPE_NULL,
 };
 
-int ucc_to_sharp_reduce_op[] = {
+enum sharp_reduce_op ucc_to_sharp_reduce_op[] = {
     [UCC_OP_SUM]         = SHARP_OP_SUM,
     [UCC_OP_PROD]        = SHARP_OP_NULL,
     [UCC_OP_MAX]         = SHARP_OP_MAX,
@@ -47,7 +47,7 @@ int ucc_to_sharp_reduce_op[] = {
     [UCC_OP_AVG]         = SHARP_OP_NULL,
 };
 
-int ucc_to_sharp_memtype[] = {
+enum sharp_data_memory_type ucc_to_sharp_memtype[] = {
     [UCC_MEMORY_TYPE_HOST]         = SHARP_MEM_TYPE_HOST,
     [UCC_MEMORY_TYPE_CUDA]         = SHARP_MEM_TYPE_CUDA,
     [UCC_MEMORY_TYPE_CUDA_MANAGED] = SHARP_MEM_TYPE_LAST,

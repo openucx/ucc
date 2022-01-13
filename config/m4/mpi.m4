@@ -26,9 +26,9 @@ AC_ARG_WITH([mpi],
 AS_IF([test "x$with_mpi" = xyes],
         [
         AC_ARG_VAR(MPICC,[MPI C compiler command])
-        AC_PATH_PROGS(MPICC,mpicc mpiicc,"",$mpi_path)
+        AC_PATH_PROGS(MPICC,mpiicc mpicc,"",$mpi_path)
         AC_ARG_VAR(MPICXX,[MPI CXX compiler command])
-        AC_PATH_PROGS(MPICXX,mpicxx mpiicpc,"",$mpi_path)
+        AC_PATH_PROGS(MPICXX,mpiicpc mpicxx,"",$mpi_path)
         AC_ARG_VAR(MPIRUN,[MPI launch command])
         AC_PATH_PROGS(MPIRUN,mpirun mpiexec aprun orterun,"",$mpi_path)
         AS_IF([test -z "$MPIRUN"],
