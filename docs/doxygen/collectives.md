@@ -25,8 +25,8 @@ the team are required to participate in the collective operations. Further the
 team should be created with endpoints, where the “eps” should be ordered and
 contiguous.
 
-UCC supports three types of collective operations: (a) UCC\_{ALLTOALL,ALLTOALLV,
-ALLGATHER, ALLGATHERV, ALLREDUCE, REDUCE_SCATTER,REDUCE_SCATTERV, BARRIER}
+UCC supports three types of collective operations: (a) UCC\_{ALLTOALL, ALLTOALLV,
+ALLGATHER, ALLGATHERV, ALLREDUCE, REDUCE_SCATTER, REDUCE_SCATTERV, BARRIER}
 operations where all participants contribute to the results and receive the
 results (b) UCC\_{REDUCE, GATHER, GATHERV, FANIN} where all participants
 contribute to the result and one participant receives the result. The
@@ -94,7 +94,7 @@ the team.
 + In the UCC\_COLL\_TYPE\_ALLTOALL collective operation, all participants
 exchange a fixed amount of the data. For a given participant, the size of data
 in src buffer is “size”, where size is dt\_elem\_size * count * num_participants.
-Here, the “count” represents the number of data elements. The "dt_elem_size"
+Here, the “count” represents the number of data elements per destination. The "dt_elem_size"
 represents the size of the data element in bytes. The "num_participants" represents
 the number of participants in the team. The size of src buffer is the same as
 the dest buffer, and it is the same across all participants. Each participant
@@ -139,7 +139,8 @@ parts (.i.e., ALLTOALL, SCATTER, GATHER, and REDUCE\_SCATTER) in that the
 location of data for the send and receive are specified by displacement arrays.
 
 **Reduction Types**: The reduction operation supported by UCC\_{ALLREDUCE,
-REDUCE} operation is defined by the enumeration ucc\_op\_t. The valid datatypes
+REDUCE, REDUCE\_SCATTER, REDUCE\_SCATTERV} operation is defined by the
+enumeration ucc\_reduction\_op\_t. The valid datatypes
 for the reduction is defined by the enumeration ucc\_datatype\_t.
 
 \b Ordering: The team can be configured for ordered collective operations or
@@ -159,12 +160,14 @@ the user to ensure the readiness of the buffer. On exit, the participants may
 exit once the read and write to the local buffers are completed.
 
 \b Buffer Ownership: The ownership of input and output buffers are transferred
-from the user to the library after invoking the ucc\_collective\_init routine
-and on return from the routine, the ownership is transferred back to the user.
+from the user to the library after invoking the ucc\_collective\_init routine.
+On return from the routine, the ownership is transferred back to the user on
+ucc\_collective\_finalize.
 However, after invoking and returning from ucc\_collective\_post or
 ucc\_collective\_init\_and\_post routines, the ownership stays with the library
 and it is returned to the user, when the collective is completed.
 
-\b The table below lists the necessary fields that user must initialize depending on the cllective operation type.
+\b The table below lists the necessary fields that user must initialize
+depending on the collective operation type.
 \image latex ucc\_coll\_args\_table1.pdf width=\textwidth
 \image latex ucc\_coll\_args\_table2.pdf width=\textwidth
