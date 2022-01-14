@@ -86,7 +86,7 @@ typedef struct ucc_tl_ucp_remote_info {
     size_t len;
     void * mem_h;
     void * packed_key;
-    void * rkey;
+    size_t packed_key_len;
 } ucc_tl_ucp_remote_info_t;
 
 typedef struct ucc_tl_ucp_context {
@@ -99,7 +99,8 @@ typedef struct ucc_tl_ucp_context {
     ucc_mpool_t                 req_mp;
     tl_ucp_ep_hash_t *          ep_hash;
     ucp_ep_h *                  eps;
-    ucc_tl_ucp_remote_info_t ** remote_info;
+    ucc_tl_ucp_remote_info_t *  remote_info;
+    ucp_rkey_h **               rkeys;
     uint64_t                    n_rinfo_segs;
     uint64_t                    ucp_memory_types;
 } ucc_tl_ucp_context_t;

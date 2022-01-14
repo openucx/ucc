@@ -216,31 +216,42 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
 {
     ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
     ucc_rank_t            core_rank;
+    uint64_t * rvas;
+    uint64_t * lens;
+    uint64_t * key_sizes;
+    void * keys;
+    ptrdiff_t base_offset;
+    ptrdiff_t key_offset = 0;
+    const size_t section_offset = sizeof(uint64_t) * ctx->n_rinfo_segs;
     *segment = 0;
+    ucc_context_addr_header_t *h;
 
-    for (int i = 0; i < ctx->n_rinfo_segs; i++) {
-        if (va >= team->va_base[i] &&
-            va < team->va_base[i] + team->base_length[i]) {
-            *segment = i;
-            break;
-        }
-    }
-    if (*segment == ctx->n_rinfo_segs) {
-        return UCC_ERR_NOT_FOUND;
-    }
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
     ucc_assert(UCC_TL_CORE_TEAM(team));
     peer = ucc_get_ctx_rank(UCC_TL_CORE_TEAM(team), core_rank);
-    if (NULL == ctx->remote_info[peer][*segment].rkey) {
-        ucs_status_t ucs_status = ucp_ep_rkey_unpack(
-            *ep, ctx->remote_info[peer][*segment].packed_key,
-            (ucp_rkey_h *)&ctx->remote_info[peer][*segment].rkey);
+
+    h = UCC_ADDR_STORAGE_RANK_HEADER(&ctx->super.super.ucc_context->addr_storage, peer); 
+    base_offset = (ptrdiff_t)PTR_OFFSET(h, h->components[0].offset + ctx->ucp_addrlen);
+    rvas = (uint64_t *)base_offset;
+    lens = PTR_OFFSET(base_offset, section_offset);
+    key_sizes = PTR_OFFSET(base_offset, (section_offset * 2));
+    keys = PTR_OFFSET(base_offset, (section_offset * 3));
+    
+    for (int i = 0; i < ctx->n_rinfo_segs; i++) {
+        if ((uint64_t)va >= rvas[i] && (uint64_t)va < rvas[i] + lens[i]) {
+            *segment = i;
+            break;
+        }
+        key_offset += key_sizes[i];
+    }
+    if (NULL == ctx->rkeys[peer][*segment]) {
+        ucs_status_t ucs_status = ucp_ep_rkey_unpack(*ep, PTR_OFFSET(keys, key_offset), &ctx->rkeys[peer][*segment]);
         if (UCS_OK != ucs_status) {
             return ucs_status_to_ucc_status(ucs_status);
         }
     }
-    *rkey = ctx->remote_info[peer][*segment].rkey;
-    *rva  = (uint64_t)ctx->remote_info[peer][*segment].va_base;
+    *rkey = ctx->rkeys[peer][*segment];
+    *rva = rvas[*segment] + ((uint64_t)va - rvas[*segment]);
     return UCC_OK;
 }
 
@@ -308,9 +319,6 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
         return status;
     }
 
-    rva = (uint64_t)PTR_OFFSET(
-        rva, ((ptrdiff_t)target - (ptrdiff_t)team->va_base[segment]));
-
     req_param.op_attr_mask =
         UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA;
     req_param.cb.send   = ucc_tl_ucp_send_completion_cb;
@@ -353,8 +361,6 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
-    rva = (uint64_t)PTR_OFFSET(
-        rva, ((ptrdiff_t)target - (ptrdiff_t)team->va_base[segment]));
 
     req_param.op_attr_mask =
         UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA;
@@ -398,9 +404,6 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
-
-    rva = (uint64_t)PTR_OFFSET(
-        rva, ((ptrdiff_t)target - (ptrdiff_t)team->va_base[segment]));
 
     req_param.op_attr_mask = UCP_OP_ATTR_FIELD_DATATYPE;
     req_param.datatype     = ucp_dt_make_contig(sizeof(uint64_t));
