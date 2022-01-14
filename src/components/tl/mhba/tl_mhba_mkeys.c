@@ -369,7 +369,7 @@ ucc_status_t ucc_tl_mhba_populate_send_recv_mkeys(ucc_tl_mhba_team_t *    team,
             status = populate_strided_mkey(
                 team, send_mem_access_flags,
                 node->ops[req->seq_index].send_mkeys[i],
-                node->ops[req->seq_index].send_umr_data[i], repeat_count);
+                SEND_UMR_DATA(req, team, i), repeat_count);
             if (status != UCC_OK) {
                 tl_error(UCC_TL_MHBA_TEAM_LIB(team),
                          "Failed to populate send umr[%d,%d]", req->seq_index,
@@ -384,7 +384,7 @@ ucc_status_t ucc_tl_mhba_populate_send_recv_mkeys(ucc_tl_mhba_team_t *    team,
             status = populate_strided_mkey(
                 team, recv_mem_access_flags,
                 node->ops[req->seq_index].recv_mkeys[i],
-                node->ops[req->seq_index].recv_umr_data[i], repeat_count);
+                RECV_UMR_DATA(req, team, i), repeat_count);
             if (status != UCC_OK) {
                 tl_error(UCC_TL_MHBA_TEAM_LIB(team),
                          "Failed to populate recv umr[%d,%d]", req->seq_index,
@@ -401,6 +401,9 @@ static void update_mkey_entry(ucc_tl_mhba_node_t *    node,
                               ucc_tl_mhba_lib_t *lib)
 {
     struct mlx5dv_mr_interleaved *mkey_entry;
+    ucc_tl_mhba_team_t *    team =
+        ucc_derived_of(req->super.super.team, ucc_tl_mhba_team_t);
+
     struct ibv_mr *buff = direction_send ? req->send_rcache_region_p->mr
                                          : req->recv_rcache_region_p->mr;
     int            i;
@@ -408,8 +411,8 @@ static void update_mkey_entry(ucc_tl_mhba_node_t *    node,
         mkey_entry =
             (struct mlx5dv_mr_interleaved
                  *)(direction_send
-                        ? node->ops[req->seq_index].my_send_umr_data[0]
-                        : node->ops[req->seq_index].my_recv_umr_data[0]);
+                    ? MY_SEND_UMR_DATA(req, team, 0)
+                    : MY_RECV_UMR_DATA(req, team, 0));
         mkey_entry->addr        = (uintptr_t)buff->addr;
         mkey_entry->bytes_count = req->block_size * req->msg_size;
         mkey_entry->bytes_skip  = 0;
@@ -425,8 +428,8 @@ static void update_mkey_entry(ucc_tl_mhba_node_t *    node,
             mkey_entry =
                 (struct mlx5dv_mr_interleaved
                      *)(direction_send
-                            ? node->ops[req->seq_index].my_send_umr_data[i]
-                            : node->ops[req->seq_index].my_recv_umr_data[i]);
+                    ? MY_SEND_UMR_DATA(req, team, i)
+                    : MY_RECV_UMR_DATA(req, team, i));
             mkey_entry->addr =
                 (uintptr_t)buff->addr + i * (req->block_size * req->msg_size);
             mkey_entry->bytes_count =

@@ -13,6 +13,7 @@
 #include "utils/ucc_rcache.h"
 #include <infiniband/verbs.h>
 #include <infiniband/mlx5dv.h>
+#include "utils/arch/cpu.h"
 /* #include "tl_mhba_mkeys.h" */
 
 #ifndef UCC_TL_MHBA_DEFAULT_SCORE
@@ -26,8 +27,6 @@
 #endif
 
 #define MHBA_ASR_RANK                0
-#define MHBA_CTRL_SIZE               128 //todo change according to arch
-#define MHBA_DATA_SIZE               sizeof(struct mlx5dv_mr_interleaved)
 #define MHBA_NUM_OF_BLOCKS_SIZE_BINS 8
 #define MAX_TRANSPOSE_SIZE           8192 // HW transpose unit is limited to matrix size
 #define MAX_MSG_SIZE                 128 // HW transpose unit is limited to element size
@@ -88,17 +87,33 @@ UCC_CLASS_DECLARE(ucc_tl_mhba_context_t, const ucc_base_context_params_t *,
 typedef struct ucc_tl_mhba_task ucc_tl_mhba_task_t;
 
 typedef struct ucc_tl_mhba_ctrl {
-    int     seq_num;
-    uint8_t mkey_cache_flag;
+    union {
+        struct {
+            volatile int seq_num;
+            int mkey_cache_flag;
+        };
+        char tmp[UCC_CACHE_LINE_SIZE];
+    };
 } ucc_tl_mhba_ctrl_t;
 
+typedef struct ucc_tl_mhba_net_ctrl {
+    union {
+        struct {
+            int atomic_counter;
+            int barrier_seq_num[2];
+        };
+        char tmp[UCC_CACHE_LINE_SIZE];
+    };
+} ucc_tl_mhba_net_ctrl_t;
+
+
+typedef struct mlx5dv_mr_interleaved umr_t;
+
+
 typedef struct ucc_tl_mhba_op {
-    void *               ctrl;
-    ucc_tl_mhba_ctrl_t * my_ctrl;
-    void **              send_umr_data;
-    void **              my_send_umr_data;
-    void **              recv_umr_data;
-    void **              my_recv_umr_data;
+    ucc_tl_mhba_net_ctrl_t *net_ctrl;
+    ucc_tl_mhba_ctrl_t *ctrl;
+    ucc_tl_mhba_ctrl_t *my_ctrl;
     struct mlx5dv_mkey **send_mkeys;
     struct mlx5dv_mkey **recv_mkeys;
 } ucc_tl_mhba_op_t;
@@ -219,6 +234,7 @@ typedef struct ucc_tl_mhba_team {
     void *                   oob_req;
     ucc_tl_mhba_bcast_data_t bcast_data;
     ucc_status_t             status;
+    ucc_rank_t               node_size;
 } ucc_tl_mhba_team_t;
 UCC_CLASS_DECLARE(ucc_tl_mhba_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
@@ -260,8 +276,8 @@ ucc_status_t ucc_tl_mhba_asr_socket_init(ucc_tl_mhba_context_t *ctx, ucc_rank_t 
 static inline ucc_tl_mhba_ctrl_t *ucc_tl_mhba_get_ctrl(ucc_tl_mhba_team_t *team,
                                                        int op_index, int rank)
 {
-	ucc_tl_mhba_ctrl_t * ctrl =  (ucc_tl_mhba_ctrl_t *)((ptrdiff_t)team->node.ops[op_index].ctrl +
-                                  MHBA_CTRL_SIZE * rank);
+	ucc_tl_mhba_ctrl_t * ctrl =  PTR_OFFSET(team->node.ops[op_index].ctrl,
+                                            sizeof(ucc_tl_mhba_ctrl_t) * rank);
 	return ctrl;
 }
 
@@ -272,4 +288,34 @@ static inline ucc_tl_mhba_ctrl_t *ucc_tl_mhba_get_my_ctrl(ucc_tl_mhba_team_t *te
     return ucc_tl_mhba_get_ctrl(team, op_index, my_rank);
 }
 
+
+#define OP_SEGMENT_SIZE(_team) \
+    (sizeof(ucc_tl_mhba_net_ctrl_t) + sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size + \
+     (sizeof(umr_t) * (_team)->max_num_of_columns * (_team)->node_size) * 2)
+
+#define NODE_CTRL_OFFSET (sizeof(ucc_tl_mhba_net_ctrl_t))
+#define UMR_DATA_OFFSET(_team) (NODE_CTRL_OFFSET + sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size)
+
+
+#define OP_UMR_DATA(_req, _team) \
+    PTR_OFFSET((_team)->node.storage,\
+               OP_SEGMENT_SIZE(_team) * (_req)->seq_index + UMR_DATA_OFFSET(_team))
+
+
+#define SEND_UMR_DATA(_req, _team, _col)                                     \
+    PTR_OFFSET(OP_UMR_DATA(_req, _team),                                \
+               _col * (_team)->node.sbgp->group_size * sizeof(umr_t))
+
+#define RECV_UMR_DATA(_req, _team, _col)                                \
+    PTR_OFFSET(OP_UMR_DATA(_req, _team),                                \
+               (_team)->max_num_of_columns * (_team)->node.sbgp->group_size * sizeof(umr_t) + \
+               _col * (_team)->node.sbgp->group_size * sizeof(umr_t))
+
+#define MY_SEND_UMR_DATA(_req, _team, _col)                     \
+    PTR_OFFSET(SEND_UMR_DATA(_req, _team, _col),                \
+               (_team)->node.sbgp->group_rank * sizeof(umr_t))
+
+#define MY_RECV_UMR_DATA(_req, _team, _col)     \
+    PTR_OFFSET(RECV_UMR_DATA(_req, _team, _col),                \
+               (_team)->node.sbgp->group_rank * sizeof(umr_t))
 #endif

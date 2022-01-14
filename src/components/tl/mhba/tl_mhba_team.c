@@ -25,7 +25,6 @@ static void calc_block_size(ucc_tl_mhba_team_t *team)
     }
 }
 
-
 struct rank_data {
     int team_rank;
     int sbgp_rank;
@@ -80,8 +79,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
     ucc_sbgp_t *  node, *net;
     size_t        storage_size;
     int           i, j, node_size, ppn, team_size, nnodes;
-    void         *ctrl_addr;
-    ucc_tl_mhba_ctrl_t *rank_ctrl;
     ucc_topo_t         *topo;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
@@ -115,6 +112,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
     }
     ppn       = ucc_topo_max_ppn(topo);
     team_size = UCC_TL_TEAM_SIZE(self);
+    self->node_size = node_size;
     ucc_assert(team_size  == ppn * nnodes);
 
     for (i = 0; i < nnodes; i++) {
@@ -138,7 +136,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
     self->node.asr_rank    = MHBA_ASR_RANK;
     self->transpose        = UCC_TL_MHBA_TEAM_LIB(self)->cfg.transpose;
     self->num_dci_qps      = UCC_TL_MHBA_TEAM_LIB(self)->cfg.num_dci_qps;
-    self->sequence_number  = 0;
+    self->sequence_number  = 1;
     self->net.ctrl_mr      = NULL;
     self->net.remote_ctrl  = NULL;
     self->net.rank_map     = NULL;
@@ -160,10 +158,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
     self->max_num_of_columns =
     		ucc_div_round_up(node->group_size, ucc_tl_mhba_calc_max_block_size());
 
-    storage_size =
-        (MHBA_CTRL_SIZE + (2 * MHBA_DATA_SIZE * self->max_num_of_columns)) *
-            node_size * MAX_OUTSTANDING_OPS +
-        MHBA_CTRL_SIZE * MAX_OUTSTANDING_OPS;
+    storage_size = OP_SEGMENT_SIZE(self) * MAX_OUTSTANDING_OPS;
 
     if (self->node.asr_rank == node->group_rank) {
         self->bcast_data.shmid =
@@ -173,16 +168,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
                      storage_size);
         } else {
             self->node.storage = shmat(self->bcast_data.shmid, NULL, 0);
-            for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
-                ctrl_addr = self->node.storage +
-                    MHBA_CTRL_SIZE * MAX_OUTSTANDING_OPS +
-                    MHBA_CTRL_SIZE * node_size * i;
-                for (j = 0; j < node->group_size; j++) {
-                    rank_ctrl = PTR_OFFSET(ctrl_addr, j * MHBA_CTRL_SIZE);
-                    memset(rank_ctrl, 0, MHBA_CTRL_SIZE);
-                    rank_ctrl->seq_num = -1; // because sequence number begin from 0
-                }
-            }
+            memset(self->node.storage, 0, storage_size);
             shmctl(self->bcast_data.shmid, IPC_RMID, NULL);
         }
         self->bcast_data.net_size = self->net.sbgp->group_size;
@@ -207,13 +193,6 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mhba_team_t)
     if (-1 == shmdt(self->node.storage)) {
         tl_error(UCC_TL_TEAM_LIB(self), "failed to shmdt %p, errno %d",
                  self->node.storage, errno);
-    }
-    for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
-        ucc_tl_mhba_op_t *op = &self->node.ops[i];
-        ucc_free(op->recv_umr_data);
-        ucc_free(op->send_umr_data);
-        ucc_free(op->my_send_umr_data);
-        ucc_free(op->my_recv_umr_data);
     }
     if (self->node.asr_rank == self->node.sbgp->group_rank) {
         status = ucc_tl_mhba_destroy_umr(&self->node,UCC_TL_TEAM_LIB(self));
@@ -279,13 +258,13 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
 
     ucc_tl_mhba_team_t *   team = ucc_derived_of(tl_team, ucc_tl_mhba_team_t);
     ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
-    int                    n_cols = team->max_num_of_columns;
     ucc_rank_t             node_size = team->node.sbgp->group_size;
+    ucc_rank_t             node_rank = team->node.sbgp->group_rank;
     ucc_status_t status;
     ucc_tl_mhba_op_t *op;
-    int i, j, asr_cq_size, net_size;
+    int i, asr_cq_size, net_size;
     struct ibv_port_attr    port_attr;
-    size_t                  local_data_size, umr_buf_size;
+    size_t                  local_data_size, umr_buf_size, op_seg_size;
     uint32_t               *local_data, *global_data, *remote_data;
 
     status = ucc_service_coll_test(team->scoll_req);
@@ -299,6 +278,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
     }
     local_data = team->scoll_req->data;
     ucc_service_coll_finalize(team->scoll_req);
+    op_seg_size = OP_SEGMENT_SIZE(team);
 
     switch (team->state) {
     case TL_MHBA_TEAM_STATE_SHMID:
@@ -308,7 +288,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
             return UCC_ERR_NO_MEMORY;
         }
         team->net.net_size = team->bcast_data.net_size;
-        if (team->node.asr_rank != team->node.sbgp->group_rank) {
+        if (team->node.asr_rank != node_rank) {
             // shmat already performed for asr above
             team->node.storage = shmat(team->bcast_data.shmid, NULL, 0);
         }
@@ -319,35 +299,9 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
         }
         for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
             op = &team->node.ops[i];
-
-            op->my_recv_umr_data = ucc_malloc(sizeof(void *) * n_cols);
-            op->my_send_umr_data = ucc_malloc(sizeof(void *) * n_cols);
-            op->send_umr_data = ucc_malloc(sizeof(void *) * n_cols);
-            op->recv_umr_data = ucc_malloc(sizeof(void *) * n_cols);
-            if (!op->my_recv_umr_data || !op->my_send_umr_data ||
-                !op->send_umr_data || !op->recv_umr_data) {
-                tl_error(tl_team->context->lib, "failed to allocate umr data");
-                return UCC_ERR_NO_MEMORY;
-            }
-
-            op->ctrl = team->node.storage + MHBA_CTRL_SIZE * MAX_OUTSTANDING_OPS +
-                MHBA_CTRL_SIZE * node_size * i;
-            op->my_ctrl = PTR_OFFSET(op->ctrl, team->node.sbgp->group_rank * MHBA_CTRL_SIZE);
-            for (j = 0; j < n_cols; j++) {
-                op->send_umr_data[j] = PTR_OFFSET(team->node.storage,
-                                                  (node_size + 1) * MHBA_CTRL_SIZE *
-                                                  MAX_OUTSTANDING_OPS +
-                                                  i * MHBA_DATA_SIZE * n_cols *
-                                                  node_size +
-                                                  j * MHBA_DATA_SIZE * node_size);
-                op->my_send_umr_data[j] = PTR_OFFSET(op->send_umr_data[j],
-                                                     team->node.sbgp->group_rank * MHBA_DATA_SIZE);
-                op->recv_umr_data[j] = PTR_OFFSET(op->send_umr_data[j],
-                                                  MHBA_DATA_SIZE * n_cols * node_size *
-                                                  MAX_OUTSTANDING_OPS);
-                op->my_recv_umr_data[j] = PTR_OFFSET(op->recv_umr_data[j],
-                                                     team->node.sbgp->group_rank * MHBA_DATA_SIZE);
-            }
+            op->net_ctrl = PTR_OFFSET(team->node.storage, op_seg_size * i);
+            op->ctrl     = PTR_OFFSET(team->node.storage, op_seg_size * i + NODE_CTRL_OFFSET);
+            op->my_ctrl  = PTR_OFFSET(op->ctrl, node_rank * sizeof(ucc_tl_mhba_ctrl_t));
         }
 
         calc_block_size(team);
@@ -356,7 +310,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
             return UCC_ERR_NO_MESSAGE;
         }
         team->requested_block_size = UCC_TL_MHBA_TEAM_LIB(team)->cfg.block_size;
-        if (team->node.asr_rank == team->node.sbgp->group_rank) {
+        if (team->node.asr_rank == node_rank) {
             for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
                 team->previous_msg_size[i] = 0;
             }
@@ -402,7 +356,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
 
             team->net.ctrl_mr =
                 ibv_reg_mr(ctx->shared_pd, team->node.storage,
-                           MHBA_CTRL_SIZE * MAX_OUTSTANDING_OPS,
+                           op_seg_size * MAX_OUTSTANDING_OPS,
                            IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ |
                            IBV_ACCESS_REMOTE_ATOMIC | IBV_ACCESS_LOCAL_WRITE);
             if (!team->net.ctrl_mr) {
@@ -474,7 +428,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
             return UCC_INPROGRESS;
         }
     case TL_MHBA_TEAM_STATE_EXCHANGE:
-        if (team->node.asr_rank != team->node.sbgp->group_rank) {
+        if (team->node.asr_rank != node_rank) {
             break;
         }
         net_size = team->net.net_size;

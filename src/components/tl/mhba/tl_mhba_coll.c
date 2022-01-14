@@ -135,7 +135,7 @@ static ucc_status_t ucc_tl_mhba_node_fanout(ucc_tl_mhba_team_t *team,
                                             ucc_tl_mhba_schedule_t *task)
 {
     ucc_tl_mhba_ctrl_t *ctrl_v;
-    int *               atomic_counter;
+    int                 atomic_counter;
 
     /* First phase of fanout: asr signals it completed local ops
        and other ranks wait for asr */
@@ -151,10 +151,10 @@ static ucc_status_t ucc_tl_mhba_node_fanout(ucc_tl_mhba_team_t *team,
     }
     /*Second phase of fanout: wait for remote atomic counters -
       ie wait for the remote data */
-    atomic_counter = (int *)((ptrdiff_t)team->node.storage +
-                             MHBA_CTRL_SIZE * task->seq_index);
-    ucc_assert(*atomic_counter <= team->net.net_size);
-    if (*atomic_counter != team->net.net_size) {
+    atomic_counter = task->op->net_ctrl->atomic_counter;
+    ucc_assert(atomic_counter <= team->net.net_size);
+
+    if (atomic_counter != team->net.net_size) {
         return UCC_INPROGRESS;
     }
     return UCC_OK;
@@ -201,8 +201,7 @@ static ucc_status_t ucc_tl_mhba_asr_barrier_start(ucc_coll_task_t *coll_task)
     ucc_tl_mhba_populate_send_recv_mkeys(team, task);
 
     //Reset atomic notification counter to 0
-    memset(team->node.storage + MHBA_CTRL_SIZE * task->seq_index, 0,
-           MHBA_CTRL_SIZE);
+    task->op->net_ctrl->atomic_counter = 0;
 
     tl_debug(UCC_TASK_LIB(task),"asr barrier start");
     status = ucc_service_allreduce(UCC_TL_CORE_TEAM(team), &task->barrier_scratch[0],
@@ -486,7 +485,7 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
             ibv_wr_start(team->net.dcis[current_dci].dc_qpex);
             send_atomic_dc(
                 (uintptr_t)team->net.remote_ctrl[i].addr +
-                    (task->seq_index * MHBA_CTRL_SIZE),
+                (task->seq_index * OP_SEGMENT_SIZE(team)),
                 team->net.remote_ctrl[i].rkey, &team->net.dcis[current_dci],
                 team->net.remote_dctns[i], team->net.ahs[i], team, task);
             if (ibv_wr_complete(team->net.dcis[current_dci].dc_qpex)) {
@@ -498,7 +497,7 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
             status =
                 send_atomic_rc(team->net.rc_qps[i],
                                (uintptr_t)team->net.remote_ctrl[i].addr +
-                                   (task->seq_index * MHBA_CTRL_SIZE),
+                                   (task->seq_index * OP_SEGMENT_SIZE(team)),
                                team->net.remote_ctrl[i].rkey, team, task);
             if (status != UCC_OK) {
                 tl_error(UCC_TASK_LIB(task),
@@ -670,7 +669,7 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
             ibv_wr_start(team->net.dcis[current_dci].dc_qpex);
             send_atomic_dc(
                 (uintptr_t)team->net.remote_ctrl[i].addr +
-                    (task->seq_index * MHBA_CTRL_SIZE),
+                (task->seq_index * OP_SEGMENT_SIZE(team)),
                 team->net.remote_ctrl[i].rkey, &team->net.dcis[current_dci],
                 team->net.remote_dctns[i], team->net.ahs[i], team, task);
             if (ibv_wr_complete(team->net.dcis[current_dci].dc_qpex)) {
@@ -682,7 +681,7 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
             status =
                 send_atomic_rc(team->net.rc_qps[i],
                                (uintptr_t)team->net.remote_ctrl[i].addr +
-                                   (task->seq_index * MHBA_CTRL_SIZE),
+                                   (task->seq_index * OP_SEGMENT_SIZE(team)),
                                team->net.remote_ctrl[i].rkey, team, task);
             if (status != UCC_OK) {
                 tl_error(UCC_TASK_LIB(task),
@@ -761,7 +760,7 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
         }
         if (team->is_dc) {
             send_atomic_dc((uintptr_t)team->net.remote_ctrl[cyc_rank].addr +
-                               (task->seq_index * MHBA_CTRL_SIZE),
+                               (task->seq_index * OP_SEGMENT_SIZE(team)),
                            team->net.remote_ctrl[cyc_rank].rkey,
                            &team->net.dcis[current_dci],
                            team->net.remote_dctns[cyc_rank],
@@ -774,7 +773,7 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
             status = send_atomic_rc(
                 team->net.rc_qps[cyc_rank],
                 (uintptr_t)team->net.remote_ctrl[cyc_rank].addr +
-                    (task->seq_index * MHBA_CTRL_SIZE),
+                    (task->seq_index * OP_SEGMENT_SIZE(team)),
                 team->net.remote_ctrl[cyc_rank].rkey, team, task);
             if (status != UCC_OK) {
                 tl_error(UCC_TASK_LIB(task),
@@ -875,7 +874,7 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
         }
         if (team->is_dc) {
             send_atomic_dc((uintptr_t)team->net.remote_ctrl[cyc_rank].addr +
-                               (task->seq_index * MHBA_CTRL_SIZE),
+                               (task->seq_index * OP_SEGMENT_SIZE(team)),
                            team->net.remote_ctrl[cyc_rank].rkey,
                            &team->net.dcis[current_dci],
                            team->net.remote_dctns[cyc_rank],
@@ -888,7 +887,7 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
             status = send_atomic_rc(
                 team->net.rc_qps[cyc_rank],
                 (uintptr_t)team->net.remote_ctrl[cyc_rank].addr +
-                    (task->seq_index * MHBA_CTRL_SIZE),
+                    (task->seq_index * OP_SEGMENT_SIZE(team)),
                 team->net.remote_ctrl[cyc_rank].rkey, team, task);
             if (status != UCC_OK) {
                 tl_error(UCC_TASK_LIB(task),
@@ -1016,6 +1015,7 @@ ucc_status_t ucc_tl_mhba_alltoall_init(ucc_base_coll_args_t *coll_args,
     task->started   = 0;
     task->seq_num   = tl_team->sequence_number;
     task->seq_index = SEQ_INDEX(tl_team->sequence_number);
+    task->op        = &tl_team->node.ops[task->seq_index];
     task->msg_size =
         (size_t)(coll_args->args.src.info.count / UCC_TL_TEAM_SIZE(tl_team)) *
         ucc_dt_size(coll_args->args.src.info.datatype);

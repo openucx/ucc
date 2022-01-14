@@ -23,6 +23,7 @@ typedef struct ucc_tl_mhba_schedule {
     int                 num_of_blocks_columns;
     int                 block_size;
     int                 started;
+    ucc_tl_mhba_op_t   *op;
     ucc_tl_mhba_reg_t * send_rcache_region_p;
     ucc_tl_mhba_reg_t * recv_rcache_region_p;
     struct ibv_mr *     transpose_buf_mr;
