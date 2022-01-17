@@ -17,17 +17,17 @@ END_C_DECLS
 static ucc_status_t oob_allgather(void *sbuf, void *rbuf, size_t msglen,
                                   void *coll_info, void **req)
 {
-    MPI_Comm    comm = (MPI_Comm)coll_info;
+    MPI_Comm    comm = (MPI_Comm)(uintptr_t)coll_info;
     MPI_Request request;
     MPI_Iallgather(sbuf, msglen, MPI_BYTE, rbuf, msglen, MPI_BYTE, comm,
                    &request);
-    *req = (void *)request;
+    *req = (void *)(uintptr_t)request;
     return UCC_OK;
 }
 
 static ucc_status_t oob_allgather_test(void *req)
 {
-    MPI_Request request = (MPI_Request)req;
+    MPI_Request request = (MPI_Request)(uintptr_t)req;
     int         completed;
     MPI_Test(&request, &completed, MPI_STATUS_IGNORE);
     return completed ? UCC_OK : UCC_INPROGRESS;
@@ -61,7 +61,7 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_loc
         ctx_params.oob.allgather = oob_allgather;
         ctx_params.oob.req_test  = oob_allgather_test;
         ctx_params.oob.req_free  = oob_allgather_free;
-        ctx_params.oob.coll_info = (void*)MPI_COMM_WORLD;
+        ctx_params.oob.coll_info = (void*)(uintptr_t)MPI_COMM_WORLD;
         ctx_params.oob.n_oob_eps = size;
         ctx_params.oob.oob_ep    = rank;
     }
@@ -131,7 +131,7 @@ ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm)
     team_params.oob.allgather = oob_allgather;
     team_params.oob.req_test  = oob_allgather_test;
     team_params.oob.req_free  = oob_allgather_free;
-    team_params.oob.coll_info = (void*)comm;
+    team_params.oob.coll_info = (void*)(uintptr_t)comm;
     team_params.oob.n_oob_eps = size;
     team_params.oob.oob_ep    = rank;
     team_params.ep            = rank;

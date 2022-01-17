@@ -11,27 +11,27 @@ TestReduce::TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                      ucc_datatype_t _dt, ucc_reduction_op_t _op,
                      ucc_memory_type_t _mt, int _root, ucc_test_team_t &_team,
                      size_t _max_size) :
-    TestCase(_team, _mt, _msgsize, _inplace, _max_size)
+    TestCase(_team, UCC_COLL_TYPE_REDUCE, _mt, _msgsize, _inplace, _max_size)
 {
     size_t dt_size = ucc_dt_size(_dt);
-    size_t count = _msgsize/dt_size;
+    size_t count   = _msgsize/dt_size;
     int rank;
+
     MPI_Comm_rank(team.comm, &rank);
-    dt = _dt;
-    op = _op;
+    dt   = _dt;
+    op   = _op;
     root = _root;
-    args.coll_type = UCC_COLL_TYPE_REDUCE;
 
     if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT,
                     team.comm)) {
         return;
     }
+    check_buf = ucc_malloc(_msgsize, "check buf");
+    UCC_MALLOC_CHECK(check_buf);
 
     if (rank == root) {
         UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize, _mt));
         rbuf = rbuf_mc_header->addr;
-        check_rbuf = ucc_malloc(_msgsize, "check rbuf");
-        UCC_MALLOC_CHECK(check_rbuf);
         args.dst.info.buffer   = rbuf;
         args.dst.info.count    = count;
         args.dst.info.datatype = _dt;
@@ -45,9 +45,6 @@ TestReduce::TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
-    UCC_CHECK(ucc_mc_alloc(&check_sbuf_mc_header, _msgsize,
-                           UCC_MEMORY_TYPE_HOST));
-    check_sbuf = check_sbuf_mc_header->addr;
 
     args.op                   = _op;
     args.src.info.buffer      = sbuf;
@@ -63,8 +60,8 @@ ucc_status_t TestReduce::set_input()
 {
     size_t dt_size = ucc_dt_size(dt);
     size_t count   = msgsize / dt_size;
-    int rank;
-    void *buf;
+    int    rank;
+    void  *buf;
 
     MPI_Comm_rank(team.comm, &rank);
     if (inplace && rank == root) {
@@ -74,7 +71,7 @@ ucc_status_t TestReduce::set_input()
     }
 
     init_buffer(buf, count, dt, mem_type, rank);
-    UCC_CHECK(ucc_mc_memcpy(check_sbuf, buf, count * dt_size,
+    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));
     return UCC_OK;
 }
@@ -92,19 +89,21 @@ ucc_status_t TestReduce::check()
     MPI_Request  req;
 
     MPI_Comm_rank(team.comm, &rank);
-    MPI_Ireduce(check_sbuf, check_rbuf, count, ucc_dt_to_mpi(dt),
+    MPI_Ireduce((root == rank) ? MPI_IN_PLACE : check_buf, check_buf,
+                count, ucc_dt_to_mpi(dt),
                 op == UCC_OP_AVG ? MPI_SUM : ucc_op_to_mpi(op), root, team.comm,
                 &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
     } while(!completed);
+
     if (rank == root && op == UCC_OP_AVG) {
-        status = divide_buffer(check_rbuf, team.team->size, count, dt);
+        status = divide_buffer(check_buf, team.team->size, count, dt);
         if (status != UCC_OK) {
             return status;
         }
     }
     return (rank != root) ? UCC_OK :
-        compare_buffers(rbuf, check_rbuf, count, dt, mem_type);
+        compare_buffers(rbuf, check_buf, count, dt, mem_type);
 }
