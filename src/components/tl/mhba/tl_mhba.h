@@ -318,4 +318,8 @@ static inline ucc_tl_mhba_ctrl_t *ucc_tl_mhba_get_my_ctrl(ucc_tl_mhba_team_t *te
 #define MY_RECV_UMR_DATA(_req, _team, _col)     \
     PTR_OFFSET(RECV_UMR_DATA(_req, _team, _col),                \
                (_team)->node.sbgp->group_rank * sizeof(umr_t))
+
+#define REMOTE_CTRL(_task, _rank) \
+    (ucc_tl_mhba_net_ctrl_t*)(PTR_OFFSET(TASK_TEAM(_task)->net.remote_ctrl[_rank].addr,    \
+               task->seq_index * OP_SEGMENT_SIZE(_team)))
 #endif

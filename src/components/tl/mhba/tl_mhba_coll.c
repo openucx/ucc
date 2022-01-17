@@ -192,10 +192,23 @@ static ucc_status_t ucc_tl_mhba_asr_barrier_start(ucc_coll_task_t *coll_task)
     ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
     ucc_tl_mhba_team_t *team    = TASK_TEAM(task);
     ucc_status_t status;
-
+    /* int i; */
     coll_task->super.status              = UCC_INPROGRESS;
 
-
+    #if 0
+    //team->inter_node_barrier[team->net.sbgp->group_rank] = request->seq_num;
+    team->op->net_ctrl->barrier_seq_num[1] = request->seq_num;
+    for(i=0; i<team->net.net_size;i++){
+        status = send_block_data(team->net.qps[i],
+                                 (uintptr_t)team->inter_node_barrier_mr->addr+team->net.sbgp->group_rank*sizeof(int) , sizeof(int),
+                                               team->inter_node_barrier_mr->lkey,
+                                               team->net.remote_ctrl[i].barrier_addr+sizeof(int)*team->net.sbgp->group_rank, team->net.remote_ctrl[i].barrier_rkey, 0, 0);
+        if (status != XCCL_OK) {
+            xccl_mhba_error("Failed sending barrier notice");
+            return status;
+        }
+    }
+#endif
     // despite while statement in poll_umr_cq, non blocking because have independent cq,
     // will be finished in a finite time
     ucc_tl_mhba_populate_send_recv_mkeys(team, task);
@@ -271,12 +284,56 @@ send_block_data_rc(struct ibv_qp *qp, uint64_t src_addr, uint32_t msg_size,
     return UCC_OK;
 }
 
+static inline ucc_status_t send_block_data(ucc_tl_mhba_team_t *team, ucc_rank_t rank,
+                                           uint64_t src_addr, uint32_t msg_size,
+                                           uint32_t lkey, uint64_t remote_addr, uint32_t rkey,
+                                           int send_flags, int local /*used for sw transpose only */)
+{
+    struct ibv_qp *qp;
+    int            dci;
+
+    if (!team->is_dc || local) {
+        qp = local ? team->node.ns_umr_qp.qp : team->net.rc_qps[rank];
+        return send_block_data_rc(qp, src_addr, msg_size, lkey, remote_addr, rkey, send_flags,
+                                  local ? 1 : 0);
+    } else {
+        dci = rank % team->num_dci_qps;
+        send_block_data_dc(src_addr,  msg_size, lkey, remote_addr, rkey, send_flags,
+                           &team->net.dcis[dci], team->net.remote_dctns[rank],
+                           team->net.ahs[rank]);
+    }
+    return UCC_OK;
+}
+
+static inline void send_start(ucc_tl_mhba_team_t *team, ucc_rank_t rank)
+{
+    int dci;
+
+    if (team->is_dc) {
+        dci = rank % team->num_dci_qps;
+        ibv_wr_start(team->net.dcis[dci].dc_qpex);
+    }
+}
+
+static inline ucc_status_t send_done(ucc_tl_mhba_team_t *team, ucc_rank_t rank)
+{
+    int dci;
+
+    if (team->is_dc) {
+        dci = rank % team->num_dci_qps;
+        if (ibv_wr_complete(team->net.dcis[dci].dc_qpex)) {
+            return UCC_ERR_NO_MESSAGE;
+        }
+    }
+    return UCC_OK;
+}
+
 static inline void
 send_atomic_dc(uint64_t remote_addr, uint32_t rkey, struct dci *dci_struct,
                uint32_t dct_number, struct ibv_ah *ah, ucc_tl_mhba_team_t *team,
-               ucc_tl_mhba_schedule_t *task)
+               uint64_t value)
 {
-    dci_struct->dc_qpex->wr_id    = task->seq_num;
+    dci_struct->dc_qpex->wr_id    = value;
     dci_struct->dc_qpex->wr_flags = IBV_SEND_SIGNALED;
     ibv_wr_atomic_fetch_add(dci_struct->dc_qpex, rkey, remote_addr, 1ULL);
     mlx5dv_wr_set_dc_addr(dci_struct->dc_mqpex, ah, dct_number, DC_KEY);
@@ -288,7 +345,7 @@ send_atomic_dc(uint64_t remote_addr, uint32_t rkey, struct dci *dci_struct,
 static inline ucc_status_t send_atomic_rc(struct ibv_qp *qp,
                                           uint64_t remote_addr, uint32_t rkey,
                                           ucc_tl_mhba_team_t *    team,
-                                          ucc_tl_mhba_schedule_t *task)
+                                          uint64_t value)
 {
     struct ibv_send_wr *bad_wr;
     struct ibv_sge      list = {
@@ -298,7 +355,7 @@ static inline ucc_status_t send_atomic_rc(struct ibv_qp *qp,
     };
 
     struct ibv_send_wr wr = {
-        .wr_id                 = task->seq_num,
+        .wr_id                 = value,
         .sg_list               = &list,
         .num_sge               = 1,
         .opcode                = IBV_WR_ATOMIC_FETCH_AND_ADD,
@@ -311,6 +368,24 @@ static inline ucc_status_t send_atomic_rc(struct ibv_qp *qp,
     if (ibv_post_send(qp, &wr, &bad_wr)) {
         tl_error(UCC_TL_MHBA_TEAM_LIB(team),"failed to post atomic send");
         return UCC_ERR_NO_MESSAGE;
+    }
+    return UCC_OK;
+}
+
+static inline ucc_status_t send_atomic(ucc_tl_mhba_team_t *team, ucc_rank_t rank,
+                                       void *remote_addr, uint32_t rkey,
+                                       uint64_t value)
+{
+    int dci;
+
+    if (!team->is_dc) {
+        return send_atomic_rc(team->net.rc_qps[rank], (uintptr_t)remote_addr,
+                              rkey, team, value);
+    } else {
+        dci = rank % team->num_dci_qps;
+        send_atomic_dc((uintptr_t)remote_addr, rkey, &team->net.dcis[dci],
+                       team->net.remote_dctns[rank], team->net.ahs[rank],
+                       team, value);
     }
     return UCC_OK;
 }
@@ -388,7 +463,7 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
     int           block_size    = task->block_size;
     int           col_msgsize   = task->msg_size * block_size * node_size;
     int           block_msgsize = SQUARED(block_size) * task->msg_size;
-    int           i, j, k, dest_rank, rank, n_compl, ret, cyc_rank, current_dci=0;
+    int           i, j, k, dest_rank, rank, n_compl, ret, cyc_rank;
     uint64_t      src_addr, remote_addr;
     struct ibv_wc transpose_completion[1];
     ucc_status_t  status;
@@ -402,9 +477,6 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
         //send all blocks from curr node to some ARR
-        if (team->is_dc) {
-            current_dci = cyc_rank % team->num_dci_qps;
-        }
         for (j = 0; j < (node_size / block_size); j++) {
             for (k = 0; k < (node_size / block_size); k++) {
                 src_addr    = (uintptr_t)(node_msgsize * dest_rank +
@@ -414,11 +486,11 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
                                           block_msgsize * j + col_msgsize * k);
                 prepost_dummy_recv(team->node.ns_umr_qp.qp, 1,UCC_TASK_LIB(task));
                 // SW Transpose
-                status = send_block_data_rc(
-                    team->node.ns_umr_qp.qp, src_addr, block_msgsize,
-                    team->node.ops[task->seq_index].send_mkeys[0]->lkey,
-                    (uintptr_t)task->transpose_buf_mr->addr,
-                    task->transpose_buf_mr->rkey, IBV_SEND_SIGNALED, 1);
+                status = send_block_data(team, cyc_rank, 
+                                         src_addr, block_msgsize,
+                                         team->node.ops[task->seq_index].send_mkeys[0]->lkey,
+                                         (uintptr_t)task->transpose_buf_mr->addr,
+                                         task->transpose_buf_mr->rkey, IBV_SEND_SIGNALED, 1);
                 if (status != UCC_OK) {
                     tl_error(
                         UCC_TASK_LIB(task),
@@ -446,32 +518,18 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
                 transpose_square_mat(task->transpose_buf_mr->addr,
                                      block_size, task->msg_size,
                                      task->tmp_transpose_buf);
-                if (team->is_dc) {
-                    ibv_wr_start(team->net.dcis[current_dci].dc_qpex);
-                    send_block_data_dc(
-                        (uintptr_t)task->transpose_buf_mr->addr,
-                        block_msgsize, task->transpose_buf_mr->lkey,
-                        remote_addr, team->net.rkeys[cyc_rank],
-                        IBV_SEND_SIGNALED, &team->net.dcis[current_dci],
-                        team->net.remote_dctns[cyc_rank],
-                        team->net.ahs[cyc_rank]);
-                    if (ibv_wr_complete(team->net.dcis[current_dci].dc_qpex)) {
-                        tl_error(UCC_TASK_LIB(task),
-                                 "can't post request [%d,%d,%d]", i, j, k);
-                        return UCC_ERR_NO_MESSAGE;
-                    }
-                } else {
-                    status = send_block_data_rc(
-                        team->net.rc_qps[cyc_rank],
-                        (uintptr_t)task->transpose_buf_mr->addr,
-                        block_msgsize, task->transpose_buf_mr->lkey,
-                        remote_addr, team->net.rkeys[cyc_rank],
-                        IBV_SEND_SIGNALED, 0);
-                    if (status != UCC_OK) {
-                        tl_error(UCC_TASK_LIB(task),
-                                 "Failed sending block [%d,%d,%d]", i, j, k);
-                        return status;
-                    }
+                send_start(team, cyc_rank);
+                status = send_block_data(team, cyc_rank, (uintptr_t)task->transpose_buf_mr->addr,
+                                         block_msgsize, task->transpose_buf_mr->lkey,
+                                         remote_addr, team->net.rkeys[cyc_rank],
+                                         IBV_SEND_SIGNALED, 0);
+                if (UCC_OK == status) {
+                    status = send_done(team, cyc_rank);
+                }
+                if (status != UCC_OK) {
+                    tl_error(UCC_TASK_LIB(task),
+                             "Failed sending block [%d,%d,%d]", i, j, k);
+                    return status;
                 }
                 while (!ibv_poll_cq(team->net.cq, 1, transpose_completion)) {
                 }
@@ -480,30 +538,17 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
     }
 
     for (i = 0; i < net_size; i++) {
-        if (team->is_dc) {
-            current_dci = i % team->num_dci_qps;
-            ibv_wr_start(team->net.dcis[current_dci].dc_qpex);
-            send_atomic_dc(
-                (uintptr_t)team->net.remote_ctrl[i].addr +
-                (task->seq_index * OP_SEGMENT_SIZE(team)),
-                team->net.remote_ctrl[i].rkey, &team->net.dcis[current_dci],
-                team->net.remote_dctns[i], team->net.ahs[i], team, task);
-            if (ibv_wr_complete(team->net.dcis[current_dci].dc_qpex)) {
-                tl_error(UCC_TASK_LIB(task), "can't post atomic request [%d]",
-                         i);
-                return UCC_ERR_NO_MESSAGE;
-            }
-        } else {
-            status =
-                send_atomic_rc(team->net.rc_qps[i],
-                               (uintptr_t)team->net.remote_ctrl[i].addr +
-                                   (task->seq_index * OP_SEGMENT_SIZE(team)),
-                               team->net.remote_ctrl[i].rkey, team, task);
-            if (status != UCC_OK) {
-                tl_error(UCC_TASK_LIB(task),
-                         "Failed sending atomic to node [%d]", i);
-                return status;
-            }
+        send_start(team, i);
+        status = send_atomic(team, i, PTR_OFFSET(team->net.remote_ctrl[i].addr,
+                                                 task->seq_index * OP_SEGMENT_SIZE(team)),
+                             team->net.remote_ctrl[i].rkey, task->seq_num);
+        if (UCC_OK == status) {
+            status = send_done(team, i);
+        }
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task),
+                     "Failed sending atomic to node [%d]", i);
+            return status;
         }
     }
     ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
@@ -529,8 +574,7 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
     int block_msgsize_leftovers =
         block_size_leftovers_side * block_size * task->msg_size;
     int corner_msgsize = SQUARED(block_size_leftovers_side) * task->msg_size;
-    int i, j, k, dest_rank, rank, n_compl, ret, cyc_rank, current_block_msgsize,
-        current_dci=0;
+    int i, j, k, dest_rank, rank, n_compl, ret, cyc_rank, current_block_msgsize;
     uint64_t      src_addr, remote_addr;
     struct ibv_wc transpose_completion[1];
     ucc_status_t  status;
@@ -543,9 +587,6 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
     for (i = 0; i < net_size; i++) {
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
-        if (team->is_dc) {
-            current_dci = cyc_rank % team->num_dci_qps;
-        }
         //send all blocks from curr node to some ARR
         for (j = 0; j < task->num_of_blocks_columns; j++) {
             for (k = 0; k < task->num_of_blocks_columns; k++) {
@@ -577,11 +618,11 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
 
                 prepost_dummy_recv(team->node.ns_umr_qp.qp, 1,UCC_TASK_LIB(task));
                 // SW Transpose
-                status = send_block_data_rc(
-                    team->node.ns_umr_qp.qp, src_addr, current_block_msgsize,
-                    team->node.ops[task->seq_index].send_mkeys[j]->lkey,
-                    (uintptr_t)task->transpose_buf_mr->addr,
-                    task->transpose_buf_mr->rkey, IBV_SEND_SIGNALED, 1);
+                status = send_block_data(team, cyc_rank,
+                                         src_addr, current_block_msgsize,
+                                         team->node.ops[task->seq_index].send_mkeys[j]->lkey,
+                                         (uintptr_t)task->transpose_buf_mr->addr,
+                                         task->transpose_buf_mr->rkey, IBV_SEND_SIGNALED, 1);
                 if (status != UCC_OK) {
                     tl_error(
                         UCC_TASK_LIB(task),
@@ -629,33 +670,18 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
                                              task->tmp_transpose_buf);
                     }
                 }
-
-                if (team->is_dc) {
-                    ibv_wr_start(team->net.dcis[current_dci].dc_qpex);
-                    send_block_data_dc(
-                        (uintptr_t)task->transpose_buf_mr->addr,
-                        current_block_msgsize, task->transpose_buf_mr->lkey,
-                        remote_addr, team->net.rkeys[cyc_rank],
-                        IBV_SEND_SIGNALED, &team->net.dcis[current_dci],
-                        team->net.remote_dctns[cyc_rank],
-                        team->net.ahs[cyc_rank]);
-                    if (ibv_wr_complete(team->net.dcis[current_dci].dc_qpex)) {
-                        tl_error(UCC_TASK_LIB(task),
-                                 "can't post request [%d,%d,%d]", i, j, k);
-                        return UCC_ERR_NO_MESSAGE;
-                    }
-                } else {
-                    status = send_block_data_rc(
-                        team->net.rc_qps[cyc_rank],
-                        (uintptr_t)task->transpose_buf_mr->addr,
-                        current_block_msgsize, task->transpose_buf_mr->lkey,
-                        remote_addr, team->net.rkeys[cyc_rank],
-                        IBV_SEND_SIGNALED, 0);
-                    if (status != UCC_OK) {
-                        tl_error(UCC_TASK_LIB(task),
-                                 "Failed sending block [%d,%d,%d]", i, j, k);
-                        return status;
-                    }
+                send_start(team, cyc_rank);
+                status = send_block_data(team, cyc_rank, (uintptr_t)task->transpose_buf_mr->addr,
+                                         current_block_msgsize, task->transpose_buf_mr->lkey,
+                                         remote_addr, team->net.rkeys[cyc_rank],
+                                         IBV_SEND_SIGNALED, 0);
+                if (UCC_OK == status) {
+                    status = send_done(team, cyc_rank);
+                }
+                if (status != UCC_OK) {
+                    tl_error(UCC_TASK_LIB(task),
+                             "Failed sending block [%d,%d,%d]", i, j, k);
+                    return status;
                 }
                 while (!ibv_poll_cq(team->net.cq, 1, transpose_completion)) {
                 }
@@ -664,30 +690,17 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
     }
 
     for (i = 0; i < net_size; i++) {
-        if (team->is_dc) {
-            current_dci = i % team->num_dci_qps;
-            ibv_wr_start(team->net.dcis[current_dci].dc_qpex);
-            send_atomic_dc(
-                (uintptr_t)team->net.remote_ctrl[i].addr +
-                (task->seq_index * OP_SEGMENT_SIZE(team)),
-                team->net.remote_ctrl[i].rkey, &team->net.dcis[current_dci],
-                team->net.remote_dctns[i], team->net.ahs[i], team, task);
-            if (ibv_wr_complete(team->net.dcis[current_dci].dc_qpex)) {
-                tl_error(UCC_TASK_LIB(task), "can't post atomic request [%d]",
-                         i);
-                return UCC_ERR_NO_MESSAGE;
-            }
-        } else {
-            status =
-                send_atomic_rc(team->net.rc_qps[i],
-                               (uintptr_t)team->net.remote_ctrl[i].addr +
-                                   (task->seq_index * OP_SEGMENT_SIZE(team)),
-                               team->net.remote_ctrl[i].rkey, team, task);
-            if (status != UCC_OK) {
+        send_start(team, i);
+        status = send_atomic(team, i, PTR_OFFSET(team->net.remote_ctrl[i].addr,
+                                                 task->seq_index * OP_SEGMENT_SIZE(team)),
+                             team->net.remote_ctrl[i].rkey, task->seq_num);
+        if (UCC_OK == status) {
+            status = send_done(team, i);
+        }
+        if (status != UCC_OK) {
                 tl_error(UCC_TASK_LIB(task),
                          "Failed sending atomic to node [%d]", i);
                 return status;
-            }
         }
     }
     ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
@@ -707,7 +720,7 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
     int          block_size    = task->block_size;
     int          col_msgsize   = task->msg_size * block_size * node_size;
     int          block_msgsize = SQUARED(block_size) * task->msg_size;
-    int          i, j, k, dest_rank, rank, cyc_rank, current_dci = 0;
+    int          i, j, k, dest_rank, rank, cyc_rank;
     uint64_t     src_addr, remote_addr;
     ucc_status_t status;
 
@@ -719,13 +732,7 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
     for (i = 0; i < net_size; i++) {
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
-        if (team->is_dc) {
-            current_dci = cyc_rank % team->num_dci_qps;
-            ibv_wr_start(
-                team->net.dcis[current_dci]
-                    .dc_qpex); //todo pay attention for MT - 2 threads cant write
-            // to same QP in same time
-        }
+        send_start(team, cyc_rank);
         //send all blocks from curr node to some ARR
         for (j = 0; j < (node_size / block_size); j++) {
             for (k = 0; k < (node_size / block_size); k++) {
@@ -735,51 +742,27 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
                                           node_msgsize * rank +
                                           block_msgsize * j + col_msgsize * k);
 
-                if (team->is_dc) {
-                    send_block_data_dc(
-                        src_addr, block_msgsize,
-                        team->node.ops[task->seq_index].send_mkeys[0]->lkey,
-                        remote_addr, team->net.rkeys[cyc_rank], 0,
-                        &team->net.dcis[current_dci],
-                        team->net.remote_dctns[cyc_rank],
-                        team->net.ahs[cyc_rank]);
-                } else {
-                    /* printf("rank %d, dest %d, block [%d:%d], block_msgsize %d\n", */
-                           /* rank, dest_rank, j, k, block_msgsize); */
-                    status = send_block_data_rc(
-                        team->net.rc_qps[cyc_rank], src_addr, block_msgsize,
-                        team->node.ops[task->seq_index].send_mkeys[0]->lkey,
-                        remote_addr, team->net.rkeys[cyc_rank], 0, 0);
-                    if (status != UCC_OK) {
-                        tl_error(UCC_TASK_LIB(task),
-                                 "Failed sending block [%d,%d,%d]", i, j, k);
-                        return status;
-                    }
+                status = send_block_data(team, cyc_rank, src_addr, block_msgsize,
+                                         team->node.ops[task->seq_index].send_mkeys[0]->lkey,
+                                         remote_addr, team->net.rkeys[cyc_rank], 0, 0);
+                if (status != UCC_OK) {
+                    tl_error(UCC_TASK_LIB(task),
+                             "Failed sending block [%d,%d,%d]", i, j, k);
+                    return status;
                 }
             }
         }
-        if (team->is_dc) {
-            send_atomic_dc((uintptr_t)team->net.remote_ctrl[cyc_rank].addr +
-                               (task->seq_index * OP_SEGMENT_SIZE(team)),
-                           team->net.remote_ctrl[cyc_rank].rkey,
-                           &team->net.dcis[current_dci],
-                           team->net.remote_dctns[cyc_rank],
-                           team->net.ahs[cyc_rank], team, task);
-            if (ibv_wr_complete(team->net.dcis[current_dci].dc_qpex)) {
-                tl_error(UCC_TASK_LIB(task), "can't post requests [%d]", i);
-                return UCC_ERR_NO_MESSAGE;
-            }
-        } else {
-            status = send_atomic_rc(
-                team->net.rc_qps[cyc_rank],
-                (uintptr_t)team->net.remote_ctrl[cyc_rank].addr +
-                    (task->seq_index * OP_SEGMENT_SIZE(team)),
-                team->net.remote_ctrl[cyc_rank].rkey, team, task);
-            if (status != UCC_OK) {
-                tl_error(UCC_TASK_LIB(task),
-                         "Failed sending atomic to node [%d]", i);
-                return status;
-            }
+        status = send_atomic(team, cyc_rank,
+                             PTR_OFFSET(team->net.remote_ctrl[cyc_rank].addr,
+                                        task->seq_index * OP_SEGMENT_SIZE(team)),
+                             team->net.remote_ctrl[cyc_rank].rkey, task->seq_num);
+        if (UCC_OK == status) {
+            status = send_done(team, cyc_rank);
+        }
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task),
+                     "Failed sending atomic to node [%d]", i);
+            return status;
         }
     }
     ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
@@ -805,7 +788,7 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
     int block_msgsize_leftovers =
         block_size_leftovers_side * block_size * task->msg_size;
     int corner_msgsize = SQUARED(block_size_leftovers_side) * task->msg_size;
-    int i, j, k, dest_rank, rank, cyc_rank, current_block_msgsize, current_dci=0;
+    int i, j, k, dest_rank, rank, cyc_rank, current_block_msgsize;
     uint64_t     src_addr, remote_addr;
     ucc_status_t status;
 
@@ -817,10 +800,7 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
     for (i = 0; i < net_size; i++) {
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
-        if (team->is_dc) {
-            current_dci = cyc_rank % team->num_dci_qps;
-            ibv_wr_start(team->net.dcis[current_dci].dc_qpex);
-        }
+        send_start(team, cyc_rank);
         //send all blocks from curr node to some ARR
         for (j = 0; j < task->num_of_blocks_columns; j++) {
             for (k = 0; k < task->num_of_blocks_columns; k++) {
@@ -849,51 +829,27 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
                             ? block_msgsize_leftovers
                             : corner_msgsize;
                 }
-
-                if (team->is_dc) {
-                    send_block_data_dc(
-                        src_addr, current_block_msgsize,
-                        team->node.ops[task->seq_index].send_mkeys[j]->lkey,
-                        remote_addr, team->net.rkeys[cyc_rank], 0,
-                        &team->net.dcis[current_dci],
-                        team->net.remote_dctns[cyc_rank],
-                        team->net.ahs[cyc_rank]);
-                } else {
-                    status = send_block_data_rc(
-                        team->net.rc_qps[cyc_rank], src_addr,
-                        current_block_msgsize,
-                        team->node.ops[task->seq_index].send_mkeys[j]->lkey,
-                        remote_addr, team->net.rkeys[cyc_rank], 0, 0);
-                    if (status != UCC_OK) {
-                        tl_error(UCC_TASK_LIB(task),
-                                 "Failed sending block [%d,%d,%d]", i, j, k);
-                        return status;
-                    }
+                status = send_block_data(team, cyc_rank, src_addr, current_block_msgsize,
+                                         team->node.ops[task->seq_index].send_mkeys[j]->lkey,
+                                         remote_addr, team->net.rkeys[cyc_rank], 0, 0);
+                if (status != UCC_OK) {
+                    tl_error(UCC_TASK_LIB(task),
+                             "Failed sending block [%d,%d,%d]", i, j, k);
+                    return status;
                 }
             }
         }
-        if (team->is_dc) {
-            send_atomic_dc((uintptr_t)team->net.remote_ctrl[cyc_rank].addr +
-                               (task->seq_index * OP_SEGMENT_SIZE(team)),
-                           team->net.remote_ctrl[cyc_rank].rkey,
-                           &team->net.dcis[current_dci],
-                           team->net.remote_dctns[cyc_rank],
-                           team->net.ahs[cyc_rank], team, task);
-            if (ibv_wr_complete(team->net.dcis[current_dci].dc_qpex)) {
-                tl_error(UCC_TASK_LIB(task), "can't post requests [%d]", i);
-                return UCC_ERR_NO_MESSAGE;
-            }
-        } else {
-            status = send_atomic_rc(
-                team->net.rc_qps[cyc_rank],
-                (uintptr_t)team->net.remote_ctrl[cyc_rank].addr +
-                    (task->seq_index * OP_SEGMENT_SIZE(team)),
-                team->net.remote_ctrl[cyc_rank].rkey, team, task);
-            if (status != UCC_OK) {
-                tl_error(UCC_TASK_LIB(task),
-                         "Failed sending atomic to node [%d]", i);
-                return status;
-            }
+        status = send_atomic(team, cyc_rank,
+                             PTR_OFFSET(team->net.remote_ctrl[cyc_rank].addr,
+                                        task->seq_index * OP_SEGMENT_SIZE(team)),
+                             team->net.remote_ctrl[cyc_rank].rkey, task->seq_num);
+        if (UCC_OK == status) {
+            status = send_done(team, cyc_rank);
+        }
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task),
+                     "Failed sending atomic to node [%d]", i);
+            return status;
         }
     }
     ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
