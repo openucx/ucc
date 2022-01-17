@@ -8,6 +8,7 @@
 #include "tl_shm_coll.h"
 #include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
+#include "utils/arch/cpu.h"
 #include <limits.h>
 
 UCC_CLASS_INIT_FUNC(ucc_tl_shm_context_t,

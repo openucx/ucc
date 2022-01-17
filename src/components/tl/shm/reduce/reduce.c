@@ -254,7 +254,7 @@ ucc_status_t ucc_tl_shm_reduce_init(ucc_tl_shm_task_t *task)
 	ucc_rank_t   top_radix  = UCC_TL_SHM_TEAM_LIB(team)->cfg.reduce_top_radix;
 	ucc_status_t status;
 
-    if (args.reduce.predefined_op == UCC_OP_AVG) {
+    if (args.op == UCC_OP_AVG) {
         task->super.super.status = UCC_ERR_NOT_SUPPORTED;
     	return UCC_ERR_NOT_SUPPORTED;
     }

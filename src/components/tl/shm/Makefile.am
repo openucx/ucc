@@ -35,9 +35,9 @@ sources =                    \
 
 module_LTLIBRARIES = libucc_tl_shm.la
 libucc_tl_shm_la_SOURCES  = $(sources)
-libucc_tl_shm_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS) $(SHM_CPPFLAGS)
+libucc_tl_shm_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS)
 libucc_tl_shm_la_CFLAGS   = $(BASE_CFLAGS)
-libucc_tl_shm_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(SHM_LDFLAGS)
+libucc_tl_shm_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed
 libucc_tl_shm_la_LIBADD   = $(SHM_LIBADD) $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 include $(top_srcdir)/config/module.am

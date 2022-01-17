@@ -63,6 +63,8 @@ ucc_status_t ucc_sysv_free(void *addr)
     }
 
     return UCC_OK;
+}
+
 /*
  * If a certain system constant (name) is undefined on the underlying system the
  * sysconf routine returns -1.  ucs_sysconf return the negative value
