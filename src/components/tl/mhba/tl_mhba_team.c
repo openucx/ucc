@@ -156,7 +156,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
     self->max_msg_size = MAX_MSG_SIZE;
 
     self->max_num_of_columns =
-    		ucc_div_round_up(node->group_size, ucc_tl_mhba_calc_max_block_size());
+        ucc_div_round_up(node->group_size, 2 /* todo: there can be an estimation of
+                                                    minimal possible block size */);
 
     storage_size = OP_SEGMENT_SIZE(self) * MAX_OUTSTANDING_OPS;
 
