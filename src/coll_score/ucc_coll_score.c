@@ -1078,3 +1078,18 @@ ucc_status_t ucc_coll_score_dup(const ucc_coll_score_t *in,
     *out = score;
     return status;
 }
+
+void ucc_coll_score_set(ucc_coll_score_t *score,
+                        ucc_score_t       value)
+{
+    int               i, j;
+    ucc_msg_range_t  *range;
+
+    for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
+        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
+            ucc_list_for_each(range, &score->scores[i][j], super.list_elem) {
+                range->super.score = value;
+            }
+        }
+    }
+}
