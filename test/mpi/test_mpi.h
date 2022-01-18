@@ -200,7 +200,8 @@ public:
             ucc_datatype_t dt = UCC_DT_INT32,
             ucc_reduction_op_t op = UCC_OP_SUM,
             ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
-            ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT);
+            ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT,
+            void ** onesided_buffers = nullptr);
     static std::vector<std::shared_ptr<TestCase>> init(
             ucc_coll_type_t _type,
             ucc_test_team_t &_team,
@@ -214,8 +215,7 @@ public:
             ucc_reduction_op_t op = UCC_OP_SUM,
             ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
             ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT,
-            void * onesided_buffers[3] = {0},
-            bool is_onesided = false);
+            void ** onesided_buffers = nullptr);
     TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
              ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
              size_t _msgsize = 0, ucc_test_mpi_inplace_t _inplace = TEST_NO_INPLACE,
@@ -228,6 +228,7 @@ public:
     virtual std::string str();
     virtual ucc_status_t test();
     void wait();
+    void tc_progress_ctx();
     ucc_status_t exec();
     test_skip_cause_t skip_reduce(test_skip_cause_t cause, MPI_Comm comm);
     test_skip_cause_t skip_reduce(int skip_cond, test_skip_cause_t cause,
@@ -290,7 +291,6 @@ public:
     void set_num_tests(int num_tests) {
         nt = num_tests;
     }
-    void create_teams(std::vector<ucc_test_mpi_team_t> &test_teams);
     void create_teams(std::vector<ucc_test_mpi_team_t> &test_teams, bool is_onesided = false);
     void progress_ctx() {
         ucc_context_progress(ctx);

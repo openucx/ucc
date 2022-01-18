@@ -38,21 +38,20 @@ static ucc_status_t oob_allgather_free(void *req)
     return UCC_OK;
 }
 
-UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
-                       int is_local)
+UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_local)
 {
     ucc_lib_config_h     lib_config;
     ucc_context_config_h ctx_config;
     int                  size, rank;
-    long                *work_buf;
-    ucc_mem_map_t        segments[3];
+    ucc_mem_map_t        segments[UCC_TEST_N_MEM_SEGMENTS];
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     /* Init ucc library */
     ucc_lib_params_t lib_params = {
-        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE, .thread_mode = _tm,
+        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE,
+        .thread_mode = _tm,
         /* .coll_types = coll_types, */
     };
     tm = _tm; //TODO check ucc provided
@@ -60,7 +59,7 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
     ucc_context_params_t ctx_params          = {};
     ucc_context_params_t onesided_ctx_params = {};
     if (!is_local) {
-        ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_OOB;
+        ctx_params.mask         |= UCC_CONTEXT_PARAM_FIELD_OOB;
         ctx_params.oob.allgather = oob_allgather;
         ctx_params.oob.req_test  = oob_allgather_test;
         ctx_params.oob.req_free  = oob_allgather_free;
@@ -70,13 +69,11 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
 
         onesided_ctx_params = ctx_params;
         for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
-            onesided_buffers[i] = ucc_malloc(UCC_TEST_MEM_SEGMENT_SIZE * size);
+            onesided_buffers[i] = ucc_calloc(UCC_TEST_MEM_SEGMENT_SIZE, size);
             UCC_MALLOC_CHECK(onesided_buffers[i]);
             segments[i].address = onesided_buffers[i];
             segments[i].len     = UCC_TEST_MEM_SEGMENT_SIZE * size;
         }
-        work_buf    = (long *)onesided_buffers[MEM_WORK_SEGMENT];
-        work_buf[0] = -1;
         onesided_ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
         onesided_ctx_params.mem_params.segments   = segments;
         onesided_ctx_params.mem_params.n_segments = UCC_TEST_N_MEM_SEGMENTS;
@@ -88,9 +85,10 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
     UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
     UCC_CHECK(ucc_init(&lib_params, lib_config, &lib));
     ucc_lib_config_release(lib_config);
+
     UCC_CHECK(ucc_context_config_read(lib, NULL, &ctx_config));
     UCC_CHECK(ucc_context_create(lib, &ctx_params, ctx_config, &ctx));
-
+    ucc_context_config_release(ctx_config);
     setenv("UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided", 1);
     UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
     UCC_CHECK(ucc_init(&lib_params, lib_config, &onesided_lib));
@@ -143,8 +141,8 @@ UccTestMpi::~UccTestMpi()
     for (auto &t : onesided_teams) {
         destroy_team(t);
     }
-    if (onesided_buffers[0]) {
-        for (auto i = 0; i < 3; i++) {
+    if (onesided_buffers) {
+        for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
             ucc_free(onesided_buffers[i]);
         }
     }
@@ -180,7 +178,7 @@ ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm, bool is_onesided)
     if (is_onesided) {
         team_params.mask |= UCC_TEAM_PARAM_FIELD_FLAGS;
         team_params.flags = UCC_TEAM_FLAG_COLL_WORK_BUFFER;
-        team_ctx = onesided_ctx;
+        team_ctx          = onesided_ctx;
     }
     UCC_CHECK(ucc_team_create_post(&team_ctx, 1, &team_params, &team));
 
@@ -376,7 +374,7 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
             if (status == UCC_OK) {
                 num_done++;
             }
-            ucc_context_progress(ctx);
+            tc->tc_progress_ctx();
         }
     } while (num_done != tcs.size());
     for (auto tc: tcs) {
@@ -438,14 +436,17 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                         auto res = exec_tests(tcs);
                                         rst.insert(rst.end(), res.begin(), res.end());
                                     } else {
+                                        if (mt != UCC_MEMORY_TYPE_HOST) {
+                                            continue;
+                                        }
                                         auto tc_onesided = TestCase::init(
-                                            c, team, r, m, inplace, mt, s,
+                                            c, team, nt, r, m, inplace, mt, s,
                                             UCC_DT_UINT32, UCC_OP_LAST,
                                             TEST_FLAG_VSIZE_64BIT,
                                             TEST_FLAG_VSIZE_64BIT,
-                                            onesided_buffers, true);
-                                        rst.push_back(
-                                            tc_onesided.get()->exec());
+                                            onesided_buffers);
+                                        auto res = exec_tests(tc_onesided);
+                                        rst.insert(rst.end(), res.begin(), res.end());
                                     }
                                     break;
                                 }
