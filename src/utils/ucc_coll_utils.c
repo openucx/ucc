@@ -242,29 +242,6 @@ ucc_coll_args_is_rooted(const ucc_base_coll_args_t *bargs)
     return 0;
 }
 
-static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
-{
-    switch((int)ct) {
-    case UCC_MEMORY_TYPE_HOST:
-        return "Host";
-    case UCC_MEMORY_TYPE_CUDA:
-        return "Cuda";
-    case UCC_MEMORY_TYPE_CUDA_MANAGED:
-        return "CudaManaged";
-    case UCC_MEMORY_TYPE_ROCM:
-        return "Rocm";
-    case UCC_MEMORY_TYPE_ROCM_MANAGED:
-        return "RocmManaged";
-    case UCC_MEMORY_TYPE_ASSYMETRIC:
-        return "assymetric";
-    case UCC_MEMORY_TYPE_NOT_APPLY:
-        return "n/a";
-    default:
-        break;
-    }
-    return "invalid";
-}
-
 void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len)
 {
     const ucc_base_coll_args_t *args  = &task->bargs;

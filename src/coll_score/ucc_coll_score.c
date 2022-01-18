@@ -5,6 +5,7 @@
  */
 #include "ucc_coll_score.h"
 #include "utils/ucc_string.h"
+#include "utils/ucc_log.h"
 #include "utils/ucc_coll_utils.h"
 
 ucc_status_t ucc_coll_score_alloc(ucc_coll_score_t **score)

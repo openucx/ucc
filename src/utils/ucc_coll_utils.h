@@ -52,6 +52,29 @@ ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
     return ((uint32_t *)counts)[idx];
 }
 
+static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
+{
+    switch((int)ct) {
+    case UCC_MEMORY_TYPE_HOST:
+        return "Host";
+    case UCC_MEMORY_TYPE_CUDA:
+        return "Cuda";
+    case UCC_MEMORY_TYPE_CUDA_MANAGED:
+        return "CudaManaged";
+    case UCC_MEMORY_TYPE_ROCM:
+        return "Rocm";
+    case UCC_MEMORY_TYPE_ROCM_MANAGED:
+        return "RocmManaged";
+    case UCC_MEMORY_TYPE_ASSYMETRIC:
+        return "assymetric";
+    case UCC_MEMORY_TYPE_NOT_APPLY:
+        return "n/a";
+    default:
+        break;
+    }
+    return "invalid";
+}
+
 static inline size_t
 ucc_coll_args_get_displacement(const ucc_coll_args_t *args,
                                const ucc_aint_t *displacements, ucc_rank_t idx)

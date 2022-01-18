@@ -432,6 +432,15 @@ out:
     if (UCC_OK == status) {
         status = ucc_team_build_score_map(team);
     }
+
+    if (UCC_OK == status &&
+        ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_INFO &&
+        team->rank == 0) {
+        ucc_info("===== COLL_SCORE_MAP (team_id %d) =====",
+                 team->id);
+        ucc_coll_score_map_print_info(team->score_map);
+        ucc_info("=======================================");
+    }
     /* TODO: add team/coll selection and check if some teams are never
              used after selection and clean them up */
     return status;

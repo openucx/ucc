@@ -5,6 +5,7 @@
  */
 #include "ucc_coll_score.h"
 #include "utils/ucc_coll_utils.h"
+#include "utils/ucc_string.h"
 #include "schedule/ucc_schedule.h"
 
 typedef struct ucc_score_map {
@@ -99,4 +100,58 @@ ucc_status_t ucc_coll_init(ucc_score_map_t      *map,
     }
 
     return status;
+}
+
+#define STR_APPEND(_str, _left, _tmp_size, _format, ...) {           \
+    char _tmp[_tmp_size];                                            \
+    ucc_snprintf_safe(_tmp, _tmp_size, _format, ## __VA_ARGS__ );    \
+    strncat(_str, _tmp, _left - 1);                                  \
+    _left = sizeof(_str)  - strlen(_str);                            \
+    if (!_left) {                                                    \
+        return;                                                      \
+    }                                                                \
+}
+
+void ucc_coll_score_map_print_info(const ucc_score_map_t *map)
+{
+    size_t            left;
+    ucc_msg_range_t  *range;
+    int               i, j, all_empty;
+    char              range_str[128];
+    char              coll_str[1024];
+
+    for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
+        all_empty = 1;
+        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
+            if (!ucc_list_is_empty(&map->score->scores[i][j])) {
+                all_empty = 0;
+                break;
+            }
+        }
+        if (all_empty) {
+            continue;
+        }
+        coll_str[0] = '\0';
+        left        = sizeof(coll_str);
+        STR_APPEND(coll_str, left, 32, "%s:\n",
+                   ucc_coll_type_str(UCC_BIT(i)));
+        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
+            if (ucc_list_is_empty(&map->score->scores[i][j])) {
+                continue;
+            }
+            STR_APPEND(coll_str, left, 32, "\t%s: ",
+                       ucc_mem_type_str((ucc_memory_type_t)j));
+            ucc_list_for_each(range, &map->score->scores[i][j],
+                              super.list_elem) {
+                ucc_memunits_range_str(range->start, range->end, range_str,
+                                       sizeof(range_str));
+                STR_APPEND(coll_str, left, 256, "{%s}:%s:%u ",
+                           range_str,
+                           range->super.team->context->lib->log_component.name,
+                           range->super.score);
+            }
+            STR_APPEND(coll_str, left, 4, "\n");
+        }
+        ucc_info("%s", coll_str);
+    }
 }
