@@ -19,7 +19,8 @@ sources =             \
 	tl_mhba_mkeys.h   \
 	tl_mhba_mkeys.c   \
 	tl_mhba_rcache.c  \
-	tl_mhba_umr.c
+	tl_mhba_umr.c     \
+	tl_mhba_inline.h
 
 module_LTLIBRARIES = libucc_tl_mhba.la
 libucc_tl_mhba_la_SOURCES  = $(sources)

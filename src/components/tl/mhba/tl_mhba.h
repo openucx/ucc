@@ -51,6 +51,7 @@ typedef struct ucc_tl_mhba_lib_config {
     ucc_tl_lib_config_t super;
 
     int    transpose;
+    int    asr_barrier;
     size_t transpose_buf_size;
     int    block_size;
     int    num_dci_qps;
@@ -99,12 +100,22 @@ typedef struct ucc_tl_mhba_ctrl {
 typedef struct ucc_tl_mhba_net_ctrl {
     union {
         struct {
-            int atomic_counter;
-            int barrier_seq_num[2];
+            uint64_t atomic_counter;
+            int      barrier_local_seq_num;
         };
         char tmp[UCC_CACHE_LINE_SIZE];
     };
 } ucc_tl_mhba_net_ctrl_t;
+
+typedef struct ucc_tl_mhba_barrier_ctrl {
+    union {
+        struct {
+            int barrier_seq_num;
+            int blocks_sent;
+        };
+        char tmp[UCC_CACHE_LINE_SIZE];
+    };
+} ucc_tl_mhba_barrier_ctrl_t;
 
 
 typedef struct mlx5dv_mr_interleaved umr_t;
@@ -290,17 +301,20 @@ static inline ucc_tl_mhba_ctrl_t *ucc_tl_mhba_get_my_ctrl(ucc_tl_mhba_team_t *te
 
 
 #define OP_SEGMENT_SIZE(_team) \
-    (sizeof(ucc_tl_mhba_net_ctrl_t) + sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size + \
+    (sizeof(ucc_tl_mhba_net_ctrl_t) +                                   \
+     sizeof(ucc_tl_mhba_barrier_ctrl_t) * (_team)->net.net_size +       \
+     sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size +                  \
      (sizeof(umr_t) * (_team)->max_num_of_columns * (_team)->node_size) * 2)
 
-#define NODE_CTRL_OFFSET (sizeof(ucc_tl_mhba_net_ctrl_t))
-#define UMR_DATA_OFFSET(_team) (NODE_CTRL_OFFSET + sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size)
+#define BARRIER_CTRL_OFFSET (sizeof(ucc_tl_mhba_net_ctrl_t))
+#define NODE_CTRL_OFFSET(_team) (BARRIER_CTRL_OFFSET + sizeof(ucc_tl_mhba_barrier_ctrl_t) * (_team)->net.net_size)
+#define UMR_DATA_OFFSET(_team) (NODE_CTRL_OFFSET(_team) + sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size)
 
+#define OP_SEGMENT_STORAGE(_req, _team) \
+    PTR_OFFSET((_team)->node.storage, OP_SEGMENT_SIZE(_team) * (_req)->seq_index)
 
 #define OP_UMR_DATA(_req, _team) \
-    PTR_OFFSET((_team)->node.storage,\
-               OP_SEGMENT_SIZE(_team) * (_req)->seq_index + UMR_DATA_OFFSET(_team))
-
+    PTR_OFFSET(OP_SEGMENT_STORAGE(_req, _team), UMR_DATA_OFFSET(_team))
 
 #define SEND_UMR_DATA(_req, _team, _col)                                     \
     PTR_OFFSET(OP_UMR_DATA(_req, _team),                                \
@@ -321,5 +335,18 @@ static inline ucc_tl_mhba_ctrl_t *ucc_tl_mhba_get_my_ctrl(ucc_tl_mhba_team_t *te
 
 #define REMOTE_CTRL(_task, _rank) \
     (ucc_tl_mhba_net_ctrl_t*)(PTR_OFFSET(TASK_TEAM(_task)->net.remote_ctrl[_rank].addr,    \
-               task->seq_index * OP_SEGMENT_SIZE(_team)))
+                                         (_task)->seq_index * OP_SEGMENT_SIZE(TASK_TEAM(_task))))
+
+#define REMOTE_BARRIER_CTRL_ADDR(_task, _rank) \
+    (uintptr_t)(PTR_OFFSET(REMOTE_CTRL(_task, _rank), BARRIER_CTRL_OFFSET))
+
+
+#define MY_BARRIER_ADDR_ON_REMOTE(_task, _rank) \
+    PTR_OFFSET(REMOTE_BARRIER_CTRL_ADDR(_task, _rank), \
+        TASK_TEAM(_task)->net.sbgp->group_rank * sizeof(ucc_tl_mhba_barrier_ctrl_t) + \
+               ucc_offsetof(ucc_tl_mhba_barrier_ctrl_t, barrier_seq_num))
+
+#define BARRIER_CTRL(_task, _rank) ((ucc_tl_mhba_barrier_ctrl_t*)      \
+    (PTR_OFFSET(OP_SEGMENT_STORAGE(_task, TASK_TEAM(_task)), BARRIER_CTRL_OFFSET + \
+                sizeof(ucc_tl_mhba_barrier_ctrl_t) * _rank)))
 #endif

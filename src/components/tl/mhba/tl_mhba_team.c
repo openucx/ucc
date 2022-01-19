@@ -159,9 +159,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
         ucc_div_round_up(node->group_size, 2 /* todo: there can be an estimation of
                                                     minimal possible block size */);
 
-    storage_size = OP_SEGMENT_SIZE(self) * MAX_OUTSTANDING_OPS;
-
     if (self->node.asr_rank == node->group_rank) {
+        self->net.net_size = self->net.sbgp->group_size;
+        storage_size       = OP_SEGMENT_SIZE(self) * MAX_OUTSTANDING_OPS;
         self->bcast_data.shmid =
             shmget(IPC_PRIVATE, storage_size, IPC_CREAT | 0600);
         if (self->bcast_data.shmid == -1) {
@@ -301,7 +301,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
         for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
             op = &team->node.ops[i];
             op->net_ctrl = PTR_OFFSET(team->node.storage, op_seg_size * i);
-            op->ctrl     = PTR_OFFSET(team->node.storage, op_seg_size * i + NODE_CTRL_OFFSET);
+            op->ctrl     = PTR_OFFSET(team->node.storage, op_seg_size * i + NODE_CTRL_OFFSET(team));
             op->my_ctrl  = PTR_OFFSET(op->ctrl, node_rank * sizeof(ucc_tl_mhba_ctrl_t));
         }
 
