@@ -6,8 +6,9 @@
 
 #include "tl_cuda.h"
 #include "utils/arch/cpu.h"
-#include <cuda_runtime.h>
 #include <tl_cuda_topo.h>
+#include <cuda_runtime.h>
+#include <cuda.h>
 
 static ucc_mpool_ops_t ucc_tl_cuda_req_mpool_ops = {
     .chunk_alloc   = ucc_mpool_hugetlb_malloc,
@@ -25,10 +26,19 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
     ucc_status_t status;
     int num_devices;
     cudaError_t cuda_st;
+    CUcontext cu_ctx;
+    CUresult cu_st;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_cuda_config->super.tl_lib,
                               params->context);
     memcpy(&self->cfg, tl_cuda_config, sizeof(*tl_cuda_config));
+
+    cu_st = cuCtxGetCurrent(&cu_ctx);
+    if (cu_ctx == NULL || cu_st != CUDA_SUCCESS) {
+        tl_info(self->super.super.lib,
+                "cannot create CUDA TL context without active CUDA context");
+        return UCC_ERR_NO_RESOURCE;
+    }
 
     cuda_st = cudaGetDeviceCount(&num_devices);
     if (cuda_st != cudaSuccess) {

@@ -24,7 +24,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     ucc_status_t status;
     int shm_id, i, j;
     size_t ctrl_size, alloc_size;
-
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     self->oob    = params->params.oob;
