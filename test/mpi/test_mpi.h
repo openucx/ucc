@@ -201,7 +201,7 @@ public:
             ucc_reduction_op_t op = UCC_OP_SUM,
             ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
             ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT,
-            void ** onesided_buffers = nullptr);
+            void **onesided_buffers = nullptr);
     static std::vector<std::shared_ptr<TestCase>> init(
             ucc_coll_type_t _type,
             ucc_test_team_t &_team,
@@ -215,7 +215,7 @@ public:
             ucc_reduction_op_t op = UCC_OP_SUM,
             ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
             ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT,
-            void ** onesided_buffers = nullptr);
+            void **onesided_buffers = nullptr);
     TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
              ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
              size_t _msgsize = 0, ucc_test_mpi_inplace_t _inplace = TEST_NO_INPLACE,
@@ -291,7 +291,8 @@ public:
     void set_num_tests(int num_tests) {
         nt = num_tests;
     }
-    void create_teams(std::vector<ucc_test_mpi_team_t> &test_teams, bool is_onesided = false);
+    void create_teams(std::vector<ucc_test_mpi_team_t> &test_teams,
+                      bool                              is_onesided = false);
     void progress_ctx() {
         ucc_context_progress(ctx);
     }
@@ -372,8 +373,8 @@ public:
 class TestAlltoall : public TestCase {
 public:
     TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-                 ucc_memory_type_t _mt, ucc_test_team_t &_team,
-                 size_t _max_size, void ** buffers = nullptr);
+                 ucc_memory_type_t _mt, ucc_test_team_t &_team, size_t _max_size,
+                 void **buffers = nullptr);
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ucc_status_t check();

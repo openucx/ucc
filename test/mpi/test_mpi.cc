@@ -38,7 +38,8 @@ static ucc_status_t oob_allgather_free(void *req)
     return UCC_OK;
 }
 
-UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm, int is_local)
+UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
+                       int is_local)
 {
     ucc_lib_config_h     lib_config;
     ucc_context_config_h ctx_config;
@@ -430,11 +431,12 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                 switch (c) {
                                 case UCC_COLL_TYPE_ALLTOALL:
                                 {
-                                    if (team.ctx == ctx) { 
-                                        auto tcs = TestCase::init(c, team, nt, r, m,
-                                                                 inplace, mt, s);
+                                    if (team.ctx == ctx) {
+                                        auto tcs = TestCase::init(
+                                            c, team, nt, r, m, inplace, mt, s);
                                         auto res = exec_tests(tcs);
-                                        rst.insert(rst.end(), res.begin(), res.end());
+                                        rst.insert(rst.end(), res.begin(),
+                                                   res.end());
                                     } else {
                                         if (mt != UCC_MEMORY_TYPE_HOST) {
                                             continue;
@@ -446,7 +448,8 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                             TEST_FLAG_VSIZE_64BIT,
                                             onesided_buffers);
                                         auto res = exec_tests(tc_onesided);
-                                        rst.insert(rst.end(), res.begin(), res.end());
+                                        rst.insert(rst.end(), res.begin(),
+                                                   res.end());
                                     }
                                     break;
                                 }

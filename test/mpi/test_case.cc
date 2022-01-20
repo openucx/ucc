@@ -11,13 +11,14 @@ TestCase::init(ucc_coll_type_t _type, ucc_test_team_t &_team, int num_tests,
                int root, size_t msgsize, ucc_test_mpi_inplace_t inplace,
                ucc_memory_type_t mt, size_t max_size, ucc_datatype_t dt,
                ucc_reduction_op_t op, ucc_test_vsize_flag_t count_bits,
-               ucc_test_vsize_flag_t displ_bits, void ** onesided_buffers)
+               ucc_test_vsize_flag_t displ_bits, void **onesided_buffers)
 {
     std::vector<std::shared_ptr<TestCase>> tcs;
 
     for (int i = 0; i < num_tests; i++) {
-        auto tc = init_single(_type, _team, root, msgsize, inplace, mt,
-                              max_size, dt, op, count_bits, displ_bits, onesided_buffers);
+        auto tc =
+            init_single(_type, _team, root, msgsize, inplace, mt, max_size, dt,
+                        op, count_bits, displ_bits, onesided_buffers);
         if (!tc) {
             tcs.clear();
             return tcs;
