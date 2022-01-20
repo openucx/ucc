@@ -150,4 +150,9 @@ ucc_status_t ucc_coll_init(ucc_score_map_t      *map,
 
 ucc_status_t ucc_coll_score_dup(const ucc_coll_score_t *in,
                                 ucc_coll_score_t      **out);
+
+void ucc_coll_score_set(ucc_coll_score_t *score,
+                        ucc_score_t       value);
+
+void ucc_coll_score_map_print_info(const ucc_score_map_t *score);
 #endif

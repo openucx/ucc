@@ -242,37 +242,18 @@ ucc_coll_args_is_rooted(const ucc_base_coll_args_t *bargs)
     return 0;
 }
 
-static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
+void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len)
 {
-    switch((int)ct) {
-    case UCC_MEMORY_TYPE_HOST:
-        return "Host";
-    case UCC_MEMORY_TYPE_CUDA:
-        return "Cuda";
-    case UCC_MEMORY_TYPE_CUDA_MANAGED:
-        return "CudaManaged";
-    case UCC_MEMORY_TYPE_ROCM:
-        return "Rocm";
-    case UCC_MEMORY_TYPE_ROCM_MANAGED:
-        return "RocmManaged";
-    case UCC_MEMORY_TYPE_ASSYMETRIC:
-        return "assymetric";
-    case UCC_MEMORY_TYPE_NOT_APPLY:
-        return "n/a";
-    default:
-        break;
-    }
-    return "invalid";
-}
+    const ucc_base_coll_args_t *args  = &task->bargs;
+    ucc_team_t                *team  = args->team;
+    ucc_coll_type_t            ct    = args->args.coll_type;
+    size_t                     left  = len;
+    char                       tmp[64];
 
-void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len)
-{
-    ucc_team_t     *team  = args->team;
-    ucc_coll_type_t ct    = args->args.coll_type;
-    size_t          left  = len;
-    char            tmp[64];
-
-    ucc_snprintf_safe(str, left, "team id %u size %u rank %u ctx_rank %u: %s %s inplace=%u",
+    ucc_snprintf_safe(str, left, "req %p, seq_num %u, %s, team_id %u, size %u, "
+                      "rank %u, ctx_rank %u: %s %s inplace=%u",
+                      task, task->seq_num,
+                      task->team->context->lib->log_component.name,
                       team->id, team->size, team->rank,
                       ucc_ep_map_eval(team->ctx_map, team->rank),
                       ucc_coll_type_str(ct),
