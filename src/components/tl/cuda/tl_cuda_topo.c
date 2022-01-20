@@ -8,6 +8,9 @@
 #include "tl_cuda_common.h"
 #include <nvml.h>
 #include "unistd.h"
+#include "pthread.h"
+
+pthread_mutex_t nvml_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #define MAX_PCI_BUS_ID_STR 16
 #define MAX_PCI_DEVICES    32
@@ -45,15 +48,6 @@ ucc_status_t ucc_tl_cuda_topo_get_pci_id(const ucc_base_lib_t *lib,
     st = ucc_tl_cuda_topo_pci_id_from_str(pci_bus_id, pci_id);
 exit:
     return st;
-}
-
-int ucc_tl_cuda_topo_device_id_equal(const ucc_tl_cuda_device_id_t *id1,
-                                     const ucc_tl_cuda_device_id_t *id2)
-{
-    return ((id1->domain   == id2->domain) &&
-            (id1->bus      == id2->bus)    &&
-            (id1->device   == id2->device) &&
-            (id1->function == id2->function));
 }
 
 static uint64_t
@@ -182,6 +176,7 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
         return UCC_ERR_NO_MEMORY;
     }
     kh_init_inplace(bus_to_node, &topo->bus_to_node_hash);
+    pthread_mutex_lock(&nvml_lock);
     NVMLCHECK_GOTO(nvmlInit_v2(), exit_free_graph, status, topo->lib);
     nvml_value.fieldId = NVML_FI_DEV_NVLINK_LINK_COUNT;
     for (i = 0; i < num_gpus; i++) {
@@ -231,12 +226,14 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
         }
     }
     nvmlShutdown();
+    pthread_mutex_unlock(&nvml_lock);
     return UCC_OK;
 
 exit_nvml_shutdown:
     nvmlShutdown();
 exit_free_graph:
     ucc_tl_cuda_topo_graph_destroy(topo);
+    pthread_mutex_unlock(&nvml_lock);
     return status;
 }
 
@@ -247,6 +244,7 @@ ucc_status_t ucc_tl_cuda_topo_create(const ucc_base_lib_t *lib,
     ucc_status_t status;
 
     topo = (ucc_tl_cuda_topo_t*)ucc_malloc(sizeof(*topo), "cuda_topo");
+    topo->lib = lib;
     if (!topo) {
         tl_error(lib, "failed to alloc cuda topo");
         status = UCC_ERR_NO_MEMORY;

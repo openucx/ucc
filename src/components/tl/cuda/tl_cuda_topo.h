@@ -17,6 +17,16 @@ typedef struct ucc_tl_cuda_device_id {
     uint8_t  function; /* range: 0 to 7 */
 } ucc_tl_cuda_device_id_t;
 
+static inline int
+ucc_tl_cuda_topo_device_id_equal(const ucc_tl_cuda_device_id_t *id1,
+                                 const ucc_tl_cuda_device_id_t *id2)
+{
+    return ((id1->domain   == id2->domain) &&
+            (id1->bus      == id2->bus)    &&
+            (id1->device   == id2->device) &&
+            (id1->function == id2->function));
+}
+
 typedef struct ucc_tl_cuda_topo_link {
     ucc_list_link_t         list_link;
     ucc_tl_cuda_device_id_t pci_id;

@@ -1,6 +1,8 @@
 #include "tl_cuda_team_topo.h"
 #include "tl_cuda.h"
 
+#define UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE -1
+
 static ucc_status_t
 ucc_tl_cuda_team_topo_init_proxy(const ucc_tl_cuda_team_t *team,
                                  ucc_tl_cuda_team_topo_t *topo)
@@ -46,7 +48,7 @@ ucc_tl_cuda_team_topo_init_proxy(const ucc_tl_cuda_team_t *team,
                 tl_info(UCC_TL_TEAM_LIB(team), "no proxy found between "
                         "dev %d rank %d and dev %d rank %d, "
                         "cuda topology is not supported",
-                        i, team->ids[i].device, j, team->ids[j].device);
+                        team->ids[i].device, i, team->ids[j].device, j);
                 status = UCC_ERR_NOT_SUPPORTED;
                 goto free_proxy;
             }
@@ -70,14 +72,19 @@ ucc_tl_cuda_team_topo_init_matrix(const ucc_tl_cuda_team_t *team,
     int i, j;
 
     for (i = 0; i < size; i++) {
-        matrix[i + i*size] = 1;
+        matrix[i + i*size] = UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE;
         for (j = i + 1; j < size; j++) {
-            status = ucc_tl_cuda_topo_num_links(topo,
-                                                &team->ids[i].pci_id,
-                                                &team->ids[j].pci_id,
-                                                &matrix[i + j*size]);
-            if (status != UCC_OK) {
-                return status;
+            if (ucc_tl_cuda_topo_device_id_equal(&team->ids[i].pci_id,
+                                                 &team->ids[j].pci_id)) {
+                matrix[i + j*size] = UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE;
+            } else {
+                status = ucc_tl_cuda_topo_num_links(topo,
+                                                    &team->ids[i].pci_id,
+                                                    &team->ids[j].pci_id,
+                                                    &matrix[i + j*size]);
+                if (status != UCC_OK) {
+                    return status;
+                }
             }
             matrix[j + i*size] = matrix[i +j*size];
         }
@@ -125,7 +132,7 @@ ucc_status_t ucc_tl_cuda_team_topo_create(const ucc_tl_team_t *cuda_team,
 free_matrix:
     ucc_free(topo->matrix);
 free_topo:
-    ucc_free(team_topo);
+    ucc_free(topo);
     return status;
 }
 
@@ -139,10 +146,17 @@ void ucc_tl_cuda_team_topo_print(const ucc_tl_team_t *tl_team,
 
     for (i = 0; i < size; i++) {
         if (ucc_tl_cuda_team_topo_is_direct(tl_team, topo, rank, i)) {
-            tl_debug(UCC_TL_TEAM_LIB(team),
-                     "dev %d rank %d to dev %d rank %d: %d direct links",
-                     team->ids[rank].device, rank, team->ids[i].device, i,
-                     topo->matrix[rank * size + i]);
+            if (topo->matrix[rank * size +i] == UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE)
+            {
+                tl_debug(UCC_TL_TEAM_LIB(team),
+                        "dev %d rank %d to dev %d rank %d: same device",
+                        team->ids[rank].device, rank, team->ids[i].device, i);
+            } else {
+                tl_debug(UCC_TL_TEAM_LIB(team),
+                        "dev %d rank %d to dev %d rank %d: %d direct links",
+                        team->ids[rank].device, rank, team->ids[i].device, i,
+                        topo->matrix[rank * size + i]);
+            }
         } else {
             for (j = 0 ; j < topo->num_proxies; j++) {
                 if ((topo->proxies[j].src == rank) &&
