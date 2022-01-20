@@ -41,15 +41,32 @@
         (_task)->start_time   = ucc_get_time();                    \
     } while(0)
 
+#define UCC_COLL_ARGS_COUNT64(_args)                                           \
+    (((_args)->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                            \
+     ((_args)->flags & UCC_COLL_ARGS_FLAG_COUNT_64BIT))
+
+#define UCC_COLL_ARGS_DISPL64(_args)                                           \
+    (((_args)->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                            \
+     ((_args)->flags & UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT))
+
 static inline size_t
 ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
                         ucc_rank_t idx)
 {
-    if ((args->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-        (args->flags & UCC_COLL_ARGS_FLAG_COUNT_64BIT)) {
+    if (UCC_COLL_ARGS_COUNT64(args)) {
         return ((uint64_t *)counts)[idx];
     }
     return ((uint32_t *)counts)[idx];
+}
+
+static inline size_t
+ucc_coll_args_get_displacement(const ucc_coll_args_t *args,
+                               const ucc_aint_t *displacements, ucc_rank_t idx)
+{
+    if (UCC_COLL_ARGS_DISPL64(args)) {
+        return ((uint64_t *)displacements)[idx];
+    }
+    return ((uint32_t *)displacements)[idx];
 }
 
 static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
@@ -73,17 +90,6 @@ static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
         break;
     }
     return "invalid";
-}
-
-static inline size_t
-ucc_coll_args_get_displacement(const ucc_coll_args_t *args,
-                               const ucc_aint_t *displacements, ucc_rank_t idx)
-{
-    if ((args->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-        (args->flags & UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT)) {
-        return ((uint64_t *)displacements)[idx];
-    }
-    return ((uint32_t *)displacements)[idx];
 }
 
 static inline size_t

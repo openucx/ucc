@@ -33,7 +33,7 @@ typedef enum ucc_sbgp_type_t
                                 local_socket_rank = 0. This group is DISABLED
                                 but EXISTS for procs with local_socket_rank != 0 */
     UCC_SBGP_NUMA_LEADERS,   /* Same as SOCKET_LEADERS but for NUMA grouping */
-    UCC_SBGP_FLAT,           /* Group contains ALL the ranks of the team */
+    UCC_SBGP_FULL,           /* Group contains ALL the ranks of the team */
     UCC_SBGP_LAST
 } ucc_sbgp_type_t;
 

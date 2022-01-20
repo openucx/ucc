@@ -9,6 +9,7 @@
 #include "core/ucc_team.h"
 #include "core/ucc_service_coll.h"
 #include "allreduce/allreduce.h"
+#include "alltoallv/alltoallv.h"
 
 #define SBGP_SET(_team, _sbgp, _enable)                                        \
     _team->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp_type = UCC_SBGP_##_sbgp;          \
@@ -23,6 +24,7 @@ static void ucc_cl_hier_enable_sbgps(ucc_cl_hier_team_t *team)
     SBGP_SET(team, NET, DISABLED);
     SBGP_SET(team, NODE, ENABLED);
     SBGP_SET(team, NODE_LEADERS, ENABLED);
+    SBGP_SET(team, FULL, ENABLED); //todo parse score if a2av is enabled
 }
 
 UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
@@ -293,6 +295,46 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
     return status;
 }
 
+static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
+{
+    switch (coll_type) {
+    case UCC_COLL_TYPE_ALLTOALLV:
+        return ucc_cl_hier_alltoallv_alg_from_str(str);
+    default:
+        break;
+    }
+    return -1;
+}
+
+static ucc_status_t
+ucc_cl_hier_alg_id_to_init(int alg_id, const char *alg_id_str,
+                           ucc_coll_type_t          coll_type,
+                           ucc_memory_type_t        mem_type, //NOLINT
+                           ucc_base_coll_init_fn_t *init)
+{
+    ucc_status_t status = UCC_OK;
+    if (alg_id_str) {
+        alg_id = alg_id_from_str(coll_type, alg_id_str);
+    }
+
+    switch (coll_type) {
+    case UCC_COLL_TYPE_ALLTOALLV:
+        switch (alg_id) {
+        case UCC_CL_HIER_ALLTOALLV_ALG_NODE_SPLIT:
+            *init = ucc_cl_hier_alltoallv_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        };
+        break;
+    default:
+        status = UCC_ERR_NOT_SUPPORTED;
+        break;
+    }
+    return status;
+}
+
 ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
                                          ucc_coll_score_t **score_p)
 {
@@ -318,13 +360,21 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
             cl_error(lib, "faild to add range to score_t");
             return status;
         }
+
+        status = ucc_coll_score_add_range(
+            score, UCC_COLL_TYPE_ALLTOALLV, mt[i], 0, UCC_MSG_MAX,
+            /* low priority 1: to be enabled manually */
+            1, ucc_cl_hier_alltoallv_init, cl_team);
+        if (UCC_OK != status) {
+            cl_error(lib, "faild to add range to score_t");
+            return status;
+        }
     }
 
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            ctx->score_str, score, UCC_CL_TEAM_SIZE(team),
-            ucc_cl_hier_coll_init,
-            cl_team, UCC_CL_HIER_DEFAULT_SCORE, NULL);
+            ctx->score_str, score, UCC_CL_TEAM_SIZE(team), NULL, cl_team,
+            UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_alg_id_to_init);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
