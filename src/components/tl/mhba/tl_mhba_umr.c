@@ -82,7 +82,8 @@ void ucc_tl_mhba_wr_complete(struct ucc_tl_mhba_internal_qp *mqp)
 }
 
 static inline void common_wqe_init(struct ibv_qp_ex *              ibqp,
-                                   struct ucc_tl_mhba_internal_qp *mqp)
+                                   struct ucc_tl_mhba_internal_qp *mqp,
+                                   int opcode)
 {
     struct mlx5_wqe_ctrl_seg *ctrl;
     uint8_t                   fence;
@@ -104,7 +105,7 @@ static inline void common_wqe_init(struct ibv_qp_ex *              ibqp,
         (ibqp->wr_flags & IBV_SEND_SOLICITED ? MLX5_WQE_CTRL_SOLICITED : 0);
 
     ctrl->opmod_idx_opcode =
-        htobe32(((mqp->sq_cur_post & 0xffff) << 8) | MLX5_OPCODE_UMR);
+        htobe32(((mqp->sq_cur_post & 0xffff) << 8) | opcode);
 
     mqp->cur_ctrl = ctrl;
 }
@@ -208,7 +209,7 @@ ucc_status_t ucc_tl_mhba_send_wr_mr_noninline(
         return UCC_ERR_NO_MESSAGE;
     }
 
-    common_wqe_init(ibqp, mqp);
+    common_wqe_init(ibqp, mqp, MLX5_OPCODE_UMR);
     mqp->cur_size      = sizeof(struct mlx5_wqe_ctrl_seg) / DS_SIZE;
     mqp->cur_ctrl->imm = htobe32(dv_mkey->lkey);
     seg                = umr_ctrl_seg =
@@ -252,5 +253,74 @@ ucc_status_t ucc_tl_mhba_send_wr_mr_noninline(
     mqp->nreq++;
 
     common_wqe_finilize(mqp);
+    return UCC_OK;
+}
+
+#define MLX5_OPCODE_LOCAL_MMO 0x32
+
+typedef struct transpose_seg {
+    __be32 element_size; /* 8 bit value */
+    __be16 num_rows; /* 7 bit value */
+    __be16 num_cols; /* 7 bit value */
+    __be64 padding;
+} transpose_seg_t;
+
+/* External API to expose the non-inline UMR registration */
+ucc_status_t ucc_tl_mhba_post_transpose(struct ucc_tl_mhba_internal_qp *mqp, struct ibv_qp_ex *ibqp,
+                                        struct ibv_mr *src_mr, struct ibv_mr *dst_mr,
+                                        uint32_t element_size, uint16_t ncols, uint16_t nrows,
+                                        uintptr_t src_mkey_addr, uintptr_t dst_addr)
+{
+
+    void *                    qend   = mqp->sq_qend;
+    uint32_t                  opcode = MLX5_OPCODE_LOCAL_MMO;
+    uint32_t                  opmode = 0x0; //TRanspose
+    uint32_t                  n_ds   = 4;
+    struct mlx5_wqe_ctrl_seg *ctrl;
+    struct mlx5_wqe_data_seg *data;
+    transpose_seg_t          *tseg;
+    uint32_t                  idx;
+
+    idx = mqp->sq_cur_post & (mqp->qp.sq.wqe_cnt - 1);
+
+    /* SET CTRL SEG */
+    ctrl = PTR_OFFSET(mqp->sq_start, (idx << MLX5_SEND_WQE_SHIFT));
+    memset(ctrl, 0, n_ds * DS_SIZE);
+    uint8_t fm_ce_se = MLX5_WQE_CTRL_FENCE;
+    // MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE ?
+    //Do i need fence, signall, solicited ?
+
+    mlx5dv_set_ctrl_seg(ctrl, mqp->sq_cur_post, opcode, opmode,
+                        mqp->qp_num, fm_ce_se, n_ds, 0x0, 0x0);
+
+    /* SET TRANSPOSE SEG */
+    tseg  = PTR_OFFSET(ctrl, DS_SIZE);
+    if (ucs_unlikely(tseg == qend)) {
+        tseg = mqp->sq_start;
+    }
+
+    tseg->element_size = htobe32(element_size);
+    tseg->num_rows = htobe16(nrows);
+    tseg->num_cols = htobe16(ncols);
+
+    /* SET SRC DATA SEG */
+    data = PTR_OFFSET(tseg, DS_SIZE);
+    if (ucs_unlikely(data == qend)) {
+        data = mqp->sq_start;
+    }
+    mlx5dv_set_data_seg(data, ncols * nrows * element_size, src_mr->lkey, src_mkey_addr);
+
+    /* SET DST DATA SEG */
+    data = PTR_OFFSET(tseg, DS_SIZE);
+    mlx5dv_set_data_seg(data, ncols * nrows * element_size, dst_mr->lkey, dst_addr);
+    if (ucs_unlikely(data == qend)) {
+        data = mqp->sq_start;
+    }
+
+    // legacy:
+    mqp->cur_ctrl = ctrl;
+    mqp->cur_size = n_ds;
+    mqp->nreq++;
+    mqp->sq_cur_post += ucc_div_round_up(mqp->cur_size, 4);
     return UCC_OK;
 }
