@@ -170,6 +170,7 @@ CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_BFLOAT16, __nv_bfloat16)
 extern "C" {
 #endif
 
+#include <unistd.h>
 ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
                                       void *dst, size_t n_vectors,
                                       size_t count, size_t stride,
@@ -223,7 +224,7 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
             break;
 #endif
         default:
-            mc_error(&ucc_mc_cuda.super, "unsupported reduction type (%s)", 
+            mc_error(&ucc_mc_cuda.super, "unsupported reduction type (%s)",
                      ucc_datatype_str(dt));
             return UCC_ERR_NOT_SUPPORTED;
     }

@@ -13,6 +13,8 @@
 
 ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params);
 
+ucc_status_t ucc_mc_finalize();
+
 ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);
 
 /**
@@ -28,25 +30,6 @@ ucc_status_t ucc_mc_alloc(ucc_mc_buffer_header_t **h_ptr, size_t len,
 ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *h_ptr);
 
 ucc_status_t ucc_mc_flush(ucc_memory_type_t mem_type);
-
-ucc_status_t ucc_mc_finalize();
-
-ucc_status_t ucc_mc_ee_task_post(void *ee_context, ucc_ee_type_t ee_type,
-                                 void **ee_task);
-
-ucc_status_t ucc_mc_ee_task_query(void *ee_task, ucc_ee_type_t ee_type);
-
-ucc_status_t ucc_mc_ee_task_end(void *ee_task, ucc_ee_type_t ee_type);
-
-ucc_status_t ucc_mc_ee_create_event(void **event, ucc_ee_type_t ee_type);
-
-ucc_status_t ucc_mc_ee_destroy_event(void *event, ucc_ee_type_t ee_type);
-
-ucc_status_t ucc_mc_ee_event_post(void *ee_context, void *event,
-                                  ucc_ee_type_t ee_type);
-
-ucc_status_t ucc_mc_ee_event_test(void *event, ucc_ee_type_t ee_type);
-
 
 ucc_status_t ucc_mc_memcpy(void *dst, const void *src, size_t len,
                            ucc_memory_type_t dst_mem,
