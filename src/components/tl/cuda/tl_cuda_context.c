@@ -33,13 +33,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
                               params->context);
     memcpy(&self->cfg, tl_cuda_config, sizeof(*tl_cuda_config));
 
-    cu_st = cuCtxGetCurrent(&cu_ctx);
-    if (cu_ctx == NULL || cu_st != CUDA_SUCCESS) {
-        tl_info(self->super.super.lib,
-                "cannot create CUDA TL context without active CUDA context");
-        return UCC_ERR_NO_RESOURCE;
-    }
-
     cuda_st = cudaGetDeviceCount(&num_devices);
     if (cuda_st != cudaSuccess) {
         tl_info(self->super.super.lib, "failed to get number of GPU devices"
@@ -47,6 +40,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
         return UCC_ERR_NO_MESSAGE;
     } else if (num_devices == 0) {
         tl_info(self->super.super.lib, "no GPU devices found");
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    cu_st = cuCtxGetCurrent(&cu_ctx);
+    if (cu_ctx == NULL || cu_st != CUDA_SUCCESS) {
+        tl_info(self->super.super.lib,
+                "cannot create CUDA TL context without active CUDA context");
         return UCC_ERR_NO_RESOURCE;
     }
 

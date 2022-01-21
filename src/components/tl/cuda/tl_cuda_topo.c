@@ -6,17 +6,18 @@
 
 #include "tl_cuda_topo.h"
 #include "tl_cuda_common.h"
+#include <inttypes.h>
+#include <pthread.h>
 #include <nvml.h>
-#include "unistd.h"
-#include "pthread.h"
 
 pthread_mutex_t nvml_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #define MAX_PCI_BUS_ID_STR 16
 #define MAX_PCI_DEVICES    32
 
-static ucc_status_t ucc_tl_cuda_topo_pci_id_from_str(const char * bus_id_str,
-                                                     ucc_tl_cuda_device_id_t *pci_id)
+static ucc_status_t
+ucc_tl_cuda_topo_pci_id_from_str(const char * bus_id_str,
+                                 ucc_tl_cuda_device_pci_id_t *pci_id)
 {
     int n;
 
@@ -29,16 +30,16 @@ static ucc_status_t ucc_tl_cuda_topo_pci_id_from_str(const char * bus_id_str,
 }
 
 // TODO: add to topo print
-// static void ucc_tl_cuda_topo_pci_id_to_str(const ucc_tl_cuda_device_id_t *pci_id,
-//                                            char *str, size_t max)
-// {
-//     ucc_snprintf_safe(str, max, "%04x:%02x:%02x.%d", pci_id->domain,
-//                       pci_id->bus, pci_id->device, pci_id->function);
-// }
+static void ucc_tl_cuda_topo_pci_id_to_str(const ucc_tl_cuda_device_pci_id_t *pci_id,
+                                           char *str, size_t max)
+{
+    ucc_snprintf_safe(str, max, "%04x:%02x:%02x.%d", pci_id->domain,
+                      pci_id->bus, pci_id->device, pci_id->function);
+}
 
 ucc_status_t ucc_tl_cuda_topo_get_pci_id(const ucc_base_lib_t *lib,
                                          int device,
-                                         ucc_tl_cuda_device_id_t *pci_id)
+                                         ucc_tl_cuda_device_pci_id_t *pci_id)
 {
     char pci_bus_id[MAX_PCI_BUS_ID_STR];
     ucc_status_t st;
@@ -51,7 +52,7 @@ exit:
 }
 
 static uint64_t
-ucc_tl_cuda_device_id_to_uint64(const ucc_tl_cuda_device_id_t *id)
+ucc_tl_cuda_device_pci_id_to_uint64(const ucc_tl_cuda_device_pci_id_t *id)
 {
     return (((uint64_t)id->domain << 24) |
             ((uint64_t)id->bus << 16)    |
@@ -62,13 +63,13 @@ ucc_tl_cuda_device_id_to_uint64(const ucc_tl_cuda_device_id_t *id)
 
 static ucc_status_t
 ucc_tl_cuda_topo_graph_find_by_id(const ucc_tl_cuda_topo_t *topo,
-                                  const ucc_tl_cuda_device_id_t *dev_id,
+                                  const ucc_tl_cuda_device_pci_id_t *dev_id,
                                   ucc_tl_cuda_topo_node_t **node)
 {
     uint64_t id;
     khiter_t iter;
 
-    id = ucc_tl_cuda_device_id_to_uint64(dev_id);
+    id = ucc_tl_cuda_device_pci_id_to_uint64(dev_id);
     iter = kh_get(bus_to_node, &topo->bus_to_node_hash, id);
     if (iter == kh_end(&topo->bus_to_node_hash)) {
         return UCC_ERR_NOT_FOUND;
@@ -78,7 +79,7 @@ ucc_tl_cuda_topo_graph_find_by_id(const ucc_tl_cuda_topo_t *topo,
 }
 
 static ucc_status_t
-ucc_tl_cuda_topo_graph_add_device(const ucc_tl_cuda_device_id_t *dev_id,
+ucc_tl_cuda_topo_graph_add_device(const ucc_tl_cuda_device_pci_id_t *dev_id,
                                   ucc_tl_cuda_topo_t *topo,
                                   ucc_tl_cuda_topo_node_t **node)
 {
@@ -86,11 +87,14 @@ ucc_tl_cuda_topo_graph_add_device(const ucc_tl_cuda_device_id_t *dev_id,
     khiter_t iter;
     int ret;
     int n;
+    char dev_id_str[MAX_PCI_BUS_ID_STR];
 
-    key = ucc_tl_cuda_device_id_to_uint64(dev_id);
+    key = ucc_tl_cuda_device_pci_id_to_uint64(dev_id);
     iter = kh_put(bus_to_node, &topo->bus_to_node_hash, key, &ret);
     if (ret < 0) {
-        tl_error(topo->lib, "failed to add device id to hash");
+        ucc_tl_cuda_topo_pci_id_to_str(dev_id, dev_id_str, MAX_PCI_BUS_ID_STR);
+        tl_error(topo->lib, "failed to add device id %s key %" PRIu64 " to hash",
+                 dev_id_str, key);
         return UCC_ERR_NO_MESSAGE;
     } else if (ret == 0) {
         /* device already exists */
@@ -157,7 +161,7 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
     nvmlFieldValue_t nvml_value;
     nvmlPciInfo_t nvml_pci;
     nvmlIntNvLinkDeviceType_t nvml_dev_type;
-    ucc_tl_cuda_device_id_t pci_id;
+    ucc_tl_cuda_device_pci_id_t pci_id;
     ucc_tl_cuda_topo_node_t *node, *peer_node;
     int num_gpus;
     int i, num_nvlinks, link;
@@ -182,7 +186,7 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
     for (i = 0; i < num_gpus; i++) {
         CUDACHECK_GOTO(cudaDeviceGetPCIBusId(pci_bus_str, MAX_PCI_BUS_ID_STR, i),
                        exit_nvml_shutdown, status, topo->lib);
-        status = ucc_tl_cuda_topo_get_pci_id(topo->lib, i, &pci_id);
+        status = ucc_tl_cuda_topo_pci_id_from_str(pci_bus_str, &pci_id);
         if (status != UCC_OK) {
             goto exit_nvml_shutdown;
         }
@@ -265,8 +269,8 @@ exit_err:
 }
 
 ucc_status_t ucc_tl_cuda_topo_num_links(const ucc_tl_cuda_topo_t *topo,
-                                        const ucc_tl_cuda_device_id_t *dev1,
-                                        const ucc_tl_cuda_device_id_t *dev2,
+                                        const ucc_tl_cuda_device_pci_id_t *dev1,
+                                        const ucc_tl_cuda_device_pci_id_t *dev2,
                                         int *num_links)
 {
     ucc_status_t status;

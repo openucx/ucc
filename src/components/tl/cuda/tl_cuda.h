@@ -85,7 +85,7 @@ typedef struct ucc_tl_cuda_context {
     ucc_tl_context_t              super;
     ucc_tl_cuda_context_config_t  cfg;
     int                           device;
-    ucc_tl_cuda_device_id_t       device_id;
+    ucc_tl_cuda_device_pci_id_t   device_id;
     ucc_tl_cuda_topo_t           *topo;
     ucc_mpool_t                   req_mp;
     tl_cuda_ep_hash_t            *ipc_cache;
@@ -104,9 +104,9 @@ typedef struct ucc_tl_cuda_shm_barrier {
 } ucc_tl_cuda_shm_barrier_t;
 
 typedef struct ucc_tl_cuda_rank_id {
-    int                     device;
-    ucc_tl_cuda_device_id_t pci_id;
-    int                     shm;
+    int                         device;
+    ucc_tl_cuda_device_pci_id_t pci_id;
+    int                         shm;
 } ucc_tl_cuda_rank_id_t;
 
 typedef struct ucc_tl_cuda_sync_data {
