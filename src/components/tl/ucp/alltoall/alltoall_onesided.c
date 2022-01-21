@@ -62,12 +62,12 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
     ucc_rank_t         gsize = UCC_TL_TEAM_SIZE(team);
     long *             pSync = TASK_ARGS(task).global_work_buffer;
 
-    if (*pSync < gsize - 1 || task->send_completed < task->send_posted) {
+    if (*pSync < gsize || task->send_completed < task->send_posted) {
         ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker);
         return UCC_INPROGRESS;
     }
 
-    *pSync                   = -1;
+    pSync[0]                 = 0;
     task->super.super.status = UCC_OK;
     ucc_task_complete(ctask);
     return task->super.super.status;
