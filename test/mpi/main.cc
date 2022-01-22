@@ -35,7 +35,7 @@ static ucc_thread_mode_t                   thread_mode  = UCC_THREAD_SINGLE;
 static int                                 iterations   = 1;
 static int                                 show_help    = 0;
 static int                                 num_tests    = 1;
-static bool                                is_onesided  = true;
+static bool                                has_onesided = true;
 #ifdef HAVE_CUDA
 static test_set_cuda_device_t test_cuda_set_device = TEST_SET_DEV_NONE;
 #endif
@@ -421,7 +421,7 @@ int ProcessArgs(int argc, char** argv)
             break;
 #endif
         case 'O':
-            is_onesided = std::stoi(optarg);
+            has_onesided = std::stoi(optarg);
             break;
         case 'h':
             show_help = 1;
@@ -472,7 +472,7 @@ int main(int argc, char *argv[])
 #ifdef HAVE_CUDA
     set_cuda_device(test_cuda_set_device);
 #endif
-    test = new UccTestMpi(argc, argv, thread_mode, 0);
+    test = new UccTestMpi(argc, argv, thread_mode, 0, has_onesided);
     for (auto &m : mtypes) {
         if (UCC_MEMORY_TYPE_HOST != m && UCC_OK != ucc_mc_available(m)) {
             std::cerr << "requested memory type " << ucc_memory_type_names[m]
@@ -482,7 +482,7 @@ int main(int argc, char *argv[])
         }
     }
     test->create_teams(teams);
-    if (is_onesided) {
+    if (has_onesided) {
         test->create_teams(teams, true);
     }
     test->set_iter(iterations);
@@ -504,7 +504,7 @@ int main(int argc, char *argv[])
         test->set_inplace(inpl);
         test->run_all();
     }
-    if (is_onesided) {
+    if (has_onesided) {
         test->set_colls(onesided_colls);
         for (auto &inpl : inplace) {
             test->set_inplace(inpl);

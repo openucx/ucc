@@ -39,11 +39,12 @@ static ucc_status_t oob_allgather_free(void *req)
 }
 
 UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
-                       int is_local)
+                       int is_local, bool with_onesided)
 {
     ucc_lib_config_h     lib_config;
     ucc_context_config_h ctx_config;
     int                  size, rank;
+    char                *prev_env;
     ucc_mem_map_t        segments[UCC_TEST_N_MEM_SEGMENTS];
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -68,17 +69,21 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
         ctx_params.oob.n_oob_eps = size;
         ctx_params.oob.oob_ep    = rank;
 
-        onesided_ctx_params = ctx_params;
-        for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
-            onesided_buffers[i] = ucc_calloc(UCC_TEST_MEM_SEGMENT_SIZE, size);
-            UCC_MALLOC_CHECK(onesided_buffers[i]);
-            segments[i].address = onesided_buffers[i];
-            segments[i].len     = UCC_TEST_MEM_SEGMENT_SIZE * size;
+        if (with_onesided) {
+            onesided_ctx_params = ctx_params;
+            for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
+                onesided_buffers[i] = ucc_calloc(UCC_TEST_MEM_SEGMENT_SIZE,
+                                                 size, "onesided buffers");
+                UCC_MALLOC_CHECK(onesided_buffers[i]);
+                segments[i].address = onesided_buffers[i];
+                segments[i].len     = UCC_TEST_MEM_SEGMENT_SIZE * size;
+            }
+            onesided_ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
+            onesided_ctx_params.mem_params.segments   = segments;
+            onesided_ctx_params.mem_params.n_segments = UCC_TEST_N_MEM_SEGMENTS;
         }
-        onesided_ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
-        onesided_ctx_params.mem_params.segments   = segments;
-        onesided_ctx_params.mem_params.n_segments = UCC_TEST_N_MEM_SEGMENTS;
-    } else {
+    }
+    if (!with_onesided) {
         for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
             onesided_buffers[i] = NULL;
         }
@@ -86,19 +91,28 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
     UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
     UCC_CHECK(ucc_init(&lib_params, lib_config, &lib));
     ucc_lib_config_release(lib_config);
-
     UCC_CHECK(ucc_context_config_read(lib, NULL, &ctx_config));
     UCC_CHECK(ucc_context_create(lib, &ctx_params, ctx_config, &ctx));
     ucc_context_config_release(ctx_config);
-    setenv("UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided", 1);
-    UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
-    UCC_CHECK(ucc_init(&lib_params, lib_config, &onesided_lib));
-    ucc_lib_config_release(lib_config);
-    UCC_CHECK(ucc_context_config_read(onesided_lib, NULL, &ctx_config));
-    UCC_CHECK(ucc_context_create(onesided_lib, &onesided_ctx_params, ctx_config,
-                                 &onesided_ctx));
-    ucc_context_config_release(ctx_config);
-    unsetenv("UCC_TL_UCP_TUNE");
+    if (with_onesided) {
+        prev_env = getenv("UCC_TL_UCP_TUNE");
+        setenv("UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided", 1);
+        UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
+        UCC_CHECK(ucc_init(&lib_params, lib_config, &onesided_lib));
+        ucc_lib_config_release(lib_config);
+        UCC_CHECK(ucc_context_config_read(onesided_lib, NULL, &ctx_config));
+        UCC_CHECK(ucc_context_create(onesided_lib, &onesided_ctx_params,
+                                     ctx_config, &onesided_ctx));
+        ucc_context_config_release(ctx_config);
+        if (prev_env) {
+            putenv(prev_env);
+        } else {
+            unsetenv("UCC_TL_UCP_TUNE");
+        }
+    } else {
+        onesided_lib = nullptr;
+        onesided_ctx = nullptr;
+    }
     set_msgsizes(8, ((1ULL) << 21), 8);
     dtypes     = {UCC_DT_INT32, UCC_DT_INT64, UCC_DT_FLOAT32, UCC_DT_FLOAT64};
     ops        = {UCC_OP_SUM, UCC_OP_MAX};
@@ -142,15 +156,15 @@ UccTestMpi::~UccTestMpi()
     for (auto &t : onesided_teams) {
         destroy_team(t);
     }
-    if (onesided_buffers) {
+    if (onesided_buffers[0]) {
         for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
             ucc_free(onesided_buffers[i]);
         }
+        UCC_CHECK(ucc_context_destroy(onesided_ctx));
+        UCC_CHECK(ucc_finalize(onesided_lib));
     }
     UCC_CHECK(ucc_context_destroy(ctx));
-    UCC_CHECK(ucc_context_destroy(onesided_ctx));
     UCC_CHECK(ucc_finalize(lib));
-    UCC_CHECK(ucc_finalize(onesided_lib));
 }
 
 ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm, bool is_onesided)

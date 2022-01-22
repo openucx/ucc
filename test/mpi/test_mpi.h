@@ -266,7 +266,8 @@ public:
     std::vector<ucc_test_team_t> onesided_teams;
     void run_all_at_team(ucc_test_team_t &team, std::vector<ucc_status_t> &rst);
     std::vector<ucc_status_t> results;
-    UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm, int is_local);
+    UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm, int is_local,
+               bool with_onesided);
     ~UccTestMpi();
     void set_msgsizes(size_t min, size_t max, size_t power);
     void set_dtypes(std::vector<ucc_datatype_t> &_dtypes);

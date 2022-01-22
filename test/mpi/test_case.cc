@@ -209,15 +209,11 @@ TestCase::~TestCase()
     if (TEST_SKIP_NONE == test_skip) {
         UCC_CHECK(ucc_collective_finalize(req));
     }
-    if (sbuf) {
-        if (sbuf_mc_header) {
-            UCC_CHECK(ucc_mc_free(sbuf_mc_header));
-        }
+    if (sbuf_mc_header) {
+        UCC_CHECK(ucc_mc_free(sbuf_mc_header));
     }
-    if (rbuf) {
-        if (rbuf_mc_header) {
-            UCC_CHECK(ucc_mc_free(rbuf_mc_header));
-        }
+    if (rbuf_mc_header) {
+        UCC_CHECK(ucc_mc_free(rbuf_mc_header));
     }
     if (check_buf) {
         ucc_free(check_buf);
