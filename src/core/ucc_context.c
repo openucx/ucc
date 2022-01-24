@@ -376,8 +376,12 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
         status = tl_lib->iface->context.create(
             &b_params, &ctx_config->tl_cfgs[i]->super.super, &b_ctx);
         if (UCC_OK != status) {
-            ucc_warn("failed to create tl context for %s",
-                      tl_lib->iface->super.name);
+            /* UCC_ERR_LAST means component was disabled via TUNE param:
+               don't print warning. */
+            if (UCC_ERR_LAST != status) {
+                ucc_warn("failed to create tl context for %s",
+                         tl_lib->iface->super.name);
+            }
             continue;
         }
         ctx->tl_ctx[ctx->n_tl_ctx] = ucc_derived_of(b_ctx, ucc_tl_context_t);
@@ -592,8 +596,13 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
                           cl_lib->iface->super.name);
                 goto error_ctx_create;
             } else {
-                ucc_warn("failed to create cl context for %s, skipping",
-                         cl_lib->iface->super.name);
+                /* UCC_ERR_LAST means component was disabled via TUNE param:
+                   don't print warning. */
+                if (UCC_ERR_LAST != status) {
+
+                    ucc_warn("failed to create cl context for %s, skipping",
+                             cl_lib->iface->super.name);
+                }
                 continue;
             }
         }

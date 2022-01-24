@@ -120,7 +120,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_context_t, const ucc_cl_context_config_t *cl_config,
     self->super.ucc_context = ucc_context;
 
     if (0 == strcmp(cl_config->super.score_str, "0")) {
-        return UCC_ERR_NO_MESSAGE;
+        return UCC_ERR_LAST;
     }
     self->super.score_str = strdup(cl_config->super.score_str);
 

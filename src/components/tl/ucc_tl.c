@@ -47,7 +47,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_context_t, const ucc_tl_context_config_t *tl_config,
     self->super.ucc_context = ucc_context;
     self->ref_count = 0;
     if (0 == strcmp(tl_config->super.score_str, "0")) {
-        return UCC_ERR_NO_MESSAGE;
+        return UCC_ERR_LAST;
     }
     self->super.score_str = strdup(tl_config->super.score_str);
 
