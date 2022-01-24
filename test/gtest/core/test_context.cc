@@ -76,6 +76,13 @@ UCC_TEST_F(test_context_get_attr, addr)
     EXPECT_EQ(true, ((attr.ctx_addr_len == 0) || (NULL != attr.ctx_addr)));
 }
 
+UCC_TEST_F(test_context_get_attr, work_buffer_size)
+{
+    ucc_context_attr_t attr;
+    attr.mask = UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE;
+    EXPECT_EQ(UCC_OK, ucc_context_get_attr(ctx_h, &attr));
+    EXPECT_EQ(5, attr.global_work_buffer_size);
+}
 
 UCC_TEST_F(test_context, global)
 {

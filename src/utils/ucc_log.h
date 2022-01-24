@@ -71,14 +71,20 @@ static inline const char* ucc_coll_type_str(ucc_coll_type_t ct)
         return "Allgatherv";
     case UCC_COLL_TYPE_GATHER:
         return "Gather";
+    case UCC_COLL_TYPE_GATHERV:
+        return "Gatherv";
     case UCC_COLL_TYPE_SCATTER:
         return "Scatter";
+    case UCC_COLL_TYPE_SCATTERV:
+        return "Scatterv";
     case UCC_COLL_TYPE_FANIN:
         return "Fanin";
     case UCC_COLL_TYPE_FANOUT:
         return "Fanout";
     case UCC_COLL_TYPE_REDUCE_SCATTER:
-        return "Reduce scatter";
+        return "Reduce_scatter";
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        return "Reduce_scatterv";
     default:
         break;
     }
@@ -154,4 +160,5 @@ static inline const char* ucc_reduction_op_str(ucc_reduction_op_t op)
         return NULL;
     }
 }
+
 #endif

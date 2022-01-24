@@ -192,9 +192,8 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     task->seq_num = team->seq_num++;
     if (ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
         char coll_debug_str[256];
-        ucc_coll_str(&op_args, coll_debug_str, sizeof(coll_debug_str));
-        ucc_debug("coll_init: %s, req %p, seq_num %u", coll_debug_str, task,
-                  task->seq_num);
+        ucc_coll_str(task, coll_debug_str, sizeof(coll_debug_str));
+        ucc_debug("coll_init: %s", coll_debug_str);
     }
     *request = &task->super;
     return UCC_OK;

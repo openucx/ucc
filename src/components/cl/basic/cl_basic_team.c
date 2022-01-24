@@ -157,6 +157,7 @@ ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)
             cl_error(ctx->super.super.lib, "failed to build score map");
         }
         team->score = score;
+        ucc_coll_score_set(team->score, UCC_CL_BASIC_DEFAULT_SCORE);
     }
     return status;
 }
@@ -172,6 +173,7 @@ ucc_status_t ucc_cl_basic_team_get_scores(ucc_base_team_t   *cl_team,
     if (UCC_OK != status) {
         return status;
     }
+
     if (strlen(lib->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             lib->score_str, *score, UCC_CL_TEAM_SIZE(team), NULL, cl_team,
