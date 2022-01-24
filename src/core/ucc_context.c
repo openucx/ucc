@@ -130,12 +130,12 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
 
 err_tl_config:
     for (i = 0; i < config->n_tl_cfg; i++) {
-        ucc_base_config_release(&config->tl_cfgs[i]->super);
+        ucc_base_config_release(&config->tl_cfgs[i]->super.super);
     }
 
 err_cl_config:
     for (i = 0; i < config->n_cl_cfg; i++) {
-        ucc_base_config_release(&config->cl_cfgs[i]->super);
+        ucc_base_config_release(&config->cl_cfgs[i]->super.super);
     }
     ucc_free(config->tl_cfgs);
 
@@ -289,11 +289,11 @@ void ucc_context_config_release(ucc_context_config_t *config)
     int i;
 
     for (i = 0; i < config->n_tl_cfg; i++) {
-        ucc_base_config_release(&config->tl_cfgs[i]->super);
+        ucc_base_config_release(&config->tl_cfgs[i]->super.super);
     }
 
     for (i = 0; i < config->n_cl_cfg; i++) {
-        ucc_base_config_release(&config->cl_cfgs[i]->super);
+        ucc_base_config_release(&config->cl_cfgs[i]->super.super);
     }
     ucc_free(config->tl_cfgs);
     ucc_free(config->cl_cfgs);
@@ -374,7 +374,7 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
     for (i = 0; i < num_tls; i++) {
         tl_lib = ctx_config->tl_cfgs[i]->tl_lib;
         status = tl_lib->iface->context.create(
-            &b_params, &ctx_config->tl_cfgs[i]->super, &b_ctx);
+            &b_params, &ctx_config->tl_cfgs[i]->super.super, &b_ctx);
         if (UCC_OK != status) {
             ucc_warn("failed to create tl context for %s",
                       tl_lib->iface->super.name);
@@ -585,7 +585,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     for (i = 0; i < num_cls; i++) {
         cl_lib = config->cl_cfgs[i]->cl_lib;
         status = cl_lib->iface->context.create(
-            &b_params, &config->cl_cfgs[i]->super, &b_ctx);
+            &b_params, &config->cl_cfgs[i]->super.super, &b_ctx);
         if (UCC_OK != status) {
             if (lib->specific_cls_requested) {
                 ucc_error("failed to create cl context for %s",

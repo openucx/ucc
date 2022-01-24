@@ -2,14 +2,17 @@
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
 
-ucc_config_field_t ucc_base_config_table[] = {
+ucc_config_field_t ucc_base_lib_config_table[] = {
     {"LOG_LEVEL", "warn",
      "UCC logging level. Messages with a level higher or equal to the "
      "selected will be printed.\n"
      "Possible values are: fatal, error, warn, info, debug, trace, data, func, "
      "poll.",
-     ucc_offsetof(ucc_base_config_t, log_component), UCC_CONFIG_TYPE_LOG_COMP},
+     ucc_offsetof(ucc_base_lib_config_t, log_component), UCC_CONFIG_TYPE_LOG_COMP},
 
+    {NULL}};
+
+ucc_config_field_t ucc_base_ctx_config_table[] = {
     {"TUNE", "", "Collective tuning modifier for a CL/TL component\n"
      "format: token1#token2#...#tokenn - '#' separated list of tokens where\n"
      "    token=coll_type:msg_range:mem_type:team_size:score:alg - ':' separated\n"
@@ -30,7 +33,7 @@ ucc_config_field_t ucc_base_config_table[] = {
      "          inf - forces the CL/TL in the given range for a given coll\n"
      "    alg=@<value|str> - character @ followed by either int number or string\n"
      "        representing the collective algorithm.",
-     ucc_offsetof(ucc_base_config_t, score_str), UCC_CONFIG_TYPE_STRING},
+     ucc_offsetof(ucc_base_ctx_config_t, score_str), UCC_CONFIG_TYPE_STRING},
 
     {NULL}};
 

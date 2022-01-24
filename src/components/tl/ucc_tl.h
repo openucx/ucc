@@ -27,14 +27,14 @@ typedef struct ucc_tl_context ucc_tl_context_t;
 typedef struct ucc_tl_team    ucc_tl_team_t;
 
 typedef struct ucc_tl_lib_config {
-    ucc_base_config_t  super;
-    ucc_tl_iface_t    *iface;
+    ucc_base_lib_config_t  super;
+    ucc_tl_iface_t        *iface;
 } ucc_tl_lib_config_t;
 extern ucc_config_field_t ucc_tl_lib_config_table[];
 
 typedef struct ucc_tl_context_config {
-    ucc_base_config_t super;
-    ucc_tl_lib_t     *tl_lib;
+    ucc_base_ctx_config_t super;
+    ucc_tl_lib_t         *tl_lib;
 } ucc_tl_context_config_t;
 extern ucc_config_field_t ucc_tl_context_config_table[];
 
@@ -87,7 +87,8 @@ typedef struct ucc_tl_context {
     ucc_base_context_t super;
     int                ref_count;
 } ucc_tl_context_t;
-UCC_CLASS_DECLARE(ucc_tl_context_t, ucc_tl_lib_t *, ucc_context_t *);
+UCC_CLASS_DECLARE(ucc_tl_context_t, const ucc_tl_context_config_t *,
+                  ucc_context_t *);
 
 typedef struct ucc_tl_team {
     ucc_base_team_t super;
@@ -134,6 +135,8 @@ typedef struct ucc_tl_lib_attr {
     (ucc_derived_of((_tl_team)->super.context->lib, ucc_tl_lib_t))->iface
 
 #define UCC_TL_TEAM_LIB(_tl_team) (_tl_team)->super.super.context->lib
+
+#define UCC_TL_TEAM_CTX(_tl_team) (_tl_team)->super.super.context
 
 #define UCC_TL_CORE_CTX(_tl_team) ((_tl_team)->super.super.context->ucc_context)
 
