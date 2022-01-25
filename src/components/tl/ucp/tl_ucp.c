@@ -6,7 +6,7 @@
 
 #include "tl_ucp.h"
 #include "utils/ucc_malloc.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "components/mc/base/ucc_mc_base.h"
 #include "allreduce/allreduce.h"
 #include "bcast/bcast.h"

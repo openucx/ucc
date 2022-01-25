@@ -5,7 +5,7 @@
  */
 
 #include "alltoall.h"
-#include "core/ucc_ec.h"
+#include "components/ec/ucc_ec.h"
 #include "tl_cuda_cache.h"
 #include "utils/arch/cpu.h"
 

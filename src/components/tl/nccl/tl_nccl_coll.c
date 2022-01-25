@@ -6,8 +6,8 @@
  */
 
 #include "tl_nccl_coll.h"
-#include "core/ucc_mc.h"
-#include "core/ucc_ec.h"
+#include "components/mc/ucc_mc.h"
+#include "components/ec/ucc_ec.h"
 #include "core/ucc_ee.h"
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_math.h"

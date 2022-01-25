@@ -12,8 +12,9 @@
 #include "utils/ucc_math.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
-#include "ucc_mc.h"
-#include "ucc_ec.h"
+#include "components/mc/ucc_mc.h"
+#include "components/ec/ucc_ec.h"
+
 UCS_CONFIG_DEFINE_ARRAY(cl_types, sizeof(ucc_cl_type_t),
                         UCS_CONFIG_TYPE_ENUM(ucc_cl_names));
 

@@ -134,12 +134,12 @@ static ucc_status_t ucc_ec_cuda_post_driver_stream_task(uint32_t *status,
 static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
 {
     ucc_ec_cuda_config_t *cfg = EC_CUDA_CONFIG;
-    ucc_status_t status;
-    int device, num_devices, attr;
-    CUdevice cu_dev;
-    CUresult cu_st;
-    cudaError_t cuda_st;
-    const char *cu_err_st_str;
+    ucc_status_t          status;
+    int                   device, num_devices, attr;
+    CUdevice              cu_dev;
+    CUresult              cu_st;
+    cudaError_t           cuda_st;
+    const char           *cu_err_st_str;
 
     ucc_ec_cuda.stream = NULL;
     ucc_strncpy_safe(ucc_ec_cuda.super.config->log_component.name,
@@ -219,10 +219,10 @@ static ucc_status_t ucc_ec_cuda_get_attr(ucc_ec_attr_t *ec_attr)
 
 ucc_status_t ucc_ec_cuda_task_post(void *ee_stream, void **ee_req)
 {
+    ucc_ec_cuda_config_t         *cfg = EC_CUDA_CONFIG;
     ucc_ec_cuda_stream_request_t *req;
-    ucc_ec_cuda_event_t *cuda_event;
-    ucc_status_t status;
-    ucc_ec_cuda_config_t *cfg = EC_CUDA_CONFIG;
+    ucc_ec_cuda_event_t          *cuda_event;
+    ucc_status_t                  status;
 
     UCC_EC_CUDA_INIT_STREAM();
     req = ucc_mpool_get(&ucc_ec_cuda.strm_reqs);

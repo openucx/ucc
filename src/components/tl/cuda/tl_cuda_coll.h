@@ -8,7 +8,7 @@
 #define UCC_TL_CUDA_COLL_H_
 
 #include "tl_cuda.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 
 #define TASK_TEAM(_task)                                                       \
     (ucc_derived_of((_task)->super.team, ucc_tl_cuda_team_t))

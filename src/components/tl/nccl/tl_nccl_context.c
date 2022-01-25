@@ -6,8 +6,8 @@
  */
 
 #include "tl_nccl.h"
-#include "core/ucc_mc.h"
-#include "core/ucc_ec.h"
+#include "components/mc/ucc_mc.h"
+#include "components/ec/ucc_ec.h"
 #include "core/ucc_ee.h"
 #include "utils/arch/cpu.h"
 

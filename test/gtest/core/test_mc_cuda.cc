@@ -4,7 +4,7 @@
  */
 
 extern "C" {
-#include <core/ucc_mc.h>
+#include <components/mc/ucc_mc.h>
 #include <pthread.h>
 }
 #include <common/test.h>

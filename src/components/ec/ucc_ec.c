@@ -4,9 +4,9 @@
  */
 
 #include "config.h"
-#include "components/ec/base/ucc_ec_base.h"
+#include "base/ucc_ec_base.h"
 #include "ucc_ec.h"
-#include "ucc_global_opts.h"
+#include "core/ucc_global_opts.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
 
