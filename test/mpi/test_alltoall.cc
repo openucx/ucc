@@ -11,13 +11,15 @@
 
 TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                            ucc_memory_type_t _mt, ucc_test_team_t &_team,
-                           size_t _max_size) :
-    TestCase(_team, _mt, _msgsize, _inplace, _max_size)
+                           size_t _max_size, void ** buffers) :
+    TestCase(_team, UCC_COLL_TYPE_ALLTOALL, _mt, _msgsize, _inplace, _max_size)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
+    size_t dt_size           = ucc_dt_size(TEST_DT);
     size_t single_rank_count = _msgsize / dt_size;
-    int rank;
-    int nprocs;
+    bool   is_onesided       = (buffers != nullptr);
+    void  *work_buf          = nullptr;
+    int    rank;
+    int    nprocs;
 
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &nprocs);
@@ -29,23 +31,34 @@ TestAlltoall::TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize * nprocs, _mt));
-    rbuf       = rbuf_mc_header->addr;
-    check_rbuf = ucc_malloc(_msgsize * nprocs, "check rbuf");
-    UCC_MALLOC_CHECK(check_rbuf);
-    if (TEST_NO_INPLACE == inplace) {
-        UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize * nprocs, _mt));
-        sbuf = sbuf_mc_header->addr;
-        init_buffer(sbuf, single_rank_count * nprocs, TEST_DT, _mt, rank);
-        UCC_ALLOC_COPY_BUF(check_sbuf_mc_header, UCC_MEMORY_TYPE_HOST, sbuf,
-                           _mt, _msgsize * nprocs);
-        check_sbuf = check_sbuf_mc_header->addr;
+    if (!is_onesided) {
+        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize * nprocs, _mt));
+        rbuf      = rbuf_mc_header->addr;
     } else {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
+        sbuf     = buffers[MEM_SEND_SEGMENT];
+        rbuf     = buffers[MEM_RECV_SEGMENT];
+        work_buf = buffers[MEM_WORK_SEGMENT];
+    }
+
+    check_buf = ucc_malloc(_msgsize * nprocs, "check buf");
+    UCC_MALLOC_CHECK(check_buf);
+    if (TEST_NO_INPLACE == inplace) {
+        if (!is_onesided) {
+            UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize * nprocs, _mt));
+            sbuf = sbuf_mc_header->addr;
+        }
+    } else {
+        args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
         init_buffer(rbuf, single_rank_count * nprocs, TEST_DT, _mt, rank);
         init_buffer(check_rbuf, single_rank_count * nprocs, TEST_DT,
                     UCC_MEMORY_TYPE_HOST, rank);
+    }
+    if (is_onesided) {
+        args.mask =
+            UCC_COLL_ARGS_FIELD_FLAGS | UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
+        args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+        args.global_work_buffer = work_buf;
     }
 
     args.src.info.buffer      = sbuf;

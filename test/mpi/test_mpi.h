@@ -75,6 +75,15 @@ extern int test_rand_seed;
 }
 #endif
 
+#define UCC_TEST_N_MEM_SEGMENTS   3
+#define UCC_TEST_MEM_SEGMENT_SIZE (1 << 21)
+
+typedef enum {
+    MEM_SEND_SEGMENT,
+    MEM_RECV_SEGMENT,
+    MEM_WORK_SEGMENT
+} ucc_test_mem_segments;
+
 typedef enum {
     TEAM_WORLD,
     TEAM_REVERSE,
@@ -161,17 +170,86 @@ typedef struct ucc_test_team {
     type(_type), comm(_comm), team(_team), ctx(_ctx) {};
 } ucc_test_team_t;
 
+class TestCase {
+protected:
+    ucc_test_team_t team;
+    ucc_memory_type_t mem_type;
+    int root;
+    size_t msgsize;
+    ucc_test_mpi_inplace_t inplace;
+    ucc_coll_args_t args;
+    ucc_coll_req_h req;
+    ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header;
+    void *sbuf;
+    void *rbuf;
+    void *check_buf;
+    MPI_Request progress_request;
+    uint8_t     progress_buf[1];
+    size_t test_max_size;
+public:
+    void mpi_progress(void);
+    test_skip_cause_t test_skip;
+    static std::shared_ptr<TestCase> init_single(
+            ucc_coll_type_t _type,
+            ucc_test_team_t &_team,
+            int    root    = 0,
+            size_t msgsize = 0,
+            ucc_test_mpi_inplace_t inplace = TEST_NO_INPLACE,
+            ucc_memory_type_t mt = UCC_MEMORY_TYPE_HOST,
+            size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX,
+            ucc_datatype_t dt = UCC_DT_INT32,
+            ucc_reduction_op_t op = UCC_OP_SUM,
+            ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
+            ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT,
+            void **onesided_buffers = nullptr);
+    static std::vector<std::shared_ptr<TestCase>> init(
+            ucc_coll_type_t _type,
+            ucc_test_team_t &_team,
+            int num_tests,
+            int    root    = 0,
+            size_t msgsize = 0,
+            ucc_test_mpi_inplace_t inplace = TEST_NO_INPLACE,
+            ucc_memory_type_t mt = UCC_MEMORY_TYPE_HOST,
+            size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX,
+            ucc_datatype_t dt = UCC_DT_INT32,
+            ucc_reduction_op_t op = UCC_OP_SUM,
+            ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
+            ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT,
+            void **onesided_buffers = nullptr);
+    TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
+             ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
+             size_t _msgsize = 0, ucc_test_mpi_inplace_t _inplace = TEST_NO_INPLACE,
+             size_t _max_size = TEST_UCC_RANK_BUF_SIZE_MAX);
+    virtual ~TestCase();
+    virtual void run();
+    virtual ucc_status_t set_input() = 0;
+    virtual ucc_status_t reset_sbuf() = 0;
+    virtual ucc_status_t check() = 0;
+    virtual std::string str();
+    virtual ucc_status_t test();
+    void wait();
+    void tc_progress_ctx();
+    ucc_status_t exec();
+    test_skip_cause_t skip_reduce(test_skip_cause_t cause, MPI_Comm comm);
+    test_skip_cause_t skip_reduce(int skip_cond, test_skip_cause_t cause,
+                                  MPI_Comm comm);
+};
+
 class UccTestMpi {
     ucc_thread_mode_t      tm;
     ucc_context_h          ctx;
+    ucc_context_h          onesided_ctx;
     ucc_lib_h              lib;
+    int                    nt;
+    ucc_lib_h              onesided_lib;
     ucc_test_mpi_inplace_t inplace;
     ucc_test_mpi_root_t    root_type;
     int                    root_value;
     int                    iterations;
-    void create_team(ucc_test_mpi_team_t t);
+    void *                 onesided_buffers[3];
+    void create_team(ucc_test_mpi_team_t t, bool is_onesided = false);
     void destroy_team(ucc_test_team_t &team);
-    ucc_team_h create_ucc_team(MPI_Comm comm);
+    ucc_team_h create_ucc_team(MPI_Comm comm, bool is_onesided = false);
     std::vector<size_t> msgsizes;
     std::vector<ucc_memory_type_t> mtypes;
     std::vector<ucc_datatype_t> dtypes;
@@ -183,9 +261,11 @@ class UccTestMpi {
     size_t test_max_size;
 public:
     std::vector<ucc_test_team_t> teams;
+    std::vector<ucc_test_team_t> onesided_teams;
     void run_all_at_team(ucc_test_team_t &team, std::vector<ucc_status_t> &rst);
     std::vector<ucc_status_t> results;
-    UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm, int is_local);
+    UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm, int is_local,
+               bool with_onesided);
     ~UccTestMpi();
     void set_msgsizes(size_t min, size_t max, size_t power);
     void set_dtypes(std::vector<ucc_datatype_t> &_dtypes);
@@ -199,7 +279,7 @@ public:
     }
     void set_count_vsizes(std::vector<ucc_test_vsize_flag_t> &_counts_vsize);
     void set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vsize);
-    void run_all();
+    void run_all(bool is_onesided = false);
     void set_root(ucc_test_mpi_root_t _root_type, int _root_value) {
         root_type = _root_type;
         root_value = _root_value;
@@ -207,7 +287,11 @@ public:
     void set_max_size(size_t _max_size) {
         test_max_size = _max_size;
     }
-    void create_teams(std::vector<ucc_test_mpi_team_t> &test_teams);
+    void set_num_tests(int num_tests) {
+        nt = num_tests;
+    }
+    void create_teams(std::vector<ucc_test_mpi_team_t> &test_teams,
+                      bool                              is_onesided = false);
     void progress_ctx() {
         ucc_context_progress(ctx);
     }
@@ -324,8 +408,10 @@ public:
 class TestAlltoall : public TestCase {
 public:
     TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-                 ucc_memory_type_t _mt, ucc_test_team_t &_team,
-                 size_t _max_size);
+                 ucc_memory_type_t _mt, ucc_test_team_t &_team, size_t _max_size,
+                 void **buffers = nullptr);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
     ucc_status_t check();
 };
 
