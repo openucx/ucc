@@ -11,6 +11,9 @@
 #include "components/tl/ucc_tl_log.h"
 #include "utils/ucc_mpool.h"
 #include "tl_cuda_ep_hash.h"
+#include "tl_cuda_topo.h"
+#include "tl_cuda_team_topo.h"
+#include "tl_cuda_common.h"
 #include <cuda_runtime.h>
 
 #ifndef UCC_TL_CUDA_DEFAULT_SCORE
@@ -56,24 +59,6 @@
 #define UCC_TL_CUDA_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
 #define UCC_TL_CUDA_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
 
-#define CUDACHECK_GOTO(_cmd, _label, _status, _lib)                            \
-    do {                                                                       \
-        cudaError_t e = _cmd;                                                  \
-        if (ucc_unlikely(cudaSuccess != e)) {                                  \
-            tl_error(_lib, "CUDA error %d %s", e, cudaGetErrorName(e));        \
-            _status = UCC_ERR_NO_MESSAGE;                                      \
-            goto _label;                                                       \
-        }                                                                      \
-    } while (0)
-
-#define CUDACHECK_NORET(_cmd)                                                  \
-    do {                                                                       \
-        cudaError_t e = _cmd;                                                  \
-        if (ucc_unlikely(cudaSuccess != e)) {                                  \
-            ucc_error("CUDA error %d %s", e, cudaGetErrorName(e));             \
-        }                                                                      \
-    } while (0)
-
 typedef struct ucc_tl_cuda_iface {
     ucc_tl_iface_t super;
 } ucc_tl_cuda_iface_t;
@@ -100,6 +85,8 @@ typedef struct ucc_tl_cuda_context {
     ucc_tl_context_t              super;
     ucc_tl_cuda_context_config_t  cfg;
     int                           device;
+    ucc_tl_cuda_device_pci_id_t   device_id;
+    ucc_tl_cuda_topo_t           *topo;
     ucc_mpool_t                   req_mp;
     tl_cuda_ep_hash_t            *ipc_cache;
 } ucc_tl_cuda_context_t;
@@ -117,8 +104,9 @@ typedef struct ucc_tl_cuda_shm_barrier {
 } ucc_tl_cuda_shm_barrier_t;
 
 typedef struct ucc_tl_cuda_rank_id {
-    int device;
-    int shm;
+    int                         device;
+    ucc_tl_cuda_device_pci_id_t pci_id;
+    int                         shm;
 } ucc_tl_cuda_rank_id_t;
 
 typedef struct ucc_tl_cuda_sync_data {
@@ -141,22 +129,10 @@ typedef struct ucc_tl_cuda_sync {
     ucc_tl_cuda_sync_data_t  data[1];
 } ucc_tl_cuda_sync_t;
 
-typedef struct ucc_tl_cuda_proxy {
-    ucc_rank_t proxy;
-    ucc_rank_t src;
-    ucc_rank_t dst;
-} ucc_tl_cuda_proxy_t;
-
-typedef struct ucc_tl_cuda_topo {
-    ucc_rank_t           num_proxies;
-    ucc_tl_cuda_proxy_t *proxies;
-    int                 *matrix;
-} ucc_tl_cuda_topo_t;
-
 typedef struct ucc_tl_cuda_team {
     ucc_tl_team_t              super;
     uint32_t                   seq_num;
-    ucc_tl_cuda_topo_t        *topo;
+    ucc_tl_cuda_team_topo_t   *topo;
     ucc_tl_cuda_sync_t        *sync;
     ucc_tl_cuda_sync_state_t  *sync_state;
     ucc_tl_cuda_shm_barrier_t *bar;

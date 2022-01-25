@@ -8,15 +8,16 @@ alltoall =                       \
 	alltoall/alltoall.c          \
 	alltoall/alltoall_ce.c
 
-sources =             \
-	tl_cuda.h         \
-	tl_cuda.c         \
-	tl_cuda_lib.c     \
-	tl_cuda_context.c \
-	tl_cuda_team.c    \
-	tl_cuda_coll.c    \
-	tl_cuda_cache.c   \
-	tl_cuda_topo.c    \
+sources =               \
+	tl_cuda.h           \
+	tl_cuda.c           \
+	tl_cuda_lib.c       \
+	tl_cuda_context.c   \
+	tl_cuda_team.c      \
+	tl_cuda_coll.c      \
+	tl_cuda_cache.c     \
+	tl_cuda_topo.c      \
+	tl_cuda_team_topo.c \
 	$(alltoall)
 
 module_LTLIBRARIES = libucc_tl_cuda.la

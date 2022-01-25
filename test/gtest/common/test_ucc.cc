@@ -280,6 +280,8 @@ UccJob::UccJob(int _n_procs, ucc_job_ctx_mode_t _ctx_mode, ucc_job_env_t vars) :
     /* NCCL TL is disabled since it currently can not support non-blocking
        team creation. */
     vars.push_back({"UCC_TL_NCCL_TUNE", "0"});
+    /* CUDA TL is disabled since cuda context is not initialized in threads. */
+    vars.push_back({"UCC_TL_CUDA_TUNE", "0"});
     /* GDR is temporarily disabled due to known issue that may result
        in a hang in the destruction flow */
     vars.push_back({"UCX_IB_GPU_DIRECT_RDMA", "no"});
