@@ -7,7 +7,6 @@
 #include "alltoall.h"
 #include "core/ucc_mc.h"
 #include "tl_cuda_cache.h"
-#include "tl_cuda_topo.h"
 #include "utils/arch/cpu.h"
 
 enum {
@@ -67,7 +66,8 @@ ucc_status_t ucc_tl_cuda_alltoall_setup_test(ucc_tl_cuda_task_t *task)
 
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
         if (i == UCC_TL_TEAM_RANK(team) ||
-            !ucc_tl_cuda_topo_is_direct(team, team->topo, UCC_TL_TEAM_RANK(team), i)) {
+            !ucc_tl_cuda_team_topo_is_direct(&team->super, team->topo,
+                                             UCC_TL_TEAM_RANK(team), i)) {
             continue;
         }
         peer_sync = TASK_SYNC(task, i);
@@ -117,7 +117,8 @@ static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task
                ucc_dt_size(args->src.info.datatype);
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
         peer = (rank + i) % UCC_TL_TEAM_SIZE(team);
-        if (!ucc_tl_cuda_topo_is_direct(team, team->topo, rank, peer)) {
+        if (!ucc_tl_cuda_team_topo_is_direct(&team->super, team->topo,
+                                             rank, peer)) {
             continue;
         }
         peer_sync = TASK_SYNC(task, peer);
