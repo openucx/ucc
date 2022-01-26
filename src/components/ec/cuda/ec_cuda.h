@@ -33,6 +33,14 @@ typedef enum ucc_ec_task_status {
     UCC_EC_CUDA_TASK_COMPLETED_ACK
 } ucc_ec_task_status_t;
 
+typedef enum ucc_ec_cuda_executor_state {
+    UCC_EC_CUDA_EXECUTOR_INITIALIZED,
+    UCC_EC_CUDA_EXECUTOR_POSTED,
+    UCC_EC_CUDA_EXECUTOR_STARTED,
+    UCC_EC_CUDA_EXECUTOR_SHUTDOWN,
+    UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK
+} ucc_ec_cuda_executor_state_t;
+
 static inline ucc_status_t cuda_error_to_ucc_status(cudaError_t cu_err)
 {
     switch(cu_err) {
@@ -55,6 +63,9 @@ typedef struct ucc_ec_cuda_config {
     ucc_ec_cuda_strm_task_mode_t   strm_task_mode;
     ucc_ec_cuda_task_stream_type_t task_strm_type;
     int                            stream_blocking_wait;
+    unsigned long                  exec_num_workers;
+    unsigned long                  exec_num_threads;
+    unsigned long                  exec_max_tasks;
 } ucc_ec_cuda_config_t;
 
 typedef struct ucc_ec_cuda {
@@ -62,6 +73,7 @@ typedef struct ucc_ec_cuda {
     cudaStream_t                   stream;
     ucc_mpool_t                    events;
     ucc_mpool_t                    strm_reqs;
+    ucc_mpool_t                    executors;
     ucc_thread_mode_t              thread_mode;
     ucc_ec_cuda_strm_task_mode_t   strm_task_mode;
     ucc_ec_cuda_task_stream_type_t task_strm_type;
@@ -78,6 +90,17 @@ typedef struct ucc_ec_cuda_stream_request {
     uint32_t           *dev_status;
     cudaStream_t        stream;
 } ucc_ec_cuda_stream_request_t;
+
+typedef struct ucc_ec_cuda_executor {
+    ucc_ee_executor_t             super;
+    ucc_ec_cuda_executor_state_t  state;
+    int                           pidx;
+    ucc_ee_executor_task_t       *tasks;
+    ucc_ec_cuda_executor_state_t *dev_state;
+    ucc_ee_executor_task_t       *dev_tasks;
+    int                          *dev_pidx;
+    int                          *dev_cidx;
+} ucc_ec_cuda_executor_t;
 
 extern ucc_ec_cuda_t ucc_ec_cuda;
 
