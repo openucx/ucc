@@ -214,29 +214,31 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
                              ucc_rank_t peer, uint64_t *rva, ucp_rkey_h *rkey,
                              int *segment)
 {
-    ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_tl_ucp_context_t *ctx            = UCC_TL_UCP_TEAM_CTX(team);
+    ptrdiff_t             key_offset     = 0;
+    const size_t          section_offset = sizeof(uint64_t) * ctx->n_rinfo_segs;
     ucc_rank_t            core_rank;
-    uint64_t * rvas;
-    uint64_t * lens;
-    uint64_t * key_sizes;
-    void * keys;
-    ptrdiff_t base_offset;
-    ptrdiff_t key_offset = 0;
-    const size_t section_offset = sizeof(uint64_t) * ctx->n_rinfo_segs;
-    *segment = 0;
+    uint64_t             *rvas;
+    uint64_t             *lens;
+    uint64_t             *key_sizes;
+    void                 *keys;
+    ptrdiff_t             base_offset;
     ucc_context_addr_header_t *h;
 
+    *segment  = 0;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
     ucc_assert(UCC_TL_CORE_TEAM(team));
     peer = ucc_get_ctx_rank(UCC_TL_CORE_TEAM(team), core_rank);
 
-    h = UCC_ADDR_STORAGE_RANK_HEADER(&ctx->super.super.ucc_context->addr_storage, peer); 
-    base_offset = (ptrdiff_t)PTR_OFFSET(h, h->components[0].offset + ctx->ucp_addrlen);
-    rvas = (uint64_t *)base_offset;
-    lens = PTR_OFFSET(base_offset, section_offset);
+    h = UCC_ADDR_STORAGE_RANK_HEADER(
+        &ctx->super.super.ucc_context->addr_storage, peer);
+    base_offset =
+        (ptrdiff_t)PTR_OFFSET(h, h->components[0].offset + ctx->ucp_addrlen);
+    rvas      = (uint64_t *)base_offset;
+    lens      = PTR_OFFSET(base_offset, section_offset);
     key_sizes = PTR_OFFSET(base_offset, (section_offset * 2));
-    keys = PTR_OFFSET(base_offset, (section_offset * 3));
-    
+    keys      = PTR_OFFSET(base_offset, (section_offset * 3));
+
     for (int i = 0; i < ctx->n_rinfo_segs; i++) {
         if ((uint64_t)va >= rvas[i] && (uint64_t)va < rvas[i] + lens[i]) {
             *segment = i;
@@ -245,13 +247,14 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
         key_offset += key_sizes[i];
     }
     if (NULL == ctx->rkeys[peer][*segment]) {
-        ucs_status_t ucs_status = ucp_ep_rkey_unpack(*ep, PTR_OFFSET(keys, key_offset), &ctx->rkeys[peer][*segment]);
+        ucs_status_t ucs_status = ucp_ep_rkey_unpack(
+            *ep, PTR_OFFSET(keys, key_offset), &ctx->rkeys[peer][*segment]);
         if (UCS_OK != ucs_status) {
             return ucs_status_to_ucc_status(ucs_status);
         }
     }
     *rkey = ctx->rkeys[peer][*segment];
-    *rva = rvas[*segment] + ((uint64_t)va - rvas[*segment]);
+    *rva  = rvas[*segment] + ((uint64_t)va - rvas[*segment]);
     return UCC_OK;
 }
 
