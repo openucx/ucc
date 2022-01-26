@@ -14,6 +14,10 @@ alltoall =                  \
 	alltoall/alltoall.h     \
 	alltoall/alltoall.c
 
+barrier =                 \
+	barrier/barrier.h     \
+	barrier/barrier.c
+
 sources =             \
 	cl_hier.h         \
 	cl_hier.c         \
@@ -24,7 +28,8 @@ sources =             \
 	cl_hier_coll.h    \
 	$(allreduce)      \
 	$(alltoallv)      \
-	$(alltoall)
+	$(alltoall)       \
+	$(barrier)
 
 module_LTLIBRARIES         = libucc_cl_hier.la
 libucc_cl_hier_la_SOURCES  = $(sources)

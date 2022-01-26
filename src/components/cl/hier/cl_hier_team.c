@@ -11,6 +11,7 @@
 #include "allreduce/allreduce.h"
 #include "alltoallv/alltoallv.h"
 #include "alltoall/alltoall.h"
+#include "barrier/barrier.h"
 
 #define SBGP_SET(_team, _sbgp, _enable)                                        \
     _team->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp_type = UCC_SBGP_##_sbgp;          \
@@ -391,6 +392,16 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
             cl_error(lib, "failed to add range to score_t");
             return status;
         }
+    }
+
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST,
+        0, UCC_MSG_MAX, UCC_CL_HIER_DEFAULT_SCORE,
+        ucc_cl_hier_barrier_init, cl_team);
+    if (UCC_OK != status) {
+        cl_error(lib, "faild to add range to score_t");
+        return status;
+
     }
 
     if (strlen(ctx->score_str) > 0) {
