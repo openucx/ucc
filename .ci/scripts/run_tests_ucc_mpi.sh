@@ -72,3 +72,19 @@ mpirun \
     -x UCC_TL_NCCL_TUNE=0 \
     /opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi --mtypes cuda --inplace 2 --set_device 1 --root random:2 --count_bits 32,64 --displ_bits 32,64
 echo "INFO: UCC MPI unit tests (GPU without NCCL) ... DONE"
+
+echo "INFO: UCC MPI unit tests (CPU/GPU with CL/HIER) ..."
+# shellcheck disable=SC2086
+mpirun \
+    -np $NP \
+    --hostfile ${HOSTFILE} \
+    --map-by node \
+    --allow-run-as-root \
+    --mca plm_rsh_args '-p 12345' \
+    -x PATH \
+    -x LD_LIBRARY_PATH \
+    -x UCC_TL_NCCL_TUNE=0 \
+    -x UCC_CLS=hier,basic \
+    -x UCC_CL_HIER_TUNE=inf \
+    /opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi --mtypes host,cuda --inplace 2 --set_device 1 --root random:2 --count_bits 32,64 --displ_bits 32,64
+echo "INFO: UCC MPI unit tests (GPU without NCCL) ... DONE"
