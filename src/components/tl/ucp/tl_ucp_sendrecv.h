@@ -219,13 +219,12 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     const size_t          section_offset = sizeof(uint64_t) * ctx->n_rinfo_segs;
     ucc_rank_t            core_rank;
     uint64_t             *rvas;
-    uint64_t             *lens;
     uint64_t             *key_sizes;
     void                 *keys;
     ptrdiff_t             base_offset;
     ucc_context_addr_header_t *h;
 
-    *segment  = 0;
+    *segment  = -1;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
     ucc_assert(UCC_TL_CORE_TEAM(team));
     peer = ucc_get_ctx_rank(UCC_TL_CORE_TEAM(team), core_rank);
@@ -235,16 +234,22 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     base_offset =
         (ptrdiff_t)PTR_OFFSET(h, h->components[0].offset + ctx->ucp_addrlen);
     rvas      = (uint64_t *)base_offset;
-    lens      = PTR_OFFSET(base_offset, section_offset);
     key_sizes = PTR_OFFSET(base_offset, (section_offset * 2));
     keys      = PTR_OFFSET(base_offset, (section_offset * 3));
 
     for (int i = 0; i < ctx->n_rinfo_segs; i++) {
-        if ((uint64_t)va >= rvas[i] && (uint64_t)va < rvas[i] + lens[i]) {
+        if ((uint64_t)va >= (uint64_t)team->va_base[i] &&
+            (uint64_t)va < (uint64_t)team->va_base[i] + team->base_length[i]) {
             *segment = i;
             break;
         }
         key_offset += key_sizes[i];
+    }
+    if (0 > *segment) {
+        tl_error(
+            UCC_TL_TEAM_LIB(team),
+            "attempt to perform one-sided operation on non-registered memory");
+        return UCC_ERR_NOT_FOUND;
     }
     if (NULL == ctx->rkeys[peer][*segment]) {
         ucs_status_t ucs_status = ucp_ep_rkey_unpack(
@@ -254,7 +259,7 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
         }
     }
     *rkey = ctx->rkeys[peer][*segment];
-    *rva  = rvas[*segment] + ((uint64_t)va - rvas[*segment]);
+    *rva  = rvas[*segment] + ((uint64_t)va - (uint64_t)team->va_base[*segment]);
     return UCC_OK;
 }
 
