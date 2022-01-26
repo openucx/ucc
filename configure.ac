@@ -140,6 +140,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_AARCH64_HI1620], [false])
      AM_CONDITIONAL([HAVE_UCX], [false])
      AM_CONDITIONAL([HAVE_CUDA], [false])
+     AM_CONDITIONAL([HAVE_NVML], [false])
      AM_CONDITIONAL([HAVE_MPI], [false])
      AM_CONDITIONAL([HAVE_MPIRUN], [false])
      AM_CONDITIONAL([HAVE_MPICC], [false])

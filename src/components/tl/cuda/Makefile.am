@@ -25,7 +25,7 @@ libucc_tl_cuda_la_SOURCES  = $(sources)
 libucc_tl_cuda_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS) $(CUDA_CPPFLAGS)
 libucc_tl_cuda_la_CFLAGS   = $(BASE_CFLAGS)
 libucc_tl_cuda_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(CUDA_LDFLAGS)
-libucc_tl_cuda_la_LIBADD   = $(CUDA_LIBS) $(UCC_TOP_BUILDDIR)/src/libucc.la
+libucc_tl_cuda_la_LIBADD   = $(CUDA_LIBS) $(NVML_LIBS) $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 include $(top_srcdir)/config/module.am
 
