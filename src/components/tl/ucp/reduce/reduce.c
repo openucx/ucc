@@ -6,10 +6,6 @@
 #include "config.h"
 #include "reduce.h"
 
-ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *task);
-ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *task);
-ucc_status_t ucc_tl_ucp_reduce_knomial_finalize(ucc_coll_task_t *task);
-
 ucc_status_t ucc_tl_ucp_reduce_init(ucc_tl_ucp_task_t *task)
 {
     ucc_coll_args_t   *args      = &TASK_ARGS(task);

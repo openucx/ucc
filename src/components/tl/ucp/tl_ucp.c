@@ -44,6 +44,16 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, barrier_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"FANIN_KN_RADIX", "4",
+     "Radix of the knomial tree fanin algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, fanin_kn_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"FANOUT_KN_RADIX", "4",
+     "Radix of the knomial tree fanout algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, fanout_kn_radix),
+     UCC_CONFIG_TYPE_UINT},
+
     {"ALLREDUCE_KN_RADIX", "4",
      "Radix of the recursive-knomial allreduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_kn_radix),
