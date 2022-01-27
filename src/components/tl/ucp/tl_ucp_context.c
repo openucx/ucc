@@ -473,7 +473,9 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
                 tl_error(ctx->super.super.lib, "failed to pack onesided information");
                 return ucc_status;
             }
-            memcpy(PTR_OFFSET(attr->attr.ctx_addr, ctx->ucp_addrlen), packed_data, packed_length);
+            if (ucc_likely(NULL != packed_data)) {
+                memcpy(PTR_OFFSET(attr->attr.ctx_addr, ctx->ucp_addrlen), packed_data, packed_length);
+            }
         }
     }
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE) {
