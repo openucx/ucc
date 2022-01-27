@@ -1026,10 +1026,11 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
  *  @brief The @ref ucc_context_config_modify routine modifies the runtime configuration
  *                  of UCC context (optionally for a given CLS)
  *
- *  @param [in] config   Pointer to the configuration descriptor to be modified
- *  @param [in] cls      Comma separated list of CLS or NULL. If NULL then core context config is modified.
- *  @param [in] name     Configuration variable to be modified
- *  @param [in] value    Configuration value to set
+ *  @param [in] config    Pointer to the configuration descriptor to be modified
+ *  @param [in] component CL/TL component (e.g. "tl/ucp" or "cl/basic") or NULL.
+                          If NULL then core context config is modified.
+ *  @param [in] name      Configuration variable to be modified
+ *  @param [in] value     Configuration value to set
  *
  *  @parblock
  *
@@ -1044,7 +1045,7 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
  */
 
 ucc_status_t ucc_context_config_modify(ucc_context_config_h config,
-                                       const char *cls, const char *name,
+                                       const char *component, const char *name,
                                        const char *value);
 
 /**
