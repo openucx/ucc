@@ -99,13 +99,14 @@ static void ucc_tl_shm_init_segs(ucc_tl_shm_team_t *team)
 
 static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
 {
-    ucc_rank_t          team_rank = UCC_TL_TEAM_RANK(team),
-                        team_size = UCC_TL_TEAM_SIZE(team);
-    size_t              shmsize   = team->n_concurrent *
-                                    (team->ctrl_size + team->data_size);
-    int                 shmid     = -1;
-    ucc_team_oob_coll_t oob       = UCC_TL_TEAM_OOB(team);
-    ucc_status_t        status;
+    ucc_rank_t           team_rank = UCC_TL_TEAM_RANK(team),
+                         team_size = UCC_TL_TEAM_SIZE(team);
+    size_t               shmsize   = team->n_concurrent *
+                                     (team->ctrl_size + team->data_size);
+    int                  shmid     = -1;
+    ucc_team_oob_coll_t  oob       = UCC_TL_TEAM_OOB(team);
+    ucc_tl_shm_ctrl_t   *seg_ctrl, *rank_ctrl;
+    ucc_status_t         status;
 
     team->allgather_dst = (int *) ucc_malloc(sizeof(int) * team_size,
                                              "algather dst buffer");
@@ -135,6 +136,13 @@ static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
             return UCC_ERR_NO_RESOURCE;
         }
         memset(team->shm_buffer, 0, shmsize);
+        for (int i = 0; i < team->n_concurrent; i++) {
+            seg_ctrl = (ucc_tl_shm_ctrl_t *) PTR_OFFSET(team->shm_buffer, i * (team->ctrl_size + team->data_size));
+        	for (int j = 0; j < team_size; j++) {
+        	    rank_ctrl = PTR_OFFSET(seg_ctrl, ucc_ep_map_eval(team->ctrl_map, j));
+                rank_ctrl->ci = i;
+        	}
+        }
         shmctl(shmid, IPC_RMID, NULL);
     }
     status = oob.allgather(&shmid, team->allgather_dst, sizeof(int),
@@ -167,7 +175,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     team_size     = UCC_TL_TEAM_SIZE(self);
     cfg_ctrl_size = UCC_TL_SHM_TEAM_LIB(self)->cfg.ctrl_size;
 
-    self->seq_num      = 1;
+    self->seq_num      = UCC_TL_SHM_TEAM_LIB(self)->cfg.n_concurrent;
     self->status       = UCC_INPROGRESS;
     self->shm_buffer   = NULL;
     self->n_concurrent = UCC_TL_SHM_TEAM_LIB(self)->cfg.n_concurrent;
@@ -187,7 +195,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
         ucc_topo_cleanup(self->topo);
         return UCC_ERR_INVALID_PARAM;
     }
-
 
     if (UCC_TL_CORE_CTX(self)->topo->sock_bound != 1) {
         /* TODO: we have just 1 base group and no top group. */
@@ -239,8 +246,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
                                             UCC_SBGP_SOCKET_LEADERS);
 
     if (self->leaders_group->status == UCC_SBGP_NOT_EXISTS ||
-        self->leaders_group->group_size == team_size ||
-        UCC_TL_SHM_TEAM_LIB(self)->cfg.base_tree_only) {
+        self->leaders_group->group_size == team_size) {
+//        || UCC_TL_SHM_TEAM_LIB(self)->cfg.base_tree_only) { //config should be removed for perf choices function and moved to coll init
     	self->leaders_group->group_size = 0;
     	self->base_groups = ucc_topo_get_sbgp(self->topo, UCC_SBGP_NODE);
     	self->n_base_groups = 1;

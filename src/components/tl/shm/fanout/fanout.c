@@ -49,28 +49,33 @@ ucc_status_t ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
 
-    if (is_op_root) {
+    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
         /* checks if previous collective has completed on the seg
-           TODO: can be optimized if we detect fanout->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_seg_ready(seg)) { //TODO: implement
+           TODO: can be optimized if we detect bcast->reduce pattern.*/
+        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
+        task->seg_ready = 1;
     }
 
-    if (tree->top_tree) {
+    if (tree->top_tree && !task->first_tree_done) {
         status = ucc_tl_shm_fanout_signal(team, seg, task, tree->top_tree,
                                           is_op_root);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
+        task->first_tree_done = 1;
     }
-    status = ucc_tl_shm_fanout_signal(team, seg, task, tree->base_tree,
-                                      is_op_root);
 
-    if (UCC_OK != status) {
-        /* in progress */
-        return status;
+    if (tree->base_tree) {
+        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->base_tree,
+                                          is_op_root);
+
+        if (UCC_OK != status) {
+            /* in progress */
+            return status;
+        }
     }
 
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
@@ -112,9 +117,12 @@ ucc_status_t ucc_tl_shm_fanout_init(ucc_tl_shm_task_t *task)
     task->super.progress = ucc_tl_shm_fanout_progress;
     task->seq_num    = team->seq_num++;
     task->seg        = &team->segs[task->seq_num % team->n_concurrent];
+    task->seg_ready = 0;
+    task->first_tree_done = 0;
+
     status = ucc_tl_shm_tree_init(team, args.root, base_radix, top_radix,
                                   &task->tree_in_cache, UCC_COLL_TYPE_FANOUT,
-                                  &task->tree);
+                                  task->base_tree_only, &task->tree);
 
     if (ucc_unlikely(UCC_OK != status)) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to init shm tree");

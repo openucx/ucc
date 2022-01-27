@@ -82,7 +82,7 @@ ucc_status_t ucc_tl_shm_bcast_read(ucc_tl_shm_team_t *team,
         /* I'm the root of the tree and NOT is_op_root. It means the tree is
            base tree and i already have the data in my shm via top_tree step
            (read or write). Just notify children. */
-        ucc_assert(task->tree->base_tree == tree);
+//        ucc_assert(task->tree->base_tree == tree);
         ucc_assert(my_ctrl->pi == seq_num);
         ucc_tl_shm_signal_to_children(seg, team, seq_num, tree);
         return UCC_OK;
@@ -125,28 +125,35 @@ ucc_status_t ucc_tl_shm_bcast_ww_progress(ucc_coll_task_t *coll_task)
     ucc_tl_shm_ctrl_t *my_ctrl;
     void              *src;
 
-    if (is_op_root) {
+    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_seg_ready(seg)) { //TODO: implement
-            return UCC_INPROGRESS;
+    	status = ucc_tl_shm_bcast_seg_ready(seg, task->seq_num, team, tree);
+        if (UCC_OK != status) {
+            /* in progress */
+            return status;
         }
+        task->seg_ready = 1;
     }
-    if (tree->top_tree) {
+
+    if (tree->top_tree && !task->first_tree_done) {
         status = ucc_tl_shm_bcast_write(team, seg, task, tree->top_tree,
                                         is_inline, &is_op_root, data_size);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
+        task->first_tree_done = 1;
     }
 
-    status = ucc_tl_shm_bcast_write(team, seg, task, tree->base_tree,
-                                    is_inline, &is_op_root, data_size);
+    if (tree->base_tree) {
+        status = ucc_tl_shm_bcast_write(team, seg, task, tree->base_tree,
+                                        is_inline, &is_op_root, data_size);
 
-    if (UCC_OK != status) {
-        /* in progress */
-        return status;
+        if (UCC_OK != status) {
+            /* in progress */
+            return status;
+        }
     }
 
     /* Copy out to user dest:
@@ -184,28 +191,35 @@ ucc_status_t ucc_tl_shm_bcast_wr_progress(ucc_coll_task_t *coll_task)
     ucc_tl_shm_ctrl_t *my_ctrl, *parent_ctrl;
     void              *src;
 
-    if (is_op_root) {
+    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_seg_ready(seg)) { //TODO: implement
+        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
+        task->seg_ready = 1;
     }
 
-    if (tree->top_tree) {
+//    volatile int flag = 0;
+//    while (!flag) {}
+    if (tree->top_tree && !task->first_tree_done) {
         status = ucc_tl_shm_bcast_write(team, seg, task, tree->top_tree,
                                         is_inline, &is_op_root, data_size);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
+        task->first_tree_done = 1;
     }
-    status = ucc_tl_shm_bcast_read(team, seg, task, tree->base_tree, is_inline,
-                                   &is_op_root, data_size);
 
-    if (UCC_OK != status) {
-        /* in progress */
-        return status;
+    if (tree->base_tree) {
+        status = ucc_tl_shm_bcast_read(team, seg, task, tree->base_tree, is_inline,
+                                       &is_op_root, data_size);
+
+        if (UCC_OK != status) {
+            /* in progress */
+            return status;
+        }
     }
 
     /* Copy out to user dest:
@@ -215,8 +229,8 @@ ucc_status_t ucc_tl_shm_bcast_wr_progress(ucc_coll_task_t *coll_task)
        - other ranks must be participants of the top tree WRITE step, hence
         they have the data in their local shm data/ctrl */
     if (!is_op_root) {
-        parent = tree->base_tree->parent == UCC_RANK_INVALID ?
-                                            rank : tree->base_tree->parent;
+        parent = tree->base_tree ? ((tree->base_tree->parent == UCC_RANK_INVALID) ?
+                                            rank : tree->base_tree->parent) : rank;
         parent_ctrl = ucc_tl_shm_get_ctrl(seg, team, parent);
         src = is_inline ? parent_ctrl->data : ucc_tl_shm_get_data(seg, team,
                                                                   parent);
@@ -248,27 +262,32 @@ ucc_status_t ucc_tl_shm_bcast_rr_progress(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
     void              *src;
 
-    if (is_op_root) {
+    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_seg_ready(seg)) { //TODO: implement
+        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seq_num, team, tree)) { //TODO: implement
             return UCC_INPROGRESS;
         }
+        task->seg_ready = 1;
     }
 
-    if (tree->top_tree) {
+    if (tree->top_tree && !task->first_tree_done) {
         status = ucc_tl_shm_bcast_read(team, seg, task, tree->top_tree,
                                        is_inline, &is_op_root, data_size);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
+        task->first_tree_done = 1;
     }
-    status = ucc_tl_shm_bcast_read(team, seg, task, tree->base_tree,
-                                   is_inline, &is_op_root, data_size);
-    if (UCC_OK != status) {
-        /* in progress */
-        return status;
+
+    if (tree->base_tree) {
+        status = ucc_tl_shm_bcast_read(team, seg, task, tree->base_tree,
+                                      is_inline, &is_op_root, data_size);
+        if (UCC_OK != status) {
+            /* in progress */
+            return status;
+        }
     }
 
     /* Copy out to user dest:
@@ -276,8 +295,8 @@ ucc_status_t ucc_tl_shm_bcast_rr_progress(ucc_coll_task_t *coll_task)
        If we did READ as 2nd step then the data is in the base_tree->parent SHM
        If we did WRITE as 2nd step then the data is in my SHM */
     if (!is_op_root) {
-        parent = tree->base_tree->parent == UCC_RANK_INVALID ?
-                 tree->top_tree->parent : tree->base_tree->parent;
+        parent = (tree->base_tree && tree->base_tree->parent != UCC_RANK_INVALID) ?
+                 tree->base_tree->parent : tree->top_tree->parent;
         parent_ctrl = ucc_tl_shm_get_ctrl(seg, team, parent);
         src = is_inline ? parent_ctrl->data : ucc_tl_shm_get_data(seg, team,
                                                                   parent);
@@ -309,28 +328,33 @@ ucc_status_t ucc_tl_shm_bcast_rw_progress(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
     void              *src;
 
-    if (is_op_root) {
+    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_seg_ready(seg)) { //TODO: implement
+        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seq_num, team, tree)) { //TODO: implement
             return UCC_INPROGRESS;
         }
+        task->seg_ready = 1;
     }
-    if (tree->top_tree) {
+
+    if (tree->top_tree && !task->first_tree_done) {
         status = ucc_tl_shm_bcast_read(team, seg, task, tree->top_tree,
                                        is_inline, &is_op_root, data_size);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
+        task->first_tree_done = 1;
     }
 
-    status = ucc_tl_shm_bcast_write(team, seg, task, tree->base_tree,
-                                    is_inline, &is_op_root, data_size);
+    if (tree->base_tree) {
+        status = ucc_tl_shm_bcast_write(team, seg, task, tree->base_tree,
+                                        is_inline, &is_op_root, data_size);
 
-    if (UCC_OK != status) {
-        /* in progress */
-        return status;
+        if (UCC_OK != status) {
+            /* in progress */
+            return status;
+        }
     }
 
     /* Copy out to user dest:
@@ -357,7 +381,6 @@ ucc_status_t ucc_tl_shm_bcast_start(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
 
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_bcast_start", 0);
-    task->seq_num++;
     task->super.super.status = UCC_INPROGRESS;
     status = task->super.progress(&task->super);
 
@@ -372,25 +395,33 @@ ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task)
 {
 	ucc_tl_shm_team_t *team = TASK_TEAM(task);
 	ucc_coll_args_t    args = TASK_ARGS(task);
-	ucc_rank_t   base_radix = UCC_TL_SHM_TEAM_LIB(team)->cfg.bcast_base_radix;
-//	ucc_rank_t   base_radix = task->base_radix;
-	ucc_rank_t   top_radix  = UCC_TL_SHM_TEAM_LIB(team)->cfg.bcast_top_radix;
-	ucc_status_t status;
+//	ucc_rank_t   base_radix = UCC_TL_SHM_TEAM_LIB(team)->cfg.bcast_base_radix;
+	ucc_rank_t         base_radix = task->base_radix;
+	ucc_rank_t         top_radix  = task->top_radix;
+//	if (UCC_TL_TEAM_SIZE(team) > base_radix) {
+//		base_radix = UCC_TL_TEAM_SIZE(team);
+//	}
+//	ucc_rank_t   top_radix  = UCC_TL_SHM_TEAM_LIB(team)->cfg.bcast_top_radix;
+	ucc_status_t       status;
 
     task->super.post = ucc_tl_shm_bcast_start;
     task->seq_num    = team->seq_num++;
     task->seg        = &team->segs[task->seq_num % team->n_concurrent];
+    task->first_tree_done = 0;
+    task->seg_ready = 0;
+
     status = ucc_tl_shm_tree_init(team, args.root, base_radix, top_radix,
                                   &task->tree_in_cache, UCC_COLL_TYPE_BCAST,
-                                  &task->tree);
+                                  task->base_tree_only, &task->tree);
 
     if (ucc_unlikely(UCC_OK != status)) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to init shm tree");
     	return status;
     }
 
-    switch(TASK_LIB(task)->cfg.bcast_alg) {
-//    switch(task->progress_alg) {
+//    while(1) {}
+//    switch(TASK_LIB(task)->cfg.bcast_alg) {
+    switch(task->progress_alg) {
         case BCAST_WW:
         	task->super.progress = ucc_tl_shm_bcast_ww_progress;
             break;

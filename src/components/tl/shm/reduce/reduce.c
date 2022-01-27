@@ -63,7 +63,7 @@ ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
     uint32_t           n_polls    = UCC_TL_SHM_TEAM_LIB(team)->cfg.n_polls;
     void              *src1, *src2, *dst;
     ucc_tl_shm_ctrl_t *child_ctrl, *my_ctrl;
-    ucc_rank_t         child;
+    ucc_rank_t         child;//, cur_child;
     int                i, j, reduced;
     ucc_status_t       status;
 
@@ -73,7 +73,7 @@ ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
     if (tree->n_children == 0) {
         /* I am leaf so I dont need to read, only notify parent*/
 
-        if (tree == task->tree->base_tree) {
+        if (tree == task->tree->base_tree || task->tree->base_tree == NULL) {
         /* I am leaf in base tree so need to copy from user buffer into my shm */
             dst = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team,
                                                                   team_rank);
@@ -84,34 +84,14 @@ ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
         return UCC_OK;
     }
 
-    if (tree == task->tree->top_tree && !task->progress_in_top_tree) {
-    	task->cur_child = 0;
-    }
-
-//    for (i = task->cur_child; i < tree->n_children; i++){
-//    	reduced = 0;
-//        child = tree->children[i];
-//        child_ctrl = ucc_tl_shm_get_ctrl(seg, team, child);
-//        for (j = 0; j < n_polls; j++) {
-//            if (child_ctrl->pi == seq_num) {
-//                SHMSEG_ISYNC();
-//                reduced = 1;
-//                break;
-//            }
-//        }
-//        if (!reduced) {
-//            task->cur_child = i;
-//            if (tree == task->tree->base_tree) {
-//                task->progress_in_top_tree = 1;
-//            }
-//            return UCC_INPROGRESS;
-//        }
+//    if (tree == task->tree->top_tree && !task->progress_in_top_tree) { //remove second flag and use local variable for each base and top tree
+//    	task->cur_child = 0;
 //    }
 
+//    cur_child = (tree == task->tree->top_tree) ? task->top_cur_child : task->base_cur_child;
+//    for (i = cur_child; i < tree->n_children; i++) {
     for (i = task->cur_child; i < tree->n_children; i++) {
-
-//    for (i = 0; i < tree->n_children; i++){
-        reduced = 0;
+    	reduced = 0;
         child = tree->children[i];
         child_ctrl = ucc_tl_shm_get_ctrl(seg, team, child);
         for (j = 0; j < n_polls; j++) {
@@ -119,9 +99,19 @@ ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
                 SHMSEG_ISYNC();
                 src1 = is_inline ? child_ctrl->data :
                                    ucc_tl_shm_get_data(seg, team, child);
-                dst  = is_inline ? my_ctrl->data :
-                                   ucc_tl_shm_get_data(seg, team, team_rank);
-                src2 = (i == 0 && tree == task->tree->base_tree) ? args->src.info.buffer : dst;
+                dst  = (args->root == team_rank) ? args->dst.info.buffer : (is_inline ? my_ctrl->data : // if is_op_root I should make dst args.dst.buffer and remove memcpy in progress
+                                   ucc_tl_shm_get_data(seg, team, team_rank));
+//                src2 = (i == 0 && (tree == task->tree->base_tree || task->tree->base_tree == NULL)) ? args->src.info.buffer : dst;
+                src2 = (task->first_reduce) ? args->src.info.buffer : dst;
+//                if (task->first_reduce) {
+//                    src2 = args->src.info.buffer; // make task var for the first time I do reduction - take from args.src.buffer otherwise from dst
+//                    task->first_reduce = 0;
+//                } else {
+//                	src2 = dst;
+//                }
+//                if (src2 == args->src.info.buffer) {
+//                	printf("src buffer with rank = %d, i = %d, tree = %p, top_tree = %p, base_tree = %p \n", team_rank, i, tree, task->tree->top_tree, task->tree->base_tree);
+//                }
                 status = ucc_dt_reduce(src1, src2, dst, count, dt, mtype, args);
 
                 if (ucc_unlikely(UCC_OK != status)) {
@@ -131,15 +121,21 @@ ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
                     return status;
                 }
                 SHMSEG_WMB();
+                task->first_reduce = 0;
                 reduced = 1;
                 break;
             }
         }
         if (!reduced) {
-            task->cur_child = i;
-            if (tree == task->tree->top_tree) {
-                task->progress_in_top_tree = 1;
-            }
+        	task->cur_child = i;
+//        	if (tree == task->tree->top_tree) {
+//                task->top_cur_child = i;
+//            } else {
+//            	task->base_cur_child = i;
+//            }
+//            if (tree == task->tree->top_tree) {
+//                task->progress_in_top_tree = 1;
+//            }
             return UCC_INPROGRESS;
         }
     }
@@ -165,7 +161,8 @@ ucc_status_t ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
     int                is_op_root = rank == root;
     ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
-    void              *src;
+//    void              *src;
+
     if (is_op_root) {
         count = args.dst.info.count;
         mtype = args.dst.info.mem_type;
@@ -178,26 +175,32 @@ ucc_status_t ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
     data_size = count * ucc_dt_size(dt);
     is_inline = data_size <= team->max_inline;
 
-    if (is_op_root) {
+//    if (tree->base_tree->n_children == 0) {
+    if (!task->seg_ready) {
         /* checks if previous collective has completed on the seg
-           TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_seg_ready(seg)) { //TODO: implement
+        TODO: can be optimized if we detect bcast->reduce pattern.*/
+        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
+        task->seg_ready = 1;
     }
 
-    UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_BASE_tree_reduce_start", 0);
+//    volatile int flag = 0;
+//    while (!flag) {}
 
-    status = ucc_tl_shm_reduce_read(team, seg, task, tree->base_tree,
+    if (tree->base_tree && !task->first_tree_done) {
+        status = ucc_tl_shm_reduce_read(team, seg, task, tree->base_tree,
                                     is_inline, count, dt, mtype, &args);
 
-    if (UCC_OK != status) {
-        /* in progress or reduction failed */
-        return status;
+        if (UCC_OK != status) {
+            /* in progress or reduction failed */
+            return status;
+        }
+        task->first_tree_done = 1;
+        task->cur_child = 0;
     }
 
     if (tree->top_tree) {
-        UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_TOP_tree_reduce_start", 0);
         status = ucc_tl_shm_reduce_read(team, seg, task, tree->top_tree,
                                         is_inline, count, dt, mtype, &args);
         if (UCC_OK != status) {
@@ -214,11 +217,11 @@ ucc_status_t ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
         they have the data in their local shm data/ctrl */
 
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
-    if (is_op_root) {
-        UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_root memcpy_start", 0);
-        src = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team, rank);
-        memcpy(args.dst.info.buffer, src, data_size);
-    }
+//    if (is_op_root) {
+//        UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_root memcpy_start", 0);
+//        src = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team, rank);
+//        memcpy(args.dst.info.buffer, src, data_size);
+//    }
 
     my_ctrl->ci = task->seq_num;
 
@@ -232,10 +235,9 @@ ucc_status_t ucc_tl_shm_reduce_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
 	ucc_tl_shm_team_t *team = TASK_TEAM(task);
-	ucc_status_t status;
+	ucc_status_t       status;
 
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_reduce_start", 0);
-    task->seq_num++;
     task->super.super.status = UCC_INPROGRESS;
     status = task->super.progress(&task->super);
 
@@ -250,9 +252,9 @@ ucc_status_t ucc_tl_shm_reduce_init(ucc_tl_shm_task_t *task)
 {
  	ucc_tl_shm_team_t *team = TASK_TEAM(task);
 	ucc_coll_args_t    args = TASK_ARGS(task);
-	ucc_rank_t   base_radix = UCC_TL_SHM_TEAM_LIB(team)->cfg.reduce_base_radix;
-	ucc_rank_t   top_radix  = UCC_TL_SHM_TEAM_LIB(team)->cfg.reduce_top_radix;
-	ucc_status_t status;
+	ucc_rank_t         base_radix = task->base_radix;
+	ucc_rank_t         top_radix  = task->top_radix;
+	ucc_status_t       status;
 
     if (args.op == UCC_OP_AVG) {
         task->super.super.status = UCC_ERR_NOT_SUPPORTED;
@@ -265,12 +267,18 @@ ucc_status_t ucc_tl_shm_reduce_init(ucc_tl_shm_task_t *task)
 
     task->seq_num    = team->seq_num++;
     task->seg        = &team->segs[task->seq_num % team->n_concurrent];
-    task->cur_child  = 0;
-    task->progress_in_top_tree = 0;
+//    task->top_cur_child  = 0;
+//    task->base_cur_child = 0;
+    task->cur_child = 0;
+    task->first_reduce   = 1;
+    task->first_tree_done  = 0;
+    task->seg_ready  = 0;
 
+//    task->base_tree_done = 0;
+//    task->progress_in_top_tree = 0;
     status = ucc_tl_shm_tree_init(team, args.root, base_radix, top_radix,
                                   &task->tree_in_cache, UCC_COLL_TYPE_REDUCE,
-                                  &task->tree);
+                                  task->base_tree_only, &task->tree);
 
 //    while(1) {}
     if (ucc_unlikely(UCC_OK != status)) {

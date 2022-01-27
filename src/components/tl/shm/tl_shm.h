@@ -69,7 +69,7 @@ typedef struct ucc_tl_shm_lib_config {
     uint32_t             max_trees_cached;
     uint32_t             n_polls;
     uint32_t             base_tree_only;
-//    uint32_t             set_perf_params;
+    uint32_t             set_perf_params;
     char                *group_mode;
 } ucc_tl_shm_lib_config_t;
 
@@ -93,9 +93,9 @@ UCC_CLASS_DECLARE(ucc_tl_shm_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
 typedef struct ucc_tl_shm_ctrl {
-    volatile int32_t pi;      /* producer index */
-    volatile int32_t ci;      /* consumer index */
-    char             data[1]; /* start of inline data */
+    volatile uint32_t pi;      /* producer index */
+    volatile uint32_t ci;      /* consumer index */
+    char              data[1]; /* start of inline data */
 } ucc_tl_shm_ctrl_t;
 
 typedef struct ucc_tl_shm_seg {
@@ -114,6 +114,7 @@ typedef struct ucc_tl_shm_tree_cache_keys {
     ucc_rank_t      top_radix;
     ucc_rank_t      root;
     ucc_coll_type_t coll_type;
+    int             base_tree_only;
 } ucc_tl_shm_tree_cache_keys_t;
 
 typedef struct ucc_tl_shm_tree_cache_elems {

@@ -21,11 +21,16 @@ typedef struct ucc_kn_tree {
 /* returns upper bound of rank's tree size (parent + children) */
 static inline size_t ucc_tl_shm_kn_tree_size(size_t size, ucc_rank_t radix)
 {
+//	volatile int flag = 0;
+//	while(!flag) {
+//
+//	}
 	size_t log_size = 1;
 	while (size > radix) {
 		size /= radix;
 		log_size++;
 	}
+//	printf ("tree size = %ld\n", log_size * (radix - 1));
 	return log_size * (radix - 1);
 }
 
