@@ -91,13 +91,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
                                   UCC_SBGP_NODE_LEADERS);
     topo      = UCC_TL_CORE_TEAM(self)->topo;
     nnodes    = ucc_topo_nnodes(topo);
-
+    team_size = UCC_TL_TEAM_SIZE(self);
     if (net->status == UCC_SBGP_NOT_EXISTS) {
         tl_debug(tl_context->lib, "disabling mhba for single node team");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (nnodes == UCC_TL_TEAM_SIZE(self)) {
+    if (nnodes == team_size) {
         tl_debug(tl_context->lib, "disabling mhba for ppn=1 case, not supported so far");
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -111,7 +111,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
     ppn       = ucc_topo_max_ppn(topo);
-    team_size = UCC_TL_TEAM_SIZE(self);
+
     self->node_size = node_size;
     ucc_assert(team_size  == ppn * nnodes);
 

@@ -140,6 +140,14 @@ static ucc_status_t ucc_tl_mhba_node_fanout(ucc_tl_mhba_team_t *team,
     /* First phase of fanout: asr signals it completed local ops
        and other ranks wait for asr */
     if (team->node.sbgp->group_rank == team->node.asr_rank) {
+        /* ASR waits for atomic replies from other ASRs */
+        atomic_counter = task->op->net_ctrl->atomic_counter;
+        ucc_assert(atomic_counter <= team->net.net_size);
+
+        if (atomic_counter != team->net.net_size) {
+            return UCC_INPROGRESS;
+        }
+
         ucc_tl_mhba_get_my_ctrl(team, task->seq_index)->seq_num =
             task->seq_num;
     } else {
@@ -148,14 +156,6 @@ static ucc_status_t ucc_tl_mhba_node_fanout(ucc_tl_mhba_team_t *team,
         if (ctrl_v->seq_num != task->seq_num) {
             return UCC_INPROGRESS;
         }
-    }
-    /*Second phase of fanout: wait for remote atomic counters -
-      ie wait for the remote data */
-    atomic_counter = task->op->net_ctrl->atomic_counter;
-    ucc_assert(atomic_counter <= team->net.net_size);
-
-    if (atomic_counter != team->net.net_size) {
-        return UCC_INPROGRESS;
     }
     return UCC_OK;
 }
