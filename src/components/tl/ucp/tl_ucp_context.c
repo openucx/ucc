@@ -391,7 +391,6 @@ fail_alloc_rkeys:
 }
 
 static ucc_status_t ucc_tl_ucp_ctx_remote_pack_data(ucc_tl_ucp_context_t *ctx,
-                                                    ucc_rank_t            rank,
                                                     void **pack, size_t *total)
 {
     uint64_t  nsegs          = ctx->n_rinfo_segs;
@@ -404,6 +403,11 @@ static ucc_status_t ucc_tl_ucp_ctx_remote_pack_data(ucc_tl_ucp_context_t *ctx,
     uint64_t *key_sizes;
     int       i;
 
+    if (0 == nsegs) {
+        *total = 0;
+        *pack  = NULL;
+        return UCC_OK;
+    }
     /* pack into one data object in following order: */
     /* rva, len, pack sizes, packed keys */
     *total = nsegs * (sizeof(uint64_t) * 3);
@@ -438,8 +442,7 @@ static ucc_status_t ucc_tl_ucp_ctx_remote_pack_data(ucc_tl_ucp_context_t *ctx,
 ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
                                          ucc_base_ctx_attr_t      *attr)
 {
-    ucc_tl_ucp_context_t *ctx  = ucc_derived_of(context, ucc_tl_ucp_context_t);
-    ucc_rank_t            rank = context->ucc_context->rank;
+    ucc_tl_ucp_context_t *ctx = ucc_derived_of(context, ucc_tl_ucp_context_t);
     ucs_status_t          ucs_status;
     ucc_status_t          ucc_status;
     void                 *packed_data;
@@ -465,7 +468,7 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR) {
         memcpy(attr->attr.ctx_addr, ctx->worker_address, ctx->ucp_addrlen);
         if (NULL != ctx->remote_info) {
-            ucc_status = ucc_tl_ucp_ctx_remote_pack_data(ctx, rank, &packed_data, &packed_length);
+            ucc_status = ucc_tl_ucp_ctx_remote_pack_data(ctx, &packed_data, &packed_length);
             if (ucc_status != UCC_OK) {
                 tl_error(ctx->super.super.lib, "failed to pack onesided information");
                 return ucc_status;
