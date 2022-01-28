@@ -29,7 +29,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     ucp_worker_h        ucp_worker;
     ucs_status_t        status;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_ucp_config->super.tl_lib,
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_ucp_config->super,
                               params->context);
     memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
     status = ucp_config_read(params->prefix, NULL, &ucp_config);

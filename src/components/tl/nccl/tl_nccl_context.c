@@ -105,7 +105,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_context_t,
     CUresult cu_st;
     CUdevice cu_dev;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_nccl_config->super.tl_lib,
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_nccl_config->super,
                               params->context);
     memcpy(&self->cfg, tl_nccl_config, sizeof(*tl_nccl_config));
     if (self->cfg.sync_type != UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {

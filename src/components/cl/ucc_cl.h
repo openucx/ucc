@@ -37,7 +37,7 @@ typedef struct ucc_cl_context ucc_cl_context_t;
 typedef struct ucc_cl_team    ucc_cl_team_t;
 
 typedef struct ucc_cl_lib_config {
-    ucc_base_config_t        super;
+    ucc_base_lib_config_t    super;
     ucc_cl_iface_t          *iface;
     ucc_config_names_array_t tls;
 } ucc_cl_lib_config_t;
@@ -45,8 +45,8 @@ extern ucc_config_field_t ucc_cl_lib_config_table[];
 
 
 typedef struct ucc_cl_context_config {
-    ucc_base_config_t super;
-    ucc_cl_lib_t   *cl_lib;
+    ucc_base_ctx_config_t super;
+    ucc_cl_lib_t         *cl_lib;
 } ucc_cl_context_config_t;
 extern ucc_config_field_t ucc_cl_context_config_table[];
 
@@ -80,7 +80,8 @@ UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_cl_lib_config_t *);
 typedef struct ucc_cl_context {
     ucc_base_context_t super;
 } ucc_cl_context_t;
-UCC_CLASS_DECLARE(ucc_cl_context_t, ucc_cl_lib_t *, ucc_context_t *);
+UCC_CLASS_DECLARE(ucc_cl_context_t, const ucc_cl_context_config_t *,
+                  ucc_context_t *);
 
 typedef struct ucc_cl_team {
     ucc_base_team_t super;
@@ -107,6 +108,8 @@ typedef struct ucc_cl_lib_attr {
     (ucc_derived_of((_cl_team)->super.context->lib, ucc_cl_lib_t))->iface
 
 #define UCC_CL_TEAM_LIB(_cl_team) (_cl_team)->super.super.context->lib
+
+#define UCC_CL_TEAM_CTX(_cl_team) (_cl_team)->super.super.context
 
 #define UCC_CL_TEAM_SIZE(_cl_team) (_cl_team)->super.super.params.size
 

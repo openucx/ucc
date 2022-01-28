@@ -183,7 +183,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
                                          ucc_coll_score_t **score_p)
 {
     ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
-    ucc_tl_nccl_lib_t * lib  = UCC_TL_NCCL_TEAM_LIB(team);
+    ucc_base_context_t *ctx  = UCC_TL_TEAM_CTX(team);
     ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_CUDA;
     ucc_coll_score_t   *score;
     ucc_status_t        status;
@@ -221,9 +221,9 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
         return status;
     }
 
-    if (strlen(lib->super.super.score_str) > 0) {
+    if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->super.super.score_str, score, UCC_TL_TEAM_SIZE(team),
+            ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_nccl_coll_init, &team->super.super,
             UCC_TL_NCCL_DEFAULT_SCORE, ucc_tl_nccl_alg_id_to_init);
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
