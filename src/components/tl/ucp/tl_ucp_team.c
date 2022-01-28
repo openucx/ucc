@@ -122,8 +122,8 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     ucc_tl_ucp_team_t          *team    = ucc_derived_of(tl_team,
                                                       ucc_tl_ucp_team_t);
     ucc_component_framework_t  *plugins = &ucc_tl_ucp.super.coll_plugins;
-    ucc_tl_ucp_context_t       *ctx     = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_tl_ucp_lib_t           *lib     = UCC_TL_UCP_TEAM_LIB(team);
+    ucc_tl_ucp_context_t       *tl_ctx  = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_base_context_t         *ctx     = UCC_TL_TEAM_CTX(team);
     int                         mt_n    = 0;
     ucc_memory_type_t           mem_types[UCC_MEMORY_TYPE_LAST];
     ucc_coll_score_t           *score, *tlcp_score;
@@ -132,7 +132,7 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     unsigned                    i;
 
     for (i = 0; i < UCC_MEMORY_TYPE_LAST; i++) {
-        if (ctx->ucp_memory_types & UCC_BIT(ucc_memtype_to_ucs[i])) {
+        if (tl_ctx->ucp_memory_types & UCC_BIT(ucc_memtype_to_ucs[i])) {
             tl_debug(tl_team->context->lib,
                      "enable support for memory type %s",
                      ucc_memory_type_names[i]);
@@ -160,9 +160,9 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
             goto err;
         }
     }
-    if (strlen(lib->super.super.score_str) > 0) {
+    if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->super.super.score_str, score, UCC_TL_TEAM_SIZE(team), NULL,
+            ctx->score_str, score, UCC_TL_TEAM_SIZE(team), NULL,
             &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
             ucc_tl_ucp_alg_id_to_init);
 

@@ -298,6 +298,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
 {
     ucc_cl_hier_team_t *team  = ucc_derived_of(cl_team, ucc_cl_hier_team_t);
     ucc_base_lib_t     *lib   = UCC_CL_TEAM_LIB(team);
+    ucc_base_context_t *ctx   = UCC_CL_TEAM_CTX(team);
     ucc_memory_type_t   mt[2] = {UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA};
     ucc_coll_score_t   *score;
     ucc_status_t        status;
@@ -319,9 +320,9 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
         }
     }
 
-    if (strlen(lib->score_str) > 0) {
+    if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->score_str, score, UCC_CL_TEAM_SIZE(team),
+            ctx->score_str, score, UCC_CL_TEAM_SIZE(team),
             ucc_cl_hier_coll_init,
             cl_team, UCC_CL_HIER_DEFAULT_SCORE, NULL);
 

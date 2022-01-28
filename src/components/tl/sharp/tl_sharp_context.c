@@ -207,7 +207,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
         goto err;
     }
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_sharp_config->super.tl_lib,
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_sharp_config->super,
                               params->context);
     memcpy(&self->cfg, tl_sharp_config, sizeof(*tl_sharp_config));
 
