@@ -56,6 +56,8 @@ typedef struct ucc_tl_mhba_lib_config {
     int    block_size;
     int    num_dci_qps;
     int    rc_dc;
+    size_t dm_buf_size;
+    size_t dm_buf_num;
 } ucc_tl_mhba_lib_config_t;
 
 typedef struct ucc_tl_mhba_context_config {
@@ -214,6 +216,11 @@ enum {
     TL_MHBA_TEAM_STATE_EXCHANGE,
 };
 
+typedef struct ucc_tl_mhba_dm_chunk_t {
+    ptrdiff_t offset; // 0 based offset from the beginning of
+                      // memic_mr (obtained with ibv_reg_dm_mr)
+} ucc_tl_mhba_dm_chunk_t;
+
 typedef struct ucc_tl_mhba_team {
     ucc_tl_team_t            super;
     int                      state;
@@ -244,6 +251,10 @@ typedef struct ucc_tl_mhba_team {
     ucc_tl_mhba_bcast_data_t bcast_data;
     ucc_status_t             status;
     ucc_rank_t               node_size;
+    ucc_mpool_t              dm_pool;
+    struct ibv_dm           *dm_ptr;
+    struct ibv_mr *          dm_mr;
+
 } ucc_tl_mhba_team_t;
 UCC_CLASS_DECLARE(ucc_tl_mhba_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

@@ -25,6 +25,14 @@ static ucc_config_field_t ucc_tl_mhba_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mhba_lib_config_t, transpose_buf_size),
      UCC_CONFIG_TYPE_MEMUNITS},
 
+    {"DM_BUF_SIZE", "8k", "Size of the pre-allocated DeviceMemory buffer",
+     ucc_offsetof(ucc_tl_mhba_lib_config_t, dm_buf_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"DM_BUF_NUM", "auto", "Number of DM buffers to alloc",
+     ucc_offsetof(ucc_tl_mhba_lib_config_t, dm_buf_num),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
     {"BLOCK_SIZE", "0",
      "Size of the blocks that are sent using blocked AlltoAll Algorithm",
      ucc_offsetof(ucc_tl_mhba_lib_config_t, block_size), UCC_CONFIG_TYPE_UINT},

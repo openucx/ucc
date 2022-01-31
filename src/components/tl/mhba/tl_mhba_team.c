@@ -11,6 +11,10 @@
 #include <sys/shm.h>
 #include "core/ucc_team.h"
 
+static ucc_mpool_ops_t ucc_tl_mhba_dm_ops;
+static ucc_status_t ucc_tl_mhba_dm_init(ucc_tl_mhba_team_t *team);
+static void ucc_tl_mhba_dm_cleanup(ucc_tl_mhba_team_t *team);
+
 static void calc_block_size(ucc_tl_mhba_team_t *team)
 {
     int i;
@@ -253,6 +257,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mhba_team_t)
         ucc_free(self->net.barrier.flags);
         ibv_dereg_mr(self->net.atomic.mr);
         ucc_free(self->net.atomic.counters);
+        ucc_tl_mhba_dm_cleanup(self);
     }
     ucc_free(self->net.dcis);
 }
@@ -622,6 +627,12 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
                      "failed to register umr buff (errno=%d)", errno);
             return UCC_ERR_NO_MESSAGE;
         }
+
+        /* MEMIC alloc, todo move to CTX */
+        status = ucc_tl_mhba_dm_init(team);
+        if (UCC_OK != status) {
+            return status;
+        }
         break;
     }
 
@@ -635,3 +646,108 @@ free_data:
 err:
     return status;
 }
+
+static void ucc_tl_mhba_dm_cleanup(ucc_tl_mhba_team_t *team)
+{
+    ibv_dereg_mr(team->dm_mr);
+    ibv_free_dm(team->dm_ptr);
+    ucc_mpool_cleanup(&team->dm_pool, 1);
+}
+
+static ucc_status_t ucc_tl_mhba_dm_init(ucc_tl_mhba_team_t *team)
+{
+    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    size_t memic_chunk         = UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_buf_size;
+    size_t n_memic_chunks      = UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_buf_num;
+    struct ibv_device_attr_ex attr;
+    struct ibv_alloc_dm_attr  dm_attr;
+    int max_n_chunks, chunks_to_alloc, i;
+    ucc_status_t status;
+
+    attr.comp_mask = 0;
+    if(ibv_query_device_ex(ctx->ib_ctx, NULL, &attr)){
+        tl_error(UCC_TL_TEAM_LIB(team),
+                 "failed to query device (errno=%d)", errno);
+        return UCC_ERR_NO_MESSAGE;
+    }
+    if (!attr.max_dm_size) {
+        tl_error(UCC_TL_TEAM_LIB(team), "device doesn't support dm allocation");
+        return UCC_ERR_NO_MESSAGE;
+    }
+    memset(&dm_attr, 0, sizeof(dm_attr));
+    max_n_chunks = attr.max_dm_size / memic_chunk;
+    chunks_to_alloc = (n_memic_chunks == UCC_ULUNITS_AUTO) ? max_n_chunks :
+        n_memic_chunks;
+
+    for(i = chunks_to_alloc; i > 0; i--) {
+        dm_attr.length = i * memic_chunk;
+        team->dm_ptr = ibv_alloc_dm(ctx->ib_ctx, &dm_attr);
+        if (team->dm_ptr) {
+            break;
+        }
+    }
+    if (!team->dm_ptr) {
+        tl_error(UCC_TL_TEAM_LIB(team), "dev mem allocation failed");
+        return UCC_ERR_NO_MESSAGE;
+    }
+    if (n_memic_chunks != UCC_ULUNITS_AUTO &&
+        i != n_memic_chunks) {
+        tl_error(UCC_TL_TEAM_LIB(team),
+                 "couldn't allocate memic chunks, required %zd allocated %d, max %d",
+                 n_memic_chunks, i, max_n_chunks);
+        return UCC_ERR_NO_MESSAGE;
+
+    }
+    n_memic_chunks = i;
+    team->dm_mr = ibv_reg_dm_mr(ctx->shared_pd, team->dm_ptr, 0, dm_attr.length,
+                             IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
+                             IBV_ACCESS_ZERO_BASED);
+    if(!team->dm_mr){
+        tl_error(UCC_TL_TEAM_LIB(team),"failed to reg memic");
+        return UCC_ERR_NO_MESSAGE;
+    }
+
+    team->oob_req = NULL;
+    status = ucc_mpool_init(
+        &team->dm_pool, 0, sizeof(ucc_tl_mhba_dm_chunk_t), 0,
+        UCC_CACHE_LINE_SIZE, n_memic_chunks, n_memic_chunks,
+        &ucc_tl_mhba_dm_ops, UCC_THREAD_MULTIPLE, "mhba dm pool");
+    if (status != UCC_OK) {
+        tl_error(UCC_TL_TEAM_LIB(team),
+                 "failed to init dm pool");
+        return status;
+    }
+    return UCC_OK;
+}
+
+
+static ucc_status_t ucc_tl_mhba_dm_chunk_alloc(ucc_mpool_t *mp, //NOLINT
+                                            size_t *size_p,
+                                            void **chunk_p)
+{
+    *chunk_p = ucc_malloc(*size_p, "mhba dm");
+    if (!*chunk_p) {
+        return UCC_ERR_NO_MEMORY;
+    }
+    return UCC_OK;
+}
+
+static void ucc_tl_mhba_dm_chunk_init(ucc_mpool_t *mp, //NOLINT
+                                   void *obj, void *chunk) //NOLINT
+{
+    ucc_tl_mhba_dm_chunk_t *c = (ucc_tl_mhba_dm_chunk_t *)obj;
+    ucc_tl_mhba_team_t *team = ucc_container_of(mp, ucc_tl_mhba_team_t, dm_pool);
+    const size_t memic_chunk = 8192;
+    c->offset = (ptrdiff_t) team->oob_req;
+    team->oob_req = PTR_OFFSET(team->oob_req, memic_chunk);
+}
+
+static void ucc_tl_mhba_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
+{
+    ucc_free(chunk);
+}
+
+static ucc_mpool_ops_t ucc_tl_mhba_dm_ops = {.chunk_alloc   = ucc_tl_mhba_dm_chunk_alloc,
+                                             .chunk_release = ucc_tl_mhba_dm_chunk_release,
+                                             .obj_init      = ucc_tl_mhba_dm_chunk_init,
+                                             .obj_cleanup   = NULL};
