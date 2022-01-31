@@ -70,8 +70,8 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
         mc_info(&ucc_mc_cuda.super, "cuda devices are not found");
         return UCC_ERR_NO_RESOURCE;
     }
-    CUDACHECK(cudaGetDevice(&device));
-    CUDACHECK(cudaGetDeviceProperties(&prop, device));
+    CUDA_CHECK(cudaGetDevice(&device));
+    CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
     cfg->reduce_num_threads = prop.maxThreadsPerBlock;
     if (cfg->reduce_num_blocks != UCC_ULUNITS_AUTO) {
         if (prop.maxGridSize[0] < cfg->reduce_num_blocks) {
@@ -390,7 +390,7 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
 static ucc_status_t ucc_mc_cuda_finalize()
 {
     if (ucc_mc_cuda.stream != NULL) {
-        CUDACHECK(cudaStreamDestroy(ucc_mc_cuda.stream));
+        CUDA_CHECK(cudaStreamDestroy(ucc_mc_cuda.stream));
         ucc_mc_cuda.stream = NULL;
     }
     if (ucc_mc_cuda.mpool_init_flag) {

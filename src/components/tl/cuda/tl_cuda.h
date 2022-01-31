@@ -13,7 +13,6 @@
 #include "tl_cuda_ep_hash.h"
 #include "tl_cuda_topo.h"
 #include "tl_cuda_team_topo.h"
-#include "tl_cuda_common.h"
 #include <cuda_runtime.h>
 
 #ifndef UCC_TL_CUDA_DEFAULT_SCORE

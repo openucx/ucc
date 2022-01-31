@@ -9,6 +9,7 @@
 
 #include "components/ec/base/ucc_ec_base.h"
 #include "components/ec/ucc_ec_log.h"
+#include "utils/arch/cuda_def.h"
 #include "utils/ucc_mpool.h"
 #include <cuda_runtime.h>
 
@@ -79,44 +80,6 @@ typedef struct ucc_ec_cuda_stream_request {
 } ucc_ec_cuda_stream_request_t;
 
 extern ucc_ec_cuda_t ucc_ec_cuda;
-#define CUDACHECK(cmd) do {                                                    \
-        cudaError_t e = cmd;                                                   \
-        if(e != cudaSuccess) {                                                 \
-            ec_error(&ucc_ec_cuda.super, "cuda failed with ret:%d(%s)", e,     \
-                     cudaGetErrorString(e));                                   \
-            return UCC_ERR_NO_MESSAGE;                                         \
-        }                                                                      \
-} while(0)
-
-#define CUDA_FUNC(_func)                                                       \
-    ({                                                                         \
-        ucc_status_t _status = UCC_OK;                                         \
-        do {                                                                   \
-            cudaError_t _result = (_func);                                     \
-            if (cudaSuccess != _result) {                                      \
-                ec_error(&ucc_ec_cuda.super, "%s() failed: %s",                \
-                       #_func, cudaGetErrorString(_result));                   \
-                _status = UCC_ERR_INVALID_PARAM;                               \
-            }                                                                  \
-        } while (0);                                                           \
-        _status;                                                               \
-    })
-
-#define CUDADRV_FUNC(_func)                                                    \
-    ({                                                                         \
-        ucc_status_t _status = UCC_OK;                                         \
-        do {                                                                   \
-            CUresult _result = (_func);                                        \
-            const char *cu_err_str;                                            \
-            if (CUDA_SUCCESS != _result) {                                     \
-                cuGetErrorString(_result, &cu_err_str);                        \
-                ec_error(&ucc_ec_cuda.super, "%s() failed: %s",                \
-                        #_func, cu_err_str);                                   \
-                _status = UCC_ERR_INVALID_PARAM;                               \
-            }                                                                  \
-        } while (0);                                                           \
-        _status;                                                               \
-    })
 
 #define EC_CUDA_CONFIG                                                         \
     (ucc_derived_of(ucc_ec_cuda.super.config, ucc_ec_cuda_config_t))

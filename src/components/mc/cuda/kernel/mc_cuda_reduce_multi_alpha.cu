@@ -145,8 +145,8 @@ ucc_mc_cuda_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
                  ucc_datatype_str(dt));
         return UCC_ERR_NOT_SUPPORTED;
     }
-    CUDACHECK(cudaGetLastError());
-    CUDACHECK(cudaStreamSynchronize(stream));
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaStreamSynchronize(stream));
     return UCC_OK;
 }
 

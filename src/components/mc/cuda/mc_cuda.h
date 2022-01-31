@@ -10,6 +10,7 @@
 #include "components/mc/base/ucc_mc_base.h"
 #include "components/mc/ucc_mc_log.h"
 #include "utils/ucc_mpool.h"
+#include "utils/arch/cuda_def.h"
 #include <cuda_runtime.h>
 
 static inline ucc_status_t cuda_error_to_ucc_status(cudaError_t cu_err)
@@ -61,44 +62,6 @@ ucc_mc_cuda_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
                                ucc_reduction_op_t vector_op, double alpha);
 
 extern ucc_mc_cuda_t ucc_mc_cuda;
-#define CUDACHECK(cmd) do {                                                    \
-        cudaError_t e = cmd;                                                   \
-        if(e != cudaSuccess) {                                                 \
-            mc_error(&ucc_mc_cuda.super, "cuda failed with ret:%d(%s)", e,     \
-                     cudaGetErrorString(e));                                   \
-            return UCC_ERR_NO_MESSAGE;                                         \
-        }                                                                      \
-} while(0)
-
-#define CUDA_FUNC(_func)                                                       \
-    ({                                                                         \
-        ucc_status_t _status = UCC_OK;                                         \
-        do {                                                                   \
-            cudaError_t _result = (_func);                                     \
-            if (cudaSuccess != _result) {                                      \
-                mc_error(&ucc_mc_cuda.super, "%s() failed: %s",                \
-                       #_func, cudaGetErrorString(_result));                   \
-                _status = UCC_ERR_INVALID_PARAM;                               \
-            }                                                                  \
-        } while (0);                                                           \
-        _status;                                                               \
-    })
-
-#define CUDADRV_FUNC(_func)                                                    \
-    ({                                                                         \
-        ucc_status_t _status = UCC_OK;                                         \
-        do {                                                                   \
-            CUresult _result = (_func);                                        \
-            const char *cu_err_str;                                            \
-            if (CUDA_SUCCESS != _result) {                                     \
-                cuGetErrorString(_result, &cu_err_str);                        \
-                mc_error(&ucc_mc_cuda.super, "%s() failed: %s",                \
-                        #_func, cu_err_str);                                   \
-                _status = UCC_ERR_INVALID_PARAM;                               \
-            }                                                                  \
-        } while (0);                                                           \
-        _status;                                                               \
-    })
 
 #define MC_CUDA_CONFIG                                                         \
     (ucc_derived_of(ucc_mc_cuda.super.config, ucc_mc_cuda_config_t))

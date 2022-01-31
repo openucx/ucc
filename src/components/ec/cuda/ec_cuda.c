@@ -151,7 +151,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         ec_info(&ucc_ec_cuda.super, "cuda devices are not found");
         return UCC_ERR_NO_RESOURCE;
     }
-    CUDACHECK(cudaGetDevice(&device));
+    CUDA_CHECK(cudaGetDevice(&device));
     /*create event pool */
     status = ucc_mpool_init(&ucc_ec_cuda.events, 0, sizeof(ucc_ec_cuda_event_t),
                             0, UCC_CACHE_LINE_SIZE, 16, UINT_MAX,
@@ -240,16 +240,16 @@ ucc_status_t ucc_ec_cuda_task_post(void *ee_stream, void **ee_req)
     } else {
         cuda_event = ucc_mpool_get(&ucc_ec_cuda.events);
         ucc_assert(cuda_event);
-        CUDACHECK(cudaEventRecord(cuda_event->event, req->stream));
-        CUDACHECK(cudaStreamWaitEvent(ucc_ec_cuda.stream, cuda_event->event, 0));
+        CUDA_CHECK(cudaEventRecord(cuda_event->event, req->stream));
+        CUDA_CHECK(cudaStreamWaitEvent(ucc_ec_cuda.stream, cuda_event->event, 0));
         status = ucc_ec_cuda.post_strm_task(req->dev_status,
                                             cfg->stream_blocking_wait,
                                             ucc_ec_cuda.stream);
         if (ucc_unlikely(status != UCC_OK)) {
             goto free_event;
         }
-        CUDACHECK(cudaEventRecord(cuda_event->event, ucc_ec_cuda.stream));
-        CUDACHECK(cudaStreamWaitEvent(req->stream, cuda_event->event, 0));
+        CUDA_CHECK(cudaEventRecord(cuda_event->event, ucc_ec_cuda.stream));
+        CUDA_CHECK(cudaStreamWaitEvent(req->stream, cuda_event->event, 0));
         ucc_mpool_put(cuda_event);
     }
 
@@ -322,7 +322,7 @@ ucc_status_t ucc_ec_cuda_event_post(void *ee_context, void *event)
     cudaStream_t stream = (cudaStream_t )ee_context;
     ucc_ec_cuda_event_t *cuda_event = event;
 
-    CUDACHECK(cudaEventRecord(cuda_event->event, stream));
+    CUDA_CHECK(cudaEventRecord(cuda_event->event, stream));
     return UCC_OK;
 }
 
@@ -335,7 +335,7 @@ ucc_status_t ucc_ec_cuda_event_test(void *event)
 
     if (ucc_unlikely((cu_err != cudaSuccess) &&
                      (cu_err != cudaErrorNotReady))) {
-        CUDACHECK(cu_err);
+        CUDA_CHECK(cu_err);
     }
     return cuda_error_to_ucc_status(cu_err);
 }
@@ -343,7 +343,7 @@ ucc_status_t ucc_ec_cuda_event_test(void *event)
 static ucc_status_t ucc_ec_cuda_finalize()
 {
     if (ucc_ec_cuda.stream != NULL) {
-        CUDACHECK(cudaStreamDestroy(ucc_ec_cuda.stream));
+        CUDA_CHECK(cudaStreamDestroy(ucc_ec_cuda.stream));
         ucc_ec_cuda.stream = NULL;
     }
     return UCC_OK;
