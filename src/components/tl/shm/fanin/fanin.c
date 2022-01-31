@@ -10,8 +10,7 @@
 ucc_status_t ucc_tl_shm_fanin_signal(ucc_tl_shm_team_t *team,
                                       ucc_tl_shm_seg_t *seg,
                                       ucc_tl_shm_task_t *task,
-                                      ucc_kn_tree_t *tree,
-                                      int *is_op_root)
+                                      ucc_kn_tree_t *tree)
 {
     ucc_rank_t         team_rank = UCC_TL_TEAM_RANK(team);
     uint32_t           seq_num   = task->seq_num;
@@ -54,27 +53,23 @@ ucc_status_t ucc_tl_shm_fanin_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
-    ucc_coll_args_t    args = TASK_ARGS(task);
-    ucc_rank_t         root = (ucc_rank_t) args.root;
     ucc_rank_t         rank = UCC_TL_TEAM_RANK(team);
     ucc_tl_shm_seg_t  *seg = task->seg;
     ucc_tl_shm_tree_t *tree = task->tree;
-    int                is_op_root = rank == root;
     ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
 
-    if (!task->seg_ready) {
+    if (!task->seg_ready) { //similar to reduce
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect fanin->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_seg_ready(seg)) { //TODO: implement
+        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
         task->seg_ready = 1;
     }
 
-    if (tree->top_tree && !task->first_tree_done) {
-        status = ucc_tl_shm_fanin_signal(team, seg, task, tree->top_tree,
-                                          &is_op_root);
+    if (tree->base_tree && !task->first_tree_done) {
+        status = ucc_tl_shm_fanin_signal(team, seg, task, tree->base_tree);
         if (UCC_OK != status) {
             /* in progress */
             return status;
@@ -83,9 +78,8 @@ ucc_status_t ucc_tl_shm_fanin_progress(ucc_coll_task_t *coll_task)
         task->cur_child = 0;
     }
 
-    if (task->base_tree) {
-        status = ucc_tl_shm_fanin_signal(team, seg, task, tree->base_tree,
-                                         &is_op_root);
+    if (tree->top_tree) {
+        status = ucc_tl_shm_fanin_signal(team, seg, task, tree->top_tree);
 
         if (UCC_OK != status) {
             /* in progress */
@@ -108,7 +102,6 @@ ucc_status_t ucc_tl_shm_fanin_start(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
 
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_fanin_start", 0);
-    task->seq_num++;
     task->super.super.status = UCC_INPROGRESS;
     status = task->super.progress(&task->super);
 
@@ -134,6 +127,8 @@ ucc_status_t ucc_tl_shm_fanin_init(ucc_tl_shm_task_t *task)
     task->seg_ready       = 0;
     task->cur_child       = 0;
     task->first_tree_done = 0;
+    task->base_tree_only  = UCC_TL_SHM_TEAM_LIB(team)->cfg.base_tree_only;
+
 
     status = ucc_tl_shm_tree_init(team, args.root, base_radix, top_radix,
                                   &task->tree_in_cache, UCC_COLL_TYPE_FANIN,

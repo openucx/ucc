@@ -21,7 +21,7 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
      ucc_offsetof(ucc_tl_shm_lib_config_t, n_concurrent),
      UCC_CONFIG_TYPE_UINT},
 
-    {"CS", "128", "Control size of each section in shm segment",
+    {"CS", "256", "Control size of each section in shm segment",
      ucc_offsetof(ucc_tl_shm_lib_config_t, ctrl_size),
      UCC_CONFIG_TYPE_UINT},
 
@@ -67,6 +67,14 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
 
     {"FANOUT_TOP_RADIX", "4", "fanout radix for top tree",
      ucc_offsetof(ucc_tl_shm_lib_config_t, fanout_top_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"BARRIER_BASE_RADIX", "4", "barrier radix for base tree",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, barrier_base_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"BARRIER_TOP_RADIX", "4", "barrier radix for top tree",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, barrier_top_radix),
      UCC_CONFIG_TYPE_UINT},
 
     {"NPOLLS", "100", "n_polls",

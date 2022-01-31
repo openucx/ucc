@@ -40,7 +40,7 @@
 #define SHMSEG_ISYNC() __asm__ __volatile__("": : :"memory")
 
 #define UCC_TL_SHM_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE)
+    (UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_BARRIER)
 
 typedef struct ucc_kn_tree ucc_kn_tree_t;
 
@@ -66,6 +66,8 @@ typedef struct ucc_tl_shm_lib_config {
     uint32_t             fanin_top_radix;
     uint32_t             fanout_base_radix;
     uint32_t             fanout_top_radix;
+    uint32_t             barrier_base_radix;
+    uint32_t             barrier_top_radix;
     uint32_t             max_trees_cached;
     uint32_t             n_polls;
     uint32_t             base_tree_only;

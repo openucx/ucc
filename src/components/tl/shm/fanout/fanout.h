@@ -9,13 +9,13 @@
 #include "../tl_shm_coll.h"
 #include "../tl_shm_knomial_pattern.h"
 
-ucc_status_t ucc_tl_shm_fanin_init(ucc_tl_shm_task_t *task);
 
-enum {
-    FANOUT_WW,
-    FANOUT_WR,
-    FANOUT_RR,
-    FANOUT_RW
-}; //make configurable from user for example from user "wr" to cfg->fanin_alg = 1
+ucc_status_t ucc_tl_shm_fanout_signal(ucc_tl_shm_team_t *team,
+                                      ucc_tl_shm_seg_t *seg,
+                                      ucc_tl_shm_task_t *task,
+                                      ucc_kn_tree_t *tree,
+                                      int is_op_root);
+
+ucc_status_t ucc_tl_shm_fanin_init(ucc_tl_shm_task_t *task);
 
 #endif

@@ -16,17 +16,15 @@ typedef struct ucc_tl_shm_task {
             ucc_tl_shm_seg_t  *seg;
             ucc_tl_shm_tree_t *tree;
             int                tree_in_cache;
-//            int                progress_in_top_tree;
             int                base_tree_only;
             int                first_reduce;
             int                first_tree_done;
             int                seg_ready;
+            int                barrier_fanin_done;
             uint32_t           seq_num;
             uint32_t           progress_alg;
             ucc_rank_t         base_radix;
             ucc_rank_t         top_radix;
-//            ucc_rank_t         top_cur_child;
-//            ucc_rank_t         base_cur_child;
             ucc_rank_t         cur_child;
         };
     };
@@ -145,7 +143,6 @@ static inline ucc_status_t ucc_tl_shm_reduce_seg_ready(ucc_tl_shm_seg_t *seg, ui
 	}
 
 	if (tree->top_tree) {
-//		ucc_assert(0);
 		parent = tree->top_tree->parent;
 		if (parent != UCC_RANK_INVALID) {
 	        ctrl = ucc_tl_shm_get_ctrl(seg, team, parent);

@@ -202,7 +202,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     }
 
     self->segs = (ucc_tl_shm_seg_t *) ucc_malloc(sizeof(ucc_tl_shm_seg_t) *
-                                          self->n_concurrent, "shm_segs");
+                                             self->n_concurrent, "shm_segs");
 
     if (!self->segs) {
         tl_error(ctx->super.super.lib,

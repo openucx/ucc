@@ -49,7 +49,7 @@ ucc_status_t ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
 
-    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
+    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) { //similar to bcast
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect bcast->reduce pattern.*/
         if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seq_num, team, tree)) {
@@ -93,7 +93,6 @@ ucc_status_t ucc_tl_shm_fanout_start(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
 
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_fanout_start", 0);
-    task->seq_num++;
     task->super.super.status = UCC_INPROGRESS;
     status = task->super.progress(&task->super);
 
@@ -109,16 +108,17 @@ ucc_status_t ucc_tl_shm_fanout_init(ucc_tl_shm_task_t *task)
 	ucc_tl_shm_team_t *team = TASK_TEAM(task);
 	ucc_coll_args_t    args = TASK_ARGS(task);
 	ucc_rank_t   base_radix = UCC_TL_SHM_TEAM_LIB(team)->cfg.fanout_base_radix;
-//	ucc_rank_t   base_radix = task->base_radix;
 	ucc_rank_t   top_radix  = UCC_TL_SHM_TEAM_LIB(team)->cfg.fanout_top_radix;
 	ucc_status_t status;
 
-    task->super.post = ucc_tl_shm_fanout_start;
-    task->super.progress = ucc_tl_shm_fanout_progress;
-    task->seq_num    = team->seq_num++;
-    task->seg        = &team->segs[task->seq_num % team->n_concurrent];
-    task->seg_ready = 0;
+    task->super.post      = ucc_tl_shm_fanout_start;
+    task->super.progress  = ucc_tl_shm_fanout_progress;
+    task->seq_num         = team->seq_num++;
+    task->seg             = &team->segs[task->seq_num % team->n_concurrent];
+    task->seg_ready       = 0;
     task->first_tree_done = 0;
+    task->base_tree_only  = UCC_TL_SHM_TEAM_LIB(team)->cfg.base_tree_only;
+
 
     status = ucc_tl_shm_tree_init(team, args.root, base_radix, top_radix,
                                   &task->tree_in_cache, UCC_COLL_TYPE_FANOUT,

@@ -12,6 +12,7 @@
 #include "utils/ucc_coll_utils.h"
 #include "bcast/bcast.h"
 #include "reduce/reduce.h"
+#include "barrier/barrier.h"
 
 ucc_status_t ucc_tl_shm_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
                                        ucc_coll_task_t *coll_task)
@@ -178,19 +179,21 @@ ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
         status = ucc_tl_shm_bcast_init(task);
         if (ucc_unlikely(status != UCC_OK)) {
         	ucc_mpool_put(task);
-//        	tl_error(team->context->lib, "bcast init failed");
             return status;
         }
         break;
     case UCC_COLL_TYPE_REDUCE:
     	ucc_tl_shm_set_reduce_perf_params(task);
-//    	volatile int flag = 0;
-//    	while (flag == 0) {
-//   	    }
         status = ucc_tl_shm_reduce_init(task);
         if (ucc_unlikely(status != UCC_OK)) {
         	ucc_mpool_put(task);
-//        	tl_error(team->context->lib, "reduce init failed");
+            return status;
+        }
+        break;
+    case UCC_COLL_TYPE_BARRIER:
+        status = ucc_tl_shm_barrier_init(task);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ucc_mpool_put(task);
             return status;
         }
         break;
@@ -198,7 +201,7 @@ ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
     	tl_error(team->context->lib,
                  "collective %d is not supported by shm tl",
                  coll_args->args.coll_type);
-    	ucc_mpool_put(task);
+        ucc_mpool_put(task);
     	return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -257,14 +260,14 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team,
 {
     ucc_kn_tree_t     *base_tree, *top_tree;
     ucc_tl_shm_tree_t *shm_tree;
-//    ucc_rank_t         team_size;
     ucc_rank_t         tree_root, rank, local_rank;
     ucc_rank_t         leader_rank, leader_group_id;
     size_t             top_tree_size, base_tree_size;
     int i;
 
     ucc_rank_t  team_rank    = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t  group_size   = base_tree_only ? UCC_TL_TEAM_SIZE(team) : team->base_groups[team->my_group_id].group_size;
+    ucc_rank_t  group_size   = base_tree_only ? UCC_TL_TEAM_SIZE(team) :
+                               team->base_groups[team->my_group_id].group_size;
     ucc_rank_t  leaders_size = team->leaders_group->group_size;
     ucc_rank_t  root_group   = ucc_ep_map_eval(team->rank_group_id_map, root);
     ucc_sbgp_t *sbgp         = &team->base_groups[team->my_group_id];
@@ -287,7 +290,6 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team,
     }
 
     if (base_tree_only) {
-//        team_size = UCC_TL_TEAM_SIZE(team);
         leaders_size = 0;
         ucc_tl_shm_kn_tree_init(group_size, root, team_rank, base_radix,
                                 coll_type, base_tree);
@@ -389,10 +391,6 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team,
             shm_tree->top_tree = top_tree;
         }
     }
-//    if (shm_tree->base_tree == NULL) {
-//    	shm_tree->base_tree = top_tree;
-//    	shm_tree->top_tree = NULL;
-//    }
     *tree_in_cache = ucc_tl_shm_cache_tree(team, base_radix, top_radix, root,
                                            coll_type, base_tree_only, shm_tree);
     *tree_p = shm_tree;

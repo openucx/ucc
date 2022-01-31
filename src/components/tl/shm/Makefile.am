@@ -2,21 +2,25 @@
 # Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
 #
 
-bcast =              \
-	bcast/bcast.h    \
+bcast =                \
+	bcast/bcast.h      \
 	bcast/bcast.c
 	
-reduce =             \
-	reduce/reduce.h  \
+reduce =               \
+	reduce/reduce.h    \
 	reduce/reduce.c
 
-fanin =              \
-	fanin/fanin.h    \
+fanin =                \
+	fanin/fanin.h      \
 	fanin/fanin.c
 
-fanout =             \
-	fanout/fanout.h  \
+fanout =               \
+	fanout/fanout.h    \
 	fanout/fanout.c
+	
+barrier =              \
+	barrier/barrier.h  \
+	barrier/barrier.c
 
 sources =                    \
 	tl_shm.h                 \
@@ -31,7 +35,8 @@ sources =                    \
 	$(bcast)                 \
 	$(reduce)                \
 	$(fanin)                 \
-	$(fanout)   
+	$(fanout)                \
+	$(barrier)   
 
 module_LTLIBRARIES = libucc_tl_shm.la
 libucc_tl_shm_la_SOURCES  = $(sources)
