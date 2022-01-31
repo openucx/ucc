@@ -134,7 +134,7 @@ ucc_status_t ucc_tl_mhba_qp_connect(struct ibv_qp *qp, uint32_t qp_num,
 }
 
 ucc_status_t ucc_tl_mhba_init_dc_qps_and_connect(ucc_tl_mhba_team_t *team,
-                                                 uint32_t *          local_data,
+                                                 uint32_t *          qpn,
                                                  uint8_t             port_num)
 {
     ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
@@ -281,7 +281,7 @@ ucc_status_t ucc_tl_mhba_init_dc_qps_and_connect(ucc_tl_mhba_team_t *team,
         goto dct_fail;
     }
 
-    local_data[0] = team->net.dct_qp->qp_num;
+    *qpn= team->net.dct_qp->qp_num;
     return UCC_OK;
 
 dct_fail:
@@ -302,7 +302,7 @@ fail:
 }
 
 ucc_status_t ucc_tl_mhba_create_rc_qps(ucc_tl_mhba_team_t *team,
-                                       uint32_t *          local_data)
+                                       uint32_t *          qpns)
 {
     ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
     struct ibv_qp_init_attr qp_init_attr;
@@ -333,7 +333,7 @@ ucc_status_t ucc_tl_mhba_create_rc_qps(ucc_tl_mhba_team_t *team,
                      "failed to create qp for dest %d, errno %d", i, errno);
             goto qp_creation_failure;
         }
-        local_data[i] = team->net.rc_qps[i]->qp_num;
+        qpns[i] = team->net.rc_qps[i]->qp_num;
     }
     return UCC_OK;
 

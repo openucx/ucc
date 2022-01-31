@@ -97,36 +97,17 @@ typedef struct ucc_tl_mhba_ctrl {
     };
 } ucc_tl_mhba_ctrl_t;
 
-typedef struct ucc_tl_mhba_net_ctrl {
-    union {
-        struct {
-            uint64_t atomic_counter;
-            int      barrier_local_seq_num;
-        };
-        char tmp[UCC_CACHE_LINE_SIZE];
-    };
-} ucc_tl_mhba_net_ctrl_t;
-
-typedef struct ucc_tl_mhba_barrier_ctrl {
-    union {
-        struct {
-            int barrier_seq_num;
-            int blocks_sent;
-        };
-        char tmp[UCC_CACHE_LINE_SIZE];
-    };
-} ucc_tl_mhba_barrier_ctrl_t;
-
+typedef uint64_t tl_mhba_atomic_t;
+typedef uint64_t tl_mhba_barrier_t;
 
 typedef struct mlx5dv_mr_interleaved umr_t;
 
-
 typedef struct ucc_tl_mhba_op {
-    ucc_tl_mhba_net_ctrl_t *net_ctrl;
     ucc_tl_mhba_ctrl_t *ctrl;
     ucc_tl_mhba_ctrl_t *my_ctrl;
     struct mlx5dv_mkey **send_mkeys;
     struct mlx5dv_mkey **recv_mkeys;
+    int                *blocks_sent;
 } ucc_tl_mhba_op_t;
 
 struct ucc_tl_mhba_internal_qp {
@@ -182,6 +163,17 @@ ucc_tl_mhba_get_rcache_reg_data(ucc_rcache_region_t *region)
 	return (ucc_tl_mhba_reg_t *)((ptrdiff_t)region + sizeof(ucc_rcache_region_t));
 }
 
+typedef struct net_ctrl {
+    struct {
+        void     *addr;
+        uint32_t rkey;
+    } atomic;
+    struct {
+        void     *addr;
+        uint32_t rkey;
+    } barrier;
+} net_ctrl_t;
+
 typedef struct ucc_tl_mhba_net {
     ucc_sbgp_t *    sbgp;
     int             net_size;
@@ -194,9 +186,15 @@ typedef struct ucc_tl_mhba_net {
     struct ibv_cq * cq;
     struct ibv_mr * ctrl_mr;
     struct {
-        void *   addr;
-        uint32_t rkey;
-    } * remote_ctrl;
+        tl_mhba_atomic_t *counters;
+        struct ibv_mr    *mr;
+    } atomic;
+    struct {
+        tl_mhba_barrier_t *flags;
+        struct ibv_mr     *mr;
+    } barrier;
+    int        *blocks_sent; // net_size * MAX_OP_OUTSTANDING
+    net_ctrl_t *remote_ctrl;
     uint32_t *rkeys;
     struct dci {
         struct ibv_qp *      dci_qp;
@@ -301,14 +299,11 @@ static inline ucc_tl_mhba_ctrl_t *ucc_tl_mhba_get_my_ctrl(ucc_tl_mhba_team_t *te
 
 
 #define OP_SEGMENT_SIZE(_team) \
-    (sizeof(ucc_tl_mhba_net_ctrl_t) +                                   \
-     sizeof(ucc_tl_mhba_barrier_ctrl_t) * (_team)->net.net_size +       \
-     sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size +                  \
+    ( sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size +                  \
      (sizeof(umr_t) * (_team)->max_num_of_columns * (_team)->node_size) * 2)
 
-#define BARRIER_CTRL_OFFSET (sizeof(ucc_tl_mhba_net_ctrl_t))
-#define NODE_CTRL_OFFSET(_team) (BARRIER_CTRL_OFFSET + sizeof(ucc_tl_mhba_barrier_ctrl_t) * (_team)->net.net_size)
-#define UMR_DATA_OFFSET(_team) (NODE_CTRL_OFFSET(_team) + sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size)
+
+#define UMR_DATA_OFFSET(_team) (sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size)
 
 #define OP_SEGMENT_STORAGE(_req, _team) \
     PTR_OFFSET((_team)->node.storage, OP_SEGMENT_SIZE(_team) * (_req)->seq_index)
@@ -333,20 +328,4 @@ static inline ucc_tl_mhba_ctrl_t *ucc_tl_mhba_get_my_ctrl(ucc_tl_mhba_team_t *te
     PTR_OFFSET(RECV_UMR_DATA(_req, _team, _col),                \
                (_team)->node.sbgp->group_rank * sizeof(umr_t))
 
-#define REMOTE_CTRL(_task, _rank) \
-    (ucc_tl_mhba_net_ctrl_t*)(PTR_OFFSET(TASK_TEAM(_task)->net.remote_ctrl[_rank].addr,    \
-                                         (_task)->seq_index * OP_SEGMENT_SIZE(TASK_TEAM(_task))))
-
-#define REMOTE_BARRIER_CTRL_ADDR(_task, _rank) \
-    (uintptr_t)(PTR_OFFSET(REMOTE_CTRL(_task, _rank), BARRIER_CTRL_OFFSET))
-
-
-#define MY_BARRIER_ADDR_ON_REMOTE(_task, _rank) \
-    PTR_OFFSET(REMOTE_BARRIER_CTRL_ADDR(_task, _rank), \
-        TASK_TEAM(_task)->net.sbgp->group_rank * sizeof(ucc_tl_mhba_barrier_ctrl_t) + \
-               ucc_offsetof(ucc_tl_mhba_barrier_ctrl_t, barrier_seq_num))
-
-#define BARRIER_CTRL(_task, _rank) ((ucc_tl_mhba_barrier_ctrl_t*)      \
-    (PTR_OFFSET(OP_SEGMENT_STORAGE(_task, TASK_TEAM(_task)), BARRIER_CTRL_OFFSET + \
-                sizeof(ucc_tl_mhba_barrier_ctrl_t) * _rank)))
 #endif

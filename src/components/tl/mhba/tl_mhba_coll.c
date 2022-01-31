@@ -135,13 +135,13 @@ static ucc_status_t ucc_tl_mhba_node_fanout(ucc_tl_mhba_team_t *team,
                                             ucc_tl_mhba_schedule_t *task)
 {
     ucc_tl_mhba_ctrl_t *ctrl_v;
-    int                 atomic_counter;
+    tl_mhba_atomic_t   atomic_counter;
 
     /* First phase of fanout: asr signals it completed local ops
        and other ranks wait for asr */
     if (team->node.sbgp->group_rank == team->node.asr_rank) {
         /* ASR waits for atomic replies from other ASRs */
-        atomic_counter = task->op->net_ctrl->atomic_counter;
+        atomic_counter = team->net.atomic.counters[task->seq_index];
         ucc_assert(atomic_counter <= team->net.net_size);
 
         if (atomic_counter != team->net.net_size) {
@@ -202,7 +202,7 @@ static ucc_status_t ucc_tl_mhba_asr_barrier_start(ucc_coll_task_t *coll_task)
     ucc_tl_mhba_populate_send_recv_mkeys(team, task);
 
     //Reset atomic notification counter to 0
-    task->op->net_ctrl->atomic_counter = 0;
+    team->net.atomic.counters[task->seq_index] = 0;
 
     if (UCC_TL_MHBA_TEAM_LIB(team)->cfg.asr_barrier) {
         tl_debug(UCC_TASK_LIB(task),"asr barrier start");
@@ -213,19 +213,21 @@ static ucc_status_t ucc_tl_mhba_asr_barrier_start(ucc_coll_task_t *coll_task)
             tl_error(UCC_TASK_LIB(task), "failed to start asr barrier");
         }
         for(i=0; i<team->net.net_size;i++) {
-            BARRIER_CTRL(task, i)->blocks_sent = 0;
-            BARRIER_CTRL(task, i)->barrier_seq_num = task->seq_num;
+            task->op->blocks_sent[i] = 0;
+            team->net.barrier.flags[(team->net.net_size + 1) * task->seq_index + i] =
+                task->seq_num;
         }
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
     } else {
-        task->op->net_ctrl->barrier_local_seq_num = task->seq_num;
+        tl_mhba_barrier_t *local = tl_mhba_barrier_local_addr(task);
+        *local = task->seq_num;
         for(i=0; i<team->net.net_size;i++) {
-            BARRIER_CTRL(task, i)->blocks_sent = 0;
+            task->op->blocks_sent[i] = 0;
             send_start(team, i);
-            status = send_block_data(team, i, (uintptr_t)&task->op->net_ctrl->barrier_local_seq_num,
-                                     sizeof(int), team->net.ctrl_mr->lkey,
-                                     (uintptr_t)MY_BARRIER_ADDR_ON_REMOTE(task, i),
-                                     team->net.remote_ctrl[i].rkey, 0, 0);
+            status = send_block_data(team, i, (uintptr_t)local,
+                                     sizeof(tl_mhba_barrier_t), team->net.barrier.mr->lkey,
+                                     tl_mhba_barrier_my_remote_addr(task, i),
+                                     tl_mhba_barrier_remote_rkey(task, i), 0, 0);
             if (UCC_OK == status) {
                 status = send_done(team, i);
             }
@@ -283,12 +285,12 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
     for (i = 0; i < net_size; i++) {
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
-        if (BARRIER_CTRL(task, cyc_rank)->blocks_sent ||
-            BARRIER_CTRL(task, cyc_rank)->barrier_seq_num != task->seq_num) {
+        if (task->op->blocks_sent[cyc_rank] ||
+            tl_mhba_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
         task->started++;
-        BARRIER_CTRL(task, cyc_rank)->blocks_sent = 1;
+        task->op->blocks_sent[cyc_rank] = 1;
         //send all blocks from curr node to some ARR
         for (j = 0; j < (node_size / block_size); j++) {
             for (k = 0; k < (node_size / block_size); k++) {
@@ -346,6 +348,13 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
                 }
                 while (!ibv_poll_cq(team->net.cq, 1, transpose_completion)) {
                 }
+                if (transpose_completion[0].status != IBV_WC_SUCCESS) {
+                    tl_error(UCC_TASK_LIB(task),
+                             "failure in send_block_data, status %s (%d)",
+                             ibv_wc_status_str(transpose_completion[0].status),
+                             transpose_completion[0].status);
+                    return UCC_ERR_NO_MESSAGE;
+                }
             }
         }
     }
@@ -353,9 +362,8 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
     if (task->started == net_size) {
         for (i = 0; i < net_size; i++) {
             send_start(team, i);
-            status = send_atomic(team, i, PTR_OFFSET(team->net.remote_ctrl[i].addr,
-                                                     task->seq_index * OP_SEGMENT_SIZE(team)),
-                                 team->net.remote_ctrl[i].rkey, task->seq_num);
+            status = send_atomic(team, i, tl_mhba_atomic_addr(task, i),
+                                 tl_mhba_atomic_rkey(task, i), task->seq_num);
             if (UCC_OK == status) {
                 status = send_done(team, i);
             }
@@ -366,6 +374,7 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
             }
         }
     }
+
     if (!task->send_blocks_enqueued) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
         task->send_blocks_enqueued = 1;
@@ -405,12 +414,12 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
     for (i = 0; i < net_size; i++) {
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
-        if (BARRIER_CTRL(task, cyc_rank)->blocks_sent ||
-            BARRIER_CTRL(task, cyc_rank)->barrier_seq_num != task->seq_num) {
+        if (task->op->blocks_sent[cyc_rank] ||
+            tl_mhba_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
         task->started++;
-        BARRIER_CTRL(task, cyc_rank)->blocks_sent = 1;
+        task->op->blocks_sent[cyc_rank] = 1;
 
         //send all blocks from curr node to some ARR
         for (j = 0; j < task->num_of_blocks_columns; j++) {
@@ -516,9 +525,8 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
     if (task->started == net_size) {
         for (i = 0; i < net_size; i++) {
             send_start(team, i);
-            status = send_atomic(team, i, PTR_OFFSET(team->net.remote_ctrl[i].addr,
-                                                     task->seq_index * OP_SEGMENT_SIZE(team)),
-                                 team->net.remote_ctrl[i].rkey, task->seq_num);
+            status = send_atomic(team, i, tl_mhba_atomic_addr(task, i),
+                                 tl_mhba_atomic_rkey(task, i), task->seq_num);
             if (UCC_OK == status) {
                 status = send_done(team, i);
             }
@@ -561,12 +569,12 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
     for (i = 0; i < net_size; i++) {
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
-        if (BARRIER_CTRL(task, cyc_rank)->blocks_sent ||
-            BARRIER_CTRL(task, cyc_rank)->barrier_seq_num != task->seq_num) {
+        if (task->op->blocks_sent[cyc_rank] ||
+            tl_mhba_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
         task->started++;
-        BARRIER_CTRL(task, cyc_rank)->blocks_sent = 1;
+        task->op->blocks_sent[cyc_rank]  = 1;
 
         send_start(team, cyc_rank);
         //send all blocks from curr node to some ARR
@@ -588,10 +596,8 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
                 }
             }
         }
-        status = send_atomic(team, cyc_rank,
-                             PTR_OFFSET(team->net.remote_ctrl[cyc_rank].addr,
-                                        task->seq_index * OP_SEGMENT_SIZE(team)),
-                             team->net.remote_ctrl[cyc_rank].rkey, task->seq_num);
+        status = send_atomic(team, i, tl_mhba_atomic_addr(task, i),
+                             tl_mhba_atomic_rkey(task, i), task->seq_num);
         if (UCC_OK == status) {
             status = send_done(team, cyc_rank);
         }
@@ -640,12 +646,12 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
     for (i = 0; i < net_size; i++) {
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
-        if (BARRIER_CTRL(task, cyc_rank)->blocks_sent ||
-            BARRIER_CTRL(task, cyc_rank)->barrier_seq_num != task->seq_num) {
+        if (task->op->blocks_sent[cyc_rank] ||
+            tl_mhba_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
         task->started++;
-        BARRIER_CTRL(task, cyc_rank)->blocks_sent = 1;
+        task->op->blocks_sent[cyc_rank]  = 1;
 
         send_start(team, cyc_rank);
         //send all blocks from curr node to some ARR
@@ -686,10 +692,8 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
                 }
             }
         }
-        status = send_atomic(team, cyc_rank,
-                             PTR_OFFSET(team->net.remote_ctrl[cyc_rank].addr,
-                                        task->seq_index * OP_SEGMENT_SIZE(team)),
-                             team->net.remote_ctrl[cyc_rank].rkey, task->seq_num);
+        status = send_atomic(team, i, tl_mhba_atomic_addr(task, i),
+                             tl_mhba_atomic_rkey(task, i), task->seq_num);
         if (UCC_OK == status) {
             status = send_done(team, cyc_rank);
         }

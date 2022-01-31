@@ -30,6 +30,14 @@ struct rank_data {
     int sbgp_rank;
 };
 
+typedef struct net_exchage {
+    struct rank_data rd;
+    net_ctrl_t       net_ctrl;
+    uint32_t         port_lid;
+    uint32_t         recv_mkey_rkey;
+    uint32_t         qpn[1];
+} net_exchange_t;
+
 static int compare_rank_data(const void *a, const void *b)
 {
     const struct rank_data *d1 = (const struct rank_data *)a;
@@ -38,19 +46,17 @@ static int compare_rank_data(const void *a, const void *b)
 }
 
 static void build_rank_map(ucc_tl_mhba_team_t *team,
-                           uint32_t *global_data, size_t local_data_size)
+                           net_exchange_t *global_data, size_t local_data_size)
 {
     struct rank_data *data    = ucc_malloc(sizeof(*data) * team->net.net_size);
-    uint32_t *d;
+    net_exchange_t *d;
     int               i;
 
 
     for (i = 0; i < team->net.net_size; i++) {
         d = PTR_OFFSET(global_data, i * local_data_size);
-        data[i].team_rank =
-            ((struct rank_data*)(&d[(team->is_dc ? 1 : team->net.net_size) + 5]))->team_rank;
-        data[i].sbgp_rank =
-            ((struct rank_data*)(&d[(team->is_dc ? 1 : team->net.net_size) + 5]))->sbgp_rank;
+        data[i].team_rank = d->rd.team_rank;
+        data[i].sbgp_rank = d->rd.sbgp_rank;
     }
 
     team->net.rank_map = ucc_malloc(sizeof(int) * team->net.net_size);
@@ -241,6 +247,12 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mhba_team_t)
         }
         ibv_dereg_mr(self->node.umr_entries_mr);
         ucc_free(self->node.umr_entries_buf);
+
+        ucc_free(self->net.blocks_sent);
+        ibv_dereg_mr(self->net.barrier.mr);
+        ucc_free(self->net.barrier.flags);
+        ibv_dereg_mr(self->net.atomic.mr);
+        ucc_free(self->net.atomic.counters);
     }
     ucc_free(self->net.dcis);
 }
@@ -251,6 +263,64 @@ UCC_CLASS_DEFINE(ucc_tl_mhba_team_t, ucc_tl_team_t);
 ucc_status_t ucc_tl_mhba_team_destroy(ucc_base_team_t *tl_team)
 {
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_mhba_team_t)(tl_team);
+    return UCC_OK;
+}
+
+            /* local_data_size = ((team->is_dc ? 1 : net_size) * sizeof(uint32_t)) + */
+                /* sizeof(uint32_t) + 2 * sizeof(uint32_t) + */
+                /* sizeof(void *) + sizeof(struct rank_data); */
+
+
+static ucc_status_t tl_mhba_alloc_atomic(ucc_tl_mhba_team_t *team)
+{
+    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    size_t                 size;
+
+    size = sizeof(*team->net.atomic.counters) * MAX_OUTSTANDING_OPS;
+    team->net.atomic.counters = ucc_malloc(size, "atomic");
+    if (!team->net.atomic.counters) {
+        tl_error(UCC_TL_TEAM_LIB(team),
+                 "failed to allocate %zd bytes for atomic counters array",
+                 size);
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    team->net.atomic.mr = ibv_reg_mr(ctx->shared_pd, team->net.atomic.counters, size,
+                                     IBV_ACCESS_REMOTE_ATOMIC | IBV_ACCESS_LOCAL_WRITE);
+
+    if (!team->net.atomic.mr) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to register atomic couters array");
+        ucc_free(team->net.atomic.counters);
+        return UCC_ERR_NO_MESSAGE;
+    }
+    return UCC_OK;
+}
+
+static ucc_status_t tl_mhba_alloc_barrier(ucc_tl_mhba_team_t *team)
+{
+    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    size_t                 size;
+
+    /* allocating net_size + 1 flags. Last one is used as local buf
+       for barrier RDMA */
+    size = (team->net.net_size + 1) * sizeof(*team->net.barrier.flags) *
+        MAX_OUTSTANDING_OPS;
+    team->net.barrier.flags = ucc_calloc(1, size, "barrier");
+    if (!team->net.barrier.flags) {
+        tl_error(UCC_TL_TEAM_LIB(team),
+                 "failed to allocate %zd bytes for barrier flags array",
+                 size);
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    team->net.barrier.mr = ibv_reg_mr(ctx->shared_pd, team->net.barrier.flags, size,
+                                     IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
+
+    if (!team->net.atomic.mr) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to register atomic couters array");
+        ucc_free(team->net.atomic.counters);
+        return UCC_ERR_NO_MESSAGE;
+    }
     return UCC_OK;
 }
 
@@ -266,7 +336,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
     int i, asr_cq_size, net_size;
     struct ibv_port_attr    port_attr;
     size_t                  local_data_size, umr_buf_size, op_seg_size;
-    uint32_t               *local_data, *global_data, *remote_data;
+    net_exchange_t *local_data, *global_data, *remote_data;
 
     status = ucc_service_coll_test(team->scoll_req);
     if (status < 0) {
@@ -300,10 +370,10 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
         }
         for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
             op = &team->node.ops[i];
-            op->net_ctrl = PTR_OFFSET(team->node.storage, op_seg_size * i);
-            op->ctrl     = PTR_OFFSET(team->node.storage, op_seg_size * i + NODE_CTRL_OFFSET(team));
+            op->ctrl     = PTR_OFFSET(team->node.storage, op_seg_size * i);
             op->my_ctrl  = PTR_OFFSET(op->ctrl, node_rank * sizeof(ucc_tl_mhba_ctrl_t));
         }
+
 
         calc_block_size(team);
         if (UCC_TL_MHBA_TEAM_LIB(team)->cfg.block_size > MAX_BLOCK_SIZE) {
@@ -312,6 +382,31 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
         }
         team->requested_block_size = UCC_TL_MHBA_TEAM_LIB(team)->cfg.block_size;
         if (team->node.asr_rank == node_rank) {
+            status = tl_mhba_alloc_atomic(team);
+            if (UCC_OK != status) {
+                goto err;
+            }
+
+            status = tl_mhba_alloc_barrier(team);
+            if (UCC_OK != status) {
+                goto err;
+            }
+
+            team->net.blocks_sent = ucc_malloc(sizeof(*team->net.blocks_sent) *
+                                               team->net.net_size * MAX_OUTSTANDING_OPS,
+                                               "blocks_sent");
+            if (!team->net.blocks_sent) {
+                tl_error(tl_team->context->lib, "failed to allocated %zd bytes for blocks_sent array",
+                         sizeof(*team->net.blocks_sent) * team->net.net_size * MAX_OUTSTANDING_OPS);
+                status = UCC_ERR_NO_MEMORY;
+                goto err;
+            }
+
+            for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
+                op->blocks_sent = PTR_OFFSET(team->net.blocks_sent,
+                                             sizeof(*team->net.blocks_sent) * team->net.net_size * i);
+            }
+
             for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
                 team->previous_msg_size[i] = 0;
             }
@@ -332,9 +427,11 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
                     tl_error(tl_team->context->lib,
                              "failed to register transpose buff, errno %d", errno);
                     return UCC_ERR_NO_MESSAGE;
-                        }
+                }
             }
-//        build_rank_map(team); TODO
+
+
+
             status = ucc_tl_mhba_init_umr(ctx, &team->node);
             if (status != UCC_OK) {
                 tl_error(tl_team->context->lib, "failed to init UMR");
@@ -380,9 +477,15 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
 
             // for each ASR - qp num, in addition to port lid,
             // ctrl segment rkey and address, recieve mkey rkey
-            local_data_size = ((team->is_dc ? 1 : net_size) * sizeof(uint32_t)) +
-                sizeof(uint32_t) + 2 * sizeof(uint32_t) +
-                sizeof(void *) + sizeof(struct rank_data);
+            /* local_data_size = ((team->is_dc ? 1 : net_size) * sizeof(uint32_t)) + */
+                /* sizeof(uint32_t) + 2 * sizeof(uint32_t) + */
+                /* sizeof(void *) + sizeof(struct rank_data); */
+            local_data_size = sizeof(net_exchange_t);
+            if (!team->is_dc) {
+                /* need more space for net_size - 1 qpns */
+                local_data_size += sizeof(uint32_t) * (net_size - 1);
+            }
+
             local_data = ucc_malloc(local_data_size * (net_size + 1), "exchange_data");
             if (!local_data) {
                 tl_error(tl_team->context->lib, "failed to allocate %zd bytes for exchange data",
@@ -392,31 +495,28 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
             global_data = PTR_OFFSET(local_data, local_data_size);
 
             if (team->is_dc) {
-                status = ucc_tl_mhba_init_dc_qps_and_connect(team, local_data,
+                status = ucc_tl_mhba_init_dc_qps_and_connect(team, local_data->qpn,
                                                              ctx->ib_port);
                 if (UCC_OK != status) {
                     tl_error(tl_team->context->lib, "failed to init DC QPs");
                     goto free_data;
                 }
             } else {
-                status = ucc_tl_mhba_create_rc_qps(team, local_data);
+                status = ucc_tl_mhba_create_rc_qps(team, local_data->qpn);
                 if (UCC_OK != status) {
                     tl_error(tl_team->context->lib, "failed to init RC QPs");
                     goto free_data;
                 }
             }
 
-            local_data[(team->is_dc ? 1 : net_size)]     = port_attr.lid;
-            local_data[(team->is_dc ? 1 : net_size) + 1] = team->net.ctrl_mr->rkey;
-            *((uint64_t *)&local_data[(team->is_dc ? 1 : net_size) + 2]) =
-                (uint64_t)(uintptr_t)team->net.ctrl_mr->addr;
-            local_data[(team->is_dc ? 1 : net_size) + 4] =
-                team->node.team_recv_mkey->rkey;
-            ((struct rank_data*)(&local_data[(team->is_dc ? 1 : net_size) + 5]))->team_rank =
-                UCC_TL_TEAM_RANK(team);
-            ((struct rank_data*)(&local_data[(team->is_dc ? 1 : net_size) + 5]))->sbgp_rank =
-                team->net.sbgp->group_rank;
-
+            local_data->port_lid = port_attr.lid;
+            local_data->recv_mkey_rkey = team->node.team_recv_mkey->rkey;
+            local_data->rd.team_rank = UCC_TL_TEAM_RANK(team);
+            local_data->rd.sbgp_rank = team->net.sbgp->group_rank;
+            local_data->net_ctrl.atomic.addr = team->net.atomic.counters;
+            local_data->net_ctrl.atomic.rkey = team->net.atomic.mr->rkey;
+            local_data->net_ctrl.barrier.addr = team->net.barrier.flags;
+            local_data->net_ctrl.barrier.rkey = team->net.barrier.mr->rkey;
             status = ucc_service_allgather(UCC_TL_CORE_TEAM(team), local_data, global_data,
                                            local_data_size, ucc_sbgp_to_subset(team->net.sbgp),
                                            &team->scoll_req);
@@ -433,9 +533,12 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
             break;
         }
         net_size = team->net.net_size;
-        local_data_size = ((team->is_dc ? 1 : net_size) * sizeof(uint32_t)) +
-            sizeof(uint32_t) + 2 * sizeof(uint32_t) +
-            sizeof(void *) + sizeof(struct rank_data);
+        local_data_size = sizeof(net_exchange_t);
+        if (!team->is_dc) {
+            /* need more space for net_size - 1 qpns */
+            local_data_size += sizeof(uint32_t) * (net_size - 1);
+        }
+
         global_data = PTR_OFFSET(local_data, local_data_size);
 
         build_rank_map(team, global_data, local_data_size);
@@ -462,8 +565,8 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
         for (i = 0; i < net_size; i++) {
             remote_data = PTR_OFFSET(global_data, i * local_data_size);
             if (team->is_dc) {
-                team->net.remote_dctns[i] = remote_data[0];
-                status = ucc_tl_mhba_create_ah(&team->net.ahs[i], remote_data[1],
+                team->net.remote_dctns[i] = remote_data->qpn[0];
+                status = ucc_tl_mhba_create_ah(&team->net.ahs[i], remote_data->port_lid,
                                                ctx->ib_port, team);
                 if (UCC_OK != status) {
                     tl_error(tl_team->context->lib, "failed to create ah, %s",
@@ -472,19 +575,16 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
                 }
             } else {
                 status = ucc_tl_mhba_qp_connect(team->net.rc_qps[i],
-                                       remote_data[team->net.sbgp->group_rank],
-                                       remote_data[net_size], ctx->ib_port,tl_team->context->lib);
+                                       remote_data->qpn[team->net.sbgp->group_rank],
+                                       remote_data->port_lid, ctx->ib_port,tl_team->context->lib);
                 if (UCC_OK != status) {
                     tl_error(tl_team->context->lib, "failed to connect rc qps, %s",
                              ucc_status_string(status));
                     return status;
                 }
             }
-            team->net.remote_ctrl[i].rkey =
-                remote_data[(team->is_dc ? 1 : net_size) + 1];
-            team->net.remote_ctrl[i].addr = (void *)(uintptr_t)(
-                *((uint64_t *)&remote_data[(team->is_dc ? 1 : net_size) + 2]));
-            team->net.rkeys[i] = remote_data[(team->is_dc ? 1 : net_size) + 4];
+            team->net.remote_ctrl[i] = remote_data->net_ctrl;
+            team->net.rkeys[i]       = remote_data->recv_mkey_rkey;
         }
 
         team->dummy_bf_mr =
@@ -532,5 +632,6 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
 
 free_data:
     ucc_free(local_data);
+err:
     return status;
 }

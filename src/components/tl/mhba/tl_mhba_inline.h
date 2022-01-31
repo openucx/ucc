@@ -13,7 +13,7 @@ static inline void send_block_data_dc(uint64_t src_addr, uint32_t msg_size,
                                       struct dci *dci_struct,
                                       uint32_t dct_number, struct ibv_ah *ah)
 {
-    dci_struct->dc_qpex->wr_id    = 1;
+    dci_struct->dc_qpex->wr_id    = 0xdeadbeef;
     dci_struct->dc_qpex->wr_flags = send_flags;
     ibv_wr_rdma_write(dci_struct->dc_qpex, rkey, remote_addr);
     mlx5dv_wr_set_dc_addr(dci_struct->dc_mqpex, ah, dct_number, DC_KEY);
@@ -211,6 +211,65 @@ static inline ucc_status_t prepost_dummy_recv(struct ibv_qp *qp, int num,ucc_bas
         }
     }
     return UCC_OK;
+}
+
+static inline void *
+tl_mhba_atomic_addr(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
+{
+    ucc_tl_mhba_team_t *team = TASK_TEAM(task);
+    void               *remote_atomic;
+
+    remote_atomic = team->net.remote_ctrl[rank].atomic.addr;
+    return PTR_OFFSET(remote_atomic, task->seq_index * sizeof(tl_mhba_atomic_t));
+}
+
+static inline uint32_t
+tl_mhba_atomic_rkey(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
+{
+    ucc_tl_mhba_team_t *team = TASK_TEAM(task);
+
+    return team->net.remote_ctrl[rank].atomic.rkey;
+}
+
+static inline tl_mhba_barrier_t
+tl_mhba_barrier_flag(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
+{
+    ucc_tl_mhba_team_t *team     = TASK_TEAM(task);
+    ucc_rank_t          net_size = team->net.net_size;
+
+    return team->net.barrier.flags[(net_size + 1) * task->seq_index + rank];
+}
+
+static inline tl_mhba_barrier_t*
+tl_mhba_barrier_local_addr(ucc_tl_mhba_schedule_t *task)
+{
+    ucc_tl_mhba_team_t *team     = TASK_TEAM(task);
+    ucc_rank_t          net_size = team->net.net_size;
+
+    return &team->net.barrier.flags[(net_size + 1) * task->seq_index + net_size];
+}
+
+static inline uintptr_t
+tl_mhba_barrier_my_remote_addr(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
+{
+    ucc_tl_mhba_team_t *team     = TASK_TEAM(task);
+    ucc_rank_t          net_size = team->net.net_size;
+    ucc_rank_t          net_rank = team->net.sbgp->group_rank;
+    void               *remote_barrier;
+    ptrdiff_t           offset;
+
+    remote_barrier = team->net.remote_ctrl[rank].barrier.addr;
+    offset = (task->seq_index * (net_size + 1) + net_rank) *
+        sizeof(tl_mhba_barrier_t);
+    return (uintptr_t)PTR_OFFSET(remote_barrier, offset) ;
+}
+
+static inline uint32_t
+tl_mhba_barrier_remote_rkey(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
+{
+    ucc_tl_mhba_team_t *team     = TASK_TEAM(task);
+
+    return team->net.remote_ctrl[rank].barrier.rkey;
 }
 
 #endif
