@@ -468,6 +468,9 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
         tl_error(ctx->super.super.lib, "failed to pack remote data");
         goto fail_pack;
     }
+    for (i = 0; i < nsegs; i++) {
+        ucp_rkey_buffer_release(my_pack[i]);
+    }
 
     global_pack_data = ucc_malloc(total * size, "ucp_global_packed_data");
     if (NULL == global_pack_data) {

@@ -86,11 +86,13 @@ public:
             }
         }
     }
+
     void data_init(int nprocs, ucc_datatype_t dtype, size_t single_rank_count,
                    UccCollCtxVec &ctxs)
     {
         data_init(nprocs, dtype, single_rank_count, ctxs, NULL);
     }
+
     void reset(UccCollCtxVec ctxs)
     {
         for (auto r = 0; r < ctxs.size(); r++) {
@@ -107,6 +109,7 @@ public:
             }
         }
     }
+
     void data_fini(UccCollCtxVec ctxs)
     {
         for (gtest_ucc_coll_ctx_t* ctx : ctxs) {
@@ -121,6 +124,7 @@ public:
         }
         ctxs.clear();
     }
+
     void data_fini_onesided(UccCollCtxVec ctxs)
     {
         for (gtest_ucc_coll_ctx_t *ctx : ctxs) {
@@ -131,6 +135,7 @@ public:
         }
         ctxs.clear();
     }
+
     bool data_validate(UccCollCtxVec ctxs)
     {
         bool                   ret = true;
