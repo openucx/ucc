@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
 #
 
 NVCCFLAGS =                                      \
@@ -19,11 +19,9 @@ LINK = $(LIBTOOL) --mode=link $(CC) -o $@
 .cu.lo:
 	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(NVCC) -c  $< $(NVCCFLAGS) $(NVCC_ARCH)
 
-comp_noinst = libucc_mc_cuda_kernels.la
+comp_noinst = libucc_ec_cuda_kernels.la
 
-libucc_mc_cuda_kernels_la_SOURCES  = mc_cuda_reduce.cu              \
-                                     mc_cuda_reduce_multi.cu        \
-                                     mc_cuda_reduce_multi_alpha.cu
-libucc_mc_cuda_kernels_la_CPPFLAGS =
+libucc_ec_cuda_kernels_la_SOURCES  = ec_cuda_wait_kernel.cu
+libucc_ec_cuda_kernels_la_CPPFLAGS =
 
 noinst_LTLIBRARIES = $(comp_noinst)

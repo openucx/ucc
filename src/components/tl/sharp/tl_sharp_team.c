@@ -6,7 +6,7 @@
 
 #include "tl_sharp.h"
 #include "tl_sharp_coll.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
 

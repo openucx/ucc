@@ -12,7 +12,8 @@
 #include "utils/ucc_math.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
-#include "ucc_mc.h"
+#include "components/mc/ucc_mc.h"
+#include "components/ec/ucc_ec.h"
 
 UCS_CONFIG_DEFINE_ARRAY(cl_types, sizeof(ucc_cl_type_t),
                         UCS_CONFIG_TYPE_ENUM(ucc_cl_names));
@@ -289,6 +290,9 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
     ucc_mc_params_t mc_params = {
         .thread_mode = params->thread_mode,
     };
+    ucc_ec_params_t ec_params = {
+        .thread_mode = params->thread_mode,
+    };
 
     *lib_p = NULL;
 
@@ -296,6 +300,9 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
         return status;
     }
     if (UCC_OK != (status = ucc_mc_init(&mc_params))) {
+        return status;
+    }
+    if (UCC_OK != (status = ucc_ec_init(&ec_params))) {
         return status;
     }
 
@@ -456,6 +463,7 @@ ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
         lib->cl_libs[i]->iface->lib.finalize(&lib->cl_libs[i]->super);
     }
     status = ucc_mc_finalize();
+    status = ucc_ec_finalize();
     ucc_free(lib->tl_libs);
     ucc_free(lib->cl_libs);
     ucc_free(lib->full_prefix);

@@ -6,7 +6,8 @@
 #include "config.h"
 #include "ucc_team.h"
 #include "ucc_context.h"
-#include "ucc_mc.h"
+#include "components/mc/ucc_mc.h"
+#include "components/ec/ucc_ec.h"
 #include "components/cl/ucc_cl.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
@@ -234,7 +235,7 @@ static ucc_status_t ucc_triggered_coll_complete(ucc_coll_task_t *parent_task, //
 {
     ucc_trace("triggered collective complete, task %p, seq_num %u",
               task, task->seq_num);
-    return ucc_mc_ee_task_end(task->ee_task, task->ee->ee_type);
+    return ucc_ec_task_end(task->ee_task, task->ee->ee_type);
 }
 
 static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
@@ -288,8 +289,8 @@ static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
     }
 
     if (task->ee_task == NULL) {
-        status = ucc_mc_ee_task_post(task->ee->ee_context,
-                                     task->ee->ee_type, &task->ee_task);
+        status = ucc_ec_task_post(task->ee->ee_context, task->ee->ee_type,
+                                  &task->ee_task);
         if (ucc_unlikely(status != UCC_OK)) {
             ucc_error("error in ee task post, %s", ucc_status_string(status));
             task->super.status = status;
@@ -304,7 +305,7 @@ static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
     }
 
     if (task->ee_task == NULL ||
-        (UCC_OK == ucc_mc_ee_task_query(task->ee_task, task->ee->ee_type))) {
+        (UCC_OK == ucc_ec_task_query(task->ee_task, task->ee->ee_type))) {
         task->super.status = UCC_OK;
     }
     return task->super.status;

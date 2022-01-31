@@ -6,12 +6,14 @@ cl_dirs = components/cl/basic \
 		  components/cl/hier
 
 mc_dirs = components/mc/cpu
+ec_dirs =
 
 if HAVE_CUDA
 mc_dirs += components/mc/cuda
+ec_dirs += components/ec/cuda
 endif
 
-SUBDIRS = . $(cl_dirs) $(mc_dirs)
+SUBDIRS = . $(cl_dirs) $(mc_dirs) $(ec_dirs)
 
 include components/tl/makefile.am
 
@@ -32,7 +34,6 @@ noinst_HEADERS =                      \
 	core/ucc_global_opts.h            \
 	core/ucc_lib.h                    \
 	core/ucc_context.h                \
-	core/ucc_mc.h                     \
 	core/ucc_team.h                   \
 	core/ucc_ee.h                     \
 	core/ucc_progress_queue.h         \
@@ -71,8 +72,12 @@ noinst_HEADERS =                      \
 	components/cl/ucc_cl_type.h       \
 	components/tl/ucc_tl.h            \
 	components/tl/ucc_tl_log.h        \
+	components/mc/ucc_mc.h            \
 	components/mc/base/ucc_mc_base.h  \
 	components/mc/ucc_mc_log.h        \
+	components/ec/ucc_ec.h            \
+	components/ec/base/ucc_ec_base.h  \
+	components/ec/ucc_ec_log.h        \
 	coll_patterns/recursive_knomial.h \
 	coll_patterns/sra_knomial.h       \
 	components/topo/ucc_topo.h        \
@@ -84,7 +89,6 @@ libucc_la_SOURCES =                   \
 	core/ucc_global_opts.c            \
 	core/ucc_version.c                \
 	core/ucc_context.c                \
-	core/ucc_mc.c                     \
 	core/ucc_team.c                   \
 	core/ucc_ee.c                     \
 	core/ucc_coll.c                   \
@@ -110,7 +114,10 @@ libucc_la_SOURCES =                   \
 	components/base/ucc_base_iface.c  \
 	components/cl/ucc_cl.c            \
 	components/tl/ucc_tl.c            \
+	components/mc/ucc_mc.c            \
 	components/mc/base/ucc_mc_base.c  \
+	components/ec/ucc_ec.c            \
+	components/ec/base/ucc_ec_base.c  \
 	components/topo/ucc_topo.c        \
 	components/topo/ucc_sbgp.c
 

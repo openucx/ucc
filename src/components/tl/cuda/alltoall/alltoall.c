@@ -5,7 +5,7 @@
  */
 
 #include "alltoall.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 
 ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task);
 

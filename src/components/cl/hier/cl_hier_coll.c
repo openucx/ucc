@@ -5,7 +5,7 @@
  */
 
 #include "cl_hier.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "core/ucc_team.h"
 #include "utils/ucc_coll_utils.h"
 #include "allreduce/allreduce.h"

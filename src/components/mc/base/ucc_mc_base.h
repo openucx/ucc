@@ -121,16 +121,6 @@ typedef struct ucc_mc_ops {
     ucc_status_t (*flush)();
  } ucc_mc_ops_t;
 
-typedef struct ucc_ee_ops {
-    ucc_status_t (*ee_task_post)(void *ee_context, void **ee_req);
-    ucc_status_t (*ee_task_query)(void *ee_req);
-    ucc_status_t (*ee_task_end)(void *ee_req);
-    ucc_status_t (*ee_create_event)(void **event);
-    ucc_status_t (*ee_destroy_event)(void *event);
-    ucc_status_t (*ee_event_post)(void *ee_context, void *event);
-    ucc_status_t (*ee_event_test)(void *event);
-} ucc_ee_ops_t;
-
 typedef struct ucc_mc_base {
     ucc_component_iface_t           super;
     uint32_t                        ref_cnt;
@@ -142,7 +132,6 @@ typedef struct ucc_mc_base {
     ucc_status_t                   (*get_attr)(ucc_mc_attr_t *mc_attr);
     ucc_status_t                   (*finalize)();
     ucc_mc_ops_t                    ops;
-    const ucc_ee_ops_t              ee_ops;
 } ucc_mc_base_t;
 
 #endif

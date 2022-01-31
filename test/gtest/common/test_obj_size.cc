@@ -30,7 +30,7 @@ UCC_TEST_F(test_obj_size, size) {
     UCC_TEST_SKIP_R("Assert enabled");
 #else
 
-    EXPECTED_SIZE(ucc_global_config_t, 144);
+    EXPECTED_SIZE(ucc_global_config_t, 168);
 
 #endif
 }

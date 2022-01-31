@@ -5,7 +5,7 @@
  */
 
 #include "alltoall.h"
-#include "core/ucc_mc.h"
+#include "components/ec/ucc_ec.h"
 #include "tl_cuda_cache.h"
 #include "utils/arch/cpu.h"
 
@@ -21,8 +21,8 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_finalize(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
 
     tl_trace(UCC_TASK_LIB(task), "finalizing task %p", task);
-    ucc_mc_ee_destroy_event((void*)task->alltoall_ce.copy_done,
-                            UCC_EE_CUDA_STREAM);
+    ucc_ec_destroy_event((void*)task->alltoall_ce.copy_done,
+                         UCC_EE_CUDA_STREAM);
     ucc_tl_cuda_task_put(task);
     return UCC_OK;
 }
@@ -157,8 +157,8 @@ static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task
                            exit, status, UCC_TASK_LIB(task));
         }
     }
-    status = ucc_mc_ee_event_post(team->stream, task->alltoall_ce.copy_done,
-                                  UCC_EE_CUDA_STREAM);
+    status = ucc_ec_event_post(team->stream, task->alltoall_ce.copy_done,
+                               UCC_EE_CUDA_STREAM);
 exit:
     return status;
 
@@ -196,8 +196,8 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
         }
         task->alltoall_ce.stage = ALLTOALL_CE_STAGE_COPY;
     case ALLTOALL_CE_STAGE_COPY:
-        status = ucc_mc_ee_event_test(task->alltoall_ce.copy_done,
-                                      UCC_EE_CUDA_STREAM);
+        status = ucc_ec_event_test(task->alltoall_ce.copy_done,
+                                   UCC_EE_CUDA_STREAM);
         if (status != UCC_OK) {
             task->super.super.status = status;
             return task->super.super.status;
@@ -241,8 +241,8 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     ucc_status_t status;
     size_t data_len;
 
-    status = ucc_mc_ee_create_event(&task->alltoall_ce.copy_done,
-                                    UCC_EE_CUDA_STREAM);
+    status = ucc_ec_create_event(&task->alltoall_ce.copy_done,
+                                 UCC_EE_CUDA_STREAM);
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
@@ -267,6 +267,6 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     return UCC_OK;
 
 exit_err:
-    ucc_mc_ee_destroy_event(task->alltoall_ce.copy_done, UCC_EE_CUDA_STREAM);
+    ucc_ec_destroy_event(task->alltoall_ce.copy_done, UCC_EE_CUDA_STREAM);
     return status;
 }

@@ -11,7 +11,7 @@
 #include "tl_ucp_sendrecv.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 
 ucc_status_t ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
 {

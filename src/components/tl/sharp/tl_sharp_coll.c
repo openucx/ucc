@@ -5,7 +5,7 @@
  */
 
 #include "tl_sharp_coll.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"

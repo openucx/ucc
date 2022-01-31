@@ -196,6 +196,8 @@ AC_CONFIG_FILES([
                  src/components/mc/cpu/Makefile
                  src/components/mc/cuda/Makefile
                  src/components/mc/cuda/kernel/Makefile
+                 src/components/ec/cuda/Makefile
+                 src/components/ec/cuda/kernel/Makefile
                  test/mpi/Makefile
                  tools/info/Makefile
                  tools/perf/Makefile

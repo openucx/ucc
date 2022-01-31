@@ -18,6 +18,7 @@ typedef struct ucc_global_config {
     ucc_component_framework_t  cl_framework;
     ucc_component_framework_t  tl_framework;
     ucc_component_framework_t  mc_framework;
+    ucc_component_framework_t  ec_framework;
 
     /* Coll component libraries path */
     char *component_path;

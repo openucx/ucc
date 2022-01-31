@@ -12,7 +12,7 @@
 #include "coll_patterns/sra_knomial.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "../scatter/scatter.h"
 #include "../allgather/allgather.h"
 

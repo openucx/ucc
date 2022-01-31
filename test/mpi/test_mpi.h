@@ -17,7 +17,7 @@ extern "C" {
 #include "utils/ucc_malloc.h"
 }
 BEGIN_C_DECLS
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "core/ucc_team.h"
 #include "utils/ucc_math.h"
 END_C_DECLS
