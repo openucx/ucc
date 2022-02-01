@@ -129,16 +129,6 @@ UCC_CLASS_DECLARE(ucc_tl_nccl_team_t, ucc_base_context_t *,
         }                                                                      \
     } while (0)
 
-#define CUDACHECK_GOTO(_cmd, _label, _status, _lib)                            \
-    do {                                                                       \
-        cudaError_t e = _cmd;                                                  \
-        if (cudaSuccess != e) {                                                \
-            tl_error(_lib, "CUDA error %d %s", e, cudaGetErrorName(e));        \
-            _status = UCC_ERR_NO_MESSAGE;                                      \
-            goto _label;                                                       \
-        }                                                                      \
-    } while (0)
-
 #define UCC_TL_NCCL_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_nccl_lib_t))
 

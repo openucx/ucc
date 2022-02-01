@@ -1,6 +1,7 @@
 #include "tl_cuda_coll.h"
 #include "alltoall/alltoall.h"
 #include "utils/arch/cpu.h"
+#include "utils/arch/cuda_def.h"
 
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
                                       ucc_tl_cuda_team_t *team,
@@ -19,8 +20,7 @@ ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
     mi->ptr    = mem_attr.base_address;
     mi->length = mem_attr.alloc_length;
     mi->offset = (ptrdiff_t)ptr - (ptrdiff_t)mi->ptr;
-    CUDACHECK_GOTO(cudaIpcGetMemHandle(&mi->handle, mi->ptr), exit, status,
-                   UCC_TL_TEAM_LIB(team));
+    CUDA_CHECK_GOTO(cudaIpcGetMemHandle(&mi->handle, mi->ptr), exit, status);
 exit:
     return status;
 }

@@ -10,6 +10,7 @@
 #include "tl_cuda_ep_hash.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
+#include "utils/arch/cuda_def.h"
 #include "core/ucc_team.h"
 #include <cuda_runtime.h>
 
@@ -53,7 +54,7 @@ static void ucc_tl_cuda_cache_purge(ucc_tl_cuda_cache_t *cache)
     ucs_pgtable_purge(&cache->pgtable, ucc_tl_cuda_cache_region_collect_callback,
                       &region_list);
     ucs_list_for_each_safe(region, tmp, &region_list, list) {
-        CUDACHECK_NORET(cudaIpcCloseMemHandle(region->mapped_addr));
+        CUDA_FUNC(cudaIpcCloseMemHandle(region->mapped_addr));
         free(region);
     }
 }
@@ -128,7 +129,7 @@ static void ucc_tl_cuda_cache_invalidate_regions(ucc_tl_cuda_cache_t *cache,
             ucc_error("failed to remove address:%p from cache (%s)",
                       (void *)region->d_ptr, ucs_status_string(status));
         }
-        CUDACHECK_NORET(cudaIpcCloseMemHandle(region->mapped_addr));
+        CUDA_FUNC(cudaIpcCloseMemHandle(region->mapped_addr));
         free(region);
     }
     ucc_trace("%s: closed memhandles in the range [%p..%p]",
@@ -276,7 +277,7 @@ err:
 
 
 #else
-    CUDACHECK_NORET(cudaIpcOpenMemHandle(mapped_addr, mem_handle,
+    CUDA_FUNC(cudaIpcOpenMemHandle(mapped_addr, mem_handle,
                                          cudaIpcMemLazyEnablePeerAccess));
     return UCC_OK;
 #endif
@@ -300,7 +301,7 @@ ucc_status_t ucc_tl_cuda_unmap_memhandle(uintptr_t d_bptr, void *mapped_addr,
 
     pthread_rwlock_unlock(&cache->lock);
 #else
-   CUDACHECK_NORET(cudaIpcCloseMemHandle(mapped_addr));
+   CUDA_FUNC(cudaIpcCloseMemHandle(mapped_addr));
 #endif
    return UCC_OK;
 }

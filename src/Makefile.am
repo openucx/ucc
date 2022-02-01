@@ -46,6 +46,7 @@ noinst_HEADERS =                      \
 	utils/arch/ppc64/cpu.h            \
 	utils/arch/x86_64/cpu.h           \
 	utils/arch/cpu.h                  \
+	utils/arch/cuda_def.h             \
 	utils/ucc_compiler_def.h          \
 	utils/ucc_log.h                   \
 	utils/ucc_parser.h                \

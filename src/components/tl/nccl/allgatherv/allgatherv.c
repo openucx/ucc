@@ -8,6 +8,7 @@
 #include "allgatherv.h"
 #include "components/mc/ucc_mc.h"
 #include "core/ucc_ee.h"
+#include "utils/arch/cuda_def.h"
 
 ucc_base_coll_alg_info_t
     ucc_tl_nccl_allgatherv_algs[UCC_TL_NCCL_ALLGATHERV_ALG_LAST + 1] = {
@@ -136,11 +137,11 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcopy_start(ucc_coll_task_t *coll_task)
     rdt_size  = ucc_dt_size(args->dst.info_v.datatype);
     sdt_size  = ucc_dt_size(args->src.info.datatype);
     if (max_count * rdt_size > scount * sdt_size) {
-        CUDACHECK_GOTO(cudaMemcpyAsync(PTR_OFFSET(scratch,
-                                       max_count * rdt_size * size), sbuf,
-                                       scount * sdt_size,
-                                       cudaMemcpyDeviceToDevice, stream),
-                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+        CUDA_CHECK_GOTO(cudaMemcpyAsync(PTR_OFFSET(scratch,
+                                        max_count * rdt_size * size), sbuf,
+                                        scount * sdt_size,
+                                        cudaMemcpyDeviceToDevice, stream),
+                        exit_coll, status);
         sbuf = PTR_OFFSET(scratch, max_count * rdt_size * size);
     }
     NCCLCHECK_GOTO(ncclAllGather(sbuf, scratch, max_count * rdt_size,
@@ -152,12 +153,12 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcopy_start(ucc_coll_task_t *coll_task)
         displ  = ucc_coll_args_get_displacement(args,
                                                 args->dst.info_v.displacements,
                                                 peer);
-        CUDACHECK_GOTO(cudaMemcpyAsync(PTR_OFFSET(rbuf, displ * rdt_size),
-                                       PTR_OFFSET(scratch,
-                                                  peer * max_count * rdt_size),
-                                       rcount * rdt_size,
-                                       cudaMemcpyDeviceToDevice, stream),
-                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+        CUDA_CHECK_GOTO(cudaMemcpyAsync(PTR_OFFSET(rbuf, displ * rdt_size),
+                                        PTR_OFFSET(scratch,
+                                                   peer * max_count * rdt_size),
+                                        rcount * rdt_size,
+                                        cudaMemcpyDeviceToDevice, stream),
+                       exit_coll, status);
     }
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:

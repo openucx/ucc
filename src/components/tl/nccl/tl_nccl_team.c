@@ -10,6 +10,7 @@
 #include "components/mc/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
+#include "utils/arch/cuda_def.h"
 
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
@@ -98,9 +99,8 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
         goto free_unique_id;
     }
 
-    CUDACHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
-                   cudaStreamNonBlocking), free_unique_id, status,
-                   tl_team->context->lib);
+    CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
+                    cudaStreamNonBlocking), free_unique_id, status);
     nccl_status = ncclCommInitRank(&team->nccl_comm, UCC_TL_TEAM_SIZE(team),
                                    team->unique_id[0], UCC_TL_TEAM_RANK(team));
     if (nccl_status != ncclSuccess) {
