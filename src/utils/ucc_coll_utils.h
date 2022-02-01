@@ -159,4 +159,14 @@ ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
 
 typedef struct ucc_coll_task ucc_coll_task_t;
 void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len);
+
+/* Creates a rank map that reverses rank order, ie
+   rank r -> size - 1 - r */
+ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size);
+
+/* Creates an inverse mapping for a given map */
+ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map);
+
+void ucc_ep_map_destroy(ucc_ep_map_t *map);
+
 #endif
