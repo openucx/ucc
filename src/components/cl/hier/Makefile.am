@@ -10,6 +10,10 @@ alltoallv =                   \
 	alltoallv/alltoallv.h     \
 	alltoallv/alltoallv.c
 
+alltoall =                  \
+	alltoall/alltoall.h     \
+	alltoall/alltoall.c
+
 sources =             \
 	cl_hier.h         \
 	cl_hier.c         \
@@ -19,7 +23,8 @@ sources =             \
 	cl_hier_coll.c    \
 	cl_hier_coll.h    \
 	$(allreduce)      \
-	$(alltoallv)
+	$(alltoallv)      \
+	$(alltoall)
 
 module_LTLIBRARIES         = libucc_cl_hier.la
 libucc_cl_hier_la_SOURCES  = $(sources)

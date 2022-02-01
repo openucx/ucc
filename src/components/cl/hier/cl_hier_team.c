@@ -10,6 +10,7 @@
 #include "core/ucc_service_coll.h"
 #include "allreduce/allreduce.h"
 #include "alltoallv/alltoallv.h"
+#include "alltoall/alltoall.h"
 
 #define SBGP_SET(_team, _sbgp, _enable)                                        \
     _team->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp_type = UCC_SBGP_##_sbgp;          \
@@ -300,6 +301,8 @@ static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
     switch (coll_type) {
     case UCC_COLL_TYPE_ALLTOALLV:
         return ucc_cl_hier_alltoallv_alg_from_str(str);
+    case UCC_COLL_TYPE_ALLTOALL:
+        return ucc_cl_hier_alltoall_alg_from_str(str);
     default:
         break;
     }
@@ -322,6 +325,16 @@ ucc_cl_hier_alg_id_to_init(int alg_id, const char *alg_id_str,
         switch (alg_id) {
         case UCC_CL_HIER_ALLTOALLV_ALG_NODE_SPLIT:
             *init = ucc_cl_hier_alltoallv_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        };
+        break;
+    case UCC_COLL_TYPE_ALLTOALL:
+        switch (alg_id) {
+        case UCC_CL_HIER_ALLTOALL_ALG_NODE_SPLIT:
+            *init = ucc_cl_hier_alltoall_init;
             break;
         default:
             status = UCC_ERR_INVALID_PARAM;
@@ -357,7 +370,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
             score, UCC_COLL_TYPE_ALLREDUCE, mt[i], 0, 2048,
             UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_allreduce_rab_init, cl_team);
         if (UCC_OK != status) {
-            cl_error(lib, "faild to add range to score_t");
+            cl_error(lib, "failed to add range to score_t");
             return status;
         }
 
@@ -366,7 +379,16 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
             /* low priority 1: to be enabled manually */
             1, ucc_cl_hier_alltoallv_init, cl_team);
         if (UCC_OK != status) {
-            cl_error(lib, "faild to add range to score_t");
+            cl_error(lib, "failed to add range to score_t");
+            return status;
+        }
+
+        status = ucc_coll_score_add_range(
+            score, UCC_COLL_TYPE_ALLTOALL, mt[i], 0, UCC_MSG_MAX,
+            /* low priority 1: to be enabled manually */
+            1, ucc_cl_hier_alltoall_init, cl_team);
+        if (UCC_OK != status) {
+            cl_error(lib, "failed to add range to score_t");
             return status;
         }
     }
