@@ -169,4 +169,31 @@ ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map);
 
 void ucc_ep_map_destroy(ucc_ep_map_t *map);
 
+/* The two helper routines below are used to partition a buffer
+   consisiting of total_count elements into blocks.
+   This is used, e.g., in ReduceScatter or during fragmentation
+   process.
+   First total_count is devided into n_blocks. If the devision
+   has remainder then it is evenly distributed among first blocks.
+*/
+static inline size_t ucc_buffer_block_count(size_t     total_count,
+                                            ucc_rank_t n_blocks,
+                                            ucc_rank_t block)
+{
+    size_t block_count = total_count / n_blocks;
+    size_t left        = total_count % n_blocks;
+
+    return (block < left) ? block_count + 1 : block_count;
+}
+
+static inline size_t ucc_buffer_block_offset(size_t     total_count,
+                                             ucc_rank_t n_blocks,
+                                             ucc_rank_t block)
+{
+    size_t block_count = total_count / n_blocks;
+    size_t left        = total_count % n_blocks;
+    size_t offset      = block * block_count + left;
+
+    return (block < left) ? offset - (left - block) : offset;
+}
 #endif
