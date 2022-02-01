@@ -20,15 +20,6 @@ const char* ucc_sbgp_str(ucc_sbgp_type_t type)
     return ucc_sbgp_type_str[type];
 }
 
-static inline int ucc_rank_on_local_node(ucc_rank_t team_rank, ucc_topo_t *topo)
-{
-    ucc_proc_info_t *procs    = topo->topo->procs;
-    ucc_rank_t       ctx_rank = ucc_ep_map_eval(topo->set.map, team_rank);
-    ucc_rank_t my_ctx_rank = ucc_ep_map_eval(topo->set.map, topo->set.myrank);
-
-    return procs[ctx_rank].host_hash == procs[my_ctx_rank].host_hash;
-}
-
 static inline int ucc_ranks_on_local_socket(ucc_rank_t rank1, ucc_rank_t rank2,
                                             ucc_topo_t *topo)
 {
@@ -352,6 +343,17 @@ static ucc_status_t sbgp_create_socket_leaders(ucc_topo_t *topo,
     return UCC_OK;
 }
 
+static inline ucc_status_t sbgp_create_full(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
+{
+    sbgp->status     = UCC_SBGP_ENABLED;
+    sbgp->group_size = ucc_subset_size(&topo->set);
+    sbgp->group_rank = topo->set.myrank;
+    sbgp->map.type   = UCC_EP_MAP_FULL;
+    sbgp->map.ep_num = ucc_subset_size(&topo->set);
+
+    return UCC_OK;
+}
+
 ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
 {
     ucc_status_t status = UCC_OK;
@@ -363,6 +365,9 @@ ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
     switch (type) {
     case UCC_SBGP_NODE:
         status = sbgp_create_node(topo, sbgp);
+        break;
+    case UCC_SBGP_FULL:
+        status = sbgp_create_full(topo, sbgp);
         break;
     case UCC_SBGP_SOCKET:
         if (!topo->topo->sock_bound) {
@@ -403,7 +408,7 @@ ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
         status = UCC_ERR_NOT_IMPLEMENTED;
         break;
     };
-    if (sbgp->rank_map) {
+    if (sbgp->rank_map && sbgp->type != UCC_SBGP_FULL) {
         sbgp->map = ucc_ep_map_from_array(&sbgp->rank_map, sbgp->group_size,
                                           ucc_subset_size(&topo->set), 1);
     }

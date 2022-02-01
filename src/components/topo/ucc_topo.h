@@ -76,4 +76,14 @@ int ucc_topo_is_single_node(ucc_topo_t *topo);
 /* Returns the array of ALL existing socket subgroups of given topo */
 ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
                                       int *n_sbgps);
+
+static inline int ucc_rank_on_local_node(ucc_rank_t team_rank, ucc_topo_t *topo)
+{
+    ucc_proc_info_t *procs    = topo->topo->procs;
+    ucc_rank_t       ctx_rank = ucc_ep_map_eval(topo->set.map, team_rank);
+    ucc_rank_t my_ctx_rank = ucc_ep_map_eval(topo->set.map, topo->set.myrank);
+
+    return procs[ctx_rank].host_hash == procs[my_ctx_rank].host_hash;
+}
+
 #endif

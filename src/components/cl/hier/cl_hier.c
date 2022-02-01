@@ -38,6 +38,17 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NET]),
      UCC_CONFIG_TYPE_STRING_ARRAY},
 
+    {"FULL_SBGP_TLS", "ucp",
+     "TLS to be used for FULL subgroup.\n"
+     "FULL subgroup contains all processes of the team",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_FULL]),
+     UCC_CONFIG_TYPE_STRING_ARRAY},
+
+    {"ALLTOALLV_SPLIT_NODE_THRESH", "0",
+     "Messages larger than that threshold will be sent via node sbgp tl",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, a2av_node_thresh),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
     {NULL}};
 
 static ucs_config_field_t ucc_cl_hier_context_config_table[] = {
