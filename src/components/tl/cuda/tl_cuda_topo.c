@@ -5,7 +5,7 @@
  */
 
 #include "tl_cuda_topo.h"
-#include "tl_cuda_common.h"
+#include "utils/arch/cuda_def.h"
 #include <inttypes.h>
 #include <pthread.h>
 #include <nvml.h>
@@ -14,6 +14,16 @@ pthread_mutex_t nvml_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #define MAX_PCI_BUS_ID_STR 16
 #define MAX_PCI_DEVICES    32
+
+#define NVMLCHECK_GOTO(_cmd, _label, _status, _lib)                            \
+    do {                                                                       \
+        nvmlReturn_t e = _cmd;                                                 \
+        if (ucc_unlikely(NVML_SUCCESS != e)) {                                 \
+            tl_error(_lib, "NVML error %d %s", e, nvmlErrorString(e));         \
+            _status = UCC_ERR_NO_MESSAGE;                                      \
+            goto _label;                                                       \
+        }                                                                      \
+    } while (0)
 
 static ucc_status_t
 ucc_tl_cuda_topo_pci_id_from_str(const char * bus_id_str,
@@ -44,8 +54,8 @@ ucc_status_t ucc_tl_cuda_topo_get_pci_id(const ucc_base_lib_t *lib,
     char pci_bus_id[MAX_PCI_BUS_ID_STR];
     ucc_status_t st;
 
-    CUDACHECK_GOTO(cudaDeviceGetPCIBusId(pci_bus_id, MAX_PCI_BUS_ID_STR,
-                                         device), exit, st, lib);
+    CUDA_CHECK_GOTO(cudaDeviceGetPCIBusId(pci_bus_id, MAX_PCI_BUS_ID_STR,
+                                          device), exit, st);
     st = ucc_tl_cuda_topo_pci_id_from_str(pci_bus_id, pci_id);
 exit:
     return st;
@@ -188,8 +198,8 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
     NVMLCHECK_GOTO(nvmlInit_v2(), exit_free_graph, status, topo->lib);
     nvml_value.fieldId = NVML_FI_DEV_NVLINK_LINK_COUNT;
     for (i = 0; i < num_gpus; i++) {
-        CUDACHECK_GOTO(cudaDeviceGetPCIBusId(pci_bus_str, MAX_PCI_BUS_ID_STR, i),
-                       exit_nvml_shutdown, status, topo->lib);
+        CUDA_CHECK_GOTO(cudaDeviceGetPCIBusId(pci_bus_str, MAX_PCI_BUS_ID_STR, i),
+                        exit_nvml_shutdown, status);
         status = ucc_tl_cuda_topo_pci_id_from_str(pci_bus_str, &pci_id);
         if (status != UCC_OK) {
             goto exit_nvml_shutdown;

@@ -8,9 +8,11 @@
 
 #include "cl_hier.h"
 #include "schedule/ucc_schedule_pipelined.h"
+#include "components/mc/ucc_mc.h"
 
 typedef struct ucc_cl_hier_schedule_t {
     ucc_schedule_pipelined_t super;
+    ucc_mc_buffer_header_t  *scratch;
 } ucc_cl_hier_schedule_t;
 
 static inline ucc_cl_hier_schedule_t *

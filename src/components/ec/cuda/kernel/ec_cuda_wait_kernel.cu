@@ -41,7 +41,7 @@ ucc_status_t ucc_ec_cuda_post_kernel_stream_task(uint32_t *status,
     } else {
         wait_kernel_nb<<<1, 1, 0, stream>>>(status);
     }
-    CUDACHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
     return UCC_OK;
 }
 

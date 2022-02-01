@@ -8,6 +8,7 @@
 #include "components/ec/ucc_ec.h"
 #include "tl_cuda_cache.h"
 #include "utils/arch/cpu.h"
+#include "utils/arch/cuda_def.h"
 
 enum {
     ALLTOALL_CE_STAGE_SYNC,  /*< Wait for free SYNC segment */
@@ -37,8 +38,8 @@ ucc_status_t ucc_tl_cuda_alltoall_setup_start(ucc_tl_cuda_task_t *task)
            sizeof(ucc_tl_cuda_mem_info_t));
     memcpy(&sync->mem_info_dst, &task->alltoall_ce.mem_info_dst,
            sizeof(ucc_tl_cuda_mem_info_t));
-    CUDACHECK_GOTO(cudaEventRecord(sync->ipc_event_local, team->stream),
-                   exit_err, status, UCC_TL_TEAM_LIB(team));
+    CUDA_CHECK_GOTO(cudaEventRecord(sync->ipc_event_local, team->stream),
+                    exit_err, status);
     ucc_memory_bus_fence();
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
     if (ucc_unlikely(status != UCC_OK)) {
@@ -127,16 +128,16 @@ static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task
         } else {
             src = PTR_OFFSET(task->alltoall_ce.peer_map_addr_src[peer],
                              peer_sync->mem_info_src.offset);
-            CUDACHECK_GOTO(cudaStreamWaitEvent(team->stream,
-                                               sync->data[peer].ipc_event_remote,
-                                               0),
-                           exit, status, UCC_TASK_LIB(task));
+            CUDA_CHECK_GOTO(cudaStreamWaitEvent(team->stream,
+                                                sync->data[peer].ipc_event_remote,
+                                                0),
+                           exit, status);
         }
         src = PTR_OFFSET(src, rank * send_len);
         dst = PTR_OFFSET(args->dst.info.buffer, peer * send_len);
-        CUDACHECK_GOTO(cudaMemcpyAsync(dst, src, send_len,
+        CUDA_CHECK_GOTO(cudaMemcpyAsync(dst, src, send_len,
                                        cudaMemcpyDeviceToDevice, team->stream),
-                       exit, status, UCC_TASK_LIB(task));
+                       exit, status);
     }
 
     for (i = 0; i < team->topo->num_proxies; i++) {
@@ -151,10 +152,10 @@ static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task
             dst = PTR_OFFSET(task->alltoall_ce.peer_map_addr_dst[pdst],
                              peer_sync->mem_info_dst.offset);
             dst = PTR_OFFSET(dst, psrc * send_len);
-            CUDACHECK_GOTO(cudaMemcpyAsync(dst, src, send_len,
-                                           cudaMemcpyDeviceToDevice,
-                                           team->stream),
-                           exit, status, UCC_TASK_LIB(task));
+            CUDA_CHECK_GOTO(cudaMemcpyAsync(dst, src, send_len,
+                                            cudaMemcpyDeviceToDevice,
+                                            team->stream),
+                            exit, status);
         }
     }
     status = ucc_ec_event_post(team->stream, task->alltoall_ce.copy_done,

@@ -188,12 +188,12 @@ ucc_status_t ucc_mc_cuda_reduce(const void *src1, const void *src2, void *dst,
             break;
 #endif
         default:
-            mc_error(&ucc_mc_cuda.super, "unsupported reduction type (%s)", 
+            mc_error(&ucc_mc_cuda.super, "unsupported reduction type (%s)",
                      ucc_datatype_str(dt));
             return UCC_ERR_NOT_SUPPORTED;
     }
-    CUDACHECK(cudaGetLastError());
-    CUDACHECK(cudaStreamSynchronize(stream));
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaStreamSynchronize(stream));
     return UCC_OK;
 }
 

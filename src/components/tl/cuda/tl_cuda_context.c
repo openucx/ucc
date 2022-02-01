@@ -6,6 +6,7 @@
 
 #include "tl_cuda.h"
 #include "utils/arch/cpu.h"
+#include "utils/arch/cuda_def.h"
 #include <tl_cuda_topo.h>
 #include <cuda_runtime.h>
 #include <cuda.h>
@@ -60,8 +61,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
         return status;
     }
 
-    CUDACHECK_GOTO(cudaGetDevice(&self->device), free_mpool, status,
-                   self->super.super.lib);
+    CUDA_CHECK_GOTO(cudaGetDevice(&self->device), free_mpool, status);
     status = ucc_tl_cuda_topo_create(self->super.super.lib, &self->topo);
     if (status != UCC_OK) {
         tl_error(self->super.super.lib,
