@@ -54,11 +54,8 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
 {
     ucc_mc_cuda_config_t *cfg = MC_CUDA_CONFIG;
     struct cudaDeviceProp prop;
-    int device, num_devices, attr, driver_ver;
-    CUdevice cu_dev;
-    CUresult cu_st;
+    int device, num_devices, driver_ver;
     cudaError_t cuda_st;
-    const char *cu_err_st_str;
 
     ucc_mc_cuda.stream = NULL;
     ucc_strncpy_safe(ucc_mc_cuda.super.config->log_component.name,
@@ -85,6 +82,11 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
 
 #if CUDA_VERSION >= 11030
     if (driver_ver >= 11030) {
+        CUdevice    cu_dev;
+        CUresult    cu_st;
+        int         attr;
+        const char *cu_err_st_str;
+
         cu_st = cuCtxGetDevice(&cu_dev);
         if (cu_st != CUDA_SUCCESS){
             cuGetErrorString(cu_st, &cu_err_st_str);
