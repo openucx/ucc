@@ -507,8 +507,8 @@ typedef enum {
  *
  */
 typedef enum {
-    UCC_NO_SYNC_COLLECTIVES = 0, /*!< Synchronous collectives */
-    UCC_SYNC_COLLECTIVES    = 1  /*!< Non-synchronous collectives */
+    UCC_NO_SYNC_COLLECTIVES = 0, /*!< Non-synchronous collectives */
+    UCC_SYNC_COLLECTIVES    = 1  /*!< Synchronous collectives */
 } ucc_coll_sync_type_t;
 
 
