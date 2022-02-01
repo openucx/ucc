@@ -100,7 +100,7 @@ ucc_status_t TestAlltoall::reset_sbuf()
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &nprocs);
     if (TEST_NO_INPLACE == inplace) {
-        init_buffer(sbuf, single_rank_count * nprocs, TEST_DT, mem_type, 0);
+        init_buffer(sbuf, single_rank_count * nprocs, TEST_DT, mem_type, rank);
     }
     return UCC_OK;
 }
