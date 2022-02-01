@@ -23,6 +23,7 @@ AS_IF([test "x$cuda_checked" != "xyes"],
     AS_IF([test "x$with_cuda" = "xno"],
         [
          cuda_happy=no
+         nvml_happy=no
         ],
         [
          save_CPPFLAGS="$CPPFLAGS"
@@ -53,20 +54,27 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                [AC_CHECK_LIB([cudart], [cudaGetDeviceCount],
                              [CUDA_LIBS="$CUDA_LIBS -lcudart"], [cuda_happy="no"])])
 
-         # Check nvml header files
-         AC_CHECK_HEADERS([nvml.h],
-                          [cuda_happy="yes"],
-                          [AS_IF([test "x$with_cuda" != "xguess"],
-                                 [AC_MSG_ERROR([nvml header not found. Install appropriate cuda-nvml-devel package])])
-                           cuda_happy="no"])
+        # Check nvml header files
+        AC_CHECK_HEADERS([nvml.h],
+                         [nvml_happy="yes"],
+                         [AS_IF([test "x$with_cuda" != "xguess"],
+                                [AC_MSG_WARN([nvml header not found. Install appropriate cuda-nvml-devel package])])
+                          nvml_happy="no"])
 
-         # Check nvml library
-         AS_IF([test "x$cuda_happy" = "xyes"],
-               [AC_CHECK_LIB([nvidia-ml], [nvmlInit],
-                             [CUDA_LIBS="$CUDA_LIBS -lnvidia-ml"],
-                             [AS_IF([test "x$with_cuda" != "xguess"],
-                                    [AC_MSG_ERROR([libnvidia-ml not found. Install appropriate nvidia-driver package])])
-                              cuda_happy="no"])])
+        # Check nvml library
+        AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
+              [AC_CHECK_LIB([nvidia-ml], [nvmlInit_v2],
+                            [nvml_happy="yes"],
+                            [AS_IF([test "x$with_cuda" != "xguess"],
+                                   [AC_MSG_WARN([libnvidia-ml not found. Install appropriate nvidia-driver package])])
+                             nvml_happy="no"])])
+        AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
+              [AC_CHECK_LIB([nvidia-ml], [nvmlDeviceGetNvLinkRemoteDeviceType],
+                            [NVML_LIBS="-lnvidia-ml"],
+                            [AS_IF([test "x$with_cuda" != "xguess"],
+                                   [AC_MSG_WARN([libnvidia-ml not found. Install appropriate nvidia-driver package])])
+                             nvml_happy="no"])])
+
          # Check for NVCC
          AC_ARG_VAR(NVCC, [NVCC compiler command])
          AS_IF([test "x$cuda_happy" = "xyes"],
@@ -99,11 +107,15 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                 AC_SUBST([CUDA_LIBS], ["$CUDA_LIBS"])
                 AC_SUBST([NVCC_CFLAGS], ["$NVCC_CFLAGS"])
                 AC_DEFINE([HAVE_CUDA], 1, [Enable CUDA support])],
+                AS_IF([test "x$nvml_happy" = "xyes"],
+                        [AC_SUBST([NVML_LIBS], ["$NVML_LIBS"])
+                         AC_DEFINE([HAVE_NVML], 1, [Enable NVML support])],[])
                [AS_IF([test "x$with_cuda" != "xguess"],
                       [AC_MSG_ERROR([CUDA support is requested but cuda packages cannot be found])],
                       [AC_MSG_WARN([CUDA not found])])])
         ]) # "x$with_cuda" = "xno"
         cuda_checked=yes
         AM_CONDITIONAL([HAVE_CUDA], [test "x$cuda_happy" != xno])
+        AM_CONDITIONAL([HAVE_NVML], [test "x$nvml_happy" != xno])
    ]) # "x$cuda_checked" != "xyes"
 ]) # CHECK_CUDA

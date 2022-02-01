@@ -6,7 +6,7 @@ tl_cuda_enabled=n
 CHECK_TLS_REQUIRED(["cuda"])
 AS_IF([test "$CHECKED_TL_REQUIRED" = "y"],
 [
-    if test $cuda_happy = "yes"; then
+    if test $cuda_happy = "yes" -a $nvml_happy = "yes"; then
        tl_modules="${tl_modules}:cuda"
        tl_cuda_enabled=y
     fi
