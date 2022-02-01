@@ -10,7 +10,7 @@
 #include "ucc_pt_comm.h"
 #include <ucc/api/ucc.h>
 extern "C" {
-#include <core/ucc_mc.h>
+#include <components/mc/ucc_mc.h>
 }
 
 class ucc_pt_coll {

@@ -36,7 +36,9 @@ jobs:
               return 1
             fi
           fi
-          if ! echo $msg | grep -qP '^Merge |^((CODESTYLE|REVIEW|CORE|UTIL|TEST|API|DOCS|TOOLS|BUILD|MC|SCHEDULE|TOPO)|(CL/|TL/|MC/|UCP|UCG|NCCL|SHARP|BASIC|HIER|CUDA|CPU|EE))+: \w'
+          H1="CODESTYLE|REVIEW|CORE|UTIL|TEST|API|DOCS|TOOLS|BUILD|MC|EC|SCHEDULE|TOPO"
+          H2="CL/|TL/|MC/|EC/|UCP|NCCL|SHARP|BASIC|HIER|CUDA|CPU|EE"
+          if ! echo $msg | grep -qP '^Merge |^'"(($H1)|($H2))"'+: \w'
           then
             echo "Wrong header"
             return 1

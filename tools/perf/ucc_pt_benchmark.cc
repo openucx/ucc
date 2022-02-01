@@ -1,6 +1,6 @@
 #include <iomanip>
 #include "ucc_pt_benchmark.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "ucc_perftest.h"
 #include "utils/ucc_coll_utils.h"
 

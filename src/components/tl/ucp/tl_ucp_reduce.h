@@ -7,7 +7,7 @@
 #ifndef UCC_TL_UCP_REDUCE_H_
 #define UCC_TL_UCP_REDUCE_H_
 #include "tl_ucp_coll.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 
 static inline ucc_status_t
 ucc_tl_ucp_reduce_multi(void *src1, void *src2, void *dst, size_t n_vectors,

@@ -51,7 +51,7 @@ UCC_TEST_F(test_context_config, modify)
     /* modify uknown field */
     testing::internal::CaptureStdout();
     EXPECT_NE(UCC_OK,
-              ucc_context_config_modify(ctx_config, "basic", "_UNKNOWN_FIELD", "_unknown_value"));
+              ucc_context_config_modify(ctx_config, "cl/basic", "_UNKNOWN_FIELD", "_unknown_value"));
     output = testing::internal::GetCapturedStdout();
     EXPECT_NE(std::string::npos, output.find("failed to modify"));
 
@@ -60,7 +60,14 @@ UCC_TEST_F(test_context_config, modify)
     EXPECT_NE(UCC_OK,
               ucc_context_config_modify(ctx_config, "_unknown_cl", "_UNKNOWN_FIELD", "_unknown_value"));
     output = testing::internal::GetCapturedStdout();
-    EXPECT_NE(std::string::npos, output.find("incorrect value"));
+    EXPECT_NE(std::string::npos, output.find("invalid component name"));
+
+    /* modify "tl/ucp" */
+    EXPECT_EQ(UCC_OK,
+              ucc_context_config_modify(ctx_config, "tl/ucp", "NPOLLS", "123"));
+
+    EXPECT_EQ(UCC_OK,
+              ucc_context_config_modify(ctx_config, "tl/ucp", "TUNE", "123"));
 
     ucc_context_config_release(ctx_config);
 }

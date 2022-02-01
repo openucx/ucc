@@ -9,7 +9,7 @@
 #include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
 #include "core/ucc_progress_queue.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "coll_patterns/sra_knomial.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"

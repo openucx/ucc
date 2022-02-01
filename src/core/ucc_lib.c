@@ -12,7 +12,8 @@
 #include "utils/ucc_math.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
-#include "ucc_mc.h"
+#include "components/mc/ucc_mc.h"
+#include "components/ec/ucc_ec.h"
 
 UCS_CONFIG_DEFINE_ARRAY(cl_types, sizeof(ucc_cl_type_t),
                         UCS_CONFIG_TYPE_ENUM(ucc_cl_names));
@@ -119,7 +120,7 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
                       cl_iface->super.name);
             goto error_cfg_read;
         }
-        status = cl_iface->lib.init(&b_params, &cl_config->super, &b_lib);
+        status = cl_iface->lib.init(&b_params, &cl_config->super.super, &b_lib);
         if (UCC_OK != status) {
             if (lib->specific_cls_requested) {
                 ucc_error("lib_init failed for component: %s",
@@ -128,11 +129,11 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
             } else {
                 ucc_info("lib_init failed for component: %s, skipping",
                          cl_iface->super.name);
-                ucc_base_config_release(&cl_config->super);
+                ucc_base_config_release(&cl_config->super.super);
                 continue;
             }
         }
-        ucc_base_config_release(&cl_config->super);
+        ucc_base_config_release(&cl_config->super.super);
         cl_lib                          = ucc_derived_of(b_lib, ucc_cl_lib_t);
         lib->cl_libs[lib->n_cl_libs_opened] = cl_lib;
         status = cl_iface->lib.get_attr(&cl_lib->super,
@@ -201,7 +202,7 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
     return UCC_OK;
 
 error_cl_init:
-    ucc_base_config_release(&cl_config->super);
+    ucc_base_config_release(&cl_config->super.super);
 error_cfg_read:
     for (i = 0; i < lib->n_cl_libs_opened; i++) {
         lib->cl_libs[i]->iface->lib.finalize(&lib->cl_libs[i]->super);
@@ -263,8 +264,9 @@ static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
                          tl_iface->super.name);
                 continue;
             }
-            status = tl_iface->lib.init(&b_params, &tl_config->super, &b_lib);
-            ucc_base_config_release(&tl_config->super);
+            status = tl_iface->lib.init(&b_params, &tl_config->super.super,
+                                        &b_lib);
+            ucc_base_config_release(&tl_config->super.super);
             if (UCC_OK != status) {
                 ucc_info("lib_init failed for component: %s, skipping",
                          tl_iface->super.name);
@@ -288,6 +290,9 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
     ucc_mc_params_t mc_params = {
         .thread_mode = params->thread_mode,
     };
+    ucc_ec_params_t ec_params = {
+        .thread_mode = params->thread_mode,
+    };
 
     *lib_p = NULL;
 
@@ -295,6 +300,9 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
         return status;
     }
     if (UCC_OK != (status = ucc_mc_init(&mc_params))) {
+        return status;
+    }
+    if (UCC_OK != (status = ucc_ec_init(&ec_params))) {
         return status;
     }
 
@@ -444,8 +452,9 @@ ucc_status_t ucc_lib_get_attr(ucc_lib_h lib_p, ucc_lib_attr_t *lib_attr)
 ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
 {
     int          i;
-    ucc_status_t status;
+    ucc_status_t status, gl_status;
 
+    gl_status = UCC_OK;
     ucc_assert(lib->n_cl_libs_opened > 0);
     ucc_assert(lib->cl_libs);
     for (i = 0; i < lib->n_tl_libs_opened; i++) {
@@ -455,10 +464,20 @@ ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
         lib->cl_libs[i]->iface->lib.finalize(&lib->cl_libs[i]->super);
     }
     status = ucc_mc_finalize();
+    if (status != UCC_OK) {
+        gl_status = status;
+    }
+
+    status = ucc_ec_finalize();
+    if (status != UCC_OK) {
+        gl_status = status;
+    }
+
     ucc_free(lib->tl_libs);
     ucc_free(lib->cl_libs);
     ucc_free(lib->full_prefix);
     ucc_free(lib->cl_attrs);
     ucc_free(lib);
-    return status;
+
+    return gl_status;
 }

@@ -6,7 +6,8 @@
  */
 
 #include "tl_nccl.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
+#include "components/ec/ucc_ec.h"
 #include "core/ucc_ee.h"
 #include "utils/arch/cpu.h"
 
@@ -16,7 +17,7 @@ ucc_status_t ucc_tl_nccl_event_collective_progress(ucc_coll_task_t *coll_task)
     ucc_status_t status;
 
     ucc_assert(task->completed != NULL);
-    status = ucc_mc_ee_event_test(task->completed, UCC_EE_CUDA_STREAM);
+    status = ucc_ec_event_test(task->completed, UCC_EE_CUDA_STREAM);
     coll_task->super.status = status;
 #ifdef HAVE_PROFILING_TL_NCCL
     if (coll_task->super.status == UCC_OK) {
@@ -105,7 +106,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_context_t,
     CUresult cu_st;
     CUdevice cu_dev;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_nccl_config->super.tl_lib,
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_nccl_config->super,
                               params->context);
     memcpy(&self->cfg, tl_nccl_config, sizeof(*tl_nccl_config));
     if (self->cfg.sync_type != UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {

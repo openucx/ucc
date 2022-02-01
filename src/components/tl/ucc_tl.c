@@ -9,12 +9,15 @@
 
 ucc_config_field_t ucc_tl_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_lib_config_t, super),
-     UCC_CONFIG_TYPE_TABLE(ucc_base_config_table)},
+     UCC_CONFIG_TYPE_TABLE(ucc_base_lib_config_table)},
 
     {NULL}
 };
 
 ucc_config_field_t ucc_tl_context_config_table[] = {
+    {"", "", NULL, ucc_offsetof(ucc_tl_context_config_t, super),
+     UCC_CONFIG_TYPE_TABLE(ucc_base_ctx_config_table)},
+
     {NULL}
 };
 
@@ -24,35 +27,36 @@ UCC_CLASS_INIT_FUNC(ucc_tl_lib_t, ucc_tl_iface_t *tl_iface,
     UCC_CLASS_CALL_BASE_INIT();
     self->iface         = tl_iface;
     self->super.log_component = tl_config->super.log_component;
-    if (0 == strcmp(tl_config->super.score_str, "0")) {
-        return UCC_ERR_NO_MESSAGE;
-    }
     ucc_strncpy_safe(self->super.log_component.name,
                      tl_iface->tl_lib_config.name,
                      sizeof(self->super.log_component.name));
-    self->super.score_str = strdup(tl_config->super.score_str);
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_lib_t)
 {
-    ucc_free(self->super.score_str);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_lib_t, void);
 
-UCC_CLASS_INIT_FUNC(ucc_tl_context_t, ucc_tl_lib_t *tl_lib,
+UCC_CLASS_INIT_FUNC(ucc_tl_context_t, const ucc_tl_context_config_t *tl_config,
                     ucc_context_t *ucc_context)
 {
     UCC_CLASS_CALL_BASE_INIT();
-    self->super.lib         = &tl_lib->super;
+    self->super.lib         = &tl_config->tl_lib->super;
     self->super.ucc_context = ucc_context;
     self->ref_count = 0;
+    if (0 == strcmp(tl_config->super.score_str, "0")) {
+        return UCC_ERR_LAST;
+    }
+    self->super.score_str = strdup(tl_config->super.score_str);
+
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_context_t)
 {
+    ucc_free(self->super.score_str);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_context_t, void);

@@ -17,6 +17,11 @@ typedef struct ucc_tl_cuda_device_id {
     uint8_t  function; /* range: 0 to 7 */
 } ucc_tl_cuda_device_pci_id_t;
 
+typedef enum ucc_tl_cuda_topo_dev_type {
+    UCC_TL_CUDA_TOPO_DEV_TYPE_GPU,
+    UCC_TL_CUDA_TOPO_DEV_TYPE_SWITCH
+} ucc_tl_cuda_topo_dev_type_t;
+
 static inline int
 ucc_tl_cuda_topo_device_id_equal(const ucc_tl_cuda_device_pci_id_t *id1,
                                  const ucc_tl_cuda_device_pci_id_t *id2)
@@ -28,14 +33,15 @@ ucc_tl_cuda_topo_device_id_equal(const ucc_tl_cuda_device_pci_id_t *id1,
 }
 
 typedef struct ucc_tl_cuda_topo_link {
-    ucc_list_link_t         list_link;
+    ucc_list_link_t             list_link;
     ucc_tl_cuda_device_pci_id_t pci_id;
-    int                     width;
+    int                         width;
 } ucc_tl_cuda_topo_link_t;
 
 typedef struct ucc_tl_cuda_topo_node {
     ucc_tl_cuda_device_pci_id_t pci_id;
-    ucc_tl_cuda_topo_link_t link;
+    ucc_tl_cuda_topo_dev_type_t type;
+    ucc_tl_cuda_topo_link_t     link;
 } ucc_tl_cuda_topo_node_t;
 
 KHASH_MAP_INIT_INT64(bus_to_node, int);

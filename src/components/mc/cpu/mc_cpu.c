@@ -262,45 +262,6 @@ static ucc_status_t ucc_mc_cpu_mem_query(const void *ptr, //NOLINT
     return UCC_ERR_NOT_SUPPORTED;
 }
 
-ucc_status_t ucc_ee_cpu_task_post(void *ee_context, //NOLINT
-                                  void **ee_req)
-{
-    *ee_req = NULL;
-    return UCC_OK;
-}
-
-ucc_status_t ucc_ee_cpu_task_query(void *ee_req) //NOLINT
-{
-    return UCC_OK;
-}
-
-ucc_status_t ucc_ee_cpu_task_end(void *ee_req) //NOLINT
-{
-    return UCC_OK;
-}
-
-ucc_status_t ucc_ee_cpu_create_event(void **event)
-{
-    *event = NULL;
-    return UCC_OK;
-}
-
-ucc_status_t ucc_ee_cpu_destroy_event(void *event) //NOLINT
-{
-    return UCC_OK;
-}
-
-ucc_status_t ucc_ee_cpu_event_post(void *ee_context, //NOLINT
-                                   void *event) //NOLINT
-{
-    return UCC_OK;
-}
-
-ucc_status_t ucc_ee_cpu_event_test(void *event) //NOLINT
-{
-    return UCC_OK;
-}
-
 static ucc_status_t ucc_mc_cpu_finalize()
 {
     if (ucc_mc_cpu.mpool_init_flag) {
@@ -335,13 +296,6 @@ ucc_mc_cpu_t ucc_mc_cpu = {
             .table  = ucc_mc_cpu_config_table,
             .size   = sizeof(ucc_mc_cpu_config_t),
         },
-    .super.ee_ops.ee_task_post     = ucc_ee_cpu_task_post,
-    .super.ee_ops.ee_task_query    = ucc_ee_cpu_task_query,
-    .super.ee_ops.ee_task_end      = ucc_ee_cpu_task_end,
-    .super.ee_ops.ee_create_event  = ucc_ee_cpu_create_event,
-    .super.ee_ops.ee_destroy_event = ucc_ee_cpu_destroy_event,
-    .super.ee_ops.ee_event_post    = ucc_ee_cpu_event_post,
-    .super.ee_ops.ee_event_test    = ucc_ee_cpu_event_test,
     .mpool_init_flag               = 0,
 };
 

@@ -26,14 +26,21 @@ typedef struct ucc_coll_task ucc_coll_task_t;
 
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
-    char                      *score_str;
 } ucc_base_lib_t;
 
 typedef struct ucc_base_config {
     ucc_config_global_list_entry_t *cfg_entry;
-    ucc_log_component_config_t      log_component;
-    char                           *score_str;
 } ucc_base_config_t;
+
+typedef struct ucc_base_lib_config {
+    ucc_base_config_t               super;
+    ucc_log_component_config_t      log_component;
+} ucc_base_lib_config_t;
+
+typedef struct ucc_base_ctx_config {
+    ucc_base_config_t               super;
+    char                           *score_str;
+} ucc_base_ctx_config_t;
 
 enum {
     UCC_BASE_LIB_FLAG_TEAM_ID_REQUIRED      = UCC_BIT(1),
@@ -49,11 +56,13 @@ typedef struct ucc_base_lib_params {
     ucc_lib_params_t params;
     char            *full_prefix;
 } ucc_base_lib_params_t;
-extern ucc_config_field_t ucc_base_config_table[];
+extern ucc_config_field_t ucc_base_lib_config_table[];
+extern ucc_config_field_t ucc_base_ctx_config_table[];
 
 typedef struct ucc_base_lib_iface {
     ucc_status_t (*init)(const ucc_base_lib_params_t *params,
-                         const ucc_base_config_t *config, ucc_base_lib_t **lib);
+                         const ucc_base_config_t *config,
+                         ucc_base_lib_t **lib);
     void         (*finalize)(ucc_base_lib_t *lib);
     ucc_status_t (*get_attr)(const ucc_base_lib_t *lib,
                              ucc_base_lib_attr_t  *attr);
@@ -71,6 +80,7 @@ typedef struct ucc_base_context_params {
 typedef struct ucc_base_context {
     ucc_context_t  *ucc_context;
     ucc_base_lib_t *lib;
+    char           *score_str;
 } ucc_base_context_t;
 
 typedef struct ucc_base_ctx_attr_t {

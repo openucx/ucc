@@ -29,7 +29,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     ucp_worker_h        ucp_worker;
     ucs_status_t        status;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_ucp_config->super.tl_lib,
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_ucp_config->super,
                               params->context);
     memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
     status = ucp_config_read(params->prefix, NULL, &ucp_config);
@@ -467,6 +467,9 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
     if (UCC_OK != ucc_status) {
         tl_error(ctx->super.super.lib, "failed to pack remote data");
         goto fail_pack;
+    }
+    for (i = 0; i < nsegs; i++) {
+        ucp_rkey_buffer_release(my_pack[i]);
     }
 
     global_pack_data = ucc_malloc(total * size, "ucp_global_packed_data");

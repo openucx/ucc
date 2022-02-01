@@ -6,7 +6,7 @@
 
 #include "tl_ucp.h"
 #include "tl_ucp_coll.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "core/ucc_team.h"
 #include "barrier/barrier.h"
 #include "alltoall/alltoall.h"

@@ -103,6 +103,20 @@ ucc_status_t ucc_constructor(void)
                       cfg->component_path);
             return status;
         }
+        status = ucc_components_load("ec", &cfg->ec_framework);
+        if (status != UCC_OK) {
+            if (status == UCC_ERR_NOT_FOUND) {
+                ucc_info("no execution components were found in the "
+                         "UCC_COMPONENT_PATH: %s. "
+                         "Triggered operations might not work",
+                         cfg->component_path);
+            } else {
+                ucc_error("failed to load execution components %d (%s)",
+                           status, ucc_status_string(status));
+                return status;
+            }
+        }
+
         if (UCC_OK != ucc_local_proc_info_init()) {
             ucc_error("failed to initialize local proc info");
             return status;

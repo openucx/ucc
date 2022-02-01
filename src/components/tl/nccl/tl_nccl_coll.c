@@ -6,7 +6,8 @@
  */
 
 #include "tl_nccl_coll.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
+#include "components/ec/ucc_ec.h"
 #include "core/ucc_ee.h"
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_math.h"
@@ -87,7 +88,7 @@ ucc_tl_nccl_task_t * ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
     task->super.triggered_post     = ucc_tl_nccl_triggered_post;
     task->completed                = NULL;
     if (nccl_ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
-        status = ucc_mc_ee_create_event(&task->completed, UCC_EE_CUDA_STREAM);
+        status = ucc_ec_create_event(&task->completed, UCC_EE_CUDA_STREAM);
         if (ucc_unlikely(status != UCC_OK)) {
             ucc_mpool_put(task);
             return NULL;
@@ -138,7 +139,7 @@ ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
 
     tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
     if (task->completed) {
-        ucc_mc_ee_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
+        ucc_ec_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
     }
     ucc_tl_nccl_free_task(task);
     return status;
@@ -153,8 +154,7 @@ ucc_status_t ucc_tl_nccl_collective_sync(ucc_tl_nccl_task_t *task,
 
     task->host_status = task->super.super.status;
     if (ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
-        status = ucc_mc_ee_event_post(stream, task->completed,
-                                      UCC_EE_CUDA_STREAM);
+        status = ucc_ec_event_post(stream, task->completed, UCC_EE_CUDA_STREAM);
         if (ucc_unlikely(status != UCC_OK)) {
             return status;
         }

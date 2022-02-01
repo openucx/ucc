@@ -17,22 +17,12 @@
 #define UCC_MC_PROFILE_FUNC UCC_PROFILE_FUNC
 
 static const ucc_mc_ops_t *mc_ops[UCC_MEMORY_TYPE_LAST];
-static const ucc_ee_ops_t *ee_ops[UCC_EE_LAST];
 
 #define UCC_CHECK_MC_AVAILABLE(mc)                                             \
     do {                                                                       \
         if (ucc_unlikely(NULL == mc_ops[mc])) {                                \
             ucc_error("no components supported memory type %s available",      \
                       ucc_memory_type_names[mc]);                              \
-            return UCC_ERR_NOT_SUPPORTED;                                      \
-        }                                                                      \
-    } while (0)
-
-#define UCC_CHECK_EE_AVAILABLE(ee)                                             \
-    do {                                                                       \
-        if (NULL == ee_ops[ee]) {                                              \
-            ucc_error("no components supported ee %s available",               \
-                      ucc_ee_type_names[ee]);                                  \
             return UCC_ERR_NOT_SUPPORTED;                                      \
         }                                                                      \
     } while (0)
@@ -45,7 +35,6 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
     ucc_mc_attr_t attr;
 
     memset(mc_ops, 0, UCC_MEMORY_TYPE_LAST * sizeof(ucc_mc_ops_t *));
-    memset(ee_ops, 0, UCC_EE_LAST * sizeof(ucc_ee_ops_t *));
     n_mcs = ucc_global_config.mc_framework.n_components;
     for (i = 0; i < n_mcs; i++) {
         mc = ucc_derived_of(ucc_global_config.mc_framework.components[i],
@@ -61,7 +50,7 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
                 mc->config, mc->config_table.table, "UCC_",
                 mc->config_table.prefix, 1);
             if (UCC_OK != status) {
-                ucc_info("failed to parse config for component: %s (%d)",
+                ucc_info("failed to parse config for mc: %s (%d)",
                          mc->super.name, status);
                 ucc_free(mc->config);
                 continue;
@@ -75,7 +64,7 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
                 ucc_free(mc->config);
                 continue;
             }
-            ucc_debug("%s initialized", mc->super.name);
+            ucc_debug("mc %s initialized", mc->super.name);
         } else {
             attr.field_mask = UCC_MC_ATTR_FIELD_THREAD_MODE;
             status = mc->get_attr(&attr);
@@ -83,7 +72,7 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
                 return status;
             }
             if (attr.thread_mode < mc_params->thread_mode) {
-                ucc_warn("memory component %s was allready initilized with "
+                ucc_warn("mc %s was allready initilized with "
                          "different thread mode: current tm %d, provided tm %d",
                          mc->super.name, attr.thread_mode,
                          mc_params->thread_mode);
@@ -91,7 +80,6 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
         }
         mc->ref_cnt++;
         mc_ops[mc->type] = &mc->ops;
-        ee_ops[mc->ee_type] = &mc->ee_ops;
     }
 
     return UCC_OK;
@@ -241,48 +229,4 @@ ucc_status_t ucc_mc_finalize()
     }
 
     return UCC_OK;
-}
-
-ucc_status_t ucc_mc_ee_task_post(void *ee_context, ucc_ee_type_t ee_type,
-                                 void **ee_task)
-{
-    UCC_CHECK_EE_AVAILABLE(ee_type);
-    return ee_ops[ee_type]->ee_task_post(ee_context, ee_task);
-}
-
-ucc_status_t ucc_mc_ee_task_query(void *ee_task, ucc_ee_type_t ee_type)
-{
-    UCC_CHECK_EE_AVAILABLE(ee_type);
-    return ee_ops[ee_type]->ee_task_query(ee_task);
-}
-
-ucc_status_t ucc_mc_ee_task_end(void *ee_task, ucc_ee_type_t ee_type)
-{
-    UCC_CHECK_EE_AVAILABLE(ee_type);
-    return ee_ops[ee_type]->ee_task_end(ee_task);
-}
-
-ucc_status_t ucc_mc_ee_create_event(void **event, ucc_ee_type_t ee_type)
-{
-    UCC_CHECK_EE_AVAILABLE(ee_type);
-    return ee_ops[ee_type]->ee_create_event(event);
-}
-
-ucc_status_t ucc_mc_ee_destroy_event(void *event, ucc_ee_type_t ee_type)
-{
-    UCC_CHECK_EE_AVAILABLE(ee_type);
-    return ee_ops[ee_type]->ee_destroy_event(event);
-}
-
-ucc_status_t ucc_mc_ee_event_post(void *ee_context, void *event,
-                                  ucc_ee_type_t ee_type)
-{
-    UCC_CHECK_EE_AVAILABLE(ee_type);
-    return ee_ops[ee_type]->ee_event_post(ee_context, event);
-}
-
-ucc_status_t ucc_mc_ee_event_test(void *event, ucc_ee_type_t ee_type)
-{
-    UCC_CHECK_EE_AVAILABLE(ee_type);
-    return ee_ops[ee_type]->ee_event_test(event);
 }

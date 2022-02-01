@@ -8,7 +8,7 @@
 #include "test.h"
 #include "ucc/api/ucc.h"
 extern "C" {
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "utils/ucc_malloc.h"
 }
 #include <vector>
@@ -34,7 +34,7 @@ typedef enum {
 } gtest_ucc_inplace_t;
 
 class UccCollArgs {
-protected: 
+protected:
     ucc_memory_type_t mem_type;
     gtest_ucc_inplace_t inplace;
     void alltoallx_init_buf(int src_rank, int dst_rank, uint8_t *buf, size_t len)
