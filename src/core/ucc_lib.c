@@ -452,8 +452,9 @@ ucc_status_t ucc_lib_get_attr(ucc_lib_h lib_p, ucc_lib_attr_t *lib_attr)
 ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
 {
     int          i;
-    ucc_status_t status;
+    ucc_status_t status, gl_status;
 
+    gl_status = UCC_OK;
     ucc_assert(lib->n_cl_libs_opened > 0);
     ucc_assert(lib->cl_libs);
     for (i = 0; i < lib->n_tl_libs_opened; i++) {
@@ -463,11 +464,20 @@ ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
         lib->cl_libs[i]->iface->lib.finalize(&lib->cl_libs[i]->super);
     }
     status = ucc_mc_finalize();
+    if (status != UCC_OK) {
+        gl_status = status;
+    }
+
     status = ucc_ec_finalize();
+    if (status != UCC_OK) {
+        gl_status = status;
+    }
+
     ucc_free(lib->tl_libs);
     ucc_free(lib->cl_libs);
     ucc_free(lib->full_prefix);
     ucc_free(lib->cl_attrs);
     ucc_free(lib);
-    return status;
+
+    return gl_status;
 }
