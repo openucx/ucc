@@ -1,10 +1,18 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
 #
 
 allreduce =                   \
 	allreduce/allreduce.h     \
 	allreduce/allreduce_rab.c
+
+alltoallv =                   \
+	alltoallv/alltoallv.h     \
+	alltoallv/alltoallv.c
+
+alltoall =                  \
+	alltoall/alltoall.h     \
+	alltoall/alltoall.c
 
 sources =             \
 	cl_hier.h         \
@@ -14,7 +22,9 @@ sources =             \
 	cl_hier_team.c    \
 	cl_hier_coll.c    \
 	cl_hier_coll.h    \
-	$(allreduce)
+	$(allreduce)      \
+	$(alltoallv)      \
+	$(alltoall)
 
 module_LTLIBRARIES         = libucc_cl_hier.la
 libucc_cl_hier_la_SOURCES  = $(sources)

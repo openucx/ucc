@@ -37,6 +37,7 @@ typedef enum {
     UCC_HIER_SBGP_NODE,
     UCC_HIER_SBGP_NODE_LEADERS,
     UCC_HIER_SBGP_NET,
+    UCC_HIER_SBGP_FULL,
     UCC_HIER_SBGP_LAST,
 } ucc_hier_sbgp_type_t;
 //DO we need it? Potential use case: different hier sbgps over same sbgp
@@ -46,6 +47,7 @@ typedef struct ucc_cl_hier_lib_config {
     /* List of TLs corresponding to the sbgp team,
        which are selected based on the TL scores */
     ucc_config_names_array_t sbgp_tls[UCC_HIER_SBGP_LAST];
+    size_t                   a2av_node_thresh;
 } ucc_cl_hier_lib_config_t;
 
 typedef struct ucc_cl_hier_context_config {
