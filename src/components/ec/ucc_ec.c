@@ -88,6 +88,15 @@ ucc_status_t ucc_ec_available(ucc_ee_type_t ee_type)
     return UCC_OK;
 }
 
+ucc_status_t ucc_ec_get_attr(ucc_ec_attr_t *attr)
+{
+    if (attr->field_mask & UCC_EC_ATTR_FILED_MAX_EXECUTORS_BUFS) {
+        attr->max_ee_bufs = UCC_EE_EXECUTOR_NUM_BUFS;
+    }
+
+    return UCC_OK;
+}
+
 ucc_status_t ucc_ec_finalize()
 {
     ucc_ee_type_t  et;
@@ -186,7 +195,7 @@ ucc_status_t ucc_ee_executor_finalize(ucc_ee_executor_t *executor)
     return executor_ops[executor->ee_type]->finalize(executor);
 }
 
-ucc_status_t ucc_ee_executor_task_post(const ucc_ee_executor_t *executor,
+ucc_status_t ucc_ee_executor_task_post(ucc_ee_executor_t *executor,
                                        const ucc_ee_executor_task_args_t *task_args,
                                        ucc_ee_executor_task_t **task)
 {

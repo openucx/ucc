@@ -70,11 +70,8 @@ static ucc_status_t ucc_ec_cuda_ee_executor_mpool_chunk_malloc(ucc_mpool_t *mp,
                                                                size_t *size_p,
                                                                void ** chunk_p)
 {
-    ucc_status_t status;
-
-    status = CUDA_FUNC(cudaHostAlloc((void**)chunk_p, *size_p,
-                       cudaHostAllocMapped));
-    return status;
+    return CUDA_FUNC(cudaHostAlloc((void**)chunk_p, *size_p,
+                                   cudaHostAllocMapped));
 }
 
 static void ucc_ec_cuda_ee_executor_mpool_chunk_free(ucc_mpool_t *mp,
@@ -83,7 +80,8 @@ static void ucc_ec_cuda_ee_executor_mpool_chunk_free(ucc_mpool_t *mp,
     cudaFreeHost(chunk);
 }
 
-static void ucc_ec_cuda_ee_executor_init(ucc_mpool_t *mp, void *obj, void *chunk)
+static void ucc_ec_cuda_executor_chunk_init(ucc_mpool_t *mp, void *obj,
+                                            void *chunk)
 {
     ucc_ec_cuda_executor_t *eee       = (ucc_ec_cuda_executor_t*) obj;
     int                     max_tasks = EC_CUDA_CONFIG->exec_max_tasks;
@@ -98,6 +96,9 @@ static void ucc_ec_cuda_ee_executor_init(ucc_mpool_t *mp, void *obj, void *chunk
                             cudaHostAllocMapped));
     CUDA_FUNC(cudaHostGetDevicePointer(
                   (void**)(&eee->dev_tasks), (void *)eee->tasks, 0));
+    if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {
+        ucc_spinlock_init(&eee->tasks_lock, 0);
+    }
 }
 
 static void ucc_ec_cuda_executor_chunk_cleanup(ucc_mpool_t *mp, void *obj)
@@ -106,13 +107,16 @@ static void ucc_ec_cuda_executor_chunk_cleanup(ucc_mpool_t *mp, void *obj)
 
     CUDA_FUNC(cudaFree((void*)eee->dev_cidx));
     CUDA_FUNC(cudaFreeHost((void*)eee->tasks));
+    if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {
+        ucc_spinlock_destroy(&eee->tasks_lock);
+    }
 }
 
 
 static ucc_mpool_ops_t ucc_ec_cuda_ee_executor_mpool_ops = {
     .chunk_alloc   = ucc_ec_cuda_ee_executor_mpool_chunk_malloc,
     .chunk_release = ucc_ec_cuda_ee_executor_mpool_chunk_free,
-    .obj_init      = ucc_ec_cuda_ee_executor_init,
+    .obj_init      = ucc_ec_cuda_executor_chunk_init,
     .obj_cleanup   = ucc_ec_cuda_executor_chunk_cleanup,
 };
 
@@ -213,7 +217,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     ucc_ec_cuda.thread_mode = ec_params->thread_mode;
     cuda_st = cudaGetDeviceCount(&num_devices);
     if ((cuda_st != cudaSuccess) || (num_devices == 0)) {
-        ec_info(&ucc_ec_cuda.super, "cuda devices are not found");
+        ec_info(&ucc_ec_cuda.super, "CUDA devices are not found");
         return UCC_ERR_NO_RESOURCE;
     }
     CUDA_CHECK(cudaGetDevice(&device));
@@ -223,7 +227,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
                             &ucc_ec_cuda_event_mpool_ops, UCC_THREAD_MULTIPLE,
                             "CUDA Event Objects");
     if (status != UCC_OK) {
-        ec_error(&ucc_ec_cuda.super, "Error to create event pool");
+        ec_error(&ucc_ec_cuda.super, "Failed to create event pool");
         return status;
     }
 
@@ -233,7 +237,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         UCC_CACHE_LINE_SIZE, 16, UINT_MAX, &ucc_ec_cuda_stream_req_mpool_ops,
         UCC_THREAD_MULTIPLE, "CUDA Event Objects");
     if (status != UCC_OK) {
-        ec_error(&ucc_ec_cuda.super, "Error to create event pool");
+        ec_error(&ucc_ec_cuda.super, "Failed to create event pool");
         return status;
     }
 
@@ -242,7 +246,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         UCC_CACHE_LINE_SIZE, 16, UINT_MAX, &ucc_ec_cuda_ee_executor_mpool_ops,
         UCC_THREAD_MULTIPLE, "EE executor Objects");
     if (status != UCC_OK) {
-        ec_error(&ucc_ec_cuda.super, "Error to create executors pool");
+        ec_error(&ucc_ec_cuda.super, "Failed to create executors pool");
         return status;
     }
 
@@ -329,7 +333,7 @@ ucc_status_t ucc_ec_cuda_task_post(void *ee_stream, void **ee_req)
 
     *ee_req = (void *) req;
 
-    ec_info(&ucc_ec_cuda.super, "CUDA stream task posted on \"%s\" stream. req:%p",
+    ec_info(&ucc_ec_cuda.super, "stream task posted on \"%s\" stream. req:%p",
             task_stream_types[ucc_ec_cuda.task_strm_type], req);
 
     return UCC_OK;
@@ -352,7 +356,7 @@ ucc_status_t ucc_ec_cuda_task_query(void *ee_req)
     if (req->status == UCC_EC_CUDA_TASK_POSTED) {
         return UCC_INPROGRESS;
     }
-    ec_info(&ucc_ec_cuda.super, "CUDA stream task started. req:%p", req);
+    ec_info(&ucc_ec_cuda.super, "stream task started. req:%p", req);
     return UCC_OK;
 }
 
@@ -369,7 +373,7 @@ ucc_status_t ucc_ec_cuda_task_end(void *ee_req)
         while(*st != UCC_EC_CUDA_TASK_COMPLETED_ACK) { }
     }
     ucc_mpool_put(req);
-    ec_info(&ucc_ec_cuda.super, "CUDA stream task done. req:%p", req);
+    ec_info(&ucc_ec_cuda.super, "stream task done. req:%p", req);
     return UCC_OK;
 }
 
@@ -419,13 +423,12 @@ ucc_status_t ucc_cuda_executor_init(const ucc_ee_executor_params_t *params,
 {
     ucc_ec_cuda_executor_t *eee = ucc_mpool_get(&ucc_ec_cuda.executors);
 
-    ec_debug(&ucc_ec_cuda.super, "CUDA executor init, eee: %p", eee);
     UCC_EC_CUDA_INIT_STREAM();
-    if (!eee) {
-        ec_error(&ucc_ec_cuda.super, "failed to allocate cuda executor");
+    if (ucc_unlikely(!eee)) {
+        ec_error(&ucc_ec_cuda.super, "failed to allocate executor");
         return UCC_ERR_NO_MEMORY;
     }
-    ucc_assert(eee);
+    ec_debug(&ucc_ec_cuda.super, "executor init, eee: %p", eee);
     eee->super.ee_type = params->ee_type;
     eee->state         = UCC_EC_CUDA_EXECUTOR_INITIALIZED;
 
@@ -439,15 +442,15 @@ ucc_status_t ucc_cuda_executor_status(const ucc_ee_executor_t *executor)
                                                  ucc_ec_cuda_executor_t);
 
     switch (eee->state) {
-        case UCC_EC_CUDA_EXECUTOR_INITIALIZED:
-            return UCC_OPERATION_INITIALIZED;
-        case UCC_EC_CUDA_EXECUTOR_POSTED:
-            return UCC_INPROGRESS;
-        case UCC_EC_CUDA_EXECUTOR_STARTED:
-            return UCC_OK;
-        default:
+    case UCC_EC_CUDA_EXECUTOR_INITIALIZED:
+        return UCC_OPERATION_INITIALIZED;
+    case UCC_EC_CUDA_EXECUTOR_POSTED:
+        return UCC_INPROGRESS;
+    case UCC_EC_CUDA_EXECUTOR_STARTED:
+        return UCC_OK;
+    default:
 /* executor has been destroyed */
-            return UCC_ERR_NO_RESOURCE;
+        return UCC_ERR_NO_RESOURCE;
     }
 }
 
@@ -460,19 +463,15 @@ ucc_status_t ucc_cuda_executor_start(ucc_ee_executor_t *executor,
                                                  ucc_ec_cuda_executor_t);
     ucc_status_t status;
 
-    ec_debug(&ucc_ec_cuda.super, "CUDA executor start, eee: %p", eee);
-    if (eee->state != UCC_EC_CUDA_EXECUTOR_INITIALIZED) {
-        ec_error(&ucc_ec_cuda.super, "failed to start CUDA executor, state %d",
-                                      eee->state);
-        return UCC_ERR_INVALID_PARAM;
-    }
+    ucc_assert(eee->state == UCC_EC_CUDA_EXECUTOR_INITIALIZED);
+    ec_debug(&ucc_ec_cuda.super, "executor start, eee: %p", eee);
     eee->super.ee_context = (NULL == ee_context) ? ucc_ec_cuda.stream : ee_context;
     eee->state            = UCC_EC_CUDA_EXECUTOR_POSTED;
     eee->pidx             = 0;
 
     status = ucc_ec_cuda_start_executor(eee);
     if (status != UCC_OK) {
-        ec_error(&ucc_ec_cuda.super, "failed to launch CUDA executor kernel");
+        ec_error(&ucc_ec_cuda.super, "failed to launch executor kernel");
         return status;
     }
 
@@ -485,7 +484,7 @@ ucc_status_t ucc_cuda_executor_stop(ucc_ee_executor_t *executor)
                                                  ucc_ec_cuda_executor_t);
     volatile ucc_ec_cuda_executor_state_t *st = &eee->state;
 
-    ec_debug(&ucc_ec_cuda.super, "CUDA executor stop, eee: %p", eee);
+    ec_debug(&ucc_ec_cuda.super, "executor stop, eee: %p", eee);
     /* can be safely ended only if it's in STARTED or COMPLETED_ACK state */
     ucc_assert((*st != UCC_EC_CUDA_EXECUTOR_POSTED) &&
                (*st != UCC_EC_CUDA_EXECUTOR_SHUTDOWN));
@@ -503,33 +502,41 @@ ucc_status_t ucc_cuda_executor_free(ucc_ee_executor_t *executor)
     ucc_ec_cuda_executor_t *eee = ucc_derived_of(executor,
                                                  ucc_ec_cuda_executor_t);
 
-    ec_debug(&ucc_ec_cuda.super, "CUDA executor free, eee: %p", eee);
+    ec_debug(&ucc_ec_cuda.super, "executor free, eee: %p", eee);
     ucc_assert(eee->state == UCC_EC_CUDA_EXECUTOR_INITIALIZED);
     ucc_mpool_put(eee);
 
     return UCC_OK;
 }
 
-ucc_status_t ucc_cuda_executor_task_test(ucc_ee_executor_task_t *task)
+ucc_status_t ucc_cuda_executor_task_test(const ucc_ee_executor_task_t *task)
 {
     CUDA_CHECK(cudaGetLastError());
     return task->status;
 }
 
-ucc_status_t ucc_cuda_executor_task_post(ucc_ee_executor_task_args_t *task_args,
-                                         ucc_ee_executor_task_t **task,
-                                         ucc_ee_executor_t *executor)
+ucc_status_t
+ucc_cuda_executor_task_post(ucc_ee_executor_t *executor,
+                            const ucc_ee_executor_task_args_t *task_args,
+                            ucc_ee_executor_task_t **task)
 {
     ucc_ec_cuda_executor_t *eee       = ucc_derived_of(executor,
                                                        ucc_ec_cuda_executor_t);
     int                     max_tasks = EC_CUDA_CONFIG->exec_max_tasks;
     ucc_ee_executor_task_t *ee_task;
 
-    ee_task = &(eee->tasks[eee->pidx % max_tasks]);
-    ee_task->eee = executor;
+    if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {
+        ucc_spin_lock(&eee->tasks_lock);
+    }
+    ee_task         = &(eee->tasks[eee->pidx % max_tasks]);
+    ee_task->eee    = executor;
     ee_task->status = UCC_OPERATION_INITIALIZED;
     memcpy(&ee_task->args, task_args, sizeof(ucc_ee_executor_task_args_t));
+    ucc_memory_bus_fence();
     eee->pidx += 1;
+    if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {
+        ucc_spin_unlock(&eee->tasks_lock);
+    }
 
     *task = ee_task;
     return UCC_OK;
@@ -561,13 +568,19 @@ ucc_ec_cuda_t ucc_ec_cuda = {
             .table  = ucc_ec_cuda_config_table,
             .size   = sizeof(ucc_ec_cuda_config_t),
         },
-    .super.ops.task_post     = ucc_ec_cuda_task_post,
-    .super.ops.task_query    = ucc_ec_cuda_task_query,
-    .super.ops.task_end      = ucc_ec_cuda_task_end,
-    .super.ops.create_event  = ucc_ec_cuda_create_event,
-    .super.ops.destroy_event = ucc_ec_cuda_destroy_event,
-    .super.ops.event_post    = ucc_ec_cuda_event_post,
-    .super.ops.event_test    = ucc_ec_cuda_event_test,
+    .super.ops.task_post          = ucc_ec_cuda_task_post,
+    .super.ops.task_query         = ucc_ec_cuda_task_query,
+    .super.ops.task_end           = ucc_ec_cuda_task_end,
+    .super.ops.create_event       = ucc_ec_cuda_create_event,
+    .super.ops.destroy_event      = ucc_ec_cuda_destroy_event,
+    .super.ops.event_post         = ucc_ec_cuda_event_post,
+    .super.ops.event_test         = ucc_ec_cuda_event_test,
+    .super.executor_ops.init      = ucc_cuda_executor_init,
+    .super.executor_ops.start     = ucc_cuda_executor_start,
+    .super.executor_ops.status    = ucc_cuda_executor_status,
+    .super.executor_ops.stop      = ucc_cuda_executor_stop,
+    .super.executor_ops.task_post = ucc_cuda_executor_task_post,
+    .super.executor_ops.task_test = ucc_cuda_executor_task_test,
 };
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_ec_cuda.super.config_table,

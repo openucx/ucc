@@ -25,7 +25,8 @@ typedef struct ucc_ec_params {
  * UCC execution component attributes field mask
  */
 typedef enum ucc_ec_attr_field {
-    UCC_EC_ATTR_FIELD_THREAD_MODE = UCC_BIT(0)
+    UCC_EC_ATTR_FIELD_THREAD_MODE        = UCC_BIT(0),
+    UCC_EC_ATTR_FILED_MAX_EXECUTORS_BUFS = UCC_BIT(1)
 }  ucc_ec_attr_field_t;
 
 typedef struct ucc_ec_attr {
@@ -35,6 +36,11 @@ typedef struct ucc_ec_attr {
      */
     uint64_t          field_mask;
     ucc_thread_mode_t thread_mode;
+    /**
+     *  Maximum number of buffers in ucc_ee_executor_task_args,
+     *  includes src buffer
+     */
+    int               max_ee_bufs;
 } ucc_ec_attr_t;
 
 typedef struct ucc_ec_ops {
@@ -70,7 +76,7 @@ typedef struct ucc_ee_executor_params {
  *  buffers[0] - destination
  *  buffers[1] .. buffers[UCC_EE_EXECUTOR_NUM_BUFS - 1] - source
  *  count - number of elements in destination
- *  size - number of operands or step between source buffers
+ *  size - number of operands or step between source buffers in bytes
  *  dt - datatype
  *  op - reduction operation
  */
@@ -97,7 +103,7 @@ typedef struct ucc_ee_executor_ops {
                           void *ee_context);
     ucc_status_t (*stop)(ucc_ee_executor_t *executor);
     ucc_status_t (*finalize)(ucc_ee_executor_t *executor);
-    ucc_status_t (*task_post)(const ucc_ee_executor_t *executor,
+    ucc_status_t (*task_post)(ucc_ee_executor_t *executor,
                               const ucc_ee_executor_task_args_t *task_args,
                               ucc_ee_executor_task_t **task);
     ucc_status_t (*task_test)(const ucc_ee_executor_task_t *task);

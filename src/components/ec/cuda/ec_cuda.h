@@ -93,6 +93,7 @@ typedef struct ucc_ec_cuda_stream_request {
 
 typedef struct ucc_ec_cuda_executor {
     ucc_ee_executor_t             super;
+    ucc_spinlock_t                tasks_lock;
     ucc_ec_cuda_executor_state_t  state;
     int                           pidx;
     ucc_ee_executor_task_t       *tasks;

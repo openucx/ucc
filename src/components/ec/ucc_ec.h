@@ -13,6 +13,8 @@ ucc_status_t ucc_ec_init(const ucc_ec_params_t *ec_params);
 
 ucc_status_t ucc_ec_available(ucc_ee_type_t ee_type);
 
+ucc_status_t ucc_ec_get_attr(ucc_ec_attr_t *attr);
+
 ucc_status_t ucc_ec_finalize();
 
 ucc_status_t ucc_ec_task_post(void *ee_context, ucc_ee_type_t ee_type,
@@ -43,7 +45,7 @@ ucc_status_t ucc_ee_executor_stop(ucc_ee_executor_t *executor);
 
 ucc_status_t ucc_ee_executor_finalize(ucc_ee_executor_t *executor);
 
-ucc_status_t ucc_ee_executor_task_post(const ucc_ee_executor_t *executor,
+ucc_status_t ucc_ee_executor_task_post(ucc_ee_executor_t *executor,
                                        const ucc_ee_executor_task_args_t *task_args,
                                        ucc_ee_executor_task_t **task);
 
