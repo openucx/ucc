@@ -3,8 +3,10 @@
 # See file LICENSE for terms.
 #
 
-ARCH5="-gencode=arch=compute_35,code=sm_35
-ARCH6="-gencode=arch=compute_50,code=sm_50
+CUDA_MIN_REQUIRED_MAJOR=11
+CUDA_MIN_REQUIRED_MINOR=0
+
+ARCH6="-gencode=arch=compute_50,code=sm_50"
 ARCH8="-gencode=arch=compute_60,code=sm_60 \
 -gencode=arch=compute_61,code=sm_61 \
 -gencode=arch=compute_61,code=compute_61"
@@ -81,21 +83,18 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                [AC_PATH_PROG([NVCC], [nvcc], [notfound], [$PATH:$check_cuda_dir/bin])])
          AS_IF([test "$NVCC" = "notfound"], [cuda_happy="no"])
          AS_IF([test "x$cuda_happy" = "xyes"],
-               [CUDA_MAJOR_VERSION=`$NVCC  --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 1`
-                AS_IF([test $CUDA_MAJOR_VERSION -lt 8],
-                      [cuda_happy=no])])
+               [CUDA_MAJOR_VERSION=`$NVCC --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 1`
+                CUDA_MINOR_VERSION=`$NVCC --version | grep release | sed 's/.*release //' | sed 's/\,.*//' |  cut -d "." -f 2`
+                AC_MSG_RESULT([Detected CUDA version: $CUDA_MAJOR_VERSION.$CUDA_MINOR_VERSION])
+                AS_IF([test $CUDA_MAJOR_VERSION -lt $CUDA_MIN_REQUIRED_MAJOR],
+                      [AC_MSG_WARN([Minimum required CUDA version: $CUDA_MIN_REQUIRED_MAJOR.$CUDA_MIN_REQUIRED_MINOR])
+                       cuda_happy=no])])
          AS_IF([test "x$enable_debug" = xyes],
                [NVCC_CFLAGS="$NVCC_CFLAGS -O0 -g"],
                [NVCC_CFLAGS="$NVCC_CFLAGS -O3 -g -DNDEBUG"])
          AS_IF([test "x$cuda_happy" = "xyes"],
-               [AS_IF([test $CUDA_MAJOR_VERSION -eq 8],
-                      [NVCC_ARCH="${ARCH5} ${ARCH6} ${ARCH8}"])
-                AS_IF([test $CUDA_MAJOR_VERSION -eq 9],
-                      [NVCC_ARCH="${ARCH5} ${ARCH6} ${ARCH8} ${ARCH9}"])
-                AS_IF([test $CUDA_MAJOR_VERSION -eq 10],
-                      [NVCC_ARCH="${ARCH5} ${ARCH6} ${ARCH8} ${ARCH9} ${ARCH10}"])
-                AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
-                      [NVCC_ARCH="${ARCH6} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11}"])
+               [AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
+                      [NVCC_ARCH="${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11}"])
                 AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])])
          LDFLAGS="$save_LDFLAGS"
          CPPFLAGS="$save_CPPFLAGS"
