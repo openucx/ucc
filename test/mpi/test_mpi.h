@@ -369,6 +369,7 @@ public:
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ucc_status_t check();
+    std::string  str();
 };
 
 class TestAlltoall : public TestCase {

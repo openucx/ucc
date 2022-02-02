@@ -107,3 +107,12 @@ ucc_status_t TestReduce::check()
     return (rank != root) ? UCC_OK :
         compare_buffers(rbuf, check_buf, count, dt, mem_type);
 }
+
+std::string TestReduce::str() {
+    return std::string("tc=")+ucc_coll_type_str(args.coll_type) +
+        " team=" + team_str(team.type) + " msgsize=" +
+        std::to_string(msgsize) + " inplace=" +
+        (inplace == TEST_INPLACE ? "1" : "0") + " dt=" +
+        ucc_datatype_str(dt) + " op=" + ucc_reduction_op_str(op) +
+        " root=" + std::to_string(root);
+}
