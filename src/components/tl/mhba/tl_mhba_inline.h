@@ -11,9 +11,9 @@ static inline void send_block_data_dc(uint64_t src_addr, uint32_t msg_size,
                                       uint32_t lkey, uint64_t remote_addr,
                                       uint32_t rkey, int send_flags,
                                       struct dci *dci_struct,
-                                      uint32_t dct_number, struct ibv_ah *ah)
+                                      uint32_t dct_number, struct ibv_ah *ah, void *dm)
 {
-    dci_struct->dc_qpex->wr_id    = 0xdeadbeef;
+    dci_struct->dc_qpex->wr_id    = (uint64_t)(uintptr_t)dm;
     dci_struct->dc_qpex->wr_flags = send_flags;
     ibv_wr_rdma_write(dci_struct->dc_qpex, rkey, remote_addr);
     mlx5dv_wr_set_dc_addr(dci_struct->dc_mqpex, ah, dct_number, DC_KEY);
@@ -23,7 +23,7 @@ static inline void send_block_data_dc(uint64_t src_addr, uint32_t msg_size,
 static inline ucc_status_t
 send_block_data_rc(struct ibv_qp *qp, uint64_t src_addr, uint32_t msg_size,
                    uint32_t lkey, uint64_t remote_addr, uint32_t rkey,
-                   int send_flags, int with_imm)
+                   int send_flags, int with_imm, void *dm)
 {
     struct ibv_send_wr *bad_wr;
     struct ibv_sge      list = {
@@ -33,7 +33,7 @@ send_block_data_rc(struct ibv_qp *qp, uint64_t src_addr, uint32_t msg_size,
     };
 
     struct ibv_send_wr wr = {
-        .wr_id      = 12345,
+        .wr_id      = (uint64_t)(uintptr_t)dm,
         .sg_list    = &list,
         .num_sge    = 1,
         .opcode     = with_imm ? IBV_WR_RDMA_WRITE_WITH_IMM : IBV_WR_RDMA_WRITE,
@@ -51,7 +51,8 @@ send_block_data_rc(struct ibv_qp *qp, uint64_t src_addr, uint32_t msg_size,
 static inline ucc_status_t send_block_data(ucc_tl_mhba_team_t *team, ucc_rank_t rank,
                                            uint64_t src_addr, uint32_t msg_size,
                                            uint32_t lkey, uint64_t remote_addr, uint32_t rkey,
-                                           int send_flags, int local /*used for sw transpose only */)
+                                           int send_flags, int local /*used for sw transpose only */,
+                                           void *dm)
 {
     struct ibv_qp *qp;
     int            dci;
@@ -59,12 +60,12 @@ static inline ucc_status_t send_block_data(ucc_tl_mhba_team_t *team, ucc_rank_t 
     if (!team->is_dc || local) {
         qp = local ? team->node.ns_umr_qp.qp : team->net.rc_qps[rank];
         return send_block_data_rc(qp, src_addr, msg_size, lkey, remote_addr, rkey, send_flags,
-                                  local ? 1 : 0);
+                                  local ? 1 : 0, dm);
     } else {
         dci = rank % team->num_dci_qps;
         send_block_data_dc(src_addr,  msg_size, lkey, remote_addr, rkey, send_flags,
                            &team->net.dcis[dci], team->net.remote_dctns[rank],
-                           team->net.ahs[rank]);
+                           team->net.ahs[rank], dm);
     }
     return UCC_OK;
 }

@@ -34,6 +34,7 @@
 #define RC_DC_LIMIT                  128
 #define DC_KEY                       1
 #define MAX_OUTSTANDING_OPS 1 //todo change - according to limitations (52 top)
+#define MIN_POLL_WC 8
 
 #define UCC_TL_MHBA_PROFILE_FUNC          UCC_PROFILE_FUNC
 #define UCC_TL_MHBA_PROFILE_FUNC_VOID     UCC_PROFILE_FUNC_VOID

@@ -10,6 +10,37 @@
 #include "core/ucc_team.h"
 #include "tl_mhba_inline.h"
 
+static ucc_status_t ucc_tl_mhba_poll_cq(ucc_tl_mhba_team_t *team)
+{
+    int                     i, completions_num;
+
+    completions_num = ibv_poll_cq(team->net.cq,
+                                  ucc_min(team->net.sbgp->group_size, MIN_POLL_WC),
+                                  team->work_completion);
+    if (completions_num < 0) {
+        tl_error(UCC_TL_TEAM_LIB(team),
+                 "ibv_poll_cq() failed, errno %d", errno);
+        return UCC_ERR_NO_MESSAGE;
+    }
+    for (i = 0; i < completions_num; i++) {
+        if (team->work_completion[i].status != IBV_WC_SUCCESS) {
+            tl_error(UCC_TL_TEAM_LIB(team),
+                     "bad work completion status %s, wr_id %zu",
+                     ibv_wc_status_str(team->work_completion[i].status),
+                     team->work_completion[i].wr_id);
+            return UCC_ERR_NO_MESSAGE;
+        }
+        if (team->work_completion[i].opcode == IBV_WC_FETCH_ADD) {
+            team->cq_completions[SEQ_INDEX(team->work_completion[i].wr_id)] += 1;
+        } else {
+            ucc_assert(team->work_completion[i].opcode == IBV_WC_RDMA_WRITE);
+            /* printf("returning dm %p to pool\n", (void*)team->work_completion[i].wr_id); */
+            ucc_mpool_put((void*)team->work_completion[i].wr_id);
+        }
+    }
+    return UCC_OK;
+}
+
 static ucc_status_t ucc_tl_mhba_node_fanin(ucc_tl_mhba_team_t *team,
                                            ucc_tl_mhba_schedule_t *task)
 {
@@ -227,7 +258,7 @@ static ucc_status_t ucc_tl_mhba_asr_barrier_start(ucc_coll_task_t *coll_task)
             status = send_block_data(team, i, (uintptr_t)local,
                                      sizeof(tl_mhba_barrier_t), team->net.barrier.mr->lkey,
                                      tl_mhba_barrier_my_remote_addr(task, i),
-                                     tl_mhba_barrier_remote_rkey(task, i), 0, 0);
+                                     tl_mhba_barrier_remote_rkey(task, i), 0, 0, NULL);
             if (UCC_OK == status) {
                 status = send_done(team, i);
             }
@@ -305,7 +336,7 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
                                          src_addr, block_msgsize,
                                          team->node.ops[task->seq_index].send_mkeys[0]->lkey,
                                          (uintptr_t)task->transpose_buf_mr->addr,
-                                         task->transpose_buf_mr->rkey, IBV_SEND_SIGNALED, 1);
+                                         task->transpose_buf_mr->rkey, IBV_SEND_SIGNALED, 1, NULL);
                 if (status != UCC_OK) {
                     tl_error(
                         UCC_TASK_LIB(task),
@@ -337,7 +368,7 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
                 status = send_block_data(team, cyc_rank, (uintptr_t)task->transpose_buf_mr->addr,
                                          block_msgsize, task->transpose_buf_mr->lkey,
                                          remote_addr, team->net.rkeys[cyc_rank],
-                                         IBV_SEND_SIGNALED, 0);
+                                         IBV_SEND_SIGNALED, 0, NULL);
                 if (UCC_OK == status) {
                     status = send_done(team, cyc_rank);
                 }
@@ -456,7 +487,7 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
                                          src_addr, current_block_msgsize,
                                          team->node.ops[task->seq_index].send_mkeys[j]->lkey,
                                          (uintptr_t)task->transpose_buf_mr->addr,
-                                         task->transpose_buf_mr->rkey, IBV_SEND_SIGNALED, 1);
+                                         task->transpose_buf_mr->rkey, IBV_SEND_SIGNALED, 1, NULL);
                 if (status != UCC_OK) {
                     tl_error(
                         UCC_TASK_LIB(task),
@@ -508,7 +539,7 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
                 status = send_block_data(team, cyc_rank, (uintptr_t)task->transpose_buf_mr->addr,
                                          current_block_msgsize, task->transpose_buf_mr->lkey,
                                          remote_addr, team->net.rkeys[cyc_rank],
-                                         IBV_SEND_SIGNALED, 0);
+                                         IBV_SEND_SIGNALED, 0, NULL);
                 if (UCC_OK == status) {
                     status = send_done(team, cyc_rank);
                 }
@@ -560,12 +591,12 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
     int          i, j, k, dest_rank, rank, cyc_rank;
     uint64_t     src_addr, remote_addr;
     ucc_status_t status;
+    ucc_tl_mhba_dm_chunk_t *dm;
 
     coll_task->super.status              = UCC_INPROGRESS;
 
     tl_debug(UCC_TASK_LIB(task), "send blocks start");
     rank = team->net.rank_map[team->net.sbgp->group_rank];
-
     for (i = 0; i < net_size; i++) {
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
@@ -586,9 +617,12 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
                                           node_msgsize * rank +
                                           block_msgsize * j + col_msgsize * k);
 
+                dm = ucc_mpool_get(&team->dm_pool);
+                /* printf("rank %d got dm %p, seq_num %d\n", rank, dm, task->seq_num); */
                 status = send_block_data(team, cyc_rank, src_addr, block_msgsize,
                                          team->node.ops[task->seq_index].send_mkeys[0]->lkey,
-                                         remote_addr, team->net.rkeys[cyc_rank], 0, 0);
+                                         remote_addr, team->net.rkeys[cyc_rank],
+                                         IBV_SEND_SIGNALED, 0, dm);
                 if (status != UCC_OK) {
                     tl_error(UCC_TASK_LIB(task),
                              "Failed sending block [%d,%d,%d]", i, j, k);
@@ -684,7 +718,7 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
                 }
                 status = send_block_data(team, cyc_rank, src_addr, current_block_msgsize,
                                          team->node.ops[task->seq_index].send_mkeys[j]->lkey,
-                                         remote_addr, team->net.rkeys[cyc_rank], 0, 0);
+                                         remote_addr, team->net.rkeys[cyc_rank], 0, 0, NULL);
                 if (status != UCC_OK) {
                     tl_error(UCC_TASK_LIB(task),
                              "Failed sending block [%d,%d,%d]", i, j, k);
@@ -715,29 +749,17 @@ ucc_status_t ucc_tl_mhba_send_blocks_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
     ucc_tl_mhba_team_t *    team    = TASK_TEAM(task);
-    int                     i, completions_num;
+    ucc_status_t            status;
 
 
     if (task->started != team->net.net_size) {
         return coll_task->post(coll_task);
     }
-    completions_num = ibv_poll_cq(team->net.cq, team->net.sbgp->group_size,
-                                  team->work_completion);
-    if (completions_num < 0) {
-        tl_error(UCC_TASK_LIB(task),
-                 "ibv_poll_cq() failed for RDMA_ATOMIC execution");
-        return UCC_ERR_NO_MESSAGE;
+    status = ucc_tl_mhba_poll_cq(team);
+    if (UCC_OK != status) {
+        return status;
     }
-    for (i = 0; i < completions_num; i++) {
-        if (team->work_completion[i].status != IBV_WC_SUCCESS) {
-            tl_error(UCC_TASK_LIB(task),
-                     "bad work completion status %s, wr_id %zu",
-                     ibv_wc_status_str(team->work_completion[i].status),
-                     team->work_completion[i].wr_id);
-            return UCC_ERR_NO_MESSAGE;
-        }
-        team->cq_completions[SEQ_INDEX(team->work_completion[i].wr_id)] += 1;
-    }
+
     if (team->cq_completions[task->seq_index] ==
         team->net.sbgp->group_size) {
         team->cq_completions[task->seq_index] = 0;

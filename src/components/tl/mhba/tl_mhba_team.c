@@ -602,7 +602,8 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
             return UCC_ERR_NO_MESSAGE;
         }
 
-        team->work_completion = ucc_malloc(sizeof(struct ibv_wc) * net_size);
+        team->work_completion = ucc_malloc(sizeof(struct ibv_wc) *
+                                           ucc_min(net_size, MIN_POLL_WC));
         if (!team->work_completion) {
             tl_error(tl_team->context->lib, "failed to allocate %zd bytes for wc array",
                      sizeof(struct ibv_wc) * net_size);
