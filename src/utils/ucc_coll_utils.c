@@ -229,6 +229,47 @@ ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
     return map;
 }
 
+ucc_ep_map_t ucc_ep_map_from_array_64(uint64_t **array, ucc_rank_t size,
+                                   ucc_rank_t full_size, int need_free)
+{
+    int          is_const_stride = 0;
+    ucc_ep_map_t map;
+    int64_t      stride;
+    ucc_rank_t   i;
+
+    map.ep_num = size;
+    if (size > 1) {
+        /* try to detect strided pattern */
+        stride          = (int64_t)(*array)[1] - (int64_t)(*array)[0];
+        is_const_stride = 1;
+        for (i = 2; i < size; i++) {
+            if (((int64_t)(*array)[i] - (int64_t)(*array)[i - 1]) != stride) {
+                is_const_stride = 0;
+                break;
+            }
+        }
+    }
+    if (is_const_stride) {
+        if ((stride == 1) && (size == full_size)) {
+            map.type = UCC_EP_MAP_FULL;
+        }
+        else {
+            map.type           = UCC_EP_MAP_STRIDED;
+            map.strided.start  = (uint64_t)(*array)[0];
+            map.strided.stride = stride;
+        }
+        if (need_free) {
+            ucc_free(*array);
+            *array = NULL;
+        }
+    } else {
+        map.type            = UCC_EP_MAP_ARRAY;
+        map.array.map       = (void *)(*array);
+        map.array.elem_size = sizeof(uint64_t);
+    }
+    return map;
+}
+
 static inline int
 ucc_coll_args_is_rooted(const ucc_base_coll_args_t *bargs)
 {
