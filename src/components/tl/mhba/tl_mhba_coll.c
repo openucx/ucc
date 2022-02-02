@@ -23,6 +23,9 @@ static ucc_status_t ucc_tl_mhba_poll_cq(ucc_tl_mhba_team_t *team)
         return UCC_ERR_NO_MESSAGE;
     }
     for (i = 0; i < completions_num; i++) {
+        /* printf("got completion wr_id %zu, opcode %d\n", */
+        /*        team->work_completion[i].wr_id, */
+        /*        team->work_completion[i].opcode); */
         if (team->work_completion[i].status != IBV_WC_SUCCESS) {
             tl_error(UCC_TL_TEAM_LIB(team),
                      "bad work completion status %s, wr_id %zu",
@@ -597,6 +600,7 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
 
     tl_debug(UCC_TASK_LIB(task), "send blocks start");
     rank = team->net.rank_map[team->net.sbgp->group_rank];
+
     for (i = 0; i < net_size; i++) {
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
@@ -604,8 +608,6 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
             tl_mhba_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
-        task->started++;
-        task->op->blocks_sent[cyc_rank]  = 1;
 
         send_start(team, cyc_rank);
         //send all blocks from curr node to some ARR
@@ -618,6 +620,19 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
                                           block_msgsize * j + col_msgsize * k);
 
                 dm = ucc_mpool_get(&team->dm_pool);
+                while (!dm) {
+                    status = send_done(team, cyc_rank);
+                    if (UCC_OK != status) {
+                        return status;
+                    }
+
+                    status = ucc_tl_mhba_poll_cq(team);
+                    if (UCC_OK != status) {
+                        return status;
+                    }
+                    dm = ucc_mpool_get(&team->dm_pool);
+                    send_start(team, cyc_rank);
+                }
                 /* printf("rank %d got dm %p, seq_num %d\n", rank, dm, task->seq_num); */
                 status = send_block_data(team, cyc_rank, src_addr, block_msgsize,
                                          team->node.ops[task->seq_index].send_mkeys[0]->lkey,
@@ -630,14 +645,17 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
                 }
             }
         }
-        status = send_atomic(team, i, tl_mhba_atomic_addr(task, i),
-                             tl_mhba_atomic_rkey(task, i), task->seq_num);
+        status = send_atomic(team, cyc_rank, tl_mhba_atomic_addr(task, cyc_rank),
+                             tl_mhba_atomic_rkey(task, cyc_rank), task->seq_num);
+
         if (UCC_OK == status) {
             status = send_done(team, cyc_rank);
         }
+        task->op->blocks_sent[cyc_rank]  = 1;
+        task->started++;
         if (status != UCC_OK) {
             tl_error(UCC_TASK_LIB(task),
-                     "Failed sending atomic to node [%d]", i);
+                     "Failed sending atomic to node [%d]", cyc_rank);
             return status;
         }
     }
@@ -726,14 +744,14 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
                 }
             }
         }
-        status = send_atomic(team, i, tl_mhba_atomic_addr(task, i),
-                             tl_mhba_atomic_rkey(task, i), task->seq_num);
+        status = send_atomic(team, cyc_rank, tl_mhba_atomic_addr(task, cyc_rank),
+                             tl_mhba_atomic_rkey(task, cyc_rank), task->seq_num);
         if (UCC_OK == status) {
             status = send_done(team, cyc_rank);
         }
         if (status != UCC_OK) {
             tl_error(UCC_TASK_LIB(task),
-                     "Failed sending atomic to node [%d]", i);
+                     "Failed sending atomic to node [%d]", cyc_rank);
             return status;
         }
     }

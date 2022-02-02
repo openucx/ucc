@@ -443,7 +443,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
                 return status;
             }
             net_size = team->net.net_size;
-            asr_cq_size = net_size * MAX_OUTSTANDING_OPS;
+            asr_cq_size = net_size * (SQUARED(team->node.sbgp->group_size / 2 + 1) + 1) * MAX_OUTSTANDING_OPS;
             team->net.cq =
                 ibv_create_cq(ctx->shared_ctx, asr_cq_size, NULL, NULL, 0);
             if (!team->net.cq) {
@@ -688,7 +688,8 @@ static ucc_status_t ucc_tl_mhba_dm_init(ucc_tl_mhba_team_t *team)
         }
     }
     if (!team->dm_ptr) {
-        tl_error(UCC_TL_TEAM_LIB(team), "dev mem allocation failed");
+        tl_error(UCC_TL_TEAM_LIB(team), "dev mem allocation failed, attr.max %zd, errno %d",
+                 attr.max_dm_size, errno);
         return UCC_ERR_NO_MESSAGE;
     }
     if (n_memic_chunks != UCC_ULUNITS_AUTO &&
