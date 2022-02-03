@@ -281,7 +281,6 @@ ucc_status_t ucc_tl_mhba_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey,
     struct ibv_qp_ex *qp_ex = ibv_qp_to_qp_ex(qp);
     struct mlx5dv_qp_ex *mqp = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
 
-    ibv_wr_start(qp_ex);
     memset(wqe_desc, 0, n_ds * DS_SIZE);
     /* SET CTRL SEG */
 
@@ -306,9 +305,5 @@ ucc_status_t ucc_tl_mhba_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey,
     data = PTR_OFFSET(data, DS_SIZE);
     mlx5dv_set_data_seg(data, ncols * nrows * element_size, dst_mr_key, dst_addr);
     mlx5dv_wr_raw_wqe(mqp, wqe_desc);
-    if (ibv_wr_complete(qp_ex)) {
-        fprintf(stderr, "failed to post transpose wqe");
-        return UCC_ERR_NO_MESSAGE;
-    }
     return UCC_OK;
 }

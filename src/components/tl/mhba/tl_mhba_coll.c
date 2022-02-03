@@ -592,10 +592,12 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
     int          block_size    = task->block_size;
     int          col_msgsize   = task->msg_size * block_size * node_size;
     int          block_msgsize = SQUARED(block_size) * task->msg_size;
+    int    dm_host             = UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_host;
     int          i, j, k, dest_rank, rank, cyc_rank;
     uint64_t     src_addr, remote_addr;
     ucc_status_t status;
     ucc_tl_mhba_dm_chunk_t *dm;
+    uintptr_t dm_addr;
 
     coll_task->super.status              = UCC_INPROGRESS;
 
@@ -634,21 +636,22 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
                     dm = ucc_mpool_get(&team->dm_pool);
                     send_start(team, cyc_rank);
                 }
-                struct ibv_qp *qp;
-                if (team->is_dc) {
-                    qp = team->net.dcis[cyc_rank % team->num_dci_qps].dci_qp;
+                if (dm_host) {
+                    dm_addr = (uintptr_t)PTR_OFFSET(team->dm_ptr, dm->offset);
                 } else {
-                    qp = team->net.rc_qps[cyc_rank];
+                    dm_addr = dm->offset; // dm reg mr 0 based
                 }
-                status = ucc_tl_mhba_post_transpose(qp, team->node.ops[task->seq_index].send_mkeys[0]->lkey,
-                                                   team->dm_mr->lkey, src_addr, dm->offset, task->msg_size,
-                                                   block_size, block_size);
+
+                status = ucc_tl_mhba_post_transpose(tl_mhba_get_qp(team, cyc_rank),
+                                                    team->node.ops[task->seq_index].send_mkeys[0]->lkey,
+                                                    team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,
+                                                    block_size, block_size);
                 if (UCC_OK != status) {
                     return status;
                 }
-                /* printf("rank %d got dm %p, seq_num %d\n", rank, dm, task->seq_num); */
-                status = send_block_data(team, cyc_rank, src_addr, block_msgsize,
-                                         team->node.ops[task->seq_index].send_mkeys[0]->lkey,
+
+                status = send_block_data(team, cyc_rank, dm_addr,
+                                         block_msgsize, team->dm_mr->lkey,
                                          remote_addr, team->net.rkeys[cyc_rank],
                                          IBV_SEND_SIGNALED, 0, dm);
                 if (status != UCC_OK) {

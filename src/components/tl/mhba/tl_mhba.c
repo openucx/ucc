@@ -44,6 +44,10 @@ static ucc_config_field_t ucc_tl_mhba_lib_config_table[] = {
     {"RC_DC", "2", "Boolean - 1 for DC QPs, 0 for RC QPs",
      ucc_offsetof(ucc_tl_mhba_lib_config_t, rc_dc), UCC_CONFIG_TYPE_UINT},
 
+    {"DM_HOST", "0", "Use host registered memory instead of DM for "
+     "transpose staging",
+     ucc_offsetof(ucc_tl_mhba_lib_config_t, dm_host), UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 static ucc_config_field_t ucc_tl_mhba_context_config_table[] = {

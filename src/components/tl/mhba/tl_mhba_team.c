@@ -443,7 +443,8 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
                 return status;
             }
             net_size = team->net.net_size;
-            asr_cq_size = net_size * (SQUARED(team->node.sbgp->group_size / 2 + 1) + 1) * MAX_OUTSTANDING_OPS;
+            asr_cq_size =
+                net_size * (SQUARED(team->node.sbgp->group_size / 2 + 1) + 1) * MAX_OUTSTANDING_OPS;
             team->net.cq =
                 ibv_create_cq(ctx->shared_ctx, asr_cq_size, NULL, NULL, 0);
             if (!team->net.cq) {
@@ -651,7 +652,11 @@ err:
 static void ucc_tl_mhba_dm_cleanup(ucc_tl_mhba_team_t *team)
 {
     ibv_dereg_mr(team->dm_mr);
-    ibv_free_dm(team->dm_ptr);
+    if (UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_host) {
+        ucc_free(team->dm_ptr);
+    }  else {
+        ibv_free_dm(team->dm_ptr);
+    }
     ucc_mpool_cleanup(&team->dm_pool, 1);
 }
 
@@ -660,50 +665,66 @@ static ucc_status_t ucc_tl_mhba_dm_init(ucc_tl_mhba_team_t *team)
     ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
     size_t memic_chunk         = UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_buf_size;
     size_t n_memic_chunks      = UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_buf_num;
+    int    dm_host             = UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_host;
     struct ibv_device_attr_ex attr;
     struct ibv_alloc_dm_attr  dm_attr;
     int max_n_chunks, chunks_to_alloc, i;
     ucc_status_t status;
 
-    attr.comp_mask = 0;
-    if(ibv_query_device_ex(ctx->ib_ctx, NULL, &attr)){
-        tl_error(UCC_TL_TEAM_LIB(team),
-                 "failed to query device (errno=%d)", errno);
-        return UCC_ERR_NO_MESSAGE;
-    }
-    if (!attr.max_dm_size) {
-        tl_error(UCC_TL_TEAM_LIB(team), "device doesn't support dm allocation");
-        return UCC_ERR_NO_MESSAGE;
-    }
-    memset(&dm_attr, 0, sizeof(dm_attr));
-    max_n_chunks = attr.max_dm_size / memic_chunk;
+    if (dm_host) {
+    max_n_chunks = 8;
     chunks_to_alloc = (n_memic_chunks == UCC_ULUNITS_AUTO) ? max_n_chunks :
         n_memic_chunks;
-
-    for(i = chunks_to_alloc; i > 0; i--) {
-        dm_attr.length = i * memic_chunk;
-        team->dm_ptr = ibv_alloc_dm(ctx->ib_ctx, &dm_attr);
-        if (team->dm_ptr) {
-            break;
-        }
-    }
+    dm_attr.length = chunks_to_alloc * memic_chunk ;
+    team->dm_ptr = ucc_malloc(dm_attr.length, "memic_host");
     if (!team->dm_ptr) {
-        tl_error(UCC_TL_TEAM_LIB(team), "dev mem allocation failed, attr.max %zd, errno %d",
-                 attr.max_dm_size, errno);
-        return UCC_ERR_NO_MESSAGE;
+        tl_error(UCC_TL_TEAM_LIB(team), " memic_host allocation failed");
+        return UCC_ERR_NO_MEMORY;
     }
-    if (n_memic_chunks != UCC_ULUNITS_AUTO &&
-        i != n_memic_chunks) {
-        tl_error(UCC_TL_TEAM_LIB(team),
-                 "couldn't allocate memic chunks, required %zd allocated %d, max %d",
-                 n_memic_chunks, i, max_n_chunks);
-        return UCC_ERR_NO_MESSAGE;
+    team->dm_mr = ibv_reg_mr(ctx->shared_pd, team->dm_ptr, dm_attr.length,
+                             IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 
+    } else {
+        attr.comp_mask = 0;
+        if(ibv_query_device_ex(ctx->ib_ctx, NULL, &attr)){
+            tl_error(UCC_TL_TEAM_LIB(team),
+                     "failed to query device (errno=%d)", errno);
+            return UCC_ERR_NO_MESSAGE;
+        }
+        if (!attr.max_dm_size) {
+            tl_error(UCC_TL_TEAM_LIB(team), "device doesn't support dm allocation");
+            return UCC_ERR_NO_MESSAGE;
+        }
+        memset(&dm_attr, 0, sizeof(dm_attr));
+        max_n_chunks = attr.max_dm_size / memic_chunk;
+        chunks_to_alloc = (n_memic_chunks == UCC_ULUNITS_AUTO) ? max_n_chunks :
+            n_memic_chunks;
+
+        for(i = chunks_to_alloc; i > 0; i--) {
+            dm_attr.length = i * memic_chunk;
+            team->dm_ptr = ibv_alloc_dm(ctx->ib_ctx, &dm_attr);
+            if (team->dm_ptr) {
+                break;
+            }
+        }
+        if (!team->dm_ptr) {
+            tl_error(UCC_TL_TEAM_LIB(team), "dev mem allocation failed, attr.max %zd, errno %d",
+                     attr.max_dm_size, errno);
+            return UCC_ERR_NO_MESSAGE;
+        }
+        if (n_memic_chunks != UCC_ULUNITS_AUTO &&
+            i != n_memic_chunks) {
+            tl_error(UCC_TL_TEAM_LIB(team),
+                     "couldn't allocate memic chunks, required %zd allocated %d, max %d",
+                     n_memic_chunks, i, max_n_chunks);
+            return UCC_ERR_NO_MESSAGE;
+
+        }
+        n_memic_chunks = i;
+        team->dm_mr = ibv_reg_dm_mr(ctx->shared_pd, team->dm_ptr, 0, dm_attr.length,
+                                    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
+                                    IBV_ACCESS_ZERO_BASED);
     }
-    n_memic_chunks = i;
-    team->dm_mr = ibv_reg_dm_mr(ctx->shared_pd, team->dm_ptr, 0, dm_attr.length,
-                             IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
-                             IBV_ACCESS_ZERO_BASED);
     if(!team->dm_mr){
         tl_error(UCC_TL_TEAM_LIB(team),"failed to reg memic");
         return UCC_ERR_NO_MESSAGE;

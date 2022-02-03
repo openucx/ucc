@@ -59,6 +59,7 @@ typedef struct ucc_tl_mhba_lib_config {
     int    rc_dc;
     size_t dm_buf_size;
     size_t dm_buf_num;
+    int    dm_host;
 } ucc_tl_mhba_lib_config_t;
 
 typedef struct ucc_tl_mhba_context_config {

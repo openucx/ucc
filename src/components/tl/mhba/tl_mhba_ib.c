@@ -155,8 +155,12 @@ ucc_status_t ucc_tl_mhba_init_dc_qps_and_connect(ucc_tl_mhba_team_t *team,
     attr_ex.send_cq = team->net.cq;
     attr_ex.recv_cq = team->net.cq;
     attr_ex.pd      = ctx->shared_pd;
+    /* Max number of send wrs per QP:
+       max_number of blocks + 1 for atomic + 1 for barrier + 1 for transpose
+       TODO: check for leftovers case ??
+    */
     attr_ex.cap.max_send_wr =
-        (SQUARED(team->node.sbgp->group_size / 2 + 1) + 2) * MAX_OUTSTANDING_OPS *
+        (SQUARED(team->node.sbgp->group_size / 2 + 1) + 3) * MAX_OUTSTANDING_OPS *
 		ucc_div_round_up(team->net.net_size, team->num_dci_qps);
     attr_ex.cap.max_send_sge = 1;
     attr_ex.comp_mask |= IBV_QP_INIT_ATTR_SEND_OPS_FLAGS | IBV_QP_INIT_ATTR_PD;
@@ -164,11 +168,12 @@ ucc_status_t ucc_tl_mhba_init_dc_qps_and_connect(ucc_tl_mhba_team_t *team,
                              IBV_QP_EX_WITH_RDMA_WRITE_WITH_IMM |
                              IBV_QP_EX_WITH_ATOMIC_FETCH_AND_ADD;
     attr_dv.comp_mask |=
-        MLX5DV_QP_INIT_ATTR_MASK_DC | MLX5DV_QP_INIT_ATTR_MASK_QP_CREATE_FLAGS;
+        MLX5DV_QP_INIT_ATTR_MASK_DC | MLX5DV_QP_INIT_ATTR_MASK_QP_CREATE_FLAGS |
+        MLX5DV_QP_INIT_ATTR_MASK_SEND_OPS_FLAGS;
     attr_dv.dc_init_attr.dc_type = MLX5DV_DCTYPE_DCI;
     attr_dv.create_flags |= MLX5DV_QP_CREATE_DISABLE_SCATTER_TO_CQE;
 
-    attr_dv.send_ops_flags = MLX5DV_QP_EX_WITH_RAW_WQE ;
+    attr_dv.send_ops_flags = MLX5DV_QP_EX_WITH_RAW_WQE;
     qp_attr_to_init.qp_state   = IBV_QPS_INIT;
     qp_attr_to_init.pkey_index = 0;
     qp_attr_to_init.port_num   = port_num;
@@ -313,7 +318,7 @@ ucc_status_t ucc_tl_mhba_create_rc_qps(ucc_tl_mhba_team_t *team,
     qp_init_attr.send_cq = team->net.cq;
     qp_init_attr.recv_cq = team->net.cq;
     qp_init_attr.cap.max_send_wr =
-        (SQUARED(team->node.sbgp->group_size / 2 + 1) + 2) *
+        (SQUARED(team->node.sbgp->group_size / 2 + 1) + 3) *
         MAX_OUTSTANDING_OPS; // TODO switch back to fixed tx/rx
     qp_init_attr.cap.max_recv_wr     = 0;
     qp_init_attr.cap.max_send_sge    = 1;

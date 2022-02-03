@@ -273,4 +273,13 @@ tl_mhba_barrier_remote_rkey(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
     return team->net.remote_ctrl[rank].barrier.rkey;
 }
 
+static inline struct ibv_qp*
+tl_mhba_get_qp(ucc_tl_mhba_team_t *team, ucc_rank_t rank)
+{
+    if (team->is_dc) {
+        return team->net.dcis[rank % team->num_dci_qps].dci_qp;
+    } else {
+        return team->net.rc_qps[rank];
+    }
+}
 #endif
