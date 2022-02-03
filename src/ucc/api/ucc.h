@@ -3,6 +3,7 @@
  * @date 2020
  * @copyright Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  * @copyright Copyright (C) Huawei Technologies Co., Ltd. 2020.  ALL RIGHTS RESERVED.
+ * @copyright Copyright (C) UChicago Argonne, LLC. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -507,8 +508,8 @@ typedef enum {
  *
  */
 typedef enum {
-    UCC_NO_SYNC_COLLECTIVES = 0, /*!< Synchornous collectives */
-    UCC_SYNC_COLLECTIVES    = 1  /*!< Non-synchronous collectives */
+    UCC_NO_SYNC_COLLECTIVES = 0, /*!< Non-synchronous collectives */
+    UCC_SYNC_COLLECTIVES    = 1  /*!< Synchronous collectives */
 } ucc_coll_sync_type_t;
 
 
