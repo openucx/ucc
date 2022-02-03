@@ -6,9 +6,11 @@
 
 #include "tl_ucp.h"
 #include "utils/ucc_malloc.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "components/mc/base/ucc_mc_base.h"
 #include "allreduce/allreduce.h"
+#include "bcast/bcast.h"
+#include "alltoall/alltoall.h"
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib,
                                      ucc_base_lib_attr_t  *base_attr);
@@ -52,6 +54,35 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"ALLREDUCE_SRA_KN_FRAG_THRESH", "inf",
+     "Threshold to enable fragmentation and pipelining of SRA Knomial "
+     "allreduce alg",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_frag_thresh),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLREDUCE_SRA_KN_FRAG_SIZE", "inf",
+     "Maximum allowed fragment size of SRA knomial alg",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_frag_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLREDUCE_SRA_KN_N_FRAGS", "2",
+     "Number of fragments each allreduce is split into when SRA knomial alg is "
+     "used\n"
+     "The actual number of fragments can be larger if fragment size exceeds\n"
+     "ALLREDUCE_SRA_KN_FRAG_SIZE",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_n_frags),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLREDUCE_SRA_KN_PIPELINE_DEPTH", "2",
+     "Number of fragments simultaneously progressed by the SRA knomial alg",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_pipeline_depth),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLREDUCE_SRA_KN_SEQUENTIAL", "n",
+     "Type of pipelined schedule for SRA knomial alg (sequential/parallel)",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_seq),
+     UCC_CONFIG_TYPE_BOOL},
+
     {"REDUCE_SCATTER_KN_RADIX", "4",
      "Radix of the knomial reduce-scatter algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatter_kn_radix),
@@ -65,9 +96,24 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"BCAST_SAG_KN_RADIX", "4",
+     "Radix of the scatter-allgather (SAG) knomial bcast algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_sag_kn_radix),
+     UCC_CONFIG_TYPE_UINT},
+
     {"REDUCE_KN_RADIX", "4", "Radix of the knomial tree reduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_kn_radix),
      UCC_CONFIG_TYPE_UINT},
+
+    {"SCATTER_KN_RADIX", "4", "Radix of the knomial scatter algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, scatter_kn_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"REDUCE_AVG_PRE_OP", "1",
+     "Reduce will perform division by team_size in early stages of the algorithm,\n"
+     "else - in result",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_avg_pre_op),
+     UCC_CONFIG_TYPE_BOOL},
 
     {NULL}};
 
@@ -84,16 +130,14 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
 
     {"NPOLLS", "10",
      "Number of ucp progress polling cycles for p2p requests testing",
-     ucc_offsetof(ucc_tl_ucp_context_config_t, n_polls),
-     UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_tl_ucp_context_config_t, n_polls), UCC_CONFIG_TYPE_UINT},
 
     {"OOB_NPOLLS", "20",
-     "Number of polling cycles for oob allgather request",
+     "Number of polling cycles for oob allgather and service coll request",
      ucc_offsetof(ucc_tl_ucp_context_config_t, oob_npolls),
      UCC_CONFIG_TYPE_UINT},
 
-    {"PRE_REG_MEM", "0",
-     "Pre Register collective memory region with UCX",
+    {"PRE_REG_MEM", "0", "Pre Register collective memory region with UCX",
      ucc_offsetof(ucc_tl_ucp_context_config_t, pre_reg_mem),
      UCC_CONFIG_TYPE_UINT},
 
@@ -129,8 +173,13 @@ ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
 ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, ucc_datatype_t dt,
                                           size_t count, ucc_reduction_op_t op,
-                                          ucc_tl_team_subset_t subset,
+                                          ucc_subset_t      subset,
                                           ucc_coll_task_t **task);
+
+ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
+                                          void *rbuf, size_t msgsize,
+                                          ucc_subset_t      subset,
+                                          ucc_coll_task_t **task_p);
 
 ucc_status_t ucc_tl_ucp_service_test(ucc_coll_task_t *task);
 
@@ -152,8 +201,9 @@ ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1] = {
     [UCC_MEMORY_TYPE_UNKNOWN]      = UCS_MEMORY_TYPE_UNKNOWN
 };
 
-void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
-                                 size_t length, ucc_memory_type_t mem_type)
+UCC_TL_UCP_PROFILE_FUNC_VOID(ucc_tl_ucp_pre_register_mem, (team, addr, length,
+                             mem_type), ucc_tl_ucp_team_t *team, void *addr,
+                             size_t length, ucc_memory_type_t mem_type)
 {
     void *base_address  = addr;
     size_t alloc_length = length;
@@ -186,9 +236,13 @@ void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
 __attribute__((constructor)) static void tl_ucp_iface_init(void)
 {
     ucc_tl_ucp.super.scoll.allreduce = ucc_tl_ucp_service_allreduce;
-    ucc_tl_ucp.super.scoll.test      = ucc_tl_ucp_service_test;
-    ucc_tl_ucp.super.scoll.cleanup   = ucc_tl_ucp_service_cleanup;
+    ucc_tl_ucp.super.scoll.allgather = ucc_tl_ucp_service_allgather;
     ucc_tl_ucp.super.scoll.update_id = ucc_tl_ucp_service_update_id;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLREDUCE)] =
         ucc_tl_ucp_allreduce_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BCAST)] =
+        ucc_tl_ucp_bcast_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLTOALL)] =
+        ucc_tl_ucp_alltoall_algs;
+    ucc_components_load("tlcp_ucp", &ucc_tl_ucp.super.coll_plugins);
 }

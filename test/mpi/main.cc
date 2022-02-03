@@ -13,11 +13,14 @@ static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
                                              UCC_COLL_TYPE_ALLGATHER,
                                              UCC_COLL_TYPE_ALLGATHERV,
                                              UCC_COLL_TYPE_ALLTOALL,
-                                             UCC_COLL_TYPE_ALLTOALLV};
+                                             UCC_COLL_TYPE_ALLTOALLV,
+                                             UCC_COLL_TYPE_REDUCE_SCATTER};
+static std::vector<ucc_coll_type_t> onesided_colls = {UCC_COLL_TYPE_ALLTOALL};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
 static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
                                              UCC_DT_FLOAT32, UCC_DT_FLOAT64};
-static std::vector<ucc_reduction_op_t> ops = {UCC_OP_SUM, UCC_OP_MAX};
+static std::vector<ucc_reduction_op_t>     ops    = {UCC_OP_SUM, UCC_OP_MAX,
+                                              UCC_OP_AVG};
 static std::vector<ucc_test_mpi_team_t> teams = {TEAM_WORLD, TEAM_REVERSE,
                                                  TEAM_SPLIT_HALF, TEAM_SPLIT_ODD_EVEN};
 static std::vector<ucc_test_vsize_flag_t> counts_vsize = {TEST_FLAG_VSIZE_32BIT,
@@ -31,6 +34,8 @@ static int root_value = 10;
 static ucc_thread_mode_t                   thread_mode  = UCC_THREAD_SINGLE;
 static int                                 iterations   = 1;
 static int                                 show_help    = 0;
+static int                                 num_tests    = 1;
+static bool                                has_onesided = true;
 #ifdef HAVE_CUDA
 static test_set_cuda_device_t test_cuda_set_device = TEST_SET_DEV_NONE;
 #endif
@@ -67,8 +72,9 @@ void PrintHelp()
        "--max_size   <value>:           maximum send/recv buffer allocation size\n"
        "--count_bits <c1,c2,..>:        list of counts bits: 32,64          (alltoallv only)\n"
        "--displ_bits <d1,d2,..>:        list of displacements bits: 32,64   (alltoallv only)\n"
-       "--set_device <value>:           0 - don't set, 1 - cuda_device = local_rank, 2 - cuda_device = local_rank % cuda_device_count"
-       "\n"
+       "--set_device <value>:           0 - don't set, 1 - cuda_device = local_rank, 2 - cuda_device = local_rank % cuda_device_count\n"
+       "--num_tests  <value>:           number of tests to run in parallel\n"
+       "--onesided   <value>:           0 - no onesided tests, 1 - onesided tests\n"
        "--help:              Show help\n";
 }
 
@@ -167,6 +173,14 @@ static ucc_datatype_t dtype_str_to_type(std::string dtype)
         return UCC_DT_FLOAT32;
     } else if (dtype == "float64") {
         return UCC_DT_FLOAT64;
+    } else if (dtype == "bfloat16") {
+        return UCC_DT_BFLOAT16;
+    } else if (dtype == "float16") {
+        return UCC_DT_FLOAT16;
+    } else if (dtype == "int128") {
+        return UCC_DT_INT128;
+    } else if (dtype == "uint128") {
+        return UCC_DT_UINT128;
     } else {
         std::cerr << "incorrect dtype: " << dtype << std::endl;
         PrintHelp();
@@ -196,6 +210,8 @@ static ucc_reduction_op_t op_str_to_type(std::string op)
         return UCC_OP_BOR;
     } else if (op == "bxor") {
         return UCC_OP_BXOR;
+    } else if (op == "avg") {
+        return UCC_OP_AVG;
     } else {
         std::cerr << "incorrect op: " << op << std::endl;
         PrintHelp();
@@ -320,7 +336,7 @@ void PrintInfo()
 
 int ProcessArgs(int argc, char** argv)
 {
-    const char *const short_opts  = "c:t:m:d:o:M:I:r:s:C:D:i:Z:ThS:";
+    const char *const short_opts  = "c:t:m:d:o:M:I:N:r:s:C:D:i:Z:ThSO:";
     const option      long_opts[] = {
                                 {"colls", required_argument, nullptr, 'c'},
                                 {"teams", required_argument, nullptr, 't'},
@@ -336,9 +352,11 @@ int ProcessArgs(int argc, char** argv)
                                 {"displ_bits", required_argument, nullptr, 'D'},
                                 {"iter", required_argument, nullptr, 'i'},
                                 {"thread-multiple", no_argument, nullptr, 'T'},
+                                {"num_tests", required_argument, nullptr, 'N'},
 #ifdef HAVE_CUDA
                                 {"set_device", required_argument, nullptr, 'S'},
 #endif
+                                {"onesided", required_argument, nullptr, 'O'},
                                 {"help", no_argument, nullptr, 'h'},
                                 {nullptr, no_argument, nullptr, 0}
     };
@@ -394,11 +412,17 @@ int ProcessArgs(int argc, char** argv)
         case 'i':
             iterations = std::stoi(optarg);
             break;
+        case 'N':
+            num_tests = std::stoi(optarg);
+            break;
 #ifdef HAVE_CUDA
         case 'S':
             test_cuda_set_device = (test_set_cuda_device_t)std::stoi(optarg);
             break;
 #endif
+        case 'O':
+            has_onesided = std::stoi(optarg);
+            break;
         case 'h':
             show_help = 1;
             break;
@@ -448,7 +472,7 @@ int main(int argc, char *argv[])
 #ifdef HAVE_CUDA
     set_cuda_device(test_cuda_set_device);
 #endif
-    test = new UccTestMpi(argc, argv, thread_mode, 0);
+    test = new UccTestMpi(argc, argv, thread_mode, 0, has_onesided);
     for (auto &m : mtypes) {
         if (UCC_MEMORY_TYPE_HOST != m && UCC_OK != ucc_mc_available(m)) {
             std::cerr << "requested memory type " << ucc_memory_type_names[m]
@@ -458,7 +482,11 @@ int main(int argc, char *argv[])
         }
     }
     test->create_teams(teams);
+    if (has_onesided) {
+        test->create_teams(teams, true);
+    }
     test->set_iter(iterations);
+    test->set_num_tests(num_tests);
     test->set_colls(colls);
     test->set_dtypes(dtypes);
     test->set_mtypes(mtypes);
@@ -475,6 +503,13 @@ int main(int argc, char *argv[])
     for (auto &inpl : inplace) {
         test->set_inplace(inpl);
         test->run_all();
+    }
+    if (has_onesided) {
+        test->set_colls(onesided_colls);
+        for (auto &inpl : inplace) {
+            test->set_inplace(inpl);
+            test->run_all(true);
+        }
     }
     std::cout << std::flush;
     MPI_Iallreduce(MPI_IN_PLACE, test->results.data(), test->results.size(),

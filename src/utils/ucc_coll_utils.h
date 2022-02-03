@@ -10,6 +10,7 @@
 #include "ucc_datastruct.h"
 #include "ucc_math.h"
 #include <string.h>
+#include "utils/ucc_time.h"
 
 #define UCC_COLL_TYPE_NUM (ucc_ilog2(UCC_COLL_TYPE_LAST - 1) + 1)
 
@@ -29,12 +30,30 @@
     (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
      ((_args).flags & UCC_COLL_ARGS_FLAG_IN_PLACE))
 
+#define UCC_COLL_TIMEOUT_REQUIRED(_task)                       \
+    (((_task)->bargs.args.mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
+     ((_task)->bargs.args.flags & UCC_COLL_ARGS_FLAG_TIMEOUT))
+
+#define UCC_COLL_SET_TIMEOUT(_task, _timeout) do {                 \
+        (_task)->bargs.args.mask   |= UCC_COLL_ARGS_FIELD_FLAGS;   \
+        (_task)->bargs.args.flags  |= UCC_COLL_ARGS_FLAG_TIMEOUT;  \
+        (_task)->bargs.args.timeout = _timeout;                    \
+        (_task)->start_time   = ucc_get_time();                    \
+    } while(0)
+
+#define UCC_COLL_ARGS_COUNT64(_args)                                           \
+    (((_args)->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                            \
+     ((_args)->flags & UCC_COLL_ARGS_FLAG_COUNT_64BIT))
+
+#define UCC_COLL_ARGS_DISPL64(_args)                                           \
+    (((_args)->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                            \
+     ((_args)->flags & UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT))
+
 static inline size_t
 ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
                         ucc_rank_t idx)
 {
-    if ((args->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-        (args->flags & UCC_COLL_ARGS_FLAG_COUNT_64BIT)) {
+    if (UCC_COLL_ARGS_COUNT64(args)) {
         return ((uint64_t *)counts)[idx];
     }
     return ((uint32_t *)counts)[idx];
@@ -44,11 +63,33 @@ static inline size_t
 ucc_coll_args_get_displacement(const ucc_coll_args_t *args,
                                const ucc_aint_t *displacements, ucc_rank_t idx)
 {
-    if ((args->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&
-        (args->flags & UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT)) {
+    if (UCC_COLL_ARGS_DISPL64(args)) {
         return ((uint64_t *)displacements)[idx];
     }
     return ((uint32_t *)displacements)[idx];
+}
+
+static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
+{
+    switch((int)ct) {
+    case UCC_MEMORY_TYPE_HOST:
+        return "Host";
+    case UCC_MEMORY_TYPE_CUDA:
+        return "Cuda";
+    case UCC_MEMORY_TYPE_CUDA_MANAGED:
+        return "CudaManaged";
+    case UCC_MEMORY_TYPE_ROCM:
+        return "Rocm";
+    case UCC_MEMORY_TYPE_ROCM_MANAGED:
+        return "RocmManaged";
+    case UCC_MEMORY_TYPE_ASSYMETRIC:
+        return "assymetric";
+    case UCC_MEMORY_TYPE_NOT_APPLY:
+        return "n/a";
+    default:
+        break;
+    }
+    return "invalid";
 }
 
 static inline size_t
@@ -116,5 +157,6 @@ static inline ucc_rank_t ucc_ep_map_eval(ucc_ep_map_t map, ucc_rank_t rank)
 ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
                                    ucc_rank_t full_size, int need_free);
 
-void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len);
+typedef struct ucc_coll_task ucc_coll_task_t;
+void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len);
 #endif

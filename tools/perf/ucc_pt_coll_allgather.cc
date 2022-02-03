@@ -57,7 +57,7 @@ float ucc_pt_coll_allgather::get_bw(float time_ms, int grsize,
                                     ucc_coll_args_t args)
 {
     float N = grsize;
-    float S = N * args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
+    float S = args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
 
     return (S / time_ms) * ((N - 1) / N) / 1000.0;
 }

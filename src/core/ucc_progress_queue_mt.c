@@ -7,9 +7,11 @@
 #include "ucc_progress_queue.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
+#include "utils/ucc_time.h"
 #include "utils/ucc_spinlock.h"
 #include "utils/ucc_list.h"
 #include "utils/ucc_lock_free_queue.h"
+#include "utils/ucc_coll_utils.h"
 
 typedef struct ucc_pq_mt {
     ucc_progress_queue_t super;
@@ -35,6 +37,7 @@ static void ucc_pq_locked_mt_enqueue(ucc_progress_queue_t *pq,
 static void ucc_pq_mt_enqueue(ucc_progress_queue_t *pq, ucc_coll_task_t *task)
 {
     ucc_pq_mt_t *pq_mt      = ucc_derived_of(pq, ucc_pq_mt_t);
+
     ucc_lf_queue_enqueue(&pq_mt->lf_queue, &task->lf_elem);
 }
 
@@ -63,15 +66,29 @@ static void ucc_pq_mt_dequeue(ucc_progress_queue_t *pq,
 
 static int ucc_pq_mt_progress(ucc_progress_queue_t *pq)
 {
-    int              n_progressed = 0;
+    int              n_progressed =  0;
+    double           timestamp    = -1;
     ucc_coll_task_t *task;
     ucc_status_t     status;
+
     pq->dequeue(pq, &task);
     if (task) {
         if (task->progress) {
             task->progress(task);
         }
         if (UCC_INPROGRESS == task->super.status) {
+            if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
+                if (timestamp < 0) {
+                    timestamp = ucc_get_time();
+                }
+                if (ucc_unlikely(timestamp - task->start_time >
+                                 task->bargs.args.timeout)) {
+                    task->super.status = UCC_ERR_TIMED_OUT;
+                    ucc_task_complete(task);
+                    return UCC_ERR_TIMED_OUT;
+                }
+            }
+
             pq->enqueue(pq, task);
             return n_progressed;
         }

@@ -6,6 +6,7 @@
 
 #include "tl_nccl.h"
 #include "components/mc/base/ucc_mc_base.h"
+#include "allgatherv/allgatherv.h"
 
 ucc_status_t ucc_tl_nccl_get_lib_attr(const ucc_base_lib_t *lib,
                                       ucc_base_lib_attr_t  *base_attr);
@@ -64,3 +65,9 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
 ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
                                          ucc_coll_score_t **score_p);
 UCC_TL_IFACE_DECLARE(nccl, NCCL);
+
+__attribute__((constructor)) static void tl_ucp_iface_init(void)
+{
+    ucc_tl_nccl.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
+        ucc_tl_nccl_allgatherv_algs;
+}

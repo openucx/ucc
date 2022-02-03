@@ -20,9 +20,9 @@ ucc_pt_coll_allreduce::ucc_pt_coll_allreduce(ucc_datatype_t dt,
         coll_args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
-    coll_args.mask |= UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
-    coll_args.reduce.predefined_op = op;
+    coll_args.op                = op;
     coll_args.src.info.datatype = dt;
+    coll_args.dst.info.datatype = dt;
     coll_args.src.info.mem_type = mt;
     coll_args.dst.info.mem_type = mt;
 }
@@ -36,6 +36,7 @@ ucc_status_t ucc_pt_coll_allreduce::init_coll_args(size_t count,
 
     args = coll_args;
     args.src.info.count = count;
+    args.dst.info.count = count;
     UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size, args.dst.info.mem_type), exit,
                   st);
     args.dst.info.buffer = dst_header->addr;

@@ -5,6 +5,9 @@ on: [push, pull_request]
 env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
+  OPEN_MPI_LINK: https://github.com/open-mpi/ompi.git
+  OPEN_MPI_BRANCH: v5.0.x
+  IMB_LINK: https://github.com/intel/mpi-benchmarks.git
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -18,7 +21,7 @@ jobs:
     - name: Build UCX
       run: |
         cd /tmp/ucx && ./autogen.sh
-        ./contrib/configure-release --without-java --disable-numa --prefix $PWD/install
+        ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
         make -j install
     - uses: actions/checkout@v1
     - name: Build UCC
@@ -37,3 +40,23 @@ jobs:
         cd /tmp/cmake-ucc
         cmake --build .
         ./test_ucc
+    - name: Get OMPI
+      run: |
+         git clone ${OPEN_MPI_LINK} -b ${OPEN_MPI_BRANCH} /tmp/ompi
+         cd /tmp/ompi
+         git submodule update --init --recursive
+    - name: Build OMPI
+      run: |
+        cd /tmp/ompi
+        ./autogen.pl --no-oshmem --exclude pml-cm,pml-ob1,mtl,coll-adapt,coll-han,coll-inter,coll-ftagree
+        ./configure --prefix=/tmp/ompi/install --enable-mpirun-prefix-by-default --disable-mpi-fortran --disable-man-pages --with-ucx=/tmp/ucx/install --with-ucc=/tmp/ucc/install
+        make -j install
+    - name: Get IMB
+      run: git clone ${IMB_LINK} /tmp/imb
+    - name: Build IMB
+      run: |
+         cd /tmp/imb
+         make CC=/tmp/ompi/install/bin/mpicc CXX=/tmp/ompi/install/bin/mpicxx CPPFLAGS="-DCHECK=1" -j IMB-MPI1
+    - name: Run IMB-DCHECK
+      run: |
+         /tmp/ompi/install/bin/mpirun --mca pml ucx --mca pml_ucx_tls any --mca pml_ucx_devices any --mca coll_ucc_priority 100 --mca coll_ucc_enable 1 -np 8 -H localhost:8 --bind-to none /tmp/imb/IMB-MPI1 barrier,bcast,allreduce,allgather,alltoall,alltoallv,reduce -iter 10 -iter_policy off

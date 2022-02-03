@@ -508,3 +508,9 @@ BASE_CPPFLAGS="$BASE_CPPFLAGS -I\${abs_top_srcdir}/src"
 BASE_CPPFLAGS="$BASE_CPPFLAGS -I\${abs_top_builddir}"
 BASE_CPPFLAGS="$BASE_CPPFLAGS -I\${abs_top_builddir}/src"
 AC_SUBST([BASE_CPPFLAGS], [$BASE_CPPFLAGS])
+
+AC_C_BIGENDIAN(
+           [AC_DEFINE([UCC_BIG_ENDIAN],[1],[Words are stored with the most significant byte first])],
+           [AC_DEFINE([UCC_BIG_ENDIAN],[0],[Words are stored with the most significant byte first])],
+           [],
+           [AC_MSG_ERROR([Universal Endian],[1])])

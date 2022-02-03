@@ -29,9 +29,8 @@ class test_allreduce : public UccCollArgs, public testing::Test {
             ctxs[r] = (gtest_ucc_coll_ctx_t*)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
             ctxs[r]->args = coll;
 
-            coll->mask = UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
             coll->coll_type = UCC_COLL_TYPE_ALLREDUCE;
-            coll->reduce.predefined_op = T::redop;
+            coll->op        = T::redop;
 
             ctxs[r]->init_buf = ucc_malloc(ucc_dt_size(dt) * count, "init buf");
             EXPECT_NE(ctxs[r]->init_buf, nullptr);
@@ -41,6 +40,8 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 /* need to limit the init value so that "prod" operation
                    would not grow too large. We have teams up to 16 procs
                    in gtest, this would result in prod ~2**48 */
+                /* bFloat16 will be assigned with the floats matching the
+                   uint16_t bit pattern*/
                 ptr[i] = (typename T::type)((i + r + 1) % 8);
             }
 
@@ -53,6 +54,9 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 UCC_CHECK(ucc_mc_memcpy(coll->dst.info.buffer, ctxs[r]->init_buf,
                                         ucc_dt_size(dt) * count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
+                coll->src.info.mem_type = UCC_MEMORY_TYPE_UNKNOWN;
+                coll->src.info.count    = SIZE_MAX;
+                coll->src.info.datatype = (ucc_datatype_t)-1;
             } else {
                 UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_mc_header,
                                        ucc_dt_size(dt) * count, mem_type));
@@ -60,13 +64,12 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                 UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
                                         ucc_dt_size(dt) * count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
+                coll->src.info.mem_type = mem_type;
+                coll->src.info.count    = (ucc_count_t)count;
+                coll->src.info.datatype = dt;
             }
-            coll->src.info.mem_type = mem_type;
-            coll->src.info.count   = (ucc_count_t)count;
-            coll->src.info.datatype = dt;
-
             coll->dst.info.mem_type = mem_type;
-            coll->dst.info.count   = (ucc_count_t)count;
+            coll->dst.info.count    = (ucc_count_t)count;
             coll->dst.info.datatype = dt;
         }
     }
@@ -102,7 +105,7 @@ class test_allreduce : public UccCollArgs, public testing::Test {
     }
     bool data_validate(UccCollCtxVec ctxs)
     {
-        size_t count = (ctxs[0])->args->src.info.count;
+        size_t count = (ctxs[0])->args->dst.info.count;
         std::vector<typename T::type *> dsts(ctxs.size());
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
@@ -123,6 +126,14 @@ class test_allreduce : public UccCollArgs, public testing::Test {
                     ((typename T::type *)((ctxs[0])->init_buf))[i];
             for (int r = 1; r < ctxs.size(); r++) {
                 res = T::do_op(res, ((typename T::type *)((ctxs[r])->init_buf))[i]);
+            }
+            if (T::redop == UCC_OP_AVG) {
+                if (T::dt == UCC_DT_BFLOAT16){
+                    float32tobfloat16(bfloat16tofloat32(&res) / (float)ctxs.size(),
+                                      &res);
+                } else {
+                    res = res / (typename T::type)ctxs.size();
+                }
             }
             for (int r = 0; r < ctxs.size(); r++) {
                 T::assert_equal(res, dsts[r][i]);
@@ -242,3 +253,90 @@ TYPED_TEST(test_allreduce, multiple_cuda_inplace) {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE);
 }
 #endif
+
+template<typename T>
+class test_allreduce_alg : public test_allreduce<T>
+{};
+
+using test_allreduce_alg_type = ::testing::Types<ReductionTest<UCC_DT_INT32, sum>>;
+TYPED_TEST_CASE(test_allreduce_alg, test_allreduce_alg_type);
+
+TYPED_TEST(test_allreduce_alg, sra_knomial_pipelined) {
+    int           n_procs = 15;
+    ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
+                             {"UCC_TL_UCP_TUNE", "allreduce:@sra_knomial:inf"},
+                             {"UCC_TL_UCP_ALLREDUCE_SRA_KN_FRAG_THRESH", "1024"},
+                             {"UCC_TL_UCP_ALLREDUCE_SRA_KN_N_FRAGS", "11"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 3;
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+
+    for (auto count : {65536, 123567}) {
+        for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+            for (auto m : mt) {
+                this->set_mem_type(m);
+                this->set_inplace(inplace);
+                this->data_init(n_procs, TypeParam::dt, count, ctxs);
+                UccReq req(team, ctxs);
+
+                for (auto i = 0; i < repeat; i++) {
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->reset(ctxs);
+                }
+                this->data_fini(ctxs);
+            }
+        }
+    }
+}
+
+template <typename T>
+class test_allreduce_avg_order : public test_allreduce<T> {
+};
+
+using test_allreduce_avg_order_type =
+    ::testing::Types<ReductionTest<UCC_DT_FLOAT32, avg>,
+                     ReductionTest<UCC_DT_FLOAT64, avg>,
+                     ReductionTest<UCC_DT_BFLOAT16, avg>>;
+TYPED_TEST_CASE(test_allreduce_avg_order, test_allreduce_avg_order_type);
+
+TYPED_TEST(test_allreduce_avg_order, avg_post_op)
+{
+    int           n_procs = 15;
+    ucc_job_env_t env     = {{"UCC_TL_UCP_REDUCE_AVG_PRE_OP", "0"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 3;
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+
+    for (auto count : {4, 256, 65536}) {
+        for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+            for (auto m : mt) {
+                this->set_mem_type(m);
+                this->set_inplace(inplace);
+                this->data_init(n_procs, TypeParam::dt, count, ctxs);
+                UccReq req(team, ctxs);
+
+                for (auto i = 0; i < repeat; i++) {
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->reset(ctxs);
+                }
+                this->data_fini(ctxs);
+            }
+        }
+    }
+}

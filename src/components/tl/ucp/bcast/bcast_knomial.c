@@ -15,16 +15,16 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    ucc_rank_t         myrank    = team->rank;
-    ucc_rank_t         team_size = team->size;
-    ucc_rank_t         root      = (uint32_t)coll_task->args.root;
+    ucc_rank_t         rank       = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         size       = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t         root      = (uint32_t)TASK_ARGS(task).root;
     uint32_t           radix     = task->bcast_kn.radix;
-    ucc_rank_t         vrank     = (myrank - root + team_size) % team_size;
+    ucc_rank_t         vrank     = (rank - root + size) % size;
     ucc_rank_t         dist      = task->bcast_kn.dist;
-    void              *buffer    = coll_task->args.src.info.buffer;
-    ucc_memory_type_t  mtype     = coll_task->args.src.info.mem_type;
-    size_t             data_size = coll_task->args.src.info.count *
-                       ucc_dt_size(coll_task->args.src.info.datatype);
+    void              *buffer    = TASK_ARGS(task).src.info.buffer;
+    ucc_memory_type_t  mtype     = TASK_ARGS(task).src.info.mem_type;
+    size_t             data_size = TASK_ARGS(task).src.info.count *
+                       ucc_dt_size(TASK_ARGS(task).src.info.datatype);
     ucc_rank_t vpeer, peer, vroot_at_level, root_at_level, pos;
     uint32_t i;
 
@@ -37,8 +37,8 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
             if (pos == 0) {
                 for (i = radix - 1; i >= 1; i--) {
                     vpeer = vrank + i * dist;
-                    if (vpeer < team_size) {
-                        peer = (vpeer + root) % team_size;
+                    if (vpeer < size) {
+                        peer = (vpeer + root) % size;
                         UCPCHECK_GOTO(ucc_tl_ucp_send_nb(buffer, data_size,
                                                          mtype, peer, team,
                                                          task),
@@ -47,7 +47,7 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
                 }
             } else {
                 vroot_at_level = vrank - pos * dist;
-                root_at_level  = (vroot_at_level + root) % team_size;
+                root_at_level  = (vroot_at_level + root) % size;
                 UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(buffer, data_size, mtype,
                                                  root_at_level, team, task),
                               task, out);
@@ -71,14 +71,15 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team = TASK_TEAM(task);
+    ucc_rank_t         size = UCC_TL_TEAM_SIZE(team);
     ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_bcast_kn_start", 0);
     ucc_tl_ucp_task_reset(task);
 
     task->bcast_kn.radix =
-        ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.bcast_kn_radix, team->size);
-    CALC_KN_TREE_DIST(team->size, task->bcast_kn.radix, task->bcast_kn.dist);
+        ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.bcast_kn_radix, size);
+    CALC_KN_TREE_DIST(size, task->bcast_kn.radix, task->bcast_kn.dist);
 
     status = ucc_tl_ucp_bcast_knomial_progress(&task->super);
     if (UCC_INPROGRESS == status) {

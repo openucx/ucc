@@ -48,6 +48,7 @@ typedef struct ucc_cl_basic_team {
     ucc_team_multiple_req_t *team_create_req;
     ucc_tl_team_t          **tl_teams;
     unsigned                 n_tl_teams;
+    ucc_coll_score_t        *score;
     ucc_score_map_t         *score_map;
 } ucc_cl_basic_team_t;
 UCC_CLASS_DECLARE(ucc_cl_basic_team_t, ucc_base_context_t *,

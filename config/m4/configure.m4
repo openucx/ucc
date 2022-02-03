@@ -7,9 +7,13 @@ AC_DEFUN([ENABLE_MODULE_PROFILING],
 [
     AS_IF([test "x$with_profiling" = xall],
         [
-            prof_modules=":core:mc:tl_ucp"
+            prof_modules=":core:mc:tl_ucp:tl_nccl:tl_sharp:cl_hier:tl_cuda"
             AC_DEFINE([HAVE_PROFILING_CORE], [1], [Enable profiling for CORE])
             AC_DEFINE([HAVE_PROFILING_TL_UCP], [1], [Enable profiling for TL UCP])
+            AC_DEFINE([HAVE_PROFILING_TL_NCCL], [1], [Enable profiling for TL NCCL])
+            AC_DEFINE([HAVE_PROFILING_TL_SHARP], [1], [Enable profiling for TL SHARP])
+            AC_DEFINE([HAVE_PROFILING_TL_CUDA], [1], [Enable profiling for TL CUDA])
+            AC_DEFINE([HAVE_PROFILING_CL_HIER], [1], [Enable profiling for CL HIER])
             AC_DEFINE([HAVE_PROFILING_MC], [1], [Enable profiling for MC])
         ],
         [
@@ -29,6 +33,30 @@ AC_DEFUN([ENABLE_MODULE_PROFILING],
             *tl_ucp*)
                 prof_modules="${prof_modules}:tl_ucp"
                 AC_DEFINE([HAVE_PROFILING_TL_UCP], [1], [Enable profiling for TL UCP])
+                ;;
+            esac
+            case $1 in
+            *tl_nccl*)
+                prof_modules="${prof_modules}:tl_nccl"
+                AC_DEFINE([HAVE_PROFILING_TL_NCCL], [1], [Enable profiling for TL NCCL])
+                ;;
+            esac
+            case $1 in
+            *tl_sharp*)
+                prof_modules="${prof_modules}:tl_sharp"
+                AC_DEFINE([HAVE_PROFILING_TL_SHARP], [1], [Enable profiling for TL SHARP])
+                ;;
+            esac
+            case $1 in
+            *cl_hier*)
+                prof_modules="${prof_modules}:cl_hier"
+                AC_DEFINE([HAVE_PROFILING_CL_HIER], [1], [Enable profiling for CL HIER])
+                ;;
+            esac
+            case $1 in
+            *tl_cuda*)
+                prof_modules="${prof_modules}:tl_cuda"
+                AC_DEFINE([HAVE_PROFILING_TL_CUDA], [1], [Enable profiling for TL CUDA])
                 ;;
             esac
         ])

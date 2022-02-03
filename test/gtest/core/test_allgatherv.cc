@@ -6,8 +6,8 @@
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
-using Param_0 = std::tuple<int, int, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
-using Param_1 = std::tuple<int, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
+using Param_0 = std::tuple<int, ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
+using Param_1 = std::tuple<ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
 
 class test_allgatherv : public UccCollArgs, public ucc::test
 {
@@ -159,7 +159,7 @@ class test_allgatherv_0 : public test_allgatherv,
 UCC_TEST_P(test_allgatherv_0, single)
 {
     const int                 team_id  = std::get<0>(GetParam());
-    const ucc_datatype_t      dtype    = (ucc_datatype_t)std::get<1>(GetParam());
+    const ucc_datatype_t      dtype    = std::get<1>(GetParam());
     const ucc_memory_type_t   mem_type = std::get<2>(GetParam());
     const int                 count    = std::get<3>(GetParam());
     const gtest_ucc_inplace_t inplace  = std::get<4>(GetParam());
@@ -170,7 +170,7 @@ UCC_TEST_P(test_allgatherv_0, single)
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    data_init(size, (ucc_datatype_t)dtype, count, ctxs);
+    data_init(size, dtype, count, ctxs);
     UccReq    req(team, ctxs);
     req.start();
     req.wait();
@@ -181,7 +181,7 @@ UCC_TEST_P(test_allgatherv_0, single)
 UCC_TEST_P(test_allgatherv_0, single_persistent)
 {
     const int                 team_id = std::get<0>(GetParam());
-    const ucc_datatype_t      dtype   = (ucc_datatype_t)std::get<1>(GetParam());
+    const ucc_datatype_t      dtype   = std::get<1>(GetParam());
     const ucc_memory_type_t   mem_type = std::get<2>(GetParam());
     const int                 count    = std::get<3>(GetParam());
     const gtest_ucc_inplace_t inplace  = std::get<4>(GetParam());
@@ -193,7 +193,7 @@ UCC_TEST_P(test_allgatherv_0, single_persistent)
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    data_init(size, (ucc_datatype_t)dtype, count, ctxs);
+    data_init(size, dtype, count, ctxs);
     UccReq req(team, ctxs);
 
     for (auto i = 0; i < n_calls; i++) {
@@ -209,7 +209,7 @@ INSTANTIATE_TEST_CASE_P(
     , test_allgatherv_0,
     ::testing::Combine(
         ::testing::Range(1, UccJob::nStaticTeams), // team_ids
-        ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_INT64 + 1), // dtype
+        PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
         ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
 #else
@@ -223,7 +223,7 @@ class test_allgatherv_1 : public test_allgatherv,
 
 UCC_TEST_P(test_allgatherv_1, multiple)
 {
-    const ucc_datatype_t       dtype    = (ucc_datatype_t)std::get<0>(GetParam());
+    const ucc_datatype_t       dtype    = std::get<0>(GetParam());
     const ucc_memory_type_t    mem_type = std::get<1>(GetParam());
     const int                  count    = std::get<2>(GetParam());
     const gtest_ucc_inplace_t  inplace  = std::get<3>(GetParam());
@@ -238,7 +238,7 @@ UCC_TEST_P(test_allgatherv_1, multiple)
         this->set_inplace(inplace);
         this->set_mem_type(mem_type);
 
-        data_init(size, (ucc_datatype_t)dtype, count, ctx);
+        data_init(size, dtype, count, ctx);
         reqs.push_back(UccReq(team, ctx));
         ctxs.push_back(ctx);
     }
@@ -254,7 +254,7 @@ UCC_TEST_P(test_allgatherv_1, multiple)
 INSTANTIATE_TEST_CASE_P(
     , test_allgatherv_1,
     ::testing::Combine(
-        ::testing::Range((int)UCC_DT_INT8, (int)UCC_DT_INT64 + 1), // dtype
+        PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
         ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
 #else

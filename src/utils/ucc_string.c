@@ -8,6 +8,7 @@
 #include "ucc_log.h"
 #include <ctype.h>
 #include <ucs/sys/string.h>
+
 char **ucc_str_split(const char *str, const char *delim)
 {
     unsigned alloc_size = 8;

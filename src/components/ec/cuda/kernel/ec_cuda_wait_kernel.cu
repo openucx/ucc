@@ -8,23 +8,23 @@
 extern "C" {
 #endif
 
-#include "../mc_cuda.h"
+#include "../ec_cuda.h"
 #ifdef __cplusplus
 }
 #endif
 
 __global__ void wait_kernel(volatile uint32_t *status) {
     ucc_status_t st;
-    *status = UCC_MC_CUDA_TASK_STARTED;
+    *status = UCC_EC_CUDA_TASK_STARTED;
     do {
         st = (ucc_status_t)*status;
-    } while(st != UCC_MC_CUDA_TASK_COMPLETED);
-    *status = UCC_MC_CUDA_TASK_COMPLETED_ACK;
+    } while(st != UCC_EC_CUDA_TASK_COMPLETED);
+    *status = UCC_EC_CUDA_TASK_COMPLETED_ACK;
     return;
 }
 
 __global__ void wait_kernel_nb(volatile uint32_t *status) {
-    *status = UCC_MC_CUDA_TASK_COMPLETED_ACK;
+    *status = UCC_EC_CUDA_TASK_COMPLETED_ACK;
     return;
 }
 
@@ -32,7 +32,7 @@ __global__ void wait_kernel_nb(volatile uint32_t *status) {
 extern "C" {
 #endif
 
-ucc_status_t ucc_mc_cuda_post_kernel_stream_task(uint32_t *status,
+ucc_status_t ucc_ec_cuda_post_kernel_stream_task(uint32_t *status,
                                                  int blocking_wait,
                                                  cudaStream_t stream)
 {
@@ -41,7 +41,7 @@ ucc_status_t ucc_mc_cuda_post_kernel_stream_task(uint32_t *status,
     } else {
         wait_kernel_nb<<<1, 1, 0, stream>>>(status);
     }
-    CUDACHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
     return UCC_OK;
 }
 

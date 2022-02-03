@@ -22,17 +22,11 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t         *team,
 void ucc_tl_ucp_close_eps(ucc_tl_ucp_context_t *ctx);
 
 static inline ucc_context_addr_header_t *
-ucc_tl_ucp_get_team_ep_header(ucc_tl_ucp_team_t *team, ucc_rank_t rank)
+ucc_tl_ucp_get_team_ep_header(ucc_tl_ucp_team_t *team, ucc_rank_t core_rank)
 
 {
-    return ucc_get_team_ep_header(UCC_TL_CORE_CTX(team), team->super.super.team,
-                                  rank);
-}
-
-static inline ucc_context_id_t
-ucc_tl_ucp_get_rank_key(ucc_tl_ucp_team_t *team, ucc_rank_t rank)
-{
-    return ucc_tl_ucp_get_team_ep_header(team, rank)->ctx_id;
+    return ucc_get_team_ep_header(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
+                                  core_rank);
 }
 
 static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team, ucc_rank_t rank,
@@ -42,17 +36,24 @@ static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team, ucc_rank_t
     ucc_context_addr_header_t *h        = NULL;
     ucc_rank_t                 ctx_rank = 0;
     ucc_status_t               status;
+    ucc_rank_t                 core_rank;
 
+    core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), rank);
     if (ctx->eps) {
-        ctx_rank = ucc_get_ctx_rank(team->super.super.team, rank);
+        ucc_team_t *core_team = UCC_TL_CORE_TEAM(team);
+        /* Core super.super.team ptr is NULL for service_team
+           which has scope == UCC_CL_LAST + 1*/
+        ucc_assert((NULL != core_team) || IS_SERVICE_TEAM(team));
+        ctx_rank = core_team ? ucc_get_ctx_rank(core_team, core_rank)
+                       : core_rank;
         *ep      = ctx->eps[ctx_rank];
     } else {
-        h   = ucc_tl_ucp_get_team_ep_header(team, rank);
+        h   = ucc_tl_ucp_get_team_ep_header(team, core_rank);
         *ep = tl_ucp_hash_get(ctx->ep_hash, h->ctx_id);
     }
     if (NULL == (*ep)) {
         /* Not connected yet */
-        status = ucc_tl_ucp_connect_team_ep(team, rank, ep);
+        status = ucc_tl_ucp_connect_team_ep(team, core_rank, ep);
         if (ucc_unlikely(UCC_OK != status)) {
             tl_error(UCC_TL_TEAM_LIB(team), "failed to connect team ep");
             *ep = NULL;

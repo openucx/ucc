@@ -35,6 +35,14 @@ BEGIN_C_DECLS
   */
 
 /**
+  * @defgroup UCC_DATATYPE Datatypes data-structures and functions
+  * @{
+  * Datatypes data-structures and functions
+  * @}
+  *
+  */
+
+/**
   * @defgroup UCC_LIB Library initialization and finalization routines
   * @{
   * Library initialization and finalization routines
@@ -115,42 +123,6 @@ BEGIN_C_DECLS
  *
  *  @ingroup UCC_LIB_INIT_DT
  *
- *  @brief Enumeration representing the UCC reduction operations
- *
- *  @parblock
- *
- *
- *  Description
- *
- *  @ref ucc_reduction_op_t  represents the UCC reduction operations. It is used by the
- *  library initialization routine @ref ucc_init to request the operations expected by the user.
- *  It is used by the @ref ucc_lib_attr_t to communicate the operations supported by
- *  the library. The user-defined reductions are represented by
- *  UCC_OP_USERDEFINED.
- *
- *  @endparblock
- *
- */
-typedef enum {
-    UCC_OP_USERDEFINED      = UCC_BIT(0), /*!< User defined reduction operation */
-    UCC_OP_SUM              = UCC_BIT(1), /*!< Predefined addition operation */
-    UCC_OP_PROD             = UCC_BIT(2),
-    UCC_OP_MAX              = UCC_BIT(3),
-    UCC_OP_MIN              = UCC_BIT(4),
-    UCC_OP_LAND             = UCC_BIT(5),
-    UCC_OP_LOR              = UCC_BIT(6),
-    UCC_OP_LXOR             = UCC_BIT(7),
-    UCC_OP_BAND             = UCC_BIT(8),
-    UCC_OP_BOR              = UCC_BIT(9),
-    UCC_OP_BXOR             = UCC_BIT(10),
-    UCC_OP_MAXLOC           = UCC_BIT(11),
-    UCC_OP_MINLOC           = UCC_BIT(12)
-} ucc_reduction_op_t;
-
-/**
- *
- *  @ingroup UCC_LIB_INIT_DT
- *
  *  @brief Enumeration representing the collective operations
  *
  *  @parblock
@@ -185,8 +157,21 @@ typedef enum {
 } ucc_coll_type_t;
 
 /**
+ *  @ingroup UCC_COLLECTIVES_DT
+ */
+typedef enum ucc_memory_type {
+    UCC_MEMORY_TYPE_HOST,         /*!< Default system memory */
+    UCC_MEMORY_TYPE_CUDA,         /*!< NVIDIA CUDA memory */
+    UCC_MEMORY_TYPE_CUDA_MANAGED, /*!< NVIDIA CUDA managed memory */
+    UCC_MEMORY_TYPE_ROCM,         /*!< AMD ROCM memory */
+    UCC_MEMORY_TYPE_ROCM_MANAGED, /*!< AMD ROCM managed system memory */
+    UCC_MEMORY_TYPE_LAST,
+    UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
+} ucc_memory_type_t;
+
+/**
  *
- *  @ingroup UCC_LIB_INIT_DT
+ *  @ingroup UCC_DATATYPE
  *
  *  @brief Enumeration representing the UCC library's datatype
  *
@@ -195,33 +180,281 @@ typedef enum {
  *  Description
  *
  *  @ref ucc_datatype_t represents the datatypes supported by the UCC library’s
- *  collective and reduction operations. The standard operations are signed and
- *  unsigned integers of various sizes, float 16, 32, and 64, and user-defined
- *  datatypes. The UCC_DT_USERDEFINED represents the user-defined datatype. The
- *  UCC_DT_OPAQUE is used to represent the user-defined datatypes for
- *  user-defined reductions. When UCC_DT_OPAQUE is used, the library passes the
- *  data to the user-defined reductions without any modifications.
+ *  collective and reduction operations. The predefined operations
+ *  are signed and unsigned integers of various sizes, float 16, 32, and 64, and
+ *  user-defined datatypes. User-defined datatypes are created using
+ *  @ref ucc_dt_create_generic interface and can support user-defined reduction
+ *  operations. Predefined reduction operations can be used only with
+ *  predefined datatypes.
+ *
+ *  @endparblock
+ *
+ */
+typedef uint64_t ucc_datatype_t;
+
+#define   UCC_DT_INT8      UCC_PREDEFINED_DT(0)
+#define   UCC_DT_INT16     UCC_PREDEFINED_DT(1)
+#define   UCC_DT_INT32     UCC_PREDEFINED_DT(2)
+#define   UCC_DT_INT64     UCC_PREDEFINED_DT(3)
+#define   UCC_DT_INT128    UCC_PREDEFINED_DT(4)
+#define   UCC_DT_UINT8     UCC_PREDEFINED_DT(5)
+#define   UCC_DT_UINT16    UCC_PREDEFINED_DT(6)
+#define   UCC_DT_UINT32    UCC_PREDEFINED_DT(7)
+#define   UCC_DT_UINT64    UCC_PREDEFINED_DT(8)
+#define   UCC_DT_UINT128   UCC_PREDEFINED_DT(9)
+#define   UCC_DT_FLOAT16   UCC_PREDEFINED_DT(10)
+#define   UCC_DT_FLOAT32   UCC_PREDEFINED_DT(11)
+#define   UCC_DT_FLOAT64   UCC_PREDEFINED_DT(12)
+#define   UCC_DT_BFLOAT16  UCC_PREDEFINED_DT(13)
+#define   UCC_DT_PREDEFINED_LAST  14
+
+/**
+ * @ingroup UCC_DATATYPE
+ */
+enum ucc_generic_dt_ops_field {
+    UCC_GENERIC_DT_OPS_FIELD_FLAGS             = UCC_BIT(0),
+};
+
+/**
+ * @ingroup UCC_DATATYPE
+ * @brief Flags that can be specified for generic datatype
+ *
+ */
+
+typedef enum {
+    UCC_GENERIC_DT_OPS_FLAG_CONTIG             = UCC_BIT(0), /*!< If set, the created datatype
+                                                                  represents a contiguous memory
+                                                                  region with the size specified
+                                                                  in @ref ucc_generic_dt_ops.contig_size
+                                                                  field of @ref ucc_generic_dt_ops */
+    UCC_GENERIC_DT_OPS_FLAG_REDUCE             = UCC_BIT(1), /*!< If set, the created datatype
+                                                                  has user-defined reduction
+                                                                  operation associated with it.
+                                                                  reduce.cb and reduce.ctx fields
+                                                                  of @ref ucc_generic_dt_ops must
+                                                                  be initialized. Collective operations
+                                                                  that involve reduction (allreduce,
+                                                                  reduce, reduce_scatter/v) can use
+                                                                  user-defined data-types only when
+                                                                  this flag is set. */
+} ucc_generic_dt_ops_flags_t;
+
+/**
+ * @ingroup UCC_DATATYPE
+ * @brief Descriptor of user-defined reduction callback
+ *
+ * This structure is the argument to the reduce.cb callback. It must implement
+ * the reduction of n_vectors + 1 data vectors each containing "count" elements.
+ * First vector is "src1", other n_vectors have start address
+ * v_j = src2 + count * dt_extent * stride * j.
+ * The result is stored in dst, so that
+ * dst[i] = src1[i] + v0[i] + v1[i] + ... +v_nvecttors[i],
+ * for i in [0:count), where "+" represents user-defined reduction of 2 elements
+ */
+
+typedef struct ucc_reduce_cb_params {
+    uint64_t          mask;      /*< for backward compatibility. currently ignored. */
+    void             *src1;      /*< input buffer */
+    void             *src2;      /*< input buffer: represents n_vectors buffers with
+                                   offset "stride" between them */
+    void             *dst;       /*< destination buffer */
+    size_t            n_vectors; /*< number of vectors from src2 to reduce */
+    size_t            count;     /*< number of elements in one vector */
+    size_t            stride;    /*< stride in bytes between the vectors in src2 */
+    ucc_dt_generic_t *dt;        /*< pointer to user-defined datatype used for
+                                     reduction */
+    void             *cb_ctx;    /*< user-defined context as defined
+                                   by @ref ucc_generic_dt_ops::reduce.cb_ctx */
+} ucc_reduce_cb_params_t;
+/**
+ * @ingroup UCC_DATATYPE
+ * @brief UCC generic data type descriptor
+ *
+ * This structure provides a generic datatype descriptor that is used to create
+ * user-defined datatypes.
+ */
+
+typedef struct ucc_generic_dt_ops {
+    uint64_t mask;
+    uint64_t flags;
+    size_t   contig_size; /*!< size of the datatype if @ref UCC_GENERIC_DT_OPS_FLAG_CONTIG is set */
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Start a packing request.
+     *
+     * The pointer refers to application defined start-to-pack routine.
+     *
+     * @param [in]  context        User-defined context.
+     * @param [in]  buffer         Buffer to pack.
+     * @param [in]  count          Number of elements to pack into the buffer.
+     *
+     * @return  A custom state that is passed to the subsequent
+     *          @ref ucc_generic_dt_ops::pack "pack()" routine.
+     */
+    void* (*start_pack)(void *context, const void *buffer, size_t count);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Start an unpacking request.
+     *
+     * The pointer refers to application defined start-to-unpack routine.
+     *
+     * @param [in]  context        User-defined context.
+     * @param [in]  buffer         Buffer to unpack to.
+     * @param [in]  count          Number of elements to unpack in the buffer.
+     *
+     * @return  A custom state that is passed later to the subsequent
+     *          @ref ucc_generic_dt_ops::unpack "unpack()" routine.
+     */
+    void* (*start_unpack)(void *context, void *buffer, size_t count);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Get the total size of packed data.
+     *
+     * The pointer refers to user defined routine that returns the size of data
+     * in a packed format.
+     *
+     * @param [in]  state          State as returned by
+     *                             @ref ucc_generic_dt_ops::start_pack
+     *                             "start_pack()" routine.
+     *
+     * @return  The size of the data in a packed form.
+     */
+    size_t (*packed_size)(void *state);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Pack data.
+     *
+     * The pointer refers to application defined pack routine.
+     *
+     * @param [in]  state          State as returned by
+     *                             @ref ucc_generic_dt_ops::start_pack
+     *                             "start_pack()" routine.
+     * @param [in]  offset         Virtual offset in the output stream.
+     * @param [in]  dest           Destination buffer to pack the data.
+     * @param [in]  max_length     Maximum length to pack.
+     *
+     * @return The size of the data that was written to the destination buffer.
+     *         Must be less than or equal to @e max_length.
+     */
+    size_t (*pack) (void *state, size_t offset, void *dest, size_t max_length);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Unpack data.
+     *
+     * The pointer refers to application defined unpack routine.
+     *
+     * @param [in]  state          State as returned by
+     *                             @ref ucc_generic_dt_ops::start_unpack
+     *                             "start_unpack()" routine.
+     * @param [in]  offset         Virtual offset in the input stream.
+     * @param [in]  src            Source to unpack the data from.
+     * @param [in]  length         Length to unpack.
+     *
+     * @return UCC_OK or an error if unpacking failed.
+     */
+    ucc_status_t (*unpack)(void *state, size_t offset, const void *src, size_t length);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief Finish packing/unpacking.
+     *
+     * The pointer refers to application defined finish routine.
+     *
+     * @param [in]  state          State as returned by
+     *                             @ref ucc_generic_dt_ops::start_pack
+     *                             "start_pack()"
+     *                             and
+     *                             @ref ucc_generic_dt_ops::start_unpack
+     *                             "start_unpack()"
+     *                             routines.
+     */
+    void (*finish)(void *state);
+
+    /**
+     * @ingroup UCC_DATATYPE
+     * @brief User-defined reduction callback
+     *
+     * The pointer refers to user-defined reduction routine.
+     *
+     * @param [in]  params reduction descriptor
+     */
+
+    struct {
+        ucc_status_t (*cb)(const ucc_reduce_cb_params_t *params);
+        void *cb_ctx;
+    } reduce;
+} ucc_generic_dt_ops_t;
+
+
+/**
+ * @ingroup UCC_DATATYPE
+ * @brief Create a generic datatype.
+ *
+ * This routine creates a generic datatype object. The generic datatype is
+ * described by the @a ops @ref ucc_generic_dt_ops_t "object" which provides
+ * a table of routines defining the operations for generic datatype manipulation.
+ * Typically, generic datatypes are used for integration with datatype engines
+ * provided with MPI implementations (MPICH, Open MPI, etc). The application
+ * is responsible for releasing the @a datatype_p  object using
+ * @ref ucc_dt_destroy "ucc_dt_destroy()" routine.
+ *
+ * @param [in]  ops          Generic datatype function table as defined by
+ *                           @ref ucc_generic_dt_ops_t .
+ * @param [in]  context      Application defined context passed to this
+ *                           routine.  The context is passed as a parameter
+ *                           to the routines in the @a ops table.
+ * @param [out] datatype_p   A pointer to datatype object.
+ *
+ * @return Error code as defined by @ref ucc_status_t
+ */
+ucc_status_t ucc_dt_create_generic(const ucc_generic_dt_ops_t *ops, void *context,
+                                   ucc_datatype_t *datatype_p);
+
+/**
+ * @ingroup UCC_DATATYPE
+ * @brief Destroy generic datatype
+ */
+void ucc_dt_destroy(ucc_datatype_t datatype);
+
+/**
+ *
+ *  @ingroup UCC_LIB_INIT_DT
+ *
+ *  @brief Enumeration representing the UCC reduction operations
+ *
+ *  @parblock
+ *
+ *
+ *  Description
+ *
+ *  @ref ucc_reduction_op_t  represents the UCC reduction operations. It is used by the
+ *  library initialization routine @ref ucc_init to request the operations expected by the user.
+ *  It is used by the @ref ucc_lib_attr_t to communicate the operations supported by
+ *  the library.
  *
  *  @endparblock
  *
  */
 typedef enum {
-    UCC_DT_INT8           = 0,
-    UCC_DT_INT16,
-    UCC_DT_INT32,
-    UCC_DT_INT64,
-    UCC_DT_INT128,
-    UCC_DT_UINT8,
-    UCC_DT_UINT16,
-    UCC_DT_UINT32,
-    UCC_DT_UINT64,
-    UCC_DT_UINT128,
-    UCC_DT_FLOAT16,
-    UCC_DT_FLOAT32,
-    UCC_DT_FLOAT64,
-    UCC_DT_USERDEFINED,
-    UCC_DT_OPAQUE
-} ucc_datatype_t;
+    UCC_OP_SUM,
+    UCC_OP_PROD,
+    UCC_OP_MAX,
+    UCC_OP_MIN,
+    UCC_OP_LAND,
+    UCC_OP_LOR,
+    UCC_OP_LXOR,
+    UCC_OP_BAND,
+    UCC_OP_BOR,
+    UCC_OP_BXOR,
+    UCC_OP_MAXLOC,
+    UCC_OP_MINLOC,
+    UCC_OP_AVG,
+    UCC_OP_LAST
+} ucc_reduction_op_t;
 
 /**
  *
@@ -280,32 +513,6 @@ typedef enum {
 
 
 /**
- *  @ingroup UCC_COLLECTIVES
- *
- *  @brief The reduction wrapper provides an interface for the UCC library to invoke
- *         user-defined custom reduction callback
- *
- *  @param [in]  invec          The input elements to be reduced by the user function
- *  @param [in]  inoutvec       The input elements to be reduced and output of the reduction
- *  @param [in]  count          The number of elements of type "dtype" to be reduced
- *  @param [in]  dtype          Datatype specified in the coll_args
- *  @param [in]  custom_op      A pointer to the user defined reduction passed to the coll_args as custom_reduction_op
- *
- *
- *  @parblock
- *
- *  @b Description
- *
- *  This function is called by the UCC library when it needs to perform a non-standard
- *  user-defined reduction operaion during allreduce/reduce collective.
- *
- *  @endparblock
- */
-typedef void(*ucc_reduction_wrapper_t)(void *invec, void *inoutvec,
-                                       ucc_count_t *count, void *dtype,
-                                       void *custom_reduction_op);
-
-/**
  * @brief UCC library initialization parameters
  */
 
@@ -317,8 +524,7 @@ enum ucc_lib_params_field{
     UCC_LIB_PARAM_FIELD_THREAD_MODE         = UCC_BIT(0),
     UCC_LIB_PARAM_FIELD_COLL_TYPES          = UCC_BIT(1),
     UCC_LIB_PARAM_FIELD_REDUCTION_TYPES     = UCC_BIT(2),
-    UCC_LIB_PARAM_FIELD_SYNC_TYPE           = UCC_BIT(3),
-    UCC_LIB_PARAM_FIELD_REDUCTION_WRAPPER   = UCC_BIT(4)
+    UCC_LIB_PARAM_FIELD_SYNC_TYPE           = UCC_BIT(3)
 };
 
 /**
@@ -358,7 +564,6 @@ typedef struct ucc_lib_params {
     uint64_t                coll_types;
     uint64_t                reduction_types;
     ucc_coll_sync_type_t    sync_type;
-    ucc_reduction_wrapper_t reduction_wrapper;
 } ucc_lib_params_t;
 
 /**
@@ -616,7 +821,8 @@ enum ucc_context_params_field {
     UCC_CONTEXT_PARAM_FIELD_TYPE              = UCC_BIT(0),
     UCC_CONTEXT_PARAM_FIELD_SYNC_TYPE         = UCC_BIT(1),
     UCC_CONTEXT_PARAM_FIELD_OOB               = UCC_BIT(2),
-    UCC_CONTEXT_PARAM_FIELD_ID                = UCC_BIT(3)
+    UCC_CONTEXT_PARAM_FIELD_ID                = UCC_BIT(3),
+    UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS        = UCC_BIT(4)
 };
 
 /**
@@ -627,7 +833,8 @@ enum ucc_context_attr_field {
     UCC_CONTEXT_ATTR_FIELD_TYPE               = UCC_BIT(0),
     UCC_CONTEXT_ATTR_FIELD_SYNC_TYPE          = UCC_BIT(1),
     UCC_CONTEXT_ATTR_FIELD_CTX_ADDR           = UCC_BIT(2),
-    UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN       = UCC_BIT(3)
+    UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN       = UCC_BIT(3),
+    UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE   = UCC_BIT(4)
 };
 
 /**
@@ -635,14 +842,44 @@ enum ucc_context_attr_field {
  *
  * @brief OOB collective operation for creating the context
  */
-typedef struct ucc_context_oob_coll {
+typedef struct ucc_oob_coll {
     ucc_status_t    (*allgather)(void *src_buf, void *recv_buf, size_t size,
                                  void *allgather_info,  void **request);
     ucc_status_t    (*req_test)(void *request);
     ucc_status_t    (*req_free)(void *request);
-    uint32_t        participants;
     void            *coll_info;
-}  ucc_context_oob_coll_t;
+    uint32_t        n_oob_eps; /*!< Number of endpoints participating in the
+                                    oob operation (e.g., number of processes
+                                    representing a ucc team) */
+    uint32_t        oob_ep; /*!< Integer value that represents the position
+                                 of the calling processes in the given oob op:
+                                 the data specified by "src_buf" will be placed
+                                 at the offset "oob_ep*size" in the "recv_buf".
+                                 oob_ep must be uniq at every calling process
+                                 and shuold be in the range [0:n_oob_eps). */
+
+}  ucc_oob_coll_t;
+
+typedef ucc_oob_coll_t ucc_context_oob_coll_t;
+typedef ucc_oob_coll_t ucc_team_oob_coll_t;
+
+/**
+ *
+ *  @ingroup UCC_CONTEXT_DT
+ */
+typedef struct ucc_mem_map {
+    void *   address; /*!< the address of a buffer to be attached to a UCC context */
+    size_t   len;     /*!< the length of the buffer */
+} ucc_mem_map_t;
+
+/**
+ *
+ * @ingroup UCC_CONTEXT_DT
+ */
+typedef struct ucc_mem_map_params {
+    ucc_mem_map_t *segments;   /*!< array of ucc_mem_map elements */
+    uint64_t       n_segments; /*!< the number of ucc_mem_map elements */
+} ucc_mem_map_params_t;
 
 /**
  *
@@ -672,6 +909,7 @@ typedef struct ucc_context_params {
     ucc_coll_sync_type_t    sync_type;
     ucc_context_oob_coll_t  oob;
     uint64_t                ctx_id;
+    ucc_mem_map_params_t    mem_params;
 } ucc_context_params_t;
 
 /**
@@ -699,6 +937,7 @@ typedef struct ucc_context_attr {
     ucc_coll_sync_type_t    sync_type;
     ucc_context_addr_h      ctx_addr;
     ucc_context_addr_len_t  ctx_addr_len;
+    uint64_t                global_work_buffer_size;
 } ucc_context_attr_t;
 
 /**
@@ -787,10 +1026,11 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
  *  @brief The @ref ucc_context_config_modify routine modifies the runtime configuration
  *                  of UCC context (optionally for a given CLS)
  *
- *  @param [in] config   Pointer to the configuration descriptor to be modified
- *  @param [in] cls      Comma separated list of CLS or NULL. If NULL then core context config is modified.
- *  @param [in] name     Configuration variable to be modified
- *  @param [in] value    Configuration value to set
+ *  @param [in] config    Pointer to the configuration descriptor to be modified
+ *  @param [in] component CL/TL component (e.g. "tl/ucp" or "cl/basic") or NULL.
+                          If NULL then core context config is modified.
+ *  @param [in] name      Configuration variable to be modified
+ *  @param [in] value     Configuration value to set
  *
  *  @parblock
  *
@@ -805,7 +1045,7 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
  */
 
 ucc_status_t ucc_context_config_modify(ucc_context_config_h config,
-                                       const char *cls, const char *name,
+                                       const char *component, const char *name,
                                        const char *value);
 
 /**
@@ -933,6 +1173,7 @@ enum ucc_team_params_field {
     UCC_TEAM_PARAM_FIELD_MEM_PARAMS             = UCC_BIT(9),
     UCC_TEAM_PARAM_FIELD_EP_MAP                 = UCC_BIT(10),
     UCC_TEAM_PARAM_FIELD_ID                     = UCC_BIT(11),
+    UCC_TEAM_PARAM_FIELD_FLAGS                  = UCC_BIT(12)
 };
 
 /**
@@ -950,35 +1191,17 @@ enum ucc_team_attr_field {
 
 /**
  *
- *  @ingroup UCC_TEAM_DT
+ * @ingroup UCC_TEAM_DT
  */
-typedef enum  {
-    UCC_MEM_CONSTRAINT_SYMMETRIC   = UCC_BIT(0),
-    UCC_MEM_CONSTRAINT_PERSISTENT  = UCC_BIT(1),
-    UCC_MEM_CONSTRAINT_ALIGN32     = UCC_BIT(2),
-    UCC_MEM_CONSTRAINT_ALIGN64     = UCC_BIT(3),
-    UCC_MEM_CONSTRAINT_ALIGN128    = UCC_BIT(4),
-} ucc_mem_constraints_t;
-
-/**
- *
- *  @ingroup UCC_TEAM_DT
- */
-typedef enum {
-    UCC_MEM_HINT_REMOTE_ATOMICS    = 0,
-    UCC_MEM_HINT_REMOTE_COUNTERS
-} ucc_mem_hints_t;
-
-/**
- *
- *  @ingroup UCC_TEAM_DT
- */
-typedef struct ucc_mem_map_params {
-    void                    *address;
-    size_t                  len;
-    ucc_mem_hints_t         hints;
-    ucc_mem_constraints_t   constraints;
-} ucc_mem_map_params_t;
+enum ucc_team_flags {
+    UCC_TEAM_FLAG_COLL_WORK_BUFFER             = UCC_BIT(0) /*< If set, this indicates
+                                                                the user will provide
+                                                                a scratchpad buffer for
+                                                                use in one-sided
+                                                                collectives. Otherwise,
+                                                                an internal buffer will
+                                                                used. */
+};
 
 /**
  *
@@ -996,22 +1219,43 @@ typedef struct ucc_team_p2p_conn {
  *
  *  @ingroup UCC_TEAM_DT
  */
-typedef struct  ucc_team_oob_coll {
-    ucc_status_t    (*allgather)(void *src_buf, void *recv_buf, size_t size,
-                                 void *allgather_info,  void **request);
-    ucc_status_t    (*req_test)(void *request);
-    ucc_status_t    (*req_free)(void *request);
-    uint32_t         participants;
-    void             *coll_info;
-}  ucc_team_oob_coll_t;
-
-/**
- *
- *  @ingroup UCC_TEAM_DT
- */
 typedef enum {
-    UCC_COLLECTIVE_POST_ORDERED     = 0,
-    UCC_COLLECTIVE_POST_UNORDERED   = 1
+
+    /**
+      * When set to this value, the collective participants shall post the operation
+      * in the same order.
+      */
+    UCC_COLLECTIVE_POST_ORDERED             = 0,
+
+    /**
+      * When set to this value, the collective participants shall post the operation
+      * in any order.
+      */
+    UCC_COLLECTIVE_POST_UNORDERED           = 1,
+
+    /**
+      * When set to this value, the collective participants shall initialize the operation
+      * in the same order.
+      */
+    UCC_COLLECTIVE_INIT_ORDERED             = 2,
+
+    /**
+      * When set to this value, the collective participants shall initialize the operation
+      * in any order.
+      */
+    UCC_COLLECTIVE_INIT_UNORDERED           = 3,
+
+    /**
+      * When set to this value, the collective participants shall initialize and
+      * post the operation in the same order.
+      */
+    UCC_COLLECTIVE_INIT_AND_POST_ORDERED    = 4,
+
+    /**
+      * When set to this value, the collective participants shall initialize and
+      * post the operation in any order.
+      */
+    UCC_COLLECTIVE_INIT_AND_POST_UNORDERED  = 5
 } ucc_post_ordering_t;
 
 /**
@@ -1095,22 +1339,111 @@ typedef struct ucc_ep_map_t {
  *  the fields is not set, the fields are not defined.
  *
  *
+ *
  *  @endparblock
  *
  */
 typedef struct ucc_team_params {
+
     uint64_t                mask;
+    uint64_t                flags;
+    /** @ref ucc_team_params.ordering is set to one the values defined by @ref
+      *  ucc_post_ordering_t
+      */
     ucc_post_ordering_t     ordering;
+
+    /** @ref ucc_team_params.outstanding_colls represents the number of outstanding non-blocking
+      * calls the user expects to post to the team. If the user posts more non-blocking
+      * calls than set, the behavior is undefined. If not set, there is no limit on
+      * the number of outstanding calls to be posted.
+      */
     uint64_t                outstanding_colls;
+
+    /** @ref ucc_team_params.ep The endpoint is a non-negative unique integer identifying the
+      * participant in the collective. If ep is not set, and @ref ucc_team_params.oob is not set, the
+      * library generates the ep. The generated ep can be queried using the @ref
+      * ucc_team_get_attr interface.
+      */
     uint64_t                ep;
+
+    /** @ref ucc_team_params.ep_list The endpoint list provides the list of eps participating to
+     *  create the team.
+     */
     uint64_t                *ep_list;
+
+    /** @ref ucc_team_params.ep_range can be either contiguous or not
+     *  contiguous. It is a hint to the library.
+     */
     ucc_ep_range_type_t     ep_range;
+
+    /** @ref ucc_team_params.team_size The team size is the number of participants in the team. If
+      * @ref ucc_team_params.oob is provided, the team size and @ref
+      * ucc_oob_coll.n_oob_eps should be the same.
+      */
     uint64_t                team_size;
+
+    /**
+      * @ref ucc_team_params.sync_type The options for sync_type are provided by @ref
+      * ucc_coll_sync_type_t
+      */
     ucc_coll_sync_type_t    sync_type;
+
+   /** @ref ucc_team_params.oob The signature of the function is defined by @ref
+     * ucc_oob_coll_t
+     * . The oob is used for exchanging information between the team
+     * participants during team creation. The user is
+     * responsible for implementing the oob operation. The relation between @ref
+     * ucc_team_params.ep and @ref ucc_oob_coll.oob_ep is defined as below:
+     *
+     * - When both are not provided. The library is responsible for generating the ep,
+     * which can be then queried via the @ref ucc_team_get_attr interface. This
+     * requires, however, ucc_params_t ep_map to be set and context created by
+     * @ref ucc_oob_coll. The behavior is undefined, when neither @ref
+     * ucc_team_params.ep or @ref ucc_team_params.ep_map, or @ref
+     * ucc_team_params.oob is not set.
+     *
+     * - When @ref ucc_team_params.ep is provided and @ref ucc_team_params.oob is
+     * not provided. The “ep” is the unique integer for the participant.
+     *
+     * - When @ref ucc_oob_coll.oob_ep is provided and @ref ucc_team_params.ep
+     * is not provided. The “ep” will be equivalent to @ref ucc_oob_coll.oob_ep.
+     *
+     * - When both are provided, the @ref ucc_oob_coll.oob_ep and @ref
+     * ucc_team_params_t.ep should be same. Otherwise, it
+     * is undefined.
+     */
     ucc_team_oob_coll_t     oob;
+
+    /** @ref ucc_team_params.p2p_conn is a callback function for the gathering
+      * the point-to-point communication information.
+      */
     ucc_team_p2p_conn_t     p2p_conn;
+
+    /** @ref ucc_team_params.mem_params provides an ability to attach a buffer
+      * to the team. This can be used as input/output or control buffer for the
+      * team. Typically, it can be useful for one-sided collective
+      * implementation.
+      */
     ucc_mem_map_params_t    mem_params;
+
+    /** @ref ucc_team_params.ep_map provides a mapping between @ref
+      * ucc_oob_coll.oob_ep used by
+      * the team and @ref ucc_oob_coll.oob_ep
+      * used by the context. The mapping options are defined by @ref
+      * ucc_ep_map_t. The definition is valid only when context is created with
+      * an @ref ucc_oob_coll.
+      */
     ucc_ep_map_t            ep_map;
+
+    /** @ref ucc_team_params.id
+      * The team id is a unique integer identifying the team that is active. The
+      * integer is unique within the process and not the job .i.e., any two active
+      * non-overlapping teams can have the same id. This semantic helps to avoid a
+      * global information exchange .i.e, the processes or threads not
+      * participating in the particular, need not participate in the team
+      * creation. If not provided, the team id is created internally. For the MPI
+      * programming model, this can be inherited from the MPI communicator id.
+      */
     uint64_t                id;
 } ucc_team_params_t;
 
@@ -1361,26 +1694,56 @@ ucc_status_t ucc_team_get_all_eps(ucc_team_h team, uint64_t **ep,
  *  @ingroup UCC_COLLECTIVES_DT
  */
 typedef enum {
-    UCC_COLL_ARGS_FLAG_IN_PLACE             = UCC_BIT(0),
-    UCC_COLL_ARGS_FLAG_PERSISTENT           = UCC_BIT(1),
-    UCC_COLL_ARGS_FLAG_COUNT_64BIT          = UCC_BIT(2),
-    UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT  = UCC_BIT(3),
-    UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER    = UCC_BIT(4),
-    UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER    = UCC_BIT(5)
+    UCC_COLL_ARGS_FLAG_IN_PLACE             = UCC_BIT(0), /*!< If set, the
+                                                            output buffer is
+                                                            identical to the
+                                                            input buffer.*/
+    UCC_COLL_ARGS_FLAG_PERSISTENT           = UCC_BIT(1), /*!< If set, the
+                                                            collective is
+                                                            considered
+                                                            persistent.
+                                                            Only, the
+                                                            persistent
+                                                            collective
+                                                            can be called
+                                                            multiple times with
+                                                            the same request.
+                                                           */
+    UCC_COLL_ARGS_FLAG_COUNT_64BIT          = UCC_BIT(2), /*!< If set, the count
+                                                            is 64bit, otherwise,
+                                                            it is 32 bit. */
+    UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT  = UCC_BIT(3), /*!< If set, the
+                                                            displacement is
+                                                            64bit, otherwise, it
+                                                            is 32 bit. */
+    UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER    = UCC_BIT(4), /*!< If set, the src
+                                                            buffer is considered
+                                                            contiguous.
+                                                            Particularly, useful
+                                                            for alltoallv
+                                                            operation.*/
+    UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER    = UCC_BIT(5), /*!<If set, the dst
+                                                            buffer is considered
+                                                            contiguous.
+                                                            Particularly, useful
+                                                            for alltoallv
+                                                            operation. */
+    UCC_COLL_ARGS_FLAG_TIMEOUT              = UCC_BIT(6), /*!<If set and the elapsed
+                                                            time after @ref ucc_collective_post
+                                                            (or @ref ucc_collective_triggered_post)
+                                                            is greater than @ref ucc_coll_args_t.timeout,
+                                                            the library returns UCC_ERR_TIMED_OUT
+                                                            on the calling thread.
+                                                            Note, the status is not guaranteed
+                                                            to be global on all the processes
+                                                            participating in the collective.*/
+    UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7)  /*!< If set, both src
+                                                            and dst buffers
+                                                            reside in a memory
+                                                            mapped region.
+                                                            Useful for one-sided
+                                                            collectives. */
 } ucc_coll_args_flags_t;
-
-/**
- *  @ingroup UCC_COLLECTIVES_DT
- */
-typedef enum ucc_memory_type {
-    UCC_MEMORY_TYPE_HOST,         /*!< Default system memory */
-    UCC_MEMORY_TYPE_CUDA,         /*!< NVIDIA CUDA memory */
-    UCC_MEMORY_TYPE_CUDA_MANAGED, /*!< NVIDIA CUDA managed memory */
-    UCC_MEMORY_TYPE_ROCM,         /*!< AMD ROCM memory */
-    UCC_MEMORY_TYPE_ROCM_MANAGED, /*!< AMD ROCM managed system memory */
-    UCC_MEMORY_TYPE_LAST,
-    UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
-} ucc_memory_type_t;
 
 /**
  *  @ingroup UCC_COLLECTIVES_DT
@@ -1427,10 +1790,9 @@ typedef enum {
  */
 enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_FLAGS                           = UCC_BIT(0),
-    UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS           = UCC_BIT(1),
-    UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS          = UCC_BIT(2),
-    UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(3),
-    UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(4)
+    UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(1),
+    UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(2),
+    UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER              = UCC_BIT(3)
 };
 
 /**
@@ -1477,20 +1839,28 @@ typedef struct ucc_coll_args {
         ucc_coll_buffer_info_t      info;   /*!< Buffer info for the collective */
         ucc_coll_buffer_info_v_t    info_v; /*!< Buffer info for the collective */
     } dst;
-    struct {
-        ucc_reduction_op_t          predefined_op; /*!< Reduction operation, if
-                                                        reduce or all-reduce
-                                                        operation selected */
-        void                       *custom_op; /*!< User defined
-                                                    reduction operation */
-        void                       *custom_dtype;
-    } reduce;
+    ucc_reduction_op_t              op; /*!< Predefined reduction operation, if
+                                             reduce, allreduce, reduce_scatter
+                                             operation is selected.
+                                             The field is only specified for collectives
+                                             that use pre-defined datatypes */
     uint64_t                        flags;
     uint64_t                        root; /*!< Root endpoint for rooted
                                              collectives */
     ucc_error_type_t                error_type; /*!< Error type */
     ucc_coll_id_t                   tag; /*!< Used for ordering collectives */
+    void                           *global_work_buffer; /*!< User allocated scratchpad
+                                                             buffer for one-sided
+                                                             collectives. The buffer
+                                                             provided should be at least
+                                                             the size returned by @ref
+                                                             ucc_context_get_attr with
+                                                             the field mask -
+                                                             UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE
+                                                             set to 1. The buffer must be initialized
+                                                             to 0. */
     ucc_coll_callback_t             cb;
+    double                          timeout; /*!< Timeout in seconds */
 } ucc_coll_args_t;
 
 /**

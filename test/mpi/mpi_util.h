@@ -34,6 +34,7 @@ static inline MPI_Datatype ucc_dt_to_mpi(ucc_datatype_t dt) {
     case UCC_DT_FLOAT16:
     case UCC_DT_INT128:
     case UCC_DT_UINT128:
+    case UCC_DT_BFLOAT16:
     default:
         std::cerr << "Unsupported dt\n";
         MPI_Abort(MPI_COMM_WORLD, -1);

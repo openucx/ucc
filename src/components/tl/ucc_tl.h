@@ -10,6 +10,7 @@
 #define UCC_TL_H_
 
 #include "components/base/ucc_base_iface.h"
+#include "core/ucc_context.h"
 
 /** TL (transport layer) is an internal interface that provides a basic
     implementation of collectives and p2p primitives. It differs from CL in that
@@ -26,14 +27,14 @@ typedef struct ucc_tl_context ucc_tl_context_t;
 typedef struct ucc_tl_team    ucc_tl_team_t;
 
 typedef struct ucc_tl_lib_config {
-    ucc_base_config_t  super;
-    ucc_tl_iface_t    *iface;
+    ucc_base_lib_config_t  super;
+    ucc_tl_iface_t        *iface;
 } ucc_tl_lib_config_t;
 extern ucc_config_field_t ucc_tl_lib_config_table[];
 
 typedef struct ucc_tl_context_config {
-    ucc_base_config_t super;
-    ucc_tl_lib_t     *tl_lib;
+    ucc_base_ctx_config_t super;
+    ucc_tl_lib_t         *tl_lib;
 } ucc_tl_context_config_t;
 extern ucc_config_field_t ucc_tl_context_config_table[];
 
@@ -45,20 +46,23 @@ ucc_status_t ucc_tl_lib_config_read(ucc_tl_iface_t *iface,
                                     const char *full_prefix,
                                     ucc_tl_lib_config_t **cl_config);
 
-typedef struct ucc_tl_team_subset {
-    ucc_ep_map_t map;
-    ucc_rank_t   myrank;
-} ucc_tl_team_subset_t ;
-
 typedef struct ucc_tl_service_coll {
     ucc_status_t (*allreduce)(ucc_base_team_t *team, void *sbuf, void *rbuf,
                               ucc_datatype_t dt, size_t count,
-                              ucc_reduction_op_t op,
-                              ucc_tl_team_subset_t subset, ucc_coll_task_t **task);
-    ucc_status_t (*test)(ucc_coll_task_t *task);
-    ucc_status_t (*cleanup)(ucc_coll_task_t *task);
+                              ucc_reduction_op_t op, ucc_subset_t subset,
+                              ucc_coll_task_t **task);
+    ucc_status_t (*allgather)(ucc_base_team_t *team, void *sbuf, void *rbuf,
+                              size_t msgsize, ucc_subset_t subset,
+                              ucc_coll_task_t **task);
     void         (*update_id)(ucc_base_team_t *team, uint16_t id);
 } ucc_tl_service_coll_t;
+
+typedef struct ucc_tl_coll_plugin_iface {
+    ucc_component_iface_t          super;
+    ucs_config_global_list_entry_t config;
+    ucc_get_coll_scores_fn_t       get_scores;
+    uint32_t                       id;
+} ucc_tl_coll_plugin_iface_t;
 
 typedef struct ucc_tl_iface {
     ucc_component_iface_t          super;
@@ -70,6 +74,7 @@ typedef struct ucc_tl_iface {
     ucc_base_coll_iface_t          coll;
     ucc_tl_service_coll_t          scoll;
     ucc_base_coll_alg_info_t *     alg_info[UCC_COLL_TYPE_NUM];
+    ucc_component_framework_t      coll_plugins;
 } ucc_tl_iface_t;
 
 typedef struct ucc_tl_lib {
@@ -82,12 +87,14 @@ typedef struct ucc_tl_context {
     ucc_base_context_t super;
     int                ref_count;
 } ucc_tl_context_t;
-UCC_CLASS_DECLARE(ucc_tl_context_t, ucc_tl_lib_t *, ucc_context_t *);
+UCC_CLASS_DECLARE(ucc_tl_context_t, const ucc_tl_context_config_t *,
+                  ucc_context_t *);
 
 typedef struct ucc_tl_team {
     ucc_base_team_t super;
 } ucc_tl_team_t;
-UCC_CLASS_DECLARE(ucc_tl_team_t, ucc_tl_context_t *, ucc_team_t *);
+UCC_CLASS_DECLARE(ucc_tl_team_t, ucc_tl_context_t *,
+                  const ucc_base_team_params_t *);
 
 #define UCC_TL_IFACE_DECLARE(_name, _NAME)                                     \
     UCC_BASE_IFACE_DECLARE(TL_, tl_, _name, _NAME)
@@ -104,6 +111,7 @@ typedef struct ucc_team_multiple_req {
         ucc_tl_team_t           *team;
         ucc_base_team_params_t   param;
         ucc_status_t             status;
+        uint64_t                 args[2];
     } descs[1];
 } ucc_team_multiple_req_t;
 
@@ -128,6 +136,19 @@ typedef struct ucc_tl_lib_attr {
 
 #define UCC_TL_TEAM_LIB(_tl_team) (_tl_team)->super.super.context->lib
 
+#define UCC_TL_TEAM_CTX(_tl_team) (_tl_team)->super.super.context
+
 #define UCC_TL_CORE_CTX(_tl_team) ((_tl_team)->super.super.context->ucc_context)
 
+#define UCC_TL_CTX_OOB(_ctx) ((_ctx)->super.super.ucc_context->params.oob)
+
+#define UCC_TL_TEAM_SIZE(_tl_team) (_tl_team)->super.super.params.size
+
+#define UCC_TL_TEAM_RANK(_tl_team) (_tl_team)->super.super.params.rank
+
+#define UCC_TL_CORE_TEAM(_tl_team) (_tl_team)->super.super.params.team
+
+#define UCC_TL_TEAM_MAP(_tl_team) (_tl_team)->super.super.params.map
+
+#define UCC_TL_TEAM_OOB(_tl_team) (_tl_team)->super.super.params.params.oob
 #endif

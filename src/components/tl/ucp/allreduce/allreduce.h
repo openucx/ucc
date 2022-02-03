@@ -6,8 +6,7 @@
 
 #ifndef ALLREDUCE_H_
 #define ALLREDUCE_H_
-#include "../tl_ucp.h"
-#include "../tl_ucp_coll.h"
+#include "../tl_ucp_reduce.h"
 
 enum {
     UCC_TL_UCP_ALLREDUCE_ALG_KNOMIAL,
@@ -22,16 +21,6 @@ ucc_status_t ucc_tl_ucp_allreduce_init(ucc_tl_ucp_task_t *task);
 #define UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR                            \
     "allreduce:0-4k:@0#allreduce:4k-inf:@1"
 
-#define CHECK_USERDEFINED_OP(_args, _team)                                     \
-    do {                                                                       \
-        if (_args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) {         \
-            tl_error(UCC_TL_TEAM_LIB(_team),                                   \
-                     "userdefined reductions are not supported yet");          \
-            status = UCC_ERR_NOT_SUPPORTED;                                    \
-            goto out;                                                          \
-        }                                                                      \
-    } while (0)
-
 #define CHECK_SAME_MEMTYPE(_args, _team)                                       \
     do {                                                                       \
         if (!UCC_IS_INPLACE(_args) &&                                          \
@@ -44,7 +33,6 @@ ucc_status_t ucc_tl_ucp_allreduce_init(ucc_tl_ucp_task_t *task);
     } while (0)
 
 #define ALLREDUCE_TASK_CHECK(_args, _team)                                     \
-    CHECK_USERDEFINED_OP((_args), (_team));                                    \
     CHECK_SAME_MEMTYPE((_args), (_team));
 
 ucc_status_t ucc_tl_ucp_allreduce_knomial_init(ucc_base_coll_args_t *coll_args,

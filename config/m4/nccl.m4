@@ -90,6 +90,5 @@ AS_IF([test "x$nccl_checked" != "xyes"],[
     ])
 
     nccl_checked=yes
-    AM_CONDITIONAL([HAVE_NCCL], [test "x$nccl_happy" != xno])
 ])
 ])

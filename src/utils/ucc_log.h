@@ -8,6 +8,7 @@
 
 #include "config.h"
 #include "core/ucc_global_opts.h"
+#include "core/ucc_dt.h"
 #include <ucs/debug/log_def.h>
 
 #define UCC_LOG_LEVEL_ERROR UCS_LOG_LEVEL_ERROR
@@ -70,14 +71,20 @@ static inline const char* ucc_coll_type_str(ucc_coll_type_t ct)
         return "Allgatherv";
     case UCC_COLL_TYPE_GATHER:
         return "Gather";
+    case UCC_COLL_TYPE_GATHERV:
+        return "Gatherv";
     case UCC_COLL_TYPE_SCATTER:
         return "Scatter";
+    case UCC_COLL_TYPE_SCATTERV:
+        return "Scatterv";
     case UCC_COLL_TYPE_FANIN:
         return "Fanin";
     case UCC_COLL_TYPE_FANOUT:
         return "Fanout";
     case UCC_COLL_TYPE_REDUCE_SCATTER:
-        return "Reduce scatter";
+        return "Reduce_scatter";
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        return "Reduce_scatterv";
     default:
         break;
     }
@@ -97,6 +104,8 @@ static inline const char* ucc_datatype_str(ucc_datatype_t dt)
         return "uint16";
     case UCC_DT_FLOAT16:
         return "float16";
+    case UCC_DT_BFLOAT16:
+        return "bfloat16";
     case UCC_DT_INT32:
         return "int32";
     case UCC_DT_UINT32:
@@ -113,12 +122,8 @@ static inline const char* ucc_datatype_str(ucc_datatype_t dt)
         return "int128";
     case UCC_DT_UINT128:
         return "uint128";
-    case UCC_DT_USERDEFINED:
-        return "userdefined";
-    case UCC_DT_OPAQUE:
-        return "opaque";
     default:
-        return NULL;
+        return "userdefined";
     }
 }
 
@@ -149,8 +154,11 @@ static inline const char* ucc_reduction_op_str(ucc_reduction_op_t op)
         return "maxloc";
     case UCC_OP_MINLOC:
         return "minloc";
+    case UCC_OP_AVG:
+        return "avg";
     default:
         return NULL;
     }
 }
+
 #endif

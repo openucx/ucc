@@ -1,6 +1,11 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
 #
+if TL_NCCL_ENABLED
+
+allgatherv =                      \
+	allgatherv/allgatherv.h       \
+	allgatherv/allgatherv.c
 
 sources =             \
 	tl_nccl.h         \
@@ -9,7 +14,8 @@ sources =             \
 	tl_nccl_context.c \
 	tl_nccl_team.c    \
 	tl_nccl_coll.h    \
-	tl_nccl_coll.c
+	tl_nccl_coll.c    \
+	$(allgatherv)
 
 module_LTLIBRARIES = libucc_tl_nccl.la
 libucc_tl_nccl_la_SOURCES  = $(sources)
@@ -19,3 +25,5 @@ libucc_tl_nccl_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(CUDA_LDFLA
 libucc_tl_nccl_la_LIBADD   = $(CUDA_LIBS) $(NCCL_LIBADD) $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 include $(top_srcdir)/config/module.am
+
+endif

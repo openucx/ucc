@@ -149,9 +149,9 @@ ucc_status_t ucc_pt_comm::allreduce(float* in, float* out, size_t size,
     ucc_coll_args_t args;
     ucc_coll_req_h req;
 
-    args.mask                 = UCC_COLL_ARGS_FIELD_PREDEFINED_REDUCTIONS;
+    args.mask                 = 0;
     args.coll_type            = UCC_COLL_TYPE_ALLREDUCE;
-    args.reduce.predefined_op = op;
+    args.op                   = op;
     args.src.info.buffer      = in;
     args.src.info.count       = size;
     args.src.info.datatype    = UCC_DT_FLOAT32;

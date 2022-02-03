@@ -6,17 +6,41 @@
 
 #include "test_mpi.h"
 
-std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
-                                         ucc_test_team_t &_team,
-                                         int root,
-                                         size_t msgsize,
-                                         ucc_test_mpi_inplace_t inplace,
-                                         ucc_memory_type_t mt,
-                                         size_t max_size,
-                                         ucc_datatype_t dt,
-                                         ucc_reduction_op_t op,
-                                         ucc_test_vsize_flag_t count_bits,
-                                         ucc_test_vsize_flag_t displ_bits)
+std::vector<std::shared_ptr<TestCase>>
+TestCase::init(ucc_coll_type_t _type, ucc_test_team_t &_team, int num_tests,
+               int root, size_t msgsize, ucc_test_mpi_inplace_t inplace,
+               ucc_memory_type_t mt, size_t max_size, ucc_datatype_t dt,
+               ucc_reduction_op_t op, ucc_test_vsize_flag_t count_bits,
+               ucc_test_vsize_flag_t displ_bits, void **onesided_buffers)
+{
+    std::vector<std::shared_ptr<TestCase>> tcs;
+
+    for (int i = 0; i < num_tests; i++) {
+        auto tc =
+            init_single(_type, _team, root, msgsize, inplace, mt, max_size, dt,
+                        op, count_bits, displ_bits, onesided_buffers);
+        if (!tc) {
+            tcs.clear();
+            return tcs;
+        }
+        tcs.push_back(tc);
+    }
+    return tcs;
+}
+
+std::shared_ptr<TestCase> TestCase::init_single(
+        ucc_coll_type_t _type,
+        ucc_test_team_t &_team,
+        int root,
+        size_t msgsize,
+        ucc_test_mpi_inplace_t inplace,
+        ucc_memory_type_t mt,
+        size_t max_size,
+        ucc_datatype_t dt,
+        ucc_reduction_op_t op,
+        ucc_test_vsize_flag_t count_bits,
+        ucc_test_vsize_flag_t displ_bits,
+        void ** onesided_buffers)
 {
     switch(_type) {
     case UCC_COLL_TYPE_BARRIER:
@@ -40,8 +64,13 @@ std::shared_ptr<TestCase> TestCase::init(ucc_coll_type_t _type,
         return std::make_shared<TestReduce>(msgsize, inplace, dt, op, mt, root,
                                            _team, max_size);
     case UCC_COLL_TYPE_ALLTOALL:
-        return std::make_shared<TestAlltoall>(msgsize, inplace, mt, _team,
-                                              max_size);
+        if (onesided_buffers) {
+            return std::make_shared<TestAlltoall>(msgsize, inplace, mt, _team,
+                                                  max_size, onesided_buffers);
+        } else {
+            return std::make_shared<TestAlltoall>(msgsize, inplace, mt, _team,
+                                                  max_size);
+        }
     case UCC_COLL_TYPE_ALLTOALLV:
         return std::make_shared<TestAlltoallv>(msgsize, inplace, mt, _team,
                                                max_size, count_bits, displ_bits);
@@ -85,9 +114,14 @@ void TestCase::mpi_progress(void)
 }
 
 std::string TestCase::str() {
-    std::string _str = std::string("tc=") + ucc_coll_type_str(args.coll_type) +
-        " team=" + team_str(team.type) + " mtype=" + ucc_memory_type_names[mem_type] +
-        " msgsize=" + std::to_string(msgsize);
+    std::string _str = std::string("tc=");
+    if (args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS) {
+        _str += std::string("Onesided ");
+    }
+    _str += std::string(ucc_coll_type_str(args.coll_type)) +
+            " team=" + team_str(team.type) +
+            " mtype=" + ucc_memory_type_names[mem_type] +
+            " msgsize=" + std::to_string(msgsize);
     if (ucc_coll_inplace_supported(args.coll_type)) {
         _str += std::string(" inplace=") + (inplace == TEST_INPLACE ? "1" : "0");
     }
@@ -137,20 +171,29 @@ test_skip_cause_t TestCase::skip_reduce(test_skip_cause_t cause, MPI_Comm comm)
     return skip_reduce(1, cause, comm);
 }
 
-TestCase::TestCase(ucc_test_team_t &_team, ucc_memory_type_t _mem_type,
+void TestCase::tc_progress_ctx()
+{
+    ucc_context_progress(team.ctx);
+}
+
+TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
+                   ucc_memory_type_t _mem_type,
                    size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                    size_t _max_size) :
     team(_team), mem_type(_mem_type),  msgsize(_msgsize), inplace(_inplace),
     test_max_size(_max_size)
 {
     int rank;
-    sbuf      = NULL;
-    rbuf      = NULL;
-    check_sbuf = NULL;
-    check_rbuf = NULL;
-    test_skip = TEST_SKIP_NONE;
-    args.flags = 0;
-    args.mask = 0;
+
+    sbuf           = NULL;
+    rbuf           = NULL;
+    check_buf      = NULL;
+    sbuf_mc_header = NULL;
+    rbuf_mc_header = NULL;
+    test_skip      = TEST_SKIP_NONE;
+    args.flags     = 0;
+    args.mask      = 0;
+    args.coll_type = ct;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Irecv((void*)progress_buf, 1, MPI_CHAR, rank, 0, MPI_COMM_WORLD,
@@ -166,16 +209,13 @@ TestCase::~TestCase()
     if (TEST_SKIP_NONE == test_skip) {
         UCC_CHECK(ucc_collective_finalize(req));
     }
-    if (sbuf) {
+    if (sbuf_mc_header) {
         UCC_CHECK(ucc_mc_free(sbuf_mc_header));
     }
-    if (rbuf) {
+    if (rbuf_mc_header) {
         UCC_CHECK(ucc_mc_free(rbuf_mc_header));
     }
-    if (check_sbuf) {
-        UCC_CHECK(ucc_mc_free(check_sbuf_mc_header));
-    }
-    if (check_rbuf) {
-        ucc_free(check_rbuf);
+    if (check_buf) {
+        ucc_free(check_buf);
     }
 }

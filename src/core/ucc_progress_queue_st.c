@@ -7,6 +7,8 @@
 #include "ucc_progress_queue.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
+#include "utils/ucc_time.h"
+#include "utils/ucc_coll_utils.h"
 
 typedef struct ucc_pq_st {
     ucc_progress_queue_t super;
@@ -16,7 +18,8 @@ typedef struct ucc_pq_st {
 static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
 {
     ucc_pq_st_t     *pq_st        = ucc_derived_of(pq, ucc_pq_st_t);
-    int              n_progressed = 0;
+    int              n_progressed =  0;
+    double           timestamp    = -1;
     ucc_coll_task_t *task, *tmp;
     ucc_status_t     status;
 
@@ -26,6 +29,18 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
             task->progress(task);
         }
         if (UCC_INPROGRESS == task->super.status) {
+            if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
+                if (timestamp < 0) {
+                    timestamp = ucc_get_time();
+                }
+                if (ucc_unlikely(timestamp - task->start_time >
+                                 task->bargs.args.timeout)) {
+                    task->super.status = UCC_ERR_TIMED_OUT;
+                    ucc_list_del(&task->list_elem);
+                    ucc_task_complete(task);
+                    return UCC_ERR_TIMED_OUT;
+                }
+            }
             continue;
         }
         ucc_list_del(&task->list_elem);
@@ -37,9 +52,11 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
     return n_progressed;
 }
 
+
 static void ucc_pq_st_enqueue(ucc_progress_queue_t *pq, ucc_coll_task_t *task)
 {
     ucc_pq_st_t *pq_st = ucc_derived_of(pq, ucc_pq_st_t);
+
     ucc_list_add_tail(&pq_st->list, &task->list_elem);
 }
 

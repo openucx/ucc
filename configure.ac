@@ -11,7 +11,7 @@
 # $HEADER$
 
 define([ucc_ver_major], 1)
-define([ucc_ver_minor], 0)
+define([ucc_ver_minor], 1)
 define([ucc_ver_patch], 0)
 define([ucc_ver_micro], esyscmd([sh -c "git rev-list HEAD | wc -l | sed -e 's/ *//g' | xargs -n1 printf"]))
 define([ucc_git_sha], esyscmd([sh -c "git rev-parse --short HEAD"]))
@@ -53,9 +53,9 @@ RPM_RELEASE=1
 MAJOR_VERSION=ucc_ver_major
 MINOR_VERSION=ucc_ver_minor
 MICRO_VERSION=ucc_ver_micro
-PATCH_VERSION=ucc_ver_micro
+PATCH_VERSION=ucc_ver_patch
 UCC_GIT_SHA=ucc_git_sha
-VERSION=$MAJOR_VERSION.$MINOR_VERSION.$MICRO_VERSION
+VERSION=$MAJOR_VERSION.$MINOR_VERSION.$PATCH_VERSION
 SOVERSION=libucc_so_version
 AC_SUBST(MAJOR_VERSION)
 AC_SUBST(MINOR_VERSION)
@@ -140,7 +140,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_AARCH64_HI1620], [false])
      AM_CONDITIONAL([HAVE_UCX], [false])
      AM_CONDITIONAL([HAVE_CUDA], [false])
-     AM_CONDITIONAL([HAVE_NCCL], [false])
+     AM_CONDITIONAL([HAVE_NVML], [false])
      AM_CONDITIONAL([HAVE_MPI], [false])
      AM_CONDITIONAL([HAVE_MPIRUN], [false])
      AM_CONDITIONAL([HAVE_MPICC], [false])
@@ -155,20 +155,22 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/ucx.m4])
      m4_include([config/m4/cuda.m4])
      m4_include([config/m4/nccl.m4])
+     m4_include([config/m4/sharp.m4])
      m4_include([config/m4/mpi.m4])
      m4_include([config/m4/configure.m4])
+     m4_include([config/m4/tl_coll_plugins.m4])
+     m4_include([config/m4/check_tls.m4])
      m4_include([test/gtest/configure.m4])
 
      mc_modules=":cpu"
      tl_modules=""
+     tlcp_modules=""
      AC_MSG_RESULT([MPI perftest: ${mpi_enable}])
 
      CHECK_UCX
      AC_MSG_RESULT([UCX support: $ucx_happy])
      if test $ucx_happy != "yes"; then
          AC_MSG_ERROR([UCX is not available])
-     else
-         tl_modules="${tl_modules}:ucp"
      fi
 
      CHECK_CUDA
@@ -176,29 +178,27 @@ AS_IF([test "x$with_docs_only" = xyes],
      if test $cuda_happy = "yes"; then
          mc_modules="${mc_modules}:cuda"
      fi
-
-     CHECK_NCCL
-     AC_MSG_RESULT([NCCL support: $nccl_happy])
-     if test $nccl_happy = "yes"; then
-         tl_modules="${tl_modules}:nccl"
-     fi
     ]) # Docs only
 
+
+CHECK_TLS
 CFLAGS="$CFLAGS -std=gnu11"
 CPPFLAGS="$CPPFLAGS $UCS_CPPFLAGS $includes"
 LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
 
+CHECK_TL_COLL_PLUGINS
 AC_CONFIG_FILES([
                  Makefile
                  src/Makefile
                  src/ucc/api/ucc_version.h
                  src/core/ucc_version.c
                  src/components/cl/basic/Makefile
-                 src/components/tl/ucp/Makefile
-                 src/components/tl/nccl/Makefile
+                 src/components/cl/hier/Makefile
                  src/components/mc/cpu/Makefile
                  src/components/mc/cuda/Makefile
                  src/components/mc/cuda/kernel/Makefile
+                 src/components/ec/cuda/Makefile
+                 src/components/ec/cuda/kernel/Makefile
                  test/mpi/Makefile
                  tools/info/Makefile
                  tools/perf/Makefile
@@ -226,6 +226,7 @@ AC_MSG_NOTICE([      C++ compiler:   ${CXX} ${CXXFLAGS} ${BASE_CXXFLAGS}])
 AC_MSG_NOTICE([          Perftest:   ${mpi_enable}])
 AC_MSG_NOTICE([        MC modules:   <$(echo ${mc_modules}|tr ':' ' ') >])
 AC_MSG_NOTICE([        TL modules:   <$(echo ${tl_modules}|tr ':' ' ') >])
+AC_MSG_NOTICE([      TLCP modules:   <$(echo ${tlcp_modules}|tr ':' ' ') >])
 AS_IF([test "x$enable_profiling" = xyes],[
 AC_MSG_NOTICE([ Profiling modules:   <$(echo ${prof_modules}|tr ':' ' ') >])
 ])

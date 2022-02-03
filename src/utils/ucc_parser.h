@@ -23,7 +23,6 @@ typedef ucs_config_field_t             ucc_config_field_t;
 typedef ucs_config_names_array_t       ucc_config_names_array_t;
 typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 
-#define ucc_config_names_search         ucs_config_names_search
 #define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
 #define UCC_CONFIG_REGISTER_TABLE       UCS_CONFIG_REGISTER_TABLE
 #define UCC_CONFIG_REGISTER_TABLE_ENTRY UCS_CONFIG_REGISTER_TABLE_ENTRY
@@ -39,6 +38,7 @@ typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 #define UCC_ULUNITS_AUTO                UCS_ULUNITS_AUTO
 #define UCC_CONFIG_TYPE_BITMAP          UCS_CONFIG_TYPE_BITMAP
 #define UCC_CONFIG_TYPE_MEMUNITS        UCS_CONFIG_TYPE_MEMUNITS
+#define UCC_CONFIG_TYPE_BOOL            UCS_CONFIG_TYPE_BOOL
 
 static inline ucc_status_t
 ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,
@@ -114,5 +114,18 @@ ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
 ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
                                         const ucc_config_names_array_t *src);
 
+ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
+                                          const ucc_config_names_array_t *src);
+
 void ucc_config_names_array_free(ucc_config_names_array_t *array);
+
+int ucc_config_names_search(ucc_config_names_array_t *config_names,
+                            const char *str);
+
+static inline
+int ucc_config_names_array_is_all(const ucc_config_names_array_t *array)
+{
+    return (array->count == 1) && (0 == strcmp(array->names[0], "all"));
+}
+
 #endif

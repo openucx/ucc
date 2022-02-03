@@ -1,6 +1,12 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
 #
+if TL_UCP_ENABLED
+
+if BUILD_TL_COLL_PLUGINS
+SUBDIRS = .
+include makefile.coll_plugins.am
+endif
 
 barrier =                     \
 	barrier/barrier.h         \
@@ -10,6 +16,7 @@ barrier =                     \
 alltoall =                       \
 	alltoall/alltoall.h          \
 	alltoall/alltoall.c          \
+	alltoall/alltoall_onesided.c \
 	alltoall/alltoall_pairwise.c
 
 alltoallv =                        \
@@ -20,7 +27,8 @@ alltoallv =                        \
 bcast =                   \
 	bcast/bcast.h         \
 	bcast/bcast.c         \
-	bcast/bcast_knomial.c
+	bcast/bcast_knomial.c \
+	bcast/bcast_sag_knomial.c
 
 allreduce =                           \
 	allreduce/allreduce.h             \
@@ -48,6 +56,10 @@ reduce_scatter =	                        \
 	reduce_scatter/reduce_scatter.h         \
 	reduce_scatter/reduce_scatter_knomial.c
 
+scatter =	                   \
+	scatter/scatter.h          \
+	scatter/scatter_knomial.c
+
 sources =                 \
 	tl_ucp.h              \
 	tl_ucp.c              \
@@ -58,6 +70,7 @@ sources =                 \
 	tl_ucp_ep.c           \
 	tl_ucp_coll.c         \
 	tl_ucp_service_coll.c \
+	tl_ucp_reduce.h       \
 	$(barrier)            \
 	$(alltoall)           \
 	$(alltoallv)          \
@@ -66,7 +79,8 @@ sources =                 \
 	$(allgatherv)         \
 	$(bcast)              \
 	$(reduce)             \
-	$(reduce_scatter)
+	$(reduce_scatter)     \
+	$(scatter)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)
@@ -76,3 +90,5 @@ libucc_tl_ucp_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(UCX_LDFLAGS
 libucc_tl_ucp_la_LIBADD   = $(UCX_LIBADD) $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 include $(top_srcdir)/config/module.am
+
+endif

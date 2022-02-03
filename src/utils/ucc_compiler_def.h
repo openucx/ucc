@@ -17,7 +17,6 @@
 #include <assert.h>
 #endif
 
-
 #define ucc_offsetof      ucs_offsetof
 #define ucc_container_of  ucs_container_of
 #define ucc_derived_of    ucs_derived_of
@@ -26,14 +25,25 @@
 #define ucc_likely        ucs_likely
 #define ucc_unlikely      ucs_unlikely
 
+/**
+ * Prevent compiler from reordering instructions
+ */
+#define ucc_compiler_fence()       asm volatile(""::: "memory")
+
 typedef ucs_log_component_config_t ucc_log_component_config_t;
 typedef int                        ucc_score_t;
 
 #define _UCC_PP_MAKE_STRING(x) #x
 #define UCC_PP_MAKE_STRING(x)  _UCC_PP_MAKE_STRING(x)
 #define UCC_PP_QUOTE UCS_PP_QUOTE
-#define UCC_MASK     UCS_MASK
 #define UCC_EMPTY_STATEMENT {}
+
+#define UCC_COPY_PARAM_BY_FIELD(_dst, _src, _FIELD, _field)                    \
+    do {                                                                       \
+        if ((_src)->mask & (_FIELD)) {                                         \
+            (_dst)->_field = (_src)->_field;                                   \
+        }                                                                      \
+    } while (0)
 
 static inline ucc_status_t ucs_status_to_ucc_status(ucs_status_t status)
 {
@@ -79,6 +89,5 @@ static inline ucs_status_t ucc_status_to_ucs_status(ucc_status_t status)
 #define ucc_assert(_cond)
 #endif
 
-#define UCC_CACHE_LINE_SIZE 128 //TODO detect it
 #define ucc_for_each_bit ucs_for_each_bit
 #endif

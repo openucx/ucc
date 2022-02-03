@@ -2,7 +2,14 @@
 # Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
 #
 
-NVCCFLAGS = ${AM_CPPFLAGS} ${UCS_CPPFLAGS} ${NVCC_CFLAGS} -I${UCC_TOP_BUILDDIR} -I${UCC_TOP_SRCDIR}/src -I${UCC_TOP_BUILDDIR}/src --compiler-options -fno-rtti,-fno-exceptions
+NVCCFLAGS =                                      \
+    ${AM_CPPFLAGS}                               \
+    ${UCS_CPPFLAGS}                              \
+    ${NVCC_CFLAGS}                               \
+    -I${UCC_TOP_BUILDDIR}                        \
+    -I${UCC_TOP_SRCDIR}/src                      \
+    -I${UCC_TOP_BUILDDIR}/src                    \
+    --compiler-options -fno-rtti,-fno-exceptions
 
 LINK = $(LIBTOOL) --mode=link $(CC) -o $@
 
@@ -14,9 +21,9 @@ LINK = $(LIBTOOL) --mode=link $(CC) -o $@
 
 comp_noinst = libucc_mc_cuda_kernels.la
 
-libucc_mc_cuda_kernels_la_SOURCES  = mc_cuda_reduce.cu \
-                                     mc_cuda_reduce_multi.cu \
-                                     mc_cuda_wait_kernel.cu
+libucc_mc_cuda_kernels_la_SOURCES  = mc_cuda_reduce.cu              \
+                                     mc_cuda_reduce_multi.cu        \
+                                     mc_cuda_reduce_multi_alpha.cu
 libucc_mc_cuda_kernels_la_CPPFLAGS =
 
 noinst_LTLIBRARIES = $(comp_noinst)

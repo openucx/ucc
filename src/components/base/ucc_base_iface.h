@@ -10,38 +10,59 @@
 #define UCC_BASE_IFACE_H_
 #include "ucc/api/ucc.h"
 #include "core/ucc_lib.h"
-#include "core/ucc_context.h"
 #include "utils/ucc_component.h"
 #include "utils/ucc_parser.h"
 #include "utils/ucc_class.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_coll_utils.h"
-#include "schedule/ucc_schedule.h"
+
+typedef struct ucc_team ucc_team_t;
+typedef struct ucc_context ucc_context_t;
+typedef struct ucc_coll_score ucc_coll_score_t;
+typedef struct ucc_coll_task ucc_coll_task_t;
+
+
 
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
-    char                      *score_str;
 } ucc_base_lib_t;
 
 typedef struct ucc_base_config {
     ucc_config_global_list_entry_t *cfg_entry;
-    ucc_log_component_config_t      log_component;
-    char                           *score_str;
 } ucc_base_config_t;
+
+typedef struct ucc_base_lib_config {
+    ucc_base_config_t               super;
+    ucc_log_component_config_t      log_component;
+} ucc_base_lib_config_t;
+
+typedef struct ucc_base_ctx_config {
+    ucc_base_config_t               super;
+    char                           *score_str;
+} ucc_base_ctx_config_t;
+
+enum {
+    UCC_BASE_LIB_FLAG_TEAM_ID_REQUIRED      = UCC_BIT(1),
+    UCC_BASE_LIB_FLAG_SERVICE_TEAM_REQUIRED = UCC_BIT(2)
+};
 
 typedef struct ucc_base_lib_attr_t {
     ucc_lib_attr_t attr;
+    uint64_t       flags;
 } ucc_base_lib_attr_t;
 
 typedef struct ucc_base_lib_params {
     ucc_lib_params_t params;
+    char            *full_prefix;
 } ucc_base_lib_params_t;
-extern ucc_config_field_t ucc_base_config_table[];
+extern ucc_config_field_t ucc_base_lib_config_table[];
+extern ucc_config_field_t ucc_base_ctx_config_table[];
 
 typedef struct ucc_base_lib_iface {
     ucc_status_t (*init)(const ucc_base_lib_params_t *params,
-                         const ucc_base_config_t *config, ucc_base_lib_t **lib);
+                         const ucc_base_config_t *config,
+                         ucc_base_lib_t **lib);
     void         (*finalize)(ucc_base_lib_t *lib);
     ucc_status_t (*get_attr)(const ucc_base_lib_t *lib,
                              ucc_base_lib_attr_t  *attr);
@@ -59,6 +80,7 @@ typedef struct ucc_base_context_params {
 typedef struct ucc_base_context {
     ucc_context_t  *ucc_context;
     ucc_base_lib_t *lib;
+    char           *score_str;
 } ucc_base_context_t;
 
 typedef struct ucc_base_ctx_attr_t {
@@ -75,7 +97,7 @@ typedef struct ucc_base_context_iface {
                              ucc_base_ctx_attr_t      *attr);
 } ucc_base_context_iface_t;
 
-typedef struct ucc_team ucc_team_t;
+
 typedef struct ucc_base_team_params {
     ucc_team_params_t params;
     int               scope; /* Scope that allocates the team. When TL team is created
@@ -88,27 +110,29 @@ typedef struct ucc_base_team_params {
     ucc_rank_t        rank; /* Rank of a calling process in the TL/CL team. It is a uniq
                                process identifier within a team (not job) but it has the
                                property: it is always contig and in the range [0, team_size).*/
+    ucc_rank_t        size; /* Size of the TL team. size <= team->size (tl can be a subset of
+                               the core team) */
     uint16_t          id;   /* core level team id */
     ucc_team_t *      team; /* core team pointer */
+    ucc_ep_map_t      map;  /* ranks map to the core ucc team */
 } ucc_base_team_params_t;
 
 typedef struct ucc_base_team {
-    ucc_base_context_t *context;
-    ucc_team_t *        team; /* core team pointer is stored on a CL/TL team
-                                 (which inherit from base) during class init. */
+    ucc_base_context_t    *context;
+    ucc_base_team_params_t params;
 } ucc_base_team_t;
 
-typedef struct ucc_coll_score ucc_coll_score_t;
+typedef ucc_status_t (*ucc_get_coll_scores_fn_t)(ucc_base_team_t *team,
+                                                 ucc_coll_score_t **score);
+
 typedef struct ucc_base_team_iface {
     ucc_status_t (*create_post)(ucc_base_context_t *context,
                                 const ucc_base_team_params_t *params,
                                 ucc_base_team_t **team);
     ucc_status_t (*create_test)(ucc_base_team_t *team);
     ucc_status_t (*destroy)(ucc_base_team_t *team);
-    ucc_status_t (*get_scores)(ucc_base_team_t *team, ucc_coll_score_t **score);
+    ucc_get_coll_scores_fn_t get_scores;
 } ucc_base_team_iface_t;
-
-typedef struct ucc_team ucc_team_t;
 
 typedef struct ucc_base_coll_args {
     uint64_t        mask;

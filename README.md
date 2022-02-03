@@ -16,7 +16,7 @@ UCC is a collective communication operations API and library that is flexible, c
 * Nonblocking collective operations that cover a variety of programming models
 * Flexible resource allocation model
 * Support for relaxed ordering model
-* Flexible synchronous model 
+* Flexible synchronous model
 * Repetitive collective operations (init once and invoke multiple times)
 * Hardware collectives are a first-class citizen
 
@@ -38,20 +38,24 @@ UCC is BSD-style licensed, as found in the [LICENSE](LICENSE) file.
 
 * [UCX](https://github.com/openucx/ucx)
    * UCC uses utilities provided by UCX's UCS component
-   
+
+* [CUDA](https://developer.nvidia.com/cuda-toolkit) (optional)
+   * UCC supports CUDA collectives. To compile with CUDA support, install
+     [NVIDIA CUDA](https://developer.nvidia.com/cuda-downloads) 11.0 or above.
+
 * Doxygen
    * UCC uses Doxygen for generating API documentation
 
 ## Compiling and Installing
 
-### Developer's Build 
+### Developer's Build
 ```sh
 $ ./autogen.sh
 $ ./configure --prefix=<ucc-install-path> --with-ucx=<ucx-install-path>
 $ make
 ```
 
-### Build Documentation 
+### Build Documentation
 ```sh
 $ ./autogen.sh
 $ ./configure --prefix=<ucc-install-path> --with-docs-only
@@ -97,4 +101,6 @@ $ mpirun -np 2 --mca scoll_ucc_enable 1 --mca scoll_ucc_priority 100 ./my_opensh
 ### Supported Transports
 * UCX/UCP
   - InfiniBand, ROCE, Cray Gemini and Aries, Shared Memory
+* SHARP
+* CUDA
 * NCCL

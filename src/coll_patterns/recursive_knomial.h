@@ -108,6 +108,18 @@ static inline int ucc_knomial_pattern_loop_done(ucc_knomial_pattern_t *p)
 }
 
 static inline int
+ucc_knomial_pattern_loop_first_iteration(ucc_knomial_pattern_t *p)
+{
+    return p->iteration == 0;
+}
+
+static inline int
+ucc_knomial_pattern_loop_last_iteration(ucc_knomial_pattern_t *p)
+{
+    return p->iteration == p->pow_radix_sup - 1;
+}
+
+static inline int
 ucc_knomial_pattern_loop_done_backward(ucc_knomial_pattern_t *p)
 {
     return p->iteration == UINT8_MAX;
@@ -149,6 +161,19 @@ ucc_knomial_pattern_next_iteration_backward(ucc_knomial_pattern_t *p)
 {
     p->iteration--;
     p->radix_pow /= p->radix;
+}
+
+static inline ucc_kn_radix_t
+ucc_knomial_pattern_get_min_radix(ucc_kn_radix_t cfg_radix,
+                                  ucc_rank_t team_size, size_t count)
+{
+	ucc_kn_radix_t radix = ucc_min(cfg_radix, team_size);
+
+    if (((count + radix - 1) / radix * (radix - 1) > count) ||
+        ((radix - 1) > count)) {
+    	radix = 2;
+    }
+    return radix;
 }
 
 /* A set of convenience macros used to implement sw based progress

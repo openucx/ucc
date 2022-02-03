@@ -19,13 +19,18 @@
 
 #define UCC_MSG_MAX UINT64_MAX
 
+typedef struct ucc_coll_entry {
+    ucc_list_link_t          list_elem;
+    ucc_score_t              score;
+    ucc_base_coll_init_fn_t  init;
+    ucc_base_team_t         *team;
+} ucc_coll_entry_t;
+
 typedef struct ucc_msg_range {
-    ucc_list_link_t         list_elem;
+    ucc_coll_entry_t        super;
+    ucc_list_link_t         fallback;
     size_t                  start;
     size_t                  end;
-    ucc_score_t             score;
-    ucc_base_coll_init_fn_t init;
-    ucc_base_team_t        *team;
 } ucc_msg_range_t;
 
 typedef struct ucc_coll_score {
@@ -114,6 +119,9 @@ ucc_status_t ucc_coll_score_update_from_str(const char *            str,
                                             ucc_score_t             def_score,
                                             ucc_alg_id_to_init_fn_t alg_fn);
 
+ucc_status_t ucc_coll_score_merge_in(ucc_coll_score_t **dst,
+                                     ucc_coll_score_t *src);
+
 ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
                                    ucc_coll_score_t *update,
                                    ucc_score_t       default_score);
@@ -134,9 +142,17 @@ ucc_status_t ucc_coll_score_build_map(ucc_coll_score_t *score,
 
 void         ucc_coll_score_free_map(ucc_score_map_t *map);
 
-/* Selects the "init" function from score map based on coll_args */
-ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t         *map,
-                                       ucc_base_coll_args_t    *args,
-                                       ucc_base_coll_init_fn_t *init,
-                                       ucc_base_team_t        **team);
+/* Initializes task based on args selection and score map.
+   Checks fallbacks if necessary. */
+ucc_status_t ucc_coll_init(ucc_score_map_t      *map,
+                           ucc_base_coll_args_t *bargs,
+                           ucc_coll_task_t     **task);
+
+ucc_status_t ucc_coll_score_dup(const ucc_coll_score_t *in,
+                                ucc_coll_score_t      **out);
+
+void ucc_coll_score_set(ucc_coll_score_t *score,
+                        ucc_score_t       value);
+
+void ucc_coll_score_map_print_info(const ucc_score_map_t *score);
 #endif

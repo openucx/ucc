@@ -148,8 +148,8 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
     case UCC_COLL_TYPE_FANOUT:
         return 0;
     case UCC_COLL_TYPE_BCAST:
-    case UCC_COLL_TYPE_ALLREDUCE:
         return args->src.info.count * ucc_dt_size(args->src.info.datatype);
+    case UCC_COLL_TYPE_ALLREDUCE:
     case UCC_COLL_TYPE_ALLTOALL:
     case UCC_COLL_TYPE_ALLGATHER:
     case UCC_COLL_TYPE_REDUCE_SCATTER:
@@ -158,7 +158,7 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
         return ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
                                              team->size) *
-               ucc_dt_size(args->dst.info.datatype);
+               ucc_dt_size(args->dst.info_v.datatype);
     case UCC_COLL_TYPE_ALLTOALLV:
     case UCC_COLL_TYPE_GATHERV:
     case UCC_COLL_TYPE_SCATTERV:
@@ -174,14 +174,14 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
                          ucc_dt_size(args->src.info.datatype);
     case UCC_COLL_TYPE_GATHER:
         return (root == team->rank)
-                   ? args->dst.info.count * ucc_dt_size(args->dst.info.datatype)
-                   : args->src.info.count * ucc_dt_size(args->src.info.datatype);
-//TODO should we multiply it by team_size ?
+                 ? args->dst.info.count * ucc_dt_size(args->dst.info.datatype)
+                 : args->src.info.count * ucc_dt_size(args->src.info.datatype) *
+                   team->size;
     case UCC_COLL_TYPE_SCATTER:
         return (root == team->rank)
-                   ? args->src.info.count * ucc_dt_size(args->src.info.datatype)
-                   : args->dst.info.count * ucc_dt_size(args->dst.info.datatype);
-//TODO should we multiply it by team_size ?
+                 ? args->src.info.count * ucc_dt_size(args->src.info.datatype)
+                 : args->dst.info.count * ucc_dt_size(args->dst.info.datatype) *
+                   team->size;
     default:
         break;
     }
@@ -191,23 +191,23 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
 ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
                                    ucc_rank_t full_size, int need_free)
 {
+    int          is_const_stride = 0;
     ucc_ep_map_t map;
     int64_t      stride;
-    int          is_const_stride;
     ucc_rank_t   i;
 
-    ucc_assert(size >= 2);
-    map.ep_num      = size;
-    /* try to detect strided pattern */
-    stride          = (int64_t)(*array)[1] - (int64_t)(*array)[0];
-    is_const_stride = 1;
-    for (i = 2; i < size; i++) {
-        if (((int64_t)(*array)[i] - (int64_t)(*array)[i - 1]) != stride) {
-            is_const_stride = 0;
-            break;
+    map.ep_num = size;
+    if (size > 1) {
+        /* try to detect strided pattern */
+        stride          = (int64_t)(*array)[1] - (int64_t)(*array)[0];
+        is_const_stride = 1;
+        for (i = 2; i < size; i++) {
+            if (((int64_t)(*array)[i] - (int64_t)(*array)[i - 1]) != stride) {
+                is_const_stride = 0;
+                break;
+            }
         }
     }
-
     if (is_const_stride) {
         if ((stride == 1) && (size == full_size)) {
             map.type = UCC_EP_MAP_FULL;
@@ -221,8 +221,7 @@ ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
             ucc_free(*array);
             *array = NULL;
         }
-    }
-    else {
+    } else {
         map.type            = UCC_EP_MAP_ARRAY;
         map.array.map       = (void *)(*array);
         map.array.elem_size = sizeof(ucc_rank_t);
@@ -243,37 +242,18 @@ ucc_coll_args_is_rooted(const ucc_base_coll_args_t *bargs)
     return 0;
 }
 
-static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
+void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len)
 {
-    switch((int)ct) {
-    case UCC_MEMORY_TYPE_HOST:
-        return "Host";
-    case UCC_MEMORY_TYPE_CUDA:
-        return "Cuda";
-    case UCC_MEMORY_TYPE_CUDA_MANAGED:
-        return "CudaManaged";
-    case UCC_MEMORY_TYPE_ROCM:
-        return "Rocm";
-    case UCC_MEMORY_TYPE_ROCM_MANAGED:
-        return "RocmManaged";
-    case UCC_MEMORY_TYPE_ASSYMETRIC:
-        return "assymetric";
-    case UCC_MEMORY_TYPE_NOT_APPLY:
-        return "n/a";
-    default:
-        break;
-    }
-    return "invalid";
-}
+    const ucc_base_coll_args_t *args  = &task->bargs;
+    ucc_team_t                *team  = args->team;
+    ucc_coll_type_t            ct    = args->args.coll_type;
+    size_t                     left  = len;
+    char                       tmp[64];
 
-void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len)
-{
-    ucc_team_t     *team  = args->team;
-    ucc_coll_type_t ct    = args->args.coll_type;
-    size_t          left  = len;
-    char            tmp[64];
-
-    ucc_snprintf_safe(str, left, "team id %u size %u rank %u ctx_rank %u: %s %s inplace=%u",
+    ucc_snprintf_safe(str, left, "req %p, seq_num %u, %s, team_id %u, size %u, "
+                      "rank %u, ctx_rank %u: %s %s inplace=%u",
+                      task, task->seq_num,
+                      task->team->context->lib->log_component.name,
                       team->id, team->size, team->rank,
                       ucc_ep_map_eval(team->ctx_map, team->rank),
                       ucc_coll_type_str(ct),
@@ -306,8 +286,7 @@ void ucc_coll_str(const ucc_base_coll_args_t *args, char *str, size_t len)
         ct == UCC_COLL_TYPE_REDUCE) {
         ucc_snprintf_safe(tmp, sizeof(tmp), " %s %s",
                           ucc_datatype_str(args->args.src.info.datatype),
-                          (args->args.mask & UCC_COLL_ARGS_FIELD_USERDEFINED_REDUCTIONS) ?
-                          "userdefined" : ucc_reduction_op_str(args->args.reduce.predefined_op));
+                          ucc_reduction_op_str(args->args.op));
         left = len - strlen(str);
         strncat(str, tmp, left);
     }

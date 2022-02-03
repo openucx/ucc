@@ -10,31 +10,41 @@
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_list.h"
+#include "utils/ucc_string.h"
 #include "ucc_progress_queue.h"
 
 static uint32_t ucc_context_seq_num = 0;
 static ucc_config_field_t ucc_context_config_table[] = {
     {"ESTIMATED_NUM_EPS", "0",
-     "An optimization hint of how many endpoints will be created on this context",
-     ucc_offsetof(ucc_context_config_t, estimated_num_eps), UCC_CONFIG_TYPE_UINT},
+     "An optimization hint of how many endpoints will be created on this "
+     "context",
+     ucc_offsetof(ucc_context_config_t, estimated_num_eps),
+     UCC_CONFIG_TYPE_UINT},
 
     {"LOCK_FREE_PROGRESS_Q", "0",
      "Enable lock free progress queue optimization",
-     ucc_offsetof(ucc_context_config_t, lock_free_progress_q), UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_context_config_t, lock_free_progress_q),
+     UCC_CONFIG_TYPE_UINT},
 
     {"ESTIMATED_NUM_PPN", "0",
      "An optimization hint of how many endpoints created on this context reside"
      " on the same node",
-     ucc_offsetof(ucc_context_config_t, estimated_num_ppn), UCC_CONFIG_TYPE_UINT},
+     ucc_offsetof(ucc_context_config_t, estimated_num_ppn),
+     UCC_CONFIG_TYPE_UINT},
 
     {"TEAM_IDS_POOL_SIZE", "32",
-     "Defines the size of the team_id_pool. The number of coexisting unique team ids "
-     "for a single process is team_ids_pool_size*64. This parameter is relevant when "
-     "internal team id allocation takes place.",
-     ucc_offsetof(ucc_context_config_t, team_ids_pool_size), UCC_CONFIG_TYPE_UINT},
+     "Defines the size of the team_id_pool. The number of coexisting unique "
+     "team ids for a single process is team_ids_pool_size*64. This parameter "
+     "is relevant when internal team id allocation takes place.",
+     ucc_offsetof(ucc_context_config_t, team_ids_pool_size),
+     UCC_CONFIG_TYPE_UINT},
 
-    {NULL}
-};
+    {"INTERNAL_OOB", "1",
+     "Use internal OOB transport for team creation. Available for ucc_context "
+     "is configured with OOB (global mode). 0 - disable, 1 - try, 2 - force.",
+     ucc_offsetof(ucc_context_config_t, internal_oob), UCC_CONFIG_TYPE_UINT},
+
+    {NULL}};
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
                           ucc_context_config_t, &ucc_config_global_list);
 
@@ -42,6 +52,7 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
                                      ucc_context_config_t **config_p)
 {
     ucc_cl_context_config_t *cl_config = NULL;
+    ucc_tl_context_config_t *tl_config = NULL;
     int                      i;
     ucc_status_t             status;
     ucc_context_config_t    *config;
@@ -55,24 +66,33 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
     if (config == NULL) {
         ucc_error("failed to allocate %zd bytes for context config",
                   sizeof(ucc_context_config_t));
-        status = UCC_ERR_NO_MEMORY;
-        goto err_config;
+        return UCC_ERR_NO_MEMORY;
     }
 
     status = ucc_config_parser_fill_opts(config, ucc_context_config_table,
                                          lib->full_prefix, NULL, 0);
     if (status != UCC_OK) {
         ucc_error("failed to read UCC core context config");
-        goto err_configs;
+        goto err_config;
     }
 
     config->lib     = lib;
-    config->configs = (ucc_cl_context_config_t **)ucc_calloc(
+    config->cl_cfgs = (ucc_cl_context_config_t **)ucc_calloc(
         lib->n_cl_libs_opened, sizeof(ucc_cl_context_config_t *),
         "cl_configs_array");
-    if (config->configs == NULL) {
+    if (config->cl_cfgs == NULL) {
         ucc_error("failed to allocate %zd bytes for cl configs array",
                   sizeof(ucc_cl_context_config_t *));
+        status = UCC_ERR_NO_MEMORY;
+        goto err_config;
+    }
+
+    config->tl_cfgs = (ucc_tl_context_config_t **)ucc_calloc(
+        lib->n_tl_libs_opened, sizeof(ucc_tl_context_config_t *),
+        "tl_configs_array");
+    if (config->tl_cfgs == NULL) {
+        ucc_error("failed to allocate %zd bytes for tl configs array",
+                  sizeof(ucc_tl_context_config_t *));
         status = UCC_ERR_NO_MEMORY;
         goto err_configs;
     }
@@ -85,36 +105,71 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
         if (UCC_OK != status) {
             ucc_error("failed to read CL \"%s\" context configuration",
                       lib->cl_libs[i]->iface->super.name);
-            goto err_config_i;
+            goto err_cl_config;
         }
-        config->configs[config->n_cl_cfg]         = cl_config;
+        config->cl_cfgs[config->n_cl_cfg] = cl_config;
         config->n_cl_cfg++;
     }
+
+    config->n_tl_cfg = 0;
+    for (i = 0; i < lib->n_tl_libs_opened; i++) {
+        ucc_assert(NULL != lib->tl_libs[i]->iface->tl_context_config.table);
+        status =
+            ucc_tl_context_config_read(lib->tl_libs[i], config, &tl_config);
+        if (UCC_OK != status) {
+            ucc_error("failed to read TL \"%s\" context configuration",
+                      lib->tl_libs[i]->iface->super.name);
+            goto err_tl_config;
+        }
+        config->tl_cfgs[config->n_tl_cfg] = tl_config;
+        config->n_tl_cfg++;
+    }
+
     *config_p   = config;
     return UCC_OK;
 
-err_config_i:
-    for (i = i - 1; i >= 0; i--) {
-        ucc_base_config_release(&config->configs[i]->super);
+err_tl_config:
+    for (i = 0; i < config->n_tl_cfg; i++) {
+        ucc_base_config_release(&config->tl_cfgs[i]->super.super);
     }
+
+err_cl_config:
+    for (i = 0; i < config->n_cl_cfg; i++) {
+        ucc_base_config_release(&config->cl_cfgs[i]->super.super);
+    }
+    ucc_free(config->tl_cfgs);
+
 err_configs:
-    ucc_free(config->configs);
+    ucc_free(config->cl_cfgs);
 
 err_config:
     ucc_free(config);
     return status;
 }
 
-/* Look up the cl_context_config in the array of configs based on the
-   cl_type. returns NULL if not found */
 static inline ucc_cl_context_config_t *
-find_cl_context_config(ucc_context_config_t *cfg, ucc_cl_type_t cl_type)
+find_cl_context_config(ucc_context_config_t *cfg, const char *name)
 {
     int i;
     for (i = 0; i < cfg->n_cl_cfg; i++) {
-        if (cfg->configs[i] &&
-            (cl_type == cfg->configs[i]->cl_lib->iface->type)) {
-            return cfg->configs[i];
+        if (cfg->cl_cfgs[i] &&
+            (0 == strcmp(cfg->cl_cfgs[i]->cl_lib->iface->super.name,
+                         name))) {
+            return cfg->cl_cfgs[i];
+        }
+    }
+    return NULL;
+}
+
+static inline ucc_tl_context_config_t *
+find_tl_context_config(ucc_context_config_t *cfg, const char *name)
+{
+    int i;
+    for (i = 0; i < cfg->n_tl_cfg; i++) {
+        if (cfg->tl_cfgs[i] &&
+            (0 == strcmp(cfg->tl_cfgs[i]->tl_lib->iface->super.name,
+                         name))) {
+            return cfg->tl_cfgs[i];
         }
     }
     return NULL;
@@ -128,13 +183,19 @@ find_cl_context_config(ucc_context_config_t *cfg, ucc_cl_type_t cl_type)
    If user passes a comma separated list of CLs, then we go over the list
    and apply modifications to the specified CLs only. */
 ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
-                                       const char *cls, const char *name,
+                                       const char *components,
+                                       const char *name,
                                        const char *value)
 {
     int                      i;
     ucc_status_t             status;
     ucc_cl_context_config_t *cl_cfg;
-    if (NULL == cls) {
+    ucc_tl_context_config_t *tl_cfg;
+    char                   **tokens;
+    const char              *component;
+    unsigned                 n_tokens;
+
+    if (NULL == components) {
         /* cls is NULL means modify core ucc context config */
         status = ucc_config_parser_set_value(config, ucc_context_config_table, name,
                                              value);
@@ -143,43 +204,69 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
                       name, value);;
             return status;
         }
-    } else if (0 != strcmp(cls, "all")) {
-        ucc_cl_type_t *required_cls;
-        int            n_required_cls;
-        status = ucc_parse_cls_string(cls, &required_cls, &n_required_cls);
-        if (UCC_OK != status) {
-            ucc_error("failed to parse cls string: %s", cls);
-            return status;
+    } else if (0 != strcmp(components, "all")) {
+        tokens = ucc_str_split(components, ",");
+        if (!tokens) {
+            return UCC_ERR_INVALID_PARAM;
         }
-        for (i = 0; i < n_required_cls; i++) {
-            cl_cfg = find_cl_context_config(config, required_cls[i]);
-            if (!cl_cfg) {
-                ucc_error("required CL %s is not part of the context",
-                          ucc_cl_names[required_cls[i]]);
-                return UCC_ERR_INVALID_PARAM;
+        n_tokens = ucc_str_split_count(tokens);
+
+        for (i = 0; i < n_tokens; i++) {
+            if (strlen(tokens[i]) < 4) {
+                status = UCC_ERR_INVALID_PARAM;
+                goto err_input;
             }
-            status = ucc_config_parser_set_value(
-                cl_cfg, cl_cfg->cl_lib->iface->cl_context_config.table, name,
-                value);
-            if (UCC_OK != status) {
-                ucc_error("failed to modify CL \"%s\" configuration, name %s, "
-                          "value %s",
-                          cl_cfg->cl_lib->iface->super.name, name, value);
-                return status;
+            component = tokens[i] + 3;
+            if (0 == strncmp(tokens[i], "cl/", 3)) {
+                cl_cfg = find_cl_context_config(config, component);
+                if (!cl_cfg) {
+                    ucc_error("required CL %s is not part of the context",
+                              component);
+                    status = UCC_ERR_NOT_FOUND;
+                    goto err;
+                }
+                status = ucc_config_parser_set_value(
+                    cl_cfg, cl_cfg->cl_lib->iface->cl_context_config.table, name,
+                    value);
+                if (UCC_OK != status) {
+                    ucc_error("failed to modify CL \"%s\" configuration, name %s, "
+                              "value %s", component, name, value);
+                    goto err;
+                }
+            } else if (0 == strncmp(tokens[i], "tl/", 3)) {
+                tl_cfg = find_tl_context_config(config, component);
+                if (!tl_cfg) {
+                    ucc_error("required TL %s is not part of the context",
+                              component);
+                    status = UCC_ERR_NOT_FOUND;
+                    goto err;
+                }
+                status = ucc_config_parser_set_value(
+                    tl_cfg, tl_cfg->tl_lib->iface->tl_context_config.table, name,
+                    value);
+                if (UCC_OK != status) {
+                    ucc_error("failed to modify TL \"%s\" configuration, name %s, "
+                              "value %s", component, name, value);
+                    goto err;
+                }
+            } else {
+                status = UCC_ERR_INVALID_PARAM;
+                ucc_error("invalid component name %s", tokens[i]);
+                goto err_input;
             }
         }
-        ucc_free(required_cls);
+        ucc_str_split_free(tokens);
     } else {
         for (i = 0; i < config->n_cl_cfg; i++) {
-            if (config->configs[i]) {
+            if (config->cl_cfgs[i]) {
                 status = ucc_config_parser_set_value(
-                    config->configs[i],
-                    config->lib->cl_libs[i]->iface->cl_context_config.table, name,
-                    value);
+                    config->cl_cfgs[i],
+                    config->cl_cfgs[i]->cl_lib->iface->cl_context_config.table,
+                    name, value);
                 if (UCC_OK != status) {
                     ucc_error("failed to modify CL \"%s\" configuration, name "
                               "%s, value %s",
-                              config->lib->cl_libs[i]->iface->super.name, name,
+                              config->cl_cfgs[i]->cl_lib->iface->super.name, name,
                               value);
                     return status;
                 }
@@ -187,18 +274,29 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
         }
     }
     return UCC_OK;
+
+err_input:
+    ucc_error("incorrect component name %s is provided. "
+              "expected cl/<cl_name> or tl/<tl_name>.",
+              tokens[i]);
+err:
+    ucc_str_split_free(tokens);
+    return status;
 }
 
 void ucc_context_config_release(ucc_context_config_t *config)
 {
     int i;
-    for (i = 0; i < config->n_cl_cfg; i++) {
-        if (!config->configs[i]) {
-            continue;
-        }
-        ucc_base_config_release(&config->configs[i]->super);
+
+    for (i = 0; i < config->n_tl_cfg; i++) {
+        ucc_base_config_release(&config->tl_cfgs[i]->super.super);
     }
-    ucc_free(config->configs);
+
+    for (i = 0; i < config->n_cl_cfg; i++) {
+        ucc_base_config_release(&config->cl_cfgs[i]->super.super);
+    }
+    ucc_free(config->tl_cfgs);
+    ucc_free(config->cl_cfgs);
     ucc_free(config);
 }
 
@@ -233,13 +331,9 @@ void ucc_context_config_print(const ucc_context_config_h config, FILE *stream,
         config->lib->full_prefix, (ucc_config_print_flags_t)flags);
 
     for (i = 0; i < config->n_cl_cfg; i++) {
-        if (!config->configs[i]) {
-            continue;
-        }
-
         ucc_config_parser_print_opts(
             stream, config->lib->cl_libs[i]->iface->cl_context_config.name,
-            config->configs[i],
+            config->cl_cfgs[i],
             config->lib->cl_libs[i]->iface->cl_context_config.table,
             config->lib->cl_libs[i]->iface->cl_context_config.prefix,
             config->lib->full_prefix, (ucc_config_print_flags_t)flags);
@@ -255,20 +349,20 @@ static inline void ucc_copy_context_params(ucc_context_params_t *dst,
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_ID, ctx_id);
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_SYNC_TYPE,
                             sync_type);
+    UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS, mem_params);
 }
 
 static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
                                            ucc_context_config_t *ctx_config,
                                            ucc_base_context_params_t b_params)
 {
-    ucc_lib_info_t *lib = ctx->lib;
-    ucc_tl_lib_t *tl_lib;
-    ucc_tl_context_config_t *tl_config;
-    ucc_base_context_t       *b_ctx;
-    int i, num_tls;
-    ucc_status_t status;
+    ucc_lib_info_t     *lib = ctx->lib;
+    ucc_tl_lib_t       *tl_lib;
+    ucc_base_context_t *b_ctx;
+    int                 i, num_tls;
+    ucc_status_t        status;
 
-    num_tls = lib->n_tl_libs_opened;
+    num_tls = ctx_config->n_tl_cfg;
     ctx->tl_ctx = (ucc_tl_context_t **)ucc_malloc(
         sizeof(ucc_tl_context_t *) * num_tls, "tl_ctx_array");
     if (!ctx->tl_ctx) {
@@ -277,22 +371,17 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
         return UCC_ERR_NO_MEMORY;
     }
     ctx->n_tl_ctx = 0;
-    for (i = 0; i < lib->n_tl_libs_opened; i++) {
-        tl_lib = lib->tl_libs[i];
-        ucc_assert(NULL != tl_lib->iface->tl_context_config.table);
-        status =
-            ucc_tl_context_config_read(tl_lib, ctx_config, &tl_config);
-        if (UCC_OK != status) {
-            ucc_warn("failed to read TL \"%s\" context configuration",
-                     tl_lib->iface->super.name);
-            continue;
-        }
+    for (i = 0; i < num_tls; i++) {
+        tl_lib = ctx_config->tl_cfgs[i]->tl_lib;
         status = tl_lib->iface->context.create(
-            &b_params, &tl_config->super, &b_ctx);
-        ucc_base_config_release(&tl_config->super);
+            &b_params, &ctx_config->tl_cfgs[i]->super.super, &b_ctx);
         if (UCC_OK != status) {
-            ucc_warn("failed to create tl context for %s",
-                      tl_lib->iface->super.name);
+            /* UCC_ERR_LAST means component was disabled via TUNE param:
+               don't print warning. */
+            if (UCC_ERR_LAST != status) {
+                ucc_warn("failed to create tl context for %s",
+                         tl_lib->iface->super.name);
+            }
             continue;
         }
         ctx->tl_ctx[ctx->n_tl_ctx] = ucc_derived_of(b_ctx, ucc_tl_context_t);
@@ -357,7 +446,7 @@ poll:
     }
     if (0 == addr_storage->addr_len) {
         if (NULL == addr_storage->storage) {
-            addr_storage->size = oob->participants;
+            addr_storage->size = oob->n_oob_eps;
             attr.mask          = UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
                         UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
             status = ucc_context_get_attr(context, &attr);
@@ -450,7 +539,8 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     uint32_t                   topo_required = 0;
     ucc_base_context_params_t  b_params;
     ucc_base_context_t        *b_ctx;
-    ucc_base_ctx_attr_t        attr;
+    ucc_base_ctx_attr_t        c_attr;
+    ucc_cl_lib_attr_t          l_attr;
     ucc_cl_lib_t              *cl_lib;
     ucc_context_t             *ctx;
     ucc_status_t               status;
@@ -465,6 +555,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
+    ctx->rank          = UCC_RANK_MAX;
     ctx->lib           = lib;
     ctx->ids.pool_size = config->team_ids_pool_size;
     ucc_list_head_init(&ctx->progress_list);
@@ -475,6 +566,9 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     b_params.estimated_num_ppn = config->estimated_num_ppn;
     b_params.prefix            = lib->full_prefix;
     b_params.thread_mode       = lib->attr.thread_mode;
+    if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+        ctx->rank = params->oob.oob_ep;
+    }
     status = ucc_create_tl_contexts(ctx, config, b_params);
     if (UCC_OK != status) {
         /* only critical error could have happened - bail */
@@ -491,33 +585,48 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         goto error_ctx;
     }
     ctx->n_cl_ctx = 0;
+    ctx->cl_flags = 0;
     for (i = 0; i < num_cls; i++) {
-        cl_lib = config->configs[i]->cl_lib;
+        cl_lib = config->cl_cfgs[i]->cl_lib;
         status = cl_lib->iface->context.create(
-            &b_params, &config->configs[i]->super, &b_ctx);
+            &b_params, &config->cl_cfgs[i]->super.super, &b_ctx);
         if (UCC_OK != status) {
             if (lib->specific_cls_requested) {
                 ucc_error("failed to create cl context for %s",
                           cl_lib->iface->super.name);
                 goto error_ctx_create;
             } else {
-                ucc_warn("failed to create cl context for %s, skipping",
-                         cl_lib->iface->super.name);
+                /* UCC_ERR_LAST means component was disabled via TUNE param:
+                   don't print warning. */
+                if (UCC_ERR_LAST != status) {
+
+                    ucc_warn("failed to create cl context for %s, skipping",
+                             cl_lib->iface->super.name);
+                }
                 continue;
             }
         }
         ctx->cl_ctx[ctx->n_cl_ctx] = ucc_derived_of(b_ctx, ucc_cl_context_t);
         ctx->n_cl_ctx++;
-        memset(&attr, 0, sizeof(attr));
-        status = cl_lib->iface->context.get_attr(b_ctx, &attr);
+
+        memset(&c_attr, 0, sizeof(c_attr));
+        status = cl_lib->iface->context.get_attr(b_ctx, &c_attr);
         if (status != UCC_OK) {
             ucc_error("failed to query context attributes for %s",
                       cl_lib->iface->super.name);
             goto error_ctx_create;
         }
-        if (attr.topo_required) {
+        if (c_attr.topo_required) {
             topo_required = 1;
         }
+
+        memset(&l_attr, 0, sizeof(l_attr));
+        status = cl_lib->iface->lib.get_attr(&cl_lib->super, &l_attr.super);
+        if (UCC_OK != status) {
+            ucc_error("failed to query lib %s attr", cl_lib->iface->super.name);
+            goto error_ctx_create;
+        }
+        ctx->cl_flags |= l_attr.super.flags;
     }
     if (0 == ctx->n_cl_ctx) {
         ucc_error("no CL context created in ucc_context_create");
@@ -540,7 +649,6 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     }
     ctx->id.pi      = ucc_local_proc;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
-    ctx->rank = UCC_RANK_MAX;
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         do {
             /* UCC context create is blocking fn, so we can wait here for the
@@ -553,16 +661,71 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
             }
         } while (status == UCC_INPROGRESS);
 
-        ctx->rank = ctx->addr_storage.rank;
-
         if (topo_required) {
             /* At least one available CL context reported it needs topo info */
-            status = ucc_topo_init(&ctx->addr_storage, &ctx->topo);
+            status = ucc_context_topo_init(&ctx->addr_storage, &ctx->topo);
             if (UCC_OK != status) {
                 ucc_free(ctx->addr_storage.storage);
                 ucc_error("failed to init ctx topo");
                 goto error_ctx_create;
             }
+        }
+        ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
+    }
+    if (config->internal_oob) {
+        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+            ucc_base_team_params_t t_params;
+            ucc_base_team_t *      b_team;
+            status = ucc_tl_context_get(ctx, "ucp", &ctx->service_ctx);
+            if (UCC_OK != status) {
+                if (config->internal_oob == 2) {
+                    ucc_error(
+                        "TL UCP context is not available, service team can "
+                        "not be created but was force requested");
+                    goto error_ctx_create;
+                }
+                ucc_debug("TL UCP context is not available, "
+                          "service team can not be created");
+            } else {
+                t_params.params.mask = UCC_TEAM_PARAM_FIELD_EP |
+                                       UCC_TEAM_PARAM_FIELD_EP_RANGE |
+                                       UCC_TEAM_PARAM_FIELD_OOB;
+                t_params.params.oob.allgather    = ctx->params.oob.allgather;
+                t_params.params.oob.req_test     = ctx->params.oob.req_test;
+                t_params.params.oob.req_free     = ctx->params.oob.req_free;
+                t_params.params.oob.coll_info    = ctx->params.oob.coll_info;
+                t_params.params.oob.n_oob_eps    = ctx->params.oob.n_oob_eps;
+                t_params.params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+                t_params.params.ep       = ctx->rank;
+                t_params.rank            = ctx->rank;
+                t_params.size            = ctx->params.oob.n_oob_eps;
+                /* CORE scope id - never overlaps with CL type */
+                t_params.scope    = UCC_CL_LAST + 1;
+                t_params.scope_id = 0;
+                t_params.id       = 0;
+                t_params.team     = NULL;
+                t_params.map.type = UCC_EP_MAP_FULL;
+                status            = UCC_TL_CTX_IFACE(ctx->service_ctx)
+                             ->team.create_post(&ctx->service_ctx->super,
+                                                &t_params, &b_team);
+                if (UCC_OK != status) {
+                    ucc_error("ctx service team create post failed");
+                    goto error_ctx_create;
+                }
+                do {
+                    status = UCC_TL_CTX_IFACE(ctx->service_ctx)
+                                 ->team.create_test(b_team);
+                } while (UCC_INPROGRESS == status);
+                if (status < 0) {
+                    ucc_error("failed to create ctx service team");
+                    goto error_ctx_create;
+                }
+                ctx->service_team = ucc_derived_of(b_team, ucc_tl_team_t);
+            }
+        } else if (config->internal_oob == 2) {
+            ucc_error("UCC_INTERNAL_OOB was force requested for context "
+                      "without OOB");
+            goto error_ctx_create;
         }
     }
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
@@ -571,7 +734,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
 
 error_ctx_create:
     for (i = 0; i < ctx->n_cl_ctx; i++) {
-        config->configs[i]->cl_lib->iface->context.destroy(
+        config->cl_cfgs[i]->cl_lib->iface->context.destroy(
             &ctx->cl_ctx[i]->super);
     }
     ucc_free(ctx->cl_ctx);
@@ -596,7 +759,19 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     ucc_tl_context_t *tl_ctx;
     ucc_tl_lib_t     *tl_lib;
     int               i;
+    ucc_status_t      status;
 
+    if (context->service_team) {
+        while (UCC_INPROGRESS ==
+               (status = UCC_TL_CTX_IFACE(context->service_ctx)
+                             ->team.destroy(&context->service_team->super))) {
+            ucc_context_progress(context);
+        }
+        if (status < 0) {
+            ucc_error("failed to destroy ctx service team");
+        }
+        ucc_tl_context_put(context->service_ctx);
+    }
     if (UCC_OK != ucc_context_free_attr(&context->attr)) {
         ucc_error("failed to free context attributes");
     }
@@ -615,6 +790,7 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
         }
         tl_lib->iface->context.destroy(&tl_ctx->super);
     }
+    ucc_context_topo_cleanup(context->topo);
     ucc_progress_queue_finalize(context->pq);
     ucc_free(context->addr_storage.storage);
     ucc_free(context->all_tls.names);
@@ -795,6 +971,29 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
         context_attr->ctx_addr = context->attr.ctx_addr;
     }
 
+    if (context_attr->mask & UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE) {
+        uint64_t            max_buffer_size = 0;
+        int                 i;
+        ucc_base_ctx_attr_t attr;
+        ucc_tl_lib_t *      tl_lib;
+
+        attr.attr.mask = UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE;
+        attr.attr.global_work_buffer_size = 0;
+        for (i = 0; i < context->n_tl_ctx; i++) {
+            tl_lib =
+                ucc_derived_of(context->tl_ctx[i]->super.lib, ucc_tl_lib_t);
+            status = tl_lib->iface->context.get_attr(&context->tl_ctx[i]->super,
+                                                     &attr);
+            if (UCC_OK != status) {
+                ucc_error("failed to obtain global work buffer size");
+                return status;
+            }
+            if (attr.attr.global_work_buffer_size > max_buffer_size) {
+                max_buffer_size = attr.attr.global_work_buffer_size;
+            }
+        }
+        context_attr->global_work_buffer_size = max_buffer_size;
+    }
+
     return status;
 }
-

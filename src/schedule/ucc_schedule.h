@@ -9,12 +9,15 @@
 #include "utils/ucc_list.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_lock_free_queue.h"
+#include "utils/ucc_coll_utils.h"
+#include "components/base/ucc_base_iface.h"
 
 #define MAX_LISTENERS 4
 
 typedef enum {
     UCC_EVENT_COMPLETED = 0,
     UCC_EVENT_SCHEDULE_STARTED,
+    UCC_EVENT_TASK_STARTED,
     UCC_EVENT_ERROR,
     UCC_EVENT_LAST
 } ucc_event_t;
@@ -45,8 +48,8 @@ enum {
 typedef struct ucc_coll_task {
     ucc_coll_req_t               super;
     uint32_t                     flags;
-    ucc_coll_args_t              args;
-    ucc_base_team_t             *team;
+    ucc_base_coll_args_t         bargs;
+    ucc_base_team_t             *team; //CL/TL team pointer
     ucc_coll_post_fn_t           post;
     ucc_coll_triggered_post_fn_t triggered_post;
     ucc_coll_finalize_fn_t       finalize;
@@ -64,6 +67,12 @@ typedef struct ucc_coll_task {
         /* used for lf mt progress queue */
         ucc_lf_queue_elem_t          lf_elem;
     };
+    uint8_t  n_deps;
+    uint8_t  n_deps_satisfied;
+    uint8_t  n_deps_base;
+    double   start_time; /* timestamp of the start time:
+                            either post or triggered_post */
+    uint32_t seq_num;
 } ucc_coll_task_t;
 
 typedef struct ucc_context ucc_context_t;
@@ -80,8 +89,8 @@ typedef struct ucc_schedule {
 
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em);
 
-ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task, ucc_coll_args_t *args,
-                                ucc_base_team_t *team);
+ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
+                                ucc_base_coll_args_t *args, ucc_base_team_t *team);
 
 void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
                                  ucc_coll_task_t *task,
@@ -90,7 +99,7 @@ void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
 ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event);
 
-ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_coll_args_t *args,
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_base_coll_args_t *bargs,
                                ucc_base_team_t *team);
 
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
@@ -101,6 +110,12 @@ ucc_status_t ucc_task_start_handler(ucc_coll_task_t *parent,
                                     ucc_coll_task_t *task);
 ucc_status_t ucc_schedule_finalize(ucc_coll_task_t *task);
 
+ucc_status_t ucc_dependency_handler(ucc_coll_task_t *parent, /* NOLINT */
+                                    ucc_coll_task_t *task);
+
+ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
+                                ucc_coll_task_t *task);
+
 static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 {
     ucc_status_t status = task->super.status;
@@ -109,8 +124,15 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
     } else {
         /* error in task status */
-        ucc_error("failure in task %p, %s", task,
-                  ucc_status_string(task->super.status));
+        if (UCC_ERR_TIMED_OUT == status) {
+            char coll_str[256];
+            ucc_coll_str(task, coll_str, sizeof(coll_str));
+            ucc_warn("timeout %g sec has expired on %s",
+                     task->bargs.args.timeout, coll_str);
+        } else {
+            ucc_error("failure in task %p, %s", task,
+                      ucc_status_string(task->super.status));
+        }
         ucc_assert(task->super.status < 0);
         ucc_event_manager_notify(task, UCC_EVENT_ERROR);
         status = task->super.status;
@@ -124,6 +146,15 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         task->finalize(task);
     }
     return status;
+}
+
+static inline void ucc_task_subscribe_dep(ucc_coll_task_t *target,
+                                          ucc_coll_task_t *subscriber,
+                                          ucc_event_t      event)
+{
+    ucc_event_manager_subscribe(&target->em, event, subscriber,
+                                ucc_dependency_handler);
+    subscriber->n_deps++;
 }
 
 #define UCC_TASK_LIB(_task) (((ucc_coll_task_t *)_task)->team->context->lib)

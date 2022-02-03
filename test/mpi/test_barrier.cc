@@ -6,11 +6,21 @@
 
 #include "test_mpi.h"
 
-TestBarrier::TestBarrier(ucc_test_team_t &team) : TestCase(team)
+TestBarrier::TestBarrier(ucc_test_team_t &team) :
+    TestCase(team, UCC_COLL_TYPE_BARRIER)
 {
     status = UCC_OK;
-    args.coll_type = UCC_COLL_TYPE_BARRIER;
     UCC_CHECK(ucc_collective_init(&args, &req, team.team));
+}
+
+ucc_status_t TestBarrier::set_input()
+{
+    return UCC_OK;
+}
+
+ucc_status_t TestBarrier::reset_sbuf()
+{
+    return UCC_OK;
 }
 
 ucc_status_t TestBarrier::check()

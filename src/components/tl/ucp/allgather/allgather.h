@@ -9,6 +9,8 @@
 #include "../tl_ucp_coll.h"
 
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task);
+ucc_status_t ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *task);
+ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *task);
 
 /* Uses allgather_kn_radix from config */
 ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,

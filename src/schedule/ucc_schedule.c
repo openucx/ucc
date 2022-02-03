@@ -5,6 +5,7 @@
 #include "ucc_schedule.h"
 #include "utils/ucc_compiler_def.h"
 #include "components/base/ucc_base_iface.h"
+#include "coll_score/ucc_coll_score.h"
 
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em)
 {
@@ -31,15 +32,19 @@ void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
     ucc_assert(i < MAX_LISTENERS);
 }
 
-ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task, ucc_coll_args_t *args,
+ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
+                                ucc_base_coll_args_t *bargs,
                                 ucc_base_team_t *team)
 {
-    task->super.status = UCC_OPERATION_INITIALIZED;
-    task->ee           = NULL;
-    task->flags        = 0;
-    task->team         = team;
-    if (args) {
-        memcpy(&task->args, args, sizeof(*args));
+    task->super.status     = UCC_OPERATION_INITIALIZED;
+    task->ee               = NULL;
+    task->flags            = 0;
+    task->team             = team;
+    task->n_deps           = 0;
+    task->n_deps_satisfied = 0;
+    task->bargs.args.mask  = 0;
+    if (bargs) {
+        memcpy(&task->bargs, bargs, sizeof(*bargs));
     }
     ucc_lf_queue_init_elem(&task->lf_elem);
     return ucc_event_manager_init(&task->em);
@@ -76,9 +81,11 @@ ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
     for (i = 0; i < MAX_LISTENERS; i++) {
         task = em->listeners[i].task;
         if (task) {
-            if (UCC_EVENT_ERROR == event) {
+            if (ucc_unlikely(event == UCC_EVENT_ERROR)) {
                 ucc_task_error_handler(parent_task, task);
-            } else if (em->listeners[i].event == event) {
+                continue;
+            }
+            if (em->listeners[i].event == event) {
                 status = em->listeners[i].handler(parent_task, task);
                 if (ucc_unlikely(status != UCC_OK)) {
                     return status;
@@ -94,6 +101,7 @@ ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
                                ucc_coll_task_t *task)
 {
     ucc_schedule_t *self = ucc_container_of(task, ucc_schedule_t, super);
+
     self->n_completed_tasks += 1;
     if (self->n_completed_tasks == self->n_tasks) {
         self->super.super.status = UCC_OK;
@@ -102,12 +110,12 @@ ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
     return UCC_OK;
 }
 
-ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_coll_args_t *args,
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_base_coll_args_t *bargs,
                                ucc_base_team_t *team)
 {
     ucc_status_t status;
 
-    status            = ucc_coll_task_init(&schedule->super, args, team);
+    status            = ucc_coll_task_init(&schedule->super, bargs, team);
     schedule->ctx     = team->context->ucc_context;
     schedule->n_tasks = 0;
     return status;
@@ -129,9 +137,10 @@ ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule)
                                     UCC_EVENT_SCHEDULE_STARTED);
 }
 
-ucc_status_t ucc_task_start_handler(ucc_coll_task_t *parent, /* NOLINT */
+ucc_status_t ucc_task_start_handler(ucc_coll_task_t *parent,
                                     ucc_coll_task_t *task)
 {
+    task->start_time = parent->start_time;
     return task->post(task);
 }
 
