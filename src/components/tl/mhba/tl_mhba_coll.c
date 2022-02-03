@@ -9,6 +9,7 @@
 #include "core/ucc_mc.h"
 #include "core/ucc_team.h"
 #include "tl_mhba_inline.h"
+#include "tl_mhba_ib.h"
 
 static ucc_status_t ucc_tl_mhba_poll_cq(ucc_tl_mhba_team_t *team)
 {
@@ -632,6 +633,18 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
                     }
                     dm = ucc_mpool_get(&team->dm_pool);
                     send_start(team, cyc_rank);
+                }
+                struct ibv_qp *qp;
+                if (team->is_dc) {
+                    qp = team->net.dcis[cyc_rank % team->num_dci_qps].dci_qp;
+                } else {
+                    qp = team->net.rc_qps[cyc_rank];
+                }
+                status = ucc_tl_mhba_post_transpose(qp, team->node.ops[task->seq_index].send_mkeys[0]->lkey,
+                                                   team->dm_mr->lkey, src_addr, dm->offset, task->msg_size,
+                                                   block_size, block_size);
+                if (UCC_OK != status) {
+                    return status;
                 }
                 /* printf("rank %d got dm %p, seq_num %d\n", rank, dm, task->seq_num); */
                 status = send_block_data(team, cyc_rank, src_addr, block_msgsize,

@@ -45,4 +45,9 @@ ucc_status_t ucc_tl_mhba_init_umr(ucc_tl_mhba_context_t *ctx,
                                   ucc_tl_mhba_node_t *   node);
 
 ucc_status_t ucc_tl_mhba_init_mkeys(ucc_tl_mhba_team_t *team);
+
+ucc_status_t ucc_tl_mhba_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey, uint32_t dst_mr_key,
+                                        uintptr_t src_mkey_addr, uintptr_t dst_addr,
+                                        uint32_t element_size, uint16_t ncols, uint16_t nrows);
+
 #endif

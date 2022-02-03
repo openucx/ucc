@@ -168,6 +168,7 @@ ucc_status_t ucc_tl_mhba_init_dc_qps_and_connect(ucc_tl_mhba_team_t *team,
     attr_dv.dc_init_attr.dc_type = MLX5DV_DCTYPE_DCI;
     attr_dv.create_flags |= MLX5DV_QP_CREATE_DISABLE_SCATTER_TO_CQE;
 
+    attr_dv.send_ops_flags = MLX5DV_QP_EX_WITH_RAW_WQE ;
     qp_attr_to_init.qp_state   = IBV_QPS_INIT;
     qp_attr_to_init.pkey_index = 0;
     qp_attr_to_init.port_num   = port_num;

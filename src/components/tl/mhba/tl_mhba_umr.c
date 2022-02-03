@@ -266,61 +266,49 @@ typedef struct transpose_seg {
 } transpose_seg_t;
 
 /* External API to expose the non-inline UMR registration */
-ucc_status_t ucc_tl_mhba_post_transpose(struct ucc_tl_mhba_internal_qp *mqp, struct ibv_qp_ex *ibqp,
-                                        struct ibv_mr *src_mr, struct ibv_mr *dst_mr,
-                                        uint32_t element_size, uint16_t ncols, uint16_t nrows,
-                                        uintptr_t src_mkey_addr, uintptr_t dst_addr)
+ucc_status_t ucc_tl_mhba_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey, uint32_t dst_mr_key,
+                                        uintptr_t src_mkey_addr, uintptr_t dst_addr,
+                                        uint32_t element_size, uint16_t ncols, uint16_t nrows)
 {
 
-    void *                    qend   = mqp->sq_qend;
     uint32_t                  opcode = MLX5_OPCODE_LOCAL_MMO;
     uint32_t                  opmode = 0x0; //TRanspose
     uint32_t                  n_ds   = 4;
+    char                      wqe_desc[n_ds * DS_SIZE];
     struct mlx5_wqe_ctrl_seg *ctrl;
     struct mlx5_wqe_data_seg *data;
     transpose_seg_t          *tseg;
-    uint32_t                  idx;
+    struct ibv_qp_ex *qp_ex = ibv_qp_to_qp_ex(qp);
+    struct mlx5dv_qp_ex *mqp = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
 
-    idx = mqp->sq_cur_post & (mqp->qp.sq.wqe_cnt - 1);
-
+    ibv_wr_start(qp_ex);
+    memset(wqe_desc, 0, n_ds * DS_SIZE);
     /* SET CTRL SEG */
-    ctrl = PTR_OFFSET(mqp->sq_start, (idx << MLX5_SEND_WQE_SHIFT));
-    memset(ctrl, 0, n_ds * DS_SIZE);
+
+    ctrl = (void*)wqe_desc;
     uint8_t fm_ce_se = MLX5_WQE_CTRL_FENCE;
     // MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE ?
-    //Do i need fence, signall, solicited ?
 
-    mlx5dv_set_ctrl_seg(ctrl, mqp->sq_cur_post, opcode, opmode,
-                        mqp->qp_num, fm_ce_se, n_ds, 0x0, 0x0);
+    mlx5dv_set_ctrl_seg(ctrl, /* pi */ 0x0, opcode, opmode,
+                        qp->qp_num, fm_ce_se, n_ds, 0x0, 0x0);
 
     /* SET TRANSPOSE SEG */
     tseg  = PTR_OFFSET(ctrl, DS_SIZE);
-    if (ucs_unlikely(tseg == qend)) {
-        tseg = mqp->sq_start;
-    }
-
     tseg->element_size = htobe32(element_size);
     tseg->num_rows = htobe16(nrows);
     tseg->num_cols = htobe16(ncols);
 
     /* SET SRC DATA SEG */
     data = PTR_OFFSET(tseg, DS_SIZE);
-    if (ucs_unlikely(data == qend)) {
-        data = mqp->sq_start;
-    }
-    mlx5dv_set_data_seg(data, ncols * nrows * element_size, src_mr->lkey, src_mkey_addr);
+    mlx5dv_set_data_seg(data, ncols * nrows * element_size, src_mr_lkey, src_mkey_addr);
 
     /* SET DST DATA SEG */
-    data = PTR_OFFSET(tseg, DS_SIZE);
-    mlx5dv_set_data_seg(data, ncols * nrows * element_size, dst_mr->lkey, dst_addr);
-    if (ucs_unlikely(data == qend)) {
-        data = mqp->sq_start;
+    data = PTR_OFFSET(data, DS_SIZE);
+    mlx5dv_set_data_seg(data, ncols * nrows * element_size, dst_mr_key, dst_addr);
+    mlx5dv_wr_raw_wqe(mqp, wqe_desc);
+    if (ibv_wr_complete(qp_ex)) {
+        fprintf(stderr, "failed to post transpose wqe");
+        return UCC_ERR_NO_MESSAGE;
     }
-
-    // legacy:
-    mqp->cur_ctrl = ctrl;
-    mqp->cur_size = n_ds;
-    mqp->nreq++;
-    mqp->sq_cur_post += ucc_div_round_up(mqp->cur_size, 4);
     return UCC_OK;
 }
