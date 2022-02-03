@@ -37,16 +37,6 @@ runs_on_dockers:
     build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}',
     cloud: 'swx-k8s'
   }
-  - {
-    file: '.ci/Dockerfile.fedora33',
-    name: 'fedora33',
-    tag: 'latest',
-    arch: 'x86_64',
-    category: 'tool',
-    uri: 'x86_64/fedora33',
-    build_args: '--rm --no-cache',
-    cloud: 'swx-k8s',
-  }
 
 # bare metal
 runs_on_agents:
@@ -55,12 +45,6 @@ runs_on_agents:
 timeout_minutes: 120
 
 steps:
-  #============================================================================
-  - name: Check Code Format
-    containerSelector: "{name:'fedora33', category: 'tool'}"
-    run: |
-      echo "INFO: check code format"
-      ${SRC_DIR}/ucc/.ci/scripts/check_code_format.sh
   #============================================================================
   - name: Start docker
     agentSelector: "{nodeLabel: 'swx-clx01'}"
