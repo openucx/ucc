@@ -63,6 +63,7 @@ typedef struct ucc_tl_ucp_task {
             ucc_ep_map_t            inv_map;
             int                     n_frags;
             int                     frag;
+            char                    s_scratch_busy[2];
         } reduce_scatter_ring;
         struct {
             int                     phase;

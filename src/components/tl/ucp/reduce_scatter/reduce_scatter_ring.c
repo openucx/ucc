@@ -12,6 +12,40 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 
+static inline void send_completion_common(void *request, ucs_status_t status,
+                                          void *user_data)
+{
+    ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
+
+    if (ucc_unlikely(UCS_OK != status)) {
+        tl_error(UCC_TASK_LIB(task), "failure in rs ring completion %s",
+                 ucs_status_string(status));
+        task->super.super.status = ucs_status_to_ucc_status(status);
+    }
+    task->send_completed++;
+    if (request) {
+        ucp_request_free(request);
+    }
+}
+
+static void send_completion_1(void *request, ucs_status_t status,
+                              void *user_data)
+{
+    ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
+
+    send_completion_common(request, status, user_data);
+    task->reduce_scatter_ring.s_scratch_busy[0] = 0;
+}
+
+static void send_completion_2(void *request, ucs_status_t status,
+                              void *user_data)
+{
+    ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
+
+    send_completion_common(request, status, user_data);
+    task->reduce_scatter_ring.s_scratch_busy[1] = 0;
+}
+
 static inline void ucc_ring_frag_count(ucc_tl_ucp_task_t *task, size_t count,
                                        ucc_rank_t block, size_t *frag_count)
 {
@@ -45,6 +79,7 @@ static inline void ucc_ring_frag_block_offset(ucc_tl_ucp_task_t *task,
     *block_offset = ucc_buffer_block_offset(count, size, block);
 }
 
+
 static inline ucc_status_t ucc_tl_ucp_test_ring(ucc_tl_ucp_task_t *task)
 {
     int polls = 0;
@@ -61,23 +96,26 @@ static inline ucc_status_t ucc_tl_ucp_test_ring(ucc_tl_ucp_task_t *task)
 static ucc_status_t
 ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task     = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t *  args     = &TASK_ARGS(task);
-    ucc_tl_ucp_team_t *team     = TASK_TEAM(task);
-    ucc_rank_t         size     = task->subset.map.ep_num;
-    ucc_rank_t         rank     = task->subset.myrank;
-    void *             sbuf     = args->src.info.buffer;
-    ucc_memory_type_t  mem_type = args->dst.info.mem_type;
-    size_t             count    = args->dst.info.count * size;
-    ucc_datatype_t     dt       = args->dst.info.datatype;
-    size_t             dt_size  = ucc_dt_size(dt);
-    ucc_rank_t         sendto   = (rank + 1) % size;
-    ucc_rank_t         recvfrom = (rank - 1 + size) % size;
-    ucc_rank_t         prevblock, recv_data_from;
-    ucc_status_t       status;
+    ucc_tl_ucp_task_t      *task     = ucc_derived_of(coll_task,
+                                                      ucc_tl_ucp_task_t);
+    ucc_coll_args_t        *args     = &TASK_ARGS(task);
+    ucc_tl_ucp_team_t      *team     = TASK_TEAM(task);
+    ucc_rank_t              size     = task->subset.map.ep_num;
+    ucc_rank_t              rank     = task->subset.myrank;
+    void                   *sbuf     = args->src.info.buffer;
+    ucc_memory_type_t       mem_type = args->dst.info.mem_type;
+    size_t                  count    = args->dst.info.count * size;
+    ucc_datatype_t          dt       = args->dst.info.datatype;
+    size_t                  dt_size  = ucc_dt_size(dt);
+    ucc_rank_t              sendto   = (rank + 1) % size;
+    ucc_rank_t              recvfrom = (rank - 1 + size) % size;
+    ucp_send_nbx_callback_t cb[2]    = {send_completion_1, send_completion_2};
+    ucc_rank_t              prevblock, recv_data_from;
+    ucc_status_t            status;
     size_t max_block_size, block_offset, frag_count, frag_offset, final_offset;
-    int    step, is_avg;
-    void  *r_scratch, *s_scratch[2];
+    int    step, is_avg, id;
+    char  *busy;
+    void  *r_scratch, *s_scratch[2], *reduce_target;
 
     final_offset = 0;
     if (UCC_IS_INPLACE(*args)) {
@@ -91,6 +129,7 @@ ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
     recvfrom = ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, recvfrom);
 
     max_block_size = task->reduce_scatter_ring.max_block_count * dt_size;
+    busy           = task->reduce_scatter_ring.s_scratch_busy;
     r_scratch      = task->reduce_scatter_ring.scratch;
     s_scratch[0]   = PTR_OFFSET(r_scratch, max_block_size);
     s_scratch[1]   = PTR_OFFSET(s_scratch[0], max_block_size);
@@ -99,9 +138,12 @@ ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
         return task->super.super.status;
     }
     while (task->recv_posted > 0) {
-        void *reduce_target = s_scratch[(task->recv_completed - 1) % 2];
-        step                = task->send_posted;
-        prevblock           = (rank - 1 - step + size) % size;
+        /* always have at least 1 send completion, ie 1 free slot */
+        ucc_assert(!busy[0] || !busy[1]);
+        id            = busy[0] ? 1 : 0;
+        reduce_target = s_scratch[id];
+        step          = task->send_posted;
+        prevblock     = (rank - 1 - step + size) % size;
         prevblock =
             ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, prevblock);
         /* reduction */
@@ -134,9 +176,9 @@ ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
         ucc_assert(task->send_posted - task->send_completed <= 1);
         ucc_assert(task->send_posted < size);
 
-        UCPCHECK_GOTO(ucc_tl_ucp_send_nb(s_scratch[(task->send_posted - 1) % 2],
-                                         frag_count * dt_size, mem_type, sendto,
-                                         team, task),
+        busy[id] = 1;
+        UCPCHECK_GOTO(ucc_tl_ucp_send_cb(reduce_target, frag_count * dt_size,
+                                         mem_type, sendto, team, task, cb[id]),
                       task, out);
 
         recv_data_from = (rank - 2 - step + size) % size;
@@ -255,11 +297,12 @@ static ucc_status_t ucc_tl_ucp_reduce_scatter_ring_init_subset(
         task->reduce_scatter_ring.inv_map.type   = UCC_EP_MAP_FULL;
         task->reduce_scatter_ring.inv_map.ep_num = task->subset.map.ep_num;
     }
-    task->reduce_scatter_ring.n_frags         = n_frags;
-    task->reduce_scatter_ring.frag            = frag;
-    task->reduce_scatter_ring.scratch         = scratch;
-    task->reduce_scatter_ring.max_block_count = max_block_count;
-
+    task->reduce_scatter_ring.n_frags           = n_frags;
+    task->reduce_scatter_ring.frag              = frag;
+    task->reduce_scatter_ring.scratch           = scratch;
+    task->reduce_scatter_ring.max_block_count   = max_block_count;
+    task->reduce_scatter_ring.s_scratch_busy[0] = 0;
+    task->reduce_scatter_ring.s_scratch_busy[1] = 0;
     *task_h = &task->super;
     return UCC_OK;
 }
