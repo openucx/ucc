@@ -43,6 +43,8 @@ extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 typedef struct ucc_tl_ucp_lib_config {
     ucc_tl_lib_config_t super;
     uint32_t            kn_radix;
+    uint32_t            fanin_kn_radix;
+    uint32_t            fanout_kn_radix;
     uint32_t            barrier_kn_radix;
     uint32_t            allreduce_kn_radix;
     uint32_t            allreduce_sra_kn_radix;
@@ -119,7 +121,7 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
     (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
      UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_BARRIER |   \
-     UCC_COLL_TYPE_REDUCE)
+     UCC_COLL_TYPE_REDUCE |   UCC_COLL_TYPE_FANIN | UCC_COLL_TYPE_FANOUT)
 
 #define UCC_TL_UCP_TEAM_LIB(_team)                                             \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_ucp_lib_t))

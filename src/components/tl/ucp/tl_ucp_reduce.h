@@ -15,6 +15,9 @@ ucc_tl_ucp_reduce_multi(void *src1, void *src2, void *dst, size_t n_vectors,
                         ucc_memory_type_t mem_type, ucc_tl_ucp_task_t *task,
                         int is_avg)
 {
+    if (count == 0) {
+        return UCC_OK;
+    }
     if (is_avg) {
         return ucc_dt_reduce_multi_alpha(
             src1, src2, dst, n_vectors, count, stride, dt, UCC_OP_PROD,

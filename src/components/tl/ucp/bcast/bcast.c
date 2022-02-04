@@ -22,11 +22,14 @@ ucc_base_coll_alg_info_t
         [UCC_TL_UCP_BCAST_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
-ucc_status_t ucc_tl_ucp_bcast_knomial_start(ucc_coll_task_t *task);
-ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *task);
-
 ucc_status_t ucc_tl_ucp_bcast_init(ucc_tl_ucp_task_t *task)
 {
+    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
+    ucc_rank_t         team_size = UCC_TL_TEAM_SIZE(team);
+
+    task->bcast_kn.radix =
+        ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.bcast_kn_radix, team_size);
+
     task->super.post     = ucc_tl_ucp_bcast_knomial_start;
     task->super.progress = ucc_tl_ucp_bcast_knomial_progress;
     return UCC_OK;
