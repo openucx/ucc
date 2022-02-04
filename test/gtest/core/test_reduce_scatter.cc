@@ -1,11 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
- *
- * See file LICENSE for terms.
- */
-
-/**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -58,6 +52,7 @@ class test_reduce_scatter : public UccCollArgs, public testing::Test {
             UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header,
                                    ucc_dt_size(dt) * rcount, mem_type));
             coll->dst.info.buffer = ctxs[r]->dst_mc_header->addr;
+            coll->src.info.buffer = NULL;
             if (TEST_INPLACE == inplace) {
                 coll->mask |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;

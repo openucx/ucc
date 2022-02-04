@@ -336,7 +336,7 @@ ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
 
     ucc_tl_ucp_team_t *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         size     = UCC_TL_TEAM_SIZE(tl_team);
-    size_t             count    = coll_args->args.dst.info.count * size;
+    size_t             count    = coll_args->args.dst.info.count;
     ucc_datatype_t     dt       = coll_args->args.dst.info.datatype;
     size_t             dt_size  = ucc_dt_size(dt);
     ucc_memory_type_t  mem_type = coll_args->args.dst.info.mem_type;
@@ -355,6 +355,10 @@ ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
+    if (!UCC_IS_INPLACE(coll_args->args)) {
+        count *= size;
+    }
+
     tl_schedule  = ucc_tl_ucp_get_schedule(tl_team, coll_args);
     schedule     = &tl_schedule->super.super;
     /* if count == size then we have 1 elem per rank, not enough
@@ -368,9 +372,6 @@ ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
     s[1].map    = ucc_ep_map_create_reverse(UCC_TL_TEAM_SIZE(tl_team));
     s[1].myrank = ucc_ep_map_eval(s[1].map, UCC_TL_TEAM_RANK(tl_team));
 
-    if (UCC_IS_INPLACE(coll_args->args)) {
-        count /= size;
-    }
 
     count_per_set    = (count + n_subsets - 1) / n_subsets;
     max_segcount     = ucc_buffer_block_count(count_per_set, size, 0);
