@@ -30,9 +30,9 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_finalize(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_cuda_alltoall_setup_start(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
-    ucc_tl_cuda_sync_t          *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
-    ucc_status_t                 status;
+    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
+    ucc_status_t        status;
 
     memcpy(&sync->mem_info_src, &task->alltoall_ce.mem_info_src,
            sizeof(ucc_tl_cuda_mem_info_t));
@@ -237,7 +237,6 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_start(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucc_status_t status;
     size_t data_len;
@@ -249,12 +248,12 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     }
 
     data_len = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
-    status = ucc_tl_cuda_mem_info_get(args->src.info.buffer, data_len, team,
+    status = ucc_tl_cuda_mem_info_get(args->src.info.buffer, data_len,
                                       &task->alltoall_ce.mem_info_src);
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;
     }
-    status = ucc_tl_cuda_mem_info_get(args->dst.info.buffer, data_len, team,
+    status = ucc_tl_cuda_mem_info_get(args->dst.info.buffer, data_len,
                                       &task->alltoall_ce.mem_info_dst);
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;

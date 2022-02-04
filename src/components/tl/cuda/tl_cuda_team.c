@@ -7,6 +7,7 @@
 #include "tl_cuda.h"
 #include "tl_cuda_coll.h"
 #include "tl_cuda_topo.h"
+#include "tl_cuda_cache.h"
 #include "core/ucc_team.h"
 #include "coll_score/ucc_coll_score.h"
 #include "utils/arch/cpu.h"
@@ -24,12 +25,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     ucc_tl_cuda_shm_barrier_t *bar;
     ucc_status_t status;
     int shm_id, i, j;
-    size_t ctrl_size, alloc_size;
+    size_t ctrl_size, alloc_size, scratch_size;
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
-    self->oob    = params->params.oob;
-    self->stream = NULL;
-    self->topo   = NULL;
+    self->oob         = params->params.oob;
+    self->stream      = NULL;
+    self->topo        = NULL;
+    self->scratch.loc = NULL;
     if (UCC_TL_TEAM_SIZE(self) > UCC_TL_CUDA_MAX_PEERS) {
         tl_info(tl_context->lib, "team size is too large, max supported %d",
                 UCC_TL_CUDA_MAX_PEERS);
@@ -52,6 +54,20 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     if (!self->ids) {
         tl_error(tl_context->lib, "failed to alloc ranks id");
         return UCC_ERR_NO_MEMORY;
+    }
+
+    scratch_size = lib->cfg.max_concurrent * lib->cfg.scratch_size;
+    status = CUDA_FUNC(cudaMalloc(&self->scratch.loc, scratch_size));
+    if (status != UCC_OK) {
+        tl_error(tl_context->lib, "failed to alloc scratch buffer");
+        goto free_ids;
+    }
+
+    status = ucc_tl_cuda_mem_info_get(self->scratch.loc, scratch_size,
+                            &self->ids[UCC_TL_TEAM_SIZE(self)].scratch_info);
+    if (status != UCC_OK) {
+        tl_error(tl_context->lib, "failed to get scratch memory info");
+        goto free_scratch;
     }
 
     ctrl_size = (sizeof(ucc_tl_cuda_sync_t) + sizeof(ucc_tl_cuda_sync_data_t) *
@@ -108,11 +124,14 @@ ids_exchange:
     return UCC_OK;
 
 free_devices:
-    ucc_free(self->ids);
     if (shm_id != -1) {
         ucc_sysv_free(self->sync);
         self->sync = (void*)(-1);
     }
+free_scratch:
+    cudaFree(self->scratch.loc);
+free_ids:
+    ucc_free(self->ids);
     return status;
 }
 
@@ -163,6 +182,22 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
             tl_warn(UCC_TL_TEAM_LIB(self), "cudaStreamDestroy failed: %d (%s)",
                     st, cudaGetErrorName(st));
         }
+        st = cudaStreamDestroy(self->stream2);
+        if (st != cudaSuccess) {
+            tl_warn(UCC_TL_TEAM_LIB(self), "cudaStreamDestroy failed: %d (%s)",
+                    st, cudaGetErrorName(st));
+        }
+    }
+    for (i = 0; i < UCC_TL_TEAM_SIZE(self); i++) {
+        if (self->scratch.rem[i]) {
+            ucc_tl_cuda_unmap_memhandle((uintptr_t)self->scratch.rem_info[i].ptr,
+                                        self->scratch.rem[i],
+                                        ucc_tl_cuda_get_cache(self, i));
+        }
+    }
+
+    if (self->scratch.loc) {
+        cudaFree(self->scratch.loc);
     }
 }
 
@@ -205,9 +240,31 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     if (status != UCC_OK) {
         goto exit_err;
     }
+
+    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
+        if (i == UCC_TL_TEAM_RANK(team) ||
+            !ucc_tl_cuda_team_topo_is_direct(&team->super, team->topo, i,
+                                             UCC_TL_TEAM_RANK(team))) {
+            team->scratch.rem[i] = NULL;
+            continue;
+        }
+        status = ucc_tl_cuda_map_memhandle(team->ids[i].scratch_info.ptr,
+                                           team->ids[i].scratch_info.length,
+                                           team->ids[i].scratch_info.handle,
+                                           &team->scratch.rem[i],
+                                           ucc_tl_cuda_get_cache(team, i));
+        memcpy(&team->scratch.rem_info[i], &team->ids[i].scratch_info,
+               sizeof(ucc_tl_cuda_mem_info_t));
+        if (status != UCC_OK) {
+            goto exit_err;
+        }
+    }
+
     if (UCC_TL_TEAM_LIB(team)->log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
         ucc_tl_cuda_team_topo_print(&team->super, team->topo);
+        ucc_tl_cuda_team_topo_print_rings(&team->super, team->topo);
     }
+
     shm_id = team->ids[0].shm;
     if (shm_id < 0) {
         tl_error(tl_team->context->lib, "failed to create shmem region");
@@ -230,6 +287,8 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
                             lib->cfg.max_concurrent);
     CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
                     cudaStreamNonBlocking), exit_err, status);
+    CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream2,
+                    cudaStreamNonBlocking), exit_err, status);
     for (i = 0; i < lib->cfg.max_concurrent; i++) {
         sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
         CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&sync->ipc_event_local,
@@ -239,7 +298,6 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
         CUDA_CHECK_GOTO(cudaIpcGetEventHandle(&sync->ev_handle,
                                              sync->ipc_event_local),
                         exit_err, status);
-        sync->seq_num[0] = i;
     }
 
     ucc_memory_bus_fence();

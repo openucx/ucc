@@ -1,10 +1,16 @@
+/**
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "tl_cuda_coll.h"
 #include "alltoall/alltoall.h"
+#include "allgather/allgather.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
-                                      ucc_tl_cuda_team_t *team,
                                       ucc_tl_cuda_mem_info_t *mi)
 {
     ucc_mem_attr_t mem_attr;
@@ -32,6 +38,8 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_ALLTOALL:
         return ucc_tl_cuda_alltoall_init(coll_args, team, task_h);
+    case UCC_COLL_TYPE_ALLGATHER:
+        return ucc_tl_cuda_allgather_init(coll_args, team, task_h);
     default:
         return UCC_ERR_NOT_SUPPORTED;
     }
