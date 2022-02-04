@@ -30,9 +30,9 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_finalize(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_cuda_alltoall_setup_start(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
-    ucc_tl_cuda_sync_t          *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
-    ucc_status_t                 status;
+    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
+    ucc_status_t        status;
 
     memcpy(&sync->mem_info_src, &task->alltoall_ce.mem_info_src,
            sizeof(ucc_tl_cuda_mem_info_t));

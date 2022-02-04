@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
 #
 
 if TL_CUDA_ENABLED
@@ -7,6 +7,11 @@ alltoall =                       \
 	alltoall/alltoall.h          \
 	alltoall/alltoall.c          \
 	alltoall/alltoall_ce.c
+
+allgather =                      \
+	allgather/allgather.h        \
+	allgather/allgather.c        \
+	allgather/allgather_ring.c
 
 sources =               \
 	tl_cuda.h           \
@@ -18,7 +23,8 @@ sources =               \
 	tl_cuda_cache.c     \
 	tl_cuda_topo.c      \
 	tl_cuda_team_topo.c \
-	$(alltoall)
+	$(alltoall)         \
+	$(allgather)
 
 module_LTLIBRARIES = libucc_tl_cuda.la
 libucc_tl_cuda_la_SOURCES  = $(sources)

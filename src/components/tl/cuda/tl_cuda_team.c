@@ -205,9 +205,12 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     if (status != UCC_OK) {
         goto exit_err;
     }
+
     if (UCC_TL_TEAM_LIB(team)->log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
         ucc_tl_cuda_team_topo_print(&team->super, team->topo);
+        ucc_tl_cuda_team_topo_print_rings(&team->super, team->topo);
     }
+
     shm_id = team->ids[0].shm;
     if (shm_id < 0) {
         tl_error(tl_team->context->lib, "failed to create shmem region");
@@ -239,7 +242,6 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
         CUDA_CHECK_GOTO(cudaIpcGetEventHandle(&sync->ev_handle,
                                              sync->ipc_event_local),
                         exit_err, status);
-        sync->seq_num[0] = i;
     }
 
     ucc_memory_bus_fence();

@@ -21,7 +21,7 @@
 
 #define UCC_TL_CUDA_MAX_PEERS 8
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_ALLTOALL)
+    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLGATHER)
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_cuda_lib_t))
@@ -120,7 +120,7 @@ typedef struct ucc_tl_cuda_mem_info {
 } ucc_tl_cuda_mem_info_t;
 
 typedef struct ucc_tl_cuda_sync {
-    uint32_t                 seq_num[2];
+    uint32_t                 seq_num;
     ucc_tl_cuda_mem_info_t   mem_info_src;
     ucc_tl_cuda_mem_info_t   mem_info_dst;
     cudaEvent_t              ipc_event_local;
@@ -158,6 +158,12 @@ typedef struct ucc_tl_cuda_task {
             void                   *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
             void                   *copy_done;
         } alltoall_ce;
+        struct {
+            int                     stage;
+            ucc_tl_cuda_mem_info_t  mem_info_dst;
+            void                   *peer_map_addr;
+            void                   *copy_done;
+        } allgather_ring;
     };
 } ucc_tl_cuda_task_t;
 
