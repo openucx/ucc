@@ -27,6 +27,20 @@
         UCC_TL_CUDA_TEAM_BARRIER(_team, (_task)->coll_id);                     \
     })
 
+#define TASK_SCRATCH(_task, _rank)                                             \
+    ({                                                                         \
+        ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                          \
+        size_t _scratch_size = UCC_TL_CUDA_TEAM_LIB(_team)->cfg.scratch_size;  \
+        void *_scratch;                                                        \
+        if (_rank == UCC_TL_TEAM_RANK(team)) {                                 \
+            _scratch = team->scratch.loc;                                      \
+        } else {                                                               \
+            _scratch = PTR_OFFSET(team->scratch.rem[_rank],                    \
+                                  team->scratch.rem_info[_rank].offset);       \
+        }                                                                      \
+        (PTR_OFFSET(_scratch, (_task)->coll_id * _scratch_size));              \
+    })
+
 static inline void ucc_tl_cuda_task_reset(ucc_tl_cuda_task_t *task)
 {
     task->super.super.status = UCC_INPROGRESS;
@@ -92,7 +106,6 @@ static inline void ucc_tl_cuda_put_sync(ucc_tl_cuda_task_t *task)
 }
 
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
-                                      ucc_tl_cuda_team_t *team,
                                       ucc_tl_cuda_mem_info_t *mi);
 
 ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,

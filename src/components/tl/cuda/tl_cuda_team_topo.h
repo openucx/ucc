@@ -16,10 +16,17 @@ typedef struct ucc_tl_cuda_proxy {
     ucc_rank_t proxy;
 } ucc_tl_cuda_proxy_t;
 
+typedef struct ucc_tl_cuda_ring {
+    ucc_rank_t *ring;
+    ucc_rank_t *iring;
+} ucc_tl_cuda_ring_t;
+
 typedef struct ucc_tl_cuda_team_topo {
     int                     *matrix;
     int                      num_proxies;
     ucc_tl_cuda_proxy_t     *proxies;
+    int                      num_rings;
+    ucc_tl_cuda_ring_t      *rings;
 } ucc_tl_cuda_team_topo_t;
 
 ucc_status_t ucc_tl_cuda_team_topo_create(const ucc_tl_team_t *team,
@@ -29,6 +36,9 @@ ucc_status_t ucc_tl_cuda_team_topo_destroy(ucc_tl_cuda_team_topo_t *team_topo);
 
 void ucc_tl_cuda_team_topo_print(const ucc_tl_team_t *team,
                                  const ucc_tl_cuda_team_topo_t *cuda_topo);
+
+void ucc_tl_cuda_team_topo_print_rings(const ucc_tl_team_t *tl_team,
+                                       const ucc_tl_cuda_team_topo_t *topo);
 
 static inline int
 ucc_tl_cuda_team_topo_is_direct(const ucc_tl_team_t *team,
