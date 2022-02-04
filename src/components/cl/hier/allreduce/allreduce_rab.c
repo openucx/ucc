@@ -56,7 +56,6 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
 
     if (SBGP_ENABLED(cl_team, NODE)) {
         ucc_assert(n_tasks == 0);
-        /* can have only NODE sbgp, both above have been skipped */
         if (cl_team->top_sbgp == UCC_HIER_SBGP_NODE) {
             args.args.coll_type = UCC_COLL_TYPE_ALLREDUCE;
         } else {
