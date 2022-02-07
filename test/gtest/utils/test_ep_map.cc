@@ -10,17 +10,24 @@ extern "C" {
 #include <vector>
 
 class EpMap {
-    ucc_ep_map_t map;
 public:
-    ucc_rank_t *array;
-    EpMap(ucc_ep_map_t _map) {
-        array = NULL;
-        map   = _map;
+  ucc_ep_map_t map;
+  ucc_rank_t * array;
+  EpMap(){};
+  EpMap(ucc_ep_map_t _map)
+  {
+      array = NULL;
+      map   = _map;
     };
-    EpMap(uint64_t full) {
-        map.type   = UCC_EP_MAP_FULL;
-        map.ep_num = full;
+    EpMap(uint64_t full, bool reverse = false)
+    {
         array      = NULL;
+        if (reverse) {
+            map = ucc_ep_map_create_reverse(full);
+        } else {
+            map.type   = UCC_EP_MAP_FULL;
+            map.ep_num = full;
+        }
     };
     EpMap(uint64_t start, int64_t stride, uint64_t num, uint64_t full) {
         map.type           = ((num == full)  && (stride == 1)) ?
@@ -84,4 +91,50 @@ UCC_TEST_F(test_ep_map, from_array_free)
 
     /* FULL pattern found - array is released */
     EXPECT_EQ((void*)NULL, EpMap({1, 2, 3, 4, 5}, 5, 1).array);
+}
+
+UCC_TEST_F(test_ep_map, reverse)
+{
+    const int    size = 10;
+    ucc_ep_map_t map  = ucc_ep_map_create_reverse(size);
+
+    for (int i = 0; i < size; i++) {
+        EXPECT_EQ(size - 1 - i, ucc_ep_map_eval(map, i));
+    }
+}
+
+class test_ep_map_inv : public test_ep_map {
+  public:
+    void check_inv(EpMap map)
+    {
+        ucc_ep_map_t inv;
+        EXPECT_EQ(UCC_OK, ucc_ep_map_create_inverse(map.map, &inv));
+        for (int i = 0; i < map.map.ep_num; i++) {
+            EXPECT_EQ(i, ucc_ep_map_eval(inv, ucc_ep_map_eval(map.map, i)));
+        }
+        ucc_ep_map_destroy(&inv);
+    };
+};
+
+UCC_TEST_F(test_ep_map_inv, contig)
+{
+    /* reverse of FULL */
+    check_inv(EpMap(10));
+
+    /* reverse of INVERSE */
+    check_inv(EpMap(10, true));
+}
+
+UCC_TEST_F(test_ep_map_inv, strided)
+{
+    /* stride positive */
+    check_inv(EpMap(1, 30, 5, 150));
+
+    /* stride negative */
+    check_inv(EpMap(100, -10, 5, 150));
+}
+
+UCC_TEST_F(test_ep_map_inv, random)
+{
+    check_inv(EpMap({4, 0, 1, 2, 3}, 5));
 }

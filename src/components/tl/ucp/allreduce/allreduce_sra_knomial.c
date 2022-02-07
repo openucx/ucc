@@ -96,9 +96,10 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
     ucc_base_team_t *team, ucc_schedule_t **frag_p)
 {
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_schedule_t      *schedule = ucc_tl_ucp_get_schedule(tl_team, coll_args);
     size_t               count    = coll_args->args.dst.info.count;
     ucc_base_coll_args_t args     = *coll_args;
+    ucc_schedule_t      *schedule =
+        &ucc_tl_ucp_get_schedule(tl_team, coll_args)->super.super;
     ucc_coll_task_t     *task, *rs_task;
     ucc_status_t         status;
     ucc_kn_radix_t       radix, cfg_radix;
@@ -159,13 +160,12 @@ static inline void get_sra_n_frags(ucc_base_coll_args_t *coll_args,
 static ucc_status_t
 ucc_tl_ucp_allreduce_sra_knomial_finalize(ucc_coll_task_t *task)
 {
-    ucc_schedule_pipelined_t *schedule =
-        ucc_derived_of(task, ucc_schedule_pipelined_t);
+    ucc_schedule_t *schedule = ucc_derived_of(task, ucc_schedule_t);
     ucc_status_t status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(schedule, "ucp_allreduce_sra_kn_done", 0);
     status = ucc_schedule_pipelined_finalize(task);
-    ucc_tl_ucp_put_schedule_pipelined(schedule);
+    ucc_tl_ucp_put_schedule(schedule);
     return status;
 }
 
@@ -184,7 +184,7 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_lib_config_t  *cfg     = &UCC_TL_UCP_TEAM_LIB(tl_team)->cfg;
     int                       n_frags, pipeline_depth;
     ucc_schedule_pipelined_t *schedule_p =
-        ucc_tl_ucp_get_schedule_pipelined(tl_team);
+        &ucc_tl_ucp_get_schedule(tl_team, NULL)->super;
     ucc_status_t status;
 
     if (!schedule_p) {
@@ -198,7 +198,7 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
         cfg->allreduce_sra_kn_seq, schedule_p);
     if (UCC_OK != status) {
         tl_error(team->context->lib, "failed to init pipelined schedule");
-        ucc_tl_ucp_put_schedule_pipelined(schedule_p);
+        ucc_tl_ucp_put_schedule(&schedule_p->super);
         return status;
     }
     schedule_p->super.super.finalize =

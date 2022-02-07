@@ -13,7 +13,7 @@
 #include "components/mc/base/ucc_mc_base.h"
 #include "tl_ucp_tag.h"
 
-#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 3
+#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 4
 extern const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
 
@@ -58,6 +58,14 @@ typedef struct ucc_tl_ucp_task {
             ucc_mc_buffer_header_t *scratch_mc_header;
         } reduce_scatter_kn;
         struct {
+            void                   *scratch;
+            size_t                  max_block_count;
+            ucc_ep_map_t            inv_map;
+            int                     n_frags;
+            int                     frag;
+            char                    s_scratch_busy[2];
+        } reduce_scatter_ring;
+        struct {
             int                     phase;
             ucc_knomial_pattern_t   p;
             ucc_rank_t              recv_dist;
@@ -83,6 +91,11 @@ typedef struct ucc_tl_ucp_task {
         } reduce_kn;
     };
 } ucc_tl_ucp_task_t;
+
+typedef struct ucc_tl_ucp_schedule {
+    ucc_schedule_pipelined_t super;
+    ucc_mc_buffer_header_t  *scratch_mc_header;
+} ucc_tl_ucp_schedule_t;
 
 #define TASK_TEAM(_task)                                                       \
     (ucc_derived_of((_task)->super.team, ucc_tl_ucp_team_t))
@@ -124,24 +137,15 @@ static inline void ucc_tl_ucp_put_task(ucc_tl_ucp_task_t *task)
     ucc_mpool_put(task);
 }
 
-static inline ucc_schedule_t *ucc_tl_ucp_get_schedule(ucc_tl_ucp_team_t *team,
-                                                      ucc_base_coll_args_t *args)
+static inline
+ucc_tl_ucp_schedule_t *ucc_tl_ucp_get_schedule(ucc_tl_ucp_team_t *team,
+                                               ucc_base_coll_args_t *args)
 {
-    ucc_tl_ucp_context_t *ctx      = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_schedule_t       *schedule = ucc_mpool_get(&ctx->req_mp);
+    ucc_tl_ucp_context_t  *ctx      = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_tl_ucp_schedule_t *schedule = ucc_mpool_get(&ctx->req_mp);
 
     UCC_TL_UCP_PROFILE_REQUEST_NEW(schedule, "tl_ucp_sched", 0);
-    ucc_schedule_init(schedule, args, &team->super.super);
-    return schedule;
-}
-
-static inline ucc_schedule_pipelined_t *
-ucc_tl_ucp_get_schedule_pipelined(ucc_tl_ucp_team_t *team)
-{
-    ucc_tl_ucp_context_t     *ctx      = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_schedule_pipelined_t *schedule = ucc_mpool_get(&ctx->req_mp);
-
-    UCC_TL_UCP_PROFILE_REQUEST_NEW(schedule, "tl_ucp_sched_p", 0);
+    ucc_schedule_init(&schedule->super.super, args, &team->super.super);
     return schedule;
 }
 
@@ -151,12 +155,6 @@ static inline void ucc_tl_ucp_put_schedule(ucc_schedule_t *schedule)
     ucc_mpool_put(schedule);
 }
 
-static inline void
-ucc_tl_ucp_put_schedule_pipelined(ucc_schedule_pipelined_t *schedule)
-{
-    UCC_TL_UCP_PROFILE_REQUEST_FREE(schedule);
-    ucc_mpool_put(schedule);
-}
 
 ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
                                   ucc_base_team_t *     team,
