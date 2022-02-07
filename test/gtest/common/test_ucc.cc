@@ -565,16 +565,25 @@ UccReq::UccReq(UccTeam_h _team, UccCollCtxVec ctxs) :
 {
     EXPECT_EQ(team->procs.size(), ctxs.size());
     ucc_coll_req_h req;
+    ucc_status_t   status, err_status;
+
+    err_status = UCC_OK;
     for (auto i = 0; i < team->procs.size(); i++) {
-        if (UCC_OK != ucc_collective_init(ctxs[i]->args, &req,
-                                          team->procs[i].team)) {
-            goto err;
+        if (UCC_OK !=(status = ucc_collective_init(ctxs[i]->args, &req,
+                                                   team->procs[i].team))) {
+            err_status = status;
         }
         reqs.push_back(req);
+    }
+    if (UCC_OK != err_status) {
+        goto err;
     }
     return;
 err:
     reqs.clear();
+    if (err_status == UCC_ERR_NOT_SUPPORTED) {
+        UCC_TEST_SKIP;
+    }
 }
 
 UccReq::~UccReq()

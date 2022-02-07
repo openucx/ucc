@@ -24,14 +24,15 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
     op = _op;
     dt = _dt;
 
-    if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT,
-                    team.comm) ||
-        skip_reduce((count % comm_size != 0), TEST_SKIP_NOT_SUPPORTED,
-                    team.comm)) {
+    if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT, team.comm) ||
+        skip_reduce((count < comm_size), TEST_SKIP_NOT_SUPPORTED, team.comm)) {
         return;
     }
     check_buf = ucc_malloc( _msgsize, "check buf");
     UCC_MALLOC_CHECK(check_buf);
+
+    count   = count - (count % comm_size);
+    msgsize = _msgsize = count * dt_size;
 
     if (TEST_NO_INPLACE == inplace) {
         args.dst.info.count = count / comm_size;
@@ -39,7 +40,7 @@ TestReduceScatter::TestReduceScatter(size_t _msgsize,
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
         rbuf = rbuf_mc_header->addr;
         sbuf = sbuf_mc_header->addr;
-  } else {
+    } else {
         args.mask           = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags          = UCC_COLL_ARGS_FLAG_IN_PLACE;
         args.dst.info.count = count;

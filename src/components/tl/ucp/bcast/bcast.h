@@ -24,6 +24,10 @@ ucc_status_t
 ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
                               ucc_base_team_t *team, ucc_coll_task_t **task_h);
 
+ucc_status_t ucc_tl_ucp_bcast_knomial_start(ucc_coll_task_t *task);
+ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *task);
+
+
 #define UCC_TL_UCP_BCAST_DEFAULT_ALG_SELECT_STR              \
     "bcast:0-32k:@0#bcast:32k-inf:@1"
 

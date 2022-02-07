@@ -54,11 +54,21 @@ reduce =	                 \
 
 reduce_scatter =	                        \
 	reduce_scatter/reduce_scatter.h         \
-	reduce_scatter/reduce_scatter_knomial.c
+	reduce_scatter/reduce_scatter_knomial.c \
+	reduce_scatter/reduce_scatter_ring.c    \
+	reduce_scatter/reduce_scatter.c
 
 scatter =	                   \
 	scatter/scatter.h          \
 	scatter/scatter_knomial.c
+
+fanin =	                  \
+	fanin/fanin.h         \
+	fanin/fanin.c
+
+fanout =	                \
+	fanout/fanout.h         \
+	fanout/fanout.c
 
 sources =                 \
 	tl_ucp.h              \
@@ -80,7 +90,9 @@ sources =                 \
 	$(bcast)              \
 	$(reduce)             \
 	$(reduce_scatter)     \
-	$(scatter)
+	$(scatter)            \
+	$(fanin)              \
+	$(fanout)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

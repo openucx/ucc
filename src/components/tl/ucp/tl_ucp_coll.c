@@ -14,13 +14,18 @@
 #include "allreduce/allreduce.h"
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
+#include "reduce_scatter/reduce_scatter.h"
 #include "bcast/bcast.h"
 #include "reduce/reduce.h"
+#include "fanin/fanin.h"
+#include "fanout/fanout.h"
+
 const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
         UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR,
         UCC_TL_UCP_BCAST_DEFAULT_ALG_SELECT_STR,
-        UCC_TL_UCP_ALLTOALL_DEFAULT_ALG_SELECT_STR};
+        UCC_TL_UCP_ALLTOALL_DEFAULT_ALG_SELECT_STR,
+        UCC_TL_UCP_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR};
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
@@ -90,6 +95,12 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
     case UCC_COLL_TYPE_REDUCE:
         status = ucc_tl_ucp_reduce_init(task);
         break;
+    case UCC_COLL_TYPE_FANIN:
+        status = ucc_tl_ucp_fanin_init(task);
+        break;
+    case UCC_COLL_TYPE_FANOUT:
+        status = ucc_tl_ucp_fanout_init(task);
+        break;
     default:
         status = UCC_ERR_NOT_SUPPORTED;
     }
@@ -111,6 +122,8 @@ static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
         return ucc_tl_ucp_bcast_alg_from_str(str);
     case UCC_COLL_TYPE_ALLTOALL:
         return ucc_tl_ucp_alltoall_alg_from_str(str);
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        return ucc_tl_ucp_reduce_scatter_alg_from_str(str);
     default:
         break;
     }
@@ -167,6 +180,17 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
             break;
         };
         break;
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        switch (alg_id) {
+        case UCC_TL_UCP_REDUCE_SCATTER_ALG_RING:
+            *init = ucc_tl_ucp_reduce_scatter_ring_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        };
+        break;
+
     default:
         status = UCC_ERR_NOT_SUPPORTED;
         break;
