@@ -171,7 +171,7 @@ ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
                            to NULL in the case of strided pattern.
                            User must check and free the array otherwise. */
 ucc_ep_map_t ucc_ep_map_from_array_64(uint64_t **array, ucc_rank_t size,
-                                   ucc_rank_t full_size, int need_free);
+                                      ucc_rank_t full_size, int need_free);
 
 typedef struct ucc_coll_task ucc_coll_task_t;
 void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len);
