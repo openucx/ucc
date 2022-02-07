@@ -77,6 +77,10 @@ void TestBarrier::run()
         if  (0 == rank && !completed) {
             MPI_Wait(&rreq, MPI_STATUS_IGNORE);
         }
+        if (i < size - 1) {
+            UCC_CHECK(ucc_collective_finalize(req));
+            UCC_CHECK(ucc_collective_init(&args, &req, team.team));
+        }
     }
     MPI_Barrier(team.comm);
     if (0 == rank) {
