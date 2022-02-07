@@ -100,7 +100,7 @@ typedef struct ucc_tl_ucp_context {
     tl_ucp_ep_hash_t *          ep_hash;
     ucp_ep_h *                  eps;
     ucc_tl_ucp_remote_info_t *  remote_info;
-    ucp_rkey_h **               rkeys;
+    ucp_rkey_h *                rkeys;
     uint64_t                    n_rinfo_segs;
     uint64_t                    ucp_memory_types;
 } ucc_tl_ucp_context_t;
@@ -140,6 +140,9 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 #define UCC_TL_CTX_OOB(_ctx) ((_ctx)->super.super.ucc_context->params.oob)
 
 #define IS_SERVICE_TEAM(_team) ((_team)->super.super.params.scope == UCC_CL_LAST + 1)
+
+#define UCC_TL_UCP_REMOTE_RKEY(_ctx, _rank, _seg)                              \
+    ((_ctx)->rkeys[_rank * _ctx->n_rinfo_segs + _seg])
 
 extern ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1];
 

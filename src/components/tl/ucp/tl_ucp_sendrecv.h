@@ -221,21 +221,20 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     uint64_t             *rvas;
     uint64_t             *key_sizes;
     void                 *keys;
+    void                 *offset;
     ptrdiff_t             base_offset;
-    ucc_context_addr_header_t *h;
 
     *segment  = -1;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
     ucc_assert(UCC_TL_CORE_TEAM(team));
     peer = ucc_get_ctx_rank(UCC_TL_CORE_TEAM(team), core_rank);
 
-    h = UCC_ADDR_STORAGE_RANK_HEADER(
-        &ctx->super.super.ucc_context->addr_storage, peer);
-    base_offset =
-        (ptrdiff_t)PTR_OFFSET(h, h->components[0].offset + ctx->ucp_addrlen);
-    rvas      = (uint64_t *)base_offset;
-    key_sizes = PTR_OFFSET(base_offset, (section_offset * 2));
-    keys      = PTR_OFFSET(base_offset, (section_offset * 3));
+    offset = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
+                                  peer, ucc_tl_ucp.super.super.id);
+    base_offset = (ptrdiff_t)PTR_OFFSET(offset, ctx->ucp_addrlen);
+    rvas        = (uint64_t *)base_offset;
+    key_sizes   = PTR_OFFSET(base_offset, (section_offset * 2));
+    keys        = PTR_OFFSET(base_offset, (section_offset * 3));
 
     for (int i = 0; i < ctx->n_rinfo_segs; i++) {
         if ((uint64_t)va >= (uint64_t)team->va_base[i] &&
@@ -251,14 +250,15 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
             "attempt to perform one-sided operation on non-registered memory");
         return UCC_ERR_NOT_FOUND;
     }
-    if (NULL == ctx->rkeys[peer][*segment]) {
-        ucs_status_t ucs_status = ucp_ep_rkey_unpack(
-            *ep, PTR_OFFSET(keys, key_offset), &ctx->rkeys[peer][*segment]);
+    if (NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment)) {
+        ucs_status_t ucs_status =
+            ucp_ep_rkey_unpack(*ep, PTR_OFFSET(keys, key_offset),
+                               &UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment));
         if (UCS_OK != ucs_status) {
             return ucs_status_to_ucc_status(ucs_status);
         }
     }
-    *rkey = ctx->rkeys[peer][*segment];
+    *rkey = UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment);
     *rva  = rvas[*segment] + ((uint64_t)va - (uint64_t)team->va_base[*segment]);
     return UCC_OK;
 }
