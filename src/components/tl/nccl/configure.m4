@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
 #
 
 tl_nccl_enabled=n
@@ -11,6 +11,12 @@ AS_IF([test "$CHECKED_TL_REQUIRED" = "y"],
     if test $nccl_happy = "yes"; then
         tl_modules="${tl_modules}:nccl"
         tl_nccl_enabled=y
+        CHECK_NEED_TL_PROFILING(["tl_nccl"])
+        AS_IF([test "$TL_PROFILING_REQUIRED" = "y"],
+              [
+                AC_DEFINE([HAVE_PROFILING_TL_NCCL], [1], [Enable profiling for TL NCCL])
+                prof_modules="${prof_modules}:tl_nccl"
+              ], [])
     fi
 ], [])
 

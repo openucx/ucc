@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
 #
 
 tl_ucp_enabled=n
@@ -9,6 +9,12 @@ AS_IF([test "$CHECKED_TL_REQUIRED" = "y"],
     if test $ucx_happy = "yes"; then
         tl_modules="${tl_modules}:ucp"
         tl_ucp_enabled=y
+        CHECK_NEED_TL_PROFILING(["tl_ucp"])
+        AS_IF([test "$TL_PROFILING_REQUIRED" = "y"],
+              [
+                AC_DEFINE([HAVE_PROFILING_TL_UCP], [1], [Enable profiling for TL UCP])
+                prof_modules="${prof_modules}:tl_ucp"
+              ], [])
     fi
 ], [])
 
