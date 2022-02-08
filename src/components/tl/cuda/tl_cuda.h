@@ -22,7 +22,8 @@
 
 #define UCC_TL_CUDA_MAX_PEERS 8
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLGATHER)
+    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLGATHER |                        \
+     UCC_COLL_TYPE_REDUCE_SCATTER)
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_cuda_lib_t))
@@ -173,14 +174,13 @@ typedef struct ucc_tl_cuda_task {
         } alltoall_ce;
         struct {
             int                     stage;
-            ucc_tl_cuda_mem_info_t  mem_info_dst;
-            void                   *peer_map_addr;
-            ucc_mc_buffer_header_t *scratch_mc_header;
-            void                   *scratch;
-            ucc_tl_cuda_mem_info_t  scratch_mem_info;
             void                   *copy_done;
             int                     num_frags;
         } allgather_ring;
+        struct {
+            int                     stage;
+            int                     num_frags;
+        } reduce_scatter_ring;
     };
 } ucc_tl_cuda_task_t;
 

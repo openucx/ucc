@@ -7,6 +7,7 @@
 #include "tl_cuda_coll.h"
 #include "alltoall/alltoall.h"
 #include "allgather/allgather.h"
+#include "reduce_scatter/reduce_scatter.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 
@@ -40,6 +41,8 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
         return ucc_tl_cuda_alltoall_init(coll_args, team, task_h);
     case UCC_COLL_TYPE_ALLGATHER:
         return ucc_tl_cuda_allgather_init(coll_args, team, task_h);
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        return ucc_tl_cuda_reduce_scatter_init(coll_args, team, task_h);
     default:
         return UCC_ERR_NOT_SUPPORTED;
     }
