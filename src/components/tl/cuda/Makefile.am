@@ -13,6 +13,11 @@ allgather =                      \
 	allgather/allgather.c        \
 	allgather/allgather_ring.c
 
+reduce_scatter =                         \
+	reduce_scatter/reduce_scatter.h      \
+	reduce_scatter/reduce_scatter.c      \
+	reduce_scatter/reduce_scatter_ring.c
+
 sources =               \
 	tl_cuda.h           \
 	tl_cuda.c           \
@@ -24,7 +29,8 @@ sources =               \
 	tl_cuda_topo.c      \
 	tl_cuda_team_topo.c \
 	$(alltoall)         \
-	$(allgather)
+	$(allgather)        \
+	$(reduce_scatter)
 
 module_LTLIBRARIES = libucc_tl_cuda.la
 libucc_tl_cuda_la_SOURCES  = $(sources)

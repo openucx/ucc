@@ -9,6 +9,7 @@
 
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
+#include "components/mc/ucc_mc.h"
 #include "utils/ucc_mpool.h"
 #include "tl_cuda_ep_hash.h"
 #include "tl_cuda_topo.h"
@@ -21,7 +22,8 @@
 
 #define UCC_TL_CUDA_MAX_PEERS 8
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLGATHER)
+    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLGATHER |                        \
+     UCC_COLL_TYPE_REDUCE_SCATTER)
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_cuda_lib_t))
@@ -164,6 +166,13 @@ typedef struct ucc_tl_cuda_task {
             void                   *peer_map_addr;
             void                   *copy_done;
         } allgather_ring;
+        struct {
+            int                     stage;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            void                   *scratch;
+            ucc_tl_cuda_mem_info_t  scratch_mem_info;
+            void                   *peer_map_addr;
+        } reduce_scatter_ring;
     };
 } ucc_tl_cuda_task_t;
 
