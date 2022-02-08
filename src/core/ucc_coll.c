@@ -201,7 +201,7 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     return UCC_OK;
 }
 
-/* Check if yser is trying to post the request which is either in completed,
+/* Check if user is trying to post the request which is either in completed,
    inprogress or error state.
    The only allowed case is: request is completed and has a
    persistent flag. Otherwise: bad usage. */
