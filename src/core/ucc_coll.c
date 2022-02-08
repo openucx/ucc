@@ -196,9 +196,27 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
         ucc_coll_str(task, coll_debug_str, sizeof(coll_debug_str));
         ucc_debug("coll_init: %s", coll_debug_str);
     }
+    ucc_assert(task->super.status == UCC_OPERATION_INITIALIZED);
     *request = &task->super;
     return UCC_OK;
 }
+
+/* Check if yser is trying to post the request which is either in completed,
+   inprogress or error state.
+   The only allowed case is: request is completed and has a
+   persistent flag. Otherwise: bad usage. */
+#define COLL_POST_STATUS_CHECK(_task) do {                              \
+        if ((_task)->super.status != UCC_OPERATION_INITIALIZED) {       \
+            if (!(UCC_OK == (_task)->super.status &&                    \
+                  UCC_IS_PERSISTENT((_task)->bargs.args))) {            \
+                ucc_error("%s request with invalid status %s is being posted", \
+                          UCC_IS_PERSISTENT((_task)->bargs.args)        \
+                          ? "persistent" : "non-persistent",            \
+                          ucc_status_string((_task)->super.status));    \
+                return UCC_ERR_INVALID_PARAM;                           \
+            }                                                           \
+        }                                                               \
+    } while(0)
 
 UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
                       ucc_coll_req_h request)
@@ -207,6 +225,7 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
 
     ucc_debug("coll_post: req %p, seq_num %u", task, task->seq_num);
 
+    COLL_POST_STATUS_CHECK(task);
     if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
         task->start_time = ucc_get_time();
     }
@@ -220,6 +239,10 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
 
     ucc_debug("coll_finalize: req %p, seq_num %u", task, task->seq_num);
+    if (task->super.status == UCC_INPROGRESS) {
+        ucc_error("attempt to finalize task with status UCC_INPROGRESS");
+        return UCC_ERR_INVALID_PARAM;
+    }
     return task->finalize(task);
 }
 
@@ -367,6 +390,7 @@ ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ev)
 
     ucc_debug("triggered_post: task %p, seq_num %u", task, task->seq_num);
 
+    COLL_POST_STATUS_CHECK(task);
     if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
         task->start_time = ucc_get_time();
     }

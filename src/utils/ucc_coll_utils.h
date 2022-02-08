@@ -30,6 +30,10 @@
     (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
      ((_args).flags & UCC_COLL_ARGS_FLAG_IN_PLACE))
 
+#define UCC_IS_PERSISTENT(_args) \
+    (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
+     ((_args).flags & UCC_COLL_ARGS_FLAG_PERSISTENT))
+
 #define UCC_COLL_TIMEOUT_REQUIRED(_task)                       \
     (((_task)->bargs.args.mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
      ((_task)->bargs.args.flags & UCC_COLL_ARGS_FLAG_TIMEOUT))
