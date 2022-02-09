@@ -26,18 +26,16 @@ ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
         task->seg_ready = 1;
     }
 
-    if (tree->base_tree && !task->first_tree_done) {
-        status = ucc_tl_shm_fanin_signal(team, seg, task, tree->base_tree);
-        if (UCC_OK != status) {
-            /* in progress */
-            return status;
+    if (!task->first_tree_done) {
+        if (tree->base_tree) {
+            status = ucc_tl_shm_fanin_signal(team, seg, task, tree->base_tree);
+            if (UCC_OK != status) {
+                /* in progress */
+                return status;
+            }
         }
         task->first_tree_done = 1;
         task->cur_child = 0;
-    }
-
-    if (tree->base_tree == NULL) {
-    	task->first_tree_done = 1;
     }
 
     if (tree->top_tree &&  task->first_tree_done == 1) {
