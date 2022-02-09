@@ -46,11 +46,10 @@ ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
             return status;
         }
         task->first_tree_done = 2;
+        task->cur_child = 0;
     }
 
     if (!task->barrier_fanin_done){
-//        my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
-//        my_ctrl->ci = task->seq_num;
         task->seq_num++;
         task->barrier_fanin_done = 1;
 	}
@@ -62,6 +61,7 @@ ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
             return status;
         }
         task->first_tree_done = 3;
+        task->cur_child = 0;
     }
 
     if (tree->base_tree) {
