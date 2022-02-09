@@ -17,34 +17,27 @@ ucc_status_t ucc_tl_shm_fanin_signal(ucc_tl_shm_team_t *team,
     uint32_t           n_polls   = UCC_TL_SHM_TEAM_LIB(team)->cfg.n_polls;
     ucc_tl_shm_ctrl_t *my_ctrl, *child_ctrl;
     ucc_rank_t         child;
-    int                i, j, reduced;
-
-    my_ctrl = ucc_tl_shm_get_ctrl(seg, team, team_rank);
-
-    if (tree->n_children == 0) {
-        /* I am leaf so I dont need to wait for children, only notify parent*/
-
-        my_ctrl->pi = seq_num; //signals to parent
-        return UCC_OK;
-    }
+    int                i, j;
 
     for (i = task->cur_child; i < tree->n_children; i++){
-        reduced = 0;
         child = tree->children[i];
         child_ctrl = ucc_tl_shm_get_ctrl(seg, team, child);
         for (j = 0; j < n_polls; j++) {
             if (child_ctrl->pi == seq_num) {
                 SHMSEG_ISYNC();
-                reduced = 1;
                 break;
             }
         }
-        if (!reduced) {
+        if (j == n_polls) {
             task->cur_child = i;
             return UCC_INPROGRESS;
         }
     }
-    my_ctrl->pi = seq_num; //signals to parent
+    if (tree->parent != UCC_RANK_INVALID) {
+        /* signals to parent */
+        my_ctrl     = ucc_tl_shm_get_ctrl(seg, team, team_rank);
+        my_ctrl->pi = seq_num;
+    }
     return UCC_OK;
 }
 

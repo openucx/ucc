@@ -10,9 +10,9 @@
 #include "../tl_shm_knomial_pattern.h"
 
 ucc_status_t ucc_tl_shm_fanin_signal(ucc_tl_shm_team_t *team,
-                                      ucc_tl_shm_seg_t *seg,
-                                      ucc_tl_shm_task_t *task,
-                                      ucc_kn_tree_t *tree);
+                                     ucc_tl_shm_seg_t *seg,
+                                     ucc_tl_shm_task_t *task,
+                                     ucc_kn_tree_t *tree);
 
 ucc_status_t ucc_tl_shm_fanin_init(ucc_tl_shm_task_t *task);
 
