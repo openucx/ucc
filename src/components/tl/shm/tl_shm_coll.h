@@ -10,24 +10,21 @@
 #include "tl_shm.h"
 
 typedef struct ucc_tl_shm_task {
-	ucc_coll_task_t   super;
-    union {
-        struct {
-            ucc_tl_shm_seg_t  *seg;
-            ucc_tl_shm_tree_t *tree;
-            int                tree_in_cache;
-            int                base_tree_only;
-            int                first_reduce;
-            int                first_tree_done;
-            int                seg_ready;
-            int                barrier_fanin_done;
-            uint32_t           seq_num;
-            uint32_t           progress_alg;
-            ucc_rank_t         base_radix;
-            ucc_rank_t         top_radix;
-            ucc_rank_t         cur_child;
-        };
-    };
+	ucc_coll_task_t    super;
+    ucc_tl_shm_seg_t  *seg;
+    ucc_tl_shm_tree_t *tree;
+    uint32_t           seq_num;
+    int                stage;
+    int                tree_in_cache;
+    int                base_tree_only;
+    int                first_reduce;
+    int                first_tree_done;
+    int                seg_ready;
+    int                barrier_fanin_done;
+    uint32_t           progress_alg;
+    ucc_rank_t         base_radix;
+    ucc_rank_t         top_radix;
+    ucc_rank_t         cur_child;
 } ucc_tl_shm_task_t;
 
 

@@ -7,6 +7,14 @@
 #include "../tl_shm.h"
 #include "barrier.h"
 
+enum {
+    BARRIER_STAGE_START,
+    BARRIER_STAGE_BASE_TREE_FANIN,
+    BARRIER_STAGE_TOP_TREE_FANIN,
+    BARRIER_STAGE_BASE_TREE_FANOUT,
+    BARRIER_STAGE_TOP_TREE_FANOUT,
+};
+
 ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
@@ -17,57 +25,57 @@ ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
 
-    if (!task->seg_ready) { //similar to reduce
+next_stage:
+    switch(task->stage) {
+    case BARRIER_STAGE_START:
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect barrier->reduce pattern.*/
         if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
-        task->seg_ready = 1;
-    }
-
-    if (!task->first_tree_done) {
         if (tree->base_tree) {
-            status = ucc_tl_shm_fanin_signal(team, seg, task, tree->base_tree);
-            if (UCC_OK != status) {
-                /* in progress */
-                return status;
-            }
+            task->stage = BARRIER_STAGE_BASE_TREE_FANIN;
+        } else {
+            task->stage = BARRIER_STAGE_TOP_TREE_FANIN;
         }
-        task->first_tree_done = 1;
-    }
-
-    if (tree->top_tree &&  task->first_tree_done == 1) {
-        status = ucc_tl_shm_fanin_signal(team, seg, task, tree->top_tree);
-
+        goto next_stage;
+    case BARRIER_STAGE_BASE_TREE_FANIN:
+        status = ucc_tl_shm_fanin_signal(team, seg, task, tree->base_tree);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
-        task->first_tree_done = 2;
-    }
-
-    if (!task->barrier_fanin_done){
+        if (tree->top_tree) {
+            task->stage = BARRIER_STAGE_TOP_TREE_FANIN;
+        } else {
+            task->stage = BARRIER_STAGE_BASE_TREE_FANOUT;
+            task->seq_num++;
+        }
+        goto next_stage;
+    case BARRIER_STAGE_TOP_TREE_FANIN:
+        status = ucc_tl_shm_fanin_signal(team, seg, task, tree->top_tree);
+        if (UCC_OK != status) {
+            return status;
+        }
+        task->stage = BARRIER_STAGE_TOP_TREE_FANOUT;
         task->seq_num++;
-        task->barrier_fanin_done = 1;
-	}
-
-    if (tree->top_tree && task->first_tree_done == 2) {
+        goto next_stage;
+    case BARRIER_STAGE_TOP_TREE_FANOUT:
         status = ucc_tl_shm_fanout_signal(team, seg, task, tree->top_tree);
         if (UCC_OK != status) {
-            /* in progress */
             return status;
         }
-        task->first_tree_done = 3;
-    }
-
-    if (tree->base_tree) {
+        if (tree->base_tree) {
+            task->stage = BARRIER_STAGE_BASE_TREE_FANOUT;
+            goto next_stage;
+        }
+        break;
+    case BARRIER_STAGE_BASE_TREE_FANOUT:
         status = ucc_tl_shm_fanout_signal(team, seg, task, tree->base_tree);
-
         if (UCC_OK != status) {
-            /* in progress */
             return status;
         }
+        break;
     }
 
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
@@ -109,10 +117,8 @@ ucc_status_t ucc_tl_shm_barrier_init(ucc_tl_shm_task_t *task)
     task->super.progress  = ucc_tl_shm_barrier_progress;
     task->seq_num         = team->seq_num++;
     task->seg             = &team->segs[task->seq_num % team->n_concurrent];
-    task->seg_ready       = 0;
     task->cur_child       = 0;
-    task->first_tree_done = 0;
-    task->barrier_fanin_done = 0;
+    task->stage           = BARRIER_STAGE_START;
     task->base_tree_only  = UCC_TL_SHM_TEAM_LIB(team)->cfg.base_tree_only;
 
     status = ucc_tl_shm_tree_init(team, root, base_radix, top_radix,
