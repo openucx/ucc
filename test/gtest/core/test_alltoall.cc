@@ -14,7 +14,7 @@ class test_alltoall : public UccCollArgs, public ucc::test
 public:
     void data_init(int nprocs, ucc_datatype_t dtype,
                    size_t single_rank_count, UccCollCtxVec &ctxs,
-                   UccTeam_h team)
+                   UccTeam_h team, bool persistent)
     {
         bool  is_onesided = (NULL != team);
         void *sbuf;
@@ -84,13 +84,18 @@ public:
                     ucc_dt_size(dtype) * single_rank_count * nprocs, mem_type,
                     UCC_MEMORY_TYPE_HOST));
             }
+
+            if (persistent) {
+                coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+                coll->flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+            }
         }
     }
 
     void data_init(int nprocs, ucc_datatype_t dtype, size_t single_rank_count,
-                   UccCollCtxVec &ctxs)
+                   UccCollCtxVec &ctxs, bool persistent = false)
     {
-        data_init(nprocs, dtype, single_rank_count, ctxs, NULL);
+        data_init(nprocs, dtype, single_rank_count, ctxs, NULL, persistent);
     }
 
     void reset(UccCollCtxVec ctxs)
@@ -195,7 +200,7 @@ UCC_TEST_P(test_alltoall_0, single)
     this->set_inplace(inplace);
     this->set_mem_type(mem_type);
 
-    data_init(size, dtype, count, ctxs);
+    data_init(size, dtype, count, ctxs, false);
     UccReq    req(team, ctxs);
     req.start();
     req.wait();
@@ -231,7 +236,7 @@ UCC_TEST_P(test_alltoall_0, single_onesided)
     team = job.create_team(reference_ranks, true, is_contig, true);
     this->set_inplace(inplace);
     this->set_mem_type(mem_type);
-    data_init(size, dtype, count, ctxs, team);
+    data_init(size, dtype, count, ctxs, team, false);
     UccReq req(team, ctxs);
     req.start();
     req.wait();
@@ -254,7 +259,7 @@ UCC_TEST_P(test_alltoall_0, single_persistent)
     this->set_inplace(inplace);
     this->set_mem_type(mem_type);
 
-    data_init(size, dtype, count, ctxs);
+    data_init(size, dtype, count, ctxs, true);
     UccReq req(team, ctxs);
 
     for (auto i = 0; i < n_calls; i++) {
@@ -299,7 +304,7 @@ UCC_TEST_P(test_alltoall_1, multiple)
         this->set_inplace(inplace);
         this->set_mem_type(mem_type);
 
-        data_init(size, dtype, count, ctx);
+        data_init(size, dtype, count, ctx, false);
         reqs.push_back(UccReq(team, ctx));
         ctxs.push_back(ctx);
     }

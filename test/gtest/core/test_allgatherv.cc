@@ -13,7 +13,7 @@ class test_allgatherv : public UccCollArgs, public ucc::test
 {
 public:
     void  data_init(int nprocs, ucc_datatype_t dtype, size_t count,
-                    UccCollCtxVec &ctxs) {
+                    UccCollCtxVec &ctxs, bool persistent) {
         ctxs.resize(nprocs);
         for (auto r = 0; r < nprocs; r++) {
             int *counts;
@@ -72,7 +72,10 @@ public:
                                         ucc_dt_size(dtype) * my_count, mem_type,
                                         UCC_MEMORY_TYPE_HOST));
             }
-
+            if (persistent) {
+                coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+                coll->flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+            }
         }
     }
     void reset(UccCollCtxVec ctxs)
@@ -170,7 +173,7 @@ UCC_TEST_P(test_allgatherv_0, single)
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    data_init(size, dtype, count, ctxs);
+    data_init(size, dtype, count, ctxs, false);
     UccReq    req(team, ctxs);
     req.start();
     req.wait();
@@ -193,7 +196,7 @@ UCC_TEST_P(test_allgatherv_0, single_persistent)
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    data_init(size, dtype, count, ctxs);
+    data_init(size, dtype, count, ctxs, true);
     UccReq req(team, ctxs);
 
     for (auto i = 0; i < n_calls; i++) {
@@ -238,7 +241,7 @@ UCC_TEST_P(test_allgatherv_1, multiple)
         this->set_inplace(inplace);
         this->set_mem_type(mem_type);
 
-        data_init(size, dtype, count, ctx);
+        data_init(size, dtype, count, ctx, false);
         reqs.push_back(UccReq(team, ctx));
         ctxs.push_back(ctx);
     }

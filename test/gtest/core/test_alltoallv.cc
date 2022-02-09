@@ -18,7 +18,7 @@ public:
 
     test_alltoallv() : coll_mask(0), coll_flags(0) {}
     void data_init(int nprocs, ucc_datatype_t dtype, size_t count,
-                   UccCollCtxVec &ctxs) {
+                   UccCollCtxVec &ctxs, bool persistent = false) {
         int buf_count;
         ctxs.resize(nprocs);
 
@@ -80,6 +80,10 @@ public:
             UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header,
                                    buf_count * ucc_dt_size(dtype), mem_type));
             coll->dst.info_v.buffer = ctxs[r]->dst_mc_header->addr;
+            if (persistent) {
+                coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+                coll->flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+            }
         }
     }
     void reset(UccCollCtxVec ctxs)
@@ -166,7 +170,7 @@ UCC_TEST_P(test_alltoallv_0, single)
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    data_init(size, dtype, 1, ctxs);
+    data_init(size, dtype, 1, ctxs, false);
     UccReq    req(team, ctxs);
     req.start();
     req.wait();
@@ -192,7 +196,7 @@ UCC_TEST_P(test_alltoallv_0, single_persistent)
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    data_init(size, dtype, 1, ctxs);
+    data_init(size, dtype, 1, ctxs, true);
     UccReq req(team, ctxs);
 
     for (auto i = 0; i < n_calls; i++) {
@@ -220,7 +224,7 @@ UCC_TEST_P(test_alltoallv_1, single)
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    data_init(size, dtype, 1, ctxs);
+    data_init(size, dtype, 1, ctxs, false);
     UccReq    req(team, ctxs);
     req.start();
     req.wait();
@@ -281,7 +285,7 @@ UCC_TEST_P(test_alltoallv_2, multiple)
         this->set_inplace(inplace);
         this->set_mem_type(mem_type);
 
-        data_init(size, dtype, 1, ctx);
+        data_init(size, dtype, 1, ctx, false);
         reqs.push_back(UccReq(team, ctx));
         ctxs.push_back(ctx);
     }
@@ -310,7 +314,7 @@ UCC_TEST_P(test_alltoallv_3, multiple)
         this->set_inplace(inplace);
         this->set_mem_type(mem_type);
 
-        data_init(size, dtype, 1, ctx);
+        data_init(size, dtype, 1, ctx, false);
         reqs.push_back(UccReq(team, ctx));
         ctxs.push_back(ctx);
     }
