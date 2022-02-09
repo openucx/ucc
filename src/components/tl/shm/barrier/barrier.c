@@ -35,7 +35,6 @@ ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
             }
         }
         task->first_tree_done = 1;
-        task->cur_child = 0;
     }
 
     if (tree->top_tree &&  task->first_tree_done == 1) {
@@ -46,7 +45,6 @@ ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
             return status;
         }
         task->first_tree_done = 2;
-        task->cur_child = 0;
     }
 
     if (!task->barrier_fanin_done){
@@ -61,7 +59,6 @@ ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
             return status;
         }
         task->first_tree_done = 3;
-        task->cur_child = 0;
     }
 
     if (tree->base_tree) {

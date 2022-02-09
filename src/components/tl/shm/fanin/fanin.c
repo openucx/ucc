@@ -38,6 +38,7 @@ ucc_status_t ucc_tl_shm_fanin_signal(ucc_tl_shm_team_t *team,
         my_ctrl     = ucc_tl_shm_get_ctrl(seg, team, team_rank);
         my_ctrl->pi = seq_num;
     }
+    task->cur_child = 0;
     return UCC_OK;
 }
 
