@@ -77,7 +77,7 @@ static ucc_status_t ucc_ec_cuda_ee_executor_mpool_chunk_malloc(ucc_mpool_t *mp,
 static void ucc_ec_cuda_ee_executor_mpool_chunk_free(ucc_mpool_t *mp,
                                                      void *chunk)
 {
-    cudaFreeHost(chunk);
+    CUDA_FUNC(cudaFreeHost(chunk));
 }
 
 static void ucc_ec_cuda_executor_chunk_init(ucc_mpool_t *mp, void *obj,
@@ -159,7 +159,7 @@ static void ucc_ec_cuda_event_init(ucc_mpool_t *mp, void *obj, void *chunk)
     if (ucc_unlikely(
             cudaSuccess !=
             cudaEventCreateWithFlags(&base->event, cudaEventDisableTiming))) {
-        ec_error(&ucc_ec_cuda.super, "cudaEventCreateWithFlags Failed");
+        ec_error(&ucc_ec_cuda.super, "cudaEventCreateWithFlags failed");
     }
 }
 
@@ -167,7 +167,7 @@ static void ucc_ec_cuda_event_cleanup(ucc_mpool_t *mp, void *obj)
 {
     ucc_ec_cuda_event_t *base = (ucc_ec_cuda_event_t *) obj;
     if (ucc_unlikely(cudaSuccess != cudaEventDestroy(base->event))) {
-        ec_error(&ucc_ec_cuda.super, "cudaEventDestroy Failed");
+        ec_error(&ucc_ec_cuda.super, "cudaEventDestroy failed");
     }
 }
 
@@ -227,7 +227,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
                             &ucc_ec_cuda_event_mpool_ops, UCC_THREAD_MULTIPLE,
                             "CUDA Event Objects");
     if (status != UCC_OK) {
-        ec_error(&ucc_ec_cuda.super, "Failed to create event pool");
+        ec_error(&ucc_ec_cuda.super, "failed to create event pool");
         return status;
     }
 
@@ -237,7 +237,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         UCC_CACHE_LINE_SIZE, 16, UINT_MAX, &ucc_ec_cuda_stream_req_mpool_ops,
         UCC_THREAD_MULTIPLE, "CUDA Event Objects");
     if (status != UCC_OK) {
-        ec_error(&ucc_ec_cuda.super, "Failed to create event pool");
+        ec_error(&ucc_ec_cuda.super, "failed to create event pool");
         return status;
     }
 
@@ -246,7 +246,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         UCC_CACHE_LINE_SIZE, 16, UINT_MAX, &ucc_ec_cuda_ee_executor_mpool_ops,
         UCC_THREAD_MULTIPLE, "EE executor Objects");
     if (status != UCC_OK) {
-        ec_error(&ucc_ec_cuda.super, "Failed to create executors pool");
+        ec_error(&ucc_ec_cuda.super, "failed to create executors pool");
         return status;
     }
 
@@ -423,11 +423,11 @@ ucc_status_t ucc_cuda_executor_init(const ucc_ee_executor_params_t *params,
 {
     ucc_ec_cuda_executor_t *eee = ucc_mpool_get(&ucc_ec_cuda.executors);
 
-    UCC_EC_CUDA_INIT_STREAM();
     if (ucc_unlikely(!eee)) {
         ec_error(&ucc_ec_cuda.super, "failed to allocate executor");
         return UCC_ERR_NO_MEMORY;
     }
+    UCC_EC_CUDA_INIT_STREAM();
     ec_debug(&ucc_ec_cuda.super, "executor init, eee: %p", eee);
     eee->super.ee_type = params->ee_type;
     eee->state         = UCC_EC_CUDA_EXECUTOR_INITIALIZED;
