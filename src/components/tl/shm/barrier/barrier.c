@@ -11,11 +11,9 @@ ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
-    ucc_rank_t         root = 0;
     ucc_rank_t         rank = UCC_TL_TEAM_RANK(team);
     ucc_tl_shm_seg_t  *seg  = task->seg;
     ucc_tl_shm_tree_t *tree = task->tree;
-    int                is_op_root = rank == root;
     ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
 
@@ -60,8 +58,7 @@ ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
 	}
 
     if (tree->top_tree && task->first_tree_done == 2) {
-        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->top_tree,
-                                          is_op_root);
+        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->top_tree);
         if (UCC_OK != status) {
             /* in progress */
             return status;
@@ -70,8 +67,7 @@ ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
     }
 
     if (tree->base_tree) {
-        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->base_tree,
-                                          is_op_root);
+        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->base_tree);
 
         if (UCC_OK != status) {
             /* in progress */

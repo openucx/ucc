@@ -10,8 +10,7 @@
 ucc_status_t ucc_tl_shm_fanout_signal(ucc_tl_shm_team_t *team,
                                       ucc_tl_shm_seg_t *seg,
                                       ucc_tl_shm_task_t *task,
-                                      ucc_kn_tree_t *tree,
-                                      int is_op_root)
+                                      ucc_kn_tree_t *tree)
 {
     ucc_rank_t         team_rank = UCC_TL_TEAM_RANK(team);
     uint32_t           seq_num   = task->seq_num;
@@ -19,7 +18,7 @@ ucc_status_t ucc_tl_shm_fanout_signal(ucc_tl_shm_team_t *team,
     ucc_tl_shm_ctrl_t *my_ctrl;
     int                i;
 
-    if (is_op_root) {
+    if (tree->parent == UCC_RANK_INVALID) {
         ucc_tl_shm_signal_to_children(seg, team, seq_num, tree);
         return UCC_OK;
     }
@@ -40,12 +39,9 @@ ucc_status_t ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
-    ucc_coll_args_t    args = TASK_ARGS(task);
-    ucc_rank_t         root = (ucc_rank_t) args.root;
     ucc_rank_t         rank = UCC_TL_TEAM_RANK(team);
     ucc_tl_shm_seg_t  *seg = task->seg;
     ucc_tl_shm_tree_t *tree = task->tree;
-    int                is_op_root = rank == root;
     ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
 
@@ -59,8 +55,7 @@ ucc_status_t ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
     }
 
     if (tree->top_tree && !task->first_tree_done) {
-        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->top_tree,
-                                          is_op_root);
+        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->top_tree);
         if (UCC_OK != status) {
             /* in progress */
             return status;
@@ -69,8 +64,7 @@ ucc_status_t ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
     }
 
     if (tree->base_tree) {
-        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->base_tree,
-                                          is_op_root);
+        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->base_tree);
 
         if (UCC_OK != status) {
             /* in progress */
