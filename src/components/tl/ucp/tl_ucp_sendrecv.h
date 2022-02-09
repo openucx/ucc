@@ -245,12 +245,11 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
         key_offset += key_sizes[i];
     }
     if (0 > *segment) {
-        tl_error(
-            UCC_TL_TEAM_LIB(team),
+        tl_error(UCC_TL_TEAM_LIB(team),
             "attempt to perform one-sided operation on non-registered memory");
         return UCC_ERR_NOT_FOUND;
     }
-    if (NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment)) {
+    if (ucc_unlikely(NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment))) {
         ucs_status_t ucs_status =
             ucp_ep_rkey_unpack(*ep, PTR_OFFSET(keys, key_offset),
                                &UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment));

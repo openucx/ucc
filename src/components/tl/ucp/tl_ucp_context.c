@@ -212,8 +212,8 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
 
     for (i = 0; i < size; i++) {
         for (j = 0; j < ctx->n_rinfo_segs; j++) {
-            if (ctx->rkeys[i * ctx->n_rinfo_segs + j]) {
-                ucp_rkey_destroy(ctx->rkeys[i * ctx->n_rinfo_segs + j]);
+            if (UCC_TL_UCP_REMOTE_RKEY(ctx, i, j)) {
+                ucp_rkey_destroy(UCC_TL_UCP_REMOTE_RKEY(ctx, i, j));
             }
         }
     }
