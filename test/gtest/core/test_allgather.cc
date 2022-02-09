@@ -13,7 +13,7 @@ class test_allgather : public UccCollArgs, public ucc::test
 {
 public:
     void data_init(int nprocs, ucc_datatype_t dtype, size_t single_rank_count,
-                   UccCollCtxVec &ctxs)
+                   UccCollCtxVec &ctxs, bool persistent)
     {
         ctxs.resize(nprocs);
         for (auto r = 0; r < nprocs; r++) {
@@ -60,6 +60,10 @@ public:
                 UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
                                         ucc_dt_size(dtype) * single_rank_count,
                                         mem_type, UCC_MEMORY_TYPE_HOST));
+            }
+            if (persistent) {
+                coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+                coll->flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
             }
         }
     }
@@ -151,7 +155,7 @@ UCC_TEST_P(test_allgather_0, single)
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    data_init(size, dtype, count, ctxs);
+    data_init(size, dtype, count, ctxs, false);
     UccReq    req(team, ctxs);
     req.start();
     req.wait();
@@ -174,7 +178,7 @@ UCC_TEST_P(test_allgather_0, single_persistent)
     set_inplace(inplace);
     set_mem_type(mem_type);
 
-    data_init(size, dtype, count, ctxs);
+    data_init(size, dtype, count, ctxs, true);
     UccReq req(team, ctxs);
 
     for (auto i = 0; i < n_calls; i++) {
@@ -221,7 +225,7 @@ UCC_TEST_P(test_allgather_1, multiple_host)
         this->set_inplace(inplace);
         this->set_mem_type(mem_type);
 
-        data_init(size, dtype, count, ctx);
+        data_init(size, dtype, count, ctx, false);
         reqs.push_back(UccReq(team, ctx));
         ctxs.push_back(ctx);
     }
