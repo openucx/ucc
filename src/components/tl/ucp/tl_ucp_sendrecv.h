@@ -230,7 +230,7 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     peer = ucc_get_ctx_rank(UCC_TL_CORE_TEAM(team), core_rank);
 
     offset = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
-                                  peer, ucc_tl_ucp.super.super.id);
+                                  core_rank, ucc_tl_ucp.super.super.id);
     base_offset = (ptrdiff_t)PTR_OFFSET(offset, ctx->ucp_addrlen);
     rvas        = (uint64_t *)base_offset;
     key_sizes   = PTR_OFFSET(base_offset, (section_offset * 2));
