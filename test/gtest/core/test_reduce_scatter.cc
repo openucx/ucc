@@ -13,7 +13,7 @@ template <typename T>
 class test_reduce_scatter : public UccCollArgs, public testing::Test {
   public:
     void data_init(int nprocs, ucc_datatype_t dt, size_t count,
-                   UccCollCtxVec &ctxs)
+                   UccCollCtxVec &ctxs, bool persistent)
     {
         size_t rcount;
         ctxs.resize(nprocs);
@@ -76,6 +76,10 @@ class test_reduce_scatter : public UccCollArgs, public testing::Test {
             coll->dst.info.mem_type = mem_type;
             coll->dst.info.count    = (ucc_count_t)rcount;
             coll->dst.info.datatype = dt;
+            if (persistent) {
+                coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+                coll->flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+            }
         }
     }
     void data_fini(UccCollCtxVec ctxs)
@@ -166,7 +170,7 @@ class test_reduce_scatter : public UccCollArgs, public testing::Test {
 
 TYPED_TEST_CASE(test_reduce_scatter, ReductionTypesOps);
 
-#define TEST_DECLARE(_mem_type, _inplace, _repeat)                             \
+#define TEST_DECLARE(_mem_type, _inplace, _repeat, _persistent)                \
     {                                                                          \
         std::array<int, 1> counts{123};                                        \
         for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {                 \
@@ -176,7 +180,7 @@ TYPED_TEST_CASE(test_reduce_scatter, ReductionTypesOps);
                 UccCollCtxVec ctxs;                                            \
                 this->set_mem_type(_mem_type);                                 \
                 this->set_inplace(_inplace);                                   \
-                this->data_init(size, TypeParam::dt, count, ctxs);             \
+                this->data_init(size, TypeParam::dt, count, ctxs, _persistent);\
                 try {                                                          \
                     UccReq req(team, ctxs);                                    \
                     for (auto i = 0; i < _repeat; i++) {                       \
@@ -195,43 +199,43 @@ TYPED_TEST_CASE(test_reduce_scatter, ReductionTypesOps);
 
 TYPED_TEST(test_reduce_scatter, single_host)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 1);
+    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 1, 0);
 }
 
 TYPED_TEST(test_reduce_scatter, single_host_persistent)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 3);
+    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 3, 1);
 }
 
 TYPED_TEST(test_reduce_scatter, single_host_inplace)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 1);
+    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 1, 0);
 }
 
 TYPED_TEST(test_reduce_scatter, single_host_persistent_inplace)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 3);
+    TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 3, 1);
 }
 
 #ifdef HAVE_CUDA
 TYPED_TEST(test_reduce_scatter, single_cuda)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 1);
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 1, 0);
 }
 
 TYPED_TEST(test_reduce_scatter, single_cuda_persistent)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 3);
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 3, 1);
 }
 
 TYPED_TEST(test_reduce_scatter, single_cuda_inplace)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 1);
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 1, 0);
 }
 
 TYPED_TEST(test_reduce_scatter, single_cuda_persistent_inplace)
 {
-    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 3);
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 3, 1);
 }
 #endif
 
@@ -248,7 +252,7 @@ TYPED_TEST(test_reduce_scatter, single_cuda_persistent_inplace)
                     UccCollCtxVec ctx;                                         \
                     this->set_inplace(_inplace);                               \
                     this->set_mem_type(_mem_type);                             \
-                    this->data_init(size, TypeParam::dt, count, ctx);          \
+                    this->data_init(size, TypeParam::dt, count, ctx, false);   \
                     ctxs.push_back(ctx);                                       \
                     reqs.push_back(UccReq(team, ctx));                         \
                 }                                                              \
@@ -316,7 +320,7 @@ TYPED_TEST(test_reduce_scatter_alg, ring)
             for (auto m : mt) {
                 this->set_mem_type(m);
                 this->set_inplace(inplace);
-                this->data_init(n_procs, TypeParam::dt, count, ctxs);
+                this->data_init(n_procs, TypeParam::dt, count, ctxs, true);
                 UccReq req(team, ctxs);
 
                 for (auto i = 0; i < repeat; i++) {
