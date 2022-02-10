@@ -128,7 +128,7 @@ ucc_status_t ucc_tl_shm_bcast_ww_progress(ucc_coll_task_t *coll_task)
     if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect bcast->reduce pattern.*/
-    	status = ucc_tl_shm_bcast_seg_ready(seg, task->seq_num, team, tree);
+    	status = ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree);
         if (UCC_OK != status) {
             /* in progress */
             return status;
@@ -194,7 +194,7 @@ ucc_status_t ucc_tl_shm_bcast_wr_progress(ucc_coll_task_t *coll_task)
     if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seq_num, team, tree)) {
+        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
         task->seg_ready = 1;
@@ -265,7 +265,7 @@ ucc_status_t ucc_tl_shm_bcast_rr_progress(ucc_coll_task_t *coll_task)
     if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seq_num, team, tree)) {
+        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
         task->seg_ready = 1;
@@ -331,7 +331,7 @@ ucc_status_t ucc_tl_shm_bcast_rw_progress(ucc_coll_task_t *coll_task)
     if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seq_num, team, tree)) {
+        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
         task->seg_ready = 1;
@@ -381,6 +381,7 @@ ucc_status_t ucc_tl_shm_bcast_start(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
 
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_bcast_start", 0);
+    UCC_TL_SHM_SET_SEG_READY_SEQ_NUM(task, team);
     task->super.super.status = UCC_INPROGRESS;
     status = task->super.progress(&task->super);
 
@@ -414,8 +415,6 @@ ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task)
     	return status;
     }
 
-//    while(1) {}
-//    switch(TASK_LIB(task)->cfg.bcast_alg) {
     switch(task->progress_alg) {
         case BCAST_WW:
         	task->super.progress = ucc_tl_shm_bcast_ww_progress;

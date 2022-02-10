@@ -134,6 +134,7 @@ typedef struct ucc_tl_shm_team {
     void                    *oob_req;
     ucc_tl_shm_seg_t        *segs;
     uint32_t                 seq_num;
+    uint32_t                *last_posted;
     uint32_t                 n_base_groups;
     uint32_t                 my_group_id;
     int                     *allgather_dst;

@@ -30,7 +30,7 @@ next_stage:
     case BARRIER_STAGE_START:
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect barrier->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seq_num, team, tree)) {
+        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
         if (tree->base_tree) {
@@ -93,6 +93,7 @@ ucc_status_t ucc_tl_shm_barrier_start(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
 
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_barrier_start", 0);
+    UCC_TL_SHM_SET_SEG_READY_SEQ_NUM(task, team);
     task->super.super.status = UCC_INPROGRESS;
     status = task->super.progress(&task->super);
 

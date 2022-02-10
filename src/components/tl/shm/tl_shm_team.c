@@ -105,7 +105,6 @@ static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
                                      (team->ctrl_size + team->data_size);
     int                  shmid     = -1;
     ucc_team_oob_coll_t  oob       = UCC_TL_TEAM_OOB(team);
-    ucc_tl_shm_ctrl_t   *seg_ctrl, *rank_ctrl;
     ucc_status_t         status;
 
     team->allgather_dst = (int *) ucc_malloc(sizeof(int) * team_size,
@@ -136,13 +135,6 @@ static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
             return UCC_ERR_NO_RESOURCE;
         }
         memset(team->shm_buffer, 0, shmsize);
-        for (int i = 0; i < team->n_concurrent; i++) {
-            seg_ctrl = (ucc_tl_shm_ctrl_t *) PTR_OFFSET(team->shm_buffer, i * (team->ctrl_size + team->data_size));
-        	for (int j = 0; j < team_size; j++) {
-        	    rank_ctrl = PTR_OFFSET(seg_ctrl, ucc_ep_map_eval(team->ctrl_map, j));
-                rank_ctrl->ci = i;
-        	}
-        }
         shmctl(shmid, IPC_RMID, NULL);
     }
     status = oob.allgather(&shmid, team->allgather_dst, sizeof(int),
@@ -199,6 +191,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     if (UCC_TL_CORE_CTX(self)->topo->sock_bound != 1) {
         /* TODO: we have just 1 base group and no top group. */
     	return UCC_ERR_NOT_SUPPORTED;
+    }
+    self->last_posted = ucc_calloc(sizeof(*self->last_posted), self->n_concurrent,
+                                   "last_posted");
+    if (!self->last_posted) {
+        tl_error(ctx->super.super.lib,
+                 "failed to allocate %zd bytes for last_posted array",
+                 sizeof(*self->last_posted) * self->n_concurrent);
+        return UCC_ERR_NO_MEMORY;
     }
 
     self->segs = (ucc_tl_shm_seg_t *) ucc_malloc(sizeof(ucc_tl_shm_seg_t) *
@@ -359,6 +359,7 @@ ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
     }
     ucc_free(team->tree_cache->elems);
     ucc_free(team->tree_cache);
+    ucc_free(team->last_posted);
 //    ucc_free(team->group_rank_map.array.map);
 //    ucc_free(team->rank_group_id_map.array.map);
 //    ucc_free(team->ctrl_map.array.map);

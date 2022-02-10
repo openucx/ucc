@@ -14,6 +14,7 @@ typedef struct ucc_tl_shm_task {
     ucc_tl_shm_seg_t  *seg;
     ucc_tl_shm_tree_t *tree;
     uint32_t           seq_num;
+    uint32_t           seg_ready_seq_num;
     int                stage;
     int                tree_in_cache;
     int                base_tree_only;
@@ -66,32 +67,26 @@ static inline void *ucc_tl_shm_get_data(ucc_tl_shm_seg_t *seg,
                                  ucc_rank_t rank) /* rank withing a TL team */
 {
 	size_t data_size = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
+
     return PTR_OFFSET(seg->data, data_size * rank);
 }
 
-static inline ucc_status_t ucc_tl_shm_bcast_seg_ready(ucc_tl_shm_seg_t *seg, uint32_t seq_num, ucc_tl_shm_team_t *team, ucc_tl_shm_tree_t *tree)
+static inline ucc_status_t
+ucc_tl_shm_bcast_seg_ready(ucc_tl_shm_seg_t *seg, uint32_t seq_num,
+                           ucc_tl_shm_team_t *team, ucc_tl_shm_tree_t *tree)
 {
 	ucc_tl_shm_ctrl_t *ctrl;
-//	size_t             team_size;
 	int                i;
 
-//    team_size = UCC_TL_TEAM_SIZE(team);
-//    for (i = 0; i < team_size; i++) {
-//    	ctrl = ucc_tl_shm_get_ctrl(seg, team, i);
-//        if (ctrl->ci + team->n_concurrent != seq_num) { // < for reduce
-//            return UCC_INPROGRESS;
-//        }
-//    }
-
     ctrl = ucc_tl_shm_get_ctrl(seg, team, UCC_TL_TEAM_RANK(team));
-    if (ctrl->ci + team->n_concurrent != seq_num) {
+    if (ctrl->ci != seq_num) {
         return UCC_INPROGRESS;
     }
 
 	if (tree->top_tree) {
 	    for (i = 0; i < tree->top_tree->n_children; i++) {
 	    	ctrl = ucc_tl_shm_get_ctrl(seg, team, tree->top_tree->children[i]);
-	        if (ctrl->ci + team->n_concurrent != seq_num) {
+	        if (ctrl->ci != seq_num) {
 	            return UCC_INPROGRESS;
 	        }
 	    }
@@ -100,7 +95,7 @@ static inline ucc_status_t ucc_tl_shm_bcast_seg_ready(ucc_tl_shm_seg_t *seg, uin
 	if (tree->base_tree) {
         for (i = 0; i < tree->base_tree->n_children; i++) {
     	    ctrl = ucc_tl_shm_get_ctrl(seg, team, tree->base_tree->children[i]);
-            if (ctrl->ci + team->n_concurrent != seq_num) {
+            if (ctrl->ci != seq_num) {
                 return UCC_INPROGRESS;
             }
         }
@@ -108,24 +103,16 @@ static inline ucc_status_t ucc_tl_shm_bcast_seg_ready(ucc_tl_shm_seg_t *seg, uin
     return UCC_OK;
 }
 
-static inline ucc_status_t ucc_tl_shm_reduce_seg_ready(ucc_tl_shm_seg_t *seg, uint32_t seq_num, ucc_tl_shm_team_t *team, ucc_tl_shm_tree_t *tree)
+static inline ucc_status_t
+ucc_tl_shm_reduce_seg_ready(ucc_tl_shm_seg_t *seg, uint32_t seq_num,
+                            ucc_tl_shm_team_t *team, ucc_tl_shm_tree_t *tree)
 {
 
 	ucc_tl_shm_ctrl_t *ctrl;
 	ucc_rank_t         parent;
-//	size_t             team_size;
-//	int                i;
-//
-//    team_size = UCC_TL_TEAM_SIZE(team);
-//    for (i = 0; i < team_size; i++) {
-//    	ctrl = ucc_tl_shm_get_ctrl(seg, team, i);
-//        if (ctrl->ci + team->n_concurrent < seq_num) {
-//            return UCC_INPROGRESS;
-//        }
-//    }
 
     ctrl = ucc_tl_shm_get_ctrl(seg, team, UCC_TL_TEAM_RANK(team));
-    if (ctrl->ci + team->n_concurrent != seq_num) {
+    if (ctrl->ci != seq_num) {
         return UCC_INPROGRESS;
     }
 
@@ -133,7 +120,7 @@ static inline ucc_status_t ucc_tl_shm_reduce_seg_ready(ucc_tl_shm_seg_t *seg, ui
 	    parent = tree->base_tree->parent;
 	    if (parent != UCC_RANK_INVALID) {
             ctrl = ucc_tl_shm_get_ctrl(seg, team, parent);
-            if (ctrl->ci + team->n_concurrent != seq_num) {
+            if (ctrl->ci != seq_num) {
                 return UCC_INPROGRESS;
             }
         }
@@ -143,7 +130,7 @@ static inline ucc_status_t ucc_tl_shm_reduce_seg_ready(ucc_tl_shm_seg_t *seg, ui
 		parent = tree->top_tree->parent;
 		if (parent != UCC_RANK_INVALID) {
 	        ctrl = ucc_tl_shm_get_ctrl(seg, team, parent);
-	        if (ctrl->ci + team->n_concurrent != seq_num) {
+	        if (ctrl->ci != seq_num) {
 	            return UCC_INPROGRESS;
 	        }
         }
@@ -151,20 +138,16 @@ static inline ucc_status_t ucc_tl_shm_reduce_seg_ready(ucc_tl_shm_seg_t *seg, ui
     return UCC_OK;
 }
 
-static inline void ucc_tl_shm_copy_to_children(ucc_tl_shm_seg_t *seg,
-                                               ucc_tl_shm_team_t *team,
-                                               ucc_kn_tree_t *tree,
-                                               uint32_t seq_num,
-                                               int is_inline,
-                                               void *src,
-                                               size_t data_size)
+static inline void
+ucc_tl_shm_copy_to_children(ucc_tl_shm_seg_t *seg, ucc_tl_shm_team_t *team,
+                            ucc_kn_tree_t *tree, uint32_t seq_num,
+                            int is_inline, void *src, size_t data_size)
 {
     ucc_tl_shm_ctrl_t *ctrl;
     void              *dst;
     int                i;
 
     for (i = 0; i < tree->n_children; i++) {
-//    for (i = tree->n_children - 1 ;i >= 0; i--) {
         ctrl = ucc_tl_shm_get_ctrl(seg, team, tree->children[i]);
         dst = is_inline ? ctrl->data : ucc_tl_shm_get_data(seg, team,
                                                            tree->children[i]);
@@ -174,18 +157,22 @@ static inline void ucc_tl_shm_copy_to_children(ucc_tl_shm_seg_t *seg,
     }
 }
 
-static inline void ucc_tl_shm_signal_to_children(ucc_tl_shm_seg_t *seg,
-                                                 ucc_tl_shm_team_t *team,
-                                                 uint32_t seq_num,
-                                                 ucc_kn_tree_t *tree)
+static inline void
+ucc_tl_shm_signal_to_children(ucc_tl_shm_seg_t *seg, ucc_tl_shm_team_t *team,
+                              uint32_t seq_num, ucc_kn_tree_t *tree)
 {
     ucc_tl_shm_ctrl_t *ctrl;
     int                i;
+
     for (i = 0; i < tree->n_children; i++) {
-//    for (i = tree->n_children - 1; i >= 0; i--) {
         ctrl = ucc_tl_shm_get_ctrl(seg, team, tree->children[i]);
         ctrl->pi = seq_num;
     }
 }
 
+#define UCC_TL_SHM_SET_SEG_READY_SEQ_NUM(_task, _team) do {         \
+        int _seg_id = (_task)->seq_num % (_team)->n_concurrent;     \
+        (_task)->seg_ready_seq_num = (_team)->last_posted[_seg_id]; \
+        (_team)->last_posted[_seg_id] = task->seq_num;              \
+    } while (0)
 #endif
