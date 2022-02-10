@@ -7,35 +7,7 @@
 #include "../tl_shm.h"
 #include "fanout.h"
 
-ucc_status_t ucc_tl_shm_fanout_signal(ucc_tl_shm_team_t *team,
-                                      ucc_tl_shm_seg_t *seg,
-                                      ucc_tl_shm_task_t *task,
-                                      ucc_kn_tree_t *tree)
-{
-    ucc_rank_t         team_rank = UCC_TL_TEAM_RANK(team);
-    uint32_t           seq_num   = task->seq_num;
-    uint32_t           n_polls   = UCC_TL_SHM_TEAM_LIB(team)->cfg.n_polls;
-    ucc_tl_shm_ctrl_t *my_ctrl;
-    int                i;
-
-    if (tree->parent == UCC_RANK_INVALID) {
-        ucc_tl_shm_signal_to_children(seg, team, seq_num, tree);
-        return UCC_OK;
-    }
-
-    my_ctrl = ucc_tl_shm_get_ctrl(seg, team, team_rank);
-    for (i = 0; i < n_polls; i++) {
-        if (my_ctrl->pi == seq_num) {
-            SHMSEG_ISYNC();
-            ucc_tl_shm_signal_to_children(seg, team, seq_num, tree);
-            return UCC_OK;
-        }
-    }
-    return UCC_INPROGRESS;
-}
-
-
-ucc_status_t ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -80,7 +52,7 @@ ucc_status_t ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_shm_fanout_start(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_fanout_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -98,30 +70,33 @@ ucc_status_t ucc_tl_shm_fanout_start(ucc_coll_task_t *coll_task)
     return ucc_task_complete(coll_task);
 }
 
-ucc_status_t ucc_tl_shm_fanout_init(ucc_tl_shm_task_t *task)
+ucc_status_t ucc_tl_shm_fanout_init(ucc_base_coll_args_t *coll_args,
+                                   ucc_base_team_t       *tl_team,
+                                   ucc_coll_task_t      **task_h)
 {
-	ucc_tl_shm_team_t *team = TASK_TEAM(task);
-	ucc_coll_args_t    args = TASK_ARGS(task);
+	ucc_tl_shm_team_t *team = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
 	ucc_rank_t   base_radix = UCC_TL_SHM_TEAM_LIB(team)->cfg.fanout_base_radix;
 	ucc_rank_t   top_radix  = UCC_TL_SHM_TEAM_LIB(team)->cfg.fanout_top_radix;
-	ucc_status_t status;
+    ucc_tl_shm_task_t *task;
+	ucc_status_t       status;
+
+    task = ucc_tl_shm_get_task(coll_args, team);
+    if (ucc_unlikely(!task)) {
+        return UCC_ERR_NO_MEMORY;
+    }
 
     task->super.post      = ucc_tl_shm_fanout_start;
     task->super.progress  = ucc_tl_shm_fanout_progress;
-    task->seq_num         = team->seq_num++;
-    task->seg             = &team->segs[task->seq_num % team->n_concurrent];
-    task->seg_ready       = 0;
-    task->first_tree_done = 0;
-    task->base_tree_only  = UCC_TL_SHM_TEAM_LIB(team)->cfg.base_tree_only;
 
-
-    status = ucc_tl_shm_tree_init(team, args.root, base_radix, top_radix,
-                                  &task->tree_in_cache, UCC_COLL_TYPE_FANOUT,
+    status = ucc_tl_shm_tree_init(team, coll_args->args.root, base_radix,
+                                  top_radix, &task->tree_in_cache,
+                                  UCC_COLL_TYPE_FANOUT,
                                   task->base_tree_only, &task->tree);
 
     if (ucc_unlikely(UCC_OK != status)) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to init shm tree");
     	return status;
     }
+    *task_h = &task->super;
     return UCC_OK;
 }

@@ -7,11 +7,11 @@
 #include "../tl_shm.h"
 #include "bcast.h"
 
-ucc_status_t ucc_tl_shm_bcast_write(ucc_tl_shm_team_t *team,
-                                    ucc_tl_shm_seg_t *seg,
-                                    ucc_tl_shm_task_t *task,
-                                    ucc_kn_tree_t *tree, int is_inline,
-                                    int *is_op_root, size_t data_size)
+static ucc_status_t ucc_tl_shm_bcast_write(ucc_tl_shm_team_t *team,
+                                           ucc_tl_shm_seg_t *seg,
+                                           ucc_tl_shm_task_t *task,
+                                           ucc_kn_tree_t *tree, int is_inline,
+                                           int *is_op_root, size_t data_size)
 {
 	ucc_rank_t         team_rank = UCC_TL_TEAM_RANK(team);
     uint32_t           seq_num   = task->seq_num;
@@ -49,11 +49,11 @@ ucc_status_t ucc_tl_shm_bcast_write(ucc_tl_shm_team_t *team,
     return UCC_INPROGRESS;
 }
 
-ucc_status_t ucc_tl_shm_bcast_read(ucc_tl_shm_team_t *team,
-                                   ucc_tl_shm_seg_t *seg,
-                                   ucc_tl_shm_task_t *task,
-                                   ucc_kn_tree_t *tree, int is_inline,
-                                   int *is_op_root, size_t data_size)
+static ucc_status_t ucc_tl_shm_bcast_read(ucc_tl_shm_team_t *team,
+                                          ucc_tl_shm_seg_t *seg,
+                                          ucc_tl_shm_task_t *task,
+                                          ucc_kn_tree_t *tree, int is_inline,
+                                          int *is_op_root, size_t data_size)
 {
 	ucc_rank_t         team_rank = UCC_TL_TEAM_RANK(team);
 	uint32_t           seq_num   = task->seq_num;
@@ -108,7 +108,7 @@ ucc_status_t ucc_tl_shm_bcast_read(ucc_tl_shm_team_t *team,
     return UCC_INPROGRESS;
 }
 
-ucc_status_t ucc_tl_shm_bcast_ww_progress(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_bcast_ww_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -173,7 +173,7 @@ ucc_status_t ucc_tl_shm_bcast_ww_progress(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_shm_bcast_wr_progress(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_bcast_wr_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -244,7 +244,7 @@ ucc_status_t ucc_tl_shm_bcast_wr_progress(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_shm_bcast_rr_progress(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_bcast_rr_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -311,7 +311,7 @@ ucc_status_t ucc_tl_shm_bcast_rr_progress(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_shm_bcast_rw_progress(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_bcast_rw_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -374,7 +374,7 @@ ucc_status_t ucc_tl_shm_bcast_rw_progress(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_shm_bcast_start(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_bcast_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
 	ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -392,21 +392,25 @@ ucc_status_t ucc_tl_shm_bcast_start(ucc_coll_task_t *coll_task)
     return ucc_task_complete(coll_task);
 }
 
-ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task)
+ucc_status_t ucc_tl_shm_bcast_init(ucc_base_coll_args_t *coll_args,
+                                   ucc_base_team_t      *tl_team,
+                                   ucc_coll_task_t     **task_h)
 {
-	ucc_tl_shm_team_t *team = TASK_TEAM(task);
-	ucc_coll_args_t    args = TASK_ARGS(task);
-	ucc_rank_t         base_radix = task->base_radix;
-	ucc_rank_t         top_radix  = task->top_radix;
+	ucc_tl_shm_team_t *team = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
+    ucc_tl_shm_task_t *task;
 	ucc_status_t       status;
 
-    task->super.post = ucc_tl_shm_bcast_start;
-    task->seq_num    = team->seq_num++;
-    task->seg        = &team->segs[task->seq_num % team->n_concurrent];
-    task->first_tree_done = 0;
-    task->seg_ready = 0;
 
-    status = ucc_tl_shm_tree_init(team, args.root, base_radix, top_radix,
+    task = ucc_tl_shm_get_task(coll_args, team);
+    if (ucc_unlikely(!task)) {
+        return UCC_ERR_NO_MEMORY;
+    }
+    ucc_tl_shm_set_bcast_perf_params(task);
+
+    task->super.post = ucc_tl_shm_bcast_start;
+
+    status = ucc_tl_shm_tree_init(team, coll_args->args.root, task->base_radix,
+                                  task->top_radix,
                                   &task->tree_in_cache, UCC_COLL_TYPE_BCAST,
                                   task->base_tree_only, &task->tree);
 
@@ -429,5 +433,7 @@ ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task)
         	task->super.progress = ucc_tl_shm_bcast_rw_progress;
             break;
     }
+
+    *task_h = &task->super;
     return UCC_OK;
 }

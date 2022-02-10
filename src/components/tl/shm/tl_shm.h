@@ -39,8 +39,9 @@
 #define SHMSEG_WMB()  __asm__ __volatile__("": : :"memory")
 #define SHMSEG_ISYNC() __asm__ __volatile__("": : :"memory")
 
-#define UCC_TL_SHM_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_BARRIER)
+#define UCC_TL_SHM_SUPPORTED_COLLS                                      \
+    (UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_BARRIER \
+     UCC_COLL_TYPE_FANIN | UCC_COLL_TYPE_FANOUT)
 
 typedef struct ucc_kn_tree ucc_kn_tree_t;
 

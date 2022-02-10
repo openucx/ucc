@@ -50,13 +50,13 @@
 //    return UCC_INPROGRESS;
 //}
 
-ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
-                                    ucc_tl_shm_seg_t *seg,
-                                    ucc_tl_shm_task_t *task,
-                                    ucc_kn_tree_t *tree, int is_inline,
-                                    size_t count, ucc_datatype_t dt,
-                                    ucc_memory_type_t mtype,
-                                    ucc_coll_args_t *args)
+static ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
+                                           ucc_tl_shm_seg_t *seg,
+                                           ucc_tl_shm_task_t *task,
+                                           ucc_kn_tree_t *tree, int is_inline,
+                                           size_t count, ucc_datatype_t dt,
+                                           ucc_memory_type_t mtype,
+                                           ucc_coll_args_t *args)
 {
 	ucc_rank_t         team_rank  = UCC_TL_TEAM_RANK(team);
     uint32_t           seq_num   = task->seq_num;
@@ -119,7 +119,7 @@ ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -195,7 +195,7 @@ ucc_status_t ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_shm_reduce_start(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_reduce_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
 	ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -213,30 +213,30 @@ ucc_status_t ucc_tl_shm_reduce_start(ucc_coll_task_t *coll_task)
     return ucc_task_complete(coll_task);
 }
 
-ucc_status_t ucc_tl_shm_reduce_init(ucc_tl_shm_task_t *task)
+ucc_status_t ucc_tl_shm_reduce_init(ucc_base_coll_args_t *coll_args,
+                                    ucc_base_team_t      *tl_team,
+                                    ucc_coll_task_t     **task_h)
 {
- 	ucc_tl_shm_team_t *team = TASK_TEAM(task);
-	ucc_coll_args_t    args = TASK_ARGS(task);
-	ucc_rank_t         base_radix = task->base_radix;
-	ucc_rank_t         top_radix  = task->top_radix;
+	ucc_tl_shm_team_t *team = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
+    ucc_tl_shm_task_t *task;
 	ucc_status_t       status;
 
-    if (args.op == UCC_OP_AVG) {
-        task->super.super.status = UCC_ERR_NOT_SUPPORTED;
+    if (coll_args->args.op == UCC_OP_AVG) {
     	return UCC_ERR_NOT_SUPPORTED;
     }
+
+    task = ucc_tl_shm_get_task(coll_args, team);
+    if (ucc_unlikely(!task)) {
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    ucc_tl_shm_set_reduce_perf_params(task);
 
     task->super.post     = ucc_tl_shm_reduce_start;
     task->super.progress = ucc_tl_shm_reduce_progress;
 
-
-    task->seq_num    = team->seq_num++;
-    task->seg        = &team->segs[task->seq_num % team->n_concurrent];
-    task->cur_child = 0;
-    task->first_reduce   = 1;
-    task->first_tree_done  = 0;
-    task->seg_ready  = 0;
-    status = ucc_tl_shm_tree_init(team, args.root, base_radix, top_radix,
+    status = ucc_tl_shm_tree_init(team, coll_args->args.root, task->base_radix,
+                                  task->top_radix,
                                   &task->tree_in_cache, UCC_COLL_TYPE_REDUCE,
                                   task->base_tree_only, &task->tree);
 
@@ -244,20 +244,6 @@ ucc_status_t ucc_tl_shm_reduce_init(ucc_tl_shm_task_t *task)
         tl_error(UCC_TL_TEAM_LIB(team), "failed to init shm tree");
     	return status;
     }
-
-//    switch(TASK_LIB(task)->cfg.reduce_alg) {
-//        case REDUCE_WW:
-//        	task->super.progress = ucc_tl_shm_reduce_ww_progress;
-//            break;
-//        case REDUCE_WR:
-//        	task->super.progress = ucc_tl_shm_reduce_wr_progress;
-//            break;
-//        case REDUCE_RR:
-//        	task->super.progress = ucc_tl_shm_reduce_rr_progress;
-//            break;
-//        case REDUCE_RW:
-//        	task->super.progress = ucc_tl_shm_reduce_rw_progress;
-//            break;
-//    }
+    *task_h = &task->super;
     return UCC_OK;
 }

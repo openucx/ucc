@@ -9,7 +9,9 @@
 #include "../tl_shm_coll.h"
 #include "../tl_shm_knomial_pattern.h"
 
-ucc_status_t ucc_tl_shm_bcast_init(ucc_tl_shm_task_t *task);
+ucc_status_t ucc_tl_shm_bcast_init(ucc_base_coll_args_t *coll_args,
+                                   ucc_base_team_t      *team,
+                                   ucc_coll_task_t     **task_h);
 
 enum {
     BCAST_WW,

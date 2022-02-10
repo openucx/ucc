@@ -10,13 +10,7 @@
 #include "../tl_shm_knomial_pattern.h"
 #include "core/ucc_mc.h"
 
-ucc_status_t ucc_tl_shm_reduce_init(ucc_tl_shm_task_t *task);
-
-enum {
-    REDUCE_WW,
-    REDUCE_WR,
-    REDUCE_RR,
-    REDUCE_RW
-}; //make configurable from user for example from user "wr" to cfg->bcast_alg = 1
-
+ucc_status_t ucc_tl_shm_reduce_init(ucc_base_coll_args_t *coll_args,
+                                    ucc_base_team_t      *tl_team,
+                                    ucc_coll_task_t     **task_h);
 #endif

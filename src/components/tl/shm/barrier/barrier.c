@@ -15,7 +15,7 @@ enum {
     BARRIER_STAGE_TOP_TREE_FANOUT,
 };
 
-ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -86,7 +86,7 @@ next_stage:
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_shm_barrier_start(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_shm_barrier_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -97,8 +97,6 @@ ucc_status_t ucc_tl_shm_barrier_start(ucc_coll_task_t *coll_task)
     task->super.super.status = UCC_INPROGRESS;
     status = task->super.progress(&task->super);
 
-//    task->barrier_fanin_done = 0;
-
     if (UCC_INPROGRESS == status) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
         return UCC_OK;
@@ -106,21 +104,25 @@ ucc_status_t ucc_tl_shm_barrier_start(ucc_coll_task_t *coll_task)
     return ucc_task_complete(coll_task);
 }
 
-ucc_status_t ucc_tl_shm_barrier_init(ucc_tl_shm_task_t *task)
+ucc_status_t ucc_tl_shm_barrier_init(ucc_base_coll_args_t *coll_args,
+                                     ucc_base_team_t      *tl_team,
+                                     ucc_coll_task_t     **task_h)
 {
-	ucc_tl_shm_team_t *team = TASK_TEAM(task);
+	ucc_tl_shm_team_t *team = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
 	ucc_rank_t   base_radix = UCC_TL_SHM_TEAM_LIB(team)->cfg.barrier_base_radix;
 	ucc_rank_t   top_radix  = UCC_TL_SHM_TEAM_LIB(team)->cfg.barrier_top_radix;
-	ucc_rank_t   root = 0;
-	ucc_status_t status;
+	ucc_rank_t         root = 0;
+    ucc_tl_shm_task_t *task;
+	ucc_status_t       status;
+
+    task = ucc_tl_shm_get_task(coll_args, team);
+    if (ucc_unlikely(!task)) {
+        return UCC_ERR_NO_MEMORY;
+    }
 
     task->super.post      = ucc_tl_shm_barrier_start;
     task->super.progress  = ucc_tl_shm_barrier_progress;
-    task->seq_num         = team->seq_num++;
-    task->seg             = &team->segs[task->seq_num % team->n_concurrent];
-    task->cur_child       = 0;
     task->stage           = BARRIER_STAGE_START;
-    task->base_tree_only  = UCC_TL_SHM_TEAM_LIB(team)->cfg.base_tree_only;
 
     status = ucc_tl_shm_tree_init(team, root, base_radix, top_radix,
                                   &task->tree_in_cache, UCC_COLL_TYPE_REDUCE,
@@ -130,5 +132,6 @@ ucc_status_t ucc_tl_shm_barrier_init(ucc_tl_shm_task_t *task)
         tl_error(UCC_TL_TEAM_LIB(team), "failed to init shm tree");
     	return status;
     }
+    *task_h = &task->super;
     return UCC_OK;
 }

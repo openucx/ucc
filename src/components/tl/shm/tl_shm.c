@@ -6,6 +6,11 @@
 
 #include "tl_shm.h"
 #include "components/mc/base/ucc_mc_base.h"
+#include "bcast/bcast.h"
+#include "reduce/reduce.h"
+#include "barrier/barrier.h"
+#include "fanin/fanin.h"
+#include "fanout/fanout.h"
 
 ucc_status_t ucc_tl_shm_get_lib_attr(const ucc_base_lib_t *lib,
                                       ucc_base_lib_attr_t  *base_attr);
@@ -128,8 +133,25 @@ ucc_status_t ucc_tl_shm_team_create_test(ucc_base_team_t *tl_team);
 ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team);
 
 ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
-                                   ucc_base_team_t *team,
-                                   ucc_coll_task_t **task);
+                                  ucc_base_team_t      *team,
+                                  ucc_coll_task_t     **task)
+{
+    switch (coll_args->args.coll_type) {
+    case UCC_COLL_TYPE_BCAST:
+        return ucc_tl_shm_bcast_init(coll_args, team, task);
+    case UCC_COLL_TYPE_REDUCE:
+        return ucc_tl_shm_reduce_init(coll_args, team, task);
+    case UCC_COLL_TYPE_FANIN:
+        return ucc_tl_shm_fanin_init(coll_args, team, task);
+    case UCC_COLL_TYPE_FANOUT:
+        return ucc_tl_shm_fanout_init(coll_args, team, task);
+    case UCC_COLL_TYPE_BARRIER:
+        return ucc_tl_shm_barrier_init(coll_args, team, task);
+    default:
+        break;
+    }
+    return UCC_ERR_NOT_SUPPORTED;
+}
 
 ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t   *tl_team,
                                          ucc_coll_score_t **score_p);

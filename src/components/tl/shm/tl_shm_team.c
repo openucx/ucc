@@ -11,7 +11,12 @@
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
 #include "utils/ucc_sys.h"
-#include <sys/stat.h> //make extern C?
+#include "bcast/bcast.h"
+#include "reduce/reduce.h"
+#include "barrier/barrier.h"
+#include "fanin/fanin.h"
+#include "fanout/fanout.h"
+#include <sys/stat.h>
 
 #define SHM_MODE (IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR|S_IWOTH|S_IRGRP|S_IWGRP)
 
@@ -407,12 +412,77 @@ ucc_status_t ucc_tl_shm_team_create_test(ucc_base_team_t *tl_team)
 }
 
 ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t   *tl_team,
-                                         ucc_coll_score_t **score_p)
+                                        ucc_coll_score_t **score_p)
 {
-	ucc_coll_score_t *score;
-	ucc_coll_score_build_default(tl_team, UCC_TL_SHM_DEFAULT_SCORE,
-	                             ucc_tl_shm_coll_init,
-	                             UCC_TL_SHM_SUPPORTED_COLLS, NULL, 0, &score);
+    ucc_tl_shm_team_t *team      = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
+    ucc_base_lib_t    *lib       = UCC_TL_TEAM_LIB(team);
+    size_t             data_size = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
+    ucc_coll_score_t  *score;
+    ucc_status_t       status;
+
+    status = ucc_coll_score_alloc(&score);
+    if (UCC_OK != status) {
+        tl_error(lib, "faild to alloc score_t");
+        return status;
+    }
+
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_BCAST, UCC_MEMORY_TYPE_HOST, 0, data_size,
+        UCC_TL_SHM_DEFAULT_SCORE, ucc_tl_shm_bcast_init, tl_team);
+    if (UCC_OK != status) {
+        tl_error(lib, "faild to add range to score_t");
+        goto err;
+    }
+
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_REDUCE, UCC_MEMORY_TYPE_HOST, 0, data_size,
+        UCC_TL_SHM_DEFAULT_SCORE, ucc_tl_shm_reduce_init, tl_team);
+    if (UCC_OK != status) {
+        tl_error(lib, "faild to add range to score_t");
+        goto err;
+    }
+
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_FANIN, UCC_MEMORY_TYPE_HOST, 0, UCC_MSG_MAX,
+        UCC_TL_SHM_DEFAULT_SCORE, ucc_tl_shm_fanin_init, tl_team);
+    if (UCC_OK != status) {
+        tl_error(lib, "faild to add range to score_t");
+        goto err;
+    }
+
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_FANOUT, UCC_MEMORY_TYPE_HOST, 0, UCC_MSG_MAX,
+        UCC_TL_SHM_DEFAULT_SCORE, ucc_tl_shm_fanout_init, tl_team);
+    if (UCC_OK != status) {
+        tl_error(lib, "faild to add range to score_t");
+        goto err;
+    }
+
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST, 0, UCC_MSG_MAX,
+        UCC_TL_SHM_DEFAULT_SCORE, ucc_tl_shm_barrier_init, tl_team);
+    if (UCC_OK != status) {
+        tl_error(lib, "faild to add range to score_t");
+        goto err;
+    }
+
+    if (strlen(lib->score_str) > 0) {
+        status = ucc_coll_score_update_from_str(
+            lib->score_str, score, UCC_TL_TEAM_SIZE(team),
+            ucc_tl_shm_coll_init, tl_team, UCC_TL_SHM_DEFAULT_SCORE, NULL);
+
+        /* If INVALID_PARAM - User provided incorrect input - try to proceed */
+        if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
+            (status != UCC_ERR_NOT_SUPPORTED)) {
+            goto err;
+        }
+    }
+
 	*score_p = score;
     return UCC_OK;
+
+err:
+    ucc_coll_score_free(score);
+    *score_p = NULL;
+    return status;
 }

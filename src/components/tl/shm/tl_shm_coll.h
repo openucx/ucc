@@ -21,12 +21,40 @@ typedef struct ucc_tl_shm_task {
     int                first_reduce;
     int                first_tree_done;
     int                seg_ready;
-    int                barrier_fanin_done;
     uint32_t           progress_alg;
     ucc_rank_t         base_radix;
     ucc_rank_t         top_radix;
     ucc_rank_t         cur_child;
 } ucc_tl_shm_task_t;
+
+
+ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task);
+
+static inline ucc_tl_shm_task_t*
+ucc_tl_shm_get_task(ucc_base_coll_args_t *coll_args, ucc_tl_shm_team_t *team)
+{
+    ucc_tl_shm_context_t *ctx  = ucc_derived_of(team->super.super.context,
+                                                ucc_tl_shm_context_t);
+    ucc_tl_shm_task_t    *task = ucc_mpool_get(&ctx->req_mp);
+
+    if (ucc_unlikely(!task)) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate task");
+        return NULL;
+    }
+
+    UCC_TL_SHM_PROFILE_REQUEST_NEW(task, "tl_shm_task", 0);
+    ucc_coll_task_init(&task->super, coll_args, &team->super.super);
+    task->seq_num   = team->seq_num++;
+    task->seg       = &team->segs[task->seq_num % team->n_concurrent];
+	task->super.finalize        = ucc_tl_shm_coll_finalize;
+    task->super.triggered_post  = ucc_triggered_post;
+    task->base_tree_only  = UCC_TL_SHM_TEAM_LIB(team)->cfg.base_tree_only;
+    task->seg_ready       = 0;
+    task->first_tree_done = 0;
+    task->first_reduce    = 1;
+    task->cur_child       = 0;
+    return task;
+}
 
 
 ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,

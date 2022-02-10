@@ -10,15 +10,6 @@
 #include "core/ucc_ee.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
-#include "bcast/bcast.h"
-#include "reduce/reduce.h"
-#include "barrier/barrier.h"
-
-ucc_status_t ucc_tl_shm_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
-                                       ucc_coll_task_t *coll_task)
-{
-    return UCC_OK;
-}
 
 void ucc_tl_shm_set_bcast_perf_params(ucc_tl_shm_task_t *task)
 {
@@ -146,9 +137,10 @@ void ucc_tl_shm_set_reduce_perf_params(ucc_tl_shm_task_t *task)
 	task->top_radix      = TASK_LIB(task)->cfg.reduce_top_radix;
 }
 
-static ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task)
 {
 	ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
+
 	if (!task->tree_in_cache) {
 	    ucc_free(task->tree->base_tree);
 	    ucc_free(task->tree->top_tree);
@@ -156,58 +148,6 @@ static ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task)
 	}
 	UCC_TL_SHM_PROFILE_REQUEST_FREE(task);
     ucc_mpool_put(task);
-    return UCC_OK;
-}
-
-ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
-                                  ucc_base_team_t *team,
-                                  ucc_coll_task_t **task_h)
-{
-    ucc_status_t          status    = UCC_OK;
-    ucc_tl_shm_context_t *ctx       = ucc_derived_of(team->context,
-                                                     ucc_tl_shm_context_t);
-    ucc_tl_shm_task_t    *task      = ucc_mpool_get(&ctx->req_mp);
-    ucc_coll_type_t       coll_type = coll_args->args.coll_type;
-    UCC_TL_SHM_PROFILE_REQUEST_NEW(task, "tl_shm_task", 0);
-	ucc_coll_task_init(&task->super, coll_args, team);
-
-	task->super.finalize = ucc_tl_shm_coll_finalize;
-
-    switch (coll_type) {
-    case UCC_COLL_TYPE_BCAST:
-    	ucc_tl_shm_set_bcast_perf_params(task);
-        status = ucc_tl_shm_bcast_init(task);
-        if (ucc_unlikely(status != UCC_OK)) {
-        	ucc_mpool_put(task);
-            return status;
-        }
-        break;
-    case UCC_COLL_TYPE_REDUCE:
-    	ucc_tl_shm_set_reduce_perf_params(task);
-        status = ucc_tl_shm_reduce_init(task);
-        if (ucc_unlikely(status != UCC_OK)) {
-        	ucc_mpool_put(task);
-            return status;
-        }
-        break;
-    case UCC_COLL_TYPE_BARRIER:
-        status = ucc_tl_shm_barrier_init(task);
-        if (ucc_unlikely(status != UCC_OK)) {
-            ucc_mpool_put(task);
-            return status;
-        }
-        break;
-    default:
-    	tl_error(team->context->lib,
-                 "collective %d is not supported by shm tl",
-                 coll_args->args.coll_type);
-        ucc_mpool_put(task);
-    	return UCC_ERR_NOT_SUPPORTED;
-    }
-
-    tl_trace(team->context->lib, "init coll req %p", task);
-
-	*task_h = &task->super;
     return UCC_OK;
 }
 
