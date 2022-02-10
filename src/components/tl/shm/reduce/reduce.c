@@ -95,7 +95,8 @@ static ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
                                    ucc_tl_shm_get_data(seg, team, child);
                 dst  = (args->root == team_rank) ? args->dst.info.buffer : (is_inline ? my_ctrl->data :
                                    ucc_tl_shm_get_data(seg, team, team_rank));
-                src2 = (task->first_reduce) ? args->src.info.buffer : dst;
+                src2 = (task->first_reduce) ?
+                    (UCC_IS_INPLACE(*args) ? args->dst.info.buffer : args->src.info.buffer) : dst;
                 status = ucc_dt_reduce(src1, src2, dst, count, dt, mtype, args);
 
                 if (ucc_unlikely(UCC_OK != status)) {
