@@ -10,7 +10,8 @@
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
 
-static const ucc_ec_ops_t *ec_ops[UCC_EE_LAST];
+static const ucc_ec_ops_t          *ec_ops[UCC_EE_LAST];
+static const ucc_ee_executor_ops_t *executor_ops[UCC_EE_LAST];
 
 #define UCC_CHECK_EC_AVAILABLE(ee)                                             \
     do {                                                                       \
@@ -72,6 +73,7 @@ ucc_status_t ucc_ec_init(const ucc_ec_params_t *ec_params)
         }
         ec->ref_cnt++;
         ec_ops[ec->type] = &ec->ops;
+        executor_ops[ec->type] = &ec->executor_ops;
     }
 
     return UCC_OK;
@@ -81,6 +83,15 @@ ucc_status_t ucc_ec_available(ucc_ee_type_t ee_type)
 {
     if (NULL == ec_ops[ee_type]) {
         return UCC_ERR_NOT_FOUND;
+    }
+
+    return UCC_OK;
+}
+
+ucc_status_t ucc_ec_get_attr(ucc_ec_attr_t *attr)
+{
+    if (attr->field_mask & UCC_EC_ATTR_FILED_MAX_EXECUTORS_BUFS) {
+        attr->max_ee_bufs = UCC_EE_EXECUTOR_NUM_BUFS;
     }
 
     return UCC_OK;
@@ -150,4 +161,50 @@ ucc_status_t ucc_ec_event_test(void *event, ucc_ee_type_t ee_type)
 {
     UCC_CHECK_EC_AVAILABLE(ee_type);
     return ec_ops[ee_type]->event_test(event);
+}
+
+ucc_status_t ucc_ee_executor_init(const ucc_ee_executor_params_t *params,
+                                  ucc_ee_executor_t **executor)
+{
+    UCC_CHECK_EC_AVAILABLE(params->ee_type);
+    return executor_ops[params->ee_type]->init(params, executor);
+}
+
+ucc_status_t ucc_ee_executor_status(const ucc_ee_executor_t *executor)
+{
+    UCC_CHECK_EC_AVAILABLE(executor->ee_type);
+    return executor_ops[executor->ee_type]->status(executor);
+}
+
+ucc_status_t ucc_ee_executor_start(ucc_ee_executor_t *executor,
+                                   void *ee_context)
+{
+    UCC_CHECK_EC_AVAILABLE(executor->ee_type);
+    return executor_ops[executor->ee_type]->start(executor, ee_context);
+}
+
+ucc_status_t ucc_ee_executor_stop(ucc_ee_executor_t *executor)
+{
+    UCC_CHECK_EC_AVAILABLE(executor->ee_type);
+    return executor_ops[executor->ee_type]->stop(executor);
+}
+
+ucc_status_t ucc_ee_executor_finalize(ucc_ee_executor_t *executor)
+{
+    UCC_CHECK_EC_AVAILABLE(executor->ee_type);
+    return executor_ops[executor->ee_type]->finalize(executor);
+}
+
+ucc_status_t ucc_ee_executor_task_post(ucc_ee_executor_t *executor,
+                                       const ucc_ee_executor_task_args_t *task_args,
+                                       ucc_ee_executor_task_t **task)
+{
+    UCC_CHECK_EC_AVAILABLE(executor->ee_type);
+    return executor_ops[executor->ee_type]->task_post(executor, task_args, task);
+}
+
+ucc_status_t ucc_ee_executor_task_test(const ucc_ee_executor_task_t *task)
+{
+    UCC_CHECK_EC_AVAILABLE(task->eee->ee_type);
+    return executor_ops[task->eee->ee_type]->task_test(task);
 }
