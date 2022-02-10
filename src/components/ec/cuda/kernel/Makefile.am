@@ -21,7 +21,8 @@ LINK = $(LIBTOOL) --mode=link $(CC) -o $@
 
 comp_noinst = libucc_ec_cuda_kernels.la
 
-libucc_ec_cuda_kernels_la_SOURCES  = ec_cuda_wait_kernel.cu
+libucc_ec_cuda_kernels_la_SOURCES  = ec_cuda_wait_kernel.cu  \
+                                     ec_cuda_executor.cu
 libucc_ec_cuda_kernels_la_CPPFLAGS =
 
 noinst_LTLIBRARIES = $(comp_noinst)
