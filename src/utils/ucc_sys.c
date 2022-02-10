@@ -62,3 +62,21 @@ ucc_status_t ucc_sysv_free(void *addr)
 
     return UCC_OK;
 }
+
+/**
+ * @return Regular page size on the system.
+ */
+size_t ucc_get_page_size()
+{
+    static long page_size = 0;
+    if (page_size == 0) {
+        page_size = sysconf(_SC_PAGESIZE);
+        if (page_size < 0) {
+            page_size = 4096;
+            ucc_debug("_SC_PAGESIZE undefined, setting default value to %ld",
+                      page_size);
+        }
+    }
+
+    return page_size;
+}
