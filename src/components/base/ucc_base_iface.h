@@ -22,8 +22,6 @@ typedef struct ucc_context ucc_context_t;
 typedef struct ucc_coll_score ucc_coll_score_t;
 typedef struct ucc_coll_task ucc_coll_task_t;
 
-
-
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
 } ucc_base_lib_t;
@@ -135,9 +133,9 @@ typedef struct ucc_base_team_iface {
 } ucc_base_team_iface_t;
 
 typedef struct ucc_base_coll_args {
-    uint64_t        mask;
-    ucc_coll_args_t args;
-    ucc_team_t     *team;
+    uint64_t         mask;
+    ucc_coll_args_t  args;
+    ucc_team_t      *team;
 } ucc_base_coll_args_t;
 
 typedef ucc_status_t (*ucc_base_coll_init_fn_t)(ucc_base_coll_args_t *coll_args,

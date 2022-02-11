@@ -156,6 +156,8 @@ typedef struct ucc_tl_cuda_task {
             ucc_tl_cuda_mem_info_t  mem_info_dst;
             void                   *peer_map_addr_src[UCC_TL_CUDA_MAX_PEERS];
             void                   *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
+            int                     num_posted;
+            ucc_ee_executor_task_t *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
             void                   *copy_done;
         } alltoall_ce;
     };

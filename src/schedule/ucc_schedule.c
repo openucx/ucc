@@ -36,18 +36,39 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
                                 ucc_base_coll_args_t *bargs,
                                 ucc_base_team_t *team)
 {
-    task->super.status     = UCC_OPERATION_INITIALIZED;
-    task->ee               = NULL;
-    task->flags            = 0;
-    task->team             = team;
-    task->n_deps           = 0;
-    task->n_deps_satisfied = 0;
-    task->bargs.args.mask  = 0;
+    task->flags                = 0;
+    task->ee                   = NULL;
+    task->team                 = team;
+    task->n_deps               = 0;
+    task->n_deps_satisfied     = 0;
+    task->bargs.args.mask      = 0;
+    task->schedule             = NULL;
+    task->executor             = NULL;
+    task->super.status         = UCC_OPERATION_INITIALIZED;
+    task->triggered_post_setup = NULL;
     if (bargs) {
         memcpy(&task->bargs, bargs, sizeof(*bargs));
     }
     ucc_lf_queue_init_elem(&task->lf_elem);
     return ucc_event_manager_init(&task->em);
+}
+
+ucc_status_t ucc_coll_task_get_executor(ucc_coll_task_t *task,
+                                        ucc_ee_executor_t **exec)
+{
+    ucc_status_t st = UCC_OK;
+
+    if (task->executor == NULL) {
+        if (ucc_unlikely(!task->schedule)) {
+            ucc_error("executor wasn't initialized for the collective");
+            return UCC_ERR_INVALID_PARAM;
+        }
+        st = ucc_coll_task_get_executor(&task->schedule->super,
+                                        &task->executor);
+    }
+
+    *exec = task->executor;
+    return st;
 }
 
 static ucc_status_t
@@ -110,7 +131,8 @@ ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
     return UCC_OK;
 }
 
-ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_base_coll_args_t *bargs,
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule,
+                               ucc_base_coll_args_t *bargs,
                                ucc_base_team_t *team)
 {
     ucc_status_t status;

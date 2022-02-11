@@ -131,7 +131,7 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
 extern "C" {
 #endif
 
-ucc_status_t ucc_ec_cuda_start_executor(ucc_ec_cuda_executor_t *eee)
+ucc_status_t ucc_ec_cuda_persistent_kernel_start(ucc_ec_cuda_executor_t *eee)
 {
     cudaStream_t stream = (cudaStream_t)eee->super.ee_context;
     int          nb     = EC_CUDA_CONFIG->exec_num_workers;

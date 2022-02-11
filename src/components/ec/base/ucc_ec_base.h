@@ -58,6 +58,10 @@ typedef struct ucc_ee_executor {
     void          *ee_context;
 } ucc_ee_executor_t;
 
+enum ucc_ee_executor_params_field {
+    UCC_EE_EXECUTOR_PARAM_FIELD_TYPE    = UCC_BIT(0),
+};
+
 typedef enum ucc_ee_executor_task_type {
     UCC_EE_EXECUTOR_TASK_TYPE_COPY = UCC_BIT(0),
 } ucc_ee_executor_task_type_t;
@@ -65,7 +69,6 @@ typedef enum ucc_ee_executor_task_type {
 typedef struct ucc_ee_executor_params {
     uint64_t        mask;
     ucc_ee_type_t   ee_type;
-    uint64_t        task_types;
 } ucc_ee_executor_params_t;
 
 #define UCC_EE_EXECUTOR_NUM_BUFS 9
@@ -104,6 +107,7 @@ typedef struct ucc_ee_executor_ops {
                               const ucc_ee_executor_task_args_t *task_args,
                               ucc_ee_executor_task_t **task);
     ucc_status_t (*task_test)(const ucc_ee_executor_task_t *task);
+    ucc_status_t (*task_finalize)(ucc_ee_executor_task_t *task);
 } ucc_ee_executor_ops_t;
 
 typedef struct ucc_ec_base {

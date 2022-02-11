@@ -153,15 +153,19 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
                       (coll_args, request, team), ucc_coll_args_t *coll_args,
                       ucc_coll_req_h *request, ucc_team_h team)
 {
-    ucc_coll_task_t       *task;
-    ucc_base_coll_args_t   op_args;
-    ucc_status_t           status;
+    ucc_coll_task_t          *task;
+    ucc_base_coll_args_t      op_args;
+    ucc_status_t              status;
+    ucc_ee_executor_params_t  params;
+    ucc_memory_type_t         coll_mem_type;
+    ucc_ee_type_t             coll_ee_type;
 
     status = ucc_coll_args_check_mem_type(coll_args, team->rank);
     if (ucc_unlikely(status != UCC_OK)) {
         ucc_error("memory type detection failed");
         return status;
     }
+
     status = ucc_check_coll_args(coll_args, team->rank);
     if (ucc_unlikely(status != UCC_OK)) {
         ucc_error("collective arguments check failed");
@@ -178,7 +182,6 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
                             flags);
 
     status = ucc_coll_init(team->score_map, &op_args, &task);
-
     if (UCC_ERR_NOT_SUPPORTED == status) {
         ucc_debug("failed to init collective: not supported");
         return status;
@@ -186,11 +189,39 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
         ucc_error("failed to init collective: %s", ucc_status_string(status));
         return status;
     }
+
+    task->flags |= UCC_COLL_TASK_FLAG_TOP_LEVEL;
+    if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
+        task->flags |= UCC_COLL_TASK_FLAG_EXECUTOR_STOP;
+        coll_mem_type = ucc_coll_args_mem_type(&op_args);
+        switch(coll_mem_type) {
+        case UCC_MEMORY_TYPE_CUDA:
+            coll_ee_type = UCC_EE_CUDA_STREAM;
+            break;
+        case UCC_MEMORY_TYPE_HOST:
+            coll_ee_type = UCC_EE_CPU_THREAD;
+            break;
+        default:
+            ucc_error("no suitable executor available for memory type %s",
+                      ucc_memory_type_names[coll_mem_type]);
+            status = UCC_ERR_INVALID_PARAM;
+            goto coll_finalize;
+        }
+        params.mask    = UCC_EE_EXECUTOR_PARAM_FIELD_TYPE;
+        params.ee_type = coll_ee_type;
+        status = ucc_ee_executor_init(&params, &task->executor);
+        if (UCC_OK != status) {
+            ucc_error("failed to init executor: %s", ucc_status_string(status));
+            goto coll_finalize;
+        }
+    }
+
     if (coll_args->mask & UCC_COLL_ARGS_FIELD_CB) {
         task->cb = coll_args->cb;
         task->flags |= UCC_COLL_TASK_FLAG_CB;
     }
     task->seq_num = team->seq_num++;
+
     if (ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
         char coll_debug_str[256];
         ucc_coll_str(task, coll_debug_str, sizeof(coll_debug_str));
@@ -198,7 +229,12 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     }
     ucc_assert(task->super.status == UCC_OPERATION_INITIALIZED);
     *request = &task->super;
+
     return UCC_OK;
+
+coll_finalize:
+    task->finalize(task);
+    return status;
 }
 
 /* Check if user is trying to post the request which is either in completed,
@@ -222,7 +258,7 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
                       ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
-
+    ucc_status_t status;
     ucc_debug("coll_post: req %p, seq_num %u", task, task->seq_num);
 
     COLL_POST_STATUS_CHECK(task);
@@ -230,6 +266,13 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
         task->start_time = ucc_get_time();
     }
 
+    if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
+        status = ucc_ee_executor_start(task->executor, NULL);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ucc_error("failed to start executor: %s",
+                      ucc_status_string(status));
+        }
+    }
     return task->post(task);
 }
 
@@ -237,13 +280,23 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
                       ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
+    ucc_status_t task_st, exec_st;
 
     ucc_debug("coll_finalize: req %p, seq_num %u", task, task->seq_num);
-    if (task->super.status == UCC_INPROGRESS) {
+    if (ucc_unlikely(task->super.status == UCC_INPROGRESS)) {
         ucc_error("attempt to finalize task with status UCC_INPROGRESS");
         return UCC_ERR_INVALID_PARAM;
     }
-    return task->finalize(task);
+
+    task_st = task->finalize(task);
+    if (task->executor) {
+        exec_st = ucc_ee_executor_finalize(task->executor);
+        if (ucc_unlikely(exec_st != UCC_OK)) {
+            ucc_error("executor finalize error: %s",
+                      ucc_status_string(exec_st));
+        }
+    }
+    return task_st;
 }
 
 static ucc_status_t ucc_triggered_task_finalize(ucc_coll_task_t *task)
@@ -258,7 +311,13 @@ static ucc_status_t ucc_triggered_coll_complete(ucc_coll_task_t *parent_task, //
 {
     ucc_trace("triggered collective complete, task %p, seq_num %u",
               task, task->seq_num);
-    return ucc_ec_task_end(task->ee_task, task->ee->ee_type);
+    if (!(task->flags & UCC_COLL_TASK_FLAG_EXECUTOR)) {
+        ucc_ee_executor_stop(task->executor);
+        ucc_ee_executor_finalize(task->executor);
+        task->executor = NULL;
+        return UCC_OK;
+    }
+    return UCC_OK;
 }
 
 static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
@@ -269,8 +328,10 @@ static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
     ucc_trace("event triggered, ev_task %p, coll_task %p, seq_num %u",
               parent_task, task, task->seq_num);
 
-    task->ee_task = parent_task->ee_task;
-    status        = task->post(task);
+    if (!(task->flags & UCC_COLL_TASK_FLAG_EXECUTOR)) {
+        task->executor = parent_task->executor;
+    }
+    status = task->post(task);
     if (ucc_unlikely(status != UCC_OK)) {
         ucc_error("failed to post triggered coll, task %p, seq_num %u, %s",
                   task, task->seq_num, ucc_status_string(status));
@@ -281,26 +342,25 @@ static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
         return ucc_triggered_coll_complete(task, task);
     } else {
         ucc_assert(task->super.status == UCC_INPROGRESS);
-        if (task->ee_task) {
-            // TODO use CB instead of EM
-            ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED, task,
-                                        ucc_triggered_coll_complete);
-        }
+        // TODO use CB instead of EM
+        ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED, task,
+                                    ucc_triggered_coll_complete);
     }
     return UCC_OK;
 }
 
 static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
 {
-    ucc_status_t status;
-    ucc_ev_t     post_event;
-    ucc_ev_t    *ev;
+    ucc_status_t              status;
+    ucc_ev_t                  post_event;
+    ucc_ev_t                 *ev;
+    ucc_ee_executor_params_t  params;
 
     if (task->ev == NULL) {
         if (task->ee->ee_type == UCC_EE_CUDA_STREAM) {
             /* implicit event triggered */
             task->ev = (ucc_ev_t *) 0xFFFF; /* dummy event */
-            task->ee_task = NULL;
+            task->executor = NULL;
         } else if (UCC_OK == ucc_ee_get_event_internal(task->ee, &ev,
                                                  &task->ee->event_in_queue)) {
             ucc_trace("triggered event arrived, ev_task %p", task);
@@ -311,11 +371,36 @@ static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
         }
     }
 
-    if (task->ee_task == NULL) {
-        status = ucc_ec_task_post(task->ee->ee_context, task->ee->ee_type,
-                                  &task->ee_task);
+    if (task->executor == NULL) {
+        if (task->triggered_task->triggered_post_setup) {
+            status = task->triggered_task->triggered_post_setup(task->triggered_task);
+            if (ucc_unlikely(status != UCC_OK)) {
+                ucc_error("error in triggered post setup, %s",
+                          ucc_status_string(status));
+                task->super.status = status;
+                return status;
+            }
+        }
+        if (task->triggered_task->executor) {
+            task->executor = task->triggered_task->executor;
+        } else {
+            /* triggered task doesn't need executor, init and start executor on
+             * trigger task
+             */
+            params.mask    = UCC_EE_EXECUTOR_PARAM_FIELD_TYPE;
+            params.ee_type = task->ee->ee_type;
+            status = ucc_ee_executor_init(&params, &task->executor);
+            if (ucc_unlikely(status != UCC_OK)) {
+                ucc_error("error in ee executor init, %s",
+                           ucc_status_string(status));
+                task->super.status = status;
+                return status;
+            }
+        }
+        status = ucc_ee_executor_start(task->executor, task->ee->ee_context);
         if (ucc_unlikely(status != UCC_OK)) {
-            ucc_error("error in ee task post, %s", ucc_status_string(status));
+            ucc_error("error in ee executor start, %s",
+                      ucc_status_string(status));
             task->super.status = status;
             return status;
         }
@@ -327,8 +412,8 @@ static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
                                   &task->ee->event_out_queue);
     }
 
-    if (task->ee_task == NULL ||
-        (UCC_OK == ucc_ec_task_query(task->ee_task, task->ee->ee_type))) {
+    if (task->executor == NULL ||
+        (ucc_ee_executor_status(task->executor) == UCC_OK)) {
         task->super.status = UCC_OK;
     }
     return task->super.status;
