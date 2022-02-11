@@ -66,16 +66,14 @@ AS_IF([test "x$cuda_checked" != "xyes"],
         # Check nvml library
         AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
               [AC_CHECK_LIB([nvidia-ml], [nvmlInit_v2],
-                            [nvml_happy="yes"],
+                            [NVML_LIBS="-lnvidia-ml"],
                             [AS_IF([test "x$with_cuda" != "xguess"],
                                    [AC_MSG_WARN([libnvidia-ml not found. Install appropriate nvidia-driver package])])
                              nvml_happy="no"])])
         AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
               [AC_CHECK_LIB([nvidia-ml], [nvmlDeviceGetNvLinkRemoteDeviceType],
-                            [NVML_LIBS="-lnvidia-ml"],
-                            [AS_IF([test "x$with_cuda" != "xguess"],
-                                   [AC_MSG_WARN([libnvidia-ml not found. Install appropriate nvidia-driver package])])
-                             nvml_happy="no"])])
+                            [AC_DEFINE([HAVE_NVML_REMOTE_DEVICE_TYPE], 1, ["Use nvmlDeviceGetNvLinkRemoteDeviceType"])],
+                            [])])
 
          # Check for NVCC
          AC_ARG_VAR(NVCC, [NVCC compiler command])

@@ -5,6 +5,7 @@ on: [push, pull_request]
 env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
+  CLANG_VER: 12
 jobs:
   clang-tidy:
     runs-on: ubuntu-20.04
@@ -14,26 +15,26 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| sudo apt-key add -
-        sudo apt-add-repository 'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-11 main'
-        sudo apt-get install -y --no-install-recommends doxygen doxygen-latex clang-tidy-11 bear
+        sudo apt-add-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-${CLANG_VER} main"
+        sudo apt-get install -y --no-install-recommends doxygen doxygen-latex clang-tidy-${CLANG_VER} bear
     - name: Get UCX
       run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX
       run: |
         cd /tmp/ucx && ./autogen.sh
-        ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install
         make -j install
     - uses: actions/checkout@v1
     - name: Build UCC
       run: |
         ./autogen.sh
-        CC=clang-11 CXX=clang++-11 ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install
         bear --cdb /tmp/compile_commands.json make
     - name: Run clang-tidy
       run: |
         echo "Workspace: ${GITHUB_WORKSPACE}"
         cd ${GITHUB_WORKSPACE}
-        run-clang-tidy-11 -p /tmp/
+        run-clang-tidy-${CLANG_VER} -p /tmp/
         make clean
         rm -rf /tmp/ucc
     - name: Run gtest ASAN
@@ -43,6 +44,6 @@ jobs:
         ls -la
         echo $PWD
         ./autogen.sh
-        CC=clang-11 CXX=clang++-11 ./configure CFLAGS="-fsanitize=address" --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure CFLAGS="-fsanitize=address" --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
         make -j install
         ./test/gtest/gtest

@@ -19,7 +19,8 @@ typedef struct ucc_tl_cuda_device_id {
 
 typedef enum ucc_tl_cuda_topo_dev_type {
     UCC_TL_CUDA_TOPO_DEV_TYPE_GPU,
-    UCC_TL_CUDA_TOPO_DEV_TYPE_SWITCH
+    UCC_TL_CUDA_TOPO_DEV_TYPE_SWITCH,
+    UCC_TL_CUDA_TOPO_DEV_TYPE_LAST
 } ucc_tl_cuda_topo_dev_type_t;
 
 static inline int
