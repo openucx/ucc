@@ -4,6 +4,7 @@
  * See file LICENSE for terms.
  */
 
+#include "config.h"
 #include "tl_cuda_topo.h"
 #include "utils/arch/cuda_def.h"
 #include <inttypes.h>
@@ -165,6 +166,54 @@ static void ucc_tl_cuda_topo_graph_destroy(ucc_tl_cuda_topo_t *topo)
     free(topo->graph);
 }
 
+static ucc_status_t
+ucc_tl_cuda_topo_get_remote_dev_type(ucc_tl_cuda_topo_t *topo,
+                                     nvmlDevice_t dev, int link,
+                                     ucc_tl_cuda_topo_dev_type_t *dev_type)
+{
+
+#if HAVE_NVML_REMOTE_DEVICE_TYPE
+    ucc_status_t status = UCC_OK;
+    nvmlIntNvLinkDeviceType_t nvml_dt;
+
+    NVMLCHECK_GOTO(nvmlDeviceGetNvLinkRemoteDeviceType(dev, link, &nvml_dt),
+                   exit, status, topo->lib);
+    switch(nvml_dt) {
+    case NVML_NVLINK_DEVICE_TYPE_GPU:
+        *dev_type = UCC_TL_CUDA_TOPO_DEV_TYPE_GPU;
+        break;
+    case NVML_NVLINK_DEVICE_TYPE_SWITCH:
+        *dev_type = UCC_TL_CUDA_TOPO_DEV_TYPE_SWITCH;
+        break;
+    default:
+        *dev_type = UCC_TL_CUDA_TOPO_DEV_TYPE_LAST;
+        break;
+    }
+exit:
+    return status;
+#else
+    nvmlPciInfo_t nvml_pci;
+    nvmlDevice_t nvml_dev;
+    nvmlReturn_t nvml_st;
+
+    nvml_st = nvmlDeviceGetNvLinkRemotePciInfo_v2(dev, link, &nvml_pci);
+    if (nvml_st != NVML_SUCCESS) {
+        *dev_type = UCC_TL_CUDA_TOPO_DEV_TYPE_LAST;
+        return UCC_OK;
+    }
+
+    nvml_st = nvmlDeviceGetHandleByPciBusId_v2(nvml_pci.busId, &nvml_dev);
+    if (nvml_st == NVML_SUCCESS) {
+        *dev_type = UCC_TL_CUDA_TOPO_DEV_TYPE_GPU;
+        return UCC_OK;
+    } else if (nvml_st == NVML_ERROR_NOT_FOUND) {
+        *dev_type = UCC_TL_CUDA_TOPO_DEV_TYPE_SWITCH;
+        return UCC_OK;
+    }
+    return UCC_ERR_NOT_SUPPORTED;
+#endif
+}
+
 static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
 {
     ucc_status_t status = UCC_OK;
@@ -173,7 +222,6 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
     nvmlDevice_t nvml_dev;
     nvmlFieldValue_t nvml_value;
     nvmlPciInfo_t nvml_pci;
-    nvmlIntNvLinkDeviceType_t nvml_dev_type;
     ucc_tl_cuda_topo_dev_type_t dev_type;
     ucc_tl_cuda_device_pci_id_t pci_id;
     ucc_tl_cuda_topo_node_t *node, *peer_node;
@@ -218,18 +266,14 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
                        (nvml_value.valueType == NVML_VALUE_TYPE_UNSIGNED_INT)) ?
                       nvml_value.value.uiVal : 0;
         for (link = 0; link < num_nvlinks; link++) {
-            NVMLCHECK_GOTO(nvmlDeviceGetNvLinkRemoteDeviceType(nvml_dev, link,
-                                                               &nvml_dev_type),
-                           exit_nvml_shutdown, status, topo->lib);
-            switch (nvml_dev_type) {
-            case NVML_NVLINK_DEVICE_TYPE_GPU:
-                dev_type = UCC_TL_CUDA_TOPO_DEV_TYPE_GPU;
-                break;
-            case NVML_NVLINK_DEVICE_TYPE_SWITCH:
-                dev_type = UCC_TL_CUDA_TOPO_DEV_TYPE_SWITCH;
-                break;
-            default:
-                /* nvlink connected device is not supported by cuda tl */
+            status = ucc_tl_cuda_topo_get_remote_dev_type(topo, nvml_dev, link,
+                                                          &dev_type);
+            if (status != UCC_OK) {
+                tl_info(topo->lib, "failed to get remote device type");
+                goto exit_nvml_shutdown;
+            }
+            if (dev_type == UCC_TL_CUDA_TOPO_DEV_TYPE_LAST) {
+               /* nvlink connected device is not supported by cuda tl */
                 continue;
             }
             NVMLCHECK_GOTO(nvmlDeviceGetNvLinkRemotePciInfo_v2(nvml_dev, link,
