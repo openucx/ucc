@@ -154,12 +154,6 @@ typedef struct ucc_tl_shm_team {
     ucc_status_t             status;
 } ucc_tl_shm_team_t;
 
-//typedef enum {
-//    UCC_TL_SHM_BASE_GROUP,
-//    UCC_TL_SHM_LEADERS_GROUP,
-//} ucc_tl_shm_group_t; // needed?
-
-
 UCC_CLASS_DECLARE(ucc_tl_shm_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 

@@ -7,48 +7,11 @@
 #include "tl_shm.h"
 #include "reduce.h"
 
-//ucc_status_t ucc_tl_shm_reduce_write(ucc_tl_shm_team_t *team,
-//                                    ucc_tl_shm_seg_t *seg,
-//                                    ucc_tl_shm_task_t *task,
-//                                    ucc_kn_tree_t *tree, int is_inline,
-//                                    int *is_op_root, size_t data_size,
-//                                    ucc_memory_type_t mtype)
-//{
-//	ucc_rank_t         team_rank = UCC_TL_TEAM_RANK(team);
-//    uint32_t           seq_num   = task->seq_num;
-//    uint32_t           n_polls   = UCC_TL_SHM_TEAM_LIB(team)->cfg.n_polls;
-//    ucc_tl_shm_ctrl_t *my_ctrl;
-//    void              *src;
-//    int                i;
-//
-//    my_ctrl = ucc_tl_shm_get_ctrl(seg, team, team_rank);
-//
-//    if (tree->parent == UCC_RANK_INVALID) {
-//        /* i am root of the tree*/
-//        /* If the tree root is global OP root he can copy data out from
-//           origin user src buffer.
-//           Otherwise, it must be base_tree in 2lvl alg,
-//           and the data of the tree root is in the local shm (ctrl or data) */
-//        src = *is_op_root ? TASK_ARGS(task).src.info.buffer :
-//                           (is_inline ? my_ctrl->data :
-//                           ucc_tl_shm_get_data(seg, team, team_rank));
-//        ucc_tl_shm_copy_to_children(seg, team, tree, seq_num, is_inline,
-//                                    src, data_size);
-//        return UCC_OK;
-//    }
-//    for (i = 0; i < n_polls; i++) {
-//        if (my_ctrl->pi == seq_num) {
-//            SHMSEG_ISYNC();
-//            src = is_inline ? my_ctrl->data :
-//                              ucc_tl_shm_get_data(seg, team, team_rank);
-//            ucc_tl_shm_copy_to_children(seg, team, tree, seq_num,
-//                                        is_inline, src, data_size);
-//            /* copy out to user dest is done in the end of base bcast alg */
-//            return UCC_OK;
-//        }
-//    }
-//    return UCC_INPROGRESS;
-//}
+enum {
+	REDUCE_STAGE_START,
+	REDUCE_STAGE_BASE_TREE,
+	REDUCE_STAGE_TOP_TREE,
+};
 
 static ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
                                            ucc_tl_shm_seg_t *seg,
@@ -150,16 +113,21 @@ static ucc_status_t ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
     data_size = count * ucc_dt_size(dt);
     is_inline = data_size <= team->max_inline;
 
-    if (!task->seg_ready) {
+next_stage:
+    switch(task->stage) {
+    case REDUCE_STAGE_START:
         /* checks if previous collective has completed on the seg
         TODO: can be optimized if we detect bcast->reduce pattern.*/
         if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
-        task->seg_ready = 1;
-    }
-
-    if (tree->base_tree && !task->first_tree_done) {
+        if (tree->base_tree) {
+            task->stage = REDUCE_STAGE_BASE_TREE;
+        } else {
+            task->stage = REDUCE_STAGE_TOP_TREE;
+        }
+        goto next_stage;
+    case REDUCE_STAGE_BASE_TREE:
         status = ucc_tl_shm_reduce_read(team, seg, task, tree->base_tree,
                                     is_inline, count, dt, mtype, &args);
 
@@ -167,17 +135,20 @@ static ucc_status_t ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
             /* in progress or reduction failed */
             return status;
         }
-        task->first_tree_done = 1;
         task->cur_child = 0;
-    }
-
-    if (tree->top_tree) {
+        if (tree->top_tree) {
+            task->stage = REDUCE_STAGE_TOP_TREE;
+            goto next_stage;
+        }
+        break;
+    case REDUCE_STAGE_TOP_TREE:
         status = ucc_tl_shm_reduce_read(team, seg, task, tree->top_tree,
                                         is_inline, count, dt, mtype, &args);
         if (UCC_OK != status) {
             /* in progress or reduction failed */
             return status;
         }
+        break;
     }
 
     /* Copy out to user dest:
@@ -235,6 +206,8 @@ ucc_status_t ucc_tl_shm_reduce_init(ucc_base_coll_args_t *coll_args,
 
     task->super.post     = ucc_tl_shm_reduce_start;
     task->super.progress = ucc_tl_shm_reduce_progress;
+    task->stage          = REDUCE_STAGE_START;
+
 
     status = ucc_tl_shm_tree_init(team, coll_args->args.root, task->base_radix,
                                   task->top_radix,

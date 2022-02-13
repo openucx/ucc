@@ -7,6 +7,12 @@
 #include "../tl_shm.h"
 #include "fanin.h"
 
+enum {
+    FANIN_STAGE_START,
+    FANIN_STAGE_BASE_TREE,
+    FANIN_STAGE_TOP_TREE,
+};
+
 static ucc_status_t ucc_tl_shm_fanin_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
@@ -17,32 +23,39 @@ static ucc_status_t ucc_tl_shm_fanin_progress(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
 
-    if (!task->seg_ready) { //similar to reduce
+next_stage:
+    switch(task->stage) {
+    case FANIN_STAGE_START:
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect fanin->reduce pattern.*/
         if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
             return UCC_INPROGRESS;
         }
-        task->seg_ready = 1;
-    }
-
-    if (tree->base_tree && !task->first_tree_done) {
+        if (tree->base_tree) {
+            task->stage = FANIN_STAGE_BASE_TREE;
+        } else {
+            task->stage = FANIN_STAGE_TOP_TREE;
+        }
+        goto next_stage;
+    case FANIN_STAGE_BASE_TREE:
         status = ucc_tl_shm_fanin_signal(team, seg, task, tree->base_tree);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
-        task->first_tree_done = 1;
-        task->cur_child = 0;
-    }
-
-    if (tree->top_tree) {
+        if (tree->top_tree) {
+            task->stage = FANIN_STAGE_TOP_TREE;
+            goto next_stage;
+        }
+        break;
+    case FANIN_STAGE_TOP_TREE:
         status = ucc_tl_shm_fanin_signal(team, seg, task, tree->top_tree);
 
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
+        break;
     }
 
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
@@ -86,8 +99,9 @@ ucc_status_t ucc_tl_shm_fanin_init(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NO_MEMORY;
     }
 
-    task->super.post      = ucc_tl_shm_fanin_start;
-    task->super.progress  = ucc_tl_shm_fanin_progress;
+    task->super.post     = ucc_tl_shm_fanin_start;
+    task->super.progress = ucc_tl_shm_fanin_progress;
+    task->stage          = FANIN_STAGE_START;
 
     status = ucc_tl_shm_tree_init(team, coll_args->args.root, base_radix,
                                   top_radix, &task->tree_in_cache,

@@ -19,14 +19,11 @@ typedef struct ucc_tl_shm_task {
     int                tree_in_cache;
     int                base_tree_only;
     int                first_reduce;
-    int                first_tree_done;
-    int                seg_ready;
     uint32_t           progress_alg;
     ucc_rank_t         base_radix;
     ucc_rank_t         top_radix;
     ucc_rank_t         cur_child;
 } ucc_tl_shm_task_t;
-
 
 ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task);
 
@@ -49,8 +46,6 @@ ucc_tl_shm_get_task(ucc_base_coll_args_t *coll_args, ucc_tl_shm_team_t *team)
 	task->super.finalize        = ucc_tl_shm_coll_finalize;
     task->super.triggered_post  = ucc_triggered_post;
     task->base_tree_only  = UCC_TL_SHM_TEAM_LIB(team)->cfg.base_tree_only;
-    task->seg_ready       = 0;
-    task->first_tree_done = 0;
     task->first_reduce    = 1;
     task->cur_child       = 0;
     return task;

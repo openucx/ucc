@@ -7,6 +7,12 @@
 #include "../tl_shm.h"
 #include "bcast.h"
 
+enum {
+    BCAST_STAGE_START,
+    BCAST_STAGE_BASE_TREE,
+    BCAST_STAGE_TOP_TREE,
+};
+
 static ucc_status_t ucc_tl_shm_bcast_write(ucc_tl_shm_team_t *team,
                                            ucc_tl_shm_seg_t *seg,
                                            ucc_tl_shm_task_t *task,
@@ -125,28 +131,37 @@ static ucc_status_t ucc_tl_shm_bcast_ww_progress(ucc_coll_task_t *coll_task)
     ucc_tl_shm_ctrl_t *my_ctrl;
     void              *src;
 
-    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
+next_stage:
+    switch(task->stage) {
+    case BCAST_STAGE_START:
+        if ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0)) {
         /* checks if previous collective has completed on the seg
-           TODO: can be optimized if we detect bcast->reduce pattern.*/
-    	status = ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree);
-        if (UCC_OK != status) {
-            /* in progress */
-            return status;
+            TODO: can be optimized if we detect bcast->reduce pattern.*/
+            status = ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree);
+            if (UCC_OK != status) {
+                /* in progress */
+                return status;
+            }
         }
-        task->seg_ready = 1;
-    }
-
-    if (tree->top_tree && !task->first_tree_done) {
+        if (tree->top_tree) {
+            task->stage = BCAST_STAGE_TOP_TREE;
+        } else {
+            task->stage = BCAST_STAGE_BASE_TREE;
+        }
+        goto next_stage;
+    case BCAST_STAGE_TOP_TREE:
         status = ucc_tl_shm_bcast_write(team, seg, task, tree->top_tree,
                                         is_inline, &is_op_root, data_size);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
-        task->first_tree_done = 1;
-    }
-
-    if (tree->base_tree) {
+        if (tree->base_tree) {
+            task->stage = BCAST_STAGE_BASE_TREE;
+            goto next_stage;
+        }
+        break;
+    case BCAST_STAGE_BASE_TREE:
         status = ucc_tl_shm_bcast_write(team, seg, task, tree->base_tree,
                                         is_inline, &is_op_root, data_size);
 
@@ -154,6 +169,7 @@ static ucc_status_t ucc_tl_shm_bcast_ww_progress(ucc_coll_task_t *coll_task)
             /* in progress */
             return status;
         }
+        break;
     }
 
     /* Copy out to user dest:
@@ -191,28 +207,35 @@ static ucc_status_t ucc_tl_shm_bcast_wr_progress(ucc_coll_task_t *coll_task)
     ucc_tl_shm_ctrl_t *my_ctrl, *parent_ctrl;
     void              *src;
 
-    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
-        /* checks if previous collective has completed on the seg
-           TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
-            return UCC_INPROGRESS;
+next_stage:
+    switch(task->stage) {
+    case BCAST_STAGE_START:
+        if ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0)) {
+            /* checks if previous collective has completed on the seg
+                TODO: can be optimized if we detect bcast->reduce pattern.*/
+            if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
+                return UCC_INPROGRESS;
+            }
         }
-        task->seg_ready = 1;
-    }
-
-//    volatile int flag = 0;
-//    while (!flag) {}
-    if (tree->top_tree && !task->first_tree_done) {
+        if (tree->top_tree) {
+            task->stage = BCAST_STAGE_TOP_TREE;
+        } else {
+            task->stage = BCAST_STAGE_BASE_TREE;
+        }
+        goto next_stage;
+    case BCAST_STAGE_TOP_TREE:
         status = ucc_tl_shm_bcast_write(team, seg, task, tree->top_tree,
                                         is_inline, &is_op_root, data_size);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
-        task->first_tree_done = 1;
-    }
-
-    if (tree->base_tree) {
+        if (tree->base_tree) {
+            task->stage = BCAST_STAGE_BASE_TREE;
+            goto next_stage;
+        }
+        break;
+    case BCAST_STAGE_BASE_TREE:
         status = ucc_tl_shm_bcast_read(team, seg, task, tree->base_tree, is_inline,
                                        &is_op_root, data_size);
 
@@ -220,6 +243,7 @@ static ucc_status_t ucc_tl_shm_bcast_wr_progress(ucc_coll_task_t *coll_task)
             /* in progress */
             return status;
         }
+        break;
     }
 
     /* Copy out to user dest:
@@ -262,32 +286,42 @@ static ucc_status_t ucc_tl_shm_bcast_rr_progress(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
     void              *src;
 
-    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
-        /* checks if previous collective has completed on the seg
-           TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
-            return UCC_INPROGRESS;
+next_stage:
+    switch(task->stage) {
+    case BCAST_STAGE_START:
+        if ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0)) {
+            /* checks if previous collective has completed on the seg
+                TODO: can be optimized if we detect bcast->reduce pattern.*/
+            if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
+                return UCC_INPROGRESS;
+            }
         }
-        task->seg_ready = 1;
-    }
-
-    if (tree->top_tree && !task->first_tree_done) {
+        if (tree->top_tree) {
+            task->stage = BCAST_STAGE_TOP_TREE;
+        } else {
+            task->stage = BCAST_STAGE_BASE_TREE;
+        }
+        goto next_stage;
+    case BCAST_STAGE_TOP_TREE:
         status = ucc_tl_shm_bcast_read(team, seg, task, tree->top_tree,
                                        is_inline, &is_op_root, data_size);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
-        task->first_tree_done = 1;
-    }
-
-    if (tree->base_tree) {
+        if (tree->base_tree) {
+            task->stage = BCAST_STAGE_BASE_TREE;
+            goto next_stage;
+        }
+        break;
+    case BCAST_STAGE_BASE_TREE:
         status = ucc_tl_shm_bcast_read(team, seg, task, tree->base_tree,
                                       is_inline, &is_op_root, data_size);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
+        break;
     }
 
     /* Copy out to user dest:
@@ -328,26 +362,35 @@ static ucc_status_t ucc_tl_shm_bcast_rw_progress(ucc_coll_task_t *coll_task)
     ucc_status_t       status;
     void              *src;
 
-    if (!task->seg_ready && ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0))) {
-        /* checks if previous collective has completed on the seg
-           TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
-            return UCC_INPROGRESS;
+next_stage:
+    switch(task->stage) {
+    case BCAST_STAGE_START:
+        if ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0)) {
+            /* checks if previous collective has completed on the seg
+                TODO: can be optimized if we detect bcast->reduce pattern.*/
+            if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
+                return UCC_INPROGRESS;
+            }
         }
-        task->seg_ready = 1;
-    }
-
-    if (tree->top_tree && !task->first_tree_done) {
+        if (tree->top_tree) {
+            task->stage = BCAST_STAGE_TOP_TREE;
+        } else {
+            task->stage = BCAST_STAGE_BASE_TREE;
+        }
+        goto next_stage;
+    case BCAST_STAGE_TOP_TREE:
         status = ucc_tl_shm_bcast_read(team, seg, task, tree->top_tree,
                                        is_inline, &is_op_root, data_size);
         if (UCC_OK != status) {
             /* in progress */
             return status;
         }
-        task->first_tree_done = 1;
-    }
-
-    if (tree->base_tree) {
+        if (tree->base_tree) {
+            task->stage = BCAST_STAGE_BASE_TREE;
+            goto next_stage;
+        }
+        break;
+    case BCAST_STAGE_BASE_TREE:
         status = ucc_tl_shm_bcast_write(team, seg, task, tree->base_tree,
                                         is_inline, &is_op_root, data_size);
 
@@ -355,6 +398,7 @@ static ucc_status_t ucc_tl_shm_bcast_rw_progress(ucc_coll_task_t *coll_task)
             /* in progress */
             return status;
         }
+        break;
     }
 
     /* Copy out to user dest:
@@ -408,6 +452,7 @@ ucc_status_t ucc_tl_shm_bcast_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_shm_set_bcast_perf_params(task);
 
     task->super.post = ucc_tl_shm_bcast_start;
+    task->stage      = BCAST_STAGE_START;
 
     status = ucc_tl_shm_tree_init(team, coll_args->args.root, task->base_radix,
                                   task->top_radix,
