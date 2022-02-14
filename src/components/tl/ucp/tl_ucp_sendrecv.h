@@ -371,18 +371,18 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
 
     req_param.op_attr_mask =
         UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA;
-    req_param.cb.recv   = ucc_tl_ucp_recv_completion_cb;
+    req_param.cb.send   = ucc_tl_ucp_send_completion_cb;
     req_param.user_data = (void *)task;
 
     ucp_status = ucp_get_nbx(ep, buffer, msglen, rva, rkey, &req_param);
 
-    task->recv_posted++;
+    task->send_posted++;
     if (UCS_OK != ucp_status) {
         if (UCS_PTR_IS_ERR(ucp_status)) {
             return ucs_status_to_ucc_status(UCS_PTR_STATUS(ucp_status));
         }
     } else {
-        task->recv_completed++;
+        task->send_completed++;
     }
 
     return UCC_OK;
