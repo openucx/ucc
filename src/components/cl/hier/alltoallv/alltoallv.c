@@ -20,10 +20,8 @@ ucc_base_coll_alg_info_t
 
 static ucc_status_t ucc_cl_hier_alltoallv_start(ucc_coll_task_t *task)
 {
-    ucc_schedule_t *schedule = ucc_derived_of(task, ucc_schedule_t);
-
     UCC_CL_HIER_PROFILE_REQUEST_EVENT(task, "cl_hier_alltoallv_start", 0);
-    return ucc_schedule_start(schedule);
+    return ucc_schedule_start(task);
 }
 
 static ucc_status_t ucc_cl_hier_alltoallv_finalize(ucc_coll_task_t *task)

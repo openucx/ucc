@@ -48,6 +48,12 @@ typedef struct ucc_cl_hier_lib_config {
        which are selected based on the TL scores */
     ucc_config_names_array_t sbgp_tls[UCC_HIER_SBGP_LAST];
     size_t                   a2av_node_thresh;
+    uint32_t                 allreduce_split_rail_n_frags;
+    uint32_t                 allreduce_split_rail_pipeline_depth;
+    int                      allreduce_split_rail_seq;
+    size_t                   allreduce_split_rail_frag_thresh;
+    size_t                   allreduce_split_rail_frag_size;
+
 } ucc_cl_hier_lib_config_t;
 
 typedef struct ucc_cl_hier_context_config {
