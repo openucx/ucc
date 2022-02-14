@@ -157,8 +157,10 @@ void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
     }
 }
 
-ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule)
+ucc_status_t ucc_schedule_start(ucc_coll_task_t *task)
 {
+    ucc_schedule_t *schedule = ucc_derived_of(task, ucc_schedule_t);
+
     schedule->n_completed_tasks  = 0;
     schedule->super.status       = UCC_INPROGRESS;
     schedule->super.super.status = UCC_INPROGRESS;
