@@ -6,7 +6,6 @@
 
 #include "tl_shm.h"
 #include "tl_shm_coll.h"
-#include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "utils/arch/cpu.h"
 #include <limits.h>
@@ -19,7 +18,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_context_t,
 	ucc_tl_shm_context_config_t *tl_shm_config =
 	    ucc_derived_of(config, ucc_tl_shm_context_config_t);
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_shm_config->super.tl_lib,
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_shm_config->super,
 	                              params->context);
 
     status = ucc_mpool_init(&self->req_mp, 0, sizeof(ucc_tl_shm_task_t), 0,

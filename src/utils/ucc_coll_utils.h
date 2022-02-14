@@ -160,8 +160,6 @@ static inline ucc_rank_t ucc_ep_map_eval(ucc_ep_map_t map, ucc_rank_t rank)
                            User must check and free the array otherwise. */
 ucc_ep_map_t ucc_ep_map_from_array(ucc_rank_t **array, ucc_rank_t size,
                                    ucc_rank_t full_size, int need_free);
-ucc_ep_map_t ucc_ep_map_from_array_64(uint64_t **array, ucc_rank_t size,
-                                   ucc_rank_t full_size, int need_free);
 
 /* Builds ucc_ep_map_t from the array of uint64_t. The routine tries
    to search for a strided pattern to optimize storage and map lookup.

@@ -26,10 +26,13 @@ static ucc_status_t ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
 next_stage:
     switch(task->stage) {
     case FANOUT_STAGE_START:
-        if ((tree->base_tree && tree->base_tree->n_children > 0) || (tree->base_tree == NULL && tree->top_tree->n_children > 0)) { //similar to bcast
+        if ((tree->base_tree && tree->base_tree->n_children > 0) ||
+            (tree->base_tree == NULL && tree->top_tree->n_children > 0)) { //similar to bcast
             /* checks if previous collective has completed on the seg
                TODO: can be optimized if we detect bcast->reduce pattern.*/
-            if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
+            if (UCC_OK != ucc_tl_shm_bcast_seg_ready(seg,
+                                                     task->seg_ready_seq_num,
+                                                     team, tree)) {
                 return UCC_INPROGRESS;
             }
         }

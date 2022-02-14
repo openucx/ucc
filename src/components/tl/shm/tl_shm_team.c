@@ -7,7 +7,6 @@
 #include "tl_shm.h"
 #include "tl_shm_coll.h"
 #include "tl_shm_knomial_pattern.h"
-#include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
 #include "utils/ucc_sys.h"
@@ -252,7 +251,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
 
     if (self->leaders_group->status == UCC_SBGP_NOT_EXISTS ||
         self->leaders_group->group_size == team_size) {
-//        || UCC_TL_SHM_TEAM_LIB(self)->cfg.base_tree_only) { //config should be removed for perf choices function and moved to coll init
     	self->leaders_group->group_size = 0;
     	self->base_groups = ucc_topo_get_sbgp(self->topo, UCC_SBGP_NODE);
     	self->n_base_groups = 1;
@@ -414,11 +412,12 @@ ucc_status_t ucc_tl_shm_team_create_test(ucc_base_team_t *tl_team)
 ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t   *tl_team,
                                         ucc_coll_score_t **score_p)
 {
-    ucc_tl_shm_team_t *team      = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
-    ucc_base_lib_t    *lib       = UCC_TL_TEAM_LIB(team);
-    size_t             data_size = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
-    ucc_coll_score_t  *score;
-    ucc_status_t       status;
+    ucc_tl_shm_team_t  *team      = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
+    ucc_base_lib_t     *lib       = UCC_TL_TEAM_LIB(team);
+    ucc_base_context_t *ctx       = UCC_TL_TEAM_CTX(team);
+    size_t              data_size = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
+    ucc_coll_score_t   *score;
+    ucc_status_t        status;
 
     status = ucc_coll_score_alloc(&score);
     if (UCC_OK != status) {
@@ -466,9 +465,9 @@ ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t   *tl_team,
         goto err;
     }
 
-    if (strlen(lib->score_str) > 0) {
+    if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->score_str, score, UCC_TL_TEAM_SIZE(team),
+            ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_shm_coll_init, tl_team, UCC_TL_SHM_DEFAULT_SCORE, NULL);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */

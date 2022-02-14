@@ -8,7 +8,7 @@
 #include "../tl_shm.h"
 #include "../tl_shm_coll.h"
 #include "../tl_shm_knomial_pattern.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 
 ucc_status_t ucc_tl_shm_reduce_init(ucc_base_coll_args_t *coll_args,
                                     ucc_base_team_t      *tl_team,

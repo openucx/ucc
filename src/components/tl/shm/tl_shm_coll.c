@@ -6,7 +6,6 @@
 
 #include "tl_shm.h"
 #include "tl_shm_coll.h"
-#include "core/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"

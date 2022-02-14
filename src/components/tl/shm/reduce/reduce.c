@@ -56,11 +56,13 @@ static ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
                 SHMSEG_ISYNC();
                 src1 = is_inline ? child_ctrl->data :
                                    ucc_tl_shm_get_data(seg, team, child);
-                dst  = (args->root == team_rank) ? args->dst.info.buffer : (is_inline ? my_ctrl->data :
-                                   ucc_tl_shm_get_data(seg, team, team_rank));
-                src2 = (task->first_reduce) ?
-                    (UCC_IS_INPLACE(*args) ? args->dst.info.buffer : args->src.info.buffer) : dst;
-                status = ucc_dt_reduce(src1, src2, dst, count, dt, mtype, args);
+                dst  = (args->root == team_rank) ? args->dst.info.buffer :
+                       (is_inline ? my_ctrl->data :
+                                    ucc_tl_shm_get_data(seg, team, team_rank));
+                src2 = (task->first_reduce) ? (UCC_IS_INPLACE(*args) ?
+                       args->dst.info.buffer : args->src.info.buffer) : dst;
+                status = ucc_dt_reduce(src1, src2, dst, count, dt, mtype,
+                                                                   args);
 
                 if (ucc_unlikely(UCC_OK != status)) {
                     tl_error(UCC_TASK_LIB(task),
@@ -118,7 +120,8 @@ next_stage:
     case REDUCE_STAGE_START:
         /* checks if previous collective has completed on the seg
         TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
+        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num,
+                                                       team, tree)) {
             return UCC_INPROGRESS;
         }
         if (tree->base_tree) {

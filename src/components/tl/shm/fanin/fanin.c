@@ -28,7 +28,8 @@ next_stage:
     case FANIN_STAGE_START:
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect fanin->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
+        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num,
+                                                  team, tree)) {
             return UCC_INPROGRESS;
         }
         if (tree->base_tree) {
