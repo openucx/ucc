@@ -63,6 +63,22 @@ ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
     return ((uint32_t *)counts)[idx];
 }
 
+static inline size_t ucc_coll_args_get_max_count(const ucc_coll_args_t *args,
+                                                 const ucc_count_t *    counts,
+                                                 ucc_rank_t             size)
+{
+    size_t max_count = 0, c;
+    int    i;
+
+    for (i = 0; i < size; i++) {
+        c = ucc_coll_args_get_count(args, counts, i);
+        if (c > max_count) {
+            max_count = c;
+        }
+    }
+    return max_count;
+}
+
 static inline size_t
 ucc_coll_args_get_displacement(const ucc_coll_args_t *args,
                                const ucc_aint_t *displacements, ucc_rank_t idx)

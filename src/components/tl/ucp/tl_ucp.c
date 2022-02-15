@@ -44,13 +44,11 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, barrier_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"FANIN_KN_RADIX", "4",
-     "Radix of the knomial tree fanin algorithm",
+    {"FANIN_KN_RADIX", "4", "Radix of the knomial tree fanin algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, fanin_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"FANOUT_KN_RADIX", "4",
-     "Radix of the knomial tree fanout algorithm",
+    {"FANOUT_KN_RADIX", "4", "Radix of the knomial tree fanout algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, fanout_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
@@ -120,14 +118,21 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      UCC_CONFIG_TYPE_UINT},
 
     {"REDUCE_AVG_PRE_OP", "1",
-     "Reduce will perform division by team_size in early stages of the algorithm,\n"
+     "Reduce will perform division by team_size in early stages of the "
+     "algorithm,\n"
      "else - in result",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_avg_pre_op),
      UCC_CONFIG_TYPE_BOOL},
 
     {"REDUCE_SCATTER_RING_BIDIRECTIONAL", "y",
-     "Launch 2 inverted rings concurrently",
+     "Launch 2 inverted rings concurrently during ReduceScatter Ring algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatter_ring_bidirectional),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"REDUCE_SCATTERV_RING_BIDIRECTIONAL", "y",
+     "Launch 2 inverted rings concurrently  during ReduceScatterV Ring "
+     "algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatterv_ring_bidirectional),
      UCC_CONFIG_TYPE_BOOL},
 
     {NULL}};
