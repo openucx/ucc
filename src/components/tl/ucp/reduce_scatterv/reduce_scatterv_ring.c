@@ -343,7 +343,6 @@ ucc_tl_ucp_reduce_scatterv_ring_init(ucc_base_coll_args_t *coll_args,
                                      ucc_base_team_t *     team,
                                      ucc_coll_task_t **    task_h)
 {
-
     ucc_tl_ucp_team_t *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         size     = UCC_TL_TEAM_SIZE(tl_team);
     ucc_datatype_t     dt       = coll_args->args.dst.info_v.datatype;
@@ -393,7 +392,6 @@ ucc_tl_ucp_reduce_scatterv_ring_init(ucc_base_coll_args_t *coll_args,
     to_alloc_per_set = count_per_set * 3;
     status           = ucc_mc_alloc(&tl_schedule->scratch_mc_header,
                           to_alloc_per_set * dt_size * n_subsets, mem_type);
-
     if (status != UCC_OK) {
         ucc_tl_ucp_put_schedule(schedule);
         return status;
