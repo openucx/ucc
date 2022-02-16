@@ -4,8 +4,8 @@
  * See file LICENSE for terms.
  */
 
-#ifndef UCC_TL_MHBA_INLINE_H_
-#define UCC_TL_MHBA_INLINE_H_
+#ifndef UCC_TL_MLX5_INLINE_H_
+#define UCC_TL_MLX5_INLINE_H_
 
 static inline void send_block_data_dc(uint64_t src_addr, uint32_t msg_size,
                                       uint32_t lkey, uint64_t remote_addr,
@@ -48,7 +48,7 @@ send_block_data_rc(struct ibv_qp *qp, uint64_t src_addr, uint32_t msg_size,
     return UCC_OK;
 }
 
-static inline ucc_status_t send_block_data(ucc_tl_mhba_team_t *team, ucc_rank_t rank,
+static inline ucc_status_t send_block_data(ucc_tl_mlx5_team_t *team, ucc_rank_t rank,
                                            uint64_t src_addr, uint32_t msg_size,
                                            uint32_t lkey, uint64_t remote_addr, uint32_t rkey,
                                            int send_flags, int local /*used for sw transpose only */,
@@ -70,7 +70,7 @@ static inline ucc_status_t send_block_data(ucc_tl_mhba_team_t *team, ucc_rank_t 
     return UCC_OK;
 }
 
-static inline void send_start(ucc_tl_mhba_team_t *team, ucc_rank_t rank)
+static inline void send_start(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 {
     int dci;
 
@@ -80,7 +80,7 @@ static inline void send_start(ucc_tl_mhba_team_t *team, ucc_rank_t rank)
     }
 }
 
-static inline ucc_status_t send_done(ucc_tl_mhba_team_t *team, ucc_rank_t rank)
+static inline ucc_status_t send_done(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 {
     int dci;
 
@@ -95,7 +95,7 @@ static inline ucc_status_t send_done(ucc_tl_mhba_team_t *team, ucc_rank_t rank)
 
 static inline void
 send_atomic_dc(uint64_t remote_addr, uint32_t rkey, struct dci *dci_struct,
-               uint32_t dct_number, struct ibv_ah *ah, ucc_tl_mhba_team_t *team,
+               uint32_t dct_number, struct ibv_ah *ah, ucc_tl_mlx5_team_t *team,
                uint64_t value)
 {
     dci_struct->dc_qpex->wr_id    = value;
@@ -109,7 +109,7 @@ send_atomic_dc(uint64_t remote_addr, uint32_t rkey, struct dci *dci_struct,
 
 static inline ucc_status_t send_atomic_rc(struct ibv_qp *qp,
                                           uint64_t remote_addr, uint32_t rkey,
-                                          ucc_tl_mhba_team_t *    team,
+                                          ucc_tl_mlx5_team_t *    team,
                                           uint64_t value)
 {
     struct ibv_send_wr *bad_wr;
@@ -131,13 +131,13 @@ static inline ucc_status_t send_atomic_rc(struct ibv_qp *qp,
     };
 
     if (ibv_post_send(qp, &wr, &bad_wr)) {
-        tl_error(UCC_TL_MHBA_TEAM_LIB(team),"failed to post atomic send");
+        tl_error(UCC_TL_MLX5_TEAM_LIB(team),"failed to post atomic send");
         return UCC_ERR_NO_MESSAGE;
     }
     return UCC_OK;
 }
 
-static inline ucc_status_t send_atomic(ucc_tl_mhba_team_t *team, ucc_rank_t rank,
+static inline ucc_status_t send_atomic(ucc_tl_mlx5_team_t *team, ucc_rank_t rank,
                                        void *remote_addr, uint32_t rkey,
                                        uint64_t value)
 {
@@ -215,45 +215,45 @@ static inline ucc_status_t prepost_dummy_recv(struct ibv_qp *qp, int num,ucc_bas
 }
 
 static inline void *
-tl_mhba_atomic_addr(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
+tl_mlx5_atomic_addr(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
 {
-    ucc_tl_mhba_team_t *team = TASK_TEAM(task);
+    ucc_tl_mlx5_team_t *team = TASK_TEAM(task);
     void               *remote_atomic;
 
     remote_atomic = team->net.remote_ctrl[rank].atomic.addr;
-    return PTR_OFFSET(remote_atomic, task->seq_index * sizeof(tl_mhba_atomic_t));
+    return PTR_OFFSET(remote_atomic, task->seq_index * sizeof(tl_mlx5_atomic_t));
 }
 
 static inline uint32_t
-tl_mhba_atomic_rkey(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
+tl_mlx5_atomic_rkey(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
 {
-    ucc_tl_mhba_team_t *team = TASK_TEAM(task);
+    ucc_tl_mlx5_team_t *team = TASK_TEAM(task);
 
     return team->net.remote_ctrl[rank].atomic.rkey;
 }
 
-static inline tl_mhba_barrier_t
-tl_mhba_barrier_flag(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
+static inline tl_mlx5_barrier_t
+tl_mlx5_barrier_flag(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
 {
-    ucc_tl_mhba_team_t *team     = TASK_TEAM(task);
+    ucc_tl_mlx5_team_t *team     = TASK_TEAM(task);
     ucc_rank_t          net_size = team->net.net_size;
 
     return team->net.barrier.flags[(net_size + 1) * task->seq_index + rank];
 }
 
-static inline tl_mhba_barrier_t*
-tl_mhba_barrier_local_addr(ucc_tl_mhba_schedule_t *task)
+static inline tl_mlx5_barrier_t*
+tl_mlx5_barrier_local_addr(ucc_tl_mlx5_schedule_t *task)
 {
-    ucc_tl_mhba_team_t *team     = TASK_TEAM(task);
+    ucc_tl_mlx5_team_t *team     = TASK_TEAM(task);
     ucc_rank_t          net_size = team->net.net_size;
 
     return &team->net.barrier.flags[(net_size + 1) * task->seq_index + net_size];
 }
 
 static inline uintptr_t
-tl_mhba_barrier_my_remote_addr(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
+tl_mlx5_barrier_my_remote_addr(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
 {
-    ucc_tl_mhba_team_t *team     = TASK_TEAM(task);
+    ucc_tl_mlx5_team_t *team     = TASK_TEAM(task);
     ucc_rank_t          net_size = team->net.net_size;
     ucc_rank_t          net_rank = team->net.sbgp->group_rank;
     void               *remote_barrier;
@@ -261,20 +261,20 @@ tl_mhba_barrier_my_remote_addr(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
 
     remote_barrier = team->net.remote_ctrl[rank].barrier.addr;
     offset = (task->seq_index * (net_size + 1) + net_rank) *
-        sizeof(tl_mhba_barrier_t);
+        sizeof(tl_mlx5_barrier_t);
     return (uintptr_t)PTR_OFFSET(remote_barrier, offset) ;
 }
 
 static inline uint32_t
-tl_mhba_barrier_remote_rkey(ucc_tl_mhba_schedule_t *task, ucc_rank_t rank)
+tl_mlx5_barrier_remote_rkey(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
 {
-    ucc_tl_mhba_team_t *team     = TASK_TEAM(task);
+    ucc_tl_mlx5_team_t *team     = TASK_TEAM(task);
 
     return team->net.remote_ctrl[rank].barrier.rkey;
 }
 
 static inline struct ibv_qp*
-tl_mhba_get_qp(ucc_tl_mhba_team_t *team, ucc_rank_t rank)
+tl_mlx5_get_qp(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 {
     if (team->is_dc) {
         return team->net.dcis[rank % team->num_dci_qps].dci_qp;

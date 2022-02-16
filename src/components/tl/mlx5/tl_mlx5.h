@@ -1,11 +1,11 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
 
-#ifndef UCC_TL_MHBA_H_
-#define UCC_TL_MHBA_H_
+#ifndef UCC_TL_MLX5_H_
+#define UCC_TL_MLX5_H_
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
 #include "core/ucc_service_coll.h"
@@ -14,20 +14,20 @@
 #include <infiniband/verbs.h>
 #include <infiniband/mlx5dv.h>
 #include "utils/arch/cpu.h"
-/* #include "tl_mhba_mkeys.h" */
+/* #include "tl_mlx5_mkeys.h" */
 
-#ifndef UCC_TL_MHBA_DEFAULT_SCORE
-#define UCC_TL_MHBA_DEFAULT_SCORE 1
+#ifndef UCC_TL_MLX5_DEFAULT_SCORE
+#define UCC_TL_MLX5_DEFAULT_SCORE 1
 #endif
 
-#ifdef HAVE_PROFILING_TL_MHBA
+#ifdef HAVE_PROFILING_TL_MLX5
 #include "utils/profile/ucc_profile.h"
 #else
 #include "utils/profile/ucc_profile_off.h"
 #endif
 
-#define MHBA_ASR_RANK                0
-#define MHBA_NUM_OF_BLOCKS_SIZE_BINS 8
+#define MLX5_ASR_RANK                0
+#define MLX5_NUM_OF_BLOCKS_SIZE_BINS 8
 #define MAX_TRANSPOSE_SIZE           8192 // HW transpose unit is limited to matrix size
 #define MAX_MSG_SIZE                 128 // HW transpose unit is limited to element size
 #define MAX_BLOCK_SIZE               64 // from limit of Transpose unit capabilities
@@ -36,19 +36,19 @@
 #define MAX_OUTSTANDING_OPS 1 //todo change - according to limitations (52 top)
 #define MIN_POLL_WC 8
 
-#define UCC_TL_MHBA_PROFILE_FUNC          UCC_PROFILE_FUNC
-#define UCC_TL_MHBA_PROFILE_FUNC_VOID     UCC_PROFILE_FUNC_VOID
-#define UCC_TL_MHBA_PROFILE_REQUEST_NEW   UCC_PROFILE_REQUEST_NEW
-#define UCC_TL_MHBA_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
-#define UCC_TL_MHBA_PROFILE_REQUEST_FREE  UCC_PROFILE_REQUEST_FREE
+#define UCC_TL_MLX5_PROFILE_FUNC          UCC_PROFILE_FUNC
+#define UCC_TL_MLX5_PROFILE_FUNC_VOID     UCC_PROFILE_FUNC_VOID
+#define UCC_TL_MLX5_PROFILE_REQUEST_NEW   UCC_PROFILE_REQUEST_NEW
+#define UCC_TL_MLX5_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
+#define UCC_TL_MLX5_PROFILE_REQUEST_FREE  UCC_PROFILE_REQUEST_FREE
 
-typedef struct ucc_tl_mhba_iface {
+typedef struct ucc_tl_mlx5_iface {
     ucc_tl_iface_t super;
-} ucc_tl_mhba_iface_t;
+} ucc_tl_mlx5_iface_t;
 /* Extern iface should follow the pattern: ucc_tl_<tl_name> */
-extern ucc_tl_mhba_iface_t ucc_tl_mhba;
+extern ucc_tl_mlx5_iface_t ucc_tl_mlx5;
 
-typedef struct ucc_tl_mhba_lib_config {
+typedef struct ucc_tl_mlx5_lib_config {
     ucc_tl_lib_config_t super;
 
     int    transpose;
@@ -60,23 +60,23 @@ typedef struct ucc_tl_mhba_lib_config {
     size_t dm_buf_size;
     size_t dm_buf_num;
     int    dm_host;
-} ucc_tl_mhba_lib_config_t;
+} ucc_tl_mlx5_lib_config_t;
 
-typedef struct ucc_tl_mhba_context_config {
+typedef struct ucc_tl_mlx5_context_config {
     ucc_tl_context_config_t  super;
     ucs_config_names_array_t devices;
-} ucc_tl_mhba_context_config_t;
+} ucc_tl_mlx5_context_config_t;
 
-typedef struct ucc_tl_mhba_lib {
+typedef struct ucc_tl_mlx5_lib {
     ucc_tl_lib_t             super;
-    ucc_tl_mhba_lib_config_t cfg;
-} ucc_tl_mhba_lib_t;
-UCC_CLASS_DECLARE(ucc_tl_mhba_lib_t, const ucc_base_lib_params_t *,
+    ucc_tl_mlx5_lib_config_t cfg;
+} ucc_tl_mlx5_lib_t;
+UCC_CLASS_DECLARE(ucc_tl_mlx5_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
 
-typedef struct ucc_tl_mhba_context {
+typedef struct ucc_tl_mlx5_context {
     ucc_tl_context_t             super;
-    ucc_tl_mhba_context_config_t cfg;
+    ucc_tl_mlx5_context_config_t cfg;
     struct ibv_context *         ib_ctx;
     struct ibv_pd *              ib_pd;
     struct ibv_context *shared_ctx;
@@ -85,13 +85,13 @@ typedef struct ucc_tl_mhba_context {
     int                 is_imported;
     int                          ib_port;
     ucc_mpool_t                  req_mp;
-} ucc_tl_mhba_context_t;
-UCC_CLASS_DECLARE(ucc_tl_mhba_context_t, const ucc_base_context_params_t *,
+} ucc_tl_mlx5_context_t;
+UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
-typedef struct ucc_tl_mhba_task ucc_tl_mhba_task_t;
+typedef struct ucc_tl_mlx5_task ucc_tl_mlx5_task_t;
 
-typedef struct ucc_tl_mhba_ctrl {
+typedef struct ucc_tl_mlx5_ctrl {
     union {
         struct {
             volatile int seq_num;
@@ -99,22 +99,22 @@ typedef struct ucc_tl_mhba_ctrl {
         };
         char tmp[UCC_CACHE_LINE_SIZE];
     };
-} ucc_tl_mhba_ctrl_t;
+} ucc_tl_mlx5_ctrl_t;
 
-typedef uint64_t tl_mhba_atomic_t;
-typedef uint64_t tl_mhba_barrier_t;
+typedef uint64_t tl_mlx5_atomic_t;
+typedef uint64_t tl_mlx5_barrier_t;
 
 typedef struct mlx5dv_mr_interleaved umr_t;
 
-typedef struct ucc_tl_mhba_op {
-    ucc_tl_mhba_ctrl_t *ctrl;
-    ucc_tl_mhba_ctrl_t *my_ctrl;
+typedef struct ucc_tl_mlx5_op {
+    ucc_tl_mlx5_ctrl_t *ctrl;
+    ucc_tl_mlx5_ctrl_t *my_ctrl;
     struct mlx5dv_mkey **send_mkeys;
     struct mlx5dv_mkey **recv_mkeys;
     int                *blocks_sent;
-} ucc_tl_mhba_op_t;
+} ucc_tl_mlx5_op_t;
 
-struct ucc_tl_mhba_internal_qp {
+struct ucc_tl_mlx5_internal_qp {
     int                       nreq;
     uint32_t                  cur_size;
     struct mlx5_wqe_ctrl_seg *cur_ctrl;
@@ -128,43 +128,43 @@ struct ucc_tl_mhba_internal_qp {
     unsigned                  offset;
 };
 
-struct ucc_tl_mhba_mlx5_qp {
+struct ucc_tl_mlx5_mlx5_qp {
     struct ibv_qp *      qp;
     struct ibv_qp_ex *   qpx;
     struct mlx5dv_qp_ex *mlx5dv_qp_ex;
 };
 
-struct ucc_tl_mhba_qp {
-    struct ucc_tl_mhba_mlx5_qp     mlx5_qp;
-    struct ucc_tl_mhba_internal_qp in_qp;
+struct ucc_tl_mlx5_qp {
+    struct ucc_tl_mlx5_mlx5_qp     mlx5_qp;
+    struct ucc_tl_mlx5_internal_qp in_qp;
 };
 
 /* This structure holds resources and data related to the "in-node"
    part of the algorithm. */
-typedef struct ucc_tl_mhba_node {
+typedef struct ucc_tl_mlx5_node {
     int                 asr_rank;
     ucc_sbgp_t *        sbgp;
     void *              storage;
-    ucc_tl_mhba_op_t       ops[MAX_OUTSTANDING_OPS];
+    ucc_tl_mlx5_op_t       ops[MAX_OUTSTANDING_OPS];
     struct mlx5dv_mkey *team_recv_mkey;
     struct ibv_cq *     umr_cq;
-    struct ucc_tl_mhba_mlx5_qp
+    struct ucc_tl_mlx5_mlx5_qp
         ns_umr_qp; // Non-strided - used for team UMR hirerchy
-    struct ucc_tl_mhba_qp
+    struct ucc_tl_mlx5_qp
           s_umr_qp; // Strided - used for operation send/recv mkey hirerchy
     void *umr_entries_buf;
     struct ibv_mr *umr_entries_mr;
-} ucc_tl_mhba_node_t;
+} ucc_tl_mlx5_node_t;
 
-typedef struct ucc_tl_mhba_reg {
+typedef struct ucc_tl_mlx5_reg {
     struct ibv_mr *      mr;
     ucs_rcache_region_t *region;
-} ucc_tl_mhba_reg_t;
+} ucc_tl_mlx5_reg_t;
 
-static inline ucc_tl_mhba_reg_t *
-ucc_tl_mhba_get_rcache_reg_data(ucc_rcache_region_t *region)
+static inline ucc_tl_mlx5_reg_t *
+ucc_tl_mlx5_get_rcache_reg_data(ucc_rcache_region_t *region)
 {
-	return (ucc_tl_mhba_reg_t *)((ptrdiff_t)region + sizeof(ucc_rcache_region_t));
+	return (ucc_tl_mlx5_reg_t *)((ptrdiff_t)region + sizeof(ucc_rcache_region_t));
 }
 
 typedef struct net_ctrl {
@@ -178,7 +178,7 @@ typedef struct net_ctrl {
     } barrier;
 } net_ctrl_t;
 
-typedef struct ucc_tl_mhba_net {
+typedef struct ucc_tl_mlx5_net {
     ucc_sbgp_t *    sbgp;
     int             net_size;
     int *           rank_map;
@@ -190,11 +190,11 @@ typedef struct ucc_tl_mhba_net {
     struct ibv_cq * cq;
     struct ibv_mr * ctrl_mr;
     struct {
-        tl_mhba_atomic_t *counters;
+        tl_mlx5_atomic_t *counters;
         struct ibv_mr    *mr;
     } atomic;
     struct {
-        tl_mhba_barrier_t *flags;
+        tl_mlx5_barrier_t *flags;
         struct ibv_mr     *mr;
     } barrier;
     int        *blocks_sent; // net_size * MAX_OP_OUTSTANDING
@@ -205,36 +205,36 @@ typedef struct ucc_tl_mhba_net {
         struct ibv_qp_ex *   dc_qpex;
         struct mlx5dv_qp_ex *dc_mqpex;
     } * dcis;
-} ucc_tl_mhba_net_t;
+} ucc_tl_mlx5_net_t;
 
-typedef struct ucc_tl_mhba_bcast_data {
+typedef struct ucc_tl_mlx5_bcast_data {
     int  shmid;
     int  net_size;
     char sock_path[L_tmpnam];
-} ucc_tl_mhba_bcast_data_t;
+} ucc_tl_mlx5_bcast_data_t;
 
 enum {
-    TL_MHBA_TEAM_STATE_SHMID,
-    TL_MHBA_TEAM_STATE_EXCHANGE,
+    TL_MLX5_TEAM_STATE_SHMID,
+    TL_MLX5_TEAM_STATE_EXCHANGE,
 };
 
-typedef struct ucc_tl_mhba_dm_chunk_t {
+typedef struct ucc_tl_mlx5_dm_chunk_t {
     ptrdiff_t offset; // 0 based offset from the beginning of
                       // memic_mr (obtained with ibv_reg_dm_mr)
-} ucc_tl_mhba_dm_chunk_t;
+} ucc_tl_mlx5_dm_chunk_t;
 
-typedef struct ucc_tl_mhba_team {
+typedef struct ucc_tl_mlx5_team {
     ucc_tl_team_t            super;
     int                      state;
     int                      transpose;
     uint64_t                 max_msg_size;
-    ucc_tl_mhba_node_t       node;
-    ucc_tl_mhba_net_t        net;
+    ucc_tl_mlx5_node_t       node;
+    ucc_tl_mlx5_net_t        net;
     void *                   service_bcast_tmp_buf;
     int                      sequence_number;
     int                      op_busy[MAX_OUTSTANDING_OPS];
     int                      cq_completions[MAX_OUTSTANDING_OPS];
-    int                      blocks_sizes[MHBA_NUM_OF_BLOCKS_SIZE_BINS];
+    int                      blocks_sizes[MLX5_NUM_OF_BLOCKS_SIZE_BINS];
     int                      num_dci_qps;
     uint8_t                  is_dc;
     int                      previous_msg_size[MAX_OUTSTANDING_OPS];
@@ -250,24 +250,24 @@ typedef struct ucc_tl_mhba_team {
     ucc_service_coll_req_t  *scoll_req;
 
     void *                   oob_req;
-    ucc_tl_mhba_bcast_data_t bcast_data;
+    ucc_tl_mlx5_bcast_data_t bcast_data;
     ucc_status_t             status;
     ucc_rank_t               node_size;
     ucc_mpool_t              dm_pool;
     struct ibv_dm           *dm_ptr;
     struct ibv_mr *          dm_mr;
 
-} ucc_tl_mhba_team_t;
-UCC_CLASS_DECLARE(ucc_tl_mhba_team_t, ucc_base_context_t *,
+} ucc_tl_mlx5_team_t;
+UCC_CLASS_DECLARE(ucc_tl_mlx5_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
-#define UCC_TL_MHBA_SUPPORTED_COLLS (UCC_COLL_TYPE_ALLTOALL)
+#define UCC_TL_MLX5_SUPPORTED_COLLS (UCC_COLL_TYPE_ALLTOALL)
 
-#define UCC_TL_MHBA_TEAM_LIB(_team)                                            \
-    (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_mhba_lib_t))
+#define UCC_TL_MLX5_TEAM_LIB(_team)                                            \
+    (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_mlx5_lib_t))
 
-#define UCC_TL_MHBA_TEAM_CTX(_team)                                            \
-    (ucc_derived_of((_team)->super.super.context, ucc_tl_mhba_context_t))
+#define UCC_TL_MLX5_TEAM_CTX(_team)                                            \
+    (ucc_derived_of((_team)->super.super.context, ucc_tl_mlx5_context_t))
 
 #define UCC_TL_CTX_HAS_OOB(_ctx)                                               \
     ((_ctx)->super.super.ucc_context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB)
@@ -275,7 +275,7 @@ UCC_CLASS_DECLARE(ucc_tl_mhba_team_t, ucc_base_context_t *,
 #define UCC_TL_CTX_OOB(_ctx) ((_ctx)->super.super.ucc_context->params.oob)
 
 #define UCC_TL_CTX_LIB(_ctx)                                                   \
-    (ucc_derived_of((_ctx)->super.super.lib, ucc_tl_mhba_lib_t))
+    (ucc_derived_of((_ctx)->super.super.lib, ucc_tl_mlx5_lib_t))
 
 #define IS_SERVICE_TEAM(_team)                                                 \
     ((_team)->super.super.params.scope == UCC_CL_LAST + 1)
@@ -286,37 +286,37 @@ UCC_CLASS_DECLARE(ucc_tl_mhba_team_t, ucc_base_context_t *,
 
 enum
 {
-    UCC_MHBA_NEED_SEND_MKEY_UPDATE = UCS_BIT(1),
-    UCC_MHBA_NEED_RECV_MKEY_UPDATE = UCS_BIT(2),
+    UCC_MLX5_NEED_SEND_MKEY_UPDATE = UCS_BIT(1),
+    UCC_MLX5_NEED_RECV_MKEY_UPDATE = UCS_BIT(2),
 };
 
-ucc_status_t tl_mhba_create_rcache(ucc_tl_mhba_context_t *ctx);
+ucc_status_t tl_mlx5_create_rcache(ucc_tl_mlx5_context_t *ctx);
 
-ucc_status_t ucc_tl_mhba_asr_socket_init(ucc_tl_mhba_context_t *ctx, ucc_rank_t group_size,
+ucc_status_t ucc_tl_mlx5_asr_socket_init(ucc_tl_mlx5_context_t *ctx, ucc_rank_t group_size,
                                          int *socket, const char *sock_path);
 
-static inline ucc_tl_mhba_ctrl_t *ucc_tl_mhba_get_ctrl(ucc_tl_mhba_team_t *team,
+static inline ucc_tl_mlx5_ctrl_t *ucc_tl_mlx5_get_ctrl(ucc_tl_mlx5_team_t *team,
                                                        int op_index, int rank)
 {
-	ucc_tl_mhba_ctrl_t * ctrl =  PTR_OFFSET(team->node.ops[op_index].ctrl,
-                                            sizeof(ucc_tl_mhba_ctrl_t) * rank);
+	ucc_tl_mlx5_ctrl_t * ctrl =  PTR_OFFSET(team->node.ops[op_index].ctrl,
+                                            sizeof(ucc_tl_mlx5_ctrl_t) * rank);
 	return ctrl;
 }
 
-static inline ucc_tl_mhba_ctrl_t *ucc_tl_mhba_get_my_ctrl(ucc_tl_mhba_team_t *team,
+static inline ucc_tl_mlx5_ctrl_t *ucc_tl_mlx5_get_my_ctrl(ucc_tl_mlx5_team_t *team,
                                                           int op_index)
 {
     int my_rank = team->node.sbgp->group_rank;
-    return ucc_tl_mhba_get_ctrl(team, op_index, my_rank);
+    return ucc_tl_mlx5_get_ctrl(team, op_index, my_rank);
 }
 
 
 #define OP_SEGMENT_SIZE(_team) \
-    ( sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size +                  \
+    ( sizeof(ucc_tl_mlx5_ctrl_t) * (_team)->node_size +                  \
      (sizeof(umr_t) * (_team)->max_num_of_columns * (_team)->node_size) * 2)
 
 
-#define UMR_DATA_OFFSET(_team) (sizeof(ucc_tl_mhba_ctrl_t) * (_team)->node_size)
+#define UMR_DATA_OFFSET(_team) (sizeof(ucc_tl_mlx5_ctrl_t) * (_team)->node_size)
 
 #define OP_SEGMENT_STORAGE(_req, _team) \
     PTR_OFFSET((_team)->node.storage, OP_SEGMENT_SIZE(_team) * (_req)->seq_index)

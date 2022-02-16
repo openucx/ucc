@@ -157,6 +157,8 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/nccl.m4])
      m4_include([config/m4/sharp.m4])
      m4_include([config/m4/mpi.m4])
+     m4_include([config/m4/ibverbs.m4])
+     m4_include([config/m4/mlx5dv.m4])
      m4_include([config/m4/configure.m4])
      m4_include([config/m4/tl_coll_plugins.m4])
      m4_include([config/m4/check_tls.m4])

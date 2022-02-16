@@ -1,42 +1,42 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
 
-#include "tl_mhba.h"
+#include "tl_mlx5.h"
 #include "utils/ucc_math.h"
 #include "schedule/ucc_schedule.h"
-#include "tl_mhba_ib.h"
+#include "tl_mlx5_ib.h"
 #include <limits.h>
-#include "tl_mhba_coll.h"
-#include "tl_mhba_pd.h"
+#include "tl_mlx5_coll.h"
+#include "tl_mlx5_pd.h"
 #include "utils/arch/cpu.h"
 
-UCC_CLASS_INIT_FUNC(ucc_tl_mhba_context_t,
+UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
                     const ucc_base_context_params_t *params,
                     const ucc_base_config_t *        config)
 {
-    ucc_tl_mhba_context_config_t *tl_mhba_config =
-        ucc_derived_of(config, ucc_tl_mhba_context_config_t);
+    ucc_tl_mlx5_context_config_t *tl_mlx5_config =
+        ucc_derived_of(config, ucc_tl_mlx5_context_config_t);
     int   port = -1, devname_len;
     char *ib_devname = NULL, *pos;
     ucc_status_t status;
     char  tmp[128];
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_mhba_config->super.tl_lib,
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_mlx5_config->super.tl_lib,
                               params->context);
-    memcpy(&self->cfg, tl_mhba_config, sizeof(*tl_mhba_config));
+    memcpy(&self->cfg, tl_mlx5_config, sizeof(*tl_mlx5_config));
 
 
     status = ucc_mpool_init(
         &self->req_mp, 0,
-        ucc_max(sizeof(ucc_tl_mhba_task_t), sizeof(ucc_tl_mhba_schedule_t)), 0,
+        ucc_max(sizeof(ucc_tl_mlx5_task_t), sizeof(ucc_tl_mlx5_schedule_t)), 0,
         UCC_CACHE_LINE_SIZE, 8, UINT_MAX, NULL, params->thread_mode,
-        "tl_mhba_req_mp");
+        "tl_mlx5_req_mp");
     if (UCC_OK != status) {
         tl_error(self->super.super.lib,
-                 "failed to initialize tl_mhba_req mpool");
+                 "failed to initialize tl_mlx5_req mpool");
         goto err_mpool;
     }
 
@@ -50,16 +50,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_context_t,
         ib_devname       = tmp;
         port             = atoi(pos + 1);
     }
-    if (UCC_OK != ucc_tl_mhba_create_ibv_ctx(&ib_devname, &self->ib_ctx,
+    if (UCC_OK != ucc_tl_mlx5_create_ibv_ctx(&ib_devname, &self->ib_ctx,
                                              self->super.super.lib)) {
         tl_error(self->super.super.lib, "failed to allocate ibv_context");
         goto release_mpool;
     }
     if (port == -1) {
-        port = ucc_tl_mhba_get_active_port(self->ib_ctx);
+        port = ucc_tl_mlx5_get_active_port(self->ib_ctx);
     }
     self->ib_port = port;
-    if (-1 == port || !ucc_tl_mhba_check_port_active(self->ib_ctx, port)) {
+    if (-1 == port || !ucc_tl_mlx5_check_port_active(self->ib_ctx, port)) {
         tl_error(self->super.super.lib, "no active ports found on %s",
                  ib_devname);
         goto destroy_context;
@@ -82,13 +82,13 @@ err_mpool:
     return status;
 }
 
-UCC_CLASS_CLEANUP_FUNC(ucc_tl_mhba_context_t)
+UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
 {
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
 
     ucc_rcache_destroy(self->rcache);
     ucc_mpool_cleanup(&self->req_mp, 1);
-    ucc_tl_mhba_remove_shared_ctx_pd(self);
+    ucc_tl_mlx5_remove_shared_ctx_pd(self);
 
     if (ibv_dealloc_pd(self->ib_pd)) {
         tl_error(self->super.super.lib, "failed to dealloc PD errno %d", errno);
@@ -96,10 +96,10 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mhba_context_t)
     ibv_close_device(self->ib_ctx);
 }
 
-UCC_CLASS_DEFINE(ucc_tl_mhba_context_t, ucc_tl_context_t);
+UCC_CLASS_DEFINE(ucc_tl_mlx5_context_t, ucc_tl_context_t);
 
 ucc_status_t
-ucc_tl_mhba_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
+ucc_tl_mlx5_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
                              ucc_base_ctx_attr_t *     attr)
 {
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
@@ -109,9 +109,9 @@ ucc_tl_mhba_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mhba_context_create_epilog(ucc_base_context_t *context)
+ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
 {
-    ucc_tl_mhba_context_t *ctx = ucc_derived_of(context, ucc_tl_mhba_context_t);
+    ucc_tl_mlx5_context_t *ctx = ucc_derived_of(context, ucc_tl_mlx5_context_t);
     ucc_context_t         *core_ctx = context->ucc_context;
     ucc_subset_t           s;
     ucc_status_t           status;
@@ -136,7 +136,7 @@ ucc_status_t ucc_tl_mhba_context_create_epilog(ucc_base_context_t *context)
 
     status = ucc_topo_init(s, core_ctx->topo, &topo);
     if (UCC_OK != status) {
-        tl_error(context->lib, "failed to init mhba ctx topo");
+        tl_error(context->lib, "failed to init mlx5 ctx topo");
         return status;
     }
 
@@ -146,9 +146,9 @@ ucc_status_t ucc_tl_mhba_context_create_epilog(ucc_base_context_t *context)
         goto out;
     }
 
-    if (sbgp->group_rank == MHBA_ASR_RANK) {
+    if (sbgp->group_rank == MLX5_ASR_RANK) {
         tmpnam(sock_path); //TODO switch to mkstemp
-        status = ucc_tl_mhba_asr_socket_init(ctx, sbgp->group_size,
+        status = ucc_tl_mlx5_asr_socket_init(ctx, sbgp->group_size,
                                              &sock, sock_path);
         if (UCC_OK != status) {
             sock_path[0]='\0';
@@ -159,11 +159,11 @@ ucc_status_t ucc_tl_mhba_context_create_epilog(ucc_base_context_t *context)
 
     s.map = sbgp->map;
     s.myrank = sbgp->group_rank;
-    status = UCC_TL_TEAM_IFACE(steam)->scoll.bcast(&steam->super, sock_path, sizeof(sock_path), MHBA_ASR_RANK,
+    status = UCC_TL_TEAM_IFACE(steam)->scoll.bcast(&steam->super, sock_path, sizeof(sock_path), MLX5_ASR_RANK,
                                                    s, &req);
 
     if (UCC_OK != status) {
-        tl_error(context->lib, "failed to start mhba ctx bcast");
+        tl_error(context->lib, "failed to start mlx5 ctx bcast");
         goto out;
     }
 
@@ -173,21 +173,21 @@ ucc_status_t ucc_tl_mhba_context_create_epilog(ucc_base_context_t *context)
     ucc_collective_finalize(&req->super);
 
     if (UCC_OK != status) {
-        tl_error(context->lib, "failure during mhba ctx bcast");
+        tl_error(context->lib, "failure during mlx5 ctx bcast");
         goto out;
     }
     if (strlen(sock_path) == 0) {
         goto out;
     }
 
-    status  = ucc_tl_mhba_share_ctx_pd(ctx, sock_path, sbgp->group_size,
-                                       sbgp->group_rank == MHBA_ASR_RANK, sock);
+    status  = ucc_tl_mlx5_share_ctx_pd(ctx, sock_path, sbgp->group_size,
+                                       sbgp->group_rank == MLX5_ASR_RANK, sock);
     if (status != UCC_OK) {
         tl_error(context->lib, "failed to share ctx and pd");
         goto out;
     }
 
-    status = tl_mhba_create_rcache(ctx);
+    status = tl_mlx5_create_rcache(ctx);
     if (UCC_OK != status) {
         tl_error(context->lib, "failed to create rcache");
         goto rcache_create_err;

@@ -1,17 +1,17 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
 
-#include "tl_mhba_coll.h"
-#include "tl_mhba_mkeys.h"
+#include "tl_mlx5_coll.h"
+#include "tl_mlx5_mkeys.h"
 #include "core/ucc_mc.h"
 #include "core/ucc_team.h"
-#include "tl_mhba_inline.h"
-#include "tl_mhba_ib.h"
+#include "tl_mlx5_inline.h"
+#include "tl_mlx5_ib.h"
 
-static ucc_status_t ucc_tl_mhba_poll_cq(ucc_tl_mhba_team_t *team)
+static ucc_status_t ucc_tl_mlx5_poll_cq(ucc_tl_mlx5_team_t *team)
 {
     int                     i, completions_num;
 
@@ -45,11 +45,11 @@ static ucc_status_t ucc_tl_mhba_poll_cq(ucc_tl_mhba_team_t *team)
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_mhba_node_fanin(ucc_tl_mhba_team_t *team,
-                                           ucc_tl_mhba_schedule_t *task)
+static ucc_status_t ucc_tl_mlx5_node_fanin(ucc_tl_mlx5_team_t *team,
+                                           ucc_tl_mlx5_schedule_t *task)
 {
     int                 i;
-    ucc_tl_mhba_ctrl_t *ctrl_v;
+    ucc_tl_mlx5_ctrl_t *ctrl_v;
 
     if (team->op_busy[task->seq_index] && !task->started) {
         return UCC_INPROGRESS;
@@ -58,14 +58,14 @@ static ucc_status_t ucc_tl_mhba_node_fanin(ucc_tl_mhba_team_t *team,
     task->started                  = 1;
 
     if (team->node.sbgp->group_rank != team->node.asr_rank) {
-        ucc_tl_mhba_get_my_ctrl(team, task->seq_index)->seq_num =
+        ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)->seq_num =
             task->seq_num;
     } else {
         for (i = 0; i < team->node.sbgp->group_size; i++) {
             if (i == team->node.sbgp->group_rank) {
                 continue;
             }
-            ctrl_v = ucc_tl_mhba_get_ctrl(team, task->seq_index, i);
+            ctrl_v = ucc_tl_mlx5_get_ctrl(team, task->seq_index, i);
             if (ctrl_v->seq_num != task->seq_num) {
                 return UCC_INPROGRESS;
             }
@@ -74,8 +74,8 @@ static ucc_status_t ucc_tl_mhba_node_fanin(ucc_tl_mhba_team_t *team,
             if (i == team->node.sbgp->group_rank) {
                 continue;
             }
-            ctrl_v = ucc_tl_mhba_get_ctrl(team, task->seq_index, i);
-            ucc_tl_mhba_get_my_ctrl(team, task->seq_index)
+            ctrl_v = ucc_tl_mlx5_get_ctrl(team, task->seq_index, i);
+            ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)
                 ->mkey_cache_flag |= ctrl_v->mkey_cache_flag;
         }
     }
@@ -85,11 +85,11 @@ static ucc_status_t ucc_tl_mhba_node_fanin(ucc_tl_mhba_team_t *team,
 /* Each rank registers sbuf and rbuf and place the registration data
    in the shared memory location. Next, all rank in node nitify the
    ASR the registration data is ready using SHM Fanin */
-static ucc_status_t ucc_tl_mhba_reg_fanin_start(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task     = TASK_SCHEDULE(coll_task);
-    ucc_tl_mhba_team_t *    team     = TASK_TEAM(task);
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    ucc_tl_mlx5_schedule_t *task     = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t *    team     = TASK_TEAM(task);
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     int                     reg_change_flag               = 0;
     ucc_rcache_region_t *   send_ptr;
     ucc_rcache_region_t *   recv_ptr;
@@ -105,21 +105,21 @@ static ucc_status_t ucc_tl_mhba_reg_fanin_start(ucc_coll_task_t *coll_task)
                  "Failed to register send_bf memory (errno=%d)", errno);
         return UCC_ERR_NO_RESOURCE;
     }
-    task->send_rcache_region_p = ucc_tl_mhba_get_rcache_reg_data(send_ptr);
+    task->send_rcache_region_p = ucc_tl_mlx5_get_rcache_reg_data(send_ptr);
 
     /* NOTE: we does not support alternating block_size for the same msg size - TODO
        Will need to add the possibility of block_size change into consideration
        when initializing the mkey_cache_flag */
 
-    ucc_tl_mhba_get_my_ctrl(team, task->seq_index)->mkey_cache_flag =
+    ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)->mkey_cache_flag =
         (task->msg_size == team->previous_msg_size[task->seq_index])
             ? 0
-            : (UCC_MHBA_NEED_RECV_MKEY_UPDATE | UCC_MHBA_NEED_RECV_MKEY_UPDATE);
+            : (UCC_MLX5_NEED_RECV_MKEY_UPDATE | UCC_MLX5_NEED_RECV_MKEY_UPDATE);
 
     if (reg_change_flag || (task->send_rcache_region_p->mr->addr !=
                             team->previous_send_address[task->seq_index])) {
-        ucc_tl_mhba_get_my_ctrl(team, task->seq_index)->mkey_cache_flag |=
-            UCC_MHBA_NEED_SEND_MKEY_UPDATE;
+        ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)->mkey_cache_flag |=
+            UCC_MLX5_NEED_SEND_MKEY_UPDATE;
     }
     reg_change_flag = 0;
     if (UCC_OK != ucc_rcache_get_arg(ctx->rcache,
@@ -131,21 +131,21 @@ static ucc_status_t ucc_tl_mhba_reg_fanin_start(ucc_coll_task_t *coll_task)
                               task->send_rcache_region_p->region);
         return UCC_ERR_NO_RESOURCE;
     }
-    task->recv_rcache_region_p = ucc_tl_mhba_get_rcache_reg_data(recv_ptr);
+    task->recv_rcache_region_p = ucc_tl_mlx5_get_rcache_reg_data(recv_ptr);
     if (reg_change_flag || (task->recv_rcache_region_p->mr->addr !=
                             team->previous_recv_address[task->seq_index])) {
-        ucc_tl_mhba_get_my_ctrl(team, task->seq_index)->mkey_cache_flag |=
-            UCC_MHBA_NEED_RECV_MKEY_UPDATE;
+        ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)->mkey_cache_flag |=
+            UCC_MLX5_NEED_RECV_MKEY_UPDATE;
     }
 
-    tl_debug(UCC_TL_MHBA_TEAM_LIB(team), "fanin start");
+    tl_debug(UCC_TL_MLX5_TEAM_LIB(team), "fanin start");
     /* start task if completion event received */
     /* Start fanin */
-    ucc_tl_mhba_update_mkeys_entries(
+    ucc_tl_mlx5_update_mkeys_entries(
         &team->node, task,
-        UCC_TL_MHBA_TEAM_LIB(team)); // no option for failure status
-    if (UCC_OK == ucc_tl_mhba_node_fanin(team, task)) {
-        tl_debug(UCC_TL_MHBA_TEAM_LIB(team), "fanin complete");
+        UCC_TL_MLX5_TEAM_LIB(team)); // no option for failure status
+    if (UCC_OK == ucc_tl_mlx5_node_fanin(team, task)) {
+        tl_debug(UCC_TL_MLX5_TEAM_LIB(team), "fanin complete");
         coll_task->super.status = UCC_OK;
         return ucc_task_complete(coll_task);
     } else {
@@ -154,23 +154,23 @@ static ucc_status_t ucc_tl_mhba_reg_fanin_start(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mhba_reg_fanin_progress(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_mlx5_reg_fanin_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
-    ucc_tl_mhba_team_t *    team    = TASK_TEAM(task);
+    ucc_tl_mlx5_schedule_t *task    = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t *    team    = TASK_TEAM(task);
     ucc_assert(team->node.sbgp->group_rank == team->node.asr_rank);
-    if (UCC_OK == ucc_tl_mhba_node_fanin(team, task)) {
-        tl_debug(UCC_TL_MHBA_TEAM_LIB(team), "fanin complete");
+    if (UCC_OK == ucc_tl_mlx5_node_fanin(team, task)) {
+        tl_debug(UCC_TL_MLX5_TEAM_LIB(team), "fanin complete");
         coll_task->super.status = UCC_OK;
     }
     return coll_task->super.status;
 }
 
-static ucc_status_t ucc_tl_mhba_node_fanout(ucc_tl_mhba_team_t *team,
-                                            ucc_tl_mhba_schedule_t *task)
+static ucc_status_t ucc_tl_mlx5_node_fanout(ucc_tl_mlx5_team_t *team,
+                                            ucc_tl_mlx5_schedule_t *task)
 {
-    ucc_tl_mhba_ctrl_t *ctrl_v;
-    tl_mhba_atomic_t   atomic_counter;
+    ucc_tl_mlx5_ctrl_t *ctrl_v;
+    tl_mlx5_atomic_t   atomic_counter;
 
     /* First phase of fanout: asr signals it completed local ops
        and other ranks wait for asr */
@@ -183,11 +183,11 @@ static ucc_status_t ucc_tl_mhba_node_fanout(ucc_tl_mhba_team_t *team,
             return UCC_INPROGRESS;
         }
 
-        ucc_tl_mhba_get_my_ctrl(team, task->seq_index)->seq_num =
+        ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)->seq_num =
             task->seq_num;
     } else {
         ctrl_v =
-            ucc_tl_mhba_get_ctrl(team, task->seq_index, team->node.asr_rank);
+            ucc_tl_mlx5_get_ctrl(team, task->seq_index, team->node.asr_rank);
         if (ctrl_v->seq_num != task->seq_num) {
             return UCC_INPROGRESS;
         }
@@ -195,10 +195,10 @@ static ucc_status_t ucc_tl_mhba_node_fanout(ucc_tl_mhba_team_t *team,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_mhba_fanout_start(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_mlx5_fanout_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
-    ucc_tl_mhba_team_t *team    = TASK_TEAM(task);
+    ucc_tl_mlx5_schedule_t *task    = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t *team    = TASK_TEAM(task);
 
     coll_task->super.status              = UCC_INPROGRESS;
     tl_debug(UCC_TASK_LIB(task),"fanout start");
@@ -209,11 +209,11 @@ static ucc_status_t ucc_tl_mhba_fanout_start(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_mhba_fanout_progress(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_mlx5_fanout_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
-    ucc_tl_mhba_team_t *team    = TASK_TEAM(task);
-    if (UCC_OK == ucc_tl_mhba_node_fanout(team, task)) {
+    ucc_tl_mlx5_schedule_t *task    = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t *team    = TASK_TEAM(task);
+    if (UCC_OK == ucc_tl_mlx5_node_fanout(team, task)) {
         /*Cleanup alg resources - all done */
         tl_debug(UCC_TASK_LIB(task),"Algorithm completion");
         team->op_busy[task->seq_index] = 0;
@@ -222,10 +222,10 @@ static ucc_status_t ucc_tl_mhba_fanout_progress(ucc_coll_task_t *coll_task)
     return coll_task->super.status;
 }
 
-static ucc_status_t ucc_tl_mhba_asr_barrier_start(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_mlx5_asr_barrier_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
-    ucc_tl_mhba_team_t *team    = TASK_TEAM(task);
+    ucc_tl_mlx5_schedule_t *task    = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t *team    = TASK_TEAM(task);
     ucc_status_t status;
     int i;
     coll_task->super.status              = UCC_INPROGRESS;
@@ -234,12 +234,12 @@ static ucc_status_t ucc_tl_mhba_asr_barrier_start(ucc_coll_task_t *coll_task)
 
     // despite while statement in poll_umr_cq, non blocking because have independent cq,
     // will be finished in a finite time
-    ucc_tl_mhba_populate_send_recv_mkeys(team, task);
+    ucc_tl_mlx5_populate_send_recv_mkeys(team, task);
 
     //Reset atomic notification counter to 0
     team->net.atomic.counters[task->seq_index] = 0;
 
-    if (UCC_TL_MHBA_TEAM_LIB(team)->cfg.asr_barrier) {
+    if (UCC_TL_MLX5_TEAM_LIB(team)->cfg.asr_barrier) {
         tl_debug(UCC_TASK_LIB(task),"asr barrier start");
         status = ucc_service_allreduce(UCC_TL_CORE_TEAM(team), &task->barrier_scratch[0],
                                        &task->barrier_scratch[1], UCC_DT_INT32, 1, UCC_OP_SUM,
@@ -254,15 +254,15 @@ static ucc_status_t ucc_tl_mhba_asr_barrier_start(ucc_coll_task_t *coll_task)
         }
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
     } else {
-        tl_mhba_barrier_t *local = tl_mhba_barrier_local_addr(task);
+        tl_mlx5_barrier_t *local = tl_mlx5_barrier_local_addr(task);
         *local = task->seq_num;
         for(i=0; i<team->net.net_size;i++) {
             task->op->blocks_sent[i] = 0;
             send_start(team, i);
             status = send_block_data(team, i, (uintptr_t)local,
-                                     sizeof(tl_mhba_barrier_t), team->net.barrier.mr->lkey,
-                                     tl_mhba_barrier_my_remote_addr(task, i),
-                                     tl_mhba_barrier_remote_rkey(task, i), 0, 0, NULL);
+                                     sizeof(tl_mlx5_barrier_t), team->net.barrier.mr->lkey,
+                                     tl_mlx5_barrier_my_remote_addr(task, i),
+                                     tl_mlx5_barrier_remote_rkey(task, i), 0, 0, NULL);
             if (UCC_OK == status) {
                 status = send_done(team, i);
             }
@@ -277,9 +277,9 @@ static ucc_status_t ucc_tl_mhba_asr_barrier_start(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mhba_asr_barrier_progress(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_mlx5_asr_barrier_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_schedule_t *task    = TASK_SCHEDULE(coll_task);
     ucc_status_t status;
 
     status = ucc_collective_test(&task->barrier_req->task->super);
@@ -295,10 +295,10 @@ ucc_status_t ucc_tl_mhba_asr_barrier_progress(ucc_coll_task_t *coll_task)
 
 // add polling mechanism for blocks in order to maintain const qp tx rx
 static ucc_status_t
-ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
+ucc_tl_mlx5_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
-    ucc_tl_mhba_team_t *    team    = TASK_TEAM(task);
+    ucc_tl_mlx5_schedule_t *task    = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t *    team    = TASK_TEAM(task);
     int node_size                   = team->node.sbgp->group_size;
     int net_size                    = team->net.sbgp->group_size;
     int op_msgsize = node_size * team->max_msg_size * UCC_TL_TEAM_SIZE(team) *
@@ -321,7 +321,7 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
         if (task->op->blocks_sent[cyc_rank] ||
-            tl_mhba_barrier_flag(task, cyc_rank) != task->seq_num) {
+            tl_mlx5_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
         task->started++;
@@ -397,8 +397,8 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
     if (task->started == net_size) {
         for (i = 0; i < net_size; i++) {
             send_start(team, i);
-            status = send_atomic(team, i, tl_mhba_atomic_addr(task, i),
-                                 tl_mhba_atomic_rkey(task, i), task->seq_num);
+            status = send_atomic(team, i, tl_mlx5_atomic_addr(task, i),
+                                 tl_mlx5_atomic_rkey(task, i), task->seq_num);
             if (UCC_OK == status) {
                 status = send_done(team, i);
             }
@@ -418,10 +418,10 @@ ucc_tl_mhba_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
 }
 
 static ucc_status_t
-ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_task)
+ucc_tl_mlx5_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
-    ucc_tl_mhba_team_t *team    = TASK_TEAM(task);
+    ucc_tl_mlx5_schedule_t *task    = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t *team    = TASK_TEAM(task);
     int node_size                   = team->node.sbgp->group_size;
     int net_size                    = team->net.sbgp->group_size;
     int op_msgsize = node_size * team->max_msg_size * UCC_TL_TEAM_SIZE(team) *
@@ -450,7 +450,7 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
         if (task->op->blocks_sent[cyc_rank] ||
-            tl_mhba_barrier_flag(task, cyc_rank) != task->seq_num) {
+            tl_mlx5_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
         task->started++;
@@ -560,8 +560,8 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
     if (task->started == net_size) {
         for (i = 0; i < net_size; i++) {
             send_start(team, i);
-            status = send_atomic(team, i, tl_mhba_atomic_addr(task, i),
-                                 tl_mhba_atomic_rkey(task, i), task->seq_num);
+            status = send_atomic(team, i, tl_mlx5_atomic_addr(task, i),
+                                 tl_mlx5_atomic_rkey(task, i), task->seq_num);
             if (UCC_OK == status) {
                 status = send_done(team, i);
             }
@@ -580,10 +580,10 @@ ucc_tl_mhba_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
 }
 
 // add polling mechanism for blocks in order to maintain const qp tx rx
-static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
-    ucc_tl_mhba_team_t *team    = TASK_TEAM(task);
+    ucc_tl_mlx5_schedule_t *task    = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t *team    = TASK_TEAM(task);
     int node_size                   = team->node.sbgp->group_size;
     int net_size                    = team->net.sbgp->group_size;
     int op_msgsize = node_size * team->max_msg_size * UCC_TL_TEAM_SIZE(team) *
@@ -592,11 +592,11 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
     int          block_size    = task->block_size;
     int          col_msgsize   = task->msg_size * block_size * node_size;
     int          block_msgsize = SQUARED(block_size) * task->msg_size;
-    int    dm_host             = UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_host;
+    int    dm_host             = UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_host;
     int          i, j, k, dest_rank, rank, cyc_rank;
     uint64_t     src_addr, remote_addr;
     ucc_status_t status;
-    ucc_tl_mhba_dm_chunk_t *dm;
+    ucc_tl_mlx5_dm_chunk_t *dm;
     uintptr_t dm_addr;
 
     coll_task->super.status              = UCC_INPROGRESS;
@@ -608,7 +608,7 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
         if (task->op->blocks_sent[cyc_rank] ||
-            tl_mhba_barrier_flag(task, cyc_rank) != task->seq_num) {
+            tl_mlx5_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
 
@@ -629,7 +629,7 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
                         return status;
                     }
 
-                    status = ucc_tl_mhba_poll_cq(team);
+                    status = ucc_tl_mlx5_poll_cq(team);
                     if (UCC_OK != status) {
                         return status;
                     }
@@ -642,7 +642,7 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
                     dm_addr = dm->offset; // dm reg mr 0 based
                 }
 
-                status = ucc_tl_mhba_post_transpose(tl_mhba_get_qp(team, cyc_rank),
+                status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
                                                     team->node.ops[task->seq_index].send_mkeys[0]->lkey,
                                                     team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,
                                                     block_size, block_size);
@@ -661,8 +661,8 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
                 }
             }
         }
-        status = send_atomic(team, cyc_rank, tl_mhba_atomic_addr(task, cyc_rank),
-                             tl_mhba_atomic_rkey(task, cyc_rank), task->seq_num);
+        status = send_atomic(team, cyc_rank, tl_mlx5_atomic_addr(task, cyc_rank),
+                             tl_mlx5_atomic_rkey(task, cyc_rank), task->seq_num);
 
         if (UCC_OK == status) {
             status = send_done(team, cyc_rank);
@@ -684,10 +684,10 @@ static ucc_status_t ucc_tl_mhba_send_blocks_start(ucc_coll_task_t *coll_task)
 }
 
 static ucc_status_t
-ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
+ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
-    ucc_tl_mhba_team_t *    team    = TASK_TEAM(task);
+    ucc_tl_mlx5_schedule_t *task    = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t *    team    = TASK_TEAM(task);
     int node_size                   = team->node.sbgp->group_size;
     int net_size                    = team->net.sbgp->group_size;
     int op_msgsize = node_size * team->max_msg_size * UCC_TL_TEAM_SIZE(team) *
@@ -715,7 +715,7 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
         cyc_rank  = (i + team->net.sbgp->group_rank) % net_size;
         dest_rank = team->net.rank_map[cyc_rank];
         if (task->op->blocks_sent[cyc_rank] ||
-            tl_mhba_barrier_flag(task, cyc_rank) != task->seq_num) {
+            tl_mlx5_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
         task->started++;
@@ -760,8 +760,8 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
                 }
             }
         }
-        status = send_atomic(team, cyc_rank, tl_mhba_atomic_addr(task, cyc_rank),
-                             tl_mhba_atomic_rkey(task, cyc_rank), task->seq_num);
+        status = send_atomic(team, cyc_rank, tl_mlx5_atomic_addr(task, cyc_rank),
+                             tl_mlx5_atomic_rkey(task, cyc_rank), task->seq_num);
         if (UCC_OK == status) {
             status = send_done(team, cyc_rank);
         }
@@ -779,17 +779,17 @@ ucc_tl_mhba_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mhba_send_blocks_progress(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_mlx5_send_blocks_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = TASK_SCHEDULE(coll_task);
-    ucc_tl_mhba_team_t *    team    = TASK_TEAM(task);
+    ucc_tl_mlx5_schedule_t *task    = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t *    team    = TASK_TEAM(task);
     ucc_status_t            status;
 
 
     if (task->started != team->net.net_size) {
         return coll_task->post(coll_task);
     }
-    status = ucc_tl_mhba_poll_cq(team);
+    status = ucc_tl_mlx5_poll_cq(team);
     if (UCC_OK != status) {
         return status;
     }
@@ -802,41 +802,41 @@ ucc_status_t ucc_tl_mhba_send_blocks_progress(ucc_coll_task_t *coll_task)
     return coll_task->super.status;
 }
 
-ucc_status_t ucc_tl_mhba_task_finalize(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_mlx5_task_finalize(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_task_t *task = ucc_derived_of(coll_task, ucc_tl_mhba_task_t);
+    ucc_tl_mlx5_task_t *task = ucc_derived_of(coll_task, ucc_tl_mlx5_task_t);
 
     tl_trace(UCC_TASK_LIB(task), "finalizing task %p", task);
-    ucc_tl_mhba_put_task(task);
+    ucc_tl_mlx5_put_task(task);
     return UCC_OK;
 }
 
-static inline ucc_tl_mhba_task_t *
-ucc_tl_mhba_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
+static inline ucc_tl_mlx5_task_t *
+ucc_tl_mlx5_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
                       ucc_schedule_t *schedule)
 {
-    ucc_tl_mhba_task_t *task    = ucc_tl_mhba_get_task(coll_args, team);
+    ucc_tl_mlx5_task_t *task    = ucc_tl_mlx5_get_task(coll_args, team);
 
     task->super.schedule = schedule;
-    task->super.finalize = ucc_tl_mhba_task_finalize;
+    task->super.finalize = ucc_tl_mlx5_task_finalize;
     return task;
 }
 
-ucc_status_t ucc_tl_mhba_alltoall_start(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_mlx5_alltoall_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = ucc_derived_of(coll_task,
-                                                     ucc_tl_mhba_schedule_t);
+    ucc_tl_mlx5_schedule_t *task    = ucc_derived_of(coll_task,
+                                                     ucc_tl_mlx5_schedule_t);
 
-    UCC_TL_MHBA_PROFILE_REQUEST_EVENT(task, "mhba_alltoall_start", 0);
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_start", 0);
     return ucc_schedule_start(&task->super);
 }
 
-ucc_status_t ucc_tl_mhba_alltoall_finalize(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_mlx5_alltoall_finalize(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mhba_schedule_t *task    = ucc_derived_of(coll_task,
-                                                     ucc_tl_mhba_schedule_t);
-    ucc_tl_mhba_team_t *    team    = TASK_TEAM(task);
-    ucc_tl_mhba_context_t *ctx = TASK_CTX(task);
+    ucc_tl_mlx5_schedule_t *task    = ucc_derived_of(coll_task,
+                                                     ucc_tl_mlx5_schedule_t);
+    ucc_tl_mlx5_team_t *    team    = TASK_TEAM(task);
+    ucc_tl_mlx5_context_t *ctx = TASK_CTX(task);
     ucc_status_t        status;
 
     team->previous_msg_size[task->seq_index] = task->msg_size;
@@ -854,20 +854,20 @@ ucc_status_t ucc_tl_mhba_alltoall_finalize(ucc_coll_task_t *coll_task)
         }
     }
 
-    UCC_TL_MHBA_PROFILE_REQUEST_EVENT(schedule, "mhba_alltoall_done", 0);
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(schedule, "mlx5_alltoall_done", 0);
     status = ucc_schedule_finalize(coll_task);
-    ucc_tl_mhba_put_schedule(task);
+    ucc_tl_mlx5_put_schedule(task);
     return status;
 }
 
-ucc_status_t ucc_tl_mhba_alltoall_init(ucc_base_coll_args_t *coll_args,
+ucc_status_t ucc_tl_mlx5_alltoall_init(ucc_base_coll_args_t *coll_args,
                                        ucc_base_team_t *     team,
                                        ucc_coll_task_t **    task_h)
 {
-    ucc_tl_mhba_team_t *    tl_team = ucc_derived_of(team, ucc_tl_mhba_team_t);
-    ucc_tl_mhba_schedule_t *task = ucc_tl_mhba_get_schedule(tl_team, coll_args);
+    ucc_tl_mlx5_team_t *    tl_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
+    ucc_tl_mlx5_schedule_t *task = ucc_tl_mlx5_get_schedule(tl_team, coll_args);
     ucc_schedule_t *        schedule    = &task->super;
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(tl_team);
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(tl_team);
     int              block_msgsize, block_size;
     void *           transpose_buf = NULL;
     ucc_coll_task_t *tasks[4];
@@ -881,7 +881,7 @@ ucc_status_t ucc_tl_mhba_alltoall_init(ucc_base_coll_args_t *coll_args,
 
     int i, n_tasks = is_asr ? 4 : 2, curr_task = 0;
     for (i = 0; i < n_tasks; i++) {
-        tasks[i] = &ucc_tl_mhba_init_task(coll_args, team, schedule)->super;
+        tasks[i] = &ucc_tl_mlx5_init_task(coll_args, team, schedule)->super;
     }
 
     task->send_blocks_enqueued = 0;
@@ -949,7 +949,7 @@ ucc_status_t ucc_tl_mhba_alltoall_init(ucc_base_coll_args_t *coll_args,
 
     if (is_asr) {
         if (tl_team->transpose) {
-            if (UCC_TL_MHBA_TEAM_LIB(tl_team)->cfg.transpose_buf_size >=
+            if (UCC_TL_MLX5_TEAM_LIB(tl_team)->cfg.transpose_buf_size >=
                 block_msgsize) {
                 task->transpose_buf_mr = tl_team->transpose_buf_mr;
             } else {
@@ -996,39 +996,39 @@ ucc_status_t ucc_tl_mhba_alltoall_init(ucc_base_coll_args_t *coll_args,
                                     tasks[i + 1], ucc_task_start_handler);
     }
 
-    tasks[curr_task]->post     = ucc_tl_mhba_reg_fanin_start;
-    tasks[curr_task]->progress = ucc_tl_mhba_reg_fanin_progress;
+    tasks[curr_task]->post     = ucc_tl_mlx5_reg_fanin_start;
+    tasks[curr_task]->progress = ucc_tl_mlx5_reg_fanin_progress;
     curr_task++;
 
     if (is_asr) {
-        tasks[curr_task]->post     = ucc_tl_mhba_asr_barrier_start;
-        tasks[curr_task]->progress = ucc_tl_mhba_asr_barrier_progress;
+        tasks[curr_task]->post     = ucc_tl_mlx5_asr_barrier_start;
+        tasks[curr_task]->progress = ucc_tl_mlx5_asr_barrier_progress;
         curr_task++;
         if (tl_team->transpose) {
             if (task->num_of_blocks_columns) {
                 tasks[curr_task]->post =
-                    ucc_tl_mhba_send_blocks_leftovers_start_with_transpose;
+                    ucc_tl_mlx5_send_blocks_leftovers_start_with_transpose;
             } else {
                 tasks[curr_task]->post =
-                    ucc_tl_mhba_send_blocks_start_with_transpose;
+                    ucc_tl_mlx5_send_blocks_start_with_transpose;
             }
         } else {
             if (task->num_of_blocks_columns) {
                 tasks[curr_task]->post =
-                    ucc_tl_mhba_send_blocks_leftovers_start;
+                    ucc_tl_mlx5_send_blocks_leftovers_start;
             } else {
-                tasks[curr_task]->post = ucc_tl_mhba_send_blocks_start;
+                tasks[curr_task]->post = ucc_tl_mlx5_send_blocks_start;
             }
         }
-        tasks[curr_task]->progress = ucc_tl_mhba_send_blocks_progress;
+        tasks[curr_task]->progress = ucc_tl_mlx5_send_blocks_progress;
         curr_task++;
     }
-    tasks[curr_task]->post     = ucc_tl_mhba_fanout_start;
-    tasks[curr_task]->progress = ucc_tl_mhba_fanout_progress;
+    tasks[curr_task]->post     = ucc_tl_mlx5_fanout_start;
+    tasks[curr_task]->progress = ucc_tl_mlx5_fanout_progress;
 
-    schedule->super.post           = ucc_tl_mhba_alltoall_start;
+    schedule->super.post           = ucc_tl_mlx5_alltoall_start;
     schedule->super.progress       = NULL;
-    schedule->super.finalize       = ucc_tl_mhba_alltoall_finalize;
+    schedule->super.finalize       = ucc_tl_mlx5_alltoall_finalize;
     schedule->super.triggered_post = NULL;
 
     *task_h                        = &schedule->super;
@@ -1044,15 +1044,15 @@ free_transpose:
     }
 
 put_schedule:
-    ucc_tl_mhba_put_schedule(task);
+    ucc_tl_mlx5_put_schedule(task);
     return status;
 }
 
 
-ucc_status_t ucc_tl_mhba_team_get_scores(ucc_base_team_t    *tl_team,
+ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t    *tl_team,
                                          ucc_coll_score_t **score_p)
 {
-    ucc_tl_mhba_team_t *team  = ucc_derived_of(tl_team, ucc_tl_mhba_team_t);
+    ucc_tl_mlx5_team_t *team  = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
     ucc_base_lib_t     *lib   = UCC_TL_TEAM_LIB(team);
     ucc_coll_score_t   *score;
     ucc_status_t        status;
@@ -1066,7 +1066,7 @@ ucc_status_t ucc_tl_mhba_team_get_scores(ucc_base_team_t    *tl_team,
 
     status = ucc_coll_score_add_range(
         score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_HOST, 0, 4096,
-        UCC_TL_MHBA_DEFAULT_SCORE, ucc_tl_mhba_alltoall_init, tl_team);
+        UCC_TL_MLX5_DEFAULT_SCORE, ucc_tl_mlx5_alltoall_init, tl_team);
     if (UCC_OK != status) {
         tl_error(lib, "faild to add range to score_t");
         return status;
@@ -1076,7 +1076,7 @@ ucc_status_t ucc_tl_mhba_team_get_scores(ucc_base_team_t    *tl_team,
     if (strlen(lib->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             lib->score_str, score, UCC_TL_TEAM_SIZE(team),
-            NULL, tl_team, UCC_TL_MHBA_DEFAULT_SCORE, NULL);
+            NULL, tl_team, UCC_TL_MLX5_DEFAULT_SCORE, NULL);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
@@ -1092,7 +1092,7 @@ err:
     return status;
 }
 
-ucc_status_t ucc_tl_mhba_coll_init(ucc_base_coll_args_t *coll_args,
+ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *     team,
                                    ucc_coll_task_t **    task)
 {

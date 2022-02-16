@@ -1,10 +1,11 @@
-/*
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+/**
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ *
  * See file LICENSE for terms.
  */
 
-#include "tl_mhba.h"
-#include "tl_mhba_pd.h"
+#include "tl_mlx5.h"
+#include "tl_mlx5_pd.h"
 
 typedef struct {
     int          sock, fd;
@@ -96,7 +97,7 @@ static ucc_status_t do_recvmsg(int sock, int *shared_cmd_fd,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mhba_asr_socket_init(ucc_tl_mhba_context_t *ctx, ucc_rank_t group_size,
+ucc_status_t ucc_tl_mlx5_asr_socket_init(ucc_tl_mlx5_context_t *ctx, ucc_rank_t group_size,
                                          int *sock_p, const char *sock_path)
 {
     struct sockaddr_storage storage = {};
@@ -130,7 +131,7 @@ ucc_status_t ucc_tl_mhba_asr_socket_init(ucc_tl_mhba_context_t *ctx, ucc_rank_t 
 
 static ucc_status_t client_recv_data(int *       shared_cmd_fd,
                                      uint32_t *  shared_pd_handle,
-                                     const char *sock_path,ucc_tl_mhba_lib_t * lib)
+                                     const char *sock_path,ucc_tl_mlx5_lib_t * lib)
 {
     struct sockaddr_storage sockaddr = {};
     struct sockaddr_un *    addr;
@@ -172,7 +173,7 @@ fail:
 
 static ucc_status_t server_send_data(int command_fd, uint32_t pd_handle,
                                      int                 group_size,
-                                     int sock, ucc_tl_mhba_lib_t * lib)
+                                     int sock, ucc_tl_mlx5_lib_t * lib)
 {
     int          i = 0;
     connection_t connection[group_size];
@@ -231,15 +232,15 @@ listen_fail:
     return UCC_ERR_NO_MESSAGE;
 }
 
-ucc_status_t ucc_tl_mhba_share_ctx_pd(ucc_tl_mhba_context_t *ctx,
+ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
                                       const char *       sock_path,
                                       ucc_rank_t group_size,
                                       int is_asr, int asr_sock)
 {
     int                    ctx_fd    = ctx->ib_ctx->cmd_fd;
     uint32_t               pd_handle = ctx->ib_pd->handle;
-    ucc_tl_mhba_lib_t     *lib       = ucc_derived_of(ctx->super.super.lib,
-                                                      ucc_tl_mhba_lib_t);
+    ucc_tl_mlx5_lib_t     *lib       = ucc_derived_of(ctx->super.super.lib,
+                                                      ucc_tl_mlx5_lib_t);
     int                    shared_ctx_fd;
     uint32_t               shared_pd_handle;
     ucc_status_t           status;
@@ -277,7 +278,7 @@ ucc_status_t ucc_tl_mhba_share_ctx_pd(ucc_tl_mhba_context_t *ctx,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mhba_remove_shared_ctx_pd(ucc_tl_mhba_context_t *ctx)
+ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx)
 {
     if (ctx->is_imported) {
         ibv_unimport_pd(ctx->shared_pd);

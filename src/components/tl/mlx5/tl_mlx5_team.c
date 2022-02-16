@@ -1,26 +1,26 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
 
-#include "tl_mhba.h"
-#include "tl_mhba_ib.h"
-#include "tl_mhba_mkeys.h"
+#include "tl_mlx5.h"
+#include "tl_mlx5_ib.h"
+#include "tl_mlx5_mkeys.h"
 #include "coll_score/ucc_coll_score.h"
 #include <sys/shm.h>
 #include "core/ucc_team.h"
 
-static ucc_mpool_ops_t ucc_tl_mhba_dm_ops;
-static ucc_status_t ucc_tl_mhba_dm_init(ucc_tl_mhba_team_t *team);
-static void ucc_tl_mhba_dm_cleanup(ucc_tl_mhba_team_t *team);
+static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops;
+static ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team);
+static void ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team);
 
-static void calc_block_size(ucc_tl_mhba_team_t *team)
+static void calc_block_size(ucc_tl_mlx5_team_t *team)
 {
     int i;
     int block_size = ucc_min(team->node.sbgp->group_size, MAX_BLOCK_SIZE);
     int msg_len    = 1;
-    for (i = 0; i < MHBA_NUM_OF_BLOCKS_SIZE_BINS; i++) {
+    for (i = 0; i < MLX5_NUM_OF_BLOCKS_SIZE_BINS; i++) {
         while ((block_size * block_size) * msg_len > MAX_TRANSPOSE_SIZE) {
             block_size -= 1;
         }
@@ -49,7 +49,7 @@ static int compare_rank_data(const void *a, const void *b)
     return d1->team_rank > d2->team_rank ? 1 : -1;
 }
 
-static void build_rank_map(ucc_tl_mhba_team_t *team,
+static void build_rank_map(ucc_tl_mlx5_team_t *team,
                            net_exchange_t *global_data, size_t local_data_size)
 {
     struct rank_data *data    = ucc_malloc(sizeof(*data) * team->net.net_size);
@@ -71,7 +71,7 @@ static void build_rank_map(ucc_tl_mhba_team_t *team,
     ucc_free(data);
 }
 
-static inline int ucc_tl_mhba_calc_max_block_size(void)
+static inline int ucc_tl_mlx5_calc_max_block_size(void)
 {
     int block_row_size = 0;
 
@@ -81,11 +81,11 @@ static inline int ucc_tl_mhba_calc_max_block_size(void)
     return block_row_size;
 }
 
-UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
+UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
-    ucc_tl_mhba_context_t *ctx =
-        ucc_derived_of(tl_context, ucc_tl_mhba_context_t);
+    ucc_tl_mlx5_context_t *ctx =
+        ucc_derived_of(tl_context, ucc_tl_mlx5_context_t);
     ucc_sbgp_t *  node, *net;
     size_t        storage_size;
     int           i, j, node_size, ppn, team_size, nnodes;
@@ -103,19 +103,19 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
     nnodes    = ucc_topo_nnodes(topo);
     team_size = UCC_TL_TEAM_SIZE(self);
     if (net->status == UCC_SBGP_NOT_EXISTS) {
-        tl_debug(tl_context->lib, "disabling mhba for single node team");
+        tl_debug(tl_context->lib, "disabling mlx5 for single node team");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (nnodes == team_size) {
-        tl_debug(tl_context->lib, "disabling mhba for ppn=1 case, not supported so far");
+        tl_debug(tl_context->lib, "disabling mlx5 for ppn=1 case, not supported so far");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (!topo ||
         ucc_topo_min_ppn(topo) != ucc_topo_max_ppn(topo)) {
         tl_debug(tl_context->lib,
-                 "disabling mhba for team with non-uniform ppn, "
+                 "disabling mlx5 for team with non-uniform ppn, "
                  "min_ppn %d, max_ppn %d",
                  ucc_topo_min_ppn(topo), ucc_topo_max_ppn(topo));
         return UCC_ERR_NOT_SUPPORTED;
@@ -130,7 +130,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
             if (!ucc_team_ranks_on_same_node(i * ppn, i * ppn + j,
                                              UCC_TL_CORE_TEAM(self))) {
                 tl_debug(tl_context->lib,
-                         "disabling mhba for team with non contiguous "
+                         "disabling mlx5 for team with non contiguous "
                          "ranks-per-node placement");
                 return UCC_ERR_NOT_SUPPORTED;
             }
@@ -143,9 +143,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
     self->node.sbgp        = node;
     self->net.sbgp         = net;
     self->status           = UCC_INPROGRESS;
-    self->node.asr_rank    = MHBA_ASR_RANK;
-    self->transpose        = UCC_TL_MHBA_TEAM_LIB(self)->cfg.transpose;
-    self->num_dci_qps      = UCC_TL_MHBA_TEAM_LIB(self)->cfg.num_dci_qps;
+    self->node.asr_rank    = MLX5_ASR_RANK;
+    self->transpose        = UCC_TL_MLX5_TEAM_LIB(self)->cfg.transpose;
+    self->num_dci_qps      = UCC_TL_MLX5_TEAM_LIB(self)->cfg.num_dci_qps;
     self->sequence_number  = 1;
     self->net.ctrl_mr      = NULL;
     self->net.remote_ctrl  = NULL;
@@ -186,14 +186,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mhba_team_t, ucc_base_context_t *tl_context,
         tmpnam(self->bcast_data.sock_path); //TODO switch to mkstemp
     }
 
-    self->state = TL_MHBA_TEAM_STATE_SHMID;
+    self->state = TL_MLX5_TEAM_STATE_SHMID;
 
     return ucc_service_bcast(UCC_TL_CORE_TEAM(self), &self->bcast_data,
-                             sizeof(ucc_tl_mhba_bcast_data_t), self->node.asr_rank,
+                             sizeof(ucc_tl_mlx5_bcast_data_t), self->node.asr_rank,
                              ucc_sbgp_to_subset(node), &self->scoll_req);
 }
 
-UCC_CLASS_CLEANUP_FUNC(ucc_tl_mhba_team_t)
+UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
 {
 
     ucc_status_t status = UCC_OK;
@@ -206,7 +206,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mhba_team_t)
                  self->node.storage, errno);
     }
     if (self->node.asr_rank == self->node.sbgp->group_rank) {
-        status = ucc_tl_mhba_destroy_umr(&self->node,UCC_TL_TEAM_LIB(self));
+        status = ucc_tl_mlx5_destroy_umr(&self->node,UCC_TL_TEAM_LIB(self));
         if (status != UCC_OK) {
             tl_error(UCC_TL_TEAM_LIB(self), "failed to destroy UMR");
         }
@@ -237,7 +237,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mhba_team_t)
                      errno);
         }
 
-        status = ucc_tl_mhba_destroy_mkeys(self, 0);
+        status = ucc_tl_mlx5_destroy_mkeys(self, 0);
         if (status != UCC_OK) {
             tl_error(UCC_TL_TEAM_LIB(self), "failed to destroy Mkeys");
         }
@@ -257,17 +257,17 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mhba_team_t)
         ucc_free(self->net.barrier.flags);
         ibv_dereg_mr(self->net.atomic.mr);
         ucc_free(self->net.atomic.counters);
-        ucc_tl_mhba_dm_cleanup(self);
+        ucc_tl_mlx5_dm_cleanup(self);
     }
     ucc_free(self->net.dcis);
 }
 
-UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_mhba_team_t, ucc_base_team_t);
-UCC_CLASS_DEFINE(ucc_tl_mhba_team_t, ucc_tl_team_t);
+UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_mlx5_team_t, ucc_base_team_t);
+UCC_CLASS_DEFINE(ucc_tl_mlx5_team_t, ucc_tl_team_t);
 
-ucc_status_t ucc_tl_mhba_team_destroy(ucc_base_team_t *tl_team)
+ucc_status_t ucc_tl_mlx5_team_destroy(ucc_base_team_t *tl_team)
 {
-    UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_mhba_team_t)(tl_team);
+    UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_mlx5_team_t)(tl_team);
     return UCC_OK;
 }
 
@@ -276,9 +276,9 @@ ucc_status_t ucc_tl_mhba_team_destroy(ucc_base_team_t *tl_team)
                 /* sizeof(void *) + sizeof(struct rank_data); */
 
 
-static ucc_status_t tl_mhba_alloc_atomic(ucc_tl_mhba_team_t *team)
+static ucc_status_t tl_mlx5_alloc_atomic(ucc_tl_mlx5_team_t *team)
 {
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     size_t                 size;
 
     size = sizeof(*team->net.atomic.counters) * MAX_OUTSTANDING_OPS;
@@ -301,9 +301,9 @@ static ucc_status_t tl_mhba_alloc_atomic(ucc_tl_mhba_team_t *team)
     return UCC_OK;
 }
 
-static ucc_status_t tl_mhba_alloc_barrier(ucc_tl_mhba_team_t *team)
+static ucc_status_t tl_mlx5_alloc_barrier(ucc_tl_mlx5_team_t *team)
 {
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     size_t                 size;
 
     /* allocating net_size + 1 flags. Last one is used as local buf
@@ -329,15 +329,15 @@ static ucc_status_t tl_mhba_alloc_barrier(ucc_tl_mhba_team_t *team)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
+ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team)
 {
 
-    ucc_tl_mhba_team_t *   team = ucc_derived_of(tl_team, ucc_tl_mhba_team_t);
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    ucc_tl_mlx5_team_t *   team = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     ucc_rank_t             node_size = team->node.sbgp->group_size;
     ucc_rank_t             node_rank = team->node.sbgp->group_rank;
     ucc_status_t status;
-    ucc_tl_mhba_op_t *op;
+    ucc_tl_mlx5_op_t *op;
     int i, asr_cq_size, net_size;
     struct ibv_port_attr    port_attr;
     size_t                  local_data_size, umr_buf_size, op_seg_size;
@@ -357,7 +357,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
     op_seg_size = OP_SEGMENT_SIZE(team);
 
     switch (team->state) {
-    case TL_MHBA_TEAM_STATE_SHMID:
+    case TL_MLX5_TEAM_STATE_SHMID:
         if (team->bcast_data.shmid == -1) {
             tl_error(tl_team->context->lib,
                      "failed to allocate sysv shm segment");
@@ -376,23 +376,23 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
         for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
             op = &team->node.ops[i];
             op->ctrl     = PTR_OFFSET(team->node.storage, op_seg_size * i);
-            op->my_ctrl  = PTR_OFFSET(op->ctrl, node_rank * sizeof(ucc_tl_mhba_ctrl_t));
+            op->my_ctrl  = PTR_OFFSET(op->ctrl, node_rank * sizeof(ucc_tl_mlx5_ctrl_t));
         }
 
 
         calc_block_size(team);
-        if (UCC_TL_MHBA_TEAM_LIB(team)->cfg.block_size > MAX_BLOCK_SIZE) {
+        if (UCC_TL_MLX5_TEAM_LIB(team)->cfg.block_size > MAX_BLOCK_SIZE) {
             tl_error(tl_team->context->lib, "Max Block size is %d", MAX_BLOCK_SIZE);
             return UCC_ERR_NO_MESSAGE;
         }
-        team->requested_block_size = UCC_TL_MHBA_TEAM_LIB(team)->cfg.block_size;
+        team->requested_block_size = UCC_TL_MLX5_TEAM_LIB(team)->cfg.block_size;
         if (team->node.asr_rank == node_rank) {
-            status = tl_mhba_alloc_atomic(team);
+            status = tl_mlx5_alloc_atomic(team);
             if (UCC_OK != status) {
                 goto err;
             }
 
-            status = tl_mhba_alloc_barrier(team);
+            status = tl_mlx5_alloc_barrier(team);
             if (UCC_OK != status) {
                 goto err;
             }
@@ -417,16 +417,16 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
             }
             if (team->transpose) {
                 team->transpose_buf =
-                    ucc_malloc(UCC_TL_MHBA_TEAM_LIB(team)->cfg.transpose_buf_size);
+                    ucc_malloc(UCC_TL_MLX5_TEAM_LIB(team)->cfg.transpose_buf_size);
                 if (!team->transpose_buf) {
                     tl_error(tl_team->context->lib,
                              "failed to allocate %zd bytes for transpose buf",
-                             UCC_TL_MHBA_TEAM_LIB(team)->cfg.transpose_buf_size);
+                             UCC_TL_MLX5_TEAM_LIB(team)->cfg.transpose_buf_size);
                     return UCC_ERR_NO_MEMORY;
                 }
                 team->transpose_buf_mr =
                     ibv_reg_mr(ctx->shared_pd, team->transpose_buf,
-                               UCC_TL_MHBA_TEAM_LIB(team)->cfg.transpose_buf_size,
+                               UCC_TL_MLX5_TEAM_LIB(team)->cfg.transpose_buf_size,
                                IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
                 if (!team->transpose_buf_mr) {
                     tl_error(tl_team->context->lib,
@@ -437,7 +437,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
 
 
 
-            status = ucc_tl_mhba_init_umr(ctx, &team->node);
+            status = ucc_tl_mlx5_init_umr(ctx, &team->node);
             if (status != UCC_OK) {
                 tl_error(tl_team->context->lib, "failed to init UMR");
                 return status;
@@ -452,9 +452,9 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
                 return UCC_ERR_NO_MESSAGE;
                     }
 
-            team->is_dc = (UCC_TL_MHBA_TEAM_LIB(team)->cfg.rc_dc == 2)
+            team->is_dc = (UCC_TL_MLX5_TEAM_LIB(team)->cfg.rc_dc == 2)
                 ? ((net_size > RC_DC_LIMIT) ? 1 : 0)
-                : UCC_TL_MHBA_TEAM_LIB(team)->cfg.rc_dc;
+                : UCC_TL_MLX5_TEAM_LIB(team)->cfg.rc_dc;
 
             ibv_query_port(ctx->ib_ctx, ctx->ib_port, &port_attr);
 
@@ -475,7 +475,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
                          sizeof(*team->net.remote_ctrl) * net_size);
             }
 
-            status = ucc_tl_mhba_init_mkeys(team);
+            status = ucc_tl_mlx5_init_mkeys(team);
             if (status != UCC_OK) {
                 tl_error(tl_team->context->lib, "failed to init mkeys");
                 return status;
@@ -501,14 +501,14 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
             global_data = PTR_OFFSET(local_data, local_data_size);
 
             if (team->is_dc) {
-                status = ucc_tl_mhba_init_dc_qps_and_connect(team, local_data->qpn,
+                status = ucc_tl_mlx5_init_dc_qps_and_connect(team, local_data->qpn,
                                                              ctx->ib_port);
                 if (UCC_OK != status) {
                     tl_error(tl_team->context->lib, "failed to init DC QPs");
                     goto free_data;
                 }
             } else {
-                status = ucc_tl_mhba_create_rc_qps(team, local_data->qpn);
+                status = ucc_tl_mlx5_create_rc_qps(team, local_data->qpn);
                 if (UCC_OK != status) {
                     tl_error(tl_team->context->lib, "failed to init RC QPs");
                     goto free_data;
@@ -531,10 +531,10 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
                 goto free_data;
             }
             team->scoll_req->data = local_data;
-            team->state = TL_MHBA_TEAM_STATE_EXCHANGE;
+            team->state = TL_MLX5_TEAM_STATE_EXCHANGE;
             return UCC_INPROGRESS;
         }
-    case TL_MHBA_TEAM_STATE_EXCHANGE:
+    case TL_MLX5_TEAM_STATE_EXCHANGE:
         if (team->node.asr_rank != node_rank) {
             break;
         }
@@ -572,7 +572,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
             remote_data = PTR_OFFSET(global_data, i * local_data_size);
             if (team->is_dc) {
                 team->net.remote_dctns[i] = remote_data->qpn[0];
-                status = ucc_tl_mhba_create_ah(&team->net.ahs[i], remote_data->port_lid,
+                status = ucc_tl_mlx5_create_ah(&team->net.ahs[i], remote_data->port_lid,
                                                ctx->ib_port, team);
                 if (UCC_OK != status) {
                     tl_error(tl_team->context->lib, "failed to create ah, %s",
@@ -580,7 +580,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
                     return status;
                 }
             } else {
-                status = ucc_tl_mhba_qp_connect(team->net.rc_qps[i],
+                status = ucc_tl_mlx5_qp_connect(team->net.rc_qps[i],
                                        remote_data->qpn[team->net.sbgp->group_rank],
                                        remote_data->port_lid, ctx->ib_port,tl_team->context->lib);
                 if (UCC_OK != status) {
@@ -631,7 +631,7 @@ ucc_status_t ucc_tl_mhba_team_create_test(ucc_base_team_t *tl_team)
         }
 
         /* MEMIC alloc, todo move to CTX */
-        status = ucc_tl_mhba_dm_init(team);
+        status = ucc_tl_mlx5_dm_init(team);
         if (UCC_OK != status) {
             return status;
         }
@@ -649,10 +649,10 @@ err:
     return status;
 }
 
-static void ucc_tl_mhba_dm_cleanup(ucc_tl_mhba_team_t *team)
+static void ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team)
 {
     ibv_dereg_mr(team->dm_mr);
-    if (UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_host) {
+    if (UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_host) {
         ucc_free(team->dm_ptr);
     }  else {
         ibv_free_dm(team->dm_ptr);
@@ -660,12 +660,12 @@ static void ucc_tl_mhba_dm_cleanup(ucc_tl_mhba_team_t *team)
     ucc_mpool_cleanup(&team->dm_pool, 1);
 }
 
-static ucc_status_t ucc_tl_mhba_dm_init(ucc_tl_mhba_team_t *team)
+static ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
 {
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
-    size_t memic_chunk         = UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_buf_size;
-    size_t n_memic_chunks      = UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_buf_num;
-    int    dm_host             = UCC_TL_MHBA_TEAM_LIB(team)->cfg.dm_host;
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
+    size_t memic_chunk         = UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_buf_size;
+    size_t n_memic_chunks      = UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_buf_num;
+    int    dm_host             = UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_host;
     struct ibv_device_attr_ex attr;
     struct ibv_alloc_dm_attr  dm_attr;
     int max_n_chunks, chunks_to_alloc, i;
@@ -732,9 +732,9 @@ static ucc_status_t ucc_tl_mhba_dm_init(ucc_tl_mhba_team_t *team)
 
     team->oob_req = NULL;
     status = ucc_mpool_init(
-        &team->dm_pool, 0, sizeof(ucc_tl_mhba_dm_chunk_t), 0,
+        &team->dm_pool, 0, sizeof(ucc_tl_mlx5_dm_chunk_t), 0,
         UCC_CACHE_LINE_SIZE, n_memic_chunks, n_memic_chunks,
-        &ucc_tl_mhba_dm_ops, UCC_THREAD_MULTIPLE, "mhba dm pool");
+        &ucc_tl_mlx5_dm_ops, UCC_THREAD_MULTIPLE, "mlx5 dm pool");
     if (status != UCC_OK) {
         tl_error(UCC_TL_TEAM_LIB(team),
                  "failed to init dm pool");
@@ -744,33 +744,33 @@ static ucc_status_t ucc_tl_mhba_dm_init(ucc_tl_mhba_team_t *team)
 }
 
 
-static ucc_status_t ucc_tl_mhba_dm_chunk_alloc(ucc_mpool_t *mp, //NOLINT
+static ucc_status_t ucc_tl_mlx5_dm_chunk_alloc(ucc_mpool_t *mp, //NOLINT
                                             size_t *size_p,
                                             void **chunk_p)
 {
-    *chunk_p = ucc_malloc(*size_p, "mhba dm");
+    *chunk_p = ucc_malloc(*size_p, "mlx5 dm");
     if (!*chunk_p) {
         return UCC_ERR_NO_MEMORY;
     }
     return UCC_OK;
 }
 
-static void ucc_tl_mhba_dm_chunk_init(ucc_mpool_t *mp, //NOLINT
+static void ucc_tl_mlx5_dm_chunk_init(ucc_mpool_t *mp, //NOLINT
                                    void *obj, void *chunk) //NOLINT
 {
-    ucc_tl_mhba_dm_chunk_t *c = (ucc_tl_mhba_dm_chunk_t *)obj;
-    ucc_tl_mhba_team_t *team = ucc_container_of(mp, ucc_tl_mhba_team_t, dm_pool);
+    ucc_tl_mlx5_dm_chunk_t *c = (ucc_tl_mlx5_dm_chunk_t *)obj;
+    ucc_tl_mlx5_team_t *team = ucc_container_of(mp, ucc_tl_mlx5_team_t, dm_pool);
     const size_t memic_chunk = 8192;
     c->offset = (ptrdiff_t) team->oob_req;
     team->oob_req = PTR_OFFSET(team->oob_req, memic_chunk);
 }
 
-static void ucc_tl_mhba_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
+static void ucc_tl_mlx5_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
 {
     ucc_free(chunk);
 }
 
-static ucc_mpool_ops_t ucc_tl_mhba_dm_ops = {.chunk_alloc   = ucc_tl_mhba_dm_chunk_alloc,
-                                             .chunk_release = ucc_tl_mhba_dm_chunk_release,
-                                             .obj_init      = ucc_tl_mhba_dm_chunk_init,
+static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {.chunk_alloc   = ucc_tl_mlx5_dm_chunk_alloc,
+                                             .chunk_release = ucc_tl_mlx5_dm_chunk_release,
+                                             .obj_init      = ucc_tl_mlx5_dm_chunk_init,
                                              .obj_cleanup   = NULL};

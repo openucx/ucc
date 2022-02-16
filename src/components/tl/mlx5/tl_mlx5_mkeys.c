@@ -1,19 +1,20 @@
-/*
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+/**
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ *
  * See file LICENSE for terms.
  */
 
-#include "tl_mhba.h"
-#include "tl_mhba_ib.h"
-#include "tl_mhba_coll.h"
-#include "tl_mhba_mkeys.h"
+#include "tl_mlx5.h"
+#include "tl_mlx5_ib.h"
+#include "tl_mlx5_coll.h"
+#include "tl_mlx5_mkeys.h"
 #include <inttypes.h>
 #include <infiniband/verbs.h>
 #include <infiniband/mlx5dv.h>
 
-static ucc_status_t create_umr_qp(struct ucc_tl_mhba_mlx5_qp *mlx5_qp,
-                                  ucc_tl_mhba_node_t *        node,
-                                  ucc_tl_mhba_context_t *     ctx)
+static ucc_status_t create_umr_qp(struct ucc_tl_mlx5_mlx5_qp *mlx5_qp,
+                                  ucc_tl_mlx5_node_t *        node,
+                                  ucc_tl_mlx5_context_t *     ctx)
 {
     struct ibv_qp_init_attr_ex umr_init_attr_ex;
     struct mlx5dv_qp_init_attr umr_mlx5dv_qp_attr;
@@ -79,7 +80,7 @@ static ucc_status_t create_umr_qp(struct ucc_tl_mhba_mlx5_qp *mlx5_qp,
         goto failure;
     }
     tl_debug(UCC_TL_CTX_LIB(ctx), "Connect UMR QP to itself");
-    status = ucc_tl_mhba_qp_connect(mlx5_qp->qp, mlx5_qp->qp->qp_num,
+    status = ucc_tl_mlx5_qp_connect(mlx5_qp->qp, mlx5_qp->qp->qp_num,
                                     port_attr.lid, ctx->ib_port, &UCC_TL_CTX_LIB(ctx)->super.super);
     if (status != UCC_OK) {
         goto failure;
@@ -97,11 +98,11 @@ failure:
 
 /**
  * Create and connect UMR qp & cq.
- * @param ctx mhba team context
+ * @param ctx mlx5 team context
  * @param node struct of the current process's node
  */
-ucc_status_t ucc_tl_mhba_init_umr(ucc_tl_mhba_context_t *ctx,
-                                  ucc_tl_mhba_node_t *   node)
+ucc_status_t ucc_tl_mlx5_init_umr(ucc_tl_mlx5_context_t *ctx,
+                                  ucc_tl_mlx5_node_t *   node)
 {
     ucc_status_t status = UCC_OK;
     tl_debug(UCC_TL_CTX_LIB(ctx), "Create UMR CQ");
@@ -119,7 +120,7 @@ ucc_status_t ucc_tl_mhba_init_umr(ucc_tl_mhba_context_t *ctx,
     if (status != UCC_OK) {
         goto qp_failure;
     }
-    status = ucc_tl_mhba_ibv_qp_to_mlx5dv_qp(node->s_umr_qp.mlx5_qp.qp,
+    status = ucc_tl_mlx5_ibv_qp_to_mlx5dv_qp(node->s_umr_qp.mlx5_qp.qp,
                                              &node->s_umr_qp.in_qp,UCC_TL_CTX_LIB(ctx));
     if (status != UCC_OK) {
         goto second_qp_failure;
@@ -144,10 +145,10 @@ cq_failure:
     return status;
 }
 
-static ucc_status_t create_master_key(ucc_tl_mhba_node_t * node,
+static ucc_status_t create_master_key(ucc_tl_mlx5_node_t * node,
                                       struct mlx5dv_mkey **mkey_ptr,
                                       int                  num_of_entries,
-                                      ucc_tl_mhba_context_t *  ctx)
+                                      ucc_tl_mlx5_context_t *  ctx)
 {
     struct mlx5dv_mkey *         mkey;
     struct mlx5dv_mkey_init_attr umr_mkey_init_attr;
@@ -170,8 +171,8 @@ static ucc_status_t create_master_key(ucc_tl_mhba_node_t * node,
     return UCC_OK;
 }
 
-static ucc_status_t poll_umr_cq(ucc_tl_mhba_node_t *node,
-                                ucc_tl_mhba_lib_t *lib)
+static ucc_status_t poll_umr_cq(ucc_tl_mlx5_node_t *node,
+                                ucc_tl_mlx5_lib_t *lib)
 {
     struct ibv_wc wc;
     int           ret = 0;
@@ -195,29 +196,29 @@ static ucc_status_t poll_umr_cq(ucc_tl_mhba_node_t *node,
 }
 
 // Execute the UMR WQE for populating the UMR's MasterMKey
-static ucc_status_t populate_non_strided_mkey(ucc_tl_mhba_team_t *team,
+static ucc_status_t populate_non_strided_mkey(ucc_tl_mlx5_team_t *team,
                                               int mem_access_flags,
                                               struct mlx5dv_mkey *mkey,
                                               void *              mkey_entries)
 {
     ucc_status_t        status;
-    ucc_tl_mhba_node_t *node = &team->node;
+    ucc_tl_mlx5_node_t *node = &team->node;
     ibv_wr_start(node->ns_umr_qp.qpx);
     node->ns_umr_qp.qpx->wr_id = 1; // First (and only) WR
     mlx5dv_wr_mr_list(node->ns_umr_qp.mlx5dv_qp_ex, mkey, mem_access_flags,
                       MAX_OUTSTANDING_OPS * team->max_num_of_columns,
                       (struct ibv_sge *)mkey_entries);
     tl_debug(
-        UCC_TL_MHBA_TEAM_LIB(team),
+        UCC_TL_MLX5_TEAM_LIB(team),
         "Execute the UMR WQE for populating the team MasterMKeys lkey 0x%x",
         mkey->lkey);
 
     if (ibv_wr_complete(node->ns_umr_qp.qpx)) {
-        tl_error(UCC_TL_MHBA_TEAM_LIB(team), "UMR WQE failed (errno=%d)",
+        tl_error(UCC_TL_MLX5_TEAM_LIB(team), "UMR WQE failed (errno=%d)",
                  errno);
         return UCC_ERR_NO_MESSAGE;
     }
-    status = poll_umr_cq(node, UCC_TL_MHBA_TEAM_LIB(team));
+    status = poll_umr_cq(node, UCC_TL_MLX5_TEAM_LIB(team));
     if (status != UCC_OK) {
         return status;
     }
@@ -225,36 +226,36 @@ static ucc_status_t populate_non_strided_mkey(ucc_tl_mhba_team_t *team,
 }
 
 // Execute the UMR WQE for populating the UMR's MasterMKey
-static ucc_status_t populate_strided_mkey(ucc_tl_mhba_team_t *team,
+static ucc_status_t populate_strided_mkey(ucc_tl_mlx5_team_t *team,
                                           int                 mem_access_flags,
                                           struct mlx5dv_mkey *mkey,
                                           void *mkey_entries, int repeat_count)
 {
     ucc_status_t        status;
-    ucc_tl_mhba_node_t *node = &team->node;
-    ucc_tl_mhba_wr_start(&node->s_umr_qp.in_qp);
-    ucc_tl_mhba_send_wr_mr_noninline(
+    ucc_tl_mlx5_node_t *node = &team->node;
+    ucc_tl_mlx5_wr_start(&node->s_umr_qp.in_qp);
+    ucc_tl_mlx5_send_wr_mr_noninline(
         &node->s_umr_qp.in_qp, mkey, mem_access_flags, repeat_count,
         node->sbgp->group_size, (struct mlx5dv_mr_interleaved *)mkey_entries,
         team->node.umr_entries_mr->lkey, team->node.umr_entries_buf,
         team->node.s_umr_qp.mlx5_qp.qpx);
-    tl_debug(UCC_TL_MHBA_TEAM_LIB(team),
+    tl_debug(UCC_TL_MLX5_TEAM_LIB(team),
              "Execute the UMR WQE for populating the send/recv "
              "MasterMKey lkey 0x%x",
              mkey->lkey);
-    ucc_tl_mhba_wr_complete(&node->s_umr_qp.in_qp);
-    status = poll_umr_cq(node, UCC_TL_MHBA_TEAM_LIB(team));
+    ucc_tl_mlx5_wr_complete(&node->s_umr_qp.in_qp);
+    status = poll_umr_cq(node, UCC_TL_MLX5_TEAM_LIB(team));
     if (status != UCC_OK) {
         return status;
     }
     return UCC_OK;
 }
 
-static ucc_status_t create_and_populate_recv_team_mkey(ucc_tl_mhba_team_t *team)
+static ucc_status_t create_and_populate_recv_team_mkey(ucc_tl_mlx5_team_t *team)
 {
     ucc_status_t        status;
-    ucc_tl_mhba_node_t *node = &team->node;
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    ucc_tl_mlx5_node_t *node = &team->node;
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     int                 i, j;
     status = create_master_key(node, &node->team_recv_mkey,
                                MAX_OUTSTANDING_OPS * team->max_num_of_columns, ctx);
@@ -278,9 +279,9 @@ static ucc_status_t create_and_populate_recv_team_mkey(ucc_tl_mhba_team_t *team)
         team, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE,
         node->team_recv_mkey, team_mkey_klm_entries);
     if (status != UCC_OK) {
-        tl_error(UCC_TL_MHBA_TEAM_LIB(team), "Failed to populate team mkey");
+        tl_error(UCC_TL_MLX5_TEAM_LIB(team), "Failed to populate team mkey");
         if (mlx5dv_destroy_mkey(node->team_recv_mkey)) {
-            tl_error(UCC_TL_MHBA_TEAM_LIB(team),
+            tl_error(UCC_TL_MLX5_TEAM_LIB(team),
                      "mkey destroy failed(errno=%d)", errno);
         }
         return status;
@@ -295,51 +296,51 @@ static ucc_status_t create_and_populate_recv_team_mkey(ucc_tl_mhba_team_t *team)
  * @param node struct of the current process's node
  * @param team_size number of processes in team
  */
-ucc_status_t ucc_tl_mhba_init_mkeys(ucc_tl_mhba_team_t *team)
+ucc_status_t ucc_tl_mlx5_init_mkeys(ucc_tl_mlx5_team_t *team)
 {
     ucc_status_t        status;
-    ucc_tl_mhba_node_t *node = &team->node;
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    ucc_tl_mlx5_node_t *node = &team->node;
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     int                 i, j;
     for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
         node->ops[i].send_mkeys = (struct mlx5dv_mkey **)ucc_malloc(
             sizeof(struct mlx5dv_mkey *) * team->max_num_of_columns);
         if (!node->ops[i].send_mkeys) {
-            tl_error(UCC_TL_MHBA_TEAM_LIB(team), "Failed to malloc");
-            ucc_tl_mhba_destroy_mkeys(team, 1);
+            tl_error(UCC_TL_MLX5_TEAM_LIB(team), "Failed to malloc");
+            ucc_tl_mlx5_destroy_mkeys(team, 1);
             return UCC_ERR_NO_MEMORY;
         }
         node->ops[i].recv_mkeys = (struct mlx5dv_mkey **)ucc_malloc(
             sizeof(struct mlx5dv_mkey *) * team->max_num_of_columns);
         if (!node->ops[i].recv_mkeys) {
-            tl_error(UCC_TL_MHBA_TEAM_LIB(team), "Failed to malloc");
-            ucc_tl_mhba_destroy_mkeys(team, 1);
+            tl_error(UCC_TL_MLX5_TEAM_LIB(team), "Failed to malloc");
+            ucc_tl_mlx5_destroy_mkeys(team, 1);
             return UCC_ERR_NO_MEMORY;
         }
         for (j = 0; j < team->max_num_of_columns; j++) {
             status = create_master_key(node, &node->ops[i].send_mkeys[j],
                                        node->sbgp->group_size + 1, ctx);
             if (status != UCC_OK) {
-                tl_error(UCC_TL_MHBA_TEAM_LIB(team),
+                tl_error(UCC_TL_MLX5_TEAM_LIB(team),
                          "create send masterkey[%d,%d] failed", i, j);
-                ucc_tl_mhba_destroy_mkeys(team, 1);
+                ucc_tl_mlx5_destroy_mkeys(team, 1);
                 return status;
             }
             status = create_master_key(node, &node->ops[i].recv_mkeys[j],
                                        node->sbgp->group_size + 1, ctx);
             if (status != UCC_OK) {
-                tl_error(UCC_TL_MHBA_TEAM_LIB(team),
+                tl_error(UCC_TL_MLX5_TEAM_LIB(team),
                          "create recv masterkey[%d,%d] failed", i, j);
-                ucc_tl_mhba_destroy_mkeys(team, 1);
+                ucc_tl_mlx5_destroy_mkeys(team, 1);
                 return status;
             }
         }
     }
     status = create_and_populate_recv_team_mkey(team);
     if (status != UCC_OK) {
-        tl_error(UCC_TL_MHBA_TEAM_LIB(team),
+        tl_error(UCC_TL_MLX5_TEAM_LIB(team),
                  "create recv top masterkey failed");
-        ucc_tl_mhba_destroy_mkeys(team, 1);
+        ucc_tl_mlx5_destroy_mkeys(team, 1);
         return status;
     }
     return UCC_OK;
@@ -350,11 +351,11 @@ ucc_status_t ucc_tl_mhba_init_mkeys(ucc_tl_mhba_team_t *team)
  * @param team struct of the current team
  * @param req current AlltoAll operation request
  */
-ucc_status_t ucc_tl_mhba_populate_send_recv_mkeys(ucc_tl_mhba_team_t *    team,
-                                                  ucc_tl_mhba_schedule_t *req)
+ucc_status_t ucc_tl_mlx5_populate_send_recv_mkeys(ucc_tl_mlx5_team_t *    team,
+                                                  ucc_tl_mlx5_schedule_t *req)
 {
     int                 send_mem_access_flags = 0;
-    ucc_tl_mhba_node_t *node                  = &team->node;
+    ucc_tl_mlx5_node_t *node                  = &team->node;
     int                 recv_mem_access_flags =
         IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE;
     int          i;
@@ -363,30 +364,30 @@ ucc_status_t ucc_tl_mhba_populate_send_recv_mkeys(ucc_tl_mhba_team_t *    team,
                                     ? team->net.sbgp->group_size
                                     : UCC_TL_TEAM_SIZE(team) / req->block_size;
     int n_mkeys = req->num_of_blocks_columns ? req->num_of_blocks_columns : 1;
-    if (ucc_tl_mhba_get_my_ctrl(team, req->seq_index)->mkey_cache_flag &
-        UCC_MHBA_NEED_SEND_MKEY_UPDATE) {
+    if (ucc_tl_mlx5_get_my_ctrl(team, req->seq_index)->mkey_cache_flag &
+        UCC_MLX5_NEED_SEND_MKEY_UPDATE) {
         for (i = 0; i < n_mkeys; i++) {
             status = populate_strided_mkey(
                 team, send_mem_access_flags,
                 node->ops[req->seq_index].send_mkeys[i],
                 SEND_UMR_DATA(req, team, i), repeat_count);
             if (status != UCC_OK) {
-                tl_error(UCC_TL_MHBA_TEAM_LIB(team),
+                tl_error(UCC_TL_MLX5_TEAM_LIB(team),
                          "Failed to populate send umr[%d,%d]", req->seq_index,
                          i);
                 return status;
             }
         }
     }
-    if (ucc_tl_mhba_get_my_ctrl(team, req->seq_index)->mkey_cache_flag &
-        UCC_MHBA_NEED_RECV_MKEY_UPDATE) {
+    if (ucc_tl_mlx5_get_my_ctrl(team, req->seq_index)->mkey_cache_flag &
+        UCC_MLX5_NEED_RECV_MKEY_UPDATE) {
         for (i = 0; i < n_mkeys; i++) {
             status = populate_strided_mkey(
                 team, recv_mem_access_flags,
                 node->ops[req->seq_index].recv_mkeys[i],
                 RECV_UMR_DATA(req, team, i), repeat_count);
             if (status != UCC_OK) {
-                tl_error(UCC_TL_MHBA_TEAM_LIB(team),
+                tl_error(UCC_TL_MLX5_TEAM_LIB(team),
                          "Failed to populate recv umr[%d,%d]", req->seq_index,
                          i);
                 return status;
@@ -396,13 +397,13 @@ ucc_status_t ucc_tl_mhba_populate_send_recv_mkeys(ucc_tl_mhba_team_t *    team,
     return UCC_OK;
 }
 
-static void update_mkey_entry(ucc_tl_mhba_node_t *    node,
-                              ucc_tl_mhba_schedule_t *req, int direction_send,
-                              ucc_tl_mhba_lib_t *lib)
+static void update_mkey_entry(ucc_tl_mlx5_node_t *    node,
+                              ucc_tl_mlx5_schedule_t *req, int direction_send,
+                              ucc_tl_mlx5_lib_t *lib)
 {
     struct mlx5dv_mr_interleaved *mkey_entry;
-    ucc_tl_mhba_team_t *    team =
-        ucc_derived_of(req->super.super.team, ucc_tl_mhba_team_t);
+    ucc_tl_mlx5_team_t *    team =
+        ucc_derived_of(req->super.super.team, ucc_tl_mlx5_team_t);
 
     struct ibv_mr *buff = direction_send ? req->send_rcache_region_p->mr
                                          : req->recv_rcache_region_p->mr;
@@ -460,9 +461,9 @@ static void update_mkey_entry(ucc_tl_mhba_node_t *    node,
  * @param node struct of the current process's node
  * @param req AlltoAll operation request object
  */
-ucc_status_t ucc_tl_mhba_update_mkeys_entries(ucc_tl_mhba_node_t *    node,
-                                              ucc_tl_mhba_schedule_t *req,
-                                              ucc_tl_mhba_lib_t *     lib)
+ucc_status_t ucc_tl_mlx5_update_mkeys_entries(ucc_tl_mlx5_node_t *    node,
+                                              ucc_tl_mlx5_schedule_t *req,
+                                              ucc_tl_mlx5_lib_t *     lib)
 {
     update_mkey_entry(node, req, 1, lib);
     update_mkey_entry(node, req, 0, lib);
@@ -473,7 +474,7 @@ ucc_status_t ucc_tl_mhba_update_mkeys_entries(ucc_tl_mhba_node_t *    node,
  * Clean UMR qp & cq
  * @param node struct of the current process's node
  */
-ucc_status_t ucc_tl_mhba_destroy_umr(ucc_tl_mhba_node_t *node,
+ucc_status_t ucc_tl_mlx5_destroy_umr(ucc_tl_mlx5_node_t *node,
 		ucc_base_lib_t * lib)
 {
     if (ibv_destroy_qp(node->ns_umr_qp.qp)) {
@@ -484,7 +485,7 @@ ucc_status_t ucc_tl_mhba_destroy_umr(ucc_tl_mhba_node_t *node,
         tl_error(lib, "umr qp destroy failed (errno=%d)", errno);
         return UCC_ERR_NO_MESSAGE;
     }
-    if (ucc_tl_mhba_destroy_mlxdv_qp(&node->s_umr_qp.in_qp) != UCC_OK) {
+    if (ucc_tl_mlx5_destroy_mlxdv_qp(&node->s_umr_qp.in_qp) != UCC_OK) {
         tl_error(lib, "umr qp destroy failed (errno=%d)", errno);
         return UCC_ERR_NO_MESSAGE;
     }
@@ -500,23 +501,23 @@ ucc_status_t ucc_tl_mhba_destroy_umr(ucc_tl_mhba_node_t *node,
  * @param node struct of the current process's node
  * @param error_mode boolean - ordinary destroy or destroy due to an earlier error
  */
-ucc_status_t ucc_tl_mhba_destroy_mkeys(ucc_tl_mhba_team_t *team, int error_mode)
+ucc_status_t ucc_tl_mlx5_destroy_mkeys(ucc_tl_mlx5_team_t *team, int error_mode)
 {
     int                 i, j;
-    ucc_tl_mhba_node_t *node   = &team->node;
+    ucc_tl_mlx5_node_t *node   = &team->node;
     ucc_status_t        status = UCC_OK;
     for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
         for (j = 0; j < team->max_num_of_columns; j++) {
             if (mlx5dv_destroy_mkey(node->ops[i].send_mkeys[j])) {
                 if (!error_mode) {
-                    tl_error(UCC_TL_MHBA_TEAM_LIB(team),
+                    tl_error(UCC_TL_MLX5_TEAM_LIB(team),
                              "mkey destroy failed(errno=%d)", errno);
                     status = UCC_ERR_NO_MESSAGE;
                 }
             }
             if (mlx5dv_destroy_mkey(node->ops[i].recv_mkeys[j])) {
                 if (!error_mode) {
-                    tl_error(UCC_TL_MHBA_TEAM_LIB(team),
+                    tl_error(UCC_TL_MLX5_TEAM_LIB(team),
                              "mkey destroy failed(errno=%d)", errno);
                     status = UCC_ERR_NO_MESSAGE;
                 }
@@ -527,7 +528,7 @@ ucc_status_t ucc_tl_mhba_destroy_mkeys(ucc_tl_mhba_team_t *team, int error_mode)
     }
     if (mlx5dv_destroy_mkey(node->team_recv_mkey)) {
         if (!error_mode) {
-            tl_error(UCC_TL_MHBA_TEAM_LIB(team),
+            tl_error(UCC_TL_MLX5_TEAM_LIB(team),
                      "mkey destroy failed(errno=%d)", errno);
             status = UCC_ERR_NO_MESSAGE;
         }

@@ -1,9 +1,10 @@
-/*
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+/**
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ *
  * See file LICENSE for terms.
  */
 
-#include "tl_mhba_ib.h"
+#include "tl_mlx5_ib.h"
 #include "utils/arch/cpu.h"
 
 #define SQ_WQE_SHIFT 6
@@ -17,8 +18,8 @@ struct mlx5_wqe_umr_pointer_seg {
 };
 
 ucc_status_t
-ucc_tl_mhba_ibv_qp_to_mlx5dv_qp(struct ibv_qp *                 umr_qp,
-                                struct ucc_tl_mhba_internal_qp *mqp, ucc_tl_mhba_lib_t *lib)
+ucc_tl_mlx5_ibv_qp_to_mlx5dv_qp(struct ibv_qp *                 umr_qp,
+                                struct ucc_tl_mlx5_internal_qp *mqp, ucc_tl_mlx5_lib_t *lib)
 {
     struct mlx5dv_obj dv_obj;
     memset((void *)&dv_obj, 0, sizeof(struct mlx5dv_obj));
@@ -38,13 +39,13 @@ ucc_tl_mhba_ibv_qp_to_mlx5dv_qp(struct ibv_qp *                 umr_qp,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mhba_destroy_mlxdv_qp(struct ucc_tl_mhba_internal_qp *mqp)
+ucc_status_t ucc_tl_mlx5_destroy_mlxdv_qp(struct ucc_tl_mlx5_internal_qp *mqp)
 {
     ucs_spinlock_destroy(&mqp->qp_spinlock);
     return UCC_OK;
 }
 
-static inline void post_send_db(struct ucc_tl_mhba_internal_qp *mqp, int nreq,
+static inline void post_send_db(struct ucc_tl_mlx5_internal_qp *mqp, int nreq,
                                 void *ctrl)
 {
     if (ucs_unlikely(!nreq))
@@ -69,20 +70,20 @@ static inline void post_send_db(struct ucc_tl_mhba_internal_qp *mqp, int nreq,
     mqp->offset ^= mqp->qp.bf.size;
 }
 
-void ucc_tl_mhba_wr_start(struct ucc_tl_mhba_internal_qp *mqp)
+void ucc_tl_mlx5_wr_start(struct ucc_tl_mlx5_internal_qp *mqp)
 {
     ucs_spin_lock(&mqp->qp_spinlock);
     mqp->nreq = 0;
 }
 
-void ucc_tl_mhba_wr_complete(struct ucc_tl_mhba_internal_qp *mqp)
+void ucc_tl_mlx5_wr_complete(struct ucc_tl_mlx5_internal_qp *mqp)
 {
     post_send_db(mqp, mqp->nreq, mqp->cur_ctrl);
     ucs_spin_unlock(&mqp->qp_spinlock);
 }
 
 static inline void common_wqe_init(struct ibv_qp_ex *              ibqp,
-                                   struct ucc_tl_mhba_internal_qp *mqp,
+                                   struct ucc_tl_mlx5_internal_qp *mqp,
                                    int opcode)
 {
     struct mlx5_wqe_ctrl_seg *ctrl;
@@ -110,7 +111,7 @@ static inline void common_wqe_init(struct ibv_qp_ex *              ibqp,
     mqp->cur_ctrl = ctrl;
 }
 
-static inline void common_wqe_finilize(struct ucc_tl_mhba_internal_qp *mqp)
+static inline void common_wqe_finilize(struct ucc_tl_mlx5_internal_qp *mqp)
 {
     mqp->cur_ctrl->qpn_ds = htobe32(mqp->cur_size | (mqp->qp_num << 8));
 
@@ -122,7 +123,7 @@ static inline void common_wqe_finilize(struct ucc_tl_mhba_internal_qp *mqp)
  * While the repeat entry contains details on the list of the block_entries.
  */
 static void umr_strided_seg_create_noninline(
-    struct ucc_tl_mhba_internal_qp *mqp, uint32_t repeat_count,
+    struct ucc_tl_mlx5_internal_qp *mqp, uint32_t repeat_count,
     uint16_t num_interleaved, struct mlx5dv_mr_interleaved *data, void *seg,
     void *qend, uint32_t ptr_mkey, void *ptr_address, int *wqe_size,
     int *xlat_size, uint64_t *reglen)
@@ -187,8 +188,8 @@ static inline uint8_t get_umr_mr_flags(uint32_t acc)
 }
 
 /* External API to expose the non-inline UMR registration */
-ucc_status_t ucc_tl_mhba_send_wr_mr_noninline(
-    struct ucc_tl_mhba_internal_qp *mqp, struct mlx5dv_mkey *dv_mkey,
+ucc_status_t ucc_tl_mlx5_send_wr_mr_noninline(
+    struct ucc_tl_mlx5_internal_qp *mqp, struct mlx5dv_mkey *dv_mkey,
     uint32_t access_flags, uint32_t repeat_count, uint16_t num_entries,
     struct mlx5dv_mr_interleaved *data, uint32_t ptr_mkey, void *ptr_address,
     struct ibv_qp_ex *ibqp)
@@ -266,7 +267,7 @@ typedef struct transpose_seg {
 } transpose_seg_t;
 
 /* External API to expose the non-inline UMR registration */
-ucc_status_t ucc_tl_mhba_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey, uint32_t dst_mr_key,
+ucc_status_t ucc_tl_mlx5_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey, uint32_t dst_mr_key,
                                         uintptr_t src_mkey_addr, uintptr_t dst_addr,
                                         uint32_t element_size, uint16_t ncols, uint16_t nrows)
 {

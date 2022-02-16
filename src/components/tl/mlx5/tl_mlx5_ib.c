@@ -1,11 +1,12 @@
-/*
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+/**
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ *
  * See file LICENSE for terms.
  */
 
-#include "tl_mhba_ib.h"
+#include "tl_mlx5_ib.h"
 
-ucc_status_t ucc_tl_mhba_create_ibv_ctx(char **               ib_devname,
+ucc_status_t ucc_tl_mlx5_create_ibv_ctx(char **               ib_devname,
                                         struct ibv_context **ctx, ucc_base_lib_t *lib)
 {
     struct ibv_device **       dev_list = ibv_get_device_list(NULL);
@@ -41,7 +42,7 @@ ucc_status_t ucc_tl_mhba_create_ibv_ctx(char **               ib_devname,
     return UCC_OK;
 }
 
-int ucc_tl_mhba_check_port_active(struct ibv_context *ctx, int port_num)
+int ucc_tl_mlx5_check_port_active(struct ibv_context *ctx, int port_num)
 {
     struct ibv_port_attr port_attr;
 
@@ -53,14 +54,14 @@ int ucc_tl_mhba_check_port_active(struct ibv_context *ctx, int port_num)
     return 0;
 }
 
-int ucc_tl_mhba_get_active_port(struct ibv_context *ctx)
+int ucc_tl_mlx5_get_active_port(struct ibv_context *ctx)
 {
     struct ibv_device_attr device_attr;
     int                    i;
 
     ibv_query_device(ctx, &device_attr);
     for (i = 1; i <= device_attr.phys_port_cnt; i++) {
-        if (ucc_tl_mhba_check_port_active(ctx, i)) {
+        if (ucc_tl_mlx5_check_port_active(ctx, i)) {
             return i;
         }
     }
@@ -70,7 +71,7 @@ int ucc_tl_mhba_get_active_port(struct ibv_context *ctx)
 
 
 
-ucc_status_t ucc_tl_mhba_qp_connect(struct ibv_qp *qp, uint32_t qp_num,
+ucc_status_t ucc_tl_mlx5_qp_connect(struct ibv_qp *qp, uint32_t qp_num,
                                     uint16_t lid, int port, ucc_base_lib_t *lib)
 {
     int                ret;
@@ -133,11 +134,11 @@ ucc_status_t ucc_tl_mhba_qp_connect(struct ibv_qp *qp, uint32_t qp_num,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mhba_init_dc_qps_and_connect(ucc_tl_mhba_team_t *team,
+ucc_status_t ucc_tl_mlx5_init_dc_qps_and_connect(ucc_tl_mlx5_team_t *team,
                                                  uint32_t *          qpn,
                                                  uint8_t             port_num)
 {
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     int                        i;
     struct ibv_qp_init_attr_ex attr_ex;
     struct mlx5dv_qp_init_attr attr_dv;
@@ -307,10 +308,10 @@ fail:
     return UCC_ERR_NO_MESSAGE;
 }
 
-ucc_status_t ucc_tl_mhba_create_rc_qps(ucc_tl_mhba_team_t *team,
+ucc_status_t ucc_tl_mlx5_create_rc_qps(ucc_tl_mlx5_team_t *team,
                                        uint32_t *          qpns)
 {
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     struct ibv_qp_init_attr qp_init_attr;
     int                     i;
     memset(&qp_init_attr, 0, sizeof(qp_init_attr));
@@ -354,10 +355,10 @@ fail_after_malloc:
     return UCC_ERR_NO_MESSAGE;
 }
 
-ucc_status_t ucc_tl_mhba_create_ah(struct ibv_ah **ah_ptr, uint16_t lid,
-                                   uint8_t port_num, ucc_tl_mhba_team_t *team)
+ucc_status_t ucc_tl_mlx5_create_ah(struct ibv_ah **ah_ptr, uint16_t lid,
+                                   uint8_t port_num, ucc_tl_mlx5_team_t *team)
 {
-    ucc_tl_mhba_context_t *ctx = UCC_TL_MHBA_TEAM_CTX(team);
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     struct ibv_ah_attr ah_attr;
     memset(&ah_attr, 0, sizeof(struct ibv_ah_attr));
 
