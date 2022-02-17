@@ -33,11 +33,21 @@ extern const char
 
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
-    uint32_t        send_posted;
-    uint32_t        send_completed;
-    uint32_t        recv_posted;
-    uint32_t        recv_completed;
-    uint32_t        tag;
+    union {
+        struct {
+            uint32_t        send_posted;
+            uint32_t        send_completed;
+            uint32_t        recv_posted;
+            uint32_t        recv_completed;
+            uint32_t        tag;
+        } tagged;
+        struct {
+            uint32_t        put_posted;
+            uint32_t        put_completed;
+            uint32_t        get_posted;
+            uint32_t        get_completed;
+        } onesided;
+    };
     uint32_t        n_polls;
     ucc_subset_t    subset;
     union {
@@ -115,11 +125,11 @@ typedef struct ucc_tl_ucp_schedule {
 
 static inline void ucc_tl_ucp_task_reset(ucc_tl_ucp_task_t *task)
 {
-    task->send_posted        = 0;
-    task->send_completed     = 0;
-    task->recv_posted        = 0;
-    task->recv_completed     = 0;
-    task->super.super.status = UCC_INPROGRESS;
+    task->tagged.send_posted    = 0;
+    task->tagged.send_completed = 0;
+    task->tagged.recv_posted    = 0;
+    task->tagged.recv_completed = 0;
+    task->super.super.status    = UCC_INPROGRESS;
 }
 
 static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
@@ -177,7 +187,7 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
 
     ucc_coll_task_init(&task->super, coll_args, team);
-    task->tag            = tl_team->seq_num;
+    task->tagged.tag     = tl_team->seq_num;
     tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
     task->super.finalize = ucc_tl_ucp_coll_finalize;
     task->super.triggered_post = ucc_triggered_post;
@@ -185,8 +195,8 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
 }
 
 #define UCC_TL_UCP_TASK_P2P_COMPLETE(_task)                                    \
-    (((_task)->send_posted == (_task)->send_completed) &&                      \
-     ((_task)->recv_posted == (_task)->recv_completed))
+    (((_task)->tagged.send_posted == (_task)->tagged.send_completed) &&        \
+     ((_task)->tagged.recv_posted == (_task)->tagged.recv_completed))
 
 static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
 {

@@ -38,7 +38,33 @@ void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                  ucs_status_string(status));
         task->super.super.status = ucs_status_to_ucc_status(status);
     }
-    task->send_completed++;
+    task->tagged.send_completed++;
+    ucp_request_free(request);
+}
+
+void ucc_tl_ucp_put_completion_cb(void *request, ucs_status_t status,
+                                  void *user_data)
+{
+    ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
+    if (ucc_unlikely(UCS_OK != status)) {
+        tl_error(UCC_TASK_LIB(task), "failure in put completion %s",
+                 ucs_status_string(status));
+        task->super.super.status = ucs_status_to_ucc_status(status);
+    }
+    task->onesided.put_completed++;
+    ucp_request_free(request);
+}
+
+void ucc_tl_ucp_get_completion_cb(void *request, ucs_status_t status,
+                                  void *user_data)
+{
+    ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
+    if (ucc_unlikely(UCS_OK != status)) {
+        tl_error(UCC_TASK_LIB(task), "failure in get completion %s",
+                 ucs_status_string(status));
+        task->super.super.status = ucs_status_to_ucc_status(status);
+    }
+    task->onesided.get_completed++;
     ucp_request_free(request);
 }
 
@@ -52,7 +78,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
                  ucs_status_string(status));
         task->super.super.status = ucs_status_to_ucc_status(status);
     }
-    task->recv_completed++;
+    task->tagged.recv_completed++;
     ucp_request_free(request);
 }
 
