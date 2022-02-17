@@ -14,7 +14,6 @@
 #include <infiniband/verbs.h>
 #include <infiniband/mlx5dv.h>
 #include "utils/arch/cpu.h"
-/* #include "tl_mlx5_mkeys.h" */
 
 #ifndef UCC_TL_MLX5_DEFAULT_SCORE
 #define UCC_TL_MLX5_DEFAULT_SCORE 1
@@ -50,7 +49,6 @@ extern ucc_tl_mlx5_iface_t ucc_tl_mlx5;
 
 typedef struct ucc_tl_mlx5_lib_config {
     ucc_tl_lib_config_t super;
-
     int    transpose;
     int    asr_barrier;
     size_t transpose_buf_size;
@@ -148,10 +146,8 @@ typedef struct ucc_tl_mlx5_node {
     ucc_tl_mlx5_op_t       ops[MAX_OUTSTANDING_OPS];
     struct mlx5dv_mkey *team_recv_mkey;
     struct ibv_cq *     umr_cq;
-    struct ucc_tl_mlx5_mlx5_qp
-        ns_umr_qp; // Non-strided - used for team UMR hirerchy
-    struct ucc_tl_mlx5_qp
-          s_umr_qp; // Strided - used for operation send/recv mkey hirerchy
+    struct ucc_tl_mlx5_mlx5_qp ns_umr_qp; // Non-strided - used for team UMR hirerchy
+    struct ucc_tl_mlx5_qp s_umr_qp; // Strided - used for operation send/recv mkey hirerchy
     void *umr_entries_buf;
     struct ibv_mr *umr_entries_mr;
 } ucc_tl_mlx5_node_t;
@@ -248,7 +244,6 @@ typedef struct ucc_tl_mlx5_team {
     void *                   transpose_buf;
     struct ibv_mr *          transpose_buf_mr;
     ucc_service_coll_req_t  *scoll_req;
-
     void *                   oob_req;
     ucc_tl_mlx5_bcast_data_t bcast_data;
     ucc_status_t             status;
@@ -256,7 +251,6 @@ typedef struct ucc_tl_mlx5_team {
     ucc_mpool_t              dm_pool;
     struct ibv_dm           *dm_ptr;
     struct ibv_mr *          dm_mr;
-
 } ucc_tl_mlx5_team_t;
 UCC_CLASS_DECLARE(ucc_tl_mlx5_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
@@ -286,8 +280,8 @@ UCC_CLASS_DECLARE(ucc_tl_mlx5_team_t, ucc_base_context_t *,
 
 enum
 {
-    UCC_MLX5_NEED_SEND_MKEY_UPDATE = UCS_BIT(1),
-    UCC_MLX5_NEED_RECV_MKEY_UPDATE = UCS_BIT(2),
+    UCC_MLX5_NEED_SEND_MKEY_UPDATE = UCC_BIT(1),
+    UCC_MLX5_NEED_RECV_MKEY_UPDATE = UCC_BIT(2),
 };
 
 ucc_status_t tl_mlx5_create_rcache(ucc_tl_mlx5_context_t *ctx);

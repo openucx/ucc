@@ -642,6 +642,7 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
                     dm_addr = dm->offset; // dm reg mr 0 based
                 }
 
+                //todo : start/end for RC ?
                 status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
                                                     team->node.ops[task->seq_index].send_mkeys[0]->lkey,
                                                     team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,

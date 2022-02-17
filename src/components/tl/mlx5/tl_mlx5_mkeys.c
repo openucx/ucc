@@ -233,17 +233,22 @@ static ucc_status_t populate_strided_mkey(ucc_tl_mlx5_team_t *team,
 {
     ucc_status_t        status;
     ucc_tl_mlx5_node_t *node = &team->node;
-    ucc_tl_mlx5_wr_start(&node->s_umr_qp.in_qp);
-    ucc_tl_mlx5_send_wr_mr_noninline(
-        &node->s_umr_qp.in_qp, mkey, mem_access_flags, repeat_count,
-        node->sbgp->group_size, (struct mlx5dv_mr_interleaved *)mkey_entries,
-        team->node.umr_entries_mr->lkey, team->node.umr_entries_buf,
-        team->node.s_umr_qp.mlx5_qp.qpx);
-    tl_debug(UCC_TL_MLX5_TEAM_LIB(team),
-             "Execute the UMR WQE for populating the send/recv "
-             "MasterMKey lkey 0x%x",
-             mkey->lkey);
-    ucc_tl_mlx5_wr_complete(&node->s_umr_qp.in_qp);
+    /* ucc_tl_mlx5_wr_start(&node->s_umr_qp.in_qp); */
+    /* ucc_tl_mlx5_send_wr_mr_noninline( */
+    /*     &node->s_umr_qp.in_qp, mkey, mem_access_flags, repeat_count, */
+    /*     node->sbgp->group_size, (struct mlx5dv_mr_interleaved *)mkey_entries, */
+    /*     team->node.umr_entries_mr->lkey, team->node.umr_entries_buf, */
+    /*     team->node.s_umr_qp.mlx5_qp.qpx); */
+    /* tl_debug(UCC_TL_MLX5_TEAM_LIB(team), */
+    /*          "Execute the UMR WQE for populating the send/recv " */
+    /*          "MasterMKey lkey 0x%x", */
+    /*          mkey->lkey); */
+    /* ucc_tl_mlx5_wr_complete(&node->s_umr_qp.in_qp); */
+
+    ucc_tl_mlx5_post_umr(node->s_umr_qp.mlx5_qp.qp, mkey, mem_access_flags, repeat_count,
+                         node->sbgp->group_size, (struct mlx5dv_mr_interleaved *)mkey_entries,
+                         team->node.umr_entries_mr->lkey, team->node.umr_entries_buf);
+
     status = poll_umr_cq(node, UCC_TL_MLX5_TEAM_LIB(team));
     if (status != UCC_OK) {
         return status;

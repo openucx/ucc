@@ -68,9 +68,6 @@ int ucc_tl_mlx5_get_active_port(struct ibv_context *ctx)
     return -1;
 }
 
-
-
-
 ucc_status_t ucc_tl_mlx5_qp_connect(struct ibv_qp *qp, uint32_t qp_num,
                                     uint16_t lid, int port, ucc_base_lib_t *lib)
 {
