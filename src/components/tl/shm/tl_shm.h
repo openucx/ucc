@@ -11,6 +11,7 @@
 #include "components/tl/ucc_tl_log.h"
 #include "utils/ucc_mpool.h"
 #include "utils/ucc_math.h"
+#include "utils/arch/cpu.h"
 #include "tl_shm_knomial_pattern.h"
 
 #include <assert.h> //needed?
@@ -35,7 +36,7 @@
 #define UCC_TL_SHM_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
 
 #define BCOL_SHMSEG_PROBE_COUNT 100
-//TODO take arch code from ucs ??
+//TODO take fence functions from arch/cpu.h after ucx bug is fixed
 #define SHMSEG_WMB()  __asm__ __volatile__("": : :"memory")
 #define SHMSEG_ISYNC() __asm__ __volatile__("": : :"memory")
 
@@ -130,9 +131,24 @@ typedef struct ucc_tl_shm_tree_cache {
 	ucc_tl_shm_tree_cache_elems_t *elems;
 } ucc_tl_shm_tree_cache_t;
 
+typedef struct ucc_tl_shm_perf_keys {
+	ucc_cpu_vendor_t  cpu_vendor;
+	ucc_cpu_model_t   cpu_model;
+	ucc_rank_t        team_size;
+	void             *bcast_func;
+	void             *reduce_func;
+} ucc_tl_shm_perf_keys_t;
+
+typedef struct ucc_tl_shm_perf_funcs {
+	size_t                  size;
+	ucc_tl_shm_perf_keys_t *keys;
+} ucc_tl_shm_perf_funcs_t;
+
 typedef struct ucc_tl_shm_team {
     ucc_tl_team_t            super;
     void                    *oob_req;
+    void                    (*perf_params_bcast)(ucc_coll_task_t*);
+    void                    (*perf_params_reduce)(ucc_coll_task_t*);
     ucc_tl_shm_seg_t        *segs;
     uint32_t                 seq_num;
     uint32_t                *last_posted;
@@ -151,6 +167,7 @@ typedef struct ucc_tl_shm_team {
     size_t                   data_size;
     size_t                   max_inline;
     ucc_tl_shm_tree_cache_t *tree_cache;
+    ucc_tl_shm_perf_funcs_t *perf_funcs;
     ucc_status_t             status;
 } ucc_tl_shm_team_t;
 

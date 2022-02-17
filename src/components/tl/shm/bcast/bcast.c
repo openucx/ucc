@@ -6,6 +6,7 @@
 #include "config.h"
 #include "../tl_shm.h"
 #include "bcast.h"
+#include "utils/arch/cpu.h"
 
 enum {
     BCAST_STAGE_START,
@@ -88,7 +89,6 @@ static ucc_status_t ucc_tl_shm_bcast_read(ucc_tl_shm_team_t *team,
         /* I'm the root of the tree and NOT is_op_root. It means the tree is
            base tree and i already have the data in my shm via top_tree step
            (read or write). Just notify children. */
-//        ucc_assert(task->tree->base_tree == tree);
         ucc_assert(my_ctrl->pi == seq_num);
         ucc_tl_shm_signal_to_children(seg, team, seq_num, tree);
         return UCC_OK;
@@ -182,6 +182,7 @@ next_stage:
     if (!is_op_root) {
         src = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team, rank);
         memcpy(args.src.info.buffer, src, data_size);
+        SHMSEG_WMB(); //needed?
     }
 
     my_ctrl->ci = task->seq_num;
@@ -265,6 +266,7 @@ next_stage:
         src = is_inline ? parent_ctrl->data : ucc_tl_shm_get_data(seg, team,
                                                                   parent);
         memcpy(args.src.info.buffer, src, data_size);
+        SHMSEG_WMB(); //needed?
     }
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
     my_ctrl->ci = task->seq_num;
@@ -345,6 +347,7 @@ next_stage:
         src         = is_inline ? parent_ctrl->data :
                                   ucc_tl_shm_get_data(seg, team, parent);
         memcpy(args.src.info.buffer, src, data_size);
+        SHMSEG_WMB(); //needed?
     }
 
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
@@ -422,6 +425,7 @@ next_stage:
     if (!is_op_root) {
         src = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team, rank);
         memcpy(args.src.info.buffer, src, data_size);
+        SHMSEG_WMB(); //needed?
     }
 
     my_ctrl->ci = task->seq_num;
@@ -461,7 +465,8 @@ ucc_status_t ucc_tl_shm_bcast_init(ucc_base_coll_args_t *coll_args,
     if (ucc_unlikely(!task)) {
         return UCC_ERR_NO_MEMORY;
     }
-    ucc_tl_shm_set_bcast_perf_params(task);
+
+    team->perf_params_bcast(&task->super);
 
     task->super.post = ucc_tl_shm_bcast_start;
     task->stage      = BCAST_STAGE_START;

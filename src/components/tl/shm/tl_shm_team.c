@@ -7,6 +7,7 @@
 #include "tl_shm.h"
 #include "tl_shm_coll.h"
 #include "tl_shm_knomial_pattern.h"
+#include "tl_shm_coll_perf_params.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
 #include "utils/ucc_sys.h"
@@ -85,6 +86,112 @@ ucc_tl_shm_group_rank_map_init(ucc_tl_shm_team_t *team)
     }
     team->group_rank_map = ucc_ep_map_from_array(&ranks, team_size,
                                                  team_size, 1);
+    return UCC_OK;
+}
+
+static inline ucc_status_t
+ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *team)
+{
+    size_t max_size = 20, size = 0; // max size is general estimate,can be changed as more archs are added for perf selection
+
+    team->perf_funcs->keys = ucc_malloc(max_size *
+                                        sizeof(ucc_tl_shm_perf_keys_t),
+                                        "perf keys");
+
+    if (!team->perf_funcs->keys) {
+        tl_error(team->super.super.context->lib,
+                 "failed to allocate %zd bytes for perf_funcs->keys",
+                 max_size * sizeof(ucc_tl_shm_perf_keys_t));
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    ucc_tl_shm_perf_keys_t intel_broadwell_28 = {
+        .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
+        .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
+        .team_size   = 28,
+        .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_28_bcast,
+        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_28_reduce
+    };
+    team->perf_funcs->keys[size] = intel_broadwell_28;
+    size++;
+
+    ucc_tl_shm_perf_keys_t intel_broadwell_14 = {
+        .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
+        .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
+        .team_size   = 14,
+        .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_14_bcast,
+        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_14_reduce
+    };
+    team->perf_funcs->keys[size] = intel_broadwell_14;
+    size++;
+
+    ucc_tl_shm_perf_keys_t intel_broadwell_8 = {
+        .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
+        .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
+        .team_size   = 8,
+        .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_8_bcast,
+        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_8_reduce
+    };
+    team->perf_funcs->keys[size] = intel_broadwell_8;
+    size++;
+
+    ucc_tl_shm_perf_keys_t intel_skylake_40 = {
+        .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
+        .cpu_model   = UCC_CPU_MODEL_INTEL_SKYLAKE,
+        .team_size   = 40,
+        .bcast_func  = ucc_tl_shm_perf_params_generic,
+        .reduce_func = ucc_tl_shm_perf_params_generic
+    };
+    team->perf_funcs->keys[size] = intel_skylake_40;
+    size++;
+
+    ucc_tl_shm_perf_keys_t amd_rome_128 = {
+        .cpu_vendor  = UCC_CPU_VENDOR_AMD,
+        .cpu_model   = UCC_CPU_MODEL_AMD_ROME,
+        .team_size   = 128,
+        .bcast_func  = ucc_tl_shm_perf_params_generic,
+        .reduce_func = ucc_tl_shm_perf_params_generic
+    };
+    team->perf_funcs->keys[size] = amd_rome_128;
+    size++;
+
+    team->perf_funcs->size = size;
+    return UCC_OK;
+}
+
+static inline ucc_status_t ucc_tl_shm_set_perf_funcs(ucc_tl_shm_team_t *team)
+{
+    ucc_rank_t team_size = UCC_TL_TEAM_SIZE(team);
+    int        set = 0, i = 0;
+    ucc_cpu_vendor_t vendor;
+    ucc_cpu_model_t  model;
+    ucc_status_t     status;
+
+    status = ucc_tl_shm_create_perf_func_list(team);
+    if (status != UCC_OK) {
+        return status;
+    }
+
+    vendor = ucc_arch_get_cpu_vendor();
+    model  = ucc_arch_get_cpu_model();
+
+	printf("model=%d, vendor=%d, team_size=%d\n", model, vendor, team_size);
+
+    for (i = 0; i < team->perf_funcs->size; i++) {
+        if (team->perf_funcs->keys[i].cpu_vendor == vendor &&
+            team->perf_funcs->keys[i].cpu_model == model &&
+            team->perf_funcs->keys[i].team_size == team_size) {
+            team->perf_params_bcast  = team->perf_funcs->keys[i].bcast_func;
+            team->perf_params_reduce = team->perf_funcs->keys[i].reduce_func;
+            set = 1;
+            printf("found perf func\n");
+            break;
+        }
+    }
+    if (!set) {
+    	team->perf_params_bcast = ucc_tl_shm_perf_params_generic;
+    	team->perf_params_reduce = ucc_tl_shm_perf_params_generic;
+    }
     return UCC_OK;
 }
 
@@ -193,9 +300,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     }
 
     if (UCC_TL_CORE_CTX(self)->topo->sock_bound != 1) {
-        /* TODO: we have just 1 base group and no top group. */
     	return UCC_ERR_NOT_SUPPORTED;
     }
+
     self->last_posted = ucc_calloc(sizeof(*self->last_posted), self->n_concurrent,
                                    "last_posted");
     if (!self->last_posted) {
@@ -312,6 +419,23 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     self->ctrl_map = ucc_ep_map_from_array_64(&rank_ctrl_offsets, team_size,
                                               team_size, 1);
 
+    self->perf_funcs = (ucc_tl_shm_perf_funcs_t *)
+                       ucc_malloc(sizeof(ucc_tl_shm_perf_funcs_t),
+                                  "perf funcs");
+
+    if (!self->perf_funcs) {
+        tl_error(ctx->super.super.lib,
+        "failed to allocate %zd bytes for perf_funcs",
+                 sizeof(ucc_tl_shm_perf_funcs_t));
+        status = UCC_ERR_NO_MEMORY;
+        goto err_perf_funcs;
+    }
+
+    status = ucc_tl_shm_set_perf_funcs(self);
+    if (UCC_OK != status) {
+        goto err_perf_func_keys;
+    }
+
     status = ucc_tl_shm_seg_alloc(self);
     if (UCC_OK != status) {
         goto err_seg_alloc;
@@ -319,6 +443,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     return UCC_OK;
 
 err_seg_alloc:
+    ucc_free(self->perf_funcs->keys);
+err_perf_func_keys:
+    ucc_free(self->perf_funcs);
+err_perf_funcs:
 //    ucc_free(self->ctrl_map.array.map);
 err_offsets:
 //    ucc_free(self->group_rank_map.array.map);
@@ -363,9 +491,8 @@ ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
     ucc_free(team->tree_cache->elems);
     ucc_free(team->tree_cache);
     ucc_free(team->last_posted);
-//    ucc_free(team->group_rank_map.array.map);
-//    ucc_free(team->rank_group_id_map.array.map);
-//    ucc_free(team->ctrl_map.array.map);
+    ucc_free(team->perf_funcs->keys);
+    ucc_free(team->perf_funcs);
     ucc_free(team->segs);
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_shm_team_t)(tl_team);
     return UCC_OK;

@@ -22,20 +22,21 @@ barrier =              \
 	barrier/barrier.h  \
 	barrier/barrier.c
 
-sources =                    \
-	tl_shm.h                 \
-	tl_shm.c                 \
-	tl_shm_lib.c             \
-	tl_shm_context.c         \
-	tl_shm_team.c            \
-	tl_shm_coll.h            \
-	tl_shm_coll.c            \
-	tl_shm_knomial_pattern.h \
-	tl_shm_knomial_pattern.c \
-	$(bcast)                 \
-	$(reduce)                \
-	$(fanin)                 \
-	$(fanout)                \
+sources =                     \
+	tl_shm.h                  \
+	tl_shm.c                  \
+	tl_shm_lib.c              \
+	tl_shm_context.c          \
+	tl_shm_team.c             \
+	tl_shm_coll.h             \
+	tl_shm_coll.c             \
+	tl_shm_coll_perf_params.h \
+	tl_shm_knomial_pattern.h  \
+	tl_shm_knomial_pattern.c  \
+	$(bcast)                  \
+	$(reduce)                 \
+	$(fanin)                  \
+	$(fanout)                 \
 	$(barrier)   
 
 module_LTLIBRARIES = libucc_tl_shm.la

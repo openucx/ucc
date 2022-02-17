@@ -73,11 +73,6 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team, ucc_rank_t root,
                                   int base_tree_only,
                                   ucc_tl_shm_tree_t **tree_p);
 
-void ucc_tl_shm_set_bcast_perf_params(ucc_tl_shm_task_t *task);
-
-void ucc_tl_shm_set_reduce_perf_params(ucc_tl_shm_task_t *task);
-
-
 static inline ucc_tl_shm_ctrl_t *ucc_tl_shm_get_ctrl(ucc_tl_shm_seg_t *seg,
                                  ucc_tl_shm_team_t *team,
                                  ucc_rank_t rank /* rank within a TL team */)

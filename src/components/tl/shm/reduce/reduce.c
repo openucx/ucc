@@ -205,7 +205,7 @@ ucc_status_t ucc_tl_shm_reduce_init(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NO_MEMORY;
     }
 
-    ucc_tl_shm_set_reduce_perf_params(task);
+    team->perf_params_reduce(&task->super);
 
     task->super.post     = ucc_tl_shm_reduce_start;
     task->super.progress = ucc_tl_shm_reduce_progress;
