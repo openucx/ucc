@@ -419,9 +419,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team)
                 return UCC_ERR_NO_MESSAGE;
                     }
 
-            team->is_dc = (UCC_TL_MLX5_TEAM_LIB(team)->cfg.rc_dc == 2)
-                ? ((net_size > RC_DC_LIMIT) ? 1 : 0)
-                : UCC_TL_MLX5_TEAM_LIB(team)->cfg.rc_dc;
+            team->is_dc = (net_size >= UCC_TL_MLX5_TEAM_LIB(team)->cfg.dc_threshold);
 
             ibv_query_port(ctx->ib_ctx, ctx->ib_port, &port_attr);
 

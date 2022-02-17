@@ -34,8 +34,9 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      "Number of parallel DCI QPs that will be used per team",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, num_dci_qps), UCC_CONFIG_TYPE_UINT},
 
-    {"RC_DC", "2", "Boolean - 1 for DC QPs, 0 for RC QPs",
-     ucc_offsetof(ucc_tl_mlx5_lib_config_t, rc_dc), UCC_CONFIG_TYPE_UINT},
+    {"DC_THRESHOLD", "128", "If number of nodes >= DC_THRESHOLD then DC QPs "
+     "are used instead of RC",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, dc_threshold), UCC_CONFIG_TYPE_UINT},
 
     {"DM_HOST", "0", "Use host registered memory instead of DM for "
      "transpose staging",

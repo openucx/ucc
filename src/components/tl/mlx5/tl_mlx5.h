@@ -30,7 +30,6 @@
 #define MAX_TRANSPOSE_SIZE           8192 // HW transpose unit is limited to matrix size
 #define MAX_MSG_SIZE                 128 // HW transpose unit is limited to element size
 #define MAX_BLOCK_SIZE               64 // from limit of Transpose unit capabilities
-#define RC_DC_LIMIT                  128
 #define DC_KEY                       1
 #define MAX_OUTSTANDING_OPS 1 //todo change - according to limitations (52 top)
 #define MIN_POLL_WC 8
@@ -52,7 +51,7 @@ typedef struct ucc_tl_mlx5_lib_config {
     int    asr_barrier;
     int    block_size;
     int    num_dci_qps;
-    int    rc_dc;
+    int    dc_threshold;;
     size_t dm_buf_size;
     size_t dm_buf_num;
     int    dm_host;
