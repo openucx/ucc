@@ -62,7 +62,7 @@ ucc_status_t ucc_tl_mlx5_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey,
     /* SET CTRL SEG */
 
     ctrl = (void*)wqe_desc;
-    uint8_t fm_ce_se =  MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE;
+    uint8_t fm_ce_se =  0;
 
     mlx5dv_set_ctrl_seg(ctrl, /* pi */ 0x0, opcode, opmode,
                         qp->qp_num, fm_ce_se, n_ds, 0x0, 0x0);

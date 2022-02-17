@@ -309,41 +309,56 @@ ucc_status_t ucc_tl_mlx5_create_rc_qps(ucc_tl_mlx5_team_t *team,
                                        uint32_t *          qpns)
 {
     ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
-    struct ibv_qp_init_attr qp_init_attr;
+    struct ibv_qp_init_attr_ex attr_ex;
+    struct mlx5dv_qp_init_attr attr_dv;
     int                     i;
-    memset(&qp_init_attr, 0, sizeof(qp_init_attr));
-    //todo change in case of non-homogenous ppn
-    qp_init_attr.send_cq = team->net.cq;
-    qp_init_attr.recv_cq = team->net.cq;
-    qp_init_attr.cap.max_send_wr =
-        (SQUARED(team->node.sbgp->group_size / 2 + 1) + 3) *
-        MAX_OUTSTANDING_OPS; // TODO switch back to fixed tx/rx
-    qp_init_attr.cap.max_recv_wr     = 0;
-    qp_init_attr.cap.max_send_sge    = 1;
-    qp_init_attr.cap.max_recv_sge    = 0;
-    qp_init_attr.cap.max_inline_data = 0;
-    qp_init_attr.qp_type             = IBV_QPT_RC;
 
-    team->net.rc_qps = ucc_malloc(sizeof(struct ibv_qp *) * team->net.net_size);
+    memset(&attr_ex, 0, sizeof(attr_ex));
+    memset(&attr_dv, 0, sizeof(attr_dv));
+
+    attr_ex.qp_type = IBV_QPT_RC;
+    attr_ex.send_cq = team->net.cq;
+    attr_ex.recv_cq = team->net.cq;
+    attr_ex.pd      = ctx->shared_pd;
+    /* Max number of send wrs per QP:
+       max_number of blocks + 1 for atomic + 1 for barrier + 1 for transpose
+       TODO: check for leftovers case ??
+    */
+    attr_ex.cap.max_send_wr =
+        (SQUARED(team->node.sbgp->group_size / 2 + 1) + 3) * MAX_OUTSTANDING_OPS;
+    attr_ex.cap.max_send_sge = 1;
+    attr_ex.comp_mask |= IBV_QP_INIT_ATTR_SEND_OPS_FLAGS | IBV_QP_INIT_ATTR_PD;
+    attr_ex.send_ops_flags = IBV_QP_EX_WITH_RDMA_WRITE |
+                             IBV_QP_EX_WITH_RDMA_WRITE_WITH_IMM |
+                             IBV_QP_EX_WITH_ATOMIC_FETCH_AND_ADD;
+    attr_dv.comp_mask |=
+         MLX5DV_QP_INIT_ATTR_MASK_QP_CREATE_FLAGS |
+        MLX5DV_QP_INIT_ATTR_MASK_SEND_OPS_FLAGS;
+    attr_dv.create_flags |= MLX5DV_QP_CREATE_DISABLE_SCATTER_TO_CQE;
+    attr_dv.send_ops_flags = MLX5DV_QP_EX_WITH_RAW_WQE;
+
+    team->net.rc_qps = ucc_malloc(sizeof(ucc_tl_mlx5_qp_t) * team->net.net_size);
     if (!team->net.rc_qps) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate asr qps array");
         goto fail_after_malloc;
     }
+
     for (i = 0; i < team->net.net_size; i++) {
-        team->net.rc_qps[i] =
-            ibv_create_qp(ctx->shared_pd, &qp_init_attr);
-        if (!team->net.rc_qps[i]) {
+        team->net.rc_qps[i].qp =
+            mlx5dv_create_qp(ctx->shared_ctx, &attr_ex, &attr_dv);
+        if (!team->net.rc_qps[i].qp) {
             tl_error(UCC_TL_TEAM_LIB(team),
                      "failed to create qp for dest %d, errno %d", i, errno);
             goto qp_creation_failure;
         }
-        qpns[i] = team->net.rc_qps[i]->qp_num;
+        team->net.rc_qps[i].qp_ex = ibv_qp_to_qp_ex(team->net.rc_qps[i].qp);
+        qpns[i] = team->net.rc_qps[i].qp->qp_num;
     }
     return UCC_OK;
 
 qp_creation_failure:
     for (i = i - 1; i >= 0; i--) {
-        if (ibv_destroy_qp(team->net.rc_qps[i])) {
+        if (ibv_destroy_qp(team->net.rc_qps[i].qp)) {
             tl_error(UCC_TL_TEAM_LIB(team), "Couldn't destroy QP");
         }
     }

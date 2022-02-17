@@ -134,6 +134,11 @@ ucc_tl_mlx5_get_rcache_reg_data(ucc_rcache_region_t *region)
 	return (ucc_tl_mlx5_reg_t *)((ptrdiff_t)region + sizeof(ucc_rcache_region_t));
 }
 
+typedef struct ucc_tl_mlx5_qp {
+    struct ibv_qp    *qp;
+    struct ibv_qp_ex *qp_ex;
+} ucc_tl_mlx5_qp_t;
+
 typedef struct net_ctrl {
     struct {
         void     *addr;
@@ -149,7 +154,7 @@ typedef struct ucc_tl_mlx5_net {
     ucc_sbgp_t *    sbgp;
     int             net_size;
     int *           rank_map;
-    struct ibv_qp **rc_qps;
+    ucc_tl_mlx5_qp_t *rc_qps;
     struct ibv_qp * dct_qp;
     struct ibv_srq *srq;
     uint32_t *      remote_dctns;

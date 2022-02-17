@@ -220,7 +220,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
             }
         } else {
             for (i = 0; i < self->net.net_size; i++) {
-                ibv_destroy_qp(self->net.rc_qps[i]);
+                ibv_destroy_qp(self->net.rc_qps[i].qp);
             }
         }
         if (self->is_dc) {
@@ -263,11 +263,6 @@ ucc_status_t ucc_tl_mlx5_team_destroy(ucc_base_team_t *tl_team)
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_mlx5_team_t)(tl_team);
     return UCC_OK;
 }
-
-            /* local_data_size = ((team->is_dc ? 1 : net_size) * sizeof(uint32_t)) + */
-                /* sizeof(uint32_t) + 2 * sizeof(uint32_t) + */
-                /* sizeof(void *) + sizeof(struct rank_data); */
-
 
 static ucc_status_t tl_mlx5_alloc_atomic(ucc_tl_mlx5_team_t *team)
 {
@@ -552,7 +547,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team)
                     return status;
                 }
             } else {
-                status = ucc_tl_mlx5_qp_connect(team->net.rc_qps[i],
+                status = ucc_tl_mlx5_qp_connect(team->net.rc_qps[i].qp,
                                        remote_data->qpn[team->net.sbgp->group_rank],
                                        remote_data->port_lid, ctx->ib_port,tl_team->context->lib);
                 if (UCC_OK != status) {

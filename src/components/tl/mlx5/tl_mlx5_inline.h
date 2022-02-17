@@ -7,131 +7,45 @@
 #ifndef UCC_TL_MLX5_INLINE_H_
 #define UCC_TL_MLX5_INLINE_H_
 
-static inline void send_block_data_dc(uint64_t src_addr, uint32_t msg_size,
-                                      uint32_t lkey, uint64_t remote_addr,
-                                      uint32_t rkey, int send_flags,
-                                      struct dci *dci_struct,
-                                      uint32_t dct_number, struct ibv_ah *ah, void *dm)
+static inline struct ibv_qp_ex*
+tl_mlx5_get_qp_ex(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 {
-    dci_struct->dc_qpex->wr_id    = (uint64_t)(uintptr_t)dm;
-    dci_struct->dc_qpex->wr_flags = send_flags;
-    ibv_wr_rdma_write(dci_struct->dc_qpex, rkey, remote_addr);
-    mlx5dv_wr_set_dc_addr(dci_struct->dc_mqpex, ah, dct_number, DC_KEY);
-    ibv_wr_set_sge(dci_struct->dc_qpex, lkey, src_addr, msg_size);
-}
-
-static inline ucc_status_t
-send_block_data_rc(struct ibv_qp *qp, uint64_t src_addr, uint32_t msg_size,
-                   uint32_t lkey, uint64_t remote_addr, uint32_t rkey,
-                   int send_flags, int with_imm, void *dm)
-{
-    struct ibv_send_wr *bad_wr;
-    struct ibv_sge      list = {
-        .addr   = src_addr,
-        .length = msg_size,
-        .lkey   = lkey,
-    };
-
-    struct ibv_send_wr wr = {
-        .wr_id      = (uint64_t)(uintptr_t)dm,
-        .sg_list    = &list,
-        .num_sge    = 1,
-        .opcode     = with_imm ? IBV_WR_RDMA_WRITE_WITH_IMM : IBV_WR_RDMA_WRITE,
-        .send_flags = send_flags,
-        .wr.rdma.remote_addr = remote_addr,
-        .wr.rdma.rkey        = rkey,
-    };
-
-    if (ibv_post_send(qp, &wr, &bad_wr)) {
-        return UCC_ERR_NO_MESSAGE;
+    if (team->is_dc) {
+        return team->net.dcis[rank % team->num_dci_qps].dc_qpex;
+    } else {
+        return team->net.rc_qps[rank].qp_ex;
     }
-    return UCC_OK;
 }
 
 static inline ucc_status_t send_block_data(ucc_tl_mlx5_team_t *team, ucc_rank_t rank,
                                            uint64_t src_addr, uint32_t msg_size,
                                            uint32_t lkey, uint64_t remote_addr, uint32_t rkey,
-                                           int send_flags, int local /*used for sw transpose only */,
-                                           void *dm)
+                                           int send_flags, void *dm)
 {
-    struct ibv_qp *qp;
-    int            dci;
+    struct ibv_qp_ex    *qp_ex;
+    struct mlx5dv_qp_ex *qp_dv;
 
-    if (!team->is_dc || local) {
-        qp = local ? team->net.umr_qp : team->net.rc_qps[rank];
-        return send_block_data_rc(qp, src_addr, msg_size, lkey, remote_addr, rkey, send_flags,
-                                  local ? 1 : 0, dm);
-    } else {
-        dci = rank % team->num_dci_qps;
-        send_block_data_dc(src_addr,  msg_size, lkey, remote_addr, rkey, send_flags,
-                           &team->net.dcis[dci], team->net.remote_dctns[rank],
-                           team->net.ahs[rank], dm);
+    qp_ex = tl_mlx5_get_qp_ex(team, rank);
+    qp_ex->wr_id = (uint64_t)(uintptr_t)dm;
+    qp_ex->wr_flags = send_flags | IBV_SEND_FENCE;
+    ibv_wr_rdma_write(qp_ex, rkey, remote_addr);
+    if (team->is_dc) {
+        qp_dv = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
+        mlx5dv_wr_set_dc_addr(qp_dv, team->net.ahs[rank],
+                              team->net.remote_dctns[rank], DC_KEY);
     }
+    ibv_wr_set_sge(qp_ex, lkey, src_addr, msg_size);
     return UCC_OK;
 }
 
 static inline void send_start(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 {
-    int dci;
-
-    if (team->is_dc) {
-        dci = rank % team->num_dci_qps;
-        ibv_wr_start(team->net.dcis[dci].dc_qpex);
-    }
+    ibv_wr_start(tl_mlx5_get_qp_ex(team, rank));
 }
 
 static inline ucc_status_t send_done(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 {
-    int dci;
-
-    if (team->is_dc) {
-        dci = rank % team->num_dci_qps;
-        if (ibv_wr_complete(team->net.dcis[dci].dc_qpex)) {
-            return UCC_ERR_NO_MESSAGE;
-        }
-    }
-    return UCC_OK;
-}
-
-static inline void
-send_atomic_dc(uint64_t remote_addr, uint32_t rkey, struct dci *dci_struct,
-               uint32_t dct_number, struct ibv_ah *ah, ucc_tl_mlx5_team_t *team,
-               uint64_t value)
-{
-    dci_struct->dc_qpex->wr_id    = value;
-    dci_struct->dc_qpex->wr_flags = IBV_SEND_SIGNALED;
-    ibv_wr_atomic_fetch_add(dci_struct->dc_qpex, rkey, remote_addr, 1ULL);
-    mlx5dv_wr_set_dc_addr(dci_struct->dc_mqpex, ah, dct_number, DC_KEY);
-    ibv_wr_set_sge(dci_struct->dc_qpex, team->dummy_bf_mr->lkey,
-                   (uint64_t)team->dummy_bf_mr->addr,
-                   team->dummy_bf_mr->length);
-}
-
-static inline ucc_status_t send_atomic_rc(struct ibv_qp *qp,
-                                          uint64_t remote_addr, uint32_t rkey,
-                                          ucc_tl_mlx5_team_t *    team,
-                                          uint64_t value)
-{
-    struct ibv_send_wr *bad_wr;
-    struct ibv_sge      list = {
-        .addr   = (uint64_t)team->dummy_bf_mr->addr,
-        .length = team->dummy_bf_mr->length,
-        .lkey   = team->dummy_bf_mr->lkey,
-    };
-
-    struct ibv_send_wr wr = {
-        .wr_id                 = value,
-        .sg_list               = &list,
-        .num_sge               = 1,
-        .opcode                = IBV_WR_ATOMIC_FETCH_AND_ADD,
-        .send_flags            = IBV_SEND_SIGNALED,
-        .wr.atomic.remote_addr = remote_addr,
-        .wr.atomic.rkey        = rkey,
-        .wr.atomic.compare_add = 1ULL,
-    };
-
-    if (ibv_post_send(qp, &wr, &bad_wr)) {
-        tl_error(UCC_TL_MLX5_TEAM_LIB(team),"failed to post atomic send");
+    if (ibv_wr_complete(tl_mlx5_get_qp_ex(team, rank))) {
         return UCC_ERR_NO_MESSAGE;
     }
     return UCC_OK;
@@ -141,17 +55,21 @@ static inline ucc_status_t send_atomic(ucc_tl_mlx5_team_t *team, ucc_rank_t rank
                                        void *remote_addr, uint32_t rkey,
                                        uint64_t value)
 {
-    int dci;
+    struct ibv_qp_ex    *qp_ex;
+    struct mlx5dv_qp_ex *qp_dv;
 
-    if (!team->is_dc) {
-        return send_atomic_rc(team->net.rc_qps[rank], (uintptr_t)remote_addr,
-                              rkey, team, value);
-    } else {
-        dci = rank % team->num_dci_qps;
-        send_atomic_dc((uintptr_t)remote_addr, rkey, &team->net.dcis[dci],
-                       team->net.remote_dctns[rank], team->net.ahs[rank],
-                       team, value);
+    qp_ex = tl_mlx5_get_qp_ex(team, rank);
+    qp_ex->wr_id = value;
+    qp_ex->wr_flags = IBV_SEND_SIGNALED;
+    ibv_wr_atomic_fetch_add(qp_ex, rkey, (uintptr_t)remote_addr, 1ULL);
+    if (team->is_dc) {
+        qp_dv = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
+        mlx5dv_wr_set_dc_addr(qp_dv, team->net.ahs[rank],
+                              team->net.remote_dctns[rank], DC_KEY);
     }
+    ibv_wr_set_sge(qp_ex, team->dummy_bf_mr->lkey,
+                   (uint64_t)team->dummy_bf_mr->addr,
+                   team->dummy_bf_mr->length);
     return UCC_OK;
 }
 
@@ -220,7 +138,7 @@ tl_mlx5_get_qp(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
     if (team->is_dc) {
         return team->net.dcis[rank % team->num_dci_qps].dci_qp;
     } else {
-        return team->net.rc_qps[rank];
+        return team->net.rc_qps[rank].qp;
     }
 }
 #endif
