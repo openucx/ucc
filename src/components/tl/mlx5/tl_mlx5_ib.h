@@ -26,24 +26,6 @@ ucc_status_t ucc_tl_mlx5_create_rc_qps(ucc_tl_mlx5_team_t *team,
                                        uint32_t *          local_data);
 ucc_status_t ucc_tl_mlx5_create_ah(struct ibv_ah **ah_ptr, uint16_t lid,
                                    uint8_t port_num, ucc_tl_mlx5_team_t *team);
-ucc_status_t
-ucc_tl_mlx5_ibv_qp_to_mlx5dv_qp(struct ibv_qp *                 umr_qp,
-                                struct ucc_tl_mlx5_internal_qp *mqp, ucc_tl_mlx5_lib_t *lib);
-
-ucc_status_t ucc_tl_mlx5_destroy_mlxdv_qp(struct ucc_tl_mlx5_internal_qp *mqp);
-
-void ucc_tl_mlx5_wr_start(struct ucc_tl_mlx5_internal_qp *mqp);
-
-void ucc_tl_mlx5_wr_complete(struct ucc_tl_mlx5_internal_qp *mqp);
-
-ucc_status_t ucc_tl_mlx5_send_wr_mr_noninline(
-    struct ucc_tl_mlx5_internal_qp *mqp, struct mlx5dv_mkey *dv_mkey,
-    uint32_t access_flags, uint32_t repeat_count, uint16_t num_entries,
-    struct mlx5dv_mr_interleaved *data, uint32_t ptr_mkey, void *ptr_address,
-    struct ibv_qp_ex *ibqp);
-
-ucc_status_t ucc_tl_mlx5_init_umr(ucc_tl_mlx5_context_t *ctx,
-                                  ucc_tl_mlx5_node_t *   node);
 
 ucc_status_t ucc_tl_mlx5_init_mkeys(ucc_tl_mlx5_team_t *team);
 

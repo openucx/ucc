@@ -17,34 +17,6 @@ struct mlx5_wqe_umr_pointer_seg {
     __be64 address;
 };
 
-ucc_status_t
-ucc_tl_mlx5_ibv_qp_to_mlx5dv_qp(struct ibv_qp *                 umr_qp,
-                                struct ucc_tl_mlx5_internal_qp *mqp, ucc_tl_mlx5_lib_t *lib)
-{
-    struct mlx5dv_obj dv_obj;
-    memset((void *)&dv_obj, 0, sizeof(struct mlx5dv_obj));
-    dv_obj.qp.in  = umr_qp;
-    dv_obj.qp.out = &mqp->qp;
-    mqp->qp_num   = umr_qp->qp_num;
-    if (mlx5dv_init_obj(&dv_obj, MLX5DV_OBJ_QP)) {
-        tl_error(lib, "mlx5dv_init failed - errno %d", errno);
-        return UCC_ERR_NO_MESSAGE;
-    }
-    mqp->sq_cur_post = 0;
-    mqp->sq_qend     = mqp->qp.sq.buf + (mqp->qp.sq.wqe_cnt << SQ_WQE_SHIFT);
-    mqp->fm_cache    = 0;
-    mqp->sq_start    = mqp->qp.sq.buf;
-    mqp->offset      = 0;
-    ucs_spinlock_init(&mqp->qp_spinlock, 0);
-    return UCC_OK;
-}
-
-ucc_status_t ucc_tl_mlx5_destroy_mlxdv_qp(struct ucc_tl_mlx5_internal_qp *mqp)
-{
-    ucs_spinlock_destroy(&mqp->qp_spinlock);
-    return UCC_OK;
-}
-
 static inline uint8_t get_umr_mr_flags(uint32_t acc)
 {
     return ((acc & IBV_ACCESS_REMOTE_ATOMIC

@@ -12,14 +12,15 @@
 #include <infiniband/verbs.h>
 #include <infiniband/mlx5dv.h>
 
-static ucc_status_t create_umr_qp(struct ucc_tl_mlx5_mlx5_qp *mlx5_qp,
-                                  ucc_tl_mlx5_node_t *        node,
+static ucc_status_t create_umr_qp(struct ibv_qp **qp,
+                                  struct ibv_cq  *cq,
                                   ucc_tl_mlx5_context_t *     ctx)
 {
     struct ibv_qp_init_attr_ex umr_init_attr_ex;
     struct mlx5dv_qp_init_attr umr_mlx5dv_qp_attr;
     struct ibv_port_attr       port_attr;
     ucc_status_t               status = UCC_OK;
+    struct ibv_qp_ex    *qp_ex;
 
     tl_debug(UCC_TL_CTX_LIB(ctx), "Create UMR QP");
 
@@ -32,8 +33,8 @@ static ucc_status_t create_umr_qp(struct ucc_tl_mlx5_mlx5_qp *mlx5_qp,
     umr_mlx5dv_qp_attr.send_ops_flags =
         MLX5DV_QP_EX_WITH_MR_LIST | MLX5DV_QP_EX_WITH_MR_INTERLEAVED;
 
-    umr_init_attr_ex.send_cq          = node->umr_cq;
-    umr_init_attr_ex.recv_cq          = node->umr_cq;
+    umr_init_attr_ex.send_cq          = cq;
+    umr_init_attr_ex.recv_cq          = cq;
     umr_init_attr_ex.cap.max_send_wr  = 1;
     umr_init_attr_ex.cap.max_recv_wr  = 1;
     umr_init_attr_ex.cap.max_send_sge = 1;
@@ -49,16 +50,17 @@ static ucc_status_t create_umr_qp(struct ucc_tl_mlx5_mlx5_qp *mlx5_qp,
         IBV_QP_INIT_ATTR_SEND_OPS_FLAGS | IBV_QP_INIT_ATTR_PD;
     umr_init_attr_ex.pd = ctx->shared_pd;
     umr_init_attr_ex.send_ops_flags |= IBV_QP_EX_WITH_SEND;
-    mlx5_qp->qp = mlx5dv_create_qp(ctx->shared_ctx, &umr_init_attr_ex,
+    *qp = mlx5dv_create_qp(ctx->shared_ctx, &umr_init_attr_ex,
                                    &umr_mlx5dv_qp_attr);
-    if (mlx5_qp->qp == NULL) {
+    if (*qp == NULL) {
         tl_error(UCC_TL_CTX_LIB(ctx), "UMR QP creation failed");
         return UCC_ERR_NO_MESSAGE;
     }
     tl_debug(UCC_TL_CTX_LIB(ctx),"UMR QP created. Returned with cap.max_inline_data = %d",
              umr_init_attr_ex.cap.max_inline_data);
-    mlx5_qp->qpx = ibv_qp_to_qp_ex(mlx5_qp->qp);
-    if (mlx5_qp->qpx == NULL) {
+
+    qp_ex = ibv_qp_to_qp_ex(*qp);
+    if (qp_ex == NULL) {
         tl_error(UCC_TL_CTX_LIB(ctx), "UMR qp_ex creation failed");
         status = UCC_ERR_NO_MESSAGE;
         goto failure;
@@ -66,21 +68,15 @@ static ucc_status_t create_umr_qp(struct ucc_tl_mlx5_mlx5_qp *mlx5_qp,
 
     // Turning on the IBV_SEND_SIGNALED option, will cause the reported work comletion to be with MLX5DV_WC_UMR opcode.
     // The option IBV_SEND_INLINE is required by the current API.
-    mlx5_qp->qpx->wr_flags = IBV_SEND_INLINE | IBV_SEND_SIGNALED;
-    mlx5_qp->mlx5dv_qp_ex  = mlx5dv_qp_ex_from_ibv_qp_ex(mlx5_qp->qpx);
-    if (mlx5_qp->mlx5dv_qp_ex == NULL) {
-        tl_error(UCC_TL_CTX_LIB(ctx), "UMR qp_ex (mlx5dv_qp) creation failed");
-        status = UCC_ERR_NO_MESSAGE;
-        goto failure;
-    }
-    if (ibv_query_port(mlx5_qp->qp->context, ctx->ib_port, &port_attr)) {
+    qp_ex->wr_flags = IBV_SEND_INLINE | IBV_SEND_SIGNALED;
+    if (ibv_query_port(ctx->ib_ctx, ctx->ib_port, &port_attr)) {
         tl_error(UCC_TL_CTX_LIB(ctx), "Couldn't get port info (errno=%d)",
                  errno);
         status = UCC_ERR_NO_MESSAGE;
         goto failure;
     }
     tl_debug(UCC_TL_CTX_LIB(ctx), "Connect UMR QP to itself");
-    status = ucc_tl_mlx5_qp_connect(mlx5_qp->qp, mlx5_qp->qp->qp_num,
+    status = ucc_tl_mlx5_qp_connect(*qp, (*qp)->qp_num,
                                     port_attr.lid, ctx->ib_port, &UCC_TL_CTX_LIB(ctx)->super.super);
     if (status != UCC_OK) {
         goto failure;
@@ -89,7 +85,7 @@ static ucc_status_t create_umr_qp(struct ucc_tl_mlx5_mlx5_qp *mlx5_qp,
     return UCC_OK;
 
 failure:
-    if (ibv_destroy_qp(mlx5_qp->qp)) {
+    if (ibv_destroy_qp(*qp)) {
         tl_error(UCC_TL_CTX_LIB(ctx), "UMR qp destroy failed (errno=%d)",
                  errno);
     }
@@ -102,46 +98,26 @@ failure:
  * @param node struct of the current process's node
  */
 ucc_status_t ucc_tl_mlx5_init_umr(ucc_tl_mlx5_context_t *ctx,
-                                  ucc_tl_mlx5_node_t *   node)
+                                  ucc_tl_mlx5_net_t *   net)
 {
     ucc_status_t status = UCC_OK;
     tl_debug(UCC_TL_CTX_LIB(ctx), "Create UMR CQ");
-    node->umr_cq = ibv_create_cq(ctx->shared_ctx, UMR_CQ_SIZE, NULL, NULL, 0);
-    if (node->umr_cq == NULL) {
+    net->umr_cq = ibv_create_cq(ctx->shared_ctx, UMR_CQ_SIZE, NULL, NULL, 0);
+    if (net->umr_cq == NULL) {
         tl_error(UCC_TL_CTX_LIB(ctx), "UMR CQ creation failed");
-        status = UCC_ERR_NO_MESSAGE;
-        goto failure;
+        return UCC_ERR_NO_MESSAGE;
     }
-    status = create_umr_qp(&node->ns_umr_qp, node, ctx);
+    status = create_umr_qp(&net->umr_qp, net->umr_cq, ctx);
     if (status != UCC_OK) {
-        goto cq_failure;
-    }
-    status = create_umr_qp(&node->s_umr_qp.mlx5_qp, node, ctx);
-    if (status != UCC_OK) {
-        goto qp_failure;
-    }
-    status = ucc_tl_mlx5_ibv_qp_to_mlx5dv_qp(node->s_umr_qp.mlx5_qp.qp,
-                                             &node->s_umr_qp.in_qp,UCC_TL_CTX_LIB(ctx));
-    if (status != UCC_OK) {
-        goto second_qp_failure;
+        goto err;
     }
     return status;
-second_qp_failure:
-    if (ibv_destroy_qp(node->s_umr_qp.mlx5_qp.qp)) {
-        tl_error(UCC_TL_CTX_LIB(ctx), "umr qp destroy failed (errno=%d)",
-                 errno);
-    }
-qp_failure:
-    if (ibv_destroy_qp(node->ns_umr_qp.qp)) {
-        tl_error(UCC_TL_CTX_LIB(ctx), "umr qp destroy failed (errno=%d)",
-                 errno);
-    }
-cq_failure:
-    if (ibv_destroy_cq(node->umr_cq)) {
+
+err:
+    if (ibv_destroy_cq(net->umr_cq)) {
         tl_error(UCC_TL_CTX_LIB(ctx), "UMR cq destroy failed (errno=%d)",
                  errno);
     }
-    failure:
     return status;
 }
 
@@ -171,13 +147,13 @@ static ucc_status_t create_master_key(ucc_tl_mlx5_node_t * node,
     return UCC_OK;
 }
 
-static ucc_status_t poll_umr_cq(ucc_tl_mlx5_node_t *node,
+static ucc_status_t poll_umr_cq(struct ibv_cq *cq,
                                 ucc_tl_mlx5_lib_t *lib)
 {
     struct ibv_wc wc;
     int           ret = 0;
     while (!ret) {
-        ret = ibv_poll_cq(node->umr_cq, 1, &wc);
+        ret = ibv_poll_cq(cq, 1, &wc);
         if (ret < 0) {
             tl_error(lib, "ibv_poll_cq() failed for UMR execution");
             return UCC_ERR_NO_MESSAGE;
@@ -201,11 +177,14 @@ static ucc_status_t populate_non_strided_mkey(ucc_tl_mlx5_team_t *team,
                                               struct mlx5dv_mkey *mkey,
                                               void *              mkey_entries)
 {
+    ucc_tl_mlx5_net_t *net = &team->net;
+    struct ibv_qp_ex *qp_ex = ibv_qp_to_qp_ex(net->umr_qp);
+    struct mlx5dv_qp_ex *mqp = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
     ucc_status_t        status;
-    ucc_tl_mlx5_node_t *node = &team->node;
-    ibv_wr_start(node->ns_umr_qp.qpx);
-    node->ns_umr_qp.qpx->wr_id = 1; // First (and only) WR
-    mlx5dv_wr_mr_list(node->ns_umr_qp.mlx5dv_qp_ex, mkey, mem_access_flags,
+
+    ibv_wr_start(qp_ex);
+    qp_ex->wr_id = 1; // First (and only) WR
+    mlx5dv_wr_mr_list(mqp, mkey, mem_access_flags,
                       MAX_OUTSTANDING_OPS * team->max_num_of_columns,
                       (struct ibv_sge *)mkey_entries);
     tl_debug(
@@ -213,12 +192,12 @@ static ucc_status_t populate_non_strided_mkey(ucc_tl_mlx5_team_t *team,
         "Execute the UMR WQE for populating the team MasterMKeys lkey 0x%x",
         mkey->lkey);
 
-    if (ibv_wr_complete(node->ns_umr_qp.qpx)) {
+    if (ibv_wr_complete(qp_ex)) {
         tl_error(UCC_TL_MLX5_TEAM_LIB(team), "UMR WQE failed (errno=%d)",
                  errno);
         return UCC_ERR_NO_MESSAGE;
     }
-    status = poll_umr_cq(node, UCC_TL_MLX5_TEAM_LIB(team));
+    status = poll_umr_cq(net->umr_cq, UCC_TL_MLX5_TEAM_LIB(team));
     if (status != UCC_OK) {
         return status;
     }
@@ -232,24 +211,20 @@ static ucc_status_t populate_strided_mkey(ucc_tl_mlx5_team_t *team,
                                           void *mkey_entries, int repeat_count)
 {
     ucc_status_t        status;
+    ucc_tl_mlx5_net_t *net = &team->net;
     ucc_tl_mlx5_node_t *node = &team->node;
-    /* ucc_tl_mlx5_wr_start(&node->s_umr_qp.in_qp); */
-    /* ucc_tl_mlx5_send_wr_mr_noninline( */
-    /*     &node->s_umr_qp.in_qp, mkey, mem_access_flags, repeat_count, */
-    /*     node->sbgp->group_size, (struct mlx5dv_mr_interleaved *)mkey_entries, */
-    /*     team->node.umr_entries_mr->lkey, team->node.umr_entries_buf, */
-    /*     team->node.s_umr_qp.mlx5_qp.qpx); */
-    /* tl_debug(UCC_TL_MLX5_TEAM_LIB(team), */
-    /*          "Execute the UMR WQE for populating the send/recv " */
-    /*          "MasterMKey lkey 0x%x", */
-    /*          mkey->lkey); */
-    /* ucc_tl_mlx5_wr_complete(&node->s_umr_qp.in_qp); */
 
-    ucc_tl_mlx5_post_umr(node->s_umr_qp.mlx5_qp.qp, mkey, mem_access_flags, repeat_count,
+    tl_debug(UCC_TL_MLX5_TEAM_LIB(team),
+             "Execute the UMR WQE for populating the send/recv "
+             "MasterMKey lkey 0x%x",
+             mkey->lkey);
+
+
+    ucc_tl_mlx5_post_umr(net->umr_qp, mkey, mem_access_flags, repeat_count,
                          node->sbgp->group_size, (struct mlx5dv_mr_interleaved *)mkey_entries,
-                         team->node.umr_entries_mr->lkey, team->node.umr_entries_buf);
+                         node->umr_entries_mr->lkey, node->umr_entries_buf);
 
-    status = poll_umr_cq(node, UCC_TL_MLX5_TEAM_LIB(team));
+    status = poll_umr_cq(net->umr_cq, UCC_TL_MLX5_TEAM_LIB(team));
     if (status != UCC_OK) {
         return status;
     }
@@ -477,24 +452,15 @@ ucc_status_t ucc_tl_mlx5_update_mkeys_entries(ucc_tl_mlx5_node_t *    node,
 
 /**
  * Clean UMR qp & cq
- * @param node struct of the current process's node
  */
-ucc_status_t ucc_tl_mlx5_destroy_umr(ucc_tl_mlx5_node_t *node,
+ucc_status_t ucc_tl_mlx5_destroy_umr(ucc_tl_mlx5_net_t *net,
 		ucc_base_lib_t * lib)
 {
-    if (ibv_destroy_qp(node->ns_umr_qp.qp)) {
+    if (ibv_destroy_qp(net->umr_qp)) {
         tl_error(lib, "umr qp destroy failed (errno=%d)", errno);
         return UCC_ERR_NO_MESSAGE;
     }
-    if (ibv_destroy_qp(node->s_umr_qp.mlx5_qp.qp)) {
-        tl_error(lib, "umr qp destroy failed (errno=%d)", errno);
-        return UCC_ERR_NO_MESSAGE;
-    }
-    if (ucc_tl_mlx5_destroy_mlxdv_qp(&node->s_umr_qp.in_qp) != UCC_OK) {
-        tl_error(lib, "umr qp destroy failed (errno=%d)", errno);
-        return UCC_ERR_NO_MESSAGE;
-    }
-    if (ibv_destroy_cq(node->umr_cq)) {
+    if (ibv_destroy_cq(net->umr_cq)) {
         tl_error(lib, "umr cq destroy failed (errno=%d)", errno);
         return UCC_ERR_NO_MESSAGE;
     }

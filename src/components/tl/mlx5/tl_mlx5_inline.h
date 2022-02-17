@@ -58,7 +58,7 @@ static inline ucc_status_t send_block_data(ucc_tl_mlx5_team_t *team, ucc_rank_t 
     int            dci;
 
     if (!team->is_dc || local) {
-        qp = local ? team->node.ns_umr_qp.qp : team->net.rc_qps[rank];
+        qp = local ? team->net.umr_qp : team->net.rc_qps[rank];
         return send_block_data_rc(qp, src_addr, msg_size, lkey, remote_addr, rkey, send_flags,
                                   local ? 1 : 0, dm);
     } else {

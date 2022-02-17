@@ -206,7 +206,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
                  self->node.storage, errno);
     }
     if (self->node.asr_rank == self->node.sbgp->group_rank) {
-        status = ucc_tl_mlx5_destroy_umr(&self->node,UCC_TL_TEAM_LIB(self));
+        status = ucc_tl_mlx5_destroy_umr(&self->net, UCC_TL_TEAM_LIB(self));
         if (status != UCC_OK) {
             tl_error(UCC_TL_TEAM_LIB(self), "failed to destroy UMR");
         }
@@ -437,7 +437,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team)
 
 
 
-            status = ucc_tl_mlx5_init_umr(ctx, &team->node);
+            status = ucc_tl_mlx5_init_umr(ctx, &team->net);
             if (status != UCC_OK) {
                 tl_error(tl_team->context->lib, "failed to init UMR");
                 return status;

@@ -112,30 +112,6 @@ typedef struct ucc_tl_mlx5_op {
     int                *blocks_sent;
 } ucc_tl_mlx5_op_t;
 
-struct ucc_tl_mlx5_internal_qp {
-    int                       nreq;
-    uint32_t                  cur_size;
-    struct mlx5_wqe_ctrl_seg *cur_ctrl;
-    uint8_t                   fm_cache;
-    void *                    sq_start;
-    struct mlx5dv_qp          qp;
-    void *                    sq_qend;
-    unsigned                  sq_cur_post;
-    uint32_t                  qp_num;
-    ucs_spinlock_t            qp_spinlock;
-    unsigned                  offset;
-};
-
-struct ucc_tl_mlx5_mlx5_qp {
-    struct ibv_qp *      qp;
-    struct ibv_qp_ex *   qpx;
-    struct mlx5dv_qp_ex *mlx5dv_qp_ex;
-};
-
-struct ucc_tl_mlx5_qp {
-    struct ucc_tl_mlx5_mlx5_qp     mlx5_qp;
-    struct ucc_tl_mlx5_internal_qp in_qp;
-};
 
 /* This structure holds resources and data related to the "in-node"
    part of the algorithm. */
@@ -145,9 +121,6 @@ typedef struct ucc_tl_mlx5_node {
     void *              storage;
     ucc_tl_mlx5_op_t       ops[MAX_OUTSTANDING_OPS];
     struct mlx5dv_mkey *team_recv_mkey;
-    struct ibv_cq *     umr_cq;
-    struct ucc_tl_mlx5_mlx5_qp ns_umr_qp; // Non-strided - used for team UMR hirerchy
-    struct ucc_tl_mlx5_qp s_umr_qp; // Strided - used for operation send/recv mkey hirerchy
     void *umr_entries_buf;
     struct ibv_mr *umr_entries_mr;
 } ucc_tl_mlx5_node_t;
@@ -184,6 +157,8 @@ typedef struct ucc_tl_mlx5_net {
     uint32_t *      remote_dctns;
     struct ibv_ah **ahs;
     struct ibv_cq * cq;
+    struct ibv_cq *umr_cq;
+    struct ibv_qp *umr_qp;
     struct ibv_mr * ctrl_mr;
     struct {
         tl_mlx5_atomic_t *counters;

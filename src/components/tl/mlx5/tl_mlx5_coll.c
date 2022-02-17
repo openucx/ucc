@@ -334,7 +334,7 @@ ucc_tl_mlx5_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
                 remote_addr = (uintptr_t)(op_msgsize * task->seq_index +
                                           node_msgsize * rank +
                                           block_msgsize * j + col_msgsize * k);
-                prepost_dummy_recv(team->node.ns_umr_qp.qp, 1,UCC_TASK_LIB(task));
+                prepost_dummy_recv(team->net.umr_qp, 1,UCC_TASK_LIB(task));
                 // SW Transpose
                 status = send_block_data(team, cyc_rank, 
                                          src_addr, block_msgsize,
@@ -351,7 +351,7 @@ ucc_tl_mlx5_send_blocks_start_with_transpose(ucc_coll_task_t *coll_task)
                 n_compl = 0;
                 while (n_compl != 2) {
                     ret =
-                        ibv_poll_cq(team->node.umr_cq, 1, transpose_completion);
+                        ibv_poll_cq(team->net.umr_cq, 1, transpose_completion);
                     if (ret > 0) {
                         if (transpose_completion[0].status != IBV_WC_SUCCESS) {
                             tl_error(UCC_TASK_LIB(task),
@@ -485,7 +485,7 @@ ucc_tl_mlx5_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
                             : corner_msgsize;
                 }
 
-                prepost_dummy_recv(team->node.ns_umr_qp.qp, 1,UCC_TASK_LIB(task));
+                prepost_dummy_recv(team->net.umr_qp, 1,UCC_TASK_LIB(task));
                 // SW Transpose
                 status = send_block_data(team, cyc_rank,
                                          src_addr, current_block_msgsize,
@@ -502,7 +502,7 @@ ucc_tl_mlx5_send_blocks_leftovers_start_with_transpose(ucc_coll_task_t *coll_tas
                 n_compl = 0;
                 while (n_compl != 2) {
                     ret =
-                        ibv_poll_cq(team->node.umr_cq, 1, transpose_completion);
+                        ibv_poll_cq(team->net.umr_cq, 1, transpose_completion);
                     if (ret > 0) {
                         if (transpose_completion[0].status != IBV_WC_SUCCESS) {
                             tl_error(UCC_TASK_LIB(task),

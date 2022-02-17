@@ -17,7 +17,7 @@ typedef struct ucc_base_lib      ucc_base_lib_t;
 #define UMR_CQ_SIZE 8 //todo check
 
 ucc_status_t ucc_tl_mlx5_init_umr(ucc_tl_mlx5_context_t *ctx,
-                                  ucc_tl_mlx5_node_t *   node);
+                                  ucc_tl_mlx5_net_t *   net);
 
 ucc_status_t ucc_tl_mlx5_init_mkeys(ucc_tl_mlx5_team_t *team);
 
@@ -28,7 +28,7 @@ ucc_status_t ucc_tl_mlx5_update_mkeys_entries(ucc_tl_mlx5_node_t *    node,
                                               ucc_tl_mlx5_schedule_t *req,
                                               ucc_tl_mlx5_lib_t *     lib);
 
-ucc_status_t ucc_tl_mlx5_destroy_umr(ucc_tl_mlx5_node_t *node,
+ucc_status_t ucc_tl_mlx5_destroy_umr(ucc_tl_mlx5_net_t *net,
 		ucc_base_lib_t * lib);
 
 ucc_status_t ucc_tl_mlx5_destroy_mkeys(ucc_tl_mlx5_team_t *team,
