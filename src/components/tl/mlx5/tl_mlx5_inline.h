@@ -7,14 +7,24 @@
 #ifndef UCC_TL_MLX5_INLINE_H_
 #define UCC_TL_MLX5_INLINE_H_
 
+#include "tl_mlx5_ib.h"
+
 static inline struct ibv_qp_ex*
 tl_mlx5_get_qp_ex(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 {
     if (team->is_dc) {
         return team->net.dcis[rank % team->num_dci_qps].dc_qpex;
-    } else {
-        return team->net.rc_qps[rank].qp_ex;
     }
+    return team->net.rc_qps[rank].qp_ex;
+}
+
+static inline struct ibv_qp*
+tl_mlx5_get_qp(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
+{
+    if (team->is_dc) {
+        return team->net.dcis[rank % team->num_dci_qps].dci_qp;
+    }
+    return team->net.rc_qps[rank].qp;
 }
 
 static inline ucc_status_t send_block_data(ucc_tl_mlx5_team_t *team, ucc_rank_t rank,
@@ -22,20 +32,16 @@ static inline ucc_status_t send_block_data(ucc_tl_mlx5_team_t *team, ucc_rank_t 
                                            uint32_t lkey, uint64_t remote_addr, uint32_t rkey,
                                            int send_flags, void *dm)
 {
-    struct ibv_qp_ex    *qp_ex;
-    struct mlx5dv_qp_ex *qp_dv;
+    struct ibv_qp *qp   = tl_mlx5_get_qp(team, rank);
+    struct ibv_ah *ah   = NULL;
+    uint32_t       dctn = 0;
 
-    qp_ex = tl_mlx5_get_qp_ex(team, rank);
-    qp_ex->wr_id = (uint64_t)(uintptr_t)dm;
-    qp_ex->wr_flags = send_flags | IBV_SEND_FENCE;
-    ibv_wr_rdma_write(qp_ex, rkey, remote_addr);
     if (team->is_dc) {
-        qp_dv = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
-        mlx5dv_wr_set_dc_addr(qp_dv, team->net.ahs[rank],
-                              team->net.remote_dctns[rank], DC_KEY);
+        ah   = team->net.ahs[rank];
+        dctn = team->net.remote_dctns[rank];
     }
-    ibv_wr_set_sge(qp_ex, lkey, src_addr, msg_size);
-    return UCC_OK;
+    return ucc_tl_mlx5_post_rdma(qp, dctn, ah, src_addr, msg_size, lkey,
+                                 remote_addr, rkey, send_flags, (uintptr_t)dm);
 }
 
 static inline void send_start(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
@@ -132,13 +138,4 @@ tl_mlx5_barrier_remote_rkey(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
     return team->net.remote_ctrl[rank].barrier.rkey;
 }
 
-static inline struct ibv_qp*
-tl_mlx5_get_qp(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
-{
-    if (team->is_dc) {
-        return team->net.dcis[rank % team->num_dci_qps].dci_qp;
-    } else {
-        return team->net.rc_qps[rank].qp;
-    }
-}
 #endif

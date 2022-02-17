@@ -37,7 +37,7 @@ static ucc_status_t ucc_tl_mlx5_poll_cq(ucc_tl_mlx5_team_t *team)
         if (team->work_completion[i].opcode == IBV_WC_FETCH_ADD) {
             team->cq_completions[SEQ_INDEX(team->work_completion[i].wr_id)] += 1;
         } else {
-            ucc_assert(team->work_completion[i].opcode == IBV_WC_RDMA_WRITE);
+            ucc_assert(team->work_completion[i].opcode == IBV_WC_DRIVER2);
             /* printf("returning dm %p to pool\n", (void*)team->work_completion[i].wr_id); */
             ucc_mpool_put((void*)team->work_completion[i].wr_id);
         }
