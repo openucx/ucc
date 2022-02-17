@@ -155,65 +155,6 @@ static inline ucc_status_t send_atomic(ucc_tl_mlx5_team_t *team, ucc_rank_t rank
     return UCC_OK;
 }
 
-static inline void tranpose_non_square_mat(void *addr, int transposed_rows_len,
-                                           int transposed_columns_len,
-                                           int unit_size,
-										   ucc_base_lib_t *lib)
-{
-    void *tmp =
-        ucc_malloc(transposed_rows_len * transposed_columns_len * unit_size);
-    if (!tmp) {
-        tl_error(lib, "malloc failed");
-    }
-    int i, j;
-    for (i = 0; i < transposed_columns_len; i++) {
-        for (j = 0; j < transposed_rows_len; j++) {
-            memcpy(tmp + (unit_size * (i * transposed_rows_len + j)),
-                   addr + (unit_size * ((j * transposed_columns_len) + i)),
-                   unit_size);
-        }
-    }
-    memcpy(addr, tmp, unit_size * transposed_rows_len * transposed_columns_len);
-    ucc_free(tmp);
-}
-
-static inline void transpose_square_mat(void *addr, int side_len, int unit_size,
-                                        void *temp_buffer)
-{
-    int   i, j;
-    char  tmp_preallocated[TMP_TRANSPOSE_PREALLOC];
-    void *tmp =
-        unit_size <= TMP_TRANSPOSE_PREALLOC ? tmp_preallocated : temp_buffer;
-    for (i = 0; i < side_len - 1; i++) {
-        for (j = i + 1; j < side_len; j++) {
-            memcpy(tmp, addr + (i * unit_size * side_len) + (j * unit_size),
-                   unit_size);
-            memcpy(addr + (i * unit_size * side_len) + (j * unit_size),
-                   addr + (j * unit_size * side_len) + (i * unit_size),
-                   unit_size);
-            memcpy(addr + j * unit_size * side_len + i * unit_size, tmp,
-                   unit_size);
-        }
-    }
-}
-
-static inline ucc_status_t prepost_dummy_recv(struct ibv_qp *qp, int num,ucc_base_lib_t *lib)
-{
-    struct ibv_recv_wr  wr;
-    struct ibv_recv_wr *bad_wr;
-    int                 i;
-    memset(&wr, 0, sizeof(wr));
-    wr.wr_id   = 0;
-    wr.num_sge = 0;
-    for (i = 0; i < num; i++) {
-        if (ibv_post_recv(qp, &wr, &bad_wr)) {
-            tl_error(lib,"failed to prepost %d receives", num);
-            return UCC_ERR_NO_MESSAGE;
-        }
-    }
-    return UCC_OK;
-}
-
 static inline void *
 tl_mlx5_atomic_addr(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
 {

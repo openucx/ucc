@@ -49,9 +49,7 @@ extern ucc_tl_mlx5_iface_t ucc_tl_mlx5;
 
 typedef struct ucc_tl_mlx5_lib_config {
     ucc_tl_lib_config_t super;
-    int    transpose;
     int    asr_barrier;
-    size_t transpose_buf_size;
     int    block_size;
     int    num_dci_qps;
     int    rc_dc;
@@ -216,8 +214,6 @@ typedef struct ucc_tl_mlx5_team {
     int                      max_num_of_columns;
     struct ibv_mr *          dummy_bf_mr;
     struct ibv_wc *          work_completion;
-    void *                   transpose_buf;
-    struct ibv_mr *          transpose_buf_mr;
     ucc_service_coll_req_t  *scoll_req;
     void *                   oob_req;
     ucc_tl_mlx5_bcast_data_t bcast_data;

@@ -10,8 +10,6 @@
 #include "tl_mlx5.h"
 #include "schedule/ucc_schedule.h"
 
-#define TMP_TRANSPOSE_PREALLOC 256
-
 typedef struct ucc_tl_mlx5_task {
     ucc_coll_task_t super;
 } ucc_tl_mlx5_task_t;
@@ -27,8 +25,6 @@ typedef struct ucc_tl_mlx5_schedule {
     ucc_tl_mlx5_op_t   *op;
     ucc_tl_mlx5_reg_t * send_rcache_region_p;
     ucc_tl_mlx5_reg_t * recv_rcache_region_p;
-    struct ibv_mr *     transpose_buf_mr;
-    void *              tmp_transpose_buf;
     size_t              msg_size;
     ucc_service_coll_req_t *barrier_req;
     int                 barrier_scratch[2];

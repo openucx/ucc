@@ -15,15 +15,8 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_mlx5_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
 
-    {"TRANSPOSE", "0", "Boolean - with transpose or not",
-     ucc_offsetof(ucc_tl_mlx5_lib_config_t, transpose), UCC_CONFIG_TYPE_UINT},
-
     {"ASR_BARRIER", "0", "Boolean - use  service barrier or p2p sync of ASRs",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, asr_barrier), UCC_CONFIG_TYPE_UINT},
-
-    {"TRANPOSE_BUF_SIZE", "128k", "Size of the pre-allocated transpose buffer",
-     ucc_offsetof(ucc_tl_mlx5_lib_config_t, transpose_buf_size),
-     UCC_CONFIG_TYPE_MEMUNITS},
 
     {"DM_BUF_SIZE", "8k", "Size of the pre-allocated DeviceMemory buffer",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, dm_buf_size),

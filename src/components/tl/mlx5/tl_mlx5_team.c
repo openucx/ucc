@@ -144,14 +144,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     self->net.sbgp         = net;
     self->status           = UCC_INPROGRESS;
     self->node.asr_rank    = MLX5_ASR_RANK;
-    self->transpose        = UCC_TL_MLX5_TEAM_LIB(self)->cfg.transpose;
     self->num_dci_qps      = UCC_TL_MLX5_TEAM_LIB(self)->cfg.num_dci_qps;
     self->sequence_number  = 1;
     self->net.ctrl_mr      = NULL;
     self->net.remote_ctrl  = NULL;
     self->net.rank_map     = NULL;
-    self->transpose_buf_mr = NULL;
-    self->transpose_buf    = NULL;
 
     self->net.dcis = ucc_malloc(sizeof(struct dci) * self->num_dci_qps);
     if (!self->net.dcis) {
@@ -245,10 +242,6 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
         ibv_dereg_mr(self->dummy_bf_mr);
         ucc_free(self->work_completion);
         ucc_free(self->net.rank_map);
-        if (self->transpose) {
-            ibv_dereg_mr(self->transpose_buf_mr);
-            ucc_free(self->transpose_buf);
-        }
         ibv_dereg_mr(self->node.umr_entries_mr);
         ucc_free(self->node.umr_entries_buf);
 
@@ -415,27 +408,6 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team)
             for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
                 team->previous_msg_size[i] = 0;
             }
-            if (team->transpose) {
-                team->transpose_buf =
-                    ucc_malloc(UCC_TL_MLX5_TEAM_LIB(team)->cfg.transpose_buf_size);
-                if (!team->transpose_buf) {
-                    tl_error(tl_team->context->lib,
-                             "failed to allocate %zd bytes for transpose buf",
-                             UCC_TL_MLX5_TEAM_LIB(team)->cfg.transpose_buf_size);
-                    return UCC_ERR_NO_MEMORY;
-                }
-                team->transpose_buf_mr =
-                    ibv_reg_mr(ctx->shared_pd, team->transpose_buf,
-                               UCC_TL_MLX5_TEAM_LIB(team)->cfg.transpose_buf_size,
-                               IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
-                if (!team->transpose_buf_mr) {
-                    tl_error(tl_team->context->lib,
-                             "failed to register transpose buff, errno %d", errno);
-                    return UCC_ERR_NO_MESSAGE;
-                }
-            }
-
-
 
             status = ucc_tl_mlx5_init_umr(ctx, &team->net);
             if (status != UCC_OK) {
