@@ -5,6 +5,7 @@
  */
 
 #include "tl_mlx5_ib.h"
+#include "tl_mlx5_inline.h"
 #include "utils/arch/cpu.h"
 
 #define SQ_WQE_SHIFT 6
@@ -183,22 +184,6 @@ ucc_status_t ucc_tl_mlx5_post_umr(
     return UCC_OK;
 }
 
-struct mlx5_ah {
-    struct ibv_ah ibv_ah;
-    struct mlx5_wqe_av av;
-    bool kern_ah;
-    pthread_mutex_t mutex;
-    uint8_t is_global;
-    struct mlx5dv_devx_obj* ah_qp_mapping;
-};
-
-typedef struct rdma_seg {
-    __be64 remote_addr; /* 64 bit value */
-    __be32 rkey; /* 32 bit value */
-    __be32 padding;
-} rdma_seg_t;
-
-#define STRONG_FENCE (3 << 5)
 ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn, struct ibv_ah *ah,
                                    uintptr_t src_mkey_addr, size_t len, uint32_t src_mr_lkey,
                                    uintptr_t dst_addr, uint32_t dst_mr_key, int send_flags,
@@ -211,7 +196,7 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn, struct ibv_a
     struct mlx5_wqe_ctrl_seg *ctrl;
     struct mlx5_wqe_data_seg *data;
     struct mlx5_wqe_datagram_seg *dseg;
-    rdma_seg_t          *rseg;
+    struct mlx5_wqe_raddr_seg    *rseg;
     struct ibv_qp_ex *qp_ex = ibv_qp_to_qp_ex(qp);
     struct mlx5dv_qp_ex *mqp = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
     uint32_t                  n_ds   = (sizeof(*ctrl) + (ah ? sizeof(*dseg) : 0) +
@@ -232,8 +217,7 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn, struct ibv_a
 
     if (ah) {
         dseg = PTR_OFFSET(ctrl, sizeof(*ctrl));
-        struct mlx5_ah *mah = ucc_container_of(ah, struct mlx5_ah, ibv_ah);
-        memcpy(&dseg->av, &mah->av, sizeof(dseg->av));
+        tl_mlx5_ah_to_av(ah, &dseg->av);
         dseg->av.dqp_dct |= htobe32(qpn | MLX5_EXTENDED_UD_AV);
         dseg->av.key.dc_key = htobe64(DC_KEY);
 
@@ -242,7 +226,7 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn, struct ibv_a
         rseg  = PTR_OFFSET(ctrl, sizeof(*ctrl));
     }
 
-    rseg->remote_addr = htobe64(dst_addr);
+    rseg->raddr = htobe64(dst_addr);
     rseg->rkey = htobe32(dst_mr_key);
 
     /* SET SRC DATA SEG */

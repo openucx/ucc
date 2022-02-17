@@ -8,6 +8,7 @@
 #define UCC_TL_MLX5_INLINE_H_
 
 #include "tl_mlx5_ib.h"
+#include "tl_mlx5_coll.h"
 
 static inline struct ibv_qp_ex*
 tl_mlx5_get_qp_ex(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
@@ -138,4 +139,15 @@ tl_mlx5_barrier_remote_rkey(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
     return team->net.remote_ctrl[rank].barrier.rkey;
 }
 
+static inline void tl_mlx5_ah_to_av(struct ibv_ah *ah, struct mlx5_wqe_av *av)
+{
+    struct mlx5dv_obj obj;
+    struct mlx5dv_ah dv_ah;
+
+    obj.ah.in  = ah;
+    obj.ah.out = &dv_ah;
+    mlx5dv_init_obj(&obj, MLX5DV_OBJ_AH);
+
+    *av = *(dv_ah.av);
+}
 #endif
