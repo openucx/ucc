@@ -31,12 +31,15 @@ tl_mlx5_get_qp(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 static inline ucc_status_t send_block_data(ucc_tl_mlx5_team_t *team, ucc_rank_t rank,
                                            uint64_t src_addr, uint32_t msg_size,
                                            uint32_t lkey, uint64_t remote_addr, uint32_t rkey,
-                                           int send_flags, void *dm)
+                                           int send_flags, ucc_tl_mlx5_dm_chunk_t *dm)
 {
     struct ibv_qp *qp   = tl_mlx5_get_qp(team, rank);
     struct ibv_ah *ah   = NULL;
     uint32_t       dctn = 0;
 
+    if (dm) {
+        dm->task->blocks_sent++;
+    }
     if (team->is_dc) {
         ah   = team->net.ahs[rank];
         dctn = team->net.remote_dctns[rank];
@@ -59,15 +62,13 @@ static inline ucc_status_t send_done(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 }
 
 static inline ucc_status_t send_atomic(ucc_tl_mlx5_team_t *team, ucc_rank_t rank,
-                                       void *remote_addr, uint32_t rkey,
-                                       uint64_t value)
+                                       void *remote_addr, uint32_t rkey)
 {
     struct ibv_qp_ex    *qp_ex;
     struct mlx5dv_qp_ex *qp_dv;
 
     qp_ex = tl_mlx5_get_qp_ex(team, rank);
-    qp_ex->wr_id = value;
-    qp_ex->wr_flags = IBV_SEND_SIGNALED;
+    qp_ex->wr_flags = 0;
     ibv_wr_atomic_fetch_add(qp_ex, rkey, (uintptr_t)remote_addr, 1ULL);
     if (team->is_dc) {
         qp_dv = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);

@@ -43,4 +43,8 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn, struct ibv_a
                                    uintptr_t dst_addr, uint32_t dst_mr_key, int send_flags,
                                    uint64_t wr_id);
 
+ucc_status_t ucc_tl_mlx5_post_wait_on_data(struct ibv_qp *qp, uint64_t value,
+                                           uint32_t lkey, uintptr_t addr, void *task_ptr);
+
+
 #endif

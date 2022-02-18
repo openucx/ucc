@@ -210,7 +210,7 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn, struct ibv_a
     uint8_t fm_ce_se = MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE;
 
     if (send_flags & IBV_SEND_SIGNALED) {
-        fm_ce_se |= MLX5_WQE_CTRL_CQ_UPDATE;;
+        fm_ce_se |= MLX5_WQE_CTRL_CQ_UPDATE;
     }
     mlx5dv_set_ctrl_seg(ctrl, /* pi */ 0x0, opcode, opmode,
                         qp->qp_num, fm_ce_se, n_ds, 0x0, 0x0);
@@ -234,5 +234,64 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn, struct ibv_a
     mlx5dv_set_data_seg(data, len, src_mr_lkey, src_mkey_addr);
 
     mlx5dv_wr_raw_wqe(mqp, wqe_desc);
-    return 0;
+    return UCC_OK;
+}
+
+#define ACTION_RETRY 0x0ULL
+#define ACTION_SEND_ERR_CQE 0x1ULL
+
+#define ACTION ACTION_RETRY
+#define MLX5_OPCODE_WAIT 0xF
+
+typedef struct wait_on_data_seg {
+    __be32 op; /* 4 bits op + 1 inv */
+    __be32 lkey;
+    __be64 va_fail; // 3 bits action on fail + 61 bits of va into lkey
+    __be64 data; // value to wait
+    __be64 data_mask; // value to wait
+} wait_on_data_seg_t;
+
+ucc_status_t ucc_tl_mlx5_post_wait_on_data(struct ibv_qp *qp, uint64_t value,
+                                           uint32_t lkey, uintptr_t addr,
+                                           void *task_ptr)
+{
+
+    uint32_t                  opcode = MLX5_OPCODE_WAIT;
+    uint32_t                  opmode = 0x1; //wait on data
+    uint32_t                  n_ds   = 3; //CTRL + Wait on Data of Size 2
+    char                      wqe_desc[n_ds * DS_SIZE];
+    struct mlx5_wqe_ctrl_seg *ctrl;
+    wait_on_data_seg_t          *wseg;
+    struct ibv_qp_ex *qp_ex = ibv_qp_to_qp_ex(qp);
+    struct mlx5dv_qp_ex *mqp = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
+
+    memset(wqe_desc, 0, n_ds * DS_SIZE);
+    /* SET CTRL SEG */
+    ibv_wr_start(qp_ex);
+    qp_ex->wr_id = ((uint64_t)(uintptr_t)task_ptr) | 0x1;
+    ctrl = (void*)wqe_desc;
+    uint8_t fm_ce_se = MLX5_WQE_CTRL_FENCE | MLX5_WQE_CTRL_CQ_UPDATE;
+
+    mlx5dv_set_ctrl_seg(ctrl, /* pi */ 0x0, opcode, opmode,
+                        qp->qp_num, fm_ce_se, n_ds, 0x0, 0x0);
+
+    /* SET TRANSPOSE SEG */
+    wseg  = PTR_OFFSET(ctrl, DS_SIZE);
+    /* wseg->op = htobe32(0x1 | (1 << 4)); //0x1 - OP_EQUAL, 1 << 4 - 5th bit - inv */
+    wseg->op = htobe32(0x1); //0x1 - OP_EQUAL
+    wseg->lkey = htobe32(lkey);
+    wseg->va_fail = htobe64((addr) | (ACTION));
+    /* wseg->data = htobe64(value); */
+    wseg->data = value;
+    /* wseg->data_mask = ((uint64_t)-1); */
+    wseg->data_mask = 0;
+    /* wseg->data_mask = 0xffffffff; */
+    /* wseg->data_mask = 0x00000000ffffffff; */
+    /* wseg->data_mask = 0xffffffff00000000; */
+    mlx5dv_wr_raw_wqe(mqp, wqe_desc);
+    if (ibv_wr_complete(qp_ex)) {
+        return UCC_ERR_NO_MESSAGE;
+    }
+
+    return UCC_OK;
 }

@@ -191,9 +191,11 @@ enum {
     TL_MLX5_TEAM_STATE_EXCHANGE,
 };
 
+typedef struct ucc_tl_mlx5_schedule ucc_tl_mlx5_schedule_t;
 typedef struct ucc_tl_mlx5_dm_chunk_t {
     ptrdiff_t offset; // 0 based offset from the beginning of
                       // memic_mr (obtained with ibv_reg_dm_mr)
+    ucc_tl_mlx5_schedule_t *task;
 } ucc_tl_mlx5_dm_chunk_t;
 
 typedef struct ucc_tl_mlx5_team {

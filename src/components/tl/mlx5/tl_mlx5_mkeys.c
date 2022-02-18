@@ -31,7 +31,7 @@ static ucc_status_t create_umr_qp(struct ibv_qp **qp,
         MLX5DV_QP_INIT_ATTR_MASK_SEND_OPS_FLAGS | IBV_QP_INIT_ATTR_PD;
     umr_mlx5dv_qp_attr.create_flags = 0;
     umr_mlx5dv_qp_attr.send_ops_flags =
-        MLX5DV_QP_EX_WITH_MR_LIST | MLX5DV_QP_EX_WITH_MR_INTERLEAVED;
+        MLX5DV_QP_EX_WITH_MR_LIST | MLX5DV_QP_EX_WITH_MR_INTERLEAVED | MLX5DV_QP_EX_WITH_RAW_WQE;
 
     umr_init_attr_ex.send_cq          = cq;
     umr_init_attr_ex.recv_cq          = cq;

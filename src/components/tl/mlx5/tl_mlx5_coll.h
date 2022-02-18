@@ -15,19 +15,22 @@ typedef struct ucc_tl_mlx5_task {
 } ucc_tl_mlx5_task_t;
 
 typedef struct ucc_tl_mlx5_schedule {
-    ucc_schedule_t         super;
+    ucc_schedule_t      super;
     int                 seq_num;
     int                 seq_index;
     int                 num_of_blocks_columns;
     int                 block_size;
     int                 started;
     int                 send_blocks_enqueued;
+    int                 blocks_sent;
+    int                 blocks_completed;
     ucc_tl_mlx5_op_t   *op;
     ucc_tl_mlx5_reg_t * send_rcache_region_p;
     ucc_tl_mlx5_reg_t * recv_rcache_region_p;
     size_t              msg_size;
     ucc_service_coll_req_t *barrier_req;
     int                 barrier_scratch[2];
+    int                 wait_wc;
 } ucc_tl_mlx5_schedule_t;
 
 #define TASK_TEAM(_task)                                                       \
