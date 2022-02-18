@@ -225,8 +225,9 @@ typedef enum {
     UCC_GENERIC_DT_OPS_FLAG_CONTIG             = UCC_BIT(0), /*!< If set, the created datatype
                                                                   represents a contiguous memory
                                                                   region with the size specified
-                                                                  in @ref contig_size field of
-                                                                  @ref ucc_generic_dt_ops */
+                                                                  in @ref
+                                                                  ucc_generic_dt_ops.contig_size
+                                                                  */
     UCC_GENERIC_DT_OPS_FLAG_REDUCE             = UCC_BIT(1), /*!< If set, the created datatype
                                                                   has user-defined reduction
                                                                   operation associated with it.
@@ -249,7 +250,7 @@ typedef enum {
  * v_j = src2 + count * dt_extent * stride * j.
  * The result is stored in dst, so that
  * dst[i] = src1[i] + v0[i] + v1[i] + ... +v_nvecttors[i],
- * for i \in [0:count), where "+" represents user-defined reduction of 2 elements
+ * for i in [0:count), where "+" represents user-defined reduction of 2 elements
  */
 
 typedef struct ucc_reduce_cb_params {
