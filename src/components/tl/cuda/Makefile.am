@@ -1,5 +1,6 @@
 #
 # Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+# Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
 #
 
 if TL_CUDA_ENABLED
@@ -7,6 +8,11 @@ alltoall =                       \
 	alltoall/alltoall.h          \
 	alltoall/alltoall.c          \
 	alltoall/alltoall_ce.c
+
+alltoallv =                       \
+	alltoall/alltoallv.h      \
+	alltoall/alltoallv.c      \
+	alltoall/alltoallv_ce.c
 
 allgather =                      \
 	allgather/allgather.h        \
@@ -28,6 +34,7 @@ reduce_scatterv =                          \
 	reduce_scatterv/reduce_scatterv.c      \
 	reduce_scatterv/reduce_scatterv_ring.c
 
+
 sources =               \
 	tl_cuda.h           \
 	tl_cuda.c           \
@@ -39,6 +46,7 @@ sources =               \
 	tl_cuda_topo.c      \
 	tl_cuda_team_topo.c \
 	$(alltoall)         \
+	$(alltoallv)        \
 	$(allgather)        \
 	$(allgatherv)       \
 	$(reduce_scatter)   \
