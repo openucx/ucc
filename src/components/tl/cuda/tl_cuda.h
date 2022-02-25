@@ -1,10 +1,6 @@
 /**
-<<<<<<< HEAD
  * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
-=======
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
->>>>>>> d34656b (TL/CUDA: alltoallv)
  *
  * See file LICENSE for terms.
  */
@@ -30,8 +26,6 @@
     (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                         \
      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                       \
      UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
-
->>>>>>> d34656b (TL/CUDA: alltoallv)
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_cuda_lib_t))
