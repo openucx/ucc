@@ -9,10 +9,10 @@ alltoall =                       \
 	alltoall/alltoall.c          \
 	alltoall/alltoall_ce.c
 
-alltoallv =                       \
-	alltoall/alltoallv.h      \
-	alltoall/alltoallv.c      \
-	alltoall/alltoallv_ce.c
+alltoallv =                      \
+	alltoallv/alltoallv.h      	 \
+	alltoallv/alltoallv.c        \
+	alltoallv/alltoallv_ce.c
 
 allgather =                      \
 	allgather/allgather.h        \
