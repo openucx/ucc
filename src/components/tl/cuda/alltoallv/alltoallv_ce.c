@@ -40,18 +40,15 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_start(ucc_tl_cuda_task_t *task)
     // copy a2av counts and displ. for proxies (if any) to access
     if (team->topo->num_proxies > 0) {
         ucc_coll_args_t *args = &TASK_ARGS(task);
-        int              i;
         // TODO: would team size match the size in args when using HIER CL?
-        for (i = 0; i < UCC_TL_TEAM_SIZE(team); ++i) {
-            sync->src_cnts[i] =
-                ucc_coll_args_get_count(args, args->src.info_v.counts, i);
-            sync->dst_cnts[i] =
-                ucc_coll_args_get_count(args, args->dst.info_v.counts, i);
-            sync->src_displ[i] = ucc_coll_args_get_displacement(
-                args, args->src.info_v.displacements, i);
-            sync->dst_displ[i] = ucc_coll_args_get_displacement(
-                args, args->dst.info_v.displacements, i);
-        }
+        memcpy(sync->src_cnts, args->src.info_v.counts,
+               sizeof(ucc_count_t) * UCC_TL_TEAM_SIZE(team));
+        memcpy(sync->dst_cnts, args->dst.info_v.counts,
+               sizeof(ucc_count_t) * UCC_TL_TEAM_SIZE(team));
+        memcpy(sync->src_displ, args->src.info_v.displacements,
+               sizeof(ucc_aint_t) * UCC_TL_TEAM_SIZE(team));
+        memcpy(sync->dst_displ, args->src.info_v.displacements,
+               sizeof(ucc_aint_t) * UCC_TL_TEAM_SIZE(team));
     }
     memcpy(&sync->mem_info_src, &task->alltoall_ce.mem_info_src,
            sizeof(ucc_tl_cuda_mem_info_t));
@@ -160,7 +157,7 @@ ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
                      sdt_size;
         src        = PTR_OFFSET(src, data_displ);
         data_displ = ucc_coll_args_get_displacement(
-                         args, args->dst.info_v.displacements, rank) *
+                         args, args->dst.info_v.displacements, peer) *
                      rdt_size;
         dst = PTR_OFFSET(args->dst.info_v.buffer, data_displ);
         CUDA_CHECK_GOTO(cudaMemcpyAsync(dst, src, data_size,
