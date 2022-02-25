@@ -174,14 +174,14 @@ ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
                              args, peer_sync->src_displ, pdst) *
                          sdt_size;
             src       = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_src[psrc],
-                             peer_sync->mem_info_src.offset);
+                                   peer_sync->mem_info_src.offset);
             src       = PTR_OFFSET(src, data_displ);
             peer_sync = TASK_SYNC(task, pdst);
             ucc_assert(
                 (rdt_size * ucc_coll_args_get_count(args, peer_sync->dst_cnts,
                                                     psrc)) == data_size);
             dst        = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_dst[pdst],
-                             peer_sync->mem_info_dst.offset);
+                                    peer_sync->mem_info_dst.offset);
             data_displ = ucc_coll_args_get_displacement(
                              args, peer_sync->dst_displ, psrc) *
                          rdt_size;
