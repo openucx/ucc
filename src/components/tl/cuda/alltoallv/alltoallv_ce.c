@@ -11,8 +11,7 @@
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 
-enum
-{
+enum {
     ALLTOALL_CE_STAGE_SYNC,  /*< Wait for free SYNC segment */
     ALLTOALL_CE_STAGE_SETUP, /*< Wait for memhandle setup to finish */
     ALLTOALL_CE_STAGE_COPY,  /*< Wait for all copies to finish */
@@ -71,9 +70,9 @@ exit_err:
 // TODO: reuse ucc_tl_cuda_alltoall_setup_test ?
 ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *         team = TASK_TEAM(task);
+    ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
     volatile ucc_tl_cuda_sync_t *peer_sync;
-    ucc_tl_cuda_cache_t *        cache;
+    ucc_tl_cuda_cache_t         *cache;
     ucc_status_t                 status;
     ucc_rank_t                   i;
 
@@ -121,13 +120,13 @@ static ucc_status_t
 ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_coll_args_t *   args = &TASK_ARGS(task);
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucc_rank_t          rank = UCC_TL_TEAM_RANK(team);
     ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
     ucc_tl_cuda_sync_t *peer_sync;
     size_t              data_size;
     ucc_rank_t          i, peer, psrc, pdst;
-    void *              src, *dst;
+    void               *src, *dst;
     ucc_status_t        status;
     size_t              rdt_size = ucc_dt_size(args->dst.info_v.datatype);
     size_t              sdt_size = ucc_dt_size(args->src.info_v.datatype);
@@ -177,7 +176,7 @@ ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
                              args, peer_sync->src_displ, pdst) *
                          sdt_size;
             src       = PTR_OFFSET(task->alltoall_ce.peer_map_addr_src[psrc],
-                             peer_sync->mem_info_src.offset);
+                                   peer_sync->mem_info_src.offset);
             src       = PTR_OFFSET(src, data_displ);
             peer_sync = TASK_SYNC(task, pdst);
             size_t dst_data_size =
@@ -185,7 +184,7 @@ ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
                 ucc_coll_args_get_count(args, peer_sync->dst_cnts, psrc);
             ucc_assert(dst_data_size == data_size);
             dst        = PTR_OFFSET(task->alltoall_ce.peer_map_addr_dst[pdst],
-                             peer_sync->mem_info_dst.offset);
+                                    peer_sync->mem_info_dst.offset);
             data_displ = ucc_coll_args_get_displacement(
                              args, peer_sync->dst_displ, psrc) *
                          rdt_size;
@@ -275,7 +274,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_start(ucc_coll_task_t *coll_task)
 ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_coll_args_t *   args = &TASK_ARGS(task);
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucc_status_t        status;
     size_t              data_len;
 

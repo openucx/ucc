@@ -27,12 +27,10 @@
 
 #define UCC_TL_CUDA_MAX_PEERS 8
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
-<<<<<<< HEAD
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLGATHER |                        \
-     UCC_COLL_TYPE_ALLGATHERV | UCC_COLL_TYPE_REDUCE_SCATTER |                 \
-     UCC_COLL_TYPE_REDUCE_SCATTERV)
-=======
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV)
+    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                         \
+     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                       \
+     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
+
 >>>>>>> d34656b (TL/CUDA: alltoallv)
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
@@ -47,15 +45,15 @@
             (sizeof(ucc_tl_cuda_sync_t) +                                           \
              sizeof(ucc_tl_cuda_sync_data_t) * (UCC_TL_TEAM_SIZE(_team) - 1));      \
         size_t _ctrl_size = _ctrl_size_rank * UCC_TL_TEAM_SIZE(_team);              \
-        void * _sync      = PTR_OFFSET(_team->sync, _ctrl_size * (_id) +            \
-                                                  _ctrl_size_rank * (_rank)); \
+        void  *_sync      = PTR_OFFSET(_team->sync, _ctrl_size * (_id) +            \
+                                                        _ctrl_size_rank * (_rank)); \
         (ucc_tl_cuda_sync_t *)_sync;                                                \
     })
 
 #define UCC_TL_CUDA_TEAM_BARRIER(_team, _id)                                   \
     ({                                                                         \
         size_t _bar_size = sizeof(ucc_tl_cuda_shm_barrier_t);                  \
-        void * _bar      = PTR_OFFSET(_team->bar, _bar_size * (_id));          \
+        void  *_bar      = PTR_OFFSET(_team->bar, _bar_size * (_id));          \
         (ucc_tl_cuda_shm_barrier_t *)_bar;                                     \
     })
 
@@ -98,9 +96,9 @@ typedef struct ucc_tl_cuda_context {
     ucc_tl_cuda_context_config_t cfg;
     int                          device;
     ucc_tl_cuda_device_pci_id_t  device_id;
-    ucc_tl_cuda_topo_t *         topo;
+    ucc_tl_cuda_topo_t          *topo;
     ucc_mpool_t                  req_mp;
-    tl_cuda_ep_hash_t *          ipc_cache;
+    tl_cuda_ep_hash_t           *ipc_cache;
 } ucc_tl_cuda_context_t;
 UCC_CLASS_DECLARE(ucc_tl_cuda_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -120,7 +118,7 @@ typedef struct ucc_tl_cuda_sync_data {
 } ucc_tl_cuda_sync_data_t;
 
 typedef struct ucc_tl_cuda_mem_info {
-    void *             ptr;
+    void              *ptr;
     size_t             length;
     size_t             offset;
     cudaIpcMemHandle_t handle;
@@ -155,15 +153,15 @@ typedef struct ucc_tl_cuda_scratch {
 typedef struct ucc_tl_cuda_team {
     ucc_tl_team_t              super;
     uint32_t                   seq_num;
-    ucc_tl_cuda_team_topo_t *  topo;
-    ucc_tl_cuda_sync_t *       sync;
-    ucc_tl_cuda_sync_state_t * sync_state;
+    ucc_tl_cuda_team_topo_t   *topo;
+    ucc_tl_cuda_sync_t        *sync;
+    ucc_tl_cuda_sync_state_t  *sync_state;
     ucc_tl_cuda_shm_barrier_t *bar;
     ucc_tl_cuda_scratch_t      scratch;
     cudaStream_t               stream;
-    ucc_tl_cuda_rank_id_t *    ids;
+    ucc_tl_cuda_rank_id_t     *ids;
     ucc_team_oob_coll_t        oob;
-    void *                     oob_req;
+    void                      *oob_req;
 } ucc_tl_cuda_team_t;
 
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
