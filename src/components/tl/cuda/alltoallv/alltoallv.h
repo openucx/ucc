@@ -5,8 +5,8 @@
  * See file LICENSE for terms.
  */
 
-#ifndef ALLTOALL_H_
-#define ALLTOALL_H_
+#ifndef ALLTOALLV_H_
+#define ALLTOALLV_H_
 
 #include "../tl_cuda.h"
 #include "../tl_cuda_coll.h"
