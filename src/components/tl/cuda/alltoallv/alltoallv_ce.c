@@ -275,6 +275,12 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
     ucc_status_t        status;
     size_t              data_len;
 
+    if (!(args->flags & (UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER |
+                         UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER))) {
+        tl_error(UCC_TL_TEAM_LIB(team), "Do not support non-contiguous buffer");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     status =
         ucc_ec_create_event(&task->alltoallv_ce.copy_done, UCC_EE_CUDA_STREAM);
     if (ucc_unlikely(status != UCC_OK)) {
