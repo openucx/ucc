@@ -6,6 +6,7 @@
 
 #include "tl_cuda_coll.h"
 #include "alltoall/alltoall.h"
+#include "alltoallv/alltoallv.h"
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
 #include "reduce_scatter/reduce_scatter.h"
