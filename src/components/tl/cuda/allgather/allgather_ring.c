@@ -145,28 +145,42 @@ ucc_status_t ucc_tl_cuda_allgather_ring_progress_ring(ucc_tl_cuda_task_t * task,
     ucc_rank_t          sendto   = get_send_to(team, trank, tsize, ring_id);
     ucc_rank_t          recvfrom = get_recv_from(team, trank, tsize, ring_id);
     void               *rbuf     = args->dst.info.buffer;
+    ucc_ee_executor_t *exec;
+    ucc_ee_executor_task_args_t exec_args;
     void *dbuf1, *dbuf2, *sbuf;
-    int step, send_step, recv_step, frag, frag_step;
+    int step, send_step, recv_step, frag, frag_step, i;
     ucc_rank_t peer_block;
     size_t remote_offset, local_offset, frag_offset, frag_size;
     ucc_status_t st;
 
+    st = ucc_coll_task_get_executor(&task->super, &exec);
+    if (ucc_unlikely(st != UCC_OK)) {
+        task->super.super.status = st;
+        return task->super.super.status;
+    }
     step = get_rank_step(task, trank, ring_id);
     while (step < (tsize * task->allgather_ring.num_frags)) {
-        if (task->allgather_ring.copy_done != NULL) {
-            st = ucc_ec_event_test(task->allgather_ring.copy_done,
-                                UCC_EE_CUDA_STREAM);
-            if (st == UCC_OK) {
-                step++;
-                set_rank_step(task, trank, step, ring_id);
-                ucc_ec_destroy_event((void*)task->allgather_ring.copy_done,
-                                     UCC_EE_CUDA_STREAM);
-                task->allgather_ring.copy_done = NULL;
-                continue;
-            } else  {
-                task->super.super.status = UCC_INPROGRESS;
-                return task->super.super.status;
+        if ((task->allgather_ring.exec_task[0] != NULL) ||
+            (task->allgather_ring.exec_task[1] != NULL)) {
+            for (i = 0 ; i < 2; i++) {
+                if (task->allgather_ring.exec_task[i] != NULL) {
+                    st = ucc_ee_executor_task_test(task->allgather_ring.exec_task[i]);
+                    if (st == UCC_OK) {
+                        ucc_ee_executor_task_finalize(task->allgather_ring.exec_task[i]);
+                        task->allgather_ring.exec_task[i] = NULL;
+                    } else {
+                        if (st > 0) {
+                            task->super.super.status = UCC_INPROGRESS;
+                        } else {
+                            task->super.super.status = st;
+                        }
+                        return task->super.super.status;
+                    }
+                }
             }
+            step++;
+            set_rank_step(task, trank, step, ring_id);
+            continue;
         }
 
         send_step = get_rank_step(task, sendto, ring_id);
@@ -204,44 +218,28 @@ ucc_status_t ucc_tl_cuda_allgather_ring_progress_ring(ucc_tl_cuda_task_t * task,
             dbuf2 = PTR_OFFSET(rbuf, peer_block * ds + frag_offset);
         }
 
-        st = ucc_ec_create_event(&task->allgather_ring.copy_done,
-                                 UCC_EE_CUDA_STREAM);
-        if (ucc_unlikely(st != UCC_OK)) {
-            task->super.super.status = st;
-            return task->super.super.status;
-        }
-
-        st = CUDA_FUNC(cudaMemcpyAsync(dbuf1, sbuf, frag_size,
-                                       cudaMemcpyDeviceToDevice, team->stream));
+        exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
+        exec_args.bufs[0]   = dbuf1;
+        exec_args.bufs[1]   = sbuf;
+        exec_args.count     = frag_size;
+        st = ucc_ee_executor_task_post(exec, &exec_args,
+                                       &task->allgather_ring.exec_task[0]);
         if (ucc_unlikely(st != UCC_OK)) {
             task->super.super.status = st;
             return task->super.super.status;
         }
         if (dbuf2 != NULL) {
-            st = CUDA_FUNC(cudaMemcpyAsync(dbuf2, sbuf, frag_size,
-                                           cudaMemcpyDeviceToDevice,
-                                           team->stream2));
+            exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
+            exec_args.bufs[0]   = dbuf2;
+            exec_args.bufs[1]   = sbuf;
+            exec_args.count     = frag_size;
+            st = ucc_ee_executor_task_post(exec, &exec_args,
+                                           &task->allgather_ring.exec_task[1]);
             if (ucc_unlikely(st != UCC_OK)) {
                 task->super.super.status = st;
                 return task->super.super.status;
             }
-            st = ucc_ec_event_post(team->stream2, task->allgather_ring.copy_done,
-                                UCC_EE_CUDA_STREAM);
-            if (ucc_unlikely(st != UCC_OK)) {
-                task->super.super.status = st;
-                return task->super.super.status;
-            }
-            CUDA_CHECK(cudaStreamWaitEvent(team->stream,
-                                *((cudaEvent_t*)task->allgather_ring.copy_done),
-                                cudaEventWaitDefault));
         }
-        st = ucc_ec_event_post(team->stream, task->allgather_ring.copy_done,
-                               UCC_EE_CUDA_STREAM);
-        if (ucc_unlikely(st != UCC_OK)) {
-            task->super.super.status = st;
-            return task->super.super.status;
-        }
-
     }
 
     return UCC_OK;
@@ -311,25 +309,25 @@ ucc_status_t ucc_tl_cuda_allgather_ring_start(ucc_coll_task_t *coll_task)
     ucc_datatype_t     dt       = args->dst.info.datatype;
     size_t             ds       = ccount * ucc_dt_size(dt);
     void               *sbuf    = args->src.info.buffer;
+    ucc_ee_executor_t *exec;
+    ucc_ee_executor_task_args_t exec_args;
     ucc_status_t st;
 
+    task->allgather_ring.exec_task[0] = NULL;
+    task->allgather_ring.exec_task[1] = NULL;
     if (!UCC_IS_INPLACE(*args)) {
-        st = CUDA_FUNC(cudaMemcpyAsync(PTR_OFFSET(args->dst.info.buffer, ds * trank),
-                                       sbuf, ds,
-                                       cudaMemcpyDeviceToDevice, team->stream));
+        st = ucc_coll_task_get_executor(&task->super, &exec);
         if (ucc_unlikely(st != UCC_OK)) {
-            task->super.super.status = st;
-            return ucc_task_complete(coll_task);
-        }
-        st = ucc_ec_create_event(&task->allgather_ring.copy_done,
-                                 UCC_EE_CUDA_STREAM);
-        if (ucc_unlikely(st != UCC_OK)) {
-            task->super.super.status = st;
-            return ucc_task_complete(coll_task);
+           task->super.super.status = st;
+           return ucc_task_complete(coll_task);
         }
 
-        st = ucc_ec_event_post(team->stream, task->allgather_ring.copy_done,
-                               UCC_EE_CUDA_STREAM);
+        exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
+        exec_args.bufs[0]   = PTR_OFFSET(args->dst.info.buffer, ds * trank);
+        exec_args.bufs[1]   = sbuf;
+        exec_args.count     = ds;
+        st = ucc_ee_executor_task_post(exec, &exec_args,
+                                       &task->allgather_ring.exec_task[0]);
         if (ucc_unlikely(st != UCC_OK)) {
             task->super.super.status = st;
             return ucc_task_complete(coll_task);
@@ -357,8 +355,10 @@ ucc_status_t ucc_tl_cuda_allgather_ring_init(ucc_tl_cuda_task_t *task)
                 (args->dst.info.count / tsize);
     frag_size = ucc_min(ssize/2, send_size);
 
+    task->super.flags              |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->allgather_ring.num_frags = (send_size + frag_size - 1) / frag_size;
     task->super.post               = ucc_tl_cuda_allgather_ring_start;
+    task->super.triggered_post     = ucc_triggered_post;
     task->super.progress           = ucc_tl_cuda_allgather_ring_progress;
     task->super.finalize           = ucc_tl_cuda_allgather_ring_finalize;
     task->bar                      = TASK_BAR(task);

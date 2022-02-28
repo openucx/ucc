@@ -174,12 +174,13 @@ typedef struct ucc_tl_cuda_task {
         } alltoall_ce;
         struct {
             int                     stage;
-            void                   *copy_done;
             int                     num_frags;
+            ucc_ee_executor_task_t *exec_task[2];
         } allgather_ring;
         struct {
             int                     stage;
             int                     num_frags;
+            ucc_ee_executor_task_t *exec_task;
         } reduce_scatter_ring;
     };
 } ucc_tl_cuda_task_t;

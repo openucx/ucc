@@ -63,6 +63,19 @@ __device__ void executor_copy_aligned(T* __restrict__ d, T* __restrict__ s,
     }
 }
 
+template <typename T>
+__device__ void executor_reduce(const T* __restrict__ s1,
+                                const T* __restrict__ s2,
+                                T* __restrict__ d, size_t count)
+{
+    size_t start = threadIdx.x;
+    const size_t step  = blockDim.x;
+
+    for (size_t i = start; i < count; i+=step) {
+        d[i] = s1[i] + s2[i];
+    }
+}
+
 __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
                                 int q_size)
 {
@@ -116,6 +129,31 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
                                    args.count);
                 }
                 break;
+            case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE:
+                switch (args.dt)
+                {
+                case UCC_DT_FLOAT32:
+                    executor_reduce<float>((float*)args.bufs[1],
+                                          (float*)args.bufs[2],
+                                          (float*)args.bufs[0],
+                                          args.count);
+                    break;
+                case UCC_DT_FLOAT64:
+                    executor_reduce<double>((double*)args.bufs[1],
+                                            (double*)args.bufs[2],
+                                            (double*)args.bufs[0],
+                                             args.count);
+                    break;
+                case UCC_DT_INT32:
+                    executor_reduce<int>((int*)args.bufs[1],
+                                         (int*)args.bufs[2],
+                                         (int*)args.bufs[0],
+                                          args.count);
+                    break;
+
+                default:
+                    break;
+                }
             default: break;
         }
         __syncthreads();

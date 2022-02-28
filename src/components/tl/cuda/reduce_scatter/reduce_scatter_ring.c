@@ -144,6 +144,8 @@ ucc_tl_cuda_reduce_scatter_ring_progress_ring(ucc_tl_cuda_task_t * task,
     ucc_datatype_t      dt       = args->dst.info.datatype;
     void               *sbuf     = args->src.info.buffer;
     void               *dbuf     = args->dst.info.buffer;
+    ucc_ee_executor_t *exec;
+    ucc_ee_executor_task_args_t exec_args;
     int step, send_step, recv_step, frag, frag_step;
     size_t frag_count, block_count, block;
     size_t remote_offset, local_offset, frag_offset, block_offset;
@@ -156,8 +158,31 @@ ucc_tl_cuda_reduce_scatter_ring_progress_ring(ucc_tl_cuda_task_t * task,
         dbuf = PTR_OFFSET(args->dst.info.buffer,
                           ccount * trank * ucc_dt_size(dt));
     }
+
+    st = ucc_coll_task_get_executor(&task->super, &exec);
+    if (ucc_unlikely(st != UCC_OK)) {
+        task->super.super.status = st;
+        return task->super.super.status;
+    }
+
     step = get_rank_step(task, trank, ring_id);
     while (step < (tsize * task->reduce_scatter_ring.num_frags)) {
+        if (task->reduce_scatter_ring.exec_task != NULL) {
+            st = ucc_ee_executor_task_test(task->reduce_scatter_ring.exec_task);
+            if (st != UCC_OK) {
+                if (st > 0) {
+                    task->super.super.status = UCC_INPROGRESS;
+                } else {
+                    task->super.super.status = st;
+                }
+                return task->super.super.status;
+            }
+            ucc_ee_executor_task_finalize(task->reduce_scatter_ring.exec_task);
+            task->reduce_scatter_ring.exec_task = NULL;
+            step++;
+            set_rank_step(task, trank, step, ring_id);
+            continue;
+        }
         send_step = get_rank_step(task, sendto, ring_id);
         recv_step = get_rank_step(task, recvfrom, ring_id);
         if ((send_step < step) || (recv_step < step)) {
@@ -184,10 +209,15 @@ ucc_tl_cuda_reduce_scatter_ring_progress_ring(ucc_tl_cuda_task_t * task,
             local_offset = 0;
         }
         if (frag_step == 0) {
-            st = ucc_mc_memcpy(PTR_OFFSET(TASK_SCRATCH(task, trank), local_offset),
-                               PTR_OFFSET(sbuf, (block_offset + frag_offset) *
-                               ucc_dt_size(dt)), frag_count * ucc_dt_size(dt),
-                               UCC_MEMORY_TYPE_CUDA, UCC_MEMORY_TYPE_CUDA);
+            exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
+            exec_args.bufs[0]   = PTR_OFFSET(TASK_SCRATCH(task, trank), local_offset);
+            exec_args.bufs[1]   = PTR_OFFSET(sbuf, (block_offset + frag_offset) *
+                                             ucc_dt_size(dt));
+            exec_args.count     = frag_count * ucc_dt_size(dt);
+            // st = ucc_mc_memcpy(PTR_OFFSET(TASK_SCRATCH(task, trank), local_offset),
+            //                    PTR_OFFSET(sbuf, (block_offset + frag_offset) *
+            //                    ucc_dt_size(dt)), frag_count * ucc_dt_size(dt),
+            //                    UCC_MEMORY_TYPE_CUDA, UCC_MEMORY_TYPE_CUDA);
         } else {
             rsrc1 = PTR_OFFSET(sbuf, (block_offset + frag_offset) * ucc_dt_size(dt));
             rsrc2 = PTR_OFFSET(TASK_SCRATCH(task, recvfrom), remote_offset);
@@ -196,15 +226,22 @@ ucc_tl_cuda_reduce_scatter_ring_progress_ring(ucc_tl_cuda_task_t * task,
             } else {
                 rdst = PTR_OFFSET(TASK_SCRATCH(task, trank), local_offset);
             }
-            st = ucc_mc_reduce(rsrc1, rsrc2, rdst, frag_count, dt,
-                            args->op, UCC_MEMORY_TYPE_CUDA);
+            exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_REDUCE;
+            exec_args.bufs[0]   = rdst;
+            exec_args.bufs[1]   = rsrc1;
+            exec_args.bufs[2]   = rsrc2;
+            exec_args.count     = frag_count;
+            exec_args.dt        = dt;
+            exec_args.op        = args->op;
+            // st = ucc_mc_reduce(rsrc1, rsrc2, rdst, frag_count, dt,
+            //                 args->op, UCC_MEMORY_TYPE_CUDA);
         }
+        st = ucc_ee_executor_task_post(exec, &exec_args,
+                                       &task->reduce_scatter_ring.exec_task);
         if (ucc_unlikely(st != UCC_OK)) {
             task->super.super.status = st;
             return task->super.super.status;
         }
-        step++;
-        set_rank_step(task, trank, step, ring_id);
     }
 
     return UCC_OK;
@@ -268,6 +305,7 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_ring_start(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_task_t *task    = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team    = TASK_TEAM(task);
 
+    task->reduce_scatter_ring.exec_task = NULL;
     task->reduce_scatter_ring.stage = REDUCE_SCATTER_RING_STAGE_SYNC;
     ucc_tl_cuda_reduce_scatter_ring_progress(coll_task);
     if (task->super.super.status == UCC_INPROGRESS) {
@@ -292,8 +330,10 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_ring_init(ucc_tl_cuda_task_t *task)
     }
     frag_size = ucc_min(ssize / ucc_dt_size(dt) / 2, send_size);
 
+    task->super.flags                   |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->reduce_scatter_ring.num_frags = (send_size  + frag_size - 1) / frag_size;
     task->super.post                    = ucc_tl_cuda_reduce_scatter_ring_start;
+    task->super.triggered_post          = ucc_triggered_post;
     task->super.progress                = ucc_tl_cuda_reduce_scatter_ring_progress;
     task->super.finalize                = ucc_tl_cuda_reduce_scatter_ring_finalize;
     task->bar                           = TASK_BAR(task);

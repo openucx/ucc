@@ -6,6 +6,7 @@
 
 #include "ec_cuda_executor.h"
 #include "utils/arch/cpu.h"
+#include "components/mc/ucc_mc.h"
 
 ucc_status_t ucc_cuda_executor_init(const ucc_ee_executor_params_t *params,
                                     ucc_ee_executor_t **executor)
@@ -55,6 +56,10 @@ ucc_status_t ucc_cuda_executor_finalize(ucc_ee_executor_t *executor)
     return UCC_OK;
 }
 
+ucc_status_t ucc_mc_cuda_reduce(const void *src1, const void *src2, void *dst,
+                                size_t count, ucc_datatype_t dt,
+                                ucc_reduction_op_t op);
+
 ucc_status_t
 ucc_cuda_executor_interuptible_task_post(ucc_ee_executor_t *executor,
                                          const ucc_ee_executor_task_args_t *task_args,
@@ -80,18 +85,34 @@ ucc_cuda_executor_interuptible_task_post(ucc_ee_executor_t *executor,
                                            task_args->count, cudaMemcpyDefault,
                                            ucc_ec_cuda.stream));
         if (ucc_unlikely(status != UCC_OK)) {
+            ec_error(&ucc_ec_cuda.super, "failed to start memcpy op");
             goto free_task;
         }
-        status = ucc_ec_cuda_event_post(ucc_ec_cuda.stream, ee_task->event);
+
+        break;
+    case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE:
+        /* temp workaround to avoid code duplication*/
+        status = ucc_mc_reduce(task_args->bufs[1], task_args->bufs[2],
+                               task_args->bufs[0], task_args->count,
+                               task_args->dt, task_args->op,
+                               UCC_MEMORY_TYPE_CUDA);
         if (ucc_unlikely(status != UCC_OK)) {
+            ec_error(&ucc_ec_cuda.super, "failed to start reduce op");
             goto free_task;
         }
+
         break;
     default:
         ec_error(&ucc_ec_cuda.super, "executor operation is not supported");
         status = UCC_ERR_INVALID_PARAM;
         goto free_task;
     }
+
+    status = ucc_ec_cuda_event_post(ucc_ec_cuda.stream, ee_task->event);
+    if (ucc_unlikely(status != UCC_OK)) {
+        goto free_task;
+    }
+
     *task = &ee_task->super;
     return UCC_OK;
 
@@ -132,6 +153,16 @@ ucc_cuda_executor_persistent_task_post(ucc_ee_executor_t *executor,
     int                     max_tasks = EC_CUDA_CONFIG->exec_max_tasks;
     ucc_ee_executor_task_t *ee_task;
 
+    if (task_args->task_type == UCC_EE_EXECUTOR_TASK_TYPE_REDUCE) {
+        if (task_args->op != UCC_OP_SUM) {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+        if ((task_args->dt != UCC_DT_FLOAT32) &&
+            (task_args->dt != UCC_DT_FLOAT64) &&
+            (task_args->dt != UCC_DT_INT32)) {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
     if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {
         ucc_spin_lock(&eee->tasks_lock);
     }
