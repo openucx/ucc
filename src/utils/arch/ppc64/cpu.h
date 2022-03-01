@@ -23,4 +23,14 @@
                                                     "isync  \n" \
                                                     ::: "memory")
 
+static inline ucc_cpu_model_t ucc_arch_get_cpu_model()
+{
+    return UCC_CPU_MODEL_UNKNOWN;
+}
+
+static inline ucc_cpu_vendor_t ucc_arch_get_cpu_vendor()
+{
+    return UCC_CPU_VENDOR_GENERIC_PPC;
+}
+
 #endif

@@ -24,4 +24,7 @@
 #define ucc_memory_cpu_store_fence()  ucc_compiler_fence()
 #define ucc_memory_cpu_load_fence()   ucc_compiler_fence()
 
+ucc_cpu_model_t  ucc_arch_get_cpu_model() UCC_F_NOOPTIMIZE;
+ucc_cpu_vendor_t ucc_arch_get_cpu_vendor();
+
 #endif
