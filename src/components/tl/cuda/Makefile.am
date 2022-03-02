@@ -23,6 +23,11 @@ reduce_scatter =                         \
 	reduce_scatter/reduce_scatter.c      \
 	reduce_scatter/reduce_scatter_ring.c
 
+reduce_scatterv =                          \
+	reduce_scatterv/reduce_scatterv.h      \
+	reduce_scatterv/reduce_scatterv.c      \
+	reduce_scatterv/reduce_scatterv_ring.c
+
 sources =               \
 	tl_cuda.h           \
 	tl_cuda.c           \
@@ -36,7 +41,8 @@ sources =               \
 	$(alltoall)         \
 	$(allgather)        \
 	$(allgatherv)       \
-	$(reduce_scatter)
+	$(reduce_scatter)   \
+	$(reduce_scatterv)
 
 module_LTLIBRARIES = libucc_tl_cuda.la
 libucc_tl_cuda_la_SOURCES  = $(sources)

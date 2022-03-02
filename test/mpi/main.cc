@@ -12,7 +12,6 @@ static std::vector<ucc_coll_type_t> colls = {
     UCC_COLL_TYPE_ALLGATHER,      UCC_COLL_TYPE_ALLGATHERV,
     UCC_COLL_TYPE_ALLTOALL,       UCC_COLL_TYPE_ALLTOALLV,
     UCC_COLL_TYPE_REDUCE_SCATTER, UCC_COLL_TYPE_REDUCE_SCATTERV};
-
 static std::vector<ucc_coll_type_t> onesided_colls = {UCC_COLL_TYPE_ALLTOALL};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
 static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
