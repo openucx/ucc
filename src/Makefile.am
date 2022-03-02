@@ -113,6 +113,7 @@ libucc_la_SOURCES =                   \
 	utils/profile/ucc_profile.c       \
 	utils/ucc_sys.c                   \
 	utils/arch/x86_64/cpu.c           \
+	utils/arch/aarch64/cpu.c          \
 	components/base/ucc_base_iface.c  \
 	components/cl/ucc_cl.c            \
 	components/tl/ucc_tl.c            \

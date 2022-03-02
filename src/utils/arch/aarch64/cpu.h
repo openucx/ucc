@@ -43,20 +43,10 @@ typedef struct ucc_aarch64_cpuid {
     int       revision;
 } ucc_aarch64_cpuid_t;
 
-static inline void ucc_aarch64_cpuid(ucc_aarch64_cpuid_t *cpuid);
-{
-    static ucc_aarch64_cpuid_t cached_cpuid;
-    static int initialized = 0;
-
-    if (!initialized) {
-        ucc_aarch64_cpuid_from_proc(&cached_cpuid);
-        ucc_memory_cpu_store_fence();
-        initialized = 1;
-    }
-
-    ucc_memory_cpu_load_fence();
-    *cpuid = cached_cpuid;
-}
+/**
+ * Get ARM CPU identifier and version
+ */
+void ucc_aarch64_cpuid(ucc_aarch64_cpuid_t *cpuid);
 
 static inline ucc_cpu_model_t ucc_arch_get_cpu_model()
 {
