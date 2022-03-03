@@ -7,6 +7,7 @@
 #include "reduce_scatter.h"
 #include "components/ec/ucc_ec.h"
 #include "tl_cuda_cache.h"
+#include "tl_cuda_ring.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 
@@ -19,74 +20,6 @@ enum {
                                         */
 };
 
-static inline ucc_rank_t get_send_to(ucc_tl_cuda_team_t *team,
-                                     ucc_rank_t trank, ucc_rank_t tsize,
-                                     int ring_id)
-{
-    ucc_tl_cuda_ring_t *ring = &team->topo->rings[ring_id];
-
-    return ring->ring[(ring->iring[trank] + 1) % tsize];
-}
-
-static inline ucc_rank_t get_recv_from(ucc_tl_cuda_team_t *team,
-                                       ucc_rank_t trank, ucc_rank_t tsize,
-                                       int ring_id)
-{
-    ucc_tl_cuda_ring_t *ring = &team->topo->rings[ring_id];
-
-    return ring->ring[(ring->iring[trank] - 1 + tsize) % tsize];
-}
-
-static inline size_t ucc_ring_block_offset(size_t total_count,
-                                           ucc_rank_t n_blocks,
-                                           ucc_rank_t block)
-{
-    size_t block_count = total_count / n_blocks;
-    size_t left        = total_count % n_blocks;
-    size_t offset      = block * block_count + left;
-    return (block < left) ? offset - (left - block) : offset;
-}
-
-static inline size_t ucc_ring_block_count(size_t total_count,
-                                          ucc_rank_t n_blocks, ucc_rank_t block)
-{
-    size_t block_count = total_count / n_blocks;
-    size_t left        = total_count % n_blocks;
-    return (block < left) ? block_count + 1 : block_count;
-}
-
-static inline ucc_rank_t get_send_block(ucc_tl_cuda_team_t *team,
-                                        ucc_rank_t trank, ucc_rank_t tsize,
-                                        uint32_t step, int ring_id)
-{
-    ucc_tl_cuda_ring_t *ring = &team->topo->rings[ring_id];
-
-    return ring->ring[(ring->iring[trank] + tsize - step) % tsize];
-}
-
-static inline ucc_rank_t get_recv_block(ucc_tl_cuda_team_t *team,
-                                        ucc_rank_t trank, ucc_rank_t tsize,
-                                        uint32_t step, int ring_id)
-{
-    ucc_tl_cuda_ring_t *ring = &team->topo->rings[ring_id];
-
-    return ring->ring[(ring->iring[trank] + tsize - step - 1) % tsize];
-}
-
-static inline void set_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
-                                 uint32_t step, int ring_id)
-{
-    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
-    sync->seq_num = step;
-}
-
-static inline uint32_t get_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
-                                     int ring_id)
-{
-    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
-    return sync->seq_num;
-}
-
 ucc_status_t ucc_tl_cuda_reduce_scatter_ring_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
@@ -94,14 +27,6 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_ring_finalize(ucc_coll_task_t *coll_task
     tl_trace(UCC_TASK_LIB(task), "finalizing task %p", task);
     ucc_tl_cuda_task_put(task);
     return UCC_OK;
-}
-
-
-static inline size_t max_frag_size(size_t total_count, ucc_rank_t n_blocks,
-                                   ucc_rank_t n_frags)
-{
-    size_t block_count = ucc_ring_block_count(total_count, n_blocks, 0);
-    return ucc_ring_block_count(block_count, n_frags, 0);
 }
 
 ucc_status_t ucc_tl_cuda_reduce_scatter_ring_setup_start(ucc_tl_cuda_task_t *task)
@@ -192,10 +117,10 @@ ucc_tl_cuda_reduce_scatter_ring_progress_ring(ucc_tl_cuda_task_t * task,
         frag = step / tsize;
         frag_step = step % tsize;
 
-        frag_offset = ucc_ring_block_offset(ccount,
+        frag_offset = ucc_buffer_block_offset(ccount,
                                             task->reduce_scatter_ring.num_frags,
                                             frag);
-        frag_count = ucc_ring_block_count(ccount,
+        frag_count = ucc_buffer_block_count(ccount,
                                           task->reduce_scatter_ring.num_frags,
                                           frag);
         block = get_recv_block(team, trank, tsize, frag_step, ring_id);
@@ -214,10 +139,6 @@ ucc_tl_cuda_reduce_scatter_ring_progress_ring(ucc_tl_cuda_task_t * task,
             exec_args.bufs[1]   = PTR_OFFSET(sbuf, (block_offset + frag_offset) *
                                              ucc_dt_size(dt));
             exec_args.count     = frag_count * ucc_dt_size(dt);
-            // st = ucc_mc_memcpy(PTR_OFFSET(TASK_SCRATCH(task, trank), local_offset),
-            //                    PTR_OFFSET(sbuf, (block_offset + frag_offset) *
-            //                    ucc_dt_size(dt)), frag_count * ucc_dt_size(dt),
-            //                    UCC_MEMORY_TYPE_CUDA, UCC_MEMORY_TYPE_CUDA);
         } else {
             rsrc1 = PTR_OFFSET(sbuf, (block_offset + frag_offset) * ucc_dt_size(dt));
             rsrc2 = PTR_OFFSET(TASK_SCRATCH(task, recvfrom), remote_offset);
@@ -233,8 +154,6 @@ ucc_tl_cuda_reduce_scatter_ring_progress_ring(ucc_tl_cuda_task_t * task,
             exec_args.count     = frag_count;
             exec_args.dt        = dt;
             exec_args.op        = args->op;
-            // st = ucc_mc_reduce(rsrc1, rsrc2, rdst, frag_count, dt,
-            //                 args->op, UCC_MEMORY_TYPE_CUDA);
         }
         st = ucc_ee_executor_task_post(exec, &exec_args,
                                        &task->reduce_scatter_ring.exec_task);
