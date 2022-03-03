@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2001-2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2001-2022.  ALL RIGHTS RESERVED.
 # See file LICENSE for terms.
 #
 
@@ -71,9 +71,14 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                                    [AC_MSG_WARN([libnvidia-ml not found. Install appropriate nvidia-driver package])])
                              nvml_happy="no"])])
         AS_IF([test "x$cuda_happy" = "xyes" -a "x$nvml_happy" = "xyes"],
-              [AC_CHECK_LIB([nvidia-ml], [nvmlDeviceGetNvLinkRemoteDeviceType],
-                            [AC_DEFINE([HAVE_NVML_REMOTE_DEVICE_TYPE], 1, ["Use nvmlDeviceGetNvLinkRemoteDeviceType"])],
-                            [])])
+              [AC_CHECK_DECL([nvmlDeviceGetNvLinkRemoteDeviceType],
+                             [AC_CHECK_LIB([nvidia-ml], [nvmlDeviceGetNvLinkRemoteDeviceType],
+                                           [AC_DEFINE([HAVE_NVML_REMOTE_DEVICE_TYPE],
+                                                       1,
+                                                      ["Use nvmlDeviceGetNvLinkRemoteDeviceType"])],
+                                           [])],
+                             [],
+                             [[#include <nvml.h>]])])
 
          # Check for NVCC
          AC_ARG_VAR(NVCC, [NVCC compiler command])
