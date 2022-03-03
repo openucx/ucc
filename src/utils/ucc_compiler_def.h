@@ -38,6 +38,21 @@ typedef int                        ucc_score_t;
 #define UCC_PP_QUOTE UCS_PP_QUOTE
 #define UCC_EMPTY_STATEMENT {}
 
+/* Packed structure */
+#define UCC_S_PACKED             __attribute__((packed))
+
+/**
+ * suppress unaligned pointer warning
+ */
+#define ucc_unaligned_ptr(_ptr) ({void *_p = (void*)(_ptr); _p;})
+
+/* A function which should not be optimized */
+#if defined(HAVE_ATTRIBUTE_NOOPTIMIZE) && (HAVE_ATTRIBUTE_NOOPTIMIZE == 1)
+#define UCC_F_NOOPTIMIZE __attribute__((optimize("O0")))
+#else
+#define UCC_F_NOOPTIMIZE
+#endif
+
 #define UCC_COPY_PARAM_BY_FIELD(_dst, _src, _FIELD, _field)                    \
     do {                                                                       \
         if ((_src)->mask & (_FIELD)) {                                         \
