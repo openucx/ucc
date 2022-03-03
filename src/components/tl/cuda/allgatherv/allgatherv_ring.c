@@ -53,22 +53,21 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress_ring(ucc_tl_cuda_task_t * task
                                                        uint32_t ring_id)
 {
     ucc_tl_cuda_team_t *team     = TASK_TEAM(task);
-    ucc_coll_args_t    *args     = &TASK_ARGS(task);
     ucc_rank_t          trank    = UCC_TL_TEAM_RANK(team);
     int                 tsize    = (int)UCC_TL_TEAM_SIZE(team);
-    ucc_datatype_t      dt       = args->dst.info_v.datatype;
+    ucc_datatype_t      dt       = task->allgatherv_ring.dt;
     ucc_rank_t          sendto   = get_send_to(team, trank, tsize, ring_id);
     ucc_rank_t          recvfrom = get_recv_from(team, trank, tsize, ring_id);
-    void               *rbuf     = args->dst.info_v.buffer;
+    void               *rbuf     = task->allgatherv_ring.rbuf;
     size_t              ssize    = UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size;
-
     ucc_ee_executor_t *exec;
     ucc_ee_executor_task_args_t exec_args;
     void *dbuf1, *dbuf2, *sbuf;
     int step, send_step, recv_step, frag, frag_step, i;
     ucc_rank_t peer_block;
-    size_t remote_offset, local_offset, frag_offset, frag_size, block_size, block_offset;
     ucc_status_t st;
+    size_t remote_offset, local_offset, frag_offset, frag_size, block_size,
+           block_offset;
 
     st = ucc_coll_task_get_executor(&task->super, &exec);
     if (ucc_unlikely(st != UCC_OK)) {
@@ -107,19 +106,19 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress_ring(ucc_tl_cuda_task_t * task
             return task->super.super.status;
         }
 
-        frag = step / tsize;
-        frag_step = step % tsize;
-
-        peer_block = get_send_block(team, trank, tsize, frag_step, ring_id);
-
-        block_size = ucc_coll_args_get_count(args, args->dst.info_v.counts, peer_block) *
-                     ucc_dt_size(dt);
-        block_offset = ucc_coll_args_get_displacement(args, args->dst.info_v.displacements, peer_block) *
+        frag         = step / tsize;
+        frag_step    = step % tsize;
+        peer_block   = get_send_block(team, trank, tsize, frag_step, ring_id);
+        block_size   = task->allgatherv_ring.get_count(task, peer_block) *
                        ucc_dt_size(dt);
-        frag_offset = ucc_buffer_block_offset(block_size, task->allgatherv_ring.num_frags,
-                                            frag);
-        frag_size = ucc_buffer_block_count(block_size, task->allgatherv_ring.num_frags,
-                                         frag);
+        block_offset = task->allgatherv_ring.get_offset(task, peer_block) *
+                       ucc_dt_size(dt);
+        frag_offset  = ucc_buffer_block_offset(block_size,
+                                               task->allgatherv_ring.num_frags,
+                                               frag);
+        frag_size    = ucc_buffer_block_count(block_size,
+                                              task->allgatherv_ring.num_frags,
+                                              frag);
         if (step % 2) {
             remote_offset = ssize / 2;
             local_offset = 0;
@@ -226,7 +225,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_team_t *team    = TASK_TEAM(task);
     ucc_coll_args_t    *args    = &TASK_ARGS(task);
     ucc_rank_t         trank    = UCC_TL_TEAM_RANK(team);
-    ucc_datatype_t     dt       = args->dst.info_v.datatype;
+    ucc_datatype_t     dt       = task->allgatherv_ring.dt;
     ucc_ee_executor_t *exec;
     ucc_ee_executor_task_args_t exec_args;
     ucc_status_t st;
@@ -241,11 +240,11 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
         }
 
         exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
-        exec_args.bufs[0]   = PTR_OFFSET(args->dst.info_v.buffer,
-                                         ucc_coll_args_get_displacement(args, args->dst.info_v.displacements, trank) *
+        exec_args.bufs[0]   = PTR_OFFSET(task->allgatherv_ring.rbuf,
+                                         task->allgatherv_ring.get_offset(task, trank) *
                                          ucc_dt_size(dt));
-        exec_args.bufs[1]   = args->src.info.buffer;
-        exec_args.count     = ucc_coll_args_get_count(args, args->dst.info_v.counts, trank) *
+        exec_args.bufs[1]   = task->allgatherv_ring.sbuf;
+        exec_args.count     = task->allgatherv_ring.get_count(task, trank) *
                               ucc_dt_size(dt);
         st = ucc_ee_executor_task_post(exec, &exec_args,
                                        &task->allgatherv_ring.exec_task[0]);
@@ -264,6 +263,21 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     return ucc_task_complete(coll_task);
 }
 
+size_t ucc_tl_cuda_allgatherv_get_count(const ucc_tl_cuda_task_t *task,
+                                        ucc_rank_t block)
+{
+    const ucc_coll_args_t *args  = &TASK_ARGS(task);
+    return ucc_coll_args_get_count(args, args->dst.info_v.counts, block);
+}
+
+size_t ucc_tl_cuda_allgatherv_get_offset(const ucc_tl_cuda_task_t *task,
+                                         ucc_rank_t block)
+{
+    const ucc_coll_args_t *args  = &TASK_ARGS(task);
+    return ucc_coll_args_get_displacement(args, args->dst.info_v.displacements,
+                                          block);
+}
+
 ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
@@ -273,12 +287,17 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_tl_cuda_task_t *task)
     size_t              send_size, frag_size;
     ucc_rank_t i;
 
-    send_size = ucc_coll_args_get_count(args, args->dst.info_v.counts, 0);
+    task->allgatherv_ring.get_count  = ucc_tl_cuda_allgatherv_get_count;
+    task->allgatherv_ring.get_offset = ucc_tl_cuda_allgatherv_get_offset;
+    task->allgatherv_ring.dt         = args->dst.info_v.datatype;
+    task->allgatherv_ring.sbuf       = args->src.info.buffer;
+    task->allgatherv_ring.rbuf       = args->dst.info_v.buffer;
+
+    send_size = task->allgatherv_ring.get_count(task, 0);
     for (i = 1; i < tsize; i++) {
-        send_size = ucc_max(send_size,
-                            ucc_coll_args_get_count(args, args->dst.info_v.counts, i));
+        send_size = ucc_max(send_size, task->allgatherv_ring.get_count(task, i));
     }
-    send_size = ucc_dt_size(args->dst.info_v.datatype) * send_size;
+    send_size = ucc_dt_size(task->allgatherv_ring.dt) * send_size;
     frag_size = ucc_min(ssize/2, send_size);
 
     task->super.flags               |= UCC_COLL_TASK_FLAG_EXECUTOR;

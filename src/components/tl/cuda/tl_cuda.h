@@ -157,7 +157,8 @@ typedef struct ucc_tl_cuda_team {
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
-typedef struct ucc_tl_cuda_task {
+typedef struct ucc_tl_cuda_task ucc_tl_cuda_task_t;
+struct ucc_tl_cuda_task {
     ucc_coll_task_t            super;
     uint32_t                   seq_num;
     uint32_t                   coll_id;
@@ -174,26 +175,30 @@ typedef struct ucc_tl_cuda_task {
             void                   *copy_done;
         } alltoall_ce;
         struct {
-            int                     stage;
-            int                     num_frags;
-            ucc_ee_executor_task_t *exec_task[2];
-        } allgather_ring;
-        struct {
-            int                     stage;
-            int                     num_frags;
-            ucc_ee_executor_task_t *exec_task[2];
+            int                      stage;
+            int                      num_frags;
+            ucc_datatype_t           dt;
+            void                    *sbuf;
+            void                    *rbuf;
+            ucc_ee_executor_task_t  *exec_task[2];
+            size_t                 (*get_count)(const ucc_tl_cuda_task_t *task,
+                                                ucc_rank_t block);
+            size_t                 (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                                 ucc_rank_t block);
         } allgatherv_ring;
         struct {
-            int                     stage;
-            int                     num_frags;
-            ucc_ee_executor_task_t *exec_task;
-        } reduce_scatter_ring;
-        struct {
-            int                     stage;
-            int                     num_frags;
-            ucc_ee_executor_task_t *exec_task;
+            int                      stage;
+            int                      num_frags;
+            ucc_datatype_t           dt;
+            void                    *sbuf;
+            void                    *rbuf;
+            ucc_ee_executor_task_t  *exec_task;
+            size_t                 (*get_count)(const ucc_tl_cuda_task_t *task,
+                                                ucc_rank_t block);
+            size_t                 (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                                 ucc_rank_t block);
         } reduce_scatterv_ring;
     };
-} ucc_tl_cuda_task_t;
+};
 
 #endif
