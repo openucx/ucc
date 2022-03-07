@@ -139,8 +139,8 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *team)
         .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
         .cpu_model   = UCC_CPU_MODEL_INTEL_SKYLAKE,
         .team_size   = 40,
-        .bcast_func  = ucc_tl_shm_perf_params_generic,
-        .reduce_func = ucc_tl_shm_perf_params_generic
+        .bcast_func  = ucc_tl_shm_perf_params_intel_skylake_40_bcast,
+        .reduce_func = ucc_tl_shm_perf_params_intel_skylake_40_reduce
     };
     team->perf_funcs->keys[size] = intel_skylake_40;
     size++;
@@ -149,8 +149,8 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *team)
         .cpu_vendor  = UCC_CPU_VENDOR_AMD,
         .cpu_model   = UCC_CPU_MODEL_AMD_ROME,
         .team_size   = 128,
-        .bcast_func  = ucc_tl_shm_perf_params_generic,
-        .reduce_func = ucc_tl_shm_perf_params_generic
+        .bcast_func  = ucc_tl_shm_perf_params_amd_rome_128_bcast,
+        .reduce_func = ucc_tl_shm_perf_params_amd_rome_128_reduce
     };
     team->perf_funcs->keys[size] = amd_rome_128;
     size++;
@@ -175,8 +175,6 @@ static inline ucc_status_t ucc_tl_shm_set_perf_funcs(ucc_tl_shm_team_t *team)
     vendor = ucc_arch_get_cpu_vendor();
     model  = ucc_arch_get_cpu_model();
 
-	printf("model=%d, vendor=%d, team_size=%d\n", model, vendor, team_size);
-
     for (i = 0; i < team->perf_funcs->size; i++) {
         if (team->perf_funcs->keys[i].cpu_vendor == vendor &&
             team->perf_funcs->keys[i].cpu_model == model &&
@@ -184,13 +182,12 @@ static inline ucc_status_t ucc_tl_shm_set_perf_funcs(ucc_tl_shm_team_t *team)
             team->perf_params_bcast  = team->perf_funcs->keys[i].bcast_func;
             team->perf_params_reduce = team->perf_funcs->keys[i].reduce_func;
             set = 1;
-            printf("found perf func\n");
             break;
         }
     }
     if (!set) {
-    	team->perf_params_bcast = ucc_tl_shm_perf_params_generic;
-    	team->perf_params_reduce = ucc_tl_shm_perf_params_generic;
+        team->perf_params_bcast = ucc_tl_shm_perf_params_generic_bcast;
+        team->perf_params_reduce = ucc_tl_shm_perf_params_generic_reduce;
     }
     return UCC_OK;
 }
