@@ -188,9 +188,9 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_tas
             return task->super.super.status;
         }
 
-        task->reduce_scatterv_ring.stage = RING_STAGE_BAR;
+        task->reduce_scatterv_ring.stage = RING_STAGE_BARRIER;
     default:
-        ucc_assert(task->reduce_scatterv_ring.stage == RING_STAGE_BAR);
+        ucc_assert(task->reduce_scatterv_ring.stage == RING_STAGE_BARRIER);
         break;
     }
 
@@ -261,7 +261,7 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_init(ucc_tl_cuda_task_t *task)
     frag_size = ucc_min(ssize / ucc_dt_size(dt) / 2, send_size);
 
     task->super.flags                    |= UCC_COLL_TASK_FLAG_EXECUTOR;
-    task->reduce_scatterv_ring.num_frags = (send_size  + frag_size - 1) / frag_size;
+    task->reduce_scatterv_ring.num_frags = ucc_div_round_up(send_size, frag_size);
     task->super.post                     = ucc_tl_cuda_reduce_scatterv_ring_start;
     task->super.triggered_post           = ucc_triggered_post;
     task->super.progress                 = ucc_tl_cuda_reduce_scatterv_ring_progress;

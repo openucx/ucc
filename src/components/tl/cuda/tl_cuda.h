@@ -148,7 +148,6 @@ typedef struct ucc_tl_cuda_team {
     ucc_tl_cuda_shm_barrier_t *bar;
     ucc_tl_cuda_scratch_t      scratch;
     cudaStream_t               stream;
-    cudaStream_t               stream2;
     ucc_tl_cuda_rank_id_t     *ids;
     ucc_team_oob_coll_t        oob;
     void                      *oob_req;

@@ -85,7 +85,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress_ring(ucc_tl_cuda_task_t * task
                         ucc_ee_executor_task_finalize(task->allgatherv_ring.exec_task[i]);
                         task->allgatherv_ring.exec_task[i] = NULL;
                     } else {
-                        if (st > 0) {
+                        if (ucc_likely(st > 0)) {
                             task->super.super.status = UCC_INPROGRESS;
                         } else {
                             task->super.super.status = st;
@@ -205,9 +205,9 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
             return task->super.super.status;
         }
 
-        task->allgatherv_ring.stage = RING_STAGE_BAR;
+        task->allgatherv_ring.stage = RING_STAGE_BARRIER;
     default:
-        ucc_assert(task->allgatherv_ring.stage == RING_STAGE_BAR);
+        ucc_assert(task->allgatherv_ring.stage == RING_STAGE_BARRIER);
         break;
     }
 
@@ -267,6 +267,7 @@ size_t ucc_tl_cuda_allgatherv_get_count(const ucc_tl_cuda_task_t *task,
                                         ucc_rank_t block)
 {
     const ucc_coll_args_t *args  = &TASK_ARGS(task);
+
     return ucc_coll_args_get_count(args, args->dst.info_v.counts, block);
 }
 
@@ -274,6 +275,7 @@ size_t ucc_tl_cuda_allgatherv_get_offset(const ucc_tl_cuda_task_t *task,
                                          ucc_rank_t block)
 {
     const ucc_coll_args_t *args  = &TASK_ARGS(task);
+
     return ucc_coll_args_get_displacement(args, args->dst.info_v.displacements,
                                           block);
 }
@@ -301,7 +303,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_tl_cuda_task_t *task)
     frag_size = ucc_min(ssize/2, send_size);
 
     task->super.flags               |= UCC_COLL_TASK_FLAG_EXECUTOR;
-    task->allgatherv_ring.num_frags = (send_size + frag_size - 1) / frag_size;
+    task->allgatherv_ring.num_frags = ucc_div_round_up(send_size, frag_size);
     task->super.post                = ucc_tl_cuda_allgatherv_ring_start;
     task->super.triggered_post      = ucc_triggered_post;
     task->super.progress            = ucc_tl_cuda_allgatherv_ring_progress;

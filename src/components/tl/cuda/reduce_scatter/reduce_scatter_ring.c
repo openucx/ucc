@@ -4,10 +4,10 @@
  * See file LICENSE for terms.
  */
 
-#include "../reduce_scatterv/reduce_scatterv.h"
+#include "reduce_scatterv/reduce_scatterv.h"
 
 size_t ucc_tl_cuda_reduce_scatter_ring_count(const ucc_tl_cuda_task_t *task,
-                                             ucc_rank_t block)
+                                             ucc_rank_t block) //NOLINT
 {
     const ucc_coll_args_t *args  = &TASK_ARGS(task);
     size_t                 count = args->dst.info.count;
@@ -28,11 +28,9 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_ring_init(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team   = TASK_TEAM(task);
     ucc_coll_args_t    *args   = &TASK_ARGS(task);
-    ucc_rank_t          tsize  = UCC_TL_TEAM_SIZE(team);
     size_t              ssize  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size;
     ucc_datatype_t      dt     = args->dst.info.datatype;
     size_t send_size, frag_size;
-    ucc_rank_t i;
 
     task->reduce_scatterv_ring.get_count  = ucc_tl_cuda_reduce_scatter_ring_count;
     task->reduce_scatterv_ring.get_offset = ucc_tl_cuda_reduce_scatter_ring_get_offset;
@@ -41,14 +39,10 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_ring_init(ucc_tl_cuda_task_t *task)
     task->reduce_scatterv_ring.rbuf       = args->dst.info.buffer;
 
     send_size = task->reduce_scatterv_ring.get_count(task, 0);
-    for (i = 1; i < tsize; i++) {
-        send_size = ucc_max(send_size,
-                            task->reduce_scatterv_ring.get_count(task, i));
-    }
     frag_size = ucc_min(ssize / ucc_dt_size(dt) / 2, send_size);
 
     task->super.flags                    |= UCC_COLL_TASK_FLAG_EXECUTOR;
-    task->reduce_scatterv_ring.num_frags = (send_size  + frag_size - 1) / frag_size;
+    task->reduce_scatterv_ring.num_frags = ucc_div_round_up(send_size, frag_size);
     task->super.post                     = ucc_tl_cuda_reduce_scatterv_ring_start;
     task->super.triggered_post           = ucc_triggered_post;
     task->super.progress                 = ucc_tl_cuda_reduce_scatterv_ring_progress;

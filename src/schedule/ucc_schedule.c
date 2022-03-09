@@ -146,9 +146,13 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule,
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
 {
     ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED,
-                            &schedule->super, ucc_schedule_completed_handler);
+                                &schedule->super,
+                                ucc_schedule_completed_handler);
     task->schedule                       = schedule;
     schedule->tasks[schedule->n_tasks++] = task;
+    if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
+        schedule->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    }
 }
 
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule)

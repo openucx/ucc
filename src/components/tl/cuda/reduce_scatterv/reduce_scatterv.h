@@ -7,8 +7,8 @@
 #ifndef REDUCE_SCATTERV_H_
 #define REDUCE_SCATTERV_H_
 
-#include "../tl_cuda.h"
-#include "../tl_cuda_coll.h"
+#include "tl_cuda.h"
+#include "tl_cuda_coll.h"
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_init(ucc_tl_cuda_task_t *task);
 

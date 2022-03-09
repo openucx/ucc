@@ -105,18 +105,18 @@ exit_err:
 
 static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_coll_args_t    *args = &TASK_ARGS(task);
-    ucc_rank_t          rank = UCC_TL_TEAM_RANK(team);
-    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
-    ucc_tl_cuda_sync_t *peer_sync;
-    size_t send_len;
-    ucc_rank_t i, peer, psrc, pdst;
-    void *src, *dst;
-    ucc_status_t status;
-    ucc_ee_executor_t *exec;
-    ucc_ee_executor_task_args_t exec_args;
-    ucc_ee_executor_task_t **exec_task;
+    ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
+    ucc_coll_args_t             *args = &TASK_ARGS(task);
+    ucc_rank_t                   rank = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_sync_t          *sync = TASK_SYNC(task, rank);
+    ucc_tl_cuda_sync_t          *peer_sync;
+    ucc_ee_executor_t           *exec;
+    void                        *src, *dst;
+    ucc_ee_executor_task_t      **exec_task;
+    size_t                       send_len;
+    ucc_rank_t                   i, peer, psrc, pdst;
+    ucc_status_t                 status;
+    ucc_ee_executor_task_args_t  exec_args;
 
     task->alltoall_ce.num_posted = 0;
     status = ucc_coll_task_get_executor(&task->super, &exec);
@@ -155,9 +155,6 @@ static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task
             goto exit;
         }
         task->alltoall_ce.num_posted++;
-        // CUDA_CHECK_GOTO(cudaMemcpyAsync(dst, src, send_len,
-        //                                cudaMemcpyDeviceToDevice, team->stream),
-        //                exit, status);
     }
 
     for (i = 0; i < team->topo->num_proxies; i++) {
@@ -182,11 +179,6 @@ static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task
                 goto exit;
             }
             task->alltoall_ce.num_posted++;
-
-            // CUDA_CHECK_GOTO(cudaMemcpyAsync(dst, src, send_len,
-            //                                 cudaMemcpyDeviceToDevice,
-            //                                 team->stream),
-            //                 exit, status);
         }
     }
     status = ucc_ec_event_post(team->stream, task->alltoall_ce.copy_done,

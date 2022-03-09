@@ -182,11 +182,6 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
             tl_warn(UCC_TL_TEAM_LIB(self), "cudaStreamDestroy failed: %d (%s)",
                     st, cudaGetErrorName(st));
         }
-        st = cudaStreamDestroy(self->stream2);
-        if (st != cudaSuccess) {
-            tl_warn(UCC_TL_TEAM_LIB(self), "cudaStreamDestroy failed: %d (%s)",
-                    st, cudaGetErrorName(st));
-        }
     }
     for (i = 0; i < UCC_TL_TEAM_SIZE(self); i++) {
         if (self->scratch.rem[i]) {
@@ -286,8 +281,6 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
                             sizeof(ucc_tl_cuda_shm_barrier_t) *
                             lib->cfg.max_concurrent);
     CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
-                    cudaStreamNonBlocking), exit_err, status);
-    CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream2,
                     cudaStreamNonBlocking), exit_err, status);
     for (i = 0; i < lib->cfg.max_concurrent; i++) {
         sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);

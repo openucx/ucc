@@ -39,6 +39,7 @@ typedef ucc_status_t (*ucc_coll_finalize_fn_t)(ucc_coll_task_t *task);
 typedef ucc_status_t (*ucc_task_event_handler_p)(ucc_coll_task_t *parent,
                                                  ucc_coll_task_t *task);
 
+/* triggered post setup function will be launched before starting executor */
 typedef ucc_status_t (*ucc_coll_triggered_post_setup_fn_t)(ucc_coll_task_t *task);
 
 typedef ucc_status_t (*ucc_coll_triggered_post_fn_t)(ucc_ee_h ee,
@@ -58,8 +59,11 @@ typedef struct ucc_event_manager {
 enum {
     UCC_COLL_TASK_FLAG_INTERNAL      = UCC_BIT(0),
     UCC_COLL_TASK_FLAG_CB            = UCC_BIT(1),
+    /* executor is required for collective*/
     UCC_COLL_TASK_FLAG_EXECUTOR      = UCC_BIT(2),
+    /* user visible task */
     UCC_COLL_TASK_FLAG_TOP_LEVEL     = UCC_BIT(3),
+    /* stop executor in task complete*/
     UCC_COLL_TASK_FLAG_EXECUTOR_STOP = UCC_BIT(4)
 };
 
@@ -165,18 +169,22 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         status = task->super.status;
     }
 
-    if (task->flags & UCC_COLL_TASK_FLAG_CB) {
-        task->cb.cb(task->cb.data, status);
-    }
-
     if (task->executor && (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR_STOP)) {
         status = ucc_ee_executor_stop(task->executor);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ucc_error("failed to stop executor %s", ucc_status_string(status));
+        }
+    }
+
+    if (task->flags & UCC_COLL_TASK_FLAG_CB) {
+        task->cb.cb(task->cb.data, status);
     }
 
     if (task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
         task->finalize(task);
     }
-    return status;
+
+    return task->super.status;
 }
 
 static inline void ucc_task_subscribe_dep(ucc_coll_task_t *target,

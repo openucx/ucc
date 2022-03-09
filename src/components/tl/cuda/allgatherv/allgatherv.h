@@ -7,8 +7,8 @@
 #ifndef ALLGATHERV_H_
 #define ALLGATHERV_H_
 
-#include "../tl_cuda.h"
-#include "../tl_cuda_coll.h"
+#include "tl_cuda.h"
+#include "tl_cuda_coll.h"
 
 
 ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_tl_cuda_task_t *task);

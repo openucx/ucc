@@ -56,20 +56,20 @@ ucc_status_t ucc_cuda_executor_finalize(ucc_ee_executor_t *executor)
     return UCC_OK;
 }
 
-ucc_status_t ucc_mc_cuda_reduce(const void *src1, const void *src2, void *dst,
-                                size_t count, ucc_datatype_t dt,
-                                ucc_reduction_op_t op);
-
 ucc_status_t
-ucc_cuda_executor_interuptible_task_post(ucc_ee_executor_t *executor,
+ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
                                          const ucc_ee_executor_task_args_t *task_args,
                                          ucc_ee_executor_task_t **task)
 {
-    ucc_ec_cuda_executor_interuptible_task_t *ee_task;
+    ucc_ec_cuda_executor_interruptible_task_t *ee_task;
     ucc_status_t status;
 
-    ee_task = ucc_mpool_get(&ucc_ec_cuda.executor_interuptible_tasks);
-    status = ucc_ec_cuda_event_create(&ee_task->event);
+    ee_task = ucc_mpool_get(&ucc_ec_cuda.executor_interruptible_tasks);
+    if (ucc_unlikely(!ee_task)) {
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    status  = ucc_ec_cuda_event_create(&ee_task->event);
     if (ucc_unlikely(status != UCC_OK)) {
         ucc_mpool_put(ee_task);
         return status;
@@ -77,8 +77,7 @@ ucc_cuda_executor_interuptible_task_post(ucc_ee_executor_t *executor,
     ee_task->super.status = UCC_INPROGRESS;
     ee_task->super.eee    = executor;
     memcpy(&ee_task->super.args, task_args, sizeof(ucc_ee_executor_task_args_t));
-    switch (task_args->task_type)
-    {
+    switch (task_args->task_type) {
     case UCC_EE_EXECUTOR_TASK_TYPE_COPY:
         status = CUDA_FUNC(cudaMemcpyAsync(task_args->bufs[0],
                                            task_args->bufs[1],
@@ -123,19 +122,19 @@ free_task:
 }
 
 ucc_status_t
-ucc_cuda_executor_interuptible_task_test(const ucc_ee_executor_task_t *task)
+ucc_cuda_executor_interruptible_task_test(const ucc_ee_executor_task_t *task)
 {
-    ucc_ec_cuda_executor_interuptible_task_t *ee_task =
-        ucc_derived_of(task, ucc_ec_cuda_executor_interuptible_task_t);
+    ucc_ec_cuda_executor_interruptible_task_t *ee_task =
+        ucc_derived_of(task, ucc_ec_cuda_executor_interruptible_task_t);
     ee_task->super.status = ucc_ec_cuda_event_test(ee_task->event);
     return ee_task->super.status;
 }
 
 ucc_status_t
-ucc_cuda_executor_interuptible_task_finalize(ucc_ee_executor_task_t *task)
+ucc_cuda_executor_interruptible_task_finalize(ucc_ee_executor_task_t *task)
 {
-    ucc_ec_cuda_executor_interuptible_task_t *ee_task =
-        ucc_derived_of(task, ucc_ec_cuda_executor_interuptible_task_t);
+    ucc_ec_cuda_executor_interruptible_task_t *ee_task =
+        ucc_derived_of(task, ucc_ec_cuda_executor_interruptible_task_t);
     ucc_status_t status;
 
     status = ucc_ec_cuda_event_destroy(ee_task->event);
@@ -224,12 +223,12 @@ ucc_status_t ucc_cuda_executor_interruptible_start(ucc_ee_executor_t *executor)
     ucc_ec_cuda_executor_t *eee = ucc_derived_of(executor,
                                                  ucc_ec_cuda_executor_t);
 
-    eee->mode = UCC_EC_CUDA_EXECUTOR_MODE_INTERUPTIBLE;
+    eee->mode  = UCC_EC_CUDA_EXECUTOR_MODE_INTERRUPTIBLE;
     eee->state = UCC_EC_CUDA_EXECUTOR_STARTED;
 
-    eee->ops.task_post     = ucc_cuda_executor_interuptible_task_post;
-    eee->ops.task_test     = ucc_cuda_executor_interuptible_task_test;
-    eee->ops.task_finalize = ucc_cuda_executor_interuptible_task_finalize;
+    eee->ops.task_post     = ucc_cuda_executor_interruptible_task_post;
+    eee->ops.task_test     = ucc_cuda_executor_interruptible_task_test;
+    eee->ops.task_finalize = ucc_cuda_executor_interruptible_task_finalize;
 
     return UCC_OK;
 }
@@ -243,9 +242,10 @@ ucc_status_t ucc_cuda_executor_persistent_start(ucc_ee_executor_t *executor,
 
     ucc_assert(eee->state == UCC_EC_CUDA_EXECUTOR_INITIALIZED);
     ec_debug(&ucc_ec_cuda.super, "executor start, eee: %p", eee);
-    eee->super.ee_context = (NULL == ee_context) ? ucc_ec_cuda.stream : ee_context;
+    eee->super.ee_context = ee_context;
     eee->state            = UCC_EC_CUDA_EXECUTOR_POSTED;
     eee->pidx             = 0;
+    eee->mode             = UCC_EC_CUDA_EXECUTOR_MODE_PERSISTENT;
 
     status = ucc_ec_cuda_persistent_kernel_start(eee);
     if (status != UCC_OK) {
@@ -302,7 +302,7 @@ ucc_status_t ucc_cuda_executor_stop(ucc_ee_executor_t *executor)
 {
     ucc_ec_cuda_executor_t *eee = ucc_derived_of(executor,
                                                  ucc_ec_cuda_executor_t);
-    if (eee->mode == UCC_EC_CUDA_EXECUTOR_MODE_INTERUPTIBLE) {
+    if (eee->mode == UCC_EC_CUDA_EXECUTOR_MODE_INTERRUPTIBLE) {
         return ucc_cuda_executor_interruptible_stop(executor);
     } else {
         return ucc_cuda_executor_persistent_stop(executor);

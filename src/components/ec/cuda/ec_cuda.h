@@ -43,7 +43,7 @@ typedef enum ucc_ec_cuda_executor_state {
 
 typedef enum ucc_ec_cuda_executor_mode {
     UCC_EC_CUDA_EXECUTOR_MODE_PERSISTENT,
-    UCC_EC_CUDA_EXECUTOR_MODE_INTERUPTIBLE
+    UCC_EC_CUDA_EXECUTOR_MODE_INTERRUPTIBLE
 } ucc_ec_cuda_executor_mode_t;
 
 static inline ucc_status_t cuda_error_to_ucc_status(cudaError_t cu_err)
@@ -79,7 +79,7 @@ typedef struct ucc_ec_cuda {
     ucc_mpool_t                    events;
     ucc_mpool_t                    strm_reqs;
     ucc_mpool_t                    executors;
-    ucc_mpool_t                    executor_interuptible_tasks;
+    ucc_mpool_t                    executor_interruptible_tasks;
     ucc_thread_mode_t              thread_mode;
     ucc_ec_cuda_strm_task_mode_t   strm_task_mode;
     ucc_ec_cuda_task_stream_type_t task_strm_type;
@@ -97,10 +97,10 @@ typedef struct ucc_ec_cuda_stream_request {
     cudaStream_t        stream;
 } ucc_ec_cuda_stream_request_t;
 
-typedef struct ucc_ec_cuda_executor_interuptible_task {
+typedef struct ucc_ec_cuda_executor_interruptible_task {
     ucc_ee_executor_task_t  super;
     void                   *event;
-} ucc_ec_cuda_executor_interuptible_task_t;
+} ucc_ec_cuda_executor_interruptible_task_t;
 
 typedef struct ucc_ec_cuda_executor_task_ops {
     ucc_status_t (*task_post)(ucc_ee_executor_t *executor,

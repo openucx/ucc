@@ -280,7 +280,7 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
                       ucc_coll_req_h request)
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
-    ucc_status_t task_st, exec_st;
+    ucc_status_t st;
 
     ucc_debug("coll_finalize: req %p, seq_num %u", task, task->seq_num);
     if (ucc_unlikely(task->super.status == UCC_INPROGRESS)) {
@@ -288,15 +288,14 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
         return UCC_ERR_INVALID_PARAM;
     }
 
-    task_st = task->finalize(task);
     if (task->executor) {
-        exec_st = ucc_ee_executor_finalize(task->executor);
-        if (ucc_unlikely(exec_st != UCC_OK)) {
+        st = ucc_ee_executor_finalize(task->executor);
+        if (ucc_unlikely(st != UCC_OK)) {
             ucc_error("executor finalize error: %s",
-                      ucc_status_string(exec_st));
+                      ucc_status_string(st));
         }
     }
-    return task_st;
+    return task->finalize(task);
 }
 
 static ucc_status_t ucc_triggered_task_finalize(ucc_coll_task_t *task)
@@ -312,6 +311,10 @@ static ucc_status_t ucc_triggered_coll_complete(ucc_coll_task_t *parent_task, //
     ucc_trace("triggered collective complete, task %p, seq_num %u",
               task, task->seq_num);
     if (!(task->flags & UCC_COLL_TASK_FLAG_EXECUTOR)) {
+        /*  need to stop and finalize executor here in case if collective itself
+         *  doesn't need executor and executor was created as part of
+         *  triggered post
+         */
         ucc_ee_executor_stop(task->executor);
         ucc_ee_executor_finalize(task->executor);
         task->executor = NULL;

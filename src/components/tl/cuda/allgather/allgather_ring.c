@@ -5,8 +5,9 @@
  */
 
 
-#include "../allgatherv/allgatherv.h"
+#include "allgatherv/allgatherv.h"
 
+//NOLINTNEXTLINE
 size_t ucc_tl_cuda_allgather_get_count(const ucc_tl_cuda_task_t *task,
                                        ucc_rank_t block)
 {
@@ -40,7 +41,7 @@ ucc_status_t ucc_tl_cuda_allgather_ring_init(ucc_tl_cuda_task_t *task)
     frag_size = ucc_min(ssize/2, send_size);
 
     task->super.flags               |= UCC_COLL_TASK_FLAG_EXECUTOR;
-    task->allgatherv_ring.num_frags = (send_size + frag_size - 1) / frag_size;
+    task->allgatherv_ring.num_frags = ucc_div_round_up(send_size, frag_size);
     task->super.post                = ucc_tl_cuda_allgatherv_ring_start;
     task->super.triggered_post      = ucc_triggered_post;
     task->super.progress            = ucc_tl_cuda_allgatherv_ring_progress;

@@ -179,13 +179,6 @@ static ucc_mpool_ops_t ucc_ec_cuda_event_mpool_ops = {
     .obj_cleanup   = ucc_ec_cuda_event_cleanup,
 };
 
-static ucc_mpool_ops_t ucc_ec_cuda_executor_interuptible_task_mpool_ops = {
-    .chunk_alloc   = ucc_mpool_hugetlb_malloc,
-    .chunk_release = ucc_mpool_hugetlb_free,
-    .obj_init      = NULL,
-    .obj_cleanup   = NULL,
-};
-
 ucc_status_t ucc_ec_cuda_post_kernel_stream_task(uint32_t *status,
                                                  int blocking_wait,
                                                  cudaStream_t stream);
@@ -259,10 +252,10 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     }
 
     status = ucc_mpool_init(
-        &ucc_ec_cuda.executor_interuptible_tasks, 0,
-        sizeof(ucc_ec_cuda_executor_interuptible_task_t), 0, UCC_CACHE_LINE_SIZE,
-        16, UINT_MAX, &ucc_ec_cuda_executor_interuptible_task_mpool_ops,
-        UCC_THREAD_MULTIPLE, "interuptible executor tasks");
+        &ucc_ec_cuda.executor_interruptible_tasks, 0,
+        sizeof(ucc_ec_cuda_executor_interruptible_task_t), 0, UCC_CACHE_LINE_SIZE,
+        16, UINT_MAX, NULL, UCC_THREAD_MULTIPLE,
+        "interruptible executor tasks");
 
     if (cfg->strm_task_mode == UCC_EC_CUDA_TASK_KERNEL) {
         ucc_ec_cuda.strm_task_mode = UCC_EC_CUDA_TASK_KERNEL;

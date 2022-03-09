@@ -22,9 +22,9 @@ ucc_tl_cuda_team_topo_add_ring(const ucc_tl_cuda_team_t *team,
 
     for (i = 0; i < num_dups; i++) {
         new_ring = &topo->rings[topo->num_rings + i];
-        new_ring->ring  = (ucc_rank_t*)ucc_malloc(size * sizeof(ucc_rank_t));
-        new_ring->iring = (ucc_rank_t*)ucc_malloc(size * sizeof(ucc_rank_t));
-        if (!new_ring->ring || !new_ring->iring) {
+        new_ring->ring  = (ucc_rank_t*)ucc_malloc(2 * size * sizeof(ucc_rank_t));
+        new_ring->iring = PTR_OFFSET(new_ring->ring, size * sizeof(ucc_rank_t));
+        if (!new_ring->ring) {
             tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate topo ring");
             status = UCC_ERR_NO_MEMORY;
             goto free_rings;
@@ -46,7 +46,6 @@ ucc_tl_cuda_team_topo_add_ring(const ucc_tl_cuda_team_t *team,
 free_rings:
     for (i = 0; i < num_dups; i++) {
         ucc_free(topo->rings[topo->num_rings + i].ring);
-        ucc_free(topo->rings[topo->num_rings + i].iring);
     }
     return status;
 }
@@ -187,7 +186,6 @@ ucc_tl_cuda_team_topo_init_rings(const ucc_tl_cuda_team_t *team,
 free_rings:
     for (i = 0; i < topo->num_rings; i++) {
         ucc_free(topo->rings[i].ring);
-        ucc_free(topo->rings[i].iring);
     }
     ucc_free(topo->rings);
 free_graph:
@@ -405,7 +403,6 @@ ucc_status_t ucc_tl_cuda_team_topo_destroy(ucc_tl_cuda_team_topo_t *team_topo)
 
     for (i = 0; i < team_topo->num_rings; i++) {
         ucc_free(team_topo->rings[i].ring);
-        ucc_free(team_topo->rings[i].iring);
     }
     ucc_free(team_topo->rings);
     if (team_topo->num_proxies > 0) {

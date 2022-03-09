@@ -14,7 +14,7 @@ enum {
     RING_STAGE_SYNC,    /*< Wait for free SYNC segment */
     RING_STAGE_SETUP,   /*< Wait for memhandle setup to finish */
     RING_STAGE_RING,    /*< Ring algorithm is running */
-    RING_STAGE_BAR,     /*< Ring algorithm is done, waiting for
+    RING_STAGE_BARRIER, /*< Ring algorithm is done, waiting for
                          *  other ranks to finish
                          */
 };
@@ -59,6 +59,7 @@ static inline int get_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
                                 int ring_id)
 {
     ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
+
     return sync->seq_num;
 }
 
@@ -66,6 +67,7 @@ static inline void set_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
                                  int step, int ring_id)
 {
     ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
+
     sync->seq_num = step;
 }
 
