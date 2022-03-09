@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -16,11 +16,40 @@ ucc_status_t ucc_coll_score_build_map(ucc_coll_score_t *score,
                                       ucc_score_map_t **map_p)
 {
     ucc_score_map_t *map;
+    ucc_msg_range_t *range, *temp, *next;
+    ucc_list_link_t *lst;
+    int              i, j;
+
     map = ucc_malloc(sizeof(*map), "ucc_score_map");
     if (!map) {
         ucc_error("failed to allocate %zd bytes for score map", sizeof(*map));
         return UCC_ERR_NO_MEMORY;
     }
+
+    /* Resolve boundary between neighbour ranges:
+       if ranges share a msg size as boundary leave that msgsize
+       to the range with higher score. That way components that report
+       higher scores do not get overwritten at range boundary */
+    for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
+        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
+            lst = &score->scores[i][j];
+            ucc_list_for_each_safe(range, temp, lst, super.list_elem) {
+                if (range->super.list_elem.next != lst) {
+                    next = ucc_container_of(range->super.list_elem.next,
+                                            ucc_msg_range_t, super.list_elem);
+
+                    if (range->end == next->start) {
+                        if (range->super.score > next->super.score) {
+                            next->start++;
+                        } else {
+                            range->end--;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     map->score = score;
     *map_p     = map;
     return UCC_OK;
@@ -59,7 +88,7 @@ ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t      *map,
     }
     list = &map->score->scores[ct][mt];
     ucc_list_for_each(r, list, super.list_elem) {
-        if (msgsize >= r->start && msgsize < r->end) {
+        if (msgsize >= r->start && msgsize <= r->end) {
             *range = r;
             return UCC_OK;
         }
