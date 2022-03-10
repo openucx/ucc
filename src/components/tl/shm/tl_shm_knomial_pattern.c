@@ -20,7 +20,6 @@ void ucc_tl_shm_kn_tree_init(ucc_rank_t size, /* group size */
     ucc_rank_t vrank = (rank - root + size) % size;
     int n_children = 0, calc_parent = 0;
 
-
     radix = ucc_min(radix, size);
 
     if (coll_type == UCC_COLL_TYPE_BCAST) {

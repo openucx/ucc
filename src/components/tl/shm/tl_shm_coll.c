@@ -93,8 +93,7 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team,
 
     shm_tree = (ucc_tl_shm_tree_t *) ucc_malloc(sizeof(ucc_kn_tree_t *) * 2);
     base_tree_size = ucc_tl_shm_kn_tree_size(group_size, base_radix);
-    base_tree = (ucc_kn_tree_t *) ucc_malloc(sizeof(ucc_rank_t) *
-                                             (base_tree_size + 2));
+    base_tree = (ucc_kn_tree_t *) ucc_malloc(base_tree_size, "base_tree");
     shm_tree->base_tree = NULL;
     shm_tree->top_tree = NULL;
 
@@ -118,8 +117,7 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team,
        base_group[my_group_id]->size and max supported radix (maybe up to group size as well */
 
     top_tree_size = ucc_tl_shm_kn_tree_size(leaders_size, top_radix);
-    top_tree = (ucc_kn_tree_t *) ucc_malloc(sizeof(ucc_rank_t) *
-                                            (top_tree_size + 2));
+    top_tree = (ucc_kn_tree_t *) ucc_malloc(top_tree_size, "top_tree");
 
     if (!top_tree) {
     	ucc_free(base_tree);
