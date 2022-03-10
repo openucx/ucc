@@ -84,6 +84,7 @@ gtest_SOURCES =                     \
 	core/test_reduce.cc             \
 	core/test_allreduce.cc          \
 	core/test_reduce_scatter.cc     \
+	core/test_reduce_scatterv.cc    \
 	core/test_schedule.cc           \
 	core/test_topo.cc               \
 	core/test_service_coll.cc       \

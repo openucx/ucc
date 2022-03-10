@@ -6,15 +6,13 @@
 int test_rand_seed = -1;
 static size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX;
 
-static std::vector<ucc_coll_type_t> colls = {UCC_COLL_TYPE_BARRIER,
-                                             UCC_COLL_TYPE_BCAST,
-                                             UCC_COLL_TYPE_REDUCE,
-                                             UCC_COLL_TYPE_ALLREDUCE,
-                                             UCC_COLL_TYPE_ALLGATHER,
-                                             UCC_COLL_TYPE_ALLGATHERV,
-                                             UCC_COLL_TYPE_ALLTOALL,
-                                             UCC_COLL_TYPE_ALLTOALLV,
-                                             UCC_COLL_TYPE_REDUCE_SCATTER};
+static std::vector<ucc_coll_type_t> colls = {
+    UCC_COLL_TYPE_BARRIER,        UCC_COLL_TYPE_BCAST,
+    UCC_COLL_TYPE_REDUCE,         UCC_COLL_TYPE_ALLREDUCE,
+    UCC_COLL_TYPE_ALLGATHER,      UCC_COLL_TYPE_ALLGATHERV,
+    UCC_COLL_TYPE_ALLTOALL,       UCC_COLL_TYPE_ALLTOALLV,
+    UCC_COLL_TYPE_REDUCE_SCATTER, UCC_COLL_TYPE_REDUCE_SCATTERV};
+
 static std::vector<ucc_coll_type_t> onesided_colls = {UCC_COLL_TYPE_ALLTOALL};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
 static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
@@ -126,6 +124,8 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
         return UCC_COLL_TYPE_ALLTOALLV;
     } else if (coll == "reduce_scatter") {
         return UCC_COLL_TYPE_REDUCE_SCATTER;
+    } else if (coll == "reduce_scatterv") {
+        return UCC_COLL_TYPE_REDUCE_SCATTERV;
     } else if (coll == "reduce") {
         return UCC_COLL_TYPE_REDUCE;
     } else {

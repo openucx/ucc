@@ -6,28 +6,52 @@
 #include "test_mc_reduce.h"
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
-
+#include "utils/ucc_coll_utils.h"
+#include <random>
+#include <algorithm>
 #include <array>
 
 template <typename T>
-class test_reduce_scatter : public UccCollArgs, public testing::Test {
+class test_reduce_scatterv : public UccCollArgs, public testing::Test {
   public:
     virtual void TestBody(){};
-    void data_init(int nprocs, ucc_datatype_t dt, size_t count,
-                   UccCollCtxVec &ctxs, bool persistent)
+    /* generates uniform random array of counts that sum
+       up to total_count */
+    std::vector<uint32_t> generate_counts(int nprocs, size_t total)
     {
-        size_t rcount;
+        std::default_random_engine eng;
+        std::vector<uint32_t>      counts, tmp;
+        eng.seed(123);
+        std::uniform_int_distribution<int> urd(1, total - 1);
+
+        for (int i = 0; i < nprocs - 1; i++) {
+            tmp.push_back(urd(eng));
+        }
+        tmp.push_back(0);
+        tmp.push_back(total);
+        std::sort(tmp.begin(), tmp.end());
+
+        for (int i = 1; i < tmp.size(); i++) {
+            counts.push_back(tmp[i] - tmp[i - 1]);
+            total -= counts.back();
+        }
+        ucc_assert(total == 0);
+        return counts;
+    }
+
+    void data_init(int nprocs, ucc_datatype_t dt, size_t total_count,
+                   UccCollCtxVec &ctxs, bool persistent)
+
+    {
+        size_t rcount = total_count;
+
         ctxs.resize(nprocs);
-        if (count < nprocs) {
-            count = nprocs;
-        }
-        count  = count - (count % nprocs);
-        rcount = count / nprocs;
-        if (TEST_INPLACE == inplace) {
-            rcount = count;
-        }
+        auto counts = generate_counts(nprocs, total_count);
 
         for (int r = 0; r < nprocs; r++) {
+            if (TEST_INPLACE != inplace) {
+                rcount = counts[r];
+            }
             ucc_coll_args_t *coll =
                 (ucc_coll_args_t *)calloc(1, sizeof(ucc_coll_args_t));
 
@@ -36,12 +60,13 @@ class test_reduce_scatter : public UccCollArgs, public testing::Test {
             ctxs[r]->args = coll;
 
             coll->mask      = 0;
-            coll->coll_type = UCC_COLL_TYPE_REDUCE_SCATTER;
+            coll->coll_type = UCC_COLL_TYPE_REDUCE_SCATTERV;
             coll->op        = T::redop;
 
-            ctxs[r]->init_buf = ucc_malloc(ucc_dt_size(dt) * count, "init buf");
+            ctxs[r]->init_buf =
+                ucc_malloc(ucc_dt_size(dt) * total_count, "init buf");
             EXPECT_NE(ctxs[r]->init_buf, nullptr);
-            for (int i = 0; i < count; i++) {
+            for (int i = 0; i < total_count; i++) {
                 typename T::type *ptr;
                 ptr = (typename T::type *)ctxs[r]->init_buf;
                 /* need to limit the init value so that "prod" operation
@@ -52,33 +77,38 @@ class test_reduce_scatter : public UccCollArgs, public testing::Test {
 
             UCC_CHECK(ucc_mc_alloc(&ctxs[r]->dst_mc_header,
                                    ucc_dt_size(dt) * rcount, mem_type));
-            coll->dst.info.buffer = ctxs[r]->dst_mc_header->addr;
-            coll->src.info.buffer = NULL;
+            coll->dst.info_v.buffer = ctxs[r]->dst_mc_header->addr;
+            coll->src.info.buffer   = NULL;
             if (TEST_INPLACE == inplace) {
                 coll->mask |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
                 UCC_CHECK(ucc_mc_memcpy(
-                    coll->dst.info.buffer, ctxs[r]->init_buf,
+                    coll->dst.info_v.buffer, ctxs[r]->init_buf,
                     ucc_dt_size(dt) * rcount, mem_type, UCC_MEMORY_TYPE_HOST));
                 coll->src.info.mem_type = UCC_MEMORY_TYPE_UNKNOWN;
                 coll->src.info.count    = SIZE_MAX;
                 coll->src.info.datatype = (ucc_datatype_t)-1;
             } else {
                 UCC_CHECK(ucc_mc_alloc(&ctxs[r]->src_mc_header,
-                                       ucc_dt_size(dt) * count, mem_type));
+                                       ucc_dt_size(dt) * total_count,
+                                       mem_type));
                 coll->src.info.buffer = ctxs[r]->src_mc_header->addr;
-                UCC_CHECK(ucc_mc_memcpy(
-                    coll->src.info.buffer, ctxs[r]->init_buf,
-                    ucc_dt_size(dt) * count, mem_type, UCC_MEMORY_TYPE_HOST));
+                UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer,
+                                        ctxs[r]->init_buf,
+                                        ucc_dt_size(dt) * total_count, mem_type,
+                                        UCC_MEMORY_TYPE_HOST));
                 coll->src.info.mem_type = mem_type;
-                coll->src.info.count    = (ucc_count_t)count;
+                coll->src.info.count    = (ucc_count_t)total_count;
                 coll->src.info.datatype = dt;
             }
-            coll->dst.info.mem_type = mem_type;
-            coll->dst.info.count    = (ucc_count_t)rcount;
-            coll->dst.info.datatype = dt;
+            coll->dst.info_v.mem_type = mem_type;
+            coll->dst.info_v.counts =
+                (ucc_count_t *)ucc_malloc(nprocs * sizeof(uint32_t), "counts");
+            memcpy(coll->dst.info_v.counts, counts.data(),
+                   sizeof(uint32_t) * nprocs);
+            coll->dst.info_v.datatype = dt;
             if (persistent) {
-                coll->mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+                coll->mask |= UCC_COLL_ARGS_FIELD_FLAGS;
                 coll->flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
             }
         }
@@ -92,54 +122,73 @@ class test_reduce_scatter : public UccCollArgs, public testing::Test {
             }
             UCC_CHECK(ucc_mc_free(ctx->dst_mc_header));
             ucc_free(ctx->init_buf);
+            ucc_free(coll->dst.info_v.counts);
             free(coll);
             free(ctx);
         }
         ctxs.clear();
     }
+    size_t get_total_count(UccCollCtxVec ctxs)
+    {
+        ucc_coll_args_t *coll = ctxs[0]->args;
+
+        return ucc_coll_args_get_total_count(coll, coll->dst.info_v.counts,
+                                             ctxs.size());
+    }
+
     void reset(UccCollCtxVec ctxs)
     {
+        size_t    total_count = get_total_count(ctxs);
+        uint32_t *counts      = (uint32_t *)ctxs[0]->args->dst.info_v.counts;
+
         for (auto r = 0; r < ctxs.size(); r++) {
             ucc_coll_args_t *coll  = ctxs[r]->args;
-            size_t           count = coll->dst.info.count;
-            ucc_datatype_t   dtype = coll->dst.info.datatype;
-            clear_buffer(coll->dst.info.buffer, count * ucc_dt_size(dtype),
+            ucc_datatype_t   dtype = coll->dst.info_v.datatype;
+            size_t rcount = (TEST_INPLACE == inplace) ? total_count : counts[r];
+
+            clear_buffer(coll->dst.info_v.buffer, rcount * ucc_dt_size(dtype),
                          mem_type, 0);
 
             if (TEST_INPLACE == inplace) {
-                UCC_CHECK(ucc_mc_memcpy(coll->dst.info.buffer,
+                UCC_CHECK(ucc_mc_memcpy(coll->dst.info_v.buffer,
                                         ctxs[r]->init_buf,
-                                        ucc_dt_size(dtype) * count, mem_type,
-                                        UCC_MEMORY_TYPE_HOST));
+                                        ucc_dt_size(dtype) * total_count,
+                                        mem_type, UCC_MEMORY_TYPE_HOST));
             }
         }
     }
-    bool data_validate(UccCollCtxVec ctxs)
-    {
-        size_t            total_count, rcount, offset;
-        typename T::type *dst, *dst_p;
 
-        if (TEST_INPLACE != inplace) {
-            total_count = (ctxs[0])->args->src.info.count;
-            rcount      = (ctxs[0])->args->dst.info.count;
-        } else {
-            total_count = (ctxs[0])->args->dst.info.count;
-            rcount      = total_count / ctxs.size();
+    size_t check_offset(UccCollCtxVec ctxs, int rank)
+    {
+        uint32_t *counts = (uint32_t *)ctxs[0]->args->dst.info_v.counts;
+        size_t    offset = 0;
+
+        if (TEST_INPLACE == inplace) {
+            for (int i = 0; i < rank; i++) {
+                offset += counts[i];
+            }
         }
 
-        ucc_assert(rcount * ctxs.size() == total_count);
+        return offset * sizeof(typename T::type);
+    }
+
+    bool data_validate(UccCollCtxVec ctxs)
+    {
+        size_t            total_count = get_total_count(ctxs);
+        uint32_t *        counts = (uint32_t *)ctxs[0]->args->dst.info_v.counts;
+        size_t            rcount;
+        typename T::type *dst, *dst_p;
 
         dst = (typename T::type *)ucc_malloc(
             total_count * sizeof(typename T::type), "dst buf");
         dst_p = dst;
         for (int r = 0; r < ctxs.size(); r++) {
-            offset = (TEST_INPLACE == inplace)
-                         ? rcount * r * sizeof(typename T::type)
-                         : 0;
-            UCC_CHECK(ucc_mc_memcpy(
-                dst_p, PTR_OFFSET(ctxs[r]->args->dst.info.buffer, offset),
-                rcount * sizeof(typename T::type), UCC_MEMORY_TYPE_HOST,
-                mem_type));
+            rcount = counts[r];
+            UCC_CHECK(ucc_mc_memcpy(dst_p,
+                                    PTR_OFFSET(ctxs[r]->args->dst.info_v.buffer,
+                                               check_offset(ctxs, r)),
+                                    rcount * sizeof(typename T::type),
+                                    UCC_MEMORY_TYPE_HOST, mem_type));
             dst_p += rcount;
         }
 
@@ -156,16 +205,15 @@ class test_reduce_scatter : public UccCollArgs, public testing::Test {
             T::assert_equal(res, dst[i]);
         }
         ucc_free(dst);
-
         return true;
     }
 };
 
-TYPED_TEST_CASE(test_reduce_scatter, ReductionTypesOps);
+TYPED_TEST_CASE(test_reduce_scatterv, ReductionTypesOps);
 
 #define TEST_DECLARE(_mem_type, _inplace, _repeat, _persistent)                \
     {                                                                          \
-        std::array<int, 1> counts{123};                                        \
+        std::array<int, 3> counts{4, 123, 65536};                              \
         for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {                 \
             for (int count : counts) {                                         \
                 UccTeam_h     team = UccJob::getStaticTeams()[tid];            \
@@ -173,7 +221,8 @@ TYPED_TEST_CASE(test_reduce_scatter, ReductionTypesOps);
                 UccCollCtxVec ctxs;                                            \
                 this->set_mem_type(_mem_type);                                 \
                 this->set_inplace(_inplace);                                   \
-                this->data_init(size, TypeParam::dt, count, ctxs, _persistent);\
+                this->data_init(size, TypeParam::dt, count, ctxs,              \
+                                _persistent);                                  \
                 try {                                                          \
                     UccReq req(team, ctxs);                                    \
                     for (auto i = 0; i < _repeat; i++) {                       \
@@ -190,43 +239,43 @@ TYPED_TEST_CASE(test_reduce_scatter, ReductionTypesOps);
         }                                                                      \
     }
 
-TYPED_TEST(test_reduce_scatter, single_host)
+TYPED_TEST(test_reduce_scatterv, single_host)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce_scatter, single_host_persistent)
+TYPED_TEST(test_reduce_scatterv, single_host_persistent)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 3, 1);
 }
 
-TYPED_TEST(test_reduce_scatter, single_host_inplace)
+TYPED_TEST(test_reduce_scatterv, single_host_inplace)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce_scatter, single_host_persistent_inplace)
+TYPED_TEST(test_reduce_scatterv, single_host_persistent_inplace)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 3, 1);
 }
 
 #ifdef HAVE_CUDA
-TYPED_TEST(test_reduce_scatter, single_cuda)
+TYPED_TEST(test_reduce_scatterv, single_cuda)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce_scatter, single_cuda_persistent)
+TYPED_TEST(test_reduce_scatterv, single_cuda_persistent)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 3, 1);
 }
 
-TYPED_TEST(test_reduce_scatter, single_cuda_inplace)
+TYPED_TEST(test_reduce_scatterv, single_cuda_inplace)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce_scatter, single_cuda_persistent_inplace)
+TYPED_TEST(test_reduce_scatterv, single_cuda_persistent_inplace)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 3, 1);
 }
@@ -234,7 +283,7 @@ TYPED_TEST(test_reduce_scatter, single_cuda_persistent_inplace)
 
 #define TEST_DECLARE_MULTIPLE(_mem_type, _inplace)                             \
     {                                                                          \
-        std::array<int, 3> counts{4, 256, 65536};                              \
+        std::array<int, 3> counts{4, 123, 65536};                              \
         for (int count : counts) {                                             \
             std::vector<UccReq>        reqs;                                   \
             std::vector<UccCollCtxVec> ctxs;                                   \
@@ -255,7 +304,7 @@ TYPED_TEST(test_reduce_scatter, single_cuda_persistent_inplace)
                     EXPECT_EQ(true, this->data_validate(ctx));                 \
                 }                                                              \
             } catch (const std::exception &e) {                                \
-                    /* NOT_SUPPORTED return by coll_init */                    \
+                /* NOT_SUPPORTED return by coll_init */                        \
             }                                                                  \
             for (auto ctx : ctxs) {                                            \
                 this->data_fini(ctx);                                          \
@@ -263,41 +312,41 @@ TYPED_TEST(test_reduce_scatter, single_cuda_persistent_inplace)
         }                                                                      \
     }
 
-TYPED_TEST(test_reduce_scatter, multiple)
+TYPED_TEST(test_reduce_scatterv, multiple)
 {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE);
 }
 
-TYPED_TEST(test_reduce_scatter, multiple_inplace)
+TYPED_TEST(test_reduce_scatterv, multiple_inplace)
 {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE);
 }
 
 #ifdef HAVE_CUDA
-TYPED_TEST(test_reduce_scatter, multiple_cuda)
+TYPED_TEST(test_reduce_scatterv, multiple_cuda)
 {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE);
 }
 
-TYPED_TEST(test_reduce_scatter, multiple_cuda_inplace)
+TYPED_TEST(test_reduce_scatterv, multiple_cuda_inplace)
 {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE);
 }
 #endif
 
-class test_reduce_scatter_alg
+class test_reduce_scatterv_alg
     : public ucc::test,
       public ::testing::WithParamInterface<std::string> {
 };
 
-UCC_TEST_P(test_reduce_scatter_alg, ring)
+UCC_TEST_P(test_reduce_scatterv_alg, ring)
 {
-    test_reduce_scatter<ReductionTest<UCC_DT_INT32, sum>> rs_test;
-    int           n_procs = 15;
-    std::string                                           bidir   = GetParam();
-    ucc_job_env_t                  env = {{"UCC_CL_BASIC_TUNE", "inf"},
-                         {"UCC_TL_UCP_TUNE", "reduce_scatter:@ring:inf"},
-                         {"REDUCE_SCATTER_RING_BIDIRECTIONAL",
+    test_reduce_scatterv<ReductionTest<UCC_DT_INT32, sum>> rsv_test;
+    int                                                    n_procs = 15;
+    std::string                                            bidir   = GetParam();
+    ucc_job_env_t env = {{"UCC_CL_BASIC_TUNE", "inf"},
+                         {"UCC_TL_UCP_TUNE", "reduce_scatterv:@ring:inf"},
+                         {"REDUCE_SCATTERV_RING_BIDIRECTIONAL",
                           bidir == "bidirectional" ? "y" : "n"}};
     UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
     UccTeam_h     team   = job.create_team(n_procs);
@@ -312,21 +361,21 @@ UCC_TEST_P(test_reduce_scatter_alg, ring)
     for (auto count : {65536, 123567}) {
         for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
             for (auto m : mt) {
-                rs_test.set_mem_type(m);
-                rs_test.set_inplace(inplace);
-                rs_test.data_init(n_procs, UCC_DT_INT32, count, ctxs, true);
+                rsv_test.set_mem_type(m);
+                rsv_test.set_inplace(inplace);
+                rsv_test.data_init(n_procs, UCC_DT_INT32, count, ctxs, true);
                 UccReq req(team, ctxs);
 
                 for (auto i = 0; i < repeat; i++) {
                     req.start();
                     req.wait();
-                    EXPECT_EQ(true, rs_test.data_validate(ctxs));
-                    rs_test.reset(ctxs);
+                    EXPECT_EQ(true, rsv_test.data_validate(ctxs));
+                    rsv_test.reset(ctxs);
                 }
-                rs_test.data_fini(ctxs);
+                rsv_test.data_fini(ctxs);
             }
         }
     }
 }
-INSTANTIATE_TEST_CASE_P(, test_reduce_scatter_alg,
+INSTANTIATE_TEST_CASE_P(, test_reduce_scatterv_alg,
                         ::testing::Values("bidirectional", "unidirectional"));

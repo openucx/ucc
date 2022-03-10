@@ -58,6 +58,11 @@ reduce_scatter =	                        \
 	reduce_scatter/reduce_scatter_ring.c    \
 	reduce_scatter/reduce_scatter.c
 
+reduce_scatterv =	                        \
+	reduce_scatterv/reduce_scatterv.h         \
+	reduce_scatterv/reduce_scatterv_ring.c    \
+	reduce_scatterv/reduce_scatterv.c
+
 scatter =	                   \
 	scatter/scatter.h          \
 	scatter/scatter_knomial.c
@@ -90,6 +95,7 @@ sources =                 \
 	$(bcast)              \
 	$(reduce)             \
 	$(reduce_scatter)     \
+	$(reduce_scatterv)    \
 	$(scatter)            \
 	$(fanin)              \
 	$(fanout)
