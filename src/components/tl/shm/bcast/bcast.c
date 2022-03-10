@@ -182,7 +182,7 @@ next_stage:
     if (!is_op_root) {
         src = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team, rank);
         memcpy(args.src.info.buffer, src, data_size);
-        SHMSEG_WMB(); //needed?
+        SHMSEG_WMB();
     }
 
     my_ctrl->ci = task->seq_num;
@@ -266,7 +266,7 @@ next_stage:
         src = is_inline ? parent_ctrl->data : ucc_tl_shm_get_data(seg, team,
                                                                   parent);
         memcpy(args.src.info.buffer, src, data_size);
-        SHMSEG_WMB(); //needed?
+        SHMSEG_WMB();
     }
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
     my_ctrl->ci = task->seq_num;
@@ -347,7 +347,7 @@ next_stage:
         src         = is_inline ? parent_ctrl->data :
                                   ucc_tl_shm_get_data(seg, team, parent);
         memcpy(args.src.info.buffer, src, data_size);
-        SHMSEG_WMB(); //needed?
+        SHMSEG_WMB();
     }
 
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
@@ -425,7 +425,7 @@ next_stage:
     if (!is_op_root) {
         src = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team, rank);
         memcpy(args.src.info.buffer, src, data_size);
-        SHMSEG_WMB(); //needed?
+        SHMSEG_WMB();
     }
 
     my_ctrl->ci = task->seq_num;

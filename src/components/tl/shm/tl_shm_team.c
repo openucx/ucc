@@ -270,6 +270,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
+    if (NULL == UCC_TL_CORE_CTX(self)->topo) {
+	/* CORE context does not have topo information -
+	 * local context mode */
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     subset.map    = UCC_TL_TEAM_MAP(self);
     subset.myrank = UCC_TL_TEAM_RANK(self);
     team_size     = UCC_TL_TEAM_SIZE(self);
