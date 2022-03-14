@@ -24,7 +24,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
     ucc_status_t status;
     char  tmp[128];
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, tl_mlx5_config->super.tl_lib,
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_mlx5_config->super,
                               params->context);
     memcpy(&self->cfg, tl_mlx5_config, sizeof(*tl_mlx5_config));
 

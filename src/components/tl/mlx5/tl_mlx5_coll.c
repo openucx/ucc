@@ -6,7 +6,7 @@
 
 #include "tl_mlx5_coll.h"
 #include "tl_mlx5_mkeys.h"
-#include "core/ucc_mc.h"
+#include "components/mc/ucc_mc.h"
 #include "core/ucc_team.h"
 #include "tl_mlx5_inline.h"
 #include "tl_mlx5_ib.h"
@@ -724,6 +724,7 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t    *tl_team,
                                          ucc_coll_score_t **score_p)
 {
     ucc_tl_mlx5_team_t *team  = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
+    ucc_base_context_t *ctx   = UCC_TL_TEAM_CTX(team);
     ucc_base_lib_t     *lib   = UCC_TL_TEAM_LIB(team);
     ucc_coll_score_t   *score;
     ucc_status_t        status;
@@ -744,9 +745,9 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t    *tl_team,
     }
 
 
-    if (strlen(lib->score_str) > 0) {
+    if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            lib->score_str, score, UCC_TL_TEAM_SIZE(team),
+            ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
             NULL, tl_team, UCC_TL_MLX5_DEFAULT_SCORE, NULL);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
