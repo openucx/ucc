@@ -63,6 +63,7 @@ ucc_status_t ucc_tl_cuda_create_cache(ucc_tl_cuda_cache_t **cache,
                                       const char *name)
 {
     ucc_status_t status;
+    ucs_status_t ucs_st;
     ucc_tl_cuda_cache_t *cache_desc;
     int ret;
 
@@ -79,9 +80,11 @@ ucc_status_t ucc_tl_cuda_create_cache(ucc_tl_cuda_cache_t **cache,
         goto err;
     }
 
-    if (UCS_OK != ucs_pgtable_init(&cache_desc->pgtable,
-                                   ucc_tl_cuda_cache_pgt_dir_alloc,
-                                   ucc_tl_cuda_cache_pgt_dir_release)) {
+    ucs_st = ucs_pgtable_init(&cache_desc->pgtable,
+                              ucc_tl_cuda_cache_pgt_dir_alloc,
+                              ucc_tl_cuda_cache_pgt_dir_release);
+    if (ucc_unlikely(UCS_OK != ucs_st)) {
+        status = ucs_status_to_ucc_status(ucs_st);
         goto err_destroy_rwlock;
     }
 
