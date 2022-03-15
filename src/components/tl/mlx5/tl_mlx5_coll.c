@@ -328,9 +328,9 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
     int          col_msgsize   = task->msg_size * block_size * node_size;
     int          block_msgsize = SQUARED(block_size) * task->msg_size;
     int    dm_host             = UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_host;
+    ucc_status_t status = UCC_OK;
     int          i, j, k, rank, dest_rank, cyc_rank;
     uint64_t     src_addr, remote_addr;
-    ucc_status_t status = UCC_OK;
     ucc_tl_mlx5_dm_chunk_t *dm;
     uintptr_t dm_addr;
 
@@ -443,9 +443,12 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
     int block_msgsize_leftovers =
         block_size_leftovers_side * block_size * task->msg_size;
     int corner_msgsize = SQUARED(block_size_leftovers_side) * task->msg_size;
+    int    dm_host             = UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_host;
+    ucc_status_t status = UCC_OK;
     int i, j, k, dest_rank, rank, cyc_rank, current_block_msgsize;
     uint64_t     src_addr, remote_addr;
-    ucc_status_t status;
+    ucc_tl_mlx5_dm_chunk_t *dm;
+    uintptr_t dm_addr;
 
     coll_task->super.status              = UCC_INPROGRESS;
 
@@ -459,8 +462,6 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
             tl_mlx5_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
-        task->started++;
-        task->op->blocks_sent[cyc_rank]  = 1;
 
         send_start(team, cyc_rank);
         //send all blocks from curr node to some ARR
@@ -491,6 +492,36 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
                             ? block_msgsize_leftovers
                             : corner_msgsize;
                 }
+
+                dm = ucc_mpool_get(&team->dm_pool);
+                while (!dm) {
+                    status = send_done(team, cyc_rank);
+                    if (UCC_OK != status) {
+                        return status;
+                    }
+
+                    status = ucc_tl_mlx5_poll_cq(team, team->net.cq);
+                    if (UCC_OK != status) {
+                        return status;
+                    }
+                    dm = ucc_mpool_get(&team->dm_pool);
+                    send_start(team, cyc_rank);
+                }
+                if (dm_host) {
+                    dm_addr = (uintptr_t)PTR_OFFSET(team->dm_ptr, dm->offset);
+                } else {
+                    dm_addr = dm->offset; // dm reg mr 0 based
+                }
+                dm->task = task;
+                //todo : start/end for RC ?
+                status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
+                                                    team->node.ops[task->seq_index].send_mkeys[0]->lkey,
+                                                    team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,
+                                                    block_size, block_size);
+                if (UCC_OK != status) {
+                    return status;
+                }
+
                 status = send_block_data(team, cyc_rank, src_addr, current_block_msgsize,
                                          team->node.ops[task->seq_index].send_mkeys[j]->lkey,
                                          remote_addr, team->net.rkeys[cyc_rank], 0, NULL);
@@ -506,6 +537,8 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
         if (UCC_OK == status) {
             status = send_done(team, cyc_rank);
         }
+        task->op->blocks_sent[cyc_rank]  = 1;
+        task->started++;
         if (status != UCC_OK) {
             tl_error(UCC_TASK_LIB(task),
                      "Failed sending atomic to node [%d]", cyc_rank);
@@ -517,7 +550,14 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
         task->send_blocks_enqueued = 1;
     }
 
-    return UCC_OK;
+    if (task->started == team->net.net_size) {
+        status = ucc_tl_mlx5_post_wait_on_data(team->net.umr_qp, team->net.net_size,
+                                      team->net.atomic.mr->lkey,
+                                      (uintptr_t)&team->net.atomic.counters[task->seq_index],
+                                      task);
+    }
+
+    return status;
 }
 
 ucc_status_t ucc_tl_mlx5_send_blocks_progress(ucc_coll_task_t *coll_task)
