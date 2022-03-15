@@ -178,11 +178,12 @@ static ucc_status_t ucc_tl_mlx5_node_fanout(ucc_tl_mlx5_team_t *team,
                                             ucc_tl_mlx5_schedule_t *task)
 {
     ucc_tl_mlx5_ctrl_t *ctrl_v;
-    tl_mlx5_atomic_t   atomic_counter;
+    /* tl_mlx5_atomic_t   atomic_counter; */
 
     /* First phase of fanout: asr signals it completed local ops
        and other ranks wait for asr */
     if (team->node.sbgp->group_rank == team->node.asr_rank) {
+#if 0
         /* ASR waits for atomic replies from other ASRs */
         atomic_counter = team->net.atomic.counters[task->seq_index];
         ucc_assert(atomic_counter <= team->net.net_size);
@@ -190,7 +191,7 @@ static ucc_status_t ucc_tl_mlx5_node_fanout(ucc_tl_mlx5_team_t *team,
         if (atomic_counter != team->net.net_size) {
             return UCC_INPROGRESS;
         }
-
+#endif /* no need to check counter - we wait on data in device */
         ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)->seq_num =
             task->seq_num;
     } else {
@@ -258,8 +259,16 @@ static ucc_status_t ucc_tl_mlx5_asr_barrier_start(ucc_coll_task_t *coll_task)
     ucc_tl_mlx5_populate_send_recv_mkeys(team, task);
 
     //Reset atomic notification counter to 0
+#if ATOMIC_IN_MEMIC
+    tl_mlx5_atomic_t zero = 0;
+    if (0 != ibv_memcpy_to_dm(team->net.atomic.counters, task->seq_index * sizeof(tl_mlx5_atomic_t),
+                              &zero, sizeof(tl_mlx5_atomic_t))) {
+        tl_error(UCC_TASK_LIB(task), "failed to reset atomic in memic");
+        return UCC_ERR_NO_MESSAGE;
+    }
+#else
     team->net.atomic.counters[task->seq_index] = 0;
-
+#endif
     if (UCC_TL_MLX5_TEAM_LIB(team)->cfg.asr_barrier) {
         tl_debug(UCC_TASK_LIB(task),"asr barrier start");
         status = ucc_service_allreduce(UCC_TL_CORE_TEAM(team), &task->barrier_scratch[0],
@@ -417,9 +426,14 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
 
     if (task->started == team->net.net_size) {
         status = ucc_tl_mlx5_post_wait_on_data(team->net.umr_qp, team->net.net_size,
-                                      team->net.atomic.mr->lkey,
-                                      (uintptr_t)&team->net.atomic.counters[task->seq_index],
-                                      task);
+                                               team->net.atomic.mr->lkey, (uintptr_t)
+#if ATOMIC_IN_MEMIC
+                                      PTR_OFFSET(0,
+#else
+                                      PTR_OFFSET(team->net.atomic.counters,
+#endif
+                                            task->seq_index * sizeof(tl_mlx5_atomic_t)),
+                                       task);
     }
     return status;
 }
@@ -552,8 +566,13 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
 
     if (task->started == team->net.net_size) {
         status = ucc_tl_mlx5_post_wait_on_data(team->net.umr_qp, team->net.net_size,
-                                      team->net.atomic.mr->lkey,
-                                      (uintptr_t)&team->net.atomic.counters[task->seq_index],
+                                               team->net.atomic.mr->lkey, (uintptr_t)
+#if ATOMIC_IN_MEMIC
+                                      PTR_OFFSET(0,
+#else
+                                     PTR_OFFSET(team->net.atomic.counters,
+#endif
+                                            task->seq_index * sizeof(tl_mlx5_atomic_t)),
                                       task);
     }
 

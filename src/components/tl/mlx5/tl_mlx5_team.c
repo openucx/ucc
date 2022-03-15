@@ -249,7 +249,11 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
         ibv_dereg_mr(self->net.barrier.mr);
         ucc_free(self->net.barrier.flags);
         ibv_dereg_mr(self->net.atomic.mr);
+#if ATOMIC_IN_MEMIC
+        ibv_free_dm(self->net.atomic.counters);
+#else
         ucc_free(self->net.atomic.counters);
+#endif
         ucc_tl_mlx5_dm_cleanup(self);
     }
     ucc_free(self->net.dcis);
@@ -270,20 +274,38 @@ static ucc_status_t tl_mlx5_alloc_atomic(ucc_tl_mlx5_team_t *team)
     size_t                 size;
 
     size = sizeof(*team->net.atomic.counters) * MAX_OUTSTANDING_OPS;
+#if ATOMIC_IN_MEMIC
+    struct ibv_alloc_dm_attr  dm_attr;
+    memset(&dm_attr, 0, sizeof(dm_attr));
+    dm_attr.length = size;
+    team->net.atomic.counters = ibv_alloc_dm(ctx->ib_ctx, &dm_attr);
+#else
     team->net.atomic.counters = ucc_malloc(size, "atomic");
+#endif
+
     if (!team->net.atomic.counters) {
         tl_error(UCC_TL_TEAM_LIB(team),
                  "failed to allocate %zd bytes for atomic counters array",
                  size);
         return UCC_ERR_NO_MEMORY;
     }
+#if ATOMIC_IN_MEMIC
+    team->net.atomic.mr = ibv_reg_dm_mr(ctx->shared_pd, team->net.atomic.counters, 0, size,
+                                        IBV_ACCESS_REMOTE_ATOMIC | IBV_ACCESS_LOCAL_WRITE |
+                                        IBV_ACCESS_ZERO_BASED);
 
+#else
     team->net.atomic.mr = ibv_reg_mr(ctx->shared_pd, team->net.atomic.counters, size,
                                      IBV_ACCESS_REMOTE_ATOMIC | IBV_ACCESS_LOCAL_WRITE);
+#endif
 
     if (!team->net.atomic.mr) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to register atomic couters array");
+#if ATOMIC_IN_MEMIC
+        ibv_free_dm(team->net.atomic.counters);
+#else
         ucc_free(team->net.atomic.counters);
+#endif
         return UCC_ERR_NO_MESSAGE;
     }
     return UCC_OK;
@@ -309,9 +331,9 @@ static ucc_status_t tl_mlx5_alloc_barrier(ucc_tl_mlx5_team_t *team)
     team->net.barrier.mr = ibv_reg_mr(ctx->shared_pd, team->net.barrier.flags, size,
                                      IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
 
-    if (!team->net.atomic.mr) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to register atomic couters array");
-        ucc_free(team->net.atomic.counters);
+    if (!team->net.barrier.mr) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to register barrier flags array");
+        ucc_free(team->net.barrier.flags);
         return UCC_ERR_NO_MESSAGE;
     }
     return UCC_OK;

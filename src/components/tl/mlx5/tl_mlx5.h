@@ -149,6 +149,8 @@ typedef struct net_ctrl {
     } barrier;
 } net_ctrl_t;
 
+#define ATOMIC_IN_MEMIC 1
+
 typedef struct ucc_tl_mlx5_net {
     ucc_sbgp_t *    sbgp;
     int             net_size;
@@ -163,7 +165,11 @@ typedef struct ucc_tl_mlx5_net {
     struct ibv_qp *umr_qp;
     struct ibv_mr * ctrl_mr;
     struct {
+#if ATOMIC_IN_MEMIC
+        struct ibv_dm    *counters;
+#else
         tl_mlx5_atomic_t *counters;
+#endif
         struct ibv_mr    *mr;
     } atomic;
     struct {
