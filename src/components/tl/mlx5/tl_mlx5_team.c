@@ -347,7 +347,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team)
     ucc_rank_t             node_rank = team->node.sbgp->group_rank;
     ucc_status_t status;
     ucc_tl_mlx5_op_t *op;
-    int i, asr_cq_size, net_size;
+    int i, asr_cq_size, net_size, ret;
     struct ibv_port_attr    port_attr;
     size_t                  local_data_size, umr_buf_size, op_seg_size;
     net_exchange_t *local_data, *global_data, *remote_data;
@@ -600,8 +600,8 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team)
         /* allocate buffer for noninline UMR registration, has to be 2KB aligned */
         umr_buf_size = ucc_align_up(sizeof(struct mlx5_wqe_umr_repeat_ent_seg) *
                                     (node_size + 1), 64);
-        ucc_posix_memalign(&team->node.umr_entries_buf, 2048, umr_buf_size);
-        if (!team->node.umr_entries_buf) {
+        ret = ucc_posix_memalign(&team->node.umr_entries_buf, 2048, umr_buf_size);
+        if (ret) {
             tl_error(tl_team->context->lib,
                      "failed to allocate %zd bytes for noninline UMR buffer",
                      umr_buf_size);
