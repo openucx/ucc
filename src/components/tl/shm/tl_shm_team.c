@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -7,7 +7,7 @@
 #include "tl_shm.h"
 #include "tl_shm_coll.h"
 #include "tl_shm_knomial_pattern.h"
-#include "tl_shm_coll_perf_params.h"
+#include "perf/tl_shm_coll_perf_params.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
 #include "utils/ucc_sys.h"
@@ -20,7 +20,7 @@
 
 #define SHM_MODE (IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR|S_IWOTH|S_IRGRP|S_IWGRP)
 
-static inline ucc_rank_t
+static ucc_rank_t
 ucc_tl_shm_team_rank_to_group_id(ucc_tl_shm_team_t *team, ucc_rank_t r)
 {
 	int i, j;
@@ -28,15 +28,18 @@ ucc_tl_shm_team_rank_to_group_id(ucc_tl_shm_team_t *team, ucc_rank_t r)
         for (j = 0; j < team->base_groups[i].group_size; j++) {
             if (r == ucc_ep_map_eval(team->base_groups[i].map, j)) {
                 /* found team rank r in base group i */
-                return i;
+                break;
             }
         }
+        if (j < team->base_groups[i].group_size) {
+            break;
+        }
     }
-    ucc_assert(0);
-    return UCC_RANK_INVALID;
+    ucc_assert(i < team->n_base_groups && j < team->base_groups[i].group_size);
+    return i;
 }
 
-static inline ucc_status_t
+static ucc_status_t
 ucc_tl_shm_rank_group_id_map_init(ucc_tl_shm_team_t *team)
 {
 	ucc_rank_t  team_size = UCC_TL_TEAM_SIZE(team);
@@ -55,32 +58,31 @@ ucc_tl_shm_rank_group_id_map_init(ucc_tl_shm_team_t *team)
     return UCC_OK;
 }
 
-static inline ucc_rank_t
+static ucc_rank_t
 ucc_tl_shm_team_rank_to_group_rank(ucc_tl_shm_team_t *team, ucc_rank_t r)
 {
     ucc_rank_t group_id = ucc_ep_map_eval(team->rank_group_id_map, r);
-	int        i;
+    ucc_rank_t i;
 
     for (i = 0; i < team->base_groups[group_id].group_size; i++) {
         if (ucc_ep_map_eval(team->base_groups[group_id].map, i) == r) {
-            return i;
+            break;
         }
     }
-    ucc_assert(0);
-    return UCC_RANK_INVALID;
+    ucc_assert(i < team->base_groups[group_id].group_size);
+    return i;
 }
 
-static inline ucc_status_t
+static ucc_status_t
 ucc_tl_shm_group_rank_map_init(ucc_tl_shm_team_t *team)
 {
     ucc_rank_t  team_size = UCC_TL_TEAM_SIZE(team);
     ucc_rank_t *ranks = (ucc_rank_t *) ucc_malloc(team_size * sizeof(*ranks));
-	int         i;
+	ucc_rank_t  i;
 
     if (!ranks) {
         return UCC_ERR_NO_MEMORY;
     }
-
     for (i = 0; i < team_size; i++) {
         ranks[i] = ucc_tl_shm_team_rank_to_group_rank(team, i);
     }
@@ -89,106 +91,55 @@ ucc_tl_shm_group_rank_map_init(ucc_tl_shm_team_t *team)
     return UCC_OK;
 }
 
-static inline ucc_status_t
-ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *team)
+static inline ucc_status_t ucc_tl_shm_set_perf_funcs(ucc_tl_shm_team_t *team)
 {
-    size_t max_size = 20, size = 0; // max size is general estimate,can be changed as more archs are added for perf selection
+    ucc_rank_t team_size = UCC_TL_TEAM_SIZE(team);
+    int                      i = 0, max_size = 20; // max size is general estimate,can be changed as more archs are added for perf selection
+    ucc_tl_shm_perf_keys_t  *perf_funcs_keys;
+    ucc_tl_shm_perf_funcs_t *perf_funcs_list;
+    ucc_cpu_vendor_t         vendor;
+    ucc_cpu_model_t          model;
 
-    team->perf_funcs->keys = ucc_malloc(max_size *
-                                        sizeof(ucc_tl_shm_perf_keys_t),
-                                        "perf keys");
+    perf_funcs_keys = ucc_malloc(max_size * sizeof(ucc_tl_shm_perf_keys_t),
+                                 "perf keys");
 
-    if (!team->perf_funcs->keys) {
+    if (!perf_funcs_keys) {
         tl_error(team->super.super.context->lib,
-                 "failed to allocate %zd bytes for perf_funcs->keys",
+                 "failed to allocate %zd bytes for perf_funcs_keys",
                  max_size * sizeof(ucc_tl_shm_perf_keys_t));
         return UCC_ERR_NO_MEMORY;
     }
 
-    ucc_tl_shm_perf_keys_t intel_broadwell_28 = {
-        .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
-        .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
-        .team_size   = 28,
-        .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_28_bcast,
-        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_28_reduce
-    };
-    team->perf_funcs->keys[size] = intel_broadwell_28;
-    size++;
+    perf_funcs_list = (ucc_tl_shm_perf_funcs_t *)
+                      ucc_malloc(sizeof(ucc_tl_shm_perf_funcs_t),
+                                 "perf funcs");
 
-    ucc_tl_shm_perf_keys_t intel_broadwell_14 = {
-        .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
-        .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
-        .team_size   = 14,
-        .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_14_bcast,
-        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_14_reduce
-    };
-    team->perf_funcs->keys[size] = intel_broadwell_14;
-    size++;
-
-    ucc_tl_shm_perf_keys_t intel_broadwell_8 = {
-        .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
-        .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
-        .team_size   = 8,
-        .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_8_bcast,
-        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_8_reduce
-    };
-    team->perf_funcs->keys[size] = intel_broadwell_8;
-    size++;
-
-    ucc_tl_shm_perf_keys_t intel_skylake_40 = {
-        .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
-        .cpu_model   = UCC_CPU_MODEL_INTEL_SKYLAKE,
-        .team_size   = 40,
-        .bcast_func  = ucc_tl_shm_perf_params_intel_skylake_40_bcast,
-        .reduce_func = ucc_tl_shm_perf_params_intel_skylake_40_reduce
-    };
-    team->perf_funcs->keys[size] = intel_skylake_40;
-    size++;
-
-    ucc_tl_shm_perf_keys_t amd_rome_128 = {
-        .cpu_vendor  = UCC_CPU_VENDOR_AMD,
-        .cpu_model   = UCC_CPU_MODEL_AMD_ROME,
-        .team_size   = 128,
-        .bcast_func  = ucc_tl_shm_perf_params_amd_rome_128_bcast,
-        .reduce_func = ucc_tl_shm_perf_params_amd_rome_128_reduce
-    };
-    team->perf_funcs->keys[size] = amd_rome_128;
-    size++;
-
-    team->perf_funcs->size = size;
-    return UCC_OK;
-}
-
-static inline ucc_status_t ucc_tl_shm_set_perf_funcs(ucc_tl_shm_team_t *team)
-{
-    ucc_rank_t team_size = UCC_TL_TEAM_SIZE(team);
-    int        set = 0, i = 0;
-    ucc_cpu_vendor_t vendor;
-    ucc_cpu_model_t  model;
-    ucc_status_t     status;
-
-    status = ucc_tl_shm_create_perf_func_list(team);
-    if (status != UCC_OK) {
-        return status;
+    if (!perf_funcs_list) {
+        tl_error(team->super.super.context->lib,
+                 "failed to allocate %zd bytes for perf_funcs_list",
+                 max_size * sizeof(ucc_tl_shm_perf_funcs_t));
+        return UCC_ERR_NO_MEMORY;
     }
 
+    ucc_tl_shm_create_perf_func_list(team, perf_funcs_keys, perf_funcs_list);
     vendor = ucc_arch_get_cpu_vendor();
     model  = ucc_arch_get_cpu_model();
 
-    for (i = 0; i < team->perf_funcs->size; i++) {
-        if (team->perf_funcs->keys[i].cpu_vendor == vendor &&
-            team->perf_funcs->keys[i].cpu_model == model &&
-            team->perf_funcs->keys[i].team_size == team_size) {
-            team->perf_params_bcast  = team->perf_funcs->keys[i].bcast_func;
-            team->perf_params_reduce = team->perf_funcs->keys[i].reduce_func;
-            set = 1;
+    team->perf_params_bcast  = ucc_tl_shm_perf_params_generic_bcast;
+    team->perf_params_reduce = ucc_tl_shm_perf_params_generic_reduce;
+
+    for (i = 0; i < perf_funcs_list->size; i++) {
+        if (perf_funcs_list->keys[i].cpu_vendor == vendor &&
+            perf_funcs_list->keys[i].cpu_model == model &&
+            perf_funcs_list->keys[i].team_size == team_size) {
+            team->perf_params_bcast  = perf_funcs_list->keys[i].bcast_func;
+            team->perf_params_reduce = perf_funcs_list->keys[i].reduce_func;
             break;
         }
     }
-    if (!set) {
-        team->perf_params_bcast = ucc_tl_shm_perf_params_generic_bcast;
-        team->perf_params_reduce = ucc_tl_shm_perf_params_generic_reduce;
-    }
+
+    ucc_free(perf_funcs_keys);
+    ucc_free(perf_funcs_list);
     return UCC_OK;
 }
 
@@ -215,7 +166,7 @@ static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
     ucc_team_oob_coll_t  oob       = UCC_TL_TEAM_OOB(team);
     ucc_status_t         status;
 
-    team->allgather_dst = (int *) ucc_malloc(sizeof(int) * team_size,
+    team->allgather_dst = (int *) ucc_malloc(sizeof(int) * (team_size + 1),
                                              "algather dst buffer");
 
     /* LOWEST on node rank  within the comm will initiate the segment creation.
@@ -226,7 +177,7 @@ static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
             tl_error(team->super.super.context->lib,
                      "Root: shmget failed, shmid=%d, shmsize=%ld, errno: %s\n",
                      shmid, shmsize, strerror(errno));
-            return UCC_ERR_NO_RESOURCE;
+            goto allgather;
         }
         team->shm_buffer = (void *) shmat(shmid, NULL, 0);
         if (team->shm_buffer == (void *) -1) {
@@ -234,19 +185,17 @@ static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
         	team->shm_buffer = NULL;
             tl_error(team->super.super.context->lib,
                      "Root: shmat failed, errno: %s\n", strerror(errno));
-            status = oob.allgather(&shmid, team->allgather_dst, sizeof(int),
-                                         oob.coll_info, &team->oob_req);
-            if (UCC_OK != status) {
-                tl_error(team->super.super.context->lib, "allgather failed");
-                return status;
-            }
-            return UCC_ERR_NO_RESOURCE;
+            goto allgather;
         }
         memset(team->shm_buffer, 0, shmsize);
         shmctl(shmid, IPC_RMID, NULL);
     }
-    status = oob.allgather(&shmid, team->allgather_dst, sizeof(int),
-                                 oob.coll_info, &team->oob_req);
+allgather:
+	team->allgather_dst[team_size] = shmid;
+    status = oob.allgather(&team->allgather_dst[team_size],
+                           team->allgather_dst, sizeof(int),
+                           oob.coll_info, &team->oob_req);
+
     if (UCC_OK != status) {
     	tl_error(team->super.super.context->lib, "allgather failed");
     	return status;
@@ -302,6 +251,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     }
 
     if (UCC_TL_CORE_CTX(self)->topo->sock_bound != 1) {
+        tl_debug(ctx->super.super.lib, "sock bound is not supported");
+        ucc_topo_cleanup(self->topo);
     	return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -311,7 +262,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
         tl_error(ctx->super.super.lib,
                  "failed to allocate %zd bytes for last_posted array",
                  sizeof(*self->last_posted) * self->n_concurrent);
-        return UCC_ERR_NO_MEMORY;
+        status =  UCC_ERR_NO_MEMORY;
+        goto err_last_posted;
     }
 
     self->segs = (ucc_tl_shm_seg_t *) ucc_malloc(sizeof(ucc_tl_shm_seg_t) *
@@ -421,21 +373,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     self->ctrl_map = ucc_ep_map_from_array_64(&rank_ctrl_offsets, team_size,
                                               team_size, 1);
 
-    self->perf_funcs = (ucc_tl_shm_perf_funcs_t *)
-                       ucc_malloc(sizeof(ucc_tl_shm_perf_funcs_t),
-                                  "perf funcs");
-
-    if (!self->perf_funcs) {
-        tl_error(ctx->super.super.lib,
-        "failed to allocate %zd bytes for perf_funcs",
-                 sizeof(ucc_tl_shm_perf_funcs_t));
-        status = UCC_ERR_NO_MEMORY;
-        goto err_perf_funcs;
-    }
-
     status = ucc_tl_shm_set_perf_funcs(self);
     if (UCC_OK != status) {
-        goto err_perf_func_keys;
+        goto err_seg_alloc;
     }
 
     status = ucc_tl_shm_seg_alloc(self);
@@ -445,10 +385,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     return UCC_OK;
 
 err_seg_alloc:
-    ucc_free(self->perf_funcs->keys);
-err_perf_func_keys:
-    ucc_free(self->perf_funcs);
-err_perf_funcs:
 //    ucc_free(self->ctrl_map.array.map);
 err_offsets:
 //    ucc_free(self->group_rank_map.array.map);
@@ -460,6 +396,8 @@ err_sockets:
 err_tree:
     ucc_free(self->segs);
 err_segs:
+    ucc_free(self->last_posted);
+err_last_posted:
     ucc_topo_cleanup(self->topo);
 
     return status;
@@ -492,10 +430,9 @@ ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
     }
     ucc_free(team->tree_cache->elems);
     ucc_free(team->tree_cache);
-    ucc_free(team->last_posted);
-    ucc_free(team->perf_funcs->keys);
-    ucc_free(team->perf_funcs);
     ucc_free(team->segs);
+    ucc_free(team->last_posted);
+
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_shm_team_t)(tl_team);
     return UCC_OK;
 }
@@ -522,6 +459,10 @@ ucc_status_t ucc_tl_shm_team_create_test(ucc_base_team_t *tl_team)
     /* Exchange keys */
     int shmid = team->allgather_dst[0];
 
+    if (shmid == -1) {
+        return UCC_ERR_NO_RESOURCE;
+    }
+
     if (UCC_TL_TEAM_RANK(team) > 0) {
         team->shm_buffer = (void *) shmat(shmid, NULL, 0);
         if (team->shm_buffer == (void *) -1) {
@@ -541,10 +482,14 @@ ucc_status_t ucc_tl_shm_team_create_test(ucc_base_team_t *tl_team)
 ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t   *tl_team,
                                         ucc_coll_score_t **score_p)
 {
-    ucc_tl_shm_team_t  *team      = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
-    ucc_base_lib_t     *lib       = UCC_TL_TEAM_LIB(team);
-    ucc_base_context_t *ctx       = UCC_TL_TEAM_CTX(team);
-    size_t              data_size = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
+    ucc_tl_shm_team_t  *team        = ucc_derived_of(tl_team,
+                                                     ucc_tl_shm_team_t);
+    ucc_base_lib_t     *lib         = UCC_TL_TEAM_LIB(team);
+    ucc_base_context_t *ctx         = UCC_TL_TEAM_CTX(team);
+    size_t              data_size   = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
+    size_t              ctrl_size   = UCC_TL_SHM_TEAM_LIB(team)->cfg.ctrl_size;
+    size_t              inline_size = ctrl_size - sizeof(ucc_tl_shm_ctrl_t);
+    size_t              max_size    = ucc_max(inline_size, data_size);
     ucc_coll_score_t   *score;
     ucc_status_t        status;
 
@@ -555,7 +500,7 @@ ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t   *tl_team,
     }
 
     status = ucc_coll_score_add_range(
-        score, UCC_COLL_TYPE_BCAST, UCC_MEMORY_TYPE_HOST, 0, data_size,
+        score, UCC_COLL_TYPE_BCAST, UCC_MEMORY_TYPE_HOST, 0, max_size,
         UCC_TL_SHM_DEFAULT_SCORE, ucc_tl_shm_bcast_init, tl_team);
     if (UCC_OK != status) {
         tl_error(lib, "faild to add range to score_t");
@@ -563,7 +508,7 @@ ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t   *tl_team,
     }
 
     status = ucc_coll_score_add_range(
-        score, UCC_COLL_TYPE_REDUCE, UCC_MEMORY_TYPE_HOST, 0, data_size,
+        score, UCC_COLL_TYPE_REDUCE, UCC_MEMORY_TYPE_HOST, 0, max_size,
         UCC_TL_SHM_DEFAULT_SCORE, ucc_tl_shm_reduce_init, tl_team);
     if (UCC_OK != status) {
         tl_error(lib, "faild to add range to score_t");
@@ -605,6 +550,8 @@ ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t   *tl_team,
             goto err;
         }
     }
+
+    //TODO: check that collective range does not exceed data size
 
 	*score_p = score;
     return UCC_OK;

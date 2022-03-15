@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -18,6 +18,14 @@ ucc_status_t ucc_tl_shm_get_lib_attr(const ucc_base_lib_t *lib,
 ucc_status_t ucc_tl_shm_get_context_attr(const ucc_base_context_t *context,
                                           ucc_base_ctx_attr_t      *base_attr);
 
+static const char *bcast_algs[] = {
+    [BCAST_WW]   = "ww",
+    [BCAST_WR]   = "wr",
+    [BCAST_RR]   = "rr",
+    [BCAST_RW]   = "rw",
+    [BCAST_LAST] = NULL
+};
+
 static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_shm_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
@@ -34,9 +42,10 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
      ucc_offsetof(ucc_tl_shm_lib_config_t, data_size),
      UCC_CONFIG_TYPE_UINT},
 
-    {"BCAST_ALG", "1", "bcast alg choice of write/read per level",
+    {"BCAST_ALG", "wr",
+     "bcast alg choice of write/read per level, can be: ww/wr/rr/rw",
      ucc_offsetof(ucc_tl_shm_lib_config_t, bcast_alg),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_ENUM(bcast_algs)},
 
     {"BCAST_BASE_RADIX", "4", "bcast radix for base tree",
      ucc_offsetof(ucc_tl_shm_lib_config_t, bcast_base_radix),
@@ -44,10 +53,6 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
 
     {"BCAST_TOP_RADIX", "4", "bcast radix for top tree",
      ucc_offsetof(ucc_tl_shm_lib_config_t, bcast_top_radix),
-     UCC_CONFIG_TYPE_UINT},
-
-    {"REDUCE_ALG", "1", "reduce alg choice of write/read per level",
-     ucc_offsetof(ucc_tl_shm_lib_config_t, reduce_alg),
      UCC_CONFIG_TYPE_UINT},
 
     {"REDUCE_BASE_RADIX", "4", "reduce radix for base tree",
@@ -93,12 +98,12 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
     {"BASE_TREE_ONLY", "0", "if true disabling topo, "
      "forcing all processes to be on same socket/numa",
      ucc_offsetof(ucc_tl_shm_lib_config_t, base_tree_only),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_BOOL},
 
     {"SET_PERF_PARAMS", "1", "changing default/user settings to optimal "
      "perf settings",
      ucc_offsetof(ucc_tl_shm_lib_config_t, set_perf_params),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_BOOL},
 
     {"GROUP_MODE", "socket", "group mode - numa or socket",
      ucc_offsetof(ucc_tl_shm_lib_config_t, group_mode),

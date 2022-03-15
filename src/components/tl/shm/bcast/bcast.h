@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -12,12 +12,5 @@
 ucc_status_t ucc_tl_shm_bcast_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t      *team,
                                    ucc_coll_task_t     **task_h);
-
-enum {
-    BCAST_WW,
-    BCAST_WR,
-    BCAST_RR,
-    BCAST_RW
-}; //make configurable from user for example from user "wr" to cfg->bcast_alg = 1
 
 #endif

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -30,7 +30,6 @@ ucc_tl_shm_fanout_signal(ucc_tl_shm_team_t *team,
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, team_rank);
     for (i = 0; i < n_polls; i++) {
         if (my_ctrl->pi == seq_num) {
-            SHMSEG_ISYNC();
             ucc_tl_shm_signal_to_children(seg, team, seq_num, tree);
             return UCC_OK;
         }

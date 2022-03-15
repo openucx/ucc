@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -41,7 +41,7 @@ static ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
             dst = is_inline ? my_ctrl->data : ucc_tl_shm_get_data(seg, team,
                                                                   team_rank);
             memcpy(dst, args->src.info.buffer, count * ucc_dt_size(dt));
-            SHMSEG_WMB();
+            ucc_memory_cpu_store_fence();
         }
         my_ctrl->pi = seq_num; //signals to parent
         return UCC_OK;
@@ -53,7 +53,6 @@ static ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
         child_ctrl = ucc_tl_shm_get_ctrl(seg, team, child);
         for (j = 0; j < n_polls; j++) {
             if (child_ctrl->pi == seq_num) {
-                SHMSEG_ISYNC();
                 src1 = is_inline ? child_ctrl->data :
                                    ucc_tl_shm_get_data(seg, team, child);
                 dst  = (args->root == team_rank) ? args->dst.info.buffer :
@@ -70,7 +69,7 @@ static ucc_status_t ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team,
                     task->super.super.status = status;
                     return status;
                 }
-                SHMSEG_WMB();
+                ucc_memory_cpu_store_fence();
                 task->first_reduce = 0;
                 reduced = 1;
                 break;
@@ -153,13 +152,6 @@ next_stage:
         }
         break;
     }
-
-    /* Copy out to user dest:
-       - ranks that are non-roots in the base tree (those that have parent)
-         will have the data in their parent's data/ctrl because we did READ
-         on the last step.
-       - other ranks must be participants of the top tree WRITE step, hence
-        they have the data in their local shm data/ctrl */
 
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
     my_ctrl->ci = task->seq_num;

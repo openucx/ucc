@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -15,8 +15,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_context_t,
                     const ucc_base_config_t *config)
 {
     ucc_status_t status;
-	ucc_tl_shm_context_config_t *tl_shm_config =
-	    ucc_derived_of(config, ucc_tl_shm_context_config_t);
+    ucc_tl_shm_context_config_t *tl_shm_config =
+        ucc_derived_of(config, ucc_tl_shm_context_config_t);
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_shm_config->super,
 	                              params->context);

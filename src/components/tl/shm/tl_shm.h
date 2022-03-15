@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -14,7 +14,7 @@
 #include "utils/arch/cpu.h"
 #include "tl_shm_knomial_pattern.h"
 
-#include <assert.h> //needed?
+#include <assert.h>
 #include <errno.h>
 #include <sys/shm.h>
 #include <sys/types.h>
@@ -35,14 +35,17 @@
 #define UCC_TL_SHM_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
 #define UCC_TL_SHM_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
 
-#define BCOL_SHMSEG_PROBE_COUNT 100
-//TODO take fence functions from arch/cpu.h after ucx bug is fixed
-#define SHMSEG_WMB()  __asm__ __volatile__("": : :"memory")
-#define SHMSEG_ISYNC() __asm__ __volatile__("": : :"memory")
-
-#define UCC_TL_SHM_SUPPORTED_COLLS                                      \
-    (UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_BARRIER \
+#define UCC_TL_SHM_SUPPORTED_COLLS                                         \
+    (UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_BARRIER |  \
      UCC_COLL_TYPE_FANIN | UCC_COLL_TYPE_FANOUT)
+
+typedef enum ucc_tl_shm_bcast_progress_alg {
+    BCAST_WW,
+    BCAST_WR,
+    BCAST_RR,
+    BCAST_RW,
+    BCAST_LAST
+} ucc_tl_shm_bcast_progress_alg_t;
 
 typedef struct ucc_kn_tree ucc_kn_tree_t;
 
@@ -53,28 +56,27 @@ typedef struct ucc_tl_shm_iface {
 extern ucc_tl_shm_iface_t ucc_tl_shm;
 
 typedef struct ucc_tl_shm_lib_config {
-    ucc_tl_lib_config_t  super;
-    uint32_t             n_concurrent;
-    uint32_t             data_size;
-    uint32_t             ctrl_size;
-    uint32_t             page_size;
-    uint32_t             bcast_alg;
-    uint32_t             bcast_base_radix;
-    uint32_t             bcast_top_radix;
-    uint32_t             reduce_alg;
-    uint32_t             reduce_base_radix;
-    uint32_t             reduce_top_radix;
-    uint32_t             fanin_base_radix;
-    uint32_t             fanin_top_radix;
-    uint32_t             fanout_base_radix;
-    uint32_t             fanout_top_radix;
-    uint32_t             barrier_base_radix;
-    uint32_t             barrier_top_radix;
-    uint32_t             max_trees_cached;
-    uint32_t             n_polls;
-    uint32_t             base_tree_only;
-    uint32_t             set_perf_params;
-    char                *group_mode;
+    ucc_tl_lib_config_t              super;
+    uint32_t                         n_concurrent;
+    uint32_t                         data_size;
+    uint32_t                         ctrl_size;
+    uint32_t                         bcast_base_radix;
+    uint32_t                         bcast_top_radix;
+    uint32_t                         reduce_alg;
+    uint32_t                         reduce_base_radix;
+    uint32_t                         reduce_top_radix;
+    uint32_t                         fanin_base_radix;
+    uint32_t                         fanin_top_radix;
+    uint32_t                         fanout_base_radix;
+    uint32_t                         fanout_top_radix;
+    uint32_t                         barrier_base_radix;
+    uint32_t                         barrier_top_radix;
+    uint32_t                         max_trees_cached;
+    uint32_t                         n_polls;
+    uint32_t                         base_tree_only;
+    uint32_t                         set_perf_params;
+    ucc_tl_shm_bcast_progress_alg_t  bcast_alg;
+    char                            *group_mode;
 } ucc_tl_shm_lib_config_t;
 
 typedef struct ucc_tl_shm_context_config {
@@ -108,21 +110,22 @@ typedef struct ucc_tl_shm_seg {
 } ucc_tl_shm_seg_t;
 
 typedef struct ucc_tl_shm_tree {
-    ucc_kn_tree_t *base_tree; /* tree for base group, always != NULL */
+    ucc_kn_tree_t *base_tree; /* tree for base group, can be NULL if the group
+                                 does not exists or the process is not part of it */
     ucc_kn_tree_t *top_tree;  /* tree for leaders group, can be NULL if the group
                                  does not exists or the process is not part of it */
 } ucc_tl_shm_tree_t;
 
-typedef struct ucc_tl_shm_tree_cache_keys {
+typedef struct ucc_tl_shm_tree_cache_key {
     ucc_rank_t      base_radix;
     ucc_rank_t      top_radix;
     ucc_rank_t      root;
     ucc_coll_type_t coll_type;
     int             base_tree_only;
-} ucc_tl_shm_tree_cache_keys_t;
+} ucc_tl_shm_tree_cache_key_t;
 
 typedef struct ucc_tl_shm_tree_cache_elems {
-	ucc_tl_shm_tree_cache_keys_t  keys;
+	ucc_tl_shm_tree_cache_key_t   key;
 	ucc_tl_shm_tree_t            *tree;
 } ucc_tl_shm_tree_cache_elems_t;
 
@@ -131,12 +134,13 @@ typedef struct ucc_tl_shm_tree_cache {
 	ucc_tl_shm_tree_cache_elems_t *elems;
 } ucc_tl_shm_tree_cache_t;
 
+typedef void (*perf_params_fn_t)(ucc_coll_task_t*);
 typedef struct ucc_tl_shm_perf_keys {
-	ucc_cpu_vendor_t  cpu_vendor;
-	ucc_cpu_model_t   cpu_model;
-	ucc_rank_t        team_size;
-	void             *bcast_func;
-	void             *reduce_func;
+	ucc_cpu_vendor_t cpu_vendor;
+	ucc_cpu_model_t  cpu_model;
+	ucc_rank_t       team_size;
+	perf_params_fn_t bcast_func;
+	perf_params_fn_t reduce_func;
 } ucc_tl_shm_perf_keys_t;
 
 typedef struct ucc_tl_shm_perf_funcs {
@@ -147,8 +151,8 @@ typedef struct ucc_tl_shm_perf_funcs {
 typedef struct ucc_tl_shm_team {
     ucc_tl_team_t            super;
     void                    *oob_req;
-    void                    (*perf_params_bcast)(ucc_coll_task_t*);
-    void                    (*perf_params_reduce)(ucc_coll_task_t*);
+    perf_params_fn_t         perf_params_bcast;
+    perf_params_fn_t         perf_params_reduce;
     ucc_tl_shm_seg_t        *segs;
     uint32_t                 seq_num;
     uint32_t                *last_posted;
@@ -167,7 +171,6 @@ typedef struct ucc_tl_shm_team {
     size_t                   data_size;
     size_t                   max_inline;
     ucc_tl_shm_tree_cache_t *tree_cache;
-    ucc_tl_shm_perf_funcs_t *perf_funcs;
     ucc_status_t             status;
 } ucc_tl_shm_team_t;
 

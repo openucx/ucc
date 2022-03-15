@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -25,7 +25,6 @@ ucc_tl_shm_fanin_signal(ucc_tl_shm_team_t *team, ucc_tl_shm_seg_t *seg,
         child_ctrl = ucc_tl_shm_get_ctrl(seg, team, child);
         for (j = 0; j < n_polls; j++) {
             if (child_ctrl->pi == seq_num) {
-                SHMSEG_ISYNC();
                 break;
             }
         }

@@ -1,45 +1,51 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
 #
 
-bcast =                \
-	bcast/bcast.h      \
+bcast   =                          \
+	bcast/bcast.h                  \
 	bcast/bcast.c
 	
-reduce =               \
-	reduce/reduce.h    \
+reduce  =                          \
+	reduce/reduce.h                \
 	reduce/reduce.c
 
-fanin =                \
-	fanin/fanin.h      \
+fanin   =                          \
+	fanin/fanin.h                  \
 	fanin/fanin.c
 
-fanout =               \
-	fanout/fanout.h    \
+fanout  =                          \
+	fanout/fanout.h                \
 	fanout/fanout.c
 	
-barrier =              \
-	barrier/barrier.h  \
+barrier =                          \
+	barrier/barrier.h              \
 	barrier/barrier.c
 
-sources =                     \
-	tl_shm.h                  \
-	tl_shm.c                  \
-	tl_shm_lib.c              \
-	tl_shm_context.c          \
-	tl_shm_team.c             \
-	tl_shm_coll.h             \
-	tl_shm_coll.c             \
-	tl_shm_coll_perf_params.h \
-	tl_shm_knomial_pattern.h  \
-	tl_shm_knomial_pattern.c  \
-	$(bcast)                  \
-	$(reduce)                 \
-	$(fanin)                  \
-	$(fanout)                 \
-	$(barrier)   
+perf    =                          \
+	perf/tl_shm_coll_perf_params.h \
+	perf/intel/broadwell.c         \
+	perf/intel/skylake.c           \
+	perf/amd/rome.c
 
-module_LTLIBRARIES = libucc_tl_shm.la
+sources =                          \
+	tl_shm.h                       \
+	tl_shm.c                       \
+	tl_shm_lib.c                   \
+	tl_shm_context.c               \
+	tl_shm_team.c                  \
+	tl_shm_coll.h                  \
+	tl_shm_coll.c                  \
+	tl_shm_knomial_pattern.h       \
+	tl_shm_knomial_pattern.c       \
+	$(bcast)                       \
+	$(reduce)                      \
+	$(fanin)                       \
+	$(fanout)                      \
+	$(barrier)                     \
+	$(perf)
+
+module_LTLIBRARIES        = libucc_tl_shm.la
 libucc_tl_shm_la_SOURCES  = $(sources)
 libucc_tl_shm_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS)
 libucc_tl_shm_la_CFLAGS   = $(BASE_CFLAGS)

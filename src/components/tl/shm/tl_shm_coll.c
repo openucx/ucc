@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -25,17 +25,16 @@ ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task)
 }
 
 int ucc_tl_shm_cache_tree_lookup(ucc_tl_shm_team_t *team,
-                                 ucc_rank_t base_radix, ucc_rank_t top_radix,
-                                 ucc_rank_t root, ucc_coll_type_t coll_type,
-                                 int base_tree_only, ucc_tl_shm_tree_t **tree) {
+                                 ucc_tl_shm_tree_cache_key_t *key,
+                                 ucc_tl_shm_tree_t **tree) {
     ucc_tl_shm_tree_cache_elems_t *elems = team->tree_cache->elems;
 
     for (int i = 0; i < team->tree_cache->size; i++) {
-        if (elems[i].keys.base_radix == base_radix &&
-            elems[i].keys.top_radix == top_radix &&
-            elems[i].keys.root == root &&
-            elems[i].keys.coll_type == coll_type &&
-            elems[i].keys.base_tree_only == base_tree_only) {
+        if (elems[i].key.coll_type == key->coll_type &&
+            elems[i].key.base_radix == key->base_radix &&
+            elems[i].key.top_radix == key->top_radix &&
+            elems[i].key.root == key->root &&
+            elems[i].key.base_tree_only == key->base_tree_only) {
             *tree = elems[i].tree;
             return 1;
         }
@@ -43,20 +42,19 @@ int ucc_tl_shm_cache_tree_lookup(ucc_tl_shm_team_t *team,
     return 0;
 }
 
-int ucc_tl_shm_cache_tree(ucc_tl_shm_team_t *team, ucc_rank_t base_radix,
-                          ucc_rank_t top_radix, ucc_rank_t root,
-                          ucc_coll_type_t coll_type,
-                          int base_tree_only, ucc_tl_shm_tree_t *tree) {
+int ucc_tl_shm_cache_tree(ucc_tl_shm_team_t *team,
+                          ucc_tl_shm_tree_cache_key_t *key,
+                          ucc_tl_shm_tree_t *tree) {
     size_t size = team->tree_cache->size;
     ucc_tl_shm_tree_cache_elems_t *elem = &team->tree_cache->elems[size];
 
     if (size < UCC_TL_SHM_TEAM_LIB(team)->cfg.max_trees_cached) {
         elem->tree = tree;
-        elem->keys.base_radix = base_radix;
-        elem->keys.top_radix = top_radix;
-        elem->keys.root = root;
-        elem->keys.coll_type = coll_type;
-        elem->keys.base_tree_only = base_tree_only;
+        elem->key.base_radix = key->base_radix;
+        elem->key.top_radix = key->top_radix;
+        elem->key.root = key->root;
+        elem->key.coll_type = key->coll_type;
+        elem->key.base_tree_only = key->base_tree_only;
         team->tree_cache->size++;
         return 1;
     }
@@ -85,13 +83,20 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team,
     ucc_rank_t  root_group   = ucc_ep_map_eval(team->rank_group_id_map, root);
     ucc_sbgp_t *sbgp         = &team->base_groups[team->my_group_id];
 
-    if (ucc_tl_shm_cache_tree_lookup(team, base_radix, top_radix, root,
-                                     coll_type, base_tree_only, tree_p) == 1) {
+    ucc_tl_shm_tree_cache_key_t key = {
+        .base_radix = base_radix,
+        .top_radix = top_radix,
+        .root = root,
+        .coll_type = coll_type,
+        .base_tree_only = base_tree_only
+    };
+
+    if (ucc_tl_shm_cache_tree_lookup(team, &key, tree_p) == 1) {
     	*tree_in_cache = 1;
         return UCC_OK;
     }
 
-    shm_tree = (ucc_tl_shm_tree_t *) ucc_malloc(sizeof(ucc_kn_tree_t *) * 2);
+    shm_tree = (ucc_tl_shm_tree_t *) ucc_malloc(sizeof(ucc_tl_shm_tree_t));
     base_tree_size = ucc_tl_shm_kn_tree_size(group_size, base_radix);
     base_tree = (ucc_kn_tree_t *) ucc_malloc(base_tree_size, "base_tree");
     shm_tree->base_tree = NULL;
@@ -106,15 +111,10 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team,
         ucc_tl_shm_kn_tree_init(group_size, root, team_rank, base_radix,
                                 coll_type, base_tree);
         shm_tree->base_tree = base_tree;
-        *tree_in_cache = ucc_tl_shm_cache_tree(team, base_radix, top_radix, root,
-                                               coll_type, base_tree_only,
-                                               shm_tree);
+        *tree_in_cache = ucc_tl_shm_cache_tree(team, &key, shm_tree);
         *tree_p = shm_tree;
         return UCC_OK;
     }
-
-    /* Pool is initialized using UCC_KN_TREE_SIZE macro memory estimation, using
-       base_group[my_group_id]->size and max supported radix (maybe up to group size as well */
 
     top_tree_size = ucc_tl_shm_kn_tree_size(leaders_size, top_radix);
     top_tree = (ucc_kn_tree_t *) ucc_malloc(top_tree_size, "top_tree");
@@ -202,8 +202,7 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team,
             shm_tree->top_tree = top_tree;
         }
     }
-    *tree_in_cache = ucc_tl_shm_cache_tree(team, base_radix, top_radix, root,
-                                           coll_type, base_tree_only, shm_tree);
+    *tree_in_cache = ucc_tl_shm_cache_tree(team, &key, shm_tree);
     *tree_p = shm_tree;
     return UCC_OK;
 }

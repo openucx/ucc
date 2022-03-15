@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -49,7 +49,7 @@ next_stage:
             task->stage = BARRIER_STAGE_TOP_TREE_FANIN;
         } else {
             task->stage = BARRIER_STAGE_BASE_TREE_FANOUT;
-            task->seq_num++;
+            task->seq_num++; /* finished fanin, need seq_num to be updated for fanout */
         }
         goto next_stage;
     case BARRIER_STAGE_TOP_TREE_FANIN:
@@ -58,7 +58,7 @@ next_stage:
             return status;
         }
         task->stage = BARRIER_STAGE_TOP_TREE_FANOUT;
-        task->seq_num++;
+        task->seq_num++; /* finished fanin, need seq_num to be updated for fanout */
         goto next_stage;
     case BARRIER_STAGE_TOP_TREE_FANOUT:
         status = ucc_tl_shm_fanout_signal(team, seg, task, tree->top_tree);
@@ -79,6 +79,7 @@ next_stage:
     }
 
     my_ctrl = ucc_tl_shm_get_ctrl(seg, team, rank);
+    /* task->seq_num was updated between fanin and fanout, now needs to be rewinded to fit general collectives order, as barrier is actually a single collective */
     my_ctrl->ci = task->seq_num - 1;
     /* barrier done */
     task->super.super.status = UCC_OK;
@@ -109,8 +110,10 @@ ucc_status_t ucc_tl_shm_barrier_init(ucc_base_coll_args_t *coll_args,
                                      ucc_coll_task_t     **task_h)
 {
 	ucc_tl_shm_team_t *team = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
-	ucc_rank_t   base_radix = UCC_TL_SHM_TEAM_LIB(team)->cfg.barrier_base_radix;
-	ucc_rank_t   top_radix  = UCC_TL_SHM_TEAM_LIB(team)->cfg.barrier_top_radix;
+	ucc_rank_t         base_radix =
+                           UCC_TL_SHM_TEAM_LIB(team)->cfg.barrier_base_radix;
+	ucc_rank_t         top_radix  =
+                           UCC_TL_SHM_TEAM_LIB(team)->cfg.barrier_top_radix;
 	ucc_rank_t         root = 0;
     ucc_tl_shm_task_t *task;
 	ucc_status_t       status;

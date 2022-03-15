@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -9,8 +9,10 @@
 
 #include "tl_shm.h"
 
-#define CONDITION(_a, _b, _coll) _coll == UCC_COLL_TYPE_BCAST || _coll == UCC_COLL_TYPE_FANOUT ? _a >= 1 : _a < _b /* coll_type can be bcast or reduce */
-#define GET_MAX_RADIX(_r1, _r2) _r1 > _r2 ? _r1 : _r2
+/* checks if to build kn tree children setup to fit bcast/fanout or reduce/fanin */
+#define CONDITION(_a, _b, _coll)                                           \
+    (((_coll) == UCC_COLL_TYPE_BCAST || (_coll) == UCC_COLL_TYPE_FANOUT) ? \
+    ((_a) >= 1) : ((_a) < (_b)))
 
 typedef struct ucc_kn_tree {
     ucc_rank_t parent;

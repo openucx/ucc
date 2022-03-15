@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -32,8 +32,6 @@ void ucc_tl_shm_kn_tree_init(ucc_rank_t size, /* group size */
         if (vrank % dist == 0) {
             pos = (vrank / dist) % radix;
             if (pos == 0) {
-//                i = coll_type == UCC_COLL_TYPE_BCAST ? radix - 1 : 1;
-//                while (CONDITION(i, radix, coll_type)) {
             	for (i = 1; i < radix; i++) {
                     vpeer = vrank + i * dist;
                     if (vpeer < size) {
@@ -46,7 +44,6 @@ void ucc_tl_shm_kn_tree_init(ucc_rank_t size, /* group size */
                     } else if (coll_type == UCC_COLL_TYPE_REDUCE || coll_type == UCC_COLL_TYPE_FANIN) {
                         break;
                     }
-//                    i = coll_type == UCC_COLL_TYPE_BCAST ? i - 1 : i + 1;
         	    }
             } else if (!calc_parent) {
                 vparent = vrank - pos * dist;

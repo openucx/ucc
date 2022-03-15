@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -10,19 +10,19 @@
 #include "tl_shm.h"
 
 typedef struct ucc_tl_shm_task {
-	ucc_coll_task_t    super;
-    ucc_tl_shm_seg_t  *seg;
-    ucc_tl_shm_tree_t *tree;
-    uint32_t           seq_num;
-    uint32_t           seg_ready_seq_num;
-    int                stage;
-    int                tree_in_cache;
-    int                base_tree_only;
-    int                first_reduce;
-    uint32_t           progress_alg;
-    ucc_rank_t         base_radix;
-    ucc_rank_t         top_radix;
-    ucc_rank_t         cur_child;
+	ucc_coll_task_t                  super;
+    ucc_tl_shm_seg_t                *seg;
+    ucc_tl_shm_tree_t               *tree;
+    uint32_t                         seq_num;
+    uint32_t                         seg_ready_seq_num;
+    int                              stage;
+    int                              tree_in_cache;
+    int                              base_tree_only;
+    int                              first_reduce;
+    ucc_tl_shm_bcast_progress_alg_t  progress_alg;
+    ucc_rank_t                       base_radix;
+    ucc_rank_t                       top_radix;
+    ucc_rank_t                       cur_child;
 } ucc_tl_shm_task_t;
 
 ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task);
@@ -57,14 +57,12 @@ ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_coll_task_t **task);
 
 int ucc_tl_shm_cache_tree_lookup(ucc_tl_shm_team_t *team,
-                                 ucc_rank_t base_radix, ucc_rank_t top_radix,
-                                 ucc_rank_t root, ucc_coll_type_t coll_type,
-                                 int base_tree_only, ucc_tl_shm_tree_t **tree);
+                                 ucc_tl_shm_tree_cache_key_t *key,
+                                 ucc_tl_shm_tree_t **tree);
 
-int ucc_tl_shm_cache_tree(ucc_tl_shm_team_t *team, ucc_rank_t base_radix,
-                          ucc_rank_t top_radix, ucc_rank_t root,
-                          ucc_coll_type_t coll_type,
-                          int base_tree_only, ucc_tl_shm_tree_t *tree);
+int ucc_tl_shm_cache_tree(ucc_tl_shm_team_t *team,
+                          ucc_tl_shm_tree_cache_key_t *key,
+                          ucc_tl_shm_tree_t *tree);
 
 ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team, ucc_rank_t root,
                                   ucc_rank_t base_radix, ucc_rank_t top_radix,
@@ -170,7 +168,7 @@ ucc_tl_shm_copy_to_children(ucc_tl_shm_seg_t *seg, ucc_tl_shm_team_t *team,
         dst = is_inline ? ctrl->data : ucc_tl_shm_get_data(seg, team,
                                                            tree->children[i]);
         memcpy(dst, src, data_size);
-        SHMSEG_WMB();
+        ucc_memory_cpu_store_fence();
         ctrl->pi = seq_num;
     }
 }
