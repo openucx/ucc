@@ -12,14 +12,14 @@
 
 UCC_CLASS_INIT_FUNC(ucc_tl_shm_context_t,
                     const ucc_base_context_params_t *params,
-                    const ucc_base_config_t *config)
+                    const ucc_base_config_t *        config)
 {
-    ucc_status_t status;
+    ucc_status_t                 status;
     ucc_tl_shm_context_config_t *tl_shm_config =
         ucc_derived_of(config, ucc_tl_shm_context_config_t);
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_shm_config->super,
-	                              params->context);
+                              params->context);
 
     status = ucc_mpool_init(&self->req_mp, 0, sizeof(ucc_tl_shm_task_t), 0,
                             UCC_CACHE_LINE_SIZE, 8, UINT_MAX, NULL,
@@ -43,7 +43,7 @@ UCC_CLASS_DEFINE(ucc_tl_shm_context_t, ucc_tl_context_t);
 
 ucc_status_t
 ucc_tl_shm_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                             ucc_base_ctx_attr_t      *attr)
+                            ucc_base_ctx_attr_t *     attr)
 {
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
         attr->attr.ctx_addr_len = 0;

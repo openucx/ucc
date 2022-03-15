@@ -7,7 +7,8 @@
 #include "../tl_shm.h"
 #include "barrier.h"
 
-enum {
+enum
+{
     BARRIER_STAGE_START,
     BARRIER_STAGE_BASE_TREE_FANIN,
     BARRIER_STAGE_TOP_TREE_FANIN,
@@ -20,17 +21,18 @@ static ucc_status_t ucc_tl_shm_barrier_progress(ucc_coll_task_t *coll_task)
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
     ucc_rank_t         rank = UCC_TL_TEAM_RANK(team);
-    ucc_tl_shm_seg_t  *seg  = task->seg;
+    ucc_tl_shm_seg_t * seg  = task->seg;
     ucc_tl_shm_tree_t *tree = task->tree;
     ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
 
 next_stage:
-    switch(task->stage) {
+    switch (task->stage) {
     case BARRIER_STAGE_START:
         /* checks if previous collective has completed on the seg
            TODO: can be optimized if we detect barrier->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num, team, tree)) {
+        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num,
+                                                  team, tree)) {
             return UCC_INPROGRESS;
         }
         if (tree->base_tree) {
@@ -96,7 +98,7 @@ static ucc_status_t ucc_tl_shm_barrier_start(ucc_coll_task_t *coll_task)
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_barrier_start", 0);
     UCC_TL_SHM_SET_SEG_READY_SEQ_NUM(task, team);
     task->super.super.status = UCC_INPROGRESS;
-    status = task->super.progress(&task->super);
+    status                   = task->super.progress(&task->super);
 
     if (UCC_INPROGRESS == status) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -106,26 +108,24 @@ static ucc_status_t ucc_tl_shm_barrier_start(ucc_coll_task_t *coll_task)
 }
 
 ucc_status_t ucc_tl_shm_barrier_init(ucc_base_coll_args_t *coll_args,
-                                     ucc_base_team_t      *tl_team,
-                                     ucc_coll_task_t     **task_h)
+                                     ucc_base_team_t *     tl_team,
+                                     ucc_coll_task_t **    task_h)
 {
-	ucc_tl_shm_team_t *team = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
-	ucc_rank_t         base_radix =
-                           UCC_TL_SHM_TEAM_LIB(team)->cfg.barrier_base_radix;
-	ucc_rank_t         top_radix  =
-                           UCC_TL_SHM_TEAM_LIB(team)->cfg.barrier_top_radix;
-	ucc_rank_t         root = 0;
+    ucc_tl_shm_team_t *team = ucc_derived_of(tl_team, ucc_tl_shm_team_t);
+    ucc_rank_t base_radix   = UCC_TL_SHM_TEAM_LIB(team)->cfg.barrier_base_radix;
+    ucc_rank_t top_radix    = UCC_TL_SHM_TEAM_LIB(team)->cfg.barrier_top_radix;
+    ucc_rank_t root         = 0;
     ucc_tl_shm_task_t *task;
-	ucc_status_t       status;
+    ucc_status_t       status;
 
     task = ucc_tl_shm_get_task(coll_args, team);
     if (ucc_unlikely(!task)) {
         return UCC_ERR_NO_MEMORY;
     }
 
-    task->super.post      = ucc_tl_shm_barrier_start;
-    task->super.progress  = ucc_tl_shm_barrier_progress;
-    task->stage           = BARRIER_STAGE_START;
+    task->super.post     = ucc_tl_shm_barrier_start;
+    task->super.progress = ucc_tl_shm_barrier_progress;
+    task->stage          = BARRIER_STAGE_START;
 
     status = ucc_tl_shm_tree_init(team, root, base_radix, top_radix,
                                   &task->tree_in_cache, UCC_COLL_TYPE_REDUCE,
@@ -133,7 +133,7 @@ ucc_status_t ucc_tl_shm_barrier_init(ucc_base_coll_args_t *coll_args,
 
     if (ucc_unlikely(UCC_OK != status)) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to init shm tree");
-    	return status;
+        return status;
     }
     *task_h = &task->super;
     return UCC_OK;

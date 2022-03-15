@@ -11,6 +11,6 @@
 #include "components/mc/ucc_mc.h"
 
 ucc_status_t ucc_tl_shm_reduce_init(ucc_base_coll_args_t *coll_args,
-                                    ucc_base_team_t      *tl_team,
-                                    ucc_coll_task_t     **task_h);
+                                    ucc_base_team_t *     tl_team,
+                                    ucc_coll_task_t **    task_h);
 #endif

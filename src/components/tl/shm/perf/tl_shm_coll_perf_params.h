@@ -7,35 +7,30 @@
 #include "../tl_shm.h"
 #include "../tl_shm_coll.h"
 
-void
-ucc_tl_shm_perf_params_intel_broadwell_28_bcast(ucc_coll_task_t *coll_task);
+void ucc_tl_shm_perf_params_intel_broadwell_28_bcast(
+    ucc_coll_task_t *coll_task);
 
-void
-ucc_tl_shm_perf_params_intel_broadwell_14_bcast(ucc_coll_task_t *coll_task);
+void ucc_tl_shm_perf_params_intel_broadwell_14_bcast(
+    ucc_coll_task_t *coll_task);
 
-void
-ucc_tl_shm_perf_params_intel_broadwell_8_bcast(ucc_coll_task_t *coll_task);
+void ucc_tl_shm_perf_params_intel_broadwell_8_bcast(ucc_coll_task_t *coll_task);
 
-void
-ucc_tl_shm_perf_params_intel_skylake_40_bcast(ucc_coll_task_t *coll_task);
+void ucc_tl_shm_perf_params_intel_skylake_40_bcast(ucc_coll_task_t *coll_task);
 
-void
-ucc_tl_shm_perf_params_amd_rome_128_bcast(ucc_coll_task_t *coll_task);
+void ucc_tl_shm_perf_params_amd_rome_128_bcast(ucc_coll_task_t *coll_task);
 
-void
-ucc_tl_shm_perf_params_intel_broadwell_28_reduce(ucc_coll_task_t *coll_task);
+void ucc_tl_shm_perf_params_intel_broadwell_28_reduce(
+    ucc_coll_task_t *coll_task);
 
-void
-ucc_tl_shm_perf_params_intel_broadwell_14_reduce(ucc_coll_task_t *coll_task);
+void ucc_tl_shm_perf_params_intel_broadwell_14_reduce(
+    ucc_coll_task_t *coll_task);
 
-void
-ucc_tl_shm_perf_params_intel_broadwell_8_reduce(ucc_coll_task_t *coll_task);
+void ucc_tl_shm_perf_params_intel_broadwell_8_reduce(
+    ucc_coll_task_t *coll_task);
 
-void
-ucc_tl_shm_perf_params_intel_skylake_40_reduce(ucc_coll_task_t *coll_task);
+void ucc_tl_shm_perf_params_intel_skylake_40_reduce(ucc_coll_task_t *coll_task);
 
-void
-ucc_tl_shm_perf_params_amd_rome_128_reduce(ucc_coll_task_t *coll_task);
+void ucc_tl_shm_perf_params_amd_rome_128_reduce(ucc_coll_task_t *coll_task);
 
 static inline void
 ucc_tl_shm_perf_params_generic_bcast(ucc_coll_task_t *coll_task)
@@ -59,9 +54,9 @@ ucc_tl_shm_perf_params_generic_reduce(ucc_coll_task_t *coll_task)
 }
 
 static inline void
-ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *team,
-                                 ucc_tl_shm_perf_keys_t* perf_funcs_keys,
-                                 ucc_tl_shm_perf_funcs_t* perf_funcs_list)
+ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *      team,
+                                 ucc_tl_shm_perf_keys_t * perf_funcs_keys,
+                                 ucc_tl_shm_perf_funcs_t *perf_funcs_list)
 {
     size_t size = 0;
 
@@ -70,8 +65,7 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *team,
         .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
         .team_size   = 28,
         .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_28_bcast,
-        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_28_reduce
-    };
+        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_28_reduce};
     perf_funcs_keys[size] = intel_broadwell_28;
     size++;
 
@@ -80,8 +74,7 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *team,
         .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
         .team_size   = 14,
         .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_14_bcast,
-        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_14_reduce
-    };
+        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_14_reduce};
     perf_funcs_keys[size] = intel_broadwell_14;
     size++;
 
@@ -90,8 +83,7 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *team,
         .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
         .team_size   = 8,
         .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_8_bcast,
-        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_8_reduce
-    };
+        .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_8_reduce};
     perf_funcs_keys[size] = intel_broadwell_8;
     size++;
 
@@ -100,8 +92,7 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *team,
         .cpu_model   = UCC_CPU_MODEL_INTEL_SKYLAKE,
         .team_size   = 40,
         .bcast_func  = ucc_tl_shm_perf_params_intel_skylake_40_bcast,
-        .reduce_func = ucc_tl_shm_perf_params_intel_skylake_40_reduce
-    };
+        .reduce_func = ucc_tl_shm_perf_params_intel_skylake_40_reduce};
     perf_funcs_keys[size] = intel_skylake_40;
     size++;
 
@@ -110,8 +101,7 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *team,
         .cpu_model   = UCC_CPU_MODEL_AMD_ROME,
         .team_size   = 128,
         .bcast_func  = ucc_tl_shm_perf_params_amd_rome_128_bcast,
-        .reduce_func = ucc_tl_shm_perf_params_amd_rome_128_reduce
-    };
+        .reduce_func = ucc_tl_shm_perf_params_amd_rome_128_reduce};
     perf_funcs_keys[size] = amd_rome_128;
     size++;
 
