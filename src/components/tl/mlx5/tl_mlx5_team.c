@@ -180,7 +180,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
             shmctl(self->bcast_data.shmid, IPC_RMID, NULL);
         }
         self->bcast_data.net_size = self->net.sbgp->group_size;
-        tmpnam(self->bcast_data.sock_path); //TODO switch to mkstemp
     }
 
     self->state = TL_MLX5_TEAM_STATE_SHMID;

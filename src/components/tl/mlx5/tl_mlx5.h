@@ -189,7 +189,6 @@ typedef struct ucc_tl_mlx5_net {
 typedef struct ucc_tl_mlx5_bcast_data {
     int  shmid;
     int  net_size;
-    char sock_path[L_tmpnam];
 } ucc_tl_mlx5_bcast_data_t;
 
 enum {
