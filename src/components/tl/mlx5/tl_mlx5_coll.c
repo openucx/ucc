@@ -465,7 +465,6 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
     uintptr_t dm_addr;
 
     coll_task->super.status              = UCC_INPROGRESS;
-
     tl_debug(UCC_TASK_LIB(task), "send blocks start");
     rank = team->net.rank_map[team->net.sbgp->group_rank];
 
@@ -476,8 +475,6 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
             tl_mlx5_barrier_flag(task, cyc_rank) != task->seq_num) {
             continue;
         }
-
-        send_start(team, cyc_rank);
         //send all blocks from curr node to some ARR
         for (j = 0; j < task->num_of_blocks_columns; j++) {
             for (k = 0; k < task->num_of_blocks_columns; k++) {
@@ -508,6 +505,7 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
                 }
 
                 dm = ucc_mpool_get(&team->dm_pool);
+                send_start(team, cyc_rank);
                 while (!dm) {
                     status = send_done(team, cyc_rank);
                     if (UCC_OK != status) {
@@ -528,24 +526,32 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
                 }
                 dm->task = task;
                 //todo : start/end for RC ?
+
                 status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
-                                                    team->node.ops[task->seq_index].send_mkeys[0]->lkey,
+                                                    team->node.ops[task->seq_index].send_mkeys[j]->lkey,
                                                     team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,
-                                                    block_size, block_size);
+                                                    k < task->num_of_blocks_columns - 1 ? block_size : block_size_leftovers_side,
+                                                    j < task->num_of_blocks_columns - 1 ? block_size : block_size_leftovers_side);
                 if (UCC_OK != status) {
                     return status;
                 }
 
-                status = send_block_data(team, cyc_rank, src_addr, current_block_msgsize,
-                                         team->node.ops[task->seq_index].send_mkeys[j]->lkey,
-                                         remote_addr, team->net.rkeys[cyc_rank], 0, NULL);
+                status = send_block_data(team, cyc_rank, dm_addr, current_block_msgsize,
+                                         team->dm_mr->lkey,
+                                         remote_addr, team->net.rkeys[cyc_rank],
+                                         IBV_SEND_SIGNALED, dm);
                 if (status != UCC_OK) {
                     tl_error(UCC_TASK_LIB(task),
                              "Failed sending block [%d,%d,%d]", i, j, k);
                     return status;
                 }
+                status = send_done(team, cyc_rank);
+                if (UCC_OK != status) {
+                    return status;
+                }
             }
         }
+        send_start(team, cyc_rank);
         status = send_atomic(team, cyc_rank, tl_mlx5_atomic_addr(task, cyc_rank),
                              tl_mlx5_atomic_rkey(task, cyc_rank));
         if (UCC_OK == status) {

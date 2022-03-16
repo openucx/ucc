@@ -56,6 +56,7 @@ static inline void send_start(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 static inline ucc_status_t send_done(ucc_tl_mlx5_team_t *team, ucc_rank_t rank)
 {
     if (ibv_wr_complete(tl_mlx5_get_qp_ex(team, rank))) {
+        tl_error(UCC_TL_TEAM_LIB(team), "ibv_wr_complete failed, errno %d", errno);
         return UCC_ERR_NO_MESSAGE;
     }
     return UCC_OK;
@@ -84,10 +85,12 @@ static inline ucc_status_t send_atomic(ucc_tl_mlx5_team_t *team, ucc_rank_t rank
 static inline void *
 tl_mlx5_atomic_addr(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
 {
+    void               *remote_atomic = NULL;
+#if !ATOMIC_IN_MEMIC
     ucc_tl_mlx5_team_t *team = TASK_TEAM(task);
-    void               *remote_atomic;
 
     remote_atomic = team->net.remote_ctrl[rank].atomic.addr;
+#endif
     return PTR_OFFSET(remote_atomic, task->seq_index * sizeof(tl_mlx5_atomic_t));
 }
 
