@@ -114,14 +114,18 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     ucc_tl_mlx5_context_t *ctx = ucc_derived_of(context, ucc_tl_mlx5_context_t);
     ucc_context_t         *core_ctx = context->ucc_context;
     const char*            template = "/tmp/ucc.mlx5.XXXXXX";
+    const char*            sockname = "/sock";
+    size_t                 sock_dir_len = strlen(template) + 1;
+    size_t                 sock_path_len = sock_dir_len + strlen(sockname);
+    char                   sock_path[sock_path_len];
     ucc_subset_t           s;
     ucc_status_t           status;
     ucc_topo_t            *topo;
     ucc_sbgp_t            *sbgp;
     ucc_tl_team_t         *steam;
     ucc_coll_task_t       *req;
-    char                   sock_path[strlen(template)];
-    int                    sock, fd;
+
+    int                    sock;
 
     if (!core_ctx->service_team) {
         /*todo can be implemented using global OOB */
@@ -148,12 +152,12 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     }
 
     if (sbgp->group_rank == MLX5_ASR_RANK) {
-        ucc_strncpy_safe(sock_path, template, sizeof(sock_path));
-        fd = mkstemp(sock_path);
-        if (-1 == fd) {
+        ucc_strncpy_safe(sock_path, template, sock_dir_len);
+        if (NULL == mkdtemp(sock_path)) {
             tl_error(context->lib, "failed to create tmp file for socket path");
             sock_path[0]='\0';
         } else {
+            strncat(sock_path, sockname, strlen(sockname));
             status = ucc_tl_mlx5_asr_socket_init(ctx, sbgp->group_size,
                                                  &sock, sock_path);
             if (UCC_OK != status) {
@@ -190,7 +194,10 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
 
     status  = ucc_tl_mlx5_share_ctx_pd(ctx, sock_path, sbgp->group_size,
                                        sbgp->group_rank == MLX5_ASR_RANK, sock);
-    close(fd);
+    if (sbgp->group_rank == MLX5_ASR_RANK) {
+        sock_path[sock_dir_len - 1] = '\0';
+        rmdir(sock_path);
+    }
     if (status != UCC_OK) {
         tl_error(context->lib, "failed to share ctx and pd");
         goto out;
