@@ -459,7 +459,7 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
     int corner_msgsize = SQUARED(block_size_leftovers_side) * task->msg_size;
     int    dm_host             = UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_host;
     ucc_status_t status = UCC_OK;
-    int i, j, k, dest_rank, rank, cyc_rank, current_block_msgsize;
+    int i, j, k, dest_rank, rank, cyc_rank, current_block_msgsize, bs_x, bs_y;
     uint64_t     src_addr, remote_addr;
     ucc_tl_mlx5_dm_chunk_t *dm;
     uintptr_t dm_addr;
@@ -503,43 +503,51 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
                             ? block_msgsize_leftovers
                             : corner_msgsize;
                 }
+                bs_x = k < task->num_of_blocks_columns - 1 ? block_size : block_size_leftovers_side;
+                bs_y = j < task->num_of_blocks_columns - 1 ? block_size : block_size_leftovers_side;
 
-                dm = ucc_mpool_get(&team->dm_pool);
                 send_start(team, cyc_rank);
-                while (!dm) {
-                    status = send_done(team, cyc_rank);
-                    if (UCC_OK != status) {
-                        return status;
-                    }
 
-                    status = ucc_tl_mlx5_poll_cq(team, team->net.cq);
-                    if (UCC_OK != status) {
-                        return status;
-                    }
-                    dm = ucc_mpool_get(&team->dm_pool);
-                    send_start(team, cyc_rank);
-                }
-                if (dm_host) {
-                    dm_addr = (uintptr_t)PTR_OFFSET(team->dm_ptr, dm->offset);
-                } else {
-                    dm_addr = dm->offset; // dm reg mr 0 based
-                }
-                dm->task = task;
                 //todo : start/end for RC ?
+                if (bs_x == 1 || bs_y == 1) {
+                    status = send_block_data(team, cyc_rank, src_addr, current_block_msgsize,
+                                             team->node.ops[task->seq_index].send_mkeys[j]->lkey,
+                                             remote_addr, team->net.rkeys[cyc_rank], 0, NULL);
+                } else {
+                    dm = ucc_mpool_get(&team->dm_pool);
+                    while (!dm) {
+                        status = send_done(team, cyc_rank);
+                        if (UCC_OK != status) {
+                            return status;
+                        }
 
-                status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
-                                                    team->node.ops[task->seq_index].send_mkeys[j]->lkey,
-                                                    team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,
-                                                    k < task->num_of_blocks_columns - 1 ? block_size : block_size_leftovers_side,
-                                                    j < task->num_of_blocks_columns - 1 ? block_size : block_size_leftovers_side);
-                if (UCC_OK != status) {
-                    return status;
+                        status = ucc_tl_mlx5_poll_cq(team, team->net.cq);
+                        if (UCC_OK != status) {
+                            return status;
+                        }
+                        dm = ucc_mpool_get(&team->dm_pool);
+                        send_start(team, cyc_rank);
+                    }
+                    if (dm_host) {
+                        dm_addr = (uintptr_t)PTR_OFFSET(team->dm_ptr, dm->offset);
+                    } else {
+                        dm_addr = dm->offset; // dm reg mr 0 based
+                    }
+                    dm->task = task;
+
+                    status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
+                                                        team->node.ops[task->seq_index].send_mkeys[j]->lkey,
+                                                        team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,
+                                                        bs_x, bs_y);
+                    if (UCC_OK != status) {
+                        return status;
+                    }
+
+                    status = send_block_data(team, cyc_rank, dm_addr, current_block_msgsize,
+                                             team->dm_mr->lkey,
+                                             remote_addr, team->net.rkeys[cyc_rank],
+                                             IBV_SEND_SIGNALED, dm);
                 }
-
-                status = send_block_data(team, cyc_rank, dm_addr, current_block_msgsize,
-                                         team->dm_mr->lkey,
-                                         remote_addr, team->net.rkeys[cyc_rank],
-                                         IBV_SEND_SIGNALED, dm);
                 if (status != UCC_OK) {
                     tl_error(UCC_TASK_LIB(task),
                              "Failed sending block [%d,%d,%d]", i, j, k);
