@@ -51,13 +51,13 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
     size = UCC_TL_TEAM_SIZE(team);
     rank = UCC_TL_TEAM_RANK(team);
     if (!team->preconnect_task) {
-        team->preconnect_task = ucc_tl_ucp_get_task(team);
-        team->preconnect_task->tag = 0;
+        team->preconnect_task             = ucc_tl_ucp_get_task(team);
+        team->preconnect_task->tagged.tag = 0;
     }
     if (UCC_INPROGRESS == ucc_tl_ucp_test(team->preconnect_task)) {
         return UCC_INPROGRESS;
     }
-    for (i = team->preconnect_task->send_posted; i < size; i++) {
+    for (i = team->preconnect_task->tagged.send_posted; i < size; i++) {
         src = (rank - i + size) % size;
         dst = (rank + i) % size;
         status = ucc_tl_ucp_send_nb(NULL, 0, UCC_MEMORY_TYPE_UNKNOWN, src, team,

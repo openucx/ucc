@@ -103,7 +103,7 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
          it's parent's send.
         */
         if (rank != root && task->scatter_kn.recv_dist == p->radix_pow &&
-                                                      task->recv_posted == 0) {
+            task->tagged.recv_posted == 0) {
             for (loop_step = 1; loop_step < radix; loop_step++) {
                 peer = ucc_knomial_pattern_get_loop_peer(p, rank, size,
                                                              loop_step);
@@ -130,8 +130,9 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
          Each rank's send (besides leaf ranks) happens only after it's recieve
          from previous iteration has completed.
         */
-        if (root == rank || (task->recv_posted > 0 &&
-                             task->recv_posted == task->recv_completed)) {
+        if (root == rank ||
+            (task->tagged.recv_posted > 0 &&
+             task->tagged.recv_posted == task->tagged.recv_completed)) {
             for (loop_step = 1; loop_step < radix; loop_step++) {
                 peer = ucc_knomial_pattern_get_loop_peer(p, rank, size,
                                                              loop_step);

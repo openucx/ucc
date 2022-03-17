@@ -42,27 +42,31 @@ ucc_status_t ucc_tl_ucp_alltoall_pairwise_progress(ucc_coll_task_t *coll_task)
     nreqs     = (posts > gsize || posts == 0) ? gsize : posts;
     data_size = (size_t)(TASK_ARGS(task).src.info.count / gsize) *
                 ucc_dt_size(TASK_ARGS(task).src.info.datatype);
-    while ((task->send_posted < gsize || task->recv_posted < gsize) &&
+    while ((task->tagged.send_posted < gsize ||
+            task->tagged.recv_posted < gsize) &&
            (polls++ < task->n_polls)) {
         ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker);
-        while ((task->recv_posted < gsize) &&
-               ((task->recv_posted - task->recv_completed) < nreqs)) {
-            peer = get_recv_peer(grank, gsize, task->recv_posted);
+        while ((task->tagged.recv_posted < gsize) &&
+               ((task->tagged.recv_posted - task->tagged.recv_completed) <
+                nreqs)) {
+            peer = get_recv_peer(grank, gsize, task->tagged.recv_posted);
             UCPCHECK_GOTO(ucc_tl_ucp_recv_nb((void *)(rbuf + peer * data_size),
                                              data_size, rmem, peer, team, task),
                           task, out);
             polls = 0;
         }
-        while ((task->send_posted < gsize) &&
-               ((task->send_posted - task->send_completed) < nreqs)) {
-            peer = get_send_peer(grank, gsize, task->send_posted);
+        while ((task->tagged.send_posted < gsize) &&
+               ((task->tagged.send_posted - task->tagged.send_completed) <
+                nreqs)) {
+            peer = get_send_peer(grank, gsize, task->tagged.send_posted);
             UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(sbuf + peer * data_size),
                                              data_size, smem, peer, team, task),
                           task, out);
             polls = 0;
         }
     }
-    if ((task->send_posted < gsize) || (task->recv_posted < gsize)) {
+    if ((task->tagged.send_posted < gsize) ||
+        (task->tagged.recv_posted < gsize)) {
         return task->super.super.status;
     }
 

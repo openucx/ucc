@@ -120,7 +120,7 @@ UCC_KN_PHASE_EXTRA:
             return task->super.super.status;
         }
 
-        if (task->send_posted > p->iteration * (radix - 1)) {
+        if (task->tagged.send_posted > p->iteration * (radix - 1)) {
             if ((ucc_knomial_pattern_loop_first_iteration(p)) &&
                 (KN_NODE_PROXY != node_type) && !UCC_IS_INPLACE(*args)) {
                 send_buf = sbuf;
@@ -132,7 +132,7 @@ UCC_KN_PHASE_EXTRA:
                                  : ucc_knomial_pattern_loop_last_iteration(p));
             status = ucc_tl_ucp_reduce_multi(
                 send_buf, scratch, rbuf,
-                task->send_posted - p->iteration * (radix - 1), count,
+                task->tagged.send_posted - p->iteration * (radix - 1), count,
                 data_size, dt, mem_type, task, is_avg);
             if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");

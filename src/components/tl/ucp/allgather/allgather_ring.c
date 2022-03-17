@@ -35,8 +35,8 @@ ucc_status_t ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
     sendto   = ucc_ep_map_eval(task->subset.map, sendto);
     recvfrom = ucc_ep_map_eval(task->subset.map, recvfrom);
 
-    while (task->send_posted < group_size - 1) {
-        step = task->send_posted;
+    while (task->tagged.send_posted < group_size - 1) {
+        step = task->tagged.send_posted;
         buf  = (void *)((ptrdiff_t)rbuf +
                        ((group_rank - step + group_size) % group_size) *
                            data_size);

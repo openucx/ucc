@@ -30,8 +30,8 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return task->super.super.status;
     }
-    while (task->send_posted < gsize) {
-        send_idx = (grank - task->send_posted + 1 + gsize) % gsize;
+    while (task->tagged.send_posted < gsize) {
+        send_idx   = (grank - task->tagged.send_posted + 1 + gsize) % gsize;
         data_displ = ucc_coll_args_get_displacement(
                          args, args->dst.info_v.displacements, send_idx) *
                      rdt_size;
@@ -41,7 +41,7 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
         UCPCHECK_GOTO(ucc_tl_ucp_send_nb((void *)(rbuf + data_displ), data_size,
                                          rmem, sendto, team, task),
                       task, out);
-        recv_idx = (grank - task->recv_posted + gsize) % gsize;
+        recv_idx   = (grank - task->tagged.recv_posted + gsize) % gsize;
         data_displ = ucc_coll_args_get_displacement(
                          args, args->dst.info_v.displacements, recv_idx) *
                      rdt_size;
@@ -95,8 +95,8 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     } else {
         /* to simplify progress fucnction and make it identical for
            in-place and non in-place */
-        task->send_posted = task->recv_posted = 1;
-        task->send_completed = task->recv_completed = 1;
+        task->tagged.send_posted = task->tagged.recv_posted = 1;
+        task->tagged.send_completed = task->tagged.recv_completed = 1;
     }
 
     status = ucc_tl_ucp_allgatherv_ring_progress(&task->super);
