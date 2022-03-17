@@ -27,7 +27,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_mlx5_config->super,
                               params->context);
     memcpy(&self->cfg, tl_mlx5_config, sizeof(*tl_mlx5_config));
-
+    self->rcache    = NULL;
+    self->shared_pd = NULL;
 
     status = ucc_mpool_init(
         &self->req_mp, 0,
@@ -39,7 +40,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
                  "failed to initialize tl_mlx5_req mpool");
         goto err_mpool;
     }
-
 
     if (self->cfg.devices.count > 0) {
         ib_devname       = self->cfg.devices.names[0];
@@ -85,14 +85,19 @@ err_mpool:
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
 {
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    if (self->rcache) {
+        ucc_rcache_destroy(self->rcache);
+    }
 
-    ucc_rcache_destroy(self->rcache);
-    ucc_mpool_cleanup(&self->req_mp, 1);
-    ucc_tl_mlx5_remove_shared_ctx_pd(self);
+    if (self->shared_pd) {
+        ucc_tl_mlx5_remove_shared_ctx_pd(self);
+    }
 
     if (ibv_dealloc_pd(self->ib_pd)) {
         tl_error(self->super.super.lib, "failed to dealloc PD errno %d", errno);
     }
+
+    ucc_mpool_cleanup(&self->req_mp, 1);
     ibv_close_device(self->ib_ctx);
 }
 
@@ -127,12 +132,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
 
     int                    sock;
 
-    if (!core_ctx->service_team) {
-        /*todo can be implemented using global OOB */
-        tl_error(context->lib, "not supported yet");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
+    ucc_assert(core_ctx->service_team);
     ucc_assert(core_ctx->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB);
 
     s.map.type = UCC_EP_MAP_FULL;
