@@ -11,7 +11,9 @@ ucc_status_t ucc_tl_mlx5_create_ibv_ctx(char **               ib_devname,
 {
     struct ibv_device **       dev_list = ibv_get_device_list(NULL);
     struct mlx5dv_context_attr attr     = {};
+    ucc_status_t               status   = UCC_OK;
     struct ibv_device *        ib_dev;
+
 
     if (!(*ib_devname)) {
         /* If no device was specified by name, use by default the first
@@ -19,7 +21,8 @@ ucc_status_t ucc_tl_mlx5_create_ibv_ctx(char **               ib_devname,
         ib_dev = *dev_list;
         if (!ib_dev) {
             tl_error(lib,"No IB devices found");
-            return UCC_ERR_NO_MESSAGE;
+            status = UCC_ERR_NO_MESSAGE;
+            goto err;
         }
         *ib_devname = (char *)ibv_get_device_name(ib_dev);
     } else {
@@ -30,7 +33,8 @@ ucc_status_t ucc_tl_mlx5_create_ibv_ctx(char **               ib_devname,
         ib_dev = dev_list[i];
         if (!ib_dev) {
             tl_error(lib,"IB device %s not found", *ib_devname);
-            return UCC_ERR_NO_MESSAGE;
+            status = UCC_ERR_NO_MESSAGE;
+            goto err;
         }
     }
 
@@ -39,7 +43,11 @@ ucc_status_t ucc_tl_mlx5_create_ibv_ctx(char **               ib_devname,
 
     attr.flags = MLX5DV_CONTEXT_FLAGS_DEVX;
     *ctx       = mlx5dv_open_device(ib_dev, &attr);
-    return UCC_OK;
+err:
+    if (dev_list) {
+        ibv_free_device_list(dev_list);
+    }
+    return status;
 }
 
 int ucc_tl_mlx5_check_port_active(struct ibv_context *ctx, int port_num)
