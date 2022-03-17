@@ -22,7 +22,7 @@ static inline void send_completion_common(void *request, ucs_status_t status,
                  ucs_status_string(status));
         task->super.super.status = ucs_status_to_ucc_status(status);
     }
-    task->send_completed++;
+    task->tagged.send_completed++;
     if (request) {
         ucp_request_free(request);
     }
@@ -92,8 +92,8 @@ static inline ucc_status_t ucc_tl_ucp_test_ring(ucc_tl_ucp_task_t *task)
 {
     int polls = 0;
     while (polls++ < task->n_polls) {
-        if (task->send_posted - task->send_completed <= 1 &&
-            task->recv_posted == task->recv_completed) {
+        if (task->tagged.send_posted - task->tagged.send_completed <= 1 &&
+            task->tagged.recv_posted == task->tagged.recv_completed) {
             return UCC_OK;
         }
         ucp_worker_progress(TASK_CTX(task)->ucp_worker);
@@ -141,28 +141,28 @@ ucc_tl_ucp_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
     if (UCC_INPROGRESS == ucc_tl_ucp_test_ring(task)) {
         return task->super.super.status;
     }
-    while (task->recv_posted > 0) {
+    while (task->tagged.recv_posted > 0) {
         /* always have at least 1 send completion, ie 1 free slot */
         ucc_assert(!busy[0] || !busy[1]);
         id            = busy[0] ? 1 : 0;
         reduce_target = s_scratch[id];
-        step          = task->send_posted;
+        step          = task->tagged.send_posted;
         prevblock     = (rank - 1 - step + size) % size;
         prevblock =
             ucc_ep_map_eval(task->reduce_scatterv_ring.inv_map, prevblock);
         /* reduction */
-        ucc_assert(task->recv_posted == task->recv_completed);
-        ucc_assert(task->recv_posted < size);
+        ucc_assert(task->tagged.recv_posted == task->tagged.recv_completed);
+        ucc_assert(task->tagged.recv_posted < size);
 
         ucc_ring_frag_count(task, prevblock, &frag_count);
         ucc_ring_frag_block_offset(task, prevblock, &block_offset,
                                    &frag_offset);
-        if (task->recv_completed == size - 1) {
+        if (task->tagged.recv_completed == size - 1) {
             reduce_target = PTR_OFFSET(args->dst.info_v.buffer,
                                        (frag_offset + final_offset) * dt_size);
         }
         is_avg =
-            (args->op == UCC_OP_AVG) && (task->recv_completed == (size - 1));
+            (args->op == UCC_OP_AVG) && (task->tagged.recv_completed == (size - 1));
         if (UCC_OK !=
             (status = ucc_tl_ucp_reduce_multi(
                  r_scratch,
@@ -173,12 +173,12 @@ ucc_tl_ucp_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
             task->super.super.status = status;
             return status;
         }
-        if (task->recv_completed == size - 1) {
-            task->recv_posted = task->recv_completed = 0;
+        if (task->tagged.recv_completed == size - 1) {
+            task->tagged.recv_posted = task->tagged.recv_completed = 0;
             break;
         }
-        ucc_assert(task->send_posted - task->send_completed <= 1);
-        ucc_assert(task->send_posted < size);
+        ucc_assert(task->tagged.send_posted - task->tagged.send_completed <= 1);
+        ucc_assert(task->tagged.send_posted < size);
 
         busy[id] = 1;
         UCPCHECK_GOTO(ucc_tl_ucp_send_cb(reduce_target, frag_count * dt_size,
