@@ -50,8 +50,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
         ib_devname       = tmp;
         port             = atoi(pos + 1);
     }
-    if (UCC_OK != ucc_tl_mlx5_create_ibv_ctx(&ib_devname, &self->ib_ctx,
-                                             self->super.super.lib)) {
+    status = ucc_tl_mlx5_create_ibv_ctx(&ib_devname, &self->ib_ctx,
+                                        self->super.super.lib);
+    if (UCC_OK != status) {
         tl_error(self->super.super.lib, "failed to allocate ibv_context");
         goto release_mpool;
     }
@@ -60,6 +61,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
     }
     self->ib_port = port;
     if (-1 == port || !ucc_tl_mlx5_check_port_active(self->ib_ctx, port)) {
+        status = UCC_ERR_NO_RESOURCE;
         tl_error(self->super.super.lib, "no active ports found on %s",
                  ib_devname);
         goto destroy_context;
@@ -68,6 +70,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
 
     self->ib_pd = ibv_alloc_pd(self->ib_ctx); // TODO only ASR
     if (!self->ib_pd) {
+        status = UCC_ERR_NO_RESOURCE;
         tl_error(self->super.super.lib, "failed to allocate ib_pd");
         goto destroy_context;
     }
