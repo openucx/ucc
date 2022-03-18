@@ -143,7 +143,7 @@ ucc_status_t ucc_tl_ucp_service_bcast(ucc_base_team_t *team, void *buf,
         goto free_task;
     }
     task->subset         = subset;
-    task->tag            = UCC_TL_UCP_SERVICE_TAG;
+    task->tagged.tag     = UCC_TL_UCP_SERVICE_TAG;
     task->n_polls        = UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.oob_npolls;
     task->super.progress = ucc_tl_ucp_bcast_knomial_progress;
     task->super.finalize = ucc_tl_ucp_coll_finalize;
