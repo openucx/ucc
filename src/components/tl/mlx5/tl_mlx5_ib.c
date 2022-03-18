@@ -162,11 +162,11 @@ ucc_status_t ucc_tl_mlx5_init_dc_qps_and_connect(ucc_tl_mlx5_team_t *team,
     attr_ex.recv_cq = team->net.cq;
     attr_ex.pd      = ctx->shared_pd;
     /* Max number of send wrs per QP:
-       max_number of blocks + 1 for atomic + 1 for barrier + 1 for transpose
+       max_number of blocks * 2 (1 send + 1 atomic) + 1 for atomic + 1 for barrier
        TODO: check for leftovers case ??
     */
     attr_ex.cap.max_send_wr =
-        (SQUARED(team->node.sbgp->group_size / 2 + 1) + 3) * MAX_OUTSTANDING_OPS *
+        (SQUARED(team->node.sbgp->group_size / 2 + 1)*2 + 2) * MAX_OUTSTANDING_OPS *
 		ucc_div_round_up(team->net.net_size, team->num_dci_qps);
     attr_ex.cap.max_send_sge = 1;
     attr_ex.comp_mask |= IBV_QP_INIT_ATTR_SEND_OPS_FLAGS | IBV_QP_INIT_ATTR_PD;
@@ -329,11 +329,11 @@ ucc_status_t ucc_tl_mlx5_create_rc_qps(ucc_tl_mlx5_team_t *team,
     attr_ex.recv_cq = team->net.cq;
     attr_ex.pd      = ctx->shared_pd;
     /* Max number of send wrs per QP:
-       max_number of blocks + 1 for atomic + 1 for barrier + 1 for transpose
+       max_number of blocks * 2 (1 send + 1 transpose) + 1 for atomic + 1 for barrier
        TODO: check for leftovers case ??
     */
     attr_ex.cap.max_send_wr =
-        (SQUARED(team->node.sbgp->group_size / 2 + 1) + 3) * MAX_OUTSTANDING_OPS;
+        (SQUARED(team->node.sbgp->group_size / 2 + 1)*2 + 2) * MAX_OUTSTANDING_OPS;
     attr_ex.cap.max_send_sge = 1;
     attr_ex.comp_mask |= IBV_QP_INIT_ATTR_SEND_OPS_FLAGS | IBV_QP_INIT_ATTR_PD;
     attr_ex.send_ops_flags = IBV_QP_EX_WITH_RDMA_WRITE |
