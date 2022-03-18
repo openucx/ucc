@@ -123,9 +123,11 @@ ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
 {
     ucc_schedule_t *self = ucc_container_of(task, ucc_schedule_t, super);
 
+    // TODO: do we need lock here?
+    // if tasks in schedule are independet and completes concurently
     self->n_completed_tasks += 1;
     if (self->n_completed_tasks == self->n_tasks) {
-        self->super.super.status = UCC_OK;
+        self->super.status = UCC_OK;
         ucc_task_complete(&self->super);
     }
     return UCC_OK;
@@ -158,6 +160,7 @@ void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule)
 {
     schedule->n_completed_tasks  = 0;
+    schedule->super.status       = UCC_INPROGRESS;
     schedule->super.super.status = UCC_INPROGRESS;
     return ucc_event_manager_notify(&schedule->super,
                                     UCC_EVENT_SCHEDULE_STARTED);

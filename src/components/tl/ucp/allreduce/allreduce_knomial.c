@@ -17,7 +17,7 @@
         task->allreduce_kn.phase = _phase;                                     \
     } while (0)
 
-ucc_status_t ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t       *args = &TASK_ARGS(task);
@@ -69,7 +69,7 @@ UCC_KN_PHASE_EXTRA:
     if (KN_NODE_PROXY == node_type || KN_NODE_EXTRA == node_type) {
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             SAVE_STATE(UCC_KN_PHASE_EXTRA);
-            return task->super.super.status;
+            return;
         }
         if (KN_NODE_EXTRA == node_type) {
             goto completion;
@@ -78,8 +78,7 @@ UCC_KN_PHASE_EXTRA:
                              (status = ucc_dt_reduce(sbuf, scratch, rbuf, count,
                                                      dt, mem_type, args)))) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
-                task->super.super.status = status;
-                return status;
+                task->super.status = status;
             }
         }
     }
@@ -117,7 +116,7 @@ UCC_KN_PHASE_EXTRA:
     UCC_KN_PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             SAVE_STATE(UCC_KN_PHASE_LOOP);
-            return task->super.super.status;
+            return;
         }
 
         if (task->tagged.send_posted > p->iteration * (radix - 1)) {
@@ -136,8 +135,8 @@ UCC_KN_PHASE_EXTRA:
                 data_size, dt, mem_type, task, is_avg);
             if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
-                task->super.super.status = status;
-                return status;
+                task->super.status = status;
+                return;
             }
         }
         ucc_knomial_pattern_next_iteration(p);
@@ -156,15 +155,15 @@ UCC_KN_PHASE_EXTRA:
 UCC_KN_PHASE_PROXY:
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         SAVE_STATE(UCC_KN_PHASE_PROXY);
-        return task->super.super.status;
+        return;
     }
 
 completion:
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
-    task->super.super.status = UCC_OK;
+    task->super.status = UCC_OK;
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_kn_done", 0);
 out:
-    return task->super.super.status;
+    return;
 }
 
 ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
@@ -173,7 +172,6 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
     ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
     ucc_rank_t         rank      = task->subset.myrank;
-    ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_kn_start", 0);
     task->allreduce_kn.phase = UCC_KN_PHASE_INIT;
@@ -184,14 +182,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
                              ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
                                      cfg.allreduce_kn_radix, size),
                              &task->allreduce_kn.p);
-    ucc_tl_ucp_task_reset(task);
-    task->super.super.status = UCC_INPROGRESS;
-    status = ucc_tl_ucp_allreduce_knomial_progress(&task->super);
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)

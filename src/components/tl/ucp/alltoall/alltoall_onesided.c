@@ -11,7 +11,7 @@
 #include "utils/ucc_math.h"
 #include "tl_ucp_sendrecv.h"
 
-ucc_status_t ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask);
+void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask);
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
 {
@@ -25,8 +25,8 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
     ucc_rank_t         start  = (grank + 1) % gsize;
     long *             pSync  = TASK_ARGS(task).global_work_buffer;
     ucc_rank_t         peer;
-    ucc_status_t       status;
 
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     /* TODO: change when support for library-based work buffers is complete */
     nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
     dest   = dest + grank * nelems;
@@ -43,33 +43,24 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
                       out);
     }
 
-    task->super.super.status = UCC_INPROGRESS;
-    status = ucc_tl_ucp_alltoall_onesided_progress(&task->super);
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    task->super.super.status = status;
-    ucc_task_complete(ctask);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 out:
-    return task->super.super.status;
+    return task->super.status;
 }
 
-ucc_status_t ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
+void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
 {
     ucc_tl_ucp_task_t *task  = ucc_derived_of(ctask, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
     ucc_rank_t         gsize = UCC_TL_TEAM_SIZE(team);
     long *             pSync = TASK_ARGS(task).global_work_buffer;
 
-    if (*pSync < gsize ||
-        task->onesided.put_completed < task->onesided.put_posted) {
+    if ((*pSync < gsize) ||
+        (task->onesided.put_completed < task->onesided.put_posted)) {
         ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker);
-        return UCC_INPROGRESS;
+        return;
     }
 
-    pSync[0]                 = 0;
-    task->super.super.status = UCC_OK;
-    ucc_task_complete(ctask);
-    return task->super.super.status;
+    pSync[0]           = 0;
+    task->super.status = UCC_OK;
 }

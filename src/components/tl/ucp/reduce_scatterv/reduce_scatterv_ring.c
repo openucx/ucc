@@ -20,7 +20,7 @@ static inline void send_completion_common(void *request, ucs_status_t status,
     if (ucc_unlikely(UCS_OK != status)) {
         tl_error(UCC_TASK_LIB(task), "failure in rs ring completion %s",
                  ucs_status_string(status));
-        task->super.super.status = ucs_status_to_ucc_status(status);
+        task->super.status = ucs_status_to_ucc_status(status);
     }
     task->tagged.send_completed++;
     if (request) {
@@ -101,8 +101,7 @@ static inline ucc_status_t ucc_tl_ucp_test_ring(ucc_tl_ucp_task_t *task)
     return UCC_INPROGRESS;
 }
 
-static ucc_status_t
-ucc_tl_ucp_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
+static void ucc_tl_ucp_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *     task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t *       args = &TASK_ARGS(task);
@@ -139,7 +138,7 @@ ucc_tl_ucp_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
     s_scratch[1]   = PTR_OFFSET(s_scratch[0], max_block_size);
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test_ring(task)) {
-        return task->super.super.status;
+        return;
     }
     while (task->tagged.recv_posted > 0) {
         /* always have at least 1 send completion, ie 1 free slot */
@@ -170,8 +169,8 @@ ucc_tl_ucp_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
                  reduce_target, 1, frag_count, 0, dt, mem_type, task,
                  is_avg))) {
             tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
-            task->super.super.status = status;
-            return status;
+            task->super.status = status;
+            return;
         }
         if (task->tagged.recv_completed == size - 1) {
             task->tagged.recv_posted = task->tagged.recv_completed = 0;
@@ -196,15 +195,15 @@ ucc_tl_ucp_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
                       task, out);
 
         if (UCC_INPROGRESS == ucc_tl_ucp_test_ring(task)) {
-            return task->super.super.status;
+            return;
         }
     }
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-        return task->super.super.status;
+        return;
     }
-    task->super.super.status = UCC_OK;
+    task->super.status = UCC_OK;
 out:
-    return task->super.super.status;
+    return;
 }
 
 static ucc_status_t
@@ -222,17 +221,14 @@ ucc_tl_ucp_reduce_scatterv_ring_start(ucc_coll_task_t *coll_task)
     ucc_memory_type_t  mem_type = args->dst.info_v.mem_type;
     void *             sbuf     = args->src.info.buffer;
     int                step     = 0;
-    ucc_status_t       status;
     size_t             block_offset, frag_count, frag_offset;
     void *             r_scratch;
     ucc_rank_t         send_block, recv_block;
 
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     if (UCC_IS_INPLACE(*args)) {
         sbuf = args->dst.info_v.buffer;
     }
-
-    task->super.super.status = UCC_INPROGRESS;
-    ucc_tl_ucp_task_reset(task);
 
     sendto     = ucc_ep_map_eval(task->reduce_scatterv_ring.inv_map, sendto);
     recvfrom   = ucc_ep_map_eval(task->reduce_scatterv_ring.inv_map, recvfrom);
@@ -256,14 +252,9 @@ ucc_tl_ucp_reduce_scatterv_ring_start(ucc_coll_task_t *coll_task)
                       frag_count * dt_size, mem_type, sendto, team, task),
                   task, out);
 
-    status = ucc_tl_ucp_reduce_scatterv_ring_progress(&task->super);
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 out:
-    return task->super.super.status;
+    return task->super.status;
 }
 
 static ucc_status_t

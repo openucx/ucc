@@ -39,16 +39,14 @@ UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_tlcp_ucp_example_cfg_entry,
                                 &ucc_config_global_list);
 
 #define UCC_TLCP_UCP_EXAMPLE_SCORE 100
-ucc_status_t ucc_tlcp_ucp_example_progress(ucc_coll_task_t *coll_task)
+void ucc_tlcp_ucp_example_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
 
     tl_info(TASK_LIB(task), "completing tl_ucp_example coll task");
 
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
-    task->super.super.status = UCC_OK;
-
-    return task->super.super.status;
+    task->super.status = UCC_OK;
 }
 
 ucc_status_t ucc_tlcp_ucp_example_start(ucc_coll_task_t *coll_task)
@@ -58,7 +56,7 @@ ucc_status_t ucc_tlcp_ucp_example_start(ucc_coll_task_t *coll_task)
 
     tl_info(TASK_LIB(task), "starting tl_ucp_example coll task");
 
-    task->super.super.status = UCC_INPROGRESS;
+    task->super.status = UCC_INPROGRESS;
     ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 
     return UCC_OK;

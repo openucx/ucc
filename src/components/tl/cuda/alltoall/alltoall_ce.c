@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -188,7 +188,7 @@ exit:
 
 }
 
-ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
@@ -199,26 +199,26 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
     {
     case ALLTOALL_CE_STAGE_SYNC:
         if (ucc_tl_cuda_get_sync(task) != UCC_OK) {
-            task->super.super.status = UCC_INPROGRESS;
-            return task->super.super.status;
+            task->super.status = UCC_INPROGRESS;
+            return;
         }
         status = ucc_tl_cuda_alltoall_setup_start(task);
         if (status != UCC_OK) {
-            task->super.super.status = status;
-            return task->super.super.status;
+            task->super.status = status;
+            return;
         }
         task->alltoall_ce.stage = ALLTOALL_CE_STAGE_SETUP;
     case ALLTOALL_CE_STAGE_SETUP:
         status =  ucc_tl_cuda_alltoall_setup_test(task);
         if (status != UCC_OK) {
-            task->super.super.status = status;
-            return task->super.super.status;
+            task->super.status = status;
+            return;
         }
     case ALLTOALL_CE_STAGE_POST_COPIES:
         status = ucc_tl_cuda_alltoall_ce_post_copies(task);
         if (ucc_unlikely(status != UCC_OK)) {
-            task->super.super.status = status;
-            return task->super.super.status;
+            task->super.status = status;
+            return;
         }
         task->alltoall_ce.stage = ALLTOALL_CE_STAGE_COPY;
     case ALLTOALL_CE_STAGE_COPY:
@@ -228,26 +228,26 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
                 if (status == UCC_OPERATION_INITIALIZED) {
                     status = UCC_INPROGRESS;
                 }
-                task->super.super.status = status;
-                return task->super.super.status;
+                task->super.status = status;
+                return;
             }
         }
-        status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
+        status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team),
+                                               task->bar);
         if (ucc_unlikely(status != UCC_OK)) {
-            task->super.super.status = status;
-            return task->super.super.status;
+            task->super.status = status;
+            return;
         }
         task->alltoall_ce.stage = ALLTOALL_CE_STAGE_BAR;
     default:
         ucc_assert(task->alltoall_ce.stage == ALLTOALL_CE_STAGE_BAR);
         break;
     }
-    task->super.super.status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team),
-                                                            task->bar);
-    if (task->super.super.status == UCC_OK) {
+    task->super.status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team),
+                                                      task->bar);
+    if (task->super.status == UCC_OK) {
         ucc_tl_cuda_put_sync(task);
     }
-    return task->super.super.status;
 }
 
 ucc_status_t ucc_tl_cuda_alltoall_ce_start(ucc_coll_task_t *coll_task)
@@ -258,12 +258,7 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_start(ucc_coll_task_t *coll_task)
     if (task->alltoall_ce.stage != ALLTOALL_CE_STAGE_POST_COPIES) {
         task->alltoall_ce.stage = ALLTOALL_CE_STAGE_SYNC;
     }
-    ucc_tl_cuda_alltoall_ce_progress(coll_task);
-    if (task->super.super.status == UCC_INPROGRESS) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 ucc_status_t ucc_tl_cuda_alltoall_ce_triggered_post_setup(ucc_coll_task_t *coll_task)

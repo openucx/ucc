@@ -15,7 +15,7 @@
         task->reduce_kn.phase = _phase;                                        \
     } while (0)
 
-ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task       = ucc_derived_of(coll_task,
                                                    ucc_tl_ucp_task_t);
@@ -54,7 +54,7 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *coll_task)
 
 UCC_REDUCE_KN_PHASE_PROGRESS:
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-        return task->super.super.status;
+        return;
     }
 
     UCC_REDUCE_KN_GOTO_PHASE(task->reduce_kn.phase);
@@ -98,8 +98,8 @@ UCC_REDUCE_KN_PHASE_MULTI:
                     if (ucc_unlikely(UCC_OK != status)) {
                         tl_error(UCC_TASK_LIB(task),
                                  "failed to perform dt reduction");
-                        task->super.super.status = status;
-                        return status;
+                        task->super.status = status;
+                        return;
                     }
                 }
             } else {
@@ -116,29 +116,26 @@ UCC_REDUCE_KN_PHASE_MULTI:
     }
 
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
-    task->super.super.status = UCC_OK;
+    task->super.status = UCC_OK;
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_kn_done", 0);
 out:
-    return task->super.super.status;
+    return;
 }
 
 ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task      =
-        ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args      = &TASK_ARGS(task);
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    uint32_t           radix     = task->reduce_kn.radix;
-    ucc_rank_t         root      = (ucc_rank_t)args->root;
-    ucc_rank_t         rank       = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t         size       = UCC_TL_TEAM_SIZE(team);
-    ucc_rank_t         vrank     = (rank - root + size) % size;
-    int                isleaf    =
-        (vrank % radix != 0 || vrank == size - 1);
-    ucc_status_t       status;
+    ucc_tl_ucp_task_t *task   = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_coll_args_t   *args   = &TASK_ARGS(task);
+    ucc_tl_ucp_team_t *team   = TASK_TEAM(task);
+    uint32_t           radix  = task->reduce_kn.radix;
+    ucc_rank_t         root   = (ucc_rank_t)args->root;
+    ucc_rank_t         rank   = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         size   = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t         vrank  = (rank - root + size) % size;
+    int                isleaf = ((vrank % radix != 0) || (vrank == size - 1));
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_kn_start", 0);
-    ucc_tl_ucp_task_reset(task);
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     if (UCC_IS_INPLACE(*args) && (rank == root)) {
         args->src.info.buffer = args->dst.info.buffer;
@@ -151,12 +148,7 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
     task->reduce_kn.dist = 1;
     task->reduce_kn.phase = UCC_REDUCE_KN_PHASE_INIT;
 
-    status = ucc_tl_ucp_reduce_knomial_progress(&task->super);
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 ucc_status_t ucc_tl_ucp_reduce_knomial_finalize(ucc_coll_task_t *coll_task)

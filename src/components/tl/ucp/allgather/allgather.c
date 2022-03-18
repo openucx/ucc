@@ -7,9 +7,6 @@
 #include "tl_ucp.h"
 #include "allgather.h"
 
-ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *task);
-ucc_status_t ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *task);
-
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task)
 {
     if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info.datatype)) ||
