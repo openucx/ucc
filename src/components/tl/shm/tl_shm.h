@@ -9,6 +9,7 @@
 
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
+#include "utils/ucc_coll_utils.h"
 #include "utils/ucc_mpool.h"
 #include "utils/ucc_math.h"
 #include "utils/arch/cpu.h"
@@ -58,7 +59,7 @@ extern ucc_tl_shm_iface_t ucc_tl_shm;
 
 typedef struct ucc_tl_shm_lib_config {
     ucc_tl_lib_config_t             super;
-    uint32_t                        n_concurrent;
+    uint32_t                        max_concurrent;
     uint32_t                        data_size;
     uint32_t                        ctrl_size;
     uint32_t                        bcast_base_radix;

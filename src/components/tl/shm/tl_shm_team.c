@@ -76,7 +76,8 @@ static ucc_rank_t ucc_tl_shm_team_rank_to_group_rank(ucc_tl_shm_team_t *team,
 static ucc_status_t ucc_tl_shm_group_rank_map_init(ucc_tl_shm_team_t *team)
 {
     ucc_rank_t  team_size = UCC_TL_TEAM_SIZE(team);
-    ucc_rank_t *ranks = (ucc_rank_t *)ucc_malloc(team_size * sizeof(*ranks));
+    ucc_rank_t *ranks = (ucc_rank_t *)ucc_malloc(team_size * sizeof(*ranks)); /* NOLINT to supress clang_tidy check of team size == 0, already checked in core */
+
     ucc_rank_t  i;
 
     if (!ranks) {
@@ -118,6 +119,7 @@ static inline ucc_status_t ucc_tl_shm_set_perf_funcs(ucc_tl_shm_team_t *team)
         tl_error(team->super.super.context->lib,
                  "failed to allocate %zd bytes for perf_funcs_list",
                  max_size * sizeof(ucc_tl_shm_perf_funcs_t));
+        ucc_free(perf_funcs_keys);
         return UCC_ERR_NO_MEMORY;
     }
 
@@ -222,15 +224,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
 	 * local context mode */
         return UCC_ERR_NOT_SUPPORTED;
     }
+
     subset.map    = UCC_TL_TEAM_MAP(self);
     subset.myrank = UCC_TL_TEAM_RANK(self);
     team_size     = UCC_TL_TEAM_SIZE(self);
     cfg_ctrl_size = UCC_TL_SHM_TEAM_LIB(self)->cfg.ctrl_size;
 
-    self->seq_num      = UCC_TL_SHM_TEAM_LIB(self)->cfg.n_concurrent;
+    self->seq_num      = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_concurrent;
     self->status       = UCC_INPROGRESS;
     self->shm_buffer   = NULL;
-    self->n_concurrent = UCC_TL_SHM_TEAM_LIB(self)->cfg.n_concurrent;
+    self->n_concurrent = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_concurrent;
     self->data_size    = UCC_TL_SHM_TEAM_LIB(self)->cfg.data_size * team_size;
     self->max_inline   = cfg_ctrl_size - ucc_offsetof(ucc_tl_shm_ctrl_t, data);
 
@@ -534,7 +537,7 @@ ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t *  tl_team,
 
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
-            ctx->score_str, score, UCC_TL_TEAM_SIZE(team), ucc_tl_shm_coll_init,
+            ctx->score_str, score, UCC_TL_TEAM_SIZE(team), NULL,
             tl_team, UCC_TL_SHM_DEFAULT_SCORE, NULL);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */

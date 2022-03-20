@@ -8,7 +8,6 @@
 #include "tl_shm_coll.h"
 #include "core/ucc_ee.h"
 #include "utils/ucc_math.h"
-#include "utils/ucc_coll_utils.h"
 
 ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task)
 {
@@ -69,20 +68,19 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team, ucc_rank_t root,
                                   int                 base_tree_only,
                                   ucc_tl_shm_tree_t **tree_p)
 {
-    ucc_kn_tree_t *    base_tree, *top_tree;
-    ucc_tl_shm_tree_t *shm_tree;
+    ucc_sbgp_t        *sbgp         = &team->base_groups[team->my_group_id];
+    ucc_rank_t         team_rank    = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         group_size   = base_tree_only ? UCC_TL_TEAM_SIZE(team) :
+                               team->base_groups[team->my_group_id].group_size;
+    ucc_rank_t         leaders_size = team->leaders_group->group_size;
+    ucc_rank_t         root_group   = ucc_ep_map_eval(team->rank_group_id_map,
+                                                      root);
     ucc_rank_t         tree_root, rank, local_rank;
     ucc_rank_t         leader_rank, leader_group_id;
+    ucc_kn_tree_t     *base_tree, *top_tree;
+    ucc_tl_shm_tree_t *shm_tree;
     size_t             top_tree_size, base_tree_size;
     int                i;
-
-    ucc_rank_t team_rank = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t group_size =
-        base_tree_only ? UCC_TL_TEAM_SIZE(team)
-                       : team->base_groups[team->my_group_id].group_size;
-    ucc_rank_t  leaders_size = team->leaders_group->group_size;
-    ucc_rank_t  root_group   = ucc_ep_map_eval(team->rank_group_id_map, root);
-    ucc_sbgp_t *sbgp         = &team->base_groups[team->my_group_id];
 
     ucc_tl_shm_tree_cache_key_t key = {.base_radix     = base_radix,
                                        .top_radix      = top_radix,
@@ -95,18 +93,23 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team, ucc_rank_t root,
         return UCC_OK;
     }
 
-    shm_tree       = (ucc_tl_shm_tree_t *)ucc_malloc(sizeof(ucc_tl_shm_tree_t));
-    base_tree_size = ucc_tl_shm_kn_tree_size(group_size, base_radix);
-    base_tree      = (ucc_kn_tree_t *)ucc_malloc(base_tree_size, "base_tree");
+    shm_tree  = (ucc_tl_shm_tree_t *)ucc_malloc(sizeof(ucc_tl_shm_tree_t));
+
+    if (!shm_tree) {
+        return UCC_ERR_NO_MEMORY;
+    }
+
     shm_tree->base_tree = NULL;
     shm_tree->top_tree  = NULL;
+    base_tree_size      = ucc_tl_shm_kn_tree_size(group_size, base_radix);
+    base_tree           = (ucc_kn_tree_t *)ucc_malloc(base_tree_size, "base_tree");
 
     if (!base_tree) {
+        ucc_free(shm_tree);
         return UCC_ERR_NO_MEMORY;
     }
 
     if (base_tree_only) {
-        leaders_size = 0;
         ucc_tl_shm_kn_tree_init(group_size, root, team_rank, base_radix,
                                 coll_type, base_tree);
         shm_tree->base_tree = base_tree;
@@ -120,6 +123,7 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team, ucc_rank_t root,
 
     if (!top_tree) {
         ucc_free(base_tree);
+        ucc_free(shm_tree);
         return UCC_ERR_NO_MEMORY;
     }
 
@@ -145,7 +149,10 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team, ucc_rank_t root,
         /* Convert the tree to origin TL/TEAM ranks from the BASE_GROUP ranks*/
         ucc_tl_shm_tree_to_team_ranks(base_tree,
                                       team->base_groups[team->my_group_id].map);
+    } else {
+        ucc_free(base_tree);
     }
+
     if (leaders_size > 1) {
         if (team_rank == root ||
             (root_group != team->my_group_id &&
@@ -197,6 +204,11 @@ ucc_status_t ucc_tl_shm_tree_init(ucc_tl_shm_team_t *team, ucc_rank_t root,
             shm_tree->top_tree = top_tree;
         }
     }
+
+    if (shm_tree->top_tree == NULL) {
+        ucc_free(top_tree);
+    }
+
     *tree_in_cache = ucc_tl_shm_cache_tree(team, &key, shm_tree);
     *tree_p        = shm_tree;
     return UCC_OK;

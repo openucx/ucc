@@ -28,8 +28,9 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_shm_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
 
-    {"N_CONCURRENT_COLLS", "2", "Number of concurrent collective calls",
-     ucc_offsetof(ucc_tl_shm_lib_config_t, n_concurrent), UCC_CONFIG_TYPE_UINT},
+    {"MAX_CONCURRENT", "2", "Maximum number of outstanding colls",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, max_concurrent),
+     UCC_CONFIG_TYPE_UINT},
 
     {"CS", "256", "Control size of each section in shm segment",
      ucc_offsetof(ucc_tl_shm_lib_config_t, ctrl_size), UCC_CONFIG_TYPE_UINT},
