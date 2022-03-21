@@ -27,7 +27,6 @@
  * of DSB. The barrier used for synchronization of access between write back
  * and device mapped memory (PCIe BAR).
  */
-#define ucc_memory_bus_fence()        ucc_aarch64_dmb(oshsy)
 #define ucc_memory_bus_store_fence()  ucc_aarch64_dmb(oshst)
 #define ucc_memory_bus_load_fence()   ucc_aarch64_dmb(oshld)
 
