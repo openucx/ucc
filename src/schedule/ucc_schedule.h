@@ -184,7 +184,7 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         task->finalize(task);
     }
 
-    return task->super.status;
+    return status;
 }
 
 static inline void ucc_task_subscribe_dep(ucc_coll_task_t *target,

@@ -126,6 +126,7 @@ ucc_cuda_executor_interruptible_task_test(const ucc_ee_executor_task_t *task)
 {
     ucc_ec_cuda_executor_interruptible_task_t *ee_task =
         ucc_derived_of(task, ucc_ec_cuda_executor_interruptible_task_t);
+
     ee_task->super.status = ucc_ec_cuda_event_test(ee_task->event);
     return ee_task->super.status;
 }
@@ -267,7 +268,6 @@ ucc_status_t ucc_cuda_executor_start(ucc_ee_executor_t *executor,
     } else {
         return ucc_cuda_executor_persistent_start(executor, ee_context);
     }
-
 }
 
 ucc_status_t ucc_cuda_executor_interruptible_stop(ucc_ee_executor_t *executor)

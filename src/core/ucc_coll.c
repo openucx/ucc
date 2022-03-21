@@ -318,7 +318,6 @@ static ucc_status_t ucc_triggered_coll_complete(ucc_coll_task_t *parent_task, //
         ucc_ee_executor_stop(task->executor);
         ucc_ee_executor_finalize(task->executor);
         task->executor = NULL;
-        return UCC_OK;
     }
     return UCC_OK;
 }

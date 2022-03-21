@@ -52,7 +52,6 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
     return n_progressed;
 }
 
-
 static void ucc_pq_st_enqueue(ucc_progress_queue_t *pq, ucc_coll_task_t *task)
 {
     ucc_pq_st_t *pq_st = ucc_derived_of(pq, ucc_pq_st_t);

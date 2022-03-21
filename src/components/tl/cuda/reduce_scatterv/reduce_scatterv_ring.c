@@ -221,6 +221,7 @@ size_t ucc_tl_cuda_reduce_scatterv_ring_get_count(const ucc_tl_cuda_task_t *task
                                                   ucc_rank_t block)
 {
     const ucc_coll_args_t *args  = &TASK_ARGS(task);
+
     return ucc_coll_args_get_count(args, args->dst.info_v.counts, block);
 }
 

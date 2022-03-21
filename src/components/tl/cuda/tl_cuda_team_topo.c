@@ -22,7 +22,8 @@ ucc_tl_cuda_team_topo_add_ring(const ucc_tl_cuda_team_t *team,
 
     for (i = 0; i < num_dups; i++) {
         new_ring = &topo->rings[topo->num_rings + i];
-        new_ring->ring  = (ucc_rank_t*)ucc_malloc(2 * size * sizeof(ucc_rank_t));
+        new_ring->ring  = (ucc_rank_t*)ucc_malloc(2 * size * sizeof(ucc_rank_t),
+                                                  "cuda_topo_ring");
         new_ring->iring = PTR_OFFSET(new_ring->ring, size * sizeof(ucc_rank_t));
         if (!new_ring->ring) {
             tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate topo ring");
@@ -117,14 +118,16 @@ ucc_tl_cuda_team_topo_init_rings(const ucc_tl_cuda_team_t *team,
     int *graph;
 
     topo->num_rings = 0;
-    ring.ring = (ucc_rank_t*) ucc_malloc(size * sizeof(ucc_rank_t));
+    ring.ring = (ucc_rank_t*) ucc_malloc(size * sizeof(ucc_rank_t),
+                                         "cuda_topo_ring");
     if (!ring.ring) {
         status = UCC_ERR_NO_MEMORY;
         tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate topo ring");
         goto free_ring;
     }
 
-    graph = (ucc_rank_t*) ucc_malloc(size * size * sizeof(int));
+    graph = (ucc_rank_t*) ucc_malloc(size * size * sizeof(int),
+                                     "cuda_topo_graph");
     if (!graph) {
         status = UCC_ERR_NO_MEMORY;
         tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate topo graph");
@@ -136,7 +139,8 @@ ucc_tl_cuda_team_topo_init_rings(const ucc_tl_cuda_team_t *team,
     }
 
     topo->rings = (ucc_tl_cuda_ring_t*) ucc_malloc(
-                  UCC_TL_CUDA_TEAM_TOPO_MAX_RINGS * sizeof(ucc_tl_cuda_ring_t));
+                  UCC_TL_CUDA_TEAM_TOPO_MAX_RINGS * sizeof(ucc_tl_cuda_ring_t),
+                  "cuda_topo_rings");
     if (!topo->rings) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate topo rings array");
         return UCC_ERR_NO_MEMORY;
@@ -300,7 +304,7 @@ ucc_status_t ucc_tl_cuda_team_topo_create(const ucc_tl_team_t *cuda_team,
     }
 
     topo->matrix = (int*)ucc_malloc(size * size * sizeof(int),
-                                     "cuda_topo_matrix");
+                                    "cuda_topo_matrix");
     if (!topo->matrix) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to alloc cuda team topo matrix");
         status = UCC_ERR_NO_MEMORY;

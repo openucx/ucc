@@ -32,11 +32,11 @@
         ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                          \
         size_t _scratch_size = UCC_TL_CUDA_TEAM_LIB(_team)->cfg.scratch_size;  \
         void *_scratch;                                                        \
-        if (_rank == UCC_TL_TEAM_RANK(team)) {                                 \
-            _scratch = team->scratch.loc;                                      \
+        if (_rank == UCC_TL_TEAM_RANK(_team)) {                                \
+            _scratch = _team->scratch.loc;                                     \
         } else {                                                               \
-            _scratch = PTR_OFFSET(team->scratch.rem[_rank],                    \
-                                  team->scratch.rem_info[_rank].offset);       \
+            _scratch = PTR_OFFSET(_team->scratch.rem[_rank],                   \
+                                  _team->scratch.rem_info[_rank].offset);      \
         }                                                                      \
         (PTR_OFFSET(_scratch, (_task)->coll_id * _scratch_size));              \
     })
