@@ -23,8 +23,8 @@
 
 #define UCC_TL_CUDA_MAX_PEERS 8
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                         \
-     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                       \
+    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
+     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
      UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
@@ -131,10 +131,10 @@ typedef struct ucc_tl_cuda_sync {
     ucc_tl_cuda_mem_info_t   mem_info_dst;
     cudaEvent_t              ipc_event_local;
     cudaIpcEventHandle_t     ev_handle;
-    ucc_count_t              src_cnts[UCC_TL_CUDA_MAX_PEERS];
-    ucc_count_t              dst_cnts[UCC_TL_CUDA_MAX_PEERS];
-    size_t                   src_displ[UCC_TL_CUDA_MAX_PEERS];
-    size_t                   dst_displ[UCC_TL_CUDA_MAX_PEERS];
+    ucc_count_t             src_cnts[UCC_TL_CUDA_MAX_PEERS];
+    ucc_count_t             dst_cnts[UCC_TL_CUDA_MAX_PEERS];
+    size_t                  src_displ[UCC_TL_CUDA_MAX_PEERS];
+    size_t                  dst_displ[UCC_TL_CUDA_MAX_PEERS];
     ucc_tl_cuda_sync_data_t  data[1];
 } ucc_tl_cuda_sync_t;
 
@@ -175,9 +175,23 @@ struct ucc_tl_cuda_task {
             void                   *peer_map_addr_src[UCC_TL_CUDA_MAX_PEERS];
             void                   *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
             int                     num_posted;
+            ucc_datatype_t          sdt;
+            ucc_datatype_t          rdt;
+            void                   *sbuf;
+            void                   *rbuf;
+            ucc_count_t            *scnts;
+            ucc_count_t            *rcnts;
+            size_t                 *sdispl;
+            size_t                 *rdispl;
             ucc_ee_executor_task_t *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
             void                   *copy_done;
-        } alltoall_ce;
+            size_t                 (*get_count)(const ucc_tl_cuda_task_t *task,
+                                                ucc_count_t *cnts,
+                                                ucc_rank_t block);
+            size_t                 (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                                 size_t *displ,
+                                                 ucc_rank_t block);
+        } alltoallv_ce;
         struct {
             int                      stage;
             int                      num_frags;

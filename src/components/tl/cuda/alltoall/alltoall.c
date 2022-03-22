@@ -16,12 +16,12 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *task);
 ucc_status_t ucc_tl_cuda_alltoall_ce_finalize(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_cuda_alltoall_init(ucc_base_coll_args_t *coll_args,
-                                       ucc_base_team_t *tl_team,
-                                       ucc_coll_task_t **task_p)
+                                       ucc_base_team_t      *tl_team,
+                                       ucc_coll_task_t     **task_p)
 {
     ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     ucc_tl_cuda_task_t *task;
-    ucc_status_t status;
+    ucc_status_t        status;
 
     if (UCC_IS_INPLACE(coll_args->args)) {
         return UCC_ERR_NOT_SUPPORTED;
