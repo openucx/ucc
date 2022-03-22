@@ -22,8 +22,6 @@ typedef struct ucc_context ucc_context_t;
 typedef struct ucc_coll_score ucc_coll_score_t;
 typedef struct ucc_coll_task ucc_coll_task_t;
 
-
-
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
 } ucc_base_lib_t;
@@ -92,6 +90,7 @@ typedef struct ucc_base_context_iface {
     ucc_status_t (*create)(const ucc_base_context_params_t *params,
                            const ucc_base_config_t *config,
                            ucc_base_context_t **ctx);
+    ucc_status_t (*create_epilog)(ucc_base_context_t *ctx);
     void         (*destroy)(ucc_base_context_t *ctx);
     ucc_status_t (*get_attr)(const ucc_base_context_t *context,
                              ucc_base_ctx_attr_t      *attr);
@@ -135,9 +134,9 @@ typedef struct ucc_base_team_iface {
 } ucc_base_team_iface_t;
 
 typedef struct ucc_base_coll_args {
-    uint64_t        mask;
-    ucc_coll_args_t args;
-    ucc_team_t     *team;
+    uint64_t         mask;
+    ucc_coll_args_t  args;
+    ucc_team_t      *team;
 } ucc_base_coll_args_t;
 
 typedef ucc_status_t (*ucc_base_coll_init_fn_t)(ucc_base_coll_args_t *coll_args,
@@ -186,6 +185,7 @@ typedef struct ucc_base_coll_alg_info {
         .super.lib.get_attr = ucc_##_f##_name##_get_lib_attr,                  \
         .super.context.create =                                                \
             UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_context_t),              \
+        .super.context.create_epilog = NULL,                                   \
         .super.context.destroy =                                               \
             UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_context_t),           \
         .super.context.get_attr = ucc_##_f##_name##_get_context_attr,          \

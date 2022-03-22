@@ -6,8 +6,10 @@ if HAVE_CUDA
 SUBDIRS = kernel
 
 sources =    \
-	ec_cuda.h \
-	ec_cuda.c
+	ec_cuda.h          \
+	ec_cuda.c          \
+	ec_cuda_executor.h \
+	ec_cuda_executor.c
 
 module_LTLIBRARIES         = libucc_ec_cuda.la
 libucc_ec_cuda_la_SOURCES  = $(sources)

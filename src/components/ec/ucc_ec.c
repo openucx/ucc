@@ -208,3 +208,9 @@ ucc_status_t ucc_ee_executor_task_test(const ucc_ee_executor_task_t *task)
     UCC_CHECK_EC_AVAILABLE(task->eee->ee_type);
     return executor_ops[task->eee->ee_type]->task_test(task);
 }
+
+ucc_status_t ucc_ee_executor_task_finalize(ucc_ee_executor_task_t *task)
+{
+    UCC_CHECK_EC_AVAILABLE(task->eee->ee_type);
+    return executor_ops[task->eee->ee_type]->task_finalize(task);
+}
