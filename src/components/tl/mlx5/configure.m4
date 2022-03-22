@@ -15,6 +15,12 @@ AS_IF([test "$CHECKED_TL_REQUIRED" = "y"],
     if test $mlx5_happy = "yes"; then
         tl_modules="${tl_modules}:mlx5"
         tl_mlx5_enabled=y
+        CHECK_NEED_TL_PROFILING(["tl_mlx5"])
+        AS_IF([test "$TL_PROFILING_REQUIRED" = "y"],
+              [
+                AC_DEFINE([HAVE_PROFILING_TL_MLX5], [1], [Enable profiling for TL MLX5])
+                prof_modules="${prof_modules}:tl_mlx5"
+              ], [])
     fi
 ], [])
 
