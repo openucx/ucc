@@ -22,9 +22,9 @@ ucc_test_mpi_SOURCES = \
 	test_bcast.cc          \
 	test_alltoall.cc       \
 	test_alltoallv.cc      \
-        test_reduce_scatter.cc \
-        test_reduce_scatterv.cc \
-        test_reduce.cc
+	test_reduce_scatter.cc \
+	test_reduce_scatterv.cc \
+	test_reduce.cc
 
 CXX=$(MPICXX)
 LD=$(MPICXX)

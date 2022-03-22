@@ -13,6 +13,7 @@
 enum {
     ALLTOALL_CE_STAGE_SYNC,  /*< Wait for free SYNC segment */
     ALLTOALL_CE_STAGE_SETUP, /*< Wait for memhandle setup to finish */
+    ALLTOALL_CE_STAGE_POST_COPIES,
     ALLTOALL_CE_STAGE_COPY,  /*< Wait for all copies to finish */
     ALLTOALL_CE_STAGE_BAR,   /*< Wait for other ranks to finish */
 };
@@ -30,9 +31,9 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_finalize(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_cuda_alltoall_setup_start(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
-    ucc_tl_cuda_sync_t          *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
-    ucc_status_t                 status;
+    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
+    ucc_status_t        status;
 
     memcpy(&sync->mem_info_src, &task->alltoall_ce.mem_info_src,
            sizeof(ucc_tl_cuda_mem_info_t));
@@ -104,15 +105,24 @@ exit_err:
 
 static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_coll_args_t    *args = &TASK_ARGS(task);
-    ucc_rank_t          rank = UCC_TL_TEAM_RANK(team);
-    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
-    ucc_tl_cuda_sync_t *peer_sync;
-    size_t send_len;
-    ucc_rank_t i, peer, psrc, pdst;
-    void *src, *dst;
-    ucc_status_t status;
+    ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
+    ucc_coll_args_t             *args = &TASK_ARGS(task);
+    ucc_rank_t                   rank = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_sync_t          *sync = TASK_SYNC(task, rank);
+    ucc_tl_cuda_sync_t          *peer_sync;
+    ucc_ee_executor_t           *exec;
+    void                        *src, *dst;
+    ucc_ee_executor_task_t      **exec_task;
+    size_t                       send_len;
+    ucc_rank_t                   i, peer, psrc, pdst;
+    ucc_status_t                 status;
+    ucc_ee_executor_task_args_t  exec_args;
+
+    task->alltoall_ce.num_posted = 0;
+    status = ucc_coll_task_get_executor(&task->super, &exec);
+    if (ucc_unlikely(status != UCC_OK)) {
+        goto exit;
+    }
 
     send_len = (args->src.info.count / UCC_TL_TEAM_SIZE(team)) *
                ucc_dt_size(args->src.info.datatype);
@@ -135,9 +145,16 @@ static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task
         }
         src = PTR_OFFSET(src, rank * send_len);
         dst = PTR_OFFSET(args->dst.info.buffer, peer * send_len);
-        CUDA_CHECK_GOTO(cudaMemcpyAsync(dst, src, send_len,
-                                       cudaMemcpyDeviceToDevice, team->stream),
-                       exit, status);
+        exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
+        exec_args.bufs[0]   = dst;
+        exec_args.bufs[1]   = src;
+        exec_args.count     = send_len;
+        exec_task = &task->alltoall_ce.exec_task[task->alltoall_ce.num_posted];
+        status = ucc_ee_executor_task_post(exec, &exec_args, exec_task);
+        if (ucc_unlikely(status != UCC_OK)) {
+            goto exit;
+        }
+        task->alltoall_ce.num_posted++;
     }
 
     for (i = 0; i < team->topo->num_proxies; i++) {
@@ -152,10 +169,16 @@ static ucc_status_t ucc_tl_cuda_alltoall_ce_post_copies(ucc_tl_cuda_task_t *task
             dst = PTR_OFFSET(task->alltoall_ce.peer_map_addr_dst[pdst],
                              peer_sync->mem_info_dst.offset);
             dst = PTR_OFFSET(dst, psrc * send_len);
-            CUDA_CHECK_GOTO(cudaMemcpyAsync(dst, src, send_len,
-                                            cudaMemcpyDeviceToDevice,
-                                            team->stream),
-                            exit, status);
+            exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
+            exec_args.bufs[0]   = dst;
+            exec_args.bufs[1]   = src;
+            exec_args.count     = send_len;
+            exec_task = &task->alltoall_ce.exec_task[task->alltoall_ce.num_posted];
+            status = ucc_ee_executor_task_post(exec, &exec_args, exec_task);
+            if (ucc_unlikely(status != UCC_OK)) {
+                goto exit;
+            }
+            task->alltoall_ce.num_posted++;
         }
     }
     status = ucc_ec_event_post(team->stream, task->alltoall_ce.copy_done,
@@ -170,6 +193,7 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     ucc_status_t        status;
+    int                 i;
 
     switch (task->alltoall_ce.stage)
     {
@@ -190,6 +214,7 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
             task->super.super.status = status;
             return task->super.super.status;
         }
+    case ALLTOALL_CE_STAGE_POST_COPIES:
         status = ucc_tl_cuda_alltoall_ce_post_copies(task);
         if (ucc_unlikely(status != UCC_OK)) {
             task->super.super.status = status;
@@ -197,11 +222,15 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_progress(ucc_coll_task_t *coll_task)
         }
         task->alltoall_ce.stage = ALLTOALL_CE_STAGE_COPY;
     case ALLTOALL_CE_STAGE_COPY:
-        status = ucc_ec_event_test(task->alltoall_ce.copy_done,
-                                   UCC_EE_CUDA_STREAM);
-        if (status != UCC_OK) {
-            task->super.super.status = status;
-            return task->super.super.status;
+        for (i = 0; i < task->alltoall_ce.num_posted; i++) {
+            status = ucc_ee_executor_task_test(task->alltoall_ce.exec_task[i]);
+            if (status != UCC_OK) {
+                if (status == UCC_OPERATION_INITIALIZED) {
+                    status = UCC_INPROGRESS;
+                }
+                task->super.super.status = status;
+                return task->super.super.status;
+            }
         }
         status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
         if (ucc_unlikely(status != UCC_OK)) {
@@ -226,7 +255,9 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_start(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
 
-    task->alltoall_ce.stage = ALLTOALL_CE_STAGE_SYNC;
+    if (task->alltoall_ce.stage != ALLTOALL_CE_STAGE_POST_COPIES) {
+        task->alltoall_ce.stage = ALLTOALL_CE_STAGE_SYNC;
+    }
     ucc_tl_cuda_alltoall_ce_progress(coll_task);
     if (task->super.super.status == UCC_INPROGRESS) {
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -235,13 +266,43 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_start(ucc_coll_task_t *coll_task)
     return ucc_task_complete(coll_task);
 }
 
+ucc_status_t ucc_tl_cuda_alltoall_ce_triggered_post_setup(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_status_t status;
+
+    do {
+        status = ucc_tl_cuda_get_sync(task);
+    } while (status == UCC_INPROGRESS);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+
+    status = ucc_tl_cuda_alltoall_setup_start(task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_tl_cuda_put_sync(task);
+        return status;
+    }
+
+    do {
+        status = ucc_tl_cuda_alltoall_setup_test(task);
+    } while(status == UCC_INPROGRESS);
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_tl_cuda_put_sync(task);
+        return status;
+    }
+    task->alltoall_ce.stage = ALLTOALL_CE_STAGE_POST_COPIES;
+
+    return UCC_OK;
+}
+
 ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucc_status_t status;
     size_t data_len;
 
+    task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     status = ucc_ec_create_event(&task->alltoall_ce.copy_done,
                                  UCC_EE_CUDA_STREAM);
     if (ucc_unlikely(status != UCC_OK)) {
@@ -249,21 +310,23 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     }
 
     data_len = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
-    status = ucc_tl_cuda_mem_info_get(args->src.info.buffer, data_len, team,
+    status = ucc_tl_cuda_mem_info_get(args->src.info.buffer, data_len,
                                       &task->alltoall_ce.mem_info_src);
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;
     }
-    status = ucc_tl_cuda_mem_info_get(args->dst.info.buffer, data_len, team,
+    status = ucc_tl_cuda_mem_info_get(args->dst.info.buffer, data_len,
                                       &task->alltoall_ce.mem_info_dst);
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;
     }
 
-    task->super.post     = ucc_tl_cuda_alltoall_ce_start;
-    task->super.progress = ucc_tl_cuda_alltoall_ce_progress;
-    task->super.finalize = ucc_tl_cuda_alltoall_ce_finalize;
-    task->bar            = TASK_BAR(task);
+    task->super.post                 = ucc_tl_cuda_alltoall_ce_start;
+    task->super.triggered_post       = ucc_triggered_post;
+    task->super.triggered_post_setup = ucc_tl_cuda_alltoall_ce_triggered_post_setup;
+    task->super.progress             = ucc_tl_cuda_alltoall_ce_progress;
+    task->super.finalize             = ucc_tl_cuda_alltoall_ce_finalize;
+    task->bar                        = TASK_BAR(task);
 
     return UCC_OK;
 

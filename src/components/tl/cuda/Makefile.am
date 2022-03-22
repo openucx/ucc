@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
 #
 
 if TL_CUDA_ENABLED
@@ -7,6 +7,26 @@ alltoall =                       \
 	alltoall/alltoall.h          \
 	alltoall/alltoall.c          \
 	alltoall/alltoall_ce.c
+
+allgather =                      \
+	allgather/allgather.h        \
+	allgather/allgather.c        \
+	allgather/allgather_ring.c
+
+allgatherv =                     \
+	allgatherv/allgatherv.h      \
+	allgatherv/allgatherv.c      \
+	allgatherv/allgatherv_ring.c
+
+reduce_scatter =                         \
+	reduce_scatter/reduce_scatter.h      \
+	reduce_scatter/reduce_scatter.c      \
+	reduce_scatter/reduce_scatter_ring.c
+
+reduce_scatterv =                          \
+	reduce_scatterv/reduce_scatterv.h      \
+	reduce_scatterv/reduce_scatterv.c      \
+	reduce_scatterv/reduce_scatterv_ring.c
 
 sources =               \
 	tl_cuda.h           \
@@ -18,7 +38,11 @@ sources =               \
 	tl_cuda_cache.c     \
 	tl_cuda_topo.c      \
 	tl_cuda_team_topo.c \
-	$(alltoall)
+	$(alltoall)         \
+	$(allgather)        \
+	$(allgatherv)       \
+	$(reduce_scatter)   \
+	$(reduce_scatterv)
 
 module_LTLIBRARIES = libucc_tl_cuda.la
 libucc_tl_cuda_la_SOURCES  = $(sources)

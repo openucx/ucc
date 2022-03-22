@@ -158,6 +158,10 @@ ucc_status_t ucc_schedule_pipelined_init(
             ucc_error("failed to initialize fragment for pipeline");
             goto err;
         }
+        frags[i]->super.schedule = &schedule->super;
+        if (frags[i]->super.flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
+            schedule->super.super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+        }
         frags[i]->super.super.status = UCC_OPERATION_INITIALIZED;
     }
     for (i = 0; i < n_frags; i++) {

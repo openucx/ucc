@@ -137,7 +137,7 @@ ucc_tl_cuda_topo_graph_add_link(ucc_tl_cuda_topo_t *topo,
             return UCC_OK;
         }
     }
-    link = (ucc_tl_cuda_topo_link_t*)ucc_malloc(sizeof(*link));
+    link = (ucc_tl_cuda_topo_link_t*)ucc_malloc(sizeof(*link), "cuda_topo_link");
     if (!link) {
         tl_error(topo->lib, "failed to allocate topo link");
         return UCC_ERR_NO_MEMORY;
