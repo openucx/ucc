@@ -90,6 +90,7 @@ typedef struct ucc_base_context_iface {
     ucc_status_t (*create)(const ucc_base_context_params_t *params,
                            const ucc_base_config_t *config,
                            ucc_base_context_t **ctx);
+    ucc_status_t (*create_epilog)(ucc_base_context_t *ctx);
     void         (*destroy)(ucc_base_context_t *ctx);
     ucc_status_t (*get_attr)(const ucc_base_context_t *context,
                              ucc_base_ctx_attr_t      *attr);
@@ -184,6 +185,7 @@ typedef struct ucc_base_coll_alg_info {
         .super.lib.get_attr = ucc_##_f##_name##_get_lib_attr,                  \
         .super.context.create =                                                \
             UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_context_t),              \
+        .super.context.create_epilog = NULL,                                   \
         .super.context.destroy =                                               \
             UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_context_t),           \
         .super.context.get_attr = ucc_##_f##_name##_get_context_attr,          \
