@@ -59,8 +59,9 @@ ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team, ucc_tl_shm_seg_t *seg,
                                     ? my_ctrl->data
                                     : ucc_tl_shm_get_data(seg, team, team_rank));
                 src2   = (task->first_reduce)
-                             ? (UCC_IS_INPLACE(*args) ? args->dst.info.buffer
-                                                      : args->src.info.buffer)
+                             ? ((UCC_IS_INPLACE(*args) &&
+                                 args->root == team_rank) ?
+                                 args->dst.info.buffer : args->src.info.buffer)
                              : dst;
                 status = ucc_dt_reduce(src1, src2, dst, count, dt, mtype, args);
 
@@ -189,7 +190,8 @@ ucc_status_t ucc_tl_shm_reduce_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_shm_task_t *task;
     ucc_status_t       status;
 
-    if (coll_args->args.op == UCC_OP_AVG) {
+    if (UCC_IS_PERSISTENT(coll_args->args) ||
+        coll_args->args.op == UCC_OP_AVG) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 

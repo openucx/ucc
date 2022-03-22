@@ -21,7 +21,7 @@
 #include <sys/types.h>
 
 #ifndef UCC_TL_SHM_DEFAULT_SCORE
-#define UCC_TL_SHM_DEFAULT_SCORE 20
+#define UCC_TL_SHM_DEFAULT_SCORE 100
 #endif
 
 #ifdef HAVE_PROFILING_TL_SHM

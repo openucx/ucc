@@ -118,6 +118,10 @@ ucc_status_t ucc_tl_shm_barrier_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_shm_task_t *task;
     ucc_status_t       status;
 
+    if (UCC_IS_PERSISTENT(coll_args->args)) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     task = ucc_tl_shm_get_task(coll_args, team);
     if (ucc_unlikely(!task)) {
         return UCC_ERR_NO_MEMORY;
