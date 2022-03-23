@@ -38,13 +38,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (!params->team->topo) {
-        tl_info(tl_context->lib,
-                "can't create cuda team without topology data");
-        return UCC_ERR_INVALID_PARAM;
-    }
-
-    if (!ucc_topo_is_single_node(params->team->topo)) {
+    if (!ucc_team_map_is_single_node(params->team, params->map)) {
         tl_info(tl_context->lib, "multinode team is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
