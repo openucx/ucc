@@ -119,7 +119,6 @@ exit_err:
 ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t         *team = TASK_TEAM(task);
-    ucc_coll_args_t            *args = &TASK_ARGS(task);
     ucc_rank_t                  rank = UCC_TL_TEAM_RANK(team);
     ucc_tl_cuda_sync_t         *sync = TASK_SYNC(task, rank);
     ucc_tl_cuda_sync_t         *peer_sync;
