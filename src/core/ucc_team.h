@@ -105,4 +105,31 @@ static inline ucc_rank_t ucc_get_ctx_rank(ucc_team_t *team, ucc_rank_t team_rank
     return ucc_ep_map_eval(team->ctx_map, team_rank);
 }
 
+static inline int ucc_team_ranks_on_same_node(ucc_rank_t rank1, ucc_rank_t rank2,
+                                              ucc_team_t *team)
+{
+    ucc_context_addr_header_t *h1 = ucc_get_team_ep_header(team->contexts[0],
+                                                           team, rank1);
+    ucc_context_addr_header_t *h2 = ucc_get_team_ep_header(team->contexts[0],
+                                                           team, rank2);
+
+    return h1->ctx_id.pi.host_hash == h2->ctx_id.pi.host_hash;
+}
+
+static inline int ucc_team_map_is_single_node(ucc_team_t *team,
+                                              ucc_ep_map_t map)
+{
+    uint64_t   i;
+    ucc_rank_t r, r0;
+
+    r0 = ucc_ep_map_eval(map, 0);
+    for (i = 1; i < map.ep_num; i++) {
+        r = ucc_ep_map_eval(map, i);
+        if (!ucc_team_ranks_on_same_node(r0, r, team)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 #endif
