@@ -72,7 +72,7 @@ ucc_status_t ucc_tlcp_ucp_example_coll_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_task_t    *task    = ucc_tl_ucp_get_task(tl_team);
 
     ucc_coll_task_init(&task->super, coll_args, team);
-    task->tag            = tl_team->seq_num;
+    task->tagged.tag     = tl_team->seq_num;
     tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
     task->super.finalize = ucc_tl_ucp_coll_finalize;
     task->super.post     = ucc_tlcp_ucp_example_start;
