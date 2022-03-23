@@ -254,9 +254,8 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
                     UCC_TL_CTX_IFACE(d->ctx)->super.name,
                     ucc_sbgp_str(hs->sbgp_type));
         } else {
-            cl_error(ctx->super.super.lib, "failed to create tl %s team",
+            cl_debug(ctx->super.super.lib, "failed to create tl %s team",
                      UCC_TL_CTX_IFACE(d->ctx)->super.name);
-            hs->state        = UCC_HIER_SBGP_DISABLED;
             hs->tl_teams[tl] = NULL;
             hs->tl_ctxs[tl]  = NULL;
             ucc_tl_context_put(d->ctx);
@@ -265,19 +264,24 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
 
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
         hs = &team->sbgps[i];
-        if (hs->state == UCC_HIER_SBGP_DISABLED) {
-            continue;
-        }
         if (hs->score == NULL) {
-            cl_error(ctx->super.super.lib,
-                     "no tl teams were created for sbgp %s",
-                     ucc_sbgp_str(hs->sbgp_type));
+            if (hs->state == UCC_HIER_SBGP_ENABLED) {
+                /* we tried to enable that sbgp, which means the subgroup
+                   exists. however failed to create a single team there */
+                cl_error(ctx->super.super.lib,
+                         "no tl teams were created for sbgp %s",
+                         ucc_sbgp_str(hs->sbgp_type));
+                status = UCC_ERR_NO_RESOURCE;
+                break;
+            }
             hs->state = UCC_HIER_SBGP_DISABLED;
         } else {
             status = ucc_coll_score_build_map(hs->score, &hs->score_map);
             if (UCC_OK != status) {
                 cl_error(ctx->super.super.lib, "failed to build score map");
                 hs->state = UCC_HIER_SBGP_DISABLED;
+                status = UCC_ERR_NO_RESOURCE;
+                break;
             }
         }
     }
