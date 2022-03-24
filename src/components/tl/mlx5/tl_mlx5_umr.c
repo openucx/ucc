@@ -46,24 +46,29 @@ typedef struct transpose_seg {
 /* External API to expose the non-inline UMR registration */
 ucc_status_t ucc_tl_mlx5_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey, uint32_t dst_mr_key,
                                         uintptr_t src_mkey_addr, uintptr_t dst_addr,
-                                        uint32_t element_size, uint16_t ncols, uint16_t nrows)
+                                        uint32_t element_size, uint16_t ncols, uint16_t nrows, int  send_flags)
 {
 
     uint32_t                  opcode = MLX5_OPCODE_LOCAL_MMO;
     uint32_t                  opmode = 0x0; //TRanspose
     uint32_t                  n_ds   = 4;
+    struct ibv_qp_ex         *qp_ex  = ibv_qp_to_qp_ex(qp);
+    struct mlx5dv_qp_ex      *mqp    = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
+    int                       fm_ce_se = 0;
     char                      wqe_desc[n_ds * DS_SIZE];
     struct mlx5_wqe_ctrl_seg *ctrl;
     struct mlx5_wqe_data_seg *data;
     transpose_seg_t          *tseg;
-    struct ibv_qp_ex *qp_ex = ibv_qp_to_qp_ex(qp);
-    struct mlx5dv_qp_ex *mqp = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
+
+    if (send_flags & IBV_SEND_SIGNALED) {
+        qp_ex->wr_id = 0;
+        fm_ce_se    |= MLX5_WQE_CTRL_CQ_UPDATE;
+    }
 
     memset(wqe_desc, 0, n_ds * DS_SIZE);
     /* SET CTRL SEG */
 
     ctrl = (void*)wqe_desc;
-    uint8_t fm_ce_se =  0;
 
     mlx5dv_set_ctrl_seg(ctrl, /* pi */ 0x0, opcode, opmode,
                         qp->qp_num, fm_ce_se, n_ds, 0x0, 0x0);

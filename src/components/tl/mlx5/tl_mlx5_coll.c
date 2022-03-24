@@ -37,7 +37,10 @@ static ucc_status_t ucc_tl_mlx5_poll_cq(ucc_tl_mlx5_team_t *team,
         }
 
         ucc_assert(team->work_completion[i].opcode == IBV_WC_DRIVER2);
-        if (team->work_completion[i].wr_id & 0x1) {
+        if (team->work_completion[i].wr_id == 0) {
+            /* signalled transpose */
+            continue;
+        } else if (team->work_completion[i].wr_id & 0x1) {
             ucc_tl_mlx5_schedule_t *task = (ucc_tl_mlx5_schedule_t *)
                 (uintptr_t)(team->work_completion[i].wr_id & (~(uint64_t)0x1));
             /* printf("wait on data completion, task %p\n", task); */
@@ -370,7 +373,6 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
             continue;
         }
 
-        send_start(team, cyc_rank);
         //send all blocks from curr node to some ARR
         for (j = 0; j < (node_size / block_size); j++) {
             for (k = 0; k < (node_size / block_size); k++) {
@@ -380,11 +382,12 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
                                           node_msgsize * rank +
                                           block_msgsize * j + col_msgsize * k);
 
+                send_start(team, cyc_rank);
                 if (cyc_rank == team->net.sbgp->group_rank) {
                     status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
                                                         team->node.ops[task->seq_index].send_mkeys[0]->lkey,
                                                         team->net.rkeys[cyc_rank], src_addr, remote_addr, task->msg_size,
-                                                        block_size, block_size);
+                                                        block_size, block_size, (j ==0 && k == 0) ? IBV_SEND_SIGNALED : 0);
                     if (UCC_OK != status) {
                         return status;
                     }
@@ -413,7 +416,7 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
                     status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
                                                         team->node.ops[task->seq_index].send_mkeys[0]->lkey,
                                                         team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,
-                                                        block_size, block_size);
+                                                        block_size, block_size, 0);
                     if (UCC_OK != status) {
                         return status;
                     }
@@ -427,8 +430,13 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
                         return status;
                     }
                 }
+                status = send_done(team, cyc_rank);
+                if (status != UCC_OK) {
+                    return status;
+                }
             }
         }
+        send_start(team, cyc_rank);
         status = send_atomic(team, cyc_rank, tl_mlx5_atomic_addr(task, cyc_rank),
                              tl_mlx5_atomic_rkey(task, cyc_rank));
 
@@ -563,7 +571,7 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
                     status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
                                                         team->node.ops[task->seq_index].send_mkeys[j]->lkey,
                                                         team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,
-                                                        bs_x, bs_y);
+                                                        bs_x, bs_y, 0);
                     if (UCC_OK != status) {
                         return status;
                     }
@@ -727,20 +735,30 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
                          ucc_coll_task_t **    task_h)
 {
     ucc_tl_mlx5_team_t *    tl_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
-    ucc_schedule_t *        schedule;
-    ucc_tl_mlx5_schedule_t *task;
-    int              block_size;
-    ucc_coll_task_t *tasks[4];
     int is_asr = (tl_team->node.sbgp->group_rank == tl_team->node.asr_rank);
     ucc_status_t status = UCC_OK;
+    int i, n_tasks = is_asr ? 4 : 2, curr_task = 0;
+    ucc_schedule_t *        schedule;
+    ucc_tl_mlx5_schedule_t *task;
+    size_t           msg_size;
+    int              block_size;
+    ucc_coll_task_t *tasks[4];
 
     if (UCC_IS_INPLACE(coll_args->args)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
+    msg_size = coll_args->args.src.info.count / UCC_TL_TEAM_SIZE(tl_team) *
+        ucc_dt_size(coll_args->args.src.info.datatype);
+
+    if (msg_size > tl_team->max_msg_size) {
+        tl_debug(UCC_TL_TEAM_LIB(tl_team), "msg size too long");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     task = ucc_tl_mlx5_get_schedule(tl_team, coll_args);
     schedule    = &task->super;
-    int i, n_tasks = is_asr ? 4 : 2, curr_task = 0;
+
     for (i = 0; i < n_tasks; i++) {
         tasks[i] = &ucc_tl_mlx5_init_task(coll_args, team, schedule)->super;
     }
@@ -753,17 +771,10 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
     task->seq_num   = tl_team->sequence_number;
     task->seq_index = SEQ_INDEX(tl_team->sequence_number);
     task->op        = &tl_team->node.ops[task->seq_index];
-    task->msg_size  =
-        (size_t)(coll_args->args.src.info.count / UCC_TL_TEAM_SIZE(tl_team)) *
-        ucc_dt_size(coll_args->args.src.info.datatype);
+    task->msg_size  = msg_size;
 
     tl_debug(UCC_TL_TEAM_LIB(tl_team), "Seq num is %d", task->seq_num);
     tl_team->sequence_number += 1;
-    if (task->msg_size > tl_team->max_msg_size) {
-        tl_error(UCC_TL_TEAM_LIB(tl_team), "msg size too long");
-        status = UCC_ERR_NO_RESOURCE;
-        goto put_schedule;
-    }
 
     block_size = tl_team->requested_block_size ? tl_team->requested_block_size
         : get_block_size(task);
@@ -864,7 +875,8 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t    *tl_team,
 
 
     status = ucc_coll_score_add_range(
-        score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_HOST, 0, 4096,
+        score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_HOST, 0,
+        MAX_MSG_SIZE * UCC_TL_TEAM_SIZE(team),
         UCC_TL_MLX5_DEFAULT_SCORE, ucc_tl_mlx5_alltoall_init, tl_team);
     if (UCC_OK != status) {
         tl_error(lib, "faild to add range to score_t");
