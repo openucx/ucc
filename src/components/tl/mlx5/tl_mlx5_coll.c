@@ -292,6 +292,11 @@ static ucc_status_t ucc_tl_mlx5_asr_barrier_start(ucc_coll_task_t *coll_task)
         *local = task->seq_num;
         for(i=0; i<team->net.net_size;i++) {
             task->op->blocks_sent[i] = 0;
+            if (i == team->net.sbgp->group_rank) {
+                tl_mlx5_barrier_flag_set(task, i);
+                continue;
+            }
+
             send_start(team, i);
             status = send_block_data(team, i, (uintptr_t)local,
                                      sizeof(tl_mlx5_barrier_t), team->net.barrier.mr->lkey,

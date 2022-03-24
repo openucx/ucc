@@ -111,6 +111,16 @@ tl_mlx5_barrier_flag(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
     return team->net.barrier.flags[(net_size + 1) * task->seq_index + rank];
 }
 
+static inline void
+tl_mlx5_barrier_flag_set(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
+{
+    ucc_tl_mlx5_team_t *team     = TASK_TEAM(task);
+    ucc_rank_t          net_size = team->net.net_size;
+
+    team->net.barrier.flags[(net_size + 1) * task->seq_index + rank]
+        = task->seq_num;
+}
+
 static inline tl_mlx5_barrier_t*
 tl_mlx5_barrier_local_addr(ucc_tl_mlx5_schedule_t *task)
 {
