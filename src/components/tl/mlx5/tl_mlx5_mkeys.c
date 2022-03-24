@@ -443,10 +443,15 @@ static void update_mkey_entry(ucc_tl_mlx5_node_t *    node,
  */
 ucc_status_t ucc_tl_mlx5_update_mkeys_entries(ucc_tl_mlx5_node_t *    node,
                                               ucc_tl_mlx5_schedule_t *req,
+                                              int                     flag,
                                               ucc_tl_mlx5_lib_t *     lib)
 {
-    update_mkey_entry(node, req, 1, lib);
-    update_mkey_entry(node, req, 0, lib);
+    if (flag & UCC_MLX5_NEED_SEND_MKEY_UPDATE) {
+        update_mkey_entry(node, req, 1, lib);
+    }
+    if (flag & UCC_MLX5_NEED_RECV_MKEY_UPDATE) {
+        update_mkey_entry(node, req, 0, lib);
+    }
     return UCC_OK;
 }
 

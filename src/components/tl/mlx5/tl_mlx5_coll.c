@@ -103,6 +103,7 @@ static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
     ucc_tl_mlx5_team_t *    team     = TASK_TEAM(task);
     ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     int                     reg_change_flag               = 0;
+    int                     flag;
     ucc_rcache_region_t *   send_ptr;
     ucc_rcache_region_t *   recv_ptr;
 
@@ -124,15 +125,13 @@ static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
        Will need to add the possibility of block_size change into consideration
        when initializing the mkey_cache_flag */
 
-    ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)->mkey_cache_flag =
-        (task->msg_size == team->previous_msg_size[task->seq_index])
+    flag = (task->msg_size == team->previous_msg_size[task->seq_index])
             ? 0
             : (UCC_MLX5_NEED_RECV_MKEY_UPDATE | UCC_MLX5_NEED_RECV_MKEY_UPDATE);
 
     if (reg_change_flag || (task->send_rcache_region_p->mr->addr !=
                             team->previous_send_address[task->seq_index])) {
-        ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)->mkey_cache_flag |=
-            UCC_MLX5_NEED_SEND_MKEY_UPDATE;
+        flag |= UCC_MLX5_NEED_SEND_MKEY_UPDATE;
     }
     reg_change_flag = 0;
     if (UCC_OK != ucc_rcache_get_arg(ctx->rcache,
@@ -147,15 +146,15 @@ static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
     task->recv_rcache_region_p = ucc_tl_mlx5_get_rcache_reg_data(recv_ptr);
     if (reg_change_flag || (task->recv_rcache_region_p->mr->addr !=
                             team->previous_recv_address[task->seq_index])) {
-        ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)->mkey_cache_flag |=
-            UCC_MLX5_NEED_RECV_MKEY_UPDATE;
+        flag |= UCC_MLX5_NEED_RECV_MKEY_UPDATE;
     }
 
     tl_debug(UCC_TL_MLX5_TEAM_LIB(team), "fanin start");
     /* start task if completion event received */
     /* Start fanin */
+    ucc_tl_mlx5_get_my_ctrl(team, task->seq_index)->mkey_cache_flag = flag;
     ucc_tl_mlx5_update_mkeys_entries(
-        &team->node, task,
+        &team->node, task, flag,
         UCC_TL_MLX5_TEAM_LIB(team)); // no option for failure status
     if (UCC_OK == ucc_tl_mlx5_node_fanin(team, task)) {
         tl_debug(UCC_TL_MLX5_TEAM_LIB(team), "fanin complete");

@@ -26,6 +26,7 @@ ucc_status_t ucc_tl_mlx5_populate_send_recv_mkeys(ucc_tl_mlx5_team_t *    team,
 
 ucc_status_t ucc_tl_mlx5_update_mkeys_entries(ucc_tl_mlx5_node_t *    node,
                                               ucc_tl_mlx5_schedule_t *req,
+                                              int                     flag,
                                               ucc_tl_mlx5_lib_t *     lib);
 
 ucc_status_t ucc_tl_mlx5_destroy_umr(ucc_tl_mlx5_net_t *net,
