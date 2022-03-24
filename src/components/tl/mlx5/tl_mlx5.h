@@ -214,7 +214,6 @@ typedef struct ucc_tl_mlx5_team {
     int                      sequence_number;
     int                      op_busy[MAX_OUTSTANDING_OPS];
     int                      cq_completions[MAX_OUTSTANDING_OPS];
-    int                      blocks_sizes[MLX5_NUM_OF_BLOCKS_SIZE_BINS];
     int                      num_dci_qps;
     uint8_t                  is_dc;
     int                      previous_msg_size[MAX_OUTSTANDING_OPS];

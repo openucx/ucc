@@ -15,20 +15,6 @@ static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops;
 static ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team);
 static void ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team);
 
-static void calc_block_size(ucc_tl_mlx5_team_t *team)
-{
-    int i;
-    int block_size = ucc_min(team->node.sbgp->group_size, MAX_BLOCK_SIZE);
-    int msg_len    = 1;
-    for (i = 0; i < MLX5_NUM_OF_BLOCKS_SIZE_BINS; i++) {
-        while ((block_size * block_size) * msg_len > MAX_TRANSPOSE_SIZE) {
-            block_size -= 1;
-        }
-        team->blocks_sizes[i] = block_size;
-        msg_len               = msg_len << 1;
-    }
-}
-
 struct rank_data {
     int team_rank;
     int sbgp_rank;
@@ -388,8 +374,6 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team)
             op->my_ctrl  = PTR_OFFSET(op->ctrl, node_rank * sizeof(ucc_tl_mlx5_ctrl_t));
         }
 
-
-        calc_block_size(team);
         if (UCC_TL_MLX5_TEAM_LIB(team)->cfg.block_size > MAX_BLOCK_SIZE) {
             tl_error(tl_team->context->lib, "Max Block size is %d", MAX_BLOCK_SIZE);
             return UCC_ERR_NO_MESSAGE;

@@ -690,6 +690,36 @@ ucc_status_t ucc_tl_mlx5_alltoall_finalize(ucc_coll_task_t *coll_task)
     return status;
 }
 
+static inline int power2(int value) {
+    int p = 2;
+
+    while (p < value) {
+        p *= 2;
+    }
+    return p;
+}
+
+static inline int block_size_fits(size_t msgsize, int block_size)
+{
+    size_t t1    = power2(ucc_max(msgsize, 8));
+    size_t tsize = block_size * ucc_max(power2(block_size) * t1, MAX_MSG_SIZE);
+
+    return tsize <= MAX_TRANSPOSE_SIZE;
+}
+
+static inline int get_block_size(ucc_tl_mlx5_schedule_t *task)
+{
+    ucc_tl_mlx5_team_t *team = TASK_TEAM(task);
+    int                 ppn  = team->node.sbgp->group_size;
+    int                 block_size;
+
+    block_size = ppn;
+    while (!block_size_fits(task->msg_size, block_size)) {
+        block_size--;
+    }
+    return block_size;
+}
+
 UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
                          (coll_args, team, task_h),
                          ucc_base_coll_args_t *coll_args,
@@ -735,12 +765,8 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
         goto put_schedule;
     }
 
-    block_size =
-        (task->msg_size != 1)
-            ? tl_team->blocks_sizes[__ucs_ilog2_u32(task->msg_size - 1) + 1]
-            : tl_team->blocks_sizes[0];
     block_size = tl_team->requested_block_size ? tl_team->requested_block_size
-                                               : block_size;
+        : get_block_size(task);
 
     //todo following section correct assuming homogenous PPN across all nodes
     task->num_of_blocks_columns =
