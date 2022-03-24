@@ -8,8 +8,7 @@
 #define ALLTOALLV_H_
 #include "../cl_hier.h"
 
-enum
-{
+enum {
     UCC_CL_HIER_ALLTOALLV_ALG_NODE_SPLIT,
     UCC_CL_HIER_ALLTOALLV_ALG_LAST,
 };

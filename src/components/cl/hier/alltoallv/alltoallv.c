@@ -1,5 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -28,8 +29,8 @@ static ucc_status_t ucc_cl_hier_alltoallv_start(ucc_coll_task_t *task)
 
 static ucc_status_t ucc_cl_hier_alltoallv_finalize(ucc_coll_task_t *task)
 {
-    ucc_cl_hier_schedule_t *schedule = ucc_derived_of(task,
-                                                      ucc_cl_hier_schedule_t);
+    ucc_cl_hier_schedule_t *schedule =
+        ucc_derived_of(task, ucc_cl_hier_schedule_t);
     ucc_status_t status;
 
     UCC_CL_HIER_PROFILE_REQUEST_EVENT(task, "cl_hier_alltoallv_finalize", 0);
@@ -98,6 +99,23 @@ static ucc_status_t ucc_cl_hier_alltoallv_finalize(ucc_coll_task_t *task)
         }                                                                      \
     } while (0)
 
+ucc_status_t ucc_cl_hier_alltoallv_triggered_post_setup(ucc_coll_task_t *task)
+{
+    ucc_cl_hier_schedule_t *schedule =
+        ucc_derived_of(task, ucc_cl_hier_schedule_t);
+    ucc_status_t status  = UCC_OK;
+    int          n_tasks = schedule->super.super.n_tasks;
+    int          i       = 0;
+
+    for (i = 0; i < n_tasks; ++i) {
+        ucc_coll_task_t *sub_task = schedule->super.super.tasks[i];
+        if (sub_task->triggered_post_setup != NULL) {
+            sub_task->triggered_post_setup(sub_task);
+        }
+    }
+    return status;
+}
+
 UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
                          (coll_args, team, task),
                          ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
@@ -147,9 +165,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
     node_size = cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp->group_size;
 
     elem_size = c64 ? 8 : 4;
-    status = ucc_mc_alloc(&cl_schedule->scratch,
-                          elem_size * (full_size + node_size) * 4,
-                          UCC_MEMORY_TYPE_HOST);
+    status    = ucc_mc_alloc(&cl_schedule->scratch,
+                             elem_size * (full_size + node_size) * 4,
+                             UCC_MEMORY_TYPE_HOST);
     if (ucc_unlikely(UCC_OK != status)) {
         cl_error(team->context->lib,
                  "failed to allocate %zd bytes for full counts",
@@ -227,7 +245,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
     schedule->super.progress       = NULL;
     schedule->super.finalize       = ucc_cl_hier_alltoallv_finalize;
     schedule->super.triggered_post = ucc_triggered_post;
-    *task                          = &schedule->super;
+    schedule->super.triggered_post_setup =
+        ucc_cl_hier_alltoallv_triggered_post_setup;
+    *task = &schedule->super;
     return UCC_OK;
 
 err_init_2:

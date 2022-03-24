@@ -6,6 +6,7 @@
 
 #include "tl_cuda_coll.h"
 #include "alltoall/alltoall.h"
+#include "alltoallv/alltoallv.h"
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
 #include "reduce_scatter/reduce_scatter.h"
@@ -19,10 +20,10 @@ ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
     ucc_mem_attr_t mem_attr;
     ucc_status_t   status;
 
-    mem_attr.field_mask   = UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
-                            UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
+    mem_attr.field_mask =
+        UCC_MEM_ATTR_FIELD_BASE_ADDRESS | UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
     mem_attr.alloc_length = length;
-    status = ucc_mc_get_mem_attr(ptr, &mem_attr);
+    status                = ucc_mc_get_mem_attr(ptr, &mem_attr);
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
@@ -35,8 +36,8 @@ exit:
 }
 
 ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
-                                   ucc_base_team_t *team,
-                                   ucc_coll_task_t **task_h)
+                                   ucc_base_team_t      *team,
+                                   ucc_coll_task_t     **task_h)
 {
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_ALLTOALL:
@@ -49,6 +50,8 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
         return ucc_tl_cuda_reduce_scatter_init(coll_args, team, task_h);
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
         return ucc_tl_cuda_reduce_scatterv_init(coll_args, team, task_h);
+    case UCC_COLL_TYPE_ALLTOALLV:
+        return ucc_tl_cuda_alltoallv_init(coll_args, team, task_h);
     default:
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -58,7 +61,7 @@ ucc_status_t ucc_tl_cuda_shm_barrier_init(ucc_rank_t size, ucc_rank_t rank,
                                           ucc_tl_cuda_shm_barrier_t *barrier)
 {
     if (rank == 0) {
-        barrier->size = size;
+        barrier->size  = size;
         barrier->count = 0;
         barrier->sense = 0;
     }
@@ -67,7 +70,7 @@ ucc_status_t ucc_tl_cuda_shm_barrier_init(ucc_rank_t size, ucc_rank_t rank,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_cuda_shm_barrier_start(ucc_rank_t rank,
+ucc_status_t ucc_tl_cuda_shm_barrier_start(ucc_rank_t                 rank,
                                            ucc_tl_cuda_shm_barrier_t *barrier)
 {
     ucc_rank_t pos = ucc_atomic_fadd32(&barrier->count, 1);
@@ -81,7 +84,7 @@ ucc_status_t ucc_tl_cuda_shm_barrier_start(ucc_rank_t rank,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_cuda_shm_barrier_test(ucc_rank_t rank,
+ucc_status_t ucc_tl_cuda_shm_barrier_test(ucc_rank_t                 rank,
                                           ucc_tl_cuda_shm_barrier_t *barrier)
 {
     if (barrier->sense != barrier->local_sense[rank]) {

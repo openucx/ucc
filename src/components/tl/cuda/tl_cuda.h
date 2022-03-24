@@ -1,5 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -22,9 +23,9 @@
 
 #define UCC_TL_CUDA_MAX_PEERS 8
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLGATHER |                        \
-     UCC_COLL_TYPE_ALLGATHERV | UCC_COLL_TYPE_REDUCE_SCATTER |                 \
-     UCC_COLL_TYPE_REDUCE_SCATTERV)
+    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
+     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
+     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_cuda_lib_t))
@@ -32,22 +33,22 @@
 #define UCC_TL_CUDA_TEAM_CTX(_team)                                            \
     (ucc_derived_of((_team)->super.super.context, ucc_tl_cuda_context_t))
 
-#define UCC_TL_CUDA_TEAM_SYNC(_team, _rank, _id)                               \
-    ({                                                                         \
-        size_t _ctrl_size_rank = (sizeof(ucc_tl_cuda_sync_t)  +                \
-                                  sizeof(ucc_tl_cuda_sync_data_t) *            \
-                                  (UCC_TL_TEAM_SIZE(_team) - 1)) ;             \
-        size_t _ctrl_size = _ctrl_size_rank * UCC_TL_TEAM_SIZE(_team);         \
-        void *_sync = PTR_OFFSET(_team->sync, _ctrl_size * (_id) +             \
-                                 _ctrl_size_rank * (_rank));                   \
-        (ucc_tl_cuda_sync_t*)_sync;                                            \
+#define UCC_TL_CUDA_TEAM_SYNC(_team, _rank, _id)                                    \
+    ({                                                                              \
+        size_t _ctrl_size_rank =                                                    \
+            (sizeof(ucc_tl_cuda_sync_t) +                                           \
+             sizeof(ucc_tl_cuda_sync_data_t) * (UCC_TL_TEAM_SIZE(_team) - 1));      \
+        size_t _ctrl_size = _ctrl_size_rank * UCC_TL_TEAM_SIZE(_team);              \
+        void  *_sync      = PTR_OFFSET(_team->sync, _ctrl_size * (_id) +            \
+                                                        _ctrl_size_rank * (_rank)); \
+        (ucc_tl_cuda_sync_t *)_sync;                                                \
     })
 
 #define UCC_TL_CUDA_TEAM_BARRIER(_team, _id)                                   \
     ({                                                                         \
         size_t _bar_size = sizeof(ucc_tl_cuda_shm_barrier_t);                  \
-        void *_bar = PTR_OFFSET(_team->bar, _bar_size * (_id));                \
-        (ucc_tl_cuda_shm_barrier_t*)_bar;                                      \
+        void  *_bar      = PTR_OFFSET(_team->bar, _bar_size * (_id));          \
+        (ucc_tl_cuda_shm_barrier_t *)_bar;                                     \
     })
 
 #ifdef HAVE_PROFILING_TL_CUDA
@@ -56,10 +57,10 @@
 #include "utils/profile/ucc_profile_off.h"
 #endif
 
-#define UCC_TL_CUDA_PROFILE_FUNC UCC_PROFILE_FUNC
-#define UCC_TL_CUDA_PROFILE_REQUEST_NEW UCC_PROFILE_REQUEST_NEW
+#define UCC_TL_CUDA_PROFILE_FUNC          UCC_PROFILE_FUNC
+#define UCC_TL_CUDA_PROFILE_REQUEST_NEW   UCC_PROFILE_REQUEST_NEW
 #define UCC_TL_CUDA_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
-#define UCC_TL_CUDA_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
+#define UCC_TL_CUDA_PROFILE_REQUEST_FREE  UCC_PROFILE_REQUEST_FREE
 
 typedef struct ucc_tl_cuda_iface {
     ucc_tl_iface_t super;
@@ -85,13 +86,13 @@ UCC_CLASS_DECLARE(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
 
 typedef struct ucc_tl_cuda_context {
-    ucc_tl_context_t              super;
-    ucc_tl_cuda_context_config_t  cfg;
-    int                           device;
-    ucc_tl_cuda_device_pci_id_t   device_id;
-    ucc_tl_cuda_topo_t           *topo;
-    ucc_mpool_t                   req_mp;
-    tl_cuda_ep_hash_t            *ipc_cache;
+    ucc_tl_context_t             super;
+    ucc_tl_cuda_context_config_t cfg;
+    int                          device;
+    ucc_tl_cuda_device_pci_id_t  device_id;
+    ucc_tl_cuda_topo_t          *topo;
+    ucc_mpool_t                  req_mp;
+    tl_cuda_ep_hash_t           *ipc_cache;
 } ucc_tl_cuda_context_t;
 UCC_CLASS_DECLARE(ucc_tl_cuda_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -111,10 +112,10 @@ typedef struct ucc_tl_cuda_sync_data {
 } ucc_tl_cuda_sync_data_t;
 
 typedef struct ucc_tl_cuda_mem_info {
-    void               *ptr;
-    size_t              length;
-    size_t              offset;
-    cudaIpcMemHandle_t  handle;
+    void              *ptr;
+    size_t             length;
+    size_t             offset;
+    cudaIpcMemHandle_t handle;
 } ucc_tl_cuda_mem_info_t;
 
 typedef struct ucc_tl_cuda_rank_id {
@@ -130,6 +131,10 @@ typedef struct ucc_tl_cuda_sync {
     ucc_tl_cuda_mem_info_t   mem_info_dst;
     cudaEvent_t              ipc_event_local;
     cudaIpcEventHandle_t     ev_handle;
+    ucc_count_t             src_cnts[UCC_TL_CUDA_MAX_PEERS];
+    ucc_count_t             dst_cnts[UCC_TL_CUDA_MAX_PEERS];
+    size_t                  src_displ[UCC_TL_CUDA_MAX_PEERS];
+    size_t                  dst_displ[UCC_TL_CUDA_MAX_PEERS];
     ucc_tl_cuda_sync_data_t  data[1];
 } ucc_tl_cuda_sync_t;
 
@@ -170,9 +175,23 @@ struct ucc_tl_cuda_task {
             void                   *peer_map_addr_src[UCC_TL_CUDA_MAX_PEERS];
             void                   *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
             int                     num_posted;
+            ucc_datatype_t          sdt;
+            ucc_datatype_t          rdt;
+            void                   *sbuf;
+            void                   *rbuf;
+            ucc_count_t            *scnts;
+            ucc_count_t            *rcnts;
+            size_t                 *sdispl;
+            size_t                 *rdispl;
             ucc_ee_executor_task_t *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
             void                   *copy_done;
-        } alltoall_ce;
+            size_t                 (*get_count)(const ucc_tl_cuda_task_t *task,
+                                                ucc_count_t *cnts,
+                                                ucc_rank_t block);
+            size_t                 (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                                 size_t *displ,
+                                                 ucc_rank_t block);
+        } alltoallv_ce;
         struct {
             int                      stage;
             int                      num_frags;

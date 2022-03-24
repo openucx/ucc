@@ -53,6 +53,17 @@
     (((_args)->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                            \
      ((_args)->flags & UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT))
 
+#define UCC_COLL_IS_SRC_CONTIG(_args)                                          \
+    (((_args)->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                            \
+     ((_args)->flags & UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER))
+
+#define UCC_COLL_IS_DST_CONTIG(_args)                                          \
+    (((_args)->mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                            \
+     ((_args)->flags & UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER))
+
+#define UCC_COLL_ARGS_CONTIG_BUFFER(_args)                                     \
+    (UCC_COLL_IS_SRC_CONTIG(_args) && UCC_COLL_IS_DST_CONTIG(_args))
+
 static inline size_t
 ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
                         ucc_rank_t idx)
