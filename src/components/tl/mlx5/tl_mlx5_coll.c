@@ -380,42 +380,52 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
                                           node_msgsize * rank +
                                           block_msgsize * j + col_msgsize * k);
 
-                dm = ucc_mpool_get(&team->dm_pool);
-                while (!dm) {
-                    status = send_done(team, cyc_rank);
+                if (cyc_rank == team->net.sbgp->group_rank) {
+                    status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
+                                                        team->node.ops[task->seq_index].send_mkeys[0]->lkey,
+                                                        team->net.rkeys[cyc_rank], src_addr, remote_addr, task->msg_size,
+                                                        block_size, block_size);
                     if (UCC_OK != status) {
                         return status;
                     }
-
-                    status = ucc_tl_mlx5_poll_cq(team, team->net.cq);
-                    if (UCC_OK != status) {
-                        return status;
-                    }
-                    dm = ucc_mpool_get(&team->dm_pool);
-                    send_start(team, cyc_rank);
-                }
-                if (dm_host) {
-                    dm_addr = (uintptr_t)PTR_OFFSET(team->dm_ptr, dm->offset);
                 } else {
-                    dm_addr = dm->offset; // dm reg mr 0 based
-                }
-                dm->task = task;
-                //todo : start/end for RC ?
-                status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
-                                                    team->node.ops[task->seq_index].send_mkeys[0]->lkey,
-                                                    team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,
-                                                    block_size, block_size);
-                if (UCC_OK != status) {
-                    return status;
-                }
-                status = send_block_data(team, cyc_rank, dm_addr,
-                                         block_msgsize, team->dm_mr->lkey,
-                                         remote_addr, team->net.rkeys[cyc_rank],
-                                         IBV_SEND_SIGNALED, dm);
-                if (status != UCC_OK) {
-                    tl_error(UCC_TASK_LIB(task),
-                             "Failed sending block [%d,%d,%d]", i, j, k);
-                    return status;
+                    dm = ucc_mpool_get(&team->dm_pool);
+                    while (!dm) {
+                        status = send_done(team, cyc_rank);
+                        if (UCC_OK != status) {
+                            return status;
+                        }
+
+                        status = ucc_tl_mlx5_poll_cq(team, team->net.cq);
+                        if (UCC_OK != status) {
+                            return status;
+                        }
+                        dm = ucc_mpool_get(&team->dm_pool);
+                        send_start(team, cyc_rank);
+                    }
+                    if (dm_host) {
+                        dm_addr = (uintptr_t)PTR_OFFSET(team->dm_ptr, dm->offset);
+                    } else {
+                        dm_addr = dm->offset; // dm reg mr 0 based
+                    }
+                    dm->task = task;
+
+                    status = ucc_tl_mlx5_post_transpose(tl_mlx5_get_qp(team, cyc_rank),
+                                                        team->node.ops[task->seq_index].send_mkeys[0]->lkey,
+                                                        team->dm_mr->rkey, src_addr, dm_addr, task->msg_size,
+                                                        block_size, block_size);
+                    if (UCC_OK != status) {
+                        return status;
+                    }
+                    status = send_block_data(team, cyc_rank, dm_addr,
+                                             block_msgsize, team->dm_mr->lkey,
+                                             remote_addr, team->net.rkeys[cyc_rank],
+                                             IBV_SEND_SIGNALED, dm);
+                    if (status != UCC_OK) {
+                        tl_error(UCC_TASK_LIB(task),
+                                 "Failed sending block [%d,%d,%d]", i, j, k);
+                        return status;
+                    }
                 }
             }
         }
