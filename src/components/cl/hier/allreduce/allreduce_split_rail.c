@@ -305,13 +305,16 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_split_rail_init,
                          ucc_coll_task_t **task)
 {
     ucc_cl_hier_team_t *cl_team = ucc_derived_of(team, ucc_cl_hier_team_t);
-    int                 n_frags, pipeline_depth;
     ucc_cl_hier_lib_config_t *cfg   = &UCC_CL_HIER_TEAM_LIB(cl_team)->cfg;
     size_t                    count = coll_args->args.dst.info.count;
     size_t data_size = count * ucc_dt_size(coll_args->args.dst.info.datatype);
     ucc_cl_hier_schedule_t *schedule;
-
+    int                 n_frags, pipeline_depth;
     ucc_status_t status;
+
+    if (coll_args->args.op == UCC_OP_AVG) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     if (!SBGP_ENABLED(cl_team, NODE) || !SBGP_ENABLED(cl_team, NET)) {
         return UCC_ERR_NOT_SUPPORTED;
