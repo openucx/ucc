@@ -75,7 +75,7 @@ ucc_status_t ucc_tl_cuda_shm_barrier_start(ucc_rank_t rank,
     barrier->state[rank] = UCC_INPROGRESS;
     if (pos == barrier->size - 1) {
         barrier->count = 0;
-        ucc_memory_bus_fence();
+        ucc_memory_cpu_store_fence();
         barrier->sense = barrier->local_sense[rank];
     }
     return UCC_OK;

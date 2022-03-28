@@ -170,7 +170,7 @@ ucc_cuda_executor_persistent_task_post(ucc_ee_executor_t *executor,
     ee_task->eee    = executor;
     ee_task->status = UCC_OPERATION_INITIALIZED;
     memcpy(&ee_task->args, task_args, sizeof(ucc_ee_executor_task_args_t));
-    ucc_memory_bus_fence();
+    ucc_memory_cpu_store_fence();
     eee->pidx += 1;
     if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {
         ucc_spin_unlock(&eee->tasks_lock);

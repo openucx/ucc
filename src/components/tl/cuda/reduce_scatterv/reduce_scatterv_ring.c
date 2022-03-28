@@ -26,7 +26,7 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_setup_start(ucc_tl_cuda_task_t *ta
     ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
 
     set_rank_step(task, trank, 0, 0);
-    ucc_memory_bus_fence();
+    ucc_memory_cpu_store_fence();
     return ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
 }
 
