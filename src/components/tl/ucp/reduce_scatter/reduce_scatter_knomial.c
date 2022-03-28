@@ -45,10 +45,17 @@ void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     size_t                 block_count, peer_seg_count, local_seg_count;
     void                  *reduce_data, *local_data;
     int                    is_avg;
+    ucc_ee_executor_t     *exec;
+    ucc_ee_executor_task_args_t eargs;
 
+    status = ucc_coll_task_get_executor(&task->super, &exec);
+    if (ucc_unlikely(status != UCC_OK)) {
+        task->super.status = status;
+        return;
+    }
     local_seg_count = 0;
     block_count     = ucc_sra_kn_compute_block_count(count, rank, p);
-    UCC_KN_GOTO_PHASE(task->reduce_scatter_kn.phase);
+    UCC_KN_REDUCE_GOTO_PHASE(task->reduce_scatter_kn.phase);
 
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, rank);
@@ -73,11 +80,27 @@ UCC_KN_PHASE_EXTRA:
         if (KN_NODE_EXTRA == node_type) {
             goto out;
         } else {
-            if (UCC_OK != (status = ucc_dt_reduce(sbuf, scratch, rbuf, count,
-                                                  dt, mem_type, args))) {
+            status = ucc_dt_reduce_nb(sbuf, scratch, rbuf, count, dt, args,
+                                      exec, &task->reduce_scatter_kn.etask);
+            if (ucc_unlikely(status != UCC_OK)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.status = status;
                 return;
+            }
+UCC_KN_PHASE_EXTRA_REDUCE:
+            if (task->reduce_scatter_kn.etask != NULL) {
+                status = ucc_ee_executor_task_test(task->reduce_scatter_kn.etask);
+                if (status == UCC_INPROGRESS) {
+                    SAVE_STATE(UCC_KN_PHASE_EXTRA_REDUCE);
+                    return;
+                }
+                ucc_ee_executor_task_finalize(task->reduce_scatter_kn.etask);
+                if (ucc_unlikely(status < 0)) {
+                    tl_error(UCC_TASK_LIB(task),
+                             "failed to perform dt reduction");
+                    task->super.status = status;
+                    return
+                }
             }
         }
     }
@@ -152,26 +175,56 @@ UCC_KN_PHASE_EXTRA:
                      (avg_pre_op ? ucc_knomial_pattern_loop_first_iteration(p)
                                  : ucc_knomial_pattern_loop_last_iteration(p));
 
-            status = ucc_tl_ucp_reduce_multi(
+            status = ucc_tl_ucp_reduce_multi_nb(
                 local_data, rbuf, reduce_data,
                 task->tagged.send_posted - p->iteration * (radix - 1),
-                local_seg_count, local_seg_count * dt_size, dt, mem_type, task,
-                is_avg);
+                local_seg_count, local_seg_count * dt_size, dt, task,
+                is_avg, exec, &task->reduce_scatter_kn.etask);
             if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.status = status;
                 return;
             }
+UCC_KN_PHASE_REDUCE:
+            if (task->reduce_scatter_kn.etask != NULL) {
+                status = ucc_ee_executor_task_test(task->reduce_scatter_kn.etask);
+                if (status == UCC_INPROGRESS) {
+                    SAVE_STATE(UCC_KN_PHASE_REDUCE);
+                    return task->super.status;
+                }
+                ucc_ee_executor_task_finalize(task->reduce_scatter_kn.etask);
+                if (ucc_unlikely(status < 0)) {
+                    tl_error(UCC_TASK_LIB(task),
+                             "failed to perform dt reduction");
+                    task->super.status = status;
+                    return;
+                }
+            }
         }
         ucc_knomial_pattern_next_iteration(p);
     }
 
-    offset = ucc_sra_kn_get_offset(count, dt_size, rank, size, radix);
-    status = ucc_mc_memcpy(PTR_OFFSET(args->dst.info.buffer, offset),
-                           task->reduce_scatter_kn.scratch,
-                           local_seg_count * dt_size, mem_type, mem_type);
-
-    if (ucc_unlikely(UCC_OK != status)) {
+    ucc_sra_kn_get_offset_and_seglen(count, dt_size, rank, size, radix,
+                                     &offset, &local_seg_count);
+    eargs.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
+    eargs.bufs[0]   = PTR_OFFSET(args->dst.info.buffer, offset);
+    eargs.bufs[1]   = task->reduce_scatter_kn.scratch;
+    eargs.count     = local_seg_count * dt_size;
+    status = ucc_ee_executor_task_post(exec, &eargs,
+                                       &task->reduce_scatter_kn.etask);
+    if (ucc_unlikely(status != UCC_OK)) {
+        tl_error(UCC_TASK_LIB(task), "failed to copy data to dst buffer");
+        task->super.status = status;
+        return;
+    }
+UCC_KN_PHASE_COMPLETE:
+    status = ucc_ee_executor_task_test(task->reduce_scatter_kn.etask);
+    if (status == UCC_INPROGRESS) {
+        SAVE_STATE(UCC_KN_PHASE_COMPLETE);
+        return;
+    }
+    ucc_ee_executor_task_finalize(task->reduce_scatter_kn.etask);
+    if (ucc_unlikely(status != UCC_OK)) {
         task->super.status = status;
         return;
     }
@@ -233,6 +286,7 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
     ucc_kn_radix_t     step_radix;
 
     task                 = ucc_tl_ucp_init_task(coll_args, team);
+    task->super.flags    |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post     = ucc_tl_ucp_reduce_scatter_knomial_start;
     task->super.progress = ucc_tl_ucp_reduce_scatter_knomial_progress;
     task->super.finalize = ucc_tl_ucp_reduce_scatter_knomial_finalize;

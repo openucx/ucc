@@ -63,8 +63,10 @@ enum ucc_ee_executor_params_field {
 };
 
 typedef enum ucc_ee_executor_task_type {
-    UCC_EE_EXECUTOR_TASK_TYPE_COPY   = UCC_BIT(0),
-    UCC_EE_EXECUTOR_TASK_TYPE_REDUCE = UCC_BIT(1),
+    UCC_EE_EXECUTOR_TASK_TYPE_COPY               = UCC_BIT(0),
+    UCC_EE_EXECUTOR_TASK_TYPE_REDUCE             = UCC_BIT(1),
+    UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI       = UCC_BIT(2),
+    UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI_ALPHA = UCC_BIT(3),
 } ucc_ee_executor_task_type_t;
 
 typedef struct ucc_ee_executor_params {
@@ -84,7 +86,9 @@ typedef struct ucc_ee_executor_params {
 typedef struct ucc_ee_executor_task_args {
     ucc_ee_executor_task_type_t  task_type;
     void                        *bufs[UCC_EE_EXECUTOR_NUM_BUFS];
+    double                       alpha;
     ucc_count_t                  count;
+    size_t                       stride;
     uint32_t                     size;
     ucc_datatype_t               dt;
     ucc_reduction_op_t           op;

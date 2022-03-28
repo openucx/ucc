@@ -41,7 +41,21 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t             peer, step_radix, peer_seg_index, local_seg_index;
     ucc_kn_radix_t         loop_step;
     size_t                 block_count, peer_seg_count, local_seg_count;
+    ucc_status_t           status;
 
+    if (task->allgather_kn.etask != NULL) {
+        status = ucc_ee_executor_task_test(task->allgather_kn.etask);
+        if (status == UCC_INPROGRESS) {
+            task->super.status = status;
+            return;
+        }
+        ucc_ee_executor_task_finalize(task->allgather_kn.etask);
+        task->allgather_kn.etask = NULL;
+        if (ucc_unlikely(status < 0)) {
+            task->super.status = status;
+            return;
+        }
+    }
     /* Bcast will first call scatter and then allgather.
        In case of non-full tree with "extra" ranks, scatter will give each rank
        a new virtual rank number - "vrank".
@@ -147,6 +161,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         broot = 0;
     ucc_status_t       status;
     ptrdiff_t          offset;
+    ucc_ee_executor_task_args_t eargs;
+    ucc_ee_executor_t *exec;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
@@ -155,6 +171,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
         rank = VRANK(rank, broot, size);
     }
 
+    task->allgather_kn.etask = NULL;
     task->allgather_kn.phase = UCC_KN_PHASE_INIT;
     ucc_assert(args->src.info.mem_type == args->dst.info.mem_type);
 
@@ -163,12 +180,21 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
                                    ucc_dt_size(args->dst.info.datatype), rank,
                                    size, radix);
     if (!UCC_IS_INPLACE(*args)) {
-        status = ucc_mc_memcpy(
-            PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer,
-            args->src.info.count * ucc_dt_size(args->src.info.datatype),
-            args->dst.info.mem_type, args->src.info.mem_type);
-        if (UCC_OK != status) {
-            return status;
+        status = ucc_coll_task_get_executor(&task->super, &exec);
+        if (ucc_unlikely(status != UCC_OK)) {
+            task->super.status = status;
+            return;
+        }
+        eargs.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
+        eargs.bufs[0]   = PTR_OFFSET(args->dst.info.buffer, offset);
+        eargs.bufs[1]   = args->src.info.buffer;
+        eargs.count     = args->src.info.count *
+                          ucc_dt_size(args->src.info.datatype);
+        status = ucc_ee_executor_task_post(exec, &eargs,
+                                           &task->allgather_kn.etask);
+        if (ucc_unlikely(status != UCC_OK)) {
+            task->super.status = status;
+            return;
         }
     }
     task->allgather_kn.sbuf = PTR_OFFSET(args->dst.info.buffer, offset);
@@ -190,6 +216,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
         rank = VRANK(rank, broot, size);
     }
     task = ucc_tl_ucp_init_task(coll_args, team);
+    task->super.flags    |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post     = ucc_tl_ucp_allgather_knomial_start;
     task->super.progress = ucc_tl_ucp_allgather_knomial_progress;
     ucc_knomial_pattern_init_backward(size, rank, radix, &task->allgather_kn.p);

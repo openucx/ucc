@@ -9,8 +9,8 @@
 #include "config.h"
 #include "ucc_datastruct.h"
 #include "ucc_math.h"
-#include <string.h>
 #include "utils/ucc_time.h"
+#include <string.h>
 
 #define UCC_COLL_TYPE_NUM (ucc_ilog2(UCC_COLL_TYPE_LAST - 1) + 1)
 
@@ -245,4 +245,5 @@ static inline size_t ucc_buffer_block_offset(size_t     total_count,
 
     return (block < left) ? offset - (left - block) : offset;
 }
+
 #endif

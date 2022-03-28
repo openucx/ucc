@@ -180,15 +180,32 @@ ucc_knomial_pattern_get_min_radix(ucc_kn_radix_t cfg_radix,
    of the algorithms that use kn pattern */
 enum {
     UCC_KN_PHASE_INIT,
-    UCC_KN_PHASE_LOOP,  /* main loop of recursive k-ing */
-    UCC_KN_PHASE_EXTRA, /* recv from extra rank */
-    UCC_KN_PHASE_PROXY  /* recv from extra rank */
+    UCC_KN_PHASE_LOOP,         /* main loop of recursive k-ing */
+    UCC_KN_PHASE_REDUCE,       /* reduce data received from peer */
+    UCC_KN_PHASE_EXTRA,        /* recv from extra rank */
+    UCC_KN_PHASE_EXTRA_REDUCE, /* reduce data received from extra rank */
+    UCC_KN_PHASE_PROXY,        /* recv from extra rank */
+    UCC_KN_PHASE_COMPLETE,     /* any work after main loop, e.g. memcpy */
 };
 
 #define UCC_KN_CHECK_PHASE(_p)                                                 \
     case _p:                                                                   \
         goto _p;                                                               \
         break;
+
+#define UCC_KN_REDUCE_GOTO_PHASE(_phase)                                       \
+    do {                                                                       \
+        switch (_phase) {                                                      \
+            UCC_KN_CHECK_PHASE(UCC_KN_PHASE_EXTRA);                            \
+            UCC_KN_CHECK_PHASE(UCC_KN_PHASE_EXTRA_REDUCE);                     \
+            UCC_KN_CHECK_PHASE(UCC_KN_PHASE_LOOP);                             \
+            UCC_KN_CHECK_PHASE(UCC_KN_PHASE_REDUCE);                           \
+            UCC_KN_CHECK_PHASE(UCC_KN_PHASE_PROXY);                            \
+            UCC_KN_CHECK_PHASE(UCC_KN_PHASE_COMPLETE);                         \
+        case UCC_KN_PHASE_INIT:                                                \
+            break;                                                             \
+        };                                                                     \
+    } while (0)
 
 #define UCC_KN_GOTO_PHASE(_phase)                                              \
     do {                                                                       \
