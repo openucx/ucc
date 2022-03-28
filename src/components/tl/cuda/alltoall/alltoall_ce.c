@@ -41,7 +41,7 @@ ucc_status_t ucc_tl_cuda_alltoall_setup_start(ucc_tl_cuda_task_t *task)
            sizeof(ucc_tl_cuda_mem_info_t));
     CUDA_CHECK_GOTO(cudaEventRecord(sync->ipc_event_local, team->stream),
                     exit_err, status);
-    ucc_memory_bus_fence();
+    ucc_memory_cpu_store_fence();
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;

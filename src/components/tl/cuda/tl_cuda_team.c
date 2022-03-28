@@ -287,7 +287,7 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
                         exit_err, status);
     }
 
-    ucc_memory_bus_fence();
+    ucc_memory_cpu_store_fence();
     bar = UCC_TL_CUDA_TEAM_BARRIER(team, 0);
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), bar);
     if (status != UCC_OK) {
