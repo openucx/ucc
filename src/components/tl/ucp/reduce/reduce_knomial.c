@@ -101,6 +101,21 @@ UCC_REDUCE_KN_PHASE_MULTI:
                         task->super.status = status;
                         return;
                     }
+                } else if (args->op == UCC_OP_AVG && avg_pre_op &&
+                           task->reduce_kn.dist == 1) {
+                    ucc_mc_memcpy(rbuf, args->src.info.buffer, data_size,
+                                  mtype, args->src.info.mem_type);
+                    status = ucc_dt_reduce_multi_alpha(args->src.info.buffer,
+                        rbuf, rbuf, 1, count, data_size, dt, UCC_OP_PROD,
+                        (double)1 /
+                        (double)(UCC_TL_TEAM_SIZE(TASK_TEAM(task)) * 2),
+                        mtype, args);
+                    if (ucc_unlikely(UCC_OK != status)) {
+                        tl_error(UCC_TASK_LIB(task),
+                                 "failed to perform dt reduction");
+                        task->super.super.status = status;
+                        return status;
+                    }
                 }
             } else {
                 vroot_at_level = vrank - pos * task->reduce_kn.dist;
@@ -124,15 +139,22 @@ out:
 
 ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task   = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t   *args   = &TASK_ARGS(task);
-    ucc_tl_ucp_team_t *team   = TASK_TEAM(task);
-    uint32_t           radix  = task->reduce_kn.radix;
-    ucc_rank_t         root   = (ucc_rank_t)args->root;
-    ucc_rank_t         rank   = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t         size   = UCC_TL_TEAM_SIZE(team);
-    ucc_rank_t         vrank  = (rank - root + size) % size;
-    int                isleaf = ((vrank % radix != 0) || (vrank == size - 1));
+    ucc_tl_ucp_task_t *task       =
+        ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_coll_args_t   *args       = &TASK_ARGS(task);
+    ucc_tl_ucp_team_t *team       = TASK_TEAM(task);
+    uint32_t           radix      = task->reduce_kn.radix;
+    ucc_rank_t         root       = (ucc_rank_t)args->root;
+    ucc_rank_t         rank       = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         size       = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t         vrank      = (rank - root + size) % size;
+    int                isleaf     =
+        (vrank % radix != 0 || vrank == size - 1);
+    int                avg_pre_op =
+        UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op;
+    int                self_avg   = (args->op == UCC_OP_AVG &&
+        avg_pre_op && vrank % radix == 0);
+    ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_kn_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
@@ -141,7 +163,7 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
         args->src.info.buffer = args->dst.info.buffer;
     }
 
-    if (isleaf) {
+    if (isleaf && !self_avg) {
     	task->reduce_kn.scratch = args->src.info.buffer;
     }
 

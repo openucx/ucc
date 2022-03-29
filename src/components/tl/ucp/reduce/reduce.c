@@ -18,6 +18,7 @@ ucc_status_t ucc_tl_ucp_reduce_init(ucc_tl_ucp_task_t *task)
     ucc_memory_type_t  mtype;
     size_t             data_size;
     int                isleaf;
+    int                self_avg;
 
     if (root == myrank) {
         data_size = args->dst.info.count * ucc_dt_size(args->dst.info.datatype);
@@ -33,10 +34,12 @@ ucc_status_t ucc_tl_ucp_reduce_init(ucc_tl_ucp_task_t *task)
         ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_kn_radix, team_size);
     CALC_KN_TREE_DIST(team_size, task->reduce_kn.radix,
                       task->reduce_kn.max_dist);
-    isleaf = (vrank % task->reduce_kn.radix != 0 || vrank == team_size - 1);
+    isleaf   = (vrank % task->reduce_kn.radix != 0 || vrank == team_size - 1);
+    self_avg = (vrank % task->reduce_kn.radix == 0 && args->op == UCC_OP_AVG &&
+                UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op);
     task->reduce_kn.scratch_mc_header = NULL;
 
-    if (!isleaf) {
+    if (!isleaf || self_avg) {
     	/* scratch of size radix to fit up to radix - 1 recieved vectors
     	from its children at each step,
     	and an additional 1 for previous step reduce multi result */
