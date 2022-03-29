@@ -43,7 +43,7 @@
 
 static inline void ucc_tl_cuda_task_reset(ucc_tl_cuda_task_t *task)
 {
-    task->super.super.status = UCC_INPROGRESS;
+    task->super.status = UCC_INPROGRESS;
 }
 
 static inline ucc_tl_cuda_task_t *ucc_tl_cuda_task_get(ucc_tl_cuda_team_t *team)
@@ -52,9 +52,9 @@ static inline ucc_tl_cuda_task_t *ucc_tl_cuda_task_get(ucc_tl_cuda_team_t *team)
     ucc_tl_cuda_task_t    *task = ucc_mpool_get(&ctx->req_mp);
 
     UCC_TL_CUDA_PROFILE_REQUEST_NEW(task, "tl_cuda_task", 0);
-    task->super.super.status = UCC_OPERATION_INITIALIZED;
-    task->super.flags        = 0;
-    task->super.team         = &team->super.super;
+    task->super.status = UCC_OPERATION_INITIALIZED;
+    task->super.flags  = 0;
+    task->super.team   = &team->super.super;
     ucc_tl_cuda_task_reset(task);
     return task;
 }

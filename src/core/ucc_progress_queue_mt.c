@@ -76,14 +76,14 @@ static int ucc_pq_mt_progress(ucc_progress_queue_t *pq)
         if (task->progress) {
             task->progress(task);
         }
-        if (UCC_INPROGRESS == task->super.status) {
+        if (UCC_INPROGRESS == task->status) {
             if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
                 if (timestamp < 0) {
                     timestamp = ucc_get_time();
                 }
                 if (ucc_unlikely(timestamp - task->start_time >
                                  task->bargs.args.timeout)) {
-                    task->super.status = UCC_ERR_TIMED_OUT;
+                    task->status = UCC_ERR_TIMED_OUT;
                     ucc_task_complete(task);
                     return UCC_ERR_TIMED_OUT;
                 }

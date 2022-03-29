@@ -595,9 +595,13 @@ UccReq::~UccReq()
 
 void UccReq::start()
 {
+    ucc_status_t st;
     ASSERT_NE(0, reqs.size());
     for (auto r : reqs) {
-        ASSERT_EQ(UCC_OK, ucc_collective_post(r));
+        st = ucc_collective_post(r);
+        ASSERT_EQ(UCC_OK, st);
+        st = ucc_collective_test(r);
+        ASSERT_NE(UCC_OPERATION_INITIALIZED, st);
     }
 }
 
