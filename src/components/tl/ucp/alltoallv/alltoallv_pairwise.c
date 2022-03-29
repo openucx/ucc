@@ -24,7 +24,7 @@ static inline ucc_rank_t get_send_peer(ucc_rank_t rank, ucc_rank_t size,
     return (rank - step + size) % size;
 }
 
-ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
@@ -36,7 +36,7 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t         gsize = UCC_TL_TEAM_SIZE(team);
     int                polls = 0;
     ucc_rank_t         peer;
-    int                posts, nreqs;//, count_stride, displ_stride;
+    int                posts, nreqs;
     size_t             rdt_size, sdt_size, data_size, data_displ;
 
     posts    = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoallv_pairwise_num_posts;
@@ -80,16 +80,14 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *coll_task)
         }
     }
     if ((task->send_posted < gsize) || (task->recv_posted < gsize)) {
-        return task->super.super.status;
+        return;
     }
-    task->super.super.status = ucc_tl_ucp_test(task);
+    task->super.status = ucc_tl_ucp_test(task);
 out:
-    if (task->super.super.status != UCC_INPROGRESS) {
+    if (task->super.status != UCC_INPROGRESS) {
         UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task,
                                          "ucp_alltoallv_pairwise_done", 0);
     }
-
-    return task->super.super.status;
 }
 
 ucc_status_t ucc_tl_ucp_alltoallv_pairwise_start(ucc_coll_task_t *coll_task)
@@ -99,14 +97,8 @@ ucc_status_t ucc_tl_ucp_alltoallv_pairwise_start(ucc_coll_task_t *coll_task)
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_alltoallv_pairwise_start",
                                      0);
-    ucc_tl_ucp_task_reset(task);
-
-    ucc_tl_ucp_alltoallv_pairwise_progress(&task->super);
-    if (UCC_INPROGRESS == task->super.super.status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 ucc_status_t ucc_tl_ucp_alltoallv_pairwise_init_common(ucc_tl_ucp_task_t *task)

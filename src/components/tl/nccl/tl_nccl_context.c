@@ -10,33 +10,31 @@
 #include "core/ucc_ee.h"
 
 
-ucc_status_t ucc_tl_nccl_event_collective_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_nccl_event_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_status_t status;
 
     ucc_assert(task->completed != NULL);
     status = ucc_mc_ee_event_test(task->completed, UCC_EE_CUDA_STREAM);
-    coll_task->super.status = status;
+    coll_task->status = status;
 #ifdef HAVE_PROFILING_TL_NCCL
-    if (coll_task->super.status == UCC_OK) {
+    if (coll_task->status == UCC_OK) {
         UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_coll_done", 0);
     }
 #endif
-    return coll_task->super.status;
 }
 
-ucc_status_t ucc_tl_nccl_driver_collective_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_nccl_driver_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
 
-    coll_task->super.status = task->host_status;
+    coll_task->status = task->host_status;
 #ifdef HAVE_PROFILING_TL_NCCL
-    if (coll_task->super.status == UCC_OK) {
+    if (coll_task->status == UCC_OK) {
         UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_coll_done", 0);
     }
 #endif
-    return coll_task->super.status;
 }
 
 static void ucc_tl_nccl_req_mpool_obj_init(ucc_mpool_t *mp, void *obj,
@@ -82,7 +80,7 @@ static void ucc_tl_nccl_req_mapped_mpool_obj_init(ucc_mpool_t *mp, void *obj,
     st = cudaHostGetDevicePointer((void **)(&req->dev_status),
                                   (void *)&req->host_status, 0);
     if (st != cudaSuccess) {
-        req->super.super.status = UCC_ERR_NO_MESSAGE;
+        req->super.status = UCC_ERR_NO_MESSAGE;
     }
     req->super.progress = ucc_tl_nccl_driver_collective_progress;
 }

@@ -23,7 +23,7 @@ ucc_base_coll_alg_info_t
             .id = 0, .name = NULL, .desc = NULL}};
 
 ucc_status_t ucc_tl_ucp_bcast_knomial_start(ucc_coll_task_t *task);
-ucc_status_t ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *task);
+void ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_ucp_bcast_init(ucc_tl_ucp_task_t *task)
 {
