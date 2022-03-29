@@ -14,7 +14,7 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_init(ucc_tl_cuda_task_t *task);
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_start(ucc_coll_task_t *task);
 
-ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_progress(ucc_coll_task_t *task);
+void ucc_tl_cuda_reduce_scatterv_ring_progress(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_finalize(ucc_coll_task_t *task);
 

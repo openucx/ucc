@@ -437,7 +437,7 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
     do {                                                                       \
         ucc_status_t _status = (_cmd);                                         \
         if (UCC_OK != _status) {                                               \
-            _task->super.super.status = _status;                               \
+            _task->super.status = _status;                                     \
             goto _label;                                                       \
         }                                                                      \
     } while (0)

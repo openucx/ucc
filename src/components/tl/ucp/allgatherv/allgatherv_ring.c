@@ -12,7 +12,7 @@
 #include "utils/ucc_coll_utils.h"
 #include "tl_ucp_sendrecv.h"
 
-ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task     = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t   *args     = &TASK_ARGS(task);
@@ -28,7 +28,7 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
     size_t             data_size, data_displ;
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-        return task->super.super.status;
+        return;
     }
     while (task->tagged.send_posted < gsize) {
         send_idx   = (grank - task->tagged.send_posted + 1 + gsize) % gsize;
@@ -52,13 +52,13 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
                                          rmem, recvfrom, team, task),
                       task, out);
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            return task->super.super.status;
+            return;
         }
     }
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
-    task->super.super.status = UCC_OK;
+    task->super.status = UCC_OK;
 out:
-    return task->super.super.status;
+    return;
 }
 
 ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
@@ -71,9 +71,8 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     ucc_memory_type_t  rmem  = TASK_ARGS(task).dst.info_v.mem_type;
     ucc_rank_t         grank = UCC_TL_TEAM_RANK(team);
     size_t             data_size, data_displ, rdt_size;
-    ucc_status_t       status;
 
-    ucc_tl_ucp_task_reset(task);
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
         /* TODO replace local sendrecv with memcpy? */
@@ -99,12 +98,7 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *coll_task)
         task->tagged.send_completed = task->tagged.recv_completed = 1;
     }
 
-    status = ucc_tl_ucp_allgatherv_ring_progress(&task->super);
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 error:
-    return task->super.super.status;
+    return task->super.status;
 }

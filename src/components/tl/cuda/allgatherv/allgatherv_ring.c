@@ -167,7 +167,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress_ring(ucc_tl_cuda_task_t * task
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task    = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team    = TASK_TEAM(task);
@@ -176,33 +176,33 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
     switch (task->allgatherv_ring.stage) {
     case RING_STAGE_SYNC:
         if (ucc_tl_cuda_get_sync(task) != UCC_OK) {
-            task->super.super.status = UCC_INPROGRESS;
-            return task->super.super.status;
+            task->super.status = UCC_INPROGRESS;
+            return;
         }
         st = ucc_tl_cuda_allgatherv_ring_setup_start(task);
         if (st != UCC_OK) {
-            task->super.super.status = st;
-            return task->super.super.status;
+            task->super.status = st;
+            return;
         }
         task->allgatherv_ring.stage = RING_STAGE_SETUP;
     case RING_STAGE_SETUP:
         st = ucc_tl_cuda_allgatherv_ring_setup_test(task);
         if (st != UCC_OK) {
-            task->super.super.status = st;
-            return task->super.super.status;
+            task->super.status = st;
+            return;
         }
         task->allgatherv_ring.stage = RING_STAGE_RING;
     case RING_STAGE_RING:
         /* TODO: add support for multiple rings, only ring 0 is used so far */
         st = ucc_tl_cuda_allgatherv_ring_progress_ring(task, 0);
         if (st != UCC_OK) {
-            return task->super.super.status;
+            return;
         }
 
         st = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
         if (ucc_unlikely(st != UCC_OK)) {
-            task->super.super.status = st;
-            return task->super.super.status;
+            task->super.status = st;
+            return;
         }
 
         task->allgatherv_ring.stage = RING_STAGE_BARRIER;
@@ -211,12 +211,11 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
         break;
     }
 
-    task->super.super.status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team),
-                                                            task->bar);
-    if (task->super.super.status == UCC_OK) {
+    task->super.status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team),
+                                                      task->bar);
+    if (task->super.status == UCC_OK) {
         ucc_tl_cuda_put_sync(task);
     }
-    return task->super.super.status;
 }
 
 ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
@@ -255,12 +254,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     }
 
     task->allgatherv_ring.stage = RING_STAGE_SYNC;
-    st = ucc_tl_cuda_allgatherv_ring_progress(coll_task);
-    if (task->super.super.status == UCC_INPROGRESS) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 size_t ucc_tl_cuda_allgatherv_get_count(const ucc_tl_cuda_task_t *task,

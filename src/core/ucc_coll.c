@@ -305,6 +305,11 @@ static ucc_status_t ucc_triggered_task_finalize(ucc_coll_task_t *task)
     return UCC_OK;
 }
 
+static void ucc_triggered_task_cb(void *task, ucc_status_t st)
+{
+    ucc_triggered_task_finalize((ucc_coll_task_t*)task);
+}
+
 static ucc_status_t ucc_triggered_coll_complete(ucc_coll_task_t *parent_task, //NOLINT
                                                 ucc_coll_task_t *task)
 {
@@ -351,7 +356,7 @@ static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
+static void ucc_trigger_test(ucc_coll_task_t *task)
 {
     ucc_status_t              status;
     ucc_ev_t                  post_event;
@@ -369,7 +374,8 @@ static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
             task->ev      = ev;
             task->ee_task = NULL;
         } else {
-            return UCC_OK;
+            task->status = UCC_OK;
+            return;
         }
     }
 
@@ -379,8 +385,8 @@ static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
             if (ucc_unlikely(status != UCC_OK)) {
                 ucc_error("error in triggered post setup, %s",
                           ucc_status_string(status));
-                task->super.status = status;
-                return status;
+                task->status = status;
+                return;
             }
         }
         if (task->triggered_task->executor) {
@@ -395,16 +401,16 @@ static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
             if (ucc_unlikely(status != UCC_OK)) {
                 ucc_error("error in ee executor init, %s",
                            ucc_status_string(status));
-                task->super.status = status;
-                return status;
+                task->status = status;
+                return;
             }
         }
         status = ucc_ee_executor_start(task->executor, task->ee->ee_context);
         if (ucc_unlikely(status != UCC_OK)) {
             ucc_error("error in ee executor start, %s",
                       ucc_status_string(status));
-            task->super.status = status;
-            return status;
+            task->status = status;
+            return;
         }
 
         post_event.ev_type         = UCC_EVENT_COLLECTIVE_POST;
@@ -416,16 +422,14 @@ static ucc_status_t ucc_trigger_test(ucc_coll_task_t *task)
 
     if (task->executor == NULL ||
         (ucc_ee_executor_status(task->executor) == UCC_OK)) {
-        task->super.status = UCC_OK;
+        task->status = UCC_OK;
     }
-    return task->super.status;
 }
 
 ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
                                 ucc_coll_task_t *task)
 {
     ucc_coll_task_t *ev_task;
-    ucc_status_t     status;
 
     if (ev->ev_type != UCC_EVENT_COMPUTE_COMPLETE) {
         ucc_error("event type %d is not supported", ev->ev_type);
@@ -443,10 +447,12 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     ev_task->ee             = ee;
     ev_task->ev             = NULL;
     ev_task->triggered_task = task;
-    ev_task->flags          = UCC_COLL_TASK_FLAG_INTERNAL;
+    ev_task->flags          = UCC_COLL_TASK_FLAG_CB;
+    ev_task->cb.cb          = ucc_triggered_task_cb;
+    ev_task->cb.data        = ev_task;
     ev_task->finalize       = ucc_triggered_task_finalize;
     ev_task->progress       = ucc_trigger_test;
-    ev_task->super.status   = UCC_INPROGRESS;
+    ev_task->status         = UCC_INPROGRESS;
 
     if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
         UCC_COLL_SET_TIMEOUT(ev_task, task->bargs.args.timeout);
@@ -454,21 +460,7 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     ucc_event_manager_subscribe(&ev_task->em, UCC_EVENT_COMPLETED, task,
                                 ucc_trigger_complete);
 
-    status = ucc_trigger_test(ev_task);
-    if (ucc_unlikely(status < 0)) {
-        ucc_free(ev_task);
-        task->super.status = status;
-        ucc_task_complete(task);
-        return status;
-    }
-
-    if (ev_task->super.status == UCC_OK) {
-        ucc_trigger_complete(ev_task, task);
-        ucc_free(ev_task);
-    } else {
-        ucc_progress_enqueue(UCC_TASK_CORE_CTX(ev_task)->pq, ev_task);
-    }
-    return UCC_OK;
+    return ucc_progress_queue_enqueue(UCC_TASK_CORE_CTX(ev_task)->pq, ev_task);
 }
 
 ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ev)
