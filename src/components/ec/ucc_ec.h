@@ -51,4 +51,6 @@ ucc_status_t ucc_ee_executor_task_post(ucc_ee_executor_t *executor,
 
 ucc_status_t ucc_ee_executor_task_test(const ucc_ee_executor_task_t *task);
 
+ucc_status_t ucc_ee_executor_task_finalize(ucc_ee_executor_task_t *task);
+
 #endif

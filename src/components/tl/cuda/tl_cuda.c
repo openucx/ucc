@@ -17,6 +17,11 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      ucc_offsetof(ucc_tl_cuda_lib_config_t, max_concurrent),
      UCC_CONFIG_TYPE_UINT},
 
+    {"SCRATCH_SIZE", "1Mb",
+     "Size of the internal scratch buffer",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, scratch_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
     {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_cuda_lib_t, ucc_base_lib_t,

@@ -1,10 +1,19 @@
+/**
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "tl_cuda_coll.h"
 #include "alltoall/alltoall.h"
+#include "allgather/allgather.h"
+#include "allgatherv/allgatherv.h"
+#include "reduce_scatter/reduce_scatter.h"
+#include "reduce_scatterv/reduce_scatterv.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
-                                      ucc_tl_cuda_team_t *team,
                                       ucc_tl_cuda_mem_info_t *mi)
 {
     ucc_mem_attr_t mem_attr;
@@ -32,6 +41,14 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_ALLTOALL:
         return ucc_tl_cuda_alltoall_init(coll_args, team, task_h);
+    case UCC_COLL_TYPE_ALLGATHER:
+        return ucc_tl_cuda_allgather_init(coll_args, team, task_h);
+    case UCC_COLL_TYPE_ALLGATHERV:
+        return ucc_tl_cuda_allgatherv_init(coll_args, team, task_h);
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        return ucc_tl_cuda_reduce_scatter_init(coll_args, team, task_h);
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        return ucc_tl_cuda_reduce_scatterv_init(coll_args, team, task_h);
     default:
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -58,7 +75,7 @@ ucc_status_t ucc_tl_cuda_shm_barrier_start(ucc_rank_t rank,
     barrier->state[rank] = UCC_INPROGRESS;
     if (pos == barrier->size - 1) {
         barrier->count = 0;
-        ucc_memory_bus_fence();
+        ucc_memory_cpu_store_fence();
         barrier->sense = barrier->local_sense[rank];
     }
     return UCC_OK;

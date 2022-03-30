@@ -63,6 +63,47 @@ __device__ void executor_copy_aligned(T* __restrict__ d, T* __restrict__ s,
     }
 }
 
+__device__ inline void add_float4(float4 &d, const float4 &x, const float4 &y)
+{
+    d.x = x.x + y.x;
+    d.y = x.y + y.y;
+    d.z = x.z + y.z;
+    d.w = x.w + y.w;
+}
+
+__device__ void executor_reduce_float(const float *s1, const float *s2,
+                                      float *d, size_t count)
+{
+    const float4 *s14      = (const float4*)s1;
+    const float4 *s24      = (const float4*)s2;
+    float4       *d4       = (float4*)d;
+    const size_t  idx      = threadIdx.x;
+    const size_t  step     = blockDim.x;
+    const int     n        = count / 4;
+    const int     num_iter = n / step + ((idx < n % step) ? 1 : 0);
+
+    for(int i = 0; i < num_iter; i++) {
+        add_float4(d4[i * step + idx], s14[i * step + idx],
+                   s24[i * step + idx]);
+    }
+    if (idx < count % 4) {
+        d[count - idx - 1] = s1[count - idx - 1] + s2[count - idx - 1];
+    }
+}
+
+template <typename T>
+__device__ void executor_reduce(const T* __restrict__ s1,
+                                const T* __restrict__ s2,
+                                T* __restrict__ d, size_t count)
+{
+    const size_t step  = blockDim.x;
+    const size_t start = threadIdx.x;
+
+    for (size_t i = start; i < count; i+=step) {
+        d[i] = s1[i] + s2[i];
+    }
+}
+
 __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
                                 int q_size)
 {
@@ -116,6 +157,41 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
                                    args.count);
                 }
                 break;
+            case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE:
+                aligned = !(align_pow2((intptr_t)args.bufs[0], 16) ||
+                            align_pow2((intptr_t)args.bufs[1], 16) ||
+                            align_pow2((intptr_t)args.bufs[2], 16));
+                switch (args.dt)
+                {
+                case UCC_DT_FLOAT32:
+                    if (aligned) {
+                        executor_reduce_float((float*)args.bufs[1],
+                                              (float*)args.bufs[2],
+                                              (float*)args.bufs[0],
+                                              args.count);
+                    } else {
+                        executor_reduce<float>((float*)args.bufs[1],
+                                               (float*)args.bufs[2],
+                                               (float*)args.bufs[0],
+                                               args.count);
+                    }
+                    break;
+                case UCC_DT_FLOAT64:
+                    executor_reduce<double>((double*)args.bufs[1],
+                                            (double*)args.bufs[2],
+                                            (double*)args.bufs[0],
+                                             args.count);
+                    break;
+                case UCC_DT_INT32:
+                    executor_reduce<int>((int*)args.bufs[1],
+                                         (int*)args.bufs[2],
+                                         (int*)args.bufs[0],
+                                          args.count);
+                    break;
+
+                default:
+                    break;
+                }
             default: break;
         }
         __syncthreads();
@@ -131,7 +207,7 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
 extern "C" {
 #endif
 
-ucc_status_t ucc_ec_cuda_start_executor(ucc_ec_cuda_executor_t *eee)
+ucc_status_t ucc_ec_cuda_persistent_kernel_start(ucc_ec_cuda_executor_t *eee)
 {
     cudaStream_t stream = (cudaStream_t)eee->super.ee_context;
     int          nb     = EC_CUDA_CONFIG->exec_num_workers;

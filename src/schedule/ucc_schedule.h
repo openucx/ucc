@@ -1,7 +1,8 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
+
 #ifndef UCC_SCHEDULE_H_
 #define UCC_SCHEDULE_H_
 
@@ -11,6 +12,7 @@
 #include "utils/ucc_lock_free_queue.h"
 #include "utils/ucc_coll_utils.h"
 #include "components/base/ucc_base_iface.h"
+#include "components/ec/ucc_ec.h"
 
 #define MAX_LISTENERS 4
 
@@ -23,12 +25,26 @@ typedef enum {
 } ucc_event_t;
 
 typedef struct ucc_coll_task ucc_coll_task_t;
+
+typedef struct ucc_schedule ucc_schedule_t;
+
 typedef struct ucc_base_team ucc_base_team_t;
+
+typedef ucc_status_t (*ucc_coll_post_fn_t)(ucc_coll_task_t *task);
+
+typedef void (*ucc_coll_progress_fn_t)(ucc_coll_task_t *task);
+
+typedef ucc_status_t (*ucc_coll_finalize_fn_t)(ucc_coll_task_t *task);
+
 typedef ucc_status_t (*ucc_task_event_handler_p)(ucc_coll_task_t *parent,
                                                  ucc_coll_task_t *task);
-typedef ucc_status_t (*ucc_coll_post_fn_t)(ucc_coll_task_t *task);
-typedef ucc_status_t (*ucc_coll_triggered_post_fn_t)(ucc_ee_h ee, ucc_ev_t *ev, ucc_coll_task_t *task);
-typedef ucc_status_t (*ucc_coll_finalize_fn_t)(ucc_coll_task_t *task);
+
+/* triggered post setup function will be launched before starting executor */
+typedef ucc_status_t (*ucc_coll_triggered_post_setup_fn_t)(ucc_coll_task_t *task);
+
+typedef ucc_status_t (*ucc_coll_triggered_post_fn_t)(ucc_ee_h ee,
+                                                     ucc_ev_t *ev,
+                                                     ucc_coll_task_t *task);
 
 typedef struct ucc_em_listener {
     ucc_coll_task_t          *task;
@@ -41,26 +57,39 @@ typedef struct ucc_event_manager {
 } ucc_event_manager_t;
 
 enum {
-    UCC_COLL_TASK_FLAG_INTERNAL = UCC_BIT(0),
-    UCC_COLL_TASK_FLAG_CB       = UCC_BIT(1)
+    UCC_COLL_TASK_FLAG_CB            = UCC_BIT(0),
+    /* executor is required for collective*/
+    UCC_COLL_TASK_FLAG_EXECUTOR      = UCC_BIT(1),
+    /* user visible task */
+    UCC_COLL_TASK_FLAG_TOP_LEVEL     = UCC_BIT(2),
+    /* stop executor in task complete*/
+    UCC_COLL_TASK_FLAG_EXECUTOR_STOP = UCC_BIT(3)
 };
 
 typedef struct ucc_coll_task {
-    ucc_coll_req_t               super;
-    uint32_t                     flags;
-    ucc_base_coll_args_t         bargs;
-    ucc_base_team_t             *team; //CL/TL team pointer
-    ucc_coll_post_fn_t           post;
-    ucc_coll_triggered_post_fn_t triggered_post;
-    ucc_coll_finalize_fn_t       finalize;
-    ucc_coll_callback_t          cb;
-    ucc_event_manager_t          em;
-    ucc_status_t               (*progress)(struct ucc_coll_task *self);
-    struct ucc_schedule         *schedule;
-    ucc_ee_h                     ee;
-    ucc_ev_t                    *ev;
-    void                        *ee_task;
-    ucc_coll_task_t             *triggered_task;
+    ucc_coll_req_t                     super;
+    /**
+     *  Task internal status, TLs and CLs should use it to track collective
+     *  state. super.status is visible to user and should be updated only
+     *  by core level to avoid potential races
+     */
+    ucc_status_t                       status;
+    ucc_event_manager_t                em;
+    ucc_base_coll_args_t               bargs;
+    ucc_base_team_t                   *team; //CL/TL team pointer
+    ucc_schedule_t                    *schedule;
+    uint32_t                           flags;
+    ucc_coll_post_fn_t                 post;
+    ucc_coll_triggered_post_setup_fn_t triggered_post_setup;
+    ucc_coll_triggered_post_fn_t       triggered_post;
+    ucc_coll_progress_fn_t             progress;
+    ucc_coll_finalize_fn_t             finalize;
+    ucc_coll_callback_t                cb;
+    ucc_ee_h                           ee;
+    ucc_ev_t                          *ev;
+    void                              *ee_task;
+    ucc_coll_task_t                   *triggered_task;
+    ucc_ee_executor_t                 *executor;
     union {
         /* used for st & locked mt progress queue */
         ucc_list_link_t              list_elem;
@@ -90,7 +119,11 @@ typedef struct ucc_schedule {
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em);
 
 ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
-                                ucc_base_coll_args_t *args, ucc_base_team_t *team);
+                                ucc_base_coll_args_t *args,
+                                ucc_base_team_t *team);
+
+ucc_status_t ucc_coll_task_get_executor(ucc_coll_task_t *task,
+                                        ucc_ee_executor_t **exec);
 
 void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
                                  ucc_coll_task_t *task,
@@ -99,7 +132,8 @@ void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
 ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event);
 
-ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_base_coll_args_t *bargs,
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule,
+                               ucc_base_coll_args_t *bargs,
                                ucc_base_team_t *team);
 
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
@@ -118,7 +152,10 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
 
 static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 {
-    ucc_status_t status = task->super.status;
+    ucc_status_t        status      = task->status;
+    ucc_coll_callback_t cb          = task->cb;
+    int                 has_cb      = task->flags & UCC_COLL_TASK_FLAG_CB;
+
     ucc_assert((status == UCC_OK) || (status < 0));
     if (ucc_likely(status == UCC_OK)) {
         status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
@@ -131,19 +168,21 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
                      task->bargs.args.timeout, coll_str);
         } else {
             ucc_error("failure in task %p, %s", task,
-                      ucc_status_string(task->super.status));
+                      ucc_status_string(task->status));
         }
-        ucc_assert(task->super.status < 0);
         ucc_event_manager_notify(task, UCC_EVENT_ERROR);
-        status = task->super.status;
     }
 
-    if (task->flags & UCC_COLL_TASK_FLAG_CB) {
-        task->cb.cb(task->cb.data, status);
+    if ((task->executor) && (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR_STOP)) {
+        status = ucc_ee_executor_stop(task->executor);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ucc_error("failed to stop executor %s", ucc_status_string(status));
+        }
     }
 
-    if (task->flags & UCC_COLL_TASK_FLAG_INTERNAL) {
-        task->finalize(task);
+    task->super.status = status;
+    if (has_cb) {
+        cb.cb(cb.data, status);
     }
     return status;
 }

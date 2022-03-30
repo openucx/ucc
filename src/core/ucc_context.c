@@ -542,6 +542,8 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     ucc_base_ctx_attr_t        c_attr;
     ucc_cl_lib_attr_t          l_attr;
     ucc_cl_lib_t              *cl_lib;
+    ucc_tl_context_t          *tl_ctx;
+    ucc_tl_lib_t              *tl_lib;
     ucc_context_t             *ctx;
     ucc_status_t               status;
     uint64_t                   i;
@@ -728,6 +730,20 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
             goto error_ctx_create;
         }
     }
+
+    for (i = 0; i < ctx->n_tl_ctx; i++) {
+        tl_ctx = ctx->tl_ctx[i];
+        tl_lib = ucc_derived_of(tl_ctx->super.lib, ucc_tl_lib_t);
+        if (tl_lib->iface->context.create_epilog) {
+            status = tl_lib->iface->context.create_epilog(&tl_ctx->super);
+            if (UCC_OK != status) {
+                ucc_error("ctx create epilog for %s failed: %s",
+                          tl_lib->iface->super.name, ucc_status_string(status));
+                goto error_ctx_create;
+            }
+        }
+    }
+
     ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;
     return UCC_OK;

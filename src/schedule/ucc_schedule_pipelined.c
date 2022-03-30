@@ -35,7 +35,7 @@ static ucc_status_t ucc_frag_start_handler(ucc_coll_task_t *parent,
 }
 
 static ucc_status_t
-ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
+ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task,
                                          ucc_coll_task_t *task)
 {
     ucc_schedule_pipelined_t *schedule =
@@ -49,24 +49,24 @@ ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
         "sched %p completed frag %p, n_completed %d, n_started %d, n_total %d",
         schedule, frag, schedule->super.n_completed_tasks,
         schedule->n_frags_started, schedule->super.n_tasks);
-    ucc_assert(frag->super.super.status == UCC_OK);
+    ucc_assert(frag->super.status == UCC_OK);
     if (schedule->super.n_completed_tasks == schedule->super.n_tasks) {
-        schedule->super.super.super.status = UCC_OK;
+        schedule->super.super.status = UCC_OK;
         ucc_task_complete(task);
         return UCC_OK;
     }
     while ((schedule->super.n_completed_tasks + schedule->n_frags_in_pipeline <
             schedule->super.n_tasks) &&
-           (frag->super.super.status == UCC_OK)) {
+           (frag->super.status == UCC_OK)) {
         /* need to post more frags*/
         if (frag == schedule->frags[schedule->next_frag_to_post]) {
             ucc_trace_req("sched %p restarting frag %d %p", schedule,
                           schedule->next_frag_to_post, frag);
-            frag->super.super.status = UCC_OPERATION_INITIALIZED;
+            frag->super.status = UCC_OPERATION_INITIALIZED;
             frag->n_completed_tasks  = 0;
             for (i = 0; i < frag->n_tasks; i++) {
                 frag->tasks[i]->n_deps += frag->tasks[i]->n_deps_base;
-                frag->tasks[i]->super.status = UCC_OPERATION_INITIALIZED;
+                frag->tasks[i]->status = UCC_OPERATION_INITIALIZED;
             }
             ucc_frag_start_handler(&schedule->super.super, &frag->super);
         }
@@ -158,6 +158,11 @@ ucc_status_t ucc_schedule_pipelined_init(
             ucc_error("failed to initialize fragment for pipeline");
             goto err;
         }
+        frags[i]->super.schedule = &schedule->super;
+        if (frags[i]->super.flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
+            schedule->super.super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+        }
+        frags[i]->super.status       = UCC_OPERATION_INITIALIZED;
         frags[i]->super.super.status = UCC_OPERATION_INITIALIZED;
     }
     for (i = 0; i < n_frags; i++) {

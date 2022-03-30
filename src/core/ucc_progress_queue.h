@@ -8,6 +8,7 @@
 
 #include "ucc/api/ucc.h"
 #include "schedule/ucc_schedule.h"
+
 typedef struct ucc_progress_queue ucc_progress_queue_t;
 struct ucc_progress_queue {
     void (*enqueue)(ucc_progress_queue_t *pq, ucc_coll_task_t *task);
@@ -24,6 +25,20 @@ static inline void ucc_progress_enqueue(ucc_progress_queue_t *pq,
                                         ucc_coll_task_t *task)
 {
     pq->enqueue(pq, task);
+}
+
+static inline ucc_status_t ucc_progress_queue_enqueue(ucc_progress_queue_t *pq,
+                                                      ucc_coll_task_t *task)
+{
+    task->progress(task);
+    if (task->status != UCC_INPROGRESS) {
+        /* task completed immediately, don't add it to the progress queue */
+        return ucc_task_complete(task);
+    }
+    /* set user visible status */
+    task->super.status = UCC_INPROGRESS;
+    pq->enqueue(pq, task);
+    return UCC_OK;
 }
 
 static inline int ucc_progress_queue(ucc_progress_queue_t *pq)

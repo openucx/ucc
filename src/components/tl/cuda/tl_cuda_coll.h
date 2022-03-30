@@ -27,9 +27,23 @@
         UCC_TL_CUDA_TEAM_BARRIER(_team, (_task)->coll_id);                     \
     })
 
+#define TASK_SCRATCH(_task, _rank)                                             \
+    ({                                                                         \
+        ucc_tl_cuda_team_t *_team = TASK_TEAM(_task);                          \
+        size_t _scratch_size = UCC_TL_CUDA_TEAM_LIB(_team)->cfg.scratch_size;  \
+        void *_scratch;                                                        \
+        if (_rank == UCC_TL_TEAM_RANK(_team)) {                                \
+            _scratch = _team->scratch.loc;                                     \
+        } else {                                                               \
+            _scratch = PTR_OFFSET(_team->scratch.rem[_rank],                   \
+                                  _team->scratch.rem_info[_rank].offset);      \
+        }                                                                      \
+        (PTR_OFFSET(_scratch, (_task)->coll_id * _scratch_size));              \
+    })
+
 static inline void ucc_tl_cuda_task_reset(ucc_tl_cuda_task_t *task)
 {
-    task->super.super.status = UCC_INPROGRESS;
+    task->super.status = UCC_INPROGRESS;
 }
 
 static inline ucc_tl_cuda_task_t *ucc_tl_cuda_task_get(ucc_tl_cuda_team_t *team)
@@ -38,9 +52,9 @@ static inline ucc_tl_cuda_task_t *ucc_tl_cuda_task_get(ucc_tl_cuda_team_t *team)
     ucc_tl_cuda_task_t    *task = ucc_mpool_get(&ctx->req_mp);
 
     UCC_TL_CUDA_PROFILE_REQUEST_NEW(task, "tl_cuda_task", 0);
-    task->super.super.status = UCC_OPERATION_INITIALIZED;
-    task->super.flags        = 0;
-    task->super.team         = &team->super.super;
+    task->super.status = UCC_OPERATION_INITIALIZED;
+    task->super.flags  = 0;
+    task->super.team   = &team->super.super;
     ucc_tl_cuda_task_reset(task);
     return task;
 }
@@ -92,7 +106,6 @@ static inline void ucc_tl_cuda_put_sync(ucc_tl_cuda_task_t *task)
 }
 
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
-                                      ucc_tl_cuda_team_t *team,
                                       ucc_tl_cuda_mem_info_t *mi);
 
 ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,

@@ -1981,6 +1981,9 @@ static inline ucc_status_t ucc_collective_test(ucc_coll_req_h request)
  *
  *  @ref ucc_collective_finalize operation releases all resources
  *  associated with the collective operation represented by the request handle.
+ *  In UCC_THREAD_MULTIPLE mode, the user is responsible for ensuring that
+ *  @ref ucc_collective_finalize is called after the status is UCC_OK and after
+ *  completing the execution of any callback registered with @ref ucc_coll_args_t.
  *
  *  @endparblock
  *

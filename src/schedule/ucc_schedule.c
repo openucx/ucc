@@ -36,18 +36,39 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
                                 ucc_base_coll_args_t *bargs,
                                 ucc_base_team_t *team)
 {
-    task->super.status     = UCC_OPERATION_INITIALIZED;
-    task->ee               = NULL;
-    task->flags            = 0;
-    task->team             = team;
-    task->n_deps           = 0;
-    task->n_deps_satisfied = 0;
-    task->bargs.args.mask  = 0;
+    task->flags                = 0;
+    task->ee                   = NULL;
+    task->team                 = team;
+    task->n_deps               = 0;
+    task->n_deps_satisfied     = 0;
+    task->bargs.args.mask      = 0;
+    task->schedule             = NULL;
+    task->executor             = NULL;
+    task->super.status         = UCC_OPERATION_INITIALIZED;
+    task->triggered_post_setup = NULL;
     if (bargs) {
         memcpy(&task->bargs, bargs, sizeof(*bargs));
     }
     ucc_lf_queue_init_elem(&task->lf_elem);
     return ucc_event_manager_init(&task->em);
+}
+
+ucc_status_t ucc_coll_task_get_executor(ucc_coll_task_t *task,
+                                        ucc_ee_executor_t **exec)
+{
+    ucc_status_t st = UCC_OK;
+
+    if (task->executor == NULL) {
+        if (ucc_unlikely(!task->schedule)) {
+            ucc_error("executor wasn't initialized for the collective");
+            return UCC_ERR_INVALID_PARAM;
+        }
+        st = ucc_coll_task_get_executor(&task->schedule->super,
+                                        &task->executor);
+    }
+
+    *exec = task->executor;
+    return st;
 }
 
 static ucc_status_t
@@ -102,15 +123,18 @@ ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
 {
     ucc_schedule_t *self = ucc_container_of(task, ucc_schedule_t, super);
 
+    // TODO: do we need lock here?
+    // if tasks in schedule are independet and completes concurently
     self->n_completed_tasks += 1;
     if (self->n_completed_tasks == self->n_tasks) {
-        self->super.super.status = UCC_OK;
+        self->super.status = UCC_OK;
         ucc_task_complete(&self->super);
     }
     return UCC_OK;
 }
 
-ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_base_coll_args_t *bargs,
+ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule,
+                               ucc_base_coll_args_t *bargs,
                                ucc_base_team_t *team)
 {
     ucc_status_t status;
@@ -124,14 +148,19 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule, ucc_base_coll_args_t *b
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
 {
     ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED,
-                            &schedule->super, ucc_schedule_completed_handler);
+                                &schedule->super,
+                                ucc_schedule_completed_handler);
     task->schedule                       = schedule;
     schedule->tasks[schedule->n_tasks++] = task;
+    if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
+        schedule->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    }
 }
 
 ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule)
 {
     schedule->n_completed_tasks  = 0;
+    schedule->super.status       = UCC_INPROGRESS;
     schedule->super.super.status = UCC_INPROGRESS;
     return ucc_event_manager_notify(&schedule->super,
                                     UCC_EVENT_SCHEDULE_STARTED);

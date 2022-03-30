@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -9,6 +9,7 @@
 
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
+#include "components/mc/ucc_mc.h"
 #include "utils/ucc_mpool.h"
 #include "tl_cuda_ep_hash.h"
 #include "tl_cuda_topo.h"
@@ -21,7 +22,9 @@
 
 #define UCC_TL_CUDA_MAX_PEERS 8
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_ALLTOALL)
+    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLGATHER |                        \
+     UCC_COLL_TYPE_ALLGATHERV | UCC_COLL_TYPE_REDUCE_SCATTER |                 \
+     UCC_COLL_TYPE_REDUCE_SCATTERV)
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_cuda_lib_t))
@@ -67,6 +70,7 @@ extern ucc_tl_cuda_iface_t ucc_tl_cuda;
 typedef struct ucc_tl_cuda_lib_config {
     ucc_tl_lib_config_t super;
     uint32_t            max_concurrent;
+    size_t              scratch_size;
 } ucc_tl_cuda_lib_config_t;
 
 typedef struct ucc_tl_cuda_context_config {
@@ -102,12 +106,6 @@ typedef struct ucc_tl_cuda_shm_barrier {
     int          local_sense[UCC_TL_CUDA_MAX_PEERS];
 } ucc_tl_cuda_shm_barrier_t;
 
-typedef struct ucc_tl_cuda_rank_id {
-    int                         device;
-    ucc_tl_cuda_device_pci_id_t pci_id;
-    int                         shm;
-} ucc_tl_cuda_rank_id_t;
-
 typedef struct ucc_tl_cuda_sync_data {
     cudaEvent_t ipc_event_remote;
 } ucc_tl_cuda_sync_data_t;
@@ -119,14 +117,27 @@ typedef struct ucc_tl_cuda_mem_info {
     cudaIpcMemHandle_t  handle;
 } ucc_tl_cuda_mem_info_t;
 
+typedef struct ucc_tl_cuda_rank_id {
+    int                         device;
+    ucc_tl_cuda_device_pci_id_t pci_id;
+    ucc_tl_cuda_mem_info_t      scratch_info;
+    int                         shm;
+} ucc_tl_cuda_rank_id_t;
+
 typedef struct ucc_tl_cuda_sync {
-    uint32_t                 seq_num[2];
+    int                      seq_num;
     ucc_tl_cuda_mem_info_t   mem_info_src;
     ucc_tl_cuda_mem_info_t   mem_info_dst;
     cudaEvent_t              ipc_event_local;
     cudaIpcEventHandle_t     ev_handle;
     ucc_tl_cuda_sync_data_t  data[1];
 } ucc_tl_cuda_sync_t;
+
+typedef struct ucc_tl_cuda_scratch {
+    void                   *loc;
+    void                   *rem[UCC_TL_CUDA_MAX_PEERS];
+    ucc_tl_cuda_mem_info_t  rem_info[UCC_TL_CUDA_MAX_PEERS];
+} ucc_tl_cuda_scratch_t;
 
 typedef struct ucc_tl_cuda_team {
     ucc_tl_team_t              super;
@@ -135,6 +146,7 @@ typedef struct ucc_tl_cuda_team {
     ucc_tl_cuda_sync_t        *sync;
     ucc_tl_cuda_sync_state_t  *sync_state;
     ucc_tl_cuda_shm_barrier_t *bar;
+    ucc_tl_cuda_scratch_t      scratch;
     cudaStream_t               stream;
     ucc_tl_cuda_rank_id_t     *ids;
     ucc_team_oob_coll_t        oob;
@@ -144,7 +156,8 @@ typedef struct ucc_tl_cuda_team {
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
-typedef struct ucc_tl_cuda_task {
+typedef struct ucc_tl_cuda_task ucc_tl_cuda_task_t;
+struct ucc_tl_cuda_task {
     ucc_coll_task_t            super;
     uint32_t                   seq_num;
     uint32_t                   coll_id;
@@ -156,9 +169,35 @@ typedef struct ucc_tl_cuda_task {
             ucc_tl_cuda_mem_info_t  mem_info_dst;
             void                   *peer_map_addr_src[UCC_TL_CUDA_MAX_PEERS];
             void                   *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
+            int                     num_posted;
+            ucc_ee_executor_task_t *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
             void                   *copy_done;
         } alltoall_ce;
+        struct {
+            int                      stage;
+            int                      num_frags;
+            ucc_datatype_t           dt;
+            void                    *sbuf;
+            void                    *rbuf;
+            ucc_ee_executor_task_t  *exec_task[2];
+            size_t                 (*get_count)(const ucc_tl_cuda_task_t *task,
+                                                ucc_rank_t block);
+            size_t                 (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                                 ucc_rank_t block);
+        } allgatherv_ring;
+        struct {
+            int                      stage;
+            int                      num_frags;
+            ucc_datatype_t           dt;
+            void                    *sbuf;
+            void                    *rbuf;
+            ucc_ee_executor_task_t  *exec_task;
+            size_t                 (*get_count)(const ucc_tl_cuda_task_t *task,
+                                                ucc_rank_t block);
+            size_t                 (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                                 ucc_rank_t block);
+        } reduce_scatterv_ring;
     };
-} ucc_tl_cuda_task_t;
+};
 
 #endif

@@ -24,18 +24,20 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
     ucc_status_t     status;
 
     ucc_list_for_each_safe(task, tmp, &pq_st->list, list_elem) {
+        ucc_assert((task->status != UCC_OPERATION_INITIALIZED) &&
+                   (task->super.status != UCC_OPERATION_INITIALIZED));
         if (task->progress) {
-            ucc_assert(task->super.status != UCC_OK);
+            ucc_assert(task->status != UCC_OK);
             task->progress(task);
         }
-        if (UCC_INPROGRESS == task->super.status) {
+        if (UCC_INPROGRESS == task->status) {
             if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
                 if (timestamp < 0) {
                     timestamp = ucc_get_time();
                 }
                 if (ucc_unlikely(timestamp - task->start_time >
                                  task->bargs.args.timeout)) {
-                    task->super.status = UCC_ERR_TIMED_OUT;
+                    task->status = UCC_ERR_TIMED_OUT;
                     ucc_list_del(&task->list_elem);
                     ucc_task_complete(task);
                     return UCC_ERR_TIMED_OUT;
@@ -51,7 +53,6 @@ static int ucc_pq_st_progress(ucc_progress_queue_t *pq)
     }
     return n_progressed;
 }
-
 
 static void ucc_pq_st_enqueue(ucc_progress_queue_t *pq, ucc_coll_task_t *task)
 {

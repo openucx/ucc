@@ -123,13 +123,14 @@ typedef struct ucc_tl_ucp_schedule {
     (ucc_derived_of((_task)->super.team->context->lib, ucc_tl_ucp_lib_t))
 #define TASK_ARGS(_task) (_task)->super.bargs.args
 
-static inline void ucc_tl_ucp_task_reset(ucc_tl_ucp_task_t *task)
+static inline void ucc_tl_ucp_task_reset(ucc_tl_ucp_task_t *task,
+                                         ucc_status_t status)
 {
     task->tagged.send_posted    = 0;
     task->tagged.send_completed = 0;
     task->tagged.recv_posted    = 0;
     task->tagged.recv_completed = 0;
-    task->super.super.status    = UCC_INPROGRESS;
+    task->super.status          = status;
 }
 
 static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
@@ -138,14 +139,13 @@ static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
     ucc_tl_ucp_task_t    *task = ucc_mpool_get(&ctx->req_mp);;
 
     UCC_TL_UCP_PROFILE_REQUEST_NEW(task, "tl_ucp_task", 0);
-    task->super.super.status = UCC_OPERATION_INITIALIZED;
-    task->super.flags        = 0;
-    task->n_polls            = ctx->cfg.n_polls;
-    task->super.team         = &team->super.super;
-    task->subset.map.type    = UCC_EP_MAP_FULL;
-    task->subset.map.ep_num  = UCC_TL_TEAM_SIZE(team);
-    task->subset.myrank      = UCC_TL_TEAM_RANK(team);
-    ucc_tl_ucp_task_reset(task);
+    task->super.flags       = 0;
+    task->n_polls           = ctx->cfg.n_polls;
+    task->super.team        = &team->super.super;
+    task->subset.map.type   = UCC_EP_MAP_FULL;
+    task->subset.map.ep_num = UCC_TL_TEAM_SIZE(team);
+    task->subset.myrank     = UCC_TL_TEAM_RANK(team);
+    ucc_tl_ucp_task_reset(task, UCC_OPERATION_INITIALIZED);
     return task;
 }
 
@@ -187,9 +187,9 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
 
     ucc_coll_task_init(&task->super, coll_args, team);
-    task->tagged.tag     = tl_team->seq_num;
-    tl_team->seq_num     = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
-    task->super.finalize = ucc_tl_ucp_coll_finalize;
+    tl_team->seq_num = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
+    task->tagged.tag           = tl_team->seq_num;
+    task->super.finalize       = ucc_tl_ucp_coll_finalize;
     task->super.triggered_post = ucc_triggered_post;
     return task;
 }
