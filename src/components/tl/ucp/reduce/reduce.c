@@ -16,17 +16,21 @@ ucc_status_t ucc_tl_ucp_reduce_init(ucc_tl_ucp_task_t *task)
     ucc_rank_t         vrank     = (myrank - root + team_size) % team_size;
     ucc_status_t       status    = UCC_OK;
     ucc_memory_type_t  mtype;
-    size_t             data_size;
+    ucc_datatype_t     dt;
+    size_t             count, data_size;
     int                isleaf;
     int                self_avg;
 
     if (root == myrank) {
-        data_size = args->dst.info.count * ucc_dt_size(args->dst.info.datatype);
+        count = args->dst.info.count;
+        dt    = args->dst.info.datatype;
         mtype = args->dst.info.mem_type;
     } else {
-        data_size = args->src.info.count * ucc_dt_size(args->src.info.datatype);
+        count = args->src.info.count;
+        dt    = args->src.info.datatype;
         mtype = args->src.info.mem_type;
     }
+    data_size = count * ucc_dt_size(dt);
     task->super.post      = ucc_tl_ucp_reduce_knomial_start;
     task->super.progress  = ucc_tl_ucp_reduce_knomial_progress;
     task->super.finalize  = ucc_tl_ucp_reduce_knomial_finalize;
@@ -48,5 +52,6 @@ ucc_status_t ucc_tl_ucp_reduce_init(ucc_tl_ucp_task_t *task)
         task->reduce_kn.scratch =
                         task->reduce_kn.scratch_mc_header->addr;
     }
+
     return status;
 }

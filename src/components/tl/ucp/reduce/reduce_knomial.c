@@ -101,21 +101,6 @@ UCC_REDUCE_KN_PHASE_MULTI:
                         task->super.status = status;
                         return;
                     }
-                } else if (args->op == UCC_OP_AVG && avg_pre_op &&
-                           task->reduce_kn.dist == 1) {
-                    ucc_mc_memcpy(rbuf, args->src.info.buffer, data_size,
-                                  mtype, args->src.info.mem_type);
-                    status = ucc_dt_reduce_multi_alpha(args->src.info.buffer,
-                        rbuf, rbuf, 1, count, data_size, dt, UCC_OP_PROD,
-                        (double)1 /
-                        (double)(UCC_TL_TEAM_SIZE(TASK_TEAM(task)) * 2),
-                        mtype, args);
-                    if (ucc_unlikely(UCC_OK != status)) {
-                        tl_error(UCC_TASK_LIB(task),
-                                 "failed to perform dt reduction");
-                        task->super.super.status = status;
-                        return status;
-                    }
                 }
             } else {
                 vroot_at_level = vrank - pos * task->reduce_kn.dist;
@@ -154,7 +139,22 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
         UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op;
     int                self_avg   = (args->op == UCC_OP_AVG &&
         avg_pre_op && vrank % radix == 0);
+    size_t             data_size, count;
+    ucc_memory_type_t  mtype;
+    ucc_datatype_t     dt;
     ucc_status_t       status;
+
+    if (root == rank) {
+        count = args->dst.info.count;
+        dt    = args->dst.info.datatype;
+        mtype = args->dst.info.mem_type;
+    } else {
+        count = args->src.info.count;
+        dt    = args->src.info.datatype;
+        mtype = args->src.info.mem_type;
+    }
+    data_size = count * ucc_dt_size(dt);
+
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_kn_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
@@ -165,6 +165,22 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
 
     if (isleaf && !self_avg) {
     	task->reduce_kn.scratch = args->src.info.buffer;
+    }
+
+    if (isleaf && self_avg) {
+        /* In case of avg_pre_op, single leaf process which does not take part
+           in first iteration reduction must divide itself by team_size */
+        status = ucc_dt_reduce_multi_alpha(args->src.info.buffer,
+            args->src.info.buffer, task->reduce_kn.scratch, 1, count,
+            data_size, dt, UCC_OP_PROD,
+            (double)1 / (double)(UCC_TL_TEAM_SIZE(TASK_TEAM(task)) * 2),
+            mtype, args);
+        if (ucc_unlikely(UCC_OK != status)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "failed to perform dt reduction");
+            task->super.status = status;
+            return status;
+        }
     }
 
     task->reduce_kn.dist = 1;
