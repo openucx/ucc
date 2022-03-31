@@ -113,7 +113,7 @@ static ucc_status_t ucc_tl_shm_bcast_read(ucc_tl_shm_team_t *team,
     return UCC_INPROGRESS;
 }
 
-static ucc_status_t ucc_tl_shm_bcast_progress(ucc_coll_task_t *coll_task)
+static void ucc_tl_shm_bcast_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -128,7 +128,6 @@ static ucc_status_t ucc_tl_shm_bcast_progress(ucc_coll_task_t *coll_task)
     int                is_inline  = data_size <= team->max_inline;
     int                is_op_root = rank == root;
     ucc_tl_shm_ctrl_t *my_ctrl, *parent_ctrl;
-    ucc_status_t       status;
     void *             src;
 
 next_stage:
@@ -138,10 +137,8 @@ next_stage:
             (tree->base_tree == NULL && tree->top_tree->n_children > 0)) {
             /* checks if previous collective has completed on the seg
                 TODO: can be optimized if we detect bcast->reduce pattern.*/
-            if (UCC_OK != ucc_tl_shm_bcast_seg_ready(
-                              seg, task->seg_ready_seq_num, team, tree)) {
-                return UCC_INPROGRESS;
-            }
+            SHMCHECK_GOTO(ucc_tl_shm_bcast_seg_ready(seg,
+                          task->seg_ready_seq_num, team, tree), task, out);
         }
         if (tree->top_tree) {
             task->stage = BCAST_STAGE_TOP_TREE;
@@ -151,15 +148,11 @@ next_stage:
         goto next_stage;
     case BCAST_STAGE_TOP_TREE:
         if (task->progress_alg == BCAST_WW || task->progress_alg == BCAST_WR) {
-            status = ucc_tl_shm_bcast_write(team, seg, task, tree->top_tree,
-                                            is_inline, &is_op_root, data_size);
+            SHMCHECK_GOTO(ucc_tl_shm_bcast_write(team, seg, task, tree->top_tree,
+                          is_inline, &is_op_root, data_size), task, out);
         } else {
-            status = ucc_tl_shm_bcast_read(team, seg, task, tree->top_tree,
-                                           is_inline, &is_op_root, data_size);
-        }
-        if (UCC_OK != status) {
-            /* in progress */
-            return status;
+            SHMCHECK_GOTO(ucc_tl_shm_bcast_read(team, seg, task, tree->top_tree,
+                          is_inline, &is_op_root, data_size), task, out);
         }
         if (tree->base_tree) {
             task->stage = BCAST_STAGE_BASE_TREE;
@@ -168,15 +161,11 @@ next_stage:
         break;
     case BCAST_STAGE_BASE_TREE:
         if (task->progress_alg == BCAST_WW || task->progress_alg == BCAST_RW) {
-            status = ucc_tl_shm_bcast_write(team, seg, task, tree->base_tree,
-                                            is_inline, &is_op_root, data_size);
+            SHMCHECK_GOTO(ucc_tl_shm_bcast_write(team, seg, task, tree->base_tree,
+                          is_inline, &is_op_root, data_size), task, out);
         } else {
-            status = ucc_tl_shm_bcast_read(team, seg, task, tree->base_tree,
-                                           is_inline, &is_op_root, data_size);
-        }
-        if (UCC_OK != status) {
-            /* in progress */
-            return status;
+            SHMCHECK_GOTO(ucc_tl_shm_bcast_read(team, seg, task, tree->base_tree,
+                          is_inline, &is_op_root, data_size), task, out);
         }
         break;
     }
@@ -215,28 +204,22 @@ next_stage:
 
     my_ctrl->ci = task->seq_num;
     /* bcast done */
-    task->super.super.status = UCC_OK;
+    task->super.status = UCC_OK;
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_bcast_rw_progress_done",
                                      0);
-    return UCC_OK;
+out:
+    return;
 }
 
 static ucc_status_t ucc_tl_shm_bcast_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
-    ucc_status_t       status;
 
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_bcast_start", 0);
     UCC_TL_SHM_SET_SEG_READY_SEQ_NUM(task, team);
-    task->super.super.status = UCC_INPROGRESS;
-    status                   = task->super.progress(&task->super);
-
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    task->super.status = UCC_INPROGRESS;
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 ucc_status_t ucc_tl_shm_bcast_init(ucc_base_coll_args_t *coll_args,
