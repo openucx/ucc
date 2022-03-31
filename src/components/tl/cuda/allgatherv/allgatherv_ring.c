@@ -220,17 +220,34 @@ void ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task    = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team    = TASK_TEAM(task);
-    ucc_coll_args_t    *args    = &TASK_ARGS(task);
-    ucc_rank_t         trank    = UCC_TL_TEAM_RANK(team);
-    ucc_datatype_t     dt       = task->allgatherv_ring.dt;
-    ucc_ee_executor_t *exec;
+    ucc_tl_cuda_task_t *task  = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
+    ucc_coll_args_t    *args  = &TASK_ARGS(task);
+    ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
+    ucc_datatype_t      dt    = task->allgatherv_ring.dt;
+    ucc_rank_t          tsize = UCC_TL_TEAM_SIZE(team);
+    size_t              ssize = UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size;
+    ucc_ee_executor_t  *exec;
     ucc_ee_executor_task_args_t exec_args;
-    ucc_status_t st;
+    size_t                      send_size, frag_size;
+    ucc_rank_t                  i;
+    ucc_status_t                st;
+
 
     task->allgatherv_ring.exec_task[0] = NULL;
     task->allgatherv_ring.exec_task[1] = NULL;
+    task->allgatherv_ring.sbuf         = args->src.info.buffer;
+    task->allgatherv_ring.rbuf         = args->dst.info_v.buffer;
+
+    send_size = task->allgatherv_ring.get_count(task, 0);
+    for (i = 1; i < tsize; i++) {
+        send_size = ucc_max(send_size, task->allgatherv_ring.get_count(task, i));
+    }
+    send_size = ucc_dt_size(task->allgatherv_ring.dt) * send_size;
+    frag_size = ucc_min(ssize/2, send_size);
+
+    task->allgatherv_ring.num_frags = ucc_div_round_up(send_size, frag_size);
+
     if (!UCC_IS_INPLACE(*args)) {
         st = ucc_coll_task_get_executor(&task->super, &exec);
         if (ucc_unlikely(st != UCC_OK)) {
@@ -276,33 +293,17 @@ size_t ucc_tl_cuda_allgatherv_get_offset(const ucc_tl_cuda_task_t *task,
 
 ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
     ucc_coll_args_t    *args  = &TASK_ARGS(task);
-    ucc_rank_t          tsize = UCC_TL_TEAM_SIZE(team);
-    size_t              ssize = UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size;
-    size_t              send_size, frag_size;
-    ucc_rank_t i;
 
+    task->super.flags               |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    task->super.post                 = ucc_tl_cuda_allgatherv_ring_start;
+    task->super.triggered_post       = ucc_triggered_post;
+    task->super.progress             = ucc_tl_cuda_allgatherv_ring_progress;
+    task->super.finalize             = ucc_tl_cuda_allgatherv_ring_finalize;
     task->allgatherv_ring.get_count  = ucc_tl_cuda_allgatherv_get_count;
     task->allgatherv_ring.get_offset = ucc_tl_cuda_allgatherv_get_offset;
     task->allgatherv_ring.dt         = args->dst.info_v.datatype;
-    task->allgatherv_ring.sbuf       = args->src.info.buffer;
-    task->allgatherv_ring.rbuf       = args->dst.info_v.buffer;
-
-    send_size = task->allgatherv_ring.get_count(task, 0);
-    for (i = 1; i < tsize; i++) {
-        send_size = ucc_max(send_size, task->allgatherv_ring.get_count(task, i));
-    }
-    send_size = ucc_dt_size(task->allgatherv_ring.dt) * send_size;
-    frag_size = ucc_min(ssize/2, send_size);
-
-    task->super.flags               |= UCC_COLL_TASK_FLAG_EXECUTOR;
-    task->allgatherv_ring.num_frags = ucc_div_round_up(send_size, frag_size);
-    task->super.post                = ucc_tl_cuda_allgatherv_ring_start;
-    task->super.triggered_post      = ucc_triggered_post;
-    task->super.progress            = ucc_tl_cuda_allgatherv_ring_progress;
-    task->super.finalize            = ucc_tl_cuda_allgatherv_ring_finalize;
-    task->bar                       = TASK_BAR(task);
+    task->bar                        = TASK_BAR(task);
 
     return UCC_OK;
 }
