@@ -57,25 +57,16 @@ steps:
       docker start $(cat ${WORKSPACE}/ucc_docker.id)
 
   #============================================================================
-  - name: Run UCC tests
+  - name: Run UCC / Torch-UCC tests
     agentSelector: "{nodeLabel: 'swx-clx01'}"
     run: |
       echo "INFO: Run UCC tests"
       hostname
       docker exec $(cat ${WORKSPACE}/ucc_docker.id) bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
-  #============================================================================
-  - name: Run Torch-UCC tests (UCC)
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    run: |
+
       echo "INFO: Run Torch-UCC tests (UCC)"
-      hostname
       docker exec $(cat ${WORKSPACE}/ucc_docker.id) bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_torch_ucc.sh"
-  #============================================================================
-  - name: Stop docker
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    #containerSelector: "{name:'skip-container'}"
-    run: |
-      echo "INFO: Stop docker containers"
+    always: |
       docker rm --force $(cat ${WORKSPACE}/ucc_docker.id)
   #============================================================================
   - name: Run docker containers
