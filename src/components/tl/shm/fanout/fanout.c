@@ -14,14 +14,13 @@ enum
     FANOUT_STAGE_TOP_TREE,
 };
 
-static ucc_status_t ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
+static void ucc_tl_shm_fanout_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
     ucc_rank_t         rank = UCC_TL_TEAM_RANK(team);
     ucc_tl_shm_seg_t * seg  = task->seg;
     ucc_tl_shm_tree_t *tree = task->tree;
-    ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
 
 next_stage:
@@ -32,10 +31,8 @@ next_stage:
              tree->top_tree->n_children > 0)) { //similar to bcast
             /* checks if previous collective has completed on the seg
                TODO: can be optimized if we detect bcast->reduce pattern.*/
-            if (UCC_OK != ucc_tl_shm_bcast_seg_ready(
-                              seg, task->seg_ready_seq_num, team, tree)) {
-                return UCC_INPROGRESS;
-            }
+            SHMCHECK_GOTO(ucc_tl_shm_bcast_seg_ready(seg,
+                          task->seg_ready_seq_num, team, tree), task, out);
         }
         if (tree->top_tree) {
             task->stage = FANOUT_STAGE_TOP_TREE;
@@ -44,50 +41,37 @@ next_stage:
         }
         goto next_stage;
     case FANOUT_STAGE_TOP_TREE:
-        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->top_tree);
-        if (UCC_OK != status) {
-            /* in progress */
-            return status;
-        }
+        SHMCHECK_GOTO(ucc_tl_shm_fanout_signal(team, seg, task, tree->top_tree),
+                      task, out);
         if (tree->base_tree) {
             task->stage = FANOUT_STAGE_BASE_TREE;
             goto next_stage;
         }
         break;
     case FANOUT_STAGE_BASE_TREE:
-        status = ucc_tl_shm_fanout_signal(team, seg, task, tree->base_tree);
-
-        if (UCC_OK != status) {
-            /* in progress */
-            return status;
-        }
+        SHMCHECK_GOTO(ucc_tl_shm_fanout_signal(team, seg, task, tree->base_tree),
+                      task, out);
         break;
     }
 
     my_ctrl     = ucc_tl_shm_get_ctrl(seg, team, rank);
     my_ctrl->ci = task->seq_num;
     /* fanout done */
-    task->super.super.status = UCC_OK;
+    task->super.status = UCC_OK;
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_fanout_progress_done", 0);
-    return UCC_OK;
+out:
+    return;
 }
 
 static ucc_status_t ucc_tl_shm_fanout_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
-    ucc_status_t       status;
 
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_fanout_start", 0);
     UCC_TL_SHM_SET_SEG_READY_SEQ_NUM(task, team);
-    task->super.super.status = UCC_INPROGRESS;
-    status                   = task->super.progress(&task->super);
-
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    task->super.status = UCC_INPROGRESS;
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 ucc_status_t ucc_tl_shm_fanout_init(ucc_base_coll_args_t *coll_args,

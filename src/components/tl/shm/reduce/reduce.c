@@ -86,7 +86,7 @@ ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team, ucc_tl_shm_seg_t *seg,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
+static void ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
@@ -101,7 +101,6 @@ static ucc_status_t ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
     ucc_tl_shm_tree_t *tree = task->tree;
     int                is_inline;
     int                is_op_root = rank == root;
-    ucc_status_t       status;
     ucc_tl_shm_ctrl_t *my_ctrl;
 
     if (is_op_root) {
@@ -121,10 +120,8 @@ next_stage:
     case REDUCE_STAGE_START:
         /* checks if previous collective has completed on the seg
         TODO: can be optimized if we detect bcast->reduce pattern.*/
-        if (UCC_OK != ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num,
-                                                  team, tree)) {
-            return UCC_INPROGRESS;
-        }
+        SHMCHECK_GOTO(ucc_tl_shm_reduce_seg_ready(seg, task->seg_ready_seq_num,
+                                                  team, tree), task, out);
         if (tree->base_tree) {
             task->stage = REDUCE_STAGE_BASE_TREE;
         } else {
@@ -132,13 +129,8 @@ next_stage:
         }
         goto next_stage;
     case REDUCE_STAGE_BASE_TREE:
-        status = ucc_tl_shm_reduce_read(team, seg, task, tree->base_tree,
-                                        is_inline, count, dt, mtype, &args);
-
-        if (UCC_OK != status) {
-            /* in progress or reduction failed */
-            return status;
-        }
+        SHMCHECK_GOTO(ucc_tl_shm_reduce_read(team, seg, task, tree->base_tree,
+                      is_inline, count, dt, mtype, &args), task, out);
         task->cur_child = 0;
         if (tree->top_tree) {
             task->stage = REDUCE_STAGE_TOP_TREE;
@@ -146,12 +138,8 @@ next_stage:
         }
         break;
     case REDUCE_STAGE_TOP_TREE:
-        status = ucc_tl_shm_reduce_read(team, seg, task, tree->top_tree,
-                                        is_inline, count, dt, mtype, &args);
-        if (UCC_OK != status) {
-            /* in progress or reduction failed */
-            return status;
-        }
+        SHMCHECK_GOTO(ucc_tl_shm_reduce_read(team, seg, task, tree->top_tree,
+                      is_inline, count, dt, mtype, &args), task, out);
         break;
     }
 
@@ -159,27 +147,21 @@ next_stage:
     my_ctrl->ci = task->seq_num;
 
     /* reduce done */
-    task->super.super.status = UCC_OK;
+    task->super.status = UCC_OK;
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_reduce_rr_done", 0);
-    return UCC_OK;
+out:
+    return;
 }
 
 static ucc_status_t ucc_tl_shm_reduce_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_shm_task_t *task = ucc_derived_of(coll_task, ucc_tl_shm_task_t);
     ucc_tl_shm_team_t *team = TASK_TEAM(task);
-    ucc_status_t       status;
 
     UCC_TL_SHM_PROFILE_REQUEST_EVENT(coll_task, "shm_reduce_start", 0);
     UCC_TL_SHM_SET_SEG_READY_SEQ_NUM(task, team);
-    task->super.super.status = UCC_INPROGRESS;
-    status                   = task->super.progress(&task->super);
-
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    task->super.status = UCC_INPROGRESS;
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 ucc_status_t ucc_tl_shm_reduce_init(ucc_base_coll_args_t *coll_args,

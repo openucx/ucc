@@ -85,6 +85,15 @@ ucc_tl_shm_get_data(ucc_tl_shm_seg_t *seg, ucc_tl_shm_team_t *team,
     return PTR_OFFSET(seg->data, data_size * rank);
 }
 
+#define SHMCHECK_GOTO(_cmd, _task, _label)                                     \
+    do {                                                                       \
+        ucc_status_t _status = (_cmd);                                         \
+        if (UCC_OK != _status) {                                               \
+            _task->super.status = _status;                                     \
+            goto _label;                                                       \
+        }                                                                      \
+    } while (0)
+
 static inline ucc_status_t ucc_tl_shm_bcast_seg_ready(ucc_tl_shm_seg_t *seg,
                                                       uint32_t          seq_num,
                                                       ucc_tl_shm_team_t *team,
