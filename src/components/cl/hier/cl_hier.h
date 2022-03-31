@@ -13,7 +13,7 @@
 #include "utils/ucc_mpool.h"
 
 #ifdef HAVE_PROFILING_CL_HIER
-#include "utils/profile/ucc_profile.h"
+#include "utils/profile/ucc_profile_on.h"
 #else
 #include "utils/profile/ucc_profile_off.h"
 #endif
