@@ -42,7 +42,8 @@ ucc_tl_shm_get_task(ucc_base_coll_args_t *coll_args, ucc_tl_shm_team_t *team)
     UCC_TL_SHM_PROFILE_REQUEST_NEW(task, "tl_shm_task", 0);
     ucc_coll_task_init(&task->super, coll_args, &team->super.super);
     task->seq_num        = team->seq_num++;
-    task->seg            = &team->segs[task->seq_num % team->n_concurrent];
+    task->seg =
+        &team->segs[(task->seq_num % team->n_concurrent) * team->n_base_groups];
     task->super.finalize = ucc_tl_shm_coll_finalize;
     task->super.triggered_post = ucc_triggered_post;
     task->base_tree_only       = UCC_TL_SHM_TEAM_LIB(team)->cfg.base_tree_only;
@@ -73,16 +74,22 @@ static inline ucc_tl_shm_ctrl_t *
 ucc_tl_shm_get_ctrl(ucc_tl_shm_seg_t *seg, ucc_tl_shm_team_t *team,
                     ucc_rank_t rank /* rank within a TL team */)
 {
-    return PTR_OFFSET(seg->ctrl, ucc_ep_map_eval(team->ctrl_map, rank));
+    int        group     = ucc_ep_map_eval(team->rank_group_id_map, rank);
+    ucc_rank_t grank     = ucc_ep_map_eval(team->group_rank_map, rank);
+    size_t     ctrl_size = UCC_TL_SHM_TEAM_LIB(team)->cfg.ctrl_size;
+
+    return PTR_OFFSET(seg[group].ctrl, ctrl_size * grank);
 }
 
 static inline void *
 ucc_tl_shm_get_data(ucc_tl_shm_seg_t *seg, ucc_tl_shm_team_t *team,
                     ucc_rank_t rank) /* rank withing a TL team */
 {
-    size_t data_size = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
+    int        group     = ucc_ep_map_eval(team->rank_group_id_map, rank);
+    ucc_rank_t grank     = ucc_ep_map_eval(team->group_rank_map, rank);
+    size_t     data_size = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
 
-    return PTR_OFFSET(seg->data, data_size * rank);
+    return PTR_OFFSET(seg[group].data, data_size * grank);
 }
 
 #define SHMCHECK_GOTO(_cmd, _task, _label)                                     \

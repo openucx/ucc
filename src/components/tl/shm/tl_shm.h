@@ -49,6 +49,14 @@ typedef enum ucc_tl_shm_bcast_progress_alg
     BCAST_LAST
 } ucc_tl_shm_bcast_progress_alg_t;
 
+typedef enum ucc_tl_shm_seg_layout
+{
+    SEG_LAYOUT_CONTIG,
+    SEG_LAYOUT_SOCKET,
+    SEG_LAYOUT_MIXED,
+    SEG_LAYOUT_LAST
+} ucc_tl_shm_seg_layout_t;
+
 typedef struct ucc_kn_tree ucc_kn_tree_t;
 
 typedef struct ucc_tl_shm_iface {
@@ -77,6 +85,7 @@ typedef struct ucc_tl_shm_lib_config {
     uint32_t                        n_polls;
     uint32_t                        base_tree_only;
     uint32_t                        set_perf_params;
+    ucc_tl_shm_seg_layout_t         layout;
     ucc_tl_shm_bcast_progress_alg_t bcast_alg;
     char *                          group_mode;
 } ucc_tl_shm_lib_config_t;
@@ -162,13 +171,13 @@ typedef struct ucc_tl_shm_team {
     uint32_t                 my_group_id;
     int *                    allgather_dst;
     int                      n_concurrent;
+    int                      is_group_leader;
     ucc_sbgp_t *             base_groups;
     ucc_sbgp_t *             leaders_group;
     ucc_topo_t *             topo;
-    void *                   shm_buffer;
+    void **                  shm_buffers;
     ucc_ep_map_t             group_rank_map;
     ucc_ep_map_t             rank_group_id_map;
-    ucc_ep_map_t             ctrl_map;
     size_t                   ctrl_size;
     size_t                   data_size;
     size_t                   max_inline;
