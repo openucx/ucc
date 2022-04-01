@@ -409,6 +409,7 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
     ucc_tl_ucp_context_t *ctx = ucc_derived_of(context, ucc_tl_ucp_context_t);
     ucs_status_t          ucs_status;
     size_t                packed_length;
+    int                   i;
 
     if ((attr->attr.mask & (UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
                             UCC_CONTEXT_ATTR_FIELD_CTX_ADDR)) &&
@@ -420,19 +421,24 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
             return ucs_status_to_ucc_status(ucs_status);
         }
     }
+
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
-        packed_length =
-            ctx->ucp_addrlen + ctx->n_rinfo_segs * (sizeof(size_t) * 3);
-        for (int i = 0; i < ctx->n_rinfo_segs; i++) {
-            packed_length += ctx->remote_info[i].packed_key_len;
+        packed_length = TL_UCP_EP_ADDRLEN_SIZE + ctx->ucp_addrlen;
+        if (NULL != ctx->remote_info) {
+            packed_length += ctx->n_rinfo_segs * (sizeof(size_t) * 3);
+            for (i = 0; i < ctx->n_rinfo_segs; i++) {
+                packed_length += ctx->remote_info[i].packed_key_len;
+            }
         }
         attr->attr.ctx_addr_len = packed_length;
     }
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR) {
-        memcpy(attr->attr.ctx_addr, ctx->worker_address, ctx->ucp_addrlen);
+        *((uint64_t*)attr->attr.ctx_addr) = ctx->ucp_addrlen;
+        memcpy(TL_UCP_EP_ADDR_WORKER(attr->attr.ctx_addr),
+               ctx->worker_address, ctx->ucp_addrlen);
         if (NULL != ctx->remote_info) {
-            ucc_tl_ucp_ctx_remote_pack_data(
-                ctx, PTR_OFFSET(attr->attr.ctx_addr, ctx->ucp_addrlen));
+            ucc_tl_ucp_ctx_remote_pack_data(ctx,
+                            TL_UCP_EP_ADDR_ONESIDED_INFO(attr->attr.ctx_addr));
         }
     }
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE) {
