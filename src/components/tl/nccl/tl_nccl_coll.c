@@ -113,7 +113,6 @@ ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
     coll_task->ee = ee;
     tl_info(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
-
     status = coll_task->post(coll_task);
     if (ucc_likely(status == UCC_OK)) {
         /* TODO: mpool */
@@ -150,7 +149,19 @@ ucc_status_t ucc_tl_nccl_collective_sync(ucc_tl_nccl_task_t *task,
 {
     ucc_tl_nccl_context_t *ctx    = TASK_CTX(task);
     ucc_status_t           status = UCC_OK;
+    enum cudaStreamCaptureStatus capture_st;
     CUresult cu_status;
+    cudaError_t cuda_st;
+
+    if (task->super.ee) {
+        cuda_st =cudaStreamIsCapturing((cudaStream_t)task->super.ee->ee_context,
+                                       &capture_st);
+        if ((cuda_st == cudaSuccess) &&
+            (capture_st != cudaStreamCaptureStatusNone)) {
+            task->super.status = UCC_OK;
+            return ucc_task_complete(&task->super);
+        }
+    }
 
     task->host_status = task->super.status;
     if (ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
