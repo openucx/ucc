@@ -17,8 +17,7 @@
         task->reduce_scatter_kn.phase = _phase;                                \
     } while (0)
 
-ucc_status_t
-ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t       *args  = &TASK_ARGS(task);
@@ -69,7 +68,7 @@ UCC_KN_PHASE_EXTRA:
     if ((KN_NODE_PROXY == node_type) || (KN_NODE_EXTRA == node_type)) {
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             SAVE_STATE(UCC_KN_PHASE_EXTRA);
-            return task->super.super.status;
+            return;
         }
         if (KN_NODE_EXTRA == node_type) {
             goto out;
@@ -77,8 +76,8 @@ UCC_KN_PHASE_EXTRA:
             if (UCC_OK != (status = ucc_dt_reduce(sbuf, scratch, rbuf, count,
                                                   dt, mem_type, args))) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
-                task->super.super.status = status;
-                return status;
+                task->super.status = status;
+                return;
             }
         }
     }
@@ -128,7 +127,7 @@ UCC_KN_PHASE_EXTRA:
     UCC_KN_PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             SAVE_STATE(UCC_KN_PHASE_LOOP);
-            return task->super.super.status;
+            return;
         }
         if (task->send_posted > p->iteration * (radix - 1)) {
             sbuf       = (ucc_knomial_pattern_loop_first_iteration(p))
@@ -159,8 +158,8 @@ UCC_KN_PHASE_EXTRA:
                 local_seg_count * dt_size, dt, mem_type, task, is_avg);
             if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
-                task->super.super.status = status;
-                return status;
+                task->super.status = status;
+                return;
             }
         }
         ucc_knomial_pattern_next_iteration(p);
@@ -171,15 +170,16 @@ UCC_KN_PHASE_EXTRA:
                            task->reduce_scatter_kn.scratch,
                            local_seg_count * dt_size, mem_type, mem_type);
 
-    if (UCC_OK != status) {
-        return status;
+    if (ucc_unlikely(UCC_OK != status)) {
+        task->super.status = status;
+        return;
     }
 UCC_KN_PHASE_PROXY: /* unused label */
 out:
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_scatter_kn_done",
                                      0);
-    task->super.super.status = UCC_OK;
-    return task->super.super.status;
+    task->super.status = UCC_OK;
+    return;
 }
 
 ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
@@ -189,13 +189,11 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team = TASK_TEAM(task);
     ucc_rank_t         rank = UCC_TL_TEAM_RANK(team);
     ucc_rank_t         size = UCC_TL_TEAM_SIZE(team);
-    ucc_status_t       status;
     uint8_t            node_type;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_scatter_kn_start",
                                      0);
-    ucc_tl_ucp_task_reset(task);
-
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     ucc_knomial_pattern_init(size, rank, task->reduce_scatter_kn.p.radix,
                              &task->reduce_scatter_kn.p);
     node_type = task->reduce_scatter_kn.p.node_type;
@@ -204,12 +202,7 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
     }
     task->reduce_scatter_kn.phase = UCC_KN_PHASE_INIT;
 
-    status = ucc_tl_ucp_reduce_scatter_knomial_progress(&task->super);
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 ucc_status_t

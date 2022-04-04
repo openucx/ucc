@@ -49,8 +49,7 @@ ucc_rank_t calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
     return dist;
 }
 
-ucc_status_t
-ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t       *args = &TASK_ARGS(task);
@@ -158,7 +157,7 @@ ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 UCC_SCATTER_KN_PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             SAVE_STATE(UCC_SCATTER_KN_PHASE_LOOP);
-            return task->super.super.status;
+            return;
         }
         ucc_knomial_pattern_next_iteration(p);
     }
@@ -169,15 +168,15 @@ UCC_SCATTER_KN_PHASE_LOOP:
         status = ucc_mc_memcpy(PTR_OFFSET(args->dst.info.buffer, offset),
                                PTR_OFFSET(rbuf, task->scatter_kn.send_offset),
                                local_seg_count * dt_size, mem_type, mem_type);
-        if (UCC_OK != status) {
-            task->super.super.status = status;
-            return task->super.super.status;
+        if (ucc_unlikely(UCC_OK != status)) {
+            task->super.status = status;
+            return;
         }
     }
 out:
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_scatter_kn_done", 0);
-    task->super.super.status = UCC_OK;
-    return task->super.super.status;
+    task->super.status = UCC_OK;
+    return;
 }
 
 ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)
@@ -188,10 +187,9 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)
     ucc_rank_t             rank = UCC_TL_TEAM_RANK(team);
     ucc_knomial_pattern_t *p    = &task->scatter_kn.p;
     ucc_rank_t             vrank, vroot, root;
-    ucc_status_t           status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_scatter_kn_start", 0);
-    ucc_tl_ucp_task_reset(task);
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     root = coll_task->bargs.args.root;
     ucc_knomial_pattern_init(size, VRANK(rank, root, size),
@@ -203,12 +201,7 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)
                                                 p->radix, vroot);
     task->scatter_kn.send_offset = 0;
 
-    status = ucc_tl_ucp_scatter_knomial_progress(&task->super);
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 ucc_status_t

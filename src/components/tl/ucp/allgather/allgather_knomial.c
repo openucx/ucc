@@ -19,7 +19,7 @@
         task->allgather_kn.phase = _phase;                                     \
     } while (0)
 
-ucc_status_t ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t       *args  = &TASK_ARGS(task);
@@ -64,7 +64,7 @@ UCC_KN_PHASE_EXTRA:
     if (KN_NODE_EXTRA == node_type) {
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             SAVE_STATE(UCC_KN_PHASE_EXTRA);
-            return task->super.super.status;
+            return;
         }
         goto out;
     }
@@ -111,7 +111,7 @@ UCC_KN_PHASE_EXTRA:
     UCC_KN_PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             SAVE_STATE(UCC_KN_PHASE_LOOP);
-            return task->super.super.status;
+            return;
         }
         ucc_knomial_pattern_next_iteration_backward(p);
     }
@@ -128,13 +128,12 @@ UCC_KN_PHASE_EXTRA:
 UCC_KN_PHASE_PROXY:
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         SAVE_STATE(UCC_KN_PHASE_PROXY);
-        return task->super.super.status;
+        return;
     }
 
 out:
-    task->super.super.status = UCC_OK;
+    task->super.status = UCC_OK;
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_done", 0);
-    return task->super.super.status;
 }
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
@@ -142,15 +141,15 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t   *args  = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
-    ucc_rank_t         rank       = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t         size       = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t         rank  = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         size  = UCC_TL_TEAM_SIZE(team);
     ucc_kn_radix_t     radix = task->allgather_kn.p.radix;
     ucc_rank_t         broot = 0;
     ucc_status_t       status;
     ptrdiff_t          offset;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
-    ucc_tl_ucp_task_reset(task);
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     if (coll_task->bargs.args.coll_type == UCC_COLL_TYPE_BCAST) {
         broot = coll_task->bargs.args.root;
         rank = VRANK(rank, broot, size);
@@ -173,13 +172,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
         }
     }
     task->allgather_kn.sbuf = PTR_OFFSET(args->dst.info.buffer, offset);
-
-    status = ucc_tl_ucp_allgather_knomial_progress(&task->super);
-    if (UCC_INPROGRESS == status) {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-        return UCC_OK;
-    }
-    return ucc_task_complete(coll_task);
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
