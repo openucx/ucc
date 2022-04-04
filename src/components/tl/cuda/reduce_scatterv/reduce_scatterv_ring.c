@@ -208,7 +208,7 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_start(ucc_coll_task_t *coll_task)
     ucc_rank_t          tsize = UCC_TL_TEAM_SIZE(team);
     size_t              ssize = UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size;
     ucc_coll_args_t    *args  = &TASK_ARGS(task);
-    ucc_datatype_t      dt    = args->dst.info_v.datatype;
+    ucc_datatype_t      dt    = task->reduce_scatterv_ring.dt;
     size_t              send_size, frag_size;
     ucc_rank_t          i;
 
