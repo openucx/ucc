@@ -79,6 +79,7 @@ UCC_KN_PHASE_EXTRA:
                                                      dt, mem_type, args)))) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.status = status;
+                return;
             }
         }
     }
