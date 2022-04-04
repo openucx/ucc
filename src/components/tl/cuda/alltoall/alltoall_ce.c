@@ -13,16 +13,18 @@
 #include "utils/arch/cuda_def.h"
 
 //NOLINTNEXTLINE
-size_t ucc_tl_cuda_alltoall_get_count(const ucc_tl_cuda_task_t *task,
-                                      ucc_count_t *cnts, ucc_rank_t block)
+size_t ucc_tl_cuda_alltoall_get_size(const ucc_tl_cuda_task_t *task,
+                                     size_t *cnts, ucc_rank_t block)
 {
-    return TASK_ARGS(task).dst.info.count / UCC_TL_TEAM_SIZE(TASK_TEAM(task));
+    return ucc_dt_size(TASK_ARGS(task).dst.info.datatype) *
+           (TASK_ARGS(task).dst.info.count / UCC_TL_TEAM_SIZE(TASK_TEAM(task)));
 }
 
 size_t ucc_tl_cuda_alltoall_get_offset(const ucc_tl_cuda_task_t *task,
                                        size_t *displ, ucc_rank_t block)
 {
-    return (TASK_ARGS(task).dst.info.count /
+    return ucc_dt_size(TASK_ARGS(task).dst.info.datatype) *
+           (TASK_ARGS(task).dst.info.count /
             UCC_TL_TEAM_SIZE(TASK_TEAM(task))) *
            block;
 }
@@ -40,7 +42,7 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
         return status;
     }
 
-    task->alltoallv_ce.get_count  = ucc_tl_cuda_alltoall_get_count;
+    task->alltoallv_ce.get_size   = ucc_tl_cuda_alltoall_get_size;
     task->alltoallv_ce.get_offset = ucc_tl_cuda_alltoall_get_offset;
     task->alltoallv_ce.sdt        = args->src.info.datatype;
     task->alltoallv_ce.rdt        = args->dst.info.datatype;

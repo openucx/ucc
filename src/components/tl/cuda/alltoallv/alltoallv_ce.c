@@ -37,18 +37,25 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_start(ucc_tl_cuda_task_t *task)
     ucc_status_t        status;
     ucc_coll_args_t    *args = &TASK_ARGS(task);
 
-    // for A2av: copy counts and displ. for proxies (if any) to access
-    if (team->topo->num_proxies > 0 &&
-        UCC_COLL_TYPE_ALLTOALLV == args->coll_type) {
-        size_t elem_size = UCC_COLL_ARGS_COUNT64(args) ? 8 : 4;
-        memcpy(sync->src_cnts, args->src.info_v.counts,
-               elem_size * UCC_TL_TEAM_SIZE(team));
-        memcpy(sync->dst_cnts, args->dst.info_v.counts,
-               elem_size * UCC_TL_TEAM_SIZE(team));
-        memcpy(sync->src_displ, args->src.info_v.displacements,
-               elem_size * UCC_TL_TEAM_SIZE(team));
-        memcpy(sync->dst_displ, args->src.info_v.displacements,
-               elem_size * UCC_TL_TEAM_SIZE(team));
+    // For Alltoallv: copy counts and displ. to SHM for remote GPUs to access (if required)
+    if (UCC_COLL_TYPE_ALLTOALLV == args->coll_type) {
+        int    i;
+        size_t rdt_size = ucc_dt_size(task->alltoallv_ce.rdt);
+        size_t sdt_size = ucc_dt_size(task->alltoallv_ce.sdt);
+        for (i = 0; i < UCC_TL_TEAM_SIZE(team); ++i) {
+            sync->alltoallv_ce.sbytes[i] =
+                sdt_size * (size_t)ucc_coll_args_get_count(
+                               args, task->alltoallv_ce.scnts, i);
+            sync->alltoallv_ce.rbytes[i] =
+                rdt_size * (size_t)ucc_coll_args_get_count(
+                               args, task->alltoallv_ce.rcnts, i);
+            sync->alltoallv_ce.sdispl_bytes[i] =
+                sdt_size * (size_t)ucc_coll_args_get_displacement(
+                               args, task->alltoallv_ce.sdispl, i);
+            sync->alltoallv_ce.rdispl_bytes[i] =
+                rdt_size * (size_t)ucc_coll_args_get_displacement(
+                               args, task->alltoallv_ce.rdispl, i);
+        }
     }
     memcpy(&sync->mem_info_src, &task->alltoallv_ce.mem_info_src,
            sizeof(ucc_tl_cuda_mem_info_t));
@@ -126,8 +133,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     void                       *src, *dst;
     ucc_ee_executor_task_t    **exec_task;
     size_t                      data_size, data_displ;
-    size_t                      rdt_size = ucc_dt_size(task->alltoallv_ce.rdt);
-    size_t                      sdt_size = ucc_dt_size(task->alltoallv_ce.sdt);
     ucc_rank_t                  i, peer, psrc, pdst;
     ucc_status_t                status;
     ucc_ee_executor_task_args_t exec_args;
@@ -155,13 +160,13 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
                                     sync->data[peer].ipc_event_remote, 0),
                 exit, status);
         }
-        data_size = sdt_size * task->alltoallv_ce.get_count(
-                                   task, task->alltoallv_ce.scnts, peer);
-        data_displ = sdt_size * task->alltoallv_ce.get_offset(
-                                    task, task->alltoallv_ce.sdispl, peer);
+        data_size =
+            task->alltoallv_ce.get_size(task, sync->alltoallv_ce.sbytes, peer);
+        data_displ = task->alltoallv_ce.get_offset(
+            task, sync->alltoallv_ce.sdispl_bytes, peer);
         src        = PTR_OFFSET(src, data_displ);
-        data_displ = rdt_size * task->alltoallv_ce.get_offset(
-                                    task, task->alltoallv_ce.rdispl, peer);
+        data_displ = task->alltoallv_ce.get_offset(
+            task, sync->alltoallv_ce.rdispl_bytes, peer);
         dst = PTR_OFFSET(task->alltoallv_ce.rbuf, data_displ);
 
         exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
@@ -183,18 +188,18 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
             pdst      = team->topo->proxies[i].dst;
             peer_sync = TASK_SYNC(task, psrc);
             // FIXME: assume the same datatype
-            data_size = sdt_size * task->alltoallv_ce.get_count(
-                                       task, peer_sync->src_cnts, pdst);
-            data_displ = sdt_size * task->alltoallv_ce.get_offset(
-                                        task, peer_sync->src_displ, pdst);
+            data_size = task->alltoallv_ce.get_size(
+                task, peer_sync->alltoallv_ce.sbytes, pdst);
+            data_displ = task->alltoallv_ce.get_offset(
+                task, peer_sync->alltoallv_ce.sdispl_bytes, pdst);
             src        = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_src[psrc],
                                     peer_sync->mem_info_src.offset);
             src        = PTR_OFFSET(src, data_displ);
             peer_sync  = TASK_SYNC(task, pdst);
             dst        = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_dst[pdst],
                                     peer_sync->mem_info_dst.offset);
-            data_displ = rdt_size * task->alltoallv_ce.get_offset(
-                                        task, peer_sync->dst_displ, psrc);
+            data_displ = task->alltoallv_ce.get_offset(
+                task, peer_sync->alltoallv_ce.rdispl_bytes, psrc);
             dst                 = PTR_OFFSET(dst, data_displ);
             exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
             exec_args.bufs[0]   = dst;
@@ -326,18 +331,16 @@ ucc_tl_cuda_alltoallv_ce_triggered_post_setup(ucc_coll_task_t *coll_task)
 }
 
 //NOLINTNEXTLINE
-size_t ucc_tl_cuda_alltoallv_get_count(const ucc_tl_cuda_task_t *task,
-                                       ucc_count_t *cnts, ucc_rank_t block)
+size_t ucc_tl_cuda_alltoallv_get_size(const ucc_tl_cuda_task_t *task,
+                                      size_t *sizes, ucc_rank_t block)
 {
-    const ucc_coll_args_t *args = &TASK_ARGS(task);
-    return ucc_coll_args_get_count(args, cnts, block);
+    return sizes[block];
 }
 
 size_t ucc_tl_cuda_alltoallv_get_offset(const ucc_tl_cuda_task_t *task,
                                         size_t *displ, ucc_rank_t block)
 {
-    const ucc_coll_args_t *args = &TASK_ARGS(task);
-    return ucc_coll_args_get_displacement(args, displ, block);
+    return displ[block];
 }
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
@@ -358,7 +361,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
         return status;
     }
 
-    task->alltoallv_ce.get_count  = ucc_tl_cuda_alltoallv_get_count;
+    task->alltoallv_ce.get_size   = ucc_tl_cuda_alltoallv_get_size;
     task->alltoallv_ce.get_offset = ucc_tl_cuda_alltoallv_get_offset;
     task->alltoallv_ce.sdt        = args->src.info_v.datatype;
     task->alltoallv_ce.rdt        = args->dst.info_v.datatype;
@@ -386,6 +389,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
         goto exit_err;
     }
 
+    task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post           = ucc_tl_cuda_alltoallv_ce_start;
     task->super.triggered_post = ucc_triggered_post;
     task->super.triggered_post_setup =

@@ -126,22 +126,26 @@ typedef struct ucc_tl_cuda_rank_id {
 } ucc_tl_cuda_rank_id_t;
 
 typedef struct ucc_tl_cuda_sync {
-    int                      seq_num;
-    ucc_tl_cuda_mem_info_t   mem_info_src;
-    ucc_tl_cuda_mem_info_t   mem_info_dst;
-    cudaEvent_t              ipc_event_local;
-    cudaIpcEventHandle_t     ev_handle;
-    ucc_count_t             src_cnts[UCC_TL_CUDA_MAX_PEERS];
-    ucc_count_t             dst_cnts[UCC_TL_CUDA_MAX_PEERS];
-    size_t                  src_displ[UCC_TL_CUDA_MAX_PEERS];
-    size_t                  dst_displ[UCC_TL_CUDA_MAX_PEERS];
-    ucc_tl_cuda_sync_data_t  data[1];
+    int                    seq_num;
+    ucc_tl_cuda_mem_info_t mem_info_src;
+    ucc_tl_cuda_mem_info_t mem_info_dst;
+    cudaEvent_t            ipc_event_local;
+    cudaIpcEventHandle_t   ev_handle;
+    union {
+        struct {
+            size_t sbytes[UCC_TL_CUDA_MAX_PEERS];
+            size_t rbytes[UCC_TL_CUDA_MAX_PEERS];
+            size_t sdispl_bytes[UCC_TL_CUDA_MAX_PEERS];
+            size_t rdispl_bytes[UCC_TL_CUDA_MAX_PEERS];
+        } alltoallv_ce;
+    };
+    ucc_tl_cuda_sync_data_t data[1];
 } ucc_tl_cuda_sync_t;
 
 typedef struct ucc_tl_cuda_scratch {
-    void                   *loc;
-    void                   *rem[UCC_TL_CUDA_MAX_PEERS];
-    ucc_tl_cuda_mem_info_t  rem_info[UCC_TL_CUDA_MAX_PEERS];
+    void                  *loc;
+    void                  *rem[UCC_TL_CUDA_MAX_PEERS];
+    ucc_tl_cuda_mem_info_t rem_info[UCC_TL_CUDA_MAX_PEERS];
 } ucc_tl_cuda_scratch_t;
 
 typedef struct ucc_tl_cuda_team {
@@ -169,52 +173,51 @@ struct ucc_tl_cuda_task {
     ucc_tl_cuda_shm_barrier_t *bar;
     union {
         struct {
-            int                     stage;
-            ucc_tl_cuda_mem_info_t  mem_info_src;
-            ucc_tl_cuda_mem_info_t  mem_info_dst;
-            void                   *peer_map_addr_src[UCC_TL_CUDA_MAX_PEERS];
-            void                   *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
-            int                     num_posted;
-            ucc_datatype_t          sdt;
-            ucc_datatype_t          rdt;
-            void                   *sbuf;
-            void                   *rbuf;
-            ucc_count_t            *scnts;
-            ucc_count_t            *rcnts;
-            size_t                 *sdispl;
-            size_t                 *rdispl;
-            ucc_ee_executor_task_t *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
-            void                   *copy_done;
-            size_t                 (*get_count)(const ucc_tl_cuda_task_t *task,
-                                                ucc_count_t *cnts,
-                                                ucc_rank_t block);
-            size_t                 (*get_offset)(const ucc_tl_cuda_task_t *task,
-                                                 size_t *displ,
-                                                 ucc_rank_t block);
+            int                    stage;
+            ucc_tl_cuda_mem_info_t mem_info_src;
+            ucc_tl_cuda_mem_info_t mem_info_dst;
+            void                  *peer_map_addr_src[UCC_TL_CUDA_MAX_PEERS];
+            void                  *peer_map_addr_dst[UCC_TL_CUDA_MAX_PEERS];
+            int                    num_posted;
+            ucc_datatype_t         sdt;
+            ucc_datatype_t         rdt;
+            void                  *sbuf;
+            void                  *rbuf;
+            ucc_count_t           *scnts;
+            ucc_count_t           *rcnts;
+            ucc_aint_t            *sdispl;
+            ucc_aint_t            *rdispl;
+            ucc_ee_executor_task_t
+                 *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
+            void *copy_done;
+            size_t (*get_size)(const ucc_tl_cuda_task_t *task, size_t *bytes,
+                               ucc_rank_t block);
+            size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                 size_t *displ_bytes, ucc_rank_t block);
         } alltoallv_ce;
         struct {
-            int                      stage;
-            int                      num_frags;
-            ucc_datatype_t           dt;
-            void                    *sbuf;
-            void                    *rbuf;
-            ucc_ee_executor_task_t  *exec_task[2];
-            size_t                 (*get_count)(const ucc_tl_cuda_task_t *task,
-                                                ucc_rank_t block);
-            size_t                 (*get_offset)(const ucc_tl_cuda_task_t *task,
-                                                 ucc_rank_t block);
+            int                     stage;
+            int                     num_frags;
+            ucc_datatype_t          dt;
+            void                   *sbuf;
+            void                   *rbuf;
+            ucc_ee_executor_task_t *exec_task[2];
+            size_t (*get_count)(const ucc_tl_cuda_task_t *task,
+                                ucc_rank_t                block);
+            size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                 ucc_rank_t                block);
         } allgatherv_ring;
         struct {
-            int                      stage;
-            int                      num_frags;
-            ucc_datatype_t           dt;
-            void                    *sbuf;
-            void                    *rbuf;
-            ucc_ee_executor_task_t  *exec_task;
-            size_t                 (*get_count)(const ucc_tl_cuda_task_t *task,
-                                                ucc_rank_t block);
-            size_t                 (*get_offset)(const ucc_tl_cuda_task_t *task,
-                                                 ucc_rank_t block);
+            int                     stage;
+            int                     num_frags;
+            ucc_datatype_t          dt;
+            void                   *sbuf;
+            void                   *rbuf;
+            ucc_ee_executor_task_t *exec_task;
+            size_t (*get_count)(const ucc_tl_cuda_task_t *task,
+                                ucc_rank_t                block);
+            size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
+                                 ucc_rank_t                block);
         } reduce_scatterv_ring;
     };
 };
