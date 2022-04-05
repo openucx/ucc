@@ -243,7 +243,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
 
     int ret = sharp_coll_init(&init_spec, &self->sharp_context);
     if (ret < 0 ) {
-        tl_error(self->super.super.lib, "Failed to initialize SHARP "
+        tl_debug(self->super.super.lib, "Failed to initialize SHARP "
                  "collectives:%s(%d) job ID:%" PRIu64"\n",
                  sharp_coll_strerror(ret), ret, init_spec.job_id);
         status = UCC_ERR_NO_RESOURCE;
