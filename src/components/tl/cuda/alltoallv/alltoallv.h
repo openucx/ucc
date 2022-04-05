@@ -15,7 +15,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_finalize(ucc_coll_task_t *coll_task);
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_start(ucc_coll_task_t *coll_task);
 
-ucc_status_t ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task);
+void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task);
 
 ucc_status_t
 ucc_tl_cuda_alltoallv_ce_triggered_post_setup(ucc_coll_task_t *coll_task);

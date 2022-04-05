@@ -12,7 +12,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task);
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_start(ucc_coll_task_t *task);
 
-ucc_status_t ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *task);
+void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_finalize(ucc_coll_task_t *task);
 

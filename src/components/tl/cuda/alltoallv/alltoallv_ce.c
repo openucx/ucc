@@ -63,7 +63,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_start(ucc_tl_cuda_task_t *task)
            sizeof(ucc_tl_cuda_mem_info_t));
     CUDA_CHECK_GOTO(cudaEventRecord(sync->ipc_event_local, team->stream),
                     exit_err, status);
-    ucc_memory_bus_fence();
+    ucc_memory_cpu_store_fence();
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;
@@ -220,7 +220,7 @@ exit:
     return status;
 }
 
-ucc_status_t ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
@@ -231,25 +231,25 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
     case ALLTOALL_CE_STAGE_SYNC:
         if (ucc_tl_cuda_get_sync(task) != UCC_OK) {
             task->super.super.status = UCC_INPROGRESS;
-            return task->super.super.status;
+            return;
         }
         status = ucc_tl_cuda_alltoallv_setup_start(task);
         if (status != UCC_OK) {
             task->super.super.status = status;
-            return task->super.super.status;
+            return;
         }
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_SETUP;
     case ALLTOALL_CE_STAGE_SETUP:
         status = ucc_tl_cuda_alltoallv_setup_test(task);
         if (status != UCC_OK) {
             task->super.super.status = status;
-            return task->super.super.status;
+            return;
         }
     case ALLTOALL_CE_STAGE_POST_COPIES:
         status = ucc_tl_cuda_alltoallv_ce_post_copies(task);
         if (ucc_unlikely(status != UCC_OK)) {
             task->super.super.status = status;
-            return task->super.super.status;
+            return;
         }
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_COPY;
     case ALLTOALL_CE_STAGE_COPY:
@@ -260,14 +260,14 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
                     status = UCC_INPROGRESS;
                 }
                 task->super.super.status = status;
-                return task->super.super.status;
+                return;
             }
         }
         status =
             ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
         if (ucc_unlikely(status != UCC_OK)) {
             task->super.super.status = status;
-            return task->super.super.status;
+            return;
         }
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_BAR;
     default:
@@ -279,7 +279,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
     if (task->super.super.status == UCC_OK) {
         ucc_tl_cuda_put_sync(task);
     }
-    return task->super.super.status;
 }
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_start(ucc_coll_task_t *coll_task)
