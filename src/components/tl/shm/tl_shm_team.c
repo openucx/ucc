@@ -152,7 +152,8 @@ static void ucc_tl_shm_init_segs(ucc_tl_shm_team_t *team)
     size_t cfg_data_size       = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
     ucc_tl_shm_seg_layout_t sl = UCC_TL_SHM_TEAM_LIB(team)->cfg.layout;
     size_t                  page_size = ucc_get_page_size();
-    size_t ctrl_offset, data_offset, grp_ctrl_size, grp_data_size, grp_seg_size;
+    size_t ctrl_offset, data_offset, grp_ctrl_size,
+        grp_data_size, grp_seg_size, grp_0_data_size;
     void * ctrl, *data;
     ucc_rank_t group_size;
     int        i, j;
@@ -161,10 +162,12 @@ static void ucc_tl_shm_init_segs(ucc_tl_shm_team_t *team)
         ctrl_offset = 0;
         data_offset = 0;
         for (j = 0; j < team->n_base_groups; j++) {
-            group_size    = team->base_groups[j].group_size;
-            grp_ctrl_size = ucc_align_up(group_size * cfg_ctrl_size, page_size);
-            grp_data_size = group_size * cfg_data_size;
-            grp_seg_size  = grp_ctrl_size + grp_data_size;
+            group_size      = team->base_groups[j].group_size;
+            grp_ctrl_size   = ucc_align_up(group_size * cfg_ctrl_size,
+                                           page_size);
+            grp_data_size   = group_size * cfg_data_size;
+            grp_0_data_size = team->base_groups[0].group_size * cfg_data_size;
+            grp_seg_size    = grp_ctrl_size + grp_data_size;
 
             if (sl == SEG_LAYOUT_CONTIG) {
                 ctrl = PTR_OFFSET(team->shm_buffers[0],
@@ -176,7 +179,7 @@ static void ucc_tl_shm_init_segs(ucc_tl_shm_team_t *team)
                 data_offset += grp_data_size;
             } else if (sl == SEG_LAYOUT_MIXED) {
                 ctrl = PTR_OFFSET(team->shm_buffers[0],
-                                  (team->ctrl_size + grp_data_size) * i +
+                                  (team->ctrl_size + grp_0_data_size) * i +
                                       ctrl_offset);
                 if (j == 0) {
                     data = PTR_OFFSET(ctrl, team->ctrl_size - ctrl_offset);
@@ -198,16 +201,17 @@ static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
 {
     ucc_rank_t team_rank = UCC_TL_TEAM_RANK(team),
                team_size = UCC_TL_TEAM_SIZE(team);
-    size_t cfg_ctrl_size            = UCC_TL_SHM_TEAM_LIB(team)->cfg.ctrl_size;
-    size_t cfg_data_size            = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
+    size_t     cfg_ctrl_size        = UCC_TL_SHM_TEAM_LIB(team)->cfg.ctrl_size;
+    size_t     cfg_data_size        = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
     ucc_tl_shm_seg_layout_t sl      = UCC_TL_SHM_TEAM_LIB(team)->cfg.layout;
     size_t                  shmsize = 0;
-    int    shmid   = -1;
-    ucc_team_oob_coll_t oob = UCC_TL_TEAM_OOB(team);
-    ucc_rank_t          gsize = team->base_groups[team->my_group_id].group_size;
-    ucc_status_t        status;
-    size_t              page_size;
+    int                     shmid   = -1;
+    ucc_team_oob_coll_t     oob     = UCC_TL_TEAM_OOB(team);
+    ucc_rank_t              gsize;
+    ucc_status_t            status;
+    size_t                  page_size;
 
+    gsize = team->base_groups[team->my_group_id].group_size;
     team->allgather_dst =
         (int *)ucc_malloc(sizeof(int) * (team_size + 1), "algather dst buffer");
 
@@ -410,7 +414,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     }
 
     self->shm_buffers =
-        (void *)ucc_calloc(sizeof(void *), self->n_base_groups, "shM_buffers");
+        (void *)ucc_calloc(sizeof(void *), self->n_base_groups, "shm_buffers");
     if (!self->shm_buffers) {
         status = UCC_ERR_NO_MEMORY;
         goto err_segs;
