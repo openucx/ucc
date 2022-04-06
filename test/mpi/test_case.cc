@@ -77,6 +77,9 @@ std::shared_ptr<TestCase> TestCase::init_single(
     case UCC_COLL_TYPE_ALLTOALLV:
         return std::make_shared<TestAlltoallv>(msgsize, inplace, mt, _team,
                                                max_size, count_bits, displ_bits);
+    case UCC_COLL_TYPE_GATHER:
+        return std::make_shared<TestGather>(msgsize, inplace, mt, root, _team,
+                                            max_size);
     default:
         break;
     }

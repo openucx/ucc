@@ -12,6 +12,7 @@
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
+#include "utils/arch/cuda_def.h"
 #include "allgatherv/allgatherv.h"
 
 #define ncclOpUnsupported (ncclNumOps + 1)
@@ -561,6 +562,85 @@ ucc_status_t ucc_tl_nccl_barrier_init(ucc_tl_nccl_task_t *task)
 
     task->super.post = ucc_tl_nccl_allreduce_start;
 
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_nccl_gather_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
+    ucc_rank_t          rank   = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t          size   = UCC_TL_TEAM_SIZE(team);
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
+    void               *dst    = args->dst.info.buffer;
+    void               *src    = args->src.info.buffer;
+    ucc_status_t        status = UCC_OK;
+    size_t send_size;
+    ucc_rank_t peer;
+
+    if (rank == args->root) {
+        send_size = ucc_dt_size(args->dst.info.datatype) *
+                    args->dst.info.count / size;
+    } else {
+        send_size = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
+    }
+
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_gather_start", 0);
+    if (rank == args->root) {
+        if (!UCC_IS_INPLACE(*args)) {
+            CUDA_CHECK_GOTO(cudaMemcpyAsync(PTR_OFFSET(dst, rank * send_size),
+                                            src, send_size,
+                                            cudaMemcpyDeviceToDevice, stream),
+                            exit_coll, status);
+        }
+        NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status,
+                       UCC_TL_TEAM_LIB(team));
+        for (peer = 0; peer < size; peer++) {
+            if (peer == args->root) {
+                continue;
+            }
+            NCCLCHECK_GOTO(ncclRecv(PTR_OFFSET(dst, peer * send_size),
+                                    send_size, ncclChar, peer, team->nccl_comm,
+                                    stream),
+                           exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
+        NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status,
+                       UCC_TL_TEAM_LIB(team));
+    } else {
+        NCCLCHECK_GOTO(ncclSend(src, send_size, ncclChar, args->root,
+                                team->nccl_comm, stream),
+                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+    }
+    task->super.status = UCC_INPROGRESS;
+    status = ucc_tl_nccl_collective_sync(task, stream);
+exit_coll:
+    return status;
+}
+
+ucc_status_t ucc_tl_nccl_gather_init(ucc_tl_nccl_task_t *task)
+{
+    ucc_tl_nccl_team_t *team = TASK_TEAM(task);
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
+
+    if (UCC_TL_TEAM_RANK(team) == args->root) {
+        if (!UCC_DT_IS_PREDEFINED(args->dst.info.datatype)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "user defined datatype is not supported");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+    if ((UCC_TL_TEAM_RANK(team) != args->root) ||
+        (!UCC_IS_INPLACE(*args))) {
+        if (!UCC_DT_IS_PREDEFINED(args->src.info.datatype)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "user defined datatype is not supported");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+
+    task->super.post     = ucc_tl_nccl_gather_start;
     return UCC_OK;
 }
 
