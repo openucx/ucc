@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 #include "ucc_schedule.h"
@@ -157,8 +157,10 @@ void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
     }
 }
 
-ucc_status_t ucc_schedule_start(ucc_schedule_t *schedule)
+ucc_status_t ucc_schedule_start(ucc_coll_task_t *task)
 {
+    ucc_schedule_t *schedule = ucc_derived_of(task, ucc_schedule_t);
+
     schedule->n_completed_tasks  = 0;
     schedule->super.status       = UCC_INPROGRESS;
     schedule->super.super.status = UCC_INPROGRESS;

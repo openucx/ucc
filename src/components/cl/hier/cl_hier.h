@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -13,7 +13,7 @@
 #include "utils/ucc_mpool.h"
 
 #ifdef HAVE_PROFILING_CL_HIER
-#include "utils/profile/ucc_profile.h"
+#include "utils/profile/ucc_profile_on.h"
 #else
 #include "utils/profile/ucc_profile_off.h"
 #endif
@@ -48,6 +48,12 @@ typedef struct ucc_cl_hier_lib_config {
        which are selected based on the TL scores */
     ucc_config_names_array_t sbgp_tls[UCC_HIER_SBGP_LAST];
     size_t                   a2av_node_thresh;
+    uint32_t                 allreduce_split_rail_n_frags;
+    uint32_t                 allreduce_split_rail_pipeline_depth;
+    int                      allreduce_split_rail_seq;
+    size_t                   allreduce_split_rail_frag_thresh;
+    size_t                   allreduce_split_rail_frag_size;
+
 } ucc_cl_hier_lib_config_t;
 
 typedef struct ucc_cl_hier_context_config {

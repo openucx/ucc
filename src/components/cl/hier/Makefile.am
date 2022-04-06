@@ -2,20 +2,22 @@
 # Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
 #
 
-allreduce =                   \
-	allreduce/allreduce.h     \
-	allreduce/allreduce_rab.c
+allreduce =                          \
+	allreduce/allreduce.h            \
+	allreduce/allreduce.c            \
+	allreduce/allreduce_rab.c        \
+	allreduce/allreduce_split_rail.c
 
 alltoallv =                   \
 	alltoallv/alltoallv.h     \
 	alltoallv/alltoallv.c
 
-alltoall =                  \
-	alltoall/alltoall.h     \
+alltoall =                    \
+	alltoall/alltoall.h       \
 	alltoall/alltoall.c
 
-barrier =                 \
-	barrier/barrier.h     \
+barrier =                     \
+	barrier/barrier.h         \
 	barrier/barrier.c
 
 sources =             \

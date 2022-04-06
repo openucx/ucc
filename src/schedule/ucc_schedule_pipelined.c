@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 #include "ucc_schedule.h"
@@ -118,7 +118,7 @@ ucc_status_t ucc_schedule_pipelined_post(ucc_coll_task_t *task)
         }
     }
 
-    return ucc_schedule_start(&schedule_p->super);
+    return ucc_schedule_start(task);
 }
 
 ucc_status_t ucc_schedule_pipelined_init(
