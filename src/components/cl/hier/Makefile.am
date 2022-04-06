@@ -12,12 +12,12 @@ alltoallv =                   \
 	alltoallv/alltoallv.h     \
 	alltoallv/alltoallv.c
 
-alltoall =                  \
-	alltoall/alltoall.h     \
+alltoall =                    \
+	alltoall/alltoall.h       \
 	alltoall/alltoall.c
 
-barrier =                 \
-	barrier/barrier.h     \
+barrier =                     \
+	barrier/barrier.h         \
 	barrier/barrier.c
 
 sources =             \

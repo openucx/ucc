@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -26,12 +26,13 @@ ucc_status_t ucc_cl_hier_allreduce_rab_init(ucc_base_coll_args_t *coll_args,
 
 ucc_status_t
 ucc_cl_hier_allreduce_split_rail_init(ucc_base_coll_args_t *coll_args,
-                                      ucc_base_team_t *     team,
-                                      ucc_coll_task_t **    task);
+                                      ucc_base_team_t      *team,
+                                      ucc_coll_task_t     **task);
 
 static inline int ucc_cl_hier_allreduce_alg_from_str(const char *str)
 {
     int i;
+
     for (i = 0; i < UCC_CL_HIER_ALLREDUCE_ALG_LAST; i++) {
         if (0 == strcasecmp(str, ucc_cl_hier_allreduce_algs[i].name)) {
             break;
