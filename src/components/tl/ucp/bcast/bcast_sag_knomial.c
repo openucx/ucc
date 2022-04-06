@@ -38,7 +38,7 @@
  */
 ucc_status_t ucc_tl_ucp_bcast_sag_knomial_start(ucc_coll_task_t *coll_task)
 {
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(schedule, "ucp_bcast_sag_kn_start", 0);
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_bcast_sag_kn_start", 0);
     return ucc_schedule_start(coll_task);
 }
 
