@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -38,10 +38,8 @@
  */
 ucc_status_t ucc_tl_ucp_bcast_sag_knomial_start(ucc_coll_task_t *coll_task)
 {
-    ucc_schedule_t *schedule = ucc_derived_of(coll_task, ucc_schedule_t);
-
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(schedule, "ucp_bcast_sag_kn_start", 0);
-    return ucc_schedule_start(schedule);
+    return ucc_schedule_start(coll_task);
 }
 
 ucc_status_t

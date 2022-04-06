@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -39,9 +39,7 @@
 static ucc_status_t
 ucc_tl_ucp_allreduce_sra_knomial_frag_start(ucc_coll_task_t *task)
 {
-    ucc_schedule_t *schedule = ucc_derived_of(task, ucc_schedule_t);
-
-    return ucc_schedule_start(schedule);
+    return ucc_schedule_start(task);
 }
 
 static ucc_status_t

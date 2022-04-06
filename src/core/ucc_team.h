@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -131,5 +131,4 @@ static inline int ucc_team_map_is_single_node(ucc_team_t *team,
     }
     return 1;
 }
-
 #endif

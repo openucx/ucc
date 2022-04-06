@@ -313,7 +313,7 @@ ucc_tl_ucp_reduce_scatterv_ring_sched_post(ucc_coll_task_t *task)
         schedule->tasks[i]->bargs.args.dst = task->bargs.args.dst;
     }
 
-    return ucc_schedule_start(schedule);
+    return ucc_schedule_start(task);
 }
 
 static ucc_status_t

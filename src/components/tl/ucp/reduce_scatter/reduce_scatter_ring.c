@@ -302,9 +302,7 @@ static ucc_status_t ucc_tl_ucp_reduce_scatter_ring_init_subset(
 static ucc_status_t
 ucc_tl_ucp_reduce_scatter_ring_sched_post(ucc_coll_task_t *coll_task)
 {
-    ucc_schedule_t *schedule = ucc_derived_of(coll_task, ucc_schedule_t);
-
-    return ucc_schedule_start(schedule);
+    return ucc_schedule_start(coll_task);
 }
 
 static ucc_status_t

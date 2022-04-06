@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -238,8 +238,8 @@ skip:
     ucc_free(nl_array_2);
 
     if (n_node_leaders > 1) {
+        sbgp->group_size = n_node_leaders;
         if (i_am_node_leader) {
-            sbgp->group_size = n_node_leaders;
             sbgp->rank_map   = nl_array_1;
             sbgp->status     = UCC_SBGP_ENABLED;
         } else {

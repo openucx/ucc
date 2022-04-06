@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -855,9 +855,10 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
     ucc_coll_entry_t *fb;
     ucc_status_t      status;
 
-    if (ucc_list_is_empty(src) || ucc_list_is_empty(dest)) {
+    if (ucc_list_is_empty(src) && ucc_list_is_empty(dest)) {
         return UCC_OK;
     }
+
     while (s != src && d != dest) {
         rs = ucc_container_of(s, ucc_msg_range_t, super.list_elem);
         rd = ucc_container_of(d, ucc_msg_range_t, super.list_elem);
@@ -944,6 +945,9 @@ static ucc_status_t ucc_coll_score_update_one(ucc_list_link_t *dest,
         rs = ucc_container_of(s, ucc_msg_range_t, super.list_elem);
         if (rs->super.init) {
             new = MSG_RANGE_DUP(rs);
+            if (new->super.score == UCC_SCORE_INVALID) {
+                new->super.score = default_score;
+            }
             ucc_list_add_tail(dest, &new->super.list_elem);
         }
         s = s->next;
