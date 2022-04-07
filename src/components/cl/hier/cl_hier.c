@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -48,6 +48,36 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
      "Messages larger than that threshold will be sent via node sbgp tl",
      ucc_offsetof(ucc_cl_hier_lib_config_t, a2av_node_thresh),
      UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLREDUCE_SPLIT_RAIL_FRAG_THRESH", "inf",
+     "Threshold to enable fragmentation and pipelining of Split_Rail "
+     "allreduce alg",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_split_rail_frag_thresh),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLREDUCE_SPLIT_RAIL_FRAG_SIZE", "inf",
+     "Maximum allowed fragment size of Split_Rail alg",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_split_rail_frag_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLREDUCE_SPLIT_RAIL_N_FRAGS", "2",
+     "Number of fragments each allreduce is split into when Split_Rail alg is "
+     "used\n"
+     "The actual number of fragments can be larger if fragment size exceeds\n"
+     "ALLREDUCE_SPLIT_RAIL_FRAG_SIZE",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_split_rail_n_frags),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLREDUCE_SPLIT_RAIL_PIPELINE_DEPTH", "2",
+     "Number of fragments simultaneously progressed by the Split_Rail alg",
+     ucc_offsetof(ucc_cl_hier_lib_config_t,
+                  allreduce_split_rail_pipeline_depth),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLREDUCE_SPLIT_RAIL_SEQUENTIAL", "n",
+     "Type of pipelined schedule for Split_Rail alg (sequential/parallel)",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_split_rail_seq),
+     UCC_CONFIG_TYPE_BOOL},
 
     {NULL}};
 

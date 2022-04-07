@@ -73,9 +73,11 @@ void TestBarrier::run()
             if (0 == rank && !completed) {
                 MPI_Test(&rreq, &completed, MPI_STATUS_IGNORE);
             }
+            mpi_progress();
         } while(UCC_OK != status);
-        if  (0 == rank && !completed) {
-            MPI_Wait(&rreq, MPI_STATUS_IGNORE);
+        while (0 == rank && !completed) {
+            MPI_Test(&rreq, &completed, MPI_STATUS_IGNORE);
+            mpi_progress();
         }
         if (i < size - 1) {
             UCC_CHECK(ucc_collective_finalize(req));

@@ -14,6 +14,7 @@
 typedef struct ucc_cl_lib      ucc_cl_lib_t;
 typedef struct ucc_tl_lib      ucc_tl_lib_t;
 typedef struct ucc_cl_lib_attr ucc_cl_lib_attr_t;
+typedef struct ucc_tl_iface    ucc_tl_iface_t;
 
 typedef struct ucc_lib_config {
     char                    *full_prefix;
@@ -38,5 +39,9 @@ void ucc_get_version(unsigned *major_version, unsigned *minor_version,
                      unsigned *release_number);
 
 const char *ucc_get_version_string(void);
+
+/* Checks if a TL is explicitely requested by user via UCC_TLS
+   parameter */
+int ucc_tl_is_requested(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface);
 
 #endif

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -8,10 +8,7 @@
 #include "utils/ucc_malloc.h"
 #include "core/ucc_team.h"
 #include "core/ucc_service_coll.h"
-#include "allreduce/allreduce.h"
-#include "alltoallv/alltoallv.h"
-#include "alltoall/alltoall.h"
-#include "barrier/barrier.h"
+#include "cl_hier_coll.h"
 
 #define SBGP_SET(_team, _sbgp, _enable)                                        \
     _team->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp_type = UCC_SBGP_##_sbgp;          \
@@ -23,7 +20,7 @@
    Next step is to enable sbgps based on the requested hierarchical algs. */
 static void ucc_cl_hier_enable_sbgps(ucc_cl_hier_team_t *team)
 {
-    SBGP_SET(team, NET, DISABLED);
+    SBGP_SET(team, NET, ENABLED);
     SBGP_SET(team, NODE, ENABLED);
     SBGP_SET(team, NODE_LEADERS, ENABLED);
     SBGP_SET(team, FULL, ENABLED); //todo parse score if a2av is enabled
@@ -257,9 +254,8 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
                     UCC_TL_CTX_IFACE(d->ctx)->super.name,
                     ucc_sbgp_str(hs->sbgp_type));
         } else {
-            cl_error(ctx->super.super.lib, "failed to create tl %s team",
+            cl_debug(ctx->super.super.lib, "failed to create tl %s team",
                      UCC_TL_CTX_IFACE(d->ctx)->super.name);
-            hs->state        = UCC_HIER_SBGP_DISABLED;
             hs->tl_teams[tl] = NULL;
             hs->tl_ctxs[tl]  = NULL;
             ucc_tl_context_put(d->ctx);
@@ -268,19 +264,24 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
 
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
         hs = &team->sbgps[i];
-        if (hs->state == UCC_HIER_SBGP_DISABLED) {
-            continue;
-        }
         if (hs->score == NULL) {
-            cl_error(ctx->super.super.lib,
-                     "no tl teams were created for sbgp %s",
-                     ucc_sbgp_str(hs->sbgp_type));
+            if (hs->state == UCC_HIER_SBGP_ENABLED) {
+                /* we tried to enable that sbgp, which means the subgroup
+                   exists. however failed to create a single team there */
+                cl_error(ctx->super.super.lib,
+                         "no tl teams were created for sbgp %s",
+                         ucc_sbgp_str(hs->sbgp_type));
+                status = UCC_ERR_NO_RESOURCE;
+                break;
+            }
             hs->state = UCC_HIER_SBGP_DISABLED;
         } else {
             status = ucc_coll_score_build_map(hs->score, &hs->score_map);
             if (UCC_OK != status) {
                 cl_error(ctx->super.super.lib, "failed to build score map");
                 hs->state = UCC_HIER_SBGP_DISABLED;
+                status = UCC_ERR_NO_RESOURCE;
+                break;
             }
         }
     }
@@ -294,58 +295,6 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
         team->top_sbgp = UCC_HIER_SBGP_NODE;
     }
 
-    return status;
-}
-
-static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
-{
-    switch (coll_type) {
-    case UCC_COLL_TYPE_ALLTOALLV:
-        return ucc_cl_hier_alltoallv_alg_from_str(str);
-    case UCC_COLL_TYPE_ALLTOALL:
-        return ucc_cl_hier_alltoall_alg_from_str(str);
-    default:
-        break;
-    }
-    return -1;
-}
-
-static ucc_status_t
-ucc_cl_hier_alg_id_to_init(int alg_id, const char *alg_id_str,
-                           ucc_coll_type_t          coll_type,
-                           ucc_memory_type_t        mem_type, //NOLINT
-                           ucc_base_coll_init_fn_t *init)
-{
-    ucc_status_t status = UCC_OK;
-    if (alg_id_str) {
-        alg_id = alg_id_from_str(coll_type, alg_id_str);
-    }
-
-    switch (coll_type) {
-    case UCC_COLL_TYPE_ALLTOALLV:
-        switch (alg_id) {
-        case UCC_CL_HIER_ALLTOALLV_ALG_NODE_SPLIT:
-            *init = ucc_cl_hier_alltoallv_init;
-            break;
-        default:
-            status = UCC_ERR_INVALID_PARAM;
-            break;
-        };
-        break;
-    case UCC_COLL_TYPE_ALLTOALL:
-        switch (alg_id) {
-        case UCC_CL_HIER_ALLTOALL_ALG_NODE_SPLIT:
-            *init = ucc_cl_hier_alltoall_init;
-            break;
-        default:
-            status = UCC_ERR_INVALID_PARAM;
-            break;
-        };
-        break;
-    default:
-        status = UCC_ERR_NOT_SUPPORTED;
-        break;
-    }
     return status;
 }
 
@@ -367,14 +316,6 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
     }
 
     for (i = 0; i < 2; i++) {
-        status = ucc_coll_score_add_range(
-            score, UCC_COLL_TYPE_ALLREDUCE, mt[i], 0, 2048,
-            UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_allreduce_rab_init, cl_team);
-        if (UCC_OK != status) {
-            cl_error(lib, "failed to add range to score_t");
-            return status;
-        }
-
         status = ucc_coll_score_add_range(
             score, UCC_COLL_TYPE_ALLTOALLV, mt[i], 0, UCC_MSG_MAX,
             /* low priority 1: to be enabled manually */
@@ -402,6 +343,18 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
         cl_error(lib, "faild to add range to score_t");
         return status;
 
+    }
+
+    for (i = 0; i < UCC_CL_HIER_N_DEFAULT_ALG_SELECT_STR; i++) {
+        status = ucc_coll_score_update_from_str(
+            ucc_cl_hier_default_alg_select_str[i], score,
+            UCC_TL_TEAM_SIZE(team), ucc_cl_hier_coll_init, &team->super.super,
+            UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_alg_id_to_init);
+        if (UCC_OK != status) {
+            cl_error(lib, "failed to apply default coll select setting: %s",
+                     ucc_cl_hier_default_alg_select_str[i]);
+            goto err;
+        }
     }
 
     if (strlen(ctx->score_str) > 0) {
