@@ -13,19 +13,6 @@
 #include "utils/arch/cuda_def.h"
 #include <cuda_runtime.h>
 
-static inline ucc_status_t cuda_error_to_ucc_status(cudaError_t cu_err)
-{
-    switch(cu_err) {
-    case cudaSuccess:
-        return UCC_OK;
-    case cudaErrorNotReady:
-        return UCC_INPROGRESS;
-    default:
-        break;
-    }
-    return UCC_ERR_NO_MESSAGE;
-}
-
 typedef struct ucc_mc_cuda_config {
     ucc_mc_config_t                super;
     unsigned long                  reduce_num_blocks;
