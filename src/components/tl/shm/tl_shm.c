@@ -24,6 +24,11 @@ static const char *bcast_algs[] = {[BCAST_WW]   = "ww",
                                    [BCAST_RW]   = "rw",
                                    [BCAST_LAST] = NULL};
 
+static const char *seg_layout[] = {[SEG_LAYOUT_CONTIG] = "contig",
+                                   [SEG_LAYOUT_SOCKET] = "socket",
+                                   [SEG_LAYOUT_MIXED]  = "mixed",
+                                   [SEG_LAYOUT_LAST]   = NULL};
+
 static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_shm_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
@@ -104,6 +109,16 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
 
     {"GROUP_MODE", "socket", "group mode - numa or socket",
      ucc_offsetof(ucc_tl_shm_lib_config_t, group_mode), UCC_CONFIG_TYPE_STRING},
+
+    {"SEG_LAYOUT", "contig",
+     "layout of SM segments:\n"
+     " contig: all segments are allocate by single process and local to a "
+     "single socket\n"
+     " socket: DATA and CTRL segs are allocated per socket subgroup respecting "
+     "locality\n"
+     " mixed:  CTRL segs are allocated contiguously, DATA - per socket",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, layout),
+     UCC_CONFIG_TYPE_ENUM(seg_layout)},
 
     {NULL}};
 
