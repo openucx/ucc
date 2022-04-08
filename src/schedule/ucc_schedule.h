@@ -200,4 +200,5 @@ static inline void ucc_task_subscribe_dep(ucc_coll_task_t *target,
 #define UCC_TASK_CORE_CTX(_task)                                               \
     (((ucc_coll_task_t *)_task)->team->context->ucc_context)
 
+#define UCC_TASK_THREAD_MODE(_task) (UCC_TASK_CORE_CTX(_task)->thread_mode)
 #endif
