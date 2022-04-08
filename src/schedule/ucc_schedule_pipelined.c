@@ -5,6 +5,7 @@
 #include "ucc_schedule.h"
 #include "ucc_schedule_pipelined.h"
 #include "coll_score/ucc_coll_score.h"
+#include "core/ucc_context.h"
 
 static ucc_status_t ucc_frag_start_handler(ucc_coll_task_t *parent,
                                            ucc_coll_task_t *task)
@@ -43,6 +44,10 @@ ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task,
     ucc_schedule_t *frag = ucc_derived_of(parent_task, ucc_schedule_t);
     int             i;
 
+    if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
+        ucc_recursive_spin_lock(&schedule->lock);
+    }
+
     schedule->super.n_completed_tasks += 1;
     schedule->n_frags_in_pipeline--;
     ucc_trace_req(
@@ -52,6 +57,9 @@ ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task,
     ucc_assert(frag->super.status == UCC_OK);
     if (schedule->super.n_completed_tasks == schedule->super.n_tasks) {
         schedule->super.super.status = UCC_OK;
+        if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
+            ucc_recursive_spin_unlock(&schedule->lock);
+        }
         ucc_task_complete(task);
         return UCC_OK;
     }
@@ -75,6 +83,9 @@ ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task,
             break;
         }
     }
+    if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
+        ucc_recursive_spin_unlock(&schedule->lock);
+    }
     return UCC_OK;
 }
 
@@ -89,6 +100,7 @@ ucc_status_t ucc_schedule_pipelined_finalize(ucc_coll_task_t *task)
     for (i = 0; i < schedule_p->n_frags; i++) {
         schedule_p->frags[i]->super.finalize(&frags[i]->super);
     }
+    ucc_recursive_spinlock_destroy(&schedule_p->lock);
     return UCC_OK;
 }
 
@@ -142,6 +154,8 @@ ucc_status_t ucc_schedule_pipelined_init(
         ucc_error("failed to init pipelined schedule");
         return status;
     }
+
+    ucc_recursive_spinlock_init(&schedule->lock, 0);
 
     schedule->super.n_tasks        = n_frags_total;
     schedule->n_frags              = n_frags;
