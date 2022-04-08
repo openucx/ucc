@@ -24,8 +24,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_finalize(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
 
     tl_trace(UCC_TASK_LIB(task), "finalizing task %p", task);
-    ucc_ec_destroy_event((void *)task->alltoallv_ce.copy_done,
-                         UCC_EE_CUDA_STREAM);
     ucc_tl_cuda_task_put(task);
     return UCC_OK;
 }
@@ -214,8 +212,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
             task->alltoallv_ce.num_posted++;
         }
     }
-    status = ucc_ec_event_post(team->stream, task->alltoallv_ce.copy_done,
-                               UCC_EE_CUDA_STREAM);
 exit:
     return status;
 }
@@ -349,12 +345,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    status =
-        ucc_ec_create_event(&task->alltoallv_ce.copy_done, UCC_EE_CUDA_STREAM);
-    if (ucc_unlikely(status != UCC_OK)) {
-        return status;
-    }
-
     task->alltoallv_ce.get_size   = ucc_tl_cuda_alltoallv_get_size;
     task->alltoallv_ce.get_offset = ucc_tl_cuda_alltoallv_get_offset;
     task->alltoallv_ce.sdt        = args->src.info_v.datatype;
@@ -395,6 +385,5 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
     return UCC_OK;
 
 exit_err:
-    ucc_ec_destroy_event(task->alltoallv_ce.copy_done, UCC_EE_CUDA_STREAM);
     return status;
 }

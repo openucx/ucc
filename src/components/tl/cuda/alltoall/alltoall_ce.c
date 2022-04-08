@@ -36,11 +36,6 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     size_t           data_len;
 
     task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
-    status =
-        ucc_ec_create_event(&task->alltoallv_ce.copy_done, UCC_EE_CUDA_STREAM);
-    if (ucc_unlikely(status != UCC_OK)) {
-        return status;
-    }
 
     task->alltoallv_ce.get_size   = ucc_tl_cuda_alltoall_get_size;
     task->alltoallv_ce.get_offset = ucc_tl_cuda_alltoall_get_offset;
@@ -77,6 +72,5 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     return UCC_OK;
 
 exit_err:
-    ucc_ec_destroy_event(task->alltoallv_ce.copy_done, UCC_EE_CUDA_STREAM);
     return status;
 }

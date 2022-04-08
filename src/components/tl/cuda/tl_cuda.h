@@ -189,7 +189,6 @@ struct ucc_tl_cuda_task {
             ucc_aint_t            *rdispl;
             ucc_ee_executor_task_t
                  *exec_task[UCC_TL_CUDA_MAX_PEERS * UCC_TL_CUDA_MAX_PEERS];
-            void *copy_done;
             size_t (*get_size)(const ucc_tl_cuda_task_t *task, size_t *bytes,
                                ucc_rank_t block);
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
