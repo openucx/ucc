@@ -341,7 +341,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
     size_t              data_len;
 
     if (!UCC_COLL_ARGS_CONTIG_BUFFER(args)) {
-        tl_error(UCC_TL_TEAM_LIB(team), "Do not support non-contiguous buffer");
+        tl_debug(UCC_TL_TEAM_LIB(team), "Do not support non-contiguous buffer");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
