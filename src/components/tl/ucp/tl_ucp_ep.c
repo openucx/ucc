@@ -47,7 +47,7 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
 
     addr = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
                                 core_rank, ucc_tl_ucp.super.super.id);
-    return ucc_tl_ucp_connect_ep(ctx, ep, addr);
+    return ucc_tl_ucp_connect_ep(ctx, ep, TL_UCP_EP_ADDR_WORKER(addr));
 }
 
 /* Finds next non-NULL ep in the storage and returns that handle
