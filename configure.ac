@@ -215,8 +215,10 @@ AC_CONFIG_FILES([
                  src/components/ec/cuda/Makefile
                  src/components/ec/cuda/kernel/Makefile
                  src/components/mc/rocm/Makefile
+                 src/components/mc/rocm/kernel/Makefile
                  src/components/ec/rocm/Makefile
-		 test/mpi/Makefile
+                 src/components/ec/rocm/kernel/Makefile
+                 test/mpi/Makefile
                  test/gtest/Makefile
                  tools/info/Makefile
                  tools/perf/Makefile
