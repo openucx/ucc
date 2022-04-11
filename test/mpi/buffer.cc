@@ -27,7 +27,7 @@ void init_buffer(void *_buf, size_t count, ucc_datatype_t dt,
                  ucc_memory_type_t mt, int value)
 {
     void *buf = NULL;
-    if (mt == UCC_MEMORY_TYPE_CUDA) {
+    if (mt == UCC_MEMORY_TYPE_CUDA || mt == UCC_MEMORY_TYPE_ROCM) {
         buf = ucc_malloc(count * ucc_dt_size(dt), "buf");
         UCC_MALLOC_CHECK(buf);
     } else if (mt == UCC_MEMORY_TYPE_HOST) {
@@ -105,7 +105,7 @@ ucc_status_t compare_buffers(void *_rst, void *expected, size_t count,
 
     if (UCC_MEMORY_TYPE_HOST == mt) {
         rst = _rst;
-    } else if (UCC_MEMORY_TYPE_CUDA == mt) {
+    } else if (UCC_MEMORY_TYPE_CUDA == mt || UCC_MEMORY_TYPE_ROCM == mt) {
         UCC_ALLOC_COPY_BUF(rst_mc_header, UCC_MEMORY_TYPE_HOST, _rst, mt,
                            count * ucc_dt_size(dt));
         rst = rst_mc_header->addr;
