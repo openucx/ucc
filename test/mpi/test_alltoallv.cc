@@ -61,12 +61,13 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
+    args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
+    args.flags |= UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER |
+                  UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
     if (count_bits == TEST_FLAG_VSIZE_64BIT) {
-        args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags |= UCC_COLL_ARGS_FLAG_COUNT_64BIT;
     }
     if (displ_bits == TEST_FLAG_VSIZE_64BIT) {
-        args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags |= UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT;
     }
 
