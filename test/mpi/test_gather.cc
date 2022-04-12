@@ -54,22 +54,23 @@ TestGather::TestGather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
     args.root = root;
     if (rank == root) {
-        args.dst.info.buffer = rbuf;
-        args.dst.info.count = single_rank_count * size;
+        args.dst.info.buffer   = rbuf;
+        args.dst.info.count    = single_rank_count * size;
         args.dst.info.datatype = TEST_DT;
         args.dst.info.mem_type = _mt;
         if (TEST_NO_INPLACE == inplace) {
-            args.src.info.buffer = sbuf;
-            args.src.info.count = single_rank_count;
+            args.src.info.buffer   = sbuf;
+            args.src.info.count    = single_rank_count;
             args.src.info.datatype = TEST_DT;
             args.src.info.mem_type = _mt;
         }
     } else {
-        args.src.info.buffer = sbuf;
-        args.src.info.count = single_rank_count;
+        args.src.info.buffer   = sbuf;
+        args.src.info.count    = single_rank_count;
         args.src.info.datatype = TEST_DT;
         args.src.info.mem_type = _mt;
     }
+
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
