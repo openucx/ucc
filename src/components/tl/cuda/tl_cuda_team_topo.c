@@ -200,17 +200,19 @@ free_ring:
 }
 
 static ucc_status_t
-ucc_tl_cuda_team_topo_init_proxy(const ucc_tl_cuda_team_t *team,
-                                 ucc_tl_cuda_team_topo_t *topo)
+ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
+                                   ucc_tl_cuda_team_topo_t *topo)
 {
     ucc_rank_t size        = UCC_TL_TEAM_SIZE(team);
     ucc_rank_t num_proxies = 0;
-    ucc_rank_t i, j, p, k;
+    ucc_rank_t i, j ,p, k, proxy;
+    float *data;
+    float score, min_score;
     ucc_status_t status;
 
     for (i = 0; i < size * size; i++) {
         if (topo->matrix[i] == 0) {
-            num_proxies ++;
+            num_proxies++;
         }
     }
 
@@ -218,11 +220,30 @@ ucc_tl_cuda_team_topo_init_proxy(const ucc_tl_cuda_team_t *team,
     if (num_proxies == 0) {
         return UCC_OK;
     }
+
     topo->proxies = (ucc_tl_cuda_proxy_t*)ucc_malloc(
             num_proxies * sizeof(ucc_tl_cuda_proxy_t), "cuda_topo_proxies");
     if (!topo->proxies) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to alloc cuda topo proxy");
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to alloc cuda topo proxies");
         return UCC_ERR_NO_MEMORY;
+    }
+
+    data = (float*)ucc_malloc(size * size * sizeof(float),
+                              "cuda topo proxies data");
+    if (!data) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to alloc cuda topo work array");
+        status = UCC_ERR_NO_MEMORY;
+        goto free_proxy;
+    }
+
+    for (i = 0; i < size; i++) {
+        for (j = 0; j < size; j++) {
+            if (ucc_tl_cuda_team_topo_is_direct(&team->super, topo, i, j)) {
+                data[i * size + j] = 1.0;
+            } else {
+                data[i * size + j] = 0.0;
+            }
+        }
     }
 
     p = 0;
@@ -231,30 +252,47 @@ ucc_tl_cuda_team_topo_init_proxy(const ucc_tl_cuda_team_t *team,
             if (ucc_tl_cuda_team_topo_is_direct(&team->super, topo, i, j)) {
                 continue;
             }
+            proxy = UCC_RANK_INVALID;
+            min_score = (float)(UCC_RANK_MAX);
             for (k = 0; k < size; k++) {
                 if (ucc_tl_cuda_team_topo_is_direct(&team->super, topo, i, k) &&
                     ucc_tl_cuda_team_topo_is_direct(&team->super, topo, k, j)) {
-                    topo->proxies[p].src   = i;
-                    topo->proxies[p].dst   = j;
-                    topo->proxies[p].proxy = k;
-                    break;
+                    ucc_assert((topo->matrix[i * size + k] > 0) &&
+                               (topo->matrix[k * size + j] > 0));
+                    score = ucc_max((data[i * size + k] + 1.0) /
+                                    topo->matrix[i * size + k],
+                                    (data[k * size + j] + 1.0) /
+                                    topo->matrix[k * size + j]);
+                    if (score >= min_score) {
+                        continue;
+                    }
+                    proxy = k;
+                    min_score = score;
                 }
             }
-            if (k == size) {
+            if (proxy == UCC_RANK_INVALID) {
                 tl_info(UCC_TL_TEAM_LIB(team), "no proxy found between "
                         "dev %d rank %d and dev %d rank %d, "
                         "cuda topology is not supported",
                         team->ids[i].device, i, team->ids[j].device, j);
                 status = UCC_ERR_NOT_SUPPORTED;
-                goto free_proxy;
+                goto free_data;
             }
+            topo->proxies[p].src   = i;
+            topo->proxies[p].dst   = j;
+            topo->proxies[p].proxy = proxy;
+            data[i * size + proxy] += 1.0;
+            data[proxy * size + j] += 1.0;
             p++;
         }
     }
-    return UCC_OK;
 
+    ucc_free(data);
+    return UCC_OK;
+free_data:
+    ucc_free(data);
 free_proxy:
-   ucc_free(topo->proxies);
+    ucc_free(topo->proxies);
     return status;
 }
 
@@ -315,7 +353,7 @@ ucc_status_t ucc_tl_cuda_team_topo_create(const ucc_tl_team_t *cuda_team,
         goto free_matrix;
     }
 
-    status = ucc_tl_cuda_team_topo_init_proxy(team, topo);
+    status = ucc_tl_cuda_team_topo_init_proxies(team, topo);
     if (status != UCC_OK) {
         if (status != UCC_ERR_NOT_SUPPORTED) {
             tl_error(UCC_TL_TEAM_LIB(team), "failed to init cuda topo proxy");

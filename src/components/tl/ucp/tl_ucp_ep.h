@@ -12,6 +12,17 @@
 #include "tl_ucp.h"
 #include "core/ucc_team.h"
 
+/* TL/UCP endpoint address layout: (ucp_addrlen may very per proc)
+
+   [ucp_addrlen][ucp_worker_address][onesided_info]
+       8 bytes    ucp_addrlen bytes
+*/
+#define TL_UCP_EP_ADDRLEN_SIZE 8
+#define TL_UCP_EP_ADDR_WORKER_LEN(_addr) (*((uint64_t*)(_addr)))
+#define TL_UCP_EP_ADDR_WORKER(_addr) PTR_OFFSET((_addr), 8)
+#define TL_UCP_EP_ADDR_ONESIDED_INFO(_addr) \
+    PTR_OFFSET((_addr), 8 + TL_UCP_EP_ADDR_WORKER_LEN(_addr))
+
 typedef struct ucc_tl_ucp_context ucc_tl_ucp_context_t;
 typedef struct ucc_tl_ucp_team    ucc_tl_ucp_team_t;
 

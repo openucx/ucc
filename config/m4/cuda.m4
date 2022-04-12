@@ -22,6 +22,11 @@ AS_IF([test "x$cuda_checked" != "xyes"],
     AC_ARG_WITH([cuda],
                 [AS_HELP_STRING([--with-cuda=(DIR)], [Enable the use of CUDA (default is guess).])],
                 [], [with_cuda=guess])
+    AC_ARG_WITH([nvcc-gencode],
+                [AS_HELP_STRING([--with-nvcc-gencode=arch,code],
+                                [Defines target GPU architecture,
+                                 see nvcc -gencode option for details])],
+                [], [with_nvcc_gencode=default])
     AS_IF([test "x$with_cuda" = "xno"],
         [
          cuda_happy=no
@@ -96,9 +101,12 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                [NVCC_CFLAGS="$NVCC_CFLAGS -O0 -g"],
                [NVCC_CFLAGS="$NVCC_CFLAGS -O3 -g -DNDEBUG"])
          AS_IF([test "x$cuda_happy" = "xyes"],
-               [AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
-                      [NVCC_ARCH="${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11}"])
-                AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])])
+               [AS_IF([test "x$with_nvcc_gencode" = "xdefault"],
+                      [AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
+                             [NVCC_ARCH="${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11}"])],
+                      [NVCC_ARCH="$with_nvcc_gencode"])
+                AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])
+                AC_MSG_RESULT([CUDA gencodes: $NVCC_ARCH])])
          LDFLAGS="$save_LDFLAGS"
          CPPFLAGS="$save_CPPFLAGS"
          LDFLAGS="$save_LDFLAGS"
