@@ -257,6 +257,8 @@ ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
             for (k = 0; k < size; k++) {
                 if (ucc_tl_cuda_team_topo_is_direct(&team->super, topo, i, k) &&
                     ucc_tl_cuda_team_topo_is_direct(&team->super, topo, k, j)) {
+                    ucc_assert((topo->matrix[i * size + k] > 0) &&
+                               (topo->matrix[k * size + j] > 0));
                     score = ucc_max((data[i * size + k] + 1.0) /
                                     topo->matrix[i * size + k],
                                     (data[k * size + j] + 1.0) /
