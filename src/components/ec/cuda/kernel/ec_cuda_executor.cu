@@ -201,10 +201,10 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
                                              args.count);
                     break;
                 case UCC_DT_INT32:
-                    executor_reduce<int>((int*)args.bufs[1],
-                                         (int*)args.bufs[2],
-                                         (int*)args.bufs[0],
-                                          args.count);
+                    executor_reduce<int32_t>((int32_t*)args.bufs[1],
+                                             (int32_t*)args.bufs[2],
+                                             (int32_t*)args.bufs[0],
+                                              args.count);
                     break;
 
                 default:
@@ -228,11 +228,11 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
                                                   args.stride);
                     break;
                 case UCC_DT_INT32:
-                    executor_reduce_multi<int>((int*)args.bufs[1],
-                                               (int*)args.bufs[2],
-                                               (int*)args.bufs[0],
-                                               args.count, args.size,
-                                               args.stride);
+                    executor_reduce_multi<int32_t>((int32_t*)args.bufs[1],
+                                                   (int32_t*)args.bufs[2],
+                                                   (int32_t*)args.bufs[0],
+                                                   args.count, args.size,
+                                                   args.stride);
                     break;
                 }
                 break;

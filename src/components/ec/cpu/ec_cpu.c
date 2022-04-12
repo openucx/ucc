@@ -28,7 +28,7 @@ static ucc_status_t ucc_ec_cpu_init(const ucc_ec_params_t *ec_params)
 
     status = ucc_mpool_init(&ucc_ec_cpu.executors, 0, sizeof(ucc_ee_executor_t),
                             0, UCC_CACHE_LINE_SIZE, 16, UINT_MAX, NULL,
-                            UCC_THREAD_MULTIPLE, "ec cpu executors");
+                            ec_params->thread_mode, "ec cpu executors");
     if (status != UCC_OK) {
         ec_error(&ucc_ec_cpu.super, "failed to created ec cpu executors mpool");
         return status;
@@ -37,7 +37,7 @@ static ucc_status_t ucc_ec_cpu_init(const ucc_ec_params_t *ec_params)
     status = ucc_mpool_init(&ucc_ec_cpu.executor_tasks, 0,
                             sizeof(ucc_ee_executor_task_t),
                             0, UCC_CACHE_LINE_SIZE, 16, UINT_MAX, NULL,
-                            UCC_THREAD_MULTIPLE, "ec cpu executor tasks");
+                            ec_params->thread_mode, "ec cpu executor tasks");
     if (status != UCC_OK) {
         ec_error(&ucc_ec_cpu.super,
                  "failed to created ec cpu executor tasks mpool");
@@ -70,7 +70,7 @@ ucc_status_t ucc_cpu_executor_init(const ucc_ee_executor_params_t *params,
 {
     ucc_ee_executor_t *eee = ucc_mpool_get(&ucc_ec_cpu.executors);
 
-    ec_debug(&ucc_ec_cpu.super, "executor finalize, eee: %p", eee);
+    ec_debug(&ucc_ec_cpu.super, "executor init, eee: %p", eee);
     if (ucc_unlikely(!eee)) {
         ec_error(&ucc_ec_cpu.super, "failed to allocate executor");
         return UCC_ERR_NO_MEMORY;
@@ -82,18 +82,18 @@ ucc_status_t ucc_cpu_executor_init(const ucc_ee_executor_params_t *params,
     return UCC_OK;
 }
 
-ucc_status_t ucc_cpu_executor_start(ucc_ee_executor_t *executor,
-                                     void *ee_context)
+ucc_status_t ucc_cpu_executor_start(ucc_ee_executor_t *executor, //NOLINT
+                                    void *ee_context)            //NOLINT
 {
     return UCC_OK;
 }
 
-ucc_status_t ucc_cpu_executor_status(const ucc_ee_executor_t *executor)
+ucc_status_t ucc_cpu_executor_status(const ucc_ee_executor_t *executor) //NOLINT
 {
     return UCC_OK;
 }
 
-ucc_status_t ucc_cpu_executor_stop(ucc_ee_executor_t *executor)
+ucc_status_t ucc_cpu_executor_stop(ucc_ee_executor_t *executor) //NOLINT
 {
     return UCC_OK;
 }
@@ -103,7 +103,7 @@ ucc_status_t ucc_cpu_executor_task_post(ucc_ee_executor_t *executor,
                                         ucc_ee_executor_task_t **task)
 {
     ucc_ee_executor_task_t *eee_task;
-    ucc_status_t status;
+    ucc_status_t            status;
 
     eee_task = ucc_mpool_get(&ucc_ec_cpu.executor_tasks);
     if (ucc_unlikely(!eee_task)) {

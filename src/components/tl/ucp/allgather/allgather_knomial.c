@@ -183,7 +183,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
         status = ucc_coll_task_get_executor(&task->super, &exec);
         if (ucc_unlikely(status != UCC_OK)) {
             task->super.status = status;
-            return;
+            return status;
         }
         eargs.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
         eargs.bufs[0]   = PTR_OFFSET(args->dst.info.buffer, offset);
@@ -194,7 +194,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
                                            &task->allgather_kn.etask);
         if (ucc_unlikely(status != UCC_OK)) {
             task->super.status = status;
-            return;
+            return status;
         }
     }
     task->allgather_kn.sbuf = PTR_OFFSET(args->dst.info.buffer, offset);

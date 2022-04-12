@@ -29,6 +29,8 @@ static ucc_status_t ucc_tl_ucp_service_coll_start_executor(ucc_coll_task_t *task
         return status;
     }
 
+    task->flags |= UCC_COLL_TASK_FLAG_EXECUTOR_STOP;
+
     return UCC_OK;
 }
 

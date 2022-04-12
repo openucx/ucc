@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -88,20 +88,9 @@ UCC_KN_PHASE_EXTRA:
                 return;
             }
 UCC_KN_PHASE_EXTRA_REDUCE:
-            if (task->reduce_scatter_kn.etask != NULL) {
-                status = ucc_ee_executor_task_test(task->reduce_scatter_kn.etask);
-                if (status == UCC_INPROGRESS) {
-                    SAVE_STATE(UCC_KN_PHASE_EXTRA_REDUCE);
-                    return;
-                }
-                ucc_ee_executor_task_finalize(task->reduce_scatter_kn.etask);
-                if (ucc_unlikely(status < 0)) {
-                    tl_error(UCC_TASK_LIB(task),
-                             "failed to perform dt reduction");
-                    task->super.status = status;
-                    return
-                }
-            }
+            EXEC_TASK_TEST(UCC_KN_PHASE_EXTRA_REDUCE,
+                           "failed to perform dt reduction",
+                           task->reduce_scatter_kn.etask);
         }
     }
     while (!ucc_knomial_pattern_loop_done(p)) {
@@ -186,20 +175,9 @@ UCC_KN_PHASE_EXTRA_REDUCE:
                 return;
             }
 UCC_KN_PHASE_REDUCE:
-            if (task->reduce_scatter_kn.etask != NULL) {
-                status = ucc_ee_executor_task_test(task->reduce_scatter_kn.etask);
-                if (status == UCC_INPROGRESS) {
-                    SAVE_STATE(UCC_KN_PHASE_REDUCE);
-                    return task->super.status;
-                }
-                ucc_ee_executor_task_finalize(task->reduce_scatter_kn.etask);
-                if (ucc_unlikely(status < 0)) {
-                    tl_error(UCC_TASK_LIB(task),
-                             "failed to perform dt reduction");
-                    task->super.status = status;
-                    return;
-                }
-            }
+            EXEC_TASK_TEST(UCC_KN_PHASE_REDUCE,
+                           "failed to perform dt reduction",
+                           task->reduce_scatter_kn.etask);
         }
         ucc_knomial_pattern_next_iteration(p);
     }
@@ -218,16 +196,9 @@ UCC_KN_PHASE_REDUCE:
         return;
     }
 UCC_KN_PHASE_COMPLETE:
-    status = ucc_ee_executor_task_test(task->reduce_scatter_kn.etask);
-    if (status == UCC_INPROGRESS) {
-        SAVE_STATE(UCC_KN_PHASE_COMPLETE);
-        return;
-    }
-    ucc_ee_executor_task_finalize(task->reduce_scatter_kn.etask);
-    if (ucc_unlikely(status != UCC_OK)) {
-        task->super.status = status;
-        return;
-    }
+    EXEC_TASK_TEST(UCC_KN_PHASE_COMPLETE, "failed to perform memcpy",
+                   task->reduce_scatter_kn.etask);
+
 UCC_KN_PHASE_PROXY: /* unused label */
 out:
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_scatter_kn_done",

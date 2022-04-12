@@ -14,13 +14,13 @@ ucc_dt_reduce(void *src1, void *src2, void *dst, size_t count,
               ucc_datatype_t dt, ucc_memory_type_t mem_type,
               ucc_coll_args_t *args)
 {
-    if (!UCC_DT_IS_PREDEFINED(dt)) {
+    if (UCC_DT_IS_PREDEFINED(dt)) {
+        return ucc_mc_reduce(src1, src2, dst, count,
+                             dt, args->op, mem_type);
+    } else {
         ucc_assert(UCC_DT_HAS_REDUCE(dt));
         return ucc_mc_reduce_userdefined(src1, src2, dst, 1, count,
                                          0, ucc_dt_to_generic(dt));
-    } else {
-        return ucc_mc_reduce(src1, src2, dst, count,
-                             dt, args->op, mem_type);
     }
 }
 
@@ -117,6 +117,7 @@ ucc_dt_reduce_multi_alpha_nb(void *src1, void *src2, void *dst,
 
     /* reduce_multi is used for OP_AVG implementation that can only be
        used with predefined dtypes */
+    ucc_assert(UCC_DT_IS_PREDEFINED(dt));
     eargs.task_type = UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI_ALPHA;
     eargs.bufs[0]   = dst;
     eargs.bufs[1]   = src1;

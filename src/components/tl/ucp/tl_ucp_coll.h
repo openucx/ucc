@@ -32,6 +32,23 @@ extern const char
 #define INV_VRANK(_rank, _root, _team_size)                                   \
     (((_rank) + (_root)) % (_team_size))
 
+#define EXEC_TASK_TEST(_phase, _errmsg, _etask) do {                           \
+    if (_etask != NULL) {                                                      \
+        status = ucc_ee_executor_task_test(_etask);                            \
+        if (status == UCC_INPROGRESS) {                                        \
+            SAVE_STATE(_phase);                                                \
+            return;                                                            \
+        }                                                                      \
+        ucc_ee_executor_task_finalize(_etask);                                 \
+        if (ucc_unlikely(status < 0)) {                                        \
+            tl_error(UCC_TASK_LIB(task), _errmsg);                             \
+            task->super.status = status;                                       \
+            return;                                                            \
+        }                                                                      \
+    }                                                                          \
+} while(0)
+
+
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
     union {

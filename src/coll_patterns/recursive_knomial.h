@@ -184,7 +184,7 @@ enum {
     UCC_KN_PHASE_REDUCE,       /* reduce data received from peer */
     UCC_KN_PHASE_EXTRA,        /* recv from extra rank */
     UCC_KN_PHASE_EXTRA_REDUCE, /* reduce data received from extra rank */
-    UCC_KN_PHASE_PROXY,        /* recv from extra rank */
+    UCC_KN_PHASE_PROXY,        /* recv from proxy rank */
     UCC_KN_PHASE_COMPLETE,     /* any work after main loop, e.g. memcpy */
 };
 
