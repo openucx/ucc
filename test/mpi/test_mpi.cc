@@ -129,6 +129,11 @@ void UccTestMpi::set_iter(int iter)
     iterations = iter;
 }
 
+void UccTestMpi::set_verbose(bool _verbose)
+{
+    verbose = _verbose;
+}
+
 void UccTestMpi::create_teams(std::vector<ucc_test_mpi_team_t> &test_teams,
                               bool                              is_onesided)
 {
@@ -363,12 +368,12 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
     std::vector<ucc_status_t> rst;
     for (auto tc: tcs) {
         if (TEST_SKIP_NONE == tc->test_skip) {
-            if (0 == world_rank) {
+            if (verbose && 0 == world_rank) {
                 std::cout << tc->str() << std::endl;
             }
             tc->run();
         } else {
-            if (0 == world_rank) {
+            if (verbose && 0 == world_rank) {
                 std::cout << "SKIPPED: " << skip_str(tc->test_skip) << ": "
                           << tc->str() << " " << std::endl;
             }

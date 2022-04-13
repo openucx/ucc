@@ -34,6 +34,7 @@ static int                                 iterations   = 1;
 static int                                 show_help    = 0;
 static int                                 num_tests    = 1;
 static bool                                has_onesided = true;
+static bool                                verbose      = false;
 #ifdef HAVE_CUDA
 static test_set_cuda_device_t test_cuda_set_device = TEST_SET_DEV_NONE;
 #endif
@@ -75,6 +76,7 @@ void PrintHelp()
        "-O, --onesided         <value>\n\t0 - no onesided tests, 1 - onesided tests\n\n"
        "-i, --iter             <value>\n\tnumber of iterations each test cases is executed\n\n"
        "-T, --thread-multiple\n\tenable multi-threaded testing\n\n"
+       "-v, --verbose\n\tlog all test cases\n\n"
        "-h, --help\n\tShow help\n";
 }
 
@@ -321,7 +323,7 @@ void PrintInfo()
 
 void ProcessArgs(int argc, char** argv)
 {
-    const char *const short_opts  = "c:t:m:d:o:M:I:N:r:s:C:D:i:Z:ThSO:";
+    const char *const short_opts  = "c:t:m:d:o:M:I:N:r:s:C:D:i:Z:ThvSO:";
     const option      long_opts[] = {
                                 {"colls", required_argument, nullptr, 'c'},
                                 {"teams", required_argument, nullptr, 't'},
@@ -408,6 +410,9 @@ void ProcessArgs(int argc, char** argv)
         case 'O':
             has_onesided = std::stoi(optarg);
             break;
+        case 'v':
+            verbose = true;
+            break;
         case 'h':
             show_help = 1;
             break;
@@ -472,6 +477,7 @@ int main(int argc, char *argv[])
     if (has_onesided) {
         test->create_teams(teams, true);
     }
+    test->set_verbose(verbose);
     test->set_iter(iterations);
     test->set_num_tests(num_tests);
     test->set_colls(colls);
