@@ -152,27 +152,6 @@ ucc_status_t ucc_dependency_handler(ucc_coll_task_t *parent, /* NOLINT */
 ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
                                 ucc_coll_task_t *task);
 
-static inline void ucc_task_complete_notify(ucc_coll_task_t *task,
-                                            ucc_event_t   event,
-                                            ucc_status_t *status)
-{
-    if (ucc_likely(*status == UCC_OK)) {
-        *status = ucc_event_manager_notify(task, event);
-    } else {
-        /* error in task status */
-        if (UCC_ERR_TIMED_OUT == *status) {
-            char coll_str[256];
-            ucc_coll_str(task, coll_str, sizeof(coll_str));
-            ucc_warn("timeout %g sec has expired on %s",
-                     task->bargs.args.timeout, coll_str);
-        } else {
-            ucc_error("failure in task %p, %s", task,
-                      ucc_status_string(task->status));
-        }
-        ucc_event_manager_notify(task, UCC_EVENT_ERROR);
-    }
-}
-
 static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 {
     ucc_status_t        status    = task->status;
