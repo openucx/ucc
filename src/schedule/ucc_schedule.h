@@ -20,6 +20,8 @@ typedef enum {
     UCC_EVENT_COMPLETED = 0,
     UCC_EVENT_SCHEDULE_STARTED,
     UCC_EVENT_TASK_STARTED,
+    UCC_EVENT_COMPLETED_SCHEDULE, /*< Event is used to notify SCHEDULE that
+                                    one of its task has completed */
     UCC_EVENT_ERROR,
     UCC_EVENT_LAST
 } ucc_event_t;
@@ -110,8 +112,8 @@ typedef struct ucc_context ucc_context_t;
 
 typedef struct ucc_schedule {
     ucc_coll_task_t  super;
-    int              n_completed_tasks;
-    int              n_tasks;
+    uint32_t         n_completed_tasks;
+    uint32_t         n_tasks;
     ucc_context_t   *ctx;
     ucc_coll_task_t *tasks[UCC_SCHEDULE_MAX_TASKS];
 } ucc_schedule_t;
@@ -150,13 +152,46 @@ ucc_status_t ucc_dependency_handler(ucc_coll_task_t *parent, /* NOLINT */
 ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
                                 ucc_coll_task_t *task);
 
+static inline void ucc_task_complete_notify(ucc_coll_task_t *task,
+                                            ucc_event_t   event,
+                                            ucc_status_t *status)
+{
+    if (ucc_likely(*status == UCC_OK)) {
+        *status = ucc_event_manager_notify(task, event);
+    } else {
+        /* error in task status */
+        if (UCC_ERR_TIMED_OUT == *status) {
+            char coll_str[256];
+            ucc_coll_str(task, coll_str, sizeof(coll_str));
+            ucc_warn("timeout %g sec has expired on %s",
+                     task->bargs.args.timeout, coll_str);
+        } else {
+            ucc_error("failure in task %p, %s", task,
+                      ucc_status_string(task->status));
+        }
+        ucc_event_manager_notify(task, UCC_EVENT_ERROR);
+    }
+}
+
 static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 {
-    ucc_status_t        status      = task->status;
-    ucc_coll_callback_t cb          = task->cb;
-    int                 has_cb      = task->flags & UCC_COLL_TASK_FLAG_CB;
+    ucc_status_t        status    = task->status;
+    ucc_coll_callback_t cb        = task->cb;
+    int                 has_cb    = task->flags & UCC_COLL_TASK_FLAG_CB;
+    int                 has_sched = task->schedule != NULL;
 
     ucc_assert((status == UCC_OK) || (status < 0));
+
+    /* If task is part of a  schedule then it can be
+       released during ucc_event_manager_notify(EVENT_COMPLETED_SCHEDULE) below.
+       Sequence: notify => schedule->n_completed_tasks++ =>
+       shedule->super.status = UCC_OK => user releases schedule from another
+       thread => schedule_finalize => schedule finalizes all the tasks.
+       After that the task ptr should not be accessed.
+       This is why notification of schedule is done separatly in the end of
+       this function. Internal implementation must make sure that tasks
+       with schedules are not released during a callabck (if set). */
+
     if (ucc_likely(status == UCC_OK)) {
         status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
     } else {
@@ -184,6 +219,10 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
     if (has_cb) {
         cb.cb(cb.data, status);
     }
+    if (has_sched && status == UCC_OK) {
+        status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED_SCHEDULE);
+    }
+
     return status;
 }
 
@@ -200,4 +239,5 @@ static inline void ucc_task_subscribe_dep(ucc_coll_task_t *target,
 #define UCC_TASK_CORE_CTX(_task)                                               \
     (((ucc_coll_task_t *)_task)->team->context->ucc_context)
 
+#define UCC_TASK_THREAD_MODE(_task) (UCC_TASK_CORE_CTX(_task)->thread_mode)
 #endif
