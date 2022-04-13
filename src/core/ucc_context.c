@@ -415,7 +415,7 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
     return UCC_OK;
 err:
     for (i = 0; i < ctx->n_tl_ctx; i++) {
-        tl_lib = lib->tl_libs[i];
+        tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
         tl_lib->iface->context.destroy(&ctx->tl_ctx[i]->super);
     }
     ucc_free(ctx->tl_ctx);

@@ -22,6 +22,7 @@
 typedef ucs_config_field_t             ucc_config_field_t;
 typedef ucs_config_names_array_t       ucc_config_names_array_t;
 typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
+typedef ucs_config_allow_list_t        ucc_config_allow_list_t;
 
 #define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
 #define UCC_CONFIG_REGISTER_TABLE       UCS_CONFIG_REGISTER_TABLE
@@ -30,6 +31,7 @@ typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 #define UCC_CONFIG_TYPE_INT             UCS_CONFIG_TYPE_INT
 #define UCC_CONFIG_TYPE_UINT            UCS_CONFIG_TYPE_UINT
 #define UCC_CONFIG_TYPE_STRING_ARRAY    UCS_CONFIG_TYPE_STRING_ARRAY
+#define UCC_CONFIG_TYPE_ALLOW_LIST      UCS_CONFIG_TYPE_ALLOW_LIST
 #define UCC_CONFIG_TYPE_ARRAY           UCS_CONFIG_TYPE_ARRAY
 #define UCC_CONFIG_TYPE_TABLE           UCS_CONFIG_TYPE_TABLE
 #define UCC_CONFIG_TYPE_ULUNITS         UCS_CONFIG_TYPE_ULUNITS
@@ -39,6 +41,9 @@ typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 #define UCC_CONFIG_TYPE_BITMAP          UCS_CONFIG_TYPE_BITMAP
 #define UCC_CONFIG_TYPE_MEMUNITS        UCS_CONFIG_TYPE_MEMUNITS
 #define UCC_CONFIG_TYPE_BOOL            UCS_CONFIG_TYPE_BOOL
+#define UCC_CONFIG_ALLOW_LIST_NEGATE    UCS_CONFIG_ALLOW_LIST_NEGATE
+#define UCC_CONFIG_ALLOW_LIST_ALLOW_ALL UCS_CONFIG_ALLOW_LIST_ALLOW_ALL
+#define UCC_CONFIG_ALLOW_LIST_ALLOW     UCS_CONFIG_ALLOW_LIST_ALLOW
 
 static inline ucc_status_t
 ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,
@@ -119,7 +124,7 @@ ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
 
 void ucc_config_names_array_free(ucc_config_names_array_t *array);
 
-int ucc_config_names_search(ucc_config_names_array_t *config_names,
+int ucc_config_names_search(const ucc_config_names_array_t *config_names,
                             const char *str);
 
 static inline
@@ -127,5 +132,9 @@ int ucc_config_names_array_is_all(const ucc_config_names_array_t *array)
 {
     return (array->count == 1) && (0 == strcmp(array->names[0], "all"));
 }
+
+ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t *list,
+                                           const ucc_config_names_array_t *all,
+                                           ucc_config_allow_list_t *out);
 
 #endif

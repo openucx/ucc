@@ -81,7 +81,7 @@ void ucc_config_names_array_free(ucc_config_names_array_t *array)
 }
 
 
-int ucc_config_names_search(ucc_config_names_array_t *config_names,
+int ucc_config_names_search(const ucc_config_names_array_t *config_names,
                             const char *str) {
     unsigned i;
 
@@ -92,4 +92,43 @@ int ucc_config_names_search(ucc_config_names_array_t *config_names,
     }
 
     return -1;
+}
+
+ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t *list,
+                                           const ucc_config_names_array_t *all,
+                                           ucc_config_allow_list_t *out)
+{
+    ucc_status_t            status;
+    int                     i;
+
+    out->mode        = list->mode;
+    out->array.names = NULL;
+
+    if (out->mode == UCC_CONFIG_ALLOW_LIST_ALLOW) {
+        status = ucc_config_names_array_dup(&out->array,
+                                            &list->array);
+        if (UCC_OK != status) {
+            ucc_error("failed to dup config_names_array");
+            return status;
+        }
+    } else {
+        ucc_assert(out->mode == UCC_CONFIG_ALLOW_LIST_NEGATE ||
+                   out->mode == UCC_CONFIG_ALLOW_LIST_ALLOW_ALL);
+
+        out->array.count = 0;
+        out->array.names = ucc_malloc(sizeof(char*) * all->count, "names");
+        if (!out->array.names) {
+            ucc_error("failed to allocate %zd bytes for names array",
+                      sizeof(char *) * all->count);
+            return UCC_ERR_NO_MEMORY;
+        }
+
+        for (i = 0; i < all->count; i++) {
+            if (out->mode == UCC_CONFIG_ALLOW_LIST_ALLOW_ALL ||
+                (ucc_config_names_search(&list->array, all->names[i]) < 0)) {
+                out->array.names[out->array.count++] = strdup(all->names[i]);
+            }
+        }
+    }
+    return UCC_OK;
 }

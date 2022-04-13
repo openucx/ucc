@@ -179,9 +179,26 @@ ucc_status_t ucc_components_load(const char *framework_name,
            This has nearly 0 probability and must be resolved by
            the component developer via just a rename of a component. */
         ucc_error("all components of a framwork must have uniq name hash");
-        return UCC_ERR_INVALID_PARAM;
+        status = UCC_ERR_INVALID_PARAM;
+        goto err;
+    }
+
+    framework->names.names = ucc_malloc(sizeof(char *) * n_loaded,
+                                        "components_names");
+    if (!framework->names.names) {
+        ucc_error("failed to allocate %zd bytes for components names",
+                  sizeof(char *) * n_loaded);
+        status = UCC_ERR_NO_MEMORY;
+        goto err;
+    }
+    framework->names.count = n_loaded;
+    for (i = 0; i < n_loaded; i++) {
+        framework->names.names[i] = strdup(framework->components[i]->name);
     }
     return UCC_OK;
+err:
+    ucc_free(framework->components);
+    return status;
 }
 
 ucc_component_iface_t* ucc_get_component(ucc_component_framework_t *framework,

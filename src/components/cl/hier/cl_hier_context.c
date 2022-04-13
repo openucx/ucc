@@ -17,7 +17,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
         ucc_derived_of(config, ucc_cl_context_config_t);
     ucc_cl_hier_lib_t        *lib = ucc_derived_of(cl_config->cl_lib,
                                                    ucc_cl_hier_lib_t);
-    ucc_config_names_array_t *tls = &lib->tls;
+    ucc_config_names_array_t *tls = &lib->tls.array;
     ucc_status_t              status;
     int                       i;
 

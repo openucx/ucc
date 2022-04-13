@@ -68,18 +68,13 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
                 continue;
             }
             hs->n_tls = 0;
-            tls       = &lib->cfg.sbgp_tls[i];
-            if (ucc_config_names_array_is_all(tls)) {
-                /* All possible TLs are requested for this SBGP.
-                   Loop through all available CL_HIER tls that are stored on lib.*/
-                tls = &lib->tls;
-            }
+            tls       = &lib->cfg.sbgp_tls[i].array;
             for (j = 0; j < tls->count; j++) {
                 status =
                     ucc_tl_context_get(ctx->super.super.ucc_context,
                                        tls->names[j], &hs->tl_ctxs[hs->n_tls]);
                 if (UCC_OK != status) {
-                    cl_warn(cl_context->lib,
+                    cl_debug(cl_context->lib,
                             "tl context %s is not available for sbgp %s",
                             tls->names[j], ucc_sbgp_str(hs->sbgp_type));
                 } else {

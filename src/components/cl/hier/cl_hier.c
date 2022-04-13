@@ -19,7 +19,7 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
      "TLS to be used for NODE subgroup.\n"
      "NODE subgroup contains processes of a team located on the same node",
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NODE]),
-     UCC_CONFIG_TYPE_STRING_ARRAY},
+     UCC_CONFIG_TYPE_ALLOW_LIST},
 
     {"NODE_LEADERS_SBGP_TLS", "ucp",
      "TLS to be used for NODE_LEADERS subgroup.\n"
@@ -27,7 +27,7 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
      "equal 0",
      ucc_offsetof(ucc_cl_hier_lib_config_t,
                   sbgp_tls[UCC_HIER_SBGP_NODE_LEADERS]),
-     UCC_CONFIG_TYPE_STRING_ARRAY},
+     UCC_CONFIG_TYPE_ALLOW_LIST},
 
     {"NET_SBGP_TLS", "ucp",
      "TLS to be used for NET subgroup.\n"
@@ -36,13 +36,13 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
      "This subgroup only exists for teams with equal number of processes "
      "across the nodes",
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_NET]),
-     UCC_CONFIG_TYPE_STRING_ARRAY},
+     UCC_CONFIG_TYPE_ALLOW_LIST},
 
     {"FULL_SBGP_TLS", "ucp",
      "TLS to be used for FULL subgroup.\n"
      "FULL subgroup contains all processes of the team",
      ucc_offsetof(ucc_cl_hier_lib_config_t, sbgp_tls[UCC_HIER_SBGP_FULL]),
-     UCC_CONFIG_TYPE_STRING_ARRAY},
+     UCC_CONFIG_TYPE_ALLOW_LIST},
 
     {"ALLTOALLV_SPLIT_NODE_THRESH", "0",
      "Messages larger than that threshold will be sent via node sbgp tl",

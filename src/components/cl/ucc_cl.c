@@ -18,7 +18,7 @@ ucc_config_field_t ucc_cl_lib_config_table[] = {
 
     [TLS_CONFIG_ENTRY] = {"TLS", "all", NULL,
                           ucc_offsetof(ucc_cl_lib_config_t, tls),
-     UCC_CONFIG_TYPE_STRING_ARRAY},
+     UCC_CONFIG_TYPE_ALLOW_LIST},
 
     {NULL}
 };
@@ -41,6 +41,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
                     const ucc_cl_lib_config_t *cl_config)
 {
     ucc_status_t status;
+
     UCC_CLASS_CALL_BASE_INIT();
     self->iface         = cl_iface;
     self->super.log_component = cl_config->super.log_component;
@@ -48,17 +49,24 @@ UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
                      cl_iface->cl_lib_config.name,
                      sizeof(self->super.log_component.name));
 
-    status = ucc_config_names_array_dup(&self->tls, &cl_config->tls);
-    if (UCC_OK != status) {
-        ucc_error("failed to dup TLS config_names_array for CL %s",
-                  cl_iface->cl_lib_config.name);
+    status = ucc_config_allow_list_process(&cl_config->tls,
+                                           &ucc_global_config.tl_framework.names,
+                                           &self->tls);
+    if (status != UCC_OK) {
+        return status;
     }
-    return status;
+    if (self->tls.array.count == 0) {
+        ucc_error("no TLs are selected for %s",
+                  cl_iface->cl_lib_config.name);
+        ucc_free(self->tls.array.names);
+        return UCC_ERR_NOT_FOUND;
+    }
+    return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_lib_t)
 {
-    ucc_config_names_array_free(&self->tls);
+    ucc_config_names_array_free(&self->tls.array);
 }
 
 UCC_CLASS_DEFINE(ucc_cl_lib_t, void);

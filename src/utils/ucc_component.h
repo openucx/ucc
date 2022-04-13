@@ -9,6 +9,7 @@
 #include "config.h"
 #include "ucc/api/ucc.h"
 #include "utils/ucc_compiler_def.h"
+#include "utils/ucc_parser.h"
 
 #define UCC_MAX_FRAMEWORK_NAME_LEN 64
 #define UCC_MAX_COMPONENT_NAME_LEN 64
@@ -21,9 +22,10 @@ typedef struct ucc_component_iface {
 } ucc_component_iface_t;
 
 typedef struct ucc_component_framework {
-    char                   *framework_name;
-    int                     n_components;
-    ucc_component_iface_t **components;
+    char                    *framework_name;
+    int                      n_components;
+    ucc_component_iface_t  **components;
+    ucc_config_names_array_t names;
 } ucc_component_framework_t;
 
 /* ucc_components_load searches for all available dynamic components 
