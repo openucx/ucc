@@ -9,6 +9,7 @@
 #include "tl_shm_knomial_pattern.h"
 #include "perf/tl_shm_coll_perf_params.h"
 #include "core/ucc_ee.h"
+#include "core/ucc_team.h"
 #include "coll_score/ucc_coll_score.h"
 #include "utils/ucc_sys.h"
 #include "bcast/bcast.h"
@@ -286,7 +287,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    subset.map    = UCC_TL_TEAM_MAP(self);
+    status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(self)->ctx_map,
+                                      &UCC_TL_TEAM_MAP(self),
+                                      &self->ctx_map);
+    if (UCC_OK != status) {
+        tl_error(ctx->super.super.lib, "failed to create ctx map");
+        return status;
+    }
+    subset.map    = self->ctx_map;
     subset.myrank = UCC_TL_TEAM_RANK(self);
     team_size     = UCC_TL_TEAM_SIZE(self);
     cfg_ctrl_size = UCC_TL_SHM_TEAM_LIB(self)->cfg.ctrl_size;
@@ -301,19 +309,19 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
 
     if (UCC_OK != status) {
         tl_error(ctx->super.super.lib, "failed to init team topo");
-        return status;
+        goto err_topo_init;
     }
 
     if (!ucc_topo_is_single_node(self->topo)) {
         tl_debug(ctx->super.super.lib, "multi node team is not supported");
-        ucc_topo_cleanup(self->topo);
-        return UCC_ERR_INVALID_PARAM;
+        status = UCC_ERR_INVALID_PARAM;
+        goto err_topo_cleanup;
     }
 
     if (UCC_TL_CORE_CTX(self)->topo->sock_bound != 1) {
         tl_debug(ctx->super.super.lib, "sock bound is not supported");
-        ucc_topo_cleanup(self->topo);
-        return UCC_ERR_NOT_SUPPORTED;
+        status = UCC_ERR_NOT_SUPPORTED;
+        goto err_topo_cleanup;
     }
 
     self->last_posted = ucc_calloc(sizeof(*self->last_posted),
@@ -439,7 +447,10 @@ err_elems:
     ucc_free(self->tree_cache);
 err_tree:
     ucc_free(self->last_posted);
+err_topo_cleanup:
     ucc_topo_cleanup(self->topo);
+err_topo_init:
+    ucc_ep_map_destroy_nested(&self->ctx_map);
     return status;
 }
 
@@ -474,7 +485,8 @@ ucc_status_t ucc_tl_shm_team_destroy(ucc_base_team_t *tl_team)
     ucc_free(team->tree_cache);
     ucc_free(team->segs);
     ucc_free(team->last_posted);
-
+    ucc_ep_map_destroy_nested(&team->ctx_map);
+    ucc_topo_cleanup(team->topo);
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_shm_team_t)(tl_team);
     return UCC_OK;
 }
