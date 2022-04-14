@@ -13,6 +13,7 @@
 
 extern "C" {
 #include <core/ucc_global_opts.h>
+#include <schedule/ucc_schedule.h>
 }
 
 class test_obj_size : public ucc::test {
@@ -30,7 +31,7 @@ UCC_TEST_F(test_obj_size, size) {
     UCC_TEST_SKIP_R("Assert enabled");
 #else
 
-    EXPECTED_SIZE(ucc_global_config_t, 168);
+    EXPECTED_SIZE(ucc_coll_task_t, 448);
 
 #endif
 }
