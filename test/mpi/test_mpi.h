@@ -453,6 +453,19 @@ public:
     ucc_status_t check();
 };
 
+class TestGatherv : public TestCase {
+    uint32_t *counts;
+    uint32_t *displacements;
+public:
+    TestGatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
+                ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
+                size_t _max_size);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
+    ucc_status_t check();
+    ~TestGatherv();
+};
+
 void init_buffer(void *buf, size_t count, ucc_datatype_t dt,
                  ucc_memory_type_t mt, int value);
 
