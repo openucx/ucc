@@ -6,15 +6,21 @@
 
 #include "ec_cuda_executor.h"
 #include "components/mc/ucc_mc.h"
+#include "utils/ucc_atomic.h"
 
 ucc_status_t ucc_cuda_executor_interruptible_get_stream(cudaStream_t *stream)
 {
-    static int last_used = 0;
-    cudaError_t cuda_st;
-    int i, j;
+    static uint32_t last_used = 0;
+    cudaError_t     cuda_st;
+    int             i, j;
+    uint32_t        id;
 
-    ucc_spin_lock(&ucc_ec_cuda.init_spinlock);
     if (ucc_unlikely(ucc_ec_cuda.exec_streams[0] == NULL)) {
+        ucc_spin_lock(&ucc_ec_cuda.init_spinlock);
+        if (ucc_ec_cuda.exec_streams[0] != NULL) {
+            goto unlock;
+        }
+
         for(i = 0; i < EC_CUDA_CONFIG->exec_num_streams; i++) {
             cuda_st = cudaStreamCreateWithFlags(&ucc_ec_cuda.exec_streams[i],
                                                 cudaStreamNonBlocking);
@@ -30,11 +36,12 @@ ucc_status_t ucc_cuda_executor_interruptible_get_stream(cudaStream_t *stream)
                 return UCC_ERR_NO_RESOURCE;
             }
         }
+unlock:
+        ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
     }
-    *stream = ucc_ec_cuda.exec_streams[last_used %
-                                       EC_CUDA_CONFIG->exec_num_streams];
-    last_used++;
-    ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
+
+    id = ucc_atomic_fadd32(&last_used, 1);
+    *stream = ucc_ec_cuda.exec_streams[id % EC_CUDA_CONFIG->exec_num_streams];
     return UCC_OK;
 }
 
