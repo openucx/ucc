@@ -55,4 +55,7 @@ ucc_status_t ucc_tl_nccl_gather_init(ucc_tl_nccl_task_t *task);
 ucc_status_t ucc_tl_nccl_gatherv_init(ucc_tl_nccl_task_t *task);
 
 ucc_status_t ucc_tl_nccl_scatter_init(ucc_tl_nccl_task_t *task);
+
+ucc_status_t ucc_tl_nccl_scatterv_init(ucc_tl_nccl_task_t *task);
+
 #endif
