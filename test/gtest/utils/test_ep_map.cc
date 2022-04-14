@@ -103,6 +103,29 @@ UCC_TEST_F(test_ep_map, reverse)
     }
 }
 
+UCC_TEST_F(test_ep_map, nested)
+{
+    auto map1 = EpMap(100); //full map, size 100
+    auto map2 = EpMap(0, 2, 50, 100); // submap even only
+    auto map3 = EpMap(1, 2, 25, 50); // submap odd only from 50
+    ucc_ep_map_t nested1, nested2;
+
+    EXPECT_EQ(UCC_OK, ucc_ep_map_create_nested(&map1.map, &map2.map, &nested1));
+    EXPECT_EQ(50, nested1.ep_num);
+    for (int i = 0; i < nested1.ep_num; i++) {
+        EXPECT_EQ(0 + i * 2, ucc_ep_map_eval(nested1, i));
+    }
+
+    EXPECT_EQ(UCC_OK, ucc_ep_map_create_nested(&nested1, &map3.map, &nested2));
+    EXPECT_EQ(25, nested2.ep_num);
+    for (int i = 0; i < nested2.ep_num; i++) {
+        EXPECT_EQ(2 + i * 4, ucc_ep_map_eval(nested2, i));
+    }
+
+    ucc_ep_map_destroy(&nested1);
+    ucc_ep_map_destroy(&nested2);
+}
+
 class test_ep_map_inv : public test_ep_map {
   public:
     void check_inv(EpMap map)
