@@ -154,6 +154,7 @@ ucc_status_t ucc_tl_sharp_barrier_start(ucc_coll_task_t *coll_task)
         coll_task->status = UCC_ERR_NO_RESOURCE;
         return ucc_task_complete(coll_task);
     }
+    coll_task->status = UCC_INPROGRESS;
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
@@ -213,6 +214,7 @@ ucc_status_t ucc_tl_sharp_allreduce_start(ucc_coll_task_t *coll_task)
         coll_task->status = UCC_ERR_NO_RESOURCE;
         return ucc_task_complete(coll_task);
     }
+    coll_task->status = UCC_INPROGRESS;
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
