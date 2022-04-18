@@ -176,6 +176,7 @@ typedef struct ucc_tl_shm_team {
     ucc_sbgp_t *             leaders_group;
     ucc_topo_t *             topo;
     void **                  shm_buffers;
+    ucc_ep_map_t             ctx_map;
     ucc_ep_map_t             group_rank_map;
     ucc_ep_map_t             rank_group_id_map;
     size_t                   ctrl_size;
