@@ -9,6 +9,7 @@
 #include "ucc_lib.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_malloc.h"
+#include "utils/ucc_parser.h"
 #include "utils/ucc_math.h"
 #include "components/cl/ucc_cl.h"
 #include "components/tl/ucc_tl.h"
@@ -332,6 +333,7 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
+
     /* Initialize ucc lib handle using requirements from the user
        provided via params/config and available CLs in the
        CL component framework.
@@ -362,6 +364,10 @@ ucc_status_t ucc_lib_config_read(const char *env_prefix, const char *filename,
     ucc_status_t      status;
     size_t            full_prefix_len;
     const char       *base_prefix = "UCC_";
+
+    if (UCC_OK != (status = ucc_constructor())) {
+        return status;
+    }
 
     if (filename != NULL) {
         ucc_error("read from file is not implemented");
