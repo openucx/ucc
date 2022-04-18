@@ -1,6 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
- * Copyright (c) Facebook, Inc. and its affiliates. 2021.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -728,6 +728,77 @@ ucc_status_t ucc_tl_nccl_gatherv_init(ucc_tl_nccl_task_t *task)
     }
 
     task->super.post = ucc_tl_nccl_gatherv_start;
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_nccl_send_start(ucc_coll_task_t *coll_task)
+{
+    ucc_status_t        status = UCC_OK;
+    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
+    ucc_ee_h            ee     = coll_task->ee;
+    void *              sbuf   = args->src.info.buffer;
+    uint64_t            peer   = args->root;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
+    ncclDataType_t      nccl_dt;
+
+    task->super.status = UCC_INPROGRESS;
+
+    nccl_dt = ucc_to_nccl_dtype[UCC_DT_PREDEFINED_ID(TASK_ARGS(task).src.info.datatype)];
+    if (args->src.info.count == 0) {
+        task->super.status = UCC_OK;
+        return UCC_OK;
+    }
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_send_start", 0);
+    NCCLCHECK_GOTO(ncclSend(sbuf, args->src.info.count, nccl_dt, peer,
+                            team->nccl_comm, stream),
+                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    status = ucc_tl_nccl_collective_sync(task, stream);
+
+exit_coll:
+    return status;
+}
+
+ucc_status_t ucc_tl_nccl_send_init(ucc_tl_nccl_task_t *task)
+{
+    task->super.post     = ucc_tl_nccl_send_start;
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_nccl_recv_start(ucc_coll_task_t *coll_task)
+{
+    ucc_status_t        status = UCC_OK;
+    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
+    ucc_ee_h            ee     = coll_task->ee;
+    void *              rbuf   = args->dst.info.buffer;
+    uint64_t            peer   = args->root;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context : team->stream;
+    size_t data_size;
+    ncclDataType_t      nccl_dt;
+
+    task->super.status = UCC_INPROGRESS;
+
+    nccl_dt = ucc_to_nccl_dtype[UCC_DT_PREDEFINED_ID(TASK_ARGS(task).dst.info.datatype)];
+    if (args->src.info.count == 0) {
+        task->super.status = UCC_OK;
+        return UCC_OK;
+    }
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_recv_start", 0);
+    NCCLCHECK_GOTO(ncclRecv(rbuf, args->dst.info.count, nccl_dt, peer,
+                            team->nccl_comm, stream),
+                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    status = ucc_tl_nccl_collective_sync(task, stream);
+
+exit_coll:
+    return status;
+}
+
+ucc_status_t ucc_tl_nccl_recv_init(ucc_tl_nccl_task_t *task)
+{
+    task->super.post     = ucc_tl_nccl_recv_start;
     return UCC_OK;
 }
 

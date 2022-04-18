@@ -1,6 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
- * Copyright (c) Facebook, Inc. and its affiliates. 2021.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -166,6 +166,12 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
         break;
     case UCC_COLL_TYPE_GATHERV:
         status = ucc_tl_nccl_gatherv_init(task);
+        break;
+    case UCC_COLL_TYPE_SEND:
+        status = ucc_tl_nccl_send_init(task);
+        break;
+    case UCC_COLL_TYPE_RECV:
+        status = ucc_tl_nccl_recv_init(task);
         break;
     default:
         tl_error(UCC_TASK_LIB(task),
