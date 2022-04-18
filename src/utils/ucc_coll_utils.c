@@ -1,5 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -29,10 +30,12 @@ ucc_coll_type_t ucc_coll_type_from_str(const char *str)
     STR_COLL_TYPE_CHECK(str, GATHER);
     STR_COLL_TYPE_CHECK(str, GATHERV);
     STR_COLL_TYPE_CHECK(str, REDUCE);
+    STR_COLL_TYPE_CHECK(str, RECV);
     STR_COLL_TYPE_CHECK(str, REDUCE_SCATTER);
     STR_COLL_TYPE_CHECK(str, REDUCE_SCATTERV);
     STR_COLL_TYPE_CHECK(str, SCATTER);
     STR_COLL_TYPE_CHECK(str, SCATTERV);
+    STR_COLL_TYPE_CHECK(str, SEND);
     return UCC_COLL_TYPE_LAST;
 }
 
@@ -63,6 +66,8 @@ ucc_coll_args_is_mem_symmetric(const ucc_base_coll_args_t *bargs)
     case UCC_COLL_TYPE_BCAST:
     case UCC_COLL_TYPE_FANIN:
     case UCC_COLL_TYPE_FANOUT:
+    case UCC_COLL_TYPE_RECV:
+    case UCC_COLL_TYPE_SEND:
         return 1;
     case UCC_COLL_TYPE_ALLTOALL:
     case UCC_COLL_TYPE_ALLREDUCE:
@@ -106,11 +111,13 @@ ucc_memory_type_t ucc_coll_args_mem_type(const ucc_base_coll_args_t *bargs)
     case UCC_COLL_TYPE_FANOUT:
         return UCC_MEMORY_TYPE_NOT_APPLY;
     case UCC_COLL_TYPE_BCAST:
+    case UCC_COLL_TYPE_SEND:
         return args->src.info.mem_type;
     case UCC_COLL_TYPE_ALLTOALL:
     case UCC_COLL_TYPE_ALLREDUCE:
     case UCC_COLL_TYPE_ALLGATHER:
     case UCC_COLL_TYPE_REDUCE_SCATTER:
+    case UCC_COLL_TYPE_RECV:
         return args->dst.info.mem_type;
     case UCC_COLL_TYPE_ALLGATHERV:
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
@@ -148,11 +155,13 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
     case UCC_COLL_TYPE_FANOUT:
         return 0;
     case UCC_COLL_TYPE_BCAST:
+    case UCC_COLL_TYPE_SEND:
         return args->src.info.count * ucc_dt_size(args->src.info.datatype);
     case UCC_COLL_TYPE_ALLREDUCE:
     case UCC_COLL_TYPE_ALLTOALL:
     case UCC_COLL_TYPE_ALLGATHER:
     case UCC_COLL_TYPE_REDUCE_SCATTER:
+    case UCC_COLL_TYPE_RECV:
         return args->dst.info.count * ucc_dt_size(args->dst.info.datatype);
     case UCC_COLL_TYPE_ALLGATHERV:
     case UCC_COLL_TYPE_REDUCE_SCATTERV:

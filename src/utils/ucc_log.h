@@ -1,5 +1,7 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
+ *
  * See file LICENSE for terms.
  */
 
@@ -85,6 +87,10 @@ static inline const char* ucc_coll_type_str(ucc_coll_type_t ct)
         return "Reduce_scatter";
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
         return "Reduce_scatterv";
+    case UCC_COLL_TYPE_RECV:
+        return "Recv";
+    case UCC_COLL_TYPE_SEND:
+        return "Send";
     default:
         break;
     }

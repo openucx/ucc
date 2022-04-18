@@ -4,6 +4,7 @@
  * @copyright Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
  * @copyright Copyright (C) Huawei Technologies Co., Ltd. 2020.  ALL RIGHTS RESERVED.
  * @copyright Copyright (C) UChicago Argonne, LLC. 2022.  ALL RIGHTS RESERVED.
+ * @copyright Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -154,6 +155,8 @@ typedef enum {
     UCC_COLL_TYPE_REDUCE_SCATTERV    = UCC_BIT(13),
     UCC_COLL_TYPE_SCATTER            = UCC_BIT(14),
     UCC_COLL_TYPE_SCATTERV           = UCC_BIT(15),
+    UCC_COLL_TYPE_RECV               = UCC_BIT(16),
+    UCC_COLL_TYPE_SEND               = UCC_BIT(17),
     UCC_COLL_TYPE_LAST
 } ucc_coll_type_t;
 

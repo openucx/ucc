@@ -1,5 +1,7 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
+ *
  * See file LICENSE for terms.
  */
 
@@ -76,6 +78,7 @@ static ucc_status_t ucc_coll_args_check_mem_type(ucc_coll_args_t *coll_args,
     case UCC_COLL_TYPE_FANOUT:
         return UCC_OK;
     case UCC_COLL_TYPE_BCAST:
+    case UCC_COLL_TYPE_RECV:
         UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->src.info);
         return UCC_OK;
     case UCC_COLL_TYPE_ALLREDUCE:
@@ -142,6 +145,9 @@ static ucc_status_t ucc_coll_args_check_mem_type(ucc_coll_args_t *coll_args,
         if (!(UCC_IS_INPLACE(*coll_args) && UCC_IS_ROOT(*coll_args, rank))) {
             UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info);
         }
+        return UCC_OK;
+    case UCC_COLL_TYPE_SEND:
+        UCC_BUFFER_INFO_CHECK_MEM_TYPE(coll_args->dst.info);
         return UCC_OK;
     default:
         ucc_error("unknown collective type");

@@ -10,8 +10,9 @@ operations.
 **Invocation semantics**: The ucc\_collective\_init routine is a non-blocking
 collective operation to initialize the buffers, operation type, reduction type,
 and other information required for the collective operation. All participants of
-the team should call the initialize operation. The collective operation
-is invoked using a ucc\_collective\_post operation.
+the team should call the initialize operation (with the exception of SEND and
+RECV, which only require participation from two the callers). The collective
+operation is invoked using a ucc\_collective\_post operation.
 ucc\_collective\_init\_and\_post operation initializes as well as post the
 collective operation.
 
@@ -19,13 +20,14 @@ collective operation.
 enumeration ucc\_coll\_type\_t. The semantics are briefly described here,
 however in most cases it agrees with the semantics of collective operations in
 the popular programming models such as MPI and OpenSHMEM. When they differ, the
-semantics changes are documented. All collective operations execute on the team.
+semantics changes are documented. All collective operations execute on the team
+(with the exception of SEND and RECV, which only operate among participants).
 For the collective operations defined by ucc\_coll\_type\_t, all participants of
 the team are required to participate in the collective operations. Further the
 team should be created with endpoints, where the “eps” should be ordered and
 contiguous.
 
-UCC supports three types of collective operations: (a) UCC\_{ALLTOALL, ALLTOALLV,
+UCC supports four types of collective operations: (a) UCC\_{ALLTOALL, ALLTOALLV,
 ALLGATHER, ALLGATHERV, ALLREDUCE, REDUCE_SCATTER, REDUCE_SCATTERV, BARRIER}
 operations where all participants contribute to the results and receive the
 results (b) UCC\_{REDUCE, GATHER, GATHERV, FANIN} where all participants
@@ -33,7 +35,9 @@ contribute to the result and one participant receives the result. The
 participant receiving the result is designated as root. (c) UCC\_{BROADCAST,
 SCATTER, SCATTERV, FANOUT} where one participant contributes to the result, and
 all participants receive the result. The participant contributing to the result
-is designated as root.
+is designated as root. (d) UCC\_{SEND, RECV} which only involve the two
+partipating processes and uses the usual send/recv semantics expressed in other
+programming models.
 
 + The UCC\_COLL\_TYPE\_BCAST operation moves the data from the root participant
 to all participants in the team.
