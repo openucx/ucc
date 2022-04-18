@@ -1,5 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -125,7 +126,8 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
      UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_BARRIER |   \
      UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_FANIN | UCC_COLL_TYPE_FANOUT |       \
-     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
+     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV |            \
+     UCC_COLL_TYPE_SEND | UCC_COLL_TYPE_RECV)
 
 #define UCC_TL_UCP_TEAM_LIB(_team)                                             \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_ucp_lib_t))
