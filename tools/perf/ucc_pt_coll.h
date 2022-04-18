@@ -122,4 +122,13 @@ public:
     float get_bw(float time_ms, int grsize, ucc_coll_args_t args) override;
 };
 
+class ucc_pt_coll_gather: public ucc_pt_coll {
+public:
+    ucc_pt_coll_gather(ucc_datatype_t dt, ucc_memory_type mt,
+                          bool is_inplace, ucc_pt_comm *communicator);
+    ucc_status_t init_coll_args(size_t count, ucc_coll_args_t &args) override;
+    void free_coll_args(ucc_coll_args_t &args) override;
+    float get_bw(float time_ms, int grsize, ucc_coll_args_t args) override;
+};
+
 #endif
