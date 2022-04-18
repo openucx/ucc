@@ -24,8 +24,11 @@ ucc_perftest_SOURCES =            \
 	ucc_pt_coll_alltoallv.cc      \
 	ucc_pt_coll_barrier.cc        \
 	ucc_pt_coll_bcast.cc          \
+	ucc_pt_coll_gatherv.cc        \
 	ucc_pt_coll_reduce.cc         \
-	ucc_pt_coll_reduce_scatter.cc
+	ucc_pt_coll_reduce_scatter.cc \
+	ucc_pt_coll_scatter.cc        \
+	ucc_pt_coll_scatterv.cc
 
 CXX=$(MPICXX)
 LD=$(MPICXX)
