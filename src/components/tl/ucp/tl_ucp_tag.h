@@ -1,5 +1,7 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
+ *
  * See file LICENSE for terms.
  */
 #ifndef UCC_TL_UCP_TAG_H_
@@ -9,21 +11,26 @@
 /*
  * UCP tag structure:
  *
- *  01        | 01234567 01234567 |    234   |      567    | 01234567 01234567 01234567 | 01234567 01234567
- *            |                   |          |             |                            |
- *  RESERV(2) | message tag (16)  | SCOPE(3) | SCOPE_ID(3) |     source rank (24)       |    team id (16)
+ *     01     |      2       | 34567 01234567 01 |    234   |      567    | 01234567 01234567 01234567 | 01234567 01234567
+ *            |              |                   |          |             |                            |
+ *  RESERV(2) | user tag (1) |  message tag (15) | SCOPE(3) | SCOPE_ID(3) |     source rank (24)       |    team id (16)
  */
 
 #define UCC_TL_UCP_RESERVED_BITS 2
 #define UCC_TL_UCP_SCOPE_BITS    3
 #define UCC_TL_UCP_SCOPE_ID_BITS 3
-#define UCC_TL_UCP_TAG_BITS      16
+#define UCC_TL_UCP_USER_TAG_BITS 1
+#define UCC_TL_UCP_TAG_BITS      15
 #define UCC_TL_UCP_SENDER_BITS   24
 #define UCC_TL_UCP_ID_BITS       16
 
 #define UCC_TL_UCP_RESERVED_BITS_OFFSET                                        \
     (UCC_TL_UCP_ID_BITS + UCC_TL_UCP_SENDER_BITS + UCC_TL_UCP_SCOPE_ID_BITS +  \
-     UCC_TL_UCP_SCOPE_BITS + UCC_TL_UCP_TAG_BITS )
+     UCC_TL_UCP_SCOPE_BITS + UCC_TL_UCP_TAG_BITS + UCC_TL_UCP_USER_TAG_BITS)
+
+#define UCC_TL_UCP_USER_TAG_BITS_OFFSET                                        \
+    (UCC_TL_UCP_ID_BITS + UCC_TL_UCP_SENDER_BITS + UCC_TL_UCP_SCOPE_ID_BITS +  \
+     UCC_TL_UCP_SCOPE_BITS + UCC_TL_UCP_TAG_BITS)
 
 #define UCC_TL_UCP_TAG_BITS_OFFSET                                             \
     (UCC_TL_UCP_ID_BITS + UCC_TL_UCP_SENDER_BITS + UCC_TL_UCP_SCOPE_ID_BITS +  \

@@ -1,5 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -208,8 +209,17 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
 
     ucc_coll_task_init(&task->super, coll_args, team);
-    tl_team->seq_num = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
-    task->tagged.tag           = tl_team->seq_num;
+    if (coll_args->mask & UCC_COLL_ARGS_FIELD_TAG) {
+        task->tagged.tag           = task->tagged.tag;
+    } else if (coll_args->args.coll_type == UCC_COLL_TYPE_SEND ||
+               coll_args->args.coll_type == UCC_COLL_TYPE_RECV) {
+        /* Use the maximum tag with the point-to-point bit set as a reserved tag
+         * for point-to-point messages that do not otherwies have a tag set. */
+        task->tagged.tag           = UCC_TL_UCP_MAX_TAG;
+    } else {
+        tl_team->seq_num = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
+        task->tagged.tag           = tl_team->seq_num;
+    }
     task->super.finalize       = ucc_tl_ucp_coll_finalize;
     task->super.triggered_post = ucc_triggered_post;
     return task;
