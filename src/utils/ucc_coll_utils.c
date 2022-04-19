@@ -319,6 +319,47 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len)
     }
 }
 
+typedef struct ucc_ep_map_nested {
+    ucc_ep_map_t *base_map;
+    ucc_ep_map_t *sub_map;
+} ucc_ep_map_nested_t;
+
+uint64_t ucc_ep_map_nested_cb(uint64_t ep, void *cb_ctx)
+{
+    ucc_ep_map_nested_t *nested = cb_ctx;
+    ucc_rank_t           r;
+
+    r = ucc_ep_map_eval(*nested->sub_map, (ucc_rank_t)ep);
+    return (uint64_t)ucc_ep_map_eval(*nested->base_map, r);
+}
+
+ucc_status_t ucc_ep_map_create_nested(ucc_ep_map_t *base_map,
+                                      ucc_ep_map_t *sub_map,
+                                      ucc_ep_map_t *out)
+{
+    ucc_ep_map_nested_t *nested;
+
+    nested = ucc_malloc(sizeof(*nested), "nested_map");
+    if (ucc_unlikely(!nested)) {
+        ucc_error("failed to allocate %zd bytes for nested map",
+                  sizeof(*nested));
+        return UCC_ERR_NO_MEMORY;
+    }
+    nested->base_map = base_map;
+    nested->sub_map  = sub_map;
+    out->type        = UCC_EP_MAP_CB;
+    out->ep_num      = sub_map->ep_num;
+    out->cb.cb       = ucc_ep_map_nested_cb;
+    out->cb.cb_ctx   = nested;
+
+    return UCC_OK;
+}
+
+void ucc_ep_map_destroy_nested(ucc_ep_map_t *out)
+{
+    ucc_free(out->cb.cb_ctx);
+}
+
 ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size)
 {
     ucc_ep_map_t map = {.type           = UCC_EP_MAP_STRIDED,

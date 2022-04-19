@@ -6,6 +6,7 @@
 #include "utils/ucc_compiler_def.h"
 #include "components/base/ucc_base_iface.h"
 #include "coll_score/ucc_coll_score.h"
+#include "core/ucc_context.h"
 
 ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em)
 {
@@ -122,11 +123,11 @@ ucc_schedule_completed_handler(ucc_coll_task_t *parent_task, //NOLINT
                                ucc_coll_task_t *task)
 {
     ucc_schedule_t *self = ucc_container_of(task, ucc_schedule_t, super);
+    uint32_t        n_completed_tasks;
 
-    // TODO: do we need lock here?
-    // if tasks in schedule are independet and completes concurently
-    self->n_completed_tasks += 1;
-    if (self->n_completed_tasks == self->n_tasks) {
+    n_completed_tasks = ucc_atomic_fadd32(&self->n_completed_tasks, 1);
+
+    if (n_completed_tasks + 1 == self->n_tasks) {
         self->super.status = UCC_OK;
         ucc_task_complete(&self->super);
     }
@@ -147,7 +148,7 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule,
 
 void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
 {
-    ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED,
+    ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED_SCHEDULE,
                                 &schedule->super,
                                 ucc_schedule_completed_handler);
     task->schedule                       = schedule;
