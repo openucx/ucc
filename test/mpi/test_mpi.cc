@@ -211,6 +211,7 @@ ucc_team_h UccTestMpi::create_ucc_team(MPI_Comm comm, bool is_onesided)
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
     };
     MPI_Send(&tmp, 1, MPI_INT, rank, 123, comm);
+    MPI_Wait(&req, MPI_STATUS_IGNORE);
     if (status < 0) {
         std::cerr << "*** UCC TEST FAIL: ucc_team_create_test failed\n";
         MPI_Abort(MPI_COMM_WORLD, -1);
