@@ -105,8 +105,7 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                       [AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
                              [NVCC_ARCH="${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11}"])],
                       [NVCC_ARCH="$with_nvcc_gencode"])
-                AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])
-                AC_MSG_RESULT([CUDA gencodes: $NVCC_ARCH])])
+                AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])])
          LDFLAGS="$save_LDFLAGS"
          CPPFLAGS="$save_CPPFLAGS"
          LDFLAGS="$save_LDFLAGS"
