@@ -32,12 +32,13 @@ ucc_test_mpi_SOURCES = \
 
 CXX=$(MPICXX)
 LD=$(MPICXX)
-ucc_test_mpi_CPPFLAGS=$(BASE_CPPFLAGS)
-ucc_test_mpi_CXXFLAGS=$(BASE_CXXFLAGS) -std=gnu++11
-ucc_test_mpi_LDADD=$(UCC_TOP_BUILDDIR)/src/libucc.la
+ucc_test_mpi_CPPFLAGS = $(BASE_CPPFLAGS)
+ucc_test_mpi_CXXFLAGS = $(BASE_CXXFLAGS) -std=gnu++11
+ucc_test_mpi_LDFLAGS = -Wl,--rpath-link=${UCS_LIBDIR}
+ucc_test_mpi_LDADD = $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 if HAVE_CUDA
-ucc_test_mpi_CPPFLAGS+=$(CUDA_CPPFLAGS)
-ucc_test_mpi_LDFLAGS=$(CUDA_LDFLAGS)
-ucc_test_mpi_LDADD+=$(CUDA_LIBS)
+ucc_test_mpi_CPPFLAGS += $(CUDA_CPPFLAGS)
+ucc_test_mpi_LDFLAGS += $(CUDA_LDFLAGS)
+ucc_test_mpi_LDADD += $(CUDA_LIBS)
 endif
