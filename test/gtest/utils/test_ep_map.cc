@@ -122,8 +122,8 @@ UCC_TEST_F(test_ep_map, nested)
         EXPECT_EQ(2 + i * 4, ucc_ep_map_eval(nested2, i));
     }
 
-    ucc_ep_map_destroy(&nested1);
-    ucc_ep_map_destroy(&nested2);
+    ucc_ep_map_destroy_nested(&nested1);
+    ucc_ep_map_destroy_nested(&nested2);
 }
 
 class test_ep_map_inv : public test_ep_map {
