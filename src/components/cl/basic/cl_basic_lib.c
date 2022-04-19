@@ -53,9 +53,9 @@ static inline ucc_status_t check_tl_lib_attr(const ucc_base_lib_t *lib,
 ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
                                        ucc_base_lib_attr_t  *base_attr)
 {
-    ucc_cl_lib_attr_t       *attr   = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
-    ucc_cl_basic_lib_t      *cl_lib = ucc_derived_of(lib, ucc_cl_basic_lib_t);
-    ucc_config_allow_list_t *tls    = &cl_lib->super.tls;
+    ucc_cl_lib_attr_t  *attr     = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
+    ucc_cl_basic_lib_t *cl_lib   = ucc_derived_of(lib, ucc_cl_basic_lib_t);
+    ucc_config_allow_list_t *tls = &cl_lib->super.tls;
     ucc_tl_iface_t          *tl_iface;
     int                      i;
     ucc_status_t             status;
@@ -79,10 +79,10 @@ ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
     for (i = 0; i < tls->array.count; i++) {
         /* Check TLs proveded in CL_BASIC_TLS. Not all of them could be
            available, check for NULL. */
-        tl_iface = ucc_derived_of(
-            ucc_get_component(&ucc_global_config.tl_framework,
-                              tls->array.names[i]),
-            ucc_tl_iface_t);
+        tl_iface =
+            ucc_derived_of(ucc_get_component(&ucc_global_config.tl_framework,
+                                             tls->array.names[i]),
+                           ucc_tl_iface_t);
         if (!tl_iface) {
             cl_warn(lib, "tl %s is not available", tls->array.names[i]);
             continue;

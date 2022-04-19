@@ -14,14 +14,13 @@ static char * ucc_cl_tls_doc_str = "List of TLs used by a given CL component.\n"
 #define TLS_CONFIG_ENTRY 1
 ucc_config_field_t ucc_cl_lib_config_table[] = {
     [0] = {"", "", NULL, ucc_offsetof(ucc_cl_lib_config_t, super),
-     UCC_CONFIG_TYPE_TABLE(ucc_base_lib_config_table)},
+           UCC_CONFIG_TYPE_TABLE(ucc_base_lib_config_table)},
 
     [TLS_CONFIG_ENTRY] = {"TLS", "all", NULL,
                           ucc_offsetof(ucc_cl_lib_config_t, tls),
-     UCC_CONFIG_TYPE_ALLOW_LIST},
+                          UCC_CONFIG_TYPE_ALLOW_LIST},
 
-    {NULL}
-};
+    {NULL}};
 
 ucc_config_field_t ucc_cl_context_config_table[] = {
     [0] = {"", "", NULL, ucc_offsetof(ucc_cl_context_config_t, super),
@@ -49,15 +48,13 @@ UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
                      cl_iface->cl_lib_config.name,
                      sizeof(self->super.log_component.name));
 
-    status = ucc_config_allow_list_process(&cl_config->tls,
-                                           &ucc_global_config.tl_framework.names,
-                                           &self->tls);
+    status = ucc_config_allow_list_process(
+        &cl_config->tls, &ucc_global_config.tl_framework.names, &self->tls);
     if (status != UCC_OK) {
         return status;
     }
     if (self->tls.array.count == 0) {
-        ucc_error("no TLs are selected for %s",
-                  cl_iface->cl_lib_config.name);
+        ucc_error("no TLs are selected for %s", cl_iface->cl_lib_config.name);
         ucc_free(self->tls.array.names);
         return UCC_ERR_NOT_FOUND;
     }

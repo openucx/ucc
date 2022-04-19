@@ -75,8 +75,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
                                        tls->names[j], &hs->tl_ctxs[hs->n_tls]);
                 if (UCC_OK != status) {
                     cl_debug(cl_context->lib,
-                            "tl context %s is not available for sbgp %s",
-                            tls->names[j], ucc_sbgp_str(hs->sbgp_type));
+                             "tl context %s is not available for sbgp %s",
+                             tls->names[j], ucc_sbgp_str(hs->sbgp_type));
                 } else {
                     hs->n_tls++;
                     n_sbgp_teams++;

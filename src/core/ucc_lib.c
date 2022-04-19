@@ -237,7 +237,6 @@ int ucc_tl_is_requested(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface)
         }
     }
     return 0;
-
 }
 
 static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,

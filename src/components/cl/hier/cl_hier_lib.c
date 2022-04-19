@@ -103,8 +103,8 @@ ucc_status_t ucc_cl_hier_get_lib_attr(const ucc_base_lib_t *lib,
     cl_lib->tls_forced.names = NULL;
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
         if (cl_lib->cfg.sbgp_tls[i].mode == UCC_CONFIG_ALLOW_LIST_ALLOW) {
-            status = ucc_config_names_array_merge(&cl_lib->tls_forced,
-                                                  &cl_lib->cfg.sbgp_tls[i].array);
+            status = ucc_config_names_array_merge(
+                &cl_lib->tls_forced, &cl_lib->cfg.sbgp_tls[i].array);
             if (ucc_unlikely(UCC_OK != status)) {
                 return status;
             }
@@ -119,10 +119,10 @@ ucc_status_t ucc_cl_hier_get_lib_attr(const ucc_base_lib_t *lib,
     for (i = 0; i < tls->array.count; i++) {
         /* Check TLs proveded in CL_HIER_TLS. Not all of them could be
            available, check for NULL. */
-        tl_iface = ucc_derived_of(
-            ucc_get_component(&ucc_global_config.tl_framework,
-                              tls->array.names[i]),
-            ucc_tl_iface_t);
+        tl_iface =
+            ucc_derived_of(ucc_get_component(&ucc_global_config.tl_framework,
+                                             tls->array.names[i]),
+                           ucc_tl_iface_t);
         if (!tl_iface) {
             cl_warn(lib, "tl %s is not available", tls->array.names[i]);
             continue;

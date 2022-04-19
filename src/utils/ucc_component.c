@@ -183,8 +183,8 @@ ucc_status_t ucc_components_load(const char *framework_name,
         goto err;
     }
 
-    framework->names.names = ucc_malloc(sizeof(char *) * n_loaded,
-                                        "components_names");
+    framework->names.names =
+        ucc_malloc(sizeof(char *) * n_loaded, "components_names");
     if (!framework->names.names) {
         ucc_error("failed to allocate %zd bytes for components names",
                   sizeof(char *) * n_loaded);

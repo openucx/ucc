@@ -24,9 +24,9 @@ ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
         }
 
         if (n_new) {
-            dst->names = ucc_realloc(dst->names,
-                                     (dst->count + n_new) * sizeof(char *),
-                                     "ucc_config_names_array");
+            dst->names =
+                ucc_realloc(dst->names, (dst->count + n_new) * sizeof(char *),
+                            "ucc_config_names_array");
             if (ucc_unlikely(!dst->names)) {
                 return UCC_ERR_NO_MEMORY;
             }
@@ -80,9 +80,9 @@ void ucc_config_names_array_free(ucc_config_names_array_t *array)
     ucc_free(array->names);
 }
 
-
 int ucc_config_names_search(const ucc_config_names_array_t *config_names,
-                            const char *str) {
+                            const char *                    str)
+{
     unsigned i;
 
     for (i = 0; i < config_names->count; ++i) {
@@ -94,19 +94,18 @@ int ucc_config_names_search(const ucc_config_names_array_t *config_names,
     return -1;
 }
 
-ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t *list,
+ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
                                            const ucc_config_names_array_t *all,
-                                           ucc_config_allow_list_t *out)
+                                           ucc_config_allow_list_t *       out)
 {
-    ucc_status_t            status;
-    int                     i;
+    ucc_status_t status;
+    int          i;
 
     out->mode        = list->mode;
     out->array.names = NULL;
 
     if (out->mode == UCC_CONFIG_ALLOW_LIST_ALLOW) {
-        status = ucc_config_names_array_dup(&out->array,
-                                            &list->array);
+        status = ucc_config_names_array_dup(&out->array, &list->array);
         if (UCC_OK != status) {
             ucc_error("failed to dup config_names_array");
             return status;
@@ -116,7 +115,7 @@ ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t *list,
                    out->mode == UCC_CONFIG_ALLOW_LIST_ALLOW_ALL);
 
         out->array.count = 0;
-        out->array.names = ucc_malloc(sizeof(char*) * all->count, "names");
+        out->array.names = ucc_malloc(sizeof(char *) * all->count, "names");
         if (!out->array.names) {
             ucc_error("failed to allocate %zd bytes for names array",
                       sizeof(char *) * all->count);

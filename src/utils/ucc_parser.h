@@ -125,7 +125,7 @@ ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
 void ucc_config_names_array_free(ucc_config_names_array_t *array);
 
 int ucc_config_names_search(const ucc_config_names_array_t *config_names,
-                            const char *str);
+                            const char *                    str);
 
 static inline
 int ucc_config_names_array_is_all(const ucc_config_names_array_t *array)
@@ -133,8 +133,8 @@ int ucc_config_names_array_is_all(const ucc_config_names_array_t *array)
     return (array->count == 1) && (0 == strcmp(array->names[0], "all"));
 }
 
-ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t *list,
+ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
                                            const ucc_config_names_array_t *all,
-                                           ucc_config_allow_list_t *out);
+                                           ucc_config_allow_list_t *       out);
 
 #endif
