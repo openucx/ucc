@@ -164,6 +164,9 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     case UCC_COLL_TYPE_GATHER:
         status = ucc_tl_nccl_gather_init(task);
         break;
+    case UCC_COLL_TYPE_GATHERV:
+        status = ucc_tl_nccl_gatherv_init(task);
+        break;
     default:
         tl_error(UCC_TASK_LIB(task),
                  "collective %d is not supported by nccl tl",
