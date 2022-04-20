@@ -114,7 +114,8 @@ typedef struct ucc_tl_nccl_task {
      UCC_COLL_TYPE_ALLGATHER      | UCC_COLL_TYPE_ALLGATHERV |                 \
      UCC_COLL_TYPE_ALLREDUCE      | UCC_COLL_TYPE_BCAST      |                 \
      UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE     |                 \
-     UCC_COLL_TYPE_BARRIER        | UCC_COLL_TYPE_GATHER)
+     UCC_COLL_TYPE_BARRIER        | UCC_COLL_TYPE_GATHER     |                 \
+     UCC_COLL_TYPE_GATHERV)
 
 UCC_CLASS_DECLARE(ucc_tl_nccl_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
