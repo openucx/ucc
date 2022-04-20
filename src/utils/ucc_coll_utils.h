@@ -210,6 +210,12 @@ ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size);
 /* Creates an inverse mapping for a given map */
 ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map);
 
+ucc_status_t ucc_ep_map_create_nested(ucc_ep_map_t *base_map,
+                                      ucc_ep_map_t *sub_map,
+                                      ucc_ep_map_t *out);
+
+void ucc_ep_map_destroy_nested(ucc_ep_map_t *out);
+
 void ucc_ep_map_destroy(ucc_ep_map_t *map);
 
 /* The two helper routines below are used to partition a buffer

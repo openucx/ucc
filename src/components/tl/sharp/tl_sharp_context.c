@@ -199,7 +199,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
         ucc_derived_of(config, ucc_tl_sharp_context_config_t);
     struct sharp_coll_init_spec    init_spec = {0};
     ucc_status_t                   status;
-    ucc_rcache_params_t rcache_params;
+    ucc_rcache_params_t            rcache_params;
+    struct timeval                 tval;
 
     if (!(params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB)) {
         tl_error(tl_sharp_config->super.tl_lib, "Context OOB is required for SHARP");
@@ -212,7 +213,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
     memcpy(&self->cfg, tl_sharp_config, sizeof(*tl_sharp_config));
 
     if (self->cfg.rand_seed == 0) {
-        self->cfg.rand_seed = time(NULL);
+        gettimeofday(&tval, NULL);
+        self->cfg.rand_seed = (int) tval.tv_usec;
     }
 
     self->rcache           = NULL;

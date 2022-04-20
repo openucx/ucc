@@ -13,15 +13,16 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
     has_range_     = true;
     has_bw_        = false;
 
-    coll_args.mask = 0;
-    coll_args.coll_type = UCC_COLL_TYPE_ALLTOALLV;
+    coll_args.mask                = UCC_COLL_ARGS_FIELD_FLAGS;
+    coll_args.coll_type           = UCC_COLL_TYPE_ALLTOALLV;
     coll_args.src.info_v.datatype = dt;
     coll_args.src.info_v.mem_type = mt;
     coll_args.dst.info_v.datatype = dt;
     coll_args.dst.info_v.mem_type = mt;
+    coll_args.flags               = UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER |
+                                    UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
     if (is_inplace) {
-        coll_args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
-        coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 }
 
