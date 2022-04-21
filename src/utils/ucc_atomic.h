@@ -15,6 +15,7 @@
 #define ucc_atomic_add64          ucs_atomic_add64
 #define ucc_atomic_sub64          ucs_atomic_sub64
 #define ucc_atomic_cswap8         ucs_atomic_cswap8
+#define ucc_atomic_cswap64        ucs_atomic_cswap64
 #define ucc_atomic_bool_cswap8    ucs_atomic_bool_cswap8
 #define ucc_atomic_bool_cswap64   ucs_atomic_bool_cswap64
 #endif
