@@ -29,6 +29,11 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoall_init,
     ucc_rank_t              team_size;
     ucc_mc_buffer_header_t *h;
 
+    if (UCC_IS_INPLACE(coll_args->args)) {
+        cl_debug(team->context->lib, "inplace alltoall is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     if (!SBGP_ENABLED(cl_team, NODE) || !SBGP_ENABLED(cl_team, FULL)) {
         cl_debug(team->context->lib, "alltoall requires NODE and FULL sbgps");
         return UCC_ERR_NOT_SUPPORTED;
