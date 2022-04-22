@@ -57,7 +57,8 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
     int device, num_devices, driver_ver;
     cudaError_t cuda_st;
 
-    ucc_mc_cuda.stream = NULL;
+    ucc_mc_cuda.stream             = NULL;
+    ucc_mc_cuda.stream_initialized = 0;
     ucc_strncpy_safe(ucc_mc_cuda.super.config->log_component.name,
                      ucc_mc_cuda.super.super.name,
                      sizeof(ucc_mc_cuda.super.config->log_component.name));

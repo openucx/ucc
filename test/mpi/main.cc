@@ -34,6 +34,7 @@ static int                                 iterations   = 1;
 static int                                 show_help    = 0;
 static int                                 num_tests    = 1;
 static bool                                has_onesided = true;
+static bool                                verbose      = false;
 #ifdef HAVE_CUDA
 static test_set_cuda_device_t test_cuda_set_device = TEST_SET_DEV_NONE;
 #endif
@@ -56,24 +57,27 @@ static std::vector<std::string> str_split(const char *value, const char *delimit
 void PrintHelp()
 {
     std::cout <<
-       "--colls      <c1,c2,..>:        list of collectives: "
+       "-c, --colls            <c1,c2,..>\n\tlist of collectives: "
             "barrier, allreduce, allgather, allgatherv, bcast, alltoall, alltoallv "
-            "reduce, reduce_scatter, reduce_scatterv, gather, gatherv\n"
-       "--teams      <t1,t2,..>:        list of teams: world,half,reverse,odd_even\n"
-       "--mtypes     <m1,m2,..>:        list of mtypes: host,cuda\n"
-       "--dtypes     <d1,d2,..>:        list of dtypes: (u)int8(16,32,64),float32(64)\n"
-       "--ops        <o1,o2,..>:        list of ops:sum,prod,max,min,land,lor,lxor,band,bor,bxor\n"
-       "--inplace    <value>:           0 - no inplace, 1 - inplace, 2 - both\n"
-       "--msgsize    <min:max[:power]>  mesage sizes range:\n"
-       "--root       <type:[value]>     type of root selection: single:<value>, random:<value>, all\n"
-       "--seed       <value>:           user defined random seed\n"
-       "--max_size   <value>:           maximum send/recv buffer allocation size\n"
-       "--count_bits <c1,c2,..>:        list of counts bits: 32,64          (alltoallv only)\n"
-       "--displ_bits <d1,d2,..>:        list of displacements bits: 32,64   (alltoallv only)\n"
-       "--set_device <value>:           0 - don't set, 1 - cuda_device = local_rank, 2 - cuda_device = local_rank % cuda_device_count\n"
-       "--num_tests  <value>:           number of tests to run in parallel\n"
-       "--onesided   <value>:           0 - no onesided tests, 1 - onesided tests\n"
-       "--help:              Show help\n";
+            "reduce, reduce_scatter, reduce_scatterv, gather, gatherv\n\n"
+       "-t, --teams            <t1,t2,..>\n\tlist of teams: world,half,reverse,odd_even\n\n"
+       "-M, --mtypes           <m1,m2,..>\n\tlist of mtypes: host,cuda\n\n"
+       "-d, --dtypes           <d1,d2,..>\n\tlist of dtypes: (u)int8(16,32,64),float32(64)\n\n"
+       "-o, --ops              <o1,o2,..>\n\tlist of ops:sum,prod,max,min,land,lor,lxor,band,bor,bxor\n\n"
+       "-I, --inplace          <value>\n\t0 - no inplace, 1 - inplace, 2 - both\n\n"
+       "-m, --msgsize          <min:max[:power]>\n\tmesage sizes range\n\n"
+       "-r, --root             <type:[value]>\n\ttype of root selection: single:<value>, random:<value>, all\n\n"
+       "-s, --seed             <value>\n\tuser defined random seed\n\n"
+       "-Z, --max_size         <value>\n\tmaximum send/recv buffer allocation size\n\n"
+       "-C, --count_bits       <c1,c2,..>\n\tlist of counts bits: 32,64          (alltoallv only)\n\n"
+       "-D, --displ_bits       <d1,d2,..>\n\tlist of displacements bits: 32,64   (alltoallv only)\n\n"
+       "-S, --set_device       <value>\n\t0 - don't set, 1 - cuda_device = local_rank, 2 - cuda_device = local_rank % cuda_device_count\n\n"
+       "-N, --num_tests        <value>\n\tnumber of tests to run in parallel\n\n"
+       "-O, --onesided         <value>\n\t0 - no onesided tests, 1 - onesided tests\n\n"
+       "-i, --iter             <value>\n\tnumber of iterations each test cases is executed\n\n"
+       "-T, --thread-multiple\n\tenable multi-threaded testing\n\n"
+       "-v, --verbose\n\tlog all test cases\n\n"
+       "-h, --help\n\tShow help\n";
 }
 
 
@@ -97,11 +101,8 @@ static ucc_test_mpi_team_t team_str_to_type(std::string team)
         return TEAM_SPLIT_ODD_EVEN;
     } else if (team == "reverse") {
         return TEAM_REVERSE;
-    } else {
-        std::cerr << "incorrect team type: " << team << std::endl;
-        PrintHelp();
     }
-    abort();
+    throw std::string("incorrect team type: ") + team;
 }
 
 static ucc_coll_type_t coll_str_to_type(std::string coll)
@@ -132,27 +133,18 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
         return UCC_COLL_TYPE_GATHER;
     } else if (coll == "gatherv") {
         return UCC_COLL_TYPE_GATHERV;
-    } else {
-        std::cerr << "incorrect coll type: " << coll << std::endl;
-        PrintHelp();
     }
-    abort();
+    throw std::string("incorrect coll type: ") + coll;
 }
 
 static ucc_memory_type_t mtype_str_to_type(std::string mtype)
 {
-    ucc_memory_type_t mem_type;
-
     if (mtype == "host") {
-        mem_type = UCC_MEMORY_TYPE_HOST;
+        return UCC_MEMORY_TYPE_HOST;
     } else if (mtype == "cuda") {
-        mem_type = UCC_MEMORY_TYPE_CUDA;
-    } else {
-        std::cerr << "incorrect memory type: " << mtype << std::endl;
-        PrintHelp();
-        abort();
+        return UCC_MEMORY_TYPE_CUDA;
     }
-    return mem_type;
+    throw std::string("incorrect memory type: ") + mtype;
 }
 
 static ucc_datatype_t dtype_str_to_type(std::string dtype)
@@ -185,11 +177,8 @@ static ucc_datatype_t dtype_str_to_type(std::string dtype)
         return UCC_DT_INT128;
     } else if (dtype == "uint128") {
         return UCC_DT_UINT128;
-    } else {
-        std::cerr << "incorrect dtype: " << dtype << std::endl;
-        PrintHelp();
     }
-    abort();
+    throw std::string("incorrect  dtype: ") + dtype;
 }
 
 static ucc_reduction_op_t op_str_to_type(std::string op)
@@ -216,11 +205,8 @@ static ucc_reduction_op_t op_str_to_type(std::string op)
         return UCC_OP_BXOR;
     } else if (op == "avg") {
         return UCC_OP_AVG;
-    } else {
-        std::cerr << "incorrect op: " << op << std::endl;
-        PrintHelp();
     }
-    abort();
+    throw std::string("incorrect  op: ") + op;
 }
 
 static ucc_test_vsize_flag_t bits_str_to_type(std::string vsize)
@@ -229,31 +215,29 @@ static ucc_test_vsize_flag_t bits_str_to_type(std::string vsize)
         return TEST_FLAG_VSIZE_32BIT;
     } else if (vsize == "64") {
         return TEST_FLAG_VSIZE_64BIT;
-    } else {
-        std::cerr << "incorrect vsize: " << vsize << std::endl;
-        PrintHelp();
     }
-    abort();
+    throw std::string("incorrect vsize") + vsize;
 }
 
 static void process_msgrange(const char *arg)
 {
     auto tokens = str_split(arg, ":");
-    if (tokens.size() == 1) {
-        std::stringstream s(tokens[0]);
-        s >> msgrange[0];
-        msgrange[1] = msgrange[0];
-        msgrange[2] = 0;
-    } else if (tokens.size() >= 2) {
-        std::stringstream s1(tokens[0]);
-        std::stringstream s2(tokens[1]);
-        s1 >> msgrange[0];
-        s2 >> msgrange[1];
-        msgrange[2] = 2;
-        if (tokens.size() == 3) {
-            std::stringstream s3(tokens[2]);
-            s3 >> msgrange[2];
+
+    try {
+        if (tokens.size() == 1) {
+            msgrange[0] = std::stol(tokens[0]);
+            msgrange[1] = msgrange[0];
+            msgrange[2] = 0;
+        } else if (tokens.size() >= 2) {
+            msgrange[0] = std::stol(tokens[0]);
+            msgrange[1] = std::stol(tokens[1]);
+            msgrange[2] = 2;
+            if (tokens.size() == 3) {
+                msgrange[2] = std::stol(tokens[2]);
+            }
         }
+    } catch (std::exception &e) {
+        throw std::string("incorrect msgrange: ") + arg;
     }
 }
 
@@ -263,16 +247,17 @@ static void process_inplace(const char *arg)
     switch(value) {
     case 0:
         inplace = {TEST_NO_INPLACE};
-        break;
+        return;
     case 1:
         inplace = {TEST_INPLACE};
-        break;
+        return;
     case 2:
         inplace = {TEST_NO_INPLACE, TEST_INPLACE};
-        break;
+        return;
     default:
         break;
     }
+    throw std::string("incorrect inplace: ") + arg;
 }
 
 static void process_root(const char *arg)
@@ -301,9 +286,7 @@ static void process_root(const char *arg)
     }
     return;
 err:
-    std::cerr << "incorrect root setting" << arg << std::endl;
-    PrintHelp();
-    abort();
+    throw std::string("incorrect root: ") + arg;
 }
 
 int init_rand_seed(int user_seed)
@@ -338,9 +321,9 @@ void PrintInfo()
               << std::endl;
 }
 
-int ProcessArgs(int argc, char** argv)
+void ProcessArgs(int argc, char** argv)
 {
-    const char *const short_opts  = "c:t:m:d:o:M:I:N:r:s:C:D:i:Z:ThSO:";
+    const char *const short_opts  = "c:t:m:d:o:M:I:N:r:s:C:D:i:Z:ThvSO:";
     const option      long_opts[] = {
                                 {"colls", required_argument, nullptr, 'c'},
                                 {"teams", required_argument, nullptr, 't'},
@@ -427,44 +410,49 @@ int ProcessArgs(int argc, char** argv)
         case 'O':
             has_onesided = std::stoi(optarg);
             break;
+        case 'v':
+            verbose = true;
+            break;
         case 'h':
             show_help = 1;
             break;
         case '?': // Unrecognized option
         default:
-            return -1;
+            throw std::string("unrecognized option");
         }
     }
-    return 0;
 }
 
 int main(int argc, char *argv[])
 {
     std::chrono::steady_clock::time_point begin =
         std::chrono::steady_clock::now();
-    int rank;
-    int ret;
     int failed = 0;
-    int size, provided, completed;
-    int required = (thread_mode == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
-        : MPI_THREAD_MULTIPLE;
+    int size, required, provided, completed, rank;
     UccTestMpi *test;
     MPI_Request req;
+    std::string err;
 
+    try {
+        ProcessArgs(argc, argv);
+    } catch (const std::string &s) {
+        err = s;
+    }
+    required = (thread_mode == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
+        : MPI_THREAD_MULTIPLE;
     MPI_Init_thread(&argc, &argv, required, &provided);
     if (provided != required) {
         std::cerr << "could not initialize MPI in thread multiple\n";
-        abort();
+        return 1;
     }
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    ret = ProcessArgs(argc, argv);
-    if (ret || show_help) {
+    if (!err.empty() || show_help) {
         if (rank == 0) {
+            std::cerr << "ParseArgs error:" << err << "\n\n";
             PrintHelp();
         }
-        failed = ret;
         goto mpi_exit;
     }
 
@@ -489,6 +477,7 @@ int main(int argc, char *argv[])
     if (has_onesided) {
         test->create_teams(teams, true);
     }
+    test->set_verbose(verbose);
     test->set_iter(iterations);
     test->set_num_tests(num_tests);
     test->set_colls(colls);
