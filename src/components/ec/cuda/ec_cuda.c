@@ -211,7 +211,8 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     cudaError_t           cuda_st;
     const char           *cu_err_st_str;
 
-    ucc_ec_cuda.stream = NULL;
+    ucc_ec_cuda.stream             = NULL;
+    ucc_ec_cuda.stream_initialized = 0;
     ucc_strncpy_safe(ucc_ec_cuda.super.config->log_component.name,
                      ucc_ec_cuda.super.super.name,
                      sizeof(ucc_ec_cuda.super.config->log_component.name));

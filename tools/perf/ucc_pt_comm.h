@@ -28,7 +28,7 @@ public:
     ~ucc_pt_comm();
     ucc_status_t init();
     ucc_status_t barrier();
-    ucc_status_t allreduce(float* in, float *out, size_t size,
+    ucc_status_t allreduce(double* in, double *out, size_t size,
                            ucc_reduction_op_t op);
     ucc_status_t finalize();
 };

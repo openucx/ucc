@@ -64,7 +64,7 @@ AC_SUBST(PATCH_VERSION)
 AC_SUBST(RPM_RELEASE)
 AC_SUBST(SOVERSION)
 AC_SUBST(UCC_GIT_SHA)
-AC_MSG_RESULT([git sha: $ucc_git_sha])
+AC_MSG_NOTICE([git sha: $UCC_GIT_SHA])
 
 CFLAGS_save="$CFLAGS"
 AC_PROG_CC
@@ -223,6 +223,9 @@ AC_MSG_NOTICE([      Build prefix:   ${prefix}])
 AC_MSG_NOTICE([Preprocessor flags:   ${CPPFLAGS} ${BASE_CPPFLAGS}])
 AC_MSG_NOTICE([        C compiler:   ${CC} ${CFLAGS} ${BASE_CFLAGS}])
 AC_MSG_NOTICE([      C++ compiler:   ${CXX} ${CXXFLAGS} ${BASE_CXXFLAGS}])
+AS_IF([test "x$cuda_happy" = "xyes"],[
+AC_MSG_NOTICE([     NVCC gencodes:   ${NVCC_ARCH}])
+])
 AC_MSG_NOTICE([          Perftest:   ${mpi_enable}])
 AC_MSG_NOTICE([        MC modules:   <$(echo ${mc_modules}|tr ':' ' ') >])
 AC_MSG_NOTICE([        TL modules:   <$(echo ${tl_modules}|tr ':' ' ') >])

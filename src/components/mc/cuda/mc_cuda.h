@@ -36,6 +36,7 @@ typedef struct ucc_mc_cuda_config {
 
 typedef struct ucc_mc_cuda {
     ucc_mc_base_t                  super;
+    int                            stream_initialized;
     cudaStream_t                   stream;
     ucc_mpool_t                    events;
     ucc_mpool_t                    strm_reqs;
@@ -67,12 +68,13 @@ extern ucc_mc_cuda_t ucc_mc_cuda;
     (ucc_derived_of(ucc_mc_cuda.super.config, ucc_mc_cuda_config_t))
 
 #define UCC_MC_CUDA_INIT_STREAM() do {                                         \
-    if (ucc_mc_cuda.stream == NULL) {                                          \
+    if (!ucc_mc_cuda.stream_initialized) {                                     \
         cudaError_t cuda_st = cudaSuccess;                                     \
         ucc_spin_lock(&ucc_mc_cuda.init_spinlock);                             \
-        if (ucc_mc_cuda.stream == NULL) {                                      \
+        if (!ucc_mc_cuda.stream_initialized) {                                 \
             cuda_st = cudaStreamCreateWithFlags(&ucc_mc_cuda.stream,           \
                                                 cudaStreamNonBlocking);        \
+            ucc_mc_cuda.stream_initialized = 1;                                \
         }                                                                      \
         ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);                           \
         if(cuda_st != cudaSuccess) {                                           \
