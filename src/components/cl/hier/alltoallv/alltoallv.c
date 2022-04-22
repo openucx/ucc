@@ -116,6 +116,11 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
     ucc_sbgp_t             *sbgp;
     size_t                  elem_size;
 
+    if (UCC_IS_INPLACE(coll_args->args)) {
+        cl_debug(team->context->lib, "inplace alltoallv is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     if (!SBGP_ENABLED(cl_team, NODE) || !SBGP_ENABLED(cl_team, FULL)) {
         cl_debug(team->context->lib, "alltoallv requires NODE and FULL sbgps");
         return UCC_ERR_NOT_SUPPORTED;
