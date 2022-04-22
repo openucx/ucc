@@ -11,7 +11,6 @@
 #include "ucc_pt_coll.h"
 #include "ucc_pt_comm.h"
 #include <ucc/api/ucc.h>
-#include <chrono>
 
 class ucc_pt_benchmark {
     ucc_pt_benchmark_config config;
@@ -21,13 +20,13 @@ class ucc_pt_benchmark {
     ucc_status_t barrier();
     void print_header();
     void print_time(size_t count, ucc_coll_args_t args,
-                    std::chrono::nanoseconds time);
+                    double time);
 public:
     ucc_pt_benchmark(ucc_pt_benchmark_config cfg, ucc_pt_comm *communicator);
     ucc_status_t run_bench() noexcept;
     ucc_status_t run_single_test(ucc_coll_args_t args,
                                  int nwarmup, int niter,
-                                 std::chrono::nanoseconds &time) noexcept;
+                                 double &time) noexcept;
     ~ucc_pt_benchmark();
 };
 

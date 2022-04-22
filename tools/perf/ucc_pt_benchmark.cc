@@ -49,9 +49,9 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
 {
     size_t min_count = coll->has_range() ? config.min_count : 1;
     size_t max_count = coll->has_range() ? config.max_count : 1;
-    ucc_status_t st;
+    ucc_status_t    st;
     ucc_coll_args_t args;
-    std::chrono::nanoseconds time;
+    double          time;
 
     print_header();
     for (size_t cnt = min_count; cnt <= max_count; cnt *= 2) {
@@ -75,9 +75,17 @@ exit_err:
     return st;
 }
 
+static inline double get_time_us(void)
+{
+    struct timeval t;
+
+    gettimeofday(&t, NULL);
+    return t.tv_sec * 1e6 + t.tv_usec;
+}
+
 ucc_status_t ucc_pt_benchmark::run_single_test(ucc_coll_args_t args,
                                                int nwarmup, int niter,
-                                               std::chrono::nanoseconds &time)
+                                               double &time)
                                                noexcept
 {
     ucc_team_h    team = comm->get_team();
@@ -86,9 +94,10 @@ ucc_status_t ucc_pt_benchmark::run_single_test(ucc_coll_args_t args,
     ucc_coll_req_h req;
 
     UCCCHECK_GOTO(comm->barrier(), exit_err, st);
-    time = std::chrono::nanoseconds::zero();
+    time = 0;
+
     for (int i = 0; i < nwarmup + niter; i++) {
-        auto s = std::chrono::high_resolution_clock::now();
+        double s = get_time_us();
         UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
         UCCCHECK_GOTO(ucc_collective_post(req), free_req, st);
         st = ucc_collective_test(req);
@@ -97,12 +106,12 @@ ucc_status_t ucc_pt_benchmark::run_single_test(ucc_coll_args_t args,
             st = ucc_collective_test(req);
         }
         ucc_collective_finalize(req);
-        auto f = std::chrono::high_resolution_clock::now();
+        double f = get_time_us();
         if (st != UCC_OK) {
             goto exit_err;
         }
         if (i >= nwarmup) {
-            time += std::chrono::duration_cast<std::chrono::nanoseconds>(f - s);
+            time += f - s;
         }
         UCCCHECK_GOTO(comm->barrier(), exit_err, st);
     }
@@ -176,16 +185,16 @@ void ucc_pt_benchmark::print_header()
 }
 
 void ucc_pt_benchmark::print_time(size_t count, ucc_coll_args_t args,
-                                  std::chrono::nanoseconds time)
+                                  double time)
 {
-    float  time_ms = time.count() / 1000.0;
+    double time_us = time;
     size_t size    = count * ucc_dt_size(config.dt);
-    int    gsize  = comm->get_size();
-    float time_avg, time_min, time_max;
+    int    gsize   = comm->get_size();
+    double time_avg, time_min, time_max;
 
-    comm->allreduce(&time_ms, &time_min, 1, UCC_OP_MIN);
-    comm->allreduce(&time_ms, &time_max, 1, UCC_OP_MAX);
-    comm->allreduce(&time_ms, &time_avg, 1, UCC_OP_SUM);
+    comm->allreduce(&time_us, &time_min, 1, UCC_OP_MIN);
+    comm->allreduce(&time_us, &time_max, 1, UCC_OP_MAX);
+    comm->allreduce(&time_us, &time_avg, 1, UCC_OP_SUM);
     time_avg /= gsize;
 
     if (comm->get_rank() == 0) {
