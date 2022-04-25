@@ -10,38 +10,36 @@
 
 ucc_status_t ucc_cuda_executor_interruptible_get_stream(cudaStream_t *stream)
 {
-    static uint32_t last_used = 0;
-    cudaError_t     cuda_st;
+    static uint32_t last_used   = 0;
+    int             num_streams = EC_CUDA_CONFIG->exec_num_streams;
+    ucc_status_t    st;
     int             i, j;
     uint32_t        id;
 
-    if (ucc_unlikely(ucc_ec_cuda.exec_streams[0] == NULL)) {
+    if (ucc_unlikely(!ucc_ec_cuda.exec_streams_initialized)) {
         ucc_spin_lock(&ucc_ec_cuda.init_spinlock);
-        if (ucc_ec_cuda.exec_streams[0] != NULL) {
+        if (ucc_ec_cuda.exec_streams_initialized) {
             goto unlock;
         }
 
-        for(i = 0; i < EC_CUDA_CONFIG->exec_num_streams; i++) {
-            cuda_st = cudaStreamCreateWithFlags(&ucc_ec_cuda.exec_streams[i],
-                                                cudaStreamNonBlocking);
-            if (ucc_unlikely(cuda_st != cudaSuccess)) {
-                ec_error(&ucc_ec_cuda.super,
-                         "failed to allocate cuda stream %d(%s)",
-                         cuda_st, cudaGetErrorString(cuda_st));
+        for(i = 0; i < num_streams; i++) {
+            st = CUDA_FUNC(cudaStreamCreateWithFlags(&ucc_ec_cuda.exec_streams[i],
+                                                     cudaStreamNonBlocking));
+            if (st != UCC_OK) {
                 for (j = 0; j < i; j++) {
-                    cudaStreamDestroy(ucc_ec_cuda.exec_streams[j]);
-                    ucc_ec_cuda.exec_streams[j] = NULL;
+                    CUDA_FUNC(cudaStreamDestroy(ucc_ec_cuda.exec_streams[j]));
                 }
                 ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
-                return UCC_ERR_NO_RESOURCE;
+                return st;
             }
         }
+        ucc_ec_cuda.exec_streams_initialized = 1;
 unlock:
         ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
     }
 
     id = ucc_atomic_fadd32(&last_used, 1);
-    *stream = ucc_ec_cuda.exec_streams[id % EC_CUDA_CONFIG->exec_num_streams];
+    *stream = ucc_ec_cuda.exec_streams[id % num_streams];
     return UCC_OK;
 }
 

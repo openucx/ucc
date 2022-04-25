@@ -78,6 +78,7 @@ typedef struct ucc_ec_cuda {
     ucc_ec_base_t                  super;
     int                            stream_initialized;
     cudaStream_t                   stream;
+    int                            exec_streams_initialized;
     cudaStream_t                  *exec_streams;
     ucc_mpool_t                    events;
     ucc_mpool_t                    strm_reqs;
