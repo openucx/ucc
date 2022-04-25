@@ -64,6 +64,7 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *      team,
         .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
         .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
         .team_size   = 28,
+        .layout      = SEG_LAYOUT_CONTIG,
         .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_28_bcast,
         .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_28_reduce};
     perf_funcs_keys[size] = intel_broadwell_28;
@@ -73,6 +74,7 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *      team,
         .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
         .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
         .team_size   = 14,
+        .layout      = UCC_TL_SHM_TEAM_LIB(team)->cfg.layout,
         .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_14_bcast,
         .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_14_reduce};
     perf_funcs_keys[size] = intel_broadwell_14;
@@ -82,6 +84,7 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *      team,
         .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
         .cpu_model   = UCC_CPU_MODEL_INTEL_BROADWELL,
         .team_size   = 8,
+        .layout      = UCC_TL_SHM_TEAM_LIB(team)->cfg.layout,
         .bcast_func  = ucc_tl_shm_perf_params_intel_broadwell_8_bcast,
         .reduce_func = ucc_tl_shm_perf_params_intel_broadwell_8_reduce};
     perf_funcs_keys[size] = intel_broadwell_8;
@@ -91,6 +94,7 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *      team,
         .cpu_vendor  = UCC_CPU_VENDOR_INTEL,
         .cpu_model   = UCC_CPU_MODEL_INTEL_SKYLAKE,
         .team_size   = 40,
+        .layout      = SEG_LAYOUT_SOCKET,
         .bcast_func  = ucc_tl_shm_perf_params_intel_skylake_40_bcast,
         .reduce_func = ucc_tl_shm_perf_params_intel_skylake_40_reduce};
     perf_funcs_keys[size] = intel_skylake_40;
@@ -100,6 +104,7 @@ ucc_tl_shm_create_perf_func_list(ucc_tl_shm_team_t *      team,
         .cpu_vendor  = UCC_CPU_VENDOR_AMD,
         .cpu_model   = UCC_CPU_MODEL_AMD_ROME,
         .team_size   = 128,
+        .layout      = SEG_LAYOUT_SOCKET,
         .bcast_func  = ucc_tl_shm_perf_params_amd_rome_128_bcast,
         .reduce_func = ucc_tl_shm_perf_params_amd_rome_128_reduce};
     perf_funcs_keys[size] = amd_rome_128;

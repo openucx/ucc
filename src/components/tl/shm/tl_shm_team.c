@@ -119,6 +119,7 @@ static inline ucc_status_t ucc_tl_shm_set_perf_funcs(ucc_tl_shm_team_t *team)
 
     if (!perf_funcs_list) {
         tl_error(team->super.super.context->lib,
+
                  "failed to allocate %zd bytes for perf_funcs_list",
                  max_size * sizeof(ucc_tl_shm_perf_funcs_t));
         ucc_free(perf_funcs_keys);
@@ -129,15 +130,13 @@ static inline ucc_status_t ucc_tl_shm_set_perf_funcs(ucc_tl_shm_team_t *team)
     vendor = ucc_arch_get_cpu_vendor();
     model  = ucc_arch_get_cpu_model();
 
-    team->perf_params_bcast  = ucc_tl_shm_perf_params_generic_bcast;
-    team->perf_params_reduce = ucc_tl_shm_perf_params_generic_reduce;
-
     for (i = 0; i < perf_funcs_list->size; i++) {
         if (perf_funcs_list->keys[i].cpu_vendor == vendor &&
             perf_funcs_list->keys[i].cpu_model == model &&
             perf_funcs_list->keys[i].team_size == team_size) {
             team->perf_params_bcast  = perf_funcs_list->keys[i].bcast_func;
             team->perf_params_reduce = perf_funcs_list->keys[i].reduce_func;
+            team->layout             = perf_funcs_list->keys[i].layout;
             break;
         }
     }
@@ -151,7 +150,7 @@ static void ucc_tl_shm_init_segs(ucc_tl_shm_team_t *team)
 {
     size_t cfg_ctrl_size       = UCC_TL_SHM_TEAM_LIB(team)->cfg.ctrl_size;
     size_t cfg_data_size       = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
-    ucc_tl_shm_seg_layout_t sl = UCC_TL_SHM_TEAM_LIB(team)->cfg.layout;
+    ucc_tl_shm_seg_layout_t sl = team->layout;
     size_t                  page_size = ucc_get_page_size();
     size_t ctrl_offset, data_offset, grp_ctrl_size,
         grp_data_size, grp_seg_size, grp_0_data_size;
@@ -204,7 +203,7 @@ static ucc_status_t ucc_tl_shm_seg_alloc(ucc_tl_shm_team_t *team)
                team_size = UCC_TL_TEAM_SIZE(team);
     size_t     cfg_ctrl_size        = UCC_TL_SHM_TEAM_LIB(team)->cfg.ctrl_size;
     size_t     cfg_data_size        = UCC_TL_SHM_TEAM_LIB(team)->cfg.data_size;
-    ucc_tl_shm_seg_layout_t sl      = UCC_TL_SHM_TEAM_LIB(team)->cfg.layout;
+    ucc_tl_shm_seg_layout_t sl      = team->layout;
     size_t                  shmsize = 0;
     int                     shmid   = -1;
     ucc_team_oob_coll_t     oob     = UCC_TL_TEAM_OOB(team);
@@ -299,11 +298,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     team_size     = UCC_TL_TEAM_SIZE(self);
     cfg_ctrl_size = UCC_TL_SHM_TEAM_LIB(self)->cfg.ctrl_size;
 
-    self->seq_num      = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_concurrent;
-    self->status       = UCC_INPROGRESS;
-    self->n_concurrent = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_concurrent;
-    self->data_size    = UCC_TL_SHM_TEAM_LIB(self)->cfg.data_size * team_size;
-    self->max_inline   = cfg_ctrl_size - ucc_offsetof(ucc_tl_shm_ctrl_t, data);
+    self->layout             = UCC_TL_SHM_TEAM_LIB(self)->cfg.layout;
+    self->perf_params_bcast  = ucc_tl_shm_perf_params_generic_bcast;
+    self->perf_params_reduce = ucc_tl_shm_perf_params_generic_reduce;
+    self->seq_num            = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_concurrent;
+    self->status             = UCC_INPROGRESS;
+    self->n_concurrent       = UCC_TL_SHM_TEAM_LIB(self)->cfg.max_concurrent;
+    self->data_size          = UCC_TL_SHM_TEAM_LIB(self)->cfg.data_size *
+                                   team_size;
+    self->max_inline         = cfg_ctrl_size - ucc_offsetof(ucc_tl_shm_ctrl_t,
+                                                            data);
 
     status = ucc_topo_init(subset, UCC_TL_CORE_CTX(self)->topo, &self->topo);
 
@@ -405,6 +409,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     if (UCC_OK != status) {
         goto err_segs;
     }
+
     status = ucc_tl_shm_group_rank_map_init(self);
     if (UCC_OK != status) {
         goto err_segs;
@@ -413,12 +418,20 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
     self->my_group_id =
         ucc_ep_map_eval(self->rank_group_id_map, UCC_TL_TEAM_RANK(self));
 
-    self->ctrl_size = 0;
-    page_size       = ucc_get_page_size();
+    if (UCC_TL_SHM_TEAM_LIB(self)->cfg.set_perf_params) {
+        status = ucc_tl_shm_set_perf_funcs(self);
+        if (UCC_OK != status) {
+            goto err_segs;
+        }
+    }
+
+    self->ctrl_size  = 0;
+    page_size        = ucc_get_page_size();
 
     for (i = 0; i < self->n_base_groups; i++) {
         group_size = self->base_groups[i].group_size;
-        self->ctrl_size += ucc_align_up(group_size * cfg_ctrl_size, page_size);
+        self->ctrl_size += ucc_align_up(group_size * cfg_ctrl_size,
+                                        page_size);
     }
 
     self->shm_buffers =
@@ -427,18 +440,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_shm_team_t, ucc_base_context_t *tl_context,
         status = UCC_ERR_NO_MEMORY;
         goto err_segs;
     }
-    status = ucc_tl_shm_set_perf_funcs(self);
-    if (UCC_OK != status) {
-        goto err_segs;
-    }
 
     status = ucc_tl_shm_seg_alloc(self);
     if (UCC_OK != status) {
-        goto err_segs;
+        goto err_buffers;
     }
     return UCC_OK;
 
     //TODO
+err_buffers:
+    ucc_free(self->shm_buffers);
 err_segs:
     ucc_free(self->segs);
 err_sockets:

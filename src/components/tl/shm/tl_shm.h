@@ -147,11 +147,12 @@ typedef struct ucc_tl_shm_tree_cache {
 
 typedef void (*perf_params_fn_t)(ucc_coll_task_t *);
 typedef struct ucc_tl_shm_perf_keys {
-    ucc_cpu_vendor_t cpu_vendor;
-    ucc_cpu_model_t  cpu_model;
-    ucc_rank_t       team_size;
-    perf_params_fn_t bcast_func;
-    perf_params_fn_t reduce_func;
+    ucc_cpu_vendor_t        cpu_vendor;
+    ucc_cpu_model_t         cpu_model;
+    ucc_rank_t              team_size;
+    perf_params_fn_t        bcast_func;
+    perf_params_fn_t        reduce_func;
+    ucc_tl_shm_seg_layout_t layout;
 } ucc_tl_shm_perf_keys_t;
 
 typedef struct ucc_tl_shm_perf_funcs {
@@ -183,6 +184,7 @@ typedef struct ucc_tl_shm_team {
     size_t                   data_size;
     size_t                   max_inline;
     ucc_tl_shm_tree_cache_t *tree_cache;
+    ucc_tl_shm_seg_layout_t  layout;
     ucc_status_t             status;
 } ucc_tl_shm_team_t;
 
