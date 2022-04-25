@@ -167,6 +167,12 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     case UCC_COLL_TYPE_GATHERV:
         status = ucc_tl_nccl_gatherv_init(task);
         break;
+    case UCC_COLL_TYPE_SCATTER:
+        status = ucc_tl_nccl_scatter_init(task);
+        break;
+    case UCC_COLL_TYPE_SCATTERV:
+        status = ucc_tl_nccl_scatterv_init(task);
+        break;
     default:
         tl_error(UCC_TASK_LIB(task),
                  "collective %d is not supported by nccl tl",

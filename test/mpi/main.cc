@@ -12,7 +12,8 @@ static std::vector<ucc_coll_type_t> colls = {
     UCC_COLL_TYPE_ALLGATHER,      UCC_COLL_TYPE_ALLGATHERV,
     UCC_COLL_TYPE_ALLTOALL,       UCC_COLL_TYPE_ALLTOALLV,
     UCC_COLL_TYPE_REDUCE_SCATTER, UCC_COLL_TYPE_REDUCE_SCATTERV,
-    UCC_COLL_TYPE_GATHER,         UCC_COLL_TYPE_GATHERV};
+    UCC_COLL_TYPE_GATHER,         UCC_COLL_TYPE_GATHERV,
+    UCC_COLL_TYPE_SCATTER,        UCC_COLL_TYPE_SCATTERV};
 static std::vector<ucc_coll_type_t> onesided_colls = {UCC_COLL_TYPE_ALLTOALL};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
 static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
@@ -59,7 +60,7 @@ void PrintHelp()
     std::cout <<
        "-c, --colls            <c1,c2,..>\n\tlist of collectives: "
             "barrier, allreduce, allgather, allgatherv, bcast, alltoall, alltoallv "
-            "reduce, reduce_scatter, reduce_scatterv, gather, gatherv\n\n"
+            "reduce, reduce_scatter, reduce_scatterv, gather, gatherv, scatter, scatterv\n\n"
        "-t, --teams            <t1,t2,..>\n\tlist of teams: world,half,reverse,odd_even\n\n"
        "-M, --mtypes           <m1,m2,..>\n\tlist of mtypes: host,cuda\n\n"
        "-d, --dtypes           <d1,d2,..>\n\tlist of dtypes: (u)int8(16,32,64),float32(64)\n\n"
@@ -133,6 +134,13 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
         return UCC_COLL_TYPE_GATHER;
     } else if (coll == "gatherv") {
         return UCC_COLL_TYPE_GATHERV;
+    } else if (coll == "scatter") {
+        return UCC_COLL_TYPE_SCATTER;
+    } else if (coll == "scatterv") {
+        return UCC_COLL_TYPE_SCATTERV;
+    } else {
+        std::cerr << "incorrect coll type: " << coll << std::endl;
+        PrintHelp();
     }
     throw std::string("incorrect coll type: ") + coll;
 }

@@ -83,6 +83,12 @@ std::shared_ptr<TestCase> TestCase::init_single(
     case UCC_COLL_TYPE_GATHERV:
         return std::make_shared<TestGatherv>(msgsize, inplace, mt, root, _team,
                                              max_size);
+    case UCC_COLL_TYPE_SCATTER:
+        return std::make_shared<TestScatter>(msgsize, inplace, mt, root, _team,
+                                             max_size);
+    case UCC_COLL_TYPE_SCATTERV:
+        return std::make_shared<TestScatterv>(msgsize, inplace, mt, root, _team,
+                                              max_size);
     default:
         break;
     }
