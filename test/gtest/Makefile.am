@@ -55,7 +55,9 @@ gtest_CPPFLAGS = \
 	-I$(top_srcdir)/test/gtest \
 	$(GTEST_CPPFLAGS)
 
-gtest_LDFLAGS  = $(GTEST_LDFLAGS) -pthread -no-install -Wl,-dynamic-list-data
+gtest_LDFLAGS = $(GTEST_LDFLAGS) -pthread -no-install -Wl,-dynamic-list-data \
+    -Wl,--rpath-link=${UCS_LIBDIR}
+
 gtest_CFLAGS   = $(BASE_CFLAGS) $(AM_CPPFLAGS)
 gtest_CXXFLAGS = -std=gnu++11 \
 	$(BASE_CXXFLAGS) $(GTEST_CXXFLAGS) \

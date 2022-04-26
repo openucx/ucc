@@ -28,5 +28,6 @@ nodist_ucc_info_SOURCES = \
 
 ucc_info_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS) -I${UCC_TOP_BUILDDIR}/src
 ucc_info_CFLAGS = $(BASE_CFLAGS)
+ucc_info_LDFLAGS = -Wl,--rpath-link=${UCS_LIBDIR}
 ucc_info_LDADD = \
 	$(UCC_TOP_BUILDDIR)/src/libucc.la

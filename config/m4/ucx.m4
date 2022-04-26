@@ -56,7 +56,7 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
         [
             ucx_happy="no"
         ])
-        
+
         AC_CHECK_HEADERS([ucs/sys/uid.h],
         [
             AC_CHECK_LIB([ucs], [ucs_get_system_id],
@@ -88,6 +88,7 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
             [
                 AC_SUBST(UCX_LDFLAGS, "-L$check_ucx_libdir")
                 AC_SUBST(UCS_LDFLAGS, "-L$check_ucx_libdir")
+                AC_SUBST(UCS_LIBDIR, $check_ucx_libdir)
             ])
 
             AC_SUBST(UCX_LIBADD, "-lucp -lucm")

@@ -28,12 +28,13 @@ ucc_perftest_SOURCES =            \
 
 CXX=$(MPICXX)
 LD=$(MPICXX)
-ucc_perftest_CPPFLAGS=$(BASE_CPPFLAGS)
-ucc_perftest_CXXFLAGS=-std=gnu++11 $(BASE_CXXFLAGS)
-ucc_perftest_LDADD=$(UCC_TOP_BUILDDIR)/src/libucc.la
+ucc_perftest_CPPFLAGS = $(BASE_CPPFLAGS)
+ucc_perftest_CXXFLAGS = -std=gnu++11 $(BASE_CXXFLAGS)
+ucc_perftest_LDFLAGS = -Wl,--rpath-link=${UCS_LIBDIR}
+ucc_perftest_LDADD = $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 if HAVE_CUDA
-ucc_perftest_CPPFLAGS+=$(CUDA_CPPFLAGS)
-ucc_perftest_LDFLAGS=$(CUDA_LDFLAGS)
-ucc_perftest_LDADD+=$(CUDA_LIBS)
+ucc_perftest_CPPFLAGS += $(CUDA_CPPFLAGS)
+ucc_perftest_LDFLAGS += $(CUDA_LDFLAGS)
+ucc_perftest_LDADD += $(CUDA_LIBS)
 endif
