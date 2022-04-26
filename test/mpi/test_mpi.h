@@ -486,4 +486,18 @@ ucc_status_t compare_buffers(void *rst, void *expected, size_t count,
 
 ucc_status_t divide_buffer(void *expected, size_t divider, size_t count,
                            ucc_datatype_t dt);
+
+class TestScatterv : public TestCase {
+    uint32_t *counts;
+    uint32_t *displacements;
+public:
+    TestScatterv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
+                 ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
+                 size_t _max_size);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
+    ucc_status_t check();
+    ~TestScatterv();
+};
+
 #endif
