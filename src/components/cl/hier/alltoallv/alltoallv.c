@@ -108,6 +108,7 @@ ucc_status_t ucc_cl_hier_alltoallv_triggered_post_setup(ucc_coll_task_t *task)
     for (i = 0; i < n_tasks; ++i) {
         ucc_coll_task_t *sub_task = schedule->super.super.tasks[i];
         if (sub_task->triggered_post_setup != NULL) {
+            sub_task->ee = task->ee;
             sub_task->triggered_post_setup(sub_task);
         }
     }
