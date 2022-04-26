@@ -1,4 +1,7 @@
 #include "ucc_pt_config.h"
+BEGIN_C_DECLS
+#include "utils/ucc_string.h"
+END_C_DECLS
 
 ucc_pt_config::ucc_pt_config() {
     bootstrap.bootstrap  = UCC_PT_BOOTSTRAP_MPI;
@@ -58,6 +61,7 @@ const std::map<std::string, ucc_datatype_t> ucc_pt_datatype_map = {
 ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
 {
     int c;
+    ucc_status_t st;
 
     while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:ihF")) != -1) {
         switch (c) {
@@ -91,10 +95,18 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                 bench.dt = ucc_pt_datatype_map.at(optarg);
                 break;
             case 'b':
-                std::stringstream(optarg) >> bench.min_count;
+                st = ucc_str_to_memunits(optarg, (void*)&bench.min_count);
+                if (st != UCC_OK) {
+                    std::cerr << "failed to parse min count" << std::endl;
+                    return st;
+                }
                 break;
             case 'e':
-                std::stringstream(optarg) >> bench.max_count;
+                st = ucc_str_to_memunits(optarg, (void*)&bench.max_count);
+                if (st != UCC_OK) {
+                    std::cerr << "failed to parse max count" << std::endl;
+                    return st;
+                }
                 break;
             case 'n':
                 std::stringstream(optarg) >> bench.n_iter_small;
