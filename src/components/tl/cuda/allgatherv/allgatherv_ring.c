@@ -243,6 +243,12 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     for (i = 1; i < tsize; i++) {
         send_size = ucc_max(send_size, task->allgatherv_ring.get_count(task, i));
     }
+
+    if (send_size == 0) {
+        task->super.status = UCC_OK;
+        return ucc_task_complete(&task->super);
+    }
+
     send_size = ucc_dt_size(task->allgatherv_ring.dt) * send_size;
     frag_size = ucc_min(ssize/2, send_size);
 
