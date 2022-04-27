@@ -348,6 +348,7 @@ void ProcessArgs(int argc, char** argv)
                                 {"iter", required_argument, nullptr, 'i'},
                                 {"thread-multiple", no_argument, nullptr, 'T'},
                                 {"num_tests", required_argument, nullptr, 'N'},
+                                {"verbose", no_argument, nullptr, 'v'},
 #ifdef HAVE_CUDA
                                 {"set_device", required_argument, nullptr, 'S'},
 #endif
