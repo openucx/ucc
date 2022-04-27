@@ -220,6 +220,12 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_start(ucc_coll_task_t *coll_task)
         send_size = ucc_max(send_size,
                             task->reduce_scatterv_ring.get_count(task, i));
     }
+
+    if (send_size == 0) {
+        task->super.status = UCC_OK;
+        return ucc_task_complete(&task->super);
+    }
+
     frag_size = ucc_min(ssize / ucc_dt_size(dt) / 2, send_size);
 
     task->reduce_scatterv_ring.num_frags = ucc_div_round_up(send_size, frag_size);
