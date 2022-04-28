@@ -34,9 +34,9 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_start(ucc_tl_cuda_task_t *task)
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
     ucc_status_t        status;
-    ucc_coll_args_t    *args = &TASK_ARGS(task);
-    ucc_ee_h            ee   = task->super.ee;
-    cudaStream_t stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
+    ucc_coll_args_t    *args    = &TASK_ARGS(task);
+    ucc_ee_h            ee      = task->super.ee;
+    cudaStream_t        stream  = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
 
     // For Alltoallv: copy counts and displ. to SHM for remote GPUs to access (if required)
     if (UCC_COLL_TYPE_ALLTOALLV == args->coll_type) {
@@ -83,8 +83,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
     ucc_tl_cuda_cache_t         *cache;
     ucc_status_t                 status;
     ucc_rank_t                   i;
-    ucc_ee_h                     ee = task->super.ee;
-    cudaStream_t stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
+    ucc_ee_h                     ee     = task->super.ee;
+    cudaStream_t                 stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
 
     status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), task->bar);
     if (status != UCC_OK) {
