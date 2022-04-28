@@ -10,85 +10,39 @@ extern "C" {
 #include <common/test.h>
 
 template<ucc_datatype_t, template <typename P> class op>
-struct ReductionTest;
+struct TypeOpPair;
 
-template<template <typename P> class op>
-struct ReductionTest<UCC_DT_INT16, op>
-{
-    using type = int16_t;
-    const static ucc_datatype_t dt = UCC_DT_INT16;
-    const static ucc_reduction_op_t redop = op<type>::redop;
-    static void assert_equal(type arg1, type arg2) {
-        ASSERT_EQ(arg1, arg2);
-    }
-    static type do_op(type arg1, type arg2) {
-        op<type> _op;
-        return _op(arg1, arg2);
-    }
-};
+#define DECLARE_TYPE_OP_PAIR(_type, _TYPE, _EQ)                     \
+    template<template <typename P> class op>                        \
+    struct TypeOpPair<UCC_DT_ ## _TYPE, op>                         \
+    {                                                               \
+        using type = _type;                                         \
+        const static ucc_datatype_t dt = UCC_DT_ ## _TYPE;          \
+        const static ucc_reduction_op_t redop = op<type>::redop;    \
+        static void assert_equal(type arg1, type arg2) {            \
+            _EQ(arg1, arg2);                                        \
+        }                                                           \
+        static type do_op(type arg1, type arg2) {                   \
+            op<type> _op;                                           \
+            return _op(arg1, arg2);                                 \
+        }                                                           \
+    };
 
-template<template <typename P> class op>
-struct ReductionTest<UCC_DT_INT32, op>
-{
-    using type = int32_t;
-    const static ucc_datatype_t dt = UCC_DT_INT32;
-    const static ucc_reduction_op_t redop = op<type>::redop;
-    static void assert_equal(type arg1, type arg2) {
-        ASSERT_EQ(arg1, arg2);
-    }
-    static type do_op(type arg1, type arg2) {
-        op<type> _op;
-        return _op(arg1, arg2);
-    }
-};
+DECLARE_TYPE_OP_PAIR(int8_t, INT8, ASSERT_EQ);
+DECLARE_TYPE_OP_PAIR(int16_t, INT16, ASSERT_EQ);
+DECLARE_TYPE_OP_PAIR(int32_t, INT32, ASSERT_EQ);
+DECLARE_TYPE_OP_PAIR(int64_t, INT64, ASSERT_EQ);
+DECLARE_TYPE_OP_PAIR(uint8_t, UINT8, ASSERT_EQ);
+DECLARE_TYPE_OP_PAIR(uint16_t, UINT16, ASSERT_EQ);
+DECLARE_TYPE_OP_PAIR(uint32_t, UINT32, ASSERT_EQ);
+DECLARE_TYPE_OP_PAIR(uint64_t, UINT64, ASSERT_EQ);
 
-template<template <typename P> class op>
-struct ReductionTest<UCC_DT_INT64, op>
-{
-    using type = int64_t;
-    const static ucc_datatype_t dt = UCC_DT_INT64;
-    const static ucc_reduction_op_t redop = op<type>::redop;
-    static void assert_equal(type arg1, type arg2) {
-        ASSERT_EQ(arg1, arg2);
-    }
-    static type do_op(type arg1, type arg2) {
-        op<type> _op;
-        return _op(arg1, arg2);
-    }
-};
-
-template<template <typename P> class op>
-struct ReductionTest<UCC_DT_FLOAT32, op>
-{
-    using type = float;
-    const static ucc_datatype_t dt = UCC_DT_FLOAT32;
-    const static ucc_reduction_op_t redop = op<type>::redop;
-    static void assert_equal(type arg1, type arg2) {
-        ASSERT_FLOAT_EQ(arg1, arg2);
-    }
-    static type do_op(type arg1, type arg2) {
-        op<type> _op;
-        return _op(arg1, arg2);
-    }
-};
-
-template<template <typename P> class op>
-struct ReductionTest<UCC_DT_FLOAT64, op>
-{
-    using type = double;
-    const static ucc_datatype_t dt = UCC_DT_FLOAT64;
-    const static ucc_reduction_op_t redop = op<type>::redop;
-    static void assert_equal(type arg1, type arg2) {
-        ASSERT_DOUBLE_EQ(arg1, arg2);
-    }
-    static type do_op(type arg1, type arg2) {
-        op<type> _op;
-        return _op(arg1, arg2);
-    }
-};
+//TODO Bfloat Custom
+DECLARE_TYPE_OP_PAIR(float, FLOAT32, ASSERT_FLOAT_EQ);
+DECLARE_TYPE_OP_PAIR(double, FLOAT64, ASSERT_FLOAT_EQ);
 
 template <template <typename P> class op>
-struct ReductionTest<UCC_DT_BFLOAT16, op> {
+struct TypeOpPair<UCC_DT_BFLOAT16, op> {
     using type                            = uint16_t;
     const static ucc_datatype_t     dt    = UCC_DT_BFLOAT16;
     const static ucc_reduction_op_t redop = op<float>::redop;
@@ -112,256 +66,83 @@ struct ReductionTest<UCC_DT_BFLOAT16, op> {
     }
 };
 
-template<typename T>
-class sum {
-public:
-    const static ucc_reduction_op_t redop = UCC_OP_SUM;
-    T operator()(T arg1, T arg2) {
-        return arg1 + arg2;
-    }
-};
+#define DECLARE_OP_(_op, _UCC_OP, _OP)                          \
+    template<typename T>                                        \
+    class _op {                                                 \
+    public:                                                     \
+    const static ucc_reduction_op_t redop = UCC_OP_ ## _UCC_OP; \
+    T operator()(T arg1, T arg2) {                              \
+        return DO_OP_ ## _OP(arg1, arg2);                       \
+    }                                                           \
+    };                                                          \
 
-template <typename T> class avg {
-  public:
-    const static ucc_reduction_op_t redop = UCC_OP_AVG;
-    T operator()(T arg1, T arg2)
-    {
-        return arg1 + arg2;
-    }
-};
+#define DECLARE_OP(_op, _OP) DECLARE_OP_(_op, _OP, _OP)
 
-template <typename T> class prod {
-  public:
-    const static ucc_reduction_op_t redop = UCC_OP_PROD;
-    T operator()(T arg1, T arg2) {
-        return arg1 * arg2;
-    }
-};
+DECLARE_OP(sum, SUM);
+DECLARE_OP(prod, PROD);
+DECLARE_OP(min, MIN);
+DECLARE_OP(max, MAX);
+DECLARE_OP(land, LAND);
+DECLARE_OP(lor, LOR);
+DECLARE_OP(lxor, LXOR);
+DECLARE_OP(band, BAND);
+DECLARE_OP(bor, BOR);
+DECLARE_OP(bxor, BXOR);
+DECLARE_OP_(avg, AVG, SUM);
 
-template<typename T>
-class max {
-public:
-    const static ucc_reduction_op_t redop = UCC_OP_MAX;
-    T operator()(T arg1, T arg2) {
-        return arg1 > arg2 ? arg1: arg2;
-    }
-};
+#define ARITHMETIC_OP_PAIRS(_TYPE) TypeOpPair<UCC_DT_ ## _TYPE, sum>,   \
+        TypeOpPair<UCC_DT_ ## _TYPE, prod>,                             \
+        TypeOpPair<UCC_DT_ ## _TYPE, min>,                              \
+        TypeOpPair<UCC_DT_ ## _TYPE, max>
 
-template<typename T>
-class min {
-public:
-    const static ucc_reduction_op_t redop = UCC_OP_MIN;
-    T operator()(T arg1, T arg2) {
-        return arg1 < arg2 ? arg1: arg2;
-    }
-};
+/* TypeOp pairs that MC Cuda supports */
+#define CUDA_OP_PAIRS TypeOpPair<UCC_DT_INT16, lor>,    \
+        TypeOpPair<UCC_DT_INT16, sum>,                  \
+        TypeOpPair<UCC_DT_INT32, prod>,                 \
+        TypeOpPair<UCC_DT_INT64, bxor>,                 \
+        TypeOpPair<UCC_DT_FLOAT32, avg>,                \
+        ARITHMETIC_OP_PAIRS(INT32),                     \
+        ARITHMETIC_OP_PAIRS(FLOAT32),                   \
+        ARITHMETIC_OP_PAIRS(FLOAT64),                   \
+        ARITHMETIC_OP_PAIRS(BFLOAT16)
 
-template<typename T>
-class land {
-public:
-    const static ucc_reduction_op_t redop = UCC_OP_LAND;
-    T operator()(T arg1, T arg2) {
-        return arg1 && arg2;
-    }
-};
+using CollReduceTypeOpsCuda = ::testing::Types<CUDA_OP_PAIRS>;
 
-template<typename T>
-class band {
-public:
-    const static ucc_reduction_op_t redop = UCC_OP_BAND;
-    T operator()(T arg1, T arg2) {
-        return arg1 & arg2;
-    }
-};
+/* Host supports all combos, so add more to tests */
+using CollReduceTypeOpsHost = ::testing::Types<CUDA_OP_PAIRS,
+                                           TypeOpPair<UCC_DT_UINT16, band>,
+                                           TypeOpPair<UCC_DT_UINT32, bor>,
+                                           TypeOpPair<UCC_DT_UINT64, land>,
+                                           TypeOpPair<UCC_DT_UINT8, lxor>,
+                                           TypeOpPair<UCC_DT_INT8, lor>>;
 
-template<typename T>
-class lor {
-public:
-    const static ucc_reduction_op_t redop = UCC_OP_LOR;
-    T operator()(T arg1, T arg2) {
-        return arg1 || arg2;
-    }
-};
+using CollReduceTypeOpsAvg = ::testing::Types<TypeOpPair<UCC_DT_FLOAT32, avg>,
+                                              TypeOpPair<UCC_DT_FLOAT64, avg>,
+                                              TypeOpPair<UCC_DT_BFLOAT16, avg>>;
 
-template<typename T>
-class bor {
-public:
-    const static ucc_reduction_op_t redop = UCC_OP_BOR;
-    T operator()(T arg1, T arg2) {
-        return arg1 | arg2;
-    }
-};
-
-template<typename T>
-class lxor {
-public:
-    const static ucc_reduction_op_t redop = UCC_OP_LXOR;
-    T operator()(T arg1, T arg2) {
-        return !arg1 != !arg2;
-    }
-};
-
-template<typename T>
-class bxor {
-public:
-    const static ucc_reduction_op_t redop = UCC_OP_BXOR;
-    T operator()(T arg1, T arg2) {
-        return arg1 ^ arg2;
-    }
-};
-
-template<typename T>
-class test_mc_reduce : public testing::Test {
-  protected:
-    const int COUNT = 1024;
-    ucc_memory_type_t mem_type;
-    virtual void SetUp() override
-    {
-        ucc_constructor();
-        ucc_mc_params_t mc_params = {
-            .thread_mode = UCC_THREAD_SINGLE,
-        };
-        ucc_mc_init(&mc_params);
-        buf1_h = buf2_h = res_h = nullptr;
-        buf1_d = buf2_d = res_d = nullptr;
-    }
-
-    ucc_status_t alloc_bufs(ucc_memory_type_t mtype, size_t n)
-    {
-        size_t n_bytes = COUNT*sizeof(typename T::type);
-        mem_type = mtype;
-
-        ucc_mc_alloc(&res_h_mc_header, n_bytes, UCC_MEMORY_TYPE_HOST);
-        res_h = (typename T::type *)res_h_mc_header->addr;
-        ucc_mc_alloc(&buf1_h_mc_header, n_bytes, UCC_MEMORY_TYPE_HOST);
-        buf1_h = (typename T::type *)buf1_h_mc_header->addr;
-        ucc_mc_alloc(&buf2_h_mc_header, n * n_bytes, UCC_MEMORY_TYPE_HOST);
-        buf2_h = (typename T::type *)buf2_h_mc_header->addr;
-
-        for (int i = 0; i < COUNT; i++) {
-            res_h[i] = (typename T::type)(0);
+static inline bool ucc_reduction_is_supported(ucc_datatype_t dt,
+                                              ucc_reduction_op_t op,
+                                              ucc_memory_type_t mt)
+{
+    switch(op) {
+    case UCC_OP_AVG:
+        switch(dt) {
+        case UCC_DT_FLOAT32:
+        case UCC_DT_FLOAT64:
+        case UCC_DT_BFLOAT16:
+            break;
+        default:
+            return false;
         }
-        for (int i = 0; i < COUNT; i++) {
-            /* bFloat16 will be assigned with the floats matching the
-               uint16_t bit pattern*/
-            buf1_h[i] = (typename T::type)(i + 1);
-        }
-        for (int j = 0; j < n; j++) {
-            for (int i = 0; i < COUNT; i++) {
-                buf2_h[i + j * COUNT] = (typename T::type)(2 * i + j + 1);
-            }
-        }
-        if (mtype != UCC_MEMORY_TYPE_HOST) {
-            ucc_mc_alloc(&res_d_mc_header, n_bytes, mtype);
-            res_d = (typename T::type *)res_d_mc_header->addr;
-            ucc_mc_alloc(&buf1_d_mc_header, n_bytes, mtype);
-            buf1_d = (typename T::type *)buf1_d_mc_header->addr;
-            ucc_mc_alloc(&buf2_d_mc_header, n * n_bytes, mtype);
-            buf2_d = (typename T::type *)buf2_d_mc_header->addr;
-            ucc_mc_memcpy(res_d, res_h, n_bytes, mtype, UCC_MEMORY_TYPE_HOST);
-            ucc_mc_memcpy(buf1_d, buf1_h, n_bytes, mtype, UCC_MEMORY_TYPE_HOST);
-            ucc_mc_memcpy(buf2_d, buf2_h, n * n_bytes, mtype,
-                          UCC_MEMORY_TYPE_HOST);
-        }
-
-        return UCC_OK;
+        break;
+    default:
+        break;
     }
+    return true;
+}
 
-    ucc_status_t free_bufs(ucc_memory_type_t mtype)
-    {
-        if (buf1_h != nullptr) {
-            ucc_mc_free(buf1_h_mc_header);
-        }
-        if (buf2_h != nullptr) {
-            ucc_mc_free(buf2_h_mc_header);
-        }
-        if (res_h != nullptr) {
-            ucc_mc_free(res_h_mc_header);
-        }
-        if (buf1_d != nullptr) {
-            ucc_mc_free(buf1_d_mc_header);
-        }
-        if (buf2_d != nullptr) {
-            ucc_mc_free(buf2_d_mc_header);
-        }
-        if (res_d != nullptr) {
-            ucc_mc_free(res_d_mc_header);
-        }
-
-        return UCC_OK;
-    }
-
-    virtual void TearDown() override
-    {
-        free_bufs(mem_type);
-        ucc_mc_finalize();
-    }
-
-    ucc_mc_buffer_header_t *buf1_h_mc_header, *buf2_h_mc_header,
-        *res_h_mc_header, *buf1_d_mc_header, *buf2_d_mc_header,
-        *res_d_mc_header;
-    typename T::type *buf1_h;
-    typename T::type *buf2_h;
-    typename T::type *res_h;
-
-    typename T::type *buf1_d;
-    typename T::type *buf2_d;
-    typename T::type *res_d;
-
-};
-
-template<typename T>
-class test_mc_reduce_alpha : public test_mc_reduce<T> {};
-
-using ReductionTypesOps = ::testing::Types<ReductionTest<UCC_DT_INT16, max>,
-                                           ReductionTest<UCC_DT_INT32, max>,
-                                           ReductionTest<UCC_DT_INT64, max>,
-                                           ReductionTest<UCC_DT_INT16, min>,
-                                           ReductionTest<UCC_DT_INT32, min>,
-                                           ReductionTest<UCC_DT_INT64, min>,
-                                           ReductionTest<UCC_DT_INT16, sum>,
-                                           ReductionTest<UCC_DT_INT32, sum>,
-                                           ReductionTest<UCC_DT_INT64, sum>,
-                                           ReductionTest<UCC_DT_INT16, prod>,
-                                           ReductionTest<UCC_DT_INT32, prod>,
-                                           ReductionTest<UCC_DT_INT64, prod>,
-                                           ReductionTest<UCC_DT_INT16, land>,
-                                           ReductionTest<UCC_DT_INT32, land>,
-                                           ReductionTest<UCC_DT_INT64, land>,
-                                           ReductionTest<UCC_DT_INT16, band>,
-                                           ReductionTest<UCC_DT_INT32, band>,
-                                           ReductionTest<UCC_DT_INT64, band>,
-                                           ReductionTest<UCC_DT_INT16, lor>,
-                                           ReductionTest<UCC_DT_INT32, lor>,
-                                           ReductionTest<UCC_DT_INT64, lor>,
-                                           ReductionTest<UCC_DT_INT16, bor>,
-                                           ReductionTest<UCC_DT_INT32, bor>,
-                                           ReductionTest<UCC_DT_INT64, bor>,
-                                           ReductionTest<UCC_DT_INT16, lxor>,
-                                           ReductionTest<UCC_DT_INT32, lxor>,
-                                           ReductionTest<UCC_DT_INT64, lxor>,
-                                           ReductionTest<UCC_DT_INT16, bxor>,
-                                           ReductionTest<UCC_DT_INT32, bxor>,
-                                           ReductionTest<UCC_DT_INT64, bxor>,
-                                           ReductionTest<UCC_DT_FLOAT32, max>,
-                                           ReductionTest<UCC_DT_FLOAT64, max>,
-                                           ReductionTest<UCC_DT_BFLOAT16, max>,
-                                           ReductionTest<UCC_DT_FLOAT32, min>,
-                                           ReductionTest<UCC_DT_FLOAT64, min>,
-                                           ReductionTest<UCC_DT_BFLOAT16, min>,
-                                           ReductionTest<UCC_DT_FLOAT32, sum>,
-                                           ReductionTest<UCC_DT_FLOAT64, sum>,
-                                           ReductionTest<UCC_DT_BFLOAT16, sum>,
-                                           ReductionTest<UCC_DT_FLOAT32, prod>,
-                                           ReductionTest<UCC_DT_FLOAT64, prod>,
-                                           ReductionTest<UCC_DT_BFLOAT16, prod>,
-                                           ReductionTest<UCC_DT_FLOAT32, avg>,
-                                           ReductionTest<UCC_DT_FLOAT64, avg>,
-                                           ReductionTest<UCC_DT_BFLOAT16, avg>>;
-
-using ReductionAlphaTypesOps = ::testing::Types<
-    ReductionTest<UCC_DT_FLOAT32, avg>, ReductionTest<UCC_DT_FLOAT64, avg>,
-    ReductionTest<UCC_DT_BFLOAT16, avg>>;
-
-TYPED_TEST_CASE(test_mc_reduce, ReductionTypesOps);
-TYPED_TEST_CASE(test_mc_reduce_alpha, ReductionAlphaTypesOps);
+#define CHECK_TYPE_OP_SKIP(_dt, _op, _mt) do {              \
+        if (!ucc_reduction_is_supported(_dt, _op, _mt)) {   \
+            GTEST_SKIP();                                   \
+        }                                                   \
+    } while(0)

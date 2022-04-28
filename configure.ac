@@ -160,7 +160,6 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/configure.m4])
      m4_include([config/m4/tl_coll_plugins.m4])
      m4_include([config/m4/check_tls.m4])
-     m4_include([test/gtest/configure.m4])
 
      mc_modules=":cpu"
      tl_modules=""
@@ -178,6 +177,9 @@ AS_IF([test "x$with_docs_only" = xyes],
      if test $cuda_happy = "yes"; then
          mc_modules="${mc_modules}:cuda"
      fi
+
+     CHECK_GTEST
+     AC_MSG_RESULT([GTEST support: $gtest_happy])
     ]) # Docs only
 
 
@@ -201,6 +203,7 @@ AC_CONFIG_FILES([
                  src/components/ec/cuda/Makefile
                  src/components/ec/cuda/kernel/Makefile
                  test/mpi/Makefile
+                 test/gtest/Makefile
                  tools/info/Makefile
                  tools/perf/Makefile
                  cmake/Makefile
@@ -228,6 +231,7 @@ AS_IF([test "x$cuda_happy" = "xyes"],[
 AC_MSG_NOTICE([     NVCC gencodes:   ${NVCC_ARCH}])
 ])
 AC_MSG_NOTICE([          Perftest:   ${mpi_enable}])
+AC_MSG_NOTICE([             Gtest:   ${gtest_enable}])
 AC_MSG_NOTICE([        MC modules:   <$(echo ${mc_modules}|tr ':' ' ') >])
 AC_MSG_NOTICE([        TL modules:   <$(echo ${tl_modules}|tr ':' ' ') >])
 AC_MSG_NOTICE([      TLCP modules:   <$(echo ${tlcp_modules}|tr ':' ' ') >])
