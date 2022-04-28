@@ -38,7 +38,7 @@
 
 #define UCC_TL_SHM_SUPPORTED_COLLS                                             \
     (UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_BARRIER |      \
-     UCC_COLL_TYPE_FANIN | UCC_COLL_TYPE_FANOUT)
+     UCC_COLL_TYPE_FANIN | UCC_COLL_TYPE_FANOUT | UCC_COLL_TYPE_ALLREDUCE)
 
 typedef enum ucc_tl_shm_bcast_progress_alg
 {
@@ -72,7 +72,6 @@ typedef struct ucc_tl_shm_lib_config {
     uint32_t                        ctrl_size;
     uint32_t                        bcast_base_radix;
     uint32_t                        bcast_top_radix;
-    uint32_t                        reduce_alg;
     uint32_t                        reduce_base_radix;
     uint32_t                        reduce_top_radix;
     uint32_t                        fanin_base_radix;
@@ -81,6 +80,8 @@ typedef struct ucc_tl_shm_lib_config {
     uint32_t                        fanout_top_radix;
     uint32_t                        barrier_base_radix;
     uint32_t                        barrier_top_radix;
+    uint32_t                        allreduce_base_radix;
+    uint32_t                        allreduce_top_radix;
     uint32_t                        max_trees_cached;
     uint32_t                        n_polls;
     uint32_t                        base_tree_only;

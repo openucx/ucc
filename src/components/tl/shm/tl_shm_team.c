@@ -17,6 +17,7 @@
 #include "barrier/barrier.h"
 #include "fanin/fanin.h"
 #include "fanout/fanout.h"
+#include "allreduce/allreduce.h"
 #include <sys/stat.h>
 
 #define SHM_MODE                                                               \
@@ -610,6 +611,14 @@ ucc_status_t ucc_tl_shm_team_get_scores(ucc_base_team_t *  tl_team,
     status = ucc_coll_score_add_range(
         score, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST, 0, UCC_MSG_MAX,
         UCC_TL_SHM_DEFAULT_SCORE, ucc_tl_shm_barrier_init, tl_team);
+    if (UCC_OK != status) {
+        tl_error(lib, "faild to add range to score_t");
+        goto err;
+    }
+
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_ALLREDUCE, UCC_MEMORY_TYPE_HOST, 0, UCC_MSG_MAX,
+        UCC_TL_SHM_DEFAULT_SCORE, ucc_tl_shm_allreduce_init, tl_team);
     if (UCC_OK != status) {
         tl_error(lib, "faild to add range to score_t");
         goto err;

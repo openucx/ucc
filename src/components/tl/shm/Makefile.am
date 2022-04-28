@@ -21,6 +21,10 @@ fanout  =                          \
 barrier =                          \
 	barrier/barrier.h              \
 	barrier/barrier.c
+	
+allreduce =                        \
+	allreduce/allreduce.h          \
+	allreduce/allreduce.c
 
 perf    =                          \
 	perf/tl_shm_coll_perf_params.h \
@@ -43,6 +47,7 @@ sources =                          \
 	$(fanin)                       \
 	$(fanout)                      \
 	$(barrier)                     \
+	$(allreduce)                   \
 	$(perf)
 
 module_LTLIBRARIES        = libucc_tl_shm.la

@@ -14,7 +14,7 @@ enum
     REDUCE_STAGE_TOP_TREE,
 };
 
-static ucc_status_t
+ucc_status_t
 ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team, ucc_tl_shm_seg_t *seg,
                        ucc_tl_shm_task_t *task, ucc_kn_tree_t *tree,
                        int is_inline, size_t count, ucc_datatype_t dt,

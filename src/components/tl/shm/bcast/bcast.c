@@ -16,11 +16,11 @@ enum
     BCAST_STAGE_CI,
 };
 
-static ucc_status_t ucc_tl_shm_bcast_write(ucc_tl_shm_team_t *team,
-                                           ucc_tl_shm_seg_t * seg,
-                                           ucc_tl_shm_task_t *task,
-                                           ucc_kn_tree_t *tree, int is_inline,
-                                           int *is_op_root, size_t data_size)
+ucc_status_t ucc_tl_shm_bcast_write(ucc_tl_shm_team_t *team,
+                                    ucc_tl_shm_seg_t * seg,
+                                    ucc_tl_shm_task_t *task,
+                                    ucc_kn_tree_t *tree, int is_inline,
+                                    int *is_op_root, size_t data_size)
 {
     ucc_rank_t         team_rank = UCC_TL_TEAM_RANK(team);
     uint32_t           seq_num   = task->seq_num;
@@ -58,11 +58,11 @@ static ucc_status_t ucc_tl_shm_bcast_write(ucc_tl_shm_team_t *team,
     return UCC_INPROGRESS;
 }
 
-static ucc_status_t ucc_tl_shm_bcast_read(ucc_tl_shm_team_t *team,
-                                          ucc_tl_shm_seg_t * seg,
-                                          ucc_tl_shm_task_t *task,
-                                          ucc_kn_tree_t *tree, int is_inline,
-                                          int *is_op_root, size_t data_size)
+ucc_status_t ucc_tl_shm_bcast_read(ucc_tl_shm_team_t *team,
+                                   ucc_tl_shm_seg_t * seg,
+                                   ucc_tl_shm_task_t *task,
+                                   ucc_kn_tree_t *tree, int is_inline,
+                                   int *is_op_root, size_t data_size)
 {
     ucc_rank_t         team_rank = UCC_TL_TEAM_RANK(team);
     uint32_t           seq_num   = task->seq_num;

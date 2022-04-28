@@ -11,6 +11,7 @@
 #include "barrier/barrier.h"
 #include "fanin/fanin.h"
 #include "fanout/fanout.h"
+#include "allreduce/allreduce.h"
 
 ucc_status_t ucc_tl_shm_get_lib_attr(const ucc_base_lib_t *lib,
                                      ucc_base_lib_attr_t * base_attr);
@@ -88,6 +89,14 @@ static ucc_config_field_t ucc_tl_shm_lib_config_table[] = {
      ucc_offsetof(ucc_tl_shm_lib_config_t, barrier_top_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"ALLREDUCE_BASE_RADIX", "4", "allreduce radix for base tree",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, allreduce_base_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLREDUCE_TOP_RADIX", "4", "allreduce radix for top tree",
+     ucc_offsetof(ucc_tl_shm_lib_config_t, allreduce_top_radix),
+     UCC_CONFIG_TYPE_UINT},
+
     {"NPOLLS", "100", "n_polls", ucc_offsetof(ucc_tl_shm_lib_config_t, n_polls),
      UCC_CONFIG_TYPE_UINT},
 
@@ -161,6 +170,8 @@ ucc_status_t ucc_tl_shm_coll_init(ucc_base_coll_args_t *coll_args,
         return ucc_tl_shm_fanout_init(coll_args, team, task);
     case UCC_COLL_TYPE_BARRIER:
         return ucc_tl_shm_barrier_init(coll_args, team, task);
+    case UCC_COLL_TYPE_ALLREDUCE:
+        return ucc_tl_shm_allreduce_init(coll_args, team, task);
     default:
         break;
     }
