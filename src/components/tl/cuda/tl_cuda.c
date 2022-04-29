@@ -17,10 +17,15 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      ucc_offsetof(ucc_tl_cuda_lib_config_t, max_concurrent),
      UCC_CONFIG_TYPE_UINT},
 
-    {"SCRATCH_SIZE", "1Mb",
+    {"SCRATCH_SIZE", "2Mb",
      "Size of the internal scratch buffer",
      ucc_offsetof(ucc_tl_cuda_lib_config_t, scratch_size),
      UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLGATHER_RING_MAX_RINGS", "2",
+     "Max number of rings used in allgather and allgatherv ring algorithms",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, allgather_ring_max_rings),
+     UCC_CONFIG_TYPE_UINT},
 
     {NULL}};
 
