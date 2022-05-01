@@ -38,7 +38,8 @@ ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team, ucc_tl_shm_seg_t *seg,
             /* I am leaf in base tree so need to copy from user buffer into my shm */
             dst = is_inline ? my_ctrl->data
                             : ucc_tl_shm_get_data(seg, team, team_rank);
-            memcpy(dst, args->src.info.buffer, count * ucc_dt_size(dt));
+            memcpy(dst, UCC_IS_INPLACE(*args) ? args->dst.info.buffer
+                        : args->src.info.buffer, count * ucc_dt_size(dt));
             ucc_memory_cpu_store_fence();
         }
         my_ctrl->pi = seq_num; //signals to parent
@@ -53,14 +54,14 @@ ucc_tl_shm_reduce_read(ucc_tl_shm_team_t *team, ucc_tl_shm_seg_t *seg,
             if (child_ctrl->pi == seq_num) {
                 src1   = is_inline ? child_ctrl->data
                                    : ucc_tl_shm_get_data(seg, team, child);
-                dst    = (args->root == team_rank)
+                dst    = (task->root == team_rank)
                              ? args->dst.info.buffer
                              : (is_inline
                                     ? my_ctrl->data
                                     : ucc_tl_shm_get_data(seg, team, team_rank));
                 src2   = (task->first_reduce)
                              ? ((UCC_IS_INPLACE(*args) &&
-                                 args->root == team_rank) ?
+                                 task->root == team_rank) ?
                                  args->dst.info.buffer : args->src.info.buffer)
                              : dst;
                 status = ucc_dt_reduce(src1, src2, dst, count, dt, mtype, args);
@@ -96,7 +97,7 @@ static void ucc_tl_shm_reduce_progress(ucc_coll_task_t *coll_task)
     ucc_memory_type_t  mtype;
     ucc_datatype_t     dt;
     size_t             count, data_size;
-    ucc_rank_t         root = (ucc_rank_t)args.root;
+    ucc_rank_t         root = task->root;
     ucc_tl_shm_seg_t * seg  = task->seg;
     ucc_tl_shm_tree_t *tree = task->tree;
     int                is_inline;
@@ -188,7 +189,7 @@ ucc_status_t ucc_tl_shm_reduce_init(ucc_base_coll_args_t *coll_args,
     task->super.progress = ucc_tl_shm_reduce_progress;
     task->stage          = REDUCE_STAGE_START;
 
-    status = ucc_tl_shm_tree_init(team, coll_args->args.root, task->base_radix,
+    status = ucc_tl_shm_tree_init(team, task->root, task->base_radix,
                                   task->top_radix, &task->tree_in_cache,
                                   UCC_COLL_TYPE_REDUCE, task->base_tree_only,
                                   &task->tree);

@@ -23,6 +23,7 @@ typedef struct ucc_tl_shm_task {
     ucc_rank_t                      base_radix;
     ucc_rank_t                      top_radix;
     ucc_rank_t                      cur_child;
+    ucc_rank_t                      root;
 } ucc_tl_shm_task_t;
 
 ucc_status_t ucc_tl_shm_coll_finalize(ucc_coll_task_t *coll_task);
@@ -49,6 +50,7 @@ ucc_tl_shm_get_task(ucc_base_coll_args_t *coll_args, ucc_tl_shm_team_t *team)
     task->base_tree_only       = UCC_TL_SHM_TEAM_LIB(team)->cfg.base_tree_only;
     task->first_reduce         = 1;
     task->cur_child            = 0;
+    task->root                 = coll_args->args.root;
     return task;
 }
 
