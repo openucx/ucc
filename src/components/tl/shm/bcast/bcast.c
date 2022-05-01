@@ -121,7 +121,7 @@ static void ucc_tl_shm_bcast_progress(ucc_coll_task_t *coll_task)
     ucc_coll_args_t    args = TASK_ARGS(task);
     size_t             data_size =
         args.src.info.count * ucc_dt_size(args.src.info.datatype);
-    ucc_rank_t         root = (ucc_rank_t)args.root;
+    ucc_rank_t         root = task->root;
     ucc_rank_t         rank = UCC_TL_TEAM_RANK(team);
     ucc_rank_t         parent;
     ucc_tl_shm_seg_t * seg        = task->seg;
@@ -275,7 +275,7 @@ ucc_status_t ucc_tl_shm_bcast_init(ucc_base_coll_args_t *coll_args,
     task->super.progress = ucc_tl_shm_bcast_progress;
     task->stage          = BCAST_STAGE_START;
 
-    status = ucc_tl_shm_tree_init(team, coll_args->args.root, task->base_radix,
+    status = ucc_tl_shm_tree_init(team, task->root, task->base_radix,
                                   task->top_radix, &task->tree_in_cache,
                                   UCC_COLL_TYPE_BCAST, task->base_tree_only,
                                   &task->tree);
