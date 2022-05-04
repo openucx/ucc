@@ -487,6 +487,7 @@ const char kStackTraceDepthFlag[] = "stack_trace_depth";
 const char kStreamResultToFlag[] = "stream_result_to";
 const char kThrowOnFailureFlag[] = "throw_on_failure";
 const char kFlagfileFlag[] = "flagfile";
+const char kPrintSkippedFlag[] = "print_skipped";
 
 // A valid random seed must be in [1, kMaxRandomSeed].
 const int kMaxRandomSeed = 99999;
@@ -567,6 +568,7 @@ class GTestFlagSaver {
     stack_trace_depth_ = GTEST_FLAG(stack_trace_depth);
     stream_result_to_ = GTEST_FLAG(stream_result_to);
     throw_on_failure_ = GTEST_FLAG(throw_on_failure);
+    print_skipped_ = GTEST_FLAG(print_skipped);
   }
 
   // The d'tor is not virtual.  DO NOT INHERIT FROM THIS CLASS.
@@ -589,6 +591,7 @@ class GTestFlagSaver {
     GTEST_FLAG(stack_trace_depth) = stack_trace_depth_;
     GTEST_FLAG(stream_result_to) = stream_result_to_;
     GTEST_FLAG(throw_on_failure) = throw_on_failure_;
+    GTEST_FLAG(print_skipped) = print_skipped_;
   }
 
  private:
@@ -611,6 +614,7 @@ class GTestFlagSaver {
   internal::Int32 stack_trace_depth_;
   std::string stream_result_to_;
   bool throw_on_failure_;
+  bool print_skipped_;
 } GTEST_ATTRIBUTE_UNUSED_;
 
 // Converts a Unicode code point to a narrow string in UTF-8 encoding.
@@ -1798,6 +1802,12 @@ GTEST_DEFINE_bool_(
     "When this flag is specified, a failed assertion will throw an exception "
     "if exceptions are enabled or exit the program with a non-zero code "
     "otherwise. For use with an external test framework.");
+
+GTEST_DEFINE_bool_(
+    print_skipped,
+    internal::BoolFromGTestEnv("print_skipped", false),
+    "When this flag is specified, list of skipped test names is printed in "
+    "summary");
 
 #if GTEST_USE_OWN_FLAGFILE_FLAG_
 GTEST_DEFINE_string_(
@@ -4832,8 +4842,12 @@ void PrettyUnitTestResultPrinter::OnTestIterationEnd(const UnitTest& unit_test,
   const int skipped_test_count = unit_test.skipped_test_count();
   if (skipped_test_count > 0) {
     ColoredPrintf(COLOR_GREEN, "[  SKIPPED ] ");
-    printf("%s, listed below:\n", FormatTestCount(skipped_test_count).c_str());
-    PrintSkippedTests(unit_test);
+    if (GTEST_FLAG(print_skipped)) {
+        printf("%s, listed below:\n", FormatTestCount(skipped_test_count).c_str());
+        PrintSkippedTests(unit_test);
+    } else {
+        printf("%s.\n", FormatTestCount(skipped_test_count).c_str());
+    }
   }
 
   int num_failures = unit_test.failed_test_count();
@@ -7393,6 +7407,8 @@ static const char kColorEncodedHelpMessage[] =
 "  @G--" GTEST_FLAG_PREFIX_ "stream_result_to=@YHOST@G:@YPORT@D\n"
 "      Stream test results to the given server.\n"
 # endif  // GTEST_CAN_STREAM_RESULTS_
+"  @G--" GTEST_FLAG_PREFIX_ "print_skipped@D\n"
+"      List all the skipped tests names in the summary\n"
 "\n"
 "Assertion Behavior:\n"
 # if GTEST_HAS_DEATH_TEST && !GTEST_OS_WINDOWS
@@ -7447,7 +7463,9 @@ static bool ParseGoogleTestFlag(const char* const arg) {
       ParseStringFlag(arg, kStreamResultToFlag,
                       &GTEST_FLAG(stream_result_to)) ||
       ParseBoolFlag(arg, kThrowOnFailureFlag,
-                    &GTEST_FLAG(throw_on_failure));
+                    &GTEST_FLAG(throw_on_failure)) ||
+      ParseBoolFlag(arg, kPrintSkippedFlag,
+                    &GTEST_FLAG(print_skipped));
 }
 
 #if GTEST_USE_OWN_FLAGFILE_FLAG_
