@@ -63,6 +63,11 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
      ucc_offsetof(ucc_ec_cuda_config_t, exec_max_tasks),
      UCC_CONFIG_TYPE_ULUNITS},
 
+    {"EXEC_NUM_STREAMS", "16",
+     "Number of streams used by interruptible executor",
+     ucc_offsetof(ucc_ec_cuda_config_t, exec_num_streams),
+     UCC_CONFIG_TYPE_ULUNITS},
+
     {NULL}
 
 };
@@ -211,8 +216,9 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     cudaError_t           cuda_st;
     const char           *cu_err_st_str;
 
-    ucc_ec_cuda.stream             = NULL;
-    ucc_ec_cuda.stream_initialized = 0;
+    ucc_ec_cuda.stream                   = NULL;
+    ucc_ec_cuda.stream_initialized       = 0;
+    ucc_ec_cuda.exec_streams_initialized = 0;
     ucc_strncpy_safe(ucc_ec_cuda.super.config->log_component.name,
                      ucc_ec_cuda.super.super.name,
                      sizeof(ucc_ec_cuda.super.config->log_component.name));
@@ -224,6 +230,13 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     }
     CUDA_CHECK(cudaGetDevice(&device));
     /*create event pool */
+    ucc_ec_cuda.exec_streams = ucc_calloc(cfg->exec_num_streams,
+                                          sizeof(cudaStream_t),
+                                          "ec cuda streams");
+    if (!ucc_ec_cuda.exec_streams) {
+        ec_error(&ucc_ec_cuda.super, "failed to allocate streams array");
+        return UCC_ERR_NO_MEMORY;
+    }
     status = ucc_mpool_init(&ucc_ec_cuda.events, 0, sizeof(ucc_ec_cuda_event_t),
                             0, UCC_CACHE_LINE_SIZE, 16, UINT_MAX,
                             &ucc_ec_cuda_event_mpool_ops, UCC_THREAD_MULTIPLE,
@@ -428,13 +441,25 @@ ucc_status_t ucc_ec_cuda_event_test(void *event)
 
 static ucc_status_t ucc_ec_cuda_finalize()
 {
-    if (ucc_ec_cuda.stream != NULL) {
-        CUDA_CHECK(cudaStreamDestroy(ucc_ec_cuda.stream));
-        ucc_ec_cuda.stream = NULL;
+    int i;
+
+    if (ucc_ec_cuda.stream_initialized) {
+        CUDA_FUNC(cudaStreamDestroy(ucc_ec_cuda.stream));
+        ucc_ec_cuda.stream_initialized = 0;
     }
+
+    if (ucc_ec_cuda.exec_streams_initialized) {
+        for (i = 0; i < EC_CUDA_CONFIG->exec_num_streams; i++) {
+            CUDA_FUNC(cudaStreamDestroy(ucc_ec_cuda.exec_streams[i]));
+        }
+        ucc_ec_cuda.exec_streams_initialized = 0;
+    }
+
     ucc_mpool_cleanup(&ucc_ec_cuda.events, 1);
     ucc_mpool_cleanup(&ucc_ec_cuda.strm_reqs, 1);
     ucc_mpool_cleanup(&ucc_ec_cuda.executors, 1);
+    ucc_free(ucc_ec_cuda.exec_streams);
+
     return UCC_OK;
 }
 
