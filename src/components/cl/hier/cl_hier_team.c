@@ -52,12 +52,11 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params);
 
+    memset(self->sbgps, 0, sizeof(self->sbgps));
     ucc_cl_hier_enable_sbgps(self);
     n_sbgp_teams = 0;
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
-        hs        = &self->sbgps[i];
-        hs->score = NULL;
-        hs->sbgp  = NULL;
+        hs            = &self->sbgps[i];
         if (hs->state == UCC_HIER_SBGP_ENABLED) {
             hs->sbgp = ucc_topo_get_sbgp(params->team->topo, hs->sbgp_type);
             if (hs->sbgp->status != UCC_SBGP_ENABLED) {
@@ -176,12 +175,16 @@ ucc_status_t ucc_cl_hier_team_destroy(ucc_base_team_t *cl_team)
         for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
             hs = &team->sbgps[i];
             if (hs->state == UCC_HIER_SBGP_ENABLED) {
-                ucc_coll_score_free_map(hs->score_map);
+                if (hs->score_map) {
+                    ucc_coll_score_free_map(hs->score_map);
+                }
                 for (j = 0; j < hs->n_tls; j++) {
-                    ucc_tl_context_put(hs->tl_ctxs[j]);
-                    team->team_create_req
-                        ->descs[team->team_create_req->n_teams++]
-                        .team = hs->tl_teams[j];
+                    if (hs->tl_teams[j]) {
+                        ucc_tl_context_put(hs->tl_ctxs[j]);
+                        team->team_create_req
+                            ->descs[team->team_create_req->n_teams++]
+                            .team = hs->tl_teams[j];
+                    }
                 }
             }
         }
