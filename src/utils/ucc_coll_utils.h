@@ -64,6 +64,10 @@
 #define UCC_COLL_ARGS_CONTIG_BUFFER(_args)                                     \
     (UCC_COLL_IS_SRC_CONTIG(_args) && UCC_COLL_IS_DST_CONTIG(_args))
 
+#define UCC_COLL_ARGS_ACTIVE_SET(_args)             \
+    ((_args)->mask & UCC_COLL_ARGS_FIELD_ACTIVE_SET)
+
+
 static inline size_t
 ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
                         ucc_rank_t idx)
@@ -244,6 +248,34 @@ static inline size_t ucc_buffer_block_offset(size_t     total_count,
     size_t offset      = block * block_count + left;
 
     return (block < left) ? offset - (left - block) : offset;
+}
+
+/* Given the rank space A (e.g. core ucc team), a subset B (e.g. active set
+   within the core team), the ep_map that maps ranks from the subset B to A,
+   and the rank of a process within A.
+   The function below computes the local rank of the process within subset B. */
+static inline ucc_rank_t ucc_ep_map_local_rank(ucc_ep_map_t map,
+                                               ucc_rank_t   rank)
+{
+    ucc_rank_t i;
+
+    for (i = 0; i < map.ep_num; i++) {
+        if (rank == ucc_ep_map_eval(map, i)) {
+            return i;
+        }
+    }
+    return UCC_RANK_INVALID;
+}
+
+static inline ucc_ep_map_t ucc_active_set_to_ep_map(ucc_coll_args_t *args)
+{
+    ucc_ep_map_t map;
+
+    map.type           = UCC_EP_MAP_STRIDED;
+    map.ep_num         = args->active_set.size;
+    map.strided.start  = args->active_set.start;
+    map.strided.stride = args->active_set.stride;
+    return map;
 }
 
 #endif
