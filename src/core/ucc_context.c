@@ -379,7 +379,7 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
             /* UCC_ERR_LAST means component was disabled via TUNE param:
                don't print warning. */
             if (UCC_ERR_LAST != status) {
-                if (ucc_tl_is_requested(lib, tl_lib->iface)) {
+                if (ucc_tl_is_required(lib, tl_lib->iface, 1)) {
                     ucc_error("failed to create tl context for %s",
                               tl_lib->iface->super.name);
                 } else {

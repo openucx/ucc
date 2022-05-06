@@ -45,6 +45,22 @@ typedef ucs_config_allow_list_t        ucc_config_allow_list_t;
 #define UCC_CONFIG_ALLOW_LIST_ALLOW_ALL UCS_CONFIG_ALLOW_LIST_ALLOW_ALL
 #define UCC_CONFIG_ALLOW_LIST_ALLOW     UCS_CONFIG_ALLOW_LIST_ALLOW
 
+/* Convenience structure used, for example, to represent TLS list.
+   "requested" field is set to 1 if the list of entries was
+   explicitly requested by user.
+
+   Union with allow_list is used in order to use this structure
+   directly as config_field. */
+typedef struct ucc_config_names_list {
+    union {
+        struct {
+            ucc_config_names_array_t array;
+            int                      requested;
+        };
+        ucc_config_allow_list_t list;
+    };
+} ucc_config_names_list_t;
+
 static inline ucc_status_t
 ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,
                             const char *env_prefix, const char *table_prefix,
@@ -135,6 +151,6 @@ int ucc_config_names_array_is_all(const ucc_config_names_array_t *array)
 
 ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
                                            const ucc_config_names_array_t *all,
-                                           ucc_config_allow_list_t *       out);
+                                           ucc_config_names_list_t *       out);
 
 #endif

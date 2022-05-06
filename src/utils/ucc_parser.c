@@ -33,7 +33,7 @@ ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
             for (i = 0; i < src->count; i++) {
                 if (ucc_config_names_search(dst, src->names[i]) < 0) {
                     dst->names[dst->count++] = strdup(src->names[i]);
-                    if (ucc_unlikely(!dst->names[dst->count - n_new])) {
+                    if (ucc_unlikely(!dst->names[dst->count - 1])) {
                         ucc_error("failed to dup config_names_array entry");
                         return UCC_ERR_NO_MEMORY;
                     }
@@ -96,38 +96,39 @@ int ucc_config_names_search(const ucc_config_names_array_t *config_names,
 
 ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
                                            const ucc_config_names_array_t *all,
-                                           ucc_config_allow_list_t *       out)
+                                           ucc_config_names_list_t *       out)
 {
-    ucc_status_t status;
+    ucc_status_t status = UCC_OK;
     int          i;
 
-    out->mode        = list->mode;
     out->array.names = NULL;
+    out->requested   = 0;
 
-    if (out->mode == UCC_CONFIG_ALLOW_LIST_ALLOW) {
+    switch (list->mode){
+    case UCC_CONFIG_ALLOW_LIST_ALLOW:
+        out->requested = 1;
         status = ucc_config_names_array_dup(&out->array, &list->array);
-        if (UCC_OK != status) {
-            ucc_error("failed to dup config_names_array");
-            return status;
-        }
-    } else {
-        ucc_assert(out->mode == UCC_CONFIG_ALLOW_LIST_NEGATE ||
-                   out->mode == UCC_CONFIG_ALLOW_LIST_ALLOW_ALL);
-
+        break;
+    case UCC_CONFIG_ALLOW_LIST_ALLOW_ALL:
+        status = ucc_config_names_array_dup(&out->array, all);
+        break;
+    case UCC_CONFIG_ALLOW_LIST_NEGATE:
         out->array.count = 0;
         out->array.names = ucc_malloc(sizeof(char *) * all->count, "names");
         if (!out->array.names) {
             ucc_error("failed to allocate %zd bytes for names array",
                       sizeof(char *) * all->count);
-            return UCC_ERR_NO_MEMORY;
+            status = UCC_ERR_NO_MEMORY;
+            break;
         }
-
         for (i = 0; i < all->count; i++) {
-            if (out->mode == UCC_CONFIG_ALLOW_LIST_ALLOW_ALL ||
-                (ucc_config_names_search(&list->array, all->names[i]) < 0)) {
+            if (ucc_config_names_search(&list->array, all->names[i]) < 0) {
                 out->array.names[out->array.count++] = strdup(all->names[i]);
             }
         }
+        break;
+    default:
+        ucc_assert(0);
     }
-    return UCC_OK;
+    return status;
 }

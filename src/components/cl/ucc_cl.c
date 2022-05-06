@@ -58,12 +58,15 @@ UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
         ucc_free(self->tls.array.names);
         return UCC_ERR_NOT_FOUND;
     }
+    self->tls_forced.count = 0;
+    self->tls_forced.names = NULL;
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_lib_t)
 {
     ucc_config_names_array_free(&self->tls.array);
+    ucc_config_names_array_free(&self->tls_forced);
 }
 
 UCC_CLASS_DEFINE(ucc_cl_lib_t, void);

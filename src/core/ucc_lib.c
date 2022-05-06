@@ -213,25 +213,15 @@ error:
     return status;
 }
 
-static int ucc_tl_is_required(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface)
+int ucc_tl_is_required(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface,
+                       int forced)
 {
     int i;
 
     for (i = 0; i < lib->n_cl_libs_opened; i++) {
-        if (ucc_config_names_search(lib->cl_attrs[i].tls,
-                                    tl_iface->super.name) >= 0) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-int ucc_tl_is_requested(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface)
-{
-    int i;
-
-    for (i = 0; i < lib->n_cl_libs_opened; i++) {
-        if (ucc_config_names_search(lib->cl_attrs[i].tls_forced,
+        if (ucc_config_names_search(forced
+                                    ? lib->cl_attrs[i].tls_forced
+                                    : lib->cl_attrs[i].tls,
                                     tl_iface->super.name) >= 0) {
             return 1;
         }
@@ -269,7 +259,7 @@ static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
            Failure to init a TL is not critical. Let CLs deal with it later during
            cl_context_create.
          */
-        if (ucc_tl_is_required(lib, tl_iface)) {
+        if (ucc_tl_is_required(lib, tl_iface, 0)) {
             status = ucc_tl_lib_config_read(tl_iface, lib->full_prefix,
                                             &tl_config);
             if (UCC_OK != status) {

@@ -73,7 +73,9 @@ typedef struct ucc_cl_iface {
 typedef struct ucc_cl_lib {
     ucc_base_lib_t           super;
     ucc_cl_iface_t          *iface;
-    ucc_config_allow_list_t  tls;
+    ucc_config_names_list_t  tls;
+    ucc_config_names_array_t tls_forced; /*< set of TLs that are
+                                           requested explicitly */
 } ucc_cl_lib_t;
 UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_cl_lib_config_t *);
 

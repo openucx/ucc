@@ -24,7 +24,6 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_lib_t, const ucc_base_lib_params_t *params,
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_lib_t)
 {
     cl_info(&self->super, "finalizing lib object: %p", self);
-    ucc_config_names_array_free(&self->tls_forced);
 }
 
 UCC_CLASS_DEFINE(ucc_cl_basic_lib_t, ucc_cl_lib_t);
@@ -55,22 +54,20 @@ ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
 {
     ucc_cl_lib_attr_t  *attr     = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
     ucc_cl_basic_lib_t *cl_lib   = ucc_derived_of(lib, ucc_cl_basic_lib_t);
-    ucc_config_allow_list_t *tls = &cl_lib->super.tls;
+    ucc_config_names_list_t *tls = &cl_lib->super.tls;
     ucc_tl_iface_t          *tl_iface;
     int                      i;
     ucc_status_t             status;
 
     attr->tls                = &cl_lib->super.tls.array;
-    cl_lib->tls_forced.count = 0;
-    cl_lib->tls_forced.names = NULL;
-    if (cl_lib->super.tls.mode == UCC_CONFIG_ALLOW_LIST_ALLOW) {
-        status = ucc_config_names_array_dup(&cl_lib->tls_forced,
+    if (cl_lib->super.tls.requested) {
+        status = ucc_config_names_array_dup(&cl_lib->super.tls_forced,
                                             &cl_lib->super.tls.array);
         if (UCC_OK != status) {
             return status;
         }
     }
-    attr->tls_forced             = &cl_lib->tls_forced;
+    attr->tls_forced             = &cl_lib->super.tls_forced;
     attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
     attr->super.attr.coll_types  = 0;
     attr->super.flags            = 0;

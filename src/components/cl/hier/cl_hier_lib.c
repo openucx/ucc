@@ -27,7 +27,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_lib_t, const ucc_base_lib_params_t *params,
     requested_sbgp_tls.count = 0;
 
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
-        status = ucc_config_allow_list_process(&cl_hier_config->sbgp_tls[i],
+        status = ucc_config_allow_list_process(&cl_hier_config->sbgp_tls[i].list,
                                                &self->super.tls.array,
                                                &self->cfg.sbgp_tls[i]);
 
@@ -63,7 +63,6 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_hier_lib_t)
         ucc_config_names_array_free(&self->cfg.sbgp_tls[i].array);
     }
     ucc_config_names_array_free(&self->tls.array);
-    ucc_config_names_array_free(&self->tls_forced);
 }
 
 UCC_CLASS_DEFINE(ucc_cl_hier_lib_t, ucc_cl_lib_t);
@@ -99,18 +98,16 @@ ucc_status_t ucc_cl_hier_get_lib_attr(const ucc_base_lib_t *lib,
     ucc_status_t             status;
 
     attr->tls                = &cl_lib->tls.array;
-    cl_lib->tls_forced.count = 0;
-    cl_lib->tls_forced.names = NULL;
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
-        if (cl_lib->cfg.sbgp_tls[i].mode == UCC_CONFIG_ALLOW_LIST_ALLOW) {
+        if (cl_lib->cfg.sbgp_tls[i].requested) {
             status = ucc_config_names_array_merge(
-                &cl_lib->tls_forced, &cl_lib->cfg.sbgp_tls[i].array);
+                &cl_lib->super.tls_forced, &cl_lib->cfg.sbgp_tls[i].array);
             if (ucc_unlikely(UCC_OK != status)) {
                 return status;
             }
         }
     }
-    attr->tls_forced             = &cl_lib->tls_forced;
+    attr->tls_forced             = &cl_lib->super.tls_forced;
     attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
     attr->super.attr.coll_types  = UCC_CL_HIER_SUPPORTED_COLLS;
     attr->super.flags            = 0;

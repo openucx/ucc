@@ -47,7 +47,7 @@ typedef struct ucc_cl_hier_lib_config {
     ucc_cl_lib_config_t super;
     /* List of TLs corresponding to the sbgp team,
        which are selected based on the TL scores */
-    ucc_config_allow_list_t sbgp_tls[UCC_HIER_SBGP_LAST];
+    ucc_config_names_list_t sbgp_tls[UCC_HIER_SBGP_LAST];
     size_t                  a2av_node_thresh;
     uint32_t                allreduce_split_rail_n_frags;
     uint32_t                allreduce_split_rail_pipeline_depth;
@@ -66,8 +66,6 @@ typedef struct ucc_cl_hier_lib {
     ucc_cl_hier_lib_config_t cfg;
     ucc_config_allow_list_t  tls; /*< Intersection of UCC_CL_HIER_TLS
                                     vs sbgp_tls */
-    ucc_config_names_array_t tls_forced; /*< set of TLs that are
-                                           requested explicitly */
 } ucc_cl_hier_lib_t;
 UCC_CLASS_DECLARE(ucc_cl_hier_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
