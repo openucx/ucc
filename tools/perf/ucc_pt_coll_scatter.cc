@@ -63,13 +63,8 @@ exit:
 float ucc_pt_coll_scatter::get_bw(float time_ms, int grsize,
                                     ucc_coll_args_t args)
 {
-    bool  is_root = (comm->get_rank() == args.root);
-    float S = 0, N = 0;
-
-    if (is_root) {
-        S = args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
-        N = grsize - 1;
-    }
+    float S = args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
+    float N = grsize - 1;
 
     return (S * N) / time_ms / 1000.0;
 }

@@ -229,12 +229,20 @@ void ucc_pt_benchmark::print_time(size_t count, ucc_coll_args_t args,
                           << std::setw(12) << "N/A"
                           << std::setw(12) << "N/A";
             } else {
-                std::cout << std::setw(12) << coll->get_bw(time_avg, gsize,
-                                                           args)
-                          << std::setw(12) << coll->get_bw(time_min, gsize,
-                                                           args)
-                          << std::setw(12) << coll->get_bw(time_max, gsize,
-                                                           args);
+                if (config.coll_type == UCC_COLL_TYPE_GATHER ||
+                    config.coll_type == UCC_COLL_TYPE_SCATTER) {
+                    std::cout << std::setw(12) << "N/A"
+                              << std::setw(12) << "N/A"
+                              << std::setw(12) << coll->get_bw(time_max, gsize,
+                                                               args);
+                } else {
+                    std::cout << std::setw(12) << coll->get_bw(time_avg, gsize,
+                                                               args)
+                              << std::setw(12) << coll->get_bw(time_min, gsize,
+                                                               args)
+                              << std::setw(12) << coll->get_bw(time_max, gsize,
+                                                               args);
+                }
             }
         }
         std::cout << std::endl;
