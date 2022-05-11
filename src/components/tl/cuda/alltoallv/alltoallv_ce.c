@@ -91,7 +91,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
         return status;
     }
 
-    peer_sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
+    sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
         if (i == UCC_TL_TEAM_RANK(team) ||
             !ucc_tl_cuda_team_topo_is_direct(&team->super, team->topo,
@@ -121,7 +121,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
             return UCC_ERR_INVALID_PARAM;
         }
         CUDA_CHECK_GOTO(
-            cudaStreamWaitEvent(stream, sync->data[peer].ipc_event_remote, 0),
+            cudaStreamWaitEvent(stream, sync->data[i].ipc_event_remote, 0),
             exit_err, status);
     }
     return UCC_OK;
