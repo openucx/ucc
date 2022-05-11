@@ -66,7 +66,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
                                          ucc_coll_score_t **score_p);
 UCC_TL_IFACE_DECLARE(nccl, NCCL);
 
-__attribute__((constructor)) static void tl_ucp_iface_init(void)
+__attribute__((constructor)) static void tl_nccl_iface_init(void)
 {
     ucc_tl_nccl.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
         ucc_tl_nccl_allgatherv_algs;
