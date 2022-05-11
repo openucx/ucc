@@ -71,12 +71,15 @@ typedef struct ucc_ec_cuda_config {
     unsigned long                  exec_num_workers;
     unsigned long                  exec_num_threads;
     unsigned long                  exec_max_tasks;
+    unsigned long                  exec_num_streams;
 } ucc_ec_cuda_config_t;
 
 typedef struct ucc_ec_cuda {
     ucc_ec_base_t                  super;
     int                            stream_initialized;
     cudaStream_t                   stream;
+    int                            exec_streams_initialized;
+    cudaStream_t                  *exec_streams;
     ucc_mpool_t                    events;
     ucc_mpool_t                    strm_reqs;
     ucc_mpool_t                    executors;

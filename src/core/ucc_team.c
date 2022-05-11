@@ -259,6 +259,7 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
         if (status < 0) {
             team->n_cl_teams--;
             ucc_info("failed to create CL %s team", cl_iface->super.name);
+            cl_iface->team.destroy(b_team);
         } else if (status == UCC_INPROGRESS) {
             return status;
         }
@@ -270,13 +271,12 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
                                             &team->bp, &b_team);
         if (status != UCC_OK) {
             ucc_info("failed to create CL %s team", cl_iface->super.name);
-            /* TODO: see comment above*/
             continue;
         }
         status = cl_iface->team.create_test(b_team);
         if (status < 0) {
             ucc_info("failed to create CL %s team", cl_iface->super.name);
-            /* TODO: see comment above */
+            cl_iface->team.destroy(b_team);
             continue;
         }
         team->cl_teams[team->n_cl_teams++] =
