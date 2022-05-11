@@ -7,6 +7,7 @@
 
 #include "alltoallv.h"
 #include "components/ec/ucc_ec.h"
+#include "core/ucc_ee.h"
 #include "tl_cuda_cache.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
@@ -33,7 +34,9 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_start(ucc_tl_cuda_task_t *task)
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
     ucc_status_t        status;
-    ucc_coll_args_t    *args = &TASK_ARGS(task);
+    ucc_coll_args_t    *args    = &TASK_ARGS(task);
+    ucc_ee_h            ee      = task->super.ee;
+    cudaStream_t        stream  = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
 
     // For Alltoallv: copy counts and displ. to SHM for remote GPUs to access (if required)
     if (UCC_COLL_TYPE_ALLTOALLV == args->coll_type) {
@@ -59,8 +62,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_start(ucc_tl_cuda_task_t *task)
            sizeof(ucc_tl_cuda_mem_info_t));
     memcpy(&sync->mem_info_dst, &task->alltoallv_ce.mem_info_dst,
            sizeof(ucc_tl_cuda_mem_info_t));
-    CUDA_CHECK_GOTO(cudaEventRecord(sync->ipc_event_local, team->stream),
-                    exit_err, status);
+    CUDA_CHECK_GOTO(cudaEventRecord(sync->ipc_event_local, stream), exit_err,
+                    status);
     ucc_memory_cpu_store_fence();
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
     if (ucc_unlikely(status != UCC_OK)) {
@@ -76,16 +79,19 @@ exit_err:
 ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t          *team = TASK_TEAM(task);
-    volatile ucc_tl_cuda_sync_t *peer_sync;
+    volatile ucc_tl_cuda_sync_t *peer_sync, *sync;
     ucc_tl_cuda_cache_t         *cache;
     ucc_status_t                 status;
     ucc_rank_t                   i;
+    ucc_ee_h                     ee     = task->super.ee;
+    cudaStream_t                 stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
 
     status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), task->bar);
     if (status != UCC_OK) {
         return status;
     }
 
+    sync = TASK_SYNC(task, UCC_TL_TEAM_RANK(team));
     for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
         if (i == UCC_TL_TEAM_RANK(team) ||
             !ucc_tl_cuda_team_topo_is_direct(&team->super, team->topo,
@@ -114,6 +120,9 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
             ucc_error("ucc_cuda_ipc_map_memhandle failed");
             return UCC_ERR_INVALID_PARAM;
         }
+        CUDA_CHECK_GOTO(
+            cudaStreamWaitEvent(stream, sync->data[i].ipc_event_remote, 0),
+            exit_err, status);
     }
     return UCC_OK;
 
@@ -153,13 +162,9 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
         } else {
             src = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_src[peer],
                              peer_sync->mem_info_src.offset);
-            CUDA_CHECK_GOTO(
-                cudaStreamWaitEvent(team->stream,
-                                    sync->data[peer].ipc_event_remote, 0),
-                exit, status);
         }
-        data_size =
-            task->alltoallv_ce.get_size(task, peer_sync->alltoallv_ce.sbytes, rank);
+        data_size = task->alltoallv_ce.get_size(
+            task, peer_sync->alltoallv_ce.sbytes, rank);
         data_displ = task->alltoallv_ce.get_offset(
             task, peer_sync->alltoallv_ce.sdispl_bytes, rank);
         src        = PTR_OFFSET(src, data_displ);
