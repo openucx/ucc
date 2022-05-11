@@ -46,19 +46,6 @@ typedef enum ucc_ec_cuda_executor_mode {
     UCC_EC_CUDA_EXECUTOR_MODE_INTERRUPTIBLE
 } ucc_ec_cuda_executor_mode_t;
 
-static inline ucc_status_t cuda_error_to_ucc_status(cudaError_t cu_err)
-{
-    switch(cu_err) {
-    case cudaSuccess:
-        return UCC_OK;
-    case cudaErrorNotReady:
-        return UCC_INPROGRESS;
-    default:
-        break;
-    }
-    return UCC_ERR_NO_MESSAGE;
-}
-
 typedef ucc_status_t (*ucc_ec_cuda_task_post_fn) (uint32_t *dev_status,
                                                   int blocking_wait,
                                                   cudaStream_t stream);
@@ -151,11 +138,7 @@ extern ucc_ec_cuda_t ucc_ec_cuda;
             ucc_ec_cuda.stream_initialized = 1;                                \
         }                                                                      \
         ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);                           \
-        if(cuda_st != cudaSuccess) {                                           \
-            ec_error(&ucc_ec_cuda.super, "cuda failed with ret:%d(%s)",        \
-                     cuda_st, cudaGetErrorString(cuda_st));                    \
-            return UCC_ERR_NO_MESSAGE;                                         \
-        }                                                                      \
+        CUDA_CHECK(cuda_st);                                                   \
     }                                                                          \
 } while(0)
 

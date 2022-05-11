@@ -64,11 +64,7 @@ extern ucc_mc_cuda_t ucc_mc_cuda;
             ucc_mc_cuda.stream_initialized = 1;                                \
         }                                                                      \
         ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);                           \
-        if(cuda_st != cudaSuccess) {                                           \
-            mc_error(&ucc_mc_cuda.super, "cuda failed with ret:%d(%s)",        \
-                     cuda_st, cudaGetErrorString(cuda_st));                    \
-            return UCC_ERR_NO_MESSAGE;                                         \
-        }                                                                      \
+        CUDA_CHECK(cuda_st);                                                   \
     }                                                                          \
 } while(0)
 

@@ -83,6 +83,11 @@ ucc_tl_nccl_task_t * ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
     ucc_status_t           status;
 
     task = ucc_mpool_get(&nccl_ctx->req_mp);
+    if (ucc_unlikely(!task)) {
+        tl_error(team->context->lib, "failed to get task from mpool");
+        return NULL;
+    }
+
     ucc_coll_task_init(&task->super, coll_args, team);
     UCC_TL_NCCL_PROFILE_REQUEST_NEW(task, "tl_nccl_task", 0);
     task->super.finalize           = ucc_tl_nccl_coll_finalize;
@@ -381,10 +386,10 @@ ucc_status_t ucc_tl_nccl_allgather_init(ucc_tl_nccl_task_t *task)
 
     if (UCC_OK != ucc_nccl_check_dt_supported(dt1, dt2)) {
         /* TODO: can we use ncclChar if datatype is not supported? */
-        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
+        tl_error(UCC_TASK_LIB(task), "datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post     = ucc_tl_nccl_allgather_start;
+    task->super.post = ucc_tl_nccl_allgather_start;
     return UCC_OK;
 }
 
@@ -436,7 +441,7 @@ ucc_status_t ucc_tl_nccl_bcast_init(ucc_tl_nccl_task_t *task)
         tl_error(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post     = ucc_tl_nccl_bcast_start;
+    task->super.post = ucc_tl_nccl_bcast_start;
     return UCC_OK;
 }
 
@@ -485,7 +490,7 @@ ucc_status_t ucc_tl_nccl_reduce_scatter_init(ucc_tl_nccl_task_t *task)
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    task->super.post     = ucc_tl_nccl_reduce_scatter_start;
+    task->super.post = ucc_tl_nccl_reduce_scatter_start;
     return UCC_OK;
 }
 
@@ -542,7 +547,7 @@ ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    task->super.post     = ucc_tl_nccl_reduce_start;
+    task->super.post = ucc_tl_nccl_reduce_start;
     return UCC_OK;
 }
 
@@ -640,7 +645,7 @@ ucc_status_t ucc_tl_nccl_gather_init(ucc_tl_nccl_task_t *task)
         }
     }
 
-    task->super.post     = ucc_tl_nccl_gather_start;
+    task->super.post = ucc_tl_nccl_gather_start;
     return UCC_OK;
 }
 
@@ -807,7 +812,7 @@ ucc_status_t ucc_tl_nccl_scatter_init(ucc_tl_nccl_task_t *task)
         }
     }
 
-    task->super.post     = ucc_tl_nccl_scatter_start;
+    task->super.post = ucc_tl_nccl_scatter_start;
     return UCC_OK;
 }
 

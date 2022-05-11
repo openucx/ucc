@@ -162,19 +162,14 @@ static void ucc_ec_cuda_event_init(ucc_mpool_t *mp, void *obj, void *chunk)
 {
     ucc_ec_cuda_event_t *base = (ucc_ec_cuda_event_t *) obj;
 
-    if (ucc_unlikely(
-            cudaSuccess !=
-            cudaEventCreateWithFlags(&base->event, cudaEventDisableTiming))) {
-        ec_error(&ucc_ec_cuda.super, "cudaEventCreateWithFlags failed");
-    }
+    CUDA_FUNC(cudaEventCreateWithFlags(&base->event, cudaEventDisableTiming));
 }
 
 static void ucc_ec_cuda_event_cleanup(ucc_mpool_t *mp, void *obj)
 {
     ucc_ec_cuda_event_t *base = (ucc_ec_cuda_event_t *) obj;
-    if (ucc_unlikely(cudaSuccess != cudaEventDestroy(base->event))) {
-        ec_error(&ucc_ec_cuda.super, "cudaEventDestroy failed");
-    }
+
+    CUDA_FUNC(cudaEventDestroy(base->event));
 }
 
 static ucc_mpool_ops_t ucc_ec_cuda_event_mpool_ops = {
@@ -325,7 +320,10 @@ ucc_status_t ucc_ec_cuda_task_post(void *ee_stream, void **ee_req)
 
     UCC_EC_CUDA_INIT_STREAM();
     req = ucc_mpool_get(&ucc_ec_cuda.strm_reqs);
-    ucc_assert(req);
+    if (ucc_unlikely(!req)) {
+        ec_error(&ucc_ec_cuda.super, "failed to get stream request from mpool");
+        return UCC_ERR_NO_MEMORY;
+    }
     req->status = UCC_EC_CUDA_TASK_POSTED;
     req->stream = (cudaStream_t)ee_stream;
 
@@ -338,7 +336,12 @@ ucc_status_t ucc_ec_cuda_task_post(void *ee_stream, void **ee_req)
         }
     } else {
         cuda_event = ucc_mpool_get(&ucc_ec_cuda.events);
-        ucc_assert(cuda_event);
+        if (ucc_unlikely(!cuda_event)) {
+            ec_error(&ucc_ec_cuda.super, "failed to get event from mpool");
+            status = UCC_ERR_NO_MEMORY;
+            goto free_req;
+        }
+
         CUDA_CHECK(cudaEventRecord(cuda_event->event, req->stream));
         CUDA_CHECK(cudaStreamWaitEvent(ucc_ec_cuda.stream, cuda_event->event, 0));
         status = ucc_ec_cuda.post_strm_task(req->dev_status,
@@ -403,7 +406,11 @@ ucc_status_t ucc_ec_cuda_event_create(void **event)
     ucc_ec_cuda_event_t *cuda_event;
 
     cuda_event = ucc_mpool_get(&ucc_ec_cuda.events);
-    ucc_assert(cuda_event);
+    if (ucc_unlikely(!cuda_event)) {
+        ec_error(&ucc_ec_cuda.super, "failed to get event from mpool");
+        return UCC_ERR_NO_MEMORY;
+    }
+
     *event = cuda_event;
     return UCC_OK;
 }
@@ -418,7 +425,7 @@ ucc_status_t ucc_ec_cuda_event_destroy(void *event)
 
 ucc_status_t ucc_ec_cuda_event_post(void *ee_context, void *event)
 {
-    cudaStream_t stream = (cudaStream_t )ee_context;
+    cudaStream_t         stream     = (cudaStream_t )ee_context;
     ucc_ec_cuda_event_t *cuda_event = event;
 
     CUDA_CHECK(cudaEventRecord(cuda_event->event, stream));
@@ -436,7 +443,7 @@ ucc_status_t ucc_ec_cuda_event_test(void *event)
                      (cu_err != cudaErrorNotReady))) {
         CUDA_CHECK(cu_err);
     }
-    return cuda_error_to_ucc_status(cu_err);
+    return CUDA_ERROR_TO_UCC_STATUS(cu_err);
 }
 
 static ucc_status_t ucc_ec_cuda_finalize()
