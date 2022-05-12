@@ -10,40 +10,32 @@
 ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
                                           const ucc_config_names_array_t *src)
 {
-    int i, j, n_new;
+    int i, n_new;
 
     n_new = 0;
     if (dst->count == 0) {
         return ucc_config_names_array_dup(dst, src);
     } else {
         for (i = 0; i < src->count; i++) {
-            for (j = 0; j < dst->count; j++) {
-                if (0 != strcmp(src->names[i], dst->names[j])) {
-                    break;
-                }
-            }
-            if (j < dst->count) {
+            if (ucc_config_names_search(dst, src->names[i]) < 0) {
                 /* found new entry in src which is not part of dst */
                 n_new++;
             }
         }
 
         if (n_new) {
-            dst->count += n_new;
-            dst->names = ucc_realloc(dst->names, dst->count * sizeof(char *),
-                                     "ucc_config_names_array");
+            dst->names =
+                ucc_realloc(dst->names, (dst->count + n_new) * sizeof(char *),
+                            "ucc_config_names_array");
             if (ucc_unlikely(!dst->names)) {
                 return UCC_ERR_NO_MEMORY;
             }
             for (i = 0; i < src->count; i++) {
-                for (j = 0; j < dst->count; j++) {
-                    if (0 != strcmp(src->names[i], dst->names[j])) {
-                        dst->names[dst->count - n_new] = strdup(src->names[i]);
-                        if (ucc_unlikely(!dst->names[dst->count - n_new])) {
-                            ucc_error("failed to dup config_names_array entry");
-                            return UCC_ERR_NO_MEMORY;
-                        }
-                        n_new--;
+                if (ucc_config_names_search(dst, src->names[i]) < 0) {
+                    dst->names[dst->count++] = strdup(src->names[i]);
+                    if (ucc_unlikely(!dst->names[dst->count - 1])) {
+                        ucc_error("failed to dup config_names_array entry");
+                        return UCC_ERR_NO_MEMORY;
                     }
                 }
             }
@@ -88,9 +80,9 @@ void ucc_config_names_array_free(ucc_config_names_array_t *array)
     ucc_free(array->names);
 }
 
-
-int ucc_config_names_search(ucc_config_names_array_t *config_names,
-                            const char *str) {
+int ucc_config_names_search(const ucc_config_names_array_t *config_names,
+                            const char *                    str)
+{
     unsigned i;
 
     for (i = 0; i < config_names->count; ++i) {
@@ -100,4 +92,43 @@ int ucc_config_names_search(ucc_config_names_array_t *config_names,
     }
 
     return -1;
+}
+
+ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
+                                           const ucc_config_names_array_t *all,
+                                           ucc_config_names_list_t *       out)
+{
+    ucc_status_t status = UCC_OK;
+    int          i;
+
+    out->array.names = NULL;
+    out->requested   = 0;
+
+    switch (list->mode){
+    case UCC_CONFIG_ALLOW_LIST_ALLOW:
+        out->requested = 1;
+        status = ucc_config_names_array_dup(&out->array, &list->array);
+        break;
+    case UCC_CONFIG_ALLOW_LIST_ALLOW_ALL:
+        status = ucc_config_names_array_dup(&out->array, all);
+        break;
+    case UCC_CONFIG_ALLOW_LIST_NEGATE:
+        out->array.count = 0;
+        out->array.names = ucc_malloc(sizeof(char *) * all->count, "names");
+        if (!out->array.names) {
+            ucc_error("failed to allocate %zd bytes for names array",
+                      sizeof(char *) * all->count);
+            status = UCC_ERR_NO_MEMORY;
+            break;
+        }
+        for (i = 0; i < all->count; i++) {
+            if (ucc_config_names_search(&list->array, all->names[i]) < 0) {
+                out->array.names[out->array.count++] = strdup(all->names[i]);
+            }
+        }
+        break;
+    default:
+        ucc_assert(0);
+    }
+    return status;
 }

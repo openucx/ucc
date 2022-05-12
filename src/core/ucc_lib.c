@@ -213,25 +213,20 @@ error:
     return status;
 }
 
-static int ucc_tl_is_required(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface,
-                              int explicitly)
+int ucc_tl_is_required(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface,
+                       int forced)
 {
-    ucc_config_names_array_t *tls;
-    int                       i;
+    int i;
 
     for (i = 0; i < lib->n_cl_libs_opened; i++) {
-        tls = lib->cl_attrs[i].tls;
-        if ((!explicitly && tls->count == 1 && !strcmp(tls->names[0], "all")) ||
-            ucc_config_names_search(tls, tl_iface->super.name) >= 0) {
+        if (ucc_config_names_search(forced
+                                    ? lib->cl_attrs[i].tls_forced
+                                    : lib->cl_attrs[i].tls,
+                                    tl_iface->super.name) >= 0) {
             return 1;
         }
     }
     return 0;
-}
-
-int ucc_tl_is_requested(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface)
-{
-    return ucc_tl_is_required(lib, tl_iface, 1);
 }
 
 static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,

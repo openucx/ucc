@@ -30,7 +30,7 @@ typedef struct ucc_cl_basic_context_config {
 } ucc_cl_basic_context_config_t;
 
 typedef struct ucc_cl_basic_lib {
-    ucc_cl_lib_t super;
+    ucc_cl_lib_t             super;
 } ucc_cl_basic_lib_t;
 UCC_CLASS_DECLARE(ucc_cl_basic_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);

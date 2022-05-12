@@ -40,8 +40,6 @@ void ucc_get_version(unsigned *major_version, unsigned *minor_version,
 
 const char *ucc_get_version_string(void);
 
-/* Checks if a TL is explicitely requested by user via UCC_TLS
-   parameter */
-int ucc_tl_is_requested(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface);
-
+int ucc_tl_is_required(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface,
+                       int forced);
 #endif

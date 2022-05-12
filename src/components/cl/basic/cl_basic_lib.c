@@ -52,42 +52,40 @@ static inline ucc_status_t check_tl_lib_attr(const ucc_base_lib_t *lib,
 ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
                                        ucc_base_lib_attr_t  *base_attr)
 {
-    ucc_cl_lib_attr_t *attr   = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
-    ucc_cl_lib_t *     cl_lib = ucc_derived_of(lib, ucc_cl_lib_t);
-    ucc_config_names_array_t *tls = &cl_lib->tls;
-    ucc_tl_iface_t *          tl_iface;
-    int                       i;
-    ucc_status_t              status;
+    ucc_cl_lib_attr_t  *attr     = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
+    ucc_cl_basic_lib_t *cl_lib   = ucc_derived_of(lib, ucc_cl_basic_lib_t);
+    ucc_config_names_list_t *tls = &cl_lib->super.tls;
+    ucc_tl_iface_t          *tl_iface;
+    int                      i;
+    ucc_status_t             status;
 
-    attr->tls                    = &cl_lib->tls;
+    attr->tls                = &cl_lib->super.tls.array;
+    if (cl_lib->super.tls.requested) {
+        status = ucc_config_names_array_dup(&cl_lib->super.tls_forced,
+                                            &cl_lib->super.tls.array);
+        if (UCC_OK != status) {
+            return status;
+        }
+    }
+    attr->tls_forced             = &cl_lib->super.tls_forced;
     attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
     attr->super.attr.coll_types  = 0;
     attr->super.flags            = 0;
-    if (tls->count == 1 && !strcmp(tls->names[0], "all")) {
-        /* Check all available components, since CL_BASIC_TLS == "all" */
-        for (i = 0; i < ucc_global_config.tl_framework.n_components; i++) {
-            tl_iface = ucc_derived_of(
-                ucc_global_config.tl_framework.components[i], ucc_tl_iface_t);
-            ucc_assert(tl_iface);
-            if (UCC_OK != (status = check_tl_lib_attr(lib, tl_iface, attr))) {
-                return status;
-            }
+
+    ucc_assert(tls->array.count >= 1);
+    for (i = 0; i < tls->array.count; i++) {
+        /* Check TLs proveded in CL_BASIC_TLS. Not all of them could be
+           available, check for NULL. */
+        tl_iface =
+            ucc_derived_of(ucc_get_component(&ucc_global_config.tl_framework,
+                                             tls->array.names[i]),
+                           ucc_tl_iface_t);
+        if (!tl_iface) {
+            cl_warn(lib, "tl %s is not available", tls->array.names[i]);
+            continue;
         }
-    } else {
-        for (i = 0; i < tls->count; i++) {
-            /* Check TLs proveded in CL_BASIC_TLS. Not all of them could be
-               available, check for NULL. */
-            tl_iface = ucc_derived_of(
-                ucc_get_component(&ucc_global_config.tl_framework,
-                                  tls->names[i]),
-                ucc_tl_iface_t);
-            if (!tl_iface) {
-                cl_warn(lib, "tl %s is not available", tls->names[i]);
-                continue;
-            }
-            if (UCC_OK != (status = check_tl_lib_attr(lib, tl_iface, attr))) {
-                return status;
-            }
+        if (UCC_OK != (status = check_tl_lib_attr(lib, tl_iface, attr))) {
+            return status;
         }
     }
     return UCC_OK;

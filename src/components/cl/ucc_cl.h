@@ -39,7 +39,7 @@ typedef struct ucc_cl_team    ucc_cl_team_t;
 typedef struct ucc_cl_lib_config {
     ucc_base_lib_config_t    super;
     ucc_cl_iface_t          *iface;
-    ucc_config_names_array_t tls;
+    ucc_config_allow_list_t  tls;
 } ucc_cl_lib_config_t;
 extern ucc_config_field_t ucc_cl_lib_config_table[];
 
@@ -73,7 +73,9 @@ typedef struct ucc_cl_iface {
 typedef struct ucc_cl_lib {
     ucc_base_lib_t           super;
     ucc_cl_iface_t          *iface;
-    ucc_config_names_array_t tls;
+    ucc_config_names_list_t  tls;
+    ucc_config_names_array_t tls_forced; /*< set of TLs that are
+                                           requested explicitly */
 } ucc_cl_lib_t;
 UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_cl_lib_config_t *);
 
@@ -92,6 +94,7 @@ UCC_CLASS_DECLARE(ucc_cl_team_t, ucc_cl_context_t *,
 typedef struct ucc_cl_lib_attr {
     ucc_base_lib_attr_t       super;
     ucc_config_names_array_t *tls;
+    ucc_config_names_array_t *tls_forced;
 } ucc_cl_lib_attr_t;
 
 #define UCC_CL_IFACE_DECLARE(_name, _NAME)                              \

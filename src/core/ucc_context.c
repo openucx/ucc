@@ -379,7 +379,7 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
             /* UCC_ERR_LAST means component was disabled via TUNE param:
                don't print warning. */
             if (UCC_ERR_LAST != status) {
-                if (ucc_tl_is_requested(lib, tl_lib->iface)) {
+                if (ucc_tl_is_required(lib, tl_lib->iface, 1)) {
                     ucc_error("failed to create tl context for %s",
                               tl_lib->iface->super.name);
                 } else {
@@ -415,7 +415,7 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
     return UCC_OK;
 err:
     for (i = 0; i < ctx->n_tl_ctx; i++) {
-        tl_lib = lib->tl_libs[i];
+        tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
         tl_lib->iface->context.destroy(&ctx->tl_ctx[i]->super);
     }
     ucc_free(ctx->tl_ctx);
