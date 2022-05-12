@@ -128,7 +128,7 @@ static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
 
     flag = (task->msg_size == team->previous_msg_size[task->seq_index])
             ? 0
-            : (UCC_MLX5_NEED_RECV_MKEY_UPDATE | UCC_MLX5_NEED_RECV_MKEY_UPDATE);
+            : (UCC_MLX5_NEED_SEND_MKEY_UPDATE | UCC_MLX5_NEED_RECV_MKEY_UPDATE);
 
     if (reg_change_flag || (task->send_rcache_region_p->mr->addr !=
                             team->previous_send_address[task->seq_index])) {
