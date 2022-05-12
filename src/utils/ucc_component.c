@@ -8,6 +8,7 @@
 #include "ucc_log.h"
 #include "ucc_math.h"
 #include "core/ucc_global_opts.h"
+#include "utils/ucc_string.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -34,7 +35,8 @@ static ucc_status_t ucc_component_load_one(const char *so_path,
     ucc_snprintf_safe(framework_pattern, sizeof(framework_pattern), "ucc_%s_",
                       framework_name);
     basename_start =
-        ((ptrdiff_t)strstr(so_path, framework_pattern) - (ptrdiff_t)so_path);
+        ((ptrdiff_t)ucc_strstr_last(so_path, framework_pattern) -
+         (ptrdiff_t)so_path);
     if (basename_start < 0) {
         return UCC_ERR_NO_MESSAGE;
     }
