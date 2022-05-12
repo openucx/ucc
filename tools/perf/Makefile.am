@@ -13,6 +13,7 @@ ucc_perftest_SOURCES =            \
 	ucc_perftest.cc               \
 	ucc_pt_config.cc              \
 	ucc_pt_comm.cc                \
+	ucc_pt_cuda.cc                \
 	ucc_pt_benchmark.cc           \
 	ucc_pt_bootstrap_mpi.cc       \
 	ucc_pt_coll.cc                \
@@ -32,9 +33,3 @@ ucc_perftest_CPPFLAGS = $(BASE_CPPFLAGS)
 ucc_perftest_CXXFLAGS = -std=gnu++11 $(BASE_CXXFLAGS)
 ucc_perftest_LDFLAGS = -Wl,--rpath-link=${UCS_LIBDIR}
 ucc_perftest_LDADD = $(UCC_TOP_BUILDDIR)/src/libucc.la
-
-if HAVE_CUDA
-ucc_perftest_CPPFLAGS += $(CUDA_CPPFLAGS)
-ucc_perftest_LDFLAGS += $(CUDA_LDFLAGS)
-ucc_perftest_LDADD += $(CUDA_LIBS)
-endif
