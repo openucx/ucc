@@ -12,6 +12,7 @@
 #include "utils/ucc_log.h"
 #include "utils/ucc_datastruct.h"
 #include "components/tl/ucc_tl.h"
+#include "components/cl/ucc_cl.h"
 #include <getopt.h>
 #include <stdlib.h>
 
@@ -40,17 +41,45 @@ static void print_algorithm_info(ucc_base_coll_alg_info_t *info)
     }
 }
 
+static void print_component_algs(ucc_base_coll_alg_info_t **alg_info,
+                                 const char *component,
+                                 const char *component_name)
+{
+    int have_algs = 0;
+    int i;
+
+    for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
+        if (alg_info[i]) {
+            have_algs = 1;
+            break;
+        }
+    }
+    if (have_algs) {
+        printf("%s/%s algorithms:\n", component, component_name);
+        for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
+            if (alg_info[i]) {
+                printf("  %s\n",
+                       ucc_coll_type_str((ucc_coll_type_t)UCC_BIT(i)));
+                print_algorithm_info(alg_info[i]);
+            }
+        }
+        printf("\n");
+    }
+}
+
 int main(int argc, char **argv)
 {
     ucc_global_config_t *cfg = &ucc_global_config;
     ucc_config_print_flags_t print_flags;
     unsigned                 print_opts;
-    int                      c, show_scores, show_algs, i;
+    int                      c, show_scores, show_algs;
     ucc_lib_h                lib;
     ucc_lib_config_h         config;
     ucc_lib_params_t         params;
     ucc_status_t             status;
     ucc_tl_iface_t *         tl;
+    ucc_cl_iface_t *         cl;
+
     print_flags = (ucc_config_print_flags_t)0;
     print_opts  = 0;
     show_scores = 0;
@@ -140,17 +169,16 @@ int main(int argc, char **argv)
         }
     }
     if (show_algs) {
+        for (c = 0; c < cfg->cl_framework.n_components; c++) {
+            cl =
+                ucc_derived_of(cfg->cl_framework.components[c], ucc_cl_iface_t);
+            print_component_algs(cl->alg_info, "cl", cl->super.name);
+        }
+
         for (c = 0; c < cfg->tl_framework.n_components; c++) {
             tl =
                 ucc_derived_of(cfg->tl_framework.components[c], ucc_tl_iface_t);
-            printf("TL/%s algorithms:\n", tl->super.name);
-            for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
-                if (tl->alg_info[i]) {
-                    printf("  %s\n",
-                           ucc_coll_type_str((ucc_coll_type_t)UCC_BIT(i)));
-                    print_algorithm_info(tl->alg_info[i]);
-                }
-            }
+            print_component_algs(tl->alg_info, "tl", tl->super.name);
         }
     }
     ucc_finalize(lib);
