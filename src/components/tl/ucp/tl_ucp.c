@@ -10,7 +10,16 @@
 #include "components/mc/base/ucc_mc_base.h"
 #include "allreduce/allreduce.h"
 #include "bcast/bcast.h"
+#include "barrier/barrier.h"
 #include "alltoall/alltoall.h"
+#include "alltoallv/alltoallv.h"
+#include "allgather/allgather.h"
+#include "allgatherv/allgatherv.h"
+#include "reduce_scatter/reduce_scatter.h"
+#include "reduce_scatterv/reduce_scatterv.h"
+#include "reduce/reduce.h"
+#include "fanout/fanout.h"
+#include "fanin/fanin.h"
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib,
                                      ucc_base_lib_attr_t  *base_attr);
@@ -258,11 +267,31 @@ __attribute__((constructor)) static void tl_ucp_iface_init(void)
     ucc_tl_ucp.super.scoll.allreduce = ucc_tl_ucp_service_allreduce;
     ucc_tl_ucp.super.scoll.allgather = ucc_tl_ucp_service_allgather;
     ucc_tl_ucp.super.scoll.update_id = ucc_tl_ucp_service_update_id;
+
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLREDUCE)] =
         ucc_tl_ucp_allreduce_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BCAST)] =
         ucc_tl_ucp_bcast_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BARRIER)] =
+        ucc_tl_ucp_barrier_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLTOALL)] =
         ucc_tl_ucp_alltoall_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLTOALLV)] =
+        ucc_tl_ucp_alltoallv_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTER)] =
+        ucc_tl_ucp_reduce_scatter_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTERV)] =
+        ucc_tl_ucp_reduce_scatterv_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE)] =
+        ucc_tl_ucp_reduce_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_FANIN)] =
+        ucc_tl_ucp_fanin_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_FANOUT)] =
+        ucc_tl_ucp_fanout_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHER)] =
+        ucc_tl_ucp_allgather_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
+        ucc_tl_ucp_allgatherv_algs;
+
     ucc_components_load("tlcp_ucp", &ucc_tl_ucp.super.coll_plugins);
 }

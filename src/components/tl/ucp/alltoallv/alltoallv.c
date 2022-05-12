@@ -11,6 +11,16 @@
 ucc_status_t ucc_tl_ucp_alltoallv_pairwise_start(ucc_coll_task_t *task);
 ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *task);
 
+ucc_base_coll_alg_info_t
+    ucc_tl_ucp_alltoallv_algs[UCC_TL_UCP_ALLTOALLV_ALG_LAST + 1] = {
+        [UCC_TL_UCP_ALLTOALLV_ALG_PAIRWISE] =
+            {.id   = UCC_TL_UCP_ALLTOALLV_ALG_PAIRWISE,
+             .name = "pairwise",
+             .desc = "O(N) pairwise exchange with adjustable number "
+             "of outstanding sends/recvs"},
+        [UCC_TL_UCP_ALLTOALLV_ALG_LAST] = {
+            .id = 0, .name = NULL, .desc = NULL}};
+
 ucc_status_t ucc_tl_ucp_alltoallv_init(ucc_tl_ucp_task_t *task)
 {
     ucc_status_t status;

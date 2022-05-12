@@ -13,6 +13,15 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *task);
 
 void ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *task);
 
+ucc_base_coll_alg_info_t
+    ucc_tl_ucp_allgatherv_algs[UCC_TL_UCP_ALLGATHERV_ALG_LAST + 1] = {
+        [UCC_TL_UCP_ALLGATHERV_ALG_RING] =
+            {.id   = UCC_TL_UCP_ALLGATHERV_ALG_RING,
+             .name = "ring",
+             .desc = "O(N) Ring"},
+        [UCC_TL_UCP_ALLGATHERV_ALG_LAST] = {
+            .id = 0, .name = NULL, .desc = NULL}};
+
 ucc_status_t ucc_tl_ucp_allgatherv_init(ucc_tl_ucp_task_t *task)
 {
     if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info_v.datatype)) ||
