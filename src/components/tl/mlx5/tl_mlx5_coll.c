@@ -890,6 +890,15 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t    *tl_team,
         return status;
     }
 
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_CUDA, 0,
+        MAX_MSG_SIZE * UCC_TL_TEAM_SIZE(team),
+        UCC_TL_MLX5_DEFAULT_SCORE, ucc_tl_mlx5_alltoall_init, tl_team);
+    if (UCC_OK != status) {
+        tl_error(lib, "faild to add range to score_t");
+        return status;
+    }
+
 
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
