@@ -1,12 +1,12 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
 #
 
 cl_dirs = components/cl/basic \
 		  components/cl/hier
 
 mc_dirs = components/mc/cpu
-ec_dirs =
+ec_dirs = components/ec/cpu
 
 if HAVE_CUDA
 mc_dirs += components/mc/cuda

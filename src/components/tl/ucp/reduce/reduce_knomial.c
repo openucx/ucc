@@ -88,7 +88,6 @@ UCC_REDUCE_KN_PHASE_MULTI:
                              (avg_pre_op ? (task->reduce_kn.dist == 1)
                                          : (task->reduce_kn.dist ==
                                             task->reduce_kn.max_dist));
-
                     status = ucc_tl_ucp_reduce_multi(
                         (task->reduce_kn.dist == 1) ? args->src.info.buffer
                                                     : rbuf,

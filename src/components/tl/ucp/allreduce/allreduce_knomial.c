@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -11,6 +11,7 @@
 #include "coll_patterns/recursive_knomial.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
+#include "components/ec/ucc_ec.h"
 
 #define SAVE_STATE(_phase)                                                     \
     do {                                                                       \
@@ -41,11 +42,17 @@ void ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_status_t           status;
     ucc_kn_radix_t         loop_step;
     int                    is_avg;
+    ucc_ee_executor_t     *exec;
 
+    status = ucc_coll_task_get_executor(&task->super, &exec);
+    if (ucc_unlikely(status != UCC_OK)) {
+        task->super.status = status;
+        return;
+    }
     if (UCC_IS_INPLACE(*args)) {
         sbuf = rbuf;
     }
-    UCC_KN_GOTO_PHASE(task->allreduce_kn.phase);
+    UCC_KN_REDUCE_GOTO_PHASE(task->allreduce_kn.phase);
 
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_ep_map_eval(task->subset.map,
@@ -74,13 +81,17 @@ UCC_KN_PHASE_EXTRA:
         if (KN_NODE_EXTRA == node_type) {
             goto completion;
         } else {
-            if (ucc_unlikely(UCC_OK !=
-                             (status = ucc_dt_reduce(sbuf, scratch, rbuf, count,
-                                                     dt, mem_type, args)))) {
+            status = ucc_dt_reduce_nb(sbuf, scratch, rbuf, count, dt, args,
+                                      exec, &task->allreduce_kn.etask);
+            if (ucc_unlikely(status != UCC_OK)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.status = status;
                 return;
             }
+UCC_KN_PHASE_EXTRA_REDUCE:
+            EXEC_TASK_TEST(UCC_KN_PHASE_EXTRA_REDUCE,
+                           "failed to perform dt reduction",
+                           task->allreduce_kn.etask);
         }
     }
     while(!ucc_knomial_pattern_loop_done(p)) {
@@ -130,15 +141,20 @@ UCC_KN_PHASE_EXTRA:
             is_avg = args->op == UCC_OP_AVG &&
                      (avg_pre_op ? ucc_knomial_pattern_loop_first_iteration(p)
                                  : ucc_knomial_pattern_loop_last_iteration(p));
-            status = ucc_tl_ucp_reduce_multi(
+            status = ucc_tl_ucp_reduce_multi_nb(
                 send_buf, scratch, rbuf,
                 task->tagged.send_posted - p->iteration * (radix - 1), count,
-                data_size, dt, mem_type, task, is_avg);
+                data_size, dt, task, is_avg, exec,
+                &task->allreduce_kn.etask);
             if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.status = status;
                 return;
             }
+UCC_KN_PHASE_REDUCE:
+            EXEC_TASK_TEST(UCC_KN_PHASE_REDUCE,
+                           "failed to perform dt reduction",
+                           task->allreduce_kn.etask);
         }
         ucc_knomial_pattern_next_iteration(p);
     }
@@ -163,6 +179,7 @@ completion:
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.status = UCC_OK;
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_kn_done", 0);
+UCC_KN_PHASE_COMPLETE: /* unused label */
 out:
     return;
 }
@@ -197,6 +214,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
         ucc_min(TASK_LIB(task)->cfg.allreduce_kn_radix, size);
     ucc_status_t       status;
 
+    task->super.flags    |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post     = ucc_tl_ucp_allreduce_knomial_start;
     task->super.progress = ucc_tl_ucp_allreduce_knomial_progress;
     task->super.finalize = ucc_tl_ucp_allreduce_knomial_finalize;
