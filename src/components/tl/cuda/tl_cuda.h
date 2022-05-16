@@ -75,6 +75,7 @@ typedef struct ucc_tl_cuda_lib_config {
     uint32_t            max_concurrent;
     size_t              scratch_size;
     uint32_t            allgather_ring_max_rings;
+    uint32_t            reduce_scatter_ring_max_rings;
 } ucc_tl_cuda_lib_config_t;
 
 typedef struct ucc_tl_cuda_context_config {
@@ -213,10 +214,11 @@ struct ucc_tl_cuda_task {
         struct {
             int                     stage;
             int                     num_frags;
+            int                     num_rings;
             ucc_datatype_t          dt;
             void                   *sbuf;
             void                   *rbuf;
-            ucc_ee_executor_task_t *exec_task;
+            ucc_ee_executor_task_t *exec_task[UCC_TL_CUDA_MAX_RINGS];
             size_t (*get_count)(const ucc_tl_cuda_task_t *task,
                                 ucc_rank_t                block);
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,

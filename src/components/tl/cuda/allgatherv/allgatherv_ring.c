@@ -181,8 +181,8 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress_ring(ucc_tl_cuda_task_t * task
 
 void ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task    = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team    = TASK_TEAM(task);
+    ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     ucc_status_t st;
     int ring, num_done;
 
@@ -262,7 +262,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     nrings = ucc_min(nrings, team->topo->num_rings);
     task->allgatherv_ring.sbuf         = args->src.info.buffer;
     task->allgatherv_ring.num_rings    = nrings;
-    if (args->coll_type ==  UCC_COLL_TYPE_ALLGATHERV) {
+    if (args->coll_type == UCC_COLL_TYPE_ALLGATHERV) {
         task->allgatherv_ring.rbuf     = args->dst.info_v.buffer;
     } else {
         task->allgatherv_ring.rbuf     = args->dst.info.buffer;
@@ -336,7 +336,7 @@ size_t ucc_tl_cuda_allgatherv_get_offset(const ucc_tl_cuda_task_t *task,
 
 ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_tl_cuda_task_t *task)
 {
-    ucc_coll_args_t    *args  = &TASK_ARGS(task);
+    ucc_coll_args_t  *args  = &TASK_ARGS(task);
 
     task->allgatherv_ring.get_count  = ucc_tl_cuda_allgatherv_get_count;
     task->allgatherv_ring.get_offset = ucc_tl_cuda_allgatherv_get_offset;
