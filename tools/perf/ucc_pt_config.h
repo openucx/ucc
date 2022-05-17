@@ -35,6 +35,7 @@ struct ucc_pt_benchmark_config {
     ucc_memory_type_t  mt;
     ucc_reduction_op_t op;
     bool               inplace;
+    bool               triggered;
     size_t             large_thresh;
     int                n_iter_small;
     int                n_warmup_small;

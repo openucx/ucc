@@ -17,12 +17,15 @@ class ucc_pt_comm {
     ucc_lib_h lib;
     ucc_context_h context;
     ucc_team_h team;
+    void *stream;
+    ucc_ee_h ee;
     ucc_pt_bootstrap *bootstrap;
     void set_gpu_device();
 public:
     ucc_pt_comm(ucc_pt_comm_config config);
     int get_rank();
     int get_size();
+    ucc_ee_h get_ee();
     ucc_team_h get_team();
     ucc_context_h get_context();
     ~ucc_pt_comm();
