@@ -31,17 +31,3 @@ extern "C" {
             goto _label;                                                       \
         }                                                                      \
     } while (0)
-
-#ifdef HAVE_CUDA
-#include <cuda_runtime_api.h>
-#define CUDA_CHECK_GOTO(_call, _label, _status)                                \
-    do {                                                                       \
-        _status = (_call);                                                     \
-        if (cudaSuccess != _status) {                                          \
-            std::cerr << "UCC perftest error: " << cudaGetErrorString(_status) \
-                      << " in " << STR(_call) << "\n";                         \
-            goto _label;                                                       \
-        }                                                                      \
-    } while (0)
-
-#endif
