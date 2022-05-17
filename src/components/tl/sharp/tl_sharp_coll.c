@@ -56,6 +56,25 @@ enum sharp_data_memory_type ucc_to_sharp_memtype[] = {
     [UCC_MEMORY_TYPE_LAST]         = SHARP_MEM_TYPE_LAST,
 };
 
+static inline ucc_status_t ucc_tl_sharp_status_to_ucc(int status)
+{
+    switch (status) {
+    case SHARP_COLL_SUCCESS:
+        return UCC_OK;
+    case SHARP_COLL_ENOMEM:
+        return UCC_ERR_NO_MEMORY;
+    case SHARP_COLL_ENOT_SUPP:
+        return UCC_ERR_NOT_SUPPORTED;
+    case SHARP_COLL_EINVAL:
+        return UCC_ERR_INVALID_PARAM;
+    case SHARP_COLL_ENO_RESOURCE:
+        return UCC_ERR_NO_RESOURCE;
+    default:
+        break;
+    }
+    return UCC_ERR_NO_MESSAGE;
+}
+
 static ucc_tl_sharp_reg_t ucc_tl_sharp_reg_null = { .mr = NULL };
 
 static ucc_status_t
@@ -132,8 +151,7 @@ void ucc_tl_sharp_collective_progress(ucc_coll_task_t *coll_task)
                                             task->allreduce.r_mem_h);
             }
             if (TASK_ARGS(task).coll_type == UCC_COLL_TYPE_BCAST) {
-                ucc_tl_sharp_mem_deregister(TASK_CTX(task),
-                                            task->bcast.mem_h);
+                ucc_tl_sharp_mem_deregister(TASK_CTX(task), task->bcast.mem_h);
             }
             sharp_coll_req_free(task->req_handle);
             coll_task->status = UCC_OK;
@@ -155,7 +173,7 @@ ucc_status_t ucc_tl_sharp_barrier_start(ucc_coll_task_t *coll_task)
     if (ret != SHARP_COLL_SUCCESS) {
         tl_error(UCC_TASK_LIB(task), "sharp_coll_do_barrier_nb failed:%s",
                  sharp_coll_strerror(ret));
-        coll_task->status = UCC_ERR_NO_RESOURCE;
+        coll_task->status = ucc_tl_sharp_status_to_ucc(ret);
         return ucc_task_complete(coll_task);
     }
     coll_task->status = UCC_INPROGRESS;
@@ -215,7 +233,7 @@ ucc_status_t ucc_tl_sharp_allreduce_start(ucc_coll_task_t *coll_task)
     if (ret != SHARP_COLL_SUCCESS) {
         tl_error(UCC_TASK_LIB(task), "sharp_coll_do_allreduce_nb failed:%s",
                  sharp_coll_strerror(ret));
-        coll_task->status = UCC_ERR_NO_RESOURCE;
+        coll_task->status = ucc_tl_sharp_status_to_ucc(ret);
         return ucc_task_complete(coll_task);
     }
     coll_task->status = UCC_INPROGRESS;
@@ -225,22 +243,22 @@ ucc_status_t ucc_tl_sharp_allreduce_start(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_sharp_bcast_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_sharp_task_t          *task  = ucc_derived_of(coll_task, ucc_tl_sharp_task_t);
-    ucc_tl_sharp_team_t          *team  = TASK_TEAM(task);
-    ucc_coll_args_t              *args  = &TASK_ARGS(task);
-    ucc_datatype_t                dt    = args->src.info.datatype;
-    size_t                        count = args->src.info.count;
-    size_t                        data_size;
-    ucc_rank_t                    root   = args->root;
-    struct sharp_coll_bcast_spec  bcast_spec;
-    int                           ret;
+    ucc_tl_sharp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_sharp_task_t);
+    ucc_tl_sharp_team_t *team  = TASK_TEAM(task);
+    ucc_coll_args_t *    args  = &TASK_ARGS(task);
+    ucc_datatype_t       dt    = args->src.info.datatype;
+    size_t               count = args->src.info.count;
+    ucc_rank_t           root  = args->root;
+    size_t               data_size;
+    struct sharp_coll_bcast_spec bcast_spec;
+    int                          ret;
 
     UCC_TL_SHARP_PROFILE_REQUEST_EVENT(coll_task, "sharp_bcast_start", 0);
 
-    data_size  = ucc_dt_size(dt) * count;
+    data_size = ucc_dt_size(dt) * count;
 
-    ucc_tl_sharp_mem_register(TASK_CTX(task), args->src.info.buffer,
-                                  data_size, &task->bcast.mem_h);
+    ucc_tl_sharp_mem_register(TASK_CTX(task), args->src.info.buffer, data_size,
+                              &task->bcast.mem_h);
 
     bcast_spec.size                       = data_size;
     bcast_spec.root                       = root;
@@ -248,14 +266,16 @@ ucc_status_t ucc_tl_sharp_bcast_start(ucc_coll_task_t *coll_task)
     bcast_spec.buf_desc.buffer.ptr        = args->src.info.buffer;
     bcast_spec.buf_desc.buffer.length     = data_size;
     bcast_spec.buf_desc.buffer.mem_handle = task->bcast.mem_h->mr;
-    bcast_spec.buf_desc.mem_type          = ucc_to_sharp_memtype[args->src.info.mem_type];
+    bcast_spec.buf_desc.mem_type =
+        ucc_to_sharp_memtype[args->src.info.mem_type];
 
-    ret = sharp_coll_do_bcast_nb(team->sharp_comm, &bcast_spec, &task->req_handle);
+    ret = sharp_coll_do_bcast_nb(team->sharp_comm, &bcast_spec,
+                                 &task->req_handle);
 
     if (ret != SHARP_COLL_SUCCESS) {
         tl_error(UCC_TASK_LIB(task), "sharp_coll_do_bcast_nb failed:%s",
                  sharp_coll_strerror(ret));
-        coll_task->status = UCC_ERR_NO_RESOURCE;
+        coll_task->status = ucc_tl_sharp_status_to_ucc(ret);
         return ucc_task_complete(coll_task);
     }
     coll_task->status = UCC_INPROGRESS;
@@ -292,7 +312,8 @@ ucc_status_t ucc_tl_sharp_bcast_init(ucc_tl_sharp_task_t *task)
     }
 
     if (ucc_to_sharp_memtype[args->src.info.mem_type] == SHARP_MEM_TYPE_LAST ||
-        ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(args->src.info.datatype)] == SHARP_DTYPE_NULL) {
+        ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(args->src.info.datatype)] ==
+            SHARP_DTYPE_NULL) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 

@@ -112,10 +112,8 @@ typedef struct ucc_tl_sharp_task {
     (ucc_derived_of((_task)->super.team->context->lib, ucc_tl_sharp_lib_t))
 #define TASK_ARGS(_task) (_task)->super.bargs.args
 
-#define UCC_TL_SHARP_SUPPORTED_COLLS                         \
-                (UCC_COLL_TYPE_ALLREDUCE |\
-                UCC_COLL_TYPE_BARRIER    |\
-                UCC_COLL_TYPE_BCAST)
+#define UCC_TL_SHARP_SUPPORTED_COLLS                                           \
+    (UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BARRIER | UCC_COLL_TYPE_BCAST)
 
 UCC_CLASS_DECLARE(ucc_tl_sharp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
