@@ -32,4 +32,4 @@ LD=$(MPICXX)
 ucc_perftest_CPPFLAGS = $(BASE_CPPFLAGS)
 ucc_perftest_CXXFLAGS = -std=gnu++11 $(BASE_CXXFLAGS)
 ucc_perftest_LDFLAGS = -Wl,--rpath-link=${UCS_LIBDIR}
-ucc_perftest_LDADD = $(UCC_TOP_BUILDDIR)/src/libucc.la
+ucc_perftest_LDADD = $(UCC_TOP_BUILDDIR)/src/libucc.la -ldl
