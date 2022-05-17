@@ -419,14 +419,42 @@ ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
     ucc_status_t        status = UCC_OK;
     size_t              count  = args->src.info.count;
     ucc_rank_t          root   = args->root;
+    ucc_rank_t          peer, rank, size;
     ncclDataType_t      dt;
+    ucc_ep_map_t        map;
 
     dt = ucc_to_nccl_dtype[UCC_DT_PREDEFINED_ID(args->src.info.datatype)];
     task->super.status = UCC_INPROGRESS;
     UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_bcast_start", 0);
-    NCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->nccl_comm,
-                                 stream),
-                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+
+    if (UCC_COLL_ARGS_ACTIVE_SET(args)) {
+        map  = ucc_active_set_to_ep_map(args);
+        rank = UCC_TL_TEAM_RANK(team);
+        size = (ucc_rank_t)args->active_set.size;
+        if (root == rank) {
+            NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status,
+                           UCC_TL_TEAM_LIB(team));
+            for (peer = 0; peer < size; peer++) {
+                if (ucc_ep_map_eval(map, peer) == rank) {
+                    continue;
+                }
+                NCCLCHECK_GOTO(ncclSend(src, count, dt,
+                                        ucc_ep_map_eval(map, peer),
+                                        team->nccl_comm, stream),
+                               exit_coll, status, UCC_TL_TEAM_LIB(team));
+            }
+            NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status,
+                           UCC_TL_TEAM_LIB(team));
+        } else {
+            NCCLCHECK_GOTO(ncclRecv(src, count, dt, root,
+                                    team->nccl_comm, stream),
+                           exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
+    } else {
+        NCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->nccl_comm,
+                                     stream),
+                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+    }
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
     return status;
