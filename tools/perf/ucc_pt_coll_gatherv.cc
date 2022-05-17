@@ -7,22 +7,21 @@
 ucc_pt_coll_gatherv::ucc_pt_coll_gatherv(ucc_datatype_t dt,
                          ucc_memory_type mt, bool is_inplace,
                          ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
-
 {
     has_inplace_   = true;
     has_reduction_ = false;
     has_range_     = true;
-    has_bw_        = true;
+    has_bw_        = false;
 
-    coll_args.mask = 0;
-    coll_args.root = 0;
-    coll_args.coll_type = UCC_COLL_TYPE_GATHERV;
+    coll_args.mask                = 0;
+    coll_args.root                = 0;
+    coll_args.coll_type           = UCC_COLL_TYPE_GATHERV;
     coll_args.src.info.datatype   = dt;
     coll_args.src.info.mem_type   = mt;
     coll_args.dst.info_v.datatype = dt;
     coll_args.dst.info_v.mem_type = mt;
     if (is_inplace) {
-        coll_args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 }
@@ -35,9 +34,10 @@ ucc_status_t ucc_pt_coll_gatherv::init_coll_args(size_t count,
     size_t size_src = count * dt_size;
     size_t size_dst = comm_size * count * dt_size;
     ucc_status_t st;
+    bool is_root;
 
-    args = coll_args;
-    bool is_root = (comm->get_rank() == args.root);
+    args    = coll_args;
+    is_root = (comm->get_rank() == args.root);
     if (is_root) {
         args.dst.info_v.counts = (ucc_count_t *)
             ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");
@@ -61,9 +61,9 @@ ucc_status_t ucc_pt_coll_gatherv::init_coll_args(size_t count,
             std::cerr << "UCC perftest error: " << ucc_status_string(st)
                       << " in " << STR(_call) << "\n";
             if (is_root) {
-                goto exit;
-            } else  {
                 goto free_dst;
+            } else  {
+                goto exit;
             }
         }
         args.src.info.buffer = src_header->addr;

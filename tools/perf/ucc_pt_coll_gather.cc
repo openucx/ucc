@@ -7,22 +7,21 @@
 ucc_pt_coll_gather::ucc_pt_coll_gather(ucc_datatype_t dt,
                          ucc_memory_type mt, bool is_inplace,
                          ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
-
 {
     has_inplace_   = true;
     has_reduction_ = false;
     has_range_     = true;
     has_bw_        = true;
 
-    coll_args.mask = 0;
-    coll_args.root = 0;
-    coll_args.coll_type = UCC_COLL_TYPE_GATHER;
+    coll_args.mask              = 0;
+    coll_args.root              = 0;
+    coll_args.coll_type         = UCC_COLL_TYPE_GATHER;
     coll_args.src.info.datatype = dt;
     coll_args.src.info.mem_type = mt;
     coll_args.dst.info.datatype = dt;
     coll_args.dst.info.mem_type = mt;
     if (is_inplace) {
-        coll_args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 }
@@ -34,11 +33,12 @@ ucc_status_t ucc_pt_coll_gather::init_coll_args(size_t single_rank_count,
     size_t size_src = single_rank_count * dt_size;
     size_t size_dst = comm->get_size() * single_rank_count * dt_size;
     ucc_status_t st_src, st_dst;
+    bool is_root;
 
-    args = coll_args;
+    args                = coll_args;
     args.dst.info.count = single_rank_count * comm->get_size();
     args.src.info.count = single_rank_count;
-    bool is_root = (comm->get_rank() == args.root);
+    is_root = (comm->get_rank() == args.root);
     if (is_root) {
         UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size_dst, args.dst.info.mem_type),
                       exit, st_dst);
