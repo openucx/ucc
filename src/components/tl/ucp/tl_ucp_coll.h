@@ -11,6 +11,7 @@
 #include "schedule/ucc_schedule_pipelined.h"
 #include "coll_patterns/recursive_knomial.h"
 #include "components/mc/base/ucc_mc_base.h"
+#include "components/ec/ucc_ec.h"
 #include "tl_ucp_tag.h"
 
 #define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 5
@@ -30,6 +31,23 @@ extern const char
 
 #define INV_VRANK(_rank, _root, _team_size)                                   \
     (((_rank) + (_root)) % (_team_size))
+
+#define EXEC_TASK_TEST(_phase, _errmsg, _etask) do {                           \
+    if (_etask != NULL) {                                                      \
+        status = ucc_ee_executor_task_test(_etask);                            \
+        if (status == UCC_INPROGRESS) {                                        \
+            SAVE_STATE(_phase);                                                \
+            return;                                                            \
+        }                                                                      \
+        ucc_ee_executor_task_finalize(_etask);                                 \
+        if (ucc_unlikely(status < 0)) {                                        \
+            tl_error(UCC_TASK_LIB(task), _errmsg);                             \
+            task->super.status = status;                                       \
+            return;                                                            \
+        }                                                                      \
+    }                                                                          \
+} while(0)
+
 
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
@@ -60,12 +78,14 @@ typedef struct ucc_tl_ucp_task {
             ucc_knomial_pattern_t   p;
             void                   *scratch;
             ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
         } allreduce_kn;
         struct {
             int                     phase;
             ucc_knomial_pattern_t   p;
             void                   *scratch;
             ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
         } reduce_scatter_kn;
         struct {
             void                   *scratch;
@@ -93,6 +113,7 @@ typedef struct ucc_tl_ucp_task {
             int                     phase;
             ucc_knomial_pattern_t   p;
             void                   *sbuf;
+            ucc_ee_executor_task_t *etask;
         } allgather_kn;
         struct {
             ucc_rank_t              dist;

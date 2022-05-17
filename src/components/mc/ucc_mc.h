@@ -104,52 +104,7 @@ static inline ucc_status_t ucc_mc_reduce_userdefined(void *src1, void *src2,
         .dt        = dt
     };
 
-    return dt->ops.reduce.cb(&params);}
-
-
-static inline ucc_status_t ucc_dt_reduce(void *src1, void *src2,
-                                         void *dst, size_t count,
-                                         ucc_datatype_t dt,
-                                         ucc_memory_type_t mem_type,
-                                         ucc_coll_args_t *args)
-{
-    if (!UCC_DT_IS_PREDEFINED(dt)) {
-        ucc_assert(UCC_DT_HAS_REDUCE(dt));
-        return ucc_mc_reduce_userdefined(src1, src2, dst, 1, count,
-                                         0, ucc_dt_to_generic(dt));
-    } else {
-        return ucc_mc_reduce(src1, src2, dst, count,
-                             dt, args->op, mem_type);
-    }
-}
-
-static inline ucc_status_t
-ucc_dt_reduce_multi(void *src1, void *src2, void *dst, size_t n_vectors,
-                    size_t count, size_t stride, ucc_datatype_t dt,
-                    ucc_memory_type_t mem_type, ucc_coll_args_t *args)
-{
-    if (!UCC_DT_IS_PREDEFINED(dt)) {
-        ucc_assert(UCC_DT_HAS_REDUCE(dt));
-        return ucc_mc_reduce_userdefined(src1, src2, dst, n_vectors, count,
-                                         stride, ucc_dt_to_generic(dt));
-    } else {
-        return ucc_mc_reduce_multi(src1, src2, dst, n_vectors, count, stride,
-                                   dt, args->op, mem_type);
-    }
-}
-
-static inline ucc_status_t
-ucc_dt_reduce_multi_alpha(void *src1, void *src2, void *dst, size_t n_vectors,
-                          size_t count, size_t stride, ucc_datatype_t dt,
-                          ucc_reduction_op_t vector_op, double alpha,
-                          ucc_memory_type_t mem_type, ucc_coll_args_t *args)
-{
-    /* reduce_multi is used for OP_AVG implementation that can only be
-       used with predefined dtypes */
-    ucc_assert(UCC_DT_IS_PREDEFINED(dt));
-    return ucc_mc_reduce_multi_alpha(src1, src2, dst, n_vectors, count,
-                                     stride, dt, args->op,
-                                     vector_op, alpha, mem_type);
+    return dt->ops.reduce.cb(&params);
 }
 
 #endif
