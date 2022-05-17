@@ -25,7 +25,7 @@ ucc_base_coll_alg_info_t
 ucc_status_t ucc_tl_ucp_bcast_init(ucc_tl_ucp_task_t *task)
 {
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    ucc_rank_t         team_size = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t         team_size = (ucc_rank_t)task->subset.map.ep_num;
 
     task->bcast_kn.radix =
         ucc_min(UCC_TL_UCP_TEAM_LIB(team)->cfg.bcast_kn_radix, team_size);
