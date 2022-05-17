@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -18,6 +18,7 @@
 #include "reduce_scatterv/reduce_scatterv.h"
 #include "bcast/bcast.h"
 #include "reduce/reduce.h"
+#include "gather/gather.h"
 #include "fanin/fanin.h"
 #include "fanout/fanout.h"
 
@@ -122,6 +123,9 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
         break;
     case UCC_COLL_TYPE_REDUCE:
         status = ucc_tl_ucp_reduce_init(task);
+        break;
+    case UCC_COLL_TYPE_GATHER:
+        status = ucc_tl_ucp_gather_init(task);
         break;
     case UCC_COLL_TYPE_FANIN:
         status = ucc_tl_ucp_fanin_init(task);

@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
 #
 if TL_UCP_ENABLED
 
@@ -63,6 +63,11 @@ reduce_scatterv =	                        \
 	reduce_scatterv/reduce_scatterv_ring.c    \
 	reduce_scatterv/reduce_scatterv.c
 
+gather =	                 \
+	gather/gather.h          \
+	gather/gather.c          \
+	gather/gather_knomial.c
+
 scatter =	                   \
 	scatter/scatter.h          \
 	scatter/scatter_knomial.c
@@ -96,6 +101,7 @@ sources =                 \
 	$(reduce)             \
 	$(reduce_scatter)     \
 	$(reduce_scatterv)    \
+	$(gather)    	      \
 	$(scatter)            \
 	$(fanin)              \
 	$(fanout)

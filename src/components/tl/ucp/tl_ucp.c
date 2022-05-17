@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -18,6 +18,7 @@
 #include "reduce_scatter/reduce_scatter.h"
 #include "reduce_scatterv/reduce_scatterv.h"
 #include "reduce/reduce.h"
+#include "gather/gather.h"
 #include "fanout/fanout.h"
 #include "fanin/fanin.h"
 
@@ -120,6 +121,10 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
 
     {"REDUCE_KN_RADIX", "4", "Radix of the knomial tree reduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_kn_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"GATHER_KN_RADIX", "4", "Radix of the knomial tree reduce algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, gather_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
     {"SCATTER_KN_RADIX", "4", "Radix of the knomial scatter algorithm",
@@ -284,6 +289,8 @@ __attribute__((constructor)) static void tl_ucp_iface_init(void)
         ucc_tl_ucp_reduce_scatterv_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE)] =
         ucc_tl_ucp_reduce_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_GATHER)] =
+        ucc_tl_ucp_gather_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_FANIN)] =
         ucc_tl_ucp_fanin_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_FANOUT)] =
