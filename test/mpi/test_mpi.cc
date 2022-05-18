@@ -122,6 +122,7 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
     root_type  = ROOT_RANDOM;
     root_value = 10;
     iterations = 1;
+    triggered  = false;
 }
 
 void UccTestMpi::set_iter(int iter)
@@ -235,6 +236,8 @@ void UccTestMpi::create_team(ucc_test_mpi_team_t t, bool is_onesided)
 void UccTestMpi::destroy_team(ucc_test_team_t &team)
 {
     ucc_status_t status;
+
+    team.free_ee();
     while (UCC_INPROGRESS == (status = ucc_team_destroy(team.team))) {
         if (UCC_OK != status) {
             std::cerr << "ucc_team_destroy failed\n";
@@ -292,6 +295,15 @@ int ucc_coll_inplace_supported(ucc_coll_type_t c)
     default:
         return 1;
     }
+}
+
+bool ucc_coll_triggered_supported(ucc_memory_type_t mt)
+{
+    if (mt == UCC_MEMORY_TYPE_CUDA) {
+        return true;
+    }
+
+    return false;
 }
 
 int ucc_coll_is_rooted(ucc_coll_type_t c)
@@ -364,6 +376,7 @@ void set_gpu_device(test_set_gpu_device_t set_device)
 #endif
 
 }
+
 #endif
 
 std::vector<ucc_status_t> UccTestMpi::exec_tests(
@@ -431,11 +444,17 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
             }
             for (auto r : roots) {
                 if (c == UCC_COLL_TYPE_BARRIER) {
-                    auto tcs = TestCase::init(c, team, nt);
+                    auto tcs = TestCase::init(c, team, triggered, nt);
                     auto res = exec_tests(tcs);
                     rst.insert(rst.end(), res.begin(), res.end());
                 } else {
                     for (auto mt : mtypes) {
+
+                        if (triggered && !ucc_coll_triggered_supported(mt)) {
+                            rst.push_back(UCC_ERR_NOT_IMPLEMENTED);
+                            continue;
+                        }
+
                         for (auto m : msgsizes) {
                             if (c == UCC_COLL_TYPE_ALLREDUCE ||
                                 c == UCC_COLL_TYPE_REDUCE ||
@@ -449,7 +468,8 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                               dt == UCC_DT_FLOAT64)) {
                                             continue;
                                         }
-                                        auto tcs = TestCase::init(c, team, nt,
+                                        auto tcs = TestCase::init(c, team,
+                                                                  triggered, nt,
                                                                   r, m, inplace,
                                                                   mt, s, dt, op);
                                         auto res = exec_tests(tcs);
@@ -463,7 +483,8 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                 {
                                     if (team.ctx == ctx) {
                                         auto tcs = TestCase::init(
-                                            c, team, nt, r, m, inplace, mt, s);
+                                            c, team, triggered, nt, r, m,
+                                            inplace, mt, s);
                                         auto res = exec_tests(tcs);
                                         rst.insert(rst.end(), res.begin(),
                                                    res.end());
@@ -472,7 +493,8 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                             continue;
                                         }
                                         auto tc_onesided = TestCase::init(
-                                            c, team, nt, r, m, inplace, mt, s,
+                                            c, team, triggered, nt, r, m,
+                                            inplace, mt, s,
                                             UCC_DT_UINT32, UCC_OP_LAST,
                                             TEST_FLAG_VSIZE_64BIT,
                                             TEST_FLAG_VSIZE_64BIT,
@@ -488,7 +510,8 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                     for (auto count_bits : counts_vsize) {
                                         for (auto displ_bits : displs_vsize) {
                                             auto tcs = TestCase::init(
-                                                c, team, nt, r, m, inplace, mt, s,
+                                                c, team, triggered, nt, r, m,
+                                                inplace, mt, s,
                                                 (ucc_datatype_t)-1,
                                                 (ucc_reduction_op_t)-1,
                                                 count_bits, displ_bits);
@@ -502,13 +525,14 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                     continue;
                                 }
                             } else {
-                                auto tcs = TestCase::init(c, team, nt, r, m,
-                                                          inplace, mt, s);
                                 if (TEST_INPLACE == inplace &&
                                     !ucc_coll_inplace_supported(c)) {
                                     rst.push_back(UCC_ERR_NOT_IMPLEMENTED);
                                     continue;
                                 }
+                                auto tcs = TestCase::init(c, team, triggered,
+                                                          nt, r, m, inplace, mt,
+                                                          s);
                                 auto res = exec_tests(tcs);
                                 rst.insert(rst.end(), res.begin(), res.end());
                             }

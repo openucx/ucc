@@ -28,6 +28,7 @@ static std::vector<ucc_test_vsize_flag_t> displs_vsize = {TEST_FLAG_VSIZE_32BIT,
                                                           TEST_FLAG_VSIZE_64BIT};
 static size_t msgrange[3] = {8, (1ULL << 21), 8};
 static std::vector<ucc_test_mpi_inplace_t> inplace = {TEST_NO_INPLACE};
+static std::vector<bool> triggered = {false};
 static ucc_test_mpi_root_t root_type = ROOT_RANDOM;
 static int root_value = 10;
 static ucc_thread_mode_t                   thread_mode  = UCC_THREAD_SINGLE;
@@ -79,6 +80,7 @@ void PrintHelp()
        "-i, --iter             <value>\n\tnumber of iterations each test cases is executed\n\n"
        "-T, --thread-multiple\n\tenable multi-threaded testing\n\n"
        "-v, --verbose\n\tlog all test cases\n\n"
+       "--triggered            <value>\n\t0 - use post, 1 - use triggered post, 2 - both\n\n"
        "-h, --help\n\tShow help\n";
 }
 
@@ -271,6 +273,25 @@ static void process_inplace(const char *arg)
     throw std::string("incorrect inplace: ") + arg;
 }
 
+static void process_triggered(const char *arg)
+{
+    int value = std::stoi(arg);
+    switch(value) {
+    case 0:
+        triggered = {false};
+        return;
+    case 1:
+        triggered = {true};
+        return;
+    case 2:
+        triggered = {false, true};
+        return;
+    default:
+        break;
+    }
+    throw std::string("incorrect triggered: ") + arg;
+}
+
 static void process_root(const char *arg)
 {
     auto tokens = str_split(arg, ":");
@@ -334,7 +355,7 @@ void PrintInfo()
 
 void ProcessArgs(int argc, char** argv)
 {
-    const char *const short_opts  = "c:t:m:d:o:M:I:N:r:s:C:D:i:Z:ThvSO:";
+    const char *const short_opts  = "c:t:m:d:o:M:I:N:r:s:C:D:i:Z:GThvSO:";
     const option      long_opts[] = {
                                 {"colls", required_argument, nullptr, 'c'},
                                 {"teams", required_argument, nullptr, 't'},
@@ -351,6 +372,8 @@ void ProcessArgs(int argc, char** argv)
                                 {"iter", required_argument, nullptr, 'i'},
                                 {"thread-multiple", no_argument, nullptr, 'T'},
                                 {"num_tests", required_argument, nullptr, 'N'},
+                                {"triggered", required_argument, nullptr, 'G'},
+                                {"verbose", no_argument, nullptr, 'v'},
 #if defined(HAVE_CUDA) || defined(HAVE_HIP)
                                 {"set_device", required_argument, nullptr, 'S'},
 #endif
@@ -388,6 +411,9 @@ void ProcessArgs(int argc, char** argv)
             break;
         case 'I':
             process_inplace(optarg);
+            break;
+        case 256:
+            process_triggered(optarg);
             break;
         case 'r':
             process_root(optarg);
@@ -505,16 +531,22 @@ int main(int argc, char *argv[])
     PrintInfo();
 
     for (auto &inpl : inplace) {
-        test->set_inplace(inpl);
-        test->run_all();
+        for (auto trig: triggered) {
+            test->set_triggered(trig);
+            test->set_inplace(inpl);
+            test->run_all();
+        }
     }
+
     if (has_onesided) {
         test->set_colls(onesided_colls);
         for (auto &inpl : inplace) {
+            test->set_triggered(false);
             test->set_inplace(inpl);
             test->run_all(true);
         }
     }
+
     std::cout << std::flush;
     MPI_Iallreduce(MPI_IN_PLACE, test->results.data(), test->results.size(),
                    MPI_INT, MPI_MIN, MPI_COMM_WORLD, &req);

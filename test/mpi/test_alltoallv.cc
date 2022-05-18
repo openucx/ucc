@@ -25,8 +25,10 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                              ucc_memory_type_t _mt, ucc_test_team_t &_team,
                              size_t _max_size,
                              ucc_test_vsize_flag_t _count_bits,
-                             ucc_test_vsize_flag_t _displ_bits) :
-    TestCase(_team, UCC_COLL_TYPE_ALLTOALLV, _mt, _msgsize, _inplace, _max_size)
+                             ucc_test_vsize_flag_t _displ_bits,
+                             bool _triggered) :
+    TestCase(_team, UCC_COLL_TYPE_ALLTOALLV, _mt, _msgsize, _inplace, _max_size,
+             _triggered)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t count   = _msgsize/dt_size;

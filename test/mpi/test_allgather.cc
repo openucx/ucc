@@ -11,8 +11,9 @@
 
 TestAllgather::TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                              ucc_memory_type_t _mt, ucc_test_team_t &_team,
-                             size_t _max_size) :
-    TestCase(_team, UCC_COLL_TYPE_ALLGATHER, _mt, _msgsize, _inplace, _max_size)
+                             size_t _max_size, bool _triggered) :
+    TestCase(_team, UCC_COLL_TYPE_ALLGATHER, _mt, _msgsize, _inplace, _max_size,
+             _triggered)
 {
     size_t dt_size           = ucc_dt_size(TEST_DT);
     size_t single_rank_count = _msgsize / dt_size;

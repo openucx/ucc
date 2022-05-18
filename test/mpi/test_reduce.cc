@@ -10,8 +10,9 @@
 TestReduce::TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                      ucc_datatype_t _dt, ucc_reduction_op_t _op,
                      ucc_memory_type_t _mt, int _root, ucc_test_team_t &_team,
-                     size_t _max_size) :
-    TestCase(_team, UCC_COLL_TYPE_REDUCE, _mt, _msgsize, _inplace, _max_size)
+                     size_t _max_size, bool _triggered) :
+    TestCase(_team, UCC_COLL_TYPE_REDUCE, _mt, _msgsize, _inplace, _max_size,
+             _triggered)
 {
     size_t dt_size = ucc_dt_size(_dt);
     size_t count   = _msgsize/dt_size;

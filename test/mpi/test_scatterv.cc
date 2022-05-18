@@ -35,8 +35,10 @@ static void fill_counts_and_displacements(int size, int count,
 
 TestScatterv::TestScatterv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
                            ucc_memory_type_t _mt, int _root,
-                           ucc_test_team_t &_team, size_t _max_size) :
-    TestCase(_team, UCC_COLL_TYPE_SCATTERV, _mt, _msgsize, _inplace, _max_size)
+                           ucc_test_team_t &_team, size_t _max_size,
+                           bool _triggered) :
+    TestCase(_team, UCC_COLL_TYPE_SCATTERV, _mt, _msgsize, _inplace, _max_size,
+             _triggered)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t count   = _msgsize / dt_size;
