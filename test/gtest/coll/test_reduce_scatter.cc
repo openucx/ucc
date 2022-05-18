@@ -3,7 +3,7 @@
  * See file LICENSE for terms.
  */
 
-#include "test_mc_reduce.h"
+#include "core/test_mc_reduce.h"
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
@@ -161,72 +161,77 @@ class test_reduce_scatter : public UccCollArgs, public testing::Test {
     }
 };
 
-TYPED_TEST_CASE(test_reduce_scatter, ReductionTypesOps);
+template<typename T>
+class test_reduce_scatter_host : public test_reduce_scatter<T> {};
+
+template<typename T>
+class test_reduce_scatter_cuda : public test_reduce_scatter<T> {};
+
+TYPED_TEST_CASE(test_reduce_scatter_host, CollReduceTypeOpsHost);
+TYPED_TEST_CASE(test_reduce_scatter_cuda, CollReduceTypeOpsCuda);
 
 #define TEST_DECLARE(_mem_type, _inplace, _repeat, _persistent)                \
     {                                                                          \
         std::array<int, 1> counts{123};                                        \
+        CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, _mem_type);        \
         for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {                 \
             for (int count : counts) {                                         \
                 UccTeam_h     team = UccJob::getStaticTeams()[tid];            \
                 int           size = team->procs.size();                       \
                 UccCollCtxVec ctxs;                                            \
-                this->set_mem_type(_mem_type);                                 \
+                SET_MEM_TYPE(_mem_type);                                       \
                 this->set_inplace(_inplace);                                   \
                 this->data_init(size, TypeParam::dt, count, ctxs, _persistent);\
-                try {                                                          \
-                    UccReq req(team, ctxs);                                    \
-                    for (auto i = 0; i < _repeat; i++) {                       \
-                        req.start();                                           \
-                        req.wait();                                            \
-                        EXPECT_EQ(true, this->data_validate(ctxs));            \
-                        this->reset(ctxs);                                     \
-                    }                                                          \
-                } catch (const std::exception &e) {                            \
-                    /* NOT_SUPPORTED return by coll_init */                    \
+                UccReq req(team, ctxs);                                        \
+                CHECK_REQ_NOT_SUPPORTED_SKIP(req, this->data_fini(ctxs));      \
+                for (auto i = 0; i < _repeat; i++) {                           \
+                    req.start();                                               \
+                    req.wait();                                                \
+                    EXPECT_EQ(true, this->data_validate(ctxs));                \
+                    this->reset(ctxs);                                         \
                 }                                                              \
                 this->data_fini(ctxs);                                         \
             }                                                                  \
         }                                                                      \
     }
 
-TYPED_TEST(test_reduce_scatter, single_host)
+TYPED_TEST(test_reduce_scatter_host, single)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce_scatter, single_host_persistent)
+TYPED_TEST(test_reduce_scatter_host, single_persistent)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 3, 1);
 }
 
-TYPED_TEST(test_reduce_scatter, single_host_inplace)
+TYPED_TEST(test_reduce_scatter_host, single_inplace)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce_scatter, single_host_persistent_inplace)
+TYPED_TEST(test_reduce_scatter_host, single_persistent_inplace)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 3, 1);
 }
 
 #ifdef HAVE_CUDA
-TYPED_TEST(test_reduce_scatter, single_cuda)
+TYPED_TEST(test_reduce_scatter_cuda, single)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce_scatter, single_cuda_persistent)
+TYPED_TEST(test_reduce_scatter_cuda, single_persistent)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 3, 1);
 }
 
-TYPED_TEST(test_reduce_scatter, single_cuda_inplace)
+TYPED_TEST(test_reduce_scatter_cuda, single_inplace)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce_scatter, single_cuda_persistent_inplace)
+TYPED_TEST(test_reduce_scatter_cuda, single_persistent_inplace)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 3, 1);
 }
@@ -235,51 +240,48 @@ TYPED_TEST(test_reduce_scatter, single_cuda_persistent_inplace)
 #define TEST_DECLARE_MULTIPLE(_mem_type, _inplace)                             \
     {                                                                          \
         std::array<int, 3> counts{4, 256, 65536};                              \
+        CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, _mem_type);        \
         for (int count : counts) {                                             \
             std::vector<UccReq>        reqs;                                   \
             std::vector<UccCollCtxVec> ctxs;                                   \
-            try {                                                              \
-                for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {         \
-                    UccTeam_h     team = UccJob::getStaticTeams()[tid];        \
-                    int           size = team->procs.size();                   \
-                    UccCollCtxVec ctx;                                         \
-                    this->set_inplace(_inplace);                               \
-                    this->set_mem_type(_mem_type);                             \
-                    this->data_init(size, TypeParam::dt, count, ctx, false);   \
-                    ctxs.push_back(ctx);                                       \
-                    reqs.push_back(UccReq(team, ctx));                         \
-                }                                                              \
-                UccReq::startall(reqs);                                        \
-                UccReq::waitall(reqs);                                         \
-                for (auto ctx : ctxs) {                                        \
-                    EXPECT_EQ(true, this->data_validate(ctx));                 \
-                }                                                              \
-            } catch (const std::exception &e) {                                \
-                    /* NOT_SUPPORTED return by coll_init */                    \
+            for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {             \
+                UccTeam_h     team = UccJob::getStaticTeams()[tid];            \
+                int           size = team->procs.size();                       \
+                UccCollCtxVec ctx;                                             \
+                this->set_inplace(_inplace);                                   \
+                SET_MEM_TYPE(_mem_type);                                       \
+                this->data_init(size, TypeParam::dt, count, ctx, false);       \
+                ctxs.push_back(ctx);                                           \
+                reqs.push_back(UccReq(team, ctx));                             \
+                CHECK_REQ_NOT_SUPPORTED_SKIP(reqs.back(),                      \
+                                             DATA_FINI_ALL(this, ctxs));       \
             }                                                                  \
+            UccReq::startall(reqs);                                            \
+            UccReq::waitall(reqs);                                             \
             for (auto ctx : ctxs) {                                            \
-                this->data_fini(ctx);                                          \
+                EXPECT_EQ(true, this->data_validate(ctx));                     \
             }                                                                  \
+            DATA_FINI_ALL(this, ctxs);                                         \
         }                                                                      \
     }
 
-TYPED_TEST(test_reduce_scatter, multiple)
+TYPED_TEST(test_reduce_scatter_host, multiple)
 {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE);
 }
 
-TYPED_TEST(test_reduce_scatter, multiple_inplace)
+TYPED_TEST(test_reduce_scatter_host, multiple_inplace)
 {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE);
 }
 
 #ifdef HAVE_CUDA
-TYPED_TEST(test_reduce_scatter, multiple_cuda)
+TYPED_TEST(test_reduce_scatter_cuda, multiple)
 {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE);
 }
 
-TYPED_TEST(test_reduce_scatter, multiple_cuda_inplace)
+TYPED_TEST(test_reduce_scatter_cuda, multiple_inplace)
 {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE);
 }
@@ -292,9 +294,9 @@ class test_reduce_scatter_alg
 
 UCC_TEST_P(test_reduce_scatter_alg, ring)
 {
-    test_reduce_scatter<ReductionTest<UCC_DT_INT32, sum>> rs_test;
-    int           n_procs = 15;
-    std::string                                           bidir   = GetParam();
+    test_reduce_scatter<TypeOpPair<UCC_DT_INT32, sum>> rs_test;
+    int                                                n_procs = 15;
+    std::string                                        bidir   = GetParam();
     ucc_job_env_t                  env = {{"UCC_CL_BASIC_TUNE", "inf"},
                          {"UCC_TL_UCP_TUNE", "reduce_scatter:@ring:inf"},
                          {"REDUCE_SCATTER_RING_BIDIRECTIONAL",

@@ -168,7 +168,7 @@ UCC_TEST_P(test_alltoallv_0, single)
     coll_flags = UCC_COLL_ARGS_FLAG_COUNT_64BIT |
                  UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT;
     set_inplace(inplace);
-    set_mem_type(mem_type);
+    SET_MEM_TYPE(mem_type);
 
     data_init(size, dtype, 1, ctxs, false);
     UccReq    req(team, ctxs);
@@ -194,7 +194,7 @@ UCC_TEST_P(test_alltoallv_0, single_persistent)
     coll_flags =
         UCC_COLL_ARGS_FLAG_COUNT_64BIT | UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT;
     set_inplace(inplace);
-    set_mem_type(mem_type);
+    SET_MEM_TYPE(mem_type);
 
     data_init(size, dtype, 1, ctxs, true);
     UccReq req(team, ctxs);
@@ -222,7 +222,7 @@ UCC_TEST_P(test_alltoallv_1, single)
     UccCollCtxVec        ctxs;
 
     set_inplace(inplace);
-    set_mem_type(mem_type);
+    SET_MEM_TYPE(mem_type);
 
     data_init(size, dtype, 1, ctxs, false);
     UccReq    req(team, ctxs);
@@ -238,11 +238,11 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Combine(
             ::testing::Range(1, UccJob::nStaticTeams), // team_ids
 #ifdef HAVE_CUDA
-            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
 #else
             ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
-            ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE), // inplace
+            ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE),
             PREDEFINED_DTYPES)); // dtype
 
 
@@ -251,11 +251,11 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Combine(
             ::testing::Range(1, UccJob::nStaticTeams), // team_ids
 #ifdef HAVE_CUDA
-            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
 #else
             ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
-            ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE), // inplace
+            ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE),
             PREDEFINED_DTYPES)); // dtype
 
 class test_alltoallv_2 : public test_alltoallv<uint64_t>,
@@ -283,7 +283,7 @@ UCC_TEST_P(test_alltoallv_2, multiple)
         UccCollCtxVec   ctx;
 
         this->set_inplace(inplace);
-        this->set_mem_type(mem_type);
+        SET_MEM_TYPE(mem_type);
 
         data_init(size, dtype, 1, ctx, false);
         reqs.push_back(UccReq(team, ctx));
@@ -312,7 +312,7 @@ UCC_TEST_P(test_alltoallv_3, multiple)
         UccCollCtxVec   ctx;
 
         this->set_inplace(inplace);
-        this->set_mem_type(mem_type);
+        SET_MEM_TYPE(mem_type);
 
         data_init(size, dtype, 1, ctx, false);
         reqs.push_back(UccReq(team, ctx));
@@ -331,20 +331,20 @@ INSTANTIATE_TEST_CASE_P(
         64, test_alltoallv_2,
         ::testing::Combine(
 #ifdef HAVE_CUDA
-            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
 #else
             ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
-            ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE), // inplace
+            ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE),
             PREDEFINED_DTYPES)); // dtype
 
 INSTANTIATE_TEST_CASE_P(
         32, test_alltoallv_3,
         ::testing::Combine(
 #ifdef HAVE_CUDA
-            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
 #else
             ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
-            ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE), // inplace
+            ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE),
             PREDEFINED_DTYPES)); // dtype
