@@ -104,13 +104,31 @@ __device__ void executor_reduce(const T* __restrict__ s1,
     }
 }
 
+template <typename T>
+__device__ void executor_reduce_multi(const T* __restrict__ s1,
+                                      const T* __restrict__ s2,
+                                      T* __restrict__ d, size_t count,
+                                      size_t size, size_t stride)
+{
+    const size_t step  = blockDim.x;
+    const size_t start = threadIdx.x;
+    const size_t ld    = stride / sizeof(T);
+
+    for (size_t i = start; i < count; i+=step) {
+        d[i] = s1[i] + s2[i];
+        for (size_t j = 1; j < size; j++) {
+            d[i] = d[i] + s2[i + j*ld];
+        }
+    }
+}
+
 __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
                                 int q_size)
 {
     const uint32_t  worker_id   = blockIdx.x;
     const uint32_t  num_workers = gridDim.x;
     bool            is_master   = (threadIdx.x == 0) ? true: false;
-    int             cidx_local, pidx_local;
+    int cidx_local, pidx_local;
     volatile int *pidx, *cidx;
     ucc_ee_executor_task_t *tasks;
     __shared__ ucc_ee_executor_task_args_t args;
@@ -183,15 +201,41 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
                                              args.count);
                     break;
                 case UCC_DT_INT32:
-                    executor_reduce<int>((int*)args.bufs[1],
-                                         (int*)args.bufs[2],
-                                         (int*)args.bufs[0],
-                                          args.count);
+                    executor_reduce<int32_t>((int32_t*)args.bufs[1],
+                                             (int32_t*)args.bufs[2],
+                                             (int32_t*)args.bufs[0],
+                                              args.count);
                     break;
 
                 default:
                     break;
                 }
+                break;
+            case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI:
+                switch(args.dt) {
+                case UCC_DT_FLOAT32:
+                    executor_reduce_multi<float>((float*)args.bufs[1],
+                                                 (float*)args.bufs[2],
+                                                 (float*)args.bufs[0],
+                                                 args.count, args.size,
+                                                 args.stride);
+                    break;
+                case UCC_DT_FLOAT64:
+                    executor_reduce_multi<double>((double*)args.bufs[1],
+                                                  (double*)args.bufs[2],
+                                                  (double*)args.bufs[0],
+                                                  args.count, args.size,
+                                                  args.stride);
+                    break;
+                case UCC_DT_INT32:
+                    executor_reduce_multi<int32_t>((int32_t*)args.bufs[1],
+                                                   (int32_t*)args.bufs[2],
+                                                   (int32_t*)args.bufs[0],
+                                                   args.count, args.size,
+                                                   args.stride);
+                    break;
+                }
+                break;
             default: break;
         }
         __syncthreads();

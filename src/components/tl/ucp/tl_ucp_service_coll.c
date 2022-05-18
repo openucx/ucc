@@ -10,14 +10,58 @@
 #include "allreduce/allreduce.h"
 #include "allgather/allgather.h"
 
+static ucc_status_t ucc_tl_ucp_service_coll_start_executor(ucc_coll_task_t *task)
+{
+    ucc_ee_executor_params_t eparams;
+    ucc_status_t status;
+
+    eparams.mask    = UCC_EE_EXECUTOR_PARAM_FIELD_TYPE;
+    eparams.ee_type = UCC_EE_CPU_THREAD;
+
+    status = ucc_ee_executor_init(&eparams, &task->executor);
+    if (status != UCC_OK) {
+        return status;
+    }
+
+    status = ucc_ee_executor_start(task->executor, NULL);
+    if (status != UCC_OK) {
+        ucc_ee_executor_finalize(task->executor);
+        return status;
+    }
+
+    task->flags |= UCC_COLL_TASK_FLAG_EXECUTOR_STOP;
+
+    return UCC_OK;
+}
+
+static ucc_status_t ucc_tl_ucp_service_coll_stop_executor(ucc_coll_task_t *task)
+{
+    ucc_status_t status, gl_status;
+
+    gl_status = UCC_OK;
+    status = ucc_ee_executor_stop(task->executor);
+    if (status != UCC_OK) {
+        gl_status = status;
+    }
+
+    status = ucc_ee_executor_finalize(task->executor);
+    if (status != UCC_OK) {
+        gl_status = status;
+    }
+
+    return gl_status;
+}
+
 ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
                                           void *rbuf, ucc_datatype_t dt,
                                           size_t count, ucc_reduction_op_t op,
                                           ucc_subset_t      subset,
                                           ucc_coll_task_t **task_p)
 {
-    ucc_tl_ucp_team_t   *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_task_t   *task    = ucc_tl_ucp_get_task(tl_team);
+    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
+    ucc_status_t       status;
+
     ucc_base_coll_args_t bargs   = {
         .args = {
             .coll_type    = UCC_COLL_TYPE_ALLREDUCE,
@@ -36,7 +80,6 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
             }
         }
     };
-    ucc_status_t status;
 
     status = ucc_coll_task_init(&task->super, &bargs, team);
     if (status != UCC_OK) {
@@ -52,6 +95,12 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
     if (status != UCC_OK) {
         goto free_task;
     }
+
+    status = ucc_tl_ucp_service_coll_start_executor(&task->super);
+    if (status != UCC_OK) {
+        goto free_task;
+    }
+
     status = ucc_tl_ucp_allreduce_knomial_start(&task->super);
     if (status != UCC_OK) {
         goto finalize_coll;
@@ -59,8 +108,10 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
 
     *task_p = &task->super;
     return status;
+
 finalize_coll:
-   ucc_tl_ucp_allreduce_knomial_finalize(*task_p);
+    ucc_tl_ucp_allreduce_knomial_finalize(&task->super);
+    ucc_tl_ucp_service_coll_stop_executor(&task->super);
 free_task:
     ucc_tl_ucp_put_task(task);
     return status;
