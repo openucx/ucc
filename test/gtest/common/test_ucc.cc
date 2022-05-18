@@ -563,26 +563,34 @@ err:
 UccReq::UccReq(UccTeam_h _team, UccCollCtxVec ctxs) :
         team(_team)
 {
-    EXPECT_EQ(team->procs.size(), ctxs.size());
-    ucc_coll_req_h req;
-    ucc_status_t   status, err_status;
+    std::vector<ucc_status_t> err_st;
+    ucc_coll_req_h            req;
+    ucc_status_t              st;
 
-    err_status = UCC_OK;
+    EXPECT_EQ(team->procs.size(), ctxs.size());
+
+    status = UCC_OK;
     for (auto i = 0; i < team->procs.size(); i++) {
-        if (UCC_OK !=(status = ucc_collective_init(ctxs[i]->args, &req,
-                                                   team->procs[i].team))) {
-            err_status = status;
+        if (UCC_OK !=(st = ucc_collective_init(ctxs[i]->args, &req,
+                                               team->procs[i].team))) {
+            err_st.push_back(st);
+        } else {
+            reqs.push_back(req);
         }
-        reqs.push_back(req);
     }
-    if (UCC_OK != err_status) {
-        goto err;
-    }
-    return;
-err:
-    reqs.clear();
-    if (err_status == UCC_ERR_NOT_SUPPORTED) {
-        UCC_TEST_SKIP;
+    if (err_st.size() > 0) {
+        /* All error status should be equal, otherwise it is
+           real fatal error. Only expected error is NOT_SUPPORTED.
+           If collective init returns NOT_SUPPORTED it has to be
+           symmetric for all ranks */
+        if (!std::equal(err_st.begin() + 1, err_st.end(), err_st.begin()) ||
+            err_st.size() != team->procs.size() ||
+            err_st[0] != UCC_ERR_NOT_SUPPORTED) {
+            status = UCC_ERR_NO_MESSAGE;
+        } else {
+            ucc_assert(err_st[0] = UCC_ERR_NOT_SUPPORTED);
+            status = err_st[0];
+        }
     }
 }
 
@@ -596,7 +604,8 @@ UccReq::~UccReq()
 void UccReq::start()
 {
     ucc_status_t st;
-    ASSERT_NE(0, reqs.size());
+
+    ASSERT_EQ(team->procs.size(), reqs.size());
     for (auto r : reqs) {
         st = ucc_collective_post(r);
         ASSERT_EQ(UCC_OK, st);
@@ -607,26 +616,26 @@ void UccReq::start()
 
 ucc_status_t UccReq::test()
 {
-    ucc_status_t status = UCC_OK;
+    ucc_status_t st = UCC_OK;
     for (auto r : reqs) {
-        status = ucc_collective_test(r);
-        if (UCC_OK != status && UCC_OPERATION_INITIALIZED != status) {
+        st = ucc_collective_test(r);
+        if (UCC_OK != st) {
             break;
         }
     }
-    return status;
+    return st;
 }
 
 ucc_status_t UccReq::wait()
 {
-    ucc_status_t status;
-    while (UCC_OK != (status = test())) {
-        if (status < 0) {
+    ucc_status_t st;
+    while (UCC_OK != (st = test())) {
+        if (st < 0) {
             break;
         }
         team->progress();
     }
-    return status;
+    return st;
 }
 
 void UccReq::waitall(std::vector<UccReq> &reqs)
@@ -656,10 +665,6 @@ void UccReq::startall(std::vector<UccReq> &reqs)
 
 void UccCollArgs::set_mem_type(ucc_memory_type_t _mt)
 {
-    if (UCC_OK != ucc_mc_available(_mt)) {
-        UCC_TEST_SKIP_R(ucc::to_string(ucc_memory_type_names[_mt]) +
-                        " memory type not available");
-    }
     mem_type = _mt;
 }
 

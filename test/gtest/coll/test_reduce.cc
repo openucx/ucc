@@ -4,7 +4,7 @@
  * See file LICENSE for terms.
  */
 
-#include "test_mc_reduce.h"
+#include "core/test_mc_reduce.h"
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
@@ -147,20 +147,29 @@ class test_reduce : public UccCollArgs, public testing::Test {
     }
 };
 
-TYPED_TEST_CASE(test_reduce, ReductionTypesOps);
+template<typename T>
+class test_reduce_host : public test_reduce<T> {};
+
+template<typename T>
+class test_reduce_cuda : public test_reduce<T> {};
+
+TYPED_TEST_CASE(test_reduce_host, CollReduceTypeOpsHost);
+TYPED_TEST_CASE(test_reduce_cuda, CollReduceTypeOpsCuda);
 
 #define TEST_DECLARE(_mem_type, _inplace, _repeat, _persistent)                \
     {                                                                          \
         std::array<int, 3> counts{4, 256, 65536};                              \
+        CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, _mem_type);        \
         for (int tid = 0; tid < UccJob::nStaticTeams; tid++) {                 \
             for (int count : counts) {                                         \
                 UccTeam_h     team = UccJob::getStaticTeams()[tid];            \
                 int           size = team->procs.size();                       \
                 UccCollCtxVec ctxs;                                            \
-                this->set_mem_type(_mem_type);                                 \
+                SET_MEM_TYPE(_mem_type);                                       \
                 this->set_inplace(_inplace);                                   \
                 this->data_init(size, TypeParam::dt, count, ctxs, _persistent);\
                 UccReq req(team, ctxs);                                        \
+                CHECK_REQ_NOT_SUPPORTED_SKIP(req, this->data_fini(ctxs));      \
                 for (auto i = 0; i < _repeat; i++) {                           \
                     req.start();                                               \
                     req.wait();                                                \
@@ -172,36 +181,35 @@ TYPED_TEST_CASE(test_reduce, ReductionTypesOps);
         }                                                                      \
     }
 
-TYPED_TEST(test_reduce, single_host) {
+TYPED_TEST(test_reduce_host, single) {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce, single_host_persistent) {
+TYPED_TEST(test_reduce_host, single_persistent) {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE, 3, 1);
 }
 
-TYPED_TEST(test_reduce, single_host_inplace) {
+TYPED_TEST(test_reduce_host, single_inplace) {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce, single_host_persistent_inplace) {
+TYPED_TEST(test_reduce_host, single_persistent_inplace) {
     TEST_DECLARE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE, 3, 1);
 }
 
 #ifdef HAVE_CUDA
-TYPED_TEST(test_reduce, single_cuda) {
+TYPED_TEST(test_reduce_cuda, single) {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce, single_cuda_persistent) {
+TYPED_TEST(test_reduce_cuda, single_persistent) {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE, 3, 1);
 }
-
-TYPED_TEST(test_reduce, single_cuda_inplace) {
+TYPED_TEST(test_reduce_cuda, single_inplace) {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 1, 0);
 }
 
-TYPED_TEST(test_reduce, single_cuda_persistent_inplace) {
+TYPED_TEST(test_reduce_cuda, single_persistent_inplace) {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 3, 1);
 }
 #endif
@@ -209,6 +217,7 @@ TYPED_TEST(test_reduce, single_cuda_persistent_inplace) {
 #define TEST_DECLARE_MULTIPLE(_mem_type, _inplace)                             \
     {                                                                          \
         std::array<int, 3> counts{4, 256, 65536};                              \
+        CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, _mem_type);        \
         for (int count : counts) {                                             \
             std::vector<UccReq>        reqs;                                   \
             std::vector<UccCollCtxVec> ctxs;                                   \
@@ -217,9 +226,11 @@ TYPED_TEST(test_reduce, single_cuda_persistent_inplace) {
                 int           size = team->procs.size();                       \
                 UccCollCtxVec ctx;                                             \
                 this->set_inplace(_inplace);                                   \
-                this->set_mem_type(_mem_type);                                 \
+                SET_MEM_TYPE(_mem_type);                                       \
                 this->data_init(size, TypeParam::dt, count, ctx, false);       \
                 reqs.push_back(UccReq(team, ctx));                             \
+                CHECK_REQ_NOT_SUPPORTED_SKIP(reqs.back(),                      \
+                                             DATA_FINI_ALL(this, ctxs));       \
                 ctxs.push_back(ctx);                                           \
             }                                                                  \
             UccReq::startall(reqs);                                            \
@@ -231,20 +242,20 @@ TYPED_TEST(test_reduce, single_cuda_persistent_inplace) {
         }                                                                      \
     }
 
-TYPED_TEST(test_reduce, multiple) {
+TYPED_TEST(test_reduce_host, multiple) {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_HOST, TEST_NO_INPLACE);
 }
 
-TYPED_TEST(test_reduce, multiple_inplace) {
+TYPED_TEST(test_reduce_host, multiple_inplace) {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_HOST, TEST_INPLACE);
 }
 
 #ifdef HAVE_CUDA
-TYPED_TEST(test_reduce, multiple_cuda) {
+TYPED_TEST(test_reduce_cuda, multiple) {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_NO_INPLACE);
 }
 
-TYPED_TEST(test_reduce, multiple_cuda_inplace) {
+TYPED_TEST(test_reduce_cuda, multiple_inplace) {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE);
 }
 #endif
@@ -252,11 +263,7 @@ TYPED_TEST(test_reduce, multiple_cuda_inplace) {
 template <typename T> class test_reduce_avg_order : public test_reduce<T> {
 };
 
-using test_reduce_avg_order_type =
-    ::testing::Types<ReductionTest<UCC_DT_FLOAT32, avg>,
-                     ReductionTest<UCC_DT_FLOAT64, avg>,
-                     ReductionTest<UCC_DT_BFLOAT16, avg>>;
-TYPED_TEST_CASE(test_reduce_avg_order, test_reduce_avg_order_type);
+TYPED_TEST_CASE(test_reduce_avg_order, CollReduceTypeOpsAvg);
 
 TYPED_TEST(test_reduce_avg_order, avg_post_op)
 {
@@ -275,11 +282,11 @@ TYPED_TEST(test_reduce_avg_order, avg_post_op)
     for (auto count : {4, 256, 65536}) {
         for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
             for (auto m : mt) {
-                this->set_mem_type(m);
+                SET_MEM_TYPE(m);
                 this->set_inplace(inplace);
                 this->data_init(n_procs, TypeParam::dt, count, ctxs, true);
                 UccReq req(team, ctxs);
-
+                CHECK_REQ_NOT_SUPPORTED_SKIP(req, this->data_fini(ctxs));
                 for (auto i = 0; i < repeat; i++) {
                     req.start();
                     req.wait();

@@ -8,6 +8,7 @@ extern "C" {
 #include <pthread.h>
 }
 #include <common/test.h>
+#include <common/test_ucc.h>
 #include <cuda_runtime.h>
 #include <vector>
 
@@ -53,11 +54,17 @@ class test_mc_cuda : public ucc::test {
         test_ptr   = NULL;
         test_mtype = UCC_MEMORY_TYPE_UNKNOWN;
     }
+
     virtual void SetUp() override
     {
         ucc_mc_params_t mc_params = {
             .thread_mode = UCC_THREAD_SINGLE,
         };
+
+        if (UCC_OK != ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+            GTEST_SKIP();
+        }
+
         TestMCCudaSetUp(mc_params);
     }
     virtual void TearDown() override
@@ -74,6 +81,11 @@ class test_mc_cuda_mt : public test_mc_cuda {
         ucc_mc_params_t mc_params = {
             .thread_mode = UCC_THREAD_MULTIPLE,
         };
+
+        if (UCC_OK != ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+            GTEST_SKIP();
+        }
+
         TestMCCudaSetUp(mc_params);
     }
 };

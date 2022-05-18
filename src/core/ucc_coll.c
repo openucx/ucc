@@ -305,6 +305,7 @@ static ucc_status_t ucc_triggered_task_finalize(ucc_coll_task_t *task)
     return UCC_OK;
 }
 
+//NOLINTNEXTLINE
 static void ucc_triggered_task_cb(void *task, ucc_status_t st)
 {
     ucc_triggered_task_finalize((ucc_coll_task_t*)task);

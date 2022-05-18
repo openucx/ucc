@@ -131,7 +131,7 @@ UCC_TEST_P(test_bcast_0, single)
     int                       size     = team->procs.size();
     UccCollCtxVec             ctxs;
 
-    set_mem_type(mem_type);
+    SET_MEM_TYPE(mem_type);
     set_root(root);
 
     data_init(size, dtype, count, ctxs, false);
@@ -154,7 +154,7 @@ UCC_TEST_P(test_bcast_0, single_persistent)
     const int               n_calls  = 3;
     UccCollCtxVec           ctxs;
 
-    set_mem_type(mem_type);
+    SET_MEM_TYPE(mem_type);
     set_root(root);
 
     data_init(size, dtype, count, ctxs, true);
@@ -176,7 +176,7 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Range(1, UccJob::nStaticTeams), // team_ids
         PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
-        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
@@ -200,7 +200,7 @@ UCC_TEST_P(test_bcast_1, multiple)
         int             size = team->procs.size();
         UccCollCtxVec   ctx;
 
-        set_mem_type(mem_type);
+        SET_MEM_TYPE(mem_type);
         set_root(root);
 
         data_init(size, dtype, count, ctx, false);
@@ -221,7 +221,7 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Combine(
         PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
-        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif

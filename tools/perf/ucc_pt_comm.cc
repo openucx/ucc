@@ -3,7 +3,11 @@
 #include "ucc_pt_comm.h"
 #include "ucc_pt_bootstrap_mpi.h"
 #include "ucc_perftest.h"
-
+#include "ucc_pt_cuda.h"
+extern "C" {
+#include "utils/ucc_coll_utils.h"
+#include "components/mc/ucc_mc.h"
+}
 ucc_pt_comm::ucc_pt_comm(ucc_pt_comm_config config)
 {
     cfg = config;
@@ -17,17 +21,14 @@ ucc_pt_comm::~ucc_pt_comm()
 
 void ucc_pt_comm::set_gpu_device()
 {
-#ifdef HAVE_CUDA
-    cudaError_t st;
-    int dev_count;
-    CUDA_CHECK_GOTO(cudaGetDeviceCount(&dev_count), exit_cuda, st);
+    int dev_count = 0;
+
+    if (ucc_pt_cudaGetDeviceCount(&dev_count) || !dev_count)
     if (dev_count == 0) {
         return;
     }
-    CUDA_CHECK_GOTO(cudaSetDevice(bootstrap->get_local_rank() % dev_count),
-                    exit_cuda, st);
-exit_cuda:
-#endif
+
+    ucc_pt_cudaSetDevice(bootstrap->get_local_rank() % dev_count);
     return;
 }
 
@@ -70,6 +71,13 @@ ucc_status_t ucc_pt_comm::init()
     lib_params.mask = UCC_LIB_PARAM_FIELD_THREAD_MODE;
     lib_params.thread_mode = UCC_THREAD_SINGLE;
     UCCCHECK_GOTO(ucc_init(&lib_params, lib_config, &lib), free_lib_config, st);
+
+    if (UCC_OK != ucc_mc_available(cfg.mt)) {
+        std::cerr << "Selected memory type " << ucc_mem_type_str(cfg.mt) <<
+            " is not available" << std::endl;
+        return UCC_ERR_INVALID_PARAM;
+    }
+
     UCCCHECK_GOTO(ucc_context_config_read(lib, NULL, &ctx_config),
                   free_lib, st);
     cfg_mod = std::to_string(bootstrap->get_size());

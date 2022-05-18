@@ -198,7 +198,7 @@ UCC_TEST_P(test_alltoall_0, single)
     UccCollCtxVec        ctxs;
 
     this->set_inplace(inplace);
-    this->set_mem_type(mem_type);
+    SET_MEM_TYPE(mem_type);
 
     data_init(size, dtype, count, ctxs, false);
     UccReq    req(team, ctxs);
@@ -235,7 +235,7 @@ UCC_TEST_P(test_alltoall_0, single_onesided)
     }
     team = job.create_team(reference_ranks, true, is_contig, true);
     this->set_inplace(inplace);
-    this->set_mem_type(mem_type);
+    SET_MEM_TYPE(mem_type);
     data_init(size, dtype, count, ctxs, team, false);
     UccReq req(team, ctxs);
     req.start();
@@ -257,7 +257,7 @@ UCC_TEST_P(test_alltoall_0, single_persistent)
     UccCollCtxVec        ctxs;
 
     this->set_inplace(inplace);
-    this->set_mem_type(mem_type);
+    SET_MEM_TYPE(mem_type);
 
     data_init(size, dtype, count, ctxs, true);
     UccReq req(team, ctxs);
@@ -277,12 +277,12 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Range(1, UccJob::nStaticTeams), // team_ids
         PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
-        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
-        ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE), // inplace
-        ::testing::Values(1,3))); // count
+        ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE),
+        ::testing::Values(1,3)));
 
 class test_alltoall_1 : public test_alltoall,
         public ::testing::WithParamInterface<Param_1> {};
@@ -302,7 +302,7 @@ UCC_TEST_P(test_alltoall_1, multiple)
         UccCollCtxVec   ctx;
 
         this->set_inplace(inplace);
-        this->set_mem_type(mem_type);
+        SET_MEM_TYPE(mem_type);
 
         data_init(size, dtype, count, ctx, false);
         reqs.push_back(UccReq(team, ctx));
@@ -322,9 +322,9 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Combine(
         PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
-        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
-        ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE), // inplace
+        ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE),
         ::testing::Values(1,3,8192))); // count

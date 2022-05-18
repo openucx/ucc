@@ -5,7 +5,7 @@
 
 #ifndef UCC_TEST_CONTEXT_H
 #define UCC_TEST_CONTEXT_H
-#include <common/test.h>
+#include <common/test_ucc.h>
 class test_context_config : public ucc::test
 {
 public:

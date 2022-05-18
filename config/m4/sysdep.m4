@@ -31,11 +31,6 @@ AC_CHECK_DECLS([asprintf, basename, fmemopen], [],
 				 ])
 
 
-#
-# Google Testing framework
-#
-GTEST_LIB_CHECK([1.5.0], [true], [true])
-
 
 #
 # Valgrind support
