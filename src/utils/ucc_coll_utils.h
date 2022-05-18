@@ -257,14 +257,31 @@ static inline size_t ucc_buffer_block_offset(size_t     total_count,
 static inline ucc_rank_t ucc_ep_map_local_rank(ucc_ep_map_t map,
                                                ucc_rank_t   rank)
 {
-    ucc_rank_t i;
+    ucc_rank_t i, local_rank = UCC_RANK_INVALID;
+    int64_t    vrank;
 
-    for (i = 0; i < map.ep_num; i++) {
-        if (rank == ucc_ep_map_eval(map, i)) {
-            return i;
+    switch(map.type) {
+    case UCC_EP_MAP_FULL:
+        local_rank = rank;
+        break;
+    case UCC_EP_MAP_STRIDED:
+        vrank = (int64_t)rank - (int64_t)map.strided.start;
+        vrank /= map.strided.stride;
+        ucc_assert(vrank >= 0 && vrank < map.ep_num);
+        local_rank = (ucc_rank_t)vrank;
+        break;
+    case UCC_EP_MAP_ARRAY:
+    case UCC_EP_MAP_CB:
+        for (i = 0; i < map.ep_num; i++) {
+            if (rank == ucc_ep_map_eval(map, i)) {
+                local_rank = i;
+                break;
+            }
         }
+    default:
+        break;
     }
-    return UCC_RANK_INVALID;
+    return local_rank;
 }
 
 static inline ucc_ep_map_t ucc_active_set_to_ep_map(ucc_coll_args_t *args)
