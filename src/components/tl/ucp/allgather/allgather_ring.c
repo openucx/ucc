@@ -57,7 +57,6 @@ void ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
     task->super.status = UCC_OK;
 out:
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_ring_done", 0);
-    return;
 }
 
 ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
