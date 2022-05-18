@@ -99,7 +99,8 @@ gtest_SOURCES =                     \
 	utils/test_cfg_file.cc          \
 	coll_score/test_score.cc        \
 	coll_score/test_score_str.cc    \
-	coll_score/test_score_update.cc
+	coll_score/test_score_update.cc \
+	active_set/test_active_set.cc
 
 if HAVE_CUDA
 gtest_SOURCES += \

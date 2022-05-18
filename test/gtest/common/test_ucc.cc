@@ -571,6 +571,9 @@ UccReq::UccReq(UccTeam_h _team, UccCollCtxVec ctxs) :
 
     status = UCC_OK;
     for (auto i = 0; i < team->procs.size(); i++) {
+        if (!ctxs[i]) {
+            continue;
+        }
         if (UCC_OK !=(st = ucc_collective_init(ctxs[i]->args, &req,
                                                team->procs[i].team))) {
             err_st.push_back(st);
@@ -605,7 +608,6 @@ void UccReq::start()
 {
     ucc_status_t st;
 
-    ASSERT_EQ(team->procs.size(), reqs.size());
     for (auto r : reqs) {
         st = ucc_collective_post(r);
         ASSERT_EQ(UCC_OK, st);
