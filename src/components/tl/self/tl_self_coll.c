@@ -174,7 +174,6 @@ ucc_status_t ucc_tl_self_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *     team,
                                    ucc_coll_task_t **    task_h)
 {
-    ucc_debug("[%s]\n", __func__);
     ucc_tl_self_task_t *task = ucc_tl_self_coll_init_task(coll_args, team);
     ucc_status_t        status;
 
