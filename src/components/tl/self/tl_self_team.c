@@ -52,14 +52,14 @@ ucc_status_t ucc_tl_self_team_create_test(ucc_base_team_t *tl_team)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_self_team_get_scores(ucc_base_team_t *  tl_team,
+ucc_status_t ucc_tl_self_team_get_scores(ucc_base_team_t   *tl_team,
                                          ucc_coll_score_t **score_p)
 {
     ucc_tl_self_team_t *team = ucc_derived_of(tl_team, ucc_tl_self_team_t);
     ucc_base_context_t *ctx  = UCC_TL_TEAM_CTX(team);
     int                 mt_n = 0, i;
     ucc_memory_type_t   mem_types[UCC_MEMORY_TYPE_LAST];
-    ucc_coll_score_t *  score;
+    ucc_coll_score_t   *score;
     ucc_status_t        status;
 
     for (i = 0; i < UCC_MEMORY_TYPE_LAST; i++) {

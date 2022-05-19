@@ -11,7 +11,7 @@
 
 UCC_CLASS_INIT_FUNC(ucc_tl_self_context_t,
                     const ucc_base_context_params_t *params,
-                    const ucc_base_config_t *        config)
+                    const ucc_base_config_t         *config)
 {
     ucc_tl_self_context_config_t *tl_self_config =
         ucc_derived_of(config, ucc_tl_self_context_config_t);
@@ -42,7 +42,7 @@ UCC_CLASS_DEFINE(ucc_tl_self_context_t, ucc_tl_context_t);
 
 ucc_status_t
 ucc_tl_self_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                             ucc_base_ctx_attr_t *     attr)
+                             ucc_base_ctx_attr_t      *attr)
 {
     return UCC_OK;
 }

@@ -60,8 +60,8 @@ UCC_CLASS_DECLARE(ucc_tl_self_context_t, const ucc_base_context_params_t *,
 
 typedef struct ucc_tl_self_task {
     ucc_coll_task_t   super;
-    void *            src;
-    void *            dst;
+    void             *src;
+    void             *dst;
     size_t            size;
     ucc_memory_type_t src_memtype;
     ucc_memory_type_t dst_memtype;
@@ -90,8 +90,8 @@ UCC_CLASS_DECLARE(ucc_tl_self_team_t, ucc_base_context_t *,
     (ucc_derived_of((_team)->super.super.context, ucc_tl_self_context_t))
 
 ucc_status_t ucc_tl_self_coll_init(ucc_base_coll_args_t *coll_args,
-                                   ucc_base_team_t *     team,
-                                   ucc_coll_task_t **    task_h);
+                                   ucc_base_team_t      *team,
+                                   ucc_coll_task_t     **task_h);
 ucc_status_t ucc_tl_self_coll_finalize(ucc_coll_task_t *coll_task);
 
 #endif

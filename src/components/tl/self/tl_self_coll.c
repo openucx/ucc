@@ -13,11 +13,11 @@
 
 static inline ucc_tl_self_task_t *
 ucc_tl_self_coll_init_task(ucc_base_coll_args_t *coll_args,
-                           ucc_base_team_t *     team)
+                           ucc_base_team_t      *team)
 {
-    ucc_tl_self_team_t *   tl_team = ucc_derived_of(team, ucc_tl_self_team_t);
+    ucc_tl_self_team_t    *tl_team = ucc_derived_of(team, ucc_tl_self_team_t);
     ucc_tl_self_context_t *ctx     = UCC_TL_SELF_TEAM_CTX(tl_team);
-    ucc_tl_self_task_t *   task    = ucc_mpool_get(&ctx->req_mp);
+    ucc_tl_self_task_t    *task    = ucc_mpool_get(&ctx->req_mp);
 
     ucc_coll_task_init(&task->super, coll_args, team);
     UCC_TL_SELF_PROFILE_REQUEST_NEW(task, "tl_self_task", 0);
@@ -115,7 +115,7 @@ ucc_status_t ucc_tl_self_alltoallv_init(ucc_tl_self_task_t *task)
             args, args->dst.info_v.displacements, 0);
         task->dst = PTR_OFFSET(args->dst.info_v.buffer, displ);
         displ     = (size_t)ucc_coll_args_get_displacement(
-            args, args->src.info_v.displacements, 0);
+                args, args->src.info_v.displacements, 0);
         task->src  = PTR_OFFSET(args->src.info_v.buffer, displ);
         task->size = ucc_coll_args_get_count(args, args->src.info_v.counts, 0) *
                      ucc_dt_size(args->src.info_v.datatype);
@@ -171,8 +171,8 @@ ucc_status_t ucc_tl_self_scatterv_init(ucc_tl_self_task_t *task)
 }
 
 ucc_status_t ucc_tl_self_coll_init(ucc_base_coll_args_t *coll_args,
-                                   ucc_base_team_t *     team,
-                                   ucc_coll_task_t **    task_h)
+                                   ucc_base_team_t      *team,
+                                   ucc_coll_task_t     **task_h)
 {
     ucc_tl_self_task_t *task = ucc_tl_self_coll_init_task(coll_args, team);
     ucc_status_t        status;
