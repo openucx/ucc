@@ -43,10 +43,9 @@ ucc_status_t ucc_tl_self_coll_finalize(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_self_noop_progress(ucc_coll_task_t *task)
+void ucc_tl_self_noop_progress(ucc_coll_task_t *task)
 {
     task->status = UCC_OK;
-    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_self_noop_start(ucc_coll_task_t *task)
@@ -55,17 +54,12 @@ ucc_status_t ucc_tl_self_noop_start(ucc_coll_task_t *task)
     return ucc_progress_queue_enqueue(UCC_TASK_CORE_CTX(task)->pq, task);
 }
 
-ucc_status_t ucc_tl_self_coll_copy_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_self_coll_copy_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_self_task_t *task   = ucc_derived_of(coll_task, ucc_tl_self_task_t);
-    ucc_status_t        status = UCC_OK;
 
-    status = ucc_mc_memcpy(task->dst, task->src, task->size, task->dst_memtype,
-                           task->src_memtype);
-
-    task->super.status = status;
-
-    return status;
+    task->super.status = ucc_mc_memcpy(task->dst, task->src, task->size, task->dst_memtype,
+                                       task->src_memtype);
 }
 
 ucc_status_t ucc_tl_self_coll_start(ucc_coll_task_t *task)
@@ -75,7 +69,6 @@ ucc_status_t ucc_tl_self_coll_start(ucc_coll_task_t *task)
 
 ucc_status_t ucc_tl_self_coll_noop_init(ucc_tl_self_task_t *task)
 {
-    // tl_debug(task->super.super.context.lib, "[%s]\n", __func__);
     task->super.status   = UCC_OK;
     task->super.post     = ucc_tl_self_coll_start;
     task->super.progress = ucc_tl_self_noop_progress;

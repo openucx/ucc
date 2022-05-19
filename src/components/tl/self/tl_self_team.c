@@ -14,8 +14,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_self_team_t, ucc_base_context_t *tl_context,
 {
     ucc_tl_self_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_self_context_t);
-    ucc_tl_self_lib_t *lib = ucc_derived_of(tl_context->lib, ucc_tl_self_lib_t);
-    ucc_status_t       status;
+
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     if (UCC_TL_TEAM_SIZE(self) > 1) {
