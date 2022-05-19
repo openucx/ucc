@@ -7,6 +7,7 @@ tl_self_enabled=n
 CHECK_TLS_REQUIRED(["self"])
 AS_IF([test "$CHECKED_TL_REQUIRED" = "y"],
 [
+   tl_modules="${tl_modules}:self"
    tl_self_enabled=y
     CHECK_NEED_TL_PROFILING(["tl_self"])
     AS_IF([test "$TL_PROFILING_REQUIRED" = "y"],

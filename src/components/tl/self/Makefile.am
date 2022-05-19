@@ -13,7 +13,7 @@ sources =               	\
 	tl_self_team.c 
 
 
-module_LTLIBRARIES = libucc_tl_cuda.la
+module_LTLIBRARIES = libucc_tl_self.la
 libucc_tl_self_la_SOURCES  = $(sources)
 libucc_tl_self_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS)
 libucc_tl_self_la_CFLAGS   = $(BASE_CFLAGS)
