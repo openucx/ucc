@@ -38,8 +38,8 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
 {
     ucc_status_t status;
 
-    if (context->service_team) {
-        /* User internal service team for OOB */
+    if (context->service_team && team->size > 1) {
+        /* User internal service team for OOB, skip OOB if team size is 1 */
         ucc_subset_t subset = {.myrank     = team->rank,
                                .map.ep_num = team->size,
                                .map.type   = UCC_EP_MAP_FULL};
@@ -110,8 +110,8 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts, uint32_t num_contexts
         }
         team_size = params->ep_map.ep_num;
     }
-    if (team_size < 2) {
-        ucc_warn("minimal size of UCC team is 2, provided %llu",
+    if (team_size < 1) {
+        ucc_warn("minimal size of UCC team is 1, provided %llu",
                  (unsigned long long)team_size);
         return UCC_ERR_INVALID_PARAM;
     }
@@ -240,7 +240,7 @@ ucc_team_create_cls(ucc_context_t *context, ucc_team_t *team)
     ucc_base_team_t       *b_team;
     ucc_status_t           status;
 
-    if (context->topo && !team->topo) {
+    if (context->topo && !team->topo && team->size > 1) {
         ucc_subset_t subset;
         /* Context->topo is not NULL if any of the enabled CLs
            reported topo_required through the lib_attr */
