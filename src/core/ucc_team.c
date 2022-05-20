@@ -60,7 +60,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     team->bp.team                 = team;
     team->bp.map.type             = UCC_EP_MAP_FULL;
     team->bp.map.ep_num           = team->size;
-    team->state                   = UCC_TEAM_ADDR_EXCHANGE;
+    team->state                   = (team->size > 1) ? UCC_TEAM_ADDR_EXCHANGE : UCC_TEAM_ALLOC_ID;
     team->last_team_create_posted = -1;
     team->status                  = UCC_INPROGRESS;
     return UCC_OK;
@@ -562,32 +562,34 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
         memset(ctx->ids.pool, 255, ctx->ids.pool_size*2*sizeof(uint64_t));
     }
     local  = ctx->ids.pool;
-    global = ctx->ids.pool + ctx->ids.pool_size;
+    if (team->size > 1) {
+        global = ctx->ids.pool + ctx->ids.pool_size;
 
-    if (!team->sreq) {
-        ucc_subset_t subset = {.map.type   = UCC_EP_MAP_FULL,
-                               .map.ep_num = team->size,
-                               .myrank     = team->rank};
-        status = ucc_service_allreduce(team, local, global, UCC_DT_UINT64,
-                                       ctx->ids.pool_size,
-                                       UCC_OP_BAND, subset,
-                                       &team->sreq);
+        if (!team->sreq) {
+            ucc_subset_t subset = {.map.type   = UCC_EP_MAP_FULL,
+                                .map.ep_num = team->size,
+                                .myrank     = team->rank};
+            status = ucc_service_allreduce(team, local, global, UCC_DT_UINT64,
+                                        ctx->ids.pool_size,
+                                        UCC_OP_BAND, subset,
+                                        &team->sreq);
+            if (status < 0) {
+                return status;
+            }
+        }
+        ucc_context_progress(ctx);
+        status = ucc_service_coll_test(team->sreq);
         if (status < 0) {
+            ucc_error("service allreduce test failure: %s",
+                    ucc_status_string(status));
+            return status;
+        } else if (status != UCC_OK) {
             return status;
         }
+        ucc_service_coll_finalize(team->sreq);
+        team->sreq = NULL;
+        memcpy(local, global, ctx->ids.pool_size*sizeof(uint64_t));
     }
-    ucc_context_progress(ctx);
-    status = ucc_service_coll_test(team->sreq);
-    if (status < 0) {
-        ucc_error("service allreduce test failure: %s",
-                  ucc_status_string(status));
-        return status;
-    } else if (status != UCC_OK) {
-        return status;
-    }
-    ucc_service_coll_finalize(team->sreq);
-    team->sreq = NULL;
-    memcpy(local, global, ctx->ids.pool_size*sizeof(uint64_t));
     pos = 0;
     for (i=0; i<ctx->ids.pool_size; i++) {
         if ((pos = find_first_set_and_zero(&local[i])) > 0) {
