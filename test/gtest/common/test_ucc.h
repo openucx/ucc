@@ -6,10 +6,12 @@
 #ifndef TEST_UCC_H
 #define TEST_UCC_H
 #include "test.h"
-#include "ucc/api/ucc.h"
+
 extern "C" {
 #include "components/mc/ucc_mc.h"
 #include "utils/ucc_malloc.h"
+#include <ucc/api/ucc.h>
+#include <core/ucc_global_opts.h>
 }
 #include <vector>
 #include <tuple>
@@ -17,6 +19,7 @@ extern "C" {
 #include <mutex>
 #include <thread>
 #include <atomic>
+#include <string>
 
 typedef struct {
     ucc_mc_buffer_header_t *dst_mc_header;
@@ -72,6 +75,13 @@ public:
     void set_mem_type(ucc_memory_type_t _mt);
     void set_inplace(gtest_ucc_inplace_t _inplace);
 };
+
+#define SET_MEM_TYPE(_mt) do {                  \
+        if (UCC_OK != ucc_mc_available(_mt)) {  \
+            GTEST_SKIP();                       \
+        }                                       \
+        this->mem_type = _mt;                   \
+    } while (0)
 
 class ThreadAllgather;
 class ThreadAllgatherReq {
@@ -220,9 +230,10 @@ class UccReq {
     /* Make copy constructor and = private,
        to avoid req leak */
 public:
+    ucc_status_t status;
     UccReq(const UccReq&) = delete;
     UccReq& operator=(const UccReq&) = delete;
-    UccReq(UccReq&& source) : team(source.team) {
+    UccReq(UccReq&& source) : team(source.team), status(source.status) {
         reqs.swap(source.reqs);
     };
 
@@ -237,12 +248,22 @@ public:
     static void startall(std::vector<UccReq> &reqs);
 };
 
+#define DATA_FINI_ALL(_test, _ctx) for (auto &c : ctxs) { _test->data_fini(c); }
+
+#define CHECK_REQ_NOT_SUPPORTED_SKIP(_UccReq, _action) do{  \
+        if ((_UccReq).status == UCC_ERR_NOT_SUPPORTED) {    \
+            _action;                                        \
+            GTEST_SKIP();                                   \
+        }                                                   \
+        ASSERT_EQ(UCC_OK, (_UccReq).status);                \
+    } while(0)
+
 void clear_buffer(void *_buf, size_t size, ucc_memory_type_t mt, uint8_t value);
 
 #define PREDEFINED_DTYPES \
     ::testing::Values(UCC_DT_INT8, UCC_DT_INT16, UCC_DT_INT32, UCC_DT_INT64, UCC_DT_INT128,\
                       UCC_DT_UINT8, UCC_DT_UINT16, UCC_DT_UINT32, UCC_DT_UINT64, UCC_DT_UINT128,\
-                      UCC_DT_FLOAT16, UCC_DT_FLOAT32, UCC_DT_FLOAT64)
+                      UCC_DT_FLOAT16, UCC_DT_FLOAT32, UCC_DT_FLOAT64, UCC_DT_BFLOAT16)
 
 #define UCC_TEST_N_MEM_SEGMENTS   3
 #define UCC_TEST_MEM_SEGMENT_SIZE (1 << 20)

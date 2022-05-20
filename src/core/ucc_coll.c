@@ -365,7 +365,7 @@ static void ucc_trigger_test(ucc_coll_task_t *task)
     ucc_ee_executor_params_t  params;
 
     if (task->ev == NULL) {
-        if (task->ee->ee_type == UCC_EE_CUDA_STREAM) {
+        if (task->ee->ee_type == UCC_EE_CUDA_STREAM || task->ee->ee_type == UCC_EE_ROCM_STREAM) {
             /* implicit event triggered */
             task->ev = (ucc_ev_t *) 0xFFFF; /* dummy event */
             task->executor = NULL;

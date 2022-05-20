@@ -4,7 +4,6 @@
  * See file LICENSE for terms.
  */
 
-#include "tl_sharp.h"
 #include "tl_sharp_coll.h"
 #include "components/mc/ucc_mc.h"
 #include "core/ucc_ee.h"
@@ -107,6 +106,9 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
         break;
     case UCC_COLL_TYPE_BARRIER:
         status = ucc_tl_sharp_barrier_init(task);
+        break;
+    case UCC_COLL_TYPE_BCAST:
+        status = ucc_tl_sharp_bcast_init(task);
         break;
     default:
         tl_error(UCC_TASK_LIB(task),
