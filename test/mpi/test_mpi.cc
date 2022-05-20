@@ -321,11 +321,11 @@ void UccTestMpi::set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vs
     displs_vsize = _displs_vsize;
 }
 
-#ifdef HAVE_CUDA
-void set_cuda_device(test_set_cuda_device_t set_device)
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
+void set_gpu_device(test_set_gpu_device_t set_device)
 {
     MPI_Comm local_comm;
-    int cuda_dev_count;
+    int gpu_dev_count;
     int local_rank;
     int device_id;
 
@@ -336,25 +336,33 @@ void set_cuda_device(test_set_cuda_device_t set_device)
     MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
                         &local_comm);
     MPI_Comm_rank(local_comm, &local_rank);
-
-    CUDA_CHECK(cudaGetDeviceCount(&cuda_dev_count));
+#if defined(HAVE_CUDA)
+    CUDA_CHECK(cudaGetDeviceCount(&gpu_dev_count));
+#elif defined(HAVE_HIP)
+    HIP_CHECK(hipGetDeviceCount(&gpu_dev_count));
+#endif
     switch (set_device) {
     case TEST_SET_DEV_LRANK:
-        if(local_rank >= cuda_dev_count) {
+        if(local_rank >= gpu_dev_count) {
             std::cerr << "*** UCC TEST FAIL: "
-                      << "not enough CUDA devices on the node to map processes.\n";
+                      << "not enough GPU devices on the node to map processes.\n";
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
         device_id = local_rank;
         break;
     case TEST_SET_DEV_LRANK_ROUND:
-        device_id = local_rank % cuda_dev_count;
+        device_id = local_rank % gpu_dev_count;
         break;
     case TEST_SET_DEV_NONE:
     default:
         return;
     }
+#if defined(HAVE_CUDA)
     CUDA_CHECK(cudaSetDevice(device_id));
+#elif defined(HAVE_HIP)
+    HIP_CHECK(hipSetDevice(device_id));
+#endif
+
 }
 #endif
 

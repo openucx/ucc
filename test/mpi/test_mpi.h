@@ -25,6 +25,9 @@ END_C_DECLS
 #include <cuda.h>
 #include <cuda_runtime.h>
 #endif
+#ifdef HAVE_HIP
+#include <hip/hip_runtime_api.h>
+#endif
 
 #define STR(x) #x
 #define UCC_CHECK(_call)                                                \
@@ -75,6 +78,17 @@ extern int test_rand_seed;
 }
 #endif
 
+#ifdef HAVE_HIP
+#define HIP_CHECK(_call) {                                          \
+    hipError_t hip_err = (_call);                                   \
+    if (hipSuccess != (hip_err)) {                                  \
+        std::cerr << "*** UCC TEST FAIL: " << STR(_call) << ": "    \
+                  << hipGetErrorString(hip_err) << "\n" ;           \
+        MPI_Abort(MPI_COMM_WORLD, -1);                              \
+    }                                                               \
+}
+#endif
+
 #define UCC_TEST_N_MEM_SEGMENTS   3
 #define UCC_TEST_MEM_SEGMENT_SIZE (1 << 21)
 
@@ -116,12 +130,12 @@ typedef enum {
     TEST_SKIP_LAST
 } test_skip_cause_t;
 
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
 typedef enum {
     TEST_SET_DEV_NONE,
     TEST_SET_DEV_LRANK,
     TEST_SET_DEV_LRANK_ROUND
-} test_set_cuda_device_t;
+} test_set_gpu_device_t;
 #endif
 
 static inline const char* skip_str(test_skip_cause_t s) {
@@ -154,8 +168,8 @@ static inline const char* team_str(ucc_test_mpi_team_t t) {
     return NULL;
 }
 
-#ifdef HAVE_CUDA
-void set_cuda_device(test_set_cuda_device_t set_device);
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
+void set_gpu_device(test_set_gpu_device_t set_device);
 #endif
 int ucc_coll_inplace_supported(ucc_coll_type_t c);
 int ucc_coll_is_rooted(ucc_coll_type_t c);

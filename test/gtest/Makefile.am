@@ -110,6 +110,14 @@ gtest_LDADD += \
 	$(CUDA_LIBS)
 endif
 
+if HAVE_ROCM
+gtest_SOURCES  += core/test_mc_rocm.cc
+gtest_CPPFLAGS += $(HIP_CPPFLAGS)
+gtest_LDFLAGS  += $(HIP_LDFLAGS)
+gtest_LDADD    += $(HIP_LIBS)
+endif
+
+
 noinst_HEADERS =            \
 	common/gtest.h          \
 	common/test.h           \

@@ -36,9 +36,10 @@ static int                                 show_help    = 0;
 static int                                 num_tests    = 1;
 static bool                                has_onesided = true;
 static bool                                verbose      = false;
-#ifdef HAVE_CUDA
-static test_set_cuda_device_t test_cuda_set_device = TEST_SET_DEV_NONE;
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
+static test_set_gpu_device_t test_gpu_set_device = TEST_SET_DEV_NONE;
 #endif
+
 static std::vector<std::string> str_split(const char *value, const char *delimiter)
 {
     std::vector<std::string> rst;
@@ -62,7 +63,7 @@ void PrintHelp()
             "barrier, allreduce, allgather, allgatherv, bcast, alltoall, alltoallv "
             "reduce, reduce_scatter, reduce_scatterv, gather, gatherv, scatter, scatterv\n\n"
        "-t, --teams            <t1,t2,..>\n\tlist of teams: world,half,reverse,odd_even\n\n"
-       "-M, --mtypes           <m1,m2,..>\n\tlist of mtypes: host,cuda\n\n"
+       "-M, --mtypes           <m1,m2,..>\n\tlist of mtypes: host,cuda,rocm\n\n"
        "-d, --dtypes           <d1,d2,..>\n\tlist of dtypes: (u)int8(16,32,64),float32(64)\n\n"
        "-o, --ops              <o1,o2,..>\n\tlist of ops:sum,prod,max,min,land,lor,lxor,band,bor,bxor\n\n"
        "-I, --inplace          <value>\n\t0 - no inplace, 1 - inplace, 2 - both\n\n"
@@ -151,6 +152,8 @@ static ucc_memory_type_t mtype_str_to_type(std::string mtype)
         return UCC_MEMORY_TYPE_HOST;
     } else if (mtype == "cuda") {
         return UCC_MEMORY_TYPE_CUDA;
+    } else if (mtype == "rocm") {
+        return UCC_MEMORY_TYPE_ROCM;
     }
     throw std::string("incorrect memory type: ") + mtype;
 }
@@ -348,8 +351,7 @@ void ProcessArgs(int argc, char** argv)
                                 {"iter", required_argument, nullptr, 'i'},
                                 {"thread-multiple", no_argument, nullptr, 'T'},
                                 {"num_tests", required_argument, nullptr, 'N'},
-                                {"verbose", no_argument, nullptr, 'v'},
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
                                 {"set_device", required_argument, nullptr, 'S'},
 #endif
                                 {"onesided", required_argument, nullptr, 'O'},
@@ -411,9 +413,9 @@ void ProcessArgs(int argc, char** argv)
         case 'N':
             num_tests = std::stoi(optarg);
             break;
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
         case 'S':
-            test_cuda_set_device = (test_set_cuda_device_t)std::stoi(optarg);
+            test_gpu_set_device = (test_set_gpu_device_t)std::stoi(optarg);
             break;
 #endif
         case 'O':
@@ -470,8 +472,8 @@ int main(int argc, char *argv[])
         goto mpi_exit;
     }
 
-#ifdef HAVE_CUDA
-    set_cuda_device(test_cuda_set_device);
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
+    set_gpu_device(test_gpu_set_device);
 #endif
     test = new UccTestMpi(argc, argv, thread_mode, 0, has_onesided);
     for (auto &m : mtypes) {
