@@ -29,7 +29,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     ucp_worker_h        ucp_worker;
     ucs_status_t        status;
 
-    if (params->params.oob.n_oob_eps < 2) {
+    if (params->params.oob.n_oob_eps == 1) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 

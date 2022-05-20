@@ -30,7 +30,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
     CUcontext cu_ctx;
     CUresult cu_st;
 
-    if (params->params.oob.n_oob_eps < 2) {
+    if (params->params.oob.n_oob_eps == 1) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 

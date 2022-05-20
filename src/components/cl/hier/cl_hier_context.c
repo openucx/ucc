@@ -21,7 +21,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
     ucc_status_t              status;
     int                       i;
 
-    if (params->params.oob.n_oob_eps < 2) {
+    if (params->params.oob.n_oob_eps == 1) {
         cl_info(
             cl_config->cl_lib,
             "team size %d is not supported for %s",
