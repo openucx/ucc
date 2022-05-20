@@ -26,6 +26,14 @@ autom4te.cache
 /missing
 /stamp-h1
 
+
+# cmake and libtool files
+
+cmake/ucc-config-version.cmake
+cmake/ucc-config.cmake
+cmake/ucc-targets.cmake
+libtool
+
 # https://www.gnu.org/software/libtool/
 
 /ltmain.sh
@@ -58,3 +66,32 @@ Makefile
 
 # IDEs
 .idea/
+.vscode
+*.code-workspace
+
+# Files and directories generated during compilation
+
+.libs
+.deps
+.dirstamp
+
+*.la
+*.lo
+*.o
+*.so
+*.a
+*.dwarf
+*.dSYM
+*.S
+*~
+
+config.h
+src/core/ucc_version.c
+src/ucc/api/ucc_version.h
+test/gtest/gtest
+test/mpi/ucc_test_mpi
+tools/info/build_config.h
+tools/info/ucc_info
+tools/perf/ucc_perftest
+modules
+

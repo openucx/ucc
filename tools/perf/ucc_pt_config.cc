@@ -44,6 +44,7 @@ const std::map<std::string, ucc_coll_type_t> ucc_pt_coll_map = {
 const std::map<std::string, ucc_memory_type_t> ucc_pt_memtype_map = {
     {"host", UCC_MEMORY_TYPE_HOST},
     {"cuda", UCC_MEMORY_TYPE_CUDA},
+    {"rocm", UCC_MEMORY_TYPE_ROCM},
 };
 
 const std::map<std::string, ucc_datatype_t> ucc_pt_datatype_map = {

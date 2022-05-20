@@ -59,3 +59,23 @@ UCC_TEST_F(test_string, split_no_delim)
     EXPECT_EQ(s, split[0]);
     ucc_str_split_free(split);
 }
+
+UCC_TEST_F(test_string, find_last)
+{
+    const char* str1 = "aaa bbb aaa ccc aaa ddd";
+    const char* str2 = "/tmp/build/ucc_tl_ucp/install/lib/ucc_tl_ucp.so";
+    const char *s;
+
+    s = ucc_strstr_last(str1, "aaa");
+    EXPECT_EQ(16, (ptrdiff_t)s - (ptrdiff_t)str1);
+
+    s = ucc_strstr_last(str2, "ucc_tl_ucp");
+    EXPECT_EQ(strlen(str2) - strlen("ucc_tl_ucp.so"),
+              (ptrdiff_t)s - (ptrdiff_t)str2);
+
+    s = ucc_strstr_last(str1, "fff");
+    EXPECT_EQ(NULL, s);
+
+    s = ucc_strstr_last(str2, "/tmp");
+    EXPECT_EQ(str2, s);
+}

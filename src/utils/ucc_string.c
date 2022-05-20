@@ -101,3 +101,13 @@ ucc_status_t ucc_str_to_memunits(const char *buf, void *dest)
 {
     return ucs_status_to_ucc_status(ucs_str_to_memunits(buf, dest));
 }
+
+const char* ucc_strstr_last(const char* string, const char* pattern)
+{
+    const char *found = NULL;
+
+    while ((string = strstr(string, pattern))) {
+        found = string++;
+    }
+    return found;
+}

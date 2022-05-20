@@ -3,6 +3,7 @@
 #include "ucc_pt_config.h"
 #include "ucc_pt_coll.h"
 #include "ucc_pt_cuda.h"
+#include "ucc_pt_rocm.h"
 #include "ucc_pt_benchmark.h"
 
 int main(int argc, char *argv[])
@@ -14,6 +15,7 @@ int main(int argc, char *argv[])
 
     pt_config.process_args(argc, argv);
     ucc_pt_cuda_init();
+    ucc_pt_rocm_init();
     try {
         comm = new ucc_pt_comm(pt_config.comm);
     } catch(std::exception &e) {
