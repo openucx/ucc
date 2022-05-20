@@ -153,7 +153,6 @@ ucc_tl_cuda_reduce_scatterv_ring_progress_ring(ucc_tl_cuda_task_t * task,
                 rdst = PTR_OFFSET(TASK_SCRATCH(task, trank), local_offset +
                                   ring_scratch_offset * ring_id);
             }
-
             exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_REDUCE;
             exec_args.bufs[0]   = rdst;
             exec_args.bufs[1]   = rsrc1;
