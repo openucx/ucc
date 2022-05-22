@@ -82,7 +82,7 @@ public:
     bool data_validate(UccCollCtxVec ctxs)
     {
         bool     ret  = true;
-        int      root = ctxs[0]->args->root;
+        int      root = (ctxs.size() > 1) ? ctxs[0]->args->root : 0;
         uint8_t *dsts;
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
