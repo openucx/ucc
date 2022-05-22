@@ -31,12 +31,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
     CUcontext cu_ctx;
     CUresult cu_st;
 
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_cuda_config->super,
+                              params->context);
     if (params->params.oob.n_oob_eps == 1) {
         return UCC_ERR_NOT_SUPPORTED;
     }
-
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_cuda_config->super,
-                              params->context);
     memcpy(&self->cfg, tl_cuda_config, sizeof(*tl_cuda_config));
 
     cuda_st = cudaGetDeviceCount(&num_devices);

@@ -22,6 +22,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
     ucc_status_t              status;
     int                       i;
 
+    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_config,
+                              params->context);
     if (params->params.oob.n_oob_eps == 1) {
         cl_info(
             cl_config->cl_lib,
@@ -29,9 +31,6 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
             params->params.oob.n_oob_eps, lib->super.iface->super.name);
         return UCC_ERR_NOT_SUPPORTED;
     }
-
-    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_config,
-                              params->context);
     if (tls->count == 1 && !strcmp(tls->names[0], "all")) {
         tls = &params->context->all_tls;
     }
