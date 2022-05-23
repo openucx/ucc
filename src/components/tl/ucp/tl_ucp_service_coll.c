@@ -64,6 +64,7 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
 
     ucc_base_coll_args_t bargs   = {
         .args = {
+            .mask         = 0,
             .coll_type    = UCC_COLL_TYPE_ALLREDUCE,
             .op           = op,
             .src.info = {

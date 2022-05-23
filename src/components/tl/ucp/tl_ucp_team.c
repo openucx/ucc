@@ -53,6 +53,7 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
     if (!team->preconnect_task) {
         team->preconnect_task             = ucc_tl_ucp_get_task(team);
         team->preconnect_task->tagged.tag = 0;
+        team->preconnect_task->super.bargs.args.mask = 0;
     }
     if (UCC_INPROGRESS == ucc_tl_ucp_test(team->preconnect_task)) {
         return UCC_INPROGRESS;
