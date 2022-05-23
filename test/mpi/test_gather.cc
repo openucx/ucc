@@ -86,7 +86,7 @@ ucc_status_t TestGather::set_input()
         if (inplace == TEST_NO_INPLACE) {
             buf = sbuf;
         } else {
-            buf = PTR_OFFSET(rbuf, rank * single_rank_count);
+            buf = PTR_OFFSET(rbuf, rank * single_rank_size);
         }
     } else {
         buf = sbuf;
