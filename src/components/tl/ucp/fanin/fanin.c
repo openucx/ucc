@@ -7,6 +7,15 @@
 #include "fanin.h"
 #include "../reduce/reduce.h"
 
+ucc_base_coll_alg_info_t
+    ucc_tl_ucp_fanin_algs[UCC_TL_UCP_FANIN_ALG_LAST + 1] = {
+        [UCC_TL_UCP_FANIN_ALG_KNOMIAL] =
+            {.id   = UCC_TL_UCP_FANIN_ALG_KNOMIAL,
+             .name = "knomial",
+             .desc = "fanin over knomial tree with arbitrary radix"},
+        [UCC_TL_UCP_FANIN_ALG_LAST] = {
+            .id = 0, .name = NULL, .desc = NULL}};
+
 ucc_status_t ucc_tl_ucp_fanin_init(ucc_tl_ucp_task_t *task)
 {
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);

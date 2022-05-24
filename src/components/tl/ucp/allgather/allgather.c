@@ -7,6 +7,15 @@
 #include "tl_ucp.h"
 #include "allgather.h"
 
+ucc_base_coll_alg_info_t
+    ucc_tl_ucp_allgather_algs[UCC_TL_UCP_ALLGATHER_ALG_LAST + 1] = {
+        [UCC_TL_UCP_ALLGATHER_ALG_RING] =
+            {.id   = UCC_TL_UCP_ALLGATHER_ALG_RING,
+             .name = "ring",
+             .desc = "O(N) Ring"},
+        [UCC_TL_UCP_ALLGATHER_ALG_LAST] = {
+            .id = 0, .name = NULL, .desc = NULL}};
+
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task)
 {
     if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info.datatype)) ||
