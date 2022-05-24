@@ -18,6 +18,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.n_warmup_large = 20;
     bench.large_thresh   = 64 * 1024;
     bench.full_print     = false;
+    comm.mt              = bench.mt;
 }
 
 const std::map<std::string, ucc_reduction_op_t> ucc_pt_op_map = {
