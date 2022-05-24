@@ -15,7 +15,7 @@ ucc_base_coll_alg_info_t
         [UCC_TL_UCP_BARRIER_ALG_KNOMIAL] =
             {.id   = UCC_TL_UCP_BARRIER_ALG_KNOMIAL,
              .name = "knomial",
-             .desc = "recursive k-ing with arbitrary radix"},
+             .desc = "recursive knomial with arbitrary radix"},
         [UCC_TL_UCP_BARRIER_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 

@@ -12,7 +12,7 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_REDUCE_ALG_KNOMIAL,
              .name = "knomial",
              .desc = "reduce over knomial tree with arbitrary radix "
-                     "(latency oriented alg)"},
+                     "(optimized for latency)"},
         [UCC_TL_UCP_REDUCE_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
