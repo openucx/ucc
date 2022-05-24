@@ -13,12 +13,12 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_BCAST_ALG_KNOMIAL,
              .name = "knomial",
              .desc = "bcast over knomial tree with arbitrary radix "
-                     "(latency oriented alg)"},
+                     "(optimized for latency)"},
         [UCC_TL_UCP_BCAST_ALG_SAG_KNOMIAL] =
             {.id   = UCC_TL_UCP_BCAST_ALG_SAG_KNOMIAL,
              .name = "sag_knomial",
-             .desc = "recursive k-nomial scatter followed by k-nomial "
-                     "allgather (bw oriented alg)"},
+             .desc = "recursive knomial scatter followed by knomial "
+                     "allgather (optimized for BW)"},
         [UCC_TL_UCP_BCAST_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 

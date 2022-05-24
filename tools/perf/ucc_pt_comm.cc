@@ -4,6 +4,7 @@
 #include "ucc_pt_bootstrap_mpi.h"
 #include "ucc_perftest.h"
 #include "ucc_pt_cuda.h"
+#include "ucc_pt_rocm.h"
 extern "C" {
 #include "utils/ucc_coll_utils.h"
 #include "components/mc/ucc_mc.h"
@@ -23,12 +24,15 @@ void ucc_pt_comm::set_gpu_device()
 {
     int dev_count = 0;
 
-    if (ucc_pt_cudaGetDeviceCount(&dev_count) || !dev_count)
-    if (dev_count == 0) {
-        return;
+    if (ucc_pt_cudaGetDeviceCount(&dev_count) == 0 && dev_count != 0) {
+	ucc_pt_cudaSetDevice(bootstrap->get_local_rank() % dev_count);
+	return;
     }
 
-    ucc_pt_cudaSetDevice(bootstrap->get_local_rank() % dev_count);
+    if (ucc_pt_rocmGetDeviceCount(&dev_count) == 0 && dev_count != 0) {
+	ucc_pt_rocmSetDevice(bootstrap->get_local_rank() % dev_count);
+    }
+
     return;
 }
 

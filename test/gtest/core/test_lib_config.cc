@@ -3,7 +3,8 @@
  * See file LICENSE for terms.
  */
 
-#include <common/test.h>
+#include <common/test_ucc.h>
+
 class test_lib_config : public ucc::test {
 };
 

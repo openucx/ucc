@@ -18,11 +18,14 @@
 #include <ucs/sys/compiler_def.h>
 #include <ucs/config/types.h>
 #include <ucs/config/parser.h>
+#include <ucs/config/ini.h>
 
 typedef ucs_config_field_t             ucc_config_field_t;
 typedef ucs_config_names_array_t       ucc_config_names_array_t;
 typedef ucs_config_global_list_entry_t ucc_config_global_list_entry_t;
 typedef ucs_config_allow_list_t        ucc_config_allow_list_t;
+
+typedef struct ucc_file_config ucc_file_config_t;
 
 #define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
 #define UCC_CONFIG_REGISTER_TABLE       UCS_CONFIG_REGISTER_TABLE
@@ -61,15 +64,10 @@ typedef struct ucc_config_names_list {
     };
 } ucc_config_names_list_t;
 
-static inline ucc_status_t
-ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,
-                            const char *env_prefix, const char *table_prefix,
-                            int ignore_errors)
-{
-    ucs_status_t status = ucs_config_parser_fill_opts(
-        opts, fields, env_prefix, table_prefix, ignore_errors);
-    return ucs_status_to_ucc_status(status);
-}
+ucc_status_t ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,
+                                         const char *env_prefix,
+                                         const char *table_prefix,
+                                         int         ignore_errors);
 
 static inline void
 ucc_config_parser_release_opts(void *opts, ucc_config_field_t *fields)
@@ -121,16 +119,9 @@ static inline void ucc_config_parser_print_opts(FILE *stream, const char *title,
                                  prefix, ucs_flags);
 }
 
-static inline void
-ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
-                                 ucc_config_print_flags_t flags,
-                                 ucc_list_link_t *config_list)
-{
-    ucs_config_print_flags_t ucs_flags;
-
-    ucs_flags = ucc_print_flags_to_ucs_print_flags(flags);
-    ucs_config_parser_print_all_opts(stream, prefix, ucs_flags, config_list);
-}
+void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
+                                      ucc_config_print_flags_t flags,
+                                      ucc_list_link_t *        config_list);
 
 ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
                                         const ucc_config_names_array_t *src);
@@ -152,5 +143,9 @@ int ucc_config_names_array_is_all(const ucc_config_names_array_t *array)
 ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
                                            const ucc_config_names_array_t *all,
                                            ucc_config_names_list_t *       out);
+
+ucc_status_t ucc_parse_file_config(const char *        filename,
+                                   ucc_file_config_t **cfg);
+void         ucc_release_file_config(ucc_file_config_t *cfg);
 
 #endif

@@ -177,7 +177,6 @@ UCC_SCATTER_KN_PHASE_LOOP:
 out:
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_scatter_kn_done", 0);
     task->super.status = UCC_OK;
-    return;
 }
 
 ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)

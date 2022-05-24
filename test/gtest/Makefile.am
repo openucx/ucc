@@ -61,13 +61,13 @@ gtest_LDFLAGS = $(GTEST_LDFLAGS) -pthread -no-install -Wl,-dynamic-list-data \
 gtest_CFLAGS   = $(BASE_CFLAGS) $(AM_CPPFLAGS)
 gtest_CXXFLAGS = -std=gnu++11 \
 	$(BASE_CXXFLAGS) $(GTEST_CXXFLAGS) \
-	-DGTEST_UCM_HOOK_LIB_DIR="\"${abs_builddir}/ucm/test_dlopen/.libs\""
+	-DGTEST_UCM_HOOK_LIB_DIR="\"${abs_builddir}/ucm/test_dlopen/.libs\"" \
+	-DGTEST_UCC_TOP_SRCDIR="\"${UCC_TOP_SRCDIR}\""
 
 gtest_SOURCES =                     \
 	common/gtest-all.cc             \
 	common/test_obj_size.cc         \
 	common/main.cc                  \
-	common/test.cc                  \
 	common/test_ucc.cc              \
 	tl/tl_test.cc                   \
 	core/test_lib_config.cc         \
@@ -75,35 +75,35 @@ gtest_SOURCES =                     \
 	core/test_context_config.cc     \
 	core/test_context.cc            \
 	core/test_mc.cc                 \
-	core/test_mc_reduce_host.cc     \
+	core/test_mc_reduce.cc          \
 	core/test_team.cc               \
-	core/test_barrier.cc            \
-	core/test_alltoall.cc           \
-	core/test_alltoallv.cc          \
-	core/test_allgather.cc          \
-	core/test_allgatherv.cc         \
-	core/test_bcast.cc              \
-	core/test_reduce.cc             \
-	core/test_allreduce.cc          \
-	core/test_reduce_scatter.cc     \
-	core/test_reduce_scatterv.cc    \
 	core/test_schedule.cc           \
 	core/test_topo.cc               \
 	core/test_service_coll.cc       \
 	core/test_timeout.cc            \
 	core/test_utils.cc              \
+	coll/test_barrier.cc            \
+	coll/test_alltoall.cc           \
+	coll/test_alltoallv.cc          \
+	coll/test_allgather.cc          \
+	coll/test_allgatherv.cc         \
+	coll/test_bcast.cc              \
+	coll/test_reduce.cc             \
+	coll/test_allreduce.cc          \
+	coll/test_reduce_scatter.cc     \
+	coll/test_reduce_scatterv.cc    \
 	utils/test_string.cc            \
 	utils/test_ep_map.cc            \
 	utils/test_lock_free_queue.cc   \
 	utils/test_math.cc              \
+	utils/test_cfg_file.cc          \
 	coll_score/test_score.cc        \
 	coll_score/test_score_str.cc    \
 	coll_score/test_score_update.cc
 
 if HAVE_CUDA
 gtest_SOURCES += \
-	core/test_mc_cuda.cc        \
-	core/test_mc_reduce_cuda.cc
+	core/test_mc_cuda.cc
 gtest_CPPFLAGS += \
 	$(CUDA_CPPFLAGS)
 gtest_LDFLAGS += \
@@ -112,10 +112,17 @@ gtest_LDADD += \
 	$(CUDA_LIBS)
 endif
 
+if HAVE_ROCM
+gtest_SOURCES  += core/test_mc_rocm.cc
+gtest_CPPFLAGS += $(HIP_CPPFLAGS)
+gtest_LDFLAGS  += $(HIP_LDFLAGS)
+gtest_LDADD    += $(HIP_LIBS)
+endif
+
+
 noinst_HEADERS =            \
 	common/gtest.h          \
 	common/test.h           \
-	common/test_helpers.h   \
 	common/test_ucc.h       \
 	core/test_context.h     \
 	core/test_mc_reduce.h   \

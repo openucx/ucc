@@ -3,8 +3,7 @@
  * See file LICENSE for terms.
  */
 
-#include <common/test.h>
-#include <vector>
+#include <common/test_ucc.h>
 #include <algorithm>
 #include <random>
 

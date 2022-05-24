@@ -14,12 +14,12 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLREDUCE_ALG_KNOMIAL,
              .name = "knomial",
              .desc =
-                 "recursive k-ing with arbitrary radix (latency oriented alg)"},
+                 "recursive knomial with arbitrary radix (optimized for latency)"},
         [UCC_TL_UCP_ALLREDUCE_ALG_SRA_KNOMIAL] =
             {.id   = UCC_TL_UCP_ALLREDUCE_ALG_SRA_KNOMIAL,
              .name = "sra_knomial",
-             .desc = "recursive k-nomial scatter-reduce followed by k-nomial "
-                     "allgather (bw oriented alg)"},
+             .desc = "recursive knomial scatter-reduce followed by knomial "
+                     "allgather (optimized for BW)"},
         [UCC_TL_UCP_ALLREDUCE_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
