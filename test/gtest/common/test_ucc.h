@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -122,18 +122,14 @@ class UccProcess {
 public:
     ucc_context_params_t ctx_params;
     static constexpr ucc_lib_params_t default_lib_params = {
-        .mask = UCC_LIB_PARAM_FIELD_THREAD_MODE |
-                UCC_LIB_PARAM_FIELD_COLL_TYPES,
+        .mask =
+            UCC_LIB_PARAM_FIELD_THREAD_MODE | UCC_LIB_PARAM_FIELD_COLL_TYPES,
         .thread_mode = UCC_THREAD_SINGLE,
-        .coll_types = UCC_COLL_TYPE_BARRIER |
-                      UCC_COLL_TYPE_ALLTOALL |
-                      UCC_COLL_TYPE_ALLTOALLV |
-                      UCC_COLL_TYPE_ALLREDUCE |
-                      UCC_COLL_TYPE_ALLGATHER |
-                      UCC_COLL_TYPE_ALLGATHERV |
-                      UCC_COLL_TYPE_REDUCE |
-                      UCC_COLL_TYPE_BCAST
-    };
+        .coll_types  = UCC_COLL_TYPE_BARRIER | UCC_COLL_TYPE_ALLTOALL |
+                      UCC_COLL_TYPE_ALLTOALLV | UCC_COLL_TYPE_ALLREDUCE |
+                      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |
+                      UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_GATHER |
+                      UCC_COLL_TYPE_BCAST};
     static constexpr ucc_context_params_t default_ctx_params = {
         .mask = UCC_CONTEXT_PARAM_FIELD_TYPE,
         .type = UCC_CONTEXT_EXCLUSIVE
