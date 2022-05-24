@@ -23,15 +23,18 @@ typedef struct ucc_global_config {
     /* Coll component libraries path */
     char *component_path;
     char *component_path_default;
+    char *install_path;
     int   initialized;
     /* Profiling mode */
     unsigned                   profile_mode;
 
     /* Profiling output file name */
-    char                       *profile_file;
+    char *profile_file;
 
     /* Limit for profiling log size */
     size_t                     profile_log_size;
+    char *                     cfg_filename;
+    ucc_file_config_t *        file_cfg;
 } ucc_global_config_t;
 
 extern ucc_global_config_t ucc_global_config;

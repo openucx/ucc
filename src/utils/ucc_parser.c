@@ -6,6 +6,7 @@
 #include "ucc_parser.h"
 #include "ucc_malloc.h"
 #include "ucc_log.h"
+#include "khash.h"
 
 ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
                                           const ucc_config_names_array_t *src)
@@ -131,4 +132,244 @@ ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
         ucc_assert(0);
     }
     return status;
+}
+
+KHASH_MAP_INIT_STR(ucc_cfg_file, char *);
+
+typedef struct ucc_file_config {
+    khash_t(ucc_cfg_file) vars;
+} ucc_file_config_t;
+
+static int ucc_file_parse_handler(void *arg, const char *section, //NOLINT
+                                  const char *name, const char *value)
+{
+    ucc_file_config_t *cfg      = arg;
+    khash_t(ucc_cfg_file) *vars = &cfg->vars;
+    khiter_t iter;
+    int      result;
+    char    *dup;
+
+    if (!name) {
+        return 1;
+    }
+    if (NULL != getenv(name)) {
+        /* variable is set in env, skip it.
+           Env gets precedence over file */
+        ;
+        return 1;
+    }
+    if (strlen(name) < 4 || NULL == strstr(name, "UCC_")) {
+        ucc_warn("incorrect parameter name %s "
+                 "(param name should start with UCC_ or <PREFIX>_UCC_)",
+                 name);
+        return 0;
+    }
+
+    iter = kh_get(ucc_cfg_file, vars, name);
+    if (iter != kh_end(vars)) {
+        ucc_warn("found duplicate '%s' in config file", name);
+        return 0;
+    } else {
+        dup  = strdup(name);
+        if (!dup) {
+            ucc_error("failed to dup str for kh_put");
+            return 0;
+        }
+        iter = kh_put(ucc_cfg_file, vars, strdup(name), &result);
+        if (result == UCS_KH_PUT_FAILED) {
+            ucc_error("inserting '%s' to config map failed", name);
+            return 0;
+        }
+    }
+    dup = strdup(value);
+    if (!dup) {
+        ucc_error("failed to dup str for kh_val");
+        return 0;
+    }
+    kh_val(vars, iter) = dup;
+    return 1;
+}
+
+ucc_status_t ucc_parse_file_config(const char *        filename,
+                                   ucc_file_config_t **cfg_p)
+{
+    ucc_file_config_t *cfg;
+    int                ret;
+    ucc_status_t       status;
+
+    cfg = ucc_calloc(1, sizeof(*cfg), "file_cfg");
+    if (!cfg) {
+        ucc_error("failed to allocate %zd bytes for file config", sizeof(*cfg));
+        return UCC_ERR_NO_MEMORY;
+    }
+    ret = ini_parse(filename, ucc_file_parse_handler, cfg);
+    if (-1 == ret) {
+        /* according to ucs/ini.h -1 means error in
+           file open */
+        status = UCC_ERR_NOT_FOUND;
+        goto out;
+    } else if (ret) {
+        ucc_error("failed to parse config file %s", filename);
+        status = UCC_ERR_INVALID_PARAM;
+        goto out;
+    }
+
+    *cfg_p = cfg;
+    return UCC_OK;
+out:
+    ucc_free(cfg);
+    return status;
+}
+
+void ucc_release_file_config(ucc_file_config_t *cfg)
+{
+    const char *key;
+    char *      value;
+
+    kh_foreach(&cfg->vars, key, value, {
+        ucc_free((void *)key);
+        ucc_free(value);
+    }) kh_destroy_inplace(ucc_cfg_file, &cfg->vars);
+    ucc_free(cfg);
+}
+
+static const char *ucc_file_config_get(ucc_file_config_t *cfg,
+                                       const char *       var_name)
+{
+    khiter_t iter;
+    khash_t(ucc_cfg_file) *vars = &cfg->vars;
+
+    iter = kh_get(ucc_cfg_file, vars, var_name);
+    if (iter == kh_end(vars)) {
+        /* variable not found in prefix hash*/
+        return NULL;
+    }
+    return kh_val(vars, iter);
+}
+
+static ucc_status_t ucc_apply_file_cfg_value(void *              opts,
+                                             ucc_config_field_t *fields,
+                                             const char *        base_prefix,
+                                             const char *component_prefix,
+                                             const char *name)
+{
+    char        var[512];
+    size_t      left = sizeof(var);
+    const char *base_prefix_var;
+    const char *cfg_value;
+
+    ucc_strncpy_safe(var, base_prefix, left);
+    left -= strlen(base_prefix);
+    strncat(var, component_prefix, left);
+    left -= strlen(component_prefix);
+    strncat(var, name, left);
+
+    base_prefix_var = strstr(var, "UCC_");
+    cfg_value =
+        ucc_file_config_get(ucc_global_config.file_cfg, base_prefix_var);
+    if (cfg_value) {
+        return ucc_config_parser_set_value(opts, fields, name, cfg_value);
+    };
+
+    if (base_prefix_var != var) {
+        cfg_value = ucc_file_config_get(ucc_global_config.file_cfg, var);
+        if (cfg_value) {
+            return ucc_config_parser_set_value(opts, fields, name, cfg_value);
+        }
+    }
+
+    return UCC_ERR_NOT_FOUND;
+}
+
+static ucc_status_t ucc_apply_file_cfg(void *opts, ucc_config_field_t *fields,
+                                       const char *env_prefix,
+                                       const char *component_prefix)
+{
+    ucc_status_t status = UCC_OK;
+
+    while (fields->name != NULL) {
+        if (strlen(fields->name) == 0) {
+            status = ucc_apply_file_cfg(
+                opts, (ucc_config_field_t *)fields->parser.arg, env_prefix,
+                component_prefix);
+            if (UCC_OK != status) {
+                return status;
+            }
+            fields++;
+            continue;
+        }
+        status = ucc_apply_file_cfg_value(
+            opts, fields, env_prefix, component_prefix ? component_prefix : "",
+            fields->name);
+        if (status == UCC_ERR_NOT_FOUND && component_prefix) {
+            status = ucc_apply_file_cfg_value(opts, fields, env_prefix, "",
+                                              fields->name);
+        }
+        if (status != UCC_OK && status != UCC_ERR_NOT_FOUND) {
+            return status;
+        }
+
+        fields++;
+    }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,
+                                         const char *env_prefix,
+                                         const char *table_prefix,
+                                         int         ignore_errors)
+{
+    ucs_status_t ucs_status;
+    ucc_status_t status;
+
+    ucs_status = ucs_config_parser_fill_opts(opts, fields, env_prefix,
+                                             table_prefix, ignore_errors);
+    status     = ucs_status_to_ucc_status(ucs_status);
+
+    if (UCC_OK == status && ucc_global_config.file_cfg) {
+        status = ucc_apply_file_cfg(opts, fields, env_prefix, table_prefix);
+    }
+
+    return status;
+}
+
+void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
+                                      ucc_config_print_flags_t flags,
+                                      ucc_list_link_t *        config_list)
+{
+    const ucc_config_global_list_entry_t *entry;
+    ucs_config_print_flags_t              ucs_flags;
+    ucc_status_t                          status;
+    char                                  title[64];
+    void *                                opts;
+
+    ucs_flags = ucc_print_flags_to_ucs_print_flags(flags);
+    ucc_list_for_each(entry, config_list, list)
+    {
+        if ((entry->table == NULL) || (entry->table[0].name == NULL)) {
+            /* don't print title for an empty configuration table */
+            continue;
+        }
+
+        opts = ucc_malloc(entry->size, "tmp_opts");
+        if (opts == NULL) {
+            ucc_error("could not allocate configuration of size %zu",
+                      entry->size);
+            continue;
+        }
+
+        status = ucc_config_parser_fill_opts(opts, entry->table, prefix,
+                                             entry->prefix, 0);
+        if (status != UCC_OK) {
+            ucc_free(opts);
+            continue;
+        }
+
+        snprintf(title, sizeof(title), "%s configuration", entry->name);
+        ucs_config_parser_print_opts(stream, title, opts, entry->table,
+                                     entry->prefix, prefix, ucs_flags);
+
+        ucs_config_parser_release_opts(opts, entry->table);
+        ucc_free(opts);
+    }
 }
