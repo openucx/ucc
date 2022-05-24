@@ -8,6 +8,7 @@
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_component.h"
 #include "utils/ucc_log.h"
+#include "utils/ucc_string.h"
 #include "utils/ucc_proc_info.h"
 #include "utils/profile/ucc_profile.h"
 #include <link.h>
@@ -70,8 +71,6 @@ static ucc_status_t ucc_check_config_file(void)
     const char *         home;
     char *               filename;
 
-    size_t len;
-
     /* First check the UCC_CONFIG_FILE - most precedence */
     if (strlen(cfg->cfg_filename) > 0) {
         status = ucc_parse_file_config(cfg->cfg_filename,
@@ -84,15 +83,10 @@ static ucc_status_t ucc_check_config_file(void)
     }
 
     if (NULL != (home = getenv("HOME"))) {
-        len      = strlen(home) + strlen(default_home_name) + 1;
-        filename = ucc_malloc(len, "filename");
-        if (!filename) {
-            ucc_error("failed to allocate %zd bytes for cfg filename", len);
-            return UCC_ERR_NO_MEMORY;
+        if (UCC_OK != (status = ucc_str_concat(home ,default_home_name,
+                                               &filename))) {
+            return status;
         }
-        ucc_strncpy_safe(filename, home, len);
-        len -= strlen(home);
-        strncat(filename, default_home_name, len);
         status = ucc_parse_file_config(filename, &ucc_global_config.file_cfg);
         ucc_free(filename);
         if (UCC_ERR_NOT_FOUND != status) {
@@ -102,15 +96,10 @@ static ucc_status_t ucc_check_config_file(void)
         }
     }
     /* Finally, try to find config file in the library install/share */
-    len      = strlen(cfg->install_path) + strlen(default_share_name) + 1;
-    filename = ucc_malloc(len, "filename");
-    if (!filename) {
-        ucc_error("failed to allocate %zd bytes for cfg filename", len);
-        return UCC_ERR_NO_MEMORY;
+    if (UCC_OK != (status = ucc_str_concat(cfg->install_path,
+                                           default_share_name, &filename))) {
+        return status;
     }
-    ucc_strncpy_safe(filename, cfg->install_path, len);
-    len -= strlen(cfg->install_path);
-    strncat(filename, default_share_name, len);
     status = ucc_parse_file_config(filename, &ucc_global_config.file_cfg);
     ucc_free(filename);
     return status;
