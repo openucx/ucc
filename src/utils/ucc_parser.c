@@ -140,16 +140,20 @@ typedef struct ucc_file_config {
     khash_t(ucc_cfg_file) vars;
 } ucc_file_config_t;
 
-static int ucc_file_parse_handler(void *arg, const char *section,
+static int ucc_file_parse_handler(void *arg, const char *section, //NOLINT
                                   const char *name, const char *value)
 {
     ucc_file_config_t *cfg      = arg;
     khash_t(ucc_cfg_file) *vars = &cfg->vars;
     khiter_t iter;
     int      result;
+    char    *dup;
 
+    if (!name) {
+        return 1;
+    }
     if (NULL != getenv(name)) {
-        /* variabel is set in env, skip it.
+        /* variable is set in env, skip it.
            Env gets precedence over file */
         ;
         return 1;
@@ -166,13 +170,23 @@ static int ucc_file_parse_handler(void *arg, const char *section,
         ucc_warn("found duplicate '%s' in config file", name);
         return 0;
     } else {
+        dup  = strdup(name);
+        if (!dup) {
+            ucc_error("failed to dup str for kh_put");
+            return 0;
+        }
         iter = kh_put(ucc_cfg_file, vars, strdup(name), &result);
         if (result == UCS_KH_PUT_FAILED) {
             ucc_error("inserting '%s' to config map failed", name);
             return 0;
         }
     }
-    kh_val(vars, iter) = strdup(value);
+    dup = strdup(value);
+    if (!dup) {
+        ucc_error("failed to dup str for kh_val");
+        return 0;
+    }
+    kh_val(vars, iter) = dup;
     return 1;
 }
 
