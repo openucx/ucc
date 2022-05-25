@@ -19,6 +19,10 @@ ucc_tl_self_coll_init_task(ucc_base_coll_args_t *coll_args,
     ucc_tl_self_context_t *ctx     = UCC_TL_SELF_TEAM_CTX(tl_team);
     ucc_tl_self_task_t    *task    = ucc_mpool_get(&ctx->req_mp);
 
+    if (ucc_unlikely(!task)) {
+        return NULL;
+    }
+
     ucc_coll_task_init(&task->super, coll_args, team);
     UCC_TL_SELF_PROFILE_REQUEST_NEW(task, "tl_self_task", 0);
     task->super.finalize       = ucc_tl_self_coll_finalize;
@@ -48,12 +52,6 @@ void ucc_tl_self_noop_progress(ucc_coll_task_t *task)
     task->status = UCC_OK;
 }
 
-ucc_status_t ucc_tl_self_noop_start(ucc_coll_task_t *task)
-{
-    task->progress = ucc_tl_self_noop_progress;
-    return ucc_progress_queue_enqueue(UCC_TASK_CORE_CTX(task)->pq, task);
-}
-
 void ucc_tl_self_coll_copy_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_self_task_t *task = ucc_derived_of(coll_task, ucc_tl_self_task_t);
@@ -69,7 +67,6 @@ ucc_status_t ucc_tl_self_coll_start(ucc_coll_task_t *task)
 
 ucc_status_t ucc_tl_self_coll_noop_init(ucc_tl_self_task_t *task)
 {
-    task->super.status   = UCC_OK;
     task->super.post     = ucc_tl_self_coll_start;
     task->super.progress = ucc_tl_self_noop_progress;
     return UCC_OK;
@@ -129,6 +126,7 @@ ucc_status_t ucc_tl_self_coll_copyv_init(ucc_tl_self_task_t *task)
         task->super.progress = ucc_tl_self_noop_progress;
     } else {
         size_t displ = 0;
+        /* reduce_scatterv may not provide displacements */
         if (args->dst.info_v.displacements) {
             displ = (size_t)ucc_coll_args_get_displacement(
                 args, args->dst.info_v.displacements, 0);
@@ -170,8 +168,12 @@ ucc_status_t ucc_tl_self_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t      *team,
                                    ucc_coll_task_t     **task_h)
 {
-    ucc_tl_self_task_t *task = ucc_tl_self_coll_init_task(coll_args, team);
     ucc_status_t        status;
+    ucc_tl_self_task_t *task = ucc_tl_self_coll_init_task(coll_args, team);
+
+    if (ucc_unlikely(!task)) {
+        return UCC_ERR_NO_MEMORY;
+    }
 
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_BARRIER:

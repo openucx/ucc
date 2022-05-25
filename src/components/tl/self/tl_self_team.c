@@ -18,15 +18,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_self_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     if (UCC_TL_TEAM_SIZE(self) > 1) {
-        tl_info(tl_context->lib,
+        tl_trace(tl_context->lib,
                 "team size %d is too large, max supported 1, skip",
                 UCC_TL_TEAM_SIZE(self));
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     tl_info(tl_context->lib, "posted tl team: %p", self);
-    self->status = UCC_INPROGRESS;
-
     return UCC_OK;
 }
 

@@ -33,7 +33,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     self->topo        = NULL;
     self->scratch.loc = NULL;
     if (UCC_TL_TEAM_SIZE(self) < 2) {
-        tl_info(tl_context->lib, "team size is too small, min supported 2");
+        tl_trace(tl_context->lib, "team size is too small, min supported 2");
         return UCC_ERR_NOT_SUPPORTED;
     }
     if (UCC_TL_TEAM_SIZE(self) > UCC_TL_CUDA_MAX_PEERS) {
