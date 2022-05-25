@@ -105,7 +105,7 @@ ucc_status_t ucc_tl_self_alltoallv_init(ucc_tl_self_task_t *task)
             args, args->dst.info_v.displacements, 0);
         task->dst = PTR_OFFSET(args->dst.info_v.buffer, displ);
         displ     = (size_t)ucc_coll_args_get_displacement(
-            args, args->src.info_v.displacements, 0);
+                args, args->src.info_v.displacements, 0);
         task->src  = PTR_OFFSET(args->src.info_v.buffer, displ);
         task->size = ucc_coll_args_get_count(args, args->src.info_v.counts, 0) *
                      ucc_dt_size(args->src.info_v.datatype);
