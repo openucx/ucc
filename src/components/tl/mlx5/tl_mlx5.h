@@ -74,8 +74,6 @@ UCC_CLASS_DECLARE(ucc_tl_mlx5_lib_t, const ucc_base_lib_params_t *,
 typedef struct ucc_tl_mlx5_context {
     ucc_tl_context_t             super;
     ucc_tl_mlx5_context_config_t cfg;
-    struct ibv_context *         ib_ctx;
-    struct ibv_pd *              ib_pd;
     struct ibv_context *         shared_ctx;
     struct ibv_pd *              shared_pd;
     ucc_rcache_t *               rcache;
