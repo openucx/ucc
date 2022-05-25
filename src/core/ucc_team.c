@@ -567,12 +567,12 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
 
     if (!team->sreq) {
         ucc_subset_t subset = {.map.type   = UCC_EP_MAP_FULL,
-                            .map.ep_num = team->size,
-                            .myrank     = team->rank};
+                               .map.ep_num = team->size,
+                               .myrank     = team->rank};
         status = ucc_service_allreduce(team, local, global, UCC_DT_UINT64,
-                                    ctx->ids.pool_size,
-                                    UCC_OP_BAND, subset,
-                                    &team->sreq);
+                                       ctx->ids.pool_size,
+                                       UCC_OP_BAND, subset,
+                                       &team->sreq);
         if (status < 0) {
             return status;
         }
@@ -581,7 +581,7 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
     status = ucc_service_coll_test(team->sreq);
     if (status < 0) {
         ucc_error("service allreduce test failure: %s",
-                ucc_status_string(status));
+                  ucc_status_string(status));
         return status;
     } else if (status != UCC_OK) {
         return status;
