@@ -100,20 +100,45 @@ ucc_status_t ucc_pt_benchmark::run_single_test(ucc_coll_args_t args,
                                                double &time)
                                                noexcept
 {
-    ucc_team_h    team = comm->get_team();
-    ucc_context_h ctx  = comm->get_context();
-    ucc_status_t  st   = UCC_OK;
+    const bool    triggered = config.triggered;
+    ucc_team_h    team      = comm->get_team();
+    ucc_context_h ctx       = comm->get_context();
+    ucc_status_t  st        = UCC_OK;
     ucc_coll_req_h req;
+    ucc_ee_h ee;
+    ucc_ev_t comp_ev, *post_ev;
 
     UCCCHECK_GOTO(comm->barrier(), exit_err, st);
     time = 0;
 
+    if (triggered) {
+        try {
+            ee = comm->get_ee();
+        } catch(std::exception &e) {
+            std::cerr << e.what() << std::endl;
+            return UCC_ERR_NO_MESSAGE;
+        }
+        /* dummy event, for benchmark purposes no real event required */
+        comp_ev.ev_type         = UCC_EVENT_COMPUTE_COMPLETE;
+        comp_ev.ev_context      = nullptr;
+        comp_ev.ev_context_size = 0;
+    }
+
     for (int i = 0; i < nwarmup + niter; i++) {
         double s = get_time_us();
         UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
-        UCCCHECK_GOTO(ucc_collective_post(req), free_req, st);
+        if (triggered) {
+            comp_ev.req = req;
+            UCCCHECK_GOTO(ucc_collective_triggered_post(ee, &comp_ev),
+                          free_req, st);
+            UCCCHECK_GOTO(ucc_ee_get_event(ee, &post_ev), free_req, st);
+            ucc_assert(post_ev->ev_type == UCC_EVENT_COLLECTIVE_POST);
+            UCCCHECK_GOTO(ucc_ee_ack_event(ee, post_ev), free_req, st);
+        } else {
+            UCCCHECK_GOTO(ucc_collective_post(req), free_req, st);
+        }
         st = ucc_collective_test(req);
-        while (st == UCC_INPROGRESS) {
+        while (st > 0) {
             UCCCHECK_GOTO(ucc_context_progress(ctx), free_req, st);
             st = ucc_collective_test(req);
         }

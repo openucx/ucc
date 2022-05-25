@@ -31,8 +31,12 @@ void ucc_pt_cuda_init(void)
     if (!handle) {
         return;
     }
+
     LOAD_CUDA_SYM("cudaGetDeviceCount", getDeviceCount);
     LOAD_CUDA_SYM("cudaSetDevice", setDevice);
     LOAD_CUDA_SYM("cudaGetErrorString", getErrorString);
+    LOAD_CUDA_SYM("cudaStreamCreateWithFlags", streamCreateWithFlags);
+    LOAD_CUDA_SYM("cudaStreamDestroy", streamDestroy);
+
     ucc_pt_cuda_iface.available = 1;
 }
