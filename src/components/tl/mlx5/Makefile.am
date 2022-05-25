@@ -12,9 +12,11 @@ sources =             \
 	tl_mlx5_team.c    \
 	tl_mlx5_coll.h    \
 	tl_mlx5_ib.h	  \
+	tl_mlx5_ib.c      \
 	tl_mlx5_wqe.h	  \
 	tl_mlx5_wqe.c	  \
-	tl_mlx5_ib.c
+	tl_mlx5_pd.h      \
+	tl_mlx5_pd.c
 
 module_LTLIBRARIES = libucc_tl_mlx5.la
 libucc_tl_mlx5_la_SOURCES  = $(sources)
