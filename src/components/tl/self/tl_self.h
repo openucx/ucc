@@ -59,12 +59,13 @@ UCC_CLASS_DECLARE(ucc_tl_self_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
 typedef struct ucc_tl_self_task {
-    ucc_coll_task_t   super;
-    void             *src;
-    void             *dst;
-    size_t            size;
-    ucc_memory_type_t src_memtype;
-    ucc_memory_type_t dst_memtype;
+    ucc_coll_task_t         super;
+    void                   *src;
+    void                   *dst;
+    size_t                  size;
+    ucc_memory_type_t       src_memtype;
+    ucc_memory_type_t       dst_memtype;
+    ucc_ee_executor_task_t *etask;
 } ucc_tl_self_task_t;
 
 typedef struct ucc_tl_self_team {

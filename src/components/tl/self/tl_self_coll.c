@@ -5,8 +5,6 @@
  * See file LICENSE for terms.
  */
 
-#include "components/mc/base/ucc_mc_base.h"
-#include "components/mc/ucc_mc.h"
 #include "tl_self.h"
 #include "utils/ucc_coll_utils.h"
 #include "utils/ucc_malloc.h"
@@ -29,6 +27,7 @@ ucc_tl_self_coll_init_task(ucc_base_coll_args_t *coll_args,
     task->super.triggered_post = ucc_triggered_post;
     task->src = task->dst = NULL;
     task->size            = 0;
+    task->etask           = NULL;
     return task;
 }
 
@@ -52,12 +51,45 @@ void ucc_tl_self_noop_progress(ucc_coll_task_t *task)
     task->status = UCC_OK;
 }
 
-void ucc_tl_self_coll_copy_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_self_copy_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_self_task_t *task = ucc_derived_of(coll_task, ucc_tl_self_task_t);
+    ucc_status_t        status;
 
-    task->super.status = ucc_mc_memcpy(task->dst, task->src, task->size,
-                                       task->dst_memtype, task->src_memtype);
+    if (task->etask != NULL) {
+        status = ucc_ee_executor_task_test(task->etask);
+        if (status == UCC_INPROGRESS) {
+            task->super.status = status;
+            return;
+        }
+        ucc_ee_executor_task_finalize(task->etask);
+        task->etask = NULL;
+        task->super.status = status;
+    }
+}
+
+ucc_status_t ucc_tl_self_copy_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_self_task_t         *task = ucc_derived_of(coll_task, ucc_tl_self_task_t);
+    ucc_ee_executor_t          *exec;
+    ucc_ee_executor_task_args_t exec_args;
+    ucc_status_t                status;
+
+    status = ucc_coll_task_get_executor(&task->super, &exec);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+
+    exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
+    exec_args.bufs[0]   = task->dst;
+    exec_args.bufs[1]   = task->src;
+    exec_args.count     = task->size;
+    task->super.status = ucc_ee_executor_task_post(exec, &exec_args, &task->etask);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+
+    return ucc_progress_queue_enqueue(UCC_TASK_CORE_CTX(coll_task)->pq, coll_task);
 }
 
 ucc_status_t ucc_tl_self_coll_start(ucc_coll_task_t *task)
@@ -76,9 +108,9 @@ ucc_status_t ucc_tl_self_coll_copy_init(ucc_tl_self_task_t *task)
 {
     ucc_coll_args_t *args = &(task->super.bargs.args);
 
-    task->super.post = ucc_tl_self_coll_start;
     if (UCC_IS_INPLACE(*args)) {
         /* no copy is required for in-place */
+        task->super.post = ucc_tl_self_coll_start;
         task->super.progress = ucc_tl_self_noop_progress;
     } else {
         task->dst = args->dst.info.buffer;
@@ -87,7 +119,9 @@ ucc_status_t ucc_tl_self_coll_copy_init(ucc_tl_self_task_t *task)
             args->src.info.count * ucc_dt_size(args->src.info.datatype);
         task->dst_memtype    = args->dst.info.mem_type;
         task->src_memtype    = args->src.info.mem_type;
-        task->super.progress = ucc_tl_self_coll_copy_progress;
+        task->super.post     = ucc_tl_self_copy_start;
+        task->super.progress = ucc_tl_self_copy_progress;
+        task->super.flags   |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
     return UCC_OK;
 }
@@ -96,22 +130,24 @@ ucc_status_t ucc_tl_self_alltoallv_init(ucc_tl_self_task_t *task)
 {
     ucc_coll_args_t *args = &(task->super.bargs.args);
 
-    task->super.post = ucc_tl_self_coll_start;
     if (UCC_IS_INPLACE(*args)) {
         /* no copy is required for in-place */
+        task->super.post = ucc_tl_self_coll_start;
         task->super.progress = ucc_tl_self_noop_progress;
     } else {
         size_t displ = (size_t)ucc_coll_args_get_displacement(
             args, args->dst.info_v.displacements, 0);
         task->dst = PTR_OFFSET(args->dst.info_v.buffer, displ);
         displ     = (size_t)ucc_coll_args_get_displacement(
-                args, args->src.info_v.displacements, 0);
+            args, args->src.info_v.displacements, 0);
         task->src  = PTR_OFFSET(args->src.info_v.buffer, displ);
         task->size = ucc_coll_args_get_count(args, args->src.info_v.counts, 0) *
                      ucc_dt_size(args->src.info_v.datatype);
         task->dst_memtype    = args->dst.info_v.mem_type;
         task->src_memtype    = args->src.info_v.mem_type;
-        task->super.progress = ucc_tl_self_coll_copy_progress;
+        task->super.post     = ucc_tl_self_copy_start;
+        task->super.progress = ucc_tl_self_copy_progress;
+        task->super.flags   |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
     return UCC_OK;
 }
@@ -120,9 +156,9 @@ ucc_status_t ucc_tl_self_coll_copyv_init(ucc_tl_self_task_t *task)
 {
     ucc_coll_args_t *args = &(task->super.bargs.args);
 
-    task->super.post = ucc_tl_self_coll_start;
     if (UCC_IS_INPLACE(*args)) {
         /* no copy is required for in-place */
+        task->super.post = ucc_tl_self_coll_start;
         task->super.progress = ucc_tl_self_noop_progress;
     } else {
         size_t displ = 0;
@@ -137,7 +173,9 @@ ucc_status_t ucc_tl_self_coll_copyv_init(ucc_tl_self_task_t *task)
             args->src.info.count * ucc_dt_size(args->src.info.datatype);
         task->dst_memtype    = args->dst.info_v.mem_type;
         task->src_memtype    = args->src.info.mem_type;
-        task->super.progress = ucc_tl_self_coll_copy_progress;
+        task->super.post     = ucc_tl_self_copy_start;
+        task->super.progress = ucc_tl_self_copy_progress;
+        task->super.flags   |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
     return UCC_OK;
 }
@@ -146,9 +184,9 @@ ucc_status_t ucc_tl_self_scatterv_init(ucc_tl_self_task_t *task)
 {
     ucc_coll_args_t *args = &(task->super.bargs.args);
 
-    task->super.post = ucc_tl_self_coll_start;
     if (UCC_IS_INPLACE(*args)) {
         /* no copy is required for in-place */
+        task->super.post = ucc_tl_self_coll_start;
         task->super.progress = ucc_tl_self_noop_progress;
     } else {
         size_t displ = (size_t)ucc_coll_args_get_displacement(
@@ -159,7 +197,9 @@ ucc_status_t ucc_tl_self_scatterv_init(ucc_tl_self_task_t *task)
             args->dst.info.count * ucc_dt_size(args->dst.info.datatype);
         task->dst_memtype    = args->dst.info.mem_type;
         task->src_memtype    = args->src.info_v.mem_type;
-        task->super.progress = ucc_tl_self_coll_copy_progress;
+        task->super.post     = ucc_tl_self_copy_start;
+        task->super.progress = ucc_tl_self_copy_progress;
+        task->super.flags   |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
     return UCC_OK;
 }
