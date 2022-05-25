@@ -56,6 +56,7 @@ typedef struct ucc_tl_mlx5_lib_config {
     unsigned long            dm_buf_num;
     int                      dm_host;
     ucc_tl_mlx5_ib_qp_conf_t qp_conf;
+    int                 asr_barrier;
 } ucc_tl_mlx5_lib_config_t;
 
 typedef struct ucc_tl_mlx5_context_config {
@@ -83,6 +84,27 @@ typedef struct ucc_tl_mlx5_context {
 } ucc_tl_mlx5_context_t;
 UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
+
+typedef struct ucc_tl_mlx5_task ucc_tl_mlx5_task_t;
+
+typedef struct ucc_tl_mlx5_reg {
+    struct ibv_mr *      mr;
+    ucs_rcache_region_t *region;
+} ucc_tl_mlx5_reg_t;
+
+static inline ucc_tl_mlx5_reg_t *
+ucc_tl_mlx5_get_rcache_reg_data(ucc_rcache_region_t *region)
+{
+    return (ucc_tl_mlx5_reg_t *)((ptrdiff_t)region +
+                                 sizeof(ucc_rcache_region_t));
+}
+
+typedef struct ucc_tl_mlx5_schedule ucc_tl_mlx5_schedule_t;
+typedef struct ucc_tl_mlx5_dm_chunk_t {
+    ptrdiff_t offset; // 0 based offset from the beginning of
+                      // memic_mr (obtained with ibv_reg_dm_mr)
+    ucc_tl_mlx5_schedule_t *task;
+} ucc_tl_mlx5_dm_chunk_t;
 
 typedef struct ucc_tl_mlx5_a2a ucc_tl_mlx5_a2a_t;
 typedef struct ucc_tl_mlx5_team {
@@ -115,5 +137,13 @@ UCC_CLASS_DECLARE(ucc_tl_mlx5_team_t, ucc_base_context_t *,
 
 #define IS_SERVICE_TEAM(_team)                                                 \
     ((_team)->super.super.params.scope == UCC_CL_LAST + 1)
+
+#define SQUARED(_num) ((_num) * (_num))
+
+ucc_status_t tl_mlx5_create_rcache(ucc_tl_mlx5_context_t *ctx);
+
+ucc_status_t ucc_tl_mlx5_asr_socket_init(ucc_tl_mlx5_context_t *ctx,
+                                         ucc_rank_t group_size, int *socket,
+                                         const char *sock_path);
 
 #endif

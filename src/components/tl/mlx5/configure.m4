@@ -6,6 +6,7 @@ tl_mlx5_enabled=n
 CHECK_TLS_REQUIRED(["mlx5"])
 AS_IF([test "$CHECKED_TL_REQUIRED" = "y"],
 [
+    CHECK_MLX5DV
     mlx5_happy=no
     if test "x$mlx5dv_happy" = "xyes" -a "x$have_mlx5dv_wr_raw_wqe" = "xyes"; then
        mlx5_happy=yes
