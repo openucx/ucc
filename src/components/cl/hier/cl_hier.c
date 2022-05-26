@@ -6,6 +6,10 @@
 
 #include "cl_hier.h"
 #include "utils/ucc_malloc.h"
+#include "allreduce/allreduce.h"
+#include "alltoall/alltoall.h"
+#include "alltoallv/alltoallv.h"
+
 ucc_status_t ucc_cl_hier_get_lib_attr(const ucc_base_lib_t *lib,
                                       ucc_base_lib_attr_t  *base_attr);
 ucc_status_t ucc_cl_hier_get_context_attr(const ucc_base_context_t *context,
@@ -109,3 +113,13 @@ ucc_status_t ucc_cl_hier_team_destroy(ucc_base_team_t *cl_team);
 ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
                                          ucc_coll_score_t **score);
 UCC_CL_IFACE_DECLARE(hier, HIER);
+
+__attribute__((constructor)) static void cl_hier_iface_init(void)
+{
+    ucc_cl_hier.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLREDUCE)] =
+        ucc_cl_hier_allreduce_algs;
+    ucc_cl_hier.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLTOALL)] =
+        ucc_cl_hier_alltoall_algs;
+    ucc_cl_hier.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLTOALLV)] =
+        ucc_cl_hier_alltoallv_algs;
+}

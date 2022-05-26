@@ -7,6 +7,14 @@
 #define REDUCE_H_
 #include "../tl_ucp_reduce.h"
 
+enum {
+    UCC_TL_UCP_REDUCE_ALG_KNOMIAL,
+    UCC_TL_UCP_REDUCE_ALG_LAST
+};
+
+extern ucc_base_coll_alg_info_t
+             ucc_tl_ucp_reduce_algs[UCC_TL_UCP_REDUCE_ALG_LAST + 1];
+
 /* A set of convenience macros used to implement sw based progress
    of the reduce algorithm that uses kn pattern */
 enum {

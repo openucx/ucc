@@ -8,6 +8,14 @@
 #include "../tl_ucp.h"
 #include "../tl_ucp_coll.h"
 
+enum {
+    UCC_TL_UCP_ALLGATHER_ALG_RING,
+    UCC_TL_UCP_ALLGATHER_ALG_LAST
+};
+
+extern ucc_base_coll_alg_info_t
+             ucc_tl_ucp_allgather_algs[UCC_TL_UCP_ALLGATHER_ALG_LAST + 1];
+
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task);
 
 void  ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *task);

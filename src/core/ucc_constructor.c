@@ -8,6 +8,7 @@
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_component.h"
 #include "utils/ucc_log.h"
+#include "utils/ucc_string.h"
 #include "utils/ucc_proc_info.h"
 #include "utils/profile/ucc_profile.h"
 #include <link.h>
@@ -21,6 +22,7 @@ static int callback(struct dl_phdr_info *info, size_t size, void *data)
 {
     char  *str;
     char  *component_path;
+    char  *install_path;
     size_t len;
     int    pos;
     if ((data != NULL) || (size == 0)) {
@@ -29,8 +31,17 @@ static int callback(struct dl_phdr_info *info, size_t size, void *data)
     if (NULL != (str = strstr(info->dlpi_name, UCC_LIB_SO_NAME))) {
         pos            = (int)(str - info->dlpi_name);
         len            = pos + UCC_COMPONENT_LIBDIR_LEN + 1;
+
+        install_path = (char *)ucc_malloc(len, "install_path");
+        if (!install_path) {
+            ucc_error("failed to allocate %zd bytes for install_path", len);
+            return -1;
+        }
+        ucc_strncpy_safe(install_path, info->dlpi_name, pos - 3);
+        ucc_global_config.install_path = install_path;
         component_path = (char *)ucc_malloc(len, "component_path");
         if (!component_path) {
+            ucc_free(install_path);
             ucc_error("failed to allocate %zd bytes for component_path", len);
             return -1;
         }
@@ -51,10 +62,54 @@ static void get_default_lib_path()
     dl_iterate_phdr(callback, NULL);
 }
 
+static ucc_status_t ucc_check_config_file(void)
+{
+    ucc_global_config_t *cfg                = &ucc_global_config;
+    ucc_status_t         status             = UCC_OK;
+    const char *         default_share_name = "share/ucc.conf";
+    const char *         default_home_name  = "/ucc.conf";
+    const char *         home;
+    char *               filename;
+
+    /* First check the UCC_CONFIG_FILE - most precedence */
+    if (strlen(cfg->cfg_filename) > 0) {
+        status = ucc_parse_file_config(cfg->cfg_filename,
+                                       &ucc_global_config.file_cfg);
+        if (UCC_ERR_NOT_FOUND == status) {
+            /* File ENV value provided but not available */
+            ucc_warn("failed to open config file: %s", cfg->cfg_filename);
+        }
+        return status;
+    }
+
+    if (NULL != (home = getenv("HOME"))) {
+        if (UCC_OK != (status = ucc_str_concat(home ,default_home_name,
+                                               &filename))) {
+            return status;
+        }
+        status = ucc_parse_file_config(filename, &ucc_global_config.file_cfg);
+        ucc_free(filename);
+        if (UCC_ERR_NOT_FOUND != status) {
+            /* either OK or fatal error, NOT_FOUND means
+               no file in HOME - just continue */
+            return status;
+        }
+    }
+    /* Finally, try to find config file in the library install/share */
+    if (UCC_OK != (status = ucc_str_concat(cfg->install_path,
+                                           default_share_name, &filename))) {
+        return status;
+    }
+    status = ucc_parse_file_config(filename, &ucc_global_config.file_cfg);
+    ucc_free(filename);
+    return status;
+}
+
 ucc_status_t ucc_constructor(void)
 {
     ucc_global_config_t *cfg = &ucc_global_config;
-    ucc_status_t status;
+    ucc_status_t         status;
+
     if (!cfg->initialized) {
         cfg->initialized            = 1;
         cfg->component_path_default = NULL;
@@ -72,6 +127,12 @@ ucc_status_t ucc_constructor(void)
             ucc_error("failed to get ucc components path");
             return UCC_ERR_NOT_FOUND;
         }
+        status = ucc_check_config_file();
+        if (UCC_OK != status && UCC_ERR_NOT_FOUND != status) {
+            /* bail only in case of real error */
+            return status;
+        }
+
         status = ucc_components_load("cl", &cfg->cl_framework);
         if (UCC_OK != status) {
             ucc_error("no CL components were found in the "

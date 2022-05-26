@@ -12,6 +12,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.mt             = UCC_MEMORY_TYPE_HOST;
     bench.op             = UCC_OP_SUM;
     bench.inplace        = false;
+    bench.triggered      = false;
     bench.n_iter_small   = 1000;
     bench.n_warmup_small = 100;
     bench.n_iter_large   = 200;
@@ -69,7 +70,7 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
     int c;
     ucc_status_t st;
 
-    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:ihF")) != -1) {
+    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:ihFT")) != -1) {
         switch (c) {
             case 'c':
                 if (ucc_pt_coll_map.count(optarg) == 0) {
@@ -125,6 +126,9 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
             case 'i':
                 bench.inplace = true;
                 break;
+            case 'T':
+                bench.triggered = true;
+                break;
             case 'F':
                 bench.full_print = true;
                 break;
@@ -149,6 +153,7 @@ void ucc_pt_config::print_help()
     std::cout << "  -m <mtype name>: memory type"<<std::endl;
     std::cout << "  -n <number>: number of iterations"<<std::endl;
     std::cout << "  -w <number>: number of warmup iterations"<<std::endl;
+    std::cout << "  -T: triggered collective"<<std::endl;
     std::cout << "  -F: enable full print"<<std::endl;
     std::cout << "  -h: show this help message"<<std::endl;
     std::cout << std::endl;

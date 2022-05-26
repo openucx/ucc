@@ -46,6 +46,36 @@ int ucc_pt_comm::get_size()
     return bootstrap->get_size();
 }
 
+ucc_ee_h ucc_pt_comm::get_ee()
+{
+    ucc_ee_params_t ee_params;
+    ucc_status_t status;
+
+    if (!ee) {
+        if (cfg.mt == UCC_MEMORY_TYPE_CUDA) {
+            if (ucc_pt_cudaStreamCreateWithFlags((cudaStream_t*)&stream,
+                                                 cudaStreamNonBlocking)) {
+                throw std::runtime_error("failed to create CUDA stream");
+            }
+            ee_params.ee_type         = UCC_EE_CUDA_STREAM;
+            ee_params.ee_context_size = sizeof(cudaStream_t);
+            ee_params.ee_context      = stream;
+            status = ucc_ee_create(team, &ee_params, &ee);
+            if (status != UCC_OK) {
+                std::cerr << "failed to create UCC EE: "
+                          << ucc_status_string(status);
+                ucc_pt_cudaStreamDestroy((cudaStream_t)stream);
+                throw std::runtime_error(ucc_status_string(status));
+            }
+        } else {
+            std::cerr << "execution engine is not supported for given memory type";
+            throw std::runtime_error("not supported");
+        }
+    }
+
+    return ee;
+}
+
 ucc_team_h ucc_pt_comm::get_team()
 {
     return team;
@@ -66,6 +96,7 @@ ucc_status_t ucc_pt_comm::init()
     ucc_status_t st;
     std::string cfg_mod;
 
+    ee = nullptr;
     if (cfg.mt != UCC_MEMORY_TYPE_HOST) {
         set_gpu_device();
     }
@@ -127,6 +158,20 @@ exit_err:
 ucc_status_t ucc_pt_comm::finalize()
 {
     ucc_status_t status;
+
+    if (ee) {
+        status = ucc_ee_destroy(ee);
+        if (status != UCC_OK) {
+            std::cerr << "ucc ee destroy error: " << ucc_status_string(status);
+        }
+
+        if (cfg.mt == UCC_MEMORY_TYPE_CUDA) {
+            ucc_pt_cudaStreamDestroy((cudaStream_t)stream);
+        } else {
+            std::cerr << "execution engine is not supported for given memory type";
+            throw std::runtime_error("not supported");
+        }
+    }
 
     do {
         status = ucc_team_destroy(team);
