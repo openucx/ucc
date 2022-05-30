@@ -104,6 +104,11 @@ gtest_SOURCES =                     \
 	coll_score/test_score_update.cc \
 	active_set/test_active_set.cc
 
+if TL_MLX5_ENABLED
+    gtest_SOURCES  += tl/mlx5/test_tl_mlx5.cc
+    gtest_LDADD    += $(IBVERBS_LIBADD) $(MLX5DV_LIBADD)
+endif
+
 if HAVE_CUDA
 gtest_SOURCES +=                    \
 	core/test_mc_cuda.cc            \

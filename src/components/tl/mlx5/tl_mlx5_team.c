@@ -48,6 +48,7 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
     ucc_tl_mlx5_team_t *team = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
     ucc_base_context_t *ctx  = UCC_TL_TEAM_CTX(team);
     ucc_base_lib_t *    lib  = UCC_TL_TEAM_LIB(team);
+    ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_HOST;
     ucc_coll_score_t *  score;
     ucc_status_t        status;
 
@@ -60,7 +61,7 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team), NULL, tl_team,
-            UCC_TL_MLX5_DEFAULT_SCORE, NULL);
+            UCC_TL_MLX5_DEFAULT_SCORE, NULL, &mt, 1);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
