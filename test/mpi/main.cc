@@ -16,8 +16,9 @@ static std::vector<ucc_coll_type_t> colls = {
     UCC_COLL_TYPE_SCATTER,        UCC_COLL_TYPE_SCATTERV};
 static std::vector<ucc_coll_type_t> onesided_colls = {UCC_COLL_TYPE_ALLTOALL};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
-static std::vector<ucc_datatype_t> dtypes = {UCC_DT_INT32, UCC_DT_INT64,
-                                             UCC_DT_FLOAT32, UCC_DT_FLOAT64};
+static std::vector<ucc_datatype_t>    dtypes      = {UCC_DT_INT32, UCC_DT_INT64,
+                                             UCC_DT_FLOAT32, UCC_DT_FLOAT64,
+                                             UCC_DT_FLOAT64_COMPLEX};
 static std::vector<ucc_reduction_op_t>     ops    = {UCC_OP_SUM, UCC_OP_MAX,
                                               UCC_OP_AVG};
 static std::vector<ucc_test_mpi_team_t> teams = {TEAM_WORLD, TEAM_REVERSE,
@@ -65,7 +66,7 @@ void PrintHelp()
             "reduce, reduce_scatter, reduce_scatterv, gather, gatherv, scatter, scatterv\n\n"
        "-t, --teams            <t1,t2,..>\n\tlist of teams: world,half,reverse,odd_even\n\n"
        "-M, --mtypes           <m1,m2,..>\n\tlist of mtypes: host,cuda,rocm\n\n"
-       "-d, --dtypes           <d1,d2,..>\n\tlist of dtypes: (u)int8(16,32,64),float32(64)\n\n"
+       "-d, --dtypes           <d1,d2,..>\n\tlist of dtypes: (u)int8(16,32,64),float32(64,128),float32(64,128)_complex\n\n"
        "-o, --ops              <o1,o2,..>\n\tlist of ops:sum,prod,max,min,land,lor,lxor,band,bor,bxor\n\n"
        "-I, --inplace          <value>\n\t0 - no inplace, 1 - inplace, 2 - both\n\n"
        "-m, --msgsize          <min:max[:power]>\n\tmesage sizes range\n\n"
@@ -122,7 +123,7 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
     } else if (coll == "bcast") {
         return UCC_COLL_TYPE_BCAST;
     } else if (coll == "reduce") {
-            return UCC_COLL_TYPE_REDUCE;
+        return UCC_COLL_TYPE_REDUCE;
     } else if (coll == "alltoall") {
         return UCC_COLL_TYPE_ALLTOALL;
     } else if (coll == "alltoallv") {
@@ -182,6 +183,8 @@ static ucc_datatype_t dtype_str_to_type(std::string dtype)
         return UCC_DT_FLOAT32;
     } else if (dtype == "float64") {
         return UCC_DT_FLOAT64;
+    } else if (dtype == "float128") {
+        return UCC_DT_FLOAT128;
     } else if (dtype == "bfloat16") {
         return UCC_DT_BFLOAT16;
     } else if (dtype == "float16") {
@@ -190,6 +193,12 @@ static ucc_datatype_t dtype_str_to_type(std::string dtype)
         return UCC_DT_INT128;
     } else if (dtype == "uint128") {
         return UCC_DT_UINT128;
+    } else if (dtype == "float32_complex") {
+        return UCC_DT_FLOAT32_COMPLEX;
+    } else if (dtype == "float64_complex") {
+        return UCC_DT_FLOAT64_COMPLEX;
+    } else if (dtype == "float128_complex") {
+        return UCC_DT_FLOAT128_COMPLEX;
     }
     throw std::string("incorrect  dtype: ") + dtype;
 }
