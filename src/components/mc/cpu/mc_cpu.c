@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -196,9 +196,25 @@ static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
         ucc_assert(8 == sizeof(double));
         return ucc_mc_cpu_reduce_multi_double(src1, src2, dst, n_vectors,
                                               count, stride, op);
+    case UCC_DT_FLOAT128:
+        ucc_assert(16 == sizeof(long double));
+        return ucc_mc_cpu_reduce_multi_long_double(src1, src2, dst, n_vectors,
+                                                   count, stride, op);
     case UCC_DT_BFLOAT16:
         return ucc_mc_cpu_reduce_multi_bfloat16(src1, src2, dst, n_vectors,
                                                 count, stride, op);
+    case UCC_DT_FLOAT32_COMPLEX:
+        ucc_assert(8 == sizeof(float complex));
+        return ucc_mc_cpu_reduce_multi_float_complex(src1, src2, dst, n_vectors,
+                                                     count, stride, op);
+    case UCC_DT_FLOAT64_COMPLEX:
+        ucc_assert(16 == sizeof(double complex));
+        return ucc_mc_cpu_reduce_multi_double_complex(
+            src1, src2, dst, n_vectors, count, stride, op);
+    case UCC_DT_FLOAT128_COMPLEX:
+        ucc_assert(32 == sizeof(long double complex));
+        return ucc_mc_cpu_reduce_multi_long_double_complex(
+            src1, src2, dst, n_vectors, count, stride, op);
     default:
         mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
                  ucc_datatype_str(dt));
@@ -231,10 +247,30 @@ ucc_mc_cpu_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
         return ucc_mc_cpu_reduce_multi_alpha_double(src1, src2, dst, n_vectors,
                                                     count, stride, reduce_op,
                                                     vector_op, alpha);
+    case UCC_DT_FLOAT128:
+        ucc_assert(16 == sizeof(long double));
+        return ucc_mc_cpu_reduce_multi_alpha_long(
+            src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
+            (long double)alpha);
     case UCC_DT_BFLOAT16:
         return ucc_mc_cpu_reduce_multi_alpha_bfloat16(src1, src2, dst, n_vectors,
                                                       count, stride, reduce_op,
                                                       vector_op, (float)alpha);
+    case UCC_DT_FLOAT32_COMPLEX:
+        ucc_assert(8 == sizeof(float complex));
+        return ucc_mc_cpu_reduce_multi_alpha_float_complex(
+            src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
+            (float)alpha);
+    case UCC_DT_FLOAT64_COMPLEX:
+        ucc_assert(16 == sizeof(double complex));
+        return ucc_mc_cpu_reduce_multi_alpha_double_complex(
+            src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
+            (double)alpha);
+    case UCC_DT_FLOAT128_COMPLEX:
+        ucc_assert(32 == sizeof(long double complex));
+        return ucc_mc_cpu_reduce_multi_alpha_long_complex(
+            src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
+            (long double)alpha);
     default:
         mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
                  ucc_datatype_str(dt));

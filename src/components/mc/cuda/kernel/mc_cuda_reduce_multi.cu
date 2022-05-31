@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -63,6 +63,13 @@ CUDA_REDUCE_WITH_OP_SPECIALIZED(MAX, DO_OP_MAX_HALF, __half)
 CUDA_REDUCE_WITH_OP_SPECIALIZED(MIN, DO_OP_MIN_HALF, __half)
 CUDA_REDUCE_WITH_OP_SPECIALIZED(SUM, DO_OP_SUM_HALF, __half)
 CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_HALF, __half)
+
+CUDA_REDUCE_WITH_OP_SPECIALIZED(SUM, DO_OP_SUM_FLOAT_COMPLEX, cuFloatComplex)
+CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_FLOAT_COMPLEX, cuFloatComplex)
+
+CUDA_REDUCE_WITH_OP_SPECIALIZED(SUM, DO_OP_SUM_DOUBLE_COMPLEX, cuDoubleComplex)
+CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_DOUBLE_COMPLEX,
+                                cuDoubleComplex)
 
 #if CUDART_VERSION >= 11000
 CUDA_REDUCE_WITH_OP_SPECIALIZED(MAX, DO_OP_MAX_BFLOAT16, __nv_bfloat16)
@@ -166,6 +173,31 @@ CUDA_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_BFLOAT16, __nv_bfloat16)
         }                                                                      \
     } while (0)
 
+#define DT_REDUCE_FLOAT_COMPLEX(type, op, src1_p, src2_p, dest_p, size, count, \
+                                ld, s, b, t)                                   \
+    do {                                                                       \
+        const type *sbuf1 = (const type *)src1_p;                              \
+        const type *sbuf2 = (const type *)src2_p;                              \
+        type *      dest  = (type *)dest_p;                                    \
+        switch (op) {                                                          \
+        case UCC_OP_SUM:                                                       \
+        case UCC_OP_AVG:                                                       \
+            LAUNCH_KERNEL(SUM, type, sbuf1, sbuf2, dest, size, count, ld, s,   \
+                          b, t);                                               \
+            break;                                                             \
+        case UCC_OP_PROD:                                                      \
+            LAUNCH_KERNEL(PROD, type, sbuf1, sbuf2, dest, size, count, ld, s,  \
+                          b, t);                                               \
+            break;                                                             \
+        default:                                                               \
+            mc_error(&ucc_mc_cuda.super,                                       \
+                     "complex float dtype does not support "                   \
+                     "requested reduce op: %s",                                \
+                     ucc_reduction_op_str(op));                                \
+            return UCC_ERR_NOT_SUPPORTED;                                      \
+        }                                                                      \
+    } while (0)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -189,33 +221,42 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
     }
     switch (dt)
     {
-        case UCC_DT_INT16:
-            DT_REDUCE_INT(int16_t, op, src1, src2, dst, n_vectors, count, ld,
-                          stream, bk, th);
-            break;
-        case UCC_DT_INT32:
-            DT_REDUCE_INT(int32_t, op, src1, src2, dst, n_vectors, count, ld,
-                          stream, bk, th);
-            break;
-        case UCC_DT_INT64:
-            DT_REDUCE_INT(int64_t, op, src1, src2, dst, n_vectors, count, ld,
-                          stream, bk, th);
-            break;
-        case UCC_DT_FLOAT16:
-            ucc_assert(2 == sizeof(__half));
-            DT_REDUCE_FLOAT(__half, op, src1, src2, dst, n_vectors, count, ld,
-                            stream, bk, th);
-            break;
-        case UCC_DT_FLOAT32:
-            ucc_assert(4 == sizeof(float));
-            DT_REDUCE_FLOAT(float, op, src1, src2, dst, n_vectors, count, ld,
-                            stream, bk, th);
-            break;
-        case UCC_DT_FLOAT64:
-            ucc_assert(8 == sizeof(double));
-            DT_REDUCE_FLOAT(double, op, src1, src2, dst, n_vectors, count, ld,
-                            stream, bk, th);
-            break;
+    case UCC_DT_INT16:
+        DT_REDUCE_INT(int16_t, op, src1, src2, dst, n_vectors, count, ld,
+                      stream, bk, th);
+        break;
+    case UCC_DT_INT32:
+        DT_REDUCE_INT(int32_t, op, src1, src2, dst, n_vectors, count, ld,
+                      stream, bk, th);
+        break;
+    case UCC_DT_INT64:
+        DT_REDUCE_INT(int64_t, op, src1, src2, dst, n_vectors, count, ld,
+                      stream, bk, th);
+        break;
+    case UCC_DT_FLOAT16:
+        DT_REDUCE_FLOAT(__half, op, src1, src2, dst, n_vectors, count, ld,
+                        stream, bk, th);
+        break;
+    case UCC_DT_FLOAT32:
+        ucc_assert(4 == sizeof(float));
+        DT_REDUCE_FLOAT(float, op, src1, src2, dst, n_vectors, count, ld,
+                        stream, bk, th);
+        break;
+    case UCC_DT_FLOAT64:
+        ucc_assert(8 == sizeof(double));
+        DT_REDUCE_FLOAT(double, op, src1, src2, dst, n_vectors, count, ld,
+                        stream, bk, th);
+        break;
+    case UCC_DT_FLOAT32_COMPLEX:
+        ucc_assert(8 == sizeof(cuFloatComplex));
+        DT_REDUCE_FLOAT_COMPLEX(cuFloatComplex, op, src1, src2, dst, n_vectors,
+                                count, ld, stream, bk, th);
+        break;
+    case UCC_DT_FLOAT64_COMPLEX:
+        ucc_assert(16 == sizeof(cuDoubleComplex));
+        DT_REDUCE_FLOAT_COMPLEX(cuDoubleComplex, op, src1, src2, dst, n_vectors,
+                                count, ld, stream, bk, th);
+        break;
 #if CUDART_VERSION >= 11000
         case UCC_DT_BFLOAT16:
             ucc_assert(2 == sizeof(__nv_bfloat16));

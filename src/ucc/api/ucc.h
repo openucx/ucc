@@ -1,7 +1,7 @@
 /**
  * @file ucc.h
  * @date 2020
- * @copyright Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * @copyright Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  * @copyright Copyright (C) Huawei Technologies Co., Ltd. 2020.  ALL RIGHTS RESERVED.
  * @copyright Copyright (C) UChicago Argonne, LLC. 2022.  ALL RIGHTS RESERVED.
  *
@@ -193,21 +193,25 @@ typedef enum ucc_memory_type {
  */
 typedef uint64_t ucc_datatype_t;
 
-#define   UCC_DT_INT8      UCC_PREDEFINED_DT(0)
-#define   UCC_DT_INT16     UCC_PREDEFINED_DT(1)
-#define   UCC_DT_INT32     UCC_PREDEFINED_DT(2)
-#define   UCC_DT_INT64     UCC_PREDEFINED_DT(3)
-#define   UCC_DT_INT128    UCC_PREDEFINED_DT(4)
-#define   UCC_DT_UINT8     UCC_PREDEFINED_DT(5)
-#define   UCC_DT_UINT16    UCC_PREDEFINED_DT(6)
-#define   UCC_DT_UINT32    UCC_PREDEFINED_DT(7)
-#define   UCC_DT_UINT64    UCC_PREDEFINED_DT(8)
-#define   UCC_DT_UINT128   UCC_PREDEFINED_DT(9)
-#define   UCC_DT_FLOAT16   UCC_PREDEFINED_DT(10)
-#define   UCC_DT_FLOAT32   UCC_PREDEFINED_DT(11)
-#define   UCC_DT_FLOAT64   UCC_PREDEFINED_DT(12)
-#define   UCC_DT_BFLOAT16  UCC_PREDEFINED_DT(13)
-#define   UCC_DT_PREDEFINED_LAST  14
+#define UCC_DT_INT8             UCC_PREDEFINED_DT(0)
+#define UCC_DT_INT16            UCC_PREDEFINED_DT(1)
+#define UCC_DT_INT32            UCC_PREDEFINED_DT(2)
+#define UCC_DT_INT64            UCC_PREDEFINED_DT(3)
+#define UCC_DT_INT128           UCC_PREDEFINED_DT(4)
+#define UCC_DT_UINT8            UCC_PREDEFINED_DT(5)
+#define UCC_DT_UINT16           UCC_PREDEFINED_DT(6)
+#define UCC_DT_UINT32           UCC_PREDEFINED_DT(7)
+#define UCC_DT_UINT64           UCC_PREDEFINED_DT(8)
+#define UCC_DT_UINT128          UCC_PREDEFINED_DT(9)
+#define UCC_DT_FLOAT16          UCC_PREDEFINED_DT(10)
+#define UCC_DT_FLOAT32          UCC_PREDEFINED_DT(11)
+#define UCC_DT_FLOAT64          UCC_PREDEFINED_DT(12)
+#define UCC_DT_BFLOAT16         UCC_PREDEFINED_DT(13)
+#define UCC_DT_FLOAT128         UCC_PREDEFINED_DT(14)
+#define UCC_DT_FLOAT32_COMPLEX  UCC_PREDEFINED_DT(15)
+#define UCC_DT_FLOAT64_COMPLEX  UCC_PREDEFINED_DT(16)
+#define UCC_DT_FLOAT128_COMPLEX UCC_PREDEFINED_DT(17)
+#define UCC_DT_PREDEFINED_LAST  18
 
 /**
  * @ingroup UCC_DATATYPE
