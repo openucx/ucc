@@ -1,5 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -27,25 +28,27 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
                                    const ucp_tag_recv_info_t *info,
                                    void *user_data);
 
-#define UCC_TL_UCP_MAKE_TAG(_tag, _rank, _id, _scope_id, _scope)               \
-    ((((uint64_t) (_tag))      << UCC_TL_UCP_TAG_BITS_OFFSET)      |           \
+#define UCC_TL_UCP_MAKE_TAG(_user_tag, _tag, _rank, _id, _scope_id, _scope)    \
+    ((((uint64_t) (_user_tag)) << UCC_TL_UCP_USER_TAG_BITS_OFFSET) |           \
+     (((uint64_t) (_tag))      << UCC_TL_UCP_TAG_BITS_OFFSET)      |           \
      (((uint64_t) (_rank))     << UCC_TL_UCP_SENDER_BITS_OFFSET)   |           \
      (((uint64_t) (_scope))    << UCC_TL_UCP_SCOPE_BITS_OFFSET)    |           \
      (((uint64_t) (_scope_id)) << UCC_TL_UCP_SCOPE_ID_BITS_OFFSET) |           \
      (((uint64_t) (_id))       << UCC_TL_UCP_ID_BITS_OFFSET))
 
-#define UCC_TL_UCP_MAKE_SEND_TAG(_tag, _rank, _id, _scope_id, _scope)          \
-    UCC_TL_UCP_MAKE_TAG(_tag, _rank, _id, _scope_id, _scope)
+#define UCC_TL_UCP_MAKE_SEND_TAG(_user_tag, _tag, _rank, _id, _scope_id, _scope)          \
+    UCC_TL_UCP_MAKE_TAG(_user_tag, _tag, _rank, _id, _scope_id, _scope)
 
-#define UCC_TL_UCP_MAKE_RECV_TAG(_ucp_tag, _ucp_tag_mask, _tag, _src, _id,     \
-                                 _scope_id, _scope)                            \
+#define UCC_TL_UCP_MAKE_RECV_TAG(_ucp_tag, _ucp_tag_mask, _user_tag, _tag,     \
+                                 _src, _id, _scope_id, _scope)                 \
     do {                                                                       \
         ucc_assert((_tag) <= UCC_TL_UCP_MAX_TAG);                              \
         ucc_assert((_src) <= UCC_TL_UCP_MAX_SENDER);                           \
         ucc_assert((_id) <= UCC_TL_UCP_MAX_ID);                                \
         (_ucp_tag_mask) = (uint64_t)(-1);                                      \
         (_ucp_tag) =                                                           \
-            UCC_TL_UCP_MAKE_TAG((_tag), (_src), (_id), (_scope_id), (_scope)); \
+            UCC_TL_UCP_MAKE_TAG((_user_tag), (_tag), (_src), (_id),            \
+                                (_scope_id), (_scope)); \
     } while (0)
 
 #define UCC_TL_UCP_CHECK_REQ_STATUS()                                          \
@@ -67,6 +70,7 @@ ucc_tl_ucp_send_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                        ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                        ucc_tl_ucp_task_t *task, ucp_send_nbx_callback_t cb)
 {
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucp_request_param_t req_param;
     ucc_status_t        status;
     ucp_ep_h            ep;
@@ -76,7 +80,7 @@ ucc_tl_ucp_send_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     if (ucc_unlikely(UCC_OK != status)) {
         return UCS_STATUS_PTR(UCS_ERR_NO_MESSAGE);
     }
-    ucp_tag = UCC_TL_UCP_MAKE_SEND_TAG(
+    ucp_tag = UCC_TL_UCP_MAKE_SEND_TAG((args->mask & UCC_COLL_ARGS_FIELD_TAG),
         task->tagged.tag, UCC_TL_TEAM_RANK(team), team->super.super.params.id,
         team->super.super.params.scope_id, team->super.super.params.scope);
     req_param.op_attr_mask =
@@ -129,11 +133,14 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                        ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                        ucc_tl_ucp_task_t *task, ucp_tag_recv_nbx_callback_t cb)
 {
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucp_request_param_t req_param;
     ucp_tag_t           ucp_tag, ucp_tag_mask;
 
-    UCC_TL_UCP_MAKE_RECV_TAG(ucp_tag, ucp_tag_mask, task->tagged.tag,
-                             dest_group_rank, team->super.super.params.id,
+    UCC_TL_UCP_MAKE_RECV_TAG(ucp_tag, ucp_tag_mask,
+                             (args->mask & UCC_COLL_ARGS_FIELD_TAG),
+                             task->tagged.tag, dest_group_rank,
+                             team->super.super.params.id,
                              team->super.super.params.scope_id,
                              team->super.super.params.scope);
     req_param.op_attr_mask =

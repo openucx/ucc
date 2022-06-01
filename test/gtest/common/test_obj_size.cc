@@ -21,5 +21,5 @@ class test_obj_size : public ucc::test {
 #define EXPECTED_SIZE(_obj, _size) EXPECT_EQ((size_t)_size, sizeof(_obj))
 
 UCC_TEST_F(test_obj_size, size) {
-    EXPECTED_SIZE(ucc_coll_task_t, 448);
+    EXPECTED_SIZE(ucc_coll_task_t, 472);
 }

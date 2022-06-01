@@ -1,5 +1,6 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -207,9 +208,33 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task    = ucc_tl_ucp_get_task(tl_team);
 
+    if (ucc_unlikely(!task)) {
+        return NULL;
+    }
+
     ucc_coll_task_init(&task->super, coll_args, team);
-    tl_team->seq_num = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
-    task->tagged.tag           = tl_team->seq_num;
+
+    if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args)) {
+        task->tagged.tag = (coll_args->mask & UCC_COLL_ARGS_FIELD_TAG)
+            ? coll_args->args.tag : UCC_TL_UCP_ACTIVE_SET_TAG;
+        task->subset.map    = ucc_active_set_to_ep_map(&coll_args->args);
+        task->subset.myrank =
+            ucc_ep_map_local_rank(task->subset.map,
+                                  UCC_TL_TEAM_RANK(tl_team));
+        ucc_assert(coll_args->args.coll_type == UCC_COLL_TYPE_BCAST);
+        /* root value in args corresponds to the  original team ranks,
+           need to convert to subset local value */
+        TASK_ARGS(task).root = ucc_ep_map_local_rank(task->subset.map,
+                                                     coll_args->args.root);
+    } else {
+        if (coll_args->mask & UCC_COLL_ARGS_FIELD_TAG) {
+            task->tagged.tag = coll_args->args.tag;
+        } else {
+            tl_team->seq_num = (tl_team->seq_num + 1) % UCC_TL_UCP_MAX_COLL_TAG;
+            task->tagged.tag = tl_team->seq_num;
+        }
+    }
+
     task->super.finalize       = ucc_tl_ucp_coll_finalize;
     task->super.triggered_post = ucc_triggered_post;
     return task;
