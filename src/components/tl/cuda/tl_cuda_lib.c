@@ -20,6 +20,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *params,
                 UCC_TL_CUDA_MAX_RINGS);
         self->cfg.allgather_ring_max_rings = UCC_TL_CUDA_MAX_RINGS;
     }
+    if (self->cfg.reduce_scatter_ring_max_rings > UCC_TL_CUDA_MAX_RINGS) {
+        tl_warn(&self->super, "max supported number of rings is %d",
+                UCC_TL_CUDA_MAX_RINGS);
+        self->cfg.reduce_scatter_ring_max_rings = UCC_TL_CUDA_MAX_RINGS;
+    }
     tl_info(&self->super, "initialized lib object: %p", self);
     return UCC_OK;
 }

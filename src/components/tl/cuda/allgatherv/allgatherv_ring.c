@@ -279,7 +279,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     }
 
     send_size = ucc_dt_size(task->allgatherv_ring.dt) * send_size;
-    frag_size      = ucc_min(ssize /  2, send_size);
+    frag_size      = ucc_min(ssize / 2, send_size);
     task->allgatherv_ring.num_frags = ucc_div_round_up(send_size, frag_size);
 
     memset(task->allgatherv_ring.exec_task, 0,
