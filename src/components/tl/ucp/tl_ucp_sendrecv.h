@@ -70,11 +70,11 @@ ucc_tl_ucp_send_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                        ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                        ucc_tl_ucp_task_t *task, ucp_send_nbx_callback_t cb)
 {
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucp_request_param_t req_param;
     ucc_status_t        status;
     ucp_ep_h            ep;
     ucp_tag_t           ucp_tag;
-    ucc_coll_args_t    *args = &TASK_ARGS(task);
 
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
@@ -133,9 +133,9 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                        ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                        ucc_tl_ucp_task_t *task, ucp_tag_recv_nbx_callback_t cb)
 {
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucp_request_param_t req_param;
     ucp_tag_t           ucp_tag, ucp_tag_mask;
-    ucc_coll_args_t    *args = &TASK_ARGS(task);
 
     UCC_TL_UCP_MAKE_RECV_TAG(ucp_tag, ucp_tag_mask,
                              (args->mask & UCC_COLL_ARGS_FIELD_TAG),
