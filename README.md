@@ -43,6 +43,10 @@ UCC is BSD-style licensed, as found in the [LICENSE](LICENSE) file.
    * UCC supports CUDA collectives. To compile with CUDA support, install
      [NVIDIA CUDA](https://developer.nvidia.com/cuda-downloads) 11.0 or above.
 
+* [HIP](https://rocmdocs.amd.com/en/latest/Programming_Guides/HIP-GUIDE.html) (optional)
+   * UCC supports AMD GPUs using HIP. Instructions for installing ROCM/HIP can be found at
+     [AMD ROCM](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html).
+
 * Doxygen
    * UCC uses Doxygen for generating API documentation
 
@@ -98,9 +102,11 @@ $ mpirun -np 2 --mca coll_ucc_enable 1 --mca coll_ucc_priority 100 ./my_mpi_app
 $ mpirun -np 2 --mca scoll_ucc_enable 1 --mca scoll_ucc_priority 100 ./my_openshmem_app
 ```
 
-### Supported Transports
+
+### SUPPORTED Transports
 * UCX/UCP
   - InfiniBand, ROCE, Cray Gemini and Aries, Shared Memory
 * SHARP
 * CUDA
 * NCCL
+* RCCL

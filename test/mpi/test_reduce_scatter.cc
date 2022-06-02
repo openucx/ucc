@@ -7,57 +7,53 @@
 #include "test_mpi.h"
 #include "mpi_util.h"
 
-TestReduceScatter::TestReduceScatter(size_t _msgsize,
-                                     ucc_test_mpi_inplace_t _inplace,
-                                     ucc_datatype_t _dt, ucc_reduction_op_t _op,
-                                     ucc_memory_type_t _mt,
-                                     ucc_test_team_t &_team, size_t _max_size) :
-    TestCase(_team, UCC_COLL_TYPE_REDUCE_SCATTER, _mt, _msgsize, _inplace,
-             _max_size)
+TestReduceScatter::TestReduceScatter(ucc_test_team_t &_team,
+                                     TestCaseParams &params) :
+    TestCase(_team, UCC_COLL_TYPE_REDUCE_SCATTER, params)
 {
-    size_t dt_size = ucc_dt_size(_dt);
-    size_t count   = _msgsize / dt_size;
+    size_t dt_size = ucc_dt_size(params.dt);
+    size_t count   = msgsize / dt_size;
     int    rank, comm_size;
 
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &comm_size);
-    op = _op;
-    dt = _dt;
+    op = params.op;
+    dt = params.dt;
 
-    if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT, team.comm) ||
+    if (skip_reduce(test_max_size < msgsize, TEST_SKIP_MEM_LIMIT, team.comm) ||
         skip_reduce((count < comm_size), TEST_SKIP_NOT_SUPPORTED, team.comm)) {
         return;
     }
-    check_buf = ucc_malloc( _msgsize, "check buf");
+    check_buf = ucc_malloc(msgsize, "check buf");
     UCC_MALLOC_CHECK(check_buf);
 
     count   = count - (count % comm_size);
-    msgsize = _msgsize = count * dt_size;
+    msgsize = count * dt_size;
 
     if (TEST_NO_INPLACE == inplace) {
         args.dst.info.count = count / comm_size;
-        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize / comm_size, _mt));
-        UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
+        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize / comm_size, mem_type));
+        UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
         rbuf = rbuf_mc_header->addr;
         sbuf = sbuf_mc_header->addr;
     } else {
         args.mask           = UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags          = UCC_COLL_ARGS_FLAG_IN_PLACE;
         args.dst.info.count = count;
-        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, _msgsize, _mt));
+        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize, mem_type));
         rbuf       = rbuf_mc_header->addr;
     }
 
     if (inplace == TEST_NO_INPLACE) {
         args.src.info.buffer      = sbuf;
         args.src.info.count       = count;
-        args.src.info.datatype    = _dt;
-        args.src.info.mem_type    = _mt;
+        args.src.info.datatype    = dt;
+        args.src.info.mem_type    = mem_type;
     }
-    args.op                   = _op;
+    args.op                   = op;
     args.dst.info.buffer      = rbuf;
-    args.dst.info.datatype    = _dt;
-    args.dst.info.mem_type    = _mt;
+    args.dst.info.datatype    = dt;
+    args.dst.info.mem_type    = mem_type;
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

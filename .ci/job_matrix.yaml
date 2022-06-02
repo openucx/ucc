@@ -42,7 +42,7 @@ runs_on_dockers:
 runs_on_agents:
   - nodeLabel: 'swx-clx01'
 
-timeout_minutes: 120
+timeout_minutes: 360
 
 steps:
   #============================================================================
