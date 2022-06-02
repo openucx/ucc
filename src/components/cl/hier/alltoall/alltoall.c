@@ -41,7 +41,13 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoall_init,
 
     memcpy(&args, coll_args, sizeof(args));
     args.args.coll_type = UCC_COLL_TYPE_ALLTOALLV;
-    team_size           = UCC_CL_TEAM_SIZE(cl_team);
+    if (!(args.args.mask & UCC_COLL_ARGS_FIELD_FLAGS)) {
+        args.args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
+        args.args.flags = 0;
+    }
+    args.args.flags |= UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER |
+                       UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
+    team_size = UCC_CL_TEAM_SIZE(cl_team);
 
     status =
         ucc_mc_alloc(&h, sizeof(int) * team_size * 2, UCC_MEMORY_TYPE_HOST);
