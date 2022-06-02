@@ -323,6 +323,66 @@ int ucc_coll_is_rooted(ucc_coll_type_t c)
     }
 }
 
+bool ucc_coll_has_memtype(ucc_coll_type_t c)
+{
+    switch(c) {
+    case UCC_COLL_TYPE_BARRIER:
+    case UCC_COLL_TYPE_FANIN:
+    case UCC_COLL_TYPE_FANOUT:
+        return false;
+    default:
+        return true;
+    }
+}
+
+bool ucc_coll_has_msgrange(ucc_coll_type_t c)
+{
+    switch(c) {
+    case UCC_COLL_TYPE_BARRIER:
+    case UCC_COLL_TYPE_FANIN:
+    case UCC_COLL_TYPE_FANOUT:
+        return false;
+    default:
+        return true;
+    }
+}
+
+bool ucc_coll_has_datatype(ucc_coll_type_t c)
+{
+    switch(c) {
+    case UCC_COLL_TYPE_ALLREDUCE:
+    case UCC_COLL_TYPE_REDUCE:
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool ucc_coll_has_op(ucc_coll_type_t c)
+{
+    switch(c) {
+    case UCC_COLL_TYPE_ALLREDUCE:
+    case UCC_COLL_TYPE_REDUCE:
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool ucc_coll_has_bits(ucc_coll_type_t c)
+{
+    switch(c) {
+    case UCC_COLL_TYPE_ALLTOALLV:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void UccTestMpi::set_count_vsizes(std::vector<ucc_test_vsize_flag_t> &_counts_vsize)
 {
     counts_vsize =  _counts_vsize;
@@ -380,7 +440,7 @@ void set_gpu_device(test_set_gpu_device_t set_device)
 #endif
 
 std::vector<ucc_status_t> UccTestMpi::exec_tests(
-        std::vector<std::shared_ptr<TestCase>> tcs)
+        std::vector<std::shared_ptr<TestCase>> tcs, bool triggered)
 {
     ucc_status_t status;
     int world_rank;
@@ -391,9 +451,13 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
     for (auto tc: tcs) {
         if (TEST_SKIP_NONE == tc->test_skip) {
             if (verbose && 0 == world_rank) {
-                std::cout << tc->str() << std::endl;
+                if (triggered) {
+                    std::cout << "Triggered "<<tc->str() << std::endl;
+                } else {
+                    std::cout << tc->str() << std::endl;
+                }
             }
-            tc->run();
+            tc->run(triggered);
         } else {
             if (verbose && 0 == world_rank) {
                 std::cout << "SKIPPED: " << skip_str(tc->test_skip) << ": "
@@ -434,107 +498,94 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
 void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                  std::vector<ucc_status_t> &rst)
 {
-    size_t s = test_max_size;
+    TestCaseParams params;
+
+    params.max_size  = test_max_size;
+    params.inplace   = inplace;
 
     for (auto i = 0; i < iterations; i++) {
         for (auto &c : colls) {
             std::vector<int> roots = {0};
+            std::vector<ucc_memory_type_t> test_memtypes = {UCC_MEMORY_TYPE_LAST};
+            std::vector<size_t> test_msgsizes = {0};
+            std::vector<ucc_datatype_t> test_dtypes = {(ucc_datatype_t)-1};
+            std::vector<ucc_reduction_op_t> test_ops = {(ucc_reduction_op_t)-1};
+            std::vector<ucc_test_vsize_flag_t> test_counts_vsize = {TEST_FLAG_VSIZE_64BIT};
+            std::vector<ucc_test_vsize_flag_t> test_displ_vsize = {TEST_FLAG_VSIZE_64BIT};
+            void **onesided_bufs;
+
+            if ((inplace == TEST_INPLACE) && !ucc_coll_inplace_supported(c)) {
+                continue;
+            }
+
             if (ucc_coll_is_rooted(c)) {
                 roots = gen_roots(team);
             }
+
+            if (ucc_coll_has_memtype(c)) {
+                test_memtypes = mtypes;
+            }
+
+            if (ucc_coll_has_msgrange(c)) {
+                test_msgsizes = msgsizes;
+            }
+
+            if (ucc_coll_has_datatype(c)) {
+                test_dtypes = dtypes;
+            }
+
+            if (ucc_coll_has_op(c)) {
+                test_ops = ops;
+            }
+
+            if (ucc_coll_has_bits(c)) {
+                test_counts_vsize = counts_vsize;
+                test_displ_vsize = displs_vsize;
+            }
+
             for (auto r : roots) {
-                if (c == UCC_COLL_TYPE_BARRIER) {
-                    auto tcs = TestCase::init(c, team, triggered, nt);
-                    auto res = exec_tests(tcs);
-                    rst.insert(rst.end(), res.begin(), res.end());
-                } else {
-                    for (auto mt : mtypes) {
+                for (auto mt: test_memtypes) {
+                    if (triggered && !ucc_coll_triggered_supported(mt)) {
+                        rst.push_back(UCC_ERR_NOT_IMPLEMENTED);
+                        continue;
+                    }
 
-                        if (triggered && !ucc_coll_triggered_supported(mt)) {
-                            rst.push_back(UCC_ERR_NOT_IMPLEMENTED);
+                    if (c == UCC_COLL_TYPE_ALLTOALL && team.ctx != ctx) {
+                        /* onesided alltoall */
+                        if (mt != UCC_MEMORY_TYPE_HOST) {
                             continue;
+                        } else {
+                            onesided_bufs = onesided_buffers;
                         }
+                    } else {
+                        onesided_bufs = nullptr;
+                    }
 
-                        for (auto m : msgsizes) {
-                            if (c == UCC_COLL_TYPE_ALLREDUCE ||
-                                c == UCC_COLL_TYPE_REDUCE ||
-                                c == UCC_COLL_TYPE_REDUCE_SCATTER ||
-                                c == UCC_COLL_TYPE_REDUCE_SCATTERV) {
-                                for (auto dt : dtypes) {
-                                    for (auto op : ops) {
-                                        if (op == UCC_OP_AVG &&
-                                            !(dt == UCC_DT_FLOAT16 ||
-                                              dt == UCC_DT_FLOAT32 ||
-                                              dt == UCC_DT_FLOAT64)) {
-                                            continue;
-                                        }
-                                        auto tcs = TestCase::init(c, team,
-                                                                  triggered, nt,
-                                                                  r, m, inplace,
-                                                                  mt, s, dt, op);
-                                        auto res = exec_tests(tcs);
+                    for (auto m: test_msgsizes) {
+                        for (auto dt: test_dtypes) {
+                            for (auto op: test_ops) {
+                                if (op == UCC_OP_AVG &&
+                                    !(dt == UCC_DT_FLOAT16 ||
+                                      dt == UCC_DT_FLOAT32 ||
+                                      dt == UCC_DT_FLOAT64)) {
+                                    continue;
+                                }
+                                for (auto count_bits: test_counts_vsize) {
+                                    for (auto displ_bits: test_displ_vsize) {
+                                        params.root       = r;
+                                        params.mt         = mt;
+                                        params.msgsize    = m;
+                                        params.dt         = dt;
+                                        params.op         = op;
+                                        params.count_bits = count_bits;
+                                        params.displ_bits = displ_bits;
+                                        params.buffers    = onesided_bufs;
+
+                                        auto tcs = TestCase::init(team, c, nt, params);
+                                        auto res = exec_tests(tcs, triggered);
                                         rst.insert(rst.end(), res.begin(), res.end());
                                     }
                                 }
-                            } else if (c == UCC_COLL_TYPE_ALLTOALL ||
-                                       c == UCC_COLL_TYPE_ALLTOALLV) {
-                                switch (c) {
-                                case UCC_COLL_TYPE_ALLTOALL:
-                                {
-                                    if (team.ctx == ctx) {
-                                        auto tcs = TestCase::init(
-                                            c, team, triggered, nt, r, m,
-                                            inplace, mt, s);
-                                        auto res = exec_tests(tcs);
-                                        rst.insert(rst.end(), res.begin(),
-                                                   res.end());
-                                    } else {
-                                        if (mt != UCC_MEMORY_TYPE_HOST) {
-                                            continue;
-                                        }
-                                        auto tc_onesided = TestCase::init(
-                                            c, team, triggered, nt, r, m,
-                                            inplace, mt, s,
-                                            UCC_DT_UINT32, UCC_OP_LAST,
-                                            TEST_FLAG_VSIZE_64BIT,
-                                            TEST_FLAG_VSIZE_64BIT,
-                                            onesided_buffers);
-                                        auto res = exec_tests(tc_onesided);
-                                        rst.insert(rst.end(), res.begin(),
-                                                   res.end());
-                                    }
-                                    break;
-                                }
-                                case UCC_COLL_TYPE_ALLTOALLV:
-                                {
-                                    for (auto count_bits : counts_vsize) {
-                                        for (auto displ_bits : displs_vsize) {
-                                            auto tcs = TestCase::init(
-                                                c, team, triggered, nt, r, m,
-                                                inplace, mt, s,
-                                                (ucc_datatype_t)-1,
-                                                (ucc_reduction_op_t)-1,
-                                                count_bits, displ_bits);
-                                            auto res = exec_tests(tcs);
-                                            rst.insert(rst.end(), res.begin(), res.end());
-                                        }
-                                    }
-                                    break;
-                                }
-                                default:
-                                    continue;
-                                }
-                            } else {
-                                if (TEST_INPLACE == inplace &&
-                                    !ucc_coll_inplace_supported(c)) {
-                                    rst.push_back(UCC_ERR_NOT_IMPLEMENTED);
-                                    continue;
-                                }
-                                auto tcs = TestCase::init(c, team, triggered,
-                                                          nt, r, m, inplace, mt,
-                                                          s);
-                                auto res = exec_tests(tcs);
-                                rst.insert(rst.end(), res.begin(), res.end());
                             }
                         }
                     }
@@ -543,6 +594,7 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
         }
     }
 }
+
 typedef struct ucc_test_thread {
     pthread_t                 thread;
     int                       id;

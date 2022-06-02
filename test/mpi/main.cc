@@ -412,7 +412,7 @@ void ProcessArgs(int argc, char** argv)
         case 'I':
             process_inplace(optarg);
             break;
-        case 256:
+        case 'G':
             process_triggered(optarg);
             break;
         case 'r':

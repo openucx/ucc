@@ -241,6 +241,19 @@ typedef struct ucc_test_team {
 
 } ucc_test_team_t;
 
+struct TestCaseParams {
+    size_t msgsize;
+    ucc_test_mpi_inplace_t inplace;
+    ucc_datatype_t dt;
+    ucc_reduction_op_t op;
+    ucc_memory_type_t mt;
+    size_t max_size;
+    int root;
+    void **buffers;
+    ucc_test_vsize_flag_t count_bits;
+    ucc_test_vsize_flag_t displ_bits;
+};
+
 class TestCase {
 protected:
     ucc_test_team_t team;
@@ -257,46 +270,21 @@ protected:
     MPI_Request progress_request;
     uint8_t     progress_buf[1];
     size_t test_max_size;
-    bool triggered;
 public:
     void mpi_progress(void);
     test_skip_cause_t test_skip;
     static std::shared_ptr<TestCase> init_single(
-            ucc_coll_type_t _type,
             ucc_test_team_t &_team,
-            bool _triggered,
-            int    root    = 0,
-            size_t msgsize = 0,
-            ucc_test_mpi_inplace_t inplace = TEST_NO_INPLACE,
-            ucc_memory_type_t mt = UCC_MEMORY_TYPE_HOST,
-            size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX,
-            ucc_datatype_t dt = UCC_DT_INT32,
-            ucc_reduction_op_t op = UCC_OP_SUM,
-            ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
-            ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT,
-            void **onesided_buffers = nullptr);
+            ucc_coll_type_t _type,
+            TestCaseParams params);
     static std::vector<std::shared_ptr<TestCase>> init(
-            ucc_coll_type_t _type,
             ucc_test_team_t &_team,
-            bool _triggered = false,
-            int num_tests = 1,
-            int    root    = 0,
-            size_t msgsize = 0,
-            ucc_test_mpi_inplace_t inplace = TEST_NO_INPLACE,
-            ucc_memory_type_t mt = UCC_MEMORY_TYPE_HOST,
-            size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX,
-            ucc_datatype_t dt = UCC_DT_INT32,
-            ucc_reduction_op_t op = UCC_OP_SUM,
-            ucc_test_vsize_flag_t count_vsize = TEST_FLAG_VSIZE_64BIT,
-            ucc_test_vsize_flag_t displ_vsize = TEST_FLAG_VSIZE_64BIT,
-            void **onesided_buffers = nullptr);
-    TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
-             ucc_memory_type_t _mem_type = UCC_MEMORY_TYPE_UNKNOWN,
-             size_t _msgsize = 0, ucc_test_mpi_inplace_t _inplace = TEST_NO_INPLACE,
-             size_t _max_size = TEST_UCC_RANK_BUF_SIZE_MAX,
-             bool triggered = false);
+            ucc_coll_type_t _type,
+            int num_tests,
+            TestCaseParams params);
+    TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct, TestCaseParams params);
     virtual ~TestCase();
-    virtual void run();
+    virtual void run(bool triggered);
     virtual ucc_status_t set_input() = 0;
     virtual ucc_status_t reset_sbuf() = 0;
     virtual ucc_status_t check() = 0;
@@ -304,7 +292,6 @@ public:
     virtual ucc_status_t test();
     void wait();
     void tc_progress_ctx();
-    ucc_status_t exec();
     test_skip_cause_t skip_reduce(test_skip_cause_t cause, MPI_Comm comm);
     test_skip_cause_t skip_reduce(int skip_cond, test_skip_cause_t cause,
                                   MPI_Comm comm);
@@ -337,7 +324,8 @@ class UccTestMpi {
     std::vector<ucc_test_vsize_flag_t> counts_vsize;
     std::vector<ucc_test_vsize_flag_t> displs_vsize;
     std::vector<ucc_status_t> exec_tests(
-            std::vector<std::shared_ptr<TestCase>> tcs);
+            std::vector<std::shared_ptr<TestCase>> tcs,
+            bool triggered);
 public:
     std::vector<ucc_test_team_t> teams;
     std::vector<ucc_test_team_t> onesided_teams;
@@ -381,37 +369,9 @@ public:
     }
 };
 
-class TestBarrier : public TestCase {
-    ucc_status_t status;
-public:
-    TestBarrier(ucc_test_team_t &team, bool _triggered);
-    ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf() override;
-    ucc_status_t check();
-    std::string str();
-    void run();
-    ucc_status_t test();
-};
-
-class TestAllreduce : public TestCase {
-    ucc_datatype_t dt;
-    ucc_reduction_op_t op;
-public:
-    TestAllreduce(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
-                  ucc_datatype_t _dt, ucc_reduction_op_t _op,
-                  ucc_memory_type_t _mt, ucc_test_team_t &team,
-                  size_t _max_size, bool _triggered);
-    ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf() override;
-    ucc_status_t check();
-    std::string str();
-};
-
 class TestAllgather : public TestCase {
 public:
-    TestAllgather(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
-                  ucc_memory_type_t _mt, ucc_test_team_t &team,
-                  size_t _max_size, bool _triggered);
+    TestAllgather(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ucc_status_t check();
@@ -421,44 +381,27 @@ class TestAllgatherv : public TestCase {
     int *counts;
     int *displacements;
 public:
-    TestAllgatherv(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
-                   ucc_memory_type_t _mt, ucc_test_team_t &team,
-                   size_t _max_size, bool _triggered);
+    TestAllgatherv(ucc_test_team_t &team, TestCaseParams &params);
     ~TestAllgatherv();
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ucc_status_t check() override;
 };
 
-class TestBcast : public TestCase {
+class TestAllreduce : public TestCase {
+    ucc_datatype_t dt;
+    ucc_reduction_op_t op;
 public:
-    TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-              ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
-              size_t _max_size, bool _triggered);
+    TestAllreduce(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ucc_status_t check();
-};
-
-class TestReduce : public TestCase {
-	ucc_datatype_t dt;
-	ucc_reduction_op_t op;
-public:
-    TestReduce(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-               ucc_datatype_t _dt, ucc_reduction_op_t _op,
-               ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
-               size_t _max_size, bool _triggered);
-    ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf() override;
-    ucc_status_t check();
-    std::string  str();
+    std::string str();
 };
 
 class TestAlltoall : public TestCase {
 public:
-    TestAlltoall(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-                 ucc_memory_type_t _mt, ucc_test_team_t &_team, size_t _max_size,
-                 void **buffers = nullptr, bool _triggered = false);
+    TestAlltoall(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ucc_status_t check();
@@ -481,11 +424,7 @@ class TestAlltoallv : public TestCase {
     template<typename T>
     void * mpi_counts_to_ucc(int *mpi_counts, size_t _ncount);
 public:
-    TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
-                  ucc_memory_type_t _mt, ucc_test_team_t &_team,
-                  size_t _max_size,
-                  ucc_test_vsize_flag_t count_bits,
-                  ucc_test_vsize_flag_t displ_bits, bool _triggered);
+    TestAlltoallv(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ucc_status_t check();
@@ -493,14 +432,61 @@ public:
     ~TestAlltoallv();
 };
 
+class TestBarrier : public TestCase {
+    ucc_status_t status;
+public:
+    TestBarrier(ucc_test_team_t &team, TestCaseParams &params);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
+    ucc_status_t check();
+    std::string str();
+    void run(bool triggered);
+    ucc_status_t test();
+};
+
+class TestBcast : public TestCase {
+public:
+    TestBcast(ucc_test_team_t &team, TestCaseParams &params);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
+    ucc_status_t check();
+};
+
+class TestGather : public TestCase {
+public:
+    TestGather(ucc_test_team_t &team, TestCaseParams &params);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
+    ucc_status_t check();
+};
+
+class TestGatherv : public TestCase {
+    uint32_t *counts;
+    uint32_t *displacements;
+public:
+    TestGatherv(ucc_test_team_t &team, TestCaseParams &params);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
+    ucc_status_t check();
+    ~TestGatherv();
+};
+
+class TestReduce : public TestCase {
+	ucc_datatype_t dt;
+	ucc_reduction_op_t op;
+public:
+    TestReduce(ucc_test_team_t &team, TestCaseParams &params);
+    ucc_status_t set_input() override;
+    ucc_status_t reset_sbuf() override;
+    ucc_status_t check();
+    std::string  str();
+};
+
 class TestReduceScatter : public TestCase {
     ucc_datatype_t dt;
     ucc_reduction_op_t op;
 public:
-    TestReduceScatter(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
-                      ucc_datatype_t _dt, ucc_reduction_op_t _op,
-                      ucc_memory_type_t _mt, ucc_test_team_t &team,
-                      size_t _max_size, bool _triggered);
+    TestReduceScatter(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ~TestReduceScatter();
@@ -512,12 +498,8 @@ class TestReduceScatterv : public TestCase {
     ucc_datatype_t     dt;
     ucc_reduction_op_t op;
     int *              counts;
-
   public:
-    TestReduceScatterv(size_t _msgsize, ucc_test_mpi_inplace_t inplace,
-                       ucc_datatype_t _dt, ucc_reduction_op_t _op,
-                       ucc_memory_type_t _mt, ucc_test_team_t &team,
-                       size_t _max_size, bool _triggered);
+    TestReduceScatterv(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ~TestReduceScatterv();
@@ -525,34 +507,9 @@ class TestReduceScatterv : public TestCase {
     std::string  str();
 };
 
-class TestGather : public TestCase {
-public:
-    TestGather(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-               ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
-               size_t _max_size, bool _triggered);
-    ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf() override;
-    ucc_status_t check();
-};
-
-class TestGatherv : public TestCase {
-    uint32_t *counts;
-    uint32_t *displacements;
-public:
-    TestGatherv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-                ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
-                size_t _max_size, bool _triggered);
-    ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf() override;
-    ucc_status_t check();
-    ~TestGatherv();
-};
-
 class TestScatter : public TestCase {
 public:
-    TestScatter(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-                ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
-                size_t _max_size, bool _triggered);
+    TestScatter(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ucc_status_t check();
@@ -562,9 +519,7 @@ class TestScatterv : public TestCase {
     uint32_t *counts;
     uint32_t *displacements;
 public:
-    TestScatterv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-                 ucc_memory_type_t _mt, int root, ucc_test_team_t &team,
-                 size_t _max_size, bool _triggered);
+    TestScatterv(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
     ucc_status_t reset_sbuf() override;
     ucc_status_t check();
