@@ -189,6 +189,7 @@ typedef struct ucc_test_team {
     {
 #ifdef HAVE_CUDA
         cuda_stream = nullptr;
+        cuda_ee     = nullptr;
 #endif
     };
 
