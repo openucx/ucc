@@ -11,11 +11,19 @@
 #include <unistd.h>
 
 typedef uint64_t ucc_host_id_t;
-typedef uint32_t ucc_socket_id_t;
+typedef uint8_t  ucc_socket_id_t;
+typedef uint8_t  ucc_numa_id_t;
+
+#define UCC_SOCKET_ID_INVALID ((ucc_socket_id_t)-1)
+#define UCC_NUMA_ID_INVALID   ((ucc_numa_id_t)-1)
+
+#define UCC_MAX_SOCKET_ID (UCC_SOCKET_ID_INVALID - 1)
+#define UCC_MAX_NUMA_ID   (UCC_NUMA_ID_INVALID - 1)
 
 typedef struct ucc_proc_info {
     ucc_host_id_t   host_hash;
     ucc_socket_id_t socket_id;
+    ucc_numa_id_t   numa_id;
     ucc_host_id_t   host_id;
     pid_t           pid;
 } ucc_proc_info_t;

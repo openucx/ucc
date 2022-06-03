@@ -2,7 +2,6 @@
 * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
 * See file LICENSE for terms.
 */
-
 #include "ucc_proc_info.h"
 #include "ucc_log.h"
 #include "utils/ucc_malloc.h"
@@ -15,7 +14,7 @@
 #ifdef HAVE_UCS_GET_SYSTEM_ID
 #include <ucs/sys/uid.h>
 #endif
-
+#include <dlfcn.h>
 
 ucc_proc_info_t ucc_local_proc;
 static char ucc_local_hostname[HOST_NAME_MAX];
@@ -24,7 +23,6 @@ const char*  ucc_hostname()
 {
     return ucc_local_hostname;
 }
-
 
 uint64_t ucc_get_system_id()
 {
@@ -79,7 +77,7 @@ static int parse_cpuset_file(FILE *file, int *nr_psbl_cpus)
     return 0;
 }
 
-ucc_status_t ucc_get_bound_socket_id(int *socketid)
+static ucc_status_t ucc_get_bound_socket_id(ucc_socket_id_t *socketid)
 {
     cpu_set_t *cpuset = NULL;
     int        sockid = -1, sockid2 = -1;
@@ -177,6 +175,11 @@ ucc_status_t ucc_get_bound_socket_id(int *socketid)
         n_sockets = ucc_sort_uniq(socket_ids, nr_cpus, 0);
         for (i = 0; i < n_sockets; i++) {
             if (socket_ids[i] == sockid) {
+                if (i > (int)UCC_MAX_SOCKET_ID) {
+                    ucc_error("too large socket id %d", i);
+                    __sched_cpufree(cpuset);
+                    return UCC_ERR_NOT_SUPPORTED;
+                }
                 *socketid = i;
                 break;
             }
@@ -186,6 +189,87 @@ ucc_status_t ucc_get_bound_socket_id(int *socketid)
     __sched_cpufree(cpuset);
     ucc_free(socket_ids);
     return UCC_OK;
+}
+
+#define LOAD_NUMA_SYM(_sym)                                                    \
+    ({                                                                         \
+        void *h = dlsym(handle, _sym);                                         \
+        if ((error = dlerror()) != NULL) {                                     \
+            ucc_error("%s", error);                                            \
+            status = UCC_ERR_NOT_FOUND;                                        \
+            goto error;                                                        \
+        }                                                                      \
+        h;                                                                     \
+    })
+
+static ucc_status_t ucc_get_bound_numa_id(ucc_numa_id_t *numaid)
+{
+    ucc_status_t status = UCC_OK;
+    char *       error;
+    void *       handle, *cpumask;
+    int          i, numa_node, n_cfg_cpus, nn;
+
+    handle = dlopen("libnuma.so", RTLD_LAZY);
+    if (!handle) {
+        ucc_error("%s", dlerror());
+        return UCC_ERR_NOT_FOUND;
+    }
+
+    int (*ucc_numa_available)(void) =
+        LOAD_NUMA_SYM("numa_available");
+    int (*ucc_numa_num_configured_cpus)(void) =
+        LOAD_NUMA_SYM("numa_num_configured_cpus");
+    void *(*ucc_numa_allocate_cpumask)(void) =
+        LOAD_NUMA_SYM("numa_allocate_cpumask");
+    void *(*ucc_numa_sched_getaffinity)(int, void *) =
+        LOAD_NUMA_SYM("numa_sched_getaffinity");
+    int (*ucc_numa_bitmask_isbitset)(void *, int) =
+        LOAD_NUMA_SYM("numa_bitmask_isbitset");
+    int (*ucc_numa_node_of_cpu)(int)     = LOAD_NUMA_SYM("numa_node_of_cpu");
+    int (*ucc_numa_bitmask_free)(void *) = LOAD_NUMA_SYM("numa_bitmask_free");
+
+    if (-1 == ucc_numa_available()) {
+        ucc_error("libnuma is not available");
+        status = UCC_ERR_NO_MESSAGE;
+        goto error;
+    }
+    /* Load the cpumask which a process is bound to, then loop through cpus
+       from that mask and check the numa nodes those cpus belong to. If there are
+       more than 1 numa nodes detected return -1, i.e. not bound to a numa. */
+    cpumask = ucc_numa_allocate_cpumask();
+    if (!cpumask) {
+        ucc_error("numa_allocate_cpumask failed");
+        status = UCC_ERR_NO_MESSAGE;
+        goto error;
+    }
+    ucc_numa_sched_getaffinity(getpid(), cpumask);
+    numa_node  = -1;
+    n_cfg_cpus = ucc_numa_num_configured_cpus();
+    for (i = 0; i < n_cfg_cpus; i++) {
+        if (ucc_numa_bitmask_isbitset(cpumask, i)) {
+            nn = ucc_numa_node_of_cpu(i);
+            if (numa_node == -1) {
+                numa_node = nn;
+            } else if (numa_node != nn && numa_node >= 0) {
+                /* At least 2 different numa nodes detected for a given cpu set.
+                   set numa_node to -1, which means not bound to a numa. */
+                numa_node = -1;
+                break;
+            }
+        }
+    }
+    ucc_numa_bitmask_free(cpumask);
+    if (numa_node >= 0) {
+        if (numa_node > (int)UCC_MAX_NUMA_ID) {
+            ucc_error("too large numa id %d", numa_node);
+            status = UCC_ERR_NOT_SUPPORTED;
+            goto error;
+        }
+        *numaid = numa_node;
+    }
+error:
+    dlclose(handle);
+    return status;
 }
 
 ucc_status_t ucc_local_proc_info_init()
@@ -200,14 +284,20 @@ ucc_status_t ucc_local_proc_info_init()
         ucc_local_proc.host_hash = ucc_get_system_id();
     }
     ucc_local_proc.pid       = getpid();
-    ucc_local_proc.socket_id = -1;
-
-    ucc_debug("proc pid %d, host %s, host_hash %lu",
-              ucc_local_proc.pid, ucc_local_hostname, ucc_local_proc.host_hash);
+    ucc_local_proc.socket_id = UCC_SOCKET_ID_INVALID;
+    ucc_local_proc.numa_id   = UCC_NUMA_ID_INVALID;
 
     if (UCC_OK != ucc_get_bound_socket_id(&ucc_local_proc.socket_id)) {
         ucc_debug("failed to get bound socket id");
     }
+
+    if (UCC_OK != ucc_get_bound_numa_id(&ucc_local_proc.numa_id)) {
+        ucc_debug("failed to get bound numa id");
+    }
+
+    ucc_debug("proc pid %d, host %s, host_hash %lu, sockid %d, numaid %d",
+              ucc_local_proc.pid, ucc_local_hostname, ucc_local_proc.host_hash,
+              (int)ucc_local_proc.socket_id, (int)ucc_local_proc.numa_id);
 
     return UCC_OK;
 }
