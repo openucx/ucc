@@ -48,8 +48,8 @@ ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
                                          const ucc_ee_executor_task_args_t *task_args,
                                          ucc_ee_executor_task_t **task)
 {
+    cudaStream_t stream = NULL;
     ucc_ec_cuda_executor_interruptible_task_t *ee_task;
-    cudaStream_t stream;
     ucc_status_t status;
 
     status = ucc_cuda_executor_interruptible_get_stream(&stream);
