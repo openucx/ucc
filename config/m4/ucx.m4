@@ -98,6 +98,18 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
                 [AC_DEFINE([UCS_HAVE_MPOOL_PARAMS], [1], [params interface for ucs_mpool_init])],
                 [],
                 [#include <ucs/datastruct/mpool.h>])
+            AC_COMPILE_IFELSE(
+            [AC_LANG_SOURCE([[#include <ucs/profile/profile_defs.h>
+					int main(int argc, char** argv) {
+						if (UCS_PROFILE_LOC_ID_DISABLED != 0) {
+						    return -1;
+						}
+						return 0;
+					} ]])],
+                [AC_MSG_RESULT([yes])
+                AC_DEFINE([UCS_NEW_PROFILER_IFACE], 1, [New ucs profiler iface])],
+                [AC_MSG_RESULT([no])
+                ])
         ],
         [
             AS_IF([test "x$with_ucx" != "xguess"],
