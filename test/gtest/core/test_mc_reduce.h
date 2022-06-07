@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -40,6 +40,14 @@ DECLARE_TYPE_OP_PAIR(uint64_t, UINT64, ASSERT_EQ);
 //TODO Bfloat Custom
 DECLARE_TYPE_OP_PAIR(float, FLOAT32, ASSERT_FLOAT_EQ);
 DECLARE_TYPE_OP_PAIR(double, FLOAT64, ASSERT_FLOAT_EQ);
+DECLARE_TYPE_OP_PAIR(long double, FLOAT128, ASSERT_FLOAT_EQ);
+
+DECLARE_TYPE_OP_PAIR(float _Complex, FLOAT32_COMPLEX,
+                     ASSERT_FLOAT32_COMPLEX_EQ);
+DECLARE_TYPE_OP_PAIR(double _Complex, FLOAT64_COMPLEX,
+                     ASSERT_FLOAT64_COMPLEX_EQ);
+DECLARE_TYPE_OP_PAIR(long double _Complex, FLOAT128_COMPLEX,
+                     ASSERT_FLOAT128_COMPLEX_EQ);
 
 template <template <typename P> class op>
 struct TypeOpPair<UCC_DT_BFLOAT16, op> {
@@ -96,40 +104,63 @@ DECLARE_OP_(avg, AVG, SUM);
         TypeOpPair<UCC_DT_ ## _TYPE, max>
 
 /* TypeOp pairs that MC Cuda supports */
-#define CUDA_OP_PAIRS TypeOpPair<UCC_DT_INT16, lor>,    \
-        TypeOpPair<UCC_DT_INT16, sum>,                  \
-        TypeOpPair<UCC_DT_INT32, prod>,                 \
-        TypeOpPair<UCC_DT_INT64, bxor>,                 \
-        TypeOpPair<UCC_DT_FLOAT32, avg>,                \
-        ARITHMETIC_OP_PAIRS(INT32),                     \
-        ARITHMETIC_OP_PAIRS(FLOAT32),                   \
-        ARITHMETIC_OP_PAIRS(FLOAT64),                   \
-        ARITHMETIC_OP_PAIRS(BFLOAT16)
+#define CUDA_OP_PAIRS                                                          \
+    TypeOpPair<UCC_DT_INT16, lor>, TypeOpPair<UCC_DT_INT16, sum>,              \
+        TypeOpPair<UCC_DT_INT32, prod>, TypeOpPair<UCC_DT_INT64, bxor>,        \
+        TypeOpPair<UCC_DT_FLOAT32, avg>, TypeOpPair<UCC_DT_FLOAT64, avg>,      \
+        ARITHMETIC_OP_PAIRS(INT32), ARITHMETIC_OP_PAIRS(FLOAT32),              \
+        ARITHMETIC_OP_PAIRS(FLOAT64), ARITHMETIC_OP_PAIRS(BFLOAT16),           \
+        TypeOpPair<UCC_DT_FLOAT32_COMPLEX, sum>,                               \
+        TypeOpPair<UCC_DT_FLOAT32_COMPLEX, prod>,                              \
+        TypeOpPair<UCC_DT_FLOAT32_COMPLEX, avg>,                               \
+        TypeOpPair<UCC_DT_FLOAT64_COMPLEX, sum>,                               \
+        TypeOpPair<UCC_DT_FLOAT64_COMPLEX, prod>,                              \
+        TypeOpPair<UCC_DT_FLOAT64_COMPLEX, avg>
 
 using CollReduceTypeOpsCuda = ::testing::Types<CUDA_OP_PAIRS>;
 
 /* Host supports all combos, so add more to tests */
-using CollReduceTypeOpsHost = ::testing::Types<CUDA_OP_PAIRS,
-                                           TypeOpPair<UCC_DT_UINT16, band>,
-                                           TypeOpPair<UCC_DT_UINT32, bor>,
-                                           TypeOpPair<UCC_DT_UINT64, land>,
-                                           TypeOpPair<UCC_DT_UINT8, lxor>,
-                                           TypeOpPair<UCC_DT_INT8, lor>>;
+using CollReduceTypeOpsHost = ::testing::Types<
+    CUDA_OP_PAIRS, TypeOpPair<UCC_DT_UINT16, band>,
+    TypeOpPair<UCC_DT_UINT32, bor>, TypeOpPair<UCC_DT_UINT64, land>,
+    TypeOpPair<UCC_DT_UINT8, lxor>, TypeOpPair<UCC_DT_INT8, lor>,
+    ARITHMETIC_OP_PAIRS(FLOAT128), TypeOpPair<UCC_DT_FLOAT128_COMPLEX, sum>,
+    TypeOpPair<UCC_DT_FLOAT128_COMPLEX, prod>>;
 
-using CollReduceTypeOpsAvg = ::testing::Types<TypeOpPair<UCC_DT_FLOAT32, avg>,
-                                              TypeOpPair<UCC_DT_FLOAT64, avg>,
-                                              TypeOpPair<UCC_DT_BFLOAT16, avg>>;
+using CollReduceTypeOpsAvg = ::testing::Types<
+    TypeOpPair<UCC_DT_FLOAT32, avg>, TypeOpPair<UCC_DT_FLOAT64, avg>,
+    TypeOpPair<UCC_DT_FLOAT128, avg>, TypeOpPair<UCC_DT_FLOAT32_COMPLEX, avg>,
+    TypeOpPair<UCC_DT_FLOAT64_COMPLEX, avg>,
+    TypeOpPair<UCC_DT_FLOAT128_COMPLEX, avg>, TypeOpPair<UCC_DT_BFLOAT16, avg>>;
 
 static inline bool ucc_reduction_is_supported(ucc_datatype_t dt,
                                               ucc_reduction_op_t op,
                                               ucc_memory_type_t mt)
 {
+    if ((mt != UCC_MEMORY_TYPE_HOST) &&
+        ((dt == UCC_DT_FLOAT128) || (dt == UCC_DT_FLOAT128_COMPLEX))) {
+        return false;
+    }
     switch(op) {
+    case UCC_OP_MIN:
+    case UCC_OP_MAX:
+        switch (dt) {
+        case UCC_DT_FLOAT32_COMPLEX:
+        case UCC_DT_FLOAT64_COMPLEX:
+        case UCC_DT_FLOAT128_COMPLEX:
+            return false;
+        default:
+            break;
+        }
     case UCC_OP_AVG:
         switch(dt) {
         case UCC_DT_FLOAT32:
         case UCC_DT_FLOAT64:
+        case UCC_DT_FLOAT32_COMPLEX:
+        case UCC_DT_FLOAT64_COMPLEX:
         case UCC_DT_BFLOAT16:
+        case UCC_DT_FLOAT128:
+        case UCC_DT_FLOAT128_COMPLEX:
             break;
         default:
             return false;
