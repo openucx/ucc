@@ -32,7 +32,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_ucp_config->super,
                               params->context);
-    if (params->params & UCC_CONTEXT_PARAM_FIELD_OOB &&
+    if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
         params->params.oob.n_oob_eps == 1) {
         return UCC_ERR_NOT_SUPPORTED;
     }
