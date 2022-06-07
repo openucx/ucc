@@ -59,8 +59,8 @@ void ucc_tl_self_copy_progress(ucc_coll_task_t *coll_task)
 
     if (task->etask != NULL) {
         status = ucc_ee_executor_task_test(task->etask);
-        if (status == UCC_INPROGRESS) {
-            task->super.status = status;
+        if (status == UCC_OPERATION_INITIALIZED || status == UCC_INPROGRESS) {
+            task->super.status = UCC_INPROGRESS;
             return;
         }
         ucc_ee_executor_task_finalize(task->etask);
