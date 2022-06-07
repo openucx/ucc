@@ -656,7 +656,8 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     }
     ctx->id.pi      = ucc_local_proc;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
-    if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+    if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
+        params->oob.n_oob_eps > 1) {
         do {
             /* UCC context create is blocking fn, so we can wait here for the
                completion of addr exchange */
@@ -680,7 +681,8 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         ucc_assert(ctx->addr_storage.rank == params->oob.oob_ep);
     }
     if (config->internal_oob) {
-        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+        if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
+            params->oob.n_oob_eps > 1) {
             ucc_base_team_params_t t_params;
             ucc_base_team_t *      b_team;
             status = ucc_tl_context_get(ctx, "ucp", &ctx->service_ctx);

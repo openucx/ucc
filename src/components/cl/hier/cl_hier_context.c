@@ -23,12 +23,6 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
     int                       i;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_config, params->context);
-    if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
-        params->params.oob.n_oob_eps == 1) {
-        cl_trace(cl_config->cl_lib, "team size %d is not supported for %s",
-                 params->params.oob.n_oob_eps, lib->super.iface->super.name);
-        return UCC_ERR_NOT_SUPPORTED;
-    }
     if (tls->count == 1 && !strcmp(tls->names[0], "all")) {
         tls = &params->context->all_tls;
     }
