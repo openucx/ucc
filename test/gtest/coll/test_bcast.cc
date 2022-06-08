@@ -82,7 +82,7 @@ public:
     bool data_validate(UccCollCtxVec ctxs)
     {
         bool     ret  = true;
-        int      root = (ctxs.size() > 1) ? ctxs[0]->args->root : 0;
+        int      root = ctxs[0]->args->root;
         uint8_t *dsts;
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
@@ -199,6 +199,11 @@ UCC_TEST_P(test_bcast_1, multiple)
         UccTeam_h       team = UccJob::getStaticTeams()[tid];
         int             size = team->procs.size();
         UccCollCtxVec   ctx;
+
+        if (size == 1 && root > 0) {
+            /* skip team size 1 and root > 0, which are invalid */
+            continue;
+        }
 
         SET_MEM_TYPE(mem_type);
         set_root(root);
