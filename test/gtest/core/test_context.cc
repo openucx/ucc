@@ -87,6 +87,9 @@ UCC_TEST_F(test_context_get_attr, work_buffer_size)
 UCC_TEST_F(test_context, global)
 {
     /* Create and cleanup several Jobs (ucc contextss) with OOB */
+    UccJob job1(1, UccJob::UCC_JOB_CTX_GLOBAL);
+    job1.cleanup();
+
     UccJob job3(3, UccJob::UCC_JOB_CTX_GLOBAL);
     job3.cleanup();
 
