@@ -1,6 +1,5 @@
 /**
  * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
- * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
  */
@@ -16,13 +15,14 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
 {
     const ucc_cl_context_config_t *cl_config =
         ucc_derived_of(config, ucc_cl_context_config_t);
-    ucc_cl_hier_lib_t *lib =
-        ucc_derived_of(cl_config->cl_lib, ucc_cl_hier_lib_t);
+    ucc_cl_hier_lib_t        *lib = ucc_derived_of(cl_config->cl_lib,
+                                                   ucc_cl_hier_lib_t);
     ucc_config_names_array_t *tls = &lib->tls.array;
     ucc_status_t              status;
     int                       i;
 
-    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_config, params->context);
+    UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, cl_config,
+                              params->context);
     if (tls->count == 1 && !strcmp(tls->names[0], "all")) {
         tls = &params->context->all_tls;
     }

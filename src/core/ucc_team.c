@@ -61,7 +61,8 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     team->bp.team                 = team;
     team->bp.map.type             = UCC_EP_MAP_FULL;
     team->bp.map.ep_num           = team->size;
-    team->state                   = (team->size > 1) ? UCC_TEAM_ADDR_EXCHANGE : UCC_TEAM_CL_CREATE;
+    team->state                   = (team->size > 1) ? UCC_TEAM_ADDR_EXCHANGE
+                                                     : UCC_TEAM_CL_CREATE;
     team->last_team_create_posted = -1;
     team->status                  = UCC_INPROGRESS;
     return UCC_OK;
