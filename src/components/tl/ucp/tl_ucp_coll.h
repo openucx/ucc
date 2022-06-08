@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -129,6 +129,14 @@ typedef struct ucc_tl_ucp_task {
             void                   *scratch;
             ucc_mc_buffer_header_t *scratch_mc_header;
         } reduce_kn;
+        struct {
+            ucc_rank_t              dist;
+            ucc_rank_t              max_dist;
+            uint32_t                radix;
+            int                     phase;
+            void *                  scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+        } gather_kn;
     };
 } ucc_tl_ucp_task_t;
 

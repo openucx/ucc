@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -54,6 +54,18 @@ int ucc_sort_uniq(int *array, int len, int inverse);
     } while (0)
 
 #define ucc_div_round_up(_n, _d) (((_n) + (_d) - 1) / (_d))
+
+// compute the greatest exponent v such that p**v divides n
+static inline uint32_t calc_valuation(uint32_t n, uint32_t p)
+{
+    uint32_t v = 0;
+    uint32_t q         = n;
+    while (q % p == 0) {
+        v++;
+        q /= p;
+    }
+    return v;
+}
 
 static inline float bfloat16tofloat32(const void *bfloat16_ptr)
 {
