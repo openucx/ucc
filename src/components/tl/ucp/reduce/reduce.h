@@ -1,11 +1,11 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
 #ifndef REDUCE_H_
 #define REDUCE_H_
-#include "../tl_ucp_reduce.h"
+#include "tl_ucp_coll.h"
 
 enum {
     UCC_TL_UCP_REDUCE_ALG_KNOMIAL,

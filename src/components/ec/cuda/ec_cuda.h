@@ -59,6 +59,8 @@ typedef struct ucc_ec_cuda_config {
     unsigned long                  exec_num_threads;
     unsigned long                  exec_max_tasks;
     unsigned long                  exec_num_streams;
+    unsigned long                  reduce_num_blocks;
+    int                            reduce_num_threads;
 } ucc_ec_cuda_config_t;
 
 typedef struct ucc_ec_cuda {

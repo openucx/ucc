@@ -9,6 +9,7 @@
 #include "core/ucc_progress_queue.h"
 #include "tl_ucp_sendrecv.h"
 #include "utils/ucc_math.h"
+#include "utils/ucc_dt_reduce.h"
 
 #define SAVE_STATE(_phase)                                                     \
     do {                                                                       \
@@ -88,18 +89,22 @@ UCC_REDUCE_KN_PHASE_MULTI:
                              (avg_pre_op ? (task->reduce_kn.dist == 1)
                                          : (task->reduce_kn.dist ==
                                             task->reduce_kn.max_dist));
-                    status = ucc_tl_ucp_reduce_multi(
+                    status = ucc_dt_reduce_strided(
                         (task->reduce_kn.dist == 1) ? args->src.info.buffer
                                                     : rbuf,
                         received_vectors, rbuf,
                         task->reduce_kn.children_per_cycle, count, data_size,
-                        dt, mtype, task, is_avg);
+                        dt, args,
+                        is_avg ? UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA : 0,
+                        AVG_ALPHA(task), task->reduce_kn.executor,
+                        &task->reduce_kn.etask);
                     if (ucc_unlikely(UCC_OK != status)) {
                         tl_error(UCC_TASK_LIB(task),
                                  "failed to perform dt reduction");
                         task->super.status = status;
                         return;
                     }
+                    EXEC_TASK_WAIT(task->reduce_kn.etask);
                 }
             } else {
                 vroot_at_level = vrank - pos * task->reduce_kn.dist;
@@ -138,22 +143,17 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
         UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op;
     int                self_avg   = (args->op == UCC_OP_AVG &&
         avg_pre_op && vrank % radix == 0);
-    size_t             data_size, count;
-    ucc_memory_type_t  mtype;
+    size_t             count;
     ucc_datatype_t     dt;
     ucc_status_t       status;
 
     if (root == rank) {
         count = args->dst.info.count;
         dt    = args->dst.info.datatype;
-        mtype = args->dst.info.mem_type;
     } else {
         count = args->src.info.count;
         dt    = args->src.info.datatype;
-        mtype = args->src.info.mem_type;
     }
-    data_size = count * ucc_dt_size(dt);
-
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_kn_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
@@ -166,20 +166,29 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
     	task->reduce_kn.scratch = args->src.info.buffer;
     }
 
+    status =
+        ucc_coll_task_get_executor(&task->super, &task->reduce_kn.executor);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+
     if (isleaf && self_avg) {
         /* In case of avg_pre_op, single leaf process which does not take part
            in first iteration reduction must divide itself by team_size */
-        status = ucc_dt_reduce_multi_alpha(args->src.info.buffer,
-            args->src.info.buffer, task->reduce_kn.scratch, 1, count,
-            data_size, dt, UCC_OP_PROD,
-            (double)1 / (double)(UCC_TL_TEAM_SIZE(TASK_TEAM(task)) * 2),
-            mtype, args);
+
+        status =
+            ucc_dt_reduce(args->src.info.buffer, args->src.info.buffer,
+                          task->reduce_kn.scratch, count, dt, args,
+                          UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA,
+                          1.0 / (double)(UCC_TL_TEAM_SIZE(TASK_TEAM(task)) * 2),
+                          task->reduce_kn.executor, &task->reduce_kn.etask);
         if (ucc_unlikely(UCC_OK != status)) {
             tl_error(UCC_TASK_LIB(task),
                      "failed to perform dt reduction");
             task->super.status = status;
             return status;
         }
+        EXEC_TASK_WAIT(task->reduce_kn.etask, status);
     }
 
     task->reduce_kn.dist = 1;

@@ -4,13 +4,11 @@
  * See file LICENSE for terms.
  */
 
-#include "config.h"
-#include "tl_ucp_reduce.h"
+#include "reduce_scatter.h"
 #include "tl_ucp_sendrecv.h"
-#include "core/ucc_progress_queue.h"
 #include "coll_patterns/sra_knomial.h"
 #include "utils/ucc_math.h"
-#include "utils/ucc_coll_utils.h"
+#include "utils/ucc_dt_reduce.h"
 
 #define SAVE_STATE(_phase)                                                     \
     do {                                                                       \
@@ -45,14 +43,8 @@ void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     size_t                 block_count, peer_seg_count, local_seg_count;
     void                  *reduce_data, *local_data;
     int                    is_avg;
-    ucc_ee_executor_t     *exec;
     ucc_ee_executor_task_args_t eargs;
 
-    status = ucc_coll_task_get_executor(&task->super, &exec);
-    if (ucc_unlikely(status != UCC_OK)) {
-        task->super.status = status;
-        return;
-    }
     local_seg_count = 0;
     block_count     = ucc_sra_kn_compute_block_count(count, rank, p);
     UCC_KN_REDUCE_GOTO_PHASE(task->reduce_scatter_kn.phase);
@@ -80,8 +72,9 @@ UCC_KN_PHASE_EXTRA:
         if (KN_NODE_EXTRA == node_type) {
             goto out;
         } else {
-            status = ucc_dt_reduce_nb(sbuf, scratch, rbuf, count, dt, args,
-                                      exec, &task->reduce_scatter_kn.etask);
+            status = ucc_dt_reduce(sbuf, scratch, rbuf, count, dt, args, 0, 0,
+                                   task->reduce_scatter_kn.executor,
+                                   &task->reduce_scatter_kn.etask);
             if (ucc_unlikely(status != UCC_OK)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.status = status;
@@ -164,11 +157,13 @@ UCC_KN_PHASE_EXTRA_REDUCE:
                      (avg_pre_op ? ucc_knomial_pattern_loop_first_iteration(p)
                                  : ucc_knomial_pattern_loop_last_iteration(p));
 
-            status = ucc_tl_ucp_reduce_multi_nb(
+            status = ucc_dt_reduce_strided(
                 local_data, rbuf, reduce_data,
                 task->tagged.send_posted - p->iteration * (radix - 1),
-                local_seg_count, local_seg_count * dt_size, dt, task,
-                is_avg, exec, &task->reduce_scatter_kn.etask);
+                local_seg_count, local_seg_count * dt_size, dt, args,
+                is_avg ? UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA : 0,
+                AVG_ALPHA(task), task->reduce_scatter_kn.executor,
+                &task->reduce_scatter_kn.etask);
             if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.status = status;
@@ -184,11 +179,11 @@ UCC_KN_PHASE_REDUCE:
 
     ucc_sra_kn_get_offset_and_seglen(count, dt_size, rank, size, radix,
                                      &offset, &local_seg_count);
-    eargs.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
-    eargs.bufs[0]   = PTR_OFFSET(args->dst.info.buffer, offset);
-    eargs.bufs[1]   = task->reduce_scatter_kn.scratch;
-    eargs.count     = local_seg_count * dt_size;
-    status = ucc_ee_executor_task_post(exec, &eargs,
+    eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+    eargs.copy.dst  = PTR_OFFSET(args->dst.info.buffer, offset);
+    eargs.copy.src  = task->reduce_scatter_kn.scratch;
+    eargs.copy.len  = local_seg_count * dt_size;
+    status = ucc_ee_executor_task_post(task->reduce_scatter_kn.executor, &eargs,
                                        &task->reduce_scatter_kn.etask);
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TASK_LIB(task), "failed to copy data to dst buffer");
@@ -213,6 +208,7 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team = TASK_TEAM(task);
     ucc_rank_t         rank = UCC_TL_TEAM_RANK(team);
     ucc_rank_t         size = UCC_TL_TEAM_SIZE(team);
+    ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_scatter_kn_start",
                                      0);
@@ -223,6 +219,11 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
         task->reduce_scatter_kn.scratch = args->dst.info.buffer;
     }
     task->reduce_scatter_kn.phase = UCC_KN_PHASE_INIT;
+    status                        = ucc_coll_task_get_executor(&task->super,
+                                        &task->reduce_scatter_kn.executor);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }

@@ -174,10 +174,11 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
         data_displ = task->alltoallv_ce.get_offset(
             task, sync->alltoallv_ce.rdispl_bytes, peer);
         dst = PTR_OFFSET(task->alltoallv_ce.rbuf, data_displ);
-        exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
-        exec_args.bufs[0]   = dst;
-        exec_args.bufs[1]   = src;
-        exec_args.count     = data_size;
+
+        exec_args.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+        exec_args.copy.dst  = dst;
+        exec_args.copy.src  = src;
+        exec_args.copy.len  = data_size;
         exec_task =
             &task->alltoallv_ce.exec_task[task->alltoallv_ce.num_posted];
         status = ucc_ee_executor_task_post(exec, &exec_args, exec_task);
@@ -207,12 +208,13 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
                                     peer_sync->mem_info_dst.offset);
             data_displ = task->alltoallv_ce.get_offset(
                 task, peer_sync->alltoallv_ce.rdispl_bytes, psrc);
-            dst        = PTR_OFFSET(dst, data_displ);
 
-            exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
-            exec_args.bufs[0]   = dst;
-            exec_args.bufs[1]   = src;
-            exec_args.count     = data_size;
+            dst                 = PTR_OFFSET(dst, data_displ);
+            exec_args.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+            exec_args.copy.dst  = dst;
+            exec_args.copy.src  = src;
+            exec_args.copy.len  = data_size;
+
             exec_task =
                 &task->alltoallv_ce.exec_task[task->alltoallv_ce.num_posted];
             status = ucc_ee_executor_task_post(exec, &exec_args, exec_task);

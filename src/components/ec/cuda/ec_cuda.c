@@ -68,6 +68,11 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
      ucc_offsetof(ucc_ec_cuda_config_t, exec_num_streams),
      UCC_CONFIG_TYPE_ULUNITS},
 
+    {"REDUCE_NUM_BLOCKS", "auto",
+     "Number of thread blocks to use for reduction in interruptible mode",
+     ucc_offsetof(ucc_ec_cuda_config_t, reduce_num_blocks),
+     UCC_CONFIG_TYPE_ULUNITS},
+
     {NULL}
 
 };
@@ -210,6 +215,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     CUresult              cu_st;
     cudaError_t           cuda_st;
     const char           *cu_err_st_str;
+    struct cudaDeviceProp prop;
 
     ucc_ec_cuda.stream                   = NULL;
     ucc_ec_cuda.stream_initialized       = 0;
@@ -224,6 +230,21 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         return UCC_ERR_NO_RESOURCE;
     }
     CUDA_CHECK(cudaGetDevice(&device));
+
+    CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
+    cfg->reduce_num_threads = prop.maxThreadsPerBlock;
+
+    if (cfg->reduce_num_blocks != UCC_ULUNITS_AUTO) {
+        if (prop.maxGridSize[0] < cfg->reduce_num_blocks) {
+            ec_warn(&ucc_ec_cuda.super,
+                    "number of blocks is too large, max supported %d",
+                    prop.maxGridSize[0]);
+            cfg->reduce_num_blocks = prop.maxGridSize[0];
+        }
+    } else {
+        cfg->reduce_num_blocks = prop.maxGridSize[0];
+    }
+
     /*create event pool */
     ucc_ec_cuda.exec_streams = ucc_calloc(cfg->exec_num_streams,
                                           sizeof(cudaStream_t),

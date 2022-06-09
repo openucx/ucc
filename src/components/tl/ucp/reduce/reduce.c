@@ -1,10 +1,10 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
-#include "config.h"
 #include "reduce.h"
+#include "components/mc/ucc_mc.h"
 
 ucc_base_coll_alg_info_t
     ucc_tl_ucp_reduce_algs[UCC_TL_UCP_REDUCE_ALG_LAST + 1] = {
@@ -41,6 +41,7 @@ ucc_status_t ucc_tl_ucp_reduce_init(ucc_tl_ucp_task_t *task)
         mtype = args->src.info.mem_type;
     }
     data_size = count * ucc_dt_size(dt);
+    task->super.flags    |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post      = ucc_tl_ucp_reduce_knomial_start;
     task->super.progress  = ucc_tl_ucp_reduce_knomial_progress;
     task->super.finalize  = ucc_tl_ucp_reduce_knomial_finalize;

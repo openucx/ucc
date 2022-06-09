@@ -50,6 +50,25 @@ extern const char
     }                                                                          \
 } while(0)
 
+#define EXEC_TASK_WAIT(_etask, ...)                                            \
+    do {                                                                       \
+        if (_etask != NULL) {                                                  \
+            do {                                                               \
+                status = ucc_ee_executor_task_test(_etask);                    \
+            } while (status > 0);                                              \
+            if (status < 0) {                                                  \
+                tl_error(UCC_TASK_LIB(task), "failure in ee task ee task");    \
+                task->super.status = status;                                   \
+                return __VA_ARGS__;                                            \
+            }                                                                  \
+            ucc_ee_executor_task_finalize(_etask);                             \
+            if (ucc_unlikely(status < 0)) {                                    \
+                tl_error(UCC_TASK_LIB(task), "failed to finalize ee task");    \
+                task->super.status = status;                                   \
+                return __VA_ARGS__;                                            \
+            }                                                                  \
+        }                                                                      \
+    } while (0)
 
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
@@ -81,6 +100,7 @@ typedef struct ucc_tl_ucp_task {
             void                   *scratch;
             ucc_mc_buffer_header_t *scratch_mc_header;
             ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
         } allreduce_kn;
         struct {
             int                     phase;
@@ -88,6 +108,7 @@ typedef struct ucc_tl_ucp_task {
             void                   *scratch;
             ucc_mc_buffer_header_t *scratch_mc_header;
             ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
         } reduce_scatter_kn;
         struct {
             void                   *scratch;
@@ -96,6 +117,8 @@ typedef struct ucc_tl_ucp_task {
             int                     n_frags;
             int                     frag;
             char                    s_scratch_busy[2];
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
         } reduce_scatter_ring;
         struct {
             void                   *scratch;
@@ -104,6 +127,8 @@ typedef struct ucc_tl_ucp_task {
             int                     n_frags;
             int                     frag;
             char                    s_scratch_busy[2];
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
         } reduce_scatterv_ring;
         struct {
             int                     phase;
@@ -129,6 +154,8 @@ typedef struct ucc_tl_ucp_task {
             int                     phase;
             void                   *scratch;
             ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
         } reduce_kn;
         struct {
             ucc_rank_t              dist;
@@ -153,6 +180,8 @@ typedef struct ucc_tl_ucp_schedule {
 #define TASK_LIB(_task)                                                        \
     (ucc_derived_of((_task)->super.team->context->lib, ucc_tl_ucp_lib_t))
 #define TASK_ARGS(_task) (_task)->super.bargs.args
+
+#define AVG_ALPHA(_task) (1.0 / (double)UCC_TL_TEAM_SIZE(TASK_TEAM(_task)))
 
 static inline void ucc_tl_ucp_task_reset(ucc_tl_ucp_task_t *task,
                                          ucc_status_t status)

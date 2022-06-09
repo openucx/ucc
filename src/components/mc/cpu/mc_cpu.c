@@ -5,8 +5,8 @@
  */
 
 #include "mc_cpu.h"
-#include "reduce/mc_cpu_reduce.h"
 #include "utils/ucc_malloc.h"
+#include "utils/ucc_math.h"
 #include "utils/arch/cpu.h"
 #include <sys/types.h>
 
@@ -157,164 +157,6 @@ ucc_mc_cpu_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr, size_t size)
     return ucc_mc_cpu_mem_pool_alloc(h_ptr, size);
 }
 
-static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
-                                            void *dst, size_t n_vectors,
-                                            size_t count, size_t stride,
-                                            ucc_datatype_t     dt,
-                                            ucc_reduction_op_t op)
-{
-    switch(dt) {
-    case UCC_DT_INT8:
-        return ucc_mc_cpu_reduce_multi_int8(src1, src2, dst, n_vectors, count,
-                                            stride, op);
-    case UCC_DT_INT16:
-        return ucc_mc_cpu_reduce_multi_int16(src1, src2, dst, n_vectors,
-                                             count, stride, op);
-    case UCC_DT_INT32:
-        return ucc_mc_cpu_reduce_multi_int32(src1, src2, dst, n_vectors,
-                                             count, stride, op);
-    case UCC_DT_INT64:
-        return ucc_mc_cpu_reduce_multi_int64(src1, src2, dst, n_vectors,
-                                             count, stride, op);
-    case UCC_DT_UINT8:
-        return ucc_mc_cpu_reduce_multi_uint8(src1, src2, dst, n_vectors,
-                                             count, stride, op);
-    case UCC_DT_UINT16:
-        return ucc_mc_cpu_reduce_multi_uint16(src1, src2, dst, n_vectors,
-                                              count, stride, op);
-    case UCC_DT_UINT32:
-        return ucc_mc_cpu_reduce_multi_uint32(src1, src2, dst, n_vectors,
-                                              count, stride, op);
-    case UCC_DT_UINT64:
-        return ucc_mc_cpu_reduce_multi_uint64(src1, src2, dst, n_vectors,
-                                              count, stride, op);
-    case UCC_DT_FLOAT32:
-#if SIZEOF_FLOAT == 4
-        return ucc_mc_cpu_reduce_multi_float(src1, src2, dst, n_vectors, count,
-                                             stride, op);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT64:
-#if SIZEOF_DOUBLE == 8
-        return ucc_mc_cpu_reduce_multi_double(src1, src2, dst, n_vectors,
-                                              count, stride, op);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT128:
-#if SIZEOF_LONG_DOUBLE == 16
-        return ucc_mc_cpu_reduce_multi_long_double(src1, src2, dst, n_vectors,
-                                                   count, stride, op);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_BFLOAT16:
-        return ucc_mc_cpu_reduce_multi_bfloat16(src1, src2, dst, n_vectors,
-                                                count, stride, op);
-    case UCC_DT_FLOAT32_COMPLEX:
-#if SIZEOF_FLOAT__COMPLEX == 8
-        return ucc_mc_cpu_reduce_multi_float_complex(src1, src2, dst, n_vectors,
-                                                     count, stride, op);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT64_COMPLEX:
-#if SIZEOF_DOUBLE__COMPLEX == 16
-        return ucc_mc_cpu_reduce_multi_double_complex(
-            src1, src2, dst, n_vectors, count, stride, op);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT128_COMPLEX:
-#if SIZEOF_LONG_DOUBLE__COMPLEX == 32
-        return ucc_mc_cpu_reduce_multi_long_double_complex(
-            src1, src2, dst, n_vectors, count, stride, op);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    default:
-        mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
-                 ucc_datatype_str(dt));
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-    return UCC_OK;
-}
-
-static ucc_status_t ucc_mc_cpu_reduce(const void *src1, const void *src2,
-                                      void *dst, size_t count,
-                                      ucc_datatype_t dt, ucc_reduction_op_t op)
-{
-    return ucc_mc_cpu_reduce_multi(src1, src2, dst, 1, count, 0, dt, op);
-}
-
-static ucc_status_t
-ucc_mc_cpu_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
-                              size_t n_vectors, size_t count, size_t stride,
-                              ucc_datatype_t dt, ucc_reduction_op_t reduce_op,
-                              ucc_reduction_op_t vector_op, double alpha)
-{
-    switch (dt) {
-    case UCC_DT_FLOAT32:
-#if SIZEOF_FLOAT == 4
-        return ucc_mc_cpu_reduce_multi_alpha_float(src1, src2, dst, n_vectors,
-                                                   count, stride, reduce_op,
-                                                   vector_op, (float)alpha);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT64:
-#if SIZEOF_DOUBLE == 8
-        return ucc_mc_cpu_reduce_multi_alpha_double(src1, src2, dst, n_vectors,
-                                                    count, stride, reduce_op,
-                                                    vector_op, alpha);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT128:
-#if SIZEOF_LONG_DOUBLE == 16
-        return ucc_mc_cpu_reduce_multi_alpha_long(
-            src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
-            (long double)alpha);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_BFLOAT16:
-        return ucc_mc_cpu_reduce_multi_alpha_bfloat16(src1, src2, dst, n_vectors,
-                                                      count, stride, reduce_op,
-                                                      vector_op, (float)alpha);
-    case UCC_DT_FLOAT32_COMPLEX:
-#if SIZEOF_FLOAT__COMPLEX == 8
-        return ucc_mc_cpu_reduce_multi_alpha_float_complex(
-            src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
-            (float)alpha);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT64_COMPLEX:
-#if SIZEOF_DOUBLE__COMPLEX == 16
-        return ucc_mc_cpu_reduce_multi_alpha_double_complex(
-            src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
-            (double)alpha);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    case UCC_DT_FLOAT128_COMPLEX:
-#if SIZEOF_LONG_DOUBLE__COMPLEX == 32
-        return ucc_mc_cpu_reduce_multi_alpha_long_complex(
-            src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
-            (long double)alpha);
-#else
-        return UCC_ERR_NOT_SUPPORTED;
-#endif
-    default:
-        mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
-                 ucc_datatype_str(dt));
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-    return UCC_OK;
-}
-
 static ucc_status_t ucc_mc_cpu_memcpy(void *dst, const void *src, size_t len,
                                       ucc_memory_type_t dst_mem, //NOLINT
                                       ucc_memory_type_t src_mem) //NOLINT
@@ -356,9 +198,6 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.ops.mem_query          = ucc_mc_cpu_mem_query,
     .super.ops.mem_alloc          = ucc_mc_cpu_mem_pool_alloc_with_init,
     .super.ops.mem_free           = ucc_mc_cpu_mem_pool_free,
-    .super.ops.reduce             = ucc_mc_cpu_reduce,
-    .super.ops.reduce_multi       = ucc_mc_cpu_reduce_multi,
-    .super.ops.reduce_multi_alpha = ucc_mc_cpu_reduce_multi_alpha,
     .super.ops.memcpy             = ucc_mc_cpu_memcpy,
     .super.ops.flush              = NULL,
     .super.config_table =
