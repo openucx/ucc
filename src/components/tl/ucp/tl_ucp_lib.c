@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -32,6 +32,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
         self->cfg.bcast_sag_kn_radix      = tl_ucp_config->kn_radix;
         self->cfg.reduce_kn_radix         = tl_ucp_config->kn_radix;
         self->cfg.scatter_kn_radix        = tl_ucp_config->kn_radix;
+        self->cfg.gather_kn_radix         = tl_ucp_config->kn_radix;
     }
 
     self->tlcp_configs = NULL;

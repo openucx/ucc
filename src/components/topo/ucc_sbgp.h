@@ -81,5 +81,17 @@ ucc_status_t ucc_sbgp_cleanup(ucc_sbgp_t *sbgp);
 ucc_status_t ucc_sbgp_create_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
                                          int *n_sbgps);
 
+ucc_status_t ucc_sbgp_create_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                       int *n_sbgps);
+
+static inline ucc_subset_t ucc_sbgp_to_subset(ucc_sbgp_t *sbgp)
+{
+    ucc_subset_t s = {
+        .map    = sbgp->map,
+        .myrank = sbgp->group_rank
+    };
+    return s;
+}
+
 void ucc_sbgp_print(ucc_sbgp_t *sbgp);
 #endif

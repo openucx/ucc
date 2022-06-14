@@ -7,18 +7,14 @@
 #include "test_mpi.h"
 
 std::vector<std::shared_ptr<TestCase>>
-TestCase::init(ucc_coll_type_t _type, ucc_test_team_t &_team, int num_tests,
-               int root, size_t msgsize, ucc_test_mpi_inplace_t inplace,
-               ucc_memory_type_t mt, size_t max_size, ucc_datatype_t dt,
-               ucc_reduction_op_t op, ucc_test_vsize_flag_t count_bits,
-               ucc_test_vsize_flag_t displ_bits, void **onesided_buffers)
+TestCase::init(ucc_test_team_t &_team, ucc_coll_type_t _type, int num_tests,
+               TestCaseParams params)
 {
     std::vector<std::shared_ptr<TestCase>> tcs;
 
     for (int i = 0; i < num_tests; i++) {
         auto tc =
-            init_single(_type, _team, root, msgsize, inplace, mt, max_size, dt,
-                        op, count_bits, displ_bits, onesided_buffers);
+            init_single(_team, _type, params);
         if (!tc) {
             tcs.clear();
             return tcs;
@@ -28,76 +24,72 @@ TestCase::init(ucc_coll_type_t _type, ucc_test_team_t &_team, int num_tests,
     return tcs;
 }
 
-std::shared_ptr<TestCase> TestCase::init_single(
-        ucc_coll_type_t _type,
-        ucc_test_team_t &_team,
-        int root,
-        size_t msgsize,
-        ucc_test_mpi_inplace_t inplace,
-        ucc_memory_type_t mt,
-        size_t max_size,
-        ucc_datatype_t dt,
-        ucc_reduction_op_t op,
-        ucc_test_vsize_flag_t count_bits,
-        ucc_test_vsize_flag_t displ_bits,
-        void ** onesided_buffers)
+std::shared_ptr<TestCase> TestCase::init_single(ucc_test_team_t &_team,
+                                                ucc_coll_type_t _type,
+                                                TestCaseParams params)
 {
     switch(_type) {
-    case UCC_COLL_TYPE_BARRIER:
-        return std::make_shared<TestBarrier>(_team);
-    case UCC_COLL_TYPE_ALLREDUCE:
-        return std::make_shared<TestAllreduce>(msgsize, inplace, dt,
-                                               op, mt, _team, max_size);
-    case UCC_COLL_TYPE_REDUCE_SCATTER:
-        return std::make_shared<TestReduceScatter>(msgsize, inplace, dt,
-                                                   op, mt, _team, max_size);
-    case UCC_COLL_TYPE_REDUCE_SCATTERV:
-        return std::make_shared<TestReduceScatterv>(msgsize, inplace, dt, op,
-                                                    mt, _team, max_size);
     case UCC_COLL_TYPE_ALLGATHER:
-        return std::make_shared<TestAllgather>(msgsize, inplace, mt, _team,
-                                               max_size);
+        return std::make_shared<TestAllgather>(_team, params);
     case UCC_COLL_TYPE_ALLGATHERV:
-        return std::make_shared<TestAllgatherv>(msgsize, inplace, mt, _team,
-                                                max_size);
-    case UCC_COLL_TYPE_BCAST:
-        return std::make_shared<TestBcast>(msgsize, inplace, mt, root, _team,
-                                           max_size);
-    case UCC_COLL_TYPE_REDUCE:
-        return std::make_shared<TestReduce>(msgsize, inplace, dt, op, mt, root,
-                                           _team, max_size);
+        return std::make_shared<TestAllgatherv>(_team, params);
+    case UCC_COLL_TYPE_ALLREDUCE:
+        return std::make_shared<TestAllreduce>(_team, params);
     case UCC_COLL_TYPE_ALLTOALL:
-        if (onesided_buffers) {
-            return std::make_shared<TestAlltoall>(msgsize, inplace, mt, _team,
-                                                  max_size, onesided_buffers);
-        } else {
-            return std::make_shared<TestAlltoall>(msgsize, inplace, mt, _team,
-                                                  max_size);
-        }
+        return std::make_shared<TestAlltoall>(_team, params);
     case UCC_COLL_TYPE_ALLTOALLV:
-        return std::make_shared<TestAlltoallv>(msgsize, inplace, mt, _team,
-                                               max_size, count_bits, displ_bits);
+        return std::make_shared<TestAlltoallv>(_team, params);
+    case UCC_COLL_TYPE_BARRIER:
+        return std::make_shared<TestBarrier>(_team, params);
+    case UCC_COLL_TYPE_BCAST:
+        return std::make_shared<TestBcast>(_team, params);
     case UCC_COLL_TYPE_GATHER:
-        return std::make_shared<TestGather>(msgsize, inplace, mt, root, _team,
-                                            max_size);
+        return std::make_shared<TestGather>(_team, params);
     case UCC_COLL_TYPE_GATHERV:
-        return std::make_shared<TestGatherv>(msgsize, inplace, mt, root, _team,
-                                             max_size);
+        return std::make_shared<TestGatherv>(_team, params);
+    case UCC_COLL_TYPE_REDUCE:
+        return std::make_shared<TestReduce>(_team, params);
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        return std::make_shared<TestReduceScatter>(_team, params);
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        return std::make_shared<TestReduceScatterv>(_team, params);
     case UCC_COLL_TYPE_SCATTER:
-        return std::make_shared<TestScatter>(msgsize, inplace, mt, root, _team,
-                                             max_size);
+        return std::make_shared<TestScatter>(_team, params);
     case UCC_COLL_TYPE_SCATTERV:
-        return std::make_shared<TestScatterv>(msgsize, inplace, mt, root, _team,
-                                              max_size);
+        return std::make_shared<TestScatterv>(_team, params);
     default:
+        std::cerr << "collective type is not supported" << std::endl;
         break;
     }
     return NULL;
 }
 
-void TestCase::run()
+void TestCase::run(bool triggered)
 {
-    UCC_CHECK(ucc_collective_post(req));
+    if (triggered) {
+        ucc_ee_h ee;
+        ucc_ev_t comp_ev, *post_ev;
+        ucc_ee_type_t ee_type;
+
+        if (mem_type == UCC_MEMORY_TYPE_CUDA) {
+            ee_type = UCC_EE_CUDA_STREAM;
+        } else {
+            UCC_CHECK(UCC_ERR_NOT_SUPPORTED);
+        }
+
+        UCC_CHECK(team.get_ee(ee_type, &ee));
+        comp_ev.ev_type         = UCC_EVENT_COMPUTE_COMPLETE;
+        comp_ev.ev_context      = nullptr;
+        comp_ev.ev_context_size = 0;
+        comp_ev.req             = req;
+
+
+        UCC_CHECK(ucc_collective_triggered_post(ee, &comp_ev));
+        UCC_CHECK(ucc_ee_get_event(ee, &post_ev));
+        UCC_CHECK(ucc_ee_ack_event(ee, post_ev));
+    } else {
+        UCC_CHECK(ucc_collective_post(req));
+    }
 }
 
 ucc_status_t TestCase::test()
@@ -133,6 +125,7 @@ std::string TestCase::str() {
     if (args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS) {
         _str += std::string("Onesided ");
     }
+
     _str += std::string(ucc_coll_type_str(args.coll_type)) +
             " team=" + team_str(team.type) +
             " mtype=" + ucc_memory_type_names[mem_type] +
@@ -144,31 +137,6 @@ std::string TestCase::str() {
         _str += std::string(" root=") + std::to_string(root);
     }
     return _str;
-}
-
-ucc_status_t TestCase::exec()
-{
-    ucc_status_t status;
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-    if (TEST_SKIP_NONE == test_skip) {
-        if (0 == world_rank) {
-            std::cout << str() << std::endl;
-        }
-        run();
-        wait();
-        status = check();
-        if (UCC_OK != status) {
-            std::cerr << "FAILURE in: " << str() << std::endl;
-        }
-    } else {
-        if (0 == world_rank) {
-            std::cout << "SKIPPED: " << skip_str(test_skip) << ": "
-                      << str() << " " << std::endl;
-        }
-        status = UCC_ERR_LAST;
-    }
-    return status;
 }
 
 test_skip_cause_t TestCase::skip_reduce(int skip_cond, test_skip_cause_t cause,
@@ -192,11 +160,9 @@ void TestCase::tc_progress_ctx()
 }
 
 TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
-                   ucc_memory_type_t _mem_type,
-                   size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-                   size_t _max_size) :
-    team(_team), mem_type(_mem_type),  msgsize(_msgsize), inplace(_inplace),
-    test_max_size(_max_size)
+                   TestCaseParams params) :
+    team(_team), mem_type(params.mt),  msgsize(params.msgsize),
+    inplace(params.inplace), test_max_size(params.max_size)
 {
     int rank;
 

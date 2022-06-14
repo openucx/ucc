@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -53,6 +53,7 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t            bcast_kn_radix;
     uint32_t            bcast_sag_kn_radix;
     uint32_t            reduce_kn_radix;
+    uint32_t            gather_kn_radix;
     uint32_t            scatter_kn_radix;
     uint32_t            alltoall_pairwise_num_posts;
     uint32_t            alltoallv_pairwise_num_posts;
@@ -121,7 +122,7 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
 #define UCC_TL_UCP_SUPPORTED_COLLS                                             \
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
+    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV | UCC_COLL_TYPE_GATHER | \
      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
      UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_BARRIER |   \
      UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_FANIN | UCC_COLL_TYPE_FANOUT |       \

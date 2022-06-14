@@ -16,7 +16,12 @@
 
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
+
+#ifdef RCCL_OLD_HEADERS
+#include <rccl.h>
+#else
 #include <rccl/rccl.h>
+#endif
 
 #ifndef UCC_TL_RCCL_DEFAULT_SCORE
 #define UCC_TL_RCCL_DEFAULT_SCORE 20

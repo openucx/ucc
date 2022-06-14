@@ -27,7 +27,8 @@ UCC_TEST_P(test_team, team_create_destroy_ctx_local)
 
 INSTANTIATE_TEST_CASE_P(, test_team,
                         ::testing::Values(
-                            2, /* Minimal team size   */
+                            1, /* Minimal team size   */
+                            2, /* Minimal power of 2  */
                             8, /* Some power of 2     */
                             7  /* Some non-power of 2 */
                             ));

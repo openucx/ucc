@@ -20,6 +20,8 @@ static int ucc_compare_proc_info(const void *a, const void *b)
         return d1->host_hash > d2->host_hash ? 1 : -1;
     } else if (d1->socket_id != d2->socket_id) {
         return d1->socket_id - d2->socket_id;
+    } else if (d1->numa_id != d2->numa_id) {
+        return d1->numa_id - d2->numa_id;
     } else {
         return d1->pid - d2->pid;
     }
@@ -33,6 +35,7 @@ static ucc_status_t ucc_context_topo_compute_layout(ucc_context_topo_t *topo,
     ucc_rank_t       max_ppn     = 0;
     ucc_rank_t       nnodes      = 1;
     int              max_sockid  = 0;
+    int              max_numaid  = 0;
     ucc_proc_info_t *sorted;
     ucc_host_id_t    current_hash, hash;
     int              i, j;
@@ -71,6 +74,9 @@ static ucc_status_t ucc_context_topo_compute_layout(ucc_context_topo_t *topo,
         if (topo->procs[j].socket_id > max_sockid) {
             max_sockid = topo->procs[j].socket_id;
         }
+        if (topo->procs[j].numa_id > max_numaid) {
+            max_numaid = topo->procs[j].numa_id;
+        }
         if (topo->procs[j].host_hash == current_hash) {
             topo->procs[j].host_id = nnodes - 1;
         }
@@ -89,6 +95,7 @@ static ucc_status_t ucc_context_topo_compute_layout(ucc_context_topo_t *topo,
     topo->min_ppn       = min_ppn;
     topo->max_ppn       = max_ppn;
     topo->max_n_sockets = max_sockid + 1;
+    topo->max_n_numas   = max_numaid + 1;
     return UCC_OK;
 }
 
@@ -112,6 +119,7 @@ ucc_status_t ucc_context_topo_init(ucc_addr_storage_t * storage,
     }
 
     topo->sock_bound = 1;
+    topo->numa_bound = 1;
     topo->n_procs    = storage->size;
     topo->procs      = (ucc_proc_info_t *)ucc_malloc(
         storage->size * sizeof(ucc_proc_info_t), "topo_procs");
@@ -125,8 +133,11 @@ ucc_status_t ucc_context_topo_init(ucc_addr_storage_t * storage,
         h = (ucc_context_addr_header_t *)PTR_OFFSET(storage->storage,
                                                     storage->addr_len * i);
         topo->procs[i] = h->ctx_id.pi;
-        if (h->ctx_id.pi.socket_id == -1) {
+        if (h->ctx_id.pi.socket_id == UCC_SOCKET_ID_INVALID) {
             topo->sock_bound = 0;
+        }
+        if (h->ctx_id.pi.numa_id == UCC_NUMA_ID_INVALID) {
+            topo->numa_bound = 0;
         }
     }
     status = ucc_context_topo_compute_layout(topo, storage->size);
@@ -167,6 +178,7 @@ ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *ctx_topo,
     topo->min_ppn             = UCC_RANK_MAX;
     topo->max_ppn             = 0;
     topo->all_sockets         = NULL;
+    topo->all_numas           = NULL;
 
     *_topo = topo;
     return UCC_OK;
@@ -227,6 +239,21 @@ ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
 
     *sbgps   = topo->all_sockets;
     *n_sbgps = topo->n_sockets;
+
+    return status;
+}
+
+ucc_status_t ucc_topo_get_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                    int *n_sbgps)
+{
+    ucc_status_t status = UCC_OK;
+
+    if (!topo->all_numas) {
+        status = ucc_sbgp_create_all_numas(topo, &topo->all_numas, n_sbgps);
+    }
+
+    *sbgps   = topo->all_numas;
+    *n_sbgps = topo->n_numas;
 
     return status;
 }

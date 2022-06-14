@@ -21,15 +21,11 @@ void * TestAlltoallv::mpi_counts_to_ucc(int *mpi_counts, size_t _ncount)
     return ucc_counts;
 }
 
-TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-                             ucc_memory_type_t _mt, ucc_test_team_t &_team,
-                             size_t _max_size,
-                             ucc_test_vsize_flag_t _count_bits,
-                             ucc_test_vsize_flag_t _displ_bits) :
-    TestCase(_team, UCC_COLL_TYPE_ALLTOALLV, _mt, _msgsize, _inplace, _max_size)
+TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
+    TestCase(_team, UCC_COLL_TYPE_ALLTOALLV, params)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
-    size_t count   = _msgsize/dt_size;
+    size_t count   = msgsize/dt_size;
     std::uniform_int_distribution<int> urd(count/2, count);
     std::default_random_engine         eng;
     int rank;
@@ -50,13 +46,13 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
     sdispls64  = NULL;
     rcounts64  = NULL;
     rdispls64  = NULL;
-    count_bits = _count_bits;
-    displ_bits = _displ_bits;
+    count_bits = params.count_bits;
+    displ_bits = params.displ_bits;
 
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &nprocs);
 
-    if (TEST_SKIP_NONE != skip_reduce(test_max_size < (_msgsize * nprocs),
+    if (TEST_SKIP_NONE != skip_reduce(test_max_size < (msgsize * nprocs),
                                       TEST_SKIP_MEM_LIMIT, team.comm)) {
         return;
     }
@@ -101,8 +97,8 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
         return;
     }
 
-    UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, sncounts * dt_size, _mt));
-    UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, rncounts * dt_size, _mt));
+    UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, sncounts * dt_size, mem_type));
+    UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, rncounts * dt_size, mem_type));
     sbuf      = sbuf_mc_header->addr;
     rbuf      = rbuf_mc_header->addr;
     check_buf = ucc_malloc((sncounts + rncounts) * dt_size, "check buf");
@@ -110,11 +106,11 @@ TestAlltoallv::TestAlltoallv(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
 
     args.src.info_v.buffer = sbuf;
     args.src.info_v.datatype = TEST_DT;
-    args.src.info_v.mem_type = _mt;
+    args.src.info_v.mem_type = mem_type;
 
     args.dst.info_v.buffer = rbuf;
     args.dst.info_v.datatype = TEST_DT;
-    args.dst.info_v.mem_type = _mt;
+    args.dst.info_v.mem_type = mem_type;
 
     if (TEST_FLAG_VSIZE_64BIT == count_bits) {
         args.src.info_v.counts = scounts64 =

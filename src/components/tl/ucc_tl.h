@@ -55,6 +55,9 @@ typedef struct ucc_tl_service_coll {
     ucc_status_t (*allgather)(ucc_base_team_t *team, void *sbuf, void *rbuf,
                               size_t msgsize, ucc_subset_t subset,
                               ucc_coll_task_t **task);
+    ucc_status_t (*bcast)(ucc_base_team_t *team, void *buf, size_t msgsize,
+                          ucc_rank_t root, ucc_subset_t subset,
+                          ucc_coll_task_t **task);
     void         (*update_id)(ucc_base_team_t *team, uint16_t id);
 } ucc_tl_service_coll_t;
 

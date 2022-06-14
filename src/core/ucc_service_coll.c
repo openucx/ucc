@@ -101,6 +101,32 @@ ucc_status_t ucc_service_allgather(ucc_team_t *team, void *sbuf, void *rbuf,
     return UCC_OK;
 }
 
+ucc_status_t ucc_service_bcast(ucc_team_t *team, void *buf, size_t msgsize,
+                               ucc_rank_t root, ucc_subset_t subset,
+                               ucc_service_coll_req_t **req)
+{
+    ucc_tl_team_t  *steam;
+    ucc_tl_iface_t *tl_iface;
+    ucc_status_t    status;
+
+    status = ucc_service_coll_req_init(team, &subset, &steam, req);
+    if (UCC_OK != status) {
+        return status;
+    }
+
+    tl_iface = UCC_TL_TEAM_IFACE(steam);
+    status = tl_iface->scoll.bcast(&steam->super, buf, msgsize,
+                                   root, subset, &(*req)->task);
+    if (status < 0) {
+        ucc_free(*req);
+        ucc_error("failed to start service bcast for team %p: %s", team,
+                  ucc_status_string(status));
+        return status;
+    }
+
+    return UCC_OK;
+}
+
 ucc_status_t ucc_service_coll_test(ucc_service_coll_req_t *req)
 {
     ucc_status_t status;

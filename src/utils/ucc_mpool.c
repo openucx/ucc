@@ -44,6 +44,10 @@ ucc_status_t ucc_mpool_init(ucc_mpool_t *mp, size_t priv_size, size_t elem_size,
                             const char *name)
 {
     ucs_mpool_ops_t *ucs_ops = ucc_calloc(1, sizeof(*ucs_ops), "mpool_ops");
+#if UCS_HAVE_MPOOL_PARAMS
+    ucs_mpool_params_t params;
+#endif
+
     if (!ucs_ops) {
         ucc_error("failed to allocate %zd bytes for mpool ucs ops",
                   sizeof(*ucs_ops));
@@ -61,15 +65,32 @@ ucc_status_t ucc_mpool_init(ucc_mpool_t *mp, size_t priv_size, size_t elem_size,
     if (mp->ucc_ops->obj_cleanup != NULL) {
         ucs_ops->obj_cleanup = ucc_mpool_obj_cleanup_wrapper;
     }
+#if UCS_HAVE_MPOOL_PARAMS
+    ucs_mpool_params_reset(&params);
+    params.priv_size       = priv_size;
+    params.elem_size       = elem_size;
+    params.align_offset    = align_offset;
+    params.alignment       = alignment;
+    params.malloc_safe     = 0;
+    params.elems_per_chunk = elems_per_chunk;
+    params.max_chunk_size  = SIZE_MAX;
+    params.max_elems       = max_elems;
+    params.grow_factor     = 1.0;
+    params.ops             = ucs_ops;
+    params.name            = name;
 
+    return ucs_status_to_ucc_status(ucs_mpool_init(&params, &mp->super));
+#else
     return ucs_status_to_ucc_status(
         ucs_mpool_init(&mp->super, priv_size, elem_size, align_offset,
                        alignment, elems_per_chunk, max_elems, ucs_ops, name));
+#endif
 }
 
 void ucc_mpool_cleanup(ucc_mpool_t *mp, int leak_check)
 {
-    ucs_mpool_ops_t *ops = mp->super.data->ops;
+    void *ops = (void*)mp->super.data->ops;
+
     ucs_mpool_cleanup(&mp->super, leak_check);
     ucc_free(ops);
     ucc_spinlock_destroy(&mp->lock);

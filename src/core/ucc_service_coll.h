@@ -24,6 +24,10 @@ ucc_status_t ucc_service_allgather(ucc_team_t *team, void *sbuf, void *rbuf,
                                    size_t msgsize, ucc_subset_t subset,
                                    ucc_service_coll_req_t **req);
 
+ucc_status_t ucc_service_bcast(ucc_team_t *team, void *buf, size_t msgsize,
+                               ucc_rank_t root, ucc_subset_t subset,
+                               ucc_service_coll_req_t **req);
+
 ucc_status_t ucc_service_coll_test(ucc_service_coll_req_t *req);
 
 ucc_status_t ucc_service_coll_finalize(ucc_service_coll_req_t *req);

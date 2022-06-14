@@ -160,6 +160,15 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     ucc_memory_type_t         coll_mem_type;
     ucc_ee_type_t             coll_ee_type;
 
+    /* Global check to reduce the amount of checks throughout
+       all TLs */
+    if (UCC_COLL_ARGS_ACTIVE_SET(coll_args) &&
+        ((UCC_COLL_TYPE_BCAST != coll_args->coll_type) ||
+         coll_args->active_set.size != 2)) {
+        ucc_warn("Active Sets are only supported for bcast and set size = 2");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     status = ucc_coll_args_check_mem_type(coll_args, team->rank);
     if (ucc_unlikely(status != UCC_OK)) {
         ucc_error("memory type detection failed");

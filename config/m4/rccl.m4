@@ -38,7 +38,7 @@ AS_IF([test "x$rccl_checked" != "xyes"],[
         [
             CPPFLAGS="$HIP_CPPFLAGS $CPPFLAGS"
             LDFLAGS="$ROCM_LDFLAGS $LDFLAGS"
-            AC_CHECK_HEADER([rccl.h],
+            AC_CHECK_HEADER([rccl/rccl.h],
             [
                 AC_CHECK_LIB([rccl], [ncclCommInitRank],
                 [
@@ -49,7 +49,17 @@ AS_IF([test "x$rccl_checked" != "xyes"],[
                 ])
             ],
             [
-                rccl_happy="no"
+                AC_CHECK_HEADER([rccl.h],
+                [
+                    AC_CHECK_LIB([rccl], [ncclCommInitRank],
+ 	    	    [
+			rccl_happy="yes"
+		        rccl_old_headers="-DRCCL_OLD_HEADERS"
+                    ],
+                    [
+			rccl_happy="no"
+                    ])
+                ]),
             ])
         ],
         [
@@ -61,7 +71,7 @@ AS_IF([test "x$rccl_checked" != "xyes"],[
             AS_IF([test "x$check_rccl_dir" != "x"],
             [
                 AC_MSG_RESULT([RCCL dir: $check_rccl_dir])
-                AC_SUBST(RCCL_CPPFLAGS, "-I$check_rccl_dir/include/")
+                AC_SUBST(RCCL_CPPFLAGS, "-I$check_rccl_dir/include/ $rccl_old_headers")
             ])
 
             AS_IF([test "x$check_rccl_libdir" != "x"],

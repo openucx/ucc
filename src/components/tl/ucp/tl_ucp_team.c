@@ -20,6 +20,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
              if all the necessary ranks mappings are provided */
+
+    if (UCC_TL_TEAM_SIZE(self) < 2) {
+        tl_trace(tl_context->lib,
+                 "team size %d is too small, minimal size is 2",
+                 UCC_TL_TEAM_SIZE(self));
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     self->preconnect_task    = NULL;
     self->seq_num            = 0;
     self->status             = UCC_INPROGRESS;
@@ -53,6 +61,7 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
     if (!team->preconnect_task) {
         team->preconnect_task             = ucc_tl_ucp_get_task(team);
         team->preconnect_task->tagged.tag = 0;
+        team->preconnect_task->super.bargs.args.mask = 0;
     }
     if (UCC_INPROGRESS == ucc_tl_ucp_test(team->preconnect_task)) {
         return UCC_INPROGRESS;

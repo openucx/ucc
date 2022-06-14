@@ -170,13 +170,14 @@ static int ucc_file_parse_handler(void *arg, const char *section, //NOLINT
         ucc_warn("found duplicate '%s' in config file", name);
         return 0;
     } else {
-        dup  = strdup(name);
+        dup = strdup(name);
         if (!dup) {
             ucc_error("failed to dup str for kh_put");
             return 0;
         }
-        iter = kh_put(ucc_cfg_file, vars, strdup(name), &result);
+        iter = kh_put(ucc_cfg_file, vars, dup, &result);
         if (result == UCS_KH_PUT_FAILED) {
+            ucc_free(dup);
             ucc_error("inserting '%s' to config map failed", name);
             return 0;
         }
@@ -202,6 +203,7 @@ ucc_status_t ucc_parse_file_config(const char *        filename,
         ucc_error("failed to allocate %zd bytes for file config", sizeof(*cfg));
         return UCC_ERR_NO_MEMORY;
     }
+    kh_init_inplace(ucc_cfg_file, &cfg->vars);
     ret = ini_parse(filename, ucc_file_parse_handler, cfg);
     if (-1 == ret) {
         /* according to ucs/ini.h -1 means error in

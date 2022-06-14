@@ -25,6 +25,10 @@ typedef struct ucc_context_topo {
                                         on a node */
     uint32_t         sock_bound;    /*< global flag, 1 if processes are bound
                                         to sockets */
+    ucc_rank_t       max_n_numas;   /*< max number of different numa domains
+                                        on a node */
+    uint32_t         numa_bound;    /*< global flag, 1 if processes are bound
+                                        to numa nodes */
 } ucc_context_topo_t;
 
 typedef struct ucc_addr_storage ucc_addr_storage_t;
@@ -44,6 +48,8 @@ typedef struct ucc_topo {
     ucc_sbgp_t  sbgps[UCC_SBGP_LAST]; /*< LOCAL sbgps initialized on demand */
     ucc_sbgp_t *all_sockets;          /*< array of socket sbgps, init on demand */
     int         n_sockets;
+    ucc_sbgp_t *all_numas;            /*< array of numa sbgps, init on demand */
+    int         n_numas;
     ucc_rank_t  node_leader_rank_id;  /*< defines which rank on a node will be
                                           node leader. Similar to local node rank.
                                           currently set to 0, can be selected differently
@@ -76,6 +82,10 @@ int ucc_topo_is_single_node(ucc_topo_t *topo);
 /* Returns the array of ALL existing socket subgroups of given topo */
 ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
                                       int *n_sbgps);
+
+/* Returns the array of ALL existing numa subgroups of given topo */
+ucc_status_t ucc_topo_get_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                    int *n_sbgps);
 
 static inline int ucc_rank_on_local_node(ucc_rank_t team_rank, ucc_topo_t *topo)
 {
@@ -114,6 +124,45 @@ static inline ucc_rank_t ucc_topo_max_ppn(ucc_topo_t *topo)
 static inline int ucc_topo_isoppn(ucc_topo_t *topo)
 {
     return ucc_topo_max_ppn(topo) == ucc_topo_min_ppn(topo);
+}
+
+static inline int ucc_topo_n_sockets(ucc_topo_t *topo)
+{
+    ucc_sbgp_t *sbgp;
+
+    if (!topo->topo->sock_bound) {
+        return 0;
+    }
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_SOCKET_LEADERS);
+    if (sbgp->status == UCC_SBGP_NOT_EXISTS) {
+        return 1;
+    }
+    return sbgp->group_size;
+}
+
+static inline int ucc_topo_n_numas(ucc_topo_t *topo)
+{
+    ucc_sbgp_t *sbgp;
+
+    if (!topo->topo->numa_bound) {
+        return 0;
+    }
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NUMA_LEADERS);
+    if (sbgp->status == UCC_SBGP_NOT_EXISTS) {
+        return 1;
+    }
+    return sbgp->group_size;
+}
+
+static inline ucc_rank_t ucc_topo_nnodes(ucc_topo_t *topo)
+{
+    ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+
+    if (sbgp->status == UCC_SBGP_NOT_EXISTS) {
+        ucc_assert(ucc_topo_is_single_node(topo));
+        return 1;
+    }
+    return sbgp->group_size;
 }
 
 #endif

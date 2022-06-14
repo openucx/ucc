@@ -198,5 +198,8 @@ __attribute__((destructor)) static void ucc_destructor(void)
 #endif
         ucc_config_parser_release_opts(&ucc_global_config,
                                        ucc_global_config_table);
+        if (ucc_global_config.file_cfg) {
+            ucc_release_file_config(ucc_global_config.file_cfg);
+        }
     }
 }
