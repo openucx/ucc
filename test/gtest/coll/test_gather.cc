@@ -242,6 +242,11 @@ UCC_TEST_P(test_gather_1, multiple_host)
         int           size = team->procs.size();
         UccCollCtxVec ctx;
 
+        if (size == 1 && root > 0) {
+            /* skip team size 1 and root > 0, which are invalid */
+            continue;
+        }
+
         this->set_inplace(inplace);
         SET_MEM_TYPE(mem_type);
         set_root(root);

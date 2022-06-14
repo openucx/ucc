@@ -202,9 +202,9 @@ public:
         UCC_JOB_CTX_GLOBAL, /*< ucc ctx create with OOB */
         UCC_JOB_CTX_GLOBAL_ONESIDED
     } ucc_job_ctx_mode_t;
-    static const int nStaticTeams     = 3;
+    static const int nStaticTeams     = 4;
     static const int staticUccJobSize = 16;
-    static constexpr int staticTeamSizes[nStaticTeams] = {2, 11, staticUccJobSize};
+    static constexpr int staticTeamSizes[nStaticTeams] = {1, 2, 11, staticUccJobSize};
     static void cleanup();
     static UccJob* getStaticJob();
     static const std::vector<UccTeam_h> &getStaticTeams();
