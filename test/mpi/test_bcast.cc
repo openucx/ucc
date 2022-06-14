@@ -9,33 +9,30 @@
 
 #define TEST_DT UCC_DT_UINT32
 
-TestBcast::TestBcast(size_t _msgsize, ucc_test_mpi_inplace_t _inplace,
-                     ucc_memory_type_t _mt, int _root, ucc_test_team_t &_team,
-                     size_t _max_size) :
-    TestCase(_team, UCC_COLL_TYPE_BCAST, _mt, _msgsize, _inplace, _max_size)
+TestBcast::TestBcast(ucc_test_team_t &_team, TestCaseParams &params) :
+    TestCase(_team, UCC_COLL_TYPE_BCAST, params)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
-    size_t count   = _msgsize / dt_size;
+    size_t count   = msgsize / dt_size;
     int rank, size;
 
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
-    root = _root;
+    root = params.root;
 
-    if (skip_reduce(test_max_size < _msgsize, TEST_SKIP_MEM_LIMIT,
-                    team.comm)) {
+    if (skip_reduce(test_max_size < msgsize, TEST_SKIP_MEM_LIMIT, team.comm)) {
         return;
     }
 
-    check_buf = ucc_malloc(_msgsize, "check buf");
+    check_buf = ucc_malloc(msgsize, "check buf");
     UCC_MALLOC_CHECK(check_buf);
-    UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, _msgsize, _mt));
+    UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
     sbuf = sbuf_mc_header->addr;
 
     args.src.info.buffer   = sbuf;
     args.src.info.count    = count;
     args.src.info.datatype = TEST_DT;
-    args.src.info.mem_type = _mt;
+    args.src.info.mem_type = mem_type;
     args.root              = root;
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);

@@ -60,7 +60,7 @@ static inline int get_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
 {
     ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
 
-    return sync->seq_num;
+    return sync->seq_num[ring_id];
 }
 
 static inline void set_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
@@ -68,7 +68,7 @@ static inline void set_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
 {
     ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
 
-    sync->seq_num = step;
+    sync->seq_num[ring_id] = step;
 }
 
 #endif
