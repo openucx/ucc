@@ -92,7 +92,8 @@ ucc_tl_sharp_mem_register(ucc_tl_sharp_context_t *ctx, void *addr,
     }
 
     if (ctx->rcache) {
-        status = ucc_rcache_get(ctx->rcache, (void *)addr, length, &rregion);
+        status = ucc_rcache_get(ctx->rcache, (void *)addr, length, NULL,
+                                &rregion);
         if (status != UCC_OK) {
             tl_error(ctx->super.super.lib, "ucc_rcache_get failed");
             return UCC_ERR_INVALID_PARAM;
