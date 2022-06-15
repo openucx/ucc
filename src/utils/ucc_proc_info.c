@@ -130,8 +130,8 @@ static ucc_status_t ucc_get_bound_socket_id(ucc_socket_id_t *socketid)
     /* If after all tries we're still not getting it, error out
      * let hwloc take over */
     if (try == 0) {
-        ucc_error("Error when manually trying to discover socket_id using "
-                  "sched_getaffinity()");
+        ucc_warn("Error when manually trying to discover socket_id using "
+                 "sched_getaffinity()");
         __sched_cpufree(cpuset);
         return UCC_ERR_NO_MESSAGE;
     }
@@ -176,7 +176,7 @@ static ucc_status_t ucc_get_bound_socket_id(ucc_socket_id_t *socketid)
         for (i = 0; i < n_sockets; i++) {
             if (socket_ids[i] == sockid) {
                 if (i > (int)UCC_MAX_SOCKET_ID) {
-                    ucc_error("too large socket id %d", i);
+                    ucc_debug("too large socket id %d", i);
                     __sched_cpufree(cpuset);
                     return UCC_ERR_NOT_SUPPORTED;
                 }
@@ -195,7 +195,7 @@ static ucc_status_t ucc_get_bound_socket_id(ucc_socket_id_t *socketid)
     ({                                                                         \
         void *h = dlsym(handle, _sym);                                         \
         if ((error = dlerror()) != NULL) {                                     \
-            ucc_error("%s", error);                                            \
+            ucc_debug("%s", error);                                            \
             status = UCC_ERR_NOT_FOUND;                                        \
             goto error;                                                        \
         }                                                                      \
@@ -211,7 +211,7 @@ static ucc_status_t ucc_get_bound_numa_id(ucc_numa_id_t *numaid)
 
     handle = dlopen("libnuma.so", RTLD_LAZY);
     if (!handle) {
-        ucc_error("%s", dlerror());
+        ucc_debug("%s", dlerror());
         return UCC_ERR_NOT_FOUND;
     }
 
@@ -229,7 +229,7 @@ static ucc_status_t ucc_get_bound_numa_id(ucc_numa_id_t *numaid)
     int (*ucc_numa_bitmask_free)(void *) = LOAD_NUMA_SYM("numa_bitmask_free");
 
     if (-1 == ucc_numa_available()) {
-        ucc_error("libnuma is not available");
+        ucc_debug("libnuma is not available");
         status = UCC_ERR_NO_MESSAGE;
         goto error;
     }
@@ -261,7 +261,7 @@ static ucc_status_t ucc_get_bound_numa_id(ucc_numa_id_t *numaid)
     ucc_numa_bitmask_free(cpumask);
     if (numa_node >= 0) {
         if (numa_node > (int)UCC_MAX_NUMA_ID) {
-            ucc_error("too large numa id %d", numa_node);
+            ucc_debug("too large numa id %d", numa_node);
             status = UCC_ERR_NOT_SUPPORTED;
             goto error;
         }
