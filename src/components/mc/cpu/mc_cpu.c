@@ -189,32 +189,50 @@ static ucc_status_t ucc_mc_cpu_reduce_multi(const void *src1, const void *src2,
         return ucc_mc_cpu_reduce_multi_uint64(src1, src2, dst, n_vectors,
                                               count, stride, op);
     case UCC_DT_FLOAT32:
-        ucc_assert(4 == sizeof(float));
-        return ucc_mc_cpu_reduce_multi_float(src1, src2, dst, n_vectors,
-                                             count, stride, op);
+#if SIZEOF_FLOAT == 4
+        return ucc_mc_cpu_reduce_multi_float(src1, src2, dst, n_vectors, count,
+                                             stride, op);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT64:
-        ucc_assert(8 == sizeof(double));
+#if SIZEOF_DOUBLE == 8
         return ucc_mc_cpu_reduce_multi_double(src1, src2, dst, n_vectors,
                                               count, stride, op);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT128:
-        ucc_assert(16 == sizeof(long double));
+#if SIZEOF_LONG_DOUBLE == 16
         return ucc_mc_cpu_reduce_multi_long_double(src1, src2, dst, n_vectors,
                                                    count, stride, op);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_BFLOAT16:
         return ucc_mc_cpu_reduce_multi_bfloat16(src1, src2, dst, n_vectors,
                                                 count, stride, op);
     case UCC_DT_FLOAT32_COMPLEX:
-        ucc_assert(8 == sizeof(float complex));
+#if SIZEOF_FLOAT__COMPLEX == 8
         return ucc_mc_cpu_reduce_multi_float_complex(src1, src2, dst, n_vectors,
                                                      count, stride, op);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT64_COMPLEX:
-        ucc_assert(16 == sizeof(double complex));
+#if SIZEOF_DOUBLE__COMPLEX == 16
         return ucc_mc_cpu_reduce_multi_double_complex(
             src1, src2, dst, n_vectors, count, stride, op);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT128_COMPLEX:
-        ucc_assert(32 == sizeof(long double complex));
+#if SIZEOF_LONG_DOUBLE__COMPLEX == 32
         return ucc_mc_cpu_reduce_multi_long_double_complex(
             src1, src2, dst, n_vectors, count, stride, op);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     default:
         mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
                  ucc_datatype_str(dt));
@@ -238,39 +256,57 @@ ucc_mc_cpu_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
 {
     switch (dt) {
     case UCC_DT_FLOAT32:
-        ucc_assert(4 == sizeof(float));
+#if SIZEOF_FLOAT == 4
         return ucc_mc_cpu_reduce_multi_alpha_float(src1, src2, dst, n_vectors,
                                                    count, stride, reduce_op,
                                                    vector_op, (float)alpha);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT64:
-        ucc_assert(8 == sizeof(double));
+#if SIZEOF_DOUBLE == 8
         return ucc_mc_cpu_reduce_multi_alpha_double(src1, src2, dst, n_vectors,
                                                     count, stride, reduce_op,
                                                     vector_op, alpha);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT128:
-        ucc_assert(16 == sizeof(long double));
+#if SIZEOF_LONG_DOUBLE == 16
         return ucc_mc_cpu_reduce_multi_alpha_long(
             src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
             (long double)alpha);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_BFLOAT16:
         return ucc_mc_cpu_reduce_multi_alpha_bfloat16(src1, src2, dst, n_vectors,
                                                       count, stride, reduce_op,
                                                       vector_op, (float)alpha);
     case UCC_DT_FLOAT32_COMPLEX:
-        ucc_assert(8 == sizeof(float complex));
+#if SIZEOF_FLOAT__COMPLEX == 8
         return ucc_mc_cpu_reduce_multi_alpha_float_complex(
             src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
             (float)alpha);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT64_COMPLEX:
-        ucc_assert(16 == sizeof(double complex));
+#if SIZEOF_DOUBLE__COMPLEX == 16
         return ucc_mc_cpu_reduce_multi_alpha_double_complex(
             src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
             (double)alpha);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT128_COMPLEX:
-        ucc_assert(32 == sizeof(long double complex));
+#if SIZEOF_LONG_DOUBLE__COMPLEX == 32
         return ucc_mc_cpu_reduce_multi_alpha_long_complex(
             src1, src2, dst, n_vectors, count, stride, reduce_op, vector_op,
             (long double)alpha);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     default:
         mc_error(&ucc_mc_cpu.super, "unsupported reduction type (%s)",
                  ucc_datatype_str(dt));

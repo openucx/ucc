@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2001-2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2001-2022.  ALL RIGHTS RESERVED.
 # This software product is a proprietary product of Mellanox Technologies Ltd.
 # (the "Company") and all right, title, and interest and to the software product,
 # including all associated intellectual property rights, are and shall
@@ -77,6 +77,12 @@ AC_PROG_LIBTOOL
 AC_HEADER_STDC
 CFLAGS="$CFLAGS_save"
 
+AC_CHECK_SIZEOF(float)
+AC_CHECK_SIZEOF(double)
+AC_CHECK_SIZEOF(long double)
+AC_CHECK_SIZEOF(float _Complex)
+AC_CHECK_SIZEOF(double _Complex)
+AC_CHECK_SIZEOF(long double _Complex)
 #
 # Check if 'ln' supports creating relative links
 #

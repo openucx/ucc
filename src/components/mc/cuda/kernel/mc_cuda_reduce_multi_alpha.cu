@@ -191,28 +191,39 @@ ucc_mc_cuda_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
                         ld, __double2half(alpha), vector_op, stream, bk, th);
         break;
     case UCC_DT_FLOAT32:
-        ucc_assert(4 == sizeof(float));
+#if SIZEOF_FLOAT == 4
         DT_REDUCE_FLOAT(float, reduce_op, src1, src2, dst, n_vectors, count, ld,
                         (float)alpha, vector_op, stream, bk, th);
         break;
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT64:
-        ucc_assert(8 == sizeof(double));
+#if SIZEOF_DOUBLE == 8
         DT_REDUCE_FLOAT(double, reduce_op, src1, src2, dst, n_vectors, count,
                         ld, alpha, vector_op, stream, bk, th);
         break;
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT32_COMPLEX:
-        ucc_assert(8 == sizeof(cuFloatComplex));
+#if SIZEOF_CUFLOATCOMPLEX == 8
         DT_REDUCE_FLOAT_COMPLEX(cuFloatComplex, reduce_op, src1, src2, dst,
                                 n_vectors, count, ld, alpha, vector_op, stream,
                                 bk, th);
         break;
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT64_COMPLEX:
-        ucc_assert(16 == sizeof(cuDoubleComplex));
+#if SIZEOF_CUDOUBLECOMPLEX == 16
         DT_REDUCE_FLOAT_COMPLEX(cuDoubleComplex, reduce_op, src1, src2, dst,
                                 n_vectors, count, ld, alpha, vector_op, stream,
                                 bk, th);
         break;
-
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
 #if CUDART_VERSION >= 11000
     case UCC_DT_BFLOAT16:
         DT_REDUCE_FLOAT(__nv_bfloat16, reduce_op, src1, src2, dst, n_vectors,
