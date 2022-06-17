@@ -206,8 +206,11 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
         switch(coll_mem_type) {
         case UCC_MEMORY_TYPE_CUDA:
             coll_ee_type = UCC_EE_CUDA_STREAM;
+            break; 
+        case UCC_MEMORY_TYPE_ROCM:
+            coll_ee_type = UCC_EE_ROCM_STREAM;
             break;
-        case UCC_MEMORY_TYPE_HOST:
+       case UCC_MEMORY_TYPE_HOST:
             coll_ee_type = UCC_EE_CPU_THREAD;
             break;
         default:
