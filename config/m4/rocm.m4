@@ -120,8 +120,14 @@ AS_IF([test "x$with_rocm" != "xno"],
     LDFLAGS="$SAVE_LDFLAGS"
     LIBS="$SAVE_LIBS"
 
+
+    AS_IF([test "x$hip_happy" = "xyes"],
+          [AC_PATH_PROG([HIPCC], [hipcc], [notfound], [$PATH:$with_rocm/bin])])
+         AS_IF([test "$HIPCC" = "notfound"], [hip_happy="no"])
+
     AS_IF([test "x$hip_happy" = "xyes"],
           [AC_DEFINE([HAVE_HIP], 1, [Enable HIP support])
+           AC_SUBST([HIPCC])
            AC_SUBST([HIP_CPPFLAGS])
            AC_SUBST([HIP_CXXFLAGS])
            AC_SUBST([HIP_LDFLAGS])
