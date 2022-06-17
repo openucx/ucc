@@ -347,6 +347,9 @@ ucc_mc_rocm_t ucc_mc_rocm = {
     .super.ops.mem_alloc          = ucc_mc_rocm_mem_pool_alloc_with_init,
     .super.ops.mem_free           = ucc_mc_rocm_mem_pool_free,
     .super.ops.memcpy             = ucc_mc_rocm_memcpy,
+    .super.ops.reduce             = ucc_mc_rocm_reduce,
+    .super.ops.reduce_multi       = ucc_mc_rocm_reduce_multi,
+    .super.ops.reduce_multi_alpha = ucc_mc_rocm_reduce_multi_alpha,
     .super.config_table =
         {
             .name   = "ROCM memory component",
