@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -305,10 +305,12 @@ template <typename T>
 class test_allreduce_avg_order : public test_allreduce<T> {
 };
 
-using test_allreduce_avg_order_type =
-    ::testing::Types<TypeOpPair<UCC_DT_FLOAT32, avg>,
-                     TypeOpPair<UCC_DT_FLOAT64, avg>,
-                     TypeOpPair<UCC_DT_BFLOAT16, avg>>;
+using test_allreduce_avg_order_type = ::testing::Types<
+    TypeOpPair<UCC_DT_FLOAT32, avg>, TypeOpPair<UCC_DT_FLOAT64, avg>,
+    TypeOpPair<UCC_DT_FLOAT128, avg>, TypeOpPair<UCC_DT_FLOAT32_COMPLEX, avg>,
+    TypeOpPair<UCC_DT_FLOAT64_COMPLEX, avg>,
+    TypeOpPair<UCC_DT_FLOAT128_COMPLEX, avg>, TypeOpPair<UCC_DT_BFLOAT16, avg>>;
+
 TYPED_TEST_CASE(test_allreduce_avg_order, test_allreduce_avg_order_type);
 
 TYPED_TEST(test_allreduce_avg_order, avg_post_op)
@@ -328,6 +330,7 @@ TYPED_TEST(test_allreduce_avg_order, avg_post_op)
     for (auto count : {4, 256, 65536}) {
         for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
             for (auto m : mt) {
+                CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, m);
                 SET_MEM_TYPE(m);
                 this->set_inplace(inplace);
                 this->data_init(n_procs, TypeParam::dt, count, ctxs, true);

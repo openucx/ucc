@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -31,6 +31,14 @@ static inline MPI_Datatype ucc_dt_to_mpi(ucc_datatype_t dt) {
         return MPI_UINT64_T;
     case UCC_DT_FLOAT64:
         return MPI_DOUBLE;
+    case UCC_DT_FLOAT128:
+        return MPI_LONG_DOUBLE;
+    case UCC_DT_FLOAT32_COMPLEX:
+        return MPI_C_FLOAT_COMPLEX;
+    case UCC_DT_FLOAT64_COMPLEX:
+        return MPI_C_DOUBLE_COMPLEX;
+    case UCC_DT_FLOAT128_COMPLEX:
+        return MPI_C_LONG_DOUBLE_COMPLEX;
     case UCC_DT_FLOAT16:
     case UCC_DT_INT128:
     case UCC_DT_UINT128:

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -43,3 +43,13 @@
 #endif
 
 #endif
+
+#define DO_OP_SUM_FLOAT_COMPLEX(_v1, _v2)  (cuCaddf(_v1, _v2))
+#define DO_OP_PROD_FLOAT_COMPLEX(_v1, _v2) (cuCmulf(_v1, _v2))
+#define DO_OP_PROD_SCALAR_FLOAT_COMPLEX(_v1, _v2)                              \
+    make_cuFloatComplex(cuCrealf(_v1) * _v2, cuCimagf(_v1) * _v2)
+
+#define DO_OP_SUM_DOUBLE_COMPLEX(_v1, _v2)  (cuCadd(_v1, _v2))
+#define DO_OP_PROD_DOUBLE_COMPLEX(_v1, _v2) (cuCmul(_v1, _v2))
+#define DO_OP_PROD_SCALAR_DOUBLE_COMPLEX(_v1, _v2)                             \
+    make_cuDoubleComplex(cuCreal(_v1) * _v2, cuCimag(_v1) * _v2)

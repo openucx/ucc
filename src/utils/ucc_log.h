@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -118,10 +118,18 @@ static inline const char* ucc_datatype_str(ucc_datatype_t dt)
         return "uint64";
     case UCC_DT_FLOAT64:
         return "float64";
+    case UCC_DT_FLOAT128:
+        return "float128";
     case UCC_DT_INT128:
         return "int128";
     case UCC_DT_UINT128:
         return "uint128";
+    case UCC_DT_FLOAT32_COMPLEX:
+        return "float32_complex";
+    case UCC_DT_FLOAT64_COMPLEX:
+        return "float64_complex";
+    case UCC_DT_FLOAT128_COMPLEX:
+        return "float128_complex";
     default:
         return "userdefined";
     }

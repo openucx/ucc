@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  * See file LICENSE for terms.
  */
 
@@ -8,21 +8,24 @@
 #include "utils/ucc_math.h"
 
 size_t ucc_dt_predefined_sizes[UCC_DT_PREDEFINED_LAST] = {
-     [UCC_DT_PREDEFINED_ID(UCC_DT_INT8)]     = 1,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_UINT8)]    = 1,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_INT16)]    = 2,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_UINT16)]   = 2,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT16)]  = 2,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = 2,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_INT32)]    = 4,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_UINT32)]   = 4,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT32)]  = 4,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_INT64)]    = 8,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_UINT64)]   = 8,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT64)]  = 8,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_INT128)]   = 16,
-     [UCC_DT_PREDEFINED_ID(UCC_DT_UINT128)]  = 16,
-};
+    [UCC_DT_PREDEFINED_ID(UCC_DT_INT8)]             = 1,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_UINT8)]            = 1,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_INT16)]            = 2,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_UINT16)]           = 2,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT16)]          = 2,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)]         = 2,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_INT32)]            = 4,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_UINT32)]           = 4,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT32)]          = 4,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_INT64)]            = 8,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_UINT64)]           = 8,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT64)]          = 8,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT128)]         = 16,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_INT128)]           = 16,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_UINT128)]          = 16,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT32_COMPLEX)]  = 8,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT64_COMPLEX)]  = 16,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT128_COMPLEX)] = 32};
 
 ucc_status_t ucc_dt_create_generic(const ucc_generic_dt_ops_t *ops, void *context,
                                    ucc_datatype_t *datatype_p)
