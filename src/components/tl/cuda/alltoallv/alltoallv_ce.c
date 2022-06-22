@@ -165,6 +165,9 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
         }
         data_size = task->alltoallv_ce.get_size(
             task, peer_sync->alltoallv_ce.sbytes, rank);
+        if (data_size == 0) {
+            continue;
+        }
         data_displ = task->alltoallv_ce.get_offset(
             task, peer_sync->alltoallv_ce.sdispl_bytes, rank);
         src        = PTR_OFFSET(src, data_displ);
@@ -190,9 +193,11 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
             psrc      = team->topo->proxies[i].src;
             pdst      = team->topo->proxies[i].dst;
             peer_sync = TASK_SYNC(task, psrc);
-            // FIXME: assume the same datatype
             data_size = task->alltoallv_ce.get_size(
                 task, peer_sync->alltoallv_ce.sbytes, pdst);
+            if (data_size == 0) {
+                continue;
+            }
             data_displ = task->alltoallv_ce.get_offset(
                 task, peer_sync->alltoallv_ce.sdispl_bytes, pdst);
             src        = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_src[psrc],
@@ -255,6 +260,9 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_COPY;
     case ALLTOALL_CE_STAGE_COPY:
         for (i = 0; i < task->alltoallv_ce.num_posted; i++) {
+            if (!task->alltoallv_ce.exec_task[i]) {
+                continue;
+            }
             status = ucc_ee_executor_task_test(task->alltoallv_ce.exec_task[i]);
             if (status != UCC_OK) {
                 if (status == UCC_OPERATION_INITIALIZED) {
@@ -263,6 +271,8 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
                 task->super.status = status;
                 return;
             }
+            ucc_ee_executor_task_finalize(task->alltoallv_ce.exec_task[i]);
+            task->alltoallv_ce.exec_task[i] = NULL;
         }
         status =
             ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
