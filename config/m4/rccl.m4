@@ -21,7 +21,7 @@ AS_IF([test "x$rccl_checked" != "xyes"],[
         AS_IF([test ! -z "$with_rccl" -a "x$with_rccl" != "xyes" -a "x$with_rccl" != "xguess"],
         [
             AS_IF([test ! -d $with_rccl],
-                  [AC_MSG_ERROR([Provided "--with-rccl=${with_rccl}" location does not exist])], [])])
+                  [AC_MSG_ERROR([Provided "--with-rccl=${with_rccl}" location does not exist])])
             check_rccl_dir="$with_rccl"
             check_rccl_libdir="$with_rccl/lib"
             CPPFLAGS="-I$with_rccl/include $save_CPPFLAGS"
@@ -59,7 +59,7 @@ AS_IF([test "x$rccl_checked" != "xyes"],[
                     [
 			rccl_happy="no"
                     ])
-                ]),
+                ])
             ])
         ],
         [
@@ -100,4 +100,4 @@ AS_IF([test "x$rccl_checked" != "xyes"],[
     ])
 
     rccl_checked=yes
-])
+])])
