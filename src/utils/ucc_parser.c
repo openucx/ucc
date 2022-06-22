@@ -5,6 +5,7 @@
 
 #include "ucc_parser.h"
 #include "ucc_malloc.h"
+#include "ucc_string.h"
 #include "ucc_log.h"
 #include "khash.h"
 
@@ -283,22 +284,46 @@ static ucc_status_t ucc_apply_file_cfg_value(void *              opts,
     return UCC_ERR_NOT_FOUND;
 }
 
+static inline int check_var_in_env(const char *prefix, const char *var)
+{
+    char *v;
+    int   present;
+
+    if (UCC_OK != ucc_str_concat(prefix, var, &v)) {
+        return 0;
+    }
+    present = (getenv(v) != NULL);
+    ucc_free(v);
+    return present;
+}
+
 static ucc_status_t ucc_apply_file_cfg(void *opts, ucc_config_field_t *fields,
                                        const char *env_prefix,
-                                       const char *component_prefix)
+                                       const char *component_prefix,
+                                       int recursive)
 {
-    ucc_status_t status = UCC_OK;
+    ucc_status_t status       = UCC_OK;
+    ucc_config_field_t *super;
 
     while (fields->name != NULL) {
         if (strlen(fields->name) == 0) {
-            status = ucc_apply_file_cfg(
-                opts, (ucc_config_field_t *)fields->parser.arg, env_prefix,
-                component_prefix);
+            super  = (ucc_config_field_t *)fields->parser.arg;
+            status = ucc_apply_file_cfg(opts, super, env_prefix,
+                                        component_prefix, 1);
             if (UCC_OK != status) {
                 return status;
             }
-            fields++;
-            continue;
+            goto next;
+        }
+
+        if (recursive) {
+            if (check_var_in_env("UCC_", fields->name)) {
+                goto next;
+            }
+            if (0 != strcmp(env_prefix, "UCC_") &&
+                check_var_in_env(env_prefix, fields->name)) {
+                goto next;
+            }
         }
         status = ucc_apply_file_cfg_value(
             opts, fields, env_prefix, component_prefix ? component_prefix : "",
@@ -310,7 +335,7 @@ static ucc_status_t ucc_apply_file_cfg(void *opts, ucc_config_field_t *fields,
         if (status != UCC_OK && status != UCC_ERR_NOT_FOUND) {
             return status;
         }
-
+    next:
         fields++;
     }
     return UCC_OK;
@@ -329,7 +354,7 @@ ucc_status_t ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,
     status     = ucs_status_to_ucc_status(ucs_status);
 
     if (UCC_OK == status && ucc_global_config.file_cfg) {
-        status = ucc_apply_file_cfg(opts, fields, env_prefix, table_prefix);
+        status = ucc_apply_file_cfg(opts, fields, env_prefix, table_prefix, 0);
     }
 
     return status;

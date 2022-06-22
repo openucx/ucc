@@ -106,3 +106,13 @@ UCC_TEST_F(test_cfg_file, env_preference) {
     EXPECT_EQ(123, cfg.bar);
     EXPECT_EQ(1,  cfg.boo);
 }
+
+UCC_TEST_F(test_cfg_file, env_preference_inherited) {
+    std::string filename = test_dir + "ucc_test.conf";
+
+    setenv("GTEST_UCC_FOO", "123", 1);
+    EXPECT_EQ(UCC_OK, ucc_parse_file_config(filename.c_str(), &file_cfg));
+    init_cfg();
+    unsetenv("GTEST_UCC_FOO");
+    EXPECT_EQ(123, cfg.super.foo);
+}
