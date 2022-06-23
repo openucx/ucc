@@ -25,4 +25,14 @@
 #define DO_OP_PROD_BFLOAT16(_v1, _v2)					\
     (hip_bfloat16(static_cast<float>(_v1) * static_cast<float>(_v2)))
 
+#define DO_OP_SUM_FLOAT_COMPLEX(_v1, _v2)  (hipCaddf(_v1, _v2))
+#define DO_OP_PROD_FLOAT_COMPLEX(_v1, _v2) (hipCmulf(_v1, _v2))
+#define DO_OP_PROD_SCALAR_FLOAT_COMPLEX(_v1, _v2)                              \
+    make_hipFloatComplex(hipCrealf(_v1) * _v2, hipCimagf(_v1) * _v2)
+
+#define DO_OP_SUM_DOUBLE_COMPLEX(_v1, _v2)  (hipCadd(_v1, _v2))
+#define DO_OP_PROD_DOUBLE_COMPLEX(_v1, _v2) (hipCmul(_v1, _v2))
+#define DO_OP_PROD_SCALAR_DOUBLE_COMPLEX(_v1, _v2)                             \
+    make_hipDoubleComplex(hipCreal(_v1) * _v2, hipCimag(_v1) * _v2)
+
 #endif
