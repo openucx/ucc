@@ -174,7 +174,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
         data_displ = task->alltoallv_ce.get_offset(
             task, sync->alltoallv_ce.rdispl_bytes, peer);
         dst = PTR_OFFSET(task->alltoallv_ce.rbuf, data_displ);
-
         exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
         exec_args.bufs[0]   = dst;
         exec_args.bufs[1]   = src;
@@ -370,6 +369,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
     task->alltoallv_ce.rcnts      = args->dst.info_v.counts;
     task->alltoallv_ce.sdispl     = args->src.info_v.displacements;
     task->alltoallv_ce.rdispl     = args->dst.info_v.displacements;
+    task->alltoallv_ce.stage      = ALLTOALL_CE_STAGE_SYNC;
 
     data_len = ucc_dt_size(args->src.info_v.datatype) *
                ucc_coll_args_get_total_count(args, args->src.info_v.counts,

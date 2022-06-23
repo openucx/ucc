@@ -43,11 +43,12 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     task->alltoallv_ce.rdt        = args->dst.info.datatype;
     task->alltoallv_ce.sbuf       = args->src.info.buffer;
     task->alltoallv_ce.rbuf       = args->dst.info.buffer;
+    task->alltoallv_ce.stage      = 0;
     /* NOT used for alltoall */
-    task->alltoallv_ce.scnts  = 0;
-    task->alltoallv_ce.rcnts  = 0;
-    task->alltoallv_ce.sdispl = 0;
-    task->alltoallv_ce.rdispl = 0;
+    task->alltoallv_ce.scnts      = 0;
+    task->alltoallv_ce.rcnts      = 0;
+    task->alltoallv_ce.sdispl     = 0;
+    task->alltoallv_ce.rdispl     = 0;
 
     data_len = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
     status   = ucc_tl_cuda_mem_info_get(args->src.info.buffer, data_len,
