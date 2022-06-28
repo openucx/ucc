@@ -224,11 +224,14 @@ ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
                                    ucc_tl_cuda_team_topo_t *topo)
 {
     ucc_rank_t size        = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t rank        = UCC_TL_TEAM_RANK(team);
     ucc_rank_t num_proxies = 0;
-    ucc_rank_t i, j ,p, k, proxy;
+    ucc_rank_t i, j, k, proxy;
     float *data;
     float score, min_score;
     ucc_status_t status;
+
+    topo->proxy_needed = 0;
 
     for (i = 0; i < size * size; i++) {
         if (topo->matrix[i] == 0) {
@@ -266,11 +269,14 @@ ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
         }
     }
 
-    p = 0;
+    num_proxies = 0;
     for (i = 0; i < size; i++) {
         for (j = 0; j < size; j++) {
             if (ucc_tl_cuda_team_topo_is_direct(&team->super, topo, i, j)) {
                 continue;
+            }
+            if ((i == rank) || (j == rank)) {
+                topo->proxy_needed = 1;
             }
             proxy = UCC_RANK_INVALID;
             min_score = (float)(UCC_RANK_MAX);
@@ -298,14 +304,17 @@ ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
                 status = UCC_ERR_NOT_SUPPORTED;
                 goto free_data;
             }
-            topo->proxies[p].src   = i;
-            topo->proxies[p].dst   = j;
-            topo->proxies[p].proxy = proxy;
+            if (proxy == rank) {
+                topo->proxies[num_proxies].src   = i;
+                topo->proxies[num_proxies].dst   = j;
+                topo->proxies[num_proxies].proxy = proxy;
+                num_proxies++;
+            }
             data[i * size + proxy] += 1.0;
             data[proxy * size + j] += 1.0;
-            p++;
         }
     }
+    topo->num_proxies = num_proxies;
 
     ucc_free(data);
     return UCC_OK;
@@ -402,13 +411,13 @@ free_topo:
     return status;
 }
 
-void ucc_tl_cuda_team_topo_print(const ucc_tl_team_t *tl_team,
-                                 const ucc_tl_cuda_team_topo_t *topo)
+void ucc_tl_cuda_team_topo_print_proxies(const ucc_tl_team_t *tl_team,
+                                         const ucc_tl_cuda_team_topo_t *topo)
 {
     ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     ucc_rank_t          size = UCC_TL_TEAM_SIZE(team);
     ucc_rank_t          rank = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t i, j;
+    ucc_rank_t i;
 
     for (i = 0; i < size; i++) {
         if (ucc_tl_cuda_team_topo_is_direct(tl_team, topo, rank, i)) {
@@ -423,21 +432,19 @@ void ucc_tl_cuda_team_topo_print(const ucc_tl_team_t *tl_team,
                         team->ids[rank].device, rank, team->ids[i].device, i,
                         topo->matrix[rank * size + i]);
             }
-        } else {
-            for (j = 0 ; j < topo->num_proxies; j++) {
-                if ((topo->proxies[j].src == rank) &&
-                    (topo->proxies[j].dst == i)) {
-                    tl_debug(UCC_TL_TEAM_LIB(team),
-                             "dev %d rank %d to dev %d rank %d: "
-                             "proxy dev %d rank %d",
-                             team->ids[rank].device, rank,
-                             team->ids[i].device, i,
-                             team->ids[topo->proxies[j].proxy].device,
-                             topo->proxies[j].proxy);
-                    break;
-                }
-            }
         }
+    }
+
+    for (i = 0; i < topo->num_proxies; i++) {
+        tl_debug(UCC_TL_TEAM_LIB(team),
+                    "dev %d rank %d to dev %d rank %d: "
+                    "proxy dev %d rank %d",
+                    team->ids[topo->proxies[i].src].device,
+                    topo->proxies[i].src,
+                    team->ids[topo->proxies[i].dst].device,
+                    topo->proxies[i].dst,
+                    team->ids[topo->proxies[i].proxy].device,
+                    topo->proxies[i].proxy);
     }
 }
 
