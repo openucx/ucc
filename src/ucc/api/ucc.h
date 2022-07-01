@@ -131,8 +131,8 @@ BEGIN_C_DECLS
  *  Description
  *
  *  @ref ucc_coll_type_t represents the collective operations supported by the
- *  UCC library. Currently, it supports barrier, broadcast, all-reduce, reduce,
- *  alltoall, all-gather, gather, scatter, fan-in and fan-out operations.
+ *  UCC library. The exact set of supported collective operations depends on
+ *  UCC build flags, runtime configuraion and available communication transports.
  *
  *  @endparblock
  *
@@ -724,7 +724,7 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
  *
  *  @brief The @ref ucc_init initializes the UCC library.
  *
- *  @param [in]  params    user provided parameters to customize the library functionality
+ *  @param [in]  params    User provided parameters to customize the library functionality
  *  @param [in]  config    UCC configuration descriptor allocated through
  *                         @ref ucc_lib_config_read "ucc_config_read()" routine.
  *  @param [out] lib_p     UCC library handle
@@ -1072,7 +1072,7 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_h config,
  *  releases the resources and destroys the context state. The creation of
  *  context does not necessarily indicate its readiness to be used for
  *  collective or other group operations. On success, the context handle will be
- *  created and ucc_status_t will return UCC_OK. On error, the library object
+ *  created and ucc_status_t will return UCC_OK. On error, the context object
  *  will not be created and corresponding error code as defined by
  *  @ref ucc_status_t is returned.
  *
@@ -1530,7 +1530,8 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts,
  *
  *  @ref ucc_team_create_test routines tests the status of team handle.
  *  If required it can progress the communication but cannot block on the
- *  communications.
+ *  communications. On error, the team handle becomes invalid, user is responsible
+ *  to call ucc_team_destroy to destroy team and free allocated resources.
  *
  *  @endparblock
  *
@@ -1879,8 +1880,8 @@ typedef struct ucc_coll_args {
  *
  *  @brief The routine to initialize a collective operation.
  *
- *  @param [out]   request     Request handle representing the collective operation
  *  @param [in]    coll_args   Collective arguments descriptor
+ *  @param [out]   request     Request handle representing the collective operation
  *  @param [in]    team        Team handle
  *
  *  @parblock
@@ -1917,7 +1918,8 @@ ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
  *
  *  @ref ucc_collective_post routine posts the collective operation. It
  *  does not require synchronization between the participants for the post
- *  operation.
+ *  operation. On error, request handle becomes invalid, user is responsible
+ *  to call ucc_collective_finalize to free allocated resources.
  *
  *  @endparblock
  *
@@ -1967,7 +1969,8 @@ ucc_status_t ucc_collective_init_and_post(ucc_coll_args_t *coll_args,
  *  @b Description
  *
  *  @ref ucc_collective_test tests and returns the status of collective
- *  operation.
+ *  operation. On error, request handle becomes invalid, user is responsible
+ *  to call ucc_collective_finalize to free allocated resources.
  *
  *  @endparblock
  *
@@ -1983,7 +1986,7 @@ static inline ucc_status_t ucc_collective_test(ucc_coll_req_h request)
  *
  *  @brief The routine to release the collective operation associated with the request object.
  *
- *  @param [in] request - request handle
+ *  @param [in] request - Request handle
  *
  *  @parblock
  *
@@ -2050,9 +2053,9 @@ typedef struct ucc_ee_params {
  *
  * @brief The routine creates the execution context for collective operations.
  *
- * @param [in] team     team handle
- * @param [in] params   user provided params to customize the execution engine
- * @param [out] ee      execution engine handle
+ * @param [in]  team    Team handle
+ * @param [in]  params  User provided params to customize the execution engine
+ * @param [out] ee      Execution engine handle
  *
  * @parblock
  *
@@ -2105,7 +2108,7 @@ ucc_status_t ucc_ee_destroy(ucc_ee_h ee);
  *
  * @brief The routine gets the event from the event queue.
  *
- * @param [in]  ee        execution engine handle
+ * @param [in]  ee        Execution engine handle
  * @param [out] ev        Event structure fetched from the event queue
  *
  * @parblock
@@ -2130,7 +2133,7 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t **ev);
  *
  * @brief The routine acks the events from the event queue.
  *
- * @param [in]  ee      execution engine handle
+ * @param [in]  ee      Execution engine handle
  * @param [in]  ev      Event to be acked
  *
  * @parblock
@@ -2153,7 +2156,7 @@ ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @brief The routine to set the event to the tail of the queue.
  *
- * @param [in]  ee        execution engine handle
+ * @param [in]  ee        Execution engine handle
  * @param [in]  ev        Event structure fetched from the event queue
  *
  * @parblock
@@ -2176,7 +2179,7 @@ ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @brief The routine blocks the calling thread until there is an event on the queue.
  *
- * @param [in]  ee        execution engine handle
+ * @param [in]  ee        Execution engine handle
  * @param [out] ev        Event structure fetched from the event queue
  *
  * @parblock
@@ -2198,7 +2201,7 @@ ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
  * @brief The routine posts the collective operation on the execution engine, which is
  * launched on the event.
  *
- * @param [in]  ee          execution engine handle
+ * @param [in]  ee          Execution engine handle
  * @param [in]  ee_event    Event triggering the post operation
  *
  * @parblock
@@ -2207,7 +2210,8 @@ ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @ref ucc_collective_triggered_post allow the users to schedule a collective
  * operation that executes in the future when an event occurs on the execution
- * engine.
+ * engine. On error, request handle associated with event becomes invalid,
+ * user is responsible to call ucc_collective_finalize to free allocated resources.
  *
  * @endparblock
  *
