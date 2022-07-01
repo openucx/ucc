@@ -297,7 +297,7 @@ static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
         if (UCC_TL_UCP_TASK_P2P_COMPLETE(task)) {
             return UCC_OK;
         }
-        ucp_worker_progress(TASK_CTX(task)->ucp_worker);
+        ucp_worker_progress(UCC_TL_UCP_TASK_WORKER(task));
     }
     return UCC_INPROGRESS;
 }

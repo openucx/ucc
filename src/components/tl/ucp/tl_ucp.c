@@ -175,6 +175,13 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_context_config_t, pre_reg_mem),
      UCC_CONFIG_TYPE_UINT},
 
+    {"SERVICE_TLS", "",
+     "If empty string (default), uses the same worker for collectives and "
+     "service. If not, creates a special worker for service collectives "
+     "for which UCX_TL configuration is set to that string",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, service_tls),
+     UCC_CONFIG_TYPE_STRING},
+
     {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_ucp_lib_t, ucc_base_lib_t,
