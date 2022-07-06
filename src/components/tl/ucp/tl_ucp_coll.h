@@ -36,7 +36,8 @@ extern const char
 #define EXEC_TASK_TEST(_phase, _errmsg, _etask) do {                           \
     if (_etask != NULL) {                                                      \
         status = ucc_ee_executor_task_test(_etask);                            \
-        if (status == UCC_INPROGRESS) {                                        \
+        if (status > 0) {                                                      \
+            task->super.status = UCC_INPROGRESS;                               \
             SAVE_STATE(_phase);                                                \
             return;                                                            \
         }                                                                      \
