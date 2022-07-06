@@ -31,6 +31,11 @@
 #define UCC_TL_CUDA_CHECK_DEVICE_MATCH(_team)
 #endif
 
+const char
+    *ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR] = {
+        UCC_TL_CUDA_ALLGATHER_DEFAULT_ALG_SELECT_STR,
+        UCC_TL_CUDA_ALLGATHERV_DEFAULT_ALG_SELECT_STR};
+
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
                                       ucc_tl_cuda_mem_info_t *mi)
 {
@@ -111,4 +116,71 @@ ucc_status_t ucc_tl_cuda_shm_barrier_test(ucc_rank_t                 rank,
     barrier->state[rank]       = UCC_OK;
     barrier->local_sense[rank] = 1 - barrier->local_sense[rank];
     return UCC_OK;
+}
+
+static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
+{
+    switch (coll_type) {
+    case UCC_COLL_TYPE_ALLGATHER:
+        return ucc_tl_cuda_allgather_alg_from_str(str);
+    case UCC_COLL_TYPE_ALLGATHERV:
+        return ucc_tl_cuda_allgatherv_alg_from_str(str);
+    default:
+        break;
+    }
+    return -1;
+}
+
+ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
+                                        ucc_coll_type_t   coll_type,
+                                        ucc_memory_type_t mem_type,
+                                        ucc_base_coll_init_fn_t *init)
+{
+    ucc_status_t status = UCC_OK;
+    if (alg_id_str) {
+        alg_id = alg_id_from_str(coll_type, alg_id_str);
+    }
+
+    if (mem_type != UCC_MEMORY_TYPE_CUDA) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    switch (coll_type) {
+    case UCC_COLL_TYPE_ALLGATHER:
+        switch (alg_id) {
+        case UCC_TL_CUDA_ALLGATHER_ALG_AUTO:
+            *init = ucc_tl_cuda_allgather_init;
+            break;
+        case UCC_TL_CUDA_ALLGATHER_ALG_RING:
+             *init = ucc_tl_cuda_allgather_ring_init;
+            break;
+        case UCC_TL_CUDA_ALLGATHER_ALG_LINEAR:
+            *init = ucc_tl_cuda_allgather_linear_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        };
+        break;
+    case UCC_COLL_TYPE_ALLGATHERV:
+        switch (alg_id) {
+        case UCC_TL_CUDA_ALLGATHER_ALG_AUTO:
+            *init = ucc_tl_cuda_allgatherv_init;
+            break;
+        case UCC_TL_CUDA_ALLGATHER_ALG_RING:
+            *init = ucc_tl_cuda_allgatherv_ring_init;
+            break;
+        case UCC_TL_CUDA_ALLGATHER_ALG_LINEAR:
+            *init = ucc_tl_cuda_allgatherv_linear_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        };
+        break;
+    default:
+        status = UCC_ERR_NOT_SUPPORTED;
+        break;
+    }
+    return status;
 }

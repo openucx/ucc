@@ -416,30 +416,20 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
-size_t ucc_tl_cuda_allgatherv_get_count(const ucc_tl_cuda_task_t *task,
-                                        ucc_rank_t block)
+ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_base_coll_args_t *coll_args,
+                                              ucc_base_team_t *tl_team,
+                                              ucc_coll_task_t **task_p)
 {
-    const ucc_coll_args_t *args  = &TASK_ARGS(task);
+    ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
+    ucc_tl_cuda_task_t *task = ucc_tl_cuda_task_init(coll_args, team);
 
-    return ucc_coll_args_get_count(args, args->dst.info_v.counts, block);
-}
-
-size_t ucc_tl_cuda_allgatherv_get_offset(const ucc_tl_cuda_task_t *task,
-                                         ucc_rank_t block)
-{
-    const ucc_coll_args_t *args  = &TASK_ARGS(task);
-
-    return ucc_coll_args_get_displacement(args, args->dst.info_v.displacements,
-                                          block);
-}
-
-ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_tl_cuda_task_t *task)
-{
-    ucc_coll_args_t  *args  = &TASK_ARGS(task);
+    if (ucc_unlikely(!task)) {
+        return UCC_ERR_NO_MEMORY;
+    }
 
     task->allgatherv_ring.get_count  = ucc_tl_cuda_allgatherv_get_count;
     task->allgatherv_ring.get_offset = ucc_tl_cuda_allgatherv_get_offset;
-    task->allgatherv_ring.dt         = args->dst.info_v.datatype;
+    task->allgatherv_ring.dt         = coll_args->args.dst.info_v.datatype;
 
     task->super.flags               |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post                 = ucc_tl_cuda_allgatherv_ring_start;
@@ -448,5 +438,6 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_tl_cuda_task_t *task)
     task->super.finalize             = ucc_tl_cuda_allgatherv_ring_finalize;
     task->bar                        = TASK_BAR(task);
 
+    *task_p = &task->super;
     return UCC_OK;
 }
