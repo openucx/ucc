@@ -36,13 +36,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_self_context_t,
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_self_context_t)
 {
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    ucc_mpool_cleanup(&self->req_mp, 1);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_self_context_t, ucc_tl_context_t);
 
 ucc_status_t
 ucc_tl_self_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                             ucc_base_ctx_attr_t      *attr)
+                             ucc_base_ctx_attr_t      *attr /* NOLINT */)
 {
     return UCC_OK;
 }
