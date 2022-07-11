@@ -13,6 +13,7 @@
 #include "utils/ucc_mpool.h"
 #include "utils/arch/rocm_def.h"
 #include <hip/hip_runtime_api.h>
+#include <hip/hip_complex.h>
 
 static inline ucc_status_t hip_error_to_ucc_status(hipError_t hip_err)
 {

@@ -32,6 +32,13 @@ ncclDataType_t ucc_to_rccl_dtype[] = {
     [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT16)]  = (ncclDataType_t)ncclFloat16,
     [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT32)]  = (ncclDataType_t)ncclFloat32,
     [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT64)]  = (ncclDataType_t)ncclFloat64,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT128)] = (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT32_COMPLEX)] =
+        (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT64_COMPLEX)] =
+        (ncclDataType_t)ncclDataTypeUnsupported,
+    [UCC_DT_PREDEFINED_ID(UCC_DT_FLOAT128_COMPLEX)] =
+        (ncclDataType_t)ncclDataTypeUnsupported,
 #if NCCL_VERSION_CODE >= NCCL_VERSION(2,10,3)
     [UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = (ncclDataType_t)ncclBfloat16,
 #else
@@ -105,6 +112,9 @@ ucc_tl_rccl_task_t * ucc_tl_rccl_init_task(ucc_base_coll_args_t *coll_args,
 void ucc_tl_rccl_free_task(ucc_tl_rccl_task_t *task)
 {
     UCC_TL_RCCL_PROFILE_REQUEST_FREE(task);
+    if (task->completed) {
+        ucc_ec_destroy_event(task->completed, UCC_EE_ROCM_STREAM);
+    }
     ucc_mpool_put(task);
 }
 
@@ -143,9 +153,6 @@ ucc_status_t ucc_tl_rccl_coll_finalize(ucc_coll_task_t *coll_task)
     ucc_status_t       status = UCC_OK ;
 
     tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
-    if (task->completed) {
-        ucc_ec_destroy_event(task->completed, UCC_EE_ROCM_STREAM);
-    }
     ucc_tl_rccl_free_task(task);
     return status;
 }
@@ -186,7 +193,7 @@ ucc_status_t ucc_tl_rccl_alltoall_start(ucc_coll_task_t *coll_task)
     size_t              data_size;
     ucc_rank_t          peer;
     ncclDataType_t      dt;
-    
+
     task->super.super.status = UCC_INPROGRESS;
     data_size                = (size_t)(args->src.info.count / gsize) *
                 ucc_dt_size(args->src.info.datatype);
@@ -201,7 +208,7 @@ ucc_status_t ucc_tl_rccl_alltoall_start(ucc_coll_task_t *coll_task)
         RCCLCHECK_GOTO(ncclAllToAll((void *)sbuf, (void *)rbuf,
                                     (size_t)(args->src.info.count / gsize),
                                     dt, team->rccl_comm, stream),
-                       exit_coll, status, UCC_TL_TEAM_LIB(team));        
+                       exit_coll, status, UCC_TL_TEAM_LIB(team));
     } else {
 	RCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
         for (peer = 0; peer < gsize; peer++) {
@@ -412,14 +419,42 @@ ucc_status_t ucc_tl_rccl_bcast_start(ucc_coll_task_t *coll_task)
     ucc_status_t        status = UCC_OK;
     size_t              count  = args->src.info.count;
     ucc_rank_t          root   = args->root;
+    ucc_rank_t          peer, rank, size;
     ncclDataType_t      dt;
+    ucc_ep_map_t        map;
 
     dt = ucc_to_rccl_dtype[UCC_DT_PREDEFINED_ID(args->src.info.datatype)];
     task->super.super.status = UCC_INPROGRESS;
     UCC_TL_RCCL_PROFILE_REQUEST_EVENT(coll_task, "rccl_bcast_start", 0);
-    RCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->rccl_comm,
-                                 stream),
-                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+
+    if (UCC_COLL_ARGS_ACTIVE_SET(args)) {
+        map  = ucc_active_set_to_ep_map(args);
+        rank = UCC_TL_TEAM_RANK(team);
+        size = (ucc_rank_t)args->active_set.size;
+        if (root == rank) {
+            RCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status,
+                           UCC_TL_TEAM_LIB(team));
+            for (peer = 0; peer < size; peer++) {
+                if (ucc_ep_map_eval(map, peer) == rank) {
+                    continue;
+                }
+                RCCLCHECK_GOTO(ncclSend(src, count, dt,
+                                        ucc_ep_map_eval(map, peer),
+                                        team->rccl_comm, stream),
+                               exit_coll, status, UCC_TL_TEAM_LIB(team));
+            }
+            RCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status,
+                           UCC_TL_TEAM_LIB(team));
+        } else {
+            RCCLCHECK_GOTO(ncclRecv(src, count, dt, root,
+                                    team->rccl_comm, stream),
+                           exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
+    } else {
+        RCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->rccl_comm,
+                                     stream),
+                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+    }
     status = ucc_tl_rccl_collective_sync(task, stream);
 exit_coll:
     return status;

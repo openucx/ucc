@@ -50,6 +50,13 @@ ROCM_REDUCE_WITH_OP_SPECIALIZED(MIN, DO_OP_MIN_HALF, __half)
 ROCM_REDUCE_WITH_OP_SPECIALIZED(SUM, DO_OP_SUM_HALF, __half)
 ROCM_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_HALF, __half)
 
+ROCM_REDUCE_WITH_OP_SPECIALIZED(SUM, DO_OP_SUM_FLOAT_COMPLEX, hipFloatComplex)
+ROCM_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_FLOAT_COMPLEX, hipFloatComplex)
+
+ROCM_REDUCE_WITH_OP_SPECIALIZED(SUM, DO_OP_SUM_DOUBLE_COMPLEX, hipDoubleComplex)
+ROCM_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_DOUBLE_COMPLEX,
+                                hipDoubleComplex)
+
 ROCM_REDUCE_WITH_OP_SPECIALIZED(MAX, DO_OP_MAX_BFLOAT16, hip_bfloat16)
 ROCM_REDUCE_WITH_OP_SPECIALIZED(MIN, DO_OP_MIN_BFLOAT16, hip_bfloat16)
 ROCM_REDUCE_WITH_OP_SPECIALIZED(SUM, DO_OP_SUM_BFLOAT16, hip_bfloat16)
@@ -132,6 +139,29 @@ ROCM_REDUCE_WITH_OP_SPECIALIZED(PROD, DO_OP_PROD_BFLOAT16, hip_bfloat16)
         }                                                                      \
     } while (0)
 
+#define DT_REDUCE_FLOAT_COMPLEX(type, op, src1_p, src2_p, dest_p, count, s, b, \
+                                t)                                             \
+    do {                                                                       \
+        const type *sbuf1 = (const type *)src1_p;                              \
+        const type *sbuf2 = (const type *)src2_p;                              \
+        type *      dest  = (type *)dest_p;                                    \
+        switch (op) {                                                          \
+        case UCC_OP_AVG:                                                       \
+        case UCC_OP_SUM:                                                       \
+            LAUNCH_KERNEL(SUM, type, sbuf1, sbuf2, dest, count, s, b, t);      \
+            break;                                                             \
+        case UCC_OP_PROD:                                                      \
+            LAUNCH_KERNEL(PROD, type, sbuf1, sbuf2, dest, count, s, b, t);     \
+            break;                                                             \
+        default:                                                               \
+            mc_error(&ucc_mc_rocm.super,                                       \
+                     "float complex dtype does not support "                   \
+                     "requested reduce op: %s",                                \
+                     ucc_reduction_op_str(op));                                \
+            return UCC_ERR_NOT_SUPPORTED;                                      \
+        }                                                                      \
+    } while (0)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -172,6 +202,14 @@ ucc_status_t ucc_mc_rocm_reduce(const void *src1, const void *src2, void *dst,
             ucc_assert(8 == sizeof(double));
             DT_REDUCE_FLOAT(double, op, src1, src2, dst, count, stream, bk, th);
             break;
+        case UCC_DT_FLOAT32_COMPLEX:
+            DT_REDUCE_FLOAT_COMPLEX(hipFloatComplex, op, src1, src2, dst, count,
+                                    stream, bk, th);
+	    break;
+        case UCC_DT_FLOAT64_COMPLEX:
+            DT_REDUCE_FLOAT_COMPLEX(hipDoubleComplex, op, src1, src2, dst, count,
+                                    stream, bk, th);
+	    break;
         case UCC_DT_BFLOAT16:
             ucc_assert(2 == sizeof(hip_bfloat16));
             DT_REDUCE_FLOAT(hip_bfloat16, op, src1, src2, dst, count, stream,

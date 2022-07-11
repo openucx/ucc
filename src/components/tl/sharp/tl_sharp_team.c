@@ -24,9 +24,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
-    self->oob_ctx.ctx      = self;
-    self->oob_ctx.ctx_oob  = NULL;
-    self->oob_ctx.team_oob = &UCC_TL_TEAM_OOB(self);
+    self->oob_ctx.ctx = UCC_TL_TEAM_CTX(self);
+    self->oob_ctx.oob = &UCC_TL_TEAM_OOB(self);
 
     comm_spec.rank              = UCC_TL_TEAM_RANK(self);
     comm_spec.size              = UCC_TL_TEAM_SIZE(self);
