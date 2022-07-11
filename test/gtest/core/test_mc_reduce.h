@@ -107,6 +107,8 @@ DECLARE_OP_(avg, AVG, SUM);
 #define CUDA_OP_PAIRS                                                          \
     TypeOpPair<UCC_DT_INT16, lor>, TypeOpPair<UCC_DT_INT16, sum>,              \
         TypeOpPair<UCC_DT_INT32, prod>, TypeOpPair<UCC_DT_INT64, bxor>,        \
+        TypeOpPair<UCC_DT_UINT16, lor>, TypeOpPair<UCC_DT_UINT16, sum>,        \
+        TypeOpPair<UCC_DT_UINT32, prod>, TypeOpPair<UCC_DT_UINT64, bxor>,      \
         TypeOpPair<UCC_DT_FLOAT32, avg>, TypeOpPair<UCC_DT_FLOAT64, avg>,      \
         ARITHMETIC_OP_PAIRS(INT32), ARITHMETIC_OP_PAIRS(FLOAT32),              \
         ARITHMETIC_OP_PAIRS(FLOAT64), ARITHMETIC_OP_PAIRS(BFLOAT16),           \
