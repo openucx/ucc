@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2001-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2001-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (C) Huawei Technologies Co., Ltd. 2020.  All rights reserved.
  *
  * See file LICENSE for terms.
