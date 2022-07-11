@@ -14,6 +14,23 @@
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
 
+
+#if ENABLE_DEBUG == 1
+/* TODO: possible need to check CUDA context */
+#define UCC_TL_CUDA_CHECK_DEVICE_MATCH(_team) do {                             \
+    int _dev;                                                                  \
+    CUDA_CHECK(cudaGetDevice(&_dev));                                          \
+    if (_dev != UCC_TL_CUDA_TEAM_CTX(_team)->device) {                         \
+        tl_error(UCC_TL_TEAM_LIB(_team), "CUDA device mismatch, "              \
+                 "current device %d, team device %d\n", _dev,                  \
+                 UCC_TL_CUDA_TEAM_CTX(_team)->device);                         \
+        return UCC_ERR_INVALID_PARAM;                                          \
+    }                                                                          \
+} while(0)
+#else
+#define UCC_TL_CUDA_CHECK_DEVICE_MATCH(_team)
+#endif
+
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
                                       ucc_tl_cuda_mem_info_t *mi)
 {
@@ -39,6 +56,7 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t      *team,
                                    ucc_coll_task_t     **task_h)
 {
+    UCC_TL_CUDA_CHECK_DEVICE_MATCH(ucc_derived_of(team, ucc_tl_cuda_team_t));
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_ALLTOALL:
         return ucc_tl_cuda_alltoall_init(coll_args, team, task_h);

@@ -397,6 +397,10 @@ void UccTestMpi::set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vs
 }
 
 #if defined(HAVE_CUDA) || defined(HAVE_HIP)
+test_set_gpu_device_t test_gpu_set_device = TEST_SET_DEV_NONE;
+#endif
+
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
 void set_gpu_device(test_set_gpu_device_t set_device)
 {
     MPI_Comm local_comm;
@@ -623,6 +627,10 @@ typedef struct ucc_test_thread {
 static void *thread_start(void *arg)
 {
     ucc_test_thread_t *t = (ucc_test_thread_t *)arg;
+
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
+    set_gpu_device(test_gpu_set_device);
+#endif
     t->test->run_all_at_team(t->test->teams[t->id], t->rst);
     return 0;
 }
