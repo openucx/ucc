@@ -132,7 +132,7 @@ BEGIN_C_DECLS
  *
  *  @ref ucc_coll_type_t represents the collective operations supported by the
  *  UCC library. The exact set of supported collective operations depends on
- *  UCC build flags, runtime configuraion and available communication transports.
+ *  UCC build flags, runtime configuration and available communication transports.
  *
  *  @endparblock
  *
@@ -253,7 +253,7 @@ typedef enum {
  * First vector is "src1", other n_vectors have start address
  * v_j = src2 + count * dt_extent * stride * j.
  * The result is stored in dst, so that
- * dst[i] = src1[i] + v0[i] + v1[i] + ... +v_nvecttors[i],
+ * dst[i] = src1[i] + v0[i] + v1[i] + ... +v_nvectors[i],
  * for i in [0:count), where "+" represents user-defined reduction of 2 elements
  */
 
@@ -861,7 +861,7 @@ typedef struct ucc_oob_coll {
                                  the data specified by "src_buf" will be placed
                                  at the offset "oob_ep*size" in the "recv_buf".
                                  oob_ep must be uniq at every calling process
-                                 and shuold be in the range [0:n_oob_eps). */
+                                 and should be in the range [0:n_oob_eps). */
 
 }  ucc_oob_coll_t;
 

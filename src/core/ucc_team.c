@@ -12,7 +12,7 @@
 #include "ucc_service_coll.h"
 
 static ucc_status_t ucc_team_alloc_id(ucc_team_t *team);
-static void ucc_team_relase_id(ucc_team_t *team);
+static void ucc_team_release_id(ucc_team_t *team);
 
 void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
 {
@@ -211,7 +211,7 @@ ucc_team_create_service_team(ucc_context_t *context, ucc_team_t *team)
         }
         memcpy(&b_params, &team->bp, sizeof(ucc_base_team_params_t));
         b_params.scope =
-            UCC_CL_LAST + 1; // CORE scopre id - never overlaps with CL type
+            UCC_CL_LAST + 1; // CORE scope id - never overlaps with CL type
         b_params.scope_id = 0;
         b_params.id       = 0;
         b_params.team     = team;
@@ -404,7 +404,7 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
         if ((context->cl_flags & UCC_BASE_LIB_FLAG_SERVICE_TEAM_REQUIRED) ||
             ((context->cl_flags & UCC_BASE_LIB_FLAG_TEAM_ID_REQUIRED) &&
              (team->id == 0))) {
-            /* We need service team either when it is explicitely required
+            /* We need service team either when it is explicitly required
                by any CL/TL (e.g. CL/HIER) or if TEAM_ID is required but
                not provided by the user */
             status = ucc_team_create_service_team(context, team);
@@ -423,7 +423,7 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
         team->bp.id = team->id;
         team->state = UCC_TEAM_CL_CREATE;
         if (team->service_team) {
-            /* update serivice team id */
+            /* update service team id */
             UCC_TL_TEAM_IFACE(team->service_team)->scoll.update_id
                 (&team->service_team->super, team->id);
         }
@@ -496,7 +496,7 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
     ucc_coll_score_free_map(team->score_map);
     ucc_free(team->addr_storage.storage);
     ucc_free(team->ctx_ranks);
-    ucc_team_relase_id(team);
+    ucc_team_release_id(team);
     ucc_free(team->cl_teams);
     ucc_free(team->contexts);
     ucc_free(team);
@@ -609,7 +609,7 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
     return UCC_OK;
 }
 
-static void ucc_team_relase_id(ucc_team_t *team)
+static void ucc_team_release_id(ucc_team_t *team)
 {
     ucc_context_t *ctx = team->contexts[0];
     /* release the id pool bit if it was not provided by user */
