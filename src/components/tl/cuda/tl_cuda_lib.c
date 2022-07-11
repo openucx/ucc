@@ -40,6 +40,8 @@ ucc_status_t ucc_tl_cuda_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
                                       ucc_base_lib_attr_t  *base_attr)
 {
     ucc_tl_lib_attr_t *attr      = ucc_derived_of(base_attr, ucc_tl_lib_attr_t);
+
+    attr->super.flags            = 0;
     attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
     attr->super.attr.coll_types  = UCC_TL_CUDA_SUPPORTED_COLLS;
     return UCC_OK;
