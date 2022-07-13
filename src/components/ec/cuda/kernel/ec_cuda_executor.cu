@@ -124,12 +124,12 @@ __device__ void executor_reduce_multi(const T* __restrict__ s1,
 
 __device__ void executor_copy_multi(ucc_ee_executor_task_args_copy_multi_t args)
 {
-    const size_t step  = blockDim.x;
-    size_t min_size = args.counts[0];
-    bool aligned;
-    __shared__ int4 *dsts[UCC_EE_EXEUCOTR_NUM_COPY_BUFS];
-    __shared__ int4 *srcs[UCC_EE_EXEUCOTR_NUM_COPY_BUFS];
-
+    const size_t     step     = blockDim.x;
+    size_t           min_size = args.counts[0];
+    size_t           idx      = threadIdx.x;
+    __shared__ int4 *dsts[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
+    __shared__ int4 *srcs[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
+    bool             aligned;
 
     for (int i = 0; i < args.num_vectors; i++) {
         dsts[i] = (int4*)args.dst[i];
@@ -153,10 +153,9 @@ __device__ void executor_copy_multi(ucc_ee_executor_task_args_copy_multi_t args)
         return;
     }
 
-    const int n = min_size / sizeof(uint4);
+    const int n        = min_size / sizeof(uint4);
     const int num_iter = n / step + ((threadIdx.x < n % step) ? 1 : 0);
 
-    size_t idx = threadIdx.x;
     for (size_t i = 0; i < num_iter; i++) {
 #pragma unroll
         for (int j = 0; j < args.num_vectors; j++) {
@@ -165,7 +164,7 @@ __device__ void executor_copy_multi(ucc_ee_executor_task_args_copy_multi_t args)
         idx += step;
     }
 
-    const int left = min_size + min_size % sizeof(uint4);
+    const size_t left = min_size + min_size % sizeof(uint4);
 
     for (int i = 0; i < args.num_vectors; i++) {
         executor_copy((char*)args.dst[i] + left,
@@ -324,14 +323,13 @@ ucc_status_t ucc_ec_cuda_persistent_kernel_start(ucc_ec_cuda_executor_t *eee)
 
 __global__ void kernel_copy_multi(ucc_ee_executor_task_args_copy_multi_t args)
 {
-    int blocks_per_buf = gridDim.x / args.num_vectors;
-    int buf_id = blockIdx.x / blocks_per_buf;
-    char1 *src = (char1*)args.src[buf_id];
-    char1 *dst = (char1*)args.dst[buf_id];
-    size_t cnt = args.counts[buf_id];
-
-    size_t start = threadIdx.x + (blockIdx.x % blocks_per_buf) * blockDim.x;
-    size_t step  = blockDim.x * blocks_per_buf;
+    int     blocks_per_buf = gridDim.x / args.num_vectors;
+    int     buf_id         = blockIdx.x / blocks_per_buf;
+    char1  *src            = (char1*)args.src[buf_id];
+    char1  *dst            = (char1*)args.dst[buf_id];
+    size_t  cnt            = args.counts[buf_id];
+    size_t  start          = threadIdx.x + (blockIdx.x % blocks_per_buf) * blockDim.x;
+    size_t  step           = blockDim.x * blocks_per_buf;
 
     for (size_t i = start; i < cnt; i += step) {
         dst[i] = src[i];
@@ -340,22 +338,20 @@ __global__ void kernel_copy_multi(ucc_ee_executor_task_args_copy_multi_t args)
 
 __global__ void kernel_copy_multi_aligned(ucc_ee_executor_task_args_copy_multi_t args)
 {
-    int blocks_per_buf = gridDim.x / args.num_vectors;
-    int buf_id = blockIdx.x / blocks_per_buf;
-    int idx   = threadIdx.x + (blockIdx.x % blocks_per_buf) * blockDim.x;
-    int step  = blockDim.x * blocks_per_buf;
-    int n = args.counts[buf_id] / sizeof(uint4);
-    int num_iter = n / step + ((idx < n % step) ? 1 : 0);
+    int    blocks_per_buf = gridDim.x / args.num_vectors;
+    int    buf_id         = blockIdx.x / blocks_per_buf;
+    int    idx            = threadIdx.x + (blockIdx.x % blocks_per_buf) * blockDim.x;
+    int    step           = blockDim.x * blocks_per_buf;
+    size_t n              = args.counts[buf_id] / sizeof(uint4);
+    size_t num_iter       = n / step + ((idx < n % step) ? 1 : 0);
+    uint4 *src            = (uint4*)args.src[buf_id];
+    uint4 *dst            = (uint4*)args.dst[buf_id];
 
-    {
-        uint4 *src = (uint4*)args.src[buf_id];
-        uint4 *dst = (uint4*)args.dst[buf_id];
-        for(int i = 0; i < num_iter; i++) {
-            dst[i * step + idx] = src[i * step + idx];
-        }
+    for(size_t i = 0; i < num_iter; i++) {
+        dst[i * step + idx] = src[i * step + idx];
     }
 
-    if (idx < args.counts[buf_id] % sizeof(uint4)) {
+    if (idx < (args.counts[buf_id] % sizeof(uint4))) {
         ((char*)args.dst[buf_id])[args.counts[buf_id] - idx - 1] =
             ((char*)args.src[buf_id])[args.counts[buf_id] - idx - 1];
     }

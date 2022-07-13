@@ -75,6 +75,7 @@ typedef struct ucc_tl_cuda_lib_config {
     uint32_t            max_concurrent;
     size_t              scratch_size;
     uint32_t            allgather_ring_max_rings;
+    uint32_t            allgather_ring_num_chunks;
     uint32_t            reduce_scatter_ring_max_rings;
 } ucc_tl_cuda_lib_config_t;
 
