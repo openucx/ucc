@@ -134,24 +134,15 @@ static int ucc_tl_sharp_service_barrier(void *arg)
     ucc_subset_t subset;
     ucc_coll_task_t *req;
     ucc_status_t status;
-    char sbuf, *rbuf;
-
+    int32_t sbuf, rbuf;
 
     subset.map.type   = UCC_EP_MAP_FULL;
     subset.map.ep_num = oob_ctx->oob->n_oob_eps;
     subset.myrank     = oob_ctx->oob->oob_ep;
 
-    rbuf = ucc_malloc(sizeof(char) * subset.map.ep_num, "tmp_barrier");
-    if (!rbuf) {
-        tl_error(ctx->super.super.lib,
-                 "failed to allocate %zd bytes for tmp barrier array",
-                 sizeof(char) * subset.map.ep_num);
-        return UCC_ERR_NO_MEMORY;
-    }
-
-    status = UCC_TL_TEAM_IFACE(steam)->scoll.allgather(&steam->super, &sbuf,
-                                                       rbuf, sizeof(char),
-                                                       subset, &req);
+    status = UCC_TL_TEAM_IFACE(steam)->scoll.allreduce(&steam->super, &sbuf,
+                                                       &rbuf, UCC_DT_INT32, 1,
+                                                       UCC_OP_SUM, subset, &req);
     if (status != UCC_OK) {
         tl_error(ctx->super.super.lib, "tl sharp gather failed\n");
         return status;
@@ -162,8 +153,6 @@ static int ucc_tl_sharp_service_barrier(void *arg)
         status = ucc_collective_test(&req->super);
     } while (status == UCC_INPROGRESS);
     ucc_collective_finalize(&req->super);
-
-    ucc_free(rbuf);
 
     return status;
 }
