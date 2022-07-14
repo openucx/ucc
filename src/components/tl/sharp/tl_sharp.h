@@ -39,6 +39,7 @@ extern ucc_tl_sharp_iface_t ucc_tl_sharp;
 
 typedef struct ucc_tl_sharp_lib_config {
     ucc_tl_lib_config_t super;
+    int                 use_internal_oob;
 } ucc_tl_sharp_lib_config_t;
 
 typedef struct ucc_tl_sharp_context_config {
@@ -52,7 +53,8 @@ typedef struct ucc_tl_sharp_context_config {
 } ucc_tl_sharp_context_config_t;
 
 typedef struct ucc_tl_sharp_lib {
-    ucc_tl_lib_t super;
+    ucc_tl_lib_t              super;
+    ucc_tl_sharp_lib_config_t cfg;
 } ucc_tl_sharp_lib_t;
 UCC_CLASS_DECLARE(ucc_tl_sharp_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
@@ -73,6 +75,7 @@ typedef struct ucc_tl_sharp_rcache_region {
 
 typedef struct ucc_tl_sharp_context {
     ucc_tl_context_t              super;
+    ucc_thread_mode_t             tm;
     struct sharp_coll_context    *sharp_context;
     ucc_tl_sharp_context_config_t cfg;
     ucc_mpool_t                   req_mp;
