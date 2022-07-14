@@ -61,7 +61,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
     ucc_status_t status;
 
     if (context->service_team && team->size > 1) {
-        /* User internal service team for OOB, skip OOB if team size is 1 */
+        /* Use internal service team for OOB, skip OOB if team size is 1 */
         ucc_subset_t subset = {.myrank     = team->rank,
                                .map.ep_num = team->size,
                                .map.type   = UCC_EP_MAP_FULL};
@@ -69,6 +69,7 @@ static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
         if (UCC_OK != status) {
             return status;
         }
+        team->bp.params.mask |= UCC_TEAM_PARAM_FIELD_OOB;
     }
 
     team->cl_teams = ucc_malloc(sizeof(ucc_cl_team_t *) * context->n_cl_ctx);
