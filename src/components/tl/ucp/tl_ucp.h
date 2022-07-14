@@ -11,6 +11,7 @@
 #include "core/ucc_ee.h"
 #include "utils/ucc_mpool.h"
 #include "tl_ucp_ep_hash.h"
+#include "utils/arch/cpu.h"
 #include <ucp/api/ucp.h>
 #include <ucs/memory/memory_type.h>
 
@@ -33,6 +34,7 @@
 #define MAX_NR_SEGMENTS 32
 #define ONESIDED_SYNC_SIZE 1
 #define ONESIDED_REDUCE_SIZE 4
+#define UCC_TL_UCP_N_PERF_PARAMS 4
 
 typedef struct ucc_tl_ucp_iface {
     ucc_tl_iface_t super;
@@ -65,6 +67,7 @@ typedef struct ucc_tl_ucp_lib_config {
     int                 reduce_avg_pre_op;
     int                 reduce_scatter_ring_bidirectional;
     int                 reduce_scatterv_ring_bidirectional;
+    int                 allreduce_set_perf_params;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {
@@ -109,6 +112,23 @@ typedef struct ucc_tl_ucp_context {
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_tl_ucp_perf_key {
+    ucc_cpu_vendor_t        cpu_vendor;
+    ucc_cpu_model_t         cpu_model;
+    ucc_rank_t              ppn;
+    ucc_rank_t              nnodes;
+    uint32_t                allreduce_kn_radix;
+    uint32_t                allreduce_sra_radix;
+//    uint32_t                allreduce_sra_kn_n_frags;
+//    uint32_t                allreduce_sra_kn_pipeline_depth;
+//    size_t                  allreduce_sra_kn_frag_thresh;
+//    size_t                  allreduce_sra_kn_frag_size;
+    const char *            allreduce_alg_thresh;
+    const char *            label;
+} ucc_tl_ucp_perf_key_t;
+
+extern ucc_tl_ucp_perf_key_t *ucc_tl_ucp_perf_params[UCC_TL_UCP_N_PERF_PARAMS];
+
 typedef struct ucc_tl_ucp_task ucc_tl_ucp_task_t;
 typedef struct ucc_tl_ucp_team {
     ucc_tl_team_t              super;
@@ -117,6 +137,7 @@ typedef struct ucc_tl_ucp_team {
     ucc_tl_ucp_task_t         *preconnect_task;
     void *                     va_base[MAX_NR_SEGMENTS];
     size_t                     base_length[MAX_NR_SEGMENTS];
+    const char *               allreduce_alg_thresh;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

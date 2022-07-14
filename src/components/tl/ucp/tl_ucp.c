@@ -62,12 +62,12 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, fanout_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ALLREDUCE_KN_RADIX", "4",
+    {"ALLREDUCE_KN_RADIX", "2",
      "Radix of the recursive-knomial allreduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ALLREDUCE_SRA_KN_RADIX", "4",
+    {"ALLREDUCE_SRA_KN_RADIX", "8",
      "Radix of the scatter-reduce-allgather (SRA) knomial allreduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_radix),
      UCC_CONFIG_TYPE_UINT},
@@ -99,6 +99,12 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"ALLREDUCE_SRA_KN_SEQUENTIAL", "n",
      "Type of pipelined schedule for SRA knomial alg (sequential/parallel)",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_seq),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"ALLREDUCE_SET_PERF_PARAMS", "0", //change to 1 when ready/works
+     "changing default/user settings to optimal "
+     "perf settings",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_set_perf_params),
      UCC_CONFIG_TYPE_BOOL},
 
     {"REDUCE_SCATTER_KN_RADIX", "4",

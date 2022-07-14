@@ -80,6 +80,13 @@ fanout =	                \
 	fanout/fanout.h         \
 	fanout/fanout.c
 
+perf =                             \
+	perf/tl_ucp_coll_perf_params.h \
+	perf/tl_ucp_coll_perf_params.c \
+	perf/intel/broadwell.c         \
+	perf/intel/skylake.c           \
+	perf/amd/rome.c
+
 sources =                 \
 	tl_ucp.h              \
 	tl_ucp.c              \
@@ -104,7 +111,8 @@ sources =                 \
 	$(gather)    	      \
 	$(scatter)            \
 	$(fanin)              \
-	$(fanout)
+	$(fanout)             \
+	$(perf)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

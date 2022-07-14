@@ -407,6 +407,8 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
                                          ucc_base_ctx_attr_t      *attr)
 {
     ucc_tl_ucp_context_t *ctx = ucc_derived_of(context, ucc_tl_ucp_context_t);
+    ucc_tl_ucp_lib_t     *lib = ucc_derived_of(ctx->super.super.lib,
+                                               ucc_tl_ucp_lib_t);
     ucs_status_t          ucs_status;
     size_t                packed_length;
     int                   i;
@@ -446,5 +448,8 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
             ONESIDED_SYNC_SIZE + ONESIDED_REDUCE_SIZE;
     }
     attr->topo_required = 0;
+    if (lib->cfg.allreduce_set_perf_params) {
+        attr->topo_required = 1;
+    }
     return UCC_OK;
 }

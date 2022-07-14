@@ -8,14 +8,77 @@
 #include "tl_ucp_ep.h"
 #include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
+#include "perf/tl_ucp_coll_perf_params.h"
 #include "utils/ucc_malloc.h"
 #include "coll_score/ucc_coll_score.h"
+
+static inline ucc_status_t
+ucc_tl_ucp_set_perf_funcs(ucc_tl_ucp_team_t *team,
+                          const ucc_base_team_params_t *params)
+{
+
+    ucc_tl_ucp_perf_key_t **key = ucc_tl_ucp_perf_params;
+    ucc_cpu_vendor_t        vendor = ucc_arch_get_cpu_vendor();
+    ucc_cpu_model_t         model = ucc_arch_get_cpu_model();
+    ucc_ep_map_t            ctx_map;
+    ucc_subset_t            subset;
+    ucc_topo_t             *topo;
+    ucc_rank_t              ppn, nnodes;
+    ucc_status_t            status;
+
+    status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
+                                      &UCC_TL_TEAM_MAP(team),
+                                      &ctx_map);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
+        return status;
+    }
+    subset.map    = ctx_map;
+    subset.myrank = UCC_TL_TEAM_RANK(team);
+
+    status = ucc_topo_init(subset, UCC_TL_CORE_CTX(team)->topo, &topo);
+
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to init team perf topo");
+        goto err_topo_init;
+    }
+
+    if (ucc_topo_isoppn(topo)) {
+        ppn = ucc_topo_min_ppn(topo);
+        nnodes = ucc_topo_nnodes(topo);
+        while (*key) {
+            if ((*key)->cpu_vendor == vendor && (*key)->cpu_model == model &&
+                nnodes == (*key)->nnodes && ppn == (*key)->ppn) {
+//                team->perf_params_allreduce = (*key)->allreduce_func; //TODO
+                team->allreduce_alg_thresh = (*key)->allreduce_alg_thresh;
+                if (0 == UCC_TL_TEAM_RANK(team)) {
+                    tl_debug(UCC_TL_TEAM_LIB(team), "using perf params: %s",
+                             (*key)->label);
+                }
+//                printf("found key\n");
+                goto exit_ok;
+            }
+            key++;
+        }
+    }
+    team->allreduce_alg_thresh = UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR;
+    if (0 == UCC_TL_TEAM_RANK(team)) {
+        tl_debug(UCC_TL_TEAM_LIB(team), "using perf params: generic");
+    }
+exit_ok:
+    status = UCC_OK;
+    ucc_topo_cleanup(topo);
+err_topo_init:
+    ucc_ep_map_destroy_nested(&ctx_map);
+    return status;
+}
 
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
     ucc_tl_ucp_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_ucp_context_t);
+    ucc_status_t status;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
@@ -28,9 +91,20 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    self->preconnect_task    = NULL;
-    self->seq_num            = 0;
-    self->status             = UCC_INPROGRESS;
+    self->preconnect_task      = NULL;
+    self->seq_num              = 0;
+    self->status               = UCC_INPROGRESS;
+
+    if (UCC_TL_UCP_TEAM_LIB(self)->cfg.allreduce_set_perf_params &&
+        !IS_SERVICE_TEAM(self) && UCC_TL_CORE_CTX(self)->topo != NULL) {
+        status = ucc_tl_ucp_set_perf_funcs(self, params);
+        if (UCC_OK != status) {
+            return status;
+        }
+    } else {
+        self->allreduce_alg_thresh =
+            UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR;
+    }
 
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
@@ -155,6 +229,18 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     if (UCC_OK != status) {
         return status;
     }
+
+    status = ucc_coll_score_update_from_str(
+        team->allreduce_alg_thresh, score, UCC_TL_TEAM_SIZE(team),
+        ucc_tl_ucp_coll_init, &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
+        ucc_tl_ucp_alg_id_to_init);
+    if (UCC_OK != status) {
+        tl_error(tl_team->context->lib,
+                 "failed to apply allreduce select setting: %s",
+                 team->allreduce_alg_thresh);
+        goto err;
+    }
+
     for (i = 0; i < UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR; i++) {
         status = ucc_coll_score_update_from_str(
             ucc_tl_ucp_default_alg_select_str[i], score, UCC_TL_TEAM_SIZE(team),
