@@ -31,8 +31,8 @@
 #define UCC_TL_CUDA_CHECK_DEVICE_MATCH(_team)
 #endif
 
-const char
-    *ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR] = {
+const char *
+    ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR] = {
         UCC_TL_CUDA_ALLGATHER_DEFAULT_ALG_SELECT_STR,
         UCC_TL_CUDA_ALLGATHERV_DEFAULT_ALG_SELECT_STR};
 
@@ -132,8 +132,8 @@ static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
 }
 
 ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
-                                        ucc_coll_type_t   coll_type,
-                                        ucc_memory_type_t mem_type,
+                                        ucc_coll_type_t          coll_type,
+                                        ucc_memory_type_t        mem_type,
                                         ucc_base_coll_init_fn_t *init)
 {
     ucc_status_t status = UCC_OK;
@@ -152,7 +152,7 @@ ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
             *init = ucc_tl_cuda_allgather_init;
             break;
         case UCC_TL_CUDA_ALLGATHER_ALG_RING:
-             *init = ucc_tl_cuda_allgather_ring_init;
+            *init = ucc_tl_cuda_allgather_ring_init;
             break;
         case UCC_TL_CUDA_ALLGATHER_ALG_LINEAR:
             *init = ucc_tl_cuda_allgather_linear_init;

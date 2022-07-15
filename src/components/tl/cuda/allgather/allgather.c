@@ -12,8 +12,7 @@ ucc_base_coll_alg_info_t
         [UCC_TL_CUDA_ALLGATHER_ALG_AUTO] =
             {.id   = UCC_TL_CUDA_ALLGATHER_ALG_AUTO,
              .name = "auto",
-             .desc =
-                 "choose allgather algorithm based on CUDA topology"},
+             .desc = "choose allgather algorithm based on CUDA topology"},
         [UCC_TL_CUDA_ALLGATHER_ALG_RING] =
             {.id   = UCC_TL_CUDA_ALLGATHER_ALG_RING,
              .name = "ring",
@@ -26,16 +25,17 @@ ucc_base_coll_alg_info_t
             .id = 0, .name = NULL, .desc = NULL}};
 
 size_t ucc_tl_cuda_allgather_get_count(const ucc_tl_cuda_task_t *task,
-                                       ucc_rank_t block)
+                                       ucc_rank_t                block)
 {
     return TASK_ARGS(task).dst.info.count / UCC_TL_TEAM_SIZE(TASK_TEAM(task));
 }
 
 size_t ucc_tl_cuda_allgather_get_offset(const ucc_tl_cuda_task_t *task,
-                                        ucc_rank_t block)
+                                        ucc_rank_t                block)
 {
-    return (TASK_ARGS(task).dst.info.count / UCC_TL_TEAM_SIZE(TASK_TEAM(task))) *
-            block;
+    return (TASK_ARGS(task).dst.info.count /
+            UCC_TL_TEAM_SIZE(TASK_TEAM(task))) *
+           block;
 }
 
 ucc_status_t ucc_tl_cuda_allgather_init(ucc_base_coll_args_t *coll_args,

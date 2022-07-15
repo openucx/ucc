@@ -10,7 +10,8 @@
 #include "tl_cuda.h"
 #include "tl_cuda_coll.h"
 
-enum {
+enum
+{
     UCC_TL_CUDA_ALLGATHERV_ALG_AUTO,
     UCC_TL_CUDA_ALLGATHERV_ALG_RING,
     UCC_TL_CUDA_ALLGATHERV_ALG_LINEAR,
@@ -18,25 +19,24 @@ enum {
 };
 
 extern ucc_base_coll_alg_info_t
-             ucc_tl_cuda_allgatherv_algs[UCC_TL_CUDA_ALLGATHERV_ALG_LAST + 1];
+    ucc_tl_cuda_allgatherv_algs[UCC_TL_CUDA_ALLGATHERV_ALG_LAST + 1];
 
-#define UCC_TL_CUDA_ALLGATHERV_DEFAULT_ALG_SELECT_STR                          \
-    "allgatherv:cuda:@0"
+#define UCC_TL_CUDA_ALLGATHERV_DEFAULT_ALG_SELECT_STR "allgatherv:cuda:@0"
 
 ucc_status_t ucc_tl_cuda_allgatherv_init(ucc_base_coll_args_t *coll_args,
-                                         ucc_base_team_t *tl_team,
-                                         ucc_coll_task_t **task_p);
+                                         ucc_base_team_t *     tl_team,
+                                         ucc_coll_task_t **    task_p);
 
 size_t ucc_tl_cuda_allgatherv_get_count(const ucc_tl_cuda_task_t *task,
-                                        ucc_rank_t block);
+                                        ucc_rank_t                block);
 
 size_t ucc_tl_cuda_allgatherv_get_offset(const ucc_tl_cuda_task_t *task,
-                                         ucc_rank_t block);
+                                         ucc_rank_t                block);
 
 /* Allgatherv ring */
 ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_base_coll_args_t *coll_args,
-                                              ucc_base_team_t *tl_team,
-                                              ucc_coll_task_t **task_p);
+                                              ucc_base_team_t *     tl_team,
+                                              ucc_coll_task_t **    task_p);
 
 ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *task);
 
@@ -46,8 +46,8 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_finalize(ucc_coll_task_t *task);
 
 /* Allgatherv linear */
 ucc_status_t ucc_tl_cuda_allgatherv_linear_init(ucc_base_coll_args_t *coll_args,
-                                                ucc_base_team_t *tl_team,
-                                                ucc_coll_task_t **task_p);
+                                                ucc_base_team_t *     tl_team,
+                                                ucc_coll_task_t **    task_p);
 
 ucc_status_t ucc_tl_cuda_allgatherv_linear_start(ucc_coll_task_t *task);
 

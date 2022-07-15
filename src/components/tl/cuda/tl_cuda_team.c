@@ -349,9 +349,9 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
 
     for (i = 0; i < UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR; i++) {
         status = ucc_coll_score_update_from_str(
-            ucc_tl_cuda_default_alg_select_str[i], score, UCC_TL_TEAM_SIZE(team),
-            ucc_tl_cuda_coll_init, &team->super.super, UCC_TL_CUDA_DEFAULT_SCORE,
-            ucc_tl_cuda_alg_id_to_init);
+            ucc_tl_cuda_default_alg_select_str[i], score,
+            UCC_TL_TEAM_SIZE(team), ucc_tl_cuda_coll_init, &team->super.super,
+            UCC_TL_CUDA_DEFAULT_SCORE, ucc_tl_cuda_alg_id_to_init);
         if (UCC_OK != status) {
             tl_error(tl_team->context->lib,
                      "failed to apply default coll select setting: %s",

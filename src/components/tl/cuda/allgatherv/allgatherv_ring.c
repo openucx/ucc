@@ -417,8 +417,8 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
 }
 
 ucc_status_t ucc_tl_cuda_allgatherv_ring_init(ucc_base_coll_args_t *coll_args,
-                                              ucc_base_team_t *tl_team,
-                                              ucc_coll_task_t **task_p)
+                                              ucc_base_team_t *     tl_team,
+                                              ucc_coll_task_t **    task_p)
 {
     ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     ucc_tl_cuda_task_t *task = ucc_tl_cuda_task_init(coll_args, team);
