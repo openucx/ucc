@@ -27,6 +27,11 @@ static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
      ucc_offsetof(ucc_tl_cuda_lib_config_t, allgather_ring_max_rings),
      UCC_CONFIG_TYPE_UINT},
 
+    {"ALLGATHER_RING_NUM_CHUNKS", "4",
+     "Number of chunks each ring message will be split into",
+     ucc_offsetof(ucc_tl_cuda_lib_config_t, allgather_ring_num_chunks),
+     UCC_CONFIG_TYPE_UINT},
+
     {"REDUCE_SCATTER_RING_MAX_RINGS", "2",
      "Max number of rings used in reduce_scatter and "
      "reduce_scatterv ring algorithms",

@@ -150,6 +150,9 @@ ucc_status_t ucc_cpu_executor_task_post(ucc_ee_executor_t *executor,
             goto free_task;
         }
         break;
+    case UCC_EE_EXECUTOR_TASK_TYPE_COPY_MULTI:
+        status = UCC_ERR_NOT_SUPPORTED;
+        goto free_task;
     }
     eee_task->status = UCC_OK;
     *task = eee_task;

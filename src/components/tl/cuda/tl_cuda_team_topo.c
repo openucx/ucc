@@ -2,7 +2,6 @@
 #include "tl_cuda.h"
 
 #define UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE -1
-#define UCC_TL_CUDA_TEAM_TOPO_MAX_RINGS 32
 
 static ucc_status_t
 ucc_tl_cuda_team_topo_add_ring(const ucc_tl_cuda_team_t *team,
@@ -99,12 +98,13 @@ ucc_tl_cuda_team_topo_build_ring(const ucc_tl_cuda_team_t *team,
 }
 
 /* TODO: simple algorithm to find NVLink rings.
- * 1. Try to find ring of width W in given team topo.
- * 2. If found
- *    2.1. Duplicate ring W times to get rings of width 1
- *    2.2. Duplicate inverted ring W times because NVLink is full duplex
- *    2.3. Remove ring from topology
- * 3. W = W/2 goto 1
+ * 1. Find number of rings and minimal ring width
+ * 2. Try to find ring of width W in given team topo.
+ * 3. If found
+ *    3.1. Duplicate ring W/min_width times to get rings of width min_width
+ *    3.2. Duplicate inverted ring W times because NVLink is full duplex
+ *    3.3. Remove ring from topology
+ * 3. W = W/2 goto 2
  */
 
 static ucc_status_t
@@ -113,7 +113,7 @@ ucc_tl_cuda_team_topo_init_rings(const ucc_tl_cuda_team_t *team,
 {
     ucc_rank_t size = UCC_TL_TEAM_SIZE(team);
     ucc_tl_cuda_ring_t ring;
-    int i, width, nr;
+    int i, width, nr, num_rings, min_width;
     ucc_status_t status;
     int *graph;
 
@@ -121,9 +121,8 @@ ucc_tl_cuda_team_topo_init_rings(const ucc_tl_cuda_team_t *team,
     ring.ring = (ucc_rank_t*) ucc_malloc(size * sizeof(ucc_rank_t),
                                          "cuda_topo_ring");
     if (!ring.ring) {
-        status = UCC_ERR_NO_MEMORY;
         tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate topo ring");
-        goto free_ring;
+        return UCC_ERR_NO_MEMORY;
     }
 
     graph = (ucc_rank_t*) ucc_malloc(size * size * sizeof(int),
@@ -131,34 +130,63 @@ ucc_tl_cuda_team_topo_init_rings(const ucc_tl_cuda_team_t *team,
     if (!graph) {
         status = UCC_ERR_NO_MEMORY;
         tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate topo graph");
-        goto free_graph;
+        goto free_ring;
     }
 
     for (i = 0; i < size * size; i++) {
         graph[i] = topo->matrix[i];
     }
 
-    topo->rings = (ucc_tl_cuda_ring_t*) ucc_malloc(
-                  UCC_TL_CUDA_TEAM_TOPO_MAX_RINGS * sizeof(ucc_tl_cuda_ring_t),
-                  "cuda_topo_rings");
-    if (!topo->rings) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate topo rings array");
-        return UCC_ERR_NO_MEMORY;
+    num_rings = 0;
+    min_width = 4;
+    for (width = min_width; width > 0; width >>= 1) {
+        ring.ring[0] = 0;
+        status = ucc_tl_cuda_team_topo_build_ring(team, graph, &ring, 1,
+                                                  width);
+        if (status == UCC_OK) {
+            num_rings += 2*width;
+            if (width < min_width) {
+                min_width = width;
+            }
+            for (i = 0; i < size; i++) {
+                if (graph[ring.ring[i] * size + ring.ring[(i+1)%size]] !=
+                    UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE) {
+                    graph[ring.ring[i] * size + ring.ring[(i+1)%size]] -= width;
+                    graph[ring.ring[(i+1)%size] * size + ring.ring[i]] -= width;
+                }
+            }
+        }
     }
 
+    if (num_rings == 0) {
+        status = UCC_ERR_NOT_SUPPORTED;
+        tl_info(UCC_TL_TEAM_LIB(team), "no rings found");
+        goto free_graph;
+    }
+
+    topo->rings = (ucc_tl_cuda_ring_t*)ucc_malloc(num_rings * sizeof(*topo->rings),
+                                                  "cuda_topo_rings");
+    if (!topo->rings) {
+        status = UCC_ERR_NO_MEMORY;
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate topo rings array");
+        goto free_graph;
+    }
+
+    for (i = 0; i < size * size; i++) {
+        graph[i] = topo->matrix[i];
+    }
     for (width = 4; width > 0; width >>= 1) {
         ring.ring[0] = 0;
         status = ucc_tl_cuda_team_topo_build_ring(team, graph, &ring, 1,
                                                   width);
         if (status == UCC_OK) {
-            nr = ucc_min(width, UCC_TL_CUDA_TEAM_TOPO_MAX_RINGS - topo->num_rings);
+            nr = width / min_width;
             status = ucc_tl_cuda_team_topo_add_ring(team, topo, &ring, 0, nr);
             if (status != UCC_OK) {
                 goto free_rings;
             }
 
             if (size > 2) {
-                nr = ucc_min(width, UCC_TL_CUDA_TEAM_TOPO_MAX_RINGS - topo->num_rings);
                 status = ucc_tl_cuda_team_topo_add_ring(team, topo, &ring, 1, nr);
                 if (status != UCC_OK) {
                     goto free_rings;
@@ -172,21 +200,13 @@ ucc_tl_cuda_team_topo_init_rings(const ucc_tl_cuda_team_t *team,
                     graph[ring.ring[(i+1)%size] * size + ring.ring[i]] -= width;
                 }
             }
-
-            if (topo->num_rings == UCC_TL_CUDA_TEAM_TOPO_MAX_RINGS) {
-                break;
-            }
         }
     }
 
     ucc_free(graph);
     ucc_free(ring.ring);
-    if (topo->num_rings == 0) {
-        tl_info(UCC_TL_TEAM_LIB(team), "no rings found");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
     return UCC_OK;
+
 free_rings:
     for (i = 0; i < topo->num_rings; i++) {
         ucc_free(topo->rings[i].ring);

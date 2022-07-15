@@ -43,6 +43,10 @@ unlock:
     return UCC_OK;
 }
 
+
+ucc_status_t ucc_ec_cuda_copy_multi_kernel(const ucc_ee_executor_task_args_t *args,
+                                           cudaStream_t stream);
+
 ucc_status_t
 ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
                                          const ucc_ee_executor_task_args_t *task_args,
@@ -80,7 +84,13 @@ ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
             ec_error(&ucc_ec_cuda.super, "failed to start memcpy op");
             goto free_task;
         }
-
+        break;
+    case UCC_EE_EXECUTOR_TASK_TYPE_COPY_MULTI:
+        status = ucc_ec_cuda_copy_multi_kernel(task_args, stream);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ec_error(&ucc_ec_cuda.super, "failed to start copy multi op");
+            goto free_task;
+        }
         break;
     case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE:
         /* temp workaround to avoid code duplication*/
@@ -120,7 +130,8 @@ ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
         }
         break;
     default:
-        ec_error(&ucc_ec_cuda.super, "executor operation is not supported");
+        ec_error(&ucc_ec_cuda.super, "executor operation %d is not supported",
+                 task_args->task_type);
         status = UCC_ERR_INVALID_PARAM;
         goto free_task;
     }

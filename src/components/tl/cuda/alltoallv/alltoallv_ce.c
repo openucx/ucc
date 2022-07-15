@@ -207,7 +207,8 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
                                     peer_sync->mem_info_dst.offset);
             data_displ = task->alltoallv_ce.get_offset(
                 task, peer_sync->alltoallv_ce.rdispl_bytes, psrc);
-            dst                 = PTR_OFFSET(dst, data_displ);
+            dst        = PTR_OFFSET(dst, data_displ);
+
             exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
             exec_args.bufs[0]   = dst;
             exec_args.bufs[1]   = src;
