@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -9,6 +9,42 @@
 #include "tl_cuda_cache.h"
 #include "utils/arch/cpu.h"
 #include "utils/arch/cuda_def.h"
+
+/*
+ * fragmented buffered copy linear allgatherv algorithm
+ *
+ * Description:
+ *  Definitions:
+ *      blockI  - full send buffer at Rank I
+ *      fragI_J - fragment of send buffer at Rank I and step J
+ *      NS      - number of steps
+ *      NF      - number of fragments
+ *      N       - team size
+ *
+ *  Setup:
+ *      max_frag_size = ucc_min(ucc_max(block1, block2, ..., block N),
+ *                              scratch_size / 2 / N)
+ *      NF            = ucc_max(block1, block2, ..., block N) / max_frag_size
+ *      NS            = 1 + NF
+ *
+ *  Algorithm
+ *      for rank R
+ *      step 1:    copy fragR_1 to remote scratch buffers for all ranks
+ *                 if not inplace copy local src buffer to local dst buffer
+ *
+ *      step 1:    copy frag1_1, frag2_1, ..., fragN_1 from local scratch buffer
+ *                 to local dst buffer
+ *                 copy fragR_2 from local dst buffer to remote scratch buffers
+ *                 for all ranks
+ *
+ *      step NS-1: copy frag1_(NS-2), frag2_(NS-2), ..., fragN_(NS-2) from local
+ *                 scratch buffer to local dst buffer
+ *                 copy fragR_NS from local dst buffer to remote scratch buffers
+ *                 for all ranks
+ *
+ *      step NS:   copy frag1_(NS-1), frag2_(NS-1), ..., fragN_(NS-1) from local
+ *                 scratch buffer to local dst buffer
+ */
 
 enum {
     STAGE_SYNC,    /*< Wait for free SYNC segment */
@@ -157,28 +193,31 @@ ucc_status_t ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *tas
 
         if (step % 2) {
             remote_offset = ssize / 2;
-            local_offset = 0;
+            local_offset  = 0;
         } else {
             remote_offset = 0;
-            local_offset = ssize / 2;
+            local_offset  = ssize / 2;
         }
 
         if (step == 0) {
-            send_size = task->allgatherv_linear.get_count(task, trank);
-            frag_size = ucc_buffer_block_count(send_size, nfrags, step) * dt_size;
+            send_size   = task->allgatherv_linear.get_count(task, trank);
+            frag_size   = ucc_buffer_block_count(send_size, nfrags, step) * dt_size;
             frag_offset = ucc_buffer_block_offset(send_size, nfrags, step) * dt_size;
             if (UCC_IS_INPLACE(*args)) {
                 rank_offset = task->allgatherv_linear.get_offset(task, trank) * dt_size;
-                sbuf = PTR_OFFSET(task->allgatherv_linear.rbuf, frag_offset + rank_offset);
+                sbuf        = PTR_OFFSET(task->allgatherv_linear.rbuf,
+                                         frag_offset + rank_offset);
             } else {
-                sbuf = PTR_OFFSET(task->allgatherv_linear.sbuf, frag_offset);
+                sbuf        = PTR_OFFSET(task->allgatherv_linear.sbuf,
+                                         frag_offset);
             }
             for (i = 0; i < tsize; i++) {
                 if (i == trank) {
                     continue;
                 }
                 scratch_offset = get_scratch_offset(team, dt, trank);
-                dbuf = PTR_OFFSET(TASK_SCRATCH(task, i), remote_offset + scratch_offset);
+                dbuf           = PTR_OFFSET(TASK_SCRATCH(task, i),
+                                            remote_offset + scratch_offset);
 
                 st = ecopy(dbuf, sbuf, frag_size, exec,
                            &task->allgatherv_linear.exec_task[i]);
@@ -187,10 +226,13 @@ ucc_status_t ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *tas
                 }
             }
             if (!UCC_IS_INPLACE(*args)) {
-                rank_offset = task->allgatherv_linear.get_offset(task, trank) * dt_size;
-                dbuf = PTR_OFFSET(task->allgatherv_linear.rbuf, rank_offset);
-                st = ecopy(dbuf, sbuf, task->allgatherv_linear.get_count(task, trank) * dt_size,
-                        exec, &task->allgatherv_linear.exec_task[tsize]);
+                rank_offset = task->allgatherv_linear.get_offset(task, trank) *
+                              dt_size;
+                dbuf        = PTR_OFFSET(task->allgatherv_linear.rbuf, rank_offset);
+
+                st = ecopy(dbuf, sbuf,
+                           task->allgatherv_linear.get_count(task, trank) * dt_size,
+                           exec, &task->allgatherv_linear.exec_task[tsize]);
                 if (ucc_unlikely(st != UCC_OK)) {
                     return st;
                 }
@@ -203,12 +245,17 @@ ucc_status_t ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *tas
                     continue;
                 }
                 scratch_offset = get_scratch_offset(team, dt, i);
-                rank_offset = task->allgatherv_linear.get_offset(task, i) * dt_size;
-                send_size = task->allgatherv_linear.get_count(task, i);
-                frag_offset = ucc_buffer_block_offset(send_size, nfrags, step - 1) * dt_size;
-                frag_size = ucc_buffer_block_count(send_size, nfrags, step - 1) * dt_size;
-                sbuf = PTR_OFFSET(TASK_SCRATCH(task, trank), local_offset + scratch_offset);
-                dbuf = PTR_OFFSET(task->allgatherv_linear.rbuf, rank_offset + frag_offset);
+                rank_offset    = task->allgatherv_linear.get_offset(task, i) *
+                                 dt_size;
+                send_size      = task->allgatherv_linear.get_count(task, i);
+                frag_offset    = ucc_buffer_block_offset(send_size, nfrags, step - 1) *
+                                 dt_size;
+                frag_size      = ucc_buffer_block_count(send_size, nfrags, step - 1) *
+                                 dt_size;
+                sbuf           = PTR_OFFSET(TASK_SCRATCH(task, trank),
+                                            local_offset + scratch_offset);
+                dbuf           = PTR_OFFSET(task->allgatherv_linear.rbuf,
+                                            rank_offset + frag_offset);
 
                 st = ecopy(dbuf, sbuf, frag_size, exec,
                            &task->allgatherv_linear.exec_task[i]);
@@ -219,18 +266,23 @@ ucc_status_t ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *tas
             }
             task->allgatherv_linear.num_posted += tsize - 1;
         } else {
-            send_size = task->allgatherv_linear.get_count(task, trank);
-            frag_size = ucc_buffer_block_count(send_size, nfrags, step) * dt_size;
-            frag_offset = ucc_buffer_block_offset(send_size, nfrags, step) * dt_size;
-            rank_offset = task->allgatherv_linear.get_offset(task, trank) * dt_size;
-            sbuf = PTR_OFFSET(task->allgatherv_linear.rbuf, rank_offset + frag_offset);
+            send_size      = task->allgatherv_linear.get_count(task, trank);
+            frag_size      = ucc_buffer_block_count(send_size, nfrags, step) *
+                             dt_size;
+            frag_offset    = ucc_buffer_block_offset(send_size, nfrags, step) *
+                             dt_size;
+            rank_offset    = task->allgatherv_linear.get_offset(task, trank) *
+                             dt_size;
+            sbuf           = PTR_OFFSET(task->allgatherv_linear.rbuf,
+                                        rank_offset + frag_offset);
             scratch_offset = get_scratch_offset(team, dt, trank);
             for (i = 0; i < tsize; i++) {
                 if (i == trank) {
                     continue;
                 }
                 rank_offset = task->allgatherv_linear.get_offset(task, i) * dt_size;
-                dbuf = PTR_OFFSET(TASK_SCRATCH(task, i), remote_offset + scratch_offset);
+                dbuf        = PTR_OFFSET(TASK_SCRATCH(task, i),
+                                         remote_offset + scratch_offset);
 
                 st = ecopy(dbuf, sbuf, frag_size, exec,
                            &task->allgatherv_linear.exec_task[i]);
@@ -244,12 +296,18 @@ ucc_status_t ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *tas
                     continue;
                 }
                 scratch_offset = get_scratch_offset(team, dt, i);
-                rank_offset = task->allgatherv_linear.get_offset(task, i) * dt_size;
-                send_size = task->allgatherv_linear.get_count(task, i);
-                frag_offset = ucc_buffer_block_offset(send_size, nfrags, step - 1) * dt_size;
-                frag_size = ucc_buffer_block_count(send_size, nfrags, step - 1) * dt_size;
-                sbuf = PTR_OFFSET(TASK_SCRATCH(task, trank), local_offset + scratch_offset);
-                dbuf = PTR_OFFSET(task->allgatherv_linear.rbuf, rank_offset + frag_offset);
+                rank_offset    = task->allgatherv_linear.get_offset(task, i) *
+                                 dt_size;
+                send_size      = task->allgatherv_linear.get_count(task, i);
+                frag_offset    = ucc_buffer_block_offset(send_size, nfrags, step - 1) *
+                                 dt_size;
+                frag_size      = ucc_buffer_block_count(send_size, nfrags, step - 1) *
+                                 dt_size;
+                sbuf           = PTR_OFFSET(TASK_SCRATCH(task, trank),
+                                 local_offset + scratch_offset);
+                dbuf           = PTR_OFFSET(task->allgatherv_linear.rbuf,
+                                 rank_offset + frag_offset);
+
                 st = ecopy(dbuf, sbuf, frag_size, exec,
                            &task->allgatherv_linear.exec_task[tsize + i]);
                 if (ucc_unlikely(st != UCC_OK)) {
