@@ -1,7 +1,7 @@
 /**
  * @file ucc.h
  * @date 2020
- * @copyright Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * @copyright Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
  * @copyright Copyright (C) Huawei Technologies Co., Ltd. 2020.  ALL RIGHTS RESERVED.
  * @copyright Copyright (C) UChicago Argonne, LLC. 2022.  ALL RIGHTS RESERVED.
  *
@@ -131,8 +131,8 @@ BEGIN_C_DECLS
  *  Description
  *
  *  @ref ucc_coll_type_t represents the collective operations supported by the
- *  UCC library. Currently, it supports barrier, broadcast, all-reduce, reduce,
- *  alltoall, all-gather, gather, scatter, fan-in and fan-out operations.
+ *  UCC library. The exact set of supported collective operations depends on
+ *  UCC build flags, runtime configuration and available communication transports.
  *
  *  @endparblock
  *
@@ -193,21 +193,25 @@ typedef enum ucc_memory_type {
  */
 typedef uint64_t ucc_datatype_t;
 
-#define   UCC_DT_INT8      UCC_PREDEFINED_DT(0)
-#define   UCC_DT_INT16     UCC_PREDEFINED_DT(1)
-#define   UCC_DT_INT32     UCC_PREDEFINED_DT(2)
-#define   UCC_DT_INT64     UCC_PREDEFINED_DT(3)
-#define   UCC_DT_INT128    UCC_PREDEFINED_DT(4)
-#define   UCC_DT_UINT8     UCC_PREDEFINED_DT(5)
-#define   UCC_DT_UINT16    UCC_PREDEFINED_DT(6)
-#define   UCC_DT_UINT32    UCC_PREDEFINED_DT(7)
-#define   UCC_DT_UINT64    UCC_PREDEFINED_DT(8)
-#define   UCC_DT_UINT128   UCC_PREDEFINED_DT(9)
-#define   UCC_DT_FLOAT16   UCC_PREDEFINED_DT(10)
-#define   UCC_DT_FLOAT32   UCC_PREDEFINED_DT(11)
-#define   UCC_DT_FLOAT64   UCC_PREDEFINED_DT(12)
-#define   UCC_DT_BFLOAT16  UCC_PREDEFINED_DT(13)
-#define   UCC_DT_PREDEFINED_LAST  14
+#define UCC_DT_INT8             UCC_PREDEFINED_DT(0)
+#define UCC_DT_INT16            UCC_PREDEFINED_DT(1)
+#define UCC_DT_INT32            UCC_PREDEFINED_DT(2)
+#define UCC_DT_INT64            UCC_PREDEFINED_DT(3)
+#define UCC_DT_INT128           UCC_PREDEFINED_DT(4)
+#define UCC_DT_UINT8            UCC_PREDEFINED_DT(5)
+#define UCC_DT_UINT16           UCC_PREDEFINED_DT(6)
+#define UCC_DT_UINT32           UCC_PREDEFINED_DT(7)
+#define UCC_DT_UINT64           UCC_PREDEFINED_DT(8)
+#define UCC_DT_UINT128          UCC_PREDEFINED_DT(9)
+#define UCC_DT_FLOAT16          UCC_PREDEFINED_DT(10)
+#define UCC_DT_FLOAT32          UCC_PREDEFINED_DT(11)
+#define UCC_DT_FLOAT64          UCC_PREDEFINED_DT(12)
+#define UCC_DT_BFLOAT16         UCC_PREDEFINED_DT(13)
+#define UCC_DT_FLOAT128         UCC_PREDEFINED_DT(14)
+#define UCC_DT_FLOAT32_COMPLEX  UCC_PREDEFINED_DT(15)
+#define UCC_DT_FLOAT64_COMPLEX  UCC_PREDEFINED_DT(16)
+#define UCC_DT_FLOAT128_COMPLEX UCC_PREDEFINED_DT(17)
+#define UCC_DT_PREDEFINED_LAST  18
 
 /**
  * @ingroup UCC_DATATYPE
@@ -249,7 +253,7 @@ typedef enum {
  * First vector is "src1", other n_vectors have start address
  * v_j = src2 + count * dt_extent * stride * j.
  * The result is stored in dst, so that
- * dst[i] = src1[i] + v0[i] + v1[i] + ... +v_nvecttors[i],
+ * dst[i] = src1[i] + v0[i] + v1[i] + ... +v_nvectors[i],
  * for i in [0:count), where "+" represents user-defined reduction of 2 elements
  */
 
@@ -720,7 +724,7 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
  *
  *  @brief The @ref ucc_init initializes the UCC library.
  *
- *  @param [in]  params    user provided parameters to customize the library functionality
+ *  @param [in]  params    User provided parameters to customize the library functionality
  *  @param [in]  config    UCC configuration descriptor allocated through
  *                         @ref ucc_lib_config_read "ucc_config_read()" routine.
  *  @param [out] lib_p     UCC library handle
@@ -857,7 +861,7 @@ typedef struct ucc_oob_coll {
                                  the data specified by "src_buf" will be placed
                                  at the offset "oob_ep*size" in the "recv_buf".
                                  oob_ep must be uniq at every calling process
-                                 and shuold be in the range [0:n_oob_eps). */
+                                 and should be in the range [0:n_oob_eps). */
 
 }  ucc_oob_coll_t;
 
@@ -1068,7 +1072,7 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_h config,
  *  releases the resources and destroys the context state. The creation of
  *  context does not necessarily indicate its readiness to be used for
  *  collective or other group operations. On success, the context handle will be
- *  created and ucc_status_t will return UCC_OK. On error, the library object
+ *  created and ucc_status_t will return UCC_OK. On error, the context object
  *  will not be created and corresponding error code as defined by
  *  @ref ucc_status_t is returned.
  *
@@ -1187,7 +1191,9 @@ enum ucc_team_attr_field {
     UCC_TEAM_ATTR_FIELD_EP                     = UCC_BIT(2),
     UCC_TEAM_ATTR_FIELD_EP_RANGE               = UCC_BIT(3),
     UCC_TEAM_ATTR_FIELD_SYNC_TYPE              = UCC_BIT(4),
-    UCC_TEAM_ATTR_FIELD_MEM_PARAMS             = UCC_BIT(5)
+    UCC_TEAM_ATTR_FIELD_MEM_PARAMS             = UCC_BIT(5),
+    UCC_TEAM_ATTR_FIELD_SIZE                   = UCC_BIT(6),
+    UCC_TEAM_ATTR_FIELD_EPS                    = UCC_BIT(7)
 };
 
 /**
@@ -1475,6 +1481,8 @@ typedef struct ucc_team_attr {
     ucc_ep_range_type_t    ep_range;
     ucc_coll_sync_type_t   sync_type;
     ucc_mem_map_params_t   mem_params;
+    uint32_t               size;
+    uint64_t              *eps;
 } ucc_team_attr_t;
 
 
@@ -1526,7 +1534,8 @@ ucc_status_t ucc_team_create_post(ucc_context_h *contexts,
  *
  *  @ref ucc_team_create_test routines tests the status of team handle.
  *  If required it can progress the communication but cannot block on the
- *  communications.
+ *  communications. On error, the team handle becomes invalid, user is responsible
+ *  to call ucc_team_destroy to destroy team and free allocated resources.
  *
  *  @endparblock
  *
@@ -1617,73 +1626,6 @@ ucc_status_t ucc_team_get_attr(ucc_team_h team,
 ucc_status_t ucc_team_create_from_parent(uint64_t my_ep, uint32_t included,
                                          ucc_team_h parent_team,
                                          ucc_team_h *new_team);
-
-/**
- *  @ingroup UCC_TEAM
- *
- *  @brief The routine returns the size of the team.
- *
- *  @param [in]   team      Team handle
- *  @param [out]  size      The size of team as number of endpoints
- *
- *  @parblock
- *
- *  @b Description
- *
- *  @ref ucc_team_get_size routine queries the size of the team. It reflects the
- *  number of unique endpoints in the team.
- *
- *  @endparblock
- *
- *  @return Error code as defined by @ref ucc_status_t
- */
-ucc_status_t ucc_team_get_size(ucc_team_h team, uint32_t *size);
-
-
-/**
- *  @ingroup UCC_TEAM
- *
- *  @brief The routine returns the endpoint of the calling participant.
- *
- *  @param [out]  ep          Endpoint of the participant calling the routine
- *  @param [in]   team        Team handle
- *
- *  @parblock
- *
- *  @b Description
- *
- *  @ref ucc_team_get_my_ep routine queries and returns the endpoint of the
- *  participant invoking the interface.
- *
- *  @endparblock
- *
- *  @return Error code as defined by @ref ucc_status_t
- */
-ucc_status_t ucc_team_get_my_ep(ucc_team_h team, uint64_t *ep);
-
-/**
- *  @ingroup UCC_TEAM
- *
- *  @brief The routine queries all endpoints associated with the team handle.
- *
- *  @param [out]     ep          List of endpoints
- *  @param [out]     num_eps     Number of endpoints
- *  @param [in]      team        Team handle
- *
- *  @parblock
- *
- *  @b Description
- *
- *  @ref ucc_team_get_all_eps routine queries and returns all endpoints of all
- *  participants in the team.
- *
- *  @endparblock
- *
- *  @return Error code as defined by @ref ucc_status_t
- */
-ucc_status_t ucc_team_get_all_eps(ucc_team_h team, uint64_t **ep,
-                                  uint64_t *num_eps);
-
 
 /*
  * *************************************************************
@@ -1875,8 +1817,8 @@ typedef struct ucc_coll_args {
  *
  *  @brief The routine to initialize a collective operation.
  *
- *  @param [out]   request     Request handle representing the collective operation
  *  @param [in]    coll_args   Collective arguments descriptor
+ *  @param [out]   request     Request handle representing the collective operation
  *  @param [in]    team        Team handle
  *
  *  @parblock
@@ -1913,7 +1855,8 @@ ucc_status_t ucc_collective_init(ucc_coll_args_t *coll_args,
  *
  *  @ref ucc_collective_post routine posts the collective operation. It
  *  does not require synchronization between the participants for the post
- *  operation.
+ *  operation. On error, request handle becomes invalid, user is responsible
+ *  to call ucc_collective_finalize to free allocated resources.
  *
  *  @endparblock
  *
@@ -1963,7 +1906,8 @@ ucc_status_t ucc_collective_init_and_post(ucc_coll_args_t *coll_args,
  *  @b Description
  *
  *  @ref ucc_collective_test tests and returns the status of collective
- *  operation.
+ *  operation. On error, request handle becomes invalid, user is responsible
+ *  to call ucc_collective_finalize to free allocated resources.
  *
  *  @endparblock
  *
@@ -1979,7 +1923,7 @@ static inline ucc_status_t ucc_collective_test(ucc_coll_req_h request)
  *
  *  @brief The routine to release the collective operation associated with the request object.
  *
- *  @param [in] request - request handle
+ *  @param [in] request - Request handle
  *
  *  @parblock
  *
@@ -2046,9 +1990,9 @@ typedef struct ucc_ee_params {
  *
  * @brief The routine creates the execution context for collective operations.
  *
- * @param [in] team     team handle
- * @param [in] params   user provided params to customize the execution engine
- * @param [out] ee      execution engine handle
+ * @param [in]  team    Team handle
+ * @param [in]  params  User provided params to customize the execution engine
+ * @param [out] ee      Execution engine handle
  *
  * @parblock
  *
@@ -2101,7 +2045,7 @@ ucc_status_t ucc_ee_destroy(ucc_ee_h ee);
  *
  * @brief The routine gets the event from the event queue.
  *
- * @param [in]  ee        execution engine handle
+ * @param [in]  ee        Execution engine handle
  * @param [out] ev        Event structure fetched from the event queue
  *
  * @parblock
@@ -2126,7 +2070,7 @@ ucc_status_t ucc_ee_get_event(ucc_ee_h ee, ucc_ev_t **ev);
  *
  * @brief The routine acks the events from the event queue.
  *
- * @param [in]  ee      execution engine handle
+ * @param [in]  ee      Execution engine handle
  * @param [in]  ev      Event to be acked
  *
  * @parblock
@@ -2149,7 +2093,7 @@ ucc_status_t ucc_ee_ack_event(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @brief The routine to set the event to the tail of the queue.
  *
- * @param [in]  ee        execution engine handle
+ * @param [in]  ee        Execution engine handle
  * @param [in]  ev        Event structure fetched from the event queue
  *
  * @parblock
@@ -2172,7 +2116,7 @@ ucc_status_t ucc_ee_set_event(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @brief The routine blocks the calling thread until there is an event on the queue.
  *
- * @param [in]  ee        execution engine handle
+ * @param [in]  ee        Execution engine handle
  * @param [out] ev        Event structure fetched from the event queue
  *
  * @parblock
@@ -2194,7 +2138,7 @@ ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
  * @brief The routine posts the collective operation on the execution engine, which is
  * launched on the event.
  *
- * @param [in]  ee          execution engine handle
+ * @param [in]  ee          Execution engine handle
  * @param [in]  ee_event    Event triggering the post operation
  *
  * @parblock
@@ -2203,7 +2147,8 @@ ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
  *
  * @ref ucc_collective_triggered_post allow the users to schedule a collective
  * operation that executes in the future when an event occurs on the execution
- * engine.
+ * engine. On error, request handle associated with event becomes invalid,
+ * user is responsible to call ucc_collective_finalize to free allocated resources.
  *
  * @endparblock
  *

@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2001-2021.  ALL RIGHTS RESERVED.
+# Copyright (C) Mellanox Technologies Ltd. 2001-2022.  ALL RIGHTS RESERVED.
 # This software product is a proprietary product of Mellanox Technologies Ltd.
 # (the "Company") and all right, title, and interest and to the software product,
 # including all associated intellectual property rights, are and shall
@@ -77,6 +77,12 @@ AC_PROG_LIBTOOL
 AC_HEADER_STDC
 CFLAGS="$CFLAGS_save"
 
+AC_CHECK_SIZEOF(float)
+AC_CHECK_SIZEOF(double)
+AC_CHECK_SIZEOF(long double)
+AC_CHECK_SIZEOF(float _Complex)
+AC_CHECK_SIZEOF(double _Complex)
+AC_CHECK_SIZEOF(long double _Complex)
 #
 # Check if 'ln' supports creating relative links
 #
@@ -148,6 +154,8 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_MPICC], [false])
      AM_CONDITIONAL([HAVE_MPICXX], [false])
      AM_CONDITIONAL([HAVE_PROFILING],[false])
+     AM_CONDITIONAL([HAVE_IBVERBS],[false])
+     AM_CONDITIONAL([HAVE_MLX5DV],[false])
     ],
     [
      AM_CONDITIONAL([DOCS_ONLY], [false])
@@ -161,6 +169,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/rccl.m4])
      m4_include([config/m4/sharp.m4])
      m4_include([config/m4/mpi.m4])
+     m4_include([config/m4/ibverbs.m4])
      m4_include([config/m4/configure.m4])
      m4_include([config/m4/tl_coll_plugins.m4])
      m4_include([config/m4/check_tls.m4])
@@ -192,7 +201,9 @@ AS_IF([test "x$with_docs_only" = xyes],
      CHECK_GTEST
      AC_MSG_RESULT([GTEST support: $gtest_happy])
 
-    ]) # Docs only
+     CHECK_IBVERBS
+     AC_MSG_RESULT([IBVERBS support: $ibverbs_happy, MLX5DV support: $mlx5dv_happy])
+     ]) # Docs only
 
 
 CHECK_TLS
@@ -215,8 +226,10 @@ AC_CONFIG_FILES([
                  src/components/ec/cuda/Makefile
                  src/components/ec/cuda/kernel/Makefile
                  src/components/mc/rocm/Makefile
+                 src/components/mc/rocm/kernel/Makefile
                  src/components/ec/rocm/Makefile
-		 test/mpi/Makefile
+                 src/components/ec/rocm/kernel/Makefile
+                 test/mpi/Makefile
                  test/gtest/Makefile
                  tools/info/Makefile
                  tools/perf/Makefile

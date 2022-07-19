@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -114,7 +114,10 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
         onesided_ctx = nullptr;
     }
     set_msgsizes(8, ((1ULL) << 21), 8);
-    dtypes     = {UCC_DT_INT32, UCC_DT_INT64, UCC_DT_FLOAT32, UCC_DT_FLOAT64};
+    dtypes     = {UCC_DT_INT32,           UCC_DT_INT64,
+              UCC_DT_FLOAT32,         UCC_DT_FLOAT64,
+              UCC_DT_FLOAT128,        UCC_DT_FLOAT32_COMPLEX,
+              UCC_DT_FLOAT64_COMPLEX, UCC_DT_FLOAT128_COMPLEX};
     ops        = {UCC_OP_SUM, UCC_OP_MAX};
     colls      = {UCC_COLL_TYPE_BARRIER, UCC_COLL_TYPE_ALLREDUCE};
     mtypes     = {UCC_MEMORY_TYPE_HOST};
@@ -394,6 +397,10 @@ void UccTestMpi::set_displ_vsizes(std::vector<ucc_test_vsize_flag_t> &_displs_vs
 }
 
 #if defined(HAVE_CUDA) || defined(HAVE_HIP)
+test_set_gpu_device_t test_gpu_set_device = TEST_SET_DEV_NONE;
+#endif
+
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
 void set_gpu_device(test_set_gpu_device_t set_device)
 {
     MPI_Comm local_comm;
@@ -567,7 +574,22 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                 if (op == UCC_OP_AVG &&
                                     !(dt == UCC_DT_FLOAT16 ||
                                       dt == UCC_DT_FLOAT32 ||
-                                      dt == UCC_DT_FLOAT64)) {
+                                      dt == UCC_DT_FLOAT64 ||
+                                      dt == UCC_DT_FLOAT128 ||
+                                      dt == UCC_DT_FLOAT32_COMPLEX ||
+                                      dt == UCC_DT_FLOAT64_COMPLEX ||
+                                      dt == UCC_DT_FLOAT128_COMPLEX)) {
+                                    continue;
+                                }
+                                if ((op == UCC_OP_MIN || op == UCC_OP_MAX) &&
+                                    (dt == UCC_DT_FLOAT32_COMPLEX ||
+                                     dt == UCC_DT_FLOAT64_COMPLEX ||
+                                     dt == UCC_DT_FLOAT128_COMPLEX)) {
+                                    continue;
+                                }
+                                if (mt != UCC_MEMORY_TYPE_HOST &&
+                                    (dt == UCC_DT_FLOAT128 ||
+                                     dt == UCC_DT_FLOAT128_COMPLEX)) {
                                     continue;
                                 }
                                 for (auto count_bits: test_counts_vsize) {
@@ -605,6 +627,10 @@ typedef struct ucc_test_thread {
 static void *thread_start(void *arg)
 {
     ucc_test_thread_t *t = (ucc_test_thread_t *)arg;
+
+#if defined(HAVE_CUDA) || defined(HAVE_HIP)
+    set_gpu_device(test_gpu_set_device);
+#endif
     t->test->run_all_at_team(t->test->teams[t->id], t->rst);
     return 0;
 }

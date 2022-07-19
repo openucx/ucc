@@ -17,24 +17,23 @@ static ucc_mpool_ops_t ucc_tl_sharp_req_mpool_ops = {
 
 static int ucc_tl_sharp_oob_barrier(void *arg)
 {
-    ucc_tl_sharp_oob_ctx_t *oob_ctx = (ucc_tl_sharp_oob_ctx_t *)arg;
-    ucc_tl_sharp_context_t *ctx     = oob_ctx->ctx;
-    ucc_oob_coll_t         *oob_coll;
+    ucc_tl_sharp_oob_ctx_t *oob_ctx  = (ucc_tl_sharp_oob_ctx_t *)arg;
+    ucc_tl_sharp_context_t *ctx      = oob_ctx->ctx;
+    ucc_oob_coll_t         *oob_coll = oob_ctx->oob;
     ucc_status_t            status;
     char                    sbuf, *rbuf;
     void                   *req;
 
-    oob_coll = (oob_ctx->ctx_oob != NULL) ? oob_ctx->ctx_oob: oob_ctx->team_oob;
-    rbuf     = ucc_malloc(sizeof(char) * oob_coll->n_oob_eps, "tmp_barrier");
+    rbuf = ucc_malloc(sizeof(char) * oob_coll->n_oob_eps, "tmp_barrier");
     if (!rbuf) {
         tl_error(ctx->super.super.lib,
                  "failed to allocate %zd bytes for tmp barrier array",
                  sizeof(char) * oob_coll->n_oob_eps);
-        return -1;
+        return UCC_ERR_NO_MEMORY;
     }
 
     status = oob_coll->allgather(&sbuf, rbuf, sizeof(char),
-                                oob_coll->coll_info, &req);
+                                 oob_coll->coll_info, &req);
     if (UCC_OK == status) {
         ucc_assert(req);
         while (UCC_OK != (status = oob_coll->req_test(req))) {
@@ -47,33 +46,32 @@ static int ucc_tl_sharp_oob_barrier(void *arg)
     }
 
     ucc_free(rbuf);
-    return 0;
+    return status;
 }
 
 static int ucc_tl_sharp_oob_gather(void *arg, int root, void *sbuf,
                                    void *rbuf, int size)
 {
-    ucc_tl_sharp_oob_ctx_t *oob_ctx = (ucc_tl_sharp_oob_ctx_t *)arg;
-    ucc_tl_sharp_context_t *ctx     = oob_ctx->ctx;
+    ucc_tl_sharp_oob_ctx_t *oob_ctx  = (ucc_tl_sharp_oob_ctx_t *)arg;
+    ucc_tl_sharp_context_t *ctx      = oob_ctx->ctx;
     void                   *tmp_rbuf = NULL;
-    ucc_oob_coll_t         *oob_coll;
+    size_t                  msg_size = size;
+    ucc_oob_coll_t         *oob_coll = oob_ctx->oob;
     void                   *req;
     ucc_status_t            status;
 
-    oob_coll   = (oob_ctx->ctx_oob != NULL) ? oob_ctx->ctx_oob: oob_ctx->team_oob;
-
     if (oob_coll->oob_ep != root) {
-        tmp_rbuf = ucc_malloc(size * oob_coll->n_oob_eps, "tmp_gather");
+        tmp_rbuf = ucc_malloc(msg_size * oob_coll->n_oob_eps, "tmp_gather");
         if (!tmp_rbuf) {
             tl_error(ctx->super.super.lib,
-                     "failed to allocate %d bytes for tmp barrier array",
-                    size *  oob_coll->n_oob_eps);
-            return -1;
+                     "failed to allocate %zd bytes for tmp barrier array",
+                     msg_size * oob_coll->n_oob_eps);
+            return UCC_ERR_NO_MEMORY;
         }
         rbuf = tmp_rbuf;
     }
 
-    status = oob_coll->allgather(sbuf, rbuf, size, oob_coll->coll_info, &req);
+    status = oob_coll->allgather(sbuf, rbuf, msg_size, oob_coll->coll_info, &req);
     if (UCC_OK == status) {
         ucc_assert(req);
         while (UCC_OK != (status = oob_coll->req_test(req))) {
@@ -89,28 +87,28 @@ static int ucc_tl_sharp_oob_gather(void *arg, int root, void *sbuf,
     if (tmp_rbuf) {
         ucc_free(tmp_rbuf);
     }
-    return 0;
+    return status;
 }
 
 static int ucc_tl_sharp_oob_bcast(void *arg, void *buf, int size, int root)
 {
-    ucc_tl_sharp_oob_ctx_t *oob_ctx = (ucc_tl_sharp_oob_ctx_t *)arg;
-    ucc_tl_sharp_context_t *ctx     = oob_ctx->ctx;
-    ucc_oob_coll_t         *oob_coll;
+    ucc_tl_sharp_oob_ctx_t *oob_ctx  = (ucc_tl_sharp_oob_ctx_t *)arg;
+    ucc_tl_sharp_context_t *ctx      = oob_ctx->ctx;
+    size_t                  msg_size = size;
+    ucc_oob_coll_t         *oob_coll = oob_ctx->oob;
     ucc_status_t            status;
     void                   *req, *tmp_rbuf;
 
-    oob_coll = (oob_ctx->ctx_oob != NULL) ? oob_ctx->ctx_oob: oob_ctx->team_oob;
-
-    tmp_rbuf = ucc_malloc(size * oob_coll->n_oob_eps, "tmp_barrier");
+    tmp_rbuf = ucc_malloc(msg_size * oob_coll->n_oob_eps, "tmp_barrier");
     if (!tmp_rbuf) {
         tl_error(ctx->super.super.lib,
-                "failed to allocate %d bytes for tmp barrier array",
-                size * oob_coll->n_oob_eps);
-        return -1;
+                 "failed to allocate %zd bytes for tmp barrier array",
+                 msg_size * oob_coll->n_oob_eps);
+        return UCC_ERR_NO_MEMORY;
     }
 
-    status = oob_coll->allgather(buf, tmp_rbuf, size, oob_coll ->coll_info, &req);
+    status = oob_coll->allgather(buf, tmp_rbuf, msg_size, oob_coll ->coll_info,
+                                 &req);
     if (UCC_OK == status) {
         ucc_assert(req);
         while (UCC_OK != (status = oob_coll ->req_test(req))) {
@@ -122,10 +120,10 @@ static int ucc_tl_sharp_oob_bcast(void *arg, void *buf, int size, int root)
         oob_coll ->req_free(req);
     }
 
-    memcpy(buf, PTR_OFFSET(tmp_rbuf, root * size), size);
+    memcpy(buf, PTR_OFFSET(tmp_rbuf, root * msg_size), msg_size);
 
     ucc_free(tmp_rbuf);
-    return 0;
+    return status;
 }
 
 static ucs_status_t
@@ -166,7 +164,7 @@ static void ucc_tl_sharp_rcache_mem_dereg_cb(void *context, ucc_rcache_t *rcache
 
     ret = sharp_coll_dereg_mr(ctx->sharp_context, region->reg.mr);
     if (ret < 0) {
-        tl_error(ctx->super.super.lib, "dereg faied(%d). mr:%p",
+        tl_error(ctx->super.super.lib, "dereg failed(%d). mr:%p",
                  ret, region->reg.mr);
     } else {
         tl_debug(ctx->super.super.lib, "rregion:%p dereg mr:%p",
@@ -217,10 +215,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
         self->cfg.rand_seed = (int) tval.tv_usec;
     }
 
-    self->rcache           = NULL;
-    self->oob_ctx.ctx      = self;
-    self->oob_ctx.ctx_oob  = &UCC_TL_CTX_OOB(self);
-    self->oob_ctx.team_oob = NULL;
+    self->rcache       = NULL;
+    self->oob_ctx.ctx  = self;
+    self->oob_ctx.oob  = &UCC_TL_CTX_OOB(self);
 
     init_spec.progress_func                  = NULL;
     init_spec.world_rank                     = UCC_TL_CTX_OOB(self).oob_ep;

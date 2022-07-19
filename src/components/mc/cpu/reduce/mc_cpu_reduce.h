@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -8,6 +8,8 @@
 #define UCC_MC_CPU_REDUCE_H_
 
 #include "utils/ucc_math.h"
+#include <complex.h>
+
 #define OP_1(_s1, _s2, _i, _sc, _OP) _OP(_s1[_i], _s2[_i])
 #define OP_2(_s1, _s2, _i, _sc, _OP)                                           \
     _OP((OP_1(_s1, _s2, _i, _sc, _OP)), _s2[_i + 1 * _sc])
@@ -163,6 +165,32 @@
         }                                                                      \
     } while (0)
 
+#define DO_DT_REDUCE_FLOAT_COMPLEX(type, reduce_op, src1_p, src2_p, dest_p,    \
+                                   size, count, stride)                        \
+    do {                                                                       \
+        const type *restrict s1 = (const type *restrict)src1_p;                \
+        const type *restrict s2 = (const type *restrict)src2_p;                \
+        type *restrict       d  = (type * restrict) dest_p;                    \
+        ucc_assert((ptrdiff_t)d <= (ptrdiff_t)src2_p ||                        \
+                   (ptrdiff_t)d > (ptrdiff_t)src2_p + (size - 1) * stride +    \
+                                      count * sizeof(type));                   \
+        switch (reduce_op) {                                                   \
+        case UCC_OP_SUM:                                                       \
+        case UCC_OP_AVG:                                                       \
+            DO_DT_REDUCE_WITH_OP(s1, s2, d, size, count, stride, DO_OP_SUM);   \
+            break;                                                             \
+        case UCC_OP_PROD:                                                      \
+            DO_DT_REDUCE_WITH_OP(s1, s2, d, size, count, stride, DO_OP_PROD);  \
+            break;                                                             \
+        default:                                                               \
+            mc_error(&ucc_mc_cpu.super,                                        \
+                     "float complex dtype does not support "                   \
+                     "requested reduce op: %s",                                \
+                     ucc_reduction_op_str(reduce_op));                         \
+            return UCC_ERR_NOT_SUPPORTED;                                      \
+        }                                                                      \
+    } while (0)
+
 #define VEC_OP(_d, OP)                                                         \
     do {                                                                       \
         size_t _i;                                                             \
@@ -201,18 +229,23 @@ REDUCE_FN_DECLARE(uint32);
 REDUCE_FN_DECLARE(uint64);
 REDUCE_FN_DECLARE(float);
 REDUCE_FN_DECLARE(double);
+REDUCE_FN_DECLARE(long_double);
 REDUCE_FN_DECLARE(bfloat16);
+REDUCE_FN_DECLARE(float_complex);
+REDUCE_FN_DECLARE(double_complex);
+REDUCE_FN_DECLARE(long_double_complex);
 
-#define REDUCE_ALPHA_FN_DECLARE(_type)                                         \
+#define REDUCE_ALPHA_FN_DECLARE(_type, alpha_dt)                               \
     ucc_status_t ucc_mc_cpu_reduce_multi_alpha_##_type(                        \
         const void *src1, const void *src2, void *dst, size_t n_vectors,       \
         size_t count, size_t stride, ucc_reduction_op_t reduce_op,             \
-        ucc_reduction_op_t vector_op, _type alpha)
-REDUCE_ALPHA_FN_DECLARE(float);
-REDUCE_ALPHA_FN_DECLARE(double);
-ucc_status_t
-ucc_mc_cpu_reduce_multi_alpha_bfloat16(const void *src1, const void *src2,
-                                       void *dst, size_t n_vectors, size_t count,
-                                       size_t stride, ucc_reduction_op_t reduce_op,
-                                       ucc_reduction_op_t vector_op, float alpha);
+        ucc_reduction_op_t vector_op, alpha_dt alpha)
+REDUCE_ALPHA_FN_DECLARE(float, float);
+REDUCE_ALPHA_FN_DECLARE(double, double);
+REDUCE_ALPHA_FN_DECLARE(long, long double);
+REDUCE_ALPHA_FN_DECLARE(bfloat16, float);
+REDUCE_ALPHA_FN_DECLARE(float_complex, float);
+REDUCE_ALPHA_FN_DECLARE(double_complex, double);
+REDUCE_ALPHA_FN_DECLARE(long_complex, long double);
+
 #endif

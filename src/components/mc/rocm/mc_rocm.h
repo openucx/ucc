@@ -13,6 +13,7 @@
 #include "utils/ucc_mpool.h"
 #include "utils/arch/rocm_def.h"
 #include <hip/hip_runtime_api.h>
+#include <hip/hip_complex.h>
 
 static inline ucc_status_t hip_error_to_ucc_status(hipError_t hip_err)
 {
@@ -52,6 +53,30 @@ typedef struct ucc_mc_rocm {
 } ucc_mc_rocm_t;
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+ucc_status_t ucc_mc_rocm_reduce(const void *src1, const void *src2,
+                                void *dst, size_t count, ucc_datatype_t dt,
+                                ucc_reduction_op_t op);
+
+ucc_status_t ucc_mc_rocm_reduce_multi(const void *src1, const void *src2,
+                                      void *dst, size_t n_vectors,
+                                      size_t count, size_t stride,
+                                      ucc_datatype_t dt,
+                                      ucc_reduction_op_t op);
+
+ucc_status_t
+ucc_mc_rocm_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
+                               size_t n_vectors, size_t count, size_t stride,
+                               ucc_datatype_t dt, ucc_reduction_op_t reduce_op,
+                               ucc_reduction_op_t vector_op, double alpha);
+
+#ifdef __cplusplus
+}    
+#endif
+    
 extern ucc_mc_rocm_t ucc_mc_rocm;
 
 #define MC_ROCM_CONFIG                                                         \

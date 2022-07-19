@@ -41,8 +41,9 @@ typedef struct ucc_base_ctx_config {
 } ucc_base_ctx_config_t;
 
 enum {
-    UCC_BASE_LIB_FLAG_TEAM_ID_REQUIRED      = UCC_BIT(1),
-    UCC_BASE_LIB_FLAG_SERVICE_TEAM_REQUIRED = UCC_BIT(2)
+    UCC_BASE_LIB_FLAG_TEAM_ID_REQUIRED          = UCC_BIT(1),
+    UCC_BASE_LIB_FLAG_SERVICE_TEAM_REQUIRED     = UCC_BIT(2),
+    UCC_BASE_LIB_FLAG_CTX_SERVICE_TEAM_REQUIRED = UCC_BIT(3)
 };
 
 typedef struct ucc_base_lib_attr_t {

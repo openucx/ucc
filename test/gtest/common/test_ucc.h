@@ -256,10 +256,13 @@ public:
 
 void clear_buffer(void *_buf, size_t size, ucc_memory_type_t mt, uint8_t value);
 
-#define PREDEFINED_DTYPES \
-    ::testing::Values(UCC_DT_INT8, UCC_DT_INT16, UCC_DT_INT32, UCC_DT_INT64, UCC_DT_INT128,\
-                      UCC_DT_UINT8, UCC_DT_UINT16, UCC_DT_UINT32, UCC_DT_UINT64, UCC_DT_UINT128,\
-                      UCC_DT_FLOAT16, UCC_DT_FLOAT32, UCC_DT_FLOAT64, UCC_DT_BFLOAT16)
+#define PREDEFINED_DTYPES                                                      \
+    ::testing::Values(                                                         \
+        UCC_DT_INT8, UCC_DT_INT16, UCC_DT_INT32, UCC_DT_INT64, UCC_DT_INT128,  \
+        UCC_DT_UINT8, UCC_DT_UINT16, UCC_DT_UINT32, UCC_DT_UINT64,             \
+        UCC_DT_UINT128, UCC_DT_FLOAT16, UCC_DT_FLOAT32, UCC_DT_FLOAT64,        \
+        UCC_DT_BFLOAT16, UCC_DT_FLOAT128, UCC_DT_FLOAT32_COMPLEX,              \
+        UCC_DT_FLOAT64_COMPLEX, UCC_DT_FLOAT128_COMPLEX)
 
 #define UCC_TEST_N_MEM_SEGMENTS   3
 #define UCC_TEST_MEM_SEGMENT_SIZE (1 << 20)
