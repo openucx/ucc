@@ -56,7 +56,7 @@ typedef struct ucc_context {
     int                      n_cl_ctx;
     int                      n_tl_ctx;
     int                      n_addr_packed; /*< Number of LT/CL components whose addresses are packed
-                                              into ucc_co0ntext->attr.addr */
+                                              into ucc_context->attr.addr */
     ucc_config_names_array_t all_tls;
     ucc_list_link_t          progress_list;
     ucc_progress_queue_t    *pq;
@@ -127,7 +127,7 @@ typedef struct ucc_context_addr_header {
     struct {
         unsigned long id;     // id of component computed during framework load
         ptrdiff_t     offset; // offset of the address of the component in the
-            // packed data array. Componete from the start of the header
+            // packed data array. Component from the start of the header
     } components[1];
 } ucc_context_addr_header_t;
 

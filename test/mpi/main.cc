@@ -40,7 +40,7 @@ static int                                 num_tests    = 1;
 static bool                                has_onesided = true;
 static bool                                verbose      = false;
 #if defined(HAVE_CUDA) || defined(HAVE_HIP)
-static test_set_gpu_device_t test_gpu_set_device = TEST_SET_DEV_NONE;
+extern test_set_gpu_device_t test_gpu_set_device;
 #endif
 
 static std::vector<std::string> str_split(const char *value, const char *delimiter)

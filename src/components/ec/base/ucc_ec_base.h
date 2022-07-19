@@ -67,6 +67,7 @@ typedef enum ucc_ee_executor_task_type {
     UCC_EE_EXECUTOR_TASK_TYPE_REDUCE             = UCC_BIT(1),
     UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI       = UCC_BIT(2),
     UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI_ALPHA = UCC_BIT(3),
+    UCC_EE_EXECUTOR_TASK_TYPE_COPY_MULTI         = UCC_BIT(4),
 } ucc_ee_executor_task_type_t;
 
 typedef struct ucc_ee_executor_params {
@@ -75,6 +76,7 @@ typedef struct ucc_ee_executor_params {
 } ucc_ee_executor_params_t;
 
 #define UCC_EE_EXECUTOR_NUM_BUFS 9
+#define UCC_EE_EXECUTOR_NUM_COPY_BUFS 6
 /*
  *  buffers[0] - destination
  *  buffers[1] .. buffers[UCC_EE_EXECUTOR_NUM_BUFS - 1] - source
@@ -83,15 +85,24 @@ typedef struct ucc_ee_executor_params {
  *  dt - datatype
  *  op - reduction operation
  */
+
+typedef struct ucc_ee_executor_task_args_copy_multi{
+    void   *src[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
+    void   *dst[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
+    size_t  counts[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
+    size_t  num_vectors;
+} ucc_ee_executor_task_args_copy_multi_t;
+
 typedef struct ucc_ee_executor_task_args {
-    ucc_ee_executor_task_type_t  task_type;
-    void                        *bufs[UCC_EE_EXECUTOR_NUM_BUFS];
-    double                       alpha;
-    ucc_count_t                  count;
-    size_t                       stride;
-    uint32_t                     size;
-    ucc_datatype_t               dt;
-    ucc_reduction_op_t           op;
+    ucc_ee_executor_task_type_t             task_type;
+    void                                   *bufs[UCC_EE_EXECUTOR_NUM_BUFS];
+    double                                  alpha;
+    ucc_count_t                             count;
+    size_t                                  stride;
+    uint32_t                                size;
+    ucc_datatype_t                          dt;
+    ucc_reduction_op_t                      op;
+    ucc_ee_executor_task_args_copy_multi_t  copy_multi;
 } ucc_ee_executor_task_args_t;
 
 typedef struct ucc_ee_executor_task {

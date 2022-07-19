@@ -6,30 +6,26 @@
 
 
 #include "allgatherv/allgatherv.h"
+#include "allgather/allgather.h"
 
 //NOLINTNEXTLINE
-size_t ucc_tl_cuda_allgather_get_count(const ucc_tl_cuda_task_t *task,
-                                       ucc_rank_t block)
-{
-    return TASK_ARGS(task).dst.info.count / UCC_TL_TEAM_SIZE(TASK_TEAM(task));
-}
 
-size_t ucc_tl_cuda_allgather_get_offset(const ucc_tl_cuda_task_t *task,
-                                        ucc_rank_t block)
+ucc_status_t ucc_tl_cuda_allgather_ring_init(ucc_base_coll_args_t *coll_args,
+                                             ucc_base_team_t *     tl_team,
+                                             ucc_coll_task_t **    task_p)
 {
-    return (TASK_ARGS(task).dst.info.count / UCC_TL_TEAM_SIZE(TASK_TEAM(task))) *
-            block;
-}
+    ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
+    ucc_tl_cuda_task_t *task = ucc_tl_cuda_task_init(coll_args, team);
 
-ucc_status_t ucc_tl_cuda_allgather_ring_init(ucc_tl_cuda_task_t *task)
-{
-    ucc_coll_args_t *args  = &TASK_ARGS(task);
+    if (ucc_unlikely(!task)) {
+        return UCC_ERR_NO_MEMORY;
+    }
 
     task->allgatherv_ring.get_count  = ucc_tl_cuda_allgather_get_count;
     task->allgatherv_ring.get_offset = ucc_tl_cuda_allgather_get_offset;
-    task->allgatherv_ring.dt         = args->dst.info.datatype;
-    task->allgatherv_ring.sbuf       = args->src.info.buffer;
-    task->allgatherv_ring.rbuf       = args->dst.info.buffer;
+    task->allgatherv_ring.dt         = coll_args->args.dst.info.datatype;
+    task->allgatherv_ring.sbuf       = coll_args->args.src.info.buffer;
+    task->allgatherv_ring.rbuf       = coll_args->args.dst.info.buffer;
 
     task->super.flags               |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post                = ucc_tl_cuda_allgatherv_ring_start;
@@ -38,5 +34,6 @@ ucc_status_t ucc_tl_cuda_allgather_ring_init(ucc_tl_cuda_task_t *task)
     task->super.finalize            = ucc_tl_cuda_allgatherv_ring_finalize;
     task->bar                       = TASK_BAR(task);
 
+    *task_p = &task->super;
     return UCC_OK;
 }
