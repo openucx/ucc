@@ -233,6 +233,18 @@ ucc_status_t ucc_mc_cuda_reduce_multi(const void *src1, const void *src2,
         DT_REDUCE_INT(int64_t, op, src1, src2, dst, n_vectors, count, ld,
                       stream, bk, th);
         break;
+    case UCC_DT_UINT16:
+        DT_REDUCE_INT(uint16_t, op, src1, src2, dst, n_vectors, count, ld,
+                      stream, bk, th);
+        break;
+    case UCC_DT_UINT32:
+        DT_REDUCE_INT(uint32_t, op, src1, src2, dst, n_vectors, count, ld,
+                      stream, bk, th);
+        break;
+    case UCC_DT_UINT64:
+        DT_REDUCE_INT(uint64_t, op, src1, src2, dst, n_vectors, count, ld,
+                      stream, bk, th);
+        break;
     case UCC_DT_FLOAT16:
         DT_REDUCE_FLOAT(__half, op, src1, src2, dst, n_vectors, count, ld,
                         stream, bk, th);

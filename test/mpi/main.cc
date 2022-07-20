@@ -16,9 +16,10 @@ static std::vector<ucc_coll_type_t> colls = {
     UCC_COLL_TYPE_SCATTER,        UCC_COLL_TYPE_SCATTERV};
 static std::vector<ucc_coll_type_t> onesided_colls = {UCC_COLL_TYPE_ALLTOALL};
 static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
-static std::vector<ucc_datatype_t>    dtypes      = {UCC_DT_INT32, UCC_DT_INT64,
-                                             UCC_DT_FLOAT32, UCC_DT_FLOAT64,
-                                             UCC_DT_FLOAT64_COMPLEX};
+static std::vector<ucc_datatype_t>    dtypes         = {
+    UCC_DT_INT16,   UCC_DT_INT32,   UCC_DT_INT64,
+    UCC_DT_UINT16,  UCC_DT_UINT32,  UCC_DT_UINT64,
+    UCC_DT_FLOAT32, UCC_DT_FLOAT64, UCC_DT_FLOAT64_COMPLEX};
 static std::vector<ucc_reduction_op_t>     ops    = {UCC_OP_SUM, UCC_OP_MAX,
                                               UCC_OP_AVG};
 static std::vector<ucc_test_mpi_team_t> teams = {TEAM_WORLD, TEAM_REVERSE,
