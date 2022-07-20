@@ -149,7 +149,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_context_t,
         return status;
     }
     // scratch buffer for barrier
-    cudaError_t cuda_st = cudaMalloc(&self->scratch_buf, sizeof(float));
+    cudaError_t cuda_st = cudaMalloc(&self->barrier_scratch, sizeof(float));
     if (cuda_st != cudaSuccess) {
         return UCC_ERR_NO_MEMORY;
     }
@@ -161,8 +161,8 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_nccl_context_t)
 {
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
     ucc_mpool_cleanup(&self->req_mp, 1);
-    cudaFree(self->scratch_buf);
-    self->scratch_buf = NULL;
+    cudaFree(self->barrier_scratch);
+    self->barrier_scratch = NULL;
 }
 
 UCC_CLASS_DEFINE(ucc_tl_nccl_context_t, ucc_tl_context_t);

@@ -601,7 +601,7 @@ ucc_status_t ucc_tl_nccl_barrier_init(ucc_tl_nccl_task_t *task)
     args->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     args->op     = UCC_OP_SUM;
 
-    args->dst.info.buffer   = TASK_CTX(task)->scratch_buf;
+    args->dst.info.buffer   = TASK_CTX(task)->barrier_scratch;
     args->src.info.buffer   = args->dst.info.buffer;
     args->dst.info.datatype = args->src.info.datatype = UCC_DT_FLOAT32;
     args->dst.info.count = args->src.info.count = 1;

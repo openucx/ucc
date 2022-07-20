@@ -75,7 +75,7 @@ typedef struct ucc_tl_nccl_context {
     ucc_tl_context_t             super;
     ucc_tl_nccl_context_config_t cfg;
     ucc_mpool_t                  req_mp;
-    void                        *scratch_buf;
+    void                        *barrier_scratch;
 } ucc_tl_nccl_context_t;
 UCC_CLASS_DECLARE(ucc_tl_nccl_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
