@@ -119,11 +119,6 @@ ucc_tl_nccl_task_t * ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
 
 void ucc_tl_nccl_free_task(ucc_tl_nccl_task_t *task)
 {
-    if (task->cpu_coll_scratch_buf) {
-        cudaFree(task->cpu_coll_scratch_buf);
-        task->cpu_coll_scratch_buf = NULL;
-    }
-
     UCC_TL_NCCL_PROFILE_REQUEST_FREE(task);
     if (task->completed) {
         ucc_ec_destroy_event(task->completed, UCC_EE_CUDA_STREAM);
@@ -440,8 +435,14 @@ static void CUDART_CB cpu_bcast_copy_in(void *data)
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_coll_args_t *args = &TASK_ARGS(task);
     uintptr_t total_bytes = args->src.info.count * ucc_dt_size(args->src.info.datatype);
+    uintptr_t completed = task->cpu_coll_round * UCC_TL_NCCL_SCRATCH_BUF_SIZE;
 
-    memcpy(task->cpu_coll_scratch_buf, args->src.info.buffer, total_bytes);
+    uintptr_t rem_bytes = total_bytes - completed;
+    if (rem_bytes > UCC_TL_NCCL_SCRATCH_BUF_SIZE) {
+        rem_bytes = UCC_TL_NCCL_SCRATCH_BUF_SIZE;
+    }
+
+    memcpy(task->cpu_coll_scratch_buf, PTR_OFFSET(args->src.info.buffer, completed), rem_bytes);
 }
 
 static void CUDART_CB cpu_bcast_copy_out(void *data)
@@ -450,8 +451,20 @@ static void CUDART_CB cpu_bcast_copy_out(void *data)
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_coll_args_t *args = &TASK_ARGS(task);
     uintptr_t total_bytes = args->src.info.count * ucc_dt_size(args->src.info.datatype);
+    uintptr_t completed = task->cpu_coll_round * UCC_TL_NCCL_SCRATCH_BUF_SIZE;
 
-    memcpy(args->src.info.buffer, task->cpu_coll_scratch_buf, total_bytes);
+    uintptr_t rem_bytes = total_bytes - completed;
+    if (rem_bytes > UCC_TL_NCCL_SCRATCH_BUF_SIZE) {
+        rem_bytes = UCC_TL_NCCL_SCRATCH_BUF_SIZE;
+    }
+
+    memcpy(PTR_OFFSET(args->src.info.buffer, completed), task->cpu_coll_scratch_buf, rem_bytes);
+    task->cpu_coll_round++;
+
+    if (completed + rem_bytes == total_bytes) {
+        ucc_mpool_put(task->cpu_coll_scratch_buf);
+        task->cpu_coll_scratch_buf = NULL;
+    }
 }
 
 ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
@@ -498,22 +511,32 @@ ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
         }
     } else {
         if (args->src.info.mem_type == UCC_MEMORY_TYPE_HOST) {
-            uintptr_t total_bytes = count * ucc_dt_size(args->src.info.datatype);
-            NCCLCHECK_GOTO(cudaMallocManaged(&task->cpu_coll_scratch_buf, total_bytes, cudaMemAttachGlobal),
-                           exit_coll, status, UCC_TL_TEAM_LIB(team));
-
-            if (UCC_TL_TEAM_RANK(team) == root) {
-                NCCLCHECK_GOTO(cudaLaunchHostFunc(stream, cpu_bcast_copy_in, (void *) coll_task),
-                               exit_coll, status, UCC_TL_TEAM_LIB(team));
+            ucc_tl_nccl_context_t *ctx = TASK_CTX(task);
+            task->cpu_coll_scratch_buf = ucc_mpool_get(&ctx->cpu_staging_scratch_mp);
+            if (ucc_unlikely(!task->cpu_coll_scratch_buf)) {
+                status = UCC_ERR_NO_MEMORY;
+                goto exit_coll;
             }
+            task->cpu_coll_round = 0;
 
-            NCCLCHECK_GOTO(ncclBroadcast(task->cpu_coll_scratch_buf, task->cpu_coll_scratch_buf, count, dt,
-                                         root, team->nccl_comm, stream),
-                           exit_coll, status, UCC_TL_TEAM_LIB(team));
+            uintptr_t total_bytes = count * ucc_dt_size(args->src.info.datatype);
+            int num_rounds = total_bytes / UCC_TL_NCCL_SCRATCH_BUF_SIZE +
+                !!(total_bytes % UCC_TL_NCCL_SCRATCH_BUF_SIZE);
 
-            if (UCC_TL_TEAM_RANK(team) != args->root) {
-                NCCLCHECK_GOTO(cudaLaunchHostFunc(stream, cpu_bcast_copy_out, (void *) coll_task),
+            for (int i = 0; i < num_rounds; i++) {
+                if (UCC_TL_TEAM_RANK(team) == root) {
+                    NCCLCHECK_GOTO(cudaLaunchHostFunc(stream, cpu_bcast_copy_in, (void *) coll_task),
+                                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+                }
+
+                NCCLCHECK_GOTO(ncclBroadcast(task->cpu_coll_scratch_buf, task->cpu_coll_scratch_buf, count, dt,
+                                             root, team->nccl_comm, stream),
                                exit_coll, status, UCC_TL_TEAM_LIB(team));
+
+                if (UCC_TL_TEAM_RANK(team) != args->root) {
+                    NCCLCHECK_GOTO(cudaLaunchHostFunc(stream, cpu_bcast_copy_out, (void *) coll_task),
+                                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+                }
             }
         } else {
             NCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->nccl_comm,
