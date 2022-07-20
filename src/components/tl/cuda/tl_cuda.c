@@ -7,6 +7,8 @@
 #include "tl_cuda.h"
 #include "core/ucc_team.h"
 #include "components/mc/base/ucc_mc_base.h"
+#include "allgather/allgather.h"
+#include "allgatherv/allgatherv.h"
 
 static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_cuda_lib_config_t, super),
@@ -79,3 +81,12 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t   *tl_team,
                                          ucc_coll_score_t **score_p);
 
 UCC_TL_IFACE_DECLARE(cuda, CUDA);
+
+__attribute__((constructor)) static void tl_cuda_iface_init(void)
+{
+
+    ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHER)] =
+        ucc_tl_cuda_allgather_algs;
+    ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
+        ucc_tl_cuda_allgatherv_algs;
+}

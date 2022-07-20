@@ -336,6 +336,7 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
     ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_CUDA;
     ucc_coll_score_t   *score;
     ucc_status_t        status;
+    int                 i;
 
     status =
         ucc_coll_score_build_default(tl_team, UCC_TL_CUDA_DEFAULT_SCORE,
@@ -346,11 +347,24 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
         return status;
     }
 
+    for (i = 0; i < UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR; i++) {
+        status = ucc_coll_score_update_from_str(
+            ucc_tl_cuda_default_alg_select_str[i], score,
+            UCC_TL_TEAM_SIZE(team), ucc_tl_cuda_coll_init, &team->super.super,
+            UCC_TL_CUDA_DEFAULT_SCORE, ucc_tl_cuda_alg_id_to_init);
+        if (UCC_OK != status) {
+            tl_error(tl_team->context->lib,
+                     "failed to apply default coll select setting: %s",
+                     ucc_tl_cuda_default_alg_select_str[i]);
+            goto err;
+        }
+    }
+
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_cuda_coll_init, &team->super.super,
-            UCC_TL_CUDA_DEFAULT_SCORE, NULL);
+            UCC_TL_CUDA_DEFAULT_SCORE, ucc_tl_cuda_alg_id_to_init);
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {
             goto err;
