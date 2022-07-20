@@ -48,7 +48,7 @@ ucc_base_coll_alg_info_t
         }                                                                      \
     } while(0)
 
-ucc_status_t ucc_tl_nccl_allgatherv_p2p_start(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_nccl_allgatherv_p2p_start_gpu(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_coll_args_t    *args   = &TASK_ARGS(task);
@@ -93,6 +93,115 @@ exit_coll:
     return status;
 }
 
+static void CUDART_CB cpu_allgatherv_copy_in(void *data)
+{
+    ucc_coll_task_t *coll_task = (ucc_coll_task_t *) data;
+    ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t *args = &TASK_ARGS(task);
+    ucc_tl_nccl_team_t *team = TASK_TEAM(task);
+    size_t sdt_size = ucc_dt_size(args->src.info.datatype);
+    size_t rdt_size = ucc_dt_size(args->dst.info_v.datatype);
+
+    uintptr_t offset = 0;
+    for (int peer = 0; peer < UCC_TL_TEAM_RANK(team); peer++) {
+        offset += ucc_coll_args_get_count(args, args->dst.info_v.counts, peer) * rdt_size;
+    }
+    void *sbuf = (void *)((ptrdiff_t) task->cpu_coll_scratch_buf + offset);
+
+    memcpy(sbuf, args->src.info.buffer, args->src.info.count * sdt_size);
+}
+
+static void CUDART_CB cpu_allgatherv_copy_out(void *data)
+{
+    ucc_coll_task_t *coll_task = (ucc_coll_task_t *) data;
+    ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t *args = &TASK_ARGS(task);
+    ucc_tl_nccl_team_t *team = TASK_TEAM(task);
+    size_t rdt_size = ucc_dt_size(args->dst.info_v.datatype);
+    uintptr_t offset = 0;
+
+    for (int peer = 0; peer < UCC_TL_TEAM_SIZE(team); peer++) {
+        size_t count = ucc_coll_args_get_count(args, args->dst.info_v.counts, peer);
+        if (count != 0) {
+            size_t displ = ucc_coll_args_get_displacement(args, args->dst.info_v.displacements, peer);
+            memcpy(PTR_OFFSET(args->dst.info_v.buffer, displ * rdt_size),
+                   PTR_OFFSET(task->cpu_coll_scratch_buf, offset), count * rdt_size);
+            offset += count * rdt_size;
+        }
+    }
+}
+
+ucc_status_t ucc_tl_nccl_allgatherv_p2p_start_cpu(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
+    ucc_rank_t          size   = UCC_TL_TEAM_SIZE(team);
+    ucc_ee_h            ee     = coll_task->ee;
+    cudaStream_t        stream = (ee) ? (cudaStream_t) ee->ee_context :
+                                                       team->stream;
+    ucc_status_t        status = UCC_OK;
+    void               *sbuf;
+    void               *rbuf;
+    size_t sdt_size, rdt_size, count, displ;
+    ucc_rank_t peer;
+
+    task->super.status = UCC_INPROGRESS;
+    sdt_size           = ucc_dt_size(args->src.info.datatype);
+    rdt_size           = ucc_dt_size(args->dst.info_v.datatype);
+    UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_allgatherv_start", 0);
+
+    uintptr_t total_bytes = 0;
+    for (peer = 0; peer < size; peer++) {
+        total_bytes += ucc_coll_args_get_count(args, args->dst.info_v.counts, peer) * rdt_size;
+    }
+
+    NCCLCHECK_GOTO(cudaMallocManaged(&task->cpu_coll_scratch_buf, total_bytes, cudaMemAttachGlobal),
+                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+
+    uintptr_t offset = 0;
+    for (peer = 0; peer < UCC_TL_TEAM_RANK(team); peer++) {
+        offset += ucc_coll_args_get_count(args, args->dst.info_v.counts, peer) * rdt_size;
+    }
+    sbuf = (void *)((ptrdiff_t) task->cpu_coll_scratch_buf + offset);
+    rbuf = task->cpu_coll_scratch_buf;
+
+    if (args->src.info.count != 0) {
+        NCCLCHECK_GOTO(cudaLaunchHostFunc(stream, cpu_allgatherv_copy_in, (void *) coll_task),
+                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+    }
+
+    NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+    count = args->src.info.count;
+    if (count != 0) {
+        for (peer = 0; peer < size; peer++) {
+            NCCLCHECK_GOTO(ncclSend(sbuf, count * sdt_size, ncclChar, peer,
+                                    team->nccl_comm, stream),
+                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
+    }
+
+    offset = 0;
+    for (peer = 0; peer < size; peer++) {
+        count = ucc_coll_args_get_count(args, args->dst.info_v.counts, peer);
+        if (count != 0) {
+            NCCLCHECK_GOTO(ncclRecv(PTR_OFFSET(rbuf, offset),
+                                    count * rdt_size, ncclChar, peer,
+                                    team->nccl_comm, stream),
+                           exit_coll, status, UCC_TL_TEAM_LIB(team));
+            offset += count * rdt_size;
+        }
+    }
+    NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+
+    NCCLCHECK_GOTO(cudaLaunchHostFunc(stream, cpu_allgatherv_copy_out, (void *) coll_task),
+                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+
+    status = ucc_tl_nccl_collective_sync(task, stream);
+exit_coll:
+    return status;
+}
+
 ucc_status_t ucc_tl_nccl_allgatherv_p2p_init(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t *     team,
                                              ucc_coll_task_t **    task_h)
@@ -108,7 +217,11 @@ ucc_status_t ucc_tl_nccl_allgatherv_p2p_init(ucc_base_coll_args_t *coll_args,
     if (!task) {
         return UCC_ERR_NO_MESSAGE;
     }
-    task->super.post     = ucc_tl_nccl_allgatherv_p2p_start;
+    if (args->src.info.mem_type == UCC_MEMORY_TYPE_HOST) {
+        task->super.post = ucc_tl_nccl_allgatherv_p2p_start_cpu;
+    } else {
+        task->super.post = ucc_tl_nccl_allgatherv_p2p_start_gpu;
+    }
     *task_h = &task->super;
 out:
     return status;

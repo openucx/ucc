@@ -93,6 +93,7 @@ typedef struct ucc_tl_nccl_task {
     ucc_status_t            host_status;
     ucc_status_t           *dev_status;
     void                   *completed;
+    void                   *cpu_coll_scratch_buf;
     union {
         struct {
             ucc_mc_buffer_header_t *scratch;
