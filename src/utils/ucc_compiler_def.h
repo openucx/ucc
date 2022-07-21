@@ -12,7 +12,7 @@
 
 #include "config.h"
 #include "ucc/api/ucc_status.h"
-#include <ucs/type/status.h>
+#include <ucs/type/status.h> /* Delete when last use of ucs_status_t is gone */
 #include <ucs/sys/string.h>
 #include <ucs/sys/preprocessor.h>
 #include <ucs/debug/log_def.h>
@@ -220,13 +220,8 @@
 #define ucs_same_type(_type1, _type2) \
     __builtin_types_compatible_p(_type1, _type2)
 
-#define ucc_offsetof      ucs_offsetof
-#define ucc_container_of  ucs_container_of
-#define ucc_derived_of    ucs_derived_of
-#define ucc_strncpy_safe  ucs_strncpy_safe
+#define ucc_strncpy_safe  ucs_strncpy_safe /* TODO - Remove this when converted */
 #define ucc_snprintf_safe snprintf
-#define ucc_likely        ucs_likely
-#define ucc_unlikely      ucs_unlikely
 
 /**
  * Prevent compiler from reordering instructions
@@ -271,12 +266,56 @@ static inline ucc_status_t ucs_status_to_ucc_status(ucs_status_t status)
         return UCC_OK;
     case UCS_INPROGRESS:
         return UCC_INPROGRESS;
-    case UCS_ERR_NO_MEMORY:
-        return UCC_ERR_NO_MEMORY;
+    case UCS_ERR_NOT_IMPLEMENTED:
+        return UCC_ERR_NOT_IMPLEMENTED;
     case UCS_ERR_INVALID_PARAM:
         return UCC_ERR_INVALID_PARAM;
+    case UCS_ERR_NO_MEMORY:
+        return UCC_ERR_NO_MEMORY;
     case UCS_ERR_NO_RESOURCE:
         return UCC_ERR_NO_RESOURCE;
+    case UCS_ERR_NO_MESSAGE:
+        return UCC_ERR_NO_MESSAGE;
+    case UCS_ERR_TIMED_OUT:
+        return UCC_ERR_TIMED_OUT;
+    case UCS_ERR_IO_ERROR:
+        return UCC_ERR_IO_ERROR;
+    case UCS_ERR_UNREACHABLE:
+        return UCC_ERR_UNREACHABLE;
+    case UCS_ERR_INVALID_ADDR:
+        return UCC_ERR_INVALID_ADDR;
+    case UCS_ERR_MESSAGE_TRUNCATED:
+        return UCC_ERR_MESSAGE_TRUNCATED;
+    case UCS_ERR_NO_PROGRESS:
+        return UCC_ERR_NO_PROGRESS;
+    case UCS_ERR_BUFFER_TOO_SMALL:
+        return UCC_ERR_BUFFER_TOO_SMALL;
+    case UCS_ERR_NO_ELEM:
+        return UCC_ERR_NO_ELEM;
+    case UCS_ERR_SOME_CONNECTS_FAILED:
+        return UCC_ERR_SOME_CONNECTS_FAILED;
+    case UCS_ERR_NO_DEVICE:
+        return UCC_ERR_NO_DEVICE;
+    case UCS_ERR_BUSY:
+        return UCC_ERR_BUSY;
+    case UCS_ERR_CANCELED:
+        return UCC_ERR_CANCELED;
+    case UCS_ERR_SHMEM_SEGMENT:
+        return UCC_ERR_SHMEM_SEGMENT;
+    case UCS_ERR_ALREADY_EXISTS:
+        return UCC_ERR_ALREADY_EXISTS;
+    case UCS_ERR_OUT_OF_RANGE:
+        return UCC_ERR_OUT_OF_RANGE;
+    case UCS_ERR_EXCEEDS_LIMIT:
+        return UCC_ERR_EXCEEDS_LIMIT;
+    case UCS_ERR_UNSUPPORTED:
+        return UCC_ERR_UNSUPPORTED;
+    case UCS_ERR_REJECTED:
+        return UCC_ERR_REJECTED;
+    case UCS_ERR_NOT_CONNECTED:
+        return UCC_ERR_NOT_CONNECTED;
+    case UCS_ERR_CONNECTION_RESET:
+        return UCC_ERR_CONNECTION_RESET;
     default:
         break;
     }
@@ -290,12 +329,56 @@ static inline ucs_status_t ucc_status_to_ucs_status(ucc_status_t status)
         return UCS_OK;
     case UCC_INPROGRESS:
         return UCS_INPROGRESS;
-    case UCC_ERR_NO_MEMORY:
-        return UCS_ERR_NO_MEMORY;
+    case UCC_ERR_NOT_IMPLEMENTED:
+        return UCS_ERR_NOT_IMPLEMENTED;
     case UCC_ERR_INVALID_PARAM:
         return UCS_ERR_INVALID_PARAM;
+    case UCC_ERR_NO_MEMORY:
+        return UCS_ERR_NO_MEMORY;
     case UCC_ERR_NO_RESOURCE:
         return UCS_ERR_NO_RESOURCE;
+    case UCC_ERR_NO_MESSAGE:
+        return UCS_ERR_NO_MESSAGE;
+    case UCC_ERR_TIMED_OUT:
+        return UCS_ERR_TIMED_OUT;
+    case UCC_ERR_IO_ERROR:
+        return UCS_ERR_IO_ERROR;
+    case UCC_ERR_UNREACHABLE:
+        return UCS_ERR_UNREACHABLE;
+    case UCC_ERR_INVALID_ADDR:
+        return UCS_ERR_INVALID_ADDR;
+    case UCC_ERR_MESSAGE_TRUNCATED:
+        return UCS_ERR_MESSAGE_TRUNCATED;
+    case UCC_ERR_NO_PROGRESS:
+        return UCS_ERR_NO_PROGRESS;
+    case UCC_ERR_BUFFER_TOO_SMALL:
+        return UCS_ERR_BUFFER_TOO_SMALL;
+    case UCC_ERR_NO_ELEM:
+        return UCS_ERR_NO_ELEM;
+    case UCC_ERR_SOME_CONNECTS_FAILED:
+        return UCS_ERR_SOME_CONNECTS_FAILED;
+    case UCC_ERR_NO_DEVICE:
+        return UCS_ERR_NO_DEVICE;
+    case UCC_ERR_BUSY:
+        return UCS_ERR_BUSY;
+    case UCC_ERR_CANCELED:
+        return UCS_ERR_CANCELED;
+    case UCC_ERR_SHMEM_SEGMENT:
+        return UCS_ERR_SHMEM_SEGMENT;
+    case UCC_ERR_ALREADY_EXISTS:
+        return UCS_ERR_ALREADY_EXISTS;
+    case UCC_ERR_OUT_OF_RANGE:
+        return UCS_ERR_OUT_OF_RANGE;
+    case UCC_ERR_EXCEEDS_LIMIT:
+        return UCS_ERR_EXCEEDS_LIMIT;
+    case UCC_ERR_UNSUPPORTED:
+        return UCS_ERR_UNSUPPORTED;
+    case UCC_ERR_REJECTED:
+        return UCS_ERR_REJECTED;
+    case UCC_ERR_NOT_CONNECTED:
+        return UCS_ERR_NOT_CONNECTED;
+    case UCC_ERR_CONNECTION_RESET:
+        return UCS_ERR_CONNECTION_RESET;
     default:
         break;
     }
