@@ -15,7 +15,6 @@
 
 #include <ucs/config/parser.h>
 #include <ucs/sys/preprocessor.h>
-#include <ucs/sys/compiler_def.h>
 #include <ucs/config/types.h>
 #include <ucs/config/parser.h>
 #include <ucs/config/ini.h>
