@@ -162,6 +162,18 @@ ucc_status_t ucc_tl_rccl_coll_init(ucc_base_coll_args_t *coll_args,
     case UCC_COLL_TYPE_BARRIER:
         status = ucc_tl_rccl_barrier_init(task);
         break;
+    case UCC_COLL_TYPE_GATHER:
+        status = ucc_tl_rccl_gather_init(task);
+        break;
+    case UCC_COLL_TYPE_GATHERV:
+        status = ucc_tl_rccl_gatherv_init(task);
+        break;
+    case UCC_COLL_TYPE_SCATTER:
+        status = ucc_tl_rccl_scatter_init(task);
+        break;
+    case UCC_COLL_TYPE_SCATTERV:
+        status = ucc_tl_rccl_scatterv_init(task);
+        break;
     default:
         tl_error(UCC_TASK_LIB(task),
                  "collective %d is not supported by rccl tl",

@@ -598,6 +598,298 @@ ucc_status_t ucc_tl_rccl_barrier_init(ucc_tl_rccl_task_t *task)
     return UCC_OK;
 }
 
+ucc_status_t ucc_tl_rccl_gather_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_rccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_rccl_task_t);
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
+    ucc_tl_rccl_team_t *team   = TASK_TEAM(task);
+    ucc_ee_h            ee     = coll_task->ee;
+    hipStream_t         stream = (ee) ? (hipStream_t) ee->ee_context : team->stream;
+    ucc_datatype_t      ucc_dt = args->src.info.datatype;
+    void               *dst    = args->dst.info.buffer;
+    void               *src    = args->src.info.buffer;
+    size_t              count  = args->src.info.count;
+    ucc_status_t        status = UCC_OK;
+    ncclDataType_t      rccl_dt;
+
+    UCC_TL_RCCL_PROFILE_REQUEST_EVENT(coll_task, "rccl_gather_start", 0);
+    if (args->root == UCC_TL_TEAM_RANK(team)) {
+        ucc_dt = args->dst.info.datatype;
+        count  = args->dst.info.count / UCC_TL_TEAM_SIZE(team);
+        if (UCC_IS_INPLACE(*args)) {
+            src = PTR_OFFSET(dst, UCC_TL_TEAM_RANK(team) * count 
+                             * ucc_dt_size(args->dst.info.datatype));
+        }
+    }
+    rccl_dt = ucc_to_rccl_dtype[UCC_DT_PREDEFINED_ID(ucc_dt)];
+    task->super.super.status = UCC_INPROGRESS;
+    RCCLCHECK_GOTO(ncclGather(src, dst, count, rccl_dt, args->root,
+                              team->rccl_comm, stream),
+                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+    status = ucc_tl_rccl_collective_sync(task, stream);
+ exit_coll:
+    return status;
+}
+
+ucc_status_t ucc_tl_rccl_gather_init(ucc_tl_rccl_task_t *task)
+{
+    ucc_tl_rccl_team_t *team = TASK_TEAM(task);
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
+
+    if (UCC_TL_TEAM_RANK(team) == args->root) {
+        if (!UCC_DT_IS_PREDEFINED(args->dst.info.datatype)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "user defined datatype is not supported");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+    if ((UCC_TL_TEAM_RANK(team) != args->root) ||
+        (!UCC_IS_INPLACE(*args))) {
+        if (!UCC_DT_IS_PREDEFINED(args->src.info.datatype)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "user defined datatype is not supported");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+
+    task->super.post = ucc_tl_rccl_gather_start;
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_rccl_gatherv_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_rccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_rccl_task_t);
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
+    ucc_tl_rccl_team_t *team   = TASK_TEAM(task);
+    ucc_rank_t          rank   = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t          size   = UCC_TL_TEAM_SIZE(team);
+    ucc_ee_h            ee     = coll_task->ee;
+    hipStream_t         stream = (ee) ? (hipStream_t) ee->ee_context : team->stream;
+    void               *dst    = args->dst.info_v.buffer;
+    void               *src    = args->src.info.buffer;
+    ucc_status_t        status = UCC_OK;
+    size_t count, displ, dt_size;
+    ucc_rank_t peer;
+
+    if (rank == args->root) {
+        dt_size = ucc_dt_size(args->dst.info_v.datatype);
+    } else {
+        dt_size = ucc_dt_size(args->src.info.datatype);
+    }
+
+    UCC_TL_RCCL_PROFILE_REQUEST_EVENT(coll_task, "rccl_gatherv_start", 0);
+    if (rank == args->root) {
+        if (!UCC_IS_INPLACE(*args)) {
+            count = ucc_coll_args_get_count(args, args->dst.info_v.counts, rank);
+            displ = ucc_coll_args_get_displacement(args,
+                                                   args->dst.info_v.displacements,
+                                                   rank);
+            HIPCHECK_GOTO(hipMemcpyAsync(PTR_OFFSET(dst, displ * dt_size),
+                                         src, count * dt_size,
+                                         hipMemcpyDeviceToDevice, stream),
+                          exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
+        RCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status,
+                       UCC_TL_TEAM_LIB(team));
+        for (peer = 0; peer < size; peer++) {
+            if (peer == args->root) {
+                continue;
+            }
+            count = ucc_coll_args_get_count(args, args->dst.info_v.counts, peer);
+            displ = ucc_coll_args_get_displacement(args,
+                                                   args->dst.info_v.displacements,
+                                                   peer);
+            RCCLCHECK_GOTO(ncclRecv(PTR_OFFSET(dst, displ * dt_size),
+                                    count * dt_size, ncclChar,
+                                    peer, team->rccl_comm, stream),
+                           exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
+        RCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status,
+                       UCC_TL_TEAM_LIB(team));
+    } else {
+        RCCLCHECK_GOTO(ncclSend(src, args->src.info.count * dt_size,
+                                ncclChar, args->root, team->rccl_comm,
+                                stream),
+                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+    }
+    task->super.status = UCC_INPROGRESS;
+    status = ucc_tl_rccl_collective_sync(task, stream);
+exit_coll:
+    return status;
+}
+
+ucc_status_t ucc_tl_rccl_gatherv_init(ucc_tl_rccl_task_t *task)
+{
+    ucc_tl_rccl_team_t *team = TASK_TEAM(task);
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
+
+    if (UCC_TL_TEAM_RANK(team) == args->root) {
+        if (!UCC_DT_IS_PREDEFINED(args->dst.info_v.datatype)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "user defined datatype is not supported");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+    if ((UCC_TL_TEAM_RANK(team) != args->root) ||
+        (!UCC_IS_INPLACE(*args))) {
+        if (!UCC_DT_IS_PREDEFINED(args->src.info.datatype)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "user defined datatype is not supported");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+
+    task->super.post = ucc_tl_rccl_gatherv_start;
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_rccl_scatter_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_rccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_rccl_task_t);
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
+    ucc_tl_rccl_team_t *team   = TASK_TEAM(task);
+    ucc_ee_h            ee     = coll_task->ee;
+    hipStream_t         stream = (ee) ? (hipStream_t) ee->ee_context : team->stream;
+    void               *dst    = args->dst.info.buffer;
+    void               *src    = args->src.info.buffer;
+    ucc_status_t        status = UCC_OK;
+    ucc_datatype_t      ucc_dt = args->dst.info.datatype;
+    size_t              count  = args->dst.info.count;
+    ncclDataType_t      rccl_dt;
+
+    UCC_TL_RCCL_PROFILE_REQUEST_EVENT(coll_task, "rccl_scatter_start", 0);
+    if (args->root == UCC_TL_TEAM_RANK(team)) {
+        ucc_dt = args->src.info.datatype;
+        count  = args->src.info.count / UCC_TL_TEAM_SIZE(team);
+        if (UCC_IS_INPLACE(*args)) {
+            dst = PTR_OFFSET(src, UCC_TL_TEAM_RANK(team) * count
+                             * ucc_dt_size(ucc_dt));
+        }
+    }
+    rccl_dt = ucc_to_rccl_dtype[UCC_DT_PREDEFINED_ID(ucc_dt)];
+    task->super.status = UCC_INPROGRESS;
+    RCCLCHECK_GOTO(ncclScatter(src, dst, count, rccl_dt, args->root,
+                              team->rccl_comm, stream),
+                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+
+    status = ucc_tl_rccl_collective_sync(task, stream);
+exit_coll:
+    return status;
+}
+
+ucc_status_t ucc_tl_rccl_scatter_init(ucc_tl_rccl_task_t *task)
+{
+    ucc_tl_rccl_team_t *team = TASK_TEAM(task);
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
+
+    if (UCC_TL_TEAM_RANK(team) == args->root) {
+        if (!UCC_DT_IS_PREDEFINED(args->src.info.datatype)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "user defined datatype is not supported");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+    if ((UCC_TL_TEAM_RANK(team) != args->root) ||
+        (!UCC_IS_INPLACE(*args))) {
+        if (!UCC_DT_IS_PREDEFINED(args->dst.info.datatype)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "user defined datatype is not supported");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+
+    task->super.post = ucc_tl_rccl_scatter_start;
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_rccl_scatterv_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_rccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_rccl_task_t);
+    ucc_coll_args_t    *args   = &TASK_ARGS(task);
+    ucc_tl_rccl_team_t *team   = TASK_TEAM(task);
+    ucc_rank_t          rank   = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t          size   = UCC_TL_TEAM_SIZE(team);
+    ucc_ee_h            ee     = coll_task->ee;
+    hipStream_t         stream = (ee) ? (hipStream_t) ee->ee_context : team->stream;
+    void               *dst    = args->dst.info.buffer;
+    void               *src    = args->src.info_v.buffer;
+    ucc_status_t        status = UCC_OK;
+    size_t count, displ, dt_size;
+    ucc_rank_t peer;
+
+    if (rank == args->root) {
+        dt_size = ucc_dt_size(args->src.info_v.datatype);
+    } else {
+        dt_size = ucc_dt_size(args->dst.info.datatype);
+    }
+
+    UCC_TL_RCCL_PROFILE_REQUEST_EVENT(coll_task, "rccl_scatterv_start", 0);
+    if (rank == args->root) {
+        if (!UCC_IS_INPLACE(*args)) {
+            count = ucc_coll_args_get_count(args, args->src.info_v.counts, rank);
+            displ = ucc_coll_args_get_displacement(args,
+                                                   args->src.info_v.displacements,
+                                                   rank);
+            HIPCHECK_GOTO(hipMemcpyAsync(dst,
+                                         PTR_OFFSET(src, displ * dt_size),
+                                         count * dt_size,
+                                         hipMemcpyDeviceToDevice, stream),
+                          exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
+        RCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status,
+                       UCC_TL_TEAM_LIB(team));
+        for (peer = 0; peer < size; peer++) {
+            if (peer == args->root) {
+                continue;
+            }
+            count = ucc_coll_args_get_count(args, args->src.info_v.counts, peer);
+            displ = ucc_coll_args_get_displacement(args,
+                                                   args->src.info_v.displacements,
+                                                   peer);
+            RCCLCHECK_GOTO(ncclSend(PTR_OFFSET(src, displ * dt_size),
+                                    count * dt_size, ncclChar, peer,
+                                    team->rccl_comm, stream),
+                           exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
+        RCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status,
+                       UCC_TL_TEAM_LIB(team));
+    } else {
+        RCCLCHECK_GOTO(ncclRecv(dst, args->dst.info.count * dt_size, ncclChar,
+                                args->root, team->rccl_comm, stream),
+                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+    }
+    task->super.status = UCC_INPROGRESS;
+    status = ucc_tl_rccl_collective_sync(task, stream);
+exit_coll:
+    return status;
+}
+
+ucc_status_t ucc_tl_rccl_scatterv_init(ucc_tl_rccl_task_t *task)
+{
+    ucc_tl_rccl_team_t *team = TASK_TEAM(task);
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
+
+    if (UCC_TL_TEAM_RANK(team) == args->root) {
+        if (!UCC_DT_IS_PREDEFINED(args->src.info_v.datatype)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "user defined datatype is not supported");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+    if ((UCC_TL_TEAM_RANK(team) != args->root) ||
+        (!UCC_IS_INPLACE(*args))) {
+        if (!UCC_DT_IS_PREDEFINED(args->dst.info.datatype)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "user defined datatype is not supported");
+            return UCC_ERR_NOT_SUPPORTED;
+        }
+    }
+
+    task->super.post = ucc_tl_rccl_scatterv_start;
+    return UCC_OK;
+}
+
+
 static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
 {
     switch (coll_type) {
