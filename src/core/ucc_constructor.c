@@ -72,7 +72,12 @@ static ucc_status_t ucc_check_config_file(void)
     char *               filename;
 
     /* First check the UCC_CONFIG_FILE - most precedence */
-    if (strlen(cfg->cfg_filename) > 0) {
+    if (strlen(cfg->cfg_filename) == 0) {
+        /* file configuration disabled */
+        return UCC_OK;
+    }
+    if (0 != strcasecmp(cfg->cfg_filename, "auto")) {
+        /* Actual file path is provided */
         status = ucc_parse_file_config(cfg->cfg_filename,
                                        &ucc_global_config.file_cfg);
         if (UCC_ERR_NOT_FOUND == status) {
@@ -82,6 +87,7 @@ static ucc_status_t ucc_check_config_file(void)
         return status;
     }
 
+    /* CONFIG_FILE is set to AUTO. Search HOME and install/share */
     if (NULL != (home = getenv("HOME"))) {
         if (UCC_OK != (status = ucc_str_concat(home ,default_home_name,
                                                &filename))) {
