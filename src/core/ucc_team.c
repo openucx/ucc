@@ -36,9 +36,23 @@ void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
 
 ucc_status_t ucc_team_get_attr(ucc_team_h team, ucc_team_attr_t *team_attr)
 {
-    ucc_error("ucc_team_get_attr() is not implemented");
+    uint64_t supported_fields =
+        UCC_TEAM_ATTR_FIELD_SIZE | UCC_TEAM_ATTR_FIELD_EP;
 
-    return UCC_ERR_NOT_IMPLEMENTED;
+    if (team_attr->mask & ~supported_fields) {
+        ucc_error("ucc_team_get_attr() is not implemented for specified field");
+        return UCC_ERR_NOT_IMPLEMENTED;
+    }
+
+    if (team_attr->mask & UCC_TEAM_ATTR_FIELD_SIZE) {
+        team_attr->size = team->size;
+    }
+
+    if (team_attr->mask & UCC_TEAM_ATTR_FIELD_EP) {
+        team_attr->ep = team->rank;
+    }
+
+    return UCC_OK;
 }
 
 static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
