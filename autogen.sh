@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE:-$0}" )" &> /dev/null && pwd )"
 if [ $SCRIPT_DIR != `pwd` ]; then
