@@ -1191,7 +1191,9 @@ enum ucc_team_attr_field {
     UCC_TEAM_ATTR_FIELD_EP                     = UCC_BIT(2),
     UCC_TEAM_ATTR_FIELD_EP_RANGE               = UCC_BIT(3),
     UCC_TEAM_ATTR_FIELD_SYNC_TYPE              = UCC_BIT(4),
-    UCC_TEAM_ATTR_FIELD_MEM_PARAMS             = UCC_BIT(5)
+    UCC_TEAM_ATTR_FIELD_MEM_PARAMS             = UCC_BIT(5),
+    UCC_TEAM_ATTR_FIELD_SIZE                   = UCC_BIT(6),
+    UCC_TEAM_ATTR_FIELD_EPS                    = UCC_BIT(7)
 };
 
 /**
@@ -1479,6 +1481,8 @@ typedef struct ucc_team_attr {
     ucc_ep_range_type_t    ep_range;
     ucc_coll_sync_type_t   sync_type;
     ucc_mem_map_params_t   mem_params;
+    uint32_t               size;
+    uint64_t              *eps;
 } ucc_team_attr_t;
 
 
@@ -1622,73 +1626,6 @@ ucc_status_t ucc_team_get_attr(ucc_team_h team,
 ucc_status_t ucc_team_create_from_parent(uint64_t my_ep, uint32_t included,
                                          ucc_team_h parent_team,
                                          ucc_team_h *new_team);
-
-/**
- *  @ingroup UCC_TEAM
- *
- *  @brief The routine returns the size of the team.
- *
- *  @param [in]   team      Team handle
- *  @param [out]  size      The size of team as number of endpoints
- *
- *  @parblock
- *
- *  @b Description
- *
- *  @ref ucc_team_get_size routine queries the size of the team. It reflects the
- *  number of unique endpoints in the team.
- *
- *  @endparblock
- *
- *  @return Error code as defined by @ref ucc_status_t
- */
-ucc_status_t ucc_team_get_size(ucc_team_h team, uint32_t *size);
-
-
-/**
- *  @ingroup UCC_TEAM
- *
- *  @brief The routine returns the endpoint of the calling participant.
- *
- *  @param [out]  ep          Endpoint of the participant calling the routine
- *  @param [in]   team        Team handle
- *
- *  @parblock
- *
- *  @b Description
- *
- *  @ref ucc_team_get_my_ep routine queries and returns the endpoint of the
- *  participant invoking the interface.
- *
- *  @endparblock
- *
- *  @return Error code as defined by @ref ucc_status_t
- */
-ucc_status_t ucc_team_get_my_ep(ucc_team_h team, uint64_t *ep);
-
-/**
- *  @ingroup UCC_TEAM
- *
- *  @brief The routine queries all endpoints associated with the team handle.
- *
- *  @param [out]     ep          List of endpoints
- *  @param [out]     num_eps     Number of endpoints
- *  @param [in]      team        Team handle
- *
- *  @parblock
- *
- *  @b Description
- *
- *  @ref ucc_team_get_all_eps routine queries and returns all endpoints of all
- *  participants in the team.
- *
- *  @endparblock
- *
- *  @return Error code as defined by @ref ucc_status_t
- */
-ucc_status_t ucc_team_get_all_eps(ucc_team_h team, uint64_t **ep,
-                                  uint64_t *num_eps);
-
 
 /*
  * *************************************************************

@@ -114,7 +114,9 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
         onesided_ctx = nullptr;
     }
     set_msgsizes(8, ((1ULL) << 21), 8);
-    dtypes     = {UCC_DT_INT32,           UCC_DT_INT64,
+    dtypes     = {UCC_DT_INT16,           UCC_DT_INT32,
+              UCC_DT_INT64,           UCC_DT_UINT16,
+              UCC_DT_UINT32,          UCC_DT_UINT64,
               UCC_DT_FLOAT32,         UCC_DT_FLOAT64,
               UCC_DT_FLOAT128,        UCC_DT_FLOAT32_COMPLEX,
               UCC_DT_FLOAT64_COMPLEX, UCC_DT_FLOAT128_COMPLEX};

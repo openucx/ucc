@@ -34,6 +34,13 @@ void ucc_copy_team_params(ucc_team_params_t *dst, const ucc_team_params_t *src)
     UCC_COPY_PARAM_BY_FIELD(dst, src, UCC_TEAM_PARAM_FIELD_EP_MAP, ep_map);
 }
 
+ucc_status_t ucc_team_get_attr(ucc_team_h team, ucc_team_attr_t *team_attr)
+{
+    ucc_error("ucc_team_get_attr() is not implemented");
+
+    return UCC_ERR_NOT_IMPLEMENTED;
+}
+
 static ucc_status_t ucc_team_create_post_single(ucc_context_t *context,
                                                 ucc_team_t *team)
 {

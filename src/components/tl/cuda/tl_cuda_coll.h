@@ -10,6 +10,10 @@
 #include "tl_cuda.h"
 #include "components/mc/ucc_mc.h"
 
+#define UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR 2
+extern const char
+    *ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR];
+
 #define TASK_TEAM(_task)                                                       \
     (ucc_derived_of((_task)->super.team, ucc_tl_cuda_team_t))
 
@@ -122,5 +126,10 @@ ucc_status_t ucc_tl_cuda_shm_barrier_start(ucc_rank_t rank,
 
 ucc_status_t ucc_tl_cuda_shm_barrier_test(ucc_rank_t rank,
                                           ucc_tl_cuda_shm_barrier_t *barrier);
+
+ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
+                                        ucc_coll_type_t          coll_type,
+                                        ucc_memory_type_t        mem_type,
+                                        ucc_base_coll_init_fn_t *init);
 
 #endif
