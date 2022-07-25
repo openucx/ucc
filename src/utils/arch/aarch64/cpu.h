@@ -1,5 +1,5 @@
 /**
-* Copyright (C) Mellanox Technologies Ltd. 2001-2021.  ALL RIGHTS RESERVED.
+* Copyright (c) 2001-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 * Copyright (C) ARM Ltd. 2016-2020.  ALL RIGHTS RESERVED.
 * Copyright (C) Stony Brook University. 2016-2020.  ALL RIGHTS RESERVED.
 *
