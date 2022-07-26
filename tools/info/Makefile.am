@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+# Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # Copyright (C) The University of Tennessee and the University of Tennessee Research Foundation. 2016. ALL RIGHTS RESERVED.
 #
 # See file LICENSE for terms.

@@ -1,6 +1,6 @@
 #
 # Copyright (C) Advanced Micro Devices, Inc. 2016 - 2022. ALL RIGHTS RESERVED.
-# Copyright (C) Mellanox Technologies Ltd. 2001-2022.  ALL RIGHTS RESERVED.
+# Copyright (c) 2001-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # See file LICENSE for terms.
 #
 

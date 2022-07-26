@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -267,4 +267,5 @@ void clear_buffer(void *_buf, size_t size, ucc_memory_type_t mt, uint8_t value);
 #define UCC_TEST_N_MEM_SEGMENTS   3
 #define UCC_TEST_MEM_SEGMENT_SIZE (1 << 20)
 
+bool tl_self_available();
 #endif

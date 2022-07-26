@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 #include "common/test_ucc.h"
@@ -16,13 +16,24 @@ class test_team : public ucc::test, public::testing::WithParamInterface<int> {
 UCC_TEST_P(test_team, team_create_destroy_ctx_global)
 {
     /* static job uses global ctx mode: oob provided */
-    UccTeam_h team = UccJob::getStaticJob()->create_team(GetParam());
+    int team_size = GetParam();
+
+    if (team_size == 1 && !tl_self_available()) {
+        GTEST_SKIP();
+    }
+    UccTeam_h team = UccJob::getStaticJob()->create_team(team_size);
 }
 
 UCC_TEST_P(test_team, team_create_destroy_ctx_local)
 {
+    int team_size = GetParam();
+
+    if (team_size == 1 && !tl_self_available()) {
+        GTEST_SKIP();
+    }
+
     UccJob job(8, UccJob::UCC_JOB_CTX_LOCAL);
-    UccTeam_h team = job.create_team(GetParam());
+    UccTeam_h team = job.create_team(team_size);
 }
 
 INSTANTIATE_TEST_CASE_P(, test_team,

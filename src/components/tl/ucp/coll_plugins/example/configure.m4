@@ -1,4 +1,4 @@
-# Copyright (c) 2021      Mellanox Technologies. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # $COPYRIGHT$
 # Additional copyrights may follow
 
