@@ -192,6 +192,7 @@ void ucc_tl_cuda_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->reduce_scatterv_ring.stage = RING_STAGE_SETUP;
+        /* fall through */
     case RING_STAGE_SETUP:
         st = ucc_tl_cuda_reduce_scatterv_ring_setup_test(task);
         if (st != UCC_OK) {
@@ -199,6 +200,7 @@ void ucc_tl_cuda_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->reduce_scatterv_ring.stage = RING_STAGE_RING;
+        /* fall through */
     case RING_STAGE_RING:
         num_done = 0;
         for (ring = 0; ring < task->reduce_scatterv_ring.num_rings; ring++) {
@@ -222,6 +224,7 @@ void ucc_tl_cuda_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
         }
 
         task->reduce_scatterv_ring.stage = RING_STAGE_BARRIER;
+        /* fall through */
     default:
         ucc_assert(task->reduce_scatterv_ring.stage == RING_STAGE_BARRIER);
         break;
