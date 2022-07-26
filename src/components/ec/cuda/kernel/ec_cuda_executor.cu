@@ -122,33 +122,33 @@ __device__ void executor_reduce_multi(const T* __restrict__ s1,
     }
 }
 
-__device__ void executor_copy_multi(ucc_ee_executor_task_args_copy_multi_t args)
+__device__  void executor_copy_multi(ucc_ee_executor_task_args_copy_multi_t *args)
 {
     const size_t     step     = blockDim.x;
-    size_t           min_size = args.counts[0];
+    size_t           min_size = args->counts[0];
     size_t           idx      = threadIdx.x;
     __shared__ int4 *dsts[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
     __shared__ int4 *srcs[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
     bool             aligned;
 
-    for (int i = 0; i < args.num_vectors; i++) {
-        dsts[i] = (int4*)args.dst[i];
-        srcs[i] = (int4*)args.src[i];
+    for (int i = 0; i < args->num_vectors; i++) {
+        dsts[i] = (int4*)args->dst[i];
+        srcs[i] = (int4*)args->src[i];
         aligned = !(align_pow2((intptr_t)srcs[i], 16) ||
                     align_pow2((intptr_t)dsts[i], 16));
         if (!aligned) {
             break;
         }
-        if (args.counts[i] < min_size) {
-            min_size = args.counts[i];
+        if (args->counts[i] < min_size) {
+            min_size = args->counts[i];
         }
     }
 
     if (!aligned || min_size < 16) {
-        for (int i = 0; i < args.num_vectors; i++) {
-            executor_copy((char*)args.dst[i],
-                          (char*)args.src[i],
-                          args.counts[i]);
+        for (int i = 0; i < args->num_vectors; i++) {
+            executor_copy((char*)args->dst[i],
+                          (char*)args->src[i],
+                          args->counts[i]);
         }
         return;
     }
@@ -158,7 +158,7 @@ __device__ void executor_copy_multi(ucc_ee_executor_task_args_copy_multi_t args)
 
     for (size_t i = 0; i < num_iter; i++) {
 #pragma unroll
-        for (int j = 0; j < args.num_vectors; j++) {
+        for (int j = 0; j < args->num_vectors; j++) {
             dsts[j][idx] = srcs[j][idx];
         }
         idx += step;
@@ -166,10 +166,10 @@ __device__ void executor_copy_multi(ucc_ee_executor_task_args_copy_multi_t args)
 
     const size_t left = min_size + min_size % sizeof(uint4);
 
-    for (int i = 0; i < args.num_vectors; i++) {
-        executor_copy((char*)args.dst[i] + left,
-                      (char*)args.src[i] + left,
-                      args.counts[i] - left);
+    for (int i = 0; i < args->num_vectors; i++) {
+        executor_copy((char*)args->dst[i] + left,
+                      (char*)args->src[i] + left,
+                      args->counts[i] - left);
     }
 }
 
@@ -228,7 +228,7 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
                 }
                 break;
             case UCC_EE_EXECUTOR_TASK_TYPE_COPY_MULTI:
-                executor_copy_multi(args.copy_multi);
+                executor_copy_multi(&args.copy_multi);
                 break;
             case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE:
                 aligned = !(align_pow2((intptr_t)args.bufs[0], 16) ||
