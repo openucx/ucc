@@ -326,6 +326,7 @@ void ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->allgatherv_ring.stage = RING_STAGE_SETUP;
+        /* fall through */
     case RING_STAGE_SETUP:
         st = ucc_tl_cuda_allgatherv_ring_setup_test(task);
         if (st != UCC_OK) {
@@ -333,6 +334,7 @@ void ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->allgatherv_ring.stage = RING_STAGE_RING;
+        /* fall through */
     case RING_STAGE_RING:
         num_done = 0;
         for (chunk = 0; chunk < task->allgatherv_ring.num_chunks; chunk++) {
@@ -356,6 +358,7 @@ void ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
         }
 
         task->allgatherv_ring.stage = RING_STAGE_BARRIER;
+        /* fall through */
     default:
         ucc_assert(task->allgatherv_ring.stage == RING_STAGE_BARRIER);
         break;

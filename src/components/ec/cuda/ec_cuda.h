@@ -138,7 +138,9 @@ extern ucc_ec_cuda_t ucc_ec_cuda;
             ucc_ec_cuda.stream_initialized = 1;                                \
         }                                                                      \
         ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);                           \
-        CUDA_CHECK(cuda_st);                                                   \
+        if (ucc_unlikely(cudaSuccess != cuda_st)) {                     \
+            return cuda_error_to_ucc_status(cuda_st);                   \
+        }                                                               \
     }                                                                          \
 } while(0)
 

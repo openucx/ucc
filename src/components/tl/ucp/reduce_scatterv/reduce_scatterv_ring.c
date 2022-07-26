@@ -361,7 +361,11 @@ ucc_tl_ucp_reduce_scatterv_ring_init(ucc_base_coll_args_t *coll_args,
         count = coll_args->args.src.info.count;
     }
 
-    tl_schedule = ucc_tl_ucp_get_schedule(tl_team, coll_args);
+    status = ucc_tl_ucp_get_schedule(tl_team, coll_args, &tl_schedule);
+    if (ucc_unlikely(UCC_OK != status)) {
+        return status;
+    }
+
     schedule    = &tl_schedule->super.super;
     /* if count == size then we have 1 elem per rank, not enough
        to split into 2 sets */

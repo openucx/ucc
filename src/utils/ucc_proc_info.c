@@ -184,7 +184,7 @@ static ucc_status_t ucc_get_bound_socket_id(ucc_socket_id_t *socketid)
                 break;
             }
         }
-        ucc_assert(((*socketid) >= 0) && ((*socketid) < nr_cpus));
+        ucc_assert(((*socketid) != UCC_SOCKET_ID_INVALID) && ((*socketid) < nr_cpus));
     }
     __sched_cpufree(cpuset);
     ucc_free(socket_ids);
