@@ -437,13 +437,13 @@ static void ucc_trigger_test(ucc_coll_task_t *task)
 
         post_event.ev_type         = UCC_EVENT_COLLECTIVE_POST;
         post_event.ev_context_size = 0;
+        post_event.ev_context      = NULL;
         post_event.req             = &task->triggered_task->super;
         ucc_ee_set_event_internal(task->ee, &post_event,
                                   &task->ee->event_out_queue);
     }
 
-    if (task->executor == NULL ||
-        (ucc_ee_executor_status(task->executor) == UCC_OK)) {
+    if (ucc_ee_executor_status(task->executor) == UCC_OK) {
         task->status = UCC_OK;
     }
 }
