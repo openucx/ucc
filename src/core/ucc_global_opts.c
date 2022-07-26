@@ -49,7 +49,11 @@ ucc_config_field_t ucc_global_config_table[] = {
      ucc_offsetof(ucc_global_config_t, profile_log_size),
      UCC_CONFIG_TYPE_MEMUNITS},
 
-    {"CONFIG_FILE", "", "Location of configuration file",
+    {"CONFIG_FILE", "auto",
+     "Location of configuration file.\n"
+     "auto - config file is searched in $HOME/ucc.conf first, then, if not "
+     "found, in <ucc_install_path>/share/ucc.conf.\n"
+     "empty string \"\" - disable use of config file",
      ucc_offsetof(ucc_global_config_t, cfg_filename), UCC_CONFIG_TYPE_STRING},
 
     {NULL}};
