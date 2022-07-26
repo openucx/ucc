@@ -14,9 +14,8 @@
 #include <link.h>
 #include <dlfcn.h>
 
-#define UCC_LIB_SO_NAME "libucc.so"
-#define UCC_COMPONENT_LIBDIR "ucc"
-#define UCC_COMPONENT_LIBDIR_LEN strlen("ucc")
+#define UCC_COMPONENT_LIBDIR     UCC_MODULE_SUBDIR
+#define UCC_COMPONENT_LIBDIR_LEN strlen(UCC_MODULE_SUBDIR)
 
 static int callback(struct dl_phdr_info *info, size_t size, void *data)
 {
