@@ -443,7 +443,7 @@ ucc_status_t ucc_ec_cuda_event_test(void *event)
                      (cu_err != cudaErrorNotReady))) {
         CUDA_CHECK(cu_err);
     }
-    return CUDA_ERROR_TO_UCC_STATUS(cu_err);
+    return cuda_error_to_ucc_status(cu_err);
 }
 
 static ucc_status_t ucc_ec_cuda_finalize()
