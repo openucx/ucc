@@ -186,16 +186,21 @@ static inline void ucc_tl_ucp_put_task(ucc_tl_ucp_task_t *task)
     ucc_mpool_put(task);
 }
 
-static inline
-ucc_tl_ucp_schedule_t *ucc_tl_ucp_get_schedule(ucc_tl_ucp_team_t *team,
-                                               ucc_base_coll_args_t *args)
+static inline ucc_status_t
+ucc_tl_ucp_get_schedule(ucc_tl_ucp_team_t      *team,
+                        ucc_base_coll_args_t   *args,
+                        ucc_tl_ucp_schedule_t **schedule)
 {
     ucc_tl_ucp_context_t  *ctx      = UCC_TL_UCP_TEAM_CTX(team);
-    ucc_tl_ucp_schedule_t *schedule = ucc_mpool_get(&ctx->req_mp);
 
+    *schedule = ucc_mpool_get(&ctx->req_mp);
+
+    if (ucc_unlikely(!(*schedule))) {
+        return UCC_ERR_NO_MEMORY;
+    }
     UCC_TL_UCP_PROFILE_REQUEST_NEW(schedule, "tl_ucp_sched", 0);
-    ucc_schedule_init(&schedule->super.super, args, &team->super.super);
-    return schedule;
+    return ucc_schedule_init(&((*schedule)->super.super), args,
+                             &team->super.super);
 }
 
 static inline void ucc_tl_ucp_put_schedule(ucc_schedule_t *schedule)
