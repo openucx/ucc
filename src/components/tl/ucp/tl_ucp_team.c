@@ -46,6 +46,7 @@ ucc_tl_ucp_set_perf_funcs(ucc_tl_ucp_team_t *team,
     if (ucc_topo_isoppn(topo)) {
         ppn = ucc_topo_min_ppn(topo);
         nnodes = ucc_topo_nnodes(topo);
+//        printf("ppn = %d, nnodes = %d, rank = %d\n", ppn, nnodes, UCC_TL_TEAM_RANK(team));
         while (*key) {
             if ((*key)->cpu_vendor == vendor && (*key)->cpu_model == model &&
                 nnodes == (*key)->nnodes && ppn == (*key)->ppn) {

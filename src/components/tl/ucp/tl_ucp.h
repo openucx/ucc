@@ -34,7 +34,7 @@
 #define MAX_NR_SEGMENTS 32
 #define ONESIDED_SYNC_SIZE 1
 #define ONESIDED_REDUCE_SIZE 4
-#define UCC_TL_UCP_N_PERF_PARAMS 4
+#define UCC_TL_UCP_N_PERF_PARAMS 15
 
 typedef struct ucc_tl_ucp_iface {
     ucc_tl_iface_t super;
