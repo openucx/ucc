@@ -9,12 +9,15 @@ extern "C" {
 #endif
 
 #include "../ec_cuda.h"
+#include "../ec_cuda_executor.h"
 #include "utils/ucc_math.h"
 #include <inttypes.h>
 
 #ifdef __cplusplus
 }
 #endif
+
+#include "ec_cuda_reduce_ops.h"
 
 #define align_pow2(_n, _p) ((_n) & ((_p) - 1))
 
@@ -30,8 +33,7 @@ __global__ void executor_shutdown_ack(ucc_ec_cuda_executor_state_t *state)
     *state = UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK;
 }
 
-template <typename T>
-__device__ void executor_copy(T* __restrict__ d, T* __restrict__ s,
+__device__ void executor_copy(char *__restrict__ d, char *__restrict__ s,
                               size_t count)
 {
     size_t start = threadIdx.x;
@@ -42,13 +44,12 @@ __device__ void executor_copy(T* __restrict__ d, T* __restrict__ s,
     }
 }
 
-template <typename T>
-__device__ void executor_copy_aligned(T* __restrict__ d, T* __restrict__ s,
-                                      size_t count)
+__device__ void executor_copy_aligned(uint4 *__restrict__ d,
+                                      uint4 *__restrict__ s, size_t count)
 {
     size_t idx = threadIdx.x;
     const size_t step  = blockDim.x;
-    const int n = count / sizeof(T);
+    const int    n        = count / sizeof(uint4);
     const int num_iter = n / step + ((idx < n % step) ? 1 : 0);
     char1 *s1 = (char1*)s;
     char1 *d1 = (char1*)d;
@@ -58,177 +59,55 @@ __device__ void executor_copy_aligned(T* __restrict__ d, T* __restrict__ s,
         d[i * step + idx] = s[i * step + idx];
     }
 
-    if (idx < count % sizeof(T)) {
+    if (idx < count % sizeof(uint4)) {
         d1[count - idx - 1] = s1[count - idx - 1];
     }
 }
 
-__device__ inline void add_float4(float4 &d, const float4 &x, const float4 &y)
+__device__ void executor_copy_task(ucc_ee_executor_task_args_t *task_args)
 {
-    d.x = x.x + y.x;
-    d.y = x.y + y.y;
-    d.z = x.z + y.z;
-    d.w = x.w + y.w;
-}
-
-__device__ void executor_reduce_float_sum_aligned_2(const float *s1,
-                                                    const float *s2, float *d,
-                                                    size_t count)
-{
-    const float4 *s14      = (const float4*)s1;
-    const float4 *s24      = (const float4*)s2;
-    float4       *d4       = (float4*)d;
-    const size_t  idx      = threadIdx.x;
-    const size_t  step     = blockDim.x;
-    const int     n        = count / 4;
-    const int     num_iter = n / step + ((idx < n % step) ? 1 : 0);
-
-    for(int i = 0; i < num_iter; i++) {
-        add_float4(d4[i * step + idx], s14[i * step + idx],
-                   s24[i * step + idx]);
-    }
-    if (idx < count % 4) {
-        d[count - idx - 1] = s1[count - idx - 1] + s2[count - idx - 1];
-    }
-}
-
-
-template <typename T>
-__device__ void executor_reduce_sum(const T **__restrict__ srcs,
-                                    uint16_t n_srcs, T *__restrict__ d,
-                                    size_t   count)
-{
-    const size_t step  = blockDim.x;
-    const size_t start = threadIdx.x;
-
-    for (size_t i = start; i < count; i+=step) {
-        d[i] = srcs[0][i] + srcs[1][i];
-        for (size_t j = 2; j < n_srcs; j++) {
-            d[i] = d[i] + srcs[j][i];
-        }
-    }
-}
-
-template <typename T>
-__device__ void executor_reduce_strided_sum(const T* __restrict__ s1,
-                                            const T* __restrict__ s2,
-                                            T* __restrict__ d, size_t count,
-                                            size_t n_src2, size_t stride)
-{
-    const size_t step  = blockDim.x;
-    const size_t start = threadIdx.x;
-    const size_t ld    = stride / sizeof(T);
-
-    for (size_t i = start; i < count; i+=step) {
-        d[i] = s1[i] + s2[i];
-        for (size_t j = 1; j < n_src2; j++) {
-            d[i] = d[i] + s2[i + j*ld];
-        }
-     }
- }
-
-__device__ void executor_copy_task(ucc_eee_task_copy_t *task)
-{
-    bool aligned = !(align_pow2((intptr_t)task->dst, 16) ||
-                     align_pow2((intptr_t)task->src, 16));
+    ucc_eee_task_copy_t task_copy = task_args->copy;
+    bool                aligned   = !(align_pow2((intptr_t)task_copy.dst, 16) ||
+                     align_pow2((intptr_t)task_copy.src, 16));
     if (aligned) {
-        executor_copy_aligned<uint4>((uint4 *)task->dst,
-                                     (uint4 *)task->src,
-                                     task->len);
+        executor_copy_aligned((uint4 *)task_copy.dst, (uint4 *)task_copy.src,
+                              task_copy.len);
 
     } else {
-        executor_copy((char *)task->dst, (char *)task->src,
-                      task->len);
+        executor_copy((char *)task_copy.dst, (char *)task_copy.src,
+                      task_copy.len);
     }
 }
+__device__ void *executor_copy_ptr = (void *)executor_copy_task;
 
-__device__ void executor_reduce_strided_task(ucc_eee_task_reduce_strided_t *task)
+__device__ void executor_copy_multi(ucc_ee_executor_task_args_t *task_args)
 {
-    bool aligned = !(align_pow2((intptr_t)task->dst, 16) ||
-                     align_pow2((intptr_t)task->src1, 16) ||
-                     align_pow2((intptr_t)task->src2, 16));
-
-    switch (task->dt) {
-    case UCC_DT_FLOAT32:
-        if (task->n_src2 == 1 && aligned) {
-            executor_reduce_float_sum_aligned_2((float *)task->src1,
-                       (float *)task->src2, (float *)task->dst, task->count);
-        } else {
-            executor_reduce_strided_sum<float>((float *)task->src1,
-                                               (float *)task->src2, (float *)task->dst,
-                                               task->count, task->n_src2, task->stride);
-        }
-        break;
-    case UCC_DT_FLOAT64:
-        executor_reduce_strided_sum<double>((double *)task->src1,
-                                            (double *)task->src2, (double *)task->dst,
-                                            task->count, task->n_src2, task->stride);
-        break;
-    case UCC_DT_INT32:
-        executor_reduce_strided_sum<int32_t>((int32_t *)task->src1,
-                                             (int32_t *)task->src2, (int32_t *)task->dst,
-                                             task->count, task->n_src2, task->stride);
-        break;
-    default:
-        break;
-    }
-}
-
-__device__ void executor_reduce_task(ucc_eee_task_reduce_t *task)
-{
-    bool aligned = !(align_pow2((intptr_t)task->dst, 16) ||
-                     align_pow2((intptr_t)task->srcs[0], 16) ||
-                     align_pow2((intptr_t)task->srcs[1], 16));
-    switch (task->dt) {
-    case UCC_DT_FLOAT32:
-        if (task->n_srcs == 2 && aligned) {
-            executor_reduce_float_sum_aligned_2((float *)task->srcs[0],
-                      (float *)task->srcs[1], (float *)task->dst, task->count);
-        } else {
-            executor_reduce_sum<float>((const float **)task->srcs, task->n_srcs,
-                                       (float *)task->dst, task->count);
-        }
-        break;
-    case UCC_DT_FLOAT64:
-        executor_reduce_sum<double>((const double **)task->srcs, task->n_srcs,
-                                    (double *)task->dst, task->count);
-        break;
-    case UCC_DT_INT32:
-        executor_reduce_sum<int32_t>((const int32_t **)task->srcs, task->n_srcs,
-                                     (int32_t *)task->dst, task->count);
-        break;
-    default:
-        break;
-    }
-}
-
-__device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
-{
+    ucc_eee_task_copy_multi_t task_copy_multi = task_args->copy_multi;
     const size_t     step     = blockDim.x;
-    size_t           min_size = task->counts[0];
+    size_t                    min_size        = task_copy_multi.counts[0];
     size_t           idx      = threadIdx.x;
     __shared__ int4 *dsts[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
     __shared__ int4 *srcs[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
     bool             aligned;
 
-    for (int i = 0; i < task->num_vectors; i++) {
-        dsts[i] = (int4*)task->dst[i];
-        srcs[i] = (int4*)task->src[i];
+    for (int i = 0; i < task_copy_multi.num_vectors; i++) {
+        dsts[i] = (int4 *)task_copy_multi.dst[i];
+        srcs[i] = (int4 *)task_copy_multi.src[i];
         aligned = !(align_pow2((intptr_t)srcs[i], 16) ||
                     align_pow2((intptr_t)dsts[i], 16));
         if (!aligned) {
             break;
         }
-        if (task->counts[i] < min_size) {
-            min_size = task->counts[i];
+        if (task_copy_multi.counts[i] < min_size) {
+            min_size = task_copy_multi.counts[i];
         }
     }
 
     if (!aligned || min_size < 16) {
-        for (int i = 0; i < task->num_vectors; i++) {
-            executor_copy((char*)task->dst[i],
-                          (char*)task->src[i],
-                          task->counts[i]);
+        for (int i = 0; i < task_copy_multi.num_vectors; i++) {
+            executor_copy((char *)task_copy_multi.dst[i],
+                          (char *)task_copy_multi.src[i],
+                          task_copy_multi.counts[i]);
         }
         return;
     }
@@ -238,7 +117,7 @@ __device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
 
     for (size_t i = 0; i < num_iter; i++) {
 #pragma unroll
-        for (int j = 0; j < task->num_vectors; j++) {
+        for (int j = 0; j < task_copy_multi.num_vectors; j++) {
             dsts[j][idx] = srcs[j][idx];
         }
         idx += step;
@@ -246,13 +125,294 @@ __device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
 
     const size_t left = min_size + min_size % sizeof(uint4);
 
-    for (int i = 0; i < task->num_vectors; i++) {
-        executor_copy((char*)task->dst[i] + left,
-                      (char*)task->src[i] + left,
-                      task->counts[i] - left);
+    for (int i = 0; i < task_copy_multi.num_vectors; i++) {
+        executor_copy((char *)task_copy_multi.dst[i] + left,
+                      (char *)task_copy_multi.src[i] + left,
+                      task_copy_multi.counts[i] - left);
     }
 }
+__device__ void *executor_copy_multi_ptr = (void *)executor_copy_multi;
 
+#define DECLARE_REDUCE_EXEC(DT, OP)                                            \
+    static __device__ void EXECUTOR_REDUCE_##DT##_##OP(                        \
+        ucc_ee_executor_task_args_t *task_args)                                \
+    {                                                                          \
+        ucc_eee_task_reduce_t task_reduce = task_args->reduce;                 \
+        const DT **           srcs        = (const DT **)task_reduce.srcs;     \
+        const uint16_t        n_srcs      = task_reduce.n_srcs;                \
+        const size_t          count       = task_reduce.count;                 \
+        DT *                  d           = (DT *)task_reduce.dst;             \
+                                                                               \
+        const size_t step  = blockDim.x;                                       \
+        const size_t start = threadIdx.x;                                      \
+                                                                               \
+        for (size_t i = start; i < count; i += step) {                         \
+            d[i] = DO_OP_##OP(srcs[0][i], srcs[1][i]);                         \
+            for (size_t j = 2; j < n_srcs; j++) {                              \
+                d[i] = DO_OP_##OP(d[i], srcs[j][i]);                           \
+            }                                                                  \
+        }                                                                      \
+    }                                                                          \
+    __device__ void *EXECUTOR_REDUCE_##DT##_##OP##_ptr =                       \
+        (void *)EXECUTOR_REDUCE_##DT##_##OP;
+
+#define DECLARE_REDUCE_STRIDED_EXEC(DT, OP)                                    \
+    static __device__ void EXECUTOR_REDUCE_STRIDED_##DT##_##OP(                \
+        ucc_ee_executor_task_args_t *task_args)                                \
+    {                                                                          \
+        ucc_eee_task_reduce_strided_t task_reduce_strided =                    \
+            task_args->reduce_strided;                                         \
+        const DT *   s1     = (const DT *)task_reduce_strided.src1;            \
+        const DT *   s2     = (const DT *)task_reduce_strided.src2;            \
+        const size_t count  = task_reduce_strided.count;                       \
+        const size_t n_src2 = task_reduce_strided.n_src2;                      \
+        const size_t stride = task_reduce_strided.stride;                      \
+        DT *         d      = (DT *)task_reduce_strided.dst;                   \
+                                                                               \
+        const size_t step  = blockDim.x;                                       \
+        const size_t start = threadIdx.x;                                      \
+        const size_t ld    = stride / sizeof(DT);                              \
+                                                                               \
+        for (size_t i = start; i < count; i += step) {                         \
+            d[i] = DO_OP_##OP(s1[i], s2[i]);                                   \
+            for (size_t j = 1; j < n_src2; j++) {                              \
+                d[i] = DO_OP_##OP(d[i], s2[i + j * ld]);                       \
+            }                                                                  \
+        }                                                                      \
+    }                                                                          \
+    __device__ void *EXECUTOR_REDUCE_STRIDED_##DT##_##OP##_ptr =               \
+        (void *)EXECUTOR_REDUCE_STRIDED_##DT##_##OP;
+
+#define DECLARE_REDUCE_MIXED_EXEC(DT, OP)                                      \
+    DECLARE_REDUCE_EXEC(DT, OP)                                                \
+    DECLARE_REDUCE_STRIDED_EXEC(DT, OP)
+
+#define DECLARE_REDUCE_MIXED_EXEC_COMPLEX_OPS(DT)                              \
+    DECLARE_REDUCE_MIXED_EXEC(DT, SUM)                                         \
+    DECLARE_REDUCE_MIXED_EXEC(DT, PROD)
+
+#define DECLARE_REDUCE_MIXED_EXEC_REAL_OPS(DT)                                 \
+    DECLARE_REDUCE_MIXED_EXEC_COMPLEX_OPS(DT)                                  \
+    DECLARE_REDUCE_MIXED_EXEC(DT, MAX)                                         \
+    DECLARE_REDUCE_MIXED_EXEC(DT, MIN)
+
+#define DECLARE_REDUCE_MIXED_EXEC_INT_OPS(DT)                                  \
+    DECLARE_REDUCE_MIXED_EXEC_REAL_OPS(DT)                                     \
+    DECLARE_REDUCE_MIXED_EXEC(DT, LAND)                                        \
+    DECLARE_REDUCE_MIXED_EXEC(DT, LOR)                                         \
+    DECLARE_REDUCE_MIXED_EXEC(DT, LXOR)                                        \
+    DECLARE_REDUCE_MIXED_EXEC(DT, BAND)                                        \
+    DECLARE_REDUCE_MIXED_EXEC(DT, BOR)                                         \
+    DECLARE_REDUCE_MIXED_EXEC(DT, BXOR)
+
+DECLARE_REDUCE_MIXED_EXEC_REAL_OPS(float)
+DECLARE_REDUCE_MIXED_EXEC_REAL_OPS(double)
+DECLARE_REDUCE_MIXED_EXEC_COMPLEX_OPS(cuFloatComplex)
+DECLARE_REDUCE_MIXED_EXEC_COMPLEX_OPS(cuDoubleComplex)
+DECLARE_REDUCE_MIXED_EXEC_INT_OPS(int8_t)
+DECLARE_REDUCE_MIXED_EXEC_INT_OPS(int16_t)
+DECLARE_REDUCE_MIXED_EXEC_INT_OPS(int32_t)
+DECLARE_REDUCE_MIXED_EXEC_INT_OPS(int64_t)
+DECLARE_REDUCE_MIXED_EXEC_INT_OPS(uint8_t)
+DECLARE_REDUCE_MIXED_EXEC_INT_OPS(uint16_t)
+DECLARE_REDUCE_MIXED_EXEC_INT_OPS(uint32_t)
+DECLARE_REDUCE_MIXED_EXEC_INT_OPS(uint64_t)
+
+//Optimized function with vectorized operation for aligned data
+#define VECTORIZE(OP, d, s1, s2)                                               \
+    d.x = DO_OP_##OP(s1.x, s2.x);                                              \
+    d.y = DO_OP_##OP(s1.y, s2.y);                                              \
+    d.z = DO_OP_##OP(s1.z, s2.z);                                              \
+    d.w = DO_OP_##OP(s1.w, s2.w);
+
+#define EXECUTOR_REDUCE_float_ALIGNED_2(OP, s1, s2, d, count)                  \
+    const float4 *s14      = (const float4 *)s1;                               \
+    const float4 *s24      = (const float4 *)s2;                               \
+    const size_t  idx      = threadIdx.x;                                      \
+    const size_t  step     = blockDim.x;                                       \
+    const int     n        = count / 4;                                        \
+    const int     num_iter = n / step + ((idx < n % step) ? 1 : 0);            \
+    float4 *      d4       = (float4 *)d;                                      \
+                                                                               \
+    for (int i = 0; i < num_iter; i++) {                                       \
+        VECTORIZE(OP, d4[i * step + idx], s14[i * step + idx],                 \
+                  s24[i * step + idx]);                                        \
+    }                                                                          \
+    if (idx < count % 4) {                                                     \
+        d[count - idx - 1] =                                                   \
+            DO_OP_##OP(s1[count - idx - 1], s2[count - idx - 1]);              \
+    }
+
+#define DECLARE_REDUCE_float_CHECK_ALIGN_EXEC(OP)                              \
+    static __device__ void EXECUTOR_REDUCE_float_##OP##_CHECK_ALIGN(           \
+        ucc_ee_executor_task_args_t *task_args)                                \
+    {                                                                          \
+        ucc_eee_task_reduce_t task_reduce = task_args->reduce;                 \
+        const float **        srcs        = (const float **)task_reduce.srcs;  \
+        const uint16_t        n_srcs      = task_reduce.n_srcs;                \
+        const size_t          count       = task_reduce.count;                 \
+        float *               d           = (float *)task_reduce.dst;          \
+                                                                               \
+        bool aligned = !(align_pow2((intptr_t)d, 16) ||                        \
+                         align_pow2((intptr_t)srcs[0], 16) ||                  \
+                         align_pow2((intptr_t)srcs[1], 16));                   \
+                                                                               \
+        if (n_srcs == 2 && aligned) {                                          \
+            EXECUTOR_REDUCE_float_ALIGNED_2(OP, srcs[0], srcs[1], d, count);   \
+        } else {                                                               \
+            EXECUTOR_REDUCE_float_##OP(task_args);                             \
+        }                                                                      \
+    }                                                                          \
+    __device__ void *EXECUTOR_REDUCE_float_##OP##_CHECK_ALIGN_ptr =            \
+        (void *)EXECUTOR_REDUCE_float_##OP##_CHECK_ALIGN;
+
+#define DECLARE_REDUCE_STRIDED_float_CHECK_ALIGN_EXEC(OP)                      \
+    static __device__ void EXECUTOR_REDUCE_STRIDED_float_##OP##_CHECK_ALIGN(   \
+        ucc_ee_executor_task_args_t *task_args)                                \
+    {                                                                          \
+        ucc_eee_task_reduce_strided_t task_reduce_strided =                    \
+            task_args->reduce_strided;                                         \
+        const float *s1     = (float *)task_reduce_strided.src1;               \
+        const float *s2     = (float *)task_reduce_strided.src2;               \
+        const size_t count  = task_reduce_strided.count;                       \
+        const size_t n_src2 = task_reduce_strided.n_src2;                      \
+        float *      d      = (float *)task_reduce_strided.dst;                \
+                                                                               \
+        bool aligned =                                                         \
+            !(align_pow2((intptr_t)d, 16) || align_pow2((intptr_t)s1, 16) ||   \
+              align_pow2((intptr_t)s2, 16));                                   \
+                                                                               \
+        if (n_src2 == 1 && aligned) {                                          \
+            EXECUTOR_REDUCE_float_ALIGNED_2(OP, s1, s2, d, count);             \
+        } else {                                                               \
+            EXECUTOR_REDUCE_STRIDED_float_##OP(task_args);                     \
+        }                                                                      \
+    }                                                                          \
+    __device__ void *EXECUTOR_REDUCE_STRIDED_float_##OP##_CHECK_ALIGN_ptr =    \
+        (void *)EXECUTOR_REDUCE_STRIDED_float_##OP##_CHECK_ALIGN;
+
+#define DECLARE_REDUCE_float_CHECK_ALIGN_MIXED(OP)                             \
+    DECLARE_REDUCE_float_CHECK_ALIGN_EXEC(OP)                                  \
+        DECLARE_REDUCE_STRIDED_float_CHECK_ALIGN_EXEC(OP)
+
+DECLARE_REDUCE_float_CHECK_ALIGN_MIXED(SUM)
+    DECLARE_REDUCE_float_CHECK_ALIGN_MIXED(PROD)
+        DECLARE_REDUCE_float_CHECK_ALIGN_MIXED(MIN)
+            DECLARE_REDUCE_float_CHECK_ALIGN_MIXED(MAX)
+
+/*AVG EXECUTOR
+the AVG executor is used only if the flag UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA
+is true. Otherwise we use the SUM executor
+*/
+#define PARSE_REDUCE_TASK(task_args)                                           \
+    ucc_eee_task_reduce_t task = task_args->reduce;
+
+#define PARSE_REDUCE_STRIDED_TASK(task_args)                                   \
+    ucc_eee_task_reduce_strided_t task = task_args->reduce_strided;
+
+#define DECLARE_REDUCE_AVG_EXEC(TYPE, DT, alpha_DT, SUFFIX)                    \
+    static __device__ void EXECUTOR_##TYPE##_##DT##_AVG##SUFFIX(               \
+        ucc_ee_executor_task_args_t *task_args)                                \
+    {                                                                          \
+        PARSE_##TYPE##_TASK(task_args) const alpha_DT alpha =                  \
+            (alpha_DT)task.alpha;                                              \
+        const size_t count = task.count;                                       \
+        DT *         d     = (DT *)task.dst;                                   \
+                                                                               \
+        const size_t step  = blockDim.x;                                       \
+        const size_t start = threadIdx.x;                                      \
+                                                                               \
+        EXECUTOR_##TYPE##_##DT##_SUM##SUFFIX(task_args);                       \
+                                                                               \
+        for (int i = start; i < count; i += step) {                            \
+            d[i] = d[i] * alpha;                                               \
+        }                                                                      \
+    }                                                                          \
+    __device__ void *EXECUTOR_##TYPE##_##DT##_AVG##SUFFIX##_ptr =              \
+        (void *)EXECUTOR_##TYPE##_##DT##_AVG##SUFFIX;
+
+#define DECLARE_REDUCE_MIXED_AVG_EXEC(DT, alpha_DT, SUFFIX)                    \
+    DECLARE_REDUCE_AVG_EXEC(REDUCE, DT, alpha_DT, SUFFIX)                      \
+    DECLARE_REDUCE_AVG_EXEC(REDUCE_STRIDED, DT, alpha_DT, SUFFIX)
+
+                DECLARE_REDUCE_MIXED_AVG_EXEC(float, float, _CHECK_ALIGN)
+                    DECLARE_REDUCE_MIXED_AVG_EXEC(double, double, )
+                        DECLARE_REDUCE_MIXED_AVG_EXEC(cuFloatComplex, float, )
+                            DECLARE_REDUCE_MIXED_AVG_EXEC(cuDoubleComplex,
+                                                          double, )
+
+//Fill array of function pointers
+#define float_TO_UCC_DT           UCC_DT_FLOAT32
+#define double_TO_UCC_DT          UCC_DT_FLOAT64
+#define uint8_t_TO_UCC_DT         UCC_DT_UINT8
+#define uint16_t_TO_UCC_DT        UCC_DT_UINT16
+#define uint32_t_TO_UCC_DT        UCC_DT_UINT32
+#define uint64_t_TO_UCC_DT        UCC_DT_UINT64
+#define int8_t_TO_UCC_DT          UCC_DT_INT8
+#define int16_t_TO_UCC_DT         UCC_DT_INT16
+#define int32_t_TO_UCC_DT         UCC_DT_INT32
+#define int64_t_TO_UCC_DT         UCC_DT_INT64
+#define cuFloatComplex_TO_UCC_DT  UCC_DT_FLOAT32_COMPLEX
+#define cuDoubleComplex_TO_UCC_DT UCC_DT_FLOAT64_COMPLEX
+
+#define FILL_FUNC_PTR_REDUCE(TYPE, DT, OP, SUFFIX)                             \
+    CUDA_CHECK(cudaMemcpyFromSymbol(                                           \
+        &(ucc_ec_cuda.exec_ptr                                                 \
+              .TYPE[UCC_DT_INDEX(DT##_TO_UCC_DT)][UCC_OP_##OP]),               \
+        EXECUTOR_##TYPE##_##DT##_##OP##SUFFIX##_ptr, sizeof(void *), 0,        \
+        cudaMemcpyDeviceToHost));
+
+#define FILL_FUNC_PTR_REDUCE_MIXED(DT, OP, SUFFIX)                             \
+    FILL_FUNC_PTR_REDUCE(REDUCE, DT, OP, SUFFIX)                               \
+    FILL_FUNC_PTR_REDUCE(REDUCE_STRIDED, DT, OP, SUFFIX)
+
+#define FILL_FUNC_PTR_REDUCE_MIXED_COMPLEX_OPS(DT, SUFFIX)                     \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, SUM, SUFFIX)                                \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, PROD, SUFFIX)                               \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, AVG, SUFFIX)
+
+#define FILL_FUNC_PTR_REDUCE_MIXED_REAL_OPS(DT, SUFFIX)                        \
+    FILL_FUNC_PTR_REDUCE_MIXED_COMPLEX_OPS(DT, SUFFIX)                         \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, MAX, SUFFIX)                                \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, MIN, SUFFIX)
+
+#define FILL_FUNC_PTR_REDUCE_MIXED_INT_OPS(DT, SUFFIX)                         \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, SUM, SUFFIX)                                \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, PROD, SUFFIX)                               \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, MAX, SUFFIX)                                \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, MIN, SUFFIX)                                \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, LAND, SUFFIX)                               \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, LOR, SUFFIX)                                \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, LXOR, SUFFIX)                               \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, BAND, SUFFIX)                               \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, BOR, SUFFIX)                                \
+    FILL_FUNC_PTR_REDUCE_MIXED(DT, BXOR, SUFFIX)
+
+ucc_status_t ucc_ec_cuda_executor_init_exec_ptr()
+{
+    CUDA_CHECK(cudaMemcpyFromSymbol(&(ucc_ec_cuda.exec_ptr.COPY),
+                                    executor_copy_ptr, sizeof(void *), 0,
+                                    cudaMemcpyDeviceToHost));
+
+    CUDA_CHECK(cudaMemcpyFromSymbol(&(ucc_ec_cuda.exec_ptr.COPY_MULTI),
+                                    executor_copy_multi_ptr, sizeof(void *), 0,
+                                    cudaMemcpyDeviceToHost));
+
+    FILL_FUNC_PTR_REDUCE_MIXED_REAL_OPS(float, _CHECK_ALIGN)
+    FILL_FUNC_PTR_REDUCE_MIXED_REAL_OPS(double, )
+    FILL_FUNC_PTR_REDUCE_MIXED_INT_OPS(uint8_t, )
+    FILL_FUNC_PTR_REDUCE_MIXED_INT_OPS(uint16_t, )
+    FILL_FUNC_PTR_REDUCE_MIXED_INT_OPS(uint32_t, )
+    FILL_FUNC_PTR_REDUCE_MIXED_INT_OPS(uint64_t, )
+    FILL_FUNC_PTR_REDUCE_MIXED_INT_OPS(int8_t, )
+    FILL_FUNC_PTR_REDUCE_MIXED_INT_OPS(int16_t, )
+    FILL_FUNC_PTR_REDUCE_MIXED_INT_OPS(int32_t, )
+    FILL_FUNC_PTR_REDUCE_MIXED_INT_OPS(int64_t, )
+    FILL_FUNC_PTR_REDUCE_MIXED_COMPLEX_OPS(cuFloatComplex, )
+    FILL_FUNC_PTR_REDUCE_MIXED_COMPLEX_OPS(cuDoubleComplex, )
+
+    return UCC_OK;
+}
 
 __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
                                 int q_size)
@@ -291,22 +451,11 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
         if (worker_done) {
             return;
         }
-        switch (args.task_type) {
-        case UCC_EE_EXECUTOR_TASK_COPY:
-            executor_copy_task(&args.copy);
-            break;
-        case UCC_EE_EXECUTOR_TASK_REDUCE:
-            executor_reduce_task(&args.reduce);
-            break;
-        case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:
-            executor_reduce_strided_task(&args.reduce_strided);
-            break;
-        case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
-            executor_copy_multi(&args.copy_multi);
-            break;
-        default:
-            break;
-        }
+
+        auto exec_function =
+            (void (*)(ucc_ee_executor_task_args_t *))args.exec_ptr;
+        exec_function(&args);
+
         __syncthreads();
         __threadfence_system();
         if (is_master) {

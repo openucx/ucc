@@ -319,6 +319,14 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
+
+    status = ucc_ec_cuda_executor_init_exec_ptr();
+    if (status != UCC_OK) {
+        ec_error(&ucc_ec_cuda.super,
+                 "failed to initialize function pointer arrays");
+        return status;
+    }
+
     ucc_ec_cuda.task_strm_type = cfg->task_strm_type;
     ucc_spinlock_init(&ucc_ec_cuda.init_spinlock, 0);
     return UCC_OK;

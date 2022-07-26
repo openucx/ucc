@@ -63,21 +63,29 @@ typedef struct ucc_ec_cuda_config {
     int                            reduce_num_threads;
 } ucc_ec_cuda_config_t;
 
+typedef struct ucc_ec_cuda_persistent_exec_ptr {
+    void *COPY;
+    void *COPY_MULTI;
+    void *REDUCE[UCC_DT_PREDEFINED_LAST][UCC_OP_NUMBER_OF_OPS];
+    void *REDUCE_STRIDED[UCC_DT_PREDEFINED_LAST][UCC_OP_NUMBER_OF_OPS];
+} ucc_ec_cuda_persistent_exec_ptr_t;
+
 typedef struct ucc_ec_cuda {
-    ucc_ec_base_t                  super;
-    int                            stream_initialized;
-    cudaStream_t                   stream;
-    int                            exec_streams_initialized;
-    cudaStream_t                  *exec_streams;
-    ucc_mpool_t                    events;
-    ucc_mpool_t                    strm_reqs;
-    ucc_mpool_t                    executors;
-    ucc_mpool_t                    executor_interruptible_tasks;
-    ucc_thread_mode_t              thread_mode;
-    ucc_ec_cuda_strm_task_mode_t   strm_task_mode;
-    ucc_ec_cuda_task_stream_type_t task_strm_type;
-    ucc_ec_cuda_task_post_fn       post_strm_task;
-    ucc_spinlock_t                 init_spinlock;
+    ucc_ec_base_t                     super;
+    int                               stream_initialized;
+    cudaStream_t                      stream;
+    int                               exec_streams_initialized;
+    cudaStream_t                     *exec_streams;
+    ucc_mpool_t                       events;
+    ucc_mpool_t                       strm_reqs;
+    ucc_mpool_t                       executors;
+    ucc_mpool_t                       executor_interruptible_tasks;
+    ucc_thread_mode_t                 thread_mode;
+    ucc_ec_cuda_strm_task_mode_t      strm_task_mode;
+    ucc_ec_cuda_task_stream_type_t    task_strm_type;
+    ucc_ec_cuda_task_post_fn          post_strm_task;
+    ucc_spinlock_t                    init_spinlock;
+    ucc_ec_cuda_persistent_exec_ptr_t exec_ptr;
 } ucc_ec_cuda_t;
 
 typedef struct ucc_ec_cuda_event {
@@ -124,6 +132,8 @@ ucc_status_t ucc_ec_cuda_event_destroy(void *event);
 ucc_status_t ucc_ec_cuda_event_post(void *ee_context, void *event);
 
 ucc_status_t ucc_ec_cuda_event_test(void *event);
+
+ucc_status_t ucc_ec_cuda_executor_init_exec_ptr();
 
 extern ucc_ec_cuda_t ucc_ec_cuda;
 

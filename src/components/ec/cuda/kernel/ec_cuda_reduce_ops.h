@@ -13,40 +13,40 @@
 #endif
 #include <cuComplex.h>
 
-__device__
-cuDoubleComplex operator+ (const cuDoubleComplex & first,
-                           const cuDoubleComplex & second) {
+static __device__ cuDoubleComplex operator+(const cuDoubleComplex &first,
+                                            const cuDoubleComplex &second)
+{
     return cuCadd(first, second);
 }
 
-__device__
-cuDoubleComplex operator* (const cuDoubleComplex & first,
-                           const cuDoubleComplex & second) {
+static __device__ cuDoubleComplex operator*(const cuDoubleComplex &first,
+                                            const cuDoubleComplex &second)
+{
     return cuCmul(first, second);
 }
 
-__device__
-cuDoubleComplex operator* (const cuDoubleComplex & first,
-                           const double & second) {
+static __device__ cuDoubleComplex operator*(const cuDoubleComplex &first,
+                                            const double &         second)
+{
     return make_cuDoubleComplex(cuCreal(first) * second,
                                 cuCimag(first) * second);
 }
 
-__device__
-cuFloatComplex operator+ (const cuFloatComplex & first,
-                          const cuFloatComplex & second) {
+static __device__ cuFloatComplex operator+(const cuFloatComplex &first,
+                                           const cuFloatComplex &second)
+{
     return cuCaddf(first, second);
 }
 
-__device__
-cuFloatComplex operator* (const cuFloatComplex & first,
-                          const cuFloatComplex & second) {
+static __device__ cuFloatComplex operator*(const cuFloatComplex &first,
+                                           const cuFloatComplex &second)
+{
     return cuCmulf(first, second);
 }
 
-__device__
-cuFloatComplex operator* (const cuFloatComplex & first,
-                          const float & second) {
+static __device__ cuFloatComplex operator*(const cuFloatComplex &first,
+                                           const float &         second)
+{
     return make_cuFloatComplex(cuCrealf(first) * second,
                                cuCimagf(first) * second);
 }

@@ -461,6 +461,8 @@ typedef enum {
     UCC_OP_LAST
 } ucc_reduction_op_t;
 
+#define UCC_OP_NUMBER_OF_OPS (UCC_OP_LAST - UCC_OP_SUM)
+
 /**
  *
  *  @ingroup UCC_LIB_INIT_DT

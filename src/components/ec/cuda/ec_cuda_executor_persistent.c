@@ -7,6 +7,34 @@
 #include "ec_cuda_executor.h"
 #include "utils/arch/cpu.h"
 
+void *get_exec_ptr(const ucc_ee_executor_task_args_t *args)
+{
+    int                avg_without_alpha;
+    ucc_reduction_op_t op;
+
+    switch (args->task_type) {
+    case UCC_EE_EXECUTOR_TASK_COPY:
+        return ucc_ec_cuda.exec_ptr.COPY;
+    case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
+        return ucc_ec_cuda.exec_ptr.COPY_MULTI;
+    case UCC_EE_EXECUTOR_TASK_REDUCE:
+        avg_without_alpha =
+            ((args->reduce.op == UCC_OP_AVG) &&
+             !(args->flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA));
+        op = avg_without_alpha ? UCC_OP_SUM : args->reduce.op;
+        return ucc_ec_cuda.exec_ptr.REDUCE[UCC_DT_INDEX(args->reduce.dt)][op];
+    case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:
+        avg_without_alpha =
+            ((args->reduce_strided.op == UCC_OP_AVG) &&
+             !(args->flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA));
+        op = avg_without_alpha ? UCC_OP_SUM : args->reduce_strided.op;
+        return ucc_ec_cuda.exec_ptr
+            .REDUCE_STRIDED[UCC_DT_INDEX(args->reduce_strided.dt)][op];
+    default:
+        return NULL;
+    }
+}
+
 ucc_status_t
 ucc_cuda_executor_persistent_task_post(ucc_ee_executor_t *executor,
                                        const ucc_ee_executor_task_args_t *task_args,
@@ -16,30 +44,6 @@ ucc_cuda_executor_persistent_task_post(ucc_ee_executor_t *executor,
                                                        ucc_ec_cuda_executor_t);
     int                     max_tasks = EC_CUDA_CONFIG->exec_max_tasks;
     ucc_ee_executor_task_t *ee_task;
-    ucc_datatype_t          dt;
-    ucc_reduction_op_t      op;
-
-    if (task_args->task_type != UCC_EE_EXECUTOR_TASK_COPY &&
-        task_args->task_type != UCC_EE_EXECUTOR_TASK_COPY_MULTI) {
-        if (task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
-            dt = task_args->reduce.dt;
-            op = task_args->reduce.op;
-        } else {
-            dt = task_args->reduce_strided.dt;
-            op = task_args->reduce_strided.op;
-        }
-        if (op != UCC_OP_SUM) {
-            ec_error(&ucc_ec_cuda.super, "not supported reduction op: %s",
-                     ucc_reduction_op_str(op));
-            return UCC_ERR_NOT_SUPPORTED;
-        }
-        if ((dt != UCC_DT_FLOAT32) && (dt != UCC_DT_FLOAT64) &&
-            (dt != UCC_DT_INT32)) {
-            ec_error(&ucc_ec_cuda.super, "not supported reduction dtype: %s",
-                     ucc_datatype_str(dt));
-            return UCC_ERR_NOT_SUPPORTED;
-        }
-    }
 
     if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {
         ucc_spin_lock(&eee->tasks_lock);
@@ -48,6 +52,11 @@ ucc_cuda_executor_persistent_task_post(ucc_ee_executor_t *executor,
     ee_task->eee    = executor;
     ee_task->status = UCC_OPERATION_INITIALIZED;
     memcpy(&ee_task->args, task_args, sizeof(ucc_ee_executor_task_args_t));
+    ee_task->args.exec_ptr = get_exec_ptr(task_args);
+    if (!ee_task->args.exec_ptr) {
+        ec_error(&ucc_ec_cuda.super, "failed to post task: task not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     ucc_memory_cpu_store_fence();
     eee->pidx += 1;
     if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {

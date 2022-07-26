@@ -176,5 +176,7 @@ typedef enum {
     (ucc_datatype_t)((((uint64_t)(_id)) << UCC_DATATYPE_SHIFT) | \
                      (UCC_DATATYPE_PREDEFINED))
 
+#define UCC_DT_INDEX(_dt)                                                      \
+    (ucc_datatype_t)(((uint64_t)(_dt)) >> UCC_DATATYPE_SHIFT)
 
 #endif

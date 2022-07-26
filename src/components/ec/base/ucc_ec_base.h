@@ -147,6 +147,7 @@ typedef struct ucc_eee_task_copy_multi{
 typedef struct ucc_ee_executor_task_args {
     uint16_t                     task_type;
     uint16_t                     flags;
+    void *                       exec_ptr;
     union {
         ucc_eee_task_reduce_t         reduce;
         ucc_eee_task_reduce_strided_t reduce_strided;
