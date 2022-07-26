@@ -313,14 +313,14 @@ ucc_status_t ucc_tl_cuda_topo_create(const ucc_base_lib_t *lib,
     ucc_status_t status;
 
     topo = (ucc_tl_cuda_topo_t*)ucc_malloc(sizeof(*topo), "cuda_topo");
-    topo->lib = lib;
     if (!topo) {
         tl_error(lib, "failed to alloc cuda topo");
         status = UCC_ERR_NO_MEMORY;
         goto exit_err;
     }
 
-    status = ucc_tl_cuda_topo_graph_create(topo);
+    topo->lib = lib;
+    status    = ucc_tl_cuda_topo_graph_create(topo);
     if (status != UCC_OK) {
         goto free_topo;
     }
