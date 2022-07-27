@@ -230,8 +230,10 @@ void UccTestMpi::create_team(ucc_test_mpi_team_t t, bool is_onesided)
     ucc_team_h team;
     MPI_Comm comm = create_mpi_comm(t);
     if (is_onesided) {
-        team = create_ucc_team(comm, true);
-        onesided_teams.push_back(ucc_test_team_t(t, comm, team, onesided_ctx));
+        MPI_Comm comm_dup;
+        MPI_Comm_dup(comm, &comm_dup);
+        team = create_ucc_team(comm_dup, true);
+        onesided_teams.push_back(ucc_test_team_t(t, comm_dup, team, onesided_ctx));
     } else {
         team = create_ucc_team(comm);
         teams.push_back(ucc_test_team_t(t, comm, team, ctx));
