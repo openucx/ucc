@@ -131,18 +131,14 @@ static int ucc_tl_sharp_service_barrier(void *arg)
     ucc_tl_sharp_oob_ctx_t *oob_ctx = (ucc_tl_sharp_oob_ctx_t*)arg;
     ucc_tl_sharp_context_t *ctx     = (ucc_tl_sharp_context_t*)oob_ctx->ctx;
     ucc_tl_team_t          *steam   = ctx->super.super.ucc_context->service_team;
-    ucc_subset_t subset;
     ucc_coll_task_t *req;
     ucc_status_t status;
     int32_t sbuf, rbuf;
 
-    subset.map.type   = UCC_EP_MAP_FULL;
-    subset.map.ep_num = oob_ctx->oob->n_oob_eps;
-    subset.myrank     = oob_ctx->oob->oob_ep;
-
     status = UCC_TL_TEAM_IFACE(steam)->scoll.allreduce(&steam->super, &sbuf,
                                                        &rbuf, UCC_DT_INT32, 1,
-                                                       UCC_OP_SUM, subset, &req);
+                                                       UCC_OP_SUM,
+                                                       oob_ctx->subset, &req);
     if (status != UCC_OK) {
         tl_error(ctx->super.super.lib, "tl sharp gather failed\n");
         return status;
@@ -164,13 +160,9 @@ static int ucc_tl_sharp_service_gather(void *arg, int root, void *sbuf,
     ucc_tl_sharp_context_t *ctx      = (ucc_tl_sharp_context_t*)oob_ctx->ctx;
     ucc_tl_team_t          *steam    = ctx->super.super.ucc_context->service_team;
     size_t                  msg_size = (size_t)size;
+    ucc_subset_t            subset   = oob_ctx->subset;
     ucc_coll_task_t *req;
     ucc_status_t status;
-    ucc_subset_t subset;
-
-    subset.map.type   = UCC_EP_MAP_FULL;
-    subset.map.ep_num = oob_ctx->oob->n_oob_eps;
-    subset.myrank     = oob_ctx->oob->oob_ep;
 
     if (subset.myrank != root) {
         rbuf = ucc_malloc(msg_size * subset.map.ep_num, "tmp_gather");
@@ -183,8 +175,8 @@ static int ucc_tl_sharp_service_gather(void *arg, int root, void *sbuf,
     }
 
     status = UCC_TL_TEAM_IFACE(steam)->scoll.allgather(&steam->super, sbuf,
-                                                       rbuf, msg_size,
-                                                       subset, &req);
+                                                       rbuf, msg_size, subset,
+                                                       &req);
     if (status != UCC_OK) {
         tl_error(ctx->super.super.lib, "tl sharp gather failed\n");
         return status;
@@ -210,14 +202,9 @@ static int ucc_tl_sharp_service_bcast(void *arg, void *buf, int size, int root)
     ucc_tl_team_t          *steam   = ctx->super.super.ucc_context->service_team;
     ucc_coll_task_t *req;
     ucc_status_t status;
-    ucc_subset_t subset;
-
-    subset.map.type   = UCC_EP_MAP_FULL;
-    subset.map.ep_num = oob_ctx->oob->n_oob_eps;
-    subset.myrank     = oob_ctx->oob->oob_ep;
 
     status = UCC_TL_TEAM_IFACE(steam)->scoll.bcast(&steam->super, buf, size,
-                                                   root, subset, &req);
+                                                   root, oob_ctx->subset, &req);
     if (status != UCC_OK) {
         tl_error(ctx->super.super.lib, "tl sharp bcast failed\n");
         return status;
@@ -374,10 +361,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
         self->cfg.rand_seed = (int) tval.tv_usec;
     }
 
-    self->sharp_context = NULL;
-    self->rcache        = NULL;
-    self->oob_ctx.ctx   = self;
-    self->oob_ctx.oob   = &UCC_TL_CTX_OOB(self);
+    self->sharp_context  = NULL;
+    self->rcache         = NULL;
+    self->oob_ctx.ctx    = self;
+    self->oob_ctx.oob    = &UCC_TL_CTX_OOB(self);
+    self->oob_ctx.subset.map.type   = UCC_EP_MAP_FULL;
+    self->oob_ctx.subset.map.ep_num = self->oob_ctx.oob->n_oob_eps;
+    self->oob_ctx.subset.myrank     = self->oob_ctx.oob->oob_ep;
     self->tm            = params->thread_mode;
 
     status = ucc_mpool_init(&self->req_mp, 0, sizeof(ucc_tl_sharp_task_t), 0,

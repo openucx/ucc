@@ -26,6 +26,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
 
     self->oob_ctx.ctx = UCC_TL_TEAM_CTX(self);
     self->oob_ctx.oob = &UCC_TL_TEAM_OOB(self);
+    self->oob_ctx.subset.map = UCC_TL_TEAM_MAP(self);
+    self->oob_ctx.subset.myrank = UCC_TL_TEAM_RANK(self);
 
     comm_spec.rank              = UCC_TL_TEAM_RANK(self);
     comm_spec.size              = UCC_TL_TEAM_SIZE(self);
