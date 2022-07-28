@@ -168,6 +168,13 @@ static inline const char* team_str(ucc_test_mpi_team_t t) {
     return NULL;
 }
 
+typedef struct ucc_test_mpi_data {
+    int local_node_rank;
+} ucc_test_mpi_data_t;
+extern ucc_test_mpi_data_t ucc_test_mpi_data;
+
+int init_test_mpi_data(void);
+
 #if defined(HAVE_CUDA) || defined(HAVE_HIP)
 void set_gpu_device(test_set_gpu_device_t set_device);
 #endif
