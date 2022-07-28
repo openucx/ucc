@@ -46,17 +46,15 @@ ucc_tl_ucp_set_perf_funcs(ucc_tl_ucp_team_t *team,
     if (ucc_topo_isoppn(topo)) {
         ppn = ucc_topo_min_ppn(topo);
         nnodes = ucc_topo_nnodes(topo);
-//        printf("ppn = %d, nnodes = %d, rank = %d\n", ppn, nnodes, UCC_TL_TEAM_RANK(team));
         while (*key) {
             if ((*key)->cpu_vendor == vendor && (*key)->cpu_model == model &&
                 nnodes == (*key)->nnodes && ppn == (*key)->ppn) {
-//                team->perf_params_allreduce = (*key)->allreduce_func; //TODO
-                team->allreduce_alg_thresh = (*key)->allreduce_alg_thresh;
+                team->perf_params_allreduce = (*key)->perf_allreduce_func;
+                team->allreduce_alg_thresh  = (*key)->allreduce_alg_thresh;
                 if (0 == UCC_TL_TEAM_RANK(team)) {
                     tl_debug(UCC_TL_TEAM_LIB(team), "using perf params: %s",
                              (*key)->label);
                 }
-//                printf("found key\n");
                 goto exit_ok;
             }
             key++;
@@ -92,9 +90,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    self->preconnect_task      = NULL;
-    self->seq_num              = 0;
-    self->status               = UCC_INPROGRESS;
+    self->preconnect_task       = NULL;
+    self->seq_num               = 0;
+    self->status                = UCC_INPROGRESS;
+    self->perf_params_allreduce = ucc_tl_ucp_perf_params_generic_allreduce;
 
     if (UCC_TL_UCP_TEAM_LIB(self)->cfg.allreduce_set_perf_params &&
         !IS_SERVICE_TEAM(self) && UCC_TL_CORE_CTX(self)->topo != NULL) {

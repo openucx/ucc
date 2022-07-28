@@ -186,19 +186,22 @@ out:
 
 ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
-    ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
-    ucc_rank_t         rank      = task->subset.myrank;
+    ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team = TASK_TEAM(task);
+    ucc_rank_t         size = (ucc_rank_t)task->subset.map.ep_num;
+    ucc_rank_t         rank = task->subset.myrank;
+    size_t data_size = TASK_ARGS(task).dst.info.count *
+                       ucc_dt_size(TASK_ARGS(task).dst.info.datatype);
+    ucc_tl_ucp_perf_params_t params;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_kn_start", 0);
     task->allreduce_kn.phase = UCC_KN_PHASE_INIT;
     ucc_assert(UCC_IS_INPLACE(TASK_ARGS(task)) ||
                (TASK_ARGS(task).src.info.mem_type ==
                TASK_ARGS(task).dst.info.mem_type));
+    team->perf_params_allreduce(&params, &TASK_LIB(task)->cfg, data_size);
     ucc_knomial_pattern_init(size, rank,
-                             ucc_min(UCC_TL_UCP_TEAM_LIB(team)->
-                                     cfg.allreduce_kn_radix, size),
+                             ucc_min(params.allreduce_kn_radix, size),
                              &task->allreduce_kn.p);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -206,13 +209,17 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
 {
+    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
     size_t             count     = TASK_ARGS(task).dst.info.count;
     ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
     size_t             data_size = count * ucc_dt_size(dt);
     ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
-    ucc_kn_radix_t     radix =
-        ucc_min(TASK_LIB(task)->cfg.allreduce_kn_radix, size);
+    ucc_kn_radix_t     radix;
     ucc_status_t       status;
+    ucc_tl_ucp_perf_params_t params;
+
+    team->perf_params_allreduce(&params, &TASK_LIB(task)->cfg, data_size);
+    radix = ucc_min(params.allreduce_kn_radix, size);
 
     task->super.flags    |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post     = ucc_tl_ucp_allreduce_knomial_start;

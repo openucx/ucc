@@ -96,13 +96,18 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
     size_t               count    = coll_args->args.dst.info.count;
     ucc_base_coll_args_t args     = *coll_args;
+    size_t               msgsize  = coll_args->args.dst.info.count *
+        ucc_dt_size(coll_args->args.dst.info.datatype);
     ucc_schedule_t      *schedule =
         &ucc_tl_ucp_get_schedule(tl_team, coll_args)->super.super;
     ucc_coll_task_t     *task, *rs_task;
     ucc_status_t         status;
     ucc_kn_radix_t       radix, cfg_radix;
+    ucc_tl_ucp_perf_params_t params;
 
-    cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sra_kn_radix;
+    tl_team->perf_params_allreduce(&params, &UCC_TL_UCP_TEAM_LIB(tl_team)->cfg,
+                                   msgsize);
+    cfg_radix = params.allreduce_sra_radix;
     radix = ucc_knomial_pattern_get_min_radix(cfg_radix,
                                               UCC_TL_TEAM_SIZE(tl_team), count);
 
@@ -144,15 +149,17 @@ static inline void get_sra_n_frags(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_lib_config_t *cfg     = &UCC_TL_UCP_TEAM_LIB(team)->cfg;
     size_t                   msgsize = coll_args->args.dst.info.count *
                      ucc_dt_size(coll_args->args.dst.info.datatype);
+    ucc_tl_ucp_perf_params_t params;
     int min_num_frags;
 
+    team->perf_params_allreduce(&params, cfg, msgsize);
     *n_frags = 1;
-    if (msgsize > cfg->allreduce_sra_kn_frag_thresh) {
+    if (msgsize > params.allreduce_sra_frag_thresh) {
         min_num_frags = ucc_div_round_up(msgsize,
                                              cfg->allreduce_sra_kn_frag_size);
-        *n_frags = ucc_max(min_num_frags, cfg->allreduce_sra_kn_n_frags);
+        *n_frags = ucc_max(min_num_frags, params.allreduce_sra_n_frags);
     }
-    *pipeline_depth = ucc_min(*n_frags, cfg->allreduce_sra_kn_pipeline_depth);
+    *pipeline_depth = ucc_min(*n_frags, params.allreduce_sra_pipeline_depth);
 }
 
 static ucc_status_t
