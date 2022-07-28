@@ -407,18 +407,14 @@ test_set_gpu_device_t test_gpu_set_device = TEST_SET_DEV_NONE;
 #if defined(HAVE_CUDA) || defined(HAVE_HIP)
 void set_gpu_device(test_set_gpu_device_t set_device)
 {
-    MPI_Comm local_comm;
+    int local_rank = ucc_test_mpi_data.local_node_rank;
     int gpu_dev_count;
-    int local_rank;
     int device_id;
 
     if (set_device == TEST_SET_DEV_NONE) {
         return;
     }
 
-    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
-                        &local_comm);
-    MPI_Comm_rank(local_comm, &local_rank);
 #if defined(HAVE_CUDA)
     CUDA_CHECK(cudaGetDeviceCount(&gpu_dev_count));
 #elif defined(HAVE_HIP)
