@@ -5,6 +5,7 @@
 
 int test_rand_seed = -1;
 static size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX;
+ucc_test_mpi_data_t ucc_test_mpi_data;
 
 static std::vector<ucc_coll_type_t> colls = {
     UCC_COLL_TYPE_BARRIER,        UCC_COLL_TYPE_BCAST,
@@ -508,6 +509,7 @@ int main(int argc, char *argv[])
         goto mpi_exit;
     }
 
+    init_test_mpi_data();
 #if defined(HAVE_CUDA) || defined(HAVE_HIP)
     set_gpu_device(test_gpu_set_device);
 #endif
@@ -599,4 +601,15 @@ test_exit:
 mpi_exit:
     MPI_Finalize();
     return failed;
+}
+
+int init_test_mpi_data(void)
+{
+    MPI_Comm local_comm;
+
+    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
+                        &local_comm);
+    MPI_Comm_rank(local_comm, &ucc_test_mpi_data.local_node_rank);
+    MPI_Comm_free(&local_comm);
+    return 0;
 }
