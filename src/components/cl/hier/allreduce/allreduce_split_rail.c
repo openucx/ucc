@@ -119,6 +119,7 @@ static ucc_status_t ucc_cl_hier_allreduce_split_rail_frag_init(
     size_t           dt_size = ucc_dt_size(coll_args->args.dst.info.datatype);
     ucc_status_t     status  = UCC_OK;
     int              inplace = UCC_IS_INPLACE(coll_args->args);
+    int              n_frags = sp->super.n_tasks;
     ucc_coll_task_t *task_rs, *task_ag, *task_ar;
     ucc_base_coll_args_t    rs_args, ar_args, ag_args;
     ucc_cl_hier_schedule_t *cl_schedule;
@@ -172,6 +173,9 @@ static ucc_status_t ucc_cl_hier_allreduce_split_rail_frag_init(
     rs_args.args.dst.info_v.counts   = counts;
     rs_args.args.dst.info_v.mem_type = coll_args->args.dst.info.mem_type;
     rs_args.args.dst.info_v.datatype = coll_args->args.dst.info.datatype;
+    rs_args.max_frag_count = ucc_buffer_block_count(
+        ucc_buffer_block_count(total_count, n_frags, 0), node_size, 0);
+    rs_args.mask |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
     if (inplace) {
         rs_args.args.src.info.buffer   = coll_args->args.dst.info.buffer;
         rs_args.args.src.info.datatype = coll_args->args.dst.info.datatype;
@@ -190,6 +194,9 @@ static ucc_status_t ucc_cl_hier_allreduce_split_rail_frag_init(
     }
 
     /* ALLREDUCE */
+    ar_args.mask |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
+    ar_args.max_frag_count      = ucc_buffer_block_count(total_count,
+                                                         n_frags, 0);
     ar_args.args.coll_type      = UCC_COLL_TYPE_ALLREDUCE;
     ar_args.args.src.info.count = counts[node_rank];
     if (!inplace) {

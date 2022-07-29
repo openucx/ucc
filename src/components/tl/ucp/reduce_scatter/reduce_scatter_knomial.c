@@ -249,11 +249,10 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
     size_t             count     = coll_args->args.dst.info.count;
     ucc_datatype_t     dt        = coll_args->args.dst.info.datatype;
     size_t             dt_size   = ucc_dt_size(dt);
-    size_t             data_size = count * dt_size;
     ucc_memory_type_t  mem_type  = coll_args->args.dst.info.mem_type;
     ucc_tl_ucp_task_t *task;
     ucc_status_t       status;
-    size_t             max_recv_size;
+    size_t             max_recv_size, data_size;
     ucc_kn_radix_t     step_radix;
 
     task                 = ucc_tl_ucp_init_task(coll_args, team);
@@ -268,6 +267,10 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
     task->reduce_scatter_kn.scratch_mc_header = NULL;
 
     if (KN_NODE_EXTRA != task->reduce_scatter_kn.p.node_type) {
+        if (coll_args->mask & UCC_BASE_CARGS_MAX_FRAG_COUNT) {
+            count = coll_args->max_frag_count;
+        }
+        data_size = count * dt_size;
         step_radix =
             ucc_sra_kn_compute_step_radix(rank, size,
                                           &task->reduce_scatter_kn.p);
