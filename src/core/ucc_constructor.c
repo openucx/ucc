@@ -42,6 +42,7 @@ static int callback(struct dl_phdr_info *info, size_t size, void *data)
         component_path = (char *)ucc_malloc(len, "component_path");
         if (!component_path) {
             ucc_free(install_path);
+            ucc_global_config.install_path = NULL;
             ucc_error("failed to allocate %zd bytes for component_path", len);
             return -1;
         }
@@ -51,15 +52,25 @@ static int callback(struct dl_phdr_info *info, size_t size, void *data)
         len                -= (pos + 1);
         component_path[pos] = '\0';
         strncat(component_path, UCC_COMPONENT_LIBDIR, len);
-        ucc_global_config.component_path =
-            ucc_global_config.component_path_default = component_path;
+        ucc_global_config.component_path = component_path;
     }
     return 0;
 }
 
-static void get_default_lib_path()
+static void get_lib_path()
 {
-    dl_iterate_phdr(callback, NULL);
+    if (strlen(ucc_global_config.component_path_customized) == 0) {
+        /* get default library path contains libucc.so */
+        dl_iterate_phdr(callback, NULL);
+    } else {
+        size_t len = strlen(ucc_global_config.component_path_customized) + 1;
+        ucc_global_config.component_path = (char *)ucc_malloc(len, "component_path");
+        if (!ucc_global_config.component_path) {
+            ucc_error("failed to allocate %zd bytes for component_path", len);
+            return;
+        }
+        ucc_strncpy_safe(ucc_global_config.component_path, ucc_global_config.component_path_customized, len);
+    }
 }
 
 static ucc_status_t ucc_check_config_file(void)
@@ -96,9 +107,11 @@ static ucc_status_t ucc_check_config_file(void)
         }
     }
     /* Finally, try to find config file in the library install/share */
-    if (UCC_OK != (status = ucc_str_concat(cfg->install_path,
-                                           default_share_name, &filename))) {
-        return status;
+    if (cfg->install_path) {
+        status = ucc_str_concat(cfg->install_path,
+                                default_share_name, &filename);
+    } else {
+        return UCC_ERR_NOT_FOUND;
     }
     status = ucc_parse_file_config(filename, &ucc_global_config.file_cfg);
     ucc_free(filename);
@@ -111,8 +124,8 @@ ucc_status_t ucc_constructor(void)
     ucc_status_t         status;
 
     if (!cfg->initialized) {
-        cfg->initialized            = 1;
-        cfg->component_path_default = NULL;
+        cfg->initialized    = 1;
+        cfg->component_path = NULL;
 
         status = ucc_config_parser_fill_opts(
             &ucc_global_config, ucc_global_config_table, "UCC_", NULL, 1);
@@ -120,9 +133,7 @@ ucc_status_t ucc_constructor(void)
             ucc_error("failed to parse global options");
             return status;
         }
-        if (strlen(cfg->component_path) == 0) {
-            get_default_lib_path();
-        }
+        get_lib_path();
         if (!cfg->component_path) {
             ucc_error("failed to get ucc components path");
             return UCC_ERR_NOT_FOUND;
@@ -196,6 +207,8 @@ __attribute__((destructor)) static void ucc_destructor(void)
 #ifdef HAVE_PROFILING
         ucc_profile_cleanup();
 #endif
+        ucc_free(ucc_global_config.component_path);
+        ucc_free(ucc_global_config.install_path);
         ucc_config_parser_release_opts(&ucc_global_config,
                                        ucc_global_config_table);
         if (ucc_global_config.file_cfg) {

@@ -22,7 +22,7 @@ typedef struct ucc_global_config {
 
     /* Coll component libraries path */
     char *component_path;
-    char *component_path_default;
+    char *component_path_customized;
     char *install_path;
     int   initialized;
     /* Profiling mode */

@@ -29,7 +29,7 @@ ucc_config_field_t ucc_global_config_table[] = {
      UCC_CONFIG_TYPE_LOG_COMP},
 
     {"COMPONENT_PATH", "", "Specifies dynamic components location",
-     ucc_offsetof(ucc_global_config_t, component_path), UCC_CONFIG_TYPE_STRING},
+     ucc_offsetof(ucc_global_config_t, component_path_customized), UCC_CONFIG_TYPE_STRING},
 
     {"PROFILE_MODE", "",
      "Profile collection modes. If none is specified, profiling is disabled.\n"
