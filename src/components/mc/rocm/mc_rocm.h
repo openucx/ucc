@@ -34,8 +34,6 @@ typedef ucc_status_t (*ucc_mc_rocm_task_post_fn) (uint32_t *dev_status,
 
 typedef struct ucc_mc_rocm_config {
     ucc_mc_config_t                super;
-    unsigned long                  reduce_num_blocks;
-    int                            reduce_num_threads;
     size_t                         mpool_elem_size;
     int                            mpool_max_elems;
 } ucc_mc_rocm_config_t;
@@ -51,31 +49,6 @@ typedef struct ucc_mc_rocm {
     ucc_spinlock_t                 init_spinlock;
     ucc_thread_mode_t              thread_mode;
 } ucc_mc_rocm_t;
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-ucc_status_t ucc_mc_rocm_reduce(const void *src1, const void *src2,
-                                void *dst, size_t count, ucc_datatype_t dt,
-                                ucc_reduction_op_t op);
-
-ucc_status_t ucc_mc_rocm_reduce_multi(const void *src1, const void *src2,
-                                      void *dst, size_t n_vectors,
-                                      size_t count, size_t stride,
-                                      ucc_datatype_t dt,
-                                      ucc_reduction_op_t op);
-
-ucc_status_t
-ucc_mc_rocm_reduce_multi_alpha(const void *src1, const void *src2, void *dst,
-                               size_t n_vectors, size_t count, size_t stride,
-                               ucc_datatype_t dt, ucc_reduction_op_t reduce_op,
-                               ucc_reduction_op_t vector_op, double alpha);
-
-#ifdef __cplusplus
-}    
-#endif
     
 extern ucc_mc_rocm_t ucc_mc_rocm;
 

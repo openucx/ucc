@@ -24,8 +24,9 @@ LINK = $(LIBTOOL) --mode=link $(CC) -o $@
 
 comp_noinst = libucc_ec_rocm_kernels.la
 
-libucc_ec_rocm_kernels_la_SOURCES  = ec_rocm_wait_kernel.cu  \
-                                     ec_rocm_executor_kernel.cu
+libucc_ec_rocm_kernels_la_SOURCES  = ec_rocm_wait_kernel.cu     \
+                                     ec_rocm_executor_kernel.cu \
+                                     ec_rocm_reduce.cu
 libucc_ec_rocm_kernels_la_CPPFLAGS =
 
 noinst_LTLIBRARIES = $(comp_noinst)
