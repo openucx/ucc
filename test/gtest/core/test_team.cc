@@ -96,3 +96,28 @@ UCC_TEST_F(test_team, team_create_no_ep)
     UccTeam_h team = UccJob::getStaticJob()->create_team(
         UccJob::staticUccJobSize, false, false);
 }
+
+UCC_TEST_F(test_team, team_get_attr)
+{
+    UccJob *job   = UccJob::getStaticJob();
+    int job_size  = job->n_procs;
+    int n_teams   = 4; /* how many teams to create */
+    int test_rank = 1;
+    std::vector<UccTeam_h> teams;
+    std::vector<int> team_sizes;
+    for (int i = 0; i < n_teams; i++) {
+        int team_size = 2 + (rand() % (job_size - 2 + 1));
+        team_sizes.push_back(team_size);
+        teams.push_back(job->create_team(team_size));
+    }
+    for (int i = 0; i < n_teams; i++) {
+        ucc_team_h      team = teams[i].get()->procs[test_rank].team;
+        ucc_team_attr_t attr = {.mask = UCC_TEAM_ATTR_FIELD_SIZE |
+                                        UCC_TEAM_ATTR_FIELD_EP};
+        EXPECT_EQ(ucc_team_get_attr(team, &attr), UCC_OK);
+        EXPECT_EQ(attr.size, team_sizes[i]);
+        EXPECT_EQ(attr.ep, test_rank);
+    }
+    /* shuffle vector so that teams are destroyed in different order */
+    std::shuffle(teams.begin(), teams.end(), std::default_random_engine());
+}
