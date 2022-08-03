@@ -100,7 +100,12 @@ AC_SUBST([localmoduledir], ['$(abs_top_builddir)/modules']) # local directory fo
 AC_SUBST([objdir],         [${objdir}])                     # libtool objects dir, usually .libs
 AC_SUBST([shrext],         [${shrext_cmds}])                # libtool shared library extension
 AC_DEFINE_UNQUOTED([UCC_MODULE_SUBDIR], ["${modulesubdir}"], [UCC module sub-directory])
-AC_DEFINE_UNQUOTED([UCC_LIB_SO_NAME], ["libucc.so"], [Default name of UCC shared object])
+#
+# customized name of UCC soname for library search at runtime
+#
+test "${UCC_SONAME+set}" = set || UCC_SONAME="libucc.so"
+AC_ARG_VAR(UCC_SONAME, [Customized UCC soname for library search at runtime (default is libucc.so)])
+AC_DEFINE_UNQUOTED([UCC_LIB_SO_NAME], ["$UCC_SONAME"], [UCC soname for library search at runtime])
 
 #
 # Additional m4 files
