@@ -123,6 +123,7 @@ typedef struct ucc_tl_ucp_perf_params {
 typedef struct ucc_tl_ucp_task ucc_tl_ucp_task_t;
 typedef void (*perf_params_fn_t)(ucc_tl_ucp_perf_params_t *params,
                                  ucc_tl_ucp_lib_config_t  *cfg,
+                                 ucc_memory_type_t         mtype,
                                  size_t                    data_size);
 
 typedef struct ucc_tl_ucp_perf_key {

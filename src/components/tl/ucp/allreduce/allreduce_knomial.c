@@ -199,7 +199,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     ucc_assert(UCC_IS_INPLACE(TASK_ARGS(task)) ||
                (TASK_ARGS(task).src.info.mem_type ==
                TASK_ARGS(task).dst.info.mem_type));
-    team->perf_params_allreduce(&params, &TASK_LIB(task)->cfg, data_size);
+    team->perf_params_allreduce(&params, &TASK_LIB(task)->cfg,
+                                TASK_ARGS(task).dst.info.mem_type, data_size);
     ucc_knomial_pattern_init(size, rank,
                              ucc_min(params.allreduce_kn_radix, size),
                              &task->allreduce_kn.p);
@@ -218,7 +219,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
     ucc_status_t       status;
     ucc_tl_ucp_perf_params_t params;
 
-    team->perf_params_allreduce(&params, &TASK_LIB(task)->cfg, data_size);
+    team->perf_params_allreduce(&params, &TASK_LIB(task)->cfg,
+                                TASK_ARGS(task).dst.info.mem_type, data_size);
     radix = ucc_min(params.allreduce_kn_radix, size);
 
     task->super.flags    |= UCC_COLL_TASK_FLAG_EXECUTOR;

@@ -106,7 +106,7 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
     ucc_tl_ucp_perf_params_t params;
 
     tl_team->perf_params_allreduce(&params, &UCC_TL_UCP_TEAM_LIB(tl_team)->cfg,
-                                   msgsize);
+                                   coll_args->args.dst.info.mem_type, msgsize);
     cfg_radix = params.allreduce_sra_radix;
     radix = ucc_knomial_pattern_get_min_radix(cfg_radix,
                                               UCC_TL_TEAM_SIZE(tl_team), count);
@@ -152,7 +152,8 @@ static inline void get_sra_n_frags(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_perf_params_t params;
     int min_num_frags;
 
-    team->perf_params_allreduce(&params, cfg, msgsize);
+    team->perf_params_allreduce(&params, cfg,
+                                coll_args->args.dst.info.mem_type, msgsize);
     *n_frags = 1;
     if (msgsize > params.allreduce_sra_frag_thresh) {
         min_num_frags = ucc_div_round_up(msgsize,
