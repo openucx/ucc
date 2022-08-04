@@ -26,13 +26,14 @@ ucc_pt_coll_allgather::ucc_pt_coll_allgather(ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_allgather::init_coll_args(size_t single_rank_count,
-                                                   ucc_coll_args_t &args)
+ucc_status_t ucc_pt_coll_allgather::init_args(size_t single_rank_count,
+                                              ucc_pt_test_args_t &test_args)
 {
-    size_t dt_size  = ucc_dt_size(coll_args.src.info.datatype);
-    size_t size_src = single_rank_count * dt_size;
-    size_t size_dst = comm->get_size() * single_rank_count * dt_size;
-    ucc_status_t st;
+    ucc_coll_args_t &args     = test_args.coll_args;
+    size_t           dt_size  = ucc_dt_size(coll_args.src.info.datatype);
+    size_t           size_src = single_rank_count * dt_size;
+    size_t           size_dst = comm->get_size() * single_rank_count * dt_size;
+    ucc_status_t     st;
 
     args = coll_args;
     args.dst.info.count = single_rank_count * comm->get_size();
@@ -54,16 +55,20 @@ exit:
 }
 
 float ucc_pt_coll_allgather::get_bw(float time_ms, int grsize,
-                                    ucc_coll_args_t args)
+                                    ucc_pt_test_args_t test_args)
 {
-    float N = grsize;
-    float S = args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
+    ucc_coll_args_t &args = test_args.coll_args;
+    float           N     = grsize;
+    float           S     = args.dst.info.count *
+                            ucc_dt_size(args.dst.info.datatype);
 
     return (S / time_ms) * ((N - 1) / N) / 1000.0;
 }
 
-void ucc_pt_coll_allgather::free_coll_args(ucc_coll_args_t &args)
+void ucc_pt_coll_allgather::free_args(ucc_pt_test_args_t &test_args)
 {
+    ucc_coll_args_t &args = test_args.coll_args;
+
     if (!UCC_IS_INPLACE(args)) {
         ucc_mc_free(src_header);
     }

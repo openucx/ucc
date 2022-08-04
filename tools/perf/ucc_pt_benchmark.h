@@ -19,14 +19,16 @@ class ucc_pt_benchmark {
 
     ucc_status_t barrier();
     void print_header();
-    void print_time(size_t count, ucc_coll_args_t args,
-                    double time);
+    void print_time(size_t count, ucc_pt_test_args_t args, double time);
 public:
     ucc_pt_benchmark(ucc_pt_benchmark_config cfg, ucc_pt_comm *communicator);
     ucc_status_t run_bench() noexcept;
-    ucc_status_t run_single_test(ucc_coll_args_t args,
-                                 int nwarmup, int niter,
-                                 double &time) noexcept;
+    ucc_status_t run_single_coll_test(ucc_coll_args_t args,
+                                      int nwarmup, int niter,
+                                      double &time) noexcept;
+    ucc_status_t run_single_executor_test(ucc_ee_executor_task_args_t args,
+                                          int nwarmup, int niter,
+                                          double &time) noexcept;
     ~ucc_pt_benchmark();
 };
 

@@ -26,13 +26,14 @@ ucc_pt_coll_scatter::ucc_pt_coll_scatter(ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_scatter::init_coll_args(size_t single_rank_count,
-                                                   ucc_coll_args_t &args)
+ucc_status_t ucc_pt_coll_scatter::init_args(size_t single_rank_count,
+                                            ucc_pt_test_args_t &test_args)
 {
-    size_t dt_size  = ucc_dt_size(coll_args.dst.info.datatype);
-    size_t size_dst = single_rank_count * dt_size;
-    size_t size_src = comm->get_size() * single_rank_count * dt_size;
-    ucc_status_t st_src = UCC_OK, st_dst = UCC_OK;
+    ucc_coll_args_t &args     = test_args.coll_args;
+    size_t           dt_size  = ucc_dt_size(coll_args.dst.info.datatype);
+    size_t           size_dst = single_rank_count * dt_size;
+    size_t           size_src = comm->get_size() * single_rank_count * dt_size;
+    ucc_status_t     st_src = UCC_OK, st_dst = UCC_OK;
     bool is_root;
 
     args                = coll_args;
@@ -61,17 +62,20 @@ exit:
 }
 
 float ucc_pt_coll_scatter::get_bw(float time_ms, int grsize,
-                                    ucc_coll_args_t args)
+                                  ucc_pt_test_args_t test_args)
 {
-    float S = args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
-    float N = grsize - 1;
+    ucc_coll_args_t &args = test_args.coll_args;
+    float            S    = args.dst.info.count * ucc_dt_size(args.dst.info.datatype);
+    float            N    = grsize - 1;
 
     return (S * N) / time_ms / 1000.0;
 }
 
-void ucc_pt_coll_scatter::free_coll_args(ucc_coll_args_t &args)
+void ucc_pt_coll_scatter::free_args(ucc_pt_test_args_t &test_args)
 {
-    bool is_root = (comm->get_rank() == args.root);
+    ucc_coll_args_t &args    = test_args.coll_args;
+    bool             is_root = (comm->get_rank() == args.root);
+
     if (!is_root || !UCC_IS_INPLACE(args)) {
         ucc_mc_free(dst_header);
     }

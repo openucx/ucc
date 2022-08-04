@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # $COPYRIGHT$
 #
 # Additional copyrights may follow
@@ -30,7 +30,10 @@ ucc_perftest_SOURCES =            \
 	ucc_pt_coll_reduce.cc         \
 	ucc_pt_coll_reduce_scatter.cc \
 	ucc_pt_coll_scatter.cc        \
-	ucc_pt_coll_scatterv.cc
+	ucc_pt_coll_scatterv.cc       \
+	ucc_pt_op_memcpy.cc           \
+	ucc_pt_op_reduce.cc           \
+	ucc_pt_op_reduce_strided.cc
 
 CXX=$(MPICXX)
 LD=$(MPICXX)
