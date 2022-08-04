@@ -51,4 +51,12 @@ ucc_status_t ucc_tl_rccl_reduce_init(ucc_tl_rccl_task_t *task);
 
 ucc_status_t ucc_tl_rccl_barrier_init(ucc_tl_rccl_task_t *task);
 
+ucc_status_t ucc_tl_rccl_gather_init(ucc_tl_rccl_task_t *task);
+
+ucc_status_t ucc_tl_rccl_gatherv_init(ucc_tl_rccl_task_t *task);
+
+ucc_status_t ucc_tl_rccl_scatter_init(ucc_tl_rccl_task_t *task);
+
+ucc_status_t ucc_tl_rccl_scatterv_init(ucc_tl_rccl_task_t *task);
+
 #endif
