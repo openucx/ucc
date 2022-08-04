@@ -421,6 +421,7 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             goto out;
         }
         team->state = UCC_TEAM_SERVICE_TEAM;
+        /* fall through */
     case UCC_TEAM_SERVICE_TEAM:
         if ((context->cl_flags & UCC_BASE_LIB_FLAG_SERVICE_TEAM_REQUIRED) ||
             ((context->cl_flags & UCC_BASE_LIB_FLAG_TEAM_ID_REQUIRED) &&
@@ -434,6 +435,7 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             }
         }
         team->state = UCC_TEAM_ALLOC_ID;
+        /* fall through */
     case UCC_TEAM_ALLOC_ID:
         if (context->cl_flags & UCC_BASE_LIB_FLAG_TEAM_ID_REQUIRED) {
             status = ucc_team_alloc_id(team);
@@ -448,6 +450,7 @@ ucc_status_t ucc_team_create_test_single(ucc_context_t *context,
             UCC_TL_TEAM_IFACE(team->service_team)->scoll.update_id
                 (&team->service_team->super, team->id);
         }
+        /* fall through */
     case UCC_TEAM_CL_CREATE:
         status = ucc_team_create_cls(context, team);
     }

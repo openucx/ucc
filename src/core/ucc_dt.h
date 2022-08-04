@@ -7,6 +7,7 @@
 #define UCC_DT_H_
 #include "config.h"
 #include "ucc/api/ucc.h"
+#include "utils/ucc_compiler_def.h"
 
 typedef struct ucc_dt_generic {
     void                     *context;
@@ -59,8 +60,10 @@ static inline size_t ucc_dt_size(ucc_datatype_t dt)
     } else if (UCC_DT_IS_CONTIG(dt)) {
         return ucc_contig_dt_size(dt);
     }
-    // GENERIC callck pack/unpack
-    // TODO remove ucc_likely once custom datatype is implemented
-    return 0;
+    /* GENERIC callback pack/unpack
+       TODO remove ucc_likely once custom datatype is implemented
+       does not matter what to return - we should not get here */
+    ucc_assert(0);
+    return SIZE_MAX;
 }
 #endif
