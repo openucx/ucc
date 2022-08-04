@@ -250,6 +250,10 @@ ucc_status_t ucc_ec_rocm_reduce(ucc_ee_executor_task_args_t *task,
         op    = task->reduce_strided.op;
     }
 
+    if (count == 0) {
+        return UCC_OK;
+    }
+
     bk = ucc_min((count + th - 1) / th, bk);
 
     switch (dt) {
