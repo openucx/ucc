@@ -332,7 +332,6 @@ ucc_status_t ucc_ec_cuda_reduce(ucc_ee_executor_task_args_t *task,
         return UCC_ERR_NOT_SUPPORTED;
     }
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaStreamSynchronize(stream));
     return UCC_OK;
 }
 #ifdef __cplusplus

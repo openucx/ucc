@@ -314,7 +314,6 @@ ucc_status_t ucc_ec_rocm_reduce(ucc_ee_executor_task_args_t *task,
         return UCC_ERR_NOT_SUPPORTED;
     }
     ROCMCHECK(hipGetLastError());
-    ROCMCHECK(hipStreamSynchronize(stream));
     return UCC_OK;
 }
 #ifdef __cplusplus
