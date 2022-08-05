@@ -84,7 +84,7 @@ UCC_REDUCE_KN_PHASE_INIT:
                 SAVE_STATE(UCC_REDUCE_KN_PHASE_MULTI);
                 goto UCC_REDUCE_KN_PHASE_PROGRESS;
 UCC_REDUCE_KN_PHASE_MULTI:
-                if (task->reduce_kn.children_per_cycle) {
+                if (task->reduce_kn.children_per_cycle && count > 0) {
                     is_avg = args->op == UCC_OP_AVG &&
                              (avg_pre_op ? (task->reduce_kn.dist == 1)
                                          : (task->reduce_kn.dist ==
@@ -166,10 +166,12 @@ ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *coll_task)
     	task->reduce_kn.scratch = args->src.info.buffer;
     }
 
-    status =
-        ucc_coll_task_get_executor(&task->super, &task->reduce_kn.executor);
-    if (ucc_unlikely(status != UCC_OK)) {
-        return status;
+    if (args->coll_type != UCC_COLL_TYPE_FANIN) {
+        status =
+            ucc_coll_task_get_executor(&task->super, &task->reduce_kn.executor);
+        if (ucc_unlikely(status != UCC_OK)) {
+            return status;
+        }
     }
 
     if (isleaf && self_avg) {
