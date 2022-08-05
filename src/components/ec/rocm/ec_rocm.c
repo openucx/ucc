@@ -70,6 +70,11 @@ static ucc_config_field_t ucc_ec_rocm_config_table[] = {
      ucc_offsetof(ucc_ec_rocm_config_t, exec_num_streams),
      UCC_CONFIG_TYPE_ULUNITS},
 
+     {"REDUCE_NUM_BLOCKS", "auto",
+     "Number of thread blocks to use for reduction in interruptible mode",
+     ucc_offsetof(ucc_ec_rocm_config_t, reduce_num_blocks),
+     UCC_CONFIG_TYPE_ULUNITS},
+
     {NULL}
 
 };
@@ -181,8 +186,6 @@ static void ucc_ec_rocm_event_cleanup(ucc_mpool_t *mp, void *obj)
     }
 }
 
-
-
 static ucc_mpool_ops_t ucc_ec_rocm_event_mpool_ops = {
     .chunk_alloc   = ucc_mpool_hugetlb_malloc,
     .chunk_release = ucc_mpool_hugetlb_free,
@@ -221,6 +224,7 @@ static ucc_status_t ucc_ec_rocm_init(const ucc_ec_params_t *ec_params)
     hipError_t            rocm_st;
     hipDevice_t           hip_dev;
     const char           *hip_err_st_str;
+    hipDeviceProp_t       prop;
 
     ucc_ec_rocm.stream                   = NULL;
     ucc_ec_rocm.stream_initialized       = 0;
@@ -235,6 +239,20 @@ static ucc_status_t ucc_ec_rocm_init(const ucc_ec_params_t *ec_params)
         return UCC_ERR_NO_RESOURCE;
     }
     ROCMCHECK(hipGetDevice(&device));
+
+    ROCMCHECK(hipGetDeviceProperties(&prop, device));
+    cfg->reduce_num_threads = prop.maxThreadsPerBlock;
+
+    if (cfg->reduce_num_blocks != UCC_ULUNITS_AUTO) {
+        if (prop.maxGridSize[0] < cfg->reduce_num_blocks) {
+            ec_warn(&ucc_ec_rocm.super,
+                    "number of blocks is too large, max supported %d",
+                    prop.maxGridSize[0]);
+            cfg->reduce_num_blocks = prop.maxGridSize[0];
+        }
+    } else {
+        cfg->reduce_num_blocks = prop.maxGridSize[0];
+    }
 
     /*create event pool */
     ucc_ec_rocm.exec_streams = ucc_calloc(cfg->exec_num_streams,

@@ -5,12 +5,12 @@
  */
 
 #include "reduce_scatterv.h"
-#include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
 #include "core/ucc_progress_queue.h"
 #include "components/mc/ucc_mc.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
+#include "utils/ucc_dt_reduce.h"
 
 static inline void send_completion_common(void *request, ucs_status_t status,
                                           void *user_data)
@@ -163,15 +163,18 @@ static void ucc_tl_ucp_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
         is_avg =
             (args->op == UCC_OP_AVG) && (task->tagged.recv_completed == (size - 1));
         if (UCC_OK !=
-            (status = ucc_tl_ucp_reduce_multi(
+            (status = ucc_dt_reduce(
                  r_scratch,
                  PTR_OFFSET(sbuf, (block_offset + frag_offset) * dt_size),
-                 reduce_target, 1, frag_count, 0, dt, mem_type, task,
-                 is_avg))) {
+                 reduce_target, frag_count, dt, args,
+                 is_avg ? UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA : 0,
+                 AVG_ALPHA(task), task->reduce_scatterv_ring.executor,
+                 &task->reduce_scatterv_ring.etask))) {
             tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
             task->super.status = status;
             return;
         }
+        EXEC_TASK_WAIT(task->reduce_scatterv_ring.etask);
         if (task->tagged.recv_completed == size - 1) {
             task->tagged.recv_posted = task->tagged.recv_completed = 0;
             break;
@@ -224,10 +227,16 @@ ucc_tl_ucp_reduce_scatterv_ring_start(ucc_coll_task_t *coll_task)
     size_t             block_offset, frag_count, frag_offset;
     void *             r_scratch;
     ucc_rank_t         send_block, recv_block;
+    ucc_status_t       status;
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     if (UCC_IS_INPLACE(*args)) {
         sbuf = args->dst.info_v.buffer;
+    }
+    status = ucc_coll_task_get_executor(&task->super,
+                                        &task->reduce_scatter_ring.executor);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
     }
 
     sendto     = ucc_ep_map_eval(task->reduce_scatterv_ring.inv_map, sendto);
@@ -408,6 +417,7 @@ ucc_tl_ucp_reduce_scatterv_ring_init(ucc_base_coll_args_t *coll_args,
                                     UCC_EVENT_SCHEDULE_STARTED, ctask,
                                     ucc_task_start_handler);
     }
+    schedule->super.flags   |= UCC_COLL_TASK_FLAG_EXECUTOR;
     schedule->super.post     = ucc_tl_ucp_reduce_scatterv_ring_sched_post;
     schedule->super.finalize = ucc_tl_ucp_reduce_scatterv_ring_sched_finalize;
     *task_h                  = &schedule->super;

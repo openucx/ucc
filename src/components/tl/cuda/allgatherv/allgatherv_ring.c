@@ -270,7 +270,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress_ring(ucc_tl_cuda_task_t *task,
             }
 
             if (dbuf1 != NULL) {
-                eargs_rem.task_type               = UCC_EE_EXECUTOR_TASK_TYPE_COPY_MULTI;
+                eargs_rem.task_type               = UCC_EE_EXECUTOR_TASK_COPY_MULTI;
                 eargs_rem.copy_multi.src[ring]    = sbuf1;
                 eargs_rem.copy_multi.dst[ring]    = dbuf1;
                 eargs_rem.copy_multi.counts[ring] = frag_count1;
@@ -278,7 +278,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress_ring(ucc_tl_cuda_task_t *task,
             }
 
             if (dbuf2 != NULL) {
-                eargs_loc.task_type               = UCC_EE_EXECUTOR_TASK_TYPE_COPY_MULTI;
+                eargs_loc.task_type               = UCC_EE_EXECUTOR_TASK_COPY_MULTI;
                 eargs_loc.copy_multi.src[ring]    = sbuf2;
                 eargs_loc.copy_multi.dst[ring]    = dbuf2;
                 eargs_loc.copy_multi.counts[ring] = frag_count2;

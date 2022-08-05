@@ -16,11 +16,6 @@ static ucc_config_field_t ucc_mc_rocm_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_mc_rocm_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_mc_config_table)},
 
-    {"REDUCE_NUM_BLOCKS", "auto",
-     "Number of thread blocks to use for reduction",
-     ucc_offsetof(ucc_mc_rocm_config_t, reduce_num_blocks),
-     UCC_CONFIG_TYPE_ULUNITS},
-
     {"MPOOL_ELEM_SIZE", "1Mb", "The size of each element in mc rocm mpool",
      ucc_offsetof(ucc_mc_rocm_config_t, mpool_elem_size),
      UCC_CONFIG_TYPE_MEMUNITS},
@@ -34,9 +29,7 @@ static ucc_config_field_t ucc_mc_rocm_config_table[] = {
 
 static ucc_status_t ucc_mc_rocm_init(const ucc_mc_params_t *mc_params)
 {
-    ucc_mc_rocm_config_t *cfg = MC_ROCM_CONFIG;
-    struct hipDeviceProp_t prop;
-    int device, num_devices;
+    int num_devices;
     hipError_t rocm_st;
 
     ucc_mc_rocm.stream             = NULL;
@@ -49,16 +42,6 @@ static ucc_status_t ucc_mc_rocm_init(const ucc_mc_params_t *mc_params)
     if ((rocm_st != hipSuccess) || (num_devices == 0)) {
         mc_info(&ucc_mc_rocm.super, "rocm devices are not found");
         return hip_error_to_ucc_status(rocm_st);
-    }
-    ROCMCHECK(hipGetDevice(&device));
-    ROCMCHECK(hipGetDeviceProperties(&prop, device));
-    cfg->reduce_num_threads = prop.maxThreadsPerBlock;
-    if (cfg->reduce_num_blocks != UCC_ULUNITS_AUTO) {
-        if (prop.maxGridSize[0] < cfg->reduce_num_blocks) {
-            mc_warn(&ucc_mc_rocm.super, "number of blocks is too large, "
-                    "max supported %d", prop.maxGridSize[0]);
-            cfg->reduce_num_blocks = prop.maxGridSize[0];
-        }
     }
 
     // lock assures single mpool initiation when multiple threads concurrently execute
@@ -347,9 +330,6 @@ ucc_mc_rocm_t ucc_mc_rocm = {
     .super.ops.mem_alloc          = ucc_mc_rocm_mem_pool_alloc_with_init,
     .super.ops.mem_free           = ucc_mc_rocm_mem_pool_free,
     .super.ops.memcpy             = ucc_mc_rocm_memcpy,
-    .super.ops.reduce             = ucc_mc_rocm_reduce,
-    .super.ops.reduce_multi       = ucc_mc_rocm_reduce_multi,
-    .super.ops.reduce_multi_alpha = ucc_mc_rocm_reduce_multi_alpha,
     .super.config_table =
         {
             .name   = "ROCM memory component",

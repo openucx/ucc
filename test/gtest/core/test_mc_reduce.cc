@@ -4,21 +4,90 @@
  */
 
 #include "test_mc_reduce.h"
+extern "C" {
+#include "components/ec/ucc_ec.h"
+}
 
 template<typename T>
 class test_mc_reduce : public testing::Test {
   protected:
     const int COUNT = 1024;
     ucc_memory_type_t mem_type;
+    ucc_ee_executor_t *executor;
+
     virtual void SetUp() override
     {
         ucc_constructor();
         ucc_mc_params_t mc_params = {
             .thread_mode = UCC_THREAD_SINGLE,
         };
+        ucc_ec_params_t ec_params = {
+            .thread_mode = UCC_THREAD_SINGLE,
+        };
         ucc_mc_init(&mc_params);
+        ucc_ec_init(&ec_params);
         buf1_h = buf2_h = res_h = nullptr;
         buf1_d = buf2_d = res_d = nullptr;
+        executor                = nullptr;
+    }
+
+    ucc_status_t alloc_executor(ucc_memory_type_t mtype)
+    {
+        ucc_ee_executor_params_t params;
+        ucc_ee_type_t            coll_ee_type;
+        ucc_status_t             status;
+
+        switch (mtype) {
+        case UCC_MEMORY_TYPE_CUDA:
+            coll_ee_type = UCC_EE_CUDA_STREAM;
+            break;
+        case UCC_MEMORY_TYPE_HOST:
+            coll_ee_type = UCC_EE_CPU_THREAD;
+            break;
+        default:
+            std::cerr << "invalid executor mem type\n";
+            return UCC_ERR_INVALID_PARAM;
+            break;
+        }
+        params.mask    = UCC_EE_EXECUTOR_PARAM_FIELD_TYPE;
+        params.ee_type = coll_ee_type;
+        status         = ucc_ee_executor_init(&params, &executor);
+        if (UCC_OK != status) {
+            std::cerr << "failed to init executor: "
+                      << ucc_status_string(status) << std::endl;
+            return status;
+        }
+        status = ucc_ee_executor_start(executor, NULL);
+        if (UCC_OK != status) {
+            std::cerr << "failed to start executor: "
+                      << ucc_status_string(status) << std::endl;
+            ucc_ee_executor_finalize(executor);
+        }
+        return status;
+    }
+
+    ucc_status_t free_executor()
+    {
+        ucc_status_t status;
+
+        status = ucc_ee_executor_stop(executor);
+        if (UCC_OK != status) {
+            std::cerr << "failed to stop executor: "
+                      << ucc_status_string(status) << std::endl;
+        }
+        ucc_ee_executor_finalize(executor);
+        return status;
+    }
+
+    ucc_status_t setup(ucc_memory_type_t mtype, size_t n)
+    {
+        ucc_status_t status;
+
+        status = alloc_executor(mtype);
+        if (UCC_OK != status) {
+            return status;
+        }
+        return alloc_bufs(mtype, n);
     }
 
     ucc_status_t alloc_bufs(ucc_memory_type_t mtype, size_t n)
@@ -96,7 +165,45 @@ class test_mc_reduce : public testing::Test {
     virtual void TearDown() override
     {
         free_bufs(mem_type);
+        if (executor) {
+            free_executor();
+        }
         ucc_mc_finalize();
+    }
+
+    ucc_status_t do_reduce(void *src1, void *src2, void *dst, size_t count,
+                           uint16_t n_src2, size_t stride, ucc_datatype_t dt,
+                           ucc_reduction_op_t op, bool with_alpha, double alpha)
+    {
+        ucc_ee_executor_task_args_t eargs;
+        ucc_status_t                status;
+        ucc_ee_executor_task_t *    task;
+
+        eargs.flags     = with_alpha ? UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA : 0;
+        eargs.task_type = UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED;
+        eargs.reduce_strided.count  = count;
+        eargs.reduce_strided.dt     = dt;
+        eargs.reduce_strided.op     = op;
+        eargs.reduce_strided.n_src2 = n_src2;
+        eargs.reduce_strided.dst    = dst;
+        eargs.reduce_strided.src1   = src1;
+        eargs.reduce_strided.src2   = src2;
+        eargs.reduce_strided.stride = stride;
+        eargs.reduce_strided.alpha  = alpha;
+
+        status = ucc_ee_executor_task_post(executor, &eargs, &task);
+        if (UCC_OK != status) {
+            std::cerr << "failed to post executor task: "
+                      << ucc_status_string(status) << std::endl;
+            return status;
+        }
+
+        while (0 < (status = ucc_ee_executor_task_test(task))) {
+            ;
+        }
+        ucc_ee_executor_task_finalize(task);
+
+        return status;
     }
 
     void test_reduce(ucc_memory_type_t mt) {
@@ -105,9 +212,9 @@ class test_mc_reduce : public testing::Test {
         if (UCC_OK !=  ucc_mc_available(mt)) {
             GTEST_SKIP();
         }
-        ASSERT_EQ(this->alloc_bufs(mt, 1), UCC_OK);
-        status = ucc_mc_reduce(this->buf1, this->buf2,
-                               this->res, this->COUNT, T::dt, T::redop, mt);
+        ASSERT_EQ(this->setup(mt, 1), UCC_OK);
+        status = do_reduce(this->buf1, this->buf2, this->res, this->COUNT, 1, 0,
+                           T::dt, T::redop, false, 0);
         if (UCC_ERR_NOT_SUPPORTED == status) {
             GTEST_SKIP();
         }
@@ -130,10 +237,10 @@ class test_mc_reduce : public testing::Test {
         if (UCC_OK !=  ucc_mc_available(mt)) {
             GTEST_SKIP();
         }
-        ASSERT_EQ(this->alloc_bufs(mt, num_vec), UCC_OK);
-        status = ucc_mc_reduce_multi(this->buf1, this->buf2, this->res,
-                       num_vec, this->COUNT, this->COUNT*sizeof(*this->buf2),
-                       T::dt, T::redop, mt);
+        ASSERT_EQ(this->setup(mt, num_vec), UCC_OK);
+        status = do_reduce(this->buf1, this->buf2, this->res, this->COUNT,
+                           num_vec, this->COUNT * sizeof(*this->buf2), T::dt,
+                           T::redop, false, 0);
         if (UCC_ERR_NOT_SUPPORTED == status) {
             GTEST_SKIP();
         }
@@ -162,10 +269,10 @@ class test_mc_reduce : public testing::Test {
             GTEST_SKIP();
         }
 
-        ASSERT_EQ(UCC_OK, this->alloc_bufs(mt, num_vec));
-        status = ucc_mc_reduce_multi_alpha(this->buf1, this->buf2, this->res,
-                               num_vec, this->COUNT, this->COUNT*sizeof(*this->buf2),
-                               T::dt, T::redop, UCC_OP_PROD, alpha, mt);
+        ASSERT_EQ(UCC_OK, this->setup(mt, num_vec));
+        status = do_reduce(this->buf1, this->buf2, this->res, this->COUNT,
+                           num_vec, this->COUNT * sizeof(*this->buf2), T::dt,
+                           T::redop, true, alpha);
 
         if (UCC_ERR_NOT_SUPPORTED == status) {
             GTEST_SKIP();
@@ -219,7 +326,14 @@ using TypeOpPairsUint = ::testing::Types<INT_OP_PAIRS(UINT8), INT_OP_PAIRS(UINT1
 
 using TypeOpPairsFloat = ::testing::Types<ARITHMETIC_OP_PAIRS(FLOAT32),
                                           ARITHMETIC_OP_PAIRS(FLOAT64),
+                                          ARITHMETIC_OP_PAIRS(FLOAT128),
                                           ARITHMETIC_OP_PAIRS(BFLOAT16),
+                                          TypeOpPair<UCC_DT_FLOAT32_COMPLEX, sum>,
+                                          TypeOpPair<UCC_DT_FLOAT32_COMPLEX, prod>,
+                                          TypeOpPair<UCC_DT_FLOAT64_COMPLEX, sum>,
+                                          TypeOpPair<UCC_DT_FLOAT64_COMPLEX, prod>,
+                                          TypeOpPair<UCC_DT_FLOAT128_COMPLEX, sum>,
+                                          TypeOpPair<UCC_DT_FLOAT128_COMPLEX, prod>,
                                           TypeOpPair<UCC_DT_FLOAT32, avg>,
                                           TypeOpPair<UCC_DT_FLOAT64, avg>,
                                           TypeOpPair<UCC_DT_BFLOAT16, avg>>;

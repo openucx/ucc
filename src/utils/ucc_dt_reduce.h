@@ -10,126 +10,63 @@
 #include "components/ec/ucc_ec.h"
 
 static inline ucc_status_t
-ucc_dt_reduce(void *src1, void *src2, void *dst, size_t count,
-              ucc_datatype_t dt, ucc_memory_type_t mem_type,
-              ucc_coll_args_t *args)
+ucc_dt_reduce_userdefined(void *src1, void *src2, void *dst, size_t n_vectors,
+                          size_t count, size_t stride, ucc_dt_generic_t *dt)
 {
-    if (UCC_DT_IS_PREDEFINED(dt)) {
-        return ucc_mc_reduce(src1, src2, dst, count,
-                             dt, args->op, mem_type);
-    } else {
-        ucc_assert(UCC_DT_HAS_REDUCE(dt));
-        return ucc_mc_reduce_userdefined(src1, src2, dst, 1, count,
-                                         0, ucc_dt_to_generic(dt));
-    }
+    ucc_reduce_cb_params_t params = {.mask      = 0,
+                                     .src1      = src1,
+                                     .src2      = src2,
+                                     .dst       = dst,
+                                     .n_vectors = n_vectors,
+                                     .count     = count,
+                                     .stride    = stride,
+                                     .dt        = dt};
+
+    return dt->ops.reduce.cb(&params);
 }
 
 static inline ucc_status_t
-ucc_dt_reduce_nb(void *src1, void *src2, void *dst, size_t count,
-                 ucc_datatype_t dt, ucc_coll_args_t *args,
-                 ucc_ee_executor_t *exec, ucc_ee_executor_task_t **task)
+ucc_dt_reduce_strided(void *src1, void *src2, void *dst, size_t n_vectors,
+                      size_t count, size_t stride, ucc_datatype_t dt,
+                      ucc_coll_args_t *args, uint16_t flags, double alpha,
+                      ucc_ee_executor_t *exec, ucc_ee_executor_task_t **task)
 {
     ucc_ee_executor_task_args_t eargs;
 
+    if (count == 0) {
+        *task = NULL;
+        return UCC_OK;
+    }
     if (!UCC_DT_IS_PREDEFINED(dt)) {
         ucc_assert(UCC_DT_HAS_REDUCE(dt));
         *task = NULL;
-        return ucc_mc_reduce_userdefined(src1, src2, dst, 1, count,
-                                         0, ucc_dt_to_generic(dt));
+        return ucc_dt_reduce_userdefined(src1, src2, dst, n_vectors, count,
+                                         stride, ucc_dt_to_generic(dt));
     } else {
-        eargs.task_type = UCC_EE_EXECUTOR_TASK_TYPE_REDUCE;
-        eargs.bufs[0]   = dst;
-        eargs.bufs[1]   = src1;
-        eargs.bufs[2]   = src2;
-        eargs.count     = count;
-        eargs.dt        = dt;
-        eargs.op        = args->op;
+        eargs.flags                 = flags;
+        eargs.task_type             = UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED;
+        eargs.reduce_strided.count  = count;
+        eargs.reduce_strided.dt     = dt;
+        eargs.reduce_strided.op     = args->op;
+        eargs.reduce_strided.n_src2 = n_vectors;
+        eargs.reduce_strided.dst    = dst;
+        eargs.reduce_strided.src1   = src1;
+        eargs.reduce_strided.src2   = src2;
+        eargs.reduce_strided.stride = stride;
+        eargs.reduce_strided.alpha  = alpha;
 
         return ucc_ee_executor_task_post(exec, &eargs, task);
     }
 }
 
-static inline ucc_status_t
-ucc_dt_reduce_multi(void *src1, void *src2, void *dst, size_t n_vectors,
-                    size_t count, size_t stride, ucc_datatype_t dt,
-                    ucc_memory_type_t mem_type, ucc_coll_args_t *args)
+static inline ucc_status_t ucc_dt_reduce(void *src1, void *src2, void *dst,
+                                         size_t count, ucc_datatype_t dt,
+                                         ucc_coll_args_t *args, uint16_t flags,
+                                         double alpha, ucc_ee_executor_t *exec,
+                                         ucc_ee_executor_task_t **task)
 {
-    if (!UCC_DT_IS_PREDEFINED(dt)) {
-        ucc_assert(UCC_DT_HAS_REDUCE(dt));
-        return ucc_mc_reduce_userdefined(src1, src2, dst, n_vectors, count,
-                                         stride, ucc_dt_to_generic(dt));
-    } else {
-        return ucc_mc_reduce_multi(src1, src2, dst, n_vectors, count, stride,
-                                   dt, args->op, mem_type);
-    }
-}
-
-static inline ucc_status_t
-ucc_dt_reduce_multi_nb(void *src1, void *src2, void *dst,  size_t n_vectors,
-                       size_t count, size_t stride, ucc_datatype_t dt,
-                       ucc_coll_args_t *args, ucc_ee_executor_t *exec,
-                       ucc_ee_executor_task_t **task)
-{
-    ucc_ee_executor_task_args_t eargs;
-
-    if (!UCC_DT_IS_PREDEFINED(dt)) {
-        ucc_assert(UCC_DT_HAS_REDUCE(dt));
-        *task = NULL;
-        return ucc_mc_reduce_userdefined(src1, src2, dst, n_vectors, count,
-                                         stride, ucc_dt_to_generic(dt));
-    } else {
-        eargs.task_type = UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI;
-        eargs.bufs[0]   = dst;
-        eargs.bufs[1]   = src1;
-        eargs.bufs[2]   = src2;
-        eargs.count     = count;
-        eargs.size      = n_vectors;
-        eargs.stride    = stride;
-        eargs.dt        = dt;
-        eargs.op        = args->op;
-
-        return ucc_ee_executor_task_post(exec, &eargs, task);
-    }
-}
-
-static inline ucc_status_t
-ucc_dt_reduce_multi_alpha(void *src1, void *src2, void *dst, size_t n_vectors,
-                          size_t count, size_t stride, ucc_datatype_t dt,
-                          ucc_reduction_op_t vector_op, double alpha,
-                          ucc_memory_type_t mem_type, ucc_coll_args_t *args)
-{
-    /* reduce_multi is used for OP_AVG implementation that can only be
-       used with predefined dtypes */
-    ucc_assert(UCC_DT_IS_PREDEFINED(dt));
-    return ucc_mc_reduce_multi_alpha(src1, src2, dst, n_vectors, count,
-                                     stride, dt, args->op,
-                                     vector_op, alpha, mem_type);
-}
-
-static inline ucc_status_t
-ucc_dt_reduce_multi_alpha_nb(void *src1, void *src2, void *dst,
-                             size_t n_vectors, size_t count, size_t stride,
-                             ucc_datatype_t dt, double alpha,
-                             ucc_coll_args_t *args, ucc_ee_executor_t *exec,
-                             ucc_ee_executor_task_t **task)
-{
-    ucc_ee_executor_task_args_t eargs;
-
-    /* reduce_multi is used for OP_AVG implementation that can only be
-       used with predefined dtypes */
-    ucc_assert(UCC_DT_IS_PREDEFINED(dt));
-    eargs.task_type = UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI_ALPHA;
-    eargs.bufs[0]   = dst;
-    eargs.bufs[1]   = src1;
-    eargs.bufs[2]   = src2;
-    eargs.alpha     = alpha;
-    eargs.count     = count;
-    eargs.size      = n_vectors;
-    eargs.stride    = stride;
-    eargs.dt        = dt;
-    eargs.op        = args->op;
-
-    return ucc_ee_executor_task_post(exec, &eargs, task);
+    return ucc_dt_reduce_strided(src1, src2, dst, 1, count, 0, dt, args, flags,
+                                 alpha, exec, task);
 }
 
 #endif

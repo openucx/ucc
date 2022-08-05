@@ -5,7 +5,7 @@
  */
 #ifndef REDUCE_SCATTERV_H_
 #define REDUCE_SCATTERV_H_
-#include "tl_ucp_reduce.h"
+#include "tl_ucp_coll.h"
 
 enum
 {
