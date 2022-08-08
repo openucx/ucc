@@ -306,11 +306,16 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx)
 
     if (lib->cfg.use_internal_oob) {
         tl_info(sharp_ctx->super.super.lib, "using internal oob");
-        init_spec.oob_colls.barrier = ucc_tl_sharp_service_barrier;
-        init_spec.oob_colls.bcast   = ucc_tl_sharp_service_bcast;
-        init_spec.oob_colls.gather  = ucc_tl_sharp_service_gather;
+        sharp_ctx->oob_ctx.subset.map.ep_num =
+            UCC_TL_CTX_OOB(sharp_ctx).n_oob_eps;
+        sharp_ctx->oob_ctx.subset.map.type   = UCC_EP_MAP_FULL;
+        sharp_ctx->oob_ctx.subset.myrank     = UCC_TL_CTX_OOB(sharp_ctx).oob_ep;
+        init_spec.oob_colls.barrier          = ucc_tl_sharp_service_barrier;
+        init_spec.oob_colls.bcast            = ucc_tl_sharp_service_bcast;
+        init_spec.oob_colls.gather           = ucc_tl_sharp_service_gather;
     } else {
         tl_info(sharp_ctx->super.super.lib, "using user provided oob");
+        sharp_ctx->oob_ctx.oob      = &UCC_TL_CTX_OOB(sharp_ctx);
         init_spec.oob_colls.barrier = ucc_tl_sharp_oob_barrier;
         init_spec.oob_colls.bcast   = ucc_tl_sharp_oob_bcast;
         init_spec.oob_colls.gather  = ucc_tl_sharp_oob_gather;
@@ -364,11 +369,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
     self->sharp_context  = NULL;
     self->rcache         = NULL;
     self->oob_ctx.ctx    = self;
-    self->oob_ctx.oob    = &UCC_TL_CTX_OOB(self);
-    self->oob_ctx.subset.map.type   = UCC_EP_MAP_FULL;
-    self->oob_ctx.subset.map.ep_num = self->oob_ctx.oob->n_oob_eps;
-    self->oob_ctx.subset.myrank     = self->oob_ctx.oob->oob_ep;
-    self->tm            = params->thread_mode;
+    self->tm             = params->thread_mode;
 
     status = ucc_mpool_init(&self->req_mp, 0, sizeof(ucc_tl_sharp_task_t), 0,
                             UCC_CACHE_LINE_SIZE, 8, UINT_MAX,

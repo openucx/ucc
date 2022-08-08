@@ -11,8 +11,6 @@
 UCC_CLASS_INIT_FUNC(ucc_tl_sharp_lib_t, const ucc_base_lib_params_t *params,
                     const ucc_base_config_t *config)
 {
-    // const ucc_tl_lib_config_t *tl_config =
-    //                         ucc_derived_of(config, ucc_tl_lib_config_t);
     const ucc_tl_sharp_lib_config_t *tl_sharp_config =
                             ucc_derived_of(config, ucc_tl_sharp_lib_config_t);
 
@@ -30,7 +28,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_sharp_lib_t)
 
 UCC_CLASS_DEFINE(ucc_tl_sharp_lib_t, ucc_tl_lib_t);
 
-ucc_status_t ucc_tl_sharp_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
+ucc_status_t ucc_tl_sharp_get_lib_attr(const ucc_base_lib_t *lib,
                                        ucc_base_lib_attr_t *base_attr)
 {
     ucc_tl_sharp_lib_t *sharp_lib = ucc_derived_of(lib, ucc_tl_sharp_lib_t);

@@ -61,8 +61,10 @@ UCC_CLASS_DECLARE(ucc_tl_sharp_lib_t, const ucc_base_lib_params_t *,
 
 typedef struct ucc_tl_sharp_oob_ctx {
     void           *ctx;
-    ucc_oob_coll_t *oob;
-    ucc_subset_t    subset;
+    union {
+        ucc_oob_coll_t *oob;
+        ucc_subset_t    subset;
+    };
 } ucc_tl_sharp_oob_ctx_t;
 
 typedef struct ucc_tl_sharp_reg {
@@ -90,7 +92,6 @@ typedef struct ucc_tl_sharp_team {
     ucc_tl_team_t           super;
     struct sharp_coll_comm *sharp_comm;
     ucc_tl_sharp_oob_ctx_t  oob_ctx;
-
 } ucc_tl_sharp_team_t;
 
 typedef struct ucc_tl_sharp_task {
