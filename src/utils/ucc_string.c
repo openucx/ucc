@@ -50,10 +50,12 @@ char **ucc_str_split(const char *str, const char *delim)
     ucc_free(str_copy);
     return out;
 error:
-    for (i = 0; i < size; i++) {
-        ucc_free(out[i]);
+    if (out) {
+        for (i = 0; i < size; i++) {
+            ucc_free(out[i]);
+        }
+        ucc_free(out);
     }
-    ucc_free(out);
     ucc_free(str_copy);
     return NULL;
 }

@@ -50,10 +50,9 @@ ucc_memory_type_t ucc_mem_type_from_str(const char *str)
 }
 
 static inline int
-ucc_coll_args_is_mem_symmetric(const ucc_base_coll_args_t *bargs)
+ucc_coll_args_is_mem_symmetric(const ucc_coll_args_t *args,
+                               ucc_rank_t rank)
 {
-    const ucc_coll_args_t *args = &bargs->args;
-    ucc_team_t            *team = bargs->team;
     ucc_rank_t             root = args->root;
     if (UCC_IS_INPLACE(*args)) {
         return 1;
@@ -77,13 +76,13 @@ ucc_coll_args_is_mem_symmetric(const ucc_base_coll_args_t *bargs)
     case UCC_COLL_TYPE_REDUCE:
     case UCC_COLL_TYPE_GATHER:
     case UCC_COLL_TYPE_SCATTER:
-        return root != team->rank ||
+        return root != rank ||
                (args->dst.info.mem_type == args->src.info.mem_type);
     case UCC_COLL_TYPE_GATHERV:
-        return root != team->rank ||
+        return root != rank ||
                (args->dst.info_v.mem_type == args->src.info.mem_type);
     case UCC_COLL_TYPE_SCATTERV:
-        return root != team->rank ||
+        return root != rank ||
                (args->dst.info.mem_type == args->src.info_v.mem_type);
     default:
         break;
@@ -91,13 +90,12 @@ ucc_coll_args_is_mem_symmetric(const ucc_base_coll_args_t *bargs)
     return 0;
 }
 
-ucc_memory_type_t ucc_coll_args_mem_type(const ucc_base_coll_args_t *bargs)
+ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
+                                         ucc_rank_t rank)
 {
-    const ucc_coll_args_t *args = &bargs->args;
-    ucc_team_t            *team = bargs->team;
     ucc_rank_t             root = args->root;
 
-    if (!ucc_coll_args_is_mem_symmetric(bargs)) {
+    if (!ucc_coll_args_is_mem_symmetric(args, rank)) {
         return UCC_MEMORY_TYPE_ASSYMETRIC;
     }
     switch (args->coll_type) {
@@ -119,27 +117,26 @@ ucc_memory_type_t ucc_coll_args_mem_type(const ucc_base_coll_args_t *bargs)
         return args->dst.info_v.mem_type;
     case UCC_COLL_TYPE_REDUCE:
     case UCC_COLL_TYPE_GATHER:
-        return (root == team->rank) ? args->dst.info.mem_type
-                                    : args->src.info.mem_type;
+        return (root == rank) ? args->dst.info.mem_type
+                              : args->src.info.mem_type;
     case UCC_COLL_TYPE_SCATTER:
-        return (root == team->rank) ? args->src.info.mem_type
-                                    : args->dst.info.mem_type;
+        return (root == rank) ? args->src.info.mem_type
+                              : args->dst.info.mem_type;
     case UCC_COLL_TYPE_GATHERV:
-        return (root == team->rank) ? args->dst.info_v.mem_type
-                                    : args->src.info.mem_type;
+        return (root == rank) ? args->dst.info_v.mem_type
+                              : args->src.info.mem_type;
     case UCC_COLL_TYPE_SCATTERV:
-        return (root == team->rank) ? args->src.info_v.mem_type
-                                    : args->dst.info.mem_type;
+        return (root == rank) ? args->src.info_v.mem_type
+                              : args->dst.info.mem_type;
     default:
         break;
     }
     return UCC_MEMORY_TYPE_UNKNOWN;
 }
 
-size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
+size_t ucc_coll_args_msgsize(const ucc_coll_args_t *args,
+                             ucc_rank_t rank, ucc_rank_t size)
 {
-    const ucc_coll_args_t *args = &bargs->args;
-    ucc_team_t            *team = bargs->team;
     ucc_rank_t             root = args->root;
 
     switch (args->coll_type) {
@@ -157,7 +154,7 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
     case UCC_COLL_TYPE_ALLGATHERV:
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
         return ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
-                                             team->size) *
+                                             size) *
                ucc_dt_size(args->dst.info_v.datatype);
     case UCC_COLL_TYPE_ALLTOALLV:
     case UCC_COLL_TYPE_GATHERV:
@@ -168,20 +165,20 @@ size_t ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs)
         */
         return UCC_MSG_SIZE_ASSYMETRIC;
     case UCC_COLL_TYPE_REDUCE:
-        return (root == team->rank)
+        return (root == rank)
                    ? args->dst.info.count * ucc_dt_size(args->dst.info.datatype)
                    : args->src.info.count *
                          ucc_dt_size(args->src.info.datatype);
     case UCC_COLL_TYPE_GATHER:
-        return (root == team->rank)
+        return (root == rank)
                  ? args->dst.info.count * ucc_dt_size(args->dst.info.datatype)
                  : args->src.info.count * ucc_dt_size(args->src.info.datatype) *
-                   team->size;
+                   size;
     case UCC_COLL_TYPE_SCATTER:
-        return (root == team->rank)
+        return (root == rank)
                  ? args->src.info.count * ucc_dt_size(args->src.info.datatype)
                  : args->dst.info.count * ucc_dt_size(args->dst.info.datatype) *
-                   team->size;
+                   size;
     default:
         break;
     }
@@ -284,7 +281,8 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len)
                       team->id, team->size, team->rank,
                       ucc_ep_map_eval(team->ctx_map, team->rank),
                       ucc_coll_type_str(ct),
-                      ucc_mem_type_str(ucc_coll_args_mem_type(args)),
+                      ucc_mem_type_str(ucc_coll_args_mem_type(&args->args,
+                                                              team->rank)),
                       UCC_IS_INPLACE(args->args));
 
     if (ucc_coll_args_is_rooted(args)) {
@@ -304,7 +302,8 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len)
                           sbytes, rbytes);
     } else {
         ucc_snprintf_safe(tmp, sizeof(tmp), " bytes=%zd",
-                          ucc_coll_args_msgsize(args));
+                          ucc_coll_args_msgsize(&args->args, team->rank,
+                                                team->size));
     }
     left = len - strlen(str);
     strncat(str, tmp, left);

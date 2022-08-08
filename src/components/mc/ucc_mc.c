@@ -126,51 +126,6 @@ UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_alloc, (h_ptr, size, mem_type),
     return mc_ops[mem_type]->mem_alloc(h_ptr, size);
 }
 
-UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce,
-                 (src1, src2, dst, count, dt, op, mem_type),
-                 const void *src1, const void *src2, void *dst,
-                 size_t count, ucc_datatype_t dt,
-                 ucc_reduction_op_t op, ucc_memory_type_t mem_type)
-
-{
-    if (count == 0) {
-        return UCC_OK;
-    }
-    UCC_CHECK_MC_AVAILABLE(mem_type);
-    return mc_ops[mem_type]->reduce(src1, src2, dst, count, dt, op);
-}
-
-UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce_multi,
-                    (src1, src2, dst, n_vectors, count, stride, dtype, op, mem_type),
-                    void *src1, void *src2, void *dst, size_t n_vectors,
-                    size_t count, size_t stride, ucc_datatype_t dtype,
-                    ucc_reduction_op_t op, ucc_memory_type_t mem_type)
-{
-    if (count == 0) {
-        return UCC_OK;
-    }
-    UCC_CHECK_MC_AVAILABLE(mem_type);
-    return mc_ops[mem_type]->reduce_multi(src1, src2, dst, n_vectors, count, stride,
-                                          dtype, op);
-}
-
-UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_reduce_multi_alpha,
-                    (src1, src2, dst, n_vectors, count, stride, dtype, reduce_op,
-                     vector_op, alpha, mem_type),
-                    void *src1, void *src2, void *dst, size_t n_vectors,
-                    size_t count, size_t stride, ucc_datatype_t dtype,
-                    ucc_reduction_op_t reduce_op, ucc_reduction_op_t vector_op,
-                    double alpha, ucc_memory_type_t mem_type)
-{
-    if (count == 0) {
-        return UCC_OK;
-    }
-    UCC_CHECK_MC_AVAILABLE(mem_type);
-    return mc_ops[mem_type]->reduce_multi_alpha(src1, src2, dst, n_vectors,
-                                                count, stride, dtype, reduce_op,
-                                                vector_op, alpha);
-}
-
 ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *h_ptr)
 {
     UCC_CHECK_MC_AVAILABLE(h_ptr->mt);

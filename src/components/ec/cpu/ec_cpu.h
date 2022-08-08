@@ -25,4 +25,5 @@ typedef struct ucc_ec_cpu {
 
 extern ucc_ec_cpu_t ucc_ec_cpu;
 
+ucc_status_t ucc_ec_cpu_reduce(ucc_eee_task_reduce_t *task, uint16_t flags);
 #endif

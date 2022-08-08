@@ -4,9 +4,9 @@
  * See file LICENSE for terms.
  */
 
-#include "config.h"
 #include "allreduce.h"
 #include "core/ucc_progress_queue.h"
+#include "utils/ucc_dt_reduce.h"
 #include "tl_ucp_sendrecv.h"
 #include "coll_patterns/recursive_knomial.h"
 #include "utils/ucc_math.h"
@@ -42,13 +42,7 @@ void ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_status_t           status;
     ucc_kn_radix_t         loop_step;
     int                    is_avg;
-    ucc_ee_executor_t     *exec;
 
-    status = ucc_coll_task_get_executor(&task->super, &exec);
-    if (ucc_unlikely(status != UCC_OK)) {
-        task->super.status = status;
-        return;
-    }
     if (UCC_IS_INPLACE(*args)) {
         sbuf = rbuf;
     }
@@ -81,8 +75,9 @@ UCC_KN_PHASE_EXTRA:
         if (KN_NODE_EXTRA == node_type) {
             goto completion;
         } else {
-            status = ucc_dt_reduce_nb(sbuf, scratch, rbuf, count, dt, args,
-                                      exec, &task->allreduce_kn.etask);
+            status = ucc_dt_reduce(sbuf, scratch, rbuf, count, dt, args, 0, 0,
+                                   task->allreduce_kn.executor,
+                                   &task->allreduce_kn.etask);
             if (ucc_unlikely(status != UCC_OK)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.status = status;
@@ -141,10 +136,12 @@ UCC_KN_PHASE_EXTRA_REDUCE:
             is_avg = args->op == UCC_OP_AVG &&
                      (avg_pre_op ? ucc_knomial_pattern_loop_first_iteration(p)
                                  : ucc_knomial_pattern_loop_last_iteration(p));
-            status = ucc_tl_ucp_reduce_multi_nb(
+            status = ucc_dt_reduce_strided(
                 send_buf, scratch, rbuf,
                 task->tagged.send_posted - p->iteration * (radix - 1), count,
-                data_size, dt, task, is_avg, exec,
+                data_size, dt, args,
+                is_avg ? UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA : 0,
+                AVG_ALPHA(task), task->allreduce_kn.executor,
                 &task->allreduce_kn.etask);
             if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
@@ -190,6 +187,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
     ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
     ucc_rank_t         rank      = task->subset.myrank;
+    ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_kn_start", 0);
     task->allreduce_kn.phase = UCC_KN_PHASE_INIT;
@@ -201,6 +199,11 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
                                      cfg.allreduce_kn_radix, size),
                              &task->allreduce_kn.p);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
+    status =
+        ucc_coll_task_get_executor(&task->super, &task->allreduce_kn.executor);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 

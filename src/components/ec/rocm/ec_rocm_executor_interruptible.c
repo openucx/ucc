@@ -44,6 +44,9 @@ unlock:
     return UCC_OK;
 }
 
+ucc_status_t ucc_ec_rocm_copy_multi_kernel(const ucc_ee_executor_task_args_t *args,
+                                           hipStream_t stream);
+
 ucc_status_t
 ucc_rocm_executor_interruptible_task_post(ucc_ee_executor_t *executor,
                                          const ucc_ee_executor_task_args_t *task_args,
@@ -73,51 +76,29 @@ ucc_rocm_executor_interruptible_task_post(ucc_ee_executor_t *executor,
     ee_task->super.eee    = executor;
     memcpy(&ee_task->super.args, task_args, sizeof(ucc_ee_executor_task_args_t));
     switch (task_args->task_type) {
-    case UCC_EE_EXECUTOR_TASK_TYPE_COPY:
-        status = ROCM_FUNC(hipMemcpyAsync(task_args->bufs[0],
-                                          task_args->bufs[1],
-                                          task_args->count, hipMemcpyDefault,
+    case UCC_EE_EXECUTOR_TASK_COPY:
+        status = ROCM_FUNC(hipMemcpyAsync(task_args->copy.dst,
+                                          task_args->copy.src,
+                                          task_args->copy.len, hipMemcpyDefault,
                                           stream));
         if (ucc_unlikely(status != UCC_OK)) {
             ec_error(&ucc_ec_rocm.super, "failed to start memcpy op");
             goto free_task;
         }
-
+      break;
+    case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
+        status = ucc_ec_rocm_copy_multi_kernel(task_args, stream);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ec_error(&ucc_ec_rocm.super, "failed to start copy multi op");
+            goto free_task;
+        }
         break;
-    case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE:
-        /* temp workaround to avoid code duplication*/
-        status = ucc_mc_reduce(task_args->bufs[1], task_args->bufs[2],
-                               task_args->bufs[0], task_args->count,
-                               task_args->dt, task_args->op,
-                               UCC_MEMORY_TYPE_ROCM);
+    case UCC_EE_EXECUTOR_TASK_REDUCE:
+    case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:
+        status = ucc_ec_rocm_reduce((ucc_ee_executor_task_args_t *)task_args,
+                                    stream);
         if (ucc_unlikely(status != UCC_OK)) {
             ec_error(&ucc_ec_rocm.super, "failed to start reduce op");
-            goto free_task;
-        }
-
-        break;
-    case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI:
-        status = ucc_mc_reduce_multi(task_args->bufs[1], task_args->bufs[2],
-                                     task_args->bufs[0], task_args->size,
-                                     task_args->count, task_args->stride,
-                                     task_args->dt, task_args->op,
-                                     UCC_MEMORY_TYPE_ROCM);
-        if (ucc_unlikely(status != UCC_OK)) {
-            ec_error(&ucc_ec_rocm.super, "failed to start reduce multi op");
-            goto free_task;
-        }
-        break;
-    case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI_ALPHA:
-        status = ucc_mc_reduce_multi_alpha(task_args->bufs[1],
-                                           task_args->bufs[2],
-                                           task_args->bufs[0],
-                                           task_args->size, task_args->count,
-                                           task_args->stride, task_args->dt,
-                                           task_args->op, UCC_OP_PROD,
-                                           task_args->alpha,
-                                           UCC_MEMORY_TYPE_ROCM);
-        if (ucc_unlikely(status != UCC_OK)) {
-            ec_error(&ucc_ec_rocm.super, "failed to start reduce multi alpha op");
             goto free_task;
         }
         break;

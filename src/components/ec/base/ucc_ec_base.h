@@ -63,11 +63,10 @@ enum ucc_ee_executor_params_field {
 };
 
 typedef enum ucc_ee_executor_task_type {
-    UCC_EE_EXECUTOR_TASK_TYPE_COPY               = UCC_BIT(0),
-    UCC_EE_EXECUTOR_TASK_TYPE_REDUCE             = UCC_BIT(1),
-    UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI       = UCC_BIT(2),
-    UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI_ALPHA = UCC_BIT(3),
-    UCC_EE_EXECUTOR_TASK_TYPE_COPY_MULTI         = UCC_BIT(4),
+    UCC_EE_EXECUTOR_TASK_REDUCE         = UCC_BIT(0),
+    UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED = UCC_BIT(1),
+    UCC_EE_EXECUTOR_TASK_COPY           = UCC_BIT(2),
+    UCC_EE_EXECUTOR_TASK_COPY_MULTI     = UCC_BIT(3)
 } ucc_ee_executor_task_type_t;
 
 typedef struct ucc_ee_executor_params {
@@ -77,32 +76,83 @@ typedef struct ucc_ee_executor_params {
 
 #define UCC_EE_EXECUTOR_NUM_BUFS 9
 #define UCC_EE_EXECUTOR_NUM_COPY_BUFS 6
-/*
- *  buffers[0] - destination
- *  buffers[1] .. buffers[UCC_EE_EXECUTOR_NUM_BUFS - 1] - source
- *  count - number of elements in destination
- *  size - number of operands or step between source buffers in bytes
- *  dt - datatype
- *  op - reduction operation
- */
 
-typedef struct ucc_ee_executor_task_args_copy_multi{
+/* Reduces "n_srcs" buffers (each contains "count" elements of type "dt")
+   into "dst" buffer.
+
+   If UCC_EEE_TASK_FLAG_REDUCE_SRCS_EXT flag is not set on task_args
+   then the sources are taken from "srcs" and n_srcs can not exceed
+   UCC_EE_EXECUTOR_NUM_BUFS.
+
+   If UCC_EEE_TASK_FLAG_REDUCE_SRCS_EXT flag IS set on task_args
+   then the sources are taken from "src_ext". In that case it is caller
+   responsibility to make sure srcs_ext pointer is valid until task
+   is complete.
+
+   If UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA flag is set on task_args
+   each element of the result of reduction is multiplied by "alpha" */
+typedef struct ucc_eee_task_reduce {
+    void *             dst;
+    union {
+        void * srcs[UCC_EE_EXECUTOR_NUM_BUFS];
+        void **srcs_ext;
+    };
+    size_t   count;
+    double   alpha;
+    ucc_datatype_t     dt;
+    ucc_reduction_op_t op;
+    uint16_t n_srcs;
+} ucc_eee_task_reduce_t;
+
+/* Reduces "n_srcs2+1" buffers (each contains "count" elements of type "dt")
+   into "dst" buffer. The first source buffer is "src1". Other n_src2 source
+   buffers are defined as SRC[i] = src2 + stride * i, where stride is defined
+   in bytes.
+
+   If UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA flag is set on task_args
+   each element of the result of reduction is multiplied by "alpha" */
+
+typedef struct ucc_eee_task_reduce_strided {
+    void *             dst;
+    void *             src1;
+    void *             src2;
+    size_t             stride;
+    size_t             count;
+    double             alpha;
+    ucc_datatype_t     dt;
+    ucc_reduction_op_t op;
+    uint16_t           n_src2;
+} ucc_eee_task_reduce_strided_t;
+
+/* Copies len bytes from "src" into "dst" */
+typedef struct ucc_eee_task_copy {
+    void * src;
+    void * dst;
+    size_t len;
+} ucc_eee_task_copy_t;
+
+enum ucc_eee_task_flags {
+    UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA = UCC_BIT(0),
+    UCC_EEE_TASK_FLAG_REDUCE_SRCS_EXT   = UCC_BIT(1)
+};
+
+/* Performs "num_vectors" copies from SRC[i] to DST[i] */
+typedef struct ucc_eee_task_copy_multi{
     void   *src[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
     void   *dst[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
     size_t  counts[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
     size_t  num_vectors;
-} ucc_ee_executor_task_args_copy_multi_t;
+} ucc_eee_task_copy_multi_t;
 
 typedef struct ucc_ee_executor_task_args {
-    ucc_ee_executor_task_type_t             task_type;
-    void                                   *bufs[UCC_EE_EXECUTOR_NUM_BUFS];
-    double                                  alpha;
-    ucc_count_t                             count;
-    size_t                                  stride;
-    uint32_t                                size;
-    ucc_datatype_t                          dt;
-    ucc_reduction_op_t                      op;
-    ucc_ee_executor_task_args_copy_multi_t  copy_multi;
+    uint16_t                     task_type;
+    uint16_t                     flags;
+    union {
+        ucc_eee_task_reduce_t         reduce;
+        ucc_eee_task_reduce_strided_t reduce_strided;
+        ucc_eee_task_copy_t           copy;
+        ucc_eee_task_copy_multi_t     copy_multi;
+    };
 } ucc_ee_executor_task_args_t;
 
 typedef struct ucc_ee_executor_task {

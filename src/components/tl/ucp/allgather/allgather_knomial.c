@@ -185,11 +185,11 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
             task->super.status = status;
             return status;
         }
-        eargs.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
-        eargs.bufs[0]   = PTR_OFFSET(args->dst.info.buffer, offset);
-        eargs.bufs[1]   = args->src.info.buffer;
-        eargs.count     = args->src.info.count *
-                          ucc_dt_size(args->src.info.datatype);
+        eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+        eargs.copy.dst  = PTR_OFFSET(args->dst.info.buffer, offset);
+        eargs.copy.src  = args->src.info.buffer;
+        eargs.copy.len  =
+            args->src.info.count * ucc_dt_size(args->src.info.datatype);
         status = ucc_ee_executor_task_post(exec, &eargs,
                                            &task->allgather_kn.etask);
         if (ucc_unlikely(status != UCC_OK)) {

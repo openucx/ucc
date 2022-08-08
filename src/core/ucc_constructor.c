@@ -128,10 +128,10 @@ ucc_status_t ucc_constructor(void)
         }
         if (strlen(cfg->component_path) == 0) {
             get_default_lib_path();
-        }
-        if (!cfg->component_path) {
-            ucc_error("failed to get ucc components path");
-            return UCC_ERR_NOT_FOUND;
+            if (strlen(cfg->component_path) == 0) {
+                ucc_error("failed to get ucc components path");
+                return UCC_ERR_NOT_FOUND;
+            }
         }
         status = ucc_check_config_file();
         if (UCC_OK != status && UCC_ERR_NOT_FOUND != status) {

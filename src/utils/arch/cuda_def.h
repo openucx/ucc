@@ -15,35 +15,36 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
-#define CUDA_ERROR_TO_UCC_STATUS(_cuda_st)                                     \
-    ({                                                                         \
-        ucc_status_t _ucc_st;                                                  \
-        switch(_cuda_st) {                                                     \
-        case cudaSuccess:                                                      \
-            _ucc_st = UCC_OK;                                                  \
-            break;                                                             \
-        case cudaErrorNotReady:                                                \
-            _ucc_st = UCC_INPROGRESS;                                          \
-            break;                                                             \
-        case cudaErrorInvalidValue:                                            \
-            _ucc_st = UCC_ERR_INVALID_PARAM;                                   \
-            break;                                                             \
-        default:                                                               \
-            _ucc_st = UCC_ERR_NO_MESSAGE;                                      \
-        }                                                                      \
-        _ucc_st;                                                               \
-    })
+static inline ucc_status_t cuda_error_to_ucc_status(cudaError_t cuda_status)
+{
+    ucc_status_t ucc_status;
+
+    switch(cuda_status) {
+    case cudaSuccess:
+        ucc_status = UCC_OK;
+        break;
+    case cudaErrorNotReady:
+        ucc_status = UCC_INPROGRESS;
+        break;
+    case cudaErrorInvalidValue:
+        ucc_status = UCC_ERR_INVALID_PARAM;
+        break;
+    default:
+        ucc_status = UCC_ERR_NO_MESSAGE;
+    }
+    return ucc_status;
+}
 
 #define CUDA_FUNC(_func)                                                       \
     ({                                                                         \
-        ucc_status_t _status = UCC_OK;                                         \
+        ucc_status_t _status;                                                  \
         do {                                                                   \
             cudaError_t _result = (_func);                                     \
             if (ucc_unlikely(cudaSuccess != _result)) {                        \
                 ucc_error("%s() failed: %d(%s)",                               \
                           #_func, _result, cudaGetErrorString(_result));       \
-                _status = CUDA_ERROR_TO_UCC_STATUS(_result);                   \
             }                                                                  \
+            _status = cuda_error_to_ucc_status(_result);                       \
         } while (0);                                                           \
         _status;                                                               \
     })
@@ -65,6 +66,7 @@
     })
 
 #define CUDA_CHECK(_cmd)                                                       \
+    /* coverity[dead_error_line] */                                            \
     do {                                                                       \
         ucc_status_t _cuda_status = CUDA_FUNC(_cmd);                           \
         if (ucc_unlikely(_cuda_status != UCC_OK)) {                            \

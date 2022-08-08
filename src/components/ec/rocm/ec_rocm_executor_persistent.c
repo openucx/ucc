@@ -17,15 +17,28 @@ ucc_rocm_executor_persistent_task_post(ucc_ee_executor_t *executor,
                                                        ucc_ec_rocm_executor_t);
     int                     max_tasks = EC_ROCM_CONFIG->exec_max_tasks;
     ucc_ee_executor_task_t *ee_task;
+    ucc_datatype_t          dt;
+    ucc_reduction_op_t      op;
 
-    if (task_args->task_type == UCC_EE_EXECUTOR_TASK_TYPE_REDUCE) {
-        if (task_args->op != UCC_OP_SUM) {
-            return UCC_ERR_NOT_SUPPORTED;
+    if (task_args->task_type != UCC_EE_EXECUTOR_TASK_COPY &&
+        task_args->task_type != UCC_EE_EXECUTOR_TASK_COPY_MULTI) {
+        if (task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
+            dt = task_args->reduce.dt;
+            op = task_args->reduce.op;
+        } else {
+            dt = task_args->reduce_strided.dt;
+            op = task_args->reduce_strided.op;
         }
-        if ((task_args->dt != UCC_DT_FLOAT32) &&
-            (task_args->dt != UCC_DT_FLOAT64) &&
-            (task_args->dt != UCC_DT_INT32)) {
-            return UCC_ERR_NOT_SUPPORTED;
+        if (op != UCC_OP_SUM) {
+            ec_error(&ucc_ec_rocm.super, "not supported reduction op: %s",
+                     ucc_reduction_op_str(op));
+	    return UCC_ERR_NOT_SUPPORTED;
+	}
+	if ((dt != UCC_DT_FLOAT32) && (dt != UCC_DT_FLOAT64) &&
+            (dt != UCC_DT_INT32)) {
+	    ec_error(&ucc_ec_rocm.super, "not supported reduction dtype: %s",
+                     ucc_datatype_str(dt));
+	    return UCC_ERR_NOT_SUPPORTED;
         }
     }
     if (ucc_ec_rocm.thread_mode == UCC_THREAD_MULTIPLE) {

@@ -25,7 +25,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     self->oob_ctx.ctx = UCC_TL_TEAM_CTX(self);
-    self->oob_ctx.oob = &UCC_TL_TEAM_OOB(self);
+    if (UCC_TL_SHARP_TEAM_LIB(self)->cfg.use_internal_oob) {
+        self->oob_ctx.subset.map    = UCC_TL_TEAM_MAP(self);
+        self->oob_ctx.subset.myrank = UCC_TL_TEAM_RANK(self);
+    } else {
+        self->oob_ctx.oob = &UCC_TL_TEAM_OOB(self);
+    }
 
     comm_spec.rank              = UCC_TL_TEAM_RANK(self);
     comm_spec.size              = UCC_TL_TEAM_SIZE(self);

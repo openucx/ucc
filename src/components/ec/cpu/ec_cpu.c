@@ -102,8 +102,8 @@ ucc_status_t ucc_cpu_executor_task_post(ucc_ee_executor_t *executor,
                                         const ucc_ee_executor_task_args_t *task_args,
                                         ucc_ee_executor_task_t **task)
 {
+    ucc_status_t            status = UCC_OK;
     ucc_ee_executor_task_t *eee_task;
-    ucc_status_t            status;
 
     eee_task = ucc_mpool_get(&ucc_ec_cpu.executor_tasks);
     if (ucc_unlikely(!eee_task)) {
@@ -112,52 +112,58 @@ ucc_status_t ucc_cpu_executor_task_post(ucc_ee_executor_t *executor,
 
     eee_task->eee = executor;
     switch (task_args->task_type) {
-    case UCC_EE_EXECUTOR_TASK_TYPE_COPY:
-        memcpy(task_args->bufs[0], task_args->bufs[1], task_args->count);
-        break;
-    case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE:
-        status = ucc_mc_reduce(task_args->bufs[1], task_args->bufs[2],
-                               task_args->bufs[0], task_args->count,
-                               task_args->dt, task_args->op,
-                               UCC_MEMORY_TYPE_HOST);
-        if (ucc_unlikely(status != UCC_OK)) {
-            ec_error(&ucc_ec_cpu.super, "reduce op failed");
+    case UCC_EE_EXECUTOR_TASK_REDUCE:
+        status = ucc_ec_cpu_reduce((ucc_eee_task_reduce_t *)&task_args->reduce,
+                                   task_args->flags);
+        if (ucc_unlikely(UCC_OK != status)) {
             goto free_task;
         }
         break;
-    case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI:
-        status = ucc_mc_reduce_multi(task_args->bufs[1], task_args->bufs[2],
-                                     task_args->bufs[0], task_args->size,
-                                     task_args->count, task_args->stride,
-                                     task_args->dt, task_args->op,
-                                     UCC_MEMORY_TYPE_HOST);
-        if (ucc_unlikely(status != UCC_OK)) {
-            ec_error(&ucc_ec_cpu.super, "reduce multi op failed");
+    case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:
+    {
+        ucc_eee_task_reduce_strided_t *trs =
+            (ucc_eee_task_reduce_strided_t *)&task_args->reduce_strided;
+        size_t                n_srcs = trs->n_src2 + 1;
+        uint16_t              flags  = task_args->flags;
+        void **               srcs;
+        ucc_eee_task_reduce_t tr;
+        int                   i;
+
+        if (n_srcs <= UCC_EE_EXECUTOR_NUM_BUFS) {
+            srcs = &tr.srcs[0];
+        } else {
+            srcs = alloca(n_srcs * sizeof(void *));
+            flags |= UCC_EEE_TASK_FLAG_REDUCE_SRCS_EXT;
+            tr.srcs_ext = srcs;
+        }
+        srcs[0] = trs->src1;
+        for (i = 0; i < n_srcs - 1; i++) {
+            srcs[i + 1] = PTR_OFFSET(trs->src2, trs->stride * i);
+        }
+        tr.count  = trs->count;
+        tr.dt     = trs->dt;
+        tr.op     = trs->op;
+        tr.n_srcs = n_srcs;
+        tr.dst    = trs->dst;
+        tr.alpha  = trs->alpha;
+
+        status = ucc_ec_cpu_reduce(&tr, flags);
+        if (ucc_unlikely(UCC_OK != status)) {
             goto free_task;
         }
+    } break;
+    case UCC_EE_EXECUTOR_TASK_COPY:
+        memcpy(task_args->copy.dst, task_args->copy.src, task_args->copy.len);
         break;
-    case UCC_EE_EXECUTOR_TASK_TYPE_REDUCE_MULTI_ALPHA:
-        status = ucc_mc_reduce_multi_alpha(task_args->bufs[1],
-                                           task_args->bufs[2],
-                                           task_args->bufs[0],
-                                           task_args->size, task_args->count,
-                                           task_args->stride, task_args->dt,
-                                           task_args->op, UCC_OP_PROD,
-                                           task_args->alpha,
-                                           UCC_MEMORY_TYPE_HOST);
-        if (ucc_unlikely(status != UCC_OK)) {
-            ec_error(&ucc_ec_cpu.super, "reduce multi alpha op failed");
-            goto free_task;
-        }
-        break;
-    case UCC_EE_EXECUTOR_TASK_TYPE_COPY_MULTI:
+    case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
+    default:
         status = UCC_ERR_NOT_SUPPORTED;
         goto free_task;
     }
-    eee_task->status = UCC_OK;
+    eee_task->status = status;
     *task = eee_task;
 
-    return UCC_OK;
+    return status;
 
 free_task:
     ucc_mpool_put(eee_task);

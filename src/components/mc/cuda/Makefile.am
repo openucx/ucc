@@ -3,9 +3,8 @@
 #
 
 if HAVE_CUDA
-SUBDIRS = kernel
 
-sources =    \
+sources =     \
 	mc_cuda.h \
 	mc_cuda.c
 
@@ -15,8 +14,7 @@ libucc_mc_cuda_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS) $(CUDA_CPPFLAGS)
 libucc_mc_cuda_la_CFLAGS   = $(BASE_CFLAGS)
 libucc_mc_cuda_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(CUDA_LDFLAGS)
 libucc_mc_cuda_la_LIBADD   = $(CUDA_LIBS)                      \
-                             $(UCC_TOP_BUILDDIR)/src/libucc.la \
-                             kernel/libucc_mc_cuda_kernels.la
+                             $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 include $(top_srcdir)/config/module.am
 endif

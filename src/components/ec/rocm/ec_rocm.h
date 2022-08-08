@@ -14,6 +14,9 @@
 #include "utils/arch/rocm_def.h"
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
+#include <hip/hip_complex.h>
+#include <hip_fp16.h>
+#include <hip_bfloat16.h>
 
 typedef enum ucc_ec_rocm_strm_task_mode {
     UCC_EC_ROCM_TASK_KERNEL,
@@ -75,6 +78,8 @@ typedef struct ucc_ec_rocm_config {
     unsigned long                  exec_num_threads;
     unsigned long                  exec_max_tasks;
     unsigned long                  exec_num_streams;
+    unsigned long                  reduce_num_blocks;
+    int                            reduce_num_threads;
 } ucc_ec_rocm_config_t;
 
 typedef struct ucc_ec_rocm {

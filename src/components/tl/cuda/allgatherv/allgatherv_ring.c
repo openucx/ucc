@@ -270,7 +270,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress_ring(ucc_tl_cuda_task_t *task,
             }
 
             if (dbuf1 != NULL) {
-                eargs_rem.task_type               = UCC_EE_EXECUTOR_TASK_TYPE_COPY_MULTI;
+                eargs_rem.task_type               = UCC_EE_EXECUTOR_TASK_COPY_MULTI;
                 eargs_rem.copy_multi.src[ring]    = sbuf1;
                 eargs_rem.copy_multi.dst[ring]    = dbuf1;
                 eargs_rem.copy_multi.counts[ring] = frag_count1;
@@ -278,7 +278,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress_ring(ucc_tl_cuda_task_t *task,
             }
 
             if (dbuf2 != NULL) {
-                eargs_loc.task_type               = UCC_EE_EXECUTOR_TASK_TYPE_COPY_MULTI;
+                eargs_loc.task_type               = UCC_EE_EXECUTOR_TASK_COPY_MULTI;
                 eargs_loc.copy_multi.src[ring]    = sbuf2;
                 eargs_loc.copy_multi.dst[ring]    = dbuf2;
                 eargs_loc.copy_multi.counts[ring] = frag_count2;
@@ -326,6 +326,7 @@ void ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->allgatherv_ring.stage = RING_STAGE_SETUP;
+        /* fall through */
     case RING_STAGE_SETUP:
         st = ucc_tl_cuda_allgatherv_ring_setup_test(task);
         if (st != UCC_OK) {
@@ -333,6 +334,7 @@ void ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->allgatherv_ring.stage = RING_STAGE_RING;
+        /* fall through */
     case RING_STAGE_RING:
         num_done = 0;
         for (chunk = 0; chunk < task->allgatherv_ring.num_chunks; chunk++) {
@@ -356,6 +358,7 @@ void ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
         }
 
         task->allgatherv_ring.stage = RING_STAGE_BARRIER;
+        /* fall through */
     default:
         ucc_assert(task->allgatherv_ring.stage == RING_STAGE_BARRIER);
         break;

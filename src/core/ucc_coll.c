@@ -202,7 +202,7 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     task->flags |= UCC_COLL_TASK_FLAG_TOP_LEVEL;
     if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
         task->flags |= UCC_COLL_TASK_FLAG_EXECUTOR_STOP;
-        coll_mem_type = ucc_coll_args_mem_type(&op_args);
+        coll_mem_type = ucc_coll_args_mem_type(coll_args, team->rank);
         switch(coll_mem_type) {
         case UCC_MEMORY_TYPE_CUDA:
             coll_ee_type = UCC_EE_CUDA_STREAM;
@@ -437,13 +437,13 @@ static void ucc_trigger_test(ucc_coll_task_t *task)
 
         post_event.ev_type         = UCC_EVENT_COLLECTIVE_POST;
         post_event.ev_context_size = 0;
+        post_event.ev_context      = NULL;
         post_event.req             = &task->triggered_task->super;
         ucc_ee_set_event_internal(task->ee, &post_event,
                                   &task->ee->event_out_queue);
     }
 
-    if (task->executor == NULL ||
-        (ucc_ee_executor_status(task->executor) == UCC_OK)) {
+    if (ucc_ee_executor_status(task->executor) == UCC_OK) {
         task->status = UCC_OK;
     }
 }
