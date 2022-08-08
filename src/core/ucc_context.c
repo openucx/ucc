@@ -861,19 +861,19 @@ ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
     return UCC_OK;
 }
 
-void ucc_context_progress_deregister(ucc_context_t *ctx,
-                                     ucc_context_progress_fn_t fn,
-                                     void *progress_arg)
+ucc_status_t ucc_context_progress_deregister(ucc_context_t *ctx,
+                                             ucc_context_progress_fn_t fn,
+                                             void *progress_arg)
 {
     ucc_context_progress_entry_t *entry, *tmp;
     ucc_list_for_each_safe(entry, tmp, &ctx->progress_list, list_elem) {
         if (entry->fn == fn && entry->arg == progress_arg) {
             ucc_list_del(&entry->list_elem);
             ucc_free(entry);
-            return;
+            return UCC_OK;
         }
     }
-    ucc_assert(0);
+    return UCC_ERR_NOT_FOUND;
 }
 
 ucc_status_t ucc_context_progress(ucc_context_h context)

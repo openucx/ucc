@@ -17,6 +17,11 @@ static ucc_config_field_t ucc_tl_sharp_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_sharp_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
 
+    {"USE_INTERNAL_OOB", "n",
+     "Use service team to create sharp context",
+     ucc_offsetof(ucc_tl_sharp_lib_config_t, use_internal_oob),
+     UCC_CONFIG_TYPE_BOOL},
+
     {NULL}};
 
 static ucc_config_field_t ucc_tl_sharp_context_config_table[] = {
@@ -47,6 +52,7 @@ static ucc_config_field_t ucc_tl_sharp_context_config_table[] = {
      "Seed for random sharp job ID. (0 - use default).",
      ucc_offsetof(ucc_tl_sharp_context_config_t, rand_seed),
      UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_sharp_lib_t, ucc_base_lib_t,
@@ -75,3 +81,10 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
 ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t   *tl_team,
                                           ucc_coll_score_t **score_p);
 UCC_TL_IFACE_DECLARE(sharp, SHARP);
+
+ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context);
+
+__attribute__((constructor)) static void tl_sharp_iface_init(void)
+{
+    ucc_tl_sharp.super.context.create_epilog = ucc_tl_sharp_context_create_epilog;
+}

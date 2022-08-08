@@ -74,7 +74,7 @@ ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
 
     ucc_assert(tls->array.count >= 1);
     for (i = 0; i < tls->array.count; i++) {
-        /* Check TLs proveded in CL_BASIC_TLS. Not all of them could be
+        /* Check TLs provided in CL_BASIC_TLS. Not all of them could be
            available, check for NULL. */
         tl_iface =
             ucc_derived_of(ucc_get_component(&ucc_global_config.tl_framework,
