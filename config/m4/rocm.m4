@@ -39,8 +39,8 @@ AC_DEFUN([ROCM_BUILD_FLAGS],
 # Parse value of ARG into appropriate LIBS, LDFLAGS, and
 # CPPFLAGS variables.
 AC_DEFUN([HIP_BUILD_FLAGS],
-    $4="-D__HIP_PLATFORM_AMD__ -I$1/include/hip -I$1/include  -I$1/hip/include"
-    $3="-L$1/hip/lib -L$1/lib"
+    $4="-D__HIP_PLATFORM_AMD__ -I$1/include/hip -I$1/include"
+    $3="-L$1/lib"
     $2="-lamdhip64"
 )
 
@@ -102,7 +102,29 @@ AS_IF([test "x$with_rocm" != "xno"],
     LDFLAGS="$SAVE_LDFLAGS"
     LIBS="$SAVE_LIBS"
 
+    #Check whether we run on ROCm 5.0 or higher
+    AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM([[#include <${with_rocm}/include/rocm_version.h>
+        ]], [[
+#if ROCM_VERSION_MAJOR >= 5
+int main() {return 0;}
+#else
+intr make+compilation_fail()
+#endif
+        ]])],
+        [ROCM_VERSION_50_OR_GREATER=1],
+        [ROCM_VERSION_50_OR_GREATER=0])
+
+
     HIP_BUILD_FLAGS([$with_rocm], [HIP_LIBS], [HIP_LDFLAGS], [HIP_CPPFLAGS])
+    AC_MSG_CHECKING([if ROCm version is 5.0 or above])
+    if test "$ROCM_VERSION_50_OR_GREATER" = "1" ; then
+        AC_MSG_RESULT([yes])
+    else
+        AC_MSG_RESULT([no])
+        HIP_CPPFLAGS="${HIP_CPPFLAGS} -I${with_rocm}/hip/include"
+        HIP_LDFLAGS="${HIP_LDFLAGS} -L${with_rocm}/hip/lib"
+    fi
 
     CPPFLAGS="$HIP_CPPFLAGS $CPPFLAGS"
     LDFLAGS="$HIP_LDFLAGS $LDFLAGS"
