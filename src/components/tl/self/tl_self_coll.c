@@ -85,9 +85,10 @@ ucc_status_t ucc_tl_self_copy_start(ucc_coll_task_t *coll_task)
     exec_args.bufs[0]   = task->dst;
     exec_args.bufs[1]   = task->src;
     exec_args.count     = task->size;
-    task->super.status =
-        ucc_ee_executor_task_post(exec, &exec_args, &task->etask);
+    status              = ucc_ee_executor_task_post(exec, &exec_args,
+                                                    &task->etask);
     if (ucc_unlikely(status != UCC_OK)) {
+        task->super.status = status;
         return status;
     }
 

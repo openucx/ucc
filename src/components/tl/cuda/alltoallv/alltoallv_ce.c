@@ -245,12 +245,14 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_SETUP;
+        /* fall through */
     case ALLTOALL_CE_STAGE_SETUP:
         status = ucc_tl_cuda_alltoallv_setup_test(task);
         if (status != UCC_OK) {
             task->super.status = status;
             return;
         }
+        /* fall through */
     case ALLTOALL_CE_STAGE_POST_COPIES:
         status = ucc_tl_cuda_alltoallv_ce_post_copies(task);
         if (ucc_unlikely(status != UCC_OK)) {
@@ -258,6 +260,7 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_COPY;
+        /* fall through */
     case ALLTOALL_CE_STAGE_COPY:
         for (i = 0; i < task->alltoallv_ce.num_posted; i++) {
             if (!task->alltoallv_ce.exec_task[i]) {
@@ -281,6 +284,7 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_BAR;
+        /* fall through */
     default:
         ucc_assert(task->alltoallv_ce.stage == ALLTOALL_CE_STAGE_BAR);
         break;

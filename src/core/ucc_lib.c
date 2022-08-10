@@ -321,7 +321,7 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
             release_number);
     }
 
-    lib = ucc_malloc(sizeof(ucc_lib_info_t), "lib_info");
+    lib = ucc_calloc(1, sizeof(ucc_lib_info_t), "lib_info");
     if (!lib) {
         ucc_error("failed to allocate %zd bytes for lib_info",
                   sizeof(ucc_lib_info_t));

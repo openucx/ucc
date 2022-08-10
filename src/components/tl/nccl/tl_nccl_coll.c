@@ -129,25 +129,19 @@ ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
                                         ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_status_t status;
-    ucc_ev_t *post_event;
+    ucc_status_t        status;
+    ucc_ev_t            post_event;
 
     ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
     coll_task->ee = ee;
     tl_info(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
     status = coll_task->post(coll_task);
     if (ucc_likely(status == UCC_OK)) {
-        /* TODO: mpool */
-        post_event = ucc_malloc(sizeof(ucc_ev_t), "event");
-        if (ucc_unlikely(post_event == NULL)) {
-            tl_error(UCC_TASK_LIB(task), "failed to allocate memory for event");
-            return UCC_ERR_NO_MEMORY;
-        }
-
-        post_event->ev_type = UCC_EVENT_COLLECTIVE_POST;
-        post_event->ev_context_size = 0;
-        post_event->req = &coll_task->super;
-        ucc_ee_set_event_internal(coll_task->ee, post_event,
+        post_event.ev_type         = UCC_EVENT_COLLECTIVE_POST;
+        post_event.ev_context_size = 0;
+        post_event.ev_context      = NULL;
+        post_event.req             = &coll_task->super;
+        ucc_ee_set_event_internal(coll_task->ee, &post_event,
                                   &coll_task->ee->event_out_queue);
     }
     return status;

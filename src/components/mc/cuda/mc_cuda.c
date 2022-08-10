@@ -378,8 +378,7 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
                 &alloc_length, (CUdeviceptr)ptr);
         if (cu_err != CUDA_SUCCESS) {
             mc_debug(&ucc_mc_cuda.super,
-                     "cuMemGetAddressRange(%p) error: %d(%s)",
-                      ptr, cu_err, cudaGetErrorString(st));
+                     "cuMemGetAddressRange(%p) error: %d", ptr, cu_err);
             return UCC_ERR_NOT_SUPPORTED;
         }
 
