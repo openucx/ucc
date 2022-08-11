@@ -28,6 +28,21 @@ typedef ucc_status_t (*ucc_schedule_frag_init_fn_t)(
 typedef ucc_status_t (*ucc_schedule_frag_setup_fn_t)(
     ucc_schedule_pipelined_t *schedule_p, ucc_schedule_t *frag, int frag_num);
 
+
+typedef enum {
+    UCC_PIPELINE_PARALLEL, /*< Tasks of different frags can start
+                             concurrently in parallel. Out-of-order
+                             launch of frags is possible */
+    UCC_PIPELINE_ORDERED, /*< Tasks of different frags are ordered
+                            on EVENT_STARTED - no out-of-order */
+    UCC_PIPELINE_SEQUENTIAL, /*< Tasks of different frags are ordered
+                              on EVENT_COMPLETED - no out-of-order.
+                              Less parallelism compared to ORDERED,
+                              but does not oversubscribe resources */
+    UCC_PIPELINE_LAST
+} ucc_pipeline_order_t;
+
+extern const char* ucc_pipeline_order_names[];
 typedef struct ucc_schedule_pipelined {
     ucc_schedule_t               super;
     /* Array of the frag schedules - 1 schedule per pipeline entry */
@@ -43,7 +58,7 @@ typedef struct ucc_schedule_pipelined {
     /* sequential flag. if set to 1 the pipeline sets additional deps
        between the tasks in different frags. This prevents out-of-order
        task launch in different frags of a pipeline */
-    int                          sequential;
+    ucc_pipeline_order_t         order;
     int                          next_frag_to_post;
     ucc_schedule_frag_setup_fn_t frag_setup;
     ucc_recursive_spinlock_t     lock;
@@ -59,7 +74,7 @@ ucc_status_t ucc_schedule_pipelined_init(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_schedule_frag_init_fn_t  frag_init,
     ucc_schedule_frag_setup_fn_t frag_setup, int n_frags, int n_frags_total,
-    int sequential, ucc_schedule_pipelined_t *schedule_p);
+    ucc_pipeline_order_t order, ucc_schedule_pipelined_t *schedule_p);
 
 ucc_status_t ucc_schedule_pipelined_post(ucc_coll_task_t *task);
 

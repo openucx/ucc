@@ -12,6 +12,7 @@
 #include "components/tl/ucc_tl.h"
 #include "coll_score/ucc_coll_score.h"
 #include "utils/ucc_mpool.h"
+#include "schedule/ucc_schedule_pipelined.h"
 
 #ifdef HAVE_PROFILING_CL_HIER
 #include "utils/profile/ucc_profile_on.h"
@@ -51,7 +52,7 @@ typedef struct ucc_cl_hier_lib_config {
     size_t                  a2av_node_thresh;
     uint32_t                allreduce_split_rail_n_frags;
     uint32_t                allreduce_split_rail_pipeline_depth;
-    int                     allreduce_split_rail_seq;
+    ucc_pipeline_order_t    allreduce_split_rail_pipeline_order;
     size_t                  allreduce_split_rail_frag_thresh;
     size_t                  allreduce_split_rail_frag_size;
 
