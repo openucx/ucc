@@ -74,7 +74,7 @@ TestReduceScatterv::TestReduceScatterv(ucc_test_team_t &_team, TestCaseParams &p
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestReduceScatterv::reset_sbuf()
+ucc_status_t TestReduceScatterv::reset_sbuf(int persistent = 0)
 {
     return UCC_OK;
 }

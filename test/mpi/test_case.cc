@@ -129,7 +129,8 @@ std::string TestCase::str() {
     _str += std::string(ucc_coll_type_str(args.coll_type)) +
             " team=" + team_str(team.type) +
             " mtype=" + ucc_memory_type_names[mem_type] +
-            " msgsize=" + std::to_string(msgsize);
+            " msgsize=" + std::to_string(msgsize) +
+            " persistent=" + (persistent == TEST_PERSISTENT ? "1" : "0");
     if (ucc_coll_inplace_supported(args.coll_type)) {
         _str += std::string(" inplace=") + (inplace == TEST_INPLACE ? "1" : "0");
     }
@@ -161,8 +162,9 @@ void TestCase::tc_progress_ctx()
 
 TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
                    TestCaseParams params) :
-    team(_team), mem_type(params.mt),  msgsize(params.msgsize),
-    inplace(params.inplace), test_max_size(params.max_size)
+    team(_team), mem_type(params.mt), msgsize(params.msgsize),
+    inplace(params.inplace), persistent(params.persistent),
+    test_max_size(params.max_size)
 {
     int rank;
 

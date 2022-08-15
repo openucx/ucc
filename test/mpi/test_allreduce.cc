@@ -35,12 +35,17 @@ TestAllreduce::TestAllreduce(ucc_test_team_t &_team, TestCaseParams &params) :
         args.src.info.datatype    = dt;
         args.src.info.mem_type    = mem_type;
     } else {
-        args.mask                 = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags                = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        args.mask                |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags               |= UCC_COLL_ARGS_FLAG_IN_PLACE;
         args.src.info.buffer      = NULL;
         args.src.info.count       = SIZE_MAX;
         args.src.info.datatype    = (ucc_datatype_t)-1;
         args.src.info.mem_type    = UCC_MEMORY_TYPE_UNKNOWN;
+    }
+
+    if (persistent) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
 
     args.op                   = op;
@@ -71,14 +76,29 @@ ucc_status_t TestAllreduce::set_input()
     return UCC_OK;
 }
 
-ucc_status_t TestAllreduce::reset_sbuf()
+ucc_status_t TestAllreduce::reset_sbuf(int iter_persistent = 0)
 {
+    size_t dt_size = ucc_dt_size(dt);
+    size_t count   = msgsize / dt_size;
+    int    rank;
+    void  *buf;
+
+    MPI_Comm_rank(team.comm, &rank);
+    if (TEST_NO_INPLACE == inplace) {
+        buf = sbuf;
+    } else {
+        buf = rbuf;
+    }
+    init_buffer(buf, count, dt, mem_type, rank * (iter_persistent + 1));
+    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
+                            UCC_MEMORY_TYPE_HOST, mem_type));
     return UCC_OK;
 }
 
 ucc_status_t TestAllreduce::check()
 {
-    size_t       count = args.dst.info.count;
+    size_t       dt_size = ucc_dt_size(dt);
+    size_t       count   = msgsize / dt_size;
     MPI_Request  req;
     int          completed;
     ucc_status_t status;
@@ -102,9 +122,11 @@ ucc_status_t TestAllreduce::check()
 }
 
 std::string TestAllreduce::str() {
-    return std::string("tc=")+ucc_coll_type_str(args.coll_type) +
-        " team=" + team_str(team.type) + " msgsize=" +
-        std::to_string(msgsize) + " inplace=" +
-        (inplace == TEST_INPLACE ? "1" : "0") + " dt=" +
-        ucc_datatype_str(dt) + " op=" + ucc_reduction_op_str(op);
+    return std::string("tc=") + ucc_coll_type_str(args.coll_type) +
+        " team=" + team_str(team.type) +
+        " msgsize=" + std::to_string(msgsize) +
+        " inplace=" + (inplace == TEST_INPLACE ? "1" : "0") +
+        " persistent=" + (persistent == TEST_PERSISTENT ? "1" : "0") +
+        " dt=" + ucc_datatype_str(dt) +
+        " op=" + ucc_reduction_op_str(op);
 }

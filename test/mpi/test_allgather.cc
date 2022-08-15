@@ -32,8 +32,8 @@ TestAllgather::TestAllgather(ucc_test_team_t &_team, TestCaseParams &params) :
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
         sbuf = sbuf_mc_header->addr;
     } else {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 
     if (TEST_NO_INPLACE == inplace) {
@@ -46,6 +46,12 @@ TestAllgather::TestAllgather(ucc_test_team_t &_team, TestCaseParams &params) :
     args.dst.info.count    = single_rank_count * size;
     args.dst.info.datatype = TEST_DT;
     args.dst.info.mem_type = mem_type;
+
+    if (persistent) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+    }
+
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
@@ -72,7 +78,7 @@ ucc_status_t TestAllgather::set_input()
     return UCC_OK;
 }
 
-ucc_status_t TestAllgather::reset_sbuf()
+ucc_status_t TestAllgather::reset_sbuf(int persistent = 0)
 {
     return UCC_OK;
 }

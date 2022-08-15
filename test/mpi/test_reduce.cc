@@ -72,7 +72,7 @@ ucc_status_t TestReduce::set_input()
     return UCC_OK;
 }
 
-ucc_status_t TestReduce::reset_sbuf()
+ucc_status_t TestReduce::reset_sbuf(int persistent = 0)
 {
     return UCC_OK;
 }

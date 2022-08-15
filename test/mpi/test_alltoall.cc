@@ -89,7 +89,7 @@ ucc_status_t TestAlltoall::set_input()
     return UCC_OK;
 }
 
-ucc_status_t TestAlltoall::reset_sbuf()
+ucc_status_t TestAlltoall::reset_sbuf(int persistent = 0)
 {
     size_t dt_size           = ucc_dt_size(TEST_DT);
     size_t single_rank_count = msgsize / dt_size;

@@ -216,6 +216,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
     ucc_kn_radix_t     radix =
         ucc_min(TASK_LIB(task)->cfg.allreduce_kn_radix, size);
     ucc_status_t       status;
+    printf("in allreduce kn init\n");
 
     task->super.flags    |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post     = ucc_tl_ucp_allreduce_knomial_start;

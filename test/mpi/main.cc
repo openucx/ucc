@@ -30,7 +30,8 @@ static std::vector<ucc_test_vsize_flag_t> counts_vsize = {TEST_FLAG_VSIZE_32BIT,
 static std::vector<ucc_test_vsize_flag_t> displs_vsize = {TEST_FLAG_VSIZE_32BIT,
                                                           TEST_FLAG_VSIZE_64BIT};
 static size_t msgrange[3] = {8, (1ULL << 21), 8};
-static std::vector<ucc_test_mpi_inplace_t> inplace = {TEST_NO_INPLACE};
+static std::vector<ucc_test_mpi_inplace_t>    inplace    = {TEST_NO_INPLACE};
+static std::vector<ucc_test_mpi_persistent_t> persistent = {TEST_NO_PERSISTENT};
 static std::vector<bool> triggered = {false};
 static ucc_test_mpi_root_t root_type = ROOT_RANDOM;
 static int root_value = 10;
@@ -71,6 +72,7 @@ void PrintHelp()
        "-d, --dtypes           <d1,d2,..>\n\tlist of dtypes: (u)int8(16,32,64),float32(64,128),float32(64,128)_complex\n\n"
        "-o, --ops              <o1,o2,..>\n\tlist of ops:sum,prod,max,min,land,lor,lxor,band,bor,bxor\n\n"
        "-I, --inplace          <value>\n\t0 - no inplace, 1 - inplace, 2 - both\n\n"
+       "-P, --persistent       <value>\n\t0 - no persistent, 1 - persistent, 2 - both\n\n"
        "-m, --msgsize          <min:max[:power]>\n\tmesage sizes range\n\n"
        "-r, --root             <type:[value]>\n\ttype of root selection: single:<value>, random:<value>, all\n\n"
        "-s, --seed             <value>\n\tuser defined random seed\n\n"
@@ -284,6 +286,25 @@ static void process_inplace(const char *arg)
     throw std::string("incorrect inplace: ") + arg;
 }
 
+static void process_persistent(const char *arg)
+{
+    int value = std::stoi(arg);
+    switch(value) {
+    case 0:
+        persistent = {TEST_NO_PERSISTENT};
+        return;
+    case 1:
+        persistent = {TEST_PERSISTENT};
+        return;
+    case 2:
+        persistent = {TEST_NO_PERSISTENT, TEST_PERSISTENT};
+        return;
+    default:
+        break;
+    }
+    throw std::string("incorrect persistent: ") + arg;
+}
+
 static void process_triggered(const char *arg)
 {
     int value = std::stoi(arg);
@@ -366,7 +387,7 @@ void PrintInfo()
 
 void ProcessArgs(int argc, char** argv)
 {
-    const char *const short_opts  = "c:t:m:d:o:M:I:N:r:s:C:D:i:Z:G:ThvS:O:";
+    const char *const short_opts  = "c:t:m:d:o:M:I:P:N:r:s:C:D:i:Z:G:ThvS:O:";
     const option      long_opts[] = {
                                 {"colls", required_argument, nullptr, 'c'},
                                 {"teams", required_argument, nullptr, 't'},
@@ -375,6 +396,7 @@ void ProcessArgs(int argc, char** argv)
                                 {"ops", required_argument, nullptr, 'o'},
                                 {"msgsize", required_argument, nullptr, 'm'},
                                 {"inplace", required_argument, nullptr, 'I'},
+                                {"persistent", required_argument, nullptr, 'P'},
                                 {"root", required_argument, nullptr, 'r'},
                                 {"seed", required_argument, nullptr, 's'},
                                 {"max_size", required_argument, nullptr, 'Z'},
@@ -422,6 +444,9 @@ void ProcessArgs(int argc, char** argv)
             break;
         case 'I':
             process_inplace(optarg);
+            break;
+        case 'P':
+            process_persistent(optarg);
             break;
         case 'G':
             process_triggered(optarg);
@@ -543,19 +568,25 @@ int main(int argc, char *argv[])
     PrintInfo();
 
     for (auto &inpl : inplace) {
-        for (auto trig: triggered) {
-            test->set_triggered(trig);
-            test->set_inplace(inpl);
-            test->run_all();
+        for (auto &pers : persistent) {
+            for (auto trig: triggered) {
+                test->set_triggered(trig);
+                test->set_inplace(inpl);
+                test->set_persistent(pers);
+                test->run_all();
+            }
         }
     }
 
     if (has_onesided) {
         test->set_colls(onesided_colls);
         for (auto &inpl : inplace) {
-            test->set_triggered(false);
-            test->set_inplace(inpl);
-            test->run_all(true);
+            for (auto &pers : persistent) {
+                test->set_triggered(false);
+                test->set_inplace(inpl);
+                test->set_persistent(pers);
+                test->run_all(true);
+            }
         }
     }
 

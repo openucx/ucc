@@ -124,6 +124,7 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
     colls      = {UCC_COLL_TYPE_BARRIER, UCC_COLL_TYPE_ALLREDUCE};
     mtypes     = {UCC_MEMORY_TYPE_HOST};
     inplace    = TEST_NO_INPLACE;
+    persistent = TEST_NO_PERSISTENT;
     root_type  = ROOT_RANDOM;
     root_value = 10;
     iterations = 1;
@@ -447,57 +448,61 @@ void set_gpu_device(test_set_gpu_device_t set_device)
 #endif
 
 std::vector<ucc_status_t> UccTestMpi::exec_tests(
-        std::vector<std::shared_ptr<TestCase>> tcs, bool triggered)
+        std::vector<std::shared_ptr<TestCase>> tcs, bool triggered,
+                                                    int  persistent)
 {
+    int n_persistent = persistent ? 5 : 1;
+    int world_rank, num_done, i;
     ucc_status_t status;
-    int world_rank;
-    int num_done;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     std::vector<ucc_status_t> rst;
-    for (auto tc: tcs) {
-        if (TEST_SKIP_NONE == tc->test_skip) {
-            if (verbose && 0 == world_rank) {
-                if (triggered) {
-                    std::cout << "Triggered "<<tc->str() << std::endl;
-                } else {
-                    std::cout << tc->str() << std::endl;
-                }
-            }
-            tc->run(triggered);
-        } else {
-            if (verbose && 0 == world_rank) {
-                std::cout << "SKIPPED: " << skip_str(tc->test_skip) << ": "
-                          << tc->str() << " " << std::endl;
-            }
-            rst.push_back(UCC_ERR_LAST);
-            return rst;
-        }
-    }
-    do {
-        num_done = 0;
+
+    for (i = 0; i < n_persistent; i++) {
         for (auto tc: tcs) {
-            tc->mpi_progress();
-            status = tc->test();
-            if (status < 0) {
-                std::cerr << "error during coll test: "
-                          << ucc_status_string(status)
-                          << " ("<<status<<")" << std::endl;
-                MPI_Abort(MPI_COMM_WORLD, -1);
+            if (TEST_SKIP_NONE == tc->test_skip) {
+                if (verbose && 0 == world_rank) {
+                    if (triggered) {
+                        std::cout << "Triggered "<<tc->str() << std::endl;
+                    } else {
+                       std::cout << tc->str() << std::endl;
+                    }
+                }
+                tc->run(triggered);
+            } else {
+                if (verbose && 0 == world_rank) {
+                    std::cout << "SKIPPED: " << skip_str(tc->test_skip) << ": "
+                              << tc->str() << " " << std::endl;
+                }
+                rst.push_back(UCC_ERR_LAST);
+                return rst;
             }
-            if (status == UCC_OK) {
-                num_done++;
+        }
+        do {
+            num_done = 0;
+            for (auto tc: tcs) {
+                tc->mpi_progress();
+                status = tc->test();
+                if (status < 0) {
+                    std::cerr << "error during coll test: "
+                              << ucc_status_string(status)
+                              << " ("<<status<<")" << std::endl;
+                    MPI_Abort(MPI_COMM_WORLD, -1);
+                }
+                if (status == UCC_OK) {
+                    num_done++;
+                }
+                tc->tc_progress_ctx();
             }
-            tc->tc_progress_ctx();
-        }
-    } while (num_done != tcs.size());
-    for (auto tc: tcs) {
-        tc->reset_sbuf();
-        status = tc->check();
-        if (UCC_OK != status) {
-            std::cerr << "FAILURE in: " << tc->str() << std::endl;
-        }
-        rst.push_back(status);
+        } while (num_done != tcs.size());
+        for (auto tc: tcs) {
+            tc->reset_sbuf(i); //?
+            status = tc->check(); //?
+            if (UCC_OK != status) {
+                std::cerr << "FAILURE in: " << tc->str() << std::endl;
+            }
+            rst.push_back(status);
+       }
     }
     return rst;
 }
@@ -507,8 +512,9 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
 {
     TestCaseParams params;
 
-    params.max_size  = test_max_size;
-    params.inplace   = inplace;
+    params.max_size   = test_max_size;
+    params.inplace    = inplace;
+    params.persistent = persistent;
 
     for (auto i = 0; i < iterations; i++) {
         for (auto &c : colls) {
@@ -604,7 +610,7 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                                         params.buffers    = onesided_bufs;
 
                                         auto tcs = TestCase::init(team, c, nt, params);
-                                        auto res = exec_tests(tcs, triggered);
+                                        auto res = exec_tests(tcs, triggered, persistent);
                                         rst.insert(rst.end(), res.begin(), res.end());
                                     }
                                 }
