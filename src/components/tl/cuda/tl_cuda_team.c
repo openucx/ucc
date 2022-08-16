@@ -254,7 +254,7 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     }
 
     if (UCC_TL_TEAM_LIB(team)->log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
-        ucc_tl_cuda_team_topo_print(&team->super, team->topo);
+        ucc_tl_cuda_team_topo_print_proxies(&team->super, team->topo);
         ucc_tl_cuda_team_topo_print_rings(&team->super, team->topo);
     }
 
