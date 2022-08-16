@@ -301,7 +301,7 @@ public:
     virtual ~TestCase();
     virtual void run(bool triggered);
     virtual ucc_status_t set_input() = 0;
-    virtual ucc_status_t reset_sbuf(int persistent = 0) = 0;
+    virtual ucc_status_t reset_sbuf(int iter_persistent) = 0;
     virtual ucc_status_t check() = 0;
     virtual std::string str();
     virtual ucc_status_t test();
@@ -393,7 +393,7 @@ class TestAllgather : public TestCase {
 public:
     TestAllgather(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
 };
 
@@ -404,7 +404,7 @@ public:
     TestAllgatherv(ucc_test_team_t &team, TestCaseParams &params);
     ~TestAllgatherv();
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check() override;
 };
 
@@ -414,7 +414,7 @@ class TestAllreduce : public TestCase {
 public:
     TestAllreduce(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
     std::string str();
 };
@@ -423,7 +423,7 @@ class TestAlltoall : public TestCase {
 public:
     TestAlltoall(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
 };
 
@@ -446,7 +446,7 @@ class TestAlltoallv : public TestCase {
 public:
     TestAlltoallv(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
     std::string str();
     ~TestAlltoallv();
@@ -457,7 +457,7 @@ class TestBarrier : public TestCase {
 public:
     TestBarrier(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
     std::string str();
     void run(bool triggered);
@@ -468,7 +468,7 @@ class TestBcast : public TestCase {
 public:
     TestBcast(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
 };
 
@@ -476,7 +476,7 @@ class TestGather : public TestCase {
 public:
     TestGather(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
 };
 
@@ -486,7 +486,7 @@ class TestGatherv : public TestCase {
 public:
     TestGatherv(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
     ~TestGatherv();
 };
@@ -497,7 +497,7 @@ class TestReduce : public TestCase {
 public:
     TestReduce(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
     std::string  str();
 };
@@ -508,7 +508,7 @@ class TestReduceScatter : public TestCase {
 public:
     TestReduceScatter(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ~TestReduceScatter();
     ucc_status_t check();
     std::string str();
@@ -521,7 +521,7 @@ class TestReduceScatterv : public TestCase {
   public:
     TestReduceScatterv(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ~TestReduceScatterv();
     ucc_status_t check();
     std::string  str();
@@ -531,7 +531,7 @@ class TestScatter : public TestCase {
 public:
     TestScatter(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
 };
 
@@ -541,7 +541,7 @@ class TestScatterv : public TestCase {
 public:
     TestScatterv(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input() override;
-    ucc_status_t reset_sbuf(int persistent) override;
+    ucc_status_t reset_sbuf(int iter_persistent) override;
     ucc_status_t check();
     ~TestScatterv();
 };

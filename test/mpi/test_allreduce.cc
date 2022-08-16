@@ -106,6 +106,7 @@ ucc_status_t TestAllreduce::check()
     MPI_Iallreduce(MPI_IN_PLACE, check_buf, count, ucc_dt_to_mpi(dt),
                    op == UCC_OP_AVG ? MPI_SUM : ucc_op_to_mpi(op), team.comm,
                    &req);
+
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);

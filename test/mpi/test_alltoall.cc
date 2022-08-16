@@ -89,17 +89,8 @@ ucc_status_t TestAlltoall::set_input()
     return UCC_OK;
 }
 
-ucc_status_t TestAlltoall::reset_sbuf(int persistent = 0)
+ucc_status_t TestAlltoall::reset_sbuf(int iter_persistent = 0)
 {
-    size_t dt_size           = ucc_dt_size(TEST_DT);
-    size_t single_rank_count = msgsize / dt_size;
-    int    rank, nprocs;
-
-    MPI_Comm_rank(team.comm, &rank);
-    MPI_Comm_size(team.comm, &nprocs);
-    if (TEST_NO_INPLACE == inplace) {
-        init_buffer(sbuf, single_rank_count * nprocs, TEST_DT, mem_type, rank);
-    }
     return UCC_OK;
 }
 

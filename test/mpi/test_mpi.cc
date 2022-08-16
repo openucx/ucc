@@ -496,8 +496,8 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
             }
         } while (num_done != tcs.size());
         for (auto tc: tcs) {
-            tc->reset_sbuf(i); //?
-            status = tc->check(); //?
+            status = tc->check();
+            tc->reset_sbuf(i + 1);
             if (UCC_OK != status) {
                 std::cerr << "FAILURE in: " << tc->str() << std::endl;
             }

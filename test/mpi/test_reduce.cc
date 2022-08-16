@@ -38,8 +38,13 @@ TestReduce::TestReduce(ucc_test_team_t &_team, TestCaseParams &params) :
         sbuf = sbuf_mc_header->addr;
     }
     if (inplace == TEST_INPLACE) {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+    }
+
+    if (persistent) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
 
     args.op                   = op;
@@ -72,8 +77,22 @@ ucc_status_t TestReduce::set_input()
     return UCC_OK;
 }
 
-ucc_status_t TestReduce::reset_sbuf(int persistent = 0)
+ucc_status_t TestReduce::reset_sbuf(int iter_persistent = 0)
 {
+    size_t dt_size = ucc_dt_size(dt);
+    size_t count   = msgsize / dt_size;
+    int    rank;
+    void  *buf;
+
+    MPI_Comm_rank(team.comm, &rank);
+    if (inplace && rank == root) {
+        buf = rbuf;
+    } else {
+        buf = sbuf;
+    }
+    init_buffer(buf, count, dt, mem_type, rank * (iter_persistent + 1));
+    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
+                            UCC_MEMORY_TYPE_HOST, mem_type));
     return UCC_OK;
 }
 

@@ -147,7 +147,7 @@ ucc_status_t TestAlltoallv::set_input()
     return UCC_OK;
 }
 
-ucc_status_t TestAlltoallv::reset_sbuf(int persistent = 0)
+ucc_status_t TestAlltoallv::reset_sbuf(int iter_persistent = 0)
 {
     return UCC_OK;
 }
