@@ -46,8 +46,12 @@ TestScatter::TestScatter(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_MALLOC_CHECK(check_buf);
 
     if (TEST_INPLACE == inplace) {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+    }
+    if (persistent) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
 
     args.root = root;
@@ -73,7 +77,7 @@ TestScatter::TestScatter(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestScatter::set_input()
+ucc_status_t TestScatter::set_input(int iter_persistent)
 {
     size_t dt_size           = ucc_dt_size(TEST_DT);
     size_t single_rank_count = msgsize / dt_size;
@@ -84,15 +88,11 @@ ucc_status_t TestScatter::set_input()
     MPI_Comm_size(team.comm, &size);
 
     if (rank == root) {
-        init_buffer(sbuf, single_rank_count * size, TEST_DT, mem_type, rank);
+        init_buffer(sbuf, single_rank_count * size, TEST_DT, mem_type,
+                    rank * (iter_persistent + 1));
         UCC_CHECK(ucc_mc_memcpy(check_buf, sbuf, single_rank_size * size,
                                 UCC_MEMORY_TYPE_HOST, mem_type));
     }
-    return UCC_OK;
-}
-
-ucc_status_t TestScatter::reset_sbuf(int iter_persistent = 0)
-{
     return UCC_OK;
 }
 

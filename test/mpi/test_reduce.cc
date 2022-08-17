@@ -57,7 +57,7 @@ TestReduce::TestReduce(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestReduce::set_input()
+ucc_status_t TestReduce::set_input(int iter_persistent)
 {
     size_t dt_size = ucc_dt_size(dt);
     size_t count   = msgsize / dt_size;
@@ -71,25 +71,6 @@ ucc_status_t TestReduce::set_input()
         buf = sbuf;
     }
 
-    init_buffer(buf, count, dt, mem_type, rank);
-    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
-                            UCC_MEMORY_TYPE_HOST, mem_type));
-    return UCC_OK;
-}
-
-ucc_status_t TestReduce::reset_sbuf(int iter_persistent = 0)
-{
-    size_t dt_size = ucc_dt_size(dt);
-    size_t count   = msgsize / dt_size;
-    int    rank;
-    void  *buf;
-
-    MPI_Comm_rank(team.comm, &rank);
-    if (inplace && rank == root) {
-        buf = rbuf;
-    } else {
-        buf = sbuf;
-    }
     init_buffer(buf, count, dt, mem_type, rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));

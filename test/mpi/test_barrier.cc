@@ -9,16 +9,15 @@
 TestBarrier::TestBarrier(ucc_test_team_t &team, TestCaseParams &params) :
     TestCase(team, UCC_COLL_TYPE_BARRIER, params)
 {
+    if (TEST_SKIP_NONE != skip_reduce(persistent == TEST_PERSISTENT,
+                                      TEST_SKIP_NOT_SUPPORTED, team.comm)) {
+        return;
+    }
     status = UCC_OK;
     UCC_CHECK(ucc_collective_init(&args, &req, team.team));
 }
 
-ucc_status_t TestBarrier::set_input()
-{
-    return UCC_OK;
-}
-
-ucc_status_t TestBarrier::reset_sbuf(int iter_persistent = 0)
+ucc_status_t TestBarrier::set_input(int iter_persistent) /* NOLINT */
 {
     return UCC_OK;
 }

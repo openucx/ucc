@@ -29,6 +29,10 @@ TestBcast::TestBcast(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
     sbuf = sbuf_mc_header->addr;
 
+    if (persistent) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+    }
     args.src.info.buffer   = sbuf;
     args.src.info.count    = count;
     args.src.info.datatype = TEST_DT;
@@ -38,7 +42,7 @@ TestBcast::TestBcast(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestBcast::set_input()
+ucc_status_t TestBcast::set_input(int iter_persistent)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t count   = msgsize / dt_size;
@@ -46,15 +50,11 @@ ucc_status_t TestBcast::set_input()
 
     MPI_Comm_rank(team.comm, &rank);
     if (rank == root) {
-        init_buffer(sbuf, count, TEST_DT, mem_type, rank);
+        init_buffer(sbuf, count, TEST_DT, mem_type,
+                    rank * (iter_persistent + 1));
         UCC_CHECK(ucc_mc_memcpy(check_buf, sbuf, count * dt_size,
                   UCC_MEMORY_TYPE_HOST, mem_type));
     }
-    return UCC_OK;
-}
-
-ucc_status_t TestBcast::reset_sbuf(int iter_persistent = 0)
-{
     return UCC_OK;
 }
 

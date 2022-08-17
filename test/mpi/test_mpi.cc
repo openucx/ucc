@@ -451,7 +451,7 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
         std::vector<std::shared_ptr<TestCase>> tcs, bool triggered,
                                                     int  persistent)
 {
-    int n_persistent = persistent ? 5 : 1;
+    int n_persistent = persistent ? 4 : 1;
     int world_rank, num_done, i;
     ucc_status_t status;
 
@@ -497,7 +497,7 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
         } while (num_done != tcs.size());
         for (auto tc: tcs) {
             status = tc->check();
-            tc->reset_sbuf(i + 1);
+            tc->set_input(i + 1);
             if (UCC_OK != status) {
                 std::cerr << "FAILURE in: " << tc->str() << std::endl;
             }

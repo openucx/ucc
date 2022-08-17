@@ -44,14 +44,18 @@ TestAlltoall::TestAlltoall(ucc_test_team_t &_team, TestCaseParams &params) :
             sbuf = sbuf_mc_header->addr;
         }
     } else {
-        args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
     if (is_onesided) {
-        args.mask =
+        args.mask  |=
             UCC_COLL_ARGS_FIELD_FLAGS | UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
         args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
         args.global_work_buffer = work_buf;
+    }
+    if (persistent) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
 
     if (TEST_NO_INPLACE == inplace) {
@@ -69,7 +73,7 @@ TestAlltoall::TestAlltoall(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestAlltoall::set_input()
+ucc_status_t TestAlltoall::set_input(int iter_persistent)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
     size_t single_rank_count = msgsize / dt_size;
@@ -83,14 +87,11 @@ ucc_status_t TestAlltoall::set_input()
     } else {
         buf = rbuf;
     }
-    init_buffer(buf, single_rank_count * nprocs, TEST_DT, mem_type, rank);
-    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, single_rank_count * nprocs * dt_size,
+    init_buffer(buf, single_rank_count * nprocs, TEST_DT, mem_type,
+                rank * (iter_persistent + 1));
+    UCC_CHECK(ucc_mc_memcpy(check_buf, buf,
+                            single_rank_count * nprocs * dt_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));
-    return UCC_OK;
-}
-
-ucc_status_t TestAlltoall::reset_sbuf(int iter_persistent = 0)
-{
     return UCC_OK;
 }
 

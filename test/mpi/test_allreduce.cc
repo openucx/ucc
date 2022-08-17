@@ -57,26 +57,7 @@ TestAllreduce::TestAllreduce(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestAllreduce::set_input()
-{
-    size_t dt_size = ucc_dt_size(dt);
-    size_t count   = msgsize / dt_size;
-    int    rank;
-    void  *buf;
-
-    MPI_Comm_rank(team.comm, &rank);
-    if (TEST_NO_INPLACE == inplace) {
-        buf = sbuf;
-    } else {
-        buf = rbuf;
-    }
-    init_buffer(buf, count, dt, mem_type, rank);
-    UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
-                            UCC_MEMORY_TYPE_HOST, mem_type));
-    return UCC_OK;
-}
-
-ucc_status_t TestAllreduce::reset_sbuf(int iter_persistent = 0)
+ucc_status_t TestAllreduce::set_input(int iter_persistent)
 {
     size_t dt_size = ucc_dt_size(dt);
     size_t count   = msgsize / dt_size;

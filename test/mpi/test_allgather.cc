@@ -32,8 +32,12 @@ TestAllgather::TestAllgather(ucc_test_team_t &_team, TestCaseParams &params) :
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
         sbuf = sbuf_mc_header->addr;
     } else {
-        args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
         args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+    }
+    if (persistent) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
 
     if (TEST_NO_INPLACE == inplace) {
@@ -46,17 +50,11 @@ TestAllgather::TestAllgather(ucc_test_team_t &_team, TestCaseParams &params) :
     args.dst.info.count    = single_rank_count * size;
     args.dst.info.datatype = TEST_DT;
     args.dst.info.mem_type = mem_type;
-
-    if (persistent) {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
-    }
-
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestAllgather::set_input()
+ucc_status_t TestAllgather::set_input(int iter_persistent)
 {
     size_t dt_size           = ucc_dt_size(TEST_DT);
     size_t single_rank_count = msgsize / dt_size;
@@ -72,14 +70,10 @@ ucc_status_t TestAllgather::set_input()
     }
     check = PTR_OFFSET(check_buf, rank * single_rank_size);
 
-    init_buffer(buf, single_rank_count, TEST_DT, mem_type, rank);
+    init_buffer(buf, single_rank_count, TEST_DT, mem_type,
+                rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check, buf, single_rank_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));
-    return UCC_OK;
-}
-
-ucc_status_t TestAllgather::reset_sbuf(int iter_persistent = 0)
-{
     return UCC_OK;
 }
 
