@@ -42,6 +42,13 @@ ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
     ucc_mem_attr_t mem_attr;
     ucc_status_t   status;
 
+    if (ptr == NULL || length == 0) {
+        mi->ptr    = NULL;
+        mi->length = 0;
+        mi->offset = 0;
+        return UCC_OK;
+    }
+
     mem_attr.field_mask =
         UCC_MEM_ATTR_FIELD_BASE_ADDRESS | UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
     mem_attr.alloc_length = length;
