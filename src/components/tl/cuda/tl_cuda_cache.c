@@ -145,6 +145,10 @@ ucc_tl_cuda_map_memhandle(const void *d_ptr, size_t size,
                           cudaIpcMemHandle_t mem_handle, void **mapped_addr,
                           ucc_tl_cuda_cache_t *cache)
 {
+    if (d_ptr == NULL || size == 0) {
+        *mapped_addr = NULL;
+        return UCC_OK;
+    }
 #if ENABLE_CACHE
     ucc_status_t status;
     ucs_status_t ucs_status;
