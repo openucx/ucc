@@ -88,7 +88,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     if (SBGP_ENABLED(cl_team, NODE) &&
         cl_team->top_sbgp != UCC_HIER_SBGP_NODE) {
         /* For bcast src should point to origin dst of allreduce */
-        args.args.src.info = args.args.dst.info;
+        args.args.src.info  = args.args.dst.info;
         args.args.coll_type = UCC_COLL_TYPE_BCAST;
         status =
             ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]);
