@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -59,6 +59,8 @@ typedef struct ucc_ec_cuda_config {
     unsigned long                  exec_num_threads;
     unsigned long                  exec_max_tasks;
     unsigned long                  exec_num_streams;
+    unsigned long                  reduce_num_blocks;
+    int                            reduce_num_threads;
 } ucc_ec_cuda_config_t;
 
 typedef struct ucc_ec_cuda {
@@ -138,7 +140,9 @@ extern ucc_ec_cuda_t ucc_ec_cuda;
             ucc_ec_cuda.stream_initialized = 1;                                \
         }                                                                      \
         ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);                           \
-        CUDA_CHECK(cuda_st);                                                   \
+        if (ucc_unlikely(cudaSuccess != cuda_st)) {                     \
+            return cuda_error_to_ucc_status(cuda_st);                   \
+        }                                                               \
     }                                                                          \
 } while(0)
 

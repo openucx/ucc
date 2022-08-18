@@ -1,6 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2022. ALL RIGHTS RESERVED.
- * Copyright (C) NVIDIA Corporation. 2022. All rights reserved.
+ * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */

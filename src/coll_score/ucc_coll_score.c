@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -629,29 +629,29 @@ static ucc_status_t str_to_tsizes(const char *str, ucc_rank_t **tsizes,
             }
             (*tsizes)[2 * i]     = (ucc_rank_t)atoi(tokens2[0]);
             (*tsizes)[2 * i + 1] = (ucc_rank_t)atoi(tokens2[0]);
-            continue;
-        }
-        if (n_tokens2 != 2) {
-            status  = UCC_ERR_INVALID_PARAM;
-            goto err;
-        }
-        if (UCC_OK == ucc_str_is_number(tokens2[0])) {
-            (*tsizes)[2 * i] = (ucc_rank_t)atoi(tokens2[0]);
         } else {
-            status  = UCC_ERR_INVALID_PARAM;
-            goto err;
-        }
-        if (0 == strcasecmp("inf", tokens2[1])) {
-            (*tsizes)[2 * i + 1] = UCC_RANK_MAX;
-        } else if (UCC_OK == ucc_str_is_number(tokens2[1])) {
-            (*tsizes)[2 * i + 1] = (ucc_rank_t)atoi(tokens2[1]);
-        } else {
-            status  = UCC_ERR_INVALID_PARAM;
-            goto err;
-        }
-        if ((*tsizes)[2 * i + 1] < (*tsizes)[2 * i]) {
-            status  = UCC_ERR_INVALID_PARAM;
-            goto err;
+            if (n_tokens2 != 2) {
+                status  = UCC_ERR_INVALID_PARAM;
+                goto err;
+            }
+            if (UCC_OK == ucc_str_is_number(tokens2[0])) {
+                (*tsizes)[2 * i] = (ucc_rank_t)atoi(tokens2[0]);
+            } else {
+                status  = UCC_ERR_INVALID_PARAM;
+                goto err;
+            }
+            if (0 == strcasecmp("inf", tokens2[1])) {
+                (*tsizes)[2 * i + 1] = UCC_RANK_MAX;
+            } else if (UCC_OK == ucc_str_is_number(tokens2[1])) {
+                (*tsizes)[2 * i + 1] = (ucc_rank_t)atoi(tokens2[1]);
+            } else {
+                status  = UCC_ERR_INVALID_PARAM;
+                goto err;
+            }
+            if ((*tsizes)[2 * i + 1] < (*tsizes)[2 * i]) {
+                status  = UCC_ERR_INVALID_PARAM;
+                goto err;
+            }
         }
         ucc_str_split_free(tokens2);
     }

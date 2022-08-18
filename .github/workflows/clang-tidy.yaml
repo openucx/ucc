@@ -38,7 +38,6 @@ jobs:
         make clean
         rm -rf /tmp/ucc
     - name: Run gtest ASAN
-      continue-on-error: true
       run: |
         cd ${GITHUB_WORKSPACE}
         ls -la

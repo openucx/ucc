@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 #include "config.h"
@@ -30,7 +30,8 @@ static ucc_status_t ucc_component_load_one(const char *so_path,
     char                  *error, iface_struct[IFACE_NAME_LEN_MAX];
     void                  *handle;
     ucc_component_iface_t *iface;
-    size_t                 basename_start, iface_struct_name_len;
+    ptrdiff_t              basename_start;
+    size_t                 iface_struct_name_len;
 
     ucc_snprintf_safe(framework_pattern, sizeof(framework_pattern), "ucc_%s_",
                       framework_name);
@@ -227,7 +228,7 @@ char* ucc_get_framework_components_list(ucc_component_framework_t *framework,
         len += strlen(framework->components[i]->name) + 1;
     }
     if (len) {
-        list = ucc_malloc(len, "components_list");
+        list = ucc_malloc(len + 1, "components_list");
         if (!list) {
             ucc_error("failed to allocate %zd bytes for components_list", len);
             return NULL;

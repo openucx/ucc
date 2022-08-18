@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  * Copyright (C) Advanced Micro Devices, Inc. 2022. ALL RIGHTS RESERVED.
  *
@@ -50,5 +50,13 @@ ucc_status_t ucc_tl_rccl_reduce_scatter_init(ucc_tl_rccl_task_t *task);
 ucc_status_t ucc_tl_rccl_reduce_init(ucc_tl_rccl_task_t *task);
 
 ucc_status_t ucc_tl_rccl_barrier_init(ucc_tl_rccl_task_t *task);
+
+ucc_status_t ucc_tl_rccl_gather_init(ucc_tl_rccl_task_t *task);
+
+ucc_status_t ucc_tl_rccl_gatherv_init(ucc_tl_rccl_task_t *task);
+
+ucc_status_t ucc_tl_rccl_scatter_init(ucc_tl_rccl_task_t *task);
+
+ucc_status_t ucc_tl_rccl_scatterv_init(ucc_tl_rccl_task_t *task);
 
 #endif

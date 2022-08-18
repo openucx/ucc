@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 if TL_UCP_ENABLED
 
@@ -90,7 +90,6 @@ sources =                 \
 	tl_ucp_ep.c           \
 	tl_ucp_coll.c         \
 	tl_ucp_service_coll.c \
-	tl_ucp_reduce.h       \
 	$(barrier)            \
 	$(alltoall)           \
 	$(alltoallv)          \

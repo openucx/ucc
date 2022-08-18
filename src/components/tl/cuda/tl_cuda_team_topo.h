@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -11,22 +11,23 @@
 #include "tl_cuda_topo.h"
 
 typedef struct ucc_tl_cuda_proxy {
-    ucc_rank_t src;
-    ucc_rank_t dst;
-    ucc_rank_t proxy;
+    ucc_rank_t src;   /* source rank */
+    ucc_rank_t dst;   /* destination rank */
+    ucc_rank_t proxy; /* proxy rank */
 } ucc_tl_cuda_proxy_t;
 
 typedef struct ucc_tl_cuda_ring {
-    ucc_rank_t *ring;
-    ucc_rank_t *iring;
+    ucc_rank_t *ring;  /* list of ranks forming ring */
+    ucc_rank_t *iring; /* inverse of ring */
 } ucc_tl_cuda_ring_t;
 
 typedef struct ucc_tl_cuda_team_topo {
-    int                     *matrix;
-    int                      num_proxies;
-    ucc_tl_cuda_proxy_t     *proxies;
-    int                      num_rings;
-    ucc_tl_cuda_ring_t      *rings;
+    int                     *matrix;       /* nvlink adjacency matrix */
+    int                      proxy_needed; /* is proxy needed for current rank */
+    int                      num_proxies;  /* number of entries in proxies list */
+    ucc_tl_cuda_proxy_t     *proxies;      /* list of pairs where current rank is proxy */
+    int                      num_rings;    /* number of entries in rings list */
+    ucc_tl_cuda_ring_t      *rings;        /* list of rings for ring algorithms */
 } ucc_tl_cuda_team_topo_t;
 
 ucc_status_t ucc_tl_cuda_team_topo_create(const ucc_tl_team_t *team,
@@ -34,8 +35,8 @@ ucc_status_t ucc_tl_cuda_team_topo_create(const ucc_tl_team_t *team,
 
 ucc_status_t ucc_tl_cuda_team_topo_destroy(ucc_tl_cuda_team_topo_t *team_topo);
 
-void ucc_tl_cuda_team_topo_print(const ucc_tl_team_t *team,
-                                 const ucc_tl_cuda_team_topo_t *cuda_topo);
+void ucc_tl_cuda_team_topo_print_proxies(const ucc_tl_team_t *team,
+                                         const ucc_tl_cuda_team_topo_t *topo);
 
 void ucc_tl_cuda_team_topo_print_rings(const ucc_tl_team_t *tl_team,
                                        const ucc_tl_cuda_team_topo_t *topo);

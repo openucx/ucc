@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -27,4 +27,7 @@ const char*  ucc_strstr_last(const char* string, const char* pattern);
    released with ucc_free. */
 ucc_status_t ucc_str_concat(const char *str1, const char *str2,
                             char **out);
+
+ucc_status_t ucc_str_concat_n(const char *strs[], int n, char **out);
+
 #endif

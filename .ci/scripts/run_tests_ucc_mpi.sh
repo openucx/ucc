@@ -22,46 +22,110 @@ HEAD_NODE=$(head -1 "$HOSTFILE")
 export HEAD_NODE
 export MASTER_ADDR=${HEAD_NODE}
 
-NP=$(wc --lines "$HOSTFILE" | awk '{print $1}')
+NNODES=$(wc --lines "$HOSTFILE" | awk '{print $1}')
 
-mpi_params="-np $NP --hostfile ${HOSTFILE} --map-by node --allow-run-as-root -x PATH -x LD_LIBRARY_PATH --mca opal_common_ucx_opal_mem_hooks 1 --mca plm_rsh_args -p12345 "
+function mpi_params {
+    ppn=$1
+    nnodes=$2
+    if [ "x$nnodes" == "x" ]; then
+        nnodes=$NNODES
+    fi
+    echo "-np $((nnodes*ppn)) --oversubscribe --hostfile ${HOSTFILE} \
+--map-by ppr:$ppn:node --bind-to socket --allow-run-as-root \
+-x PATH -x LD_LIBRARY_PATH --mca opal_common_ucx_opal_mem_hooks 1 --mca plm_rsh_args -p12345 \
+--mca coll ^ucc,hcoll "
+}
 
-# shellcheck disable=SC2086
-mpirun $mpi_params hostname
+# # shellcheck disable=SC2086
+mpirun $(mpi_params 1) hostname
 
-# shellcheck disable=SC2086
-mpirun $mpi_params cat /proc/1/cgroup
 
-echo "INFO: UCC MPI unit tests (CPU/GPU with NCCL) ..."
-# shellcheck disable=SC2086
-mpirun $mpi_params /opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi --mtypes host,cuda --inplace 2 --set_device 1\
-       --root random:2 --count_bits 32,64 --displ_bits 32,64
-echo "INFO: UCC MPI unit tests (CPU/GPU with NCCL) ... DONE"
+# # shellcheck disable=SC2086
+mpirun $(mpi_params 1) cat /proc/1/cgroup
+
+NGPUS=$(ssh $HEAD_NODE 'nvidia-smi -L | wc -l')
+PPN=4
+EXE=/opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi
+EXE+=" --inplace 2 --set_device 2 --root random:2 --count_bits 32,64 --displ_bits 32,64"
+
+start=`date +%s`
 
 for MT in "" "-T"; do
-    echo "INFO: UCC MPI unit tests (GPU without NCCL) ..."
+    if [ $MT == "-T" ]; then
+        TG="--triggered 0"
+    else
+        # disabled so far, need to fix current issues and re-enable for CI
+        TG="--triggered 0"
+    fi
+    echo "INFO: UCC MPI unit tests (default configuration) ..."
     # shellcheck disable=SC2086
-    mpirun $mpi_params -x UCC_TL_NCCL_TUNE=0 \
-           /opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi --mtypes cuda --inplace 2 --set_device 1\
-           --root random:2 --count_bits 32,64 --displ_bits 32,64 $MT
-    echo "INFO: UCC MPI unit tests (GPU without NCCL) ... DONE"
+    default_args="-x UCC_TL_NCCL_TUNE=0"
+    mpirun $(mpi_params $PPN) $default_args $EXE $MT $TG --mtypes host,cuda
+    echo "INFO: UCC MPI unit tests (default configuration) ... DONE"
 
-    echo "INFO: UCC MPI unit tests (CPU/GPU with CL/HIER) ..."
-    # shellcheck disable=SC2086
-    mpirun $mpi_params -x UCC_TL_NCCL_TUNE=0 -x UCC_CLS=hier,basic -x UCC_CL_HIER_TUNE=inf \
-           /opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi -c alltoall,alltoallv,allreduce,barrier \
-           --mtypes host,cuda --inplace 2 --set_device 1 --root random:2 --count_bits 32,64 --displ_bits 32,64 $MT
-    echo "INFO: UCC MPI unit tests (CPU/GPU with CL/HIER) ... DONE"
 
-    echo "INFO: UCC MPI unit tests (CPU/GPU Allreduce with CL/HIER RAB) ..."
+    echo "INFO: UCC MPI unit tests (NCCL) ..."
     # shellcheck disable=SC2086
-    mpirun $mpi_params -x UCC_TL_NCCL_TUNE=0 -x UCC_CLS=hier,basic -x UCC_CL_HIER_TUNE=allreduce:@rab:inf \
-        /opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi -c allreduce --mtypes host,cuda --inplace 2 --set_device 1 $MT
-    echo "INFO: UCC MPI unit tests (CPU/GPU Allreduce with CL/HIER RAB) ... DONE"
+    nccl_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp,nccl -x UCC_TL_NCCL_TUNE=cuda:inf "
+    mpirun $(mpi_params $NGPUS) $nccl_args $EXE $MT $TG --mtypes cuda
+    echo "INFO: UCC MPI unit tests (NCCL) ... DONE"
 
-    echo "INFO: UCC MPI unit tests (CPU/GPU Allreduce with CL/HIER SplitRail) ..."
+
+    echo "INFO: UCC MPI unit tests (TL/UCP) ..."
     # shellcheck disable=SC2086
-    mpirun $mpi_params -x UCC_TL_NCCL_TUNE=0 -x UCC_CLS=hier,basic -x UCC_CL_HIER_TUNE=allreduce:@split_rail:inf \
-        /opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi -c allreduce --mtypes host,cuda --inplace 2 --set_device 1 $MT
-    echo "INFO: UCC MPI unit tests (CPU/GPU Allreduce with CL/HIER SplitRail) ... DONE"
+    tlucp_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp "
+    mpirun $(mpi_params $PPN) $tlucp_args $EXE $MT $TG --mtypes host,cuda
+    echo "INFO: UCC MPI unit tests (TL/UCP) ... DONE"
+
+
+    echo "INFO: UCC MPI unit tests (TL/CUDA) ..."
+    # shellcheck disable=SC2086
+    tlcuda_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp,cuda -x UCC_TL_CUDA_TUNE=cuda:inf "
+    tlcuda_colls="alltoall,alltoallv,allgather,allgatherv,reduce_scatter,reduce_scatterv"
+    mpirun $(mpi_params $PPN 1) $tlcuda_args $EXE $MT $TG --mtypes cuda -c $tlcuda_colls
+    echo "INFO: UCC MPI unit tests (TL/CUDA) ... DONE"
+
+
+    echo "INFO: UCC MPI unit tests (CL/HIER) ..."
+    # shellcheck disable=SC2086
+    clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=inf -x UCC_TL_NCCL_TUNE=0 "
+    clhier_colls="alltoall,alltoallv,allreduce,barrier"
+    mpirun $(mpi_params $PPN) $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
+    echo "INFO: UCC MPI unit tests (CL/HIER) ... DONE"
+
+
+    echo "INFO: UCC MPI unit tests (CL/HIER+ucp) ..."
+    # shellcheck disable=SC2086
+    clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=inf -x UCC_CL_HIER_TLS=ucp -x UCC_TL_NCCL_TUNE=0 "
+    clhier_colls="alltoall,alltoallv,allreduce,barrier"
+    mpirun $(mpi_params $PPN) $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
+    echo "INFO: UCC MPI unit tests (CL/HIER+ucp) ... DONE"
+
+
+    echo "INFO: UCC MPI unit tests (CL/HIER+rab) ..."
+    # shellcheck disable=SC2086
+    clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=allreduce:@rab:inf -x UCC_CL_HIER_TLS=ucp -x UCC_TL_NCCL_TUNE=0 "
+    clhier_colls="allreduce"
+    mpirun $(mpi_params $PPN) $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
+    echo "INFO: UCC MPI unit tests (CL/HIER+rab) ... DONE"
+
+
+    echo "INFO: UCC MPI unit tests (CL/HIER+split_rail) ..."
+    # shellcheck disable=SC2086
+    clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=allreduce:@split_rail:inf -x UCC_CL_HIER_TLS=ucp -x UCC_TL_NCCL_TUNE=0 "
+    clhier_colls="allreduce"
+    mpirun $(mpi_params $PPN) $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
+    echo "INFO: UCC MPI unit tests (CL/HIER+split_rail) ... DONE"
+
+    echo "INFO: UCC MPI unit tests (CL/HIER+split_rail+pipeline) ..."
+    # shellcheck disable=SC2086
+    clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=allreduce:@split_rail:inf -x UCC_CL_HIER_TLS=ucp -x UCC_TL_NCCL_TUNE=0 "
+    clhier_args+=" -x UCC_CL_HIER_ALLREDUCE_SPLIT_RAIL_FRAG_THRESH=0 -x UCC_CL_HIER_ALLREDUCE_SPLIT_RAIL_FRAG_SIZE=256K "
+    clhier_colls="allreduce"
+    mpirun $(mpi_params $PPN) $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
+    echo "INFO: UCC MPI unit tests (CL/HIER+split_rail+pipeline) ... DONE"
 done
+
+end=`date +%s`
+
+echo Tests took $((end - start)) seconds

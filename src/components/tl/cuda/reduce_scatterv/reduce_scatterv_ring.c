@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -126,14 +126,14 @@ ucc_tl_cuda_reduce_scatterv_ring_progress_ring(ucc_tl_cuda_task_t * task,
 
         ring_scratch_offset = ssize / 2 / task->reduce_scatterv_ring.num_rings;
         if (frag_step == 0) {
-            exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
-            exec_args.bufs[0]   = PTR_OFFSET(TASK_SCRATCH(task, trank),
-                                             local_offset +
-                                             ring_scratch_offset * ring_id);
-            exec_args.bufs[1]   = PTR_OFFSET(sbuf, (block_offset + frag_offset +
-                                             ring_frag_offset) *
-                                              ucc_dt_size(dt));
-            exec_args.count     = ring_frag_count * ucc_dt_size(dt);
+            exec_args.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+            exec_args.copy.dst =
+                PTR_OFFSET(TASK_SCRATCH(task, trank),
+                           local_offset + ring_scratch_offset * ring_id);
+            exec_args.copy.src = PTR_OFFSET(
+                sbuf, (block_offset + frag_offset + ring_frag_offset) *
+                          ucc_dt_size(dt));
+            exec_args.copy.len = ring_frag_count * ucc_dt_size(dt);
 
         } else {
 
@@ -153,13 +153,16 @@ ucc_tl_cuda_reduce_scatterv_ring_progress_ring(ucc_tl_cuda_task_t * task,
                 rdst = PTR_OFFSET(TASK_SCRATCH(task, trank), local_offset +
                                   ring_scratch_offset * ring_id);
             }
-            exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_REDUCE;
-            exec_args.bufs[0]   = rdst;
-            exec_args.bufs[1]   = rsrc1;
-            exec_args.bufs[2]   = rsrc2;
-            exec_args.count     = ring_frag_count;
-            exec_args.dt        = dt;
-            exec_args.op        = args->op;
+
+            exec_args.task_type      = UCC_EE_EXECUTOR_TASK_REDUCE;
+            exec_args.flags          = 0;
+            exec_args.reduce.dst     = rdst;
+            exec_args.reduce.srcs[0] = rsrc1;
+            exec_args.reduce.srcs[1] = rsrc2;
+            exec_args.reduce.n_srcs  = 2;
+            exec_args.reduce.count   = ring_frag_count;
+            exec_args.reduce.dt      = dt;
+            exec_args.reduce.op      = args->op;
         }
         st = ucc_ee_executor_task_post(exec, &exec_args,
                                        &task->reduce_scatterv_ring.exec_task[ring_id]);
@@ -192,6 +195,7 @@ void ucc_tl_cuda_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->reduce_scatterv_ring.stage = RING_STAGE_SETUP;
+        /* fall through */
     case RING_STAGE_SETUP:
         st = ucc_tl_cuda_reduce_scatterv_ring_setup_test(task);
         if (st != UCC_OK) {
@@ -199,6 +203,7 @@ void ucc_tl_cuda_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->reduce_scatterv_ring.stage = RING_STAGE_RING;
+        /* fall through */
     case RING_STAGE_RING:
         num_done = 0;
         for (ring = 0; ring < task->reduce_scatterv_ring.num_rings; ring++) {
@@ -222,6 +227,7 @@ void ucc_tl_cuda_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
         }
 
         task->reduce_scatterv_ring.stage = RING_STAGE_BARRIER;
+        /* fall through */
     default:
         ucc_assert(task->reduce_scatterv_ring.stage == RING_STAGE_BARRIER);
         break;

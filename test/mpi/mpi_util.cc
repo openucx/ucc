@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -40,17 +40,23 @@ static MPI_Comm create_reverse_comm()
 
 MPI_Comm create_mpi_comm(ucc_test_mpi_team_t t)
 {
+    MPI_Comm comm = MPI_COMM_NULL;
+
     switch(t) {
     case TEAM_WORLD:
-        return MPI_COMM_WORLD;
+        MPI_Comm_dup(MPI_COMM_WORLD, &comm);
+        break;
     case TEAM_REVERSE:
-        return create_reverse_comm();
+        comm = create_reverse_comm();
+        break;
     case TEAM_SPLIT_HALF:
-        return create_half_comm();
+        comm = create_half_comm();
+        break;
     case TEAM_SPLIT_ODD_EVEN:
-        return create_odd_even_comm();
+        comm = create_odd_even_comm();
+        break;
     default:
         break;
     }
-    return MPI_COMM_NULL;
+    return comm;
 }

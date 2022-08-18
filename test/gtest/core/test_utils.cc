@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 extern "C" {
@@ -46,7 +46,8 @@ UCC_TEST_P(test_coll_args_msgsize, dst_vector)
 
     for (auto c : colls) {
         args.args.coll_type = c;
-        EXPECT_EQ(total_size(), ucc_coll_args_msgsize(&args));
+        EXPECT_EQ(total_size(), ucc_coll_args_msgsize(&args.args, team.rank,
+                                                      team.size));
     }
 }
 
@@ -59,7 +60,7 @@ UCC_TEST_P(test_coll_args_msgsize, always_zero)
     _init(std::get<0>(p), std::get<1>(p), std::get<2>(p));
     for (auto c : colls) {
         args.args.coll_type = c;
-        EXPECT_EQ(0, ucc_coll_args_msgsize(&args));
+        EXPECT_EQ(0, ucc_coll_args_msgsize(&args.args, team.rank, team.size));
     }
 }
 
@@ -77,7 +78,8 @@ UCC_TEST_P(test_coll_args_msgsize, scalar)
     for (auto c : colls) {
         args.args.coll_type = c;
         args.args.coll_type = UCC_COLL_TYPE_ALLREDUCE;
-        EXPECT_EQ(total_size(), ucc_coll_args_msgsize(&args));
+        EXPECT_EQ(total_size(), ucc_coll_args_msgsize(&args.args, team.rank,
+                                                      team.size));
     }
 }
 
@@ -96,7 +98,8 @@ UCC_TEST_P(test_coll_args_msgsize, reduce)
             args.args.dst.info.count    = total;
             args.args.dst.info.datatype = dt;
         }
-        EXPECT_EQ(total_size(), ucc_coll_args_msgsize(&args));
+        EXPECT_EQ(total_size(), ucc_coll_args_msgsize(&args.args, team.rank,
+                                                      team.size));
     }
 
 }
@@ -116,7 +119,8 @@ UCC_TEST_P(test_coll_args_msgsize, scatter)
             args.args.src.info.count    = total * team.size;
             args.args.src.info.datatype = dt;
         }
-        EXPECT_EQ(total_size() * team.size, ucc_coll_args_msgsize(&args));
+        EXPECT_EQ(total_size() * team.size,
+                  ucc_coll_args_msgsize(&args.args, team.rank, team.size));
     }
 }
 
@@ -135,7 +139,8 @@ UCC_TEST_P(test_coll_args_msgsize, gather)
             args.args.dst.info.count    = total * team.size;
             args.args.dst.info.datatype = dt;
         }
-        EXPECT_EQ(total_size() * team.size, ucc_coll_args_msgsize(&args));
+        EXPECT_EQ(total_size() * team.size,
+                  ucc_coll_args_msgsize(&args.args, team.rank, team.size));
     }
 
 }

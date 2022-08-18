@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -50,10 +50,12 @@ char **ucc_str_split(const char *str, const char *delim)
     ucc_free(str_copy);
     return out;
 error:
-    for (i = 0; i < size; i++) {
-        ucc_free(out[i]);
+    if (out) {
+        for (i = 0; i < size; i++) {
+            ucc_free(out[i]);
+        }
+        ucc_free(out);
     }
-    ucc_free(out);
     ucc_free(str_copy);
     return NULL;
 }
@@ -112,21 +114,34 @@ const char* ucc_strstr_last(const char* string, const char* pattern)
     return found;
 }
 
-ucc_status_t ucc_str_concat(const char *str1, const char *str2,
-                            char **out)
+ucc_status_t ucc_str_concat_n(const char *strs[], int n, char **out)
 {
-    size_t len;
+    size_t len = 1;
     char  *rst;
+    int    i;
 
-    len = strlen(str1) + strlen(str2) + 1;
+    for (i = 0; i < n; i++) {
+        len += strlen(strs[i]);
+    }
+
     rst = ucc_malloc(len, "str_concat");
     if (!rst) {
         ucc_error("failed to allocate %zd bytes for concatenated string", len);
         return UCC_ERR_NO_MEMORY;
     }
-    ucc_strncpy_safe(rst, str1, len);
-    len -= strlen(str1);
-    strncat(rst, str2, len);
+    ucc_strncpy_safe(rst, strs[0], len);
+
+    for (i = 1; i < n; i++) {
+        len -= strlen(strs[i - 1]);
+        strncat(rst, strs[i], len);
+    }
     *out = rst;
     return UCC_OK;
+}
+
+ucc_status_t ucc_str_concat(const char *str1, const char *str2, char **out)
+{
+    const char *strs[2] = {str1, str2};
+
+    return ucc_str_concat_n(strs, 2, out);
 }

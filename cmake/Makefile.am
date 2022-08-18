@@ -1,5 +1,5 @@
 #
-# Copyright (C) NVIDIA Corporation. 2021.  ALL RIGHTS RESERVED.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 cmakedir = $(libdir)/cmake/ucc

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Mellanox Technologies.  All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # Copyright (C) Huawei Technologies Co., Ltd. 2020.  All rights reserved.
 # $HEADER$
 #

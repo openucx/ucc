@@ -1,10 +1,11 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 sources =    \
 	ec_cpu.h \
-	ec_cpu.c
+	ec_cpu.c \
+	ec_cpu_reduce.c
 
 module_LTLIBRARIES        = libucc_ec_cpu.la
 libucc_ec_cpu_la_SOURCES  = $(sources)

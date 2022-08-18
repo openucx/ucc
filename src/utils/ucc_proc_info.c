@@ -1,5 +1,5 @@
 /**
-* Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+* Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 * See file LICENSE for terms.
 */
 #include "ucc_proc_info.h"
@@ -184,7 +184,7 @@ static ucc_status_t ucc_get_bound_socket_id(ucc_socket_id_t *socketid)
                 break;
             }
         }
-        ucc_assert(((*socketid) >= 0) && ((*socketid) < nr_cpus));
+        ucc_assert(((*socketid) != UCC_SOCKET_ID_INVALID) && ((*socketid) < nr_cpus));
     }
     __sched_cpufree(cpuset);
     ucc_free(socket_ids);

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -31,9 +31,10 @@ size_t ucc_tl_cuda_alltoall_get_offset(const ucc_tl_cuda_task_t *task,
 
 ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
 {
-    ucc_coll_args_t *args = &TASK_ARGS(task);
-    ucc_status_t     status;
-    size_t           data_len;
+    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
+    ucc_status_t        status;
+    size_t              data_len;
 
     task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
 
@@ -56,10 +57,13 @@ ucc_status_t ucc_tl_cuda_alltoall_ce_init(ucc_tl_cuda_task_t *task)
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;
     }
-    status = ucc_tl_cuda_mem_info_get(args->dst.info.buffer, data_len,
-                                      &task->alltoallv_ce.mem_info_dst);
-    if (ucc_unlikely(status != UCC_OK)) {
-        goto exit_err;
+
+    if (team->topo->proxy_needed) {
+        status = ucc_tl_cuda_mem_info_get(args->dst.info.buffer, data_len,
+                                          &task->alltoallv_ce.mem_info_dst);
+        if (ucc_unlikely(status != UCC_OK)) {
+            goto exit_err;
+        }
     }
 
     task->super.post           = ucc_tl_cuda_alltoallv_ce_start;

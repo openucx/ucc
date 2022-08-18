@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -81,13 +81,14 @@ ucc_status_t ucc_tl_self_copy_start(ucc_coll_task_t *coll_task)
         return status;
     }
 
-    exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
-    exec_args.bufs[0]   = task->dst;
-    exec_args.bufs[1]   = task->src;
-    exec_args.count     = task->size;
-    task->super.status =
-        ucc_ee_executor_task_post(exec, &exec_args, &task->etask);
+    exec_args.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+    exec_args.copy.dst  = task->dst;
+    exec_args.copy.src  = task->src;
+    exec_args.copy.len  = task->size;
+    status              = ucc_ee_executor_task_post(exec, &exec_args,
+                                                    &task->etask);
     if (ucc_unlikely(status != UCC_OK)) {
+        task->super.status = status;
         return status;
     }
 

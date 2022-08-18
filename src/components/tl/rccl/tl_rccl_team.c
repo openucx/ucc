@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  * Copyright (C) Advanced Micro Devices, Inc. 2022. ALL RIGHTS RESERVED.
  *
@@ -161,6 +161,18 @@ ucc_status_t ucc_tl_rccl_coll_init(ucc_base_coll_args_t *coll_args,
         break;
     case UCC_COLL_TYPE_BARRIER:
         status = ucc_tl_rccl_barrier_init(task);
+        break;
+    case UCC_COLL_TYPE_GATHER:
+        status = ucc_tl_rccl_gather_init(task);
+        break;
+    case UCC_COLL_TYPE_GATHERV:
+        status = ucc_tl_rccl_gatherv_init(task);
+        break;
+    case UCC_COLL_TYPE_SCATTER:
+        status = ucc_tl_rccl_scatter_init(task);
+        break;
+    case UCC_COLL_TYPE_SCATTERV:
+        status = ucc_tl_rccl_scatterv_init(task);
         break;
     default:
         tl_error(UCC_TASK_LIB(task),

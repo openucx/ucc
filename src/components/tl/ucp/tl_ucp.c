@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -306,5 +306,6 @@ __attribute__((constructor)) static void tl_ucp_iface_init(void)
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
         ucc_tl_ucp_allgatherv_algs;
 
-    ucc_components_load("tlcp_ucp", &ucc_tl_ucp.super.coll_plugins);
+    /* no need to check return value, plugins can be absent */
+    (void)ucc_components_load("tlcp_ucp", &ucc_tl_ucp.super.coll_plugins);
 }

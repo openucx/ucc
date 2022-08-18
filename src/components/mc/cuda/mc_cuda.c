@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -13,11 +13,6 @@
 static ucc_config_field_t ucc_mc_cuda_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_mc_cuda_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_mc_config_table)},
-
-    {"REDUCE_NUM_BLOCKS", "auto",
-     "Number of thread blocks to use for reduction",
-     ucc_offsetof(ucc_mc_cuda_config_t, reduce_num_blocks),
-     UCC_CONFIG_TYPE_ULUNITS},
 
     {"MPOOL_ELEM_SIZE", "1Mb", "The size of each element in mc cuda mpool",
      ucc_offsetof(ucc_mc_cuda_config_t, mpool_elem_size),
@@ -52,9 +47,7 @@ static ucc_status_t ucc_mc_cuda_flush_to_owner()
 
 static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
 {
-    ucc_mc_cuda_config_t *cfg = MC_CUDA_CONFIG;
-    struct cudaDeviceProp prop;
-    int device, num_devices, driver_ver;
+    int         num_devices, driver_ver;
     cudaError_t cuda_st;
 
     ucc_mc_cuda.stream             = NULL;
@@ -67,16 +60,6 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
     if ((cuda_st != cudaSuccess) || (num_devices == 0)) {
         mc_info(&ucc_mc_cuda.super, "cuda devices are not found");
         return UCC_ERR_NO_RESOURCE;
-    }
-    CUDA_CHECK(cudaGetDevice(&device));
-    CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
-    cfg->reduce_num_threads = prop.maxThreadsPerBlock;
-    if (cfg->reduce_num_blocks != UCC_ULUNITS_AUTO) {
-        if (prop.maxGridSize[0] < cfg->reduce_num_blocks) {
-            mc_warn(&ucc_mc_cuda.super, "number of blocks is too large, "
-                    "max supported %d", prop.maxGridSize[0]);
-            cfg->reduce_num_blocks = prop.maxGridSize[0];
-        }
     }
     CUDADRV_FUNC(cuDriverGetVersion(&driver_ver));
     mc_debug(&ucc_mc_cuda.super, "driver version %d", driver_ver);
@@ -378,8 +361,7 @@ static ucc_status_t ucc_mc_cuda_mem_query(const void *ptr,
                 &alloc_length, (CUdeviceptr)ptr);
         if (cu_err != CUDA_SUCCESS) {
             mc_debug(&ucc_mc_cuda.super,
-                     "cuMemGetAddressRange(%p) error: %d(%s)",
-                      ptr, cu_err, cudaGetErrorString(st));
+                     "cuMemGetAddressRange(%p) error: %d", ptr, cu_err);
             return UCC_ERR_NOT_SUPPORTED;
         }
 
@@ -416,9 +398,6 @@ ucc_mc_cuda_t ucc_mc_cuda = {
     .super.ops.mem_query          = ucc_mc_cuda_mem_query,
     .super.ops.mem_alloc          = ucc_mc_cuda_mem_pool_alloc_with_init,
     .super.ops.mem_free           = ucc_mc_cuda_mem_pool_free,
-    .super.ops.reduce             = ucc_mc_cuda_reduce,
-    .super.ops.reduce_multi       = ucc_mc_cuda_reduce_multi,
-    .super.ops.reduce_multi_alpha = ucc_mc_cuda_reduce_multi_alpha,
     .super.ops.memcpy             = ucc_mc_cuda_memcpy,
     .super.ops.flush              = ucc_mc_cuda_flush_not_supported,
     .super.config_table =

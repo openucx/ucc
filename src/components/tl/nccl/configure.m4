@@ -1,5 +1,5 @@
 #
-# Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+# Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 tl_nccl_enabled=n

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -9,6 +9,9 @@
 #include <sys/shm.h>
 #include <unistd.h>
 #include <errno.h>
+#include <dlfcn.h>
+#include <libgen.h>
+#include "ucc_string.h"
 
 ucc_status_t ucc_sysv_alloc(size_t *size, void **addr, int *shm_id)
 {
@@ -79,4 +82,52 @@ size_t ucc_get_page_size()
     }
 
     return page_size;
+}
+
+static ucc_status_t ucc_sys_get_lib_info(Dl_info *dl_info)
+{
+    int ret;
+
+    (void)dlerror();
+    ret = dladdr(ucc_sys_get_lib_info, dl_info);
+    if (ret == 0) {
+        return UCC_ERR_NO_MESSAGE;
+    }
+
+    return UCC_OK;
+}
+
+
+const char* ucc_sys_get_lib_path()
+{
+    ucc_status_t status;
+    Dl_info      dl_info;
+
+    status = ucc_sys_get_lib_info(&dl_info);
+    if (status != UCC_OK) {
+        return NULL;
+    }
+
+    return dl_info.dli_fname;
+}
+
+ucc_status_t ucc_sys_dirname(const char *path, char **out)
+{
+    char *path_dup = strdup(path);
+    char *dirname_path;
+
+    if (!path_dup) {
+        return UCC_ERR_NO_MEMORY;
+    }
+    dirname_path = strdup(dirname(path_dup));
+    free(path_dup);
+    *out = dirname_path;
+    return UCC_OK;
+}
+
+ucc_status_t ucc_sys_path_join(const char *path1, const char *path2, char **out)
+{
+    const char *strs[3] = {path1, "/", path2};
+
+    return ucc_str_concat_n(strs, 3, out);
 }

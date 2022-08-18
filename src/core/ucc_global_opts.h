@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -22,7 +22,6 @@ typedef struct ucc_global_config {
 
     /* Coll component libraries path */
     char *component_path;
-    char *component_path_default;
     char *install_path;
     int   initialized;
     /* Profiling mode */

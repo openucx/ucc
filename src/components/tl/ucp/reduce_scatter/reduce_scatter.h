@@ -1,11 +1,11 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
 #ifndef REDUCE_SCATTER_H_
 #define REDUCE_SCATTER_H_
-#include "../tl_ucp_reduce.h"
+#include "tl_ucp_coll.h"
 
 enum
 {

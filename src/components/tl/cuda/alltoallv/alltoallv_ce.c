@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -82,7 +82,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
     volatile ucc_tl_cuda_sync_t *peer_sync, *sync;
     ucc_tl_cuda_cache_t         *cache;
     ucc_status_t                 status;
-    ucc_rank_t                   i;
+    ucc_rank_t                   i, dst;
     ucc_ee_h                     ee     = task->super.ee;
     cudaStream_t                 stream = (ee) ? (cudaStream_t)ee->ee_context : team->stream;
 
@@ -104,6 +104,7 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
             status = UCC_ERR_NO_MESSAGE;
             goto exit_err;
         }
+
         status = ucc_tl_cuda_map_memhandle(
             peer_sync->mem_info_src.ptr, peer_sync->mem_info_src.length,
             peer_sync->mem_info_src.handle,
@@ -112,18 +113,31 @@ ucc_status_t ucc_tl_cuda_alltoallv_setup_test(ucc_tl_cuda_task_t *task)
             ucc_error("ucc_cuda_ipc_map_memhandle failed");
             return UCC_ERR_INVALID_PARAM;
         }
-        status = ucc_tl_cuda_map_memhandle(
-            peer_sync->mem_info_dst.ptr, peer_sync->mem_info_dst.length,
-            peer_sync->mem_info_dst.handle,
-            &task->alltoallv_ce.peer_map_addr_dst[i], cache);
-        if (UCC_OK != status) {
-            ucc_error("ucc_cuda_ipc_map_memhandle failed");
-            return UCC_ERR_INVALID_PARAM;
-        }
+
         CUDA_CHECK_GOTO(
             cudaStreamWaitEvent(stream, sync->data[i].ipc_event_remote, 0),
             exit_err, status);
     }
+
+    for (i = 0; i < team->topo->num_proxies; i++) {
+        dst = team->topo->proxies[i].dst;
+        peer_sync = TASK_SYNC(task, dst);
+        cache     = ucc_tl_cuda_get_cache(team, dst);
+        if (ucc_unlikely(!cache)) {
+            status = UCC_ERR_NO_MESSAGE;
+            goto exit_err;
+        }
+
+        status = ucc_tl_cuda_map_memhandle(
+            peer_sync->mem_info_dst.ptr, peer_sync->mem_info_dst.length,
+            peer_sync->mem_info_dst.handle,
+            &task->alltoallv_ce.peer_map_addr_dst[dst], cache);
+        if (UCC_OK != status) {
+            ucc_error("ucc_cuda_ipc_map_memhandle failed");
+            return UCC_ERR_INVALID_PARAM;
+        }
+    }
+
     return UCC_OK;
 
 exit_err:
@@ -174,10 +188,11 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
         data_displ = task->alltoallv_ce.get_offset(
             task, sync->alltoallv_ce.rdispl_bytes, peer);
         dst = PTR_OFFSET(task->alltoallv_ce.rbuf, data_displ);
-        exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
-        exec_args.bufs[0]   = dst;
-        exec_args.bufs[1]   = src;
-        exec_args.count     = data_size;
+
+        exec_args.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+        exec_args.copy.dst  = dst;
+        exec_args.copy.src  = src;
+        exec_args.copy.len  = data_size;
         exec_task =
             &task->alltoallv_ce.exec_task[task->alltoallv_ce.num_posted];
         status = ucc_ee_executor_task_post(exec, &exec_args, exec_task);
@@ -188,39 +203,36 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     }
 
     for (i = 0; i < team->topo->num_proxies; i++) {
-        if (team->topo->proxies[i].proxy == rank) {
-            psrc      = team->topo->proxies[i].src;
-            pdst      = team->topo->proxies[i].dst;
-            peer_sync = TASK_SYNC(task, psrc);
-            data_size = task->alltoallv_ce.get_size(
-                task, peer_sync->alltoallv_ce.sbytes, pdst);
-            if (data_size == 0) {
-                continue;
-            }
-            data_displ = task->alltoallv_ce.get_offset(
-                task, peer_sync->alltoallv_ce.sdispl_bytes, pdst);
-            src        = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_src[psrc],
-                                    peer_sync->mem_info_src.offset);
-            src        = PTR_OFFSET(src, data_displ);
-            peer_sync  = TASK_SYNC(task, pdst);
-            dst        = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_dst[pdst],
-                                    peer_sync->mem_info_dst.offset);
-            data_displ = task->alltoallv_ce.get_offset(
-                task, peer_sync->alltoallv_ce.rdispl_bytes, psrc);
-            dst        = PTR_OFFSET(dst, data_displ);
-
-            exec_args.task_type = UCC_EE_EXECUTOR_TASK_TYPE_COPY;
-            exec_args.bufs[0]   = dst;
-            exec_args.bufs[1]   = src;
-            exec_args.count     = data_size;
-            exec_task =
-                &task->alltoallv_ce.exec_task[task->alltoallv_ce.num_posted];
-            status = ucc_ee_executor_task_post(exec, &exec_args, exec_task);
-            if (ucc_unlikely(status != UCC_OK)) {
-                goto exit;
-            }
-            task->alltoallv_ce.num_posted++;
+        psrc      = team->topo->proxies[i].src;
+        pdst      = team->topo->proxies[i].dst;
+        peer_sync = TASK_SYNC(task, psrc);
+        data_size = task->alltoallv_ce.get_size(
+            task, peer_sync->alltoallv_ce.sbytes, pdst);
+        if (data_size == 0) {
+            continue;
         }
+        data_displ = task->alltoallv_ce.get_offset(
+            task, peer_sync->alltoallv_ce.sdispl_bytes, pdst);
+        src        = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_src[psrc],
+                                peer_sync->mem_info_src.offset);
+        src        = PTR_OFFSET(src, data_displ);
+        peer_sync  = TASK_SYNC(task, pdst);
+        dst        = PTR_OFFSET(task->alltoallv_ce.peer_map_addr_dst[pdst],
+                                peer_sync->mem_info_dst.offset);
+        data_displ = task->alltoallv_ce.get_offset(
+            task, peer_sync->alltoallv_ce.rdispl_bytes, psrc);
+        dst                 = PTR_OFFSET(dst, data_displ);
+        exec_args.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+        exec_args.copy.dst  = dst;
+        exec_args.copy.src  = src;
+        exec_args.copy.len  = data_size;
+        exec_task =
+            &task->alltoallv_ce.exec_task[task->alltoallv_ce.num_posted];
+        status = ucc_ee_executor_task_post(exec, &exec_args, exec_task);
+        if (ucc_unlikely(status != UCC_OK)) {
+            goto exit;
+        }
+        task->alltoallv_ce.num_posted++;
     }
 exit:
     return status;
@@ -245,12 +257,14 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_SETUP;
+        /* fall through */
     case ALLTOALL_CE_STAGE_SETUP:
         status = ucc_tl_cuda_alltoallv_setup_test(task);
         if (status != UCC_OK) {
             task->super.status = status;
             return;
         }
+        /* fall through */
     case ALLTOALL_CE_STAGE_POST_COPIES:
         status = ucc_tl_cuda_alltoallv_ce_post_copies(task);
         if (ucc_unlikely(status != UCC_OK)) {
@@ -258,6 +272,7 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_COPY;
+        /* fall through */
     case ALLTOALL_CE_STAGE_COPY:
         for (i = 0; i < task->alltoallv_ce.num_posted; i++) {
             if (!task->alltoallv_ce.exec_task[i]) {
@@ -281,6 +296,7 @@ void ucc_tl_cuda_alltoallv_ce_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->alltoallv_ce.stage = ALLTOALL_CE_STAGE_BAR;
+        /* fall through */
     default:
         ucc_assert(task->alltoallv_ce.stage == ALLTOALL_CE_STAGE_BAR);
         break;
@@ -380,13 +396,16 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;
     }
-    data_len = ucc_dt_size(args->dst.info_v.datatype) *
-               ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
-                                             UCC_TL_TEAM_SIZE(team));
-    status = ucc_tl_cuda_mem_info_get(args->dst.info_v.buffer, data_len,
-                                      &task->alltoallv_ce.mem_info_dst);
-    if (ucc_unlikely(status != UCC_OK)) {
-        goto exit_err;
+
+    if (team->topo->proxy_needed) {
+        data_len = ucc_dt_size(args->dst.info_v.datatype) *
+                ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
+                                              UCC_TL_TEAM_SIZE(team));
+        status = ucc_tl_cuda_mem_info_get(args->dst.info_v.buffer, data_len,
+                                          &task->alltoallv_ce.mem_info_dst);
+        if (ucc_unlikely(status != UCC_OK)) {
+            goto exit_err;
+        }
     }
 
     task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;

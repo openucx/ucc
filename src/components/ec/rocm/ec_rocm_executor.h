@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (C) Advanced Micro Devices, Inc. 2022. ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
@@ -33,4 +33,6 @@ ucc_status_t ucc_rocm_executor_task_finalize(ucc_ee_executor_task_t *task);
 /* implemented in ec_rocm_executor.cu */
 ucc_status_t ucc_ec_rocm_persistent_kernel_start(ucc_ec_rocm_executor_t *eee);
 
+ucc_status_t ucc_ec_rocm_reduce(ucc_ee_executor_task_args_t *task,
+                                hipStream_t                  stream);
 #endif

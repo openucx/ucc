@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -137,6 +137,7 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     ucp_request_param_t req_param;
     ucp_tag_t           ucp_tag, ucp_tag_mask;
 
+    // coverity[result_independent_of_operands:FALSE]
     UCC_TL_UCP_MAKE_RECV_TAG(ucp_tag, ucp_tag_mask,
                              (args->mask & UCC_COLL_ARGS_FIELD_TAG),
                              task->tagged.tag, dest_group_rank,

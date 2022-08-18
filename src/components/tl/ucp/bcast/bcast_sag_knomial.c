@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -75,9 +75,10 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
     cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.bcast_sag_kn_radix;
     radix = ucc_knomial_pattern_get_min_radix(cfg_radix,
                                               UCC_TL_TEAM_SIZE(tl_team), count);
-    schedule = &ucc_tl_ucp_get_schedule(tl_team, coll_args)->super.super;
-    if (ucc_unlikely(!schedule)) {
-        return UCC_ERR_NO_MEMORY;
+    status = ucc_tl_ucp_get_schedule(tl_team, coll_args,
+                                     (ucc_tl_ucp_schedule_t **)&schedule);
+    if (ucc_unlikely(UCC_OK != status)) {
+        return status;
     }
     /* 1st step of bcast: knomial scatter */
     args.args.dst.info.buffer   = args.args.src.info.buffer;

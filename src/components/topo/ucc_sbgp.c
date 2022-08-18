@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -310,7 +310,7 @@ static ucc_status_t sbgp_create_sn_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
         topo->n_numas = n_sn_leaders;
     }
     if (n_sn_leaders > 1) {
-        ucc_rank_t sl_rank = -1;
+        ucc_rank_t sl_rank = UCC_RANK_INVALID;
         sbgp->rank_map =
             ucc_malloc(sizeof(ucc_rank_t) * n_sn_leaders, "rank_map");
         if (!sbgp->rank_map) {
@@ -336,7 +336,6 @@ static ucc_status_t sbgp_create_sn_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
                 break;
             }
         }
-        ucc_assert(sl_rank >= 0);
         ucc_assert(nlr_pos >= 0);
         sbgp->group_rank = sl_rank;
         if (nlr_pos > 0) {

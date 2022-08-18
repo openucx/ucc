@@ -1,10 +1,11 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 #include "test_ucc.h"
 extern "C" {
 #include "core/ucc_team.h"
+#include "components/tl/ucc_tl.h"
 }
 constexpr ucc_lib_params_t UccProcess::default_lib_params;
 constexpr ucc_context_params_t UccProcess::default_ctx_params;
@@ -502,6 +503,12 @@ const std::vector<UccTeam_h> &UccJob::getStaticTeams()
                                std::end(staticTeamSizes));
     if (0 == staticTeams.size()) {
         for (auto ts : teamSizes) {
+            if (ts == 1 && !tl_self_available()) {
+                /* don't use team_size = 1 if there is no tl/self.
+                   we can't modify nStaticTeams, so just use some other
+                   team_size */
+                ts = 3;
+            }
             staticTeams.push_back(getStaticJob()->create_team(ts));
         }
         /* Create one more team with reversed ranks order */
@@ -688,4 +695,19 @@ void clear_buffer(void *_buf, size_t size, ucc_memory_type_t mt, uint8_t value)
         UCC_CHECK(ucc_mc_memcpy(_buf, buf, size, mt, UCC_MEMORY_TYPE_HOST));
         ucc_free(buf);
     }
+}
+
+bool tl_self_available()
+{
+    ucc_tl_context_t *tl_ctx;
+    ucc_status_t      status;
+
+    status = ucc_tl_context_get(UccJob::getStaticJob()->procs[0]->ctx_h,
+                                "self", &tl_ctx);
+
+    if (UCC_OK != status) {
+        return false;
+    }
+    ucc_tl_context_put(tl_ctx);
+    return true;
 }

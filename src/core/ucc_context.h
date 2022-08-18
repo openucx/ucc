@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -94,7 +94,7 @@ ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
                                            ucc_context_progress_fn_t fn,
                                            void *progress_arg);
 
-void         ucc_context_progress_deregister(ucc_context_t *ctx,
+ucc_status_t ucc_context_progress_deregister(ucc_context_t *ctx,
                                              ucc_context_progress_fn_t fn,
                                              void *progress_arg);
 /* Performs address exchange between the processes group defined by OOB.

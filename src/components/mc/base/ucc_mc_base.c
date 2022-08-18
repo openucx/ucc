@@ -1,10 +1,11 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
 
 #include "ucc_mc_base.h"
+#include "utils/ucc_coll_utils.h"
 
 ucc_config_field_t ucc_mc_config_table[] = {
     {"LOG_LEVEL", "warn",
@@ -22,7 +23,8 @@ const char *ucc_memory_type_names[] = {
     [UCC_MEMORY_TYPE_CUDA_MANAGED] = "cuda-managed",
     [UCC_MEMORY_TYPE_ROCM]         = "rocm",
     [UCC_MEMORY_TYPE_ROCM_MANAGED] = "rocm-managed",
-    [UCC_MEMORY_TYPE_LAST]         = "unknown"};
+    [UCC_MEMORY_TYPE_LAST]         = "unknown",
+    [UCC_MEMORY_TYPE_NOT_APPLY]    = "not_apply"};
 
 
 const char *ucc_ee_type_names[] = {

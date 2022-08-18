@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021-2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -10,6 +10,11 @@
 
 typedef struct ucc_score_map {
     ucc_coll_score_t *score;
+    /* Size, rank of the process in the base_team associated with that
+       score_map. It can be CL or TL team, which can be a subset of a
+       core UCC team */
+    ucc_rank_t        team_size;
+    ucc_rank_t        team_rank;
 } ucc_score_map_t;
 
 ucc_status_t ucc_coll_score_build_map(ucc_coll_score_t *score,
@@ -20,7 +25,7 @@ ucc_status_t ucc_coll_score_build_map(ucc_coll_score_t *score,
     ucc_list_link_t *lst;
     int              i, j;
 
-    map = ucc_malloc(sizeof(*map), "ucc_score_map");
+    map = ucc_calloc(1, sizeof(*map), "ucc_score_map");
     if (!map) {
         ucc_error("failed to allocate %zd bytes for score map", sizeof(*map));
         return UCC_ERR_NO_MEMORY;
@@ -33,6 +38,13 @@ ucc_status_t ucc_coll_score_build_map(ucc_coll_score_t *score,
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
         for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
             lst = &score->scores[i][j];
+            if (!ucc_list_is_empty(lst) && map->team_size == 0) {
+                /* For a given score_map all the entries refer to the base_teams
+                   (CL/TL) of the same size/rank. So we can take the first one. */
+                range = ucc_list_head(lst, ucc_msg_range_t, super.list_elem);
+                map->team_size = range->super.team->params.size;
+                map->team_rank = range->super.team->params.rank;
+            }
             ucc_list_for_each_safe(range, temp, lst, super.list_elem) {
                 if (range->super.list_elem.next != lst) {
                     next = ucc_container_of(range->super.list_elem.next,
@@ -66,9 +78,12 @@ ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t      *map,
                                        ucc_base_coll_args_t *bargs,
                                        ucc_msg_range_t     **range)
 {
-    ucc_memory_type_t mt      = ucc_coll_args_mem_type(bargs);
+    ucc_memory_type_t mt      = ucc_coll_args_mem_type(&bargs->args,
+                                                       map->team_rank);
     unsigned          ct      = ucc_ilog2(bargs->args.coll_type);
-    size_t            msgsize = ucc_coll_args_msgsize(bargs);
+    size_t            msgsize = ucc_coll_args_msgsize(&bargs->args,
+                                                      map->team_rank,
+                                                      map->team_size);
     ucc_list_link_t  *list;
     ucc_msg_range_t  *r;
 

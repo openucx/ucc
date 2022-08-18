@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -153,9 +153,11 @@ ucc_coll_type_t   ucc_coll_type_from_str(const char *str);
 
 ucc_memory_type_t ucc_mem_type_from_str(const char *str);
 
-size_t            ucc_coll_args_msgsize(const ucc_base_coll_args_t *bargs);
+size_t            ucc_coll_args_msgsize(const ucc_coll_args_t *args,
+                                        ucc_rank_t rank, ucc_rank_t size);
 
-ucc_memory_type_t ucc_coll_args_mem_type(const ucc_base_coll_args_t *bargs);
+ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
+                                         ucc_rank_t rank);
 
 
 static inline ucc_rank_t ucc_ep_map_eval(ucc_ep_map_t map, ucc_rank_t rank)

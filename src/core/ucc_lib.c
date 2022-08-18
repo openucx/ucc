@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2020.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -321,7 +321,7 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
             release_number);
     }
 
-    lib = ucc_malloc(sizeof(ucc_lib_info_t), "lib_info");
+    lib = ucc_calloc(1, sizeof(ucc_lib_info_t), "lib_info");
     if (!lib) {
         ucc_error("failed to allocate %zd bytes for lib_info",
                   sizeof(ucc_lib_info_t));

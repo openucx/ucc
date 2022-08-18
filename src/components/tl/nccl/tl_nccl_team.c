@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2021.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
@@ -174,9 +174,9 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
         status = ucc_tl_nccl_scatterv_init(task);
         break;
     default:
-        tl_error(UCC_TASK_LIB(task),
-                 "collective %d is not supported by nccl tl",
-                 coll_args->args.coll_type);
+        tl_debug(UCC_TASK_LIB(task),
+                 "collective %s is not supported by nccl tl",
+                 ucc_coll_type_str(coll_args->args.coll_type));
         status = UCC_ERR_NOT_SUPPORTED;
     }
     if (ucc_unlikely(status != UCC_OK)) {
