@@ -15,6 +15,7 @@ extern "C" {
 }
 #endif
 
+#include "ec_cuda_half_sm52.h"
 #include "ec_cuda_reduce_ops.h"
 
 #define CUDA_REDUCE_WITH_OP_DEFAULT(NAME, _OP)                                  \
