@@ -11,6 +11,9 @@
 #include "ucc_pt_config.h"
 #include "ucc_pt_bootstrap.h"
 #include "ucc_pt_bootstrap_mpi.h"
+extern "C" {
+#include "components/ec/ucc_ec.h"
+}
 
 class ucc_pt_comm {
     ucc_pt_comm_config cfg;
@@ -19,12 +22,14 @@ class ucc_pt_comm {
     ucc_team_h team;
     void *stream;
     ucc_ee_h ee;
+    ucc_ee_executor_t *executor;
     ucc_pt_bootstrap *bootstrap;
     void set_gpu_device();
 public:
     ucc_pt_comm(ucc_pt_comm_config config);
     int get_rank();
     int get_size();
+    ucc_ee_executor_t* get_executor();
     ucc_ee_h get_ee();
     ucc_team_h get_team();
     ucc_context_h get_context();

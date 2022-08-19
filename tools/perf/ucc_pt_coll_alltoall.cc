@@ -25,13 +25,14 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_alltoall::init_coll_args(size_t single_rank_count,
-                                                  ucc_coll_args_t &args)
+ucc_status_t ucc_pt_coll_alltoall::init_args(size_t single_rank_count,
+                                             ucc_pt_test_args_t &test_args)
 {
-    int          comm_size = comm->get_size();
-    size_t       dt_size   = ucc_dt_size(coll_args.src.info.datatype);
-    size_t       size      = comm_size * single_rank_count * dt_size;
-    ucc_status_t st        = UCC_OK;
+    ucc_coll_args_t &args      = test_args.coll_args;
+    int              comm_size = comm->get_size();
+    size_t           dt_size   = ucc_dt_size(coll_args.src.info.datatype);
+    size_t           size      = comm_size * single_rank_count * dt_size;
+    ucc_status_t     st        = UCC_OK;
 
     args = coll_args;
     args.dst.info.count = single_rank_count * comm_size;
@@ -51,8 +52,10 @@ exit:
     return st;
 }
 
-void ucc_pt_coll_alltoall::free_coll_args(ucc_coll_args_t &args)
+void ucc_pt_coll_alltoall::free_args(ucc_pt_test_args_t &test_args)
 {
+    ucc_coll_args_t &args = test_args.coll_args;
+
     if (!UCC_IS_INPLACE(args)) {
         ucc_mc_free(src_header);
     }
@@ -60,10 +63,12 @@ void ucc_pt_coll_alltoall::free_coll_args(ucc_coll_args_t &args)
 }
 
 float ucc_pt_coll_alltoall::get_bw(float time_ms, int grsize,
-                                   ucc_coll_args_t args)
+                                   ucc_pt_test_args_t test_args)
 {
-    float N = grsize;
-    float S = args.src.info.count * ucc_dt_size(args.src.info.datatype);
+    ucc_coll_args_t &args = test_args.coll_args;
+    float            N    = grsize;
+    float            S    = args.src.info.count *
+                            ucc_dt_size(args.src.info.datatype);
 
     return (S / time_ms) * ((N - 1) / N) / 1000.0;
 }

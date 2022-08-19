@@ -28,11 +28,12 @@ ucc_pt_coll_reduce::ucc_pt_coll_reduce(ucc_datatype_t dt, ucc_memory_type mt,
     coll_args.dst.info.mem_type = mt;
 }
 
-ucc_status_t ucc_pt_coll_reduce::init_coll_args(size_t count,
-                                                   ucc_coll_args_t &args)
+ucc_status_t ucc_pt_coll_reduce::init_args(size_t count,
+                                           ucc_pt_test_args_t &test_args)
 {
-    size_t dt_size = ucc_dt_size(coll_args.src.info.datatype);
-    size_t size    = count * dt_size;
+    ucc_coll_args_t &args    = test_args.coll_args;
+    size_t           dt_size = ucc_dt_size(coll_args.src.info.datatype);
+    size_t           size    = count * dt_size;
     ucc_status_t st_src, st_dst;
 
     args = coll_args;
@@ -59,9 +60,11 @@ exit:
     return st_dst;
 }
 
-void ucc_pt_coll_reduce::free_coll_args(ucc_coll_args_t &args)
+void ucc_pt_coll_reduce::free_args(ucc_pt_test_args_t &test_args)
 {
-    bool is_root = (comm->get_rank() == args.root);
+    ucc_coll_args_t &args    = test_args.coll_args;
+    bool             is_root = (comm->get_rank() == args.root);
+
     if (!is_root || !UCC_IS_INPLACE(args)) {
         ucc_mc_free(src_header);
     }
@@ -71,9 +74,11 @@ void ucc_pt_coll_reduce::free_coll_args(ucc_coll_args_t &args)
 }
 
 float ucc_pt_coll_reduce::get_bw(float time_ms, int grsize,
-                                    ucc_coll_args_t args)
+                                 ucc_pt_test_args_t test_args)
 {
-    float S = args.src.info.count * ucc_dt_size(args.src.info.datatype);
+    ucc_coll_args_t &args = test_args.coll_args;
+    float            S    = args.src.info.count *
+                            ucc_dt_size(args.src.info.datatype);
 
     return S / time_ms / 1000.0;
 }

@@ -5,7 +5,7 @@ END_C_DECLS
 
 ucc_pt_config::ucc_pt_config() {
     bootstrap.bootstrap  = UCC_PT_BOOTSTRAP_MPI;
-    bench.coll_type      = UCC_COLL_TYPE_ALLREDUCE;
+    bench.op_type        = UCC_PT_OP_TYPE_ALLREDUCE;
     bench.min_count      = 128;
     bench.max_count      = 128;
     bench.dt             = UCC_DT_FLOAT32;
@@ -19,28 +19,32 @@ ucc_pt_config::ucc_pt_config() {
     bench.n_warmup_large = 20;
     bench.large_thresh   = 64 * 1024;
     bench.full_print     = false;
+    bench.n_bufs         = 2;
     comm.mt              = bench.mt;
 }
 
-const std::map<std::string, ucc_reduction_op_t> ucc_pt_op_map = {
+const std::map<std::string, ucc_reduction_op_t> ucc_pt_reduction_op_map = {
     {"sum", UCC_OP_SUM}, {"prod", UCC_OP_PROD}, {"min", UCC_OP_MIN},
     {"max", UCC_OP_MAX}, {"avg", UCC_OP_AVG},
 };
 
-const std::map<std::string, ucc_coll_type_t> ucc_pt_coll_map = {
-    {"allgather", UCC_COLL_TYPE_ALLGATHER},
-    {"allgatherv", UCC_COLL_TYPE_ALLGATHERV},
-    {"allreduce", UCC_COLL_TYPE_ALLREDUCE},
-    {"alltoall", UCC_COLL_TYPE_ALLTOALL},
-    {"alltoallv", UCC_COLL_TYPE_ALLTOALLV},
-    {"barrier", UCC_COLL_TYPE_BARRIER},
-    {"bcast", UCC_COLL_TYPE_BCAST},
-    {"gather", UCC_COLL_TYPE_GATHER},
-    {"gatherv", UCC_COLL_TYPE_GATHERV},
-    {"reduce", UCC_COLL_TYPE_REDUCE},
-    {"reduce_scatter", UCC_COLL_TYPE_REDUCE_SCATTER},
-    {"scatter", UCC_COLL_TYPE_SCATTER},
-    {"scatterv", UCC_COLL_TYPE_SCATTERV},
+const std::map<std::string, ucc_pt_op_type_t> ucc_pt_op_map = {
+    {"allgather", UCC_PT_OP_TYPE_ALLGATHER},
+    {"allgatherv", UCC_PT_OP_TYPE_ALLGATHERV},
+    {"allreduce", UCC_PT_OP_TYPE_ALLREDUCE},
+    {"alltoall", UCC_PT_OP_TYPE_ALLTOALL},
+    {"alltoallv", UCC_PT_OP_TYPE_ALLTOALLV},
+    {"barrier", UCC_PT_OP_TYPE_BARRIER},
+    {"bcast", UCC_PT_OP_TYPE_BCAST},
+    {"gather", UCC_PT_OP_TYPE_GATHER},
+    {"gatherv", UCC_PT_OP_TYPE_GATHERV},
+    {"reduce", UCC_PT_OP_TYPE_REDUCE},
+    {"reduce_scatter", UCC_PT_OP_TYPE_REDUCE_SCATTER},
+    {"scatter", UCC_PT_OP_TYPE_SCATTER},
+    {"scatterv", UCC_PT_OP_TYPE_SCATTERV},
+    {"memcpy", UCC_PT_OP_TYPE_MEMCPY},
+    {"reducedt", UCC_PT_OP_TYPE_REDUCEDT},
+    {"reducedt_strided", UCC_PT_OP_TYPE_REDUCEDT_STRIDED},
 };
 
 const std::map<std::string, ucc_memory_type_t> ucc_pt_memtype_map = {
@@ -70,21 +74,21 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
     int c;
     ucc_status_t st;
 
-    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:ihFT")) != -1) {
+    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:ihFT")) != -1) {
         switch (c) {
             case 'c':
-                if (ucc_pt_coll_map.count(optarg) == 0) {
-                    std::cerr << "invalid collective" << std::endl;
+                if (ucc_pt_op_map.count(optarg) == 0) {
+                    std::cerr << "invalid opeartion" << std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
-                bench.coll_type = ucc_pt_coll_map.at(optarg);
+                bench.op_type = ucc_pt_op_map.at(optarg);
                 break;
             case 'o':
-                if (ucc_pt_op_map.count(optarg) == 0) {
-                    std::cerr << "invalid operation" << std::endl;
+                if (ucc_pt_reduction_op_map.count(optarg) == 0) {
+                    std::cerr << "invalid reduction operation" << std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
-                bench.op = ucc_pt_op_map.at(optarg);
+                bench.op = ucc_pt_reduction_op_map.at(optarg);
                 break;
             case 'm':
                 if (ucc_pt_memtype_map.count(optarg) == 0) {
@@ -123,6 +127,9 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                 std::stringstream(optarg) >> bench.n_warmup_small;
                 bench.n_warmup_large = bench.n_warmup_small;
                 break;
+            case 'N':
+                std::stringstream(optarg) >> bench.n_bufs;
+                break;
             case 'i':
                 bench.inplace = true;
                 break;
@@ -153,6 +160,7 @@ void ucc_pt_config::print_help()
     std::cout << "  -m <mtype name>: memory type"<<std::endl;
     std::cout << "  -n <number>: number of iterations"<<std::endl;
     std::cout << "  -w <number>: number of warmup iterations"<<std::endl;
+    std::cout << "  -N <number>: number of buffers"<<std::endl;
     std::cout << "  -T: triggered collective"<<std::endl;
     std::cout << "  -F: enable full print"<<std::endl;
     std::cout << "  -h: show this help message"<<std::endl;
