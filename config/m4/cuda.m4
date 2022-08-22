@@ -63,6 +63,13 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                [AC_CHECK_LIB([cudart], [cudaGetDeviceCount],
                              [CUDA_LIBS="$CUDA_LIBS -lcudart"], [cuda_happy="no"])])
 
+         AC_CHECK_HEADERS([cooperative_groups.h],
+                        [flag=1
+                        AC_MSG_RESULT([yes])],
+                        [flag=0
+                        AC_MSG_RESULT([no])])
+           AC_DEFINE_UNQUOTED(CUDA_SUPPORTS_COOP_LAUNCH, $flag, [if CUDA supports cooperative launch.])
+
         # Check nvml header files
         AC_CHECK_HEADERS([nvml.h],
                          [nvml_happy="yes"],
