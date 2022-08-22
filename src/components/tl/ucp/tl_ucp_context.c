@@ -23,16 +23,30 @@ static inline ucc_status_t ucc_tl_ucp_context_service_init(
     ucp_worker_h  ucp_worker_service;
     ucs_status_t  status;
 
-    if (*ctx->cfg.service_tls) {
+    if (ctx->cfg.service_worker != 0) {
         ctx->service.is_used = 1;
-        status = ucp_config_modify(ucp_config, "TLS", ctx->cfg.service_tls);
-        if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib,
-                     "failed to set UCX_TLS "
-                     "for service worker, %s",
-                     ucs_status_string(status));
-            ucc_status = ucs_status_to_ucc_status(status);
-            goto err_cfg;
+        if (*ctx->cfg.service_tls) {
+            status = ucp_config_modify(ucp_config, "TLS", ctx->cfg.service_tls);
+            if (UCS_OK != status) {
+                tl_error(ctx->super.super.lib,
+                         "failed to set UCX_TLS "
+                         "for service worker, %s",
+                         ucs_status_string(status));
+                ucc_status = ucs_status_to_ucc_status(status);
+                goto err_cfg;
+            }
+        }
+        if (*ctx->cfg.service_devs) {
+            status = ucp_config_modify(ucp_config, "NET_DEVICES",
+                                       ctx->cfg.service_devs);
+            if (UCS_OK != status) {
+                tl_error(ctx->super.super.lib,
+                         "failed to set UCX_NET_DEVICES "
+                         "for service worker, %s",
+                         ucs_status_string(status));
+                ucc_status = ucs_status_to_ucc_status(status);
+                goto err_cfg;
+            }
         }
         status = ucp_init(&ucp_params, ucp_config, &ucp_context_service);
         if (UCS_OK != status) {

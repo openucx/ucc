@@ -74,7 +74,9 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                n_polls;
     uint32_t                oob_npolls;
     uint32_t                pre_reg_mem;
+    uint32_t                service_worker;
     char *                  service_tls;
+    char *                  service_devs;
 } ucc_tl_ucp_context_config_t;
 
 typedef struct ucc_tl_ucp_lib {
