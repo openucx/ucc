@@ -39,6 +39,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     ucc_base_coll_args_t args;
     int                  n_tasks, i;
 
+    if (coll_args->args.op == UCC_OP_AVG) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     schedule = &ucc_cl_hier_get_schedule(cl_team)->super.super;
     if (ucc_unlikely(!schedule)) {
         return UCC_ERR_NO_MEMORY;
@@ -88,7 +91,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     if (SBGP_ENABLED(cl_team, NODE) &&
         cl_team->top_sbgp != UCC_HIER_SBGP_NODE) {
         /* For bcast src should point to origin dst of allreduce */
-        args.args.src.info = args.args.dst.info;
+        args.args.src.info  = args.args.dst.info;
         args.args.coll_type = UCC_COLL_TYPE_BCAST;
         status =
             ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]);
