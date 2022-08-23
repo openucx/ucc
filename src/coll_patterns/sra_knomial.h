@@ -13,17 +13,10 @@ static inline ucc_rank_t ucc_sra_kn_compute_step_radix(ucc_rank_t rank,
                                                        ucc_rank_t size,
                                                        ucc_knomial_pattern_t *p)
 {
-    ucc_rank_t step_radix = 0;
-    ucc_rank_t k, peer;
+    ucc_rank_t n_full  = ucc_kn_pattern_n_full(p);
 
-    for (k = 1; k < p->radix; k++) {
-        peer = ucc_knomial_pattern_get_loop_peer(p, rank, size, k);
-        if (peer == UCC_KN_PEER_NULL)
-            continue;
-        step_radix += 1;
-    }
-    step_radix += 1;
-    return step_radix;
+    return p->radix_pow * p->radix >= p->size ? (n_full > 1 ? n_full : p->radix)
+        : p->radix;
 }
 
 // segment index in exchange group of tree
@@ -65,9 +58,10 @@ static inline size_t ucc_sra_kn_compute_block_count(size_t     count,
 {
     size_t     block_count = count;
     ucc_rank_t k_pow       = 1;
-    ucc_rank_t i, my_si, my_seg_len;
+    ucc_rank_t i, my_si, my_seg_len, steps;
 
-    for (i = 0; i < p->iteration; i++) {
+    steps = p->backward ? p->n_iters - p->iteration - 1 : p->iteration;
+    for (i = 0; i < steps; i++) {
         my_si       = ucc_sra_kn_compute_seg_index(rank, k_pow, p);
         my_seg_len  = ucc_sra_kn_compute_seg_size(block_count, p->radix, my_si);
         block_count = my_seg_len;
@@ -88,6 +82,7 @@ ucc_sra_kn_get_offset_and_seglen(size_t count, size_t dt_size, ucc_rank_t rank,
     ucc_rank_t            k, r, peer, my_si;
     size_t                my_seg_offset;
     ucc_knomial_pattern_t p;
+
     ucc_knomial_pattern_init(size, rank, radix, &p);
 
     if (KN_NODE_EXTRA == p.node_type) {
@@ -110,7 +105,7 @@ ucc_sra_kn_get_offset_and_seglen(size_t count, size_t dt_size, ucc_rank_t rank,
         my_seg_offset =
             ucc_sra_kn_compute_seg_offset(block_count, step_radix, my_si);
         _offset += my_seg_offset * dt_size;
-        if (p.iteration < p.pow_radix_sup - 1) {
+        if (!ucc_knomial_pattern_loop_last_iteration(&p)) {
             block_count =
                 ucc_sra_kn_compute_seg_size(block_count, step_radix, my_si);
         }

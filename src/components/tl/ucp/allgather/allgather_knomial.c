@@ -82,7 +82,7 @@ UCC_KN_PHASE_EXTRA:
         }
         goto out;
     }
-    while (!ucc_knomial_pattern_loop_done_backward(p)) {
+    while (!ucc_knomial_pattern_loop_done(p)) {
         step_radix       = ucc_sra_kn_compute_step_radix(rank, size, p);
         block_count      = ucc_sra_kn_compute_block_count(count, rank, p);
         local_seg_index  = ucc_sra_kn_compute_seg_index(rank, p->radix_pow, p);

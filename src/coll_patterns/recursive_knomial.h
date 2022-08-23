@@ -39,11 +39,29 @@ enum {
 typedef struct ucc_knomial_pattern {
     ucc_kn_radix_t radix;
     uint8_t        iteration;
+    uint8_t        n_iters;
     uint8_t        pow_radix_sup;
     uint8_t        node_type;
+    uint8_t        backward;
     ucc_rank_t     radix_pow;
+    ucc_rank_t     full_pow_size;
+    ucc_rank_t     size;
     ucc_rank_t     n_extra; /**< number of "extra" ranks to be served by "proxies" */
 } ucc_knomial_pattern_t;
+
+static inline ucc_rank_t ucc_kn_pattern_n_full(ucc_knomial_pattern_t *p)
+{
+    return p->size / p->full_pow_size;
+}
+
+static inline ucc_rank_t ucc_kn_pattern_radix_pow_init(ucc_knomial_pattern_t *p,
+                                                       int backward)
+{
+    ucc_rank_t n_full = ucc_kn_pattern_n_full(p);
+
+    return backward ? ((n_full == 1) ? p->full_pow_size / p->radix
+                       : p->full_pow_size) : 1;
+}
 
 /**
  *  Initializes recursive knomial tree attributes.
@@ -52,22 +70,24 @@ typedef struct ucc_knomial_pattern {
  *  @param [in]  size  Team size
  *  @param [out] p     ucc_knomial_pattern
  */
-
 static inline void ucc_knomial_pattern_init_impl(ucc_rank_t             size,
                                                  ucc_rank_t             rank,
                                                  ucc_kn_radix_t         radix,
                                                  ucc_knomial_pattern_t *p,
                                                  int backward)
 {
-    ucc_rank_t full_pow_size, n_full_subtrees;
-    CALC_POW_RADIX_SUP(size, radix, p->pow_radix_sup, full_pow_size);
-    n_full_subtrees  = size / full_pow_size;
-    p->n_extra       = size - n_full_subtrees * full_pow_size;
+    ucc_rank_t n_full_subtrees;
+
+    CALC_POW_RADIX_SUP(size, radix, p->pow_radix_sup, p->full_pow_size);
     p->radix         = radix;
-    p->iteration     = backward ? p->pow_radix_sup - 1 : 0;
-    p->radix_pow = backward ? ((full_pow_size == size) ? full_pow_size / radix
-                                                       : full_pow_size)
-                            : 1;
+    p->size          = size;
+    p->backward      = backward;
+    p->iteration     = 0;
+    n_full_subtrees  = ucc_kn_pattern_n_full(p);
+    p->n_extra       = size - n_full_subtrees * p->full_pow_size;
+    p->n_iters       = (p->n_extra && n_full_subtrees == 1) ?
+        p->pow_radix_sup - 1 : p->pow_radix_sup;
+    p->radix_pow     = ucc_kn_pattern_radix_pow_init(p, backward);
     p->node_type     = KN_NODE_BASE;
     if (rank < p->n_extra * 2) {
         p->node_type = (rank % 2) ? KN_NODE_EXTRA : KN_NODE_PROXY;
@@ -103,8 +123,7 @@ static inline ucc_rank_t ucc_knomial_pattern_get_extra(ucc_knomial_pattern_t *p,
 
 static inline int ucc_knomial_pattern_loop_done(ucc_knomial_pattern_t *p)
 {
-    ucc_assert(p->iteration <= p->pow_radix_sup);
-    return p->iteration == p->pow_radix_sup;
+    return p->iteration == p->n_iters;
 }
 
 static inline int
@@ -116,13 +135,7 @@ ucc_knomial_pattern_loop_first_iteration(ucc_knomial_pattern_t *p)
 static inline int
 ucc_knomial_pattern_loop_last_iteration(ucc_knomial_pattern_t *p)
 {
-    return p->iteration == p->pow_radix_sup - 1;
-}
-
-static inline int
-ucc_knomial_pattern_loop_done_backward(ucc_knomial_pattern_t *p)
-{
-    return p->iteration == UINT8_MAX;
+    return p->iteration == p->n_iters - 1;
 }
 
 static inline ucc_rank_t ucc_knomial_pattern_loop_rank(ucc_knomial_pattern_t *p,
@@ -153,13 +166,12 @@ static inline void ucc_knomial_pattern_next_iteration(ucc_knomial_pattern_t *p)
 {
     p->iteration++;
     p->radix_pow *= p->radix;
-    ucc_assert(p->iteration <= p->pow_radix_sup);
 }
 
 static inline void
 ucc_knomial_pattern_next_iteration_backward(ucc_knomial_pattern_t *p)
 {
-    p->iteration--;
+    p->iteration++;
     p->radix_pow /= p->radix;
 }
 
