@@ -66,9 +66,6 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     if (displ_bits == TEST_FLAG_VSIZE_64BIT) {
         args.flags |= UCC_COLL_ARGS_FLAG_DISPLACEMENTS_64BIT;
     }
-    if (persistent) {
-        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
-    }
 
     scounts = (int*)malloc(sizeof(*scounts) * nprocs);
     sdispls = (int*)malloc(sizeof(*sdispls) * nprocs);

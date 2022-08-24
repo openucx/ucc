@@ -36,28 +36,20 @@ TestReduceScatter::TestReduceScatter(ucc_test_team_t &_team,
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
         rbuf = rbuf_mc_header->addr;
         sbuf = sbuf_mc_header->addr;
+        args.src.info.buffer   = sbuf;
+        args.src.info.count    = count;
+        args.src.info.datatype = dt;
+        args.src.info.mem_type = mem_type;
     } else {
-        args.mask           |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags          |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-        args.dst.info.count  = count;
+        args.dst.info.count = count;
         UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize, mem_type));
         rbuf = rbuf_mc_header->addr;
     }
-    if (persistent) {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
-    }
 
-    if (inplace == TEST_NO_INPLACE) {
-        args.src.info.buffer      = sbuf;
-        args.src.info.count       = count;
-        args.src.info.datatype    = dt;
-        args.src.info.mem_type    = mem_type;
-    }
-    args.op                   = op;
-    args.dst.info.buffer      = rbuf;
-    args.dst.info.datatype    = dt;
-    args.dst.info.mem_type    = mem_type;
+    args.op                = op;
+    args.dst.info.buffer   = rbuf;
+    args.dst.info.datatype = dt;
+    args.dst.info.mem_type = mem_type;
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
@@ -119,8 +111,10 @@ TestReduceScatter::~TestReduceScatter() {}
 
 std::string TestReduceScatter::str() {
     return std::string("tc=")+ucc_coll_type_str(args.coll_type) +
-        " team=" + team_str(team.type) + " msgsize=" +
-        std::to_string(msgsize) + " inplace=" +
-        (inplace == TEST_INPLACE ? "1" : "0") + " dt=" +
-        ucc_datatype_str(dt) + " op=" + ucc_reduction_op_str(op);
+        " team=" + team_str(team.type) +
+        " msgsize=" + std::to_string(msgsize) +
+        " inplace=" + (inplace == TEST_INPLACE ? "1" : "0") +
+        " persistent=" + (persistent == TEST_PERSISTENT ? "1" : "0") +
+        " dt=" + ucc_datatype_str(dt) +
+        " op=" + ucc_reduction_op_str(op);
 }

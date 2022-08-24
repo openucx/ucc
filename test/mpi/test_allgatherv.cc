@@ -61,24 +61,12 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
     fill_counts_and_displacements(size, count, counts, displacements);
 
     if (TEST_NO_INPLACE == inplace) {
-        args.mask = 0;
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, counts[rank] * dt_size, mem_type));
-        sbuf = sbuf_mc_header->addr;
-    } else {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-    }
-
-    if (persistent) {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
-    }
-
-    if (TEST_NO_INPLACE == inplace) {
-        args.src.info.buffer          = sbuf;
-        args.src.info.datatype        = TEST_DT;
-        args.src.info.mem_type        = mem_type;
-        args.src.info.count           = counts[rank];
+        sbuf                   = sbuf_mc_header->addr;
+        args.src.info.buffer   = sbuf;
+        args.src.info.datatype = TEST_DT;
+        args.src.info.mem_type = mem_type;
+        args.src.info.count    = counts[rank];
     }
     args.dst.info_v.buffer        = rbuf;
     args.dst.info_v.counts        = (ucc_count_t*)counts;

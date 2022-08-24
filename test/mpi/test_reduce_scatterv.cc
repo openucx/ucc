@@ -52,23 +52,15 @@ TestReduceScatterv::TestReduceScatterv(ucc_test_team_t &_team, TestCaseParams &p
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
         rbuf = rbuf_mc_header->addr;
         sbuf = sbuf_mc_header->addr;
-    } else {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize, mem_type));
-        rbuf = rbuf_mc_header->addr;
-    }
-    if (persistent) {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
-    }
-
-    if (inplace == TEST_NO_INPLACE) {
         args.src.info.buffer   = sbuf;
         args.src.info.count    = count;
         args.src.info.datatype = dt;
         args.src.info.mem_type = mem_type;
+    } else {
+        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize, mem_type));
+        rbuf = rbuf_mc_header->addr;
     }
+
     args.op                  = op;
     args.dst.info_v.counts   = (ucc_count_t *)counts;
     args.dst.info_v.buffer   = rbuf;

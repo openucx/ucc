@@ -58,6 +58,16 @@ static ucc_status_t ucc_check_coll_args(const ucc_coll_args_t *coll_args,
                                            coll_args->dst.info);
         }
         break;
+    case UCC_COLL_TYPE_BCAST:
+        if (UCC_IS_INPLACE(*coll_args)) {
+            ucc_warn("Inplace not supported in bcast");
+        }
+        break;
+    case UCC_COLL_TYPE_BARRIER:
+        if (UCC_IS_INPLACE(*coll_args)) {
+            ucc_warn("Inplace not supported in barrier");
+        }
+        break;
     default:
         return UCC_OK;
     }

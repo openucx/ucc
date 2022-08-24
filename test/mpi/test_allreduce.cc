@@ -29,30 +29,23 @@ TestAllreduce::TestAllreduce(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_MALLOC_CHECK(check_buf);
     if (TEST_NO_INPLACE == inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
-        sbuf = sbuf_mc_header->addr;
-        args.src.info.buffer      = sbuf;
-        args.src.info.count       = count;
-        args.src.info.datatype    = dt;
-        args.src.info.mem_type    = mem_type;
+        sbuf                   = sbuf_mc_header->addr;
+        args.src.info.buffer   = sbuf;
+        args.src.info.count    = count;
+        args.src.info.datatype = dt;
+        args.src.info.mem_type = mem_type;
     } else {
-        args.mask                |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags               |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-        args.src.info.buffer      = NULL;
-        args.src.info.count       = SIZE_MAX;
-        args.src.info.datatype    = (ucc_datatype_t)-1;
-        args.src.info.mem_type    = UCC_MEMORY_TYPE_UNKNOWN;
+        args.src.info.buffer   = NULL;
+        args.src.info.count    = SIZE_MAX;
+        args.src.info.datatype = (ucc_datatype_t)-1;
+        args.src.info.mem_type = UCC_MEMORY_TYPE_UNKNOWN;
     }
 
-    if (persistent) {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
-    }
-
-    args.op                   = op;
-    args.dst.info.buffer      = rbuf;
-    args.dst.info.count       = count;
-    args.dst.info.datatype    = dt;
-    args.dst.info.mem_type    = mem_type;
+    args.op                = op;
+    args.dst.info.buffer   = rbuf;
+    args.dst.info.count    = count;
+    args.dst.info.datatype = dt;
+    args.dst.info.mem_type = mem_type;
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

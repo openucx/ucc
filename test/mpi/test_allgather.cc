@@ -30,17 +30,7 @@ TestAllgather::TestAllgather(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_MALLOC_CHECK(check_buf);
     if (TEST_NO_INPLACE == inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
-        sbuf = sbuf_mc_header->addr;
-    } else {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-    }
-    if (persistent) {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
-    }
-
-    if (TEST_NO_INPLACE == inplace) {
+        sbuf                   = sbuf_mc_header->addr;
         args.src.info.buffer   = sbuf;
         args.src.info.count    = single_rank_count;
         args.src.info.datatype = TEST_DT;

@@ -79,16 +79,6 @@ TestScatterv::TestScatterv(ucc_test_team_t &_team, TestCaseParams &params) :
 
     check_buf = ucc_malloc(count * size * dt_size, "check buf");
     UCC_MALLOC_CHECK(check_buf);
-
-    if (TEST_INPLACE == inplace) {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-    }
-    if (persistent) {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
-    }
-
     args.root = root;
     if (rank == root) {
         args.src.info_v.buffer        = sbuf;

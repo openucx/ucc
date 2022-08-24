@@ -178,6 +178,16 @@ TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
     args.mask      = 0;
     args.coll_type = ct;
 
+    if (inplace) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+    }
+
+    if (persistent) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+    }
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Irecv((void*)progress_buf, 1, MPI_CHAR, rank, 0, MPI_COMM_WORLD,
               &progress_request);

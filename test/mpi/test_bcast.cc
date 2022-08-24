@@ -29,10 +29,6 @@ TestBcast::TestBcast(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
     sbuf = sbuf_mc_header->addr;
 
-    if (persistent) {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
-    }
     args.src.info.buffer   = sbuf;
     args.src.info.count    = count;
     args.src.info.datatype = TEST_DT;

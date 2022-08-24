@@ -43,19 +43,12 @@ TestAlltoall::TestAlltoall(ucc_test_team_t &_team, TestCaseParams &params) :
             UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize * nprocs, mem_type));
             sbuf = sbuf_mc_header->addr;
         }
-    } else {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
     if (is_onesided) {
         args.mask  |=
             UCC_COLL_ARGS_FIELD_FLAGS | UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
         args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
         args.global_work_buffer = work_buf;
-    }
-    if (persistent) {
-        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
 
     if (TEST_NO_INPLACE == inplace) {

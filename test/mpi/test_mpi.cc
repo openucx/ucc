@@ -305,6 +305,16 @@ int ucc_coll_inplace_supported(ucc_coll_type_t c)
     }
 }
 
+int ucc_coll_persistent_supported(ucc_coll_type_t c)
+{
+    switch(c) {
+    case UCC_COLL_TYPE_BARRIER:
+        return 0;
+    default:
+        return 1;
+    }
+}
+
 bool ucc_coll_triggered_supported(ucc_memory_type_t mt)
 {
     if (mt == UCC_MEMORY_TYPE_CUDA) {
@@ -527,7 +537,9 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
             std::vector<ucc_test_vsize_flag_t> test_displ_vsize = {TEST_FLAG_VSIZE_64BIT};
             void **onesided_bufs;
 
-            if ((inplace == TEST_INPLACE) && !ucc_coll_inplace_supported(c)) {
+            if ((inplace == TEST_INPLACE && !ucc_coll_inplace_supported(c)) ||
+                (persistent == TEST_PERSISTENT &&
+                 !ucc_coll_persistent_supported(c))) {
                 continue;
             }
 
