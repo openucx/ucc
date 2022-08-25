@@ -28,9 +28,10 @@ ucc_pt_coll_reduce_scatter::ucc_pt_coll_reduce_scatter(ucc_datatype_t dt,
     coll_args.dst.info.mem_type = mt;
 }
 
-ucc_status_t ucc_pt_coll_reduce_scatter::init_coll_args(size_t count,
-                                                        ucc_coll_args_t &args)
+ucc_status_t ucc_pt_coll_reduce_scatter::init_args(size_t count,
+                                                   ucc_pt_test_args_t &test_args)
 {
+    ucc_coll_args_t &args = test_args.coll_args;
     size_t size;
     ucc_status_t st;
 
@@ -62,7 +63,7 @@ exit:
     return st;
 }
 
-void ucc_pt_coll_reduce_scatter::free_coll_args(ucc_coll_args_t &args)
+void ucc_pt_coll_reduce_scatter::free_args(ucc_pt_test_args_t &test_args)
 {
     if (dst_header) {
         ucc_mc_free(dst_header);
@@ -75,12 +76,13 @@ void ucc_pt_coll_reduce_scatter::free_coll_args(ucc_coll_args_t &args)
 }
 
 float ucc_pt_coll_reduce_scatter::get_bw(float time_ms, int grsize,
-                                         ucc_coll_args_t args)
+                                         ucc_pt_test_args_t test_args)
 {
-    float N      = grsize;
-    size_t count = UCC_IS_INPLACE(args) ? args.dst.info.count :
-                                          args.src.info.count;
-    float S      = count * ucc_dt_size(args.dst.info.datatype);
+    ucc_coll_args_t &args  = test_args.coll_args;
+    float            N     = grsize;
+    size_t           count = UCC_IS_INPLACE(args) ? args.dst.info.count :
+                                                   args.src.info.count;
+    float S                = count * ucc_dt_size(args.dst.info.datatype);
 
     return (S / time_ms) * ((N - 1) / N) / 1000.0;
 }

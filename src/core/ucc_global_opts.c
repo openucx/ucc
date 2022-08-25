@@ -12,7 +12,8 @@ UCC_LIST_HEAD(ucc_config_global_list);
 
 ucc_global_config_t ucc_global_config = {
     .log_component    = {UCC_LOG_LEVEL_WARN, "UCC"},
-    .component_path   = "",
+    .component_path   = NULL,
+    .install_path     = NULL,
     .initialized      = 0,
     .profile_mode     = 0,
     .profile_file     = "",
@@ -27,9 +28,6 @@ ucc_config_field_t ucc_global_config_table[] = {
      "poll.",
      ucc_offsetof(ucc_global_config_t, log_component),
      UCC_CONFIG_TYPE_LOG_COMP},
-
-    {"COMPONENT_PATH", "", "Specifies dynamic components location",
-     ucc_offsetof(ucc_global_config_t, component_path), UCC_CONFIG_TYPE_STRING},
 
     {"PROFILE_MODE", "",
      "Profile collection modes. If none is specified, profiling is disabled.\n"

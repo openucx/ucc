@@ -26,15 +26,16 @@ ucc_pt_coll_gatherv::ucc_pt_coll_gatherv(ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_gatherv::init_coll_args(size_t count,
-                                                   ucc_coll_args_t &args)
+ucc_status_t ucc_pt_coll_gatherv::init_args(size_t count,
+                                            ucc_pt_test_args_t &test_args)
 {
-    int comm_size   = comm->get_size();
-    size_t dt_size  = ucc_dt_size(coll_args.src.info.datatype);
-    size_t size_src = count * dt_size;
-    size_t size_dst = comm_size * count * dt_size;
+    ucc_coll_args_t &args      = test_args.coll_args;
+    int              comm_size = comm->get_size();
+    size_t           dt_size   = ucc_dt_size(coll_args.src.info.datatype);
+    size_t           size_src  = count * dt_size;
+    size_t           size_dst  = comm_size * count * dt_size;
     ucc_status_t st;
-    bool is_root;
+    bool         is_root;
 
     args    = coll_args;
     is_root = (comm->get_rank() == args.root);
@@ -79,9 +80,11 @@ exit:
     return st;
 }
 
-void ucc_pt_coll_gatherv::free_coll_args(ucc_coll_args_t &args)
+void ucc_pt_coll_gatherv::free_args(ucc_pt_test_args_t &test_args)
 {
-    bool is_root = (comm->get_rank() == args.root);
+    ucc_coll_args_t &args    = test_args.coll_args;
+    bool             is_root = (comm->get_rank() == args.root);
+
     if (!is_root || !UCC_IS_INPLACE(args)) {
         ucc_mc_free(src_header);
     }

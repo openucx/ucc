@@ -26,13 +26,14 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
     }
 }
 
-ucc_status_t ucc_pt_coll_alltoallv::init_coll_args(size_t count,
-                                                   ucc_coll_args_t &args)
+ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count,
+                                              ucc_pt_test_args_t &test_args)
 {
-    int          comm_size = comm->get_size();
-    size_t       dt_size   = ucc_dt_size(coll_args.src.info_v.datatype);
-    size_t       size      = comm_size * count * dt_size;
-    ucc_status_t st        = UCC_OK;
+    ucc_coll_args_t &args      = test_args.coll_args;
+    int              comm_size = comm->get_size();
+    size_t           dt_size   = ucc_dt_size(coll_args.src.info_v.datatype);
+    size_t           size      = comm_size * count * dt_size;
+    ucc_status_t     st        = UCC_OK;
 
     args = coll_args;
     args.src.info_v.counts = (ucc_count_t *) ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");
@@ -72,8 +73,10 @@ exit:
     return st;
 }
 
-void ucc_pt_coll_alltoallv::free_coll_args(ucc_coll_args_t &args)
+void ucc_pt_coll_alltoallv::free_args(ucc_pt_test_args_t &test_args)
 {
+    ucc_coll_args_t &args = test_args.coll_args;
+
     if (!UCC_IS_INPLACE(args)) {
         ucc_mc_free(src_header);
     }

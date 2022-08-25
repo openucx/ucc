@@ -219,11 +219,6 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_init_r(
     ucc_rank_t         rank    = UCC_TL_TEAM_RANK(tl_team);
     ucc_tl_ucp_task_t *task;
 
-    /* In place currently not supported */
-    if (UCC_IS_INPLACE(coll_args->args)) {
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
     task                 = ucc_tl_ucp_init_task(coll_args, team);
     task->super.post     = ucc_tl_ucp_scatter_knomial_start;
     task->super.progress = ucc_tl_ucp_scatter_knomial_progress;
