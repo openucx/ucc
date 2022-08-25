@@ -54,7 +54,6 @@ ucc_schedule_pipelined_completed_handler(ucc_coll_task_t *parent_task,
         "sched %p completed frag %p, n_completed %d, n_started %d, n_total %d",
         schedule, frag, schedule->super.n_completed_tasks,
         schedule->n_frags_started, schedule->super.n_tasks);
-    ucc_assert(frag->super.status == UCC_OK);
     if (schedule->super.n_completed_tasks == schedule->super.n_tasks) {
         schedule->super.super.status = UCC_OK;
         if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
