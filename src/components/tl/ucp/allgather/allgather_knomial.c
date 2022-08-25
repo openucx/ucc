@@ -43,19 +43,9 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     size_t                 block_count, peer_seg_count, local_seg_count;
     ucc_status_t           status;
 
-    if (task->allgather_kn.etask != NULL) {
-        status = ucc_ee_executor_task_test(task->allgather_kn.etask);
-        if (status == UCC_INPROGRESS) {
-            task->super.status = status;
-            return;
-        }
-        ucc_ee_executor_task_finalize(task->allgather_kn.etask);
-        task->allgather_kn.etask = NULL;
-        if (ucc_unlikely(status < 0)) {
-            task->super.status = status;
-            return;
-        }
-    }
+    EXEC_TASK_TEST(task->allgather_kn.phase,
+                   "failed during ee task test",
+                   task->allgather_kn.etask);
     /* Bcast will first call scatter and then allgather.
        In case of non-full tree with "extra" ranks, scatter will give each rank
        a new virtual rank number - "vrank".
