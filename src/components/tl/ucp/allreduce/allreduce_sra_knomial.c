@@ -61,14 +61,10 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_setup(
     size_t           dt_size = ucc_dt_size(dt);
     ucc_coll_args_t *targs;
     int              n_frags    = schedule_p->super.n_tasks;
-    size_t           frag_count = args->dst.info.count / n_frags;
-    size_t           left       = args->dst.info.count % n_frags;
-    size_t           offset     = frag_num * frag_count + left;
-
-    if (frag_num < left) {
-        frag_count++;
-        offset -= left - frag_num;
-    }
+    size_t           frag_count = ucc_buffer_block_count(args->dst.info.count,
+                                                         n_frags, frag_num);
+    size_t           offset     = ucc_buffer_block_offset(args->dst.info.count,
+                                                          n_frags, frag_num);
 
     targs = &frag->tasks[0]->bargs.args; //REDUCE_SCATTER
     targs->src.info.buffer =
@@ -140,14 +136,12 @@ out:
     return status;
 }
 
-static inline void get_sra_n_frags(ucc_base_coll_args_t *coll_args,
+static inline void get_sra_n_frags(size_t msgsize,
                                    ucc_tl_ucp_team_t *team, int *n_frags,
                                    int *pipeline_depth)
 {
     //TODO make selection mem_type - specific
     ucc_tl_ucp_lib_config_t *cfg     = &UCC_TL_UCP_TEAM_LIB(team)->cfg;
-    size_t                   msgsize = coll_args->args.dst.info.count *
-                     ucc_dt_size(coll_args->args.dst.info.datatype);
     int min_num_frags;
 
     *n_frags = 1;
@@ -186,17 +180,35 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_lib_config_t  *cfg     = &UCC_TL_UCP_TEAM_LIB(tl_team)->cfg;
     int                       n_frags, pipeline_depth;
     ucc_schedule_pipelined_t *schedule_p;
-    ucc_status_t status;
+    ucc_status_t         status;
+    ucc_base_coll_args_t bargs;
+    size_t               max_frag_count, dt_size;
 
-    status = ucc_tl_ucp_get_schedule(tl_team, coll_args,
-                                     (ucc_tl_ucp_schedule_t **)&schedule_p);
+    dt_size = ucc_dt_size(coll_args->args.dst.info.datatype);
+    status  = ucc_tl_ucp_get_schedule(tl_team, coll_args,
+                                      (ucc_tl_ucp_schedule_t **)&schedule_p);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
+    bargs = *coll_args;
 
-    get_sra_n_frags(coll_args, tl_team, &n_frags, &pipeline_depth);
+    if (bargs.mask & UCC_BASE_CARGS_MAX_FRAG_COUNT) {
+        max_frag_count = bargs.max_frag_count;
+    } else {
+        max_frag_count = coll_args->args.dst.info.count;
+    }
+
+    get_sra_n_frags(max_frag_count * dt_size, tl_team, &n_frags,
+                    &pipeline_depth);
+
+    if (n_frags > 1) {
+        bargs.mask         |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
+        bargs.max_frag_count =
+            ucc_buffer_block_count(max_frag_count, n_frags, 0);
+    }
+
     status = ucc_schedule_pipelined_init(
-        coll_args, team, ucc_tl_ucp_allreduce_sra_knomial_frag_init,
+        &bargs, team, ucc_tl_ucp_allreduce_sra_knomial_frag_init,
         ucc_tl_ucp_allreduce_sra_knomial_frag_setup, pipeline_depth, n_frags,
         cfg->allreduce_sra_kn_seq, schedule_p);
     if (UCC_OK != status) {

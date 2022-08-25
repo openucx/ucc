@@ -387,8 +387,12 @@ ucc_tl_ucp_reduce_scatterv_ring_init(ucc_base_coll_args_t *coll_args,
     s[1].map    = ucc_ep_map_create_reverse(UCC_TL_TEAM_SIZE(tl_team));
     s[1].myrank = ucc_ep_map_eval(s[1].map, UCC_TL_TEAM_RANK(tl_team));
 
-    max_segcount = ucc_coll_args_get_max_count(
-        &coll_args->args, coll_args->args.dst.info_v.counts, size);
+    if (coll_args->mask & UCC_BASE_CARGS_MAX_FRAG_COUNT) {
+        max_segcount = coll_args->max_frag_count;
+    } else {
+        max_segcount = ucc_coll_args_get_max_count(
+            &coll_args->args, coll_args->args.dst.info_v.counts, size);
+    }
     /* in flight we can have 2 sends from 2 differnt blocks and 1 recv:
        need 3 * max_segcount of scratch per set */
     count_per_set = (max_segcount + n_subsets - 1) / n_subsets;
