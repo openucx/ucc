@@ -23,6 +23,21 @@ export HEAD_NODE
 export MASTER_ADDR=${HEAD_NODE}
 
 NNODES=$(wc --lines "$HOSTFILE" | awk '{print $1}')
+DEV=""
+
+# Find first available active device
+for d in $(ssh $HEAD_NODE "ibstat -l"); do
+    state=$(ssh $HEAD_NODE "ibstat $d" | grep 'State:' | awk '{print $2}')
+    if [ $state == 'Active' ]; then
+        DEV=$d
+        break
+    fi
+done
+
+if [ "x$DEV" == "x" ]; then
+    echo "No active devices are found on $HEAD_NODE"
+    exit -1
+fi
 
 function mpi_params {
     ppn=$1
@@ -33,7 +48,8 @@ function mpi_params {
     echo "-np $((nnodes*ppn)) --oversubscribe --hostfile ${HOSTFILE} \
 --map-by ppr:$ppn:node --bind-to socket --allow-run-as-root \
 -x PATH -x LD_LIBRARY_PATH --mca opal_common_ucx_opal_mem_hooks 1 --mca plm_rsh_args -p12345 \
---mca coll ^ucc,hcoll "
+--mca coll ^ucc,hcoll \
+-x UCX_NET_DEVICES=$DEV:1"
 }
 
 # # shellcheck disable=SC2086
