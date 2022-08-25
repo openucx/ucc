@@ -4,160 +4,12 @@
  * See file LICENSE for terms.
  */
 
-#ifdef __cplusplus
+
 extern "C" {
-#endif
-
 #include "../ec_cuda.h"
-#include "utils/ucc_math_op.h"
 #include <inttypes.h>
-#ifdef __cplusplus
 }
-#endif
-
-#include "ec_cuda_half_sm52.h"
 #include "ec_cuda_reduce_ops.h"
-
-#define CUDA_REDUCE_WITH_OP_DEFAULT(NAME, _OP)                                  \
-    template <typename _Type, typename _AlphaType>                              \
-    __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task,  \
-                                                   uint16_t              flags) \
-    {                                                                           \
-        size_t        start  = blockIdx.x * blockDim.x + threadIdx.x;           \
-        size_t        step   = blockDim.x * gridDim.x;                          \
-        size_t        count  = task.count;                                      \
-        int           n_srcs = task.n_srcs;                                     \
-        const _Type **s      = (const _Type **)task.srcs;                       \
-        _Type *       d      = (_Type *)task.dst;                               \
-        size_t        i;                                                        \
-                                                                                \
-        switch (n_srcs) {                                                       \
-        case 2:                                                                 \
-            for (i = start; i < count; i += step) {                             \
-                d[i] = _OP##_2(s[0][i], s[1][i]);                               \
-            }                                                                   \
-            break;                                                              \
-        case 3:                                                                 \
-            for (i = start; i < count; i += step) {                             \
-                d[i] = _OP##_3(s[0][i], s[1][i], s[2][i]);                      \
-            }                                                                   \
-            break;                                                              \
-        case 4:                                                                 \
-            for (i = start; i < count; i += step) {                             \
-                d[i] = _OP##_4(s[0][i], s[1][i], s[2][i], s[3][i]);             \
-            }                                                                   \
-            break;                                                              \
-        default:                                                                \
-            for (i = start; i < count; i += step) {                             \
-                d[i] = _OP(s[0][i], s[1][i]);                                   \
-                for (size_t j = 2; j < n_srcs; j++) {                           \
-                    d[i] = _OP(d[i], s[j][i]);                                  \
-                }                                                               \
-            }                                                                   \
-            break;                                                              \
-        }                                                                       \
-        if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                      \
-            for (i = start; i < count; i += step) {                             \
-                d[i] = d[i] * (_AlphaType)task.alpha;                           \
-            }                                                                   \
-        }                                                                       \
-    }
-
-#define CUDA_REDUCE_WITH_OP_STRIDED(NAME, _OP)                                 \
-    template <typename _Type, typename _AlphaType>                             \
-    __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                            \
-        const _Type *s1, const _Type *s2, _Type *d, size_t count,              \
-        size_t stride, uint16_t n_src2, const bool with_alpha,                 \
-        const double alpha)                                                    \
-    {                                                                          \
-        size_t start = blockIdx.x * blockDim.x + threadIdx.x;                  \
-        size_t step  = blockDim.x * gridDim.x;                                 \
-        size_t ld    = stride / sizeof(_Type);                                 \
-        size_t i;                                                              \
-                                                                               \
-        ucc_assert(stride % sizeof(_Type) == 0);                               \
-        switch (n_src2) {                                                      \
-        case 1:                                                                \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP##_2(s1[i], s2[i]);                                  \
-            }                                                                  \
-            break;                                                             \
-        case 2:                                                                \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP##_3(s1[i], s2[i], s2[i + ld]);                      \
-            }                                                                  \
-            break;                                                             \
-        case 3:                                                                \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP##_4(s1[i], s2[i], s2[i + ld], s2[i + 2 * ld]);      \
-            }                                                                  \
-            break;                                                             \
-        default:                                                               \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP(s1[i], s2[i]);                                      \
-                for (size_t j = 1; j < n_src2; j++) {                          \
-                    d[i] = _OP(d[i], s2[i + j * ld]);                          \
-                }                                                              \
-            }                                                                  \
-            break;                                                             \
-        }                                                                      \
-        if (with_alpha) {                                                      \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = d[i] * (_AlphaType)alpha;                               \
-            }                                                                  \
-        }                                                                      \
-    }
-
-#define CUDA_REDUCE_WITH_OP_MULTI_DST(NAME, _OP)                               \
-    template <typename _Type>                             \
-    __global__ void UCC_REDUCE_CUDA_MULTI_DST_##NAME(                          \
-        ucc_eee_task_reduce_multi_dst_t arg)                                   \
-    {                                                                          \
-        size_t start = blockIdx.x * blockDim.x + threadIdx.x;                  \
-        size_t step  = blockDim.x * gridDim.x;                                 \
-        for (int j = 0; j < arg.n_bufs; j++) {                                 \
-            size_t count = arg.counts[j];                                      \
-            _Type *s2 = (_Type *)arg.src2[j];                                  \
-            _Type *s1 = (_Type *)arg.src1[j];                                  \
-            _Type *d  = (_Type *)arg.dst[j];                                   \
-            for (size_t i = start; i < count; i += step) {                     \
-                d[i] = _OP##_2(s1[i], s2[i]);                                  \
-            }                                                                  \
-        }                                                                      \
-    }
-
-CUDA_REDUCE_WITH_OP_DEFAULT(SUM, DO_OP_SUM);
-CUDA_REDUCE_WITH_OP_DEFAULT(PROD, DO_OP_PROD);
-CUDA_REDUCE_WITH_OP_DEFAULT(MIN, DO_OP_MIN);
-CUDA_REDUCE_WITH_OP_DEFAULT(MAX, DO_OP_MAX);
-CUDA_REDUCE_WITH_OP_DEFAULT(LAND, DO_OP_LAND);
-CUDA_REDUCE_WITH_OP_DEFAULT(LOR, DO_OP_LOR);
-CUDA_REDUCE_WITH_OP_DEFAULT(LXOR, DO_OP_LXOR);
-CUDA_REDUCE_WITH_OP_DEFAULT(BAND, DO_OP_BAND);
-CUDA_REDUCE_WITH_OP_DEFAULT(BOR, DO_OP_BOR);
-CUDA_REDUCE_WITH_OP_DEFAULT(BXOR, DO_OP_BXOR);
-
-CUDA_REDUCE_WITH_OP_STRIDED(SUM, DO_OP_SUM);
-CUDA_REDUCE_WITH_OP_STRIDED(PROD, DO_OP_PROD);
-CUDA_REDUCE_WITH_OP_STRIDED(MIN, DO_OP_MIN);
-CUDA_REDUCE_WITH_OP_STRIDED(MAX, DO_OP_MAX);
-CUDA_REDUCE_WITH_OP_STRIDED(LAND, DO_OP_LAND);
-CUDA_REDUCE_WITH_OP_STRIDED(LOR, DO_OP_LOR);
-CUDA_REDUCE_WITH_OP_STRIDED(LXOR, DO_OP_LXOR);
-CUDA_REDUCE_WITH_OP_STRIDED(BAND, DO_OP_BAND);
-CUDA_REDUCE_WITH_OP_STRIDED(BOR, DO_OP_BOR);
-CUDA_REDUCE_WITH_OP_STRIDED(BXOR, DO_OP_BXOR);
-
-CUDA_REDUCE_WITH_OP_MULTI_DST(SUM, DO_OP_SUM);
-CUDA_REDUCE_WITH_OP_MULTI_DST(PROD, DO_OP_PROD);
-CUDA_REDUCE_WITH_OP_MULTI_DST(MIN, DO_OP_MIN);
-CUDA_REDUCE_WITH_OP_MULTI_DST(MAX, DO_OP_MAX);
-CUDA_REDUCE_WITH_OP_MULTI_DST(LAND, DO_OP_LAND);
-CUDA_REDUCE_WITH_OP_MULTI_DST(LOR, DO_OP_LOR);
-CUDA_REDUCE_WITH_OP_MULTI_DST(LXOR, DO_OP_LXOR);
-CUDA_REDUCE_WITH_OP_MULTI_DST(BAND, DO_OP_BAND);
-CUDA_REDUCE_WITH_OP_MULTI_DST(BOR, DO_OP_BOR);
-CUDA_REDUCE_WITH_OP_MULTI_DST(BXOR, DO_OP_BXOR);
 
 #define align_pow2(_n, _p) ((_n) & ((_p) - 1))
 
@@ -212,18 +64,14 @@ __global__ void UCC_REDUCE_CUDA_MULTI_DST_SUM<float>(
     }
 }
 
-#define LAUNCH_KERNEL_A(NAME, type, _AlphaType, _task, s, b, t)                \
+#define LAUNCH_REDUCE_A(NAME, type, _AlphaType, _task, s, b, t)                \
     do {                                                                       \
         if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
             UCC_REDUCE_CUDA_DEFAULT_##NAME<type, _AlphaType>                   \
                 <<<b, t, 0, s>>>(_task->reduce, _task->flags);                 \
         } else if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED) {  \
-            ucc_eee_task_reduce_strided_t *trs = &_task->reduce_strided;       \
-            UCC_REDUCE_CUDA_STRIDED_##NAME<type, _AlphaType><<<b, t, 0, s>>>(  \
-                (type *)trs->src1, (type *)trs->src2, (type *)trs->dst,        \
-                trs->count, trs->stride, trs->n_src2,                          \
-                (bool)(_task->flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA),    \
-                trs->alpha);                                                   \
+            UCC_REDUCE_CUDA_STRIDED_##NAME<type, _AlphaType>                   \
+            <<<b, t, 0, s>>>(_task->reduce_strided, _task->flags);             \
         } else {                                                               \
             UCC_REDUCE_CUDA_MULTI_DST_##NAME<type>                             \
                 <<<b, t, 0, s>>>(_task->reduce_multi_dst);                     \
@@ -233,97 +81,11 @@ __global__ void UCC_REDUCE_CUDA_MULTI_DST_SUM<float>(
 #define LAUNCH_KERNEL(NAME, type,  _task, s, b, t)  \
     LAUNCH_KERNEL_A(NAME, type, type, _task, s, b, t)
 
-#define DT_REDUCE_INT(type, _task, _op, s, b, t)                               \
-    do {                                                                       \
-        switch (_op) {                                                         \
-        case UCC_OP_AVG:                                                       \
-        case UCC_OP_SUM:                                                       \
-            LAUNCH_KERNEL(SUM, type, _task, s, b, t);                          \
-            break;                                                             \
-        case UCC_OP_PROD:                                                      \
-            LAUNCH_KERNEL(PROD, type, _task, s, b, t);                         \
-            break;                                                             \
-        case UCC_OP_MIN:                                                       \
-            LAUNCH_KERNEL(MIN, type, _task, s, b, t);                          \
-            break;                                                             \
-        case UCC_OP_MAX:                                                       \
-            LAUNCH_KERNEL(MAX, type, _task, s, b, t);                          \
-            break;                                                             \
-        case UCC_OP_LAND:                                                      \
-            LAUNCH_KERNEL(LAND, type, _task, s, b, t);                         \
-            break;                                                             \
-        case UCC_OP_BAND:                                                      \
-            LAUNCH_KERNEL(BAND, type, _task, s, b, t);                         \
-            break;                                                             \
-        case UCC_OP_LOR:                                                       \
-            LAUNCH_KERNEL(LOR, type, _task, s, b, t);                          \
-            break;                                                             \
-        case UCC_OP_BOR:                                                       \
-            LAUNCH_KERNEL(BOR, type, _task, s, b, t);                          \
-            break;                                                             \
-        case UCC_OP_LXOR:                                                      \
-            LAUNCH_KERNEL(LXOR, type, _task, s, b, t);                         \
-            break;                                                             \
-        case UCC_OP_BXOR:                                                      \
-            LAUNCH_KERNEL(BXOR, type, _task, s, b, t);                         \
-            break;                                                             \
-        default:                                                               \
-            ec_error(&ucc_ec_cuda.super,                                       \
-                     "int dtype does not support "                             \
-                     "requested reduce op: %s",                                \
-                     ucc_reduction_op_str(_op));                               \
-            return UCC_ERR_NOT_SUPPORTED;                                      \
-        }                                                                      \
-    } while (0)
+#define LAUNCH_REDUCE(NAME, type,  _task, s, b, t)  \
+    LAUNCH_REDUCE_A(NAME, type, type, _task, s, b, t)
 
-#define DT_REDUCE_FLOAT(type, _task, _op, s, b, t)                             \
-    do {                                                                       \
-        switch (_op) {                                                         \
-        case UCC_OP_AVG:                                                       \
-        case UCC_OP_SUM:                                                       \
-            LAUNCH_KERNEL(SUM, type, _task, s, b, t);                          \
-            break;                                                             \
-        case UCC_OP_PROD:                                                      \
-            LAUNCH_KERNEL(PROD, type, _task, s, b, t);                         \
-            break;                                                             \
-        case UCC_OP_MIN:                                                       \
-            LAUNCH_KERNEL(MIN, type, _task, s, b, t);                          \
-            break;                                                             \
-        case UCC_OP_MAX:                                                       \
-            LAUNCH_KERNEL(MAX, type, _task, s, b, t);                          \
-            break;                                                             \
-        default:                                                               \
-            ec_error(&ucc_ec_cuda.super,                                       \
-                     "float dtype does not support "                           \
-                     "requested reduce op: %s",                                \
-                     ucc_reduction_op_str(_op));                               \
-            return UCC_ERR_NOT_SUPPORTED;                                      \
-        }                                                                      \
-    } while (0)
 
-#define DT_REDUCE_FLOAT_COMPLEX(type, _alphaType, _task, _op, s, b, t)         \
-    do {                                                                       \
-        switch (_op) {                                                         \
-        case UCC_OP_AVG:                                                       \
-        case UCC_OP_SUM:                                                       \
-            LAUNCH_KERNEL_A(SUM, type, _alphaType, _task, s, b, t);            \
-            break;                                                             \
-        case UCC_OP_PROD:                                                      \
-            LAUNCH_KERNEL_A(PROD, type, _alphaType, _task, s, b, t);           \
-            break;                                                             \
-        default:                                                               \
-            ec_error(&ucc_ec_cuda.super,                                       \
-                     "float complex dtype does not support "                   \
-                     "requested reduce op: %s",                                \
-                     ucc_reduction_op_str(_op));                               \
-            return UCC_ERR_NOT_SUPPORTED;                                      \
-        }                                                                      \
-    } while (0)
-
-#ifdef __cplusplus
 extern "C" {
-#endif
-
 ucc_status_t ucc_ec_cuda_reduce(ucc_ee_executor_task_args_t *task,
                                 cudaStream_t                 stream)
 {
@@ -431,6 +193,5 @@ ucc_status_t ucc_ec_cuda_reduce(ucc_ee_executor_task_args_t *task,
     CUDA_CHECK(cudaGetLastError());
     return UCC_OK;
 }
-#ifdef __cplusplus
+
 }
-#endif

@@ -17,35 +17,7 @@ ucc_cuda_executor_persistent_task_post(ucc_ee_executor_t *executor,
     int                     max_tasks = EC_CUDA_CONFIG->exec_max_tasks;
     ucc_ee_executor_task_args_t            *subtask_args;
     ucc_ec_cuda_executor_persistent_task_t *ee_task;
-    ucc_datatype_t                          dt;
-    ucc_reduction_op_t                      op;
     int                                     i;
-
-    if (task_args->task_type != UCC_EE_EXECUTOR_TASK_COPY &&
-        task_args->task_type != UCC_EE_EXECUTOR_TASK_COPY_MULTI) {
-        if (task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
-            dt = task_args->reduce.dt;
-            op = task_args->reduce.op;
-        } else if (task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED) {
-            dt = task_args->reduce_strided.dt;
-            op = task_args->reduce_strided.op;
-        } else {
-            dt = task_args->reduce_multi_dst.dt;
-            op = task_args->reduce_multi_dst.op;
-        }
-
-        if (op != UCC_OP_SUM) {
-            ec_error(&ucc_ec_cuda.super, "not supported reduction op: %s",
-                     ucc_reduction_op_str(op));
-            return UCC_ERR_NOT_SUPPORTED;
-        }
-        if ((dt != UCC_DT_FLOAT32) && (dt != UCC_DT_FLOAT64) &&
-            (dt != UCC_DT_INT32)) {
-            ec_error(&ucc_ec_cuda.super, "not supported reduction dtype: %s",
-                     ucc_datatype_str(dt));
-            return UCC_ERR_NOT_SUPPORTED;
-        }
-    }
 
     if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {
         ucc_spin_lock(&eee->tasks_lock);
