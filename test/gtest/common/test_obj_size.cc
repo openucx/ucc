@@ -18,8 +18,8 @@ extern "C" {
 class test_obj_size : public ucc::test {
 };
 
-#define EXPECTED_SIZE(_obj, _size) EXPECT_EQ((size_t)_size, sizeof(_obj))
-
 UCC_TEST_F(test_obj_size, size) {
-    EXPECTED_SIZE(ucc_coll_task_t, 472);
+    /* lets try to keep it within 8 cache lines
+       currently 480b */
+    EXPECT_LT(sizeof(ucc_coll_task_t), 64 * 8);
 }
