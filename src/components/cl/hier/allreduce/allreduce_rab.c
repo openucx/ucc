@@ -184,23 +184,6 @@ static ucc_status_t ucc_cl_hier_allreduce_rab_frag_init(
     return status;
 }
 
-static inline void get_n_frags(ucc_base_coll_args_t *coll_args,
-                               ucc_cl_hier_team_t *team, int *n_frags,
-                               int *pipeline_depth)
-{
-    ucc_cl_hier_lib_config_t *cfg     = &UCC_CL_HIER_TEAM_LIB(team)->cfg;
-    size_t                    msgsize = coll_args->args.dst.info.count *
-                     ucc_dt_size(coll_args->args.dst.info.datatype);
-    int min_num_frags;
-
-    *n_frags = 1;
-    if (msgsize > cfg->allreduce_rab_frag_thresh) {
-        min_num_frags = msgsize / cfg->allreduce_rab_frag_size;
-        *n_frags      = ucc_max(min_num_frags, cfg->allreduce_rab_n_frags);
-    }
-    *pipeline_depth = ucc_min(*n_frags, cfg->allreduce_rab_pipeline_depth);
-}
-
 static ucc_status_t ucc_cl_hier_rab_allreduce_start(ucc_coll_task_t *task)
 {
     ucc_schedule_pipelined_t *schedule =
@@ -233,7 +216,10 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     if (coll_args->args.op == UCC_OP_AVG) {
         return UCC_ERR_NOT_SUPPORTED;
     }
-    get_n_frags(coll_args, cl_team, &n_frags, &pipeline_depth);
+    ucc_pipeline_nfrags_pdepth(&cfg->allreduce_rab_pipeline,
+                               coll_args->args.dst.info.count *
+                               ucc_dt_size(coll_args->args.dst.info.datatype),
+                               &n_frags, &pipeline_depth);
 
     if (n_frags == 1) {
         return ucc_cl_hier_allreduce_rab_init_schedule(
@@ -248,7 +234,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     status = ucc_schedule_pipelined_init(
         coll_args, team, ucc_cl_hier_allreduce_rab_frag_init,
         ucc_cl_hier_allreduce_rab_frag_setup, pipeline_depth, n_frags,
-        cfg->allreduce_rab_seq, &schedule->super);
+        cfg->allreduce_rab_pipeline.order, &schedule->super);
 
     if (ucc_unlikely(status != UCC_OK)) {
         cl_error(team->context->lib,
