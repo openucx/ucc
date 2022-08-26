@@ -38,6 +38,20 @@
  */
 ucc_status_t ucc_tl_ucp_bcast_sag_knomial_start(ucc_coll_task_t *coll_task)
 {
+    ucc_schedule_t  *schedule = ucc_derived_of(coll_task, ucc_schedule_t);
+    ucc_coll_args_t *args     = &schedule->super.bargs.args;
+    ucc_coll_task_t *ag_task, *scatter_task;
+
+    scatter_task                             = schedule->tasks[0];
+    scatter_task->bargs.args.src.info.buffer = args->src.info.buffer;
+    scatter_task->bargs.args.dst.info.buffer = args->src.info.buffer;
+    scatter_task->bargs.args.src.info.count  = args->src.info.count;
+    scatter_task->bargs.args.dst.info.count  = args->src.info.count;
+
+    ag_task                             = schedule->tasks[1];
+    ag_task->bargs.args.dst.info.buffer = args->src.info.buffer;
+    ag_task->bargs.args.dst.info.count  = args->src.info.count;
+
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_bcast_sag_kn_start", 0);
     return ucc_schedule_start(coll_task);
 }
