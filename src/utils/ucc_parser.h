@@ -148,4 +148,28 @@ ucc_status_t ucc_parse_file_config(const char *        filename,
                                    ucc_file_config_t **cfg);
 void         ucc_release_file_config(ucc_file_config_t *cfg);
 
+typedef struct ucc_pipeline_params ucc_pipeline_params_t;
+
+int ucc_pipeline_params_is_auto(const ucc_pipeline_params_t *p);
+
+int ucc_config_sscanf_pipeline_params(const char *buf, void *dest,
+                                      const void *arg);
+
+int ucc_config_sprintf_pipeline_params(char *buf, size_t max, const void *src,
+                                       const void *arg);
+
+ucs_status_t ucc_config_clone_pipeline_params(const void *src, void *dest,
+                                              const void *arg);
+
+void ucc_config_release_pipeline_params(void *ptr, const void *arg);
+
+#define UCC_CONFIG_TYPE_PIPELINE_PARAMS                                        \
+    {                                                                          \
+        ucc_config_sscanf_pipeline_params, ucc_config_sprintf_pipeline_params, \
+            ucc_config_clone_pipeline_params,                                  \
+            ucc_config_release_pipeline_params, ucs_config_help_generic,       \
+            "thresh=<memunit>:fragsize=<memunit>:nfrags="                      \
+            "<uint>:pdepth=<uint>:<ordered/parallel/serial>"                   \
+    }
+
 #endif

@@ -72,34 +72,10 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ALLREDUCE_SRA_KN_FRAG_THRESH", "inf",
-     "Threshold to enable fragmentation and pipelining of SRA Knomial "
-     "allreduce alg",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_frag_thresh),
-     UCC_CONFIG_TYPE_MEMUNITS},
-
-    {"ALLREDUCE_SRA_KN_FRAG_SIZE", "inf",
-     "Maximum allowed fragment size of SRA knomial alg",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_frag_size),
-     UCC_CONFIG_TYPE_MEMUNITS},
-
-    {"ALLREDUCE_SRA_KN_N_FRAGS", "2",
-     "Number of fragments each allreduce is split into when SRA knomial alg is "
-     "used\n"
-     "The actual number of fragments can be larger if fragment size exceeds\n"
-     "ALLREDUCE_SRA_KN_FRAG_SIZE",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_n_frags),
-     UCC_CONFIG_TYPE_UINT},
-
-    {"ALLREDUCE_SRA_KN_PIPELINE_DEPTH", "2",
-     "Number of fragments simultaneously progressed by the SRA knomial alg",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_pipeline_depth),
-     UCC_CONFIG_TYPE_UINT},
-
-    {"ALLREDUCE_SRA_KN_PIPELINE_ORDER", "parallel",
-     "Type of pipelined schedule for SRA knomial alg (sequential/ordered/parallel)",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_pipeline_order),
-     UCC_CONFIG_TYPE_ENUM(ucc_pipeline_order_names)},
+    {"ALLREDUCE_SRA_KN_PIPELINE", "n",
+     "Pipelining settings for SRA Knomial allreduce algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_pipeline),
+     UCC_CONFIG_TYPE_PIPELINE_PARAMS},
 
     {"REDUCE_SCATTER_KN_RADIX", "4",
      "Radix of the knomial reduce-scatter algorithm",

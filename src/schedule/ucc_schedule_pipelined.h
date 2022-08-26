@@ -42,6 +42,28 @@ typedef enum {
     UCC_PIPELINE_LAST
 } ucc_pipeline_order_t;
 
+typedef struct ucc_pipeline_params {
+    size_t               threshold;
+    size_t               frag_size;
+    unsigned             n_frags;
+    unsigned             pdepth;
+    ucc_pipeline_order_t order;
+} ucc_pipeline_params_t;
+
+static inline void ucc_pipeline_nfrags_pdepth(ucc_pipeline_params_t *p,
+                                              size_t msgsize, int *n_frags,
+                                              int *pipeline_depth)
+{
+    int min_num_frags;
+
+    *n_frags = 1;
+    if (msgsize > p->threshold) {
+        min_num_frags = ucc_div_round_up(msgsize, p->frag_size);
+        *n_frags      = ucc_max(min_num_frags, p->n_frags);
+    }
+    *pipeline_depth = ucc_min(*n_frags, p->pdepth);
+}
+
 extern const char* ucc_pipeline_order_names[];
 typedef struct ucc_schedule_pipelined {
     ucc_schedule_t               super;
