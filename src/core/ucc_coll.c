@@ -372,7 +372,7 @@ static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
     } else {
         ucc_assert(task->super.status == UCC_INPROGRESS);
         // TODO use CB instead of EM
-        ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED, task,
+        ucc_event_manager_subscribe(task, UCC_EVENT_COMPLETED, task,
                                     ucc_triggered_coll_complete);
     }
     return UCC_OK;
@@ -465,6 +465,7 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
         return UCC_ERR_NO_MEMORY;
     }
 
+    ucc_coll_task_construct(ev_task);
     ucc_coll_task_init(ev_task, NULL, task->team);
     ev_task->ee             = ee;
     ev_task->ev             = NULL;
@@ -479,7 +480,7 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
         UCC_COLL_SET_TIMEOUT(ev_task, task->bargs.args.timeout);
     }
-    ucc_event_manager_subscribe(&ev_task->em, UCC_EVENT_COMPLETED, task,
+    ucc_event_manager_subscribe(ev_task, UCC_EVENT_COMPLETED, task,
                                 ucc_trigger_complete);
 
     return ucc_progress_queue_enqueue(UCC_TASK_CORE_CTX(ev_task)->pq, ev_task);

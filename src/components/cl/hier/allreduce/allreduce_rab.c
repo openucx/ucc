@@ -101,11 +101,11 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
         n_tasks++;
     }
 
-    ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
+    ucc_event_manager_subscribe(&schedule->super, UCC_EVENT_SCHEDULE_STARTED,
                                 tasks[0], ucc_task_start_handler);
     ucc_schedule_add_task(schedule, tasks[0]);
     for (i = 1; i < n_tasks; i++) {
-        ucc_event_manager_subscribe(&tasks[i - 1]->em, UCC_EVENT_COMPLETED,
+        ucc_event_manager_subscribe(tasks[i - 1], UCC_EVENT_COMPLETED,
                                     tasks[i], ucc_task_start_handler);
         ucc_schedule_add_task(schedule, tasks[i]);
     }

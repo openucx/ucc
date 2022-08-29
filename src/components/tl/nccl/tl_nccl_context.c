@@ -38,10 +38,17 @@ void ucc_tl_nccl_driver_collective_progress(ucc_coll_task_t *coll_task)
 #endif
 }
 
+static void ucc_tl_nccl_req_mpool_obj_cleanup(ucc_mpool_t *mp, void *obj)
+{
+    ucc_coll_task_destruct(obj);
+}
+
 static void ucc_tl_nccl_req_mpool_obj_init(ucc_mpool_t *mp, void *obj,
                                            void *chunk)
 {
     ucc_tl_nccl_task_t *req = (ucc_tl_nccl_task_t*) obj;
+
+    ucc_coll_task_construct(&req->super);
     req->super.progress = ucc_tl_nccl_event_collective_progress;
 }
 
@@ -50,7 +57,7 @@ static ucc_mpool_ops_t ucc_tl_nccl_req_mpool_ops = {
     .chunk_alloc   = ucc_mpool_hugetlb_malloc,
     .chunk_release = ucc_mpool_hugetlb_free,
     .obj_init      = ucc_tl_nccl_req_mpool_obj_init,
-    .obj_cleanup   = NULL
+    .obj_cleanup   = ucc_tl_nccl_req_mpool_obj_cleanup
 };
 
 static ucc_status_t ucc_tl_nccl_req_mapped_mpool_chunk_malloc(ucc_mpool_t *mp,
@@ -83,6 +90,7 @@ static void ucc_tl_nccl_req_mapped_mpool_obj_init(ucc_mpool_t *mp, void *obj,
     if (st != cudaSuccess) {
         req->super.status = UCC_ERR_NO_MESSAGE;
     }
+    ucc_coll_task_construct(&req->super);
     req->super.progress = ucc_tl_nccl_driver_collective_progress;
 }
 
@@ -90,7 +98,7 @@ static ucc_mpool_ops_t ucc_tl_nccl_req_mapped_mpool_ops = {
     .chunk_alloc   = ucc_tl_nccl_req_mapped_mpool_chunk_malloc,
     .chunk_release = ucc_tl_nccl_req_mapped_mpool_chunk_free,
     .obj_init      = ucc_tl_nccl_req_mapped_mpool_obj_init,
-    .obj_cleanup   = NULL
+    .obj_cleanup   = ucc_tl_nccl_req_mpool_obj_cleanup
 };
 
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_context_t,

@@ -183,19 +183,18 @@ ucc_status_t ucc_schedule_pipelined_init(
             frags[i]->tasks[j]->n_deps_base = frags[i]->tasks[j]->n_deps;
             if (n_frags > 1 && sequential) {
                 ucc_event_manager_subscribe(
-                    &frags[(i > 0) ? (i - 1) : (n_frags - 1)]->tasks[j]->em,
+                    frags[(i > 0) ? (i - 1) : (n_frags - 1)]->tasks[j],
                     UCC_EVENT_TASK_STARTED, frags[i]->tasks[j],
                     ucc_dependency_handler);
                 frags[i]->tasks[j]->n_deps_base++;
             }
         }
-        ucc_event_manager_subscribe(&schedule->super.super.em,
+        ucc_event_manager_subscribe(&schedule->super.super,
                                     UCC_EVENT_SCHEDULE_STARTED,
                                     &frags[i]->super, ucc_frag_start_handler);
         ucc_event_manager_subscribe(
-            &frags[i]->super.em, UCC_EVENT_COMPLETED_SCHEDULE,
-            &schedule->super.super,
-            ucc_schedule_pipelined_completed_handler);
+            &frags[i]->super, UCC_EVENT_COMPLETED_SCHEDULE,
+            &schedule->super.super, ucc_schedule_pipelined_completed_handler);
     }
     return UCC_OK;
 err:

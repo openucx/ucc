@@ -218,17 +218,17 @@ static ucc_status_t ucc_cl_hier_allreduce_split_rail_frag_init(
 
     task_rs->n_deps = 1;
     ucc_schedule_add_task(schedule, task_rs);
-    ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
+    ucc_event_manager_subscribe(&schedule->super, UCC_EVENT_SCHEDULE_STARTED,
                                 task_rs, ucc_dependency_handler);
 
     task_ar->n_deps = 1;
     ucc_schedule_add_task(schedule, task_ar);
-    ucc_event_manager_subscribe(&task_rs->em, UCC_EVENT_COMPLETED, task_ar,
+    ucc_event_manager_subscribe(task_rs, UCC_EVENT_COMPLETED, task_ar,
                                 ucc_dependency_handler);
 
     task_ag->n_deps = 1;
     ucc_schedule_add_task(schedule, task_ag);
-    ucc_event_manager_subscribe(&task_ar->em, UCC_EVENT_COMPLETED, task_ag,
+    ucc_event_manager_subscribe(task_ar, UCC_EVENT_COMPLETED, task_ag,
                                 ucc_dependency_handler);
 
     schedule->super.post     = ucc_schedule_start;

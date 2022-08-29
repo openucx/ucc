@@ -417,7 +417,7 @@ ucc_tl_ucp_reduce_scatterv_ring_init(ucc_base_coll_args_t *coll_args,
         }
         ctask->n_deps = 1;
         ucc_schedule_add_task(schedule, ctask);
-        ucc_event_manager_subscribe(&schedule->super.em,
+        ucc_event_manager_subscribe(&schedule->super,
                                     UCC_EVENT_SCHEDULE_STARTED, ctask,
                                     ucc_task_start_handler);
     }

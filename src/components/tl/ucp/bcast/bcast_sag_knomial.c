@@ -92,7 +92,7 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
         goto out;
     }
     ucc_schedule_add_task(schedule, task);
-    ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
+    ucc_event_manager_subscribe(&schedule->super, UCC_EVENT_SCHEDULE_STARTED,
                                 task, ucc_task_start_handler);
     rs_task = task;
 
@@ -108,7 +108,7 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
     }
 
     ucc_schedule_add_task(schedule, task);
-    ucc_event_manager_subscribe(&rs_task->em, UCC_EVENT_COMPLETED, task,
+    ucc_event_manager_subscribe(rs_task, UCC_EVENT_COMPLETED, task,
                                 ucc_task_start_handler);
 
     schedule->super.post           = ucc_tl_ucp_bcast_sag_knomial_start;
