@@ -11,36 +11,37 @@
 UCC_CLASS_INIT_FUNC(ucc_cl_basic_team_t, ucc_base_context_t *cl_context,
                     const ucc_base_team_params_t *params)
 {
-    ucc_cl_basic_context_t *ctx =
+    ucc_cl_basic_context_t *ctx       =
         ucc_derived_of(cl_context, ucc_cl_basic_context_t);
+    unsigned                n_tl_ctxs = ctx->super.n_tl_ctxs;
     int                     i;
     ucc_status_t            status;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params);
-    self->tl_teams = ucc_malloc(sizeof(ucc_tl_team_t *) * ctx->n_tl_ctxs,
+    self->tl_teams = ucc_malloc(sizeof(ucc_tl_team_t *) * n_tl_ctxs,
                                 "cl_basic_tl_teams");
     if (!self->tl_teams) {
         cl_error(cl_context->lib, "failed to allocate %zd bytes for tl_teams",
-                 sizeof(ucc_tl_team_t *) * ctx->n_tl_ctxs);
+                 sizeof(ucc_tl_team_t *) * n_tl_ctxs);
         status = UCC_ERR_NO_MEMORY;
         goto err;
     }
     self->n_tl_teams = 0;
     self->score_map  = NULL;
     status           = ucc_team_multiple_req_alloc(&self->team_create_req,
-                                                   ctx->n_tl_ctxs);
+                                                   n_tl_ctxs);
     if (UCC_OK != status) {
         cl_error(cl_context->lib, "failed to allocate team req multiple");
         goto err;
     }
-    for (i = 0; i < ctx->n_tl_ctxs; i++) {
+    for (i = 0; i < n_tl_ctxs; i++) {
         memcpy(&self->team_create_req->descs[i].param, params,
                sizeof(ucc_base_team_params_t));
-        self->team_create_req->descs[i].ctx            = ctx->tl_ctxs[i];
+        self->team_create_req->descs[i].ctx            = ctx->super.tl_ctxs[i];
         self->team_create_req->descs[i].param.scope    = UCC_CL_BASIC;
         self->team_create_req->descs[i].param.scope_id = 0;
     }
-    self->team_create_req->n_teams = ctx->n_tl_ctxs;
+    self->team_create_req->n_teams = n_tl_ctxs;
 
     status = ucc_tl_team_create_multiple(self->team_create_req);
     if (status < 0) {
@@ -112,7 +113,7 @@ ucc_status_t ucc_cl_basic_team_create_test(ucc_base_team_t *cl_team)
 
     status = ucc_tl_team_create_multiple(team->team_create_req);
     if (status == UCC_OK) {
-        for (i = 0; i < ctx->n_tl_ctxs; i++) {
+        for (i = 0; i < ctx->super.n_tl_ctxs; i++) {
             if (team->team_create_req->descs[i].status == UCC_OK) {
                 team->tl_teams[team->n_tl_teams++] =
                     team->team_create_req->descs[i].team;
