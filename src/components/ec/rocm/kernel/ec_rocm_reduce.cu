@@ -5,7 +5,7 @@
  * See file LICENSE for terms.
  */
 
-#include "../ec_rocm.h"
+#include "ec_rocm.h"
 #include "utils/ucc_math_op.h"
 #include <inttypes.h>
 
