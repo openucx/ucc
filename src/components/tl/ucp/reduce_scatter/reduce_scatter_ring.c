@@ -381,32 +381,35 @@ ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
     /* in flight we can have 2 sends from 2 differnt blocks and 1 recv:
        need 3 * max_segcount of scratch per set */
     to_alloc_per_set = max_segcount * 3;
-    status = ucc_mc_alloc(&tl_schedule->scratch_mc_header,
-                          to_alloc_per_set * dt_size * n_subsets, mem_type);
-
-    if (status != UCC_OK) {
-        ucc_tl_ucp_put_schedule(schedule);
-        return status;
-    }
+    UCC_CHECK_GOTO(ucc_mc_alloc(&tl_schedule->scratch_mc_header,
+                                to_alloc_per_set * dt_size * n_subsets,
+                                mem_type),
+                   out, status);
 
     for (i = 0; i < n_subsets; i++) {
-        status = ucc_tl_ucp_reduce_scatter_ring_init_subset(
-            coll_args, team, &ctask, s[i], n_subsets, i,
-            PTR_OFFSET(tl_schedule->scratch_mc_header->addr,
-                       to_alloc_per_set * i * dt_size), max_segcount);
-        if (UCC_OK != status) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team), "failed to allocate ring task");
-            return status;
-        }
+        UCC_CHECK_GOTO(ucc_tl_ucp_reduce_scatter_ring_init_subset(
+                           coll_args, team, &ctask, s[i], n_subsets, i,
+                           PTR_OFFSET(tl_schedule->scratch_mc_header->addr,
+                                      to_alloc_per_set * i * dt_size),
+                           max_segcount),
+                       out_free, status);
         ctask->n_deps = 1;
-        ucc_schedule_add_task(schedule, ctask);
-        ucc_event_manager_subscribe(&schedule->super,
-                                    UCC_EVENT_SCHEDULE_STARTED, ctask,
-                                    ucc_task_start_handler);
+        UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, ctask), out_free,
+                       status);
+        UCC_CHECK_GOTO(ucc_event_manager_subscribe(
+                           &schedule->super, UCC_EVENT_SCHEDULE_STARTED, ctask,
+                           ucc_task_start_handler),
+                       out_free, status);
     }
     schedule->super.flags   |= UCC_COLL_TASK_FLAG_EXECUTOR;
     schedule->super.post     = ucc_tl_ucp_reduce_scatter_ring_sched_post;
     schedule->super.finalize = ucc_tl_ucp_reduce_scatter_ring_sched_finalize;
     *task_h                  = &schedule->super;
     return UCC_OK;
+
+out_free:
+    ucc_mc_free(tl_schedule->scratch_mc_header);
+out:
+    ucc_tl_ucp_put_schedule(schedule);
+    return status;
 }

@@ -107,27 +107,26 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
                                               UCC_TL_TEAM_SIZE(tl_team), count);
 
     /* 1st step of allreduce: knomial reduce_scatter */
-    status = ucc_tl_ucp_reduce_scatter_knomial_init_r(&args, team, &task, radix);
-    if (UCC_OK != status) {
-        tl_error(UCC_TL_TEAM_LIB(tl_team),
-                 "failed to init reduce_scatter_knomial task");
-        goto out;
-    }
-    ucc_schedule_add_task(schedule, task);
-    ucc_task_subscribe_dep(&schedule->super, task, UCC_EVENT_SCHEDULE_STARTED);
+    UCC_CHECK_GOTO(
+        ucc_tl_ucp_reduce_scatter_knomial_init_r(&args, team, &task, radix),
+        out, status);
+
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task), out, status);
+    UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, task,
+                                          UCC_EVENT_SCHEDULE_STARTED),
+                   out, status);
     rs_task = task;
+
     /* 2nd step of allreduce: knomial allgather. 2nd task subscribes
      to completion event of reduce_scatter task. */
     args.args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
     args.args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-    status = ucc_tl_ucp_allgather_knomial_init_r(&args, team, &task, radix);
-    if (UCC_OK != status) {
-        tl_error(UCC_TL_TEAM_LIB(tl_team),
-                 "failed to init allgather_knomial task");
-        goto out;
-    }
-    ucc_schedule_add_task(schedule, task);
-    ucc_task_subscribe_dep(rs_task, task, UCC_EVENT_COMPLETED);
+    UCC_CHECK_GOTO(
+        ucc_tl_ucp_allgather_knomial_init_r(&args, team, &task, radix), out,
+        status);
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task), out, status);
+    UCC_CHECK_GOTO(ucc_task_subscribe_dep(rs_task, task, UCC_EVENT_COMPLETED),
+                   out, status);
     schedule->super.finalize = ucc_tl_ucp_allreduce_sra_knomial_frag_finalize;
     schedule->super.post     = ucc_tl_ucp_allreduce_sra_knomial_frag_start;
     *frag_p                  = schedule;

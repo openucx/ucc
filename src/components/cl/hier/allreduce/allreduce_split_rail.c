@@ -217,19 +217,23 @@ static ucc_status_t ucc_cl_hier_allreduce_split_rail_frag_init(
     }
 
     task_rs->n_deps = 1;
-    ucc_schedule_add_task(schedule, task_rs);
-    ucc_event_manager_subscribe(&schedule->super, UCC_EVENT_SCHEDULE_STARTED,
-                                task_rs, ucc_dependency_handler);
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_rs), err_ag, status);
+    UCC_CHECK_GOTO(ucc_event_manager_subscribe(&schedule->super,
+                                               UCC_EVENT_SCHEDULE_STARTED,
+                                               task_rs, ucc_dependency_handler),
+                   err_ag, status);
 
     task_ar->n_deps = 1;
-    ucc_schedule_add_task(schedule, task_ar);
-    ucc_event_manager_subscribe(task_rs, UCC_EVENT_COMPLETED, task_ar,
-                                ucc_dependency_handler);
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_ar), err_ag, status);
+    UCC_CHECK_GOTO(ucc_event_manager_subscribe(task_rs, UCC_EVENT_COMPLETED,
+                                               task_ar, ucc_dependency_handler),
+                   err_ag, status);
 
     task_ag->n_deps = 1;
-    ucc_schedule_add_task(schedule, task_ag);
-    ucc_event_manager_subscribe(task_ar, UCC_EVENT_COMPLETED, task_ag,
-                                ucc_dependency_handler);
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_ag), err_ag, status);
+    UCC_CHECK_GOTO(ucc_event_manager_subscribe(task_ar, UCC_EVENT_COMPLETED,
+                                               task_ag, ucc_dependency_handler),
+                   err_ag, status);
 
     schedule->super.post     = ucc_schedule_start;
     schedule->super.progress = NULL;

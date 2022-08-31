@@ -182,19 +182,24 @@ ucc_status_t ucc_schedule_pipelined_init(
         for (j = 0; j < frags[i]->n_tasks; j++) {
             frags[i]->tasks[j]->n_deps_base = frags[i]->tasks[j]->n_deps;
             if (n_frags > 1 && sequential) {
-                ucc_event_manager_subscribe(
-                    frags[(i > 0) ? (i - 1) : (n_frags - 1)]->tasks[j],
-                    UCC_EVENT_TASK_STARTED, frags[i]->tasks[j],
-                    ucc_dependency_handler);
+                UCC_CHECK_GOTO(
+                    ucc_event_manager_subscribe(
+                        frags[(i > 0) ? (i - 1) : (n_frags - 1)]->tasks[j],
+                        UCC_EVENT_TASK_STARTED, frags[i]->tasks[j],
+                        ucc_dependency_handler),
+                    err, status);
                 frags[i]->tasks[j]->n_deps_base++;
             }
         }
-        ucc_event_manager_subscribe(&schedule->super.super,
-                                    UCC_EVENT_SCHEDULE_STARTED,
-                                    &frags[i]->super, ucc_frag_start_handler);
-        ucc_event_manager_subscribe(
-            &frags[i]->super, UCC_EVENT_COMPLETED_SCHEDULE,
-            &schedule->super.super, ucc_schedule_pipelined_completed_handler);
+        UCC_CHECK_GOTO(ucc_event_manager_subscribe(
+                           &schedule->super.super, UCC_EVENT_SCHEDULE_STARTED,
+                           &frags[i]->super, ucc_frag_start_handler),
+                       err, status);
+        UCC_CHECK_GOTO(ucc_event_manager_subscribe(
+                           &frags[i]->super, UCC_EVENT_COMPLETED_SCHEDULE,
+                           &schedule->super.super,
+                           ucc_schedule_pipelined_completed_handler),
+                       err, status);
     }
     return UCC_OK;
 err:
