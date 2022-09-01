@@ -55,6 +55,8 @@ typedef struct ucc_em_listener {
 } ucc_em_listener_t;
 
 typedef struct ucc_event_manager {
+    ucc_list_link_t   list_elem;
+    unsigned          n_listeners;
     ucc_em_listener_t listeners[MAX_LISTENERS];
 } ucc_event_manager_t;
 
@@ -76,7 +78,7 @@ typedef struct ucc_coll_task {
      *  by core level to avoid potential races
      */
     ucc_status_t                       status;
-    ucc_event_manager_t                em;
+    ucc_list_link_t                    em_list;
     ucc_base_coll_args_t               bargs;
     ucc_base_team_t                   *team; //CL/TL team pointer
     ucc_schedule_t                    *schedule;
@@ -106,6 +108,7 @@ typedef struct ucc_coll_task {
     uint32_t seq_num;
 } ucc_coll_task_t;
 
+extern struct ucc_mpool_ops ucc_coll_task_mpool_ops;
 typedef struct ucc_context ucc_context_t;
 
 #define UCC_SCHEDULE_MAX_TASKS 8
@@ -118,7 +121,9 @@ typedef struct ucc_schedule {
     ucc_coll_task_t *tasks[UCC_SCHEDULE_MAX_TASKS];
 } ucc_schedule_t;
 
-ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em);
+void ucc_coll_task_construct(ucc_coll_task_t *task);
+
+void ucc_coll_task_destruct(ucc_coll_task_t *task);
 
 ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
                                 ucc_base_coll_args_t *args,
@@ -127,9 +132,10 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
 ucc_status_t ucc_coll_task_get_executor(ucc_coll_task_t *task,
                                         ucc_ee_executor_t **exec);
 
-void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
-                                 ucc_coll_task_t *task,
-                                 ucc_task_event_handler_p handler);
+ucc_status_t ucc_event_manager_subscribe(ucc_coll_task_t *parent_task,
+                                         ucc_event_t event,
+                                         ucc_coll_task_t *task,
+                                         ucc_task_event_handler_p handler);
 
 ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event);
@@ -138,7 +144,7 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule,
                                ucc_base_coll_args_t *bargs,
                                ucc_base_team_t *team);
 
-void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
+ucc_status_t ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
 
 ucc_status_t ucc_schedule_start(ucc_coll_task_t *task);
 
@@ -205,13 +211,16 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
     return status;
 }
 
-static inline void ucc_task_subscribe_dep(ucc_coll_task_t *target,
+static inline ucc_status_t ucc_task_subscribe_dep(ucc_coll_task_t *target,
                                           ucc_coll_task_t *subscriber,
                                           ucc_event_t      event)
 {
-    ucc_event_manager_subscribe(&target->em, event, subscriber,
+    ucc_status_t status =
+    ucc_event_manager_subscribe(target, event, subscriber,
                                 ucc_dependency_handler);
+
     subscriber->n_deps++;
+    return status;
 }
 
 #define UCC_TASK_LIB(_task) (((ucc_coll_task_t *)_task)->team->context->lib)
