@@ -30,9 +30,9 @@ static std::vector<ucc_test_vsize_flag_t> counts_vsize = {TEST_FLAG_VSIZE_32BIT,
 static std::vector<ucc_test_vsize_flag_t> displs_vsize = {TEST_FLAG_VSIZE_32BIT,
                                                           TEST_FLAG_VSIZE_64BIT};
 static size_t msgrange[3] = {8, (1ULL << 21), 8};
-static std::vector<ucc_test_mpi_inplace_t>    inplace    = {TEST_NO_INPLACE};
-static std::vector<ucc_test_mpi_persistent_t> persistent = {TEST_NO_PERSISTENT};
-static std::vector<bool> triggered = {false};
+static std::vector<bool> inplace    = {false};
+static std::vector<bool> persistent = {false};
+static std::vector<bool> triggered  = {false};
 static ucc_test_mpi_root_t root_type = ROOT_RANDOM;
 static int root_value = 10;
 static ucc_thread_mode_t                   thread_mode  = UCC_THREAD_SINGLE;
@@ -272,13 +272,13 @@ static void process_inplace(const char *arg)
     int value = std::stoi(arg);
     switch(value) {
     case 0:
-        inplace = {TEST_NO_INPLACE};
+        inplace = {false};
         return;
     case 1:
-        inplace = {TEST_INPLACE};
+        inplace = {true};
         return;
     case 2:
-        inplace = {TEST_NO_INPLACE, TEST_INPLACE};
+        inplace = {false, true};
         return;
     default:
         break;
@@ -291,13 +291,13 @@ static void process_persistent(const char *arg)
     int value = std::stoi(arg);
     switch(value) {
     case 0:
-        persistent = {TEST_NO_PERSISTENT};
+        persistent = {false};
         return;
     case 1:
-        persistent = {TEST_PERSISTENT};
+        persistent = {true};
         return;
     case 2:
-        persistent = {TEST_NO_PERSISTENT, TEST_PERSISTENT};
+        persistent = {false, true};
         return;
     default:
         break;
@@ -567,8 +567,8 @@ int main(int argc, char *argv[])
 
     PrintInfo();
 
-    for (auto &inpl : inplace) {
-        for (auto &pers : persistent) {
+    for (auto inpl : inplace) {
+        for (auto pers : persistent) {
             for (auto trig: triggered) {
                 test->set_triggered(trig);
                 test->set_inplace(inpl);
@@ -580,8 +580,8 @@ int main(int argc, char *argv[])
 
     if (has_onesided) {
         test->set_colls(onesided_colls);
-        for (auto &inpl : inplace) {
-            for (auto &pers : persistent) {
+        for (auto inpl : inplace) {
+            for (auto pers : persistent) {
                 test->set_triggered(false);
                 test->set_inplace(inpl);
                 test->set_persistent(pers);

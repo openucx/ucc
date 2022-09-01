@@ -130,9 +130,9 @@ std::string TestCase::str() {
             " team=" + team_str(team.type) +
             " mtype=" + ucc_memory_type_names[mem_type] +
             " msgsize=" + std::to_string(msgsize) +
-            " persistent=" + (persistent == TEST_PERSISTENT ? "1" : "0");
+            " persistent=" + (persistent ? "1" : "0");
     if (ucc_coll_inplace_supported(args.coll_type)) {
-        _str += std::string(" inplace=") + (inplace == TEST_INPLACE ? "1" : "0");
+        _str += std::string(" inplace=") + (inplace ? "1" : "0");
     }
     if (ucc_coll_is_rooted(args.coll_type)) {
         _str += std::string(" root=") + std::to_string(root);

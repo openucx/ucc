@@ -28,12 +28,12 @@ TestGather::TestGather(ucc_test_team_t &_team, TestCaseParams &params) :
     if (rank == root) {
         UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize * size, mem_type));
         rbuf = rbuf_mc_header->addr;
-        if (TEST_NO_INPLACE == inplace) {
-            UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
-            sbuf = sbuf_mc_header->addr;
-        } else {
+        if (inplace) {
             sbuf_mc_header = NULL;
             sbuf = NULL;
+        } else {
+            UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
+            sbuf = sbuf_mc_header->addr;
         }
     } else {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
@@ -51,7 +51,7 @@ TestGather::TestGather(ucc_test_team_t &_team, TestCaseParams &params) :
         args.dst.info.count    = single_rank_count * size;
         args.dst.info.datatype = TEST_DT;
         args.dst.info.mem_type = mem_type;
-        if (TEST_NO_INPLACE == inplace) {
+        if (!inplace) {
             args.src.info.buffer   = sbuf;
             args.src.info.count    = single_rank_count;
             args.src.info.datatype = TEST_DT;
@@ -78,10 +78,10 @@ ucc_status_t TestGather::set_input(int iter_persistent)
 
     MPI_Comm_rank(team.comm, &rank);
     if (rank == root) {
-        if (inplace == TEST_NO_INPLACE) {
-            buf = sbuf;
-        } else {
+        if (inplace) {
             buf = PTR_OFFSET(rbuf, rank * single_rank_size);
+        } else {
+            buf = sbuf;
         }
     } else {
         buf = sbuf;

@@ -123,8 +123,8 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
     ops        = {UCC_OP_SUM, UCC_OP_MAX};
     colls      = {UCC_COLL_TYPE_BARRIER, UCC_COLL_TYPE_ALLREDUCE};
     mtypes     = {UCC_MEMORY_TYPE_HOST};
-    inplace    = TEST_NO_INPLACE;
-    persistent = TEST_NO_PERSISTENT;
+    inplace    = false;
+    persistent = false;
     root_type  = ROOT_RANDOM;
     root_value = 10;
     iterations = 1;
@@ -305,16 +305,6 @@ int ucc_coll_inplace_supported(ucc_coll_type_t c)
     }
 }
 
-int ucc_coll_persistent_supported(ucc_coll_type_t c)
-{
-    switch(c) {
-    case UCC_COLL_TYPE_BARRIER:
-        return 0;
-    default:
-        return 1;
-    }
-}
-
 bool ucc_coll_triggered_supported(ucc_memory_type_t mt)
 {
     if (mt == UCC_MEMORY_TYPE_CUDA) {
@@ -459,9 +449,9 @@ void set_gpu_device(test_set_gpu_device_t set_device)
 
 std::vector<ucc_status_t> UccTestMpi::exec_tests(
         std::vector<std::shared_ptr<TestCase>> tcs, bool triggered,
-                                                    int  persistent)
+                                                    bool persistent)
 {
-    int n_persistent = persistent ? 4 : 1;
+    int n_persistent = persistent ? UCC_TEST_N_PERSISTENT : 1;
     int world_rank, num_done, i;
     ucc_status_t status;
 
@@ -537,9 +527,7 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
             std::vector<ucc_test_vsize_flag_t> test_displ_vsize = {TEST_FLAG_VSIZE_64BIT};
             void **onesided_bufs;
 
-            if ((inplace == TEST_INPLACE && !ucc_coll_inplace_supported(c)) ||
-                (persistent == TEST_PERSISTENT &&
-                 !ucc_coll_persistent_supported(c))) {
+            if (inplace && !ucc_coll_inplace_supported(c)) {
                 continue;
             }
 

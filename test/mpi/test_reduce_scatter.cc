@@ -30,7 +30,11 @@ TestReduceScatter::TestReduceScatter(ucc_test_team_t &_team,
     count   = count - (count % comm_size);
     msgsize = count * dt_size;
 
-    if (TEST_NO_INPLACE == inplace) {
+    if (inplace) {
+        args.dst.info.count = count;
+        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize, mem_type));
+        rbuf = rbuf_mc_header->addr;
+    } else {
         args.dst.info.count = count / comm_size;
         UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize / comm_size, mem_type));
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
@@ -40,10 +44,6 @@ TestReduceScatter::TestReduceScatter(ucc_test_team_t &_team,
         args.src.info.count    = count;
         args.src.info.datatype = dt;
         args.src.info.mem_type = mem_type;
-    } else {
-        args.dst.info.count = count;
-        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize, mem_type));
-        rbuf = rbuf_mc_header->addr;
     }
 
     args.op                = op;
@@ -62,10 +62,10 @@ ucc_status_t TestReduceScatter::set_input(int iter_persistent)
     int    rank;
 
     MPI_Comm_rank(team.comm, &rank);
-    if (TEST_NO_INPLACE == inplace) {
-        buf = sbuf;
-    } else {
+    if (inplace) {
         buf = rbuf;
+    } else {
+        buf = sbuf;
     }
     init_buffer(buf, count, dt, mem_type, rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
@@ -113,8 +113,8 @@ std::string TestReduceScatter::str() {
     return std::string("tc=")+ucc_coll_type_str(args.coll_type) +
         " team=" + team_str(team.type) +
         " msgsize=" + std::to_string(msgsize) +
-        " inplace=" + (inplace == TEST_INPLACE ? "1" : "0") +
-        " persistent=" + (persistent == TEST_PERSISTENT ? "1" : "0") +
+        " inplace=" + (inplace ? "1" : "0") +
+        " persistent=" + (persistent ? "1" : "0") +
         " dt=" + ucc_datatype_str(dt) +
         " op=" + ucc_reduction_op_str(op);
 }

@@ -28,7 +28,7 @@ TestAllgather::TestAllgather(ucc_test_team_t &_team, TestCaseParams &params) :
     rbuf      = rbuf_mc_header->addr;
     check_buf = ucc_malloc(msgsize * size, "check buf");
     UCC_MALLOC_CHECK(check_buf);
-    if (TEST_NO_INPLACE == inplace) {
+    if (!inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
         sbuf                   = sbuf_mc_header->addr;
         args.src.info.buffer   = sbuf;
@@ -53,10 +53,10 @@ ucc_status_t TestAllgather::set_input(int iter_persistent)
     void  *buf, *check;
 
     MPI_Comm_rank(team.comm, &rank);
-    if (inplace == TEST_NO_INPLACE) {
-        buf   = sbuf;
-    } else {
+    if (inplace) {
         buf   = PTR_OFFSET(rbuf, rank * single_rank_size);
+    } else {
+        buf   = sbuf;
     }
     check = PTR_OFFSET(check_buf, rank * single_rank_size);
 

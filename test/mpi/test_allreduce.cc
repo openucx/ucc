@@ -27,7 +27,7 @@ TestAllreduce::TestAllreduce(ucc_test_team_t &_team, TestCaseParams &params) :
     rbuf      = rbuf_mc_header->addr;
     check_buf = ucc_malloc(msgsize, "check buf");
     UCC_MALLOC_CHECK(check_buf);
-    if (TEST_NO_INPLACE == inplace) {
+    if (!inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
         sbuf                   = sbuf_mc_header->addr;
         args.src.info.buffer   = sbuf;
@@ -58,10 +58,10 @@ ucc_status_t TestAllreduce::set_input(int iter_persistent)
     void  *buf;
 
     MPI_Comm_rank(team.comm, &rank);
-    if (TEST_NO_INPLACE == inplace) {
-        buf = sbuf;
-    } else {
+    if (inplace) {
         buf = rbuf;
+    } else {
+        buf = sbuf;
     }
     init_buffer(buf, count, dt, mem_type, rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
@@ -80,7 +80,6 @@ ucc_status_t TestAllreduce::check()
     MPI_Iallreduce(MPI_IN_PLACE, check_buf, count, ucc_dt_to_mpi(dt),
                    op == UCC_OP_AVG ? MPI_SUM : ucc_op_to_mpi(op), team.comm,
                    &req);
-
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
@@ -100,8 +99,8 @@ std::string TestAllreduce::str() {
     return std::string("tc=") + ucc_coll_type_str(args.coll_type) +
         " team=" + team_str(team.type) +
         " msgsize=" + std::to_string(msgsize) +
-        " inplace=" + (inplace == TEST_INPLACE ? "1" : "0") +
-        " persistent=" + (persistent == TEST_PERSISTENT ? "1" : "0") +
+        " inplace=" + (inplace ? "1" : "0") +
+        " persistent=" + (persistent ? "1" : "0") +
         " dt=" + ucc_datatype_str(dt) +
         " op=" + ucc_reduction_op_str(op);
 }

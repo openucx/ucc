@@ -59,13 +59,12 @@ static ucc_status_t ucc_check_coll_args(const ucc_coll_args_t *coll_args,
         }
         break;
     case UCC_COLL_TYPE_BCAST:
-        if (UCC_IS_INPLACE(*coll_args)) {
-            ucc_warn("Inplace not supported in bcast");
-        }
-        break;
     case UCC_COLL_TYPE_BARRIER:
+    case UCC_COLL_TYPE_FANIN:
+    case UCC_COLL_TYPE_FANOUT:
         if (UCC_IS_INPLACE(*coll_args)) {
-            ucc_warn("Inplace not supported in barrier");
+            ucc_warn("Inplace flag for %s is not defined by UCC API",
+                     ucc_coll_type_str(coll_args->coll_type));
         }
         break;
     default:

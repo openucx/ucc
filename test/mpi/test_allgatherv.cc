@@ -60,7 +60,7 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_MALLOC_CHECK(check_buf);
     fill_counts_and_displacements(size, count, counts, displacements);
 
-    if (TEST_NO_INPLACE == inplace) {
+    if (!inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, counts[rank] * dt_size, mem_type));
         sbuf                   = sbuf_mc_header->addr;
         args.src.info.buffer   = sbuf;
@@ -84,10 +84,10 @@ ucc_status_t TestAllgatherv::set_input(int iter_persistent)
     void  *buf, *check;
 
     MPI_Comm_rank(team.comm, &rank);
-    if (inplace == TEST_NO_INPLACE) {
-        buf = sbuf;
-    } else {
+    if (inplace) {
         buf = PTR_OFFSET(rbuf, displacements[rank] * dt_size);
+    } else {
+        buf = sbuf;
     }
     check = PTR_OFFSET(check_buf, displacements[rank] * dt_size);
     init_buffer(buf, counts[rank], TEST_DT, mem_type,

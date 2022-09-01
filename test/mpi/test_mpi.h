@@ -89,6 +89,7 @@ extern int test_rand_seed;
 }
 #endif
 
+#define UCC_TEST_N_PERSISTENT 4
 #define UCC_TEST_N_MEM_SEGMENTS   3
 #define UCC_TEST_MEM_SEGMENT_SIZE (1 << 21)
 
@@ -105,16 +106,6 @@ typedef enum {
     TEAM_SPLIT_ODD_EVEN,
     TEAM_LAST
 } ucc_test_mpi_team_t;
-
-typedef enum {
-    TEST_NO_INPLACE,
-    TEST_INPLACE
-} ucc_test_mpi_inplace_t;
-
-typedef enum {
-    TEST_NO_PERSISTENT,
-    TEST_PERSISTENT
-} ucc_test_mpi_persistent_t;
 
 typedef enum {
     ROOT_SINGLE,
@@ -256,8 +247,8 @@ typedef struct ucc_test_team {
 
 struct TestCaseParams {
     size_t msgsize;
-    ucc_test_mpi_inplace_t inplace;
-    ucc_test_mpi_persistent_t persistent;
+    bool inplace;
+    bool persistent;
     ucc_datatype_t dt;
     ucc_reduction_op_t op;
     ucc_memory_type_t mt;
@@ -274,8 +265,8 @@ protected:
     ucc_memory_type_t mem_type;
     int root;
     size_t msgsize;
-    ucc_test_mpi_inplace_t inplace;
-    ucc_test_mpi_persistent_t persistent;
+    bool inplace;
+    bool persistent;
     ucc_coll_args_t args;
     ucc_coll_req_h req;
     ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header;
@@ -318,8 +309,8 @@ class UccTestMpi {
     ucc_lib_h                 lib;
     int                       nt;
     ucc_lib_h                 onesided_lib;
-    ucc_test_mpi_inplace_t    inplace;
-    ucc_test_mpi_persistent_t persistent;
+    bool                      inplace;
+    bool                      persistent;
     ucc_test_mpi_root_t       root_type;
     int                       root_value;
     int                       iterations;
@@ -340,7 +331,7 @@ class UccTestMpi {
     std::vector<ucc_test_vsize_flag_t> displs_vsize;
     std::vector<ucc_status_t> exec_tests(
             std::vector<std::shared_ptr<TestCase>> tcs,
-            bool triggered, int persistent);
+            bool triggered, bool persistent);
 public:
     std::vector<ucc_test_team_t> teams;
     std::vector<ucc_test_team_t> onesided_teams;
@@ -356,11 +347,11 @@ public:
     void set_verbose(bool verbose);
     void set_ops(std::vector<ucc_reduction_op_t> &_ops);
     void set_mtypes(std::vector<ucc_memory_type_t> &_mtypes);
-    void set_inplace(ucc_test_mpi_inplace_t _inplace)
+    void set_inplace(bool _inplace)
     {
         inplace = _inplace;
     }
-    void set_persistent(ucc_test_mpi_persistent_t _persistent)
+    void set_persistent(bool _persistent)
     {
         persistent = _persistent;
     }
@@ -416,6 +407,7 @@ public:
 };
 
 class TestAlltoall : public TestCase {
+    bool is_onesided;
 public:
     TestAlltoall(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input(int iter_persistent = 0) override;

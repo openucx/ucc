@@ -62,13 +62,13 @@ TestScatterv::TestScatterv(ucc_test_team_t &_team, TestCaseParams &params) :
     if (rank == root) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, count * size * dt_size, mem_type));
         sbuf = sbuf_mc_header->addr;
-        if (TEST_NO_INPLACE == inplace) {
+        if (inplace) {
+            rbuf_mc_header = NULL;
+            rbuf = NULL;
+        } else {
             UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, counts[rank] * dt_size,
                                    mem_type));
             rbuf = rbuf_mc_header->addr;
-        } else {
-            rbuf_mc_header = NULL;
-            rbuf = NULL;
         }
     } else {
         UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, counts[rank] * dt_size, mem_type));
@@ -86,7 +86,7 @@ TestScatterv::TestScatterv(ucc_test_team_t &_team, TestCaseParams &params) :
         args.src.info_v.displacements = (ucc_aint_t*)displacements;
         args.src.info_v.datatype      = TEST_DT;
         args.src.info_v.mem_type      = mem_type;
-        if (TEST_NO_INPLACE == inplace) {
+        if (!inplace) {
             args.dst.info.buffer   = rbuf;
             args.dst.info.count    = counts[rank];
             args.dst.info.datatype = TEST_DT;
@@ -151,12 +151,13 @@ ucc_status_t TestScatterv::check()
     } while(!completed);
 
     if (rank == root) {
-        if (TEST_INPLACE == inplace) {
+        if (inplace) {
             return compare_buffers(sbuf, check_buf, count * size,
                                    TEST_DT, mem_type);
         } else {
             return compare_buffers(rbuf,
-                                   PTR_OFFSET(check_buf, displacements[rank] * dt_size),
+                                   PTR_OFFSET(check_buf,
+                                              displacements[rank] * dt_size),
                                    counts[rank], TEST_DT, mem_type);
         }
     } else {
