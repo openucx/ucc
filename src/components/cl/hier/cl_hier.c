@@ -63,6 +63,11 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
      ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_rab_pipeline),
      UCC_CONFIG_TYPE_PIPELINE_PARAMS},
 
+    {"BCAST_2STEP_PIPELINE", "n",
+     "Pipelining settings for RAB bcast algorithm",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, bcast_2step_pipeline),
+     UCC_CONFIG_TYPE_PIPELINE_PARAMS},
+
     {NULL}};
 
 static ucs_config_field_t ucc_cl_hier_context_config_table[] = {

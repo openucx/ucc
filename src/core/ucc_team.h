@@ -105,6 +105,11 @@ static inline ucc_rank_t ucc_get_ctx_rank(ucc_team_t *team, ucc_rank_t team_rank
     return ucc_ep_map_eval(team->ctx_map, team_rank);
 }
 
+static inline ucc_host_id_t ucc_team_rank_host_id(ucc_rank_t rank, ucc_team_t *team)
+{
+    return team->topo->topo->procs[ucc_get_ctx_rank(team, rank)].host_id;
+}
+
 static inline int ucc_team_ranks_on_same_node(ucc_rank_t rank1, ucc_rank_t rank2,
                                               ucc_team_t *team)
 {
