@@ -96,10 +96,10 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_pipeline_depth),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ALLREDUCE_SRA_KN_SEQUENTIAL", "n",
-     "Type of pipelined schedule for SRA knomial alg (sequential/parallel)",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_seq),
-     UCC_CONFIG_TYPE_BOOL},
+    {"ALLREDUCE_SRA_KN_PIPELINE_ORDER", "parallel",
+     "Type of pipelined schedule for SRA knomial alg (sequential/ordered/parallel)",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_pipeline_order),
+     UCC_CONFIG_TYPE_ENUM(ucc_pipeline_order_names)},
 
     {"REDUCE_SCATTER_KN_RADIX", "4",
      "Radix of the knomial reduce-scatter algorithm",

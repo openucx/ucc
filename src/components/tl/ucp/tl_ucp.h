@@ -11,6 +11,7 @@
 #include "core/ucc_ee.h"
 #include "utils/ucc_mpool.h"
 #include "tl_ucp_ep_hash.h"
+#include "schedule/ucc_schedule_pipelined.h"
 #include <ucp/api/ucp.h>
 #include <ucs/memory/memory_type.h>
 
@@ -41,30 +42,30 @@ typedef struct ucc_tl_ucp_iface {
 extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 
 typedef struct ucc_tl_ucp_lib_config {
-    ucc_tl_lib_config_t super;
-    uint32_t            kn_radix;
-    uint32_t            fanin_kn_radix;
-    uint32_t            fanout_kn_radix;
-    uint32_t            barrier_kn_radix;
-    uint32_t            allreduce_kn_radix;
-    uint32_t            allreduce_sra_kn_radix;
-    uint32_t            reduce_scatter_kn_radix;
-    uint32_t            allgather_kn_radix;
-    uint32_t            bcast_kn_radix;
-    uint32_t            bcast_sag_kn_radix;
-    uint32_t            reduce_kn_radix;
-    uint32_t            gather_kn_radix;
-    uint32_t            scatter_kn_radix;
-    uint32_t            alltoall_pairwise_num_posts;
-    uint32_t            alltoallv_pairwise_num_posts;
-    uint32_t            allreduce_sra_kn_n_frags;
-    uint32_t            allreduce_sra_kn_pipeline_depth;
-    int                 allreduce_sra_kn_seq;
-    size_t              allreduce_sra_kn_frag_thresh;
-    size_t              allreduce_sra_kn_frag_size;
-    int                 reduce_avg_pre_op;
-    int                 reduce_scatter_ring_bidirectional;
-    int                 reduce_scatterv_ring_bidirectional;
+    ucc_tl_lib_config_t  super;
+    uint32_t             kn_radix;
+    uint32_t             fanin_kn_radix;
+    uint32_t             fanout_kn_radix;
+    uint32_t             barrier_kn_radix;
+    uint32_t             allreduce_kn_radix;
+    uint32_t             allreduce_sra_kn_radix;
+    uint32_t             reduce_scatter_kn_radix;
+    uint32_t             allgather_kn_radix;
+    uint32_t             bcast_kn_radix;
+    uint32_t             bcast_sag_kn_radix;
+    uint32_t             reduce_kn_radix;
+    uint32_t             gather_kn_radix;
+    uint32_t             scatter_kn_radix;
+    uint32_t             alltoall_pairwise_num_posts;
+    uint32_t             alltoallv_pairwise_num_posts;
+    uint32_t             allreduce_sra_kn_n_frags;
+    uint32_t             allreduce_sra_kn_pipeline_depth;
+    ucc_pipeline_order_t allreduce_sra_kn_pipeline_order;
+    size_t               allreduce_sra_kn_frag_thresh;
+    size_t               allreduce_sra_kn_frag_size;
+    int                  reduce_avg_pre_op;
+    int                  reduce_scatter_ring_bidirectional;
+    int                  reduce_scatterv_ring_bidirectional;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {

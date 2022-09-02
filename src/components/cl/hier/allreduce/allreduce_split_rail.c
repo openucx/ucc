@@ -216,23 +216,19 @@ static ucc_status_t ucc_cl_hier_allreduce_split_rail_frag_init(
         goto err_ag;
     }
 
-    task_rs->n_deps = 1;
     UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_rs), err_ag, status);
-    UCC_CHECK_GOTO(ucc_event_manager_subscribe(&schedule->super,
-                                               UCC_EVENT_SCHEDULE_STARTED,
-                                               task_rs, ucc_dependency_handler),
+    UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, task_rs,
+                                          UCC_EVENT_SCHEDULE_STARTED),
                    err_ag, status);
 
-    task_ar->n_deps = 1;
     UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_ar), err_ag, status);
-    UCC_CHECK_GOTO(ucc_event_manager_subscribe(task_rs, UCC_EVENT_COMPLETED,
-                                               task_ar, ucc_dependency_handler),
+    UCC_CHECK_GOTO(ucc_task_subscribe_dep(task_rs, task_ar,
+                                          UCC_EVENT_COMPLETED),
                    err_ag, status);
 
-    task_ag->n_deps = 1;
     UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_ag), err_ag, status);
-    UCC_CHECK_GOTO(ucc_event_manager_subscribe(task_ar, UCC_EVENT_COMPLETED,
-                                               task_ag, ucc_dependency_handler),
+    UCC_CHECK_GOTO(ucc_task_subscribe_dep(task_ar, task_ag,
+                                          UCC_EVENT_COMPLETED),
                    err_ag, status);
 
     schedule->super.post     = ucc_schedule_start;
@@ -327,7 +323,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_split_rail_init,
     status = ucc_schedule_pipelined_init(
         coll_args, team, ucc_cl_hier_allreduce_split_rail_frag_init,
         ucc_cl_hier_allreduce_split_rail_frag_setup, pipeline_depth, n_frags,
-        cfg->allreduce_split_rail_seq, &schedule->super);
+        cfg->allreduce_split_rail_pipeline_order, &schedule->super);
 
     if (ucc_unlikely(status != UCC_OK)) {
         cl_error(team->context->lib,

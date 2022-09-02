@@ -209,7 +209,7 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
     status = ucc_schedule_pipelined_init(
         &bargs, team, ucc_tl_ucp_allreduce_sra_knomial_frag_init,
         ucc_tl_ucp_allreduce_sra_knomial_frag_setup, pipeline_depth, n_frags,
-        cfg->allreduce_sra_kn_seq, schedule_p);
+        cfg->allreduce_sra_kn_pipeline_order, schedule_p);
     if (UCC_OK != status) {
         tl_error(team->context->lib, "failed to init pipelined schedule");
         ucc_tl_ucp_put_schedule(&schedule_p->super);
