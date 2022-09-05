@@ -12,6 +12,35 @@
 #include "schedule/ucc_schedule_pipelined.h"
 #include "utils/ucc_string.h"
 
+#define UCC_ADD_KEY_VALUE_TO_HASH(_type, _h, _name, _val)            \
+    khiter_t _iter;                                                  \
+    int      _res;                                                   \
+    char    *_dup;                                                   \
+    _iter = kh_get(_type, _h, _name);                                \
+    if (_iter != kh_end(_h)) {                                       \
+        ucc_warn("found duplicate '%s' in config file", _name);      \
+        return 0;                                                    \
+    } else {                                                         \
+        _dup = strdup(_name);                                        \
+        if (!_dup) {                                                 \
+            ucc_error("failed to dup str for kh_put");               \
+            return 0;                                                \
+        }                                                            \
+        _iter = kh_put(_type, _h, _dup, &_res);                      \
+        if (_res == UCS_KH_PUT_FAILED) {                             \
+            ucc_free(_dup);                                          \
+            ucc_error("inserting '%s' to config map failed", _name); \
+            return 0;                                                \
+        }                                                            \
+    }                                                                \
+    _dup = strdup(_val);                                             \
+    if (!_dup) {                                                     \
+        ucc_error("failed to dup str for kh_val");                   \
+        return 0;                                                    \
+    }                                                                \
+    kh_val(_h, _iter) = _dup;                                        \
+    return 1;
+
 ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
                                           const ucc_config_names_array_t *src)
 {
@@ -139,19 +168,76 @@ ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
 }
 
 KHASH_MAP_INIT_STR(ucc_cfg_file, char *);
+KHASH_MAP_INIT_STR(ucc_sec, char *);
+KHASH_MAP_INIT_STR(ucc_sections, khash_t(ucc_sec) *);
 
 typedef struct ucc_file_config {
     khash_t(ucc_cfg_file) vars;
+    khash_t(ucc_sections)  sections;
 } ucc_file_config_t;
 
-static int ucc_file_parse_handler(void *arg, const char *section, //NOLINT
+static int ucc_file_parse_handler(void *arg, const char *section,
                                   const char *name, const char *value)
 {
-    ucc_file_config_t *cfg      = arg;
-    khash_t(ucc_cfg_file) *vars = &cfg->vars;
+    ucc_file_config_t *cfg          = arg;
+    khash_t(ucc_cfg_file) *vars     = &cfg->vars;
+    khash_t(ucc_sections) *sections = &cfg->sections;
+    khash_t(ucc_sec)      *cfg_section;
     khiter_t iter;
     int      result;
     char    *dup;
+
+    if (strcmp(section,"") != 0) {
+        /* has section */
+        printf("section = %s, name = %s, value = %s\n", section, name, value);
+
+        iter = kh_get(ucc_sections, sections, section);
+        if (iter == kh_end(sections)) { /*checks if section has table already exists */
+            cfg_section = ucc_calloc(1, sizeof(*cfg_section), "section_"+section+"_cfg");
+            if (!cfg_section) {
+                ucc_error("failed to allocate %zd bytes for file config", sizeof(*cfg_section));
+                return UCC_ERR_NO_MEMORY; //0?
+            }
+            kh_init_inplace(ucc_sec, cfg_section);  // new hash table for section, how to make section name similar to ucc_cfg_file?
+            dup = strdup(section);
+            iter = kh_put(ucc_sections, sections, dup, &result); //adding section to original hash table
+            if (result == UCS_KH_PUT_FAILED) {
+                ucc_free(dup);
+                ucc_error("inserting '%s' to config map failed", name);
+                return 0;
+            }
+            kh_val(sections, iter) = cfg_section; //putting the new hashtable in as value for section , like this? how/when to freecfg_section?
+        } else {
+        	iter = kh_get(ucc_sections, sections, section);
+        	cfg_section = kh_val(sections, iter);//sections->vals[iter];
+        }
+//        iter = kh_get(ucc_sec, cfg_section, name); //ucc_cfg_file vs section?
+//        if (iter != kh_end(cfg_section)) {
+////        	printf("iter = %d, end = %d\n", *(int*)iter, *(int*)kh_end(cfg_section));
+//            ucc_warn("found duplicate '%s' in config file", name);
+//            return 0;
+//        } else {
+//            dup = strdup(name);
+//            if (!dup) {
+//                ucc_error("failed to dup str for kh_put");
+//                return 0;
+//            }
+//            iter = kh_put(ucc_sec, cfg_section, dup, &result);
+//            if (result == UCS_KH_PUT_FAILED) {
+//                ucc_free(dup);
+//                ucc_error("inserting '%s' to config map failed", name);
+//                return 0;
+//            }
+//        }
+//        dup = strdup(value);
+//        if (!dup) {
+//            ucc_error("failed to dup str for kh_val");
+//            return 0;
+//        }
+//        kh_val(cfg_section, iter) = dup;
+//        return 1;
+        UCC_ADD_KEY_VALUE_TO_HASH(ucc_sec, cfg_section, name, value);
+    }
 
     if (!name) {
         return 1;
@@ -169,30 +255,31 @@ static int ucc_file_parse_handler(void *arg, const char *section, //NOLINT
         return 0;
     }
 
-    iter = kh_get(ucc_cfg_file, vars, name);
-    if (iter != kh_end(vars)) {
-        ucc_warn("found duplicate '%s' in config file", name);
-        return 0;
-    } else {
-        dup = strdup(name);
-        if (!dup) {
-            ucc_error("failed to dup str for kh_put");
-            return 0;
-        }
-        iter = kh_put(ucc_cfg_file, vars, dup, &result);
-        if (result == UCS_KH_PUT_FAILED) {
-            ucc_free(dup);
-            ucc_error("inserting '%s' to config map failed", name);
-            return 0;
-        }
-    }
-    dup = strdup(value);
-    if (!dup) {
-        ucc_error("failed to dup str for kh_val");
-        return 0;
-    }
-    kh_val(vars, iter) = dup; //NOLINT
-    return 1;
+//    iter = kh_get(ucc_cfg_file, vars, name);
+//    if (iter != kh_end(vars)) {
+//        ucc_warn("found duplicate '%s' in config file", name);
+//        return 0;
+//    } else {
+//        dup = strdup(name);
+//        if (!dup) {
+//            ucc_error("failed to dup str for kh_put");
+//            return 0;
+//        }
+//        iter = kh_put(ucc_cfg_file, vars, dup, &result);
+//        if (result == UCS_KH_PUT_FAILED) {
+//            ucc_free(dup);
+//            ucc_error("inserting '%s' to config map failed", name);
+//            return 0;
+//        }
+//    }
+//    dup = strdup(value);
+//    if (!dup) {
+//        ucc_error("failed to dup str for kh_val");
+//        return 0;
+//    }
+//    kh_val(vars, iter) = dup;
+//    return 1;
+    UCC_ADD_KEY_VALUE_TO_HASH(ucc_cfg_file, vars, name, value);
 }
 
 ucc_status_t ucc_parse_file_config(const char *        filename,
@@ -201,6 +288,7 @@ ucc_status_t ucc_parse_file_config(const char *        filename,
     ucc_file_config_t *cfg;
     int                ret;
     ucc_status_t       status;
+//    volatile int flag = 1;
 
     cfg = ucc_calloc(1, sizeof(*cfg), "file_cfg");
     if (!cfg) {
@@ -208,6 +296,7 @@ ucc_status_t ucc_parse_file_config(const char *        filename,
         return UCC_ERR_NO_MEMORY;
     }
     kh_init_inplace(ucc_cfg_file, &cfg->vars);
+    kh_init_inplace(ucc_sections, &cfg->sections);
     ret = ini_parse(filename, ucc_file_parse_handler, cfg);
     if (-1 == ret) {
         /* according to ucs/ini.h -1 means error in
@@ -219,7 +308,7 @@ ucc_status_t ucc_parse_file_config(const char *        filename,
         status = UCC_ERR_INVALID_PARAM;
         goto out;
     }
-
+//    while(flag) {}
     *cfg_p = cfg;
     return UCC_OK;
 out:
@@ -229,13 +318,28 @@ out:
 
 void ucc_release_file_config(ucc_file_config_t *cfg)
 {
-    const char *key;
-    char *      value;
+    const char *key, *section_key;
+    char       *value, *section_val;
+    khash_t(ucc_sec) *section;
+    int j;
 
     kh_foreach(&cfg->vars, key, value, {
         ucc_free((void *)key);
         ucc_free(value);
     }) kh_destroy_inplace(ucc_cfg_file, &cfg->vars);
+
+    kh_foreach(&cfg->sections, key, section, {
+        for (j = kh_begin(section); j != kh_end(section); ++j) {
+        	if (!kh_exist(section, j)) continue;
+        	section_key = kh_key(section, j);
+        	section_val = kh_val(section, j);
+        	ucc_free((void *)section_key);
+        	ucc_free(section_val);
+        }
+        ucc_free((void *)key);
+        kh_destroy_inplace(ucc_sec, section);
+    }) kh_destroy_inplace(ucc_sections, &cfg->sections);
+
     ucc_free(cfg);
 }
 
@@ -263,6 +367,8 @@ static ucc_status_t ucc_apply_file_cfg_value(void *              opts,
     size_t      left = sizeof(var);
     const char *base_prefix_var;
     const char *cfg_value;
+    volatile int flag = 1;
+    while (flag) {}
 
     ucc_strncpy_safe(var, base_prefix, left);
     left -= strlen(base_prefix);
