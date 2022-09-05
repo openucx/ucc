@@ -53,6 +53,7 @@ typedef struct ucc_cl_hier_lib_config {
     ucc_pipeline_params_t   allreduce_split_rail_pipeline;
     ucc_pipeline_params_t   allreduce_rab_pipeline;
     ucc_pipeline_params_t   bcast_2step_pipeline;
+    ucc_pipeline_params_t   reduce_2step_pipeline;
 } ucc_cl_hier_lib_config_t;
 
 typedef struct ucc_cl_hier_context_config {

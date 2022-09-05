@@ -68,6 +68,11 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
      ucc_offsetof(ucc_cl_hier_lib_config_t, bcast_2step_pipeline),
      UCC_CONFIG_TYPE_PIPELINE_PARAMS},
 
+    {"REDUCE_2STEP_PIPELINE", "n",
+     "Pipelining settings for RAB reduce algorithm",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, reduce_2step_pipeline),
+     UCC_CONFIG_TYPE_PIPELINE_PARAMS},
+
     {NULL}};
 
 static ucs_config_field_t ucc_cl_hier_context_config_table[] = {
