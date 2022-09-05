@@ -19,6 +19,7 @@
 #define ucc_list_extract_head  ucs_list_extract_head
 #define ucc_list_length        ucs_list_length
 #define ucc_list_head          ucs_list_head
+#define ucc_list_tail          ucs_list_tail
 #define ucc_list_next          ucs_list_next
 #define ucc_list_insert_after  ucs_list_insert_after
 #define ucc_list_insert_before ucs_list_insert_before

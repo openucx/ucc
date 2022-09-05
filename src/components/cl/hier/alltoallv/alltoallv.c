@@ -160,10 +160,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
     }
     schedule = &cl_schedule->super.super;
     memcpy(&args, coll_args, sizeof(args));
-    status = ucc_schedule_init(schedule, &args, team);
-    if (ucc_unlikely(UCC_OK != status)) {
-        goto error;
-    }
+    UCC_CHECK_GOTO(ucc_schedule_init(schedule, &args, team), error, status);
 
     full_size = cl_team->sbgps[UCC_HIER_SBGP_FULL].sbgp->group_size;
     node_size = cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp->group_size;
@@ -209,12 +206,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
     args.args.src.info_v.displacements = (ucc_aint_t *)sd_full;
     args.args.dst.info_v.displacements = (ucc_aint_t *)rd_full;
 
-    status = ucc_coll_init(cl_team->sbgps[UCC_HIER_SBGP_FULL].score_map, &args,
-                           &task_full);
-    if (UCC_OK != status) {
-        cl_error(team->context->lib, "failed to init full a2av task");
-        goto err_init_1;
-    }
+    UCC_CHECK_GOTO(ucc_coll_init(cl_team->sbgps[UCC_HIER_SBGP_FULL].score_map,
+                                 &args, &task_full),
+                   err_init_1, status);
 
     /* Setup NODE a2av */
     sbgp = cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp;
@@ -232,18 +226,20 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
     args.args.dst.info_v.counts        = (ucc_aint_t *)rc_node;
     args.args.src.info_v.displacements = (ucc_aint_t *)sd_node;
     args.args.dst.info_v.displacements = (ucc_aint_t *)rd_node;
-    status = ucc_coll_init(cl_team->sbgps[UCC_HIER_SBGP_NODE].score_map, &args,
-                           &task_node);
-    if (UCC_OK != status) {
-        cl_error(team->context->lib, "failed to init full a2av task");
-        goto err_init_2;
-    }
-    ucc_schedule_add_task(schedule, task_node);
-    ucc_schedule_add_task(schedule, task_full);
-    ucc_task_subscribe_dep(&schedule->super, task_node,
-                           UCC_EVENT_SCHEDULE_STARTED);
-    ucc_task_subscribe_dep(&schedule->super, task_full,
-                           UCC_EVENT_SCHEDULE_STARTED);
+    UCC_CHECK_GOTO(ucc_coll_init(cl_team->sbgps[UCC_HIER_SBGP_NODE].score_map,
+                                 &args, &task_node),
+                   err_init_2, status);
+
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_node), err_init_2,
+                   status);
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_full), err_init_2,
+                   status);
+    UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, task_node,
+                                          UCC_EVENT_SCHEDULE_STARTED),
+                   err_init_2, status);
+    UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, task_full,
+                                          UCC_EVENT_SCHEDULE_STARTED),
+                   err_init_2, status);
 
     schedule->super.post           = ucc_cl_hier_alltoallv_start;
     schedule->super.progress       = NULL;

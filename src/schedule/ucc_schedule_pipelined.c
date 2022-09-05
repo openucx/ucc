@@ -7,6 +7,13 @@
 #include "coll_score/ucc_coll_score.h"
 #include "core/ucc_context.h"
 
+const char* ucc_pipeline_order_names[] = {
+    [UCC_PIPELINE_PARALLEL]   = "parallel",
+    [UCC_PIPELINE_ORDERED]    = "ordered",
+    [UCC_PIPELINE_SEQUENTIAL] = "sequential",
+    [UCC_PIPELINE_LAST]       =  NULL
+};
+
 static ucc_status_t ucc_frag_start_handler(ucc_coll_task_t *parent,
                                            ucc_coll_task_t *task)
 {
@@ -123,7 +130,8 @@ ucc_status_t ucc_schedule_pipelined_post(ucc_coll_task_t *task)
             frags[i]->tasks[j]->n_deps = frags[i]->tasks[j]->n_deps_base;
             frags[i]->tasks[j]->n_deps_satisfied = 0;
             frags[i]->tasks[j]->super.status     = UCC_OPERATION_INITIALIZED;
-            if (i == 0 && schedule_p->n_frags > 1 && schedule_p->sequential) {
+            if (i == 0 && schedule_p->n_frags > 1 &&
+                UCC_PIPELINE_PARALLEL != schedule_p->order) {
                 frags[0]->tasks[j]->n_deps_satisfied++;
             }
         }
@@ -136,7 +144,7 @@ ucc_status_t ucc_schedule_pipelined_init(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_schedule_frag_init_fn_t  frag_init,
     ucc_schedule_frag_setup_fn_t frag_setup, int n_frags, int n_frags_total,
-    int sequential, ucc_schedule_pipelined_t *schedule)
+    ucc_pipeline_order_t order, ucc_schedule_pipelined_t *schedule)
 {
     int              i, j;
     ucc_status_t     status;
@@ -158,7 +166,7 @@ ucc_status_t ucc_schedule_pipelined_init(
 
     schedule->super.n_tasks        = n_frags_total;
     schedule->n_frags              = n_frags;
-    schedule->sequential           = sequential;
+    schedule->order                = order;
     schedule->frag_setup           = frag_setup;
     schedule->next_frag_to_post    = 0;
     schedule->n_frags_in_pipeline  = 0;
@@ -181,21 +189,27 @@ ucc_status_t ucc_schedule_pipelined_init(
     for (i = 0; i < n_frags; i++) {
         for (j = 0; j < frags[i]->n_tasks; j++) {
             frags[i]->tasks[j]->n_deps_base = frags[i]->tasks[j]->n_deps;
-            if (n_frags > 1 && sequential) {
-                ucc_event_manager_subscribe(
-                    &frags[(i > 0) ? (i - 1) : (n_frags - 1)]->tasks[j]->em,
-                    UCC_EVENT_TASK_STARTED, frags[i]->tasks[j],
-                    ucc_dependency_handler);
+            if (n_frags > 1 && UCC_PIPELINE_PARALLEL != order) {
+                UCC_CHECK_GOTO(
+                    ucc_event_manager_subscribe(
+                        frags[(i > 0) ? (i - 1) : (n_frags - 1)]->tasks[j],
+                        UCC_PIPELINE_ORDERED == order
+                        ? UCC_EVENT_TASK_STARTED
+                        : UCC_EVENT_COMPLETED, frags[i]->tasks[j],
+                        ucc_dependency_handler),
+                    err, status);
                 frags[i]->tasks[j]->n_deps_base++;
             }
         }
-        ucc_event_manager_subscribe(&schedule->super.super.em,
-                                    UCC_EVENT_SCHEDULE_STARTED,
-                                    &frags[i]->super, ucc_frag_start_handler);
-        ucc_event_manager_subscribe(
-            &frags[i]->super.em, UCC_EVENT_COMPLETED_SCHEDULE,
-            &schedule->super.super,
-            ucc_schedule_pipelined_completed_handler);
+        UCC_CHECK_GOTO(ucc_event_manager_subscribe(
+                           &schedule->super.super, UCC_EVENT_SCHEDULE_STARTED,
+                           &frags[i]->super, ucc_frag_start_handler),
+                       err, status);
+        UCC_CHECK_GOTO(ucc_event_manager_subscribe(
+                           &frags[i]->super, UCC_EVENT_COMPLETED_SCHEDULE,
+                           &schedule->super.super,
+                           ucc_schedule_pipelined_completed_handler),
+                       err, status);
     }
     return UCC_OK;
 err:
@@ -209,11 +223,13 @@ ucc_status_t ucc_dependency_handler(ucc_coll_task_t *parent,
                                     ucc_coll_task_t *task)
 {
     ucc_status_t status;
+    uint8_t      n_deps_satisfied;
 
-    task->n_deps_satisfied++;
+    n_deps_satisfied = ucc_atomic_fadd8(&task->n_deps_satisfied, 1);
+
     ucc_trace_req("task %p, n_deps %d, satisfied %d", task, task->n_deps,
-                  task->n_deps_satisfied);
-    if (task->n_deps == task->n_deps_satisfied) {
+                  n_deps_satisfied);
+    if (task->n_deps == n_deps_satisfied + 1) {
         task->start_time = parent->start_time;
         status = task->post(task);
         if (status >= 0) {

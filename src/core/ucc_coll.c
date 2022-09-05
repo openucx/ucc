@@ -369,13 +369,11 @@ static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
 
     if (task->super.status == UCC_OK) {
         return ucc_triggered_coll_complete(task, task);
-    } else {
-        ucc_assert(task->super.status == UCC_INPROGRESS);
-        // TODO use CB instead of EM
-        ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED, task,
-                                    ucc_triggered_coll_complete);
     }
-    return UCC_OK;
+    ucc_assert(task->super.status == UCC_INPROGRESS);
+    // TODO use CB instead of EM
+    return ucc_event_manager_subscribe(task, UCC_EVENT_COMPLETED, task,
+                                       ucc_triggered_coll_complete);
 }
 
 static void ucc_trigger_test(ucc_coll_task_t *task)
@@ -452,6 +450,7 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
                                 ucc_coll_task_t *task)
 {
     ucc_coll_task_t *ev_task;
+    ucc_status_t     status;
 
     if (ev->ev_type != UCC_EVENT_COMPUTE_COMPLETE) {
         ucc_error("event type %d is not supported", ev->ev_type);
@@ -465,6 +464,7 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
         return UCC_ERR_NO_MEMORY;
     }
 
+    ucc_coll_task_construct(ev_task);
     ucc_coll_task_init(ev_task, NULL, task->team);
     ev_task->ee             = ee;
     ev_task->ev             = NULL;
@@ -479,8 +479,11 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
         UCC_COLL_SET_TIMEOUT(ev_task, task->bargs.args.timeout);
     }
-    ucc_event_manager_subscribe(&ev_task->em, UCC_EVENT_COMPLETED, task,
-                                ucc_trigger_complete);
+    status = ucc_event_manager_subscribe(ev_task, UCC_EVENT_COMPLETED, task,
+                                         ucc_trigger_complete);
+    if (ucc_unlikely(UCC_OK != status)) {
+        return status;
+    }
 
     return ucc_progress_queue_enqueue(UCC_TASK_CORE_CTX(ev_task)->pq, ev_task);
 }

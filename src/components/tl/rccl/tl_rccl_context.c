@@ -43,7 +43,13 @@ static void ucc_tl_rccl_req_mpool_obj_init(ucc_mpool_t *mp, void *obj,
 {
     ucc_tl_rccl_task_t *req = (ucc_tl_rccl_task_t*) obj;
 
+    ucc_coll_task_construct(&req->super);
     req->super.progress = ucc_tl_rccl_event_collective_progress;
+}
+
+static void ucc_tl_rccl_req_mpool_obj_cleanup(ucc_mpool_t *mp, void *obj)
+{
+    ucc_coll_task_destruct(obj);
 }
 
 
@@ -51,7 +57,7 @@ static ucc_mpool_ops_t ucc_tl_rccl_req_mpool_ops = {
     .chunk_alloc   = ucc_mpool_hugetlb_malloc,
     .chunk_release = ucc_mpool_hugetlb_free,
     .obj_init      = ucc_tl_rccl_req_mpool_obj_init,
-    .obj_cleanup   = NULL
+    .obj_cleanup   = ucc_tl_rccl_req_mpool_obj_cleanup
 };
 
 UCC_CLASS_INIT_FUNC(ucc_tl_rccl_context_t,
