@@ -90,7 +90,6 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
     task->subset         = subset;
     task->tagged.tag     = UCC_TL_UCP_SERVICE_TAG;
     task->n_polls        = UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.oob_npolls;
-    task->super.is_service = UCC_TL_UCP_TEAM_CTX(tl_team)->service.is_used;
     task->super.progress = ucc_tl_ucp_allreduce_knomial_progress;
     task->super.finalize = ucc_tl_ucp_allreduce_knomial_finalize;
 
@@ -153,7 +152,6 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
     task->subset         = subset;
     task->tagged.tag     = UCC_TL_UCP_SERVICE_TAG;
     task->n_polls        = UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.oob_npolls;
-    task->super.is_service = UCC_TL_UCP_TEAM_CTX(tl_team)->service.is_used;
     task->super.progress = ucc_tl_ucp_allgather_ring_progress;
     task->super.finalize = ucc_tl_ucp_coll_finalize;
 
@@ -199,7 +197,6 @@ ucc_status_t ucc_tl_ucp_service_bcast(ucc_base_team_t *team, void *buf,
     task->subset         = subset;
     task->tagged.tag     = UCC_TL_UCP_SERVICE_TAG;
     task->n_polls        = UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.oob_npolls;
-    task->super.is_service = UCC_TL_UCP_TEAM_CTX(tl_team)->service.is_used;
     task->super.progress = ucc_tl_ucp_bcast_knomial_progress;
     task->super.finalize = ucc_tl_ucp_coll_finalize;
     task->bcast_kn.radix = 2;

@@ -106,7 +106,6 @@ typedef struct ucc_coll_task {
     double   start_time; /* timestamp of the start time:
                             either post or triggered_post */
     uint32_t seq_num;
-    int is_service; /* bool flag specifying if using a special service worker */
 } ucc_coll_task_t;
 
 extern struct ucc_mpool_ops ucc_coll_task_mpool_ops;

@@ -39,8 +39,7 @@ typedef struct ucc_tl_ucp_context ucc_tl_ucp_context_t;
 typedef struct ucc_tl_ucp_team    ucc_tl_ucp_team_t;
 
 ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
-                                        ucc_rank_t team_rank, int is_service,
-                                        ucp_ep_h *ep);
+                                        ucc_rank_t team_rank, ucp_ep_h *ep);
 
 void ucc_tl_ucp_close_eps(ucp_worker_h worker, tl_ucp_ep_hash_t *ep_hash,
                           ucp_ep_h *eps, ucc_tl_ucp_context_t *ctx);
@@ -54,15 +53,14 @@ ucc_tl_ucp_get_team_ep_header(ucc_tl_ucp_team_t *team, ucc_rank_t core_rank)
 }
 
 static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team,
-                                             ucc_rank_t rank, int is_service,
-                                             ucp_ep_h *ep)
+                                             ucc_rank_t rank, ucp_ep_h *ep)
 {
     ucc_tl_ucp_context_t      *ctx      = UCC_TL_UCP_TEAM_CTX(team);
     ucc_context_addr_header_t *h        = NULL;
     ucc_rank_t                 ctx_rank = 0;
     tl_ucp_ep_hash_t *         ep_hash =
-        (is_service) ? ctx->service.ep_hash : ctx->ep_hash;
-    ucp_ep_h *                 eps = (is_service) ? ctx->service.eps : ctx->eps;
+        (USE_SERVICE_WORKER(team)) ? ctx->service.ep_hash : ctx->ep_hash;
+    ucp_ep_h *eps = (USE_SERVICE_WORKER(team)) ? ctx->service.eps : ctx->eps;
     ucc_status_t               status;
     ucc_rank_t                 core_rank;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), rank);
@@ -80,7 +78,7 @@ static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team,
     }
     if (NULL == (*ep)) {
         /* Not connected yet */
-        status = ucc_tl_ucp_connect_team_ep(team, core_rank, is_service, ep);
+        status = ucc_tl_ucp_connect_team_ep(team, core_rank, ep);
         if (ucc_unlikely(UCC_OK != status)) {
             tl_error(UCC_TL_TEAM_LIB(team), "failed to connect team ep");
             *ep = NULL;

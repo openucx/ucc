@@ -59,8 +59,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
                      task->tagged.tag, dest_group_rank,                        \
                      team->super.super.params.id,                              \
                      ucs_status_string(UCS_PTR_STATUS(ucp_status)));           \
-            ucp_request_cancel(UCC_TL_UCP_TEAM_TASK_WORKER(team, task),        \
-                               ucp_status);                                    \
+            ucp_request_cancel(UCC_TL_UCP_TEAM_WORKER(team), ucp_status);      \
             ucp_request_free(ucp_status);                                      \
             return ucs_status_to_ucc_status(UCS_PTR_STATUS(ucp_status));       \
         }                                                                      \
@@ -77,8 +76,7 @@ ucc_tl_ucp_send_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     ucp_ep_h            ep;
     ucp_tag_t           ucp_tag;
 
-    status =
-        ucc_tl_ucp_get_ep(team, dest_group_rank, task->super.is_service, &ep);
+    status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return UCS_STATUS_PTR(UCS_ERR_NO_MESSAGE);
     }
@@ -154,8 +152,8 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     req_param.memory_type = ucc_memtype_to_ucs[mtype];
     req_param.user_data   = (void *)task;
     task->tagged.recv_posted++;
-    return ucp_tag_recv_nbx(UCC_TL_UCP_TEAM_TASK_WORKER(team, task), buffer, 1,
-                            ucp_tag, ucp_tag_mask, &req_param);
+    return ucp_tag_recv_nbx(UCC_TL_UCP_TEAM_WORKER(team), buffer, 1, ucp_tag,
+                            ucp_tag_mask, &req_param);
 }
 
 static inline ucc_status_t
@@ -302,8 +300,7 @@ static inline ucc_status_t ucc_tl_ucp_ep_flush(ucc_rank_t dest_group_rank,
     ucs_status_ptr_t    req;
     ucp_ep_h            ep;
 
-    status =
-        ucc_tl_ucp_get_ep(team, dest_group_rank, IS_SERVICE_TEAM(team), &ep);
+    status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
@@ -332,8 +329,7 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
     ucc_status_t        status;
     ucp_ep_h            ep;
 
-    status =
-        ucc_tl_ucp_get_ep(team, dest_group_rank, task->super.is_service, &ep);
+    status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
@@ -376,8 +372,7 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
     ucc_status_t        status;
     ucp_ep_h            ep;
 
-    status =
-        ucc_tl_ucp_get_ep(team, dest_group_rank, task->super.is_service, &ep);
+    status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
@@ -420,7 +415,7 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
     ucc_status_t        status;
     ucp_ep_h            ep;
 
-    status = ucc_tl_ucp_get_ep(team, dest_group_rank, 0, &ep);
+    status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }

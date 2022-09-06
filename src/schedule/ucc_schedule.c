@@ -96,7 +96,6 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
     task->executor             = NULL;
     task->super.status         = UCC_OPERATION_INITIALIZED;
     task->triggered_post_setup = NULL;
-    task->is_service           = 0;
     if (bargs) {
         memcpy(&task->bargs, bargs, sizeof(*bargs));
     }

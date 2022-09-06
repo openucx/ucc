@@ -152,21 +152,19 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 #define IS_SERVICE_TEAM(_team)                                                 \
     ((_team)->super.super.params.scope == UCC_CL_LAST + 1)
 
+#define USE_SERVICE_WORKER(_team)                                              \
+    (IS_SERVICE_TEAM(_team) && UCC_TL_UCP_TEAM_CTX(_team)->service.is_used)
+
 #define UCC_TL_UCP_TEAM_WORKER(_team)                                          \
-    (IS_SERVICE_TEAM(_team) && UCC_TL_UCP_TEAM_CTX(_team)->service.is_used)    \
+    (USE_SERVICE_WORKER(_team))                                                \
         ? UCC_TL_UCP_TEAM_CTX(_team)->service.ucp_worker                       \
         : UCC_TL_UCP_TEAM_CTX(_team)->ucp_worker
 
-#define UCC_TL_UCP_TASK_IS_SERVICE(_task) (_task)->super.is_service
+#define UCC_TL_UCP_TASK_TEAM(_task)                                            \
+    (ucc_derived_of((_task)->super.team, ucc_tl_ucp_team_t))
 
-#define UCC_TL_UCP_WORKER(_ctx, _task)                                         \
-    (UCC_TL_UCP_TASK_IS_SERVICE(_task)) ? _ctx->service.ucp_worker             \
-                                        : _ctx->ucp_worker
-
-#define UCC_TL_UCP_TASK_WORKER(_task) UCC_TL_UCP_WORKER(TASK_CTX(_task), _task)
-
-#define UCC_TL_UCP_TEAM_TASK_WORKER(_team, _task)                              \
-    UCC_TL_UCP_WORKER(UCC_TL_UCP_TEAM_CTX(_team), _task)
+#define UCC_TL_UCP_TASK_WORKER(_task)                                          \
+    UCC_TL_UCP_TEAM_WORKER(UCC_TL_UCP_TASK_TEAM(_task))
 
 #define UCC_TL_CTX_HAS_OOB(_ctx)                                               \
     ((_ctx)->super.super.ucc_context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB)
