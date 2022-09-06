@@ -85,8 +85,8 @@ ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
 
 static inline ucc_status_t ucc_tl_cuda_get_sync(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t       *team  = TASK_TEAM(task);
-    ucc_tl_cuda_sync_state_t *state = &team->sync_state[task->coll_id];
+    ucc_tl_cuda_team_t                *team  = TASK_TEAM(task);
+    volatile ucc_tl_cuda_sync_state_t *state = &team->sync_state[task->coll_id];
 
     if ((UCC_TL_TEAM_RANK(team) == 0) && (*state == 0)) {
         *state = task->seq_num;
