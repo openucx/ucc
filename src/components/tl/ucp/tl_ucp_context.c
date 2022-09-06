@@ -13,6 +13,43 @@
 #include "schedule/ucc_schedule_pipelined.h"
 #include <limits.h>
 
+#define UCP_CHECK(function, msg, go, ctx)                                      \
+    status = function;                                                         \
+    if (UCS_OK != status) {                                                    \
+        tl_error(ctx->super.super.lib, msg ", %s", ucs_status_string(status)); \
+        ucc_status = ucs_status_to_ucc_status(status);                         \
+        goto go;                                                               \
+    }
+
+#define CHECK(test, msg, go, return_status, ctx)                               \
+    if (test) {                                                                \
+        tl_error(ctx->super.super.lib, msg);                                   \
+        ucc_status = return_status;                                            \
+        goto go;                                                               \
+    }
+
+static inline ucc_status_t
+ucc_tl_ucp_eps_ephash_init(const ucc_base_context_params_t *params,
+                           ucc_tl_ucp_context_t *           ctx,
+                           tl_ucp_ep_hash_t **ep_hash, ucp_ep_h **eps)
+{
+    if (params->context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+        /* Global ctx mode, we will have ctx_map so can use array for eps */
+        *eps = ucc_calloc(params->context->params.oob.n_oob_eps,
+                          sizeof(ucp_ep_h), "ucp_eps");
+        if (!(*eps)) {
+            tl_error(ctx->super.super.lib,
+                     "failed to allocate %zd bytes for ucp_eps",
+                     params->context->params.oob.n_oob_eps * sizeof(ucp_ep_h));
+            return UCC_ERR_NO_MEMORY;
+        }
+    } else {
+        *eps     = NULL;
+        *ep_hash = kh_init(tl_ucp_ep_hash);
+    }
+    return UCC_OK;
+}
+
 static inline ucc_status_t ucc_tl_ucp_context_service_init(
     ucp_params_t ucp_params, ucp_config_t *ucp_config,
     ucp_worker_params_t worker_params, const ucc_base_context_params_t *params,
@@ -26,74 +63,42 @@ static inline ucc_status_t ucc_tl_ucp_context_service_init(
     if (ctx->cfg.service_worker != 0) {
         ctx->service.is_used = 1;
         if (*ctx->cfg.service_tls) {
-            status = ucp_config_modify(ucp_config, "TLS", ctx->cfg.service_tls);
-            if (UCS_OK != status) {
-                tl_error(ctx->super.super.lib,
-                         "failed to set UCX_TLS "
-                         "for service worker, %s",
-                         ucs_status_string(status));
-                ucc_status = ucs_status_to_ucc_status(status);
-                goto err_cfg;
-            }
+            UCP_CHECK(
+                ucp_config_modify(ucp_config, "TLS", ctx->cfg.service_tls),
+                "failed to set UCX_TLS for service worker", err_cfg, ctx);
         }
         if (*ctx->cfg.service_devs) {
-            status = ucp_config_modify(ucp_config, "NET_DEVICES",
-                                       ctx->cfg.service_devs);
-            if (UCS_OK != status) {
-                tl_error(ctx->super.super.lib,
-                         "failed to set UCX_NET_DEVICES "
-                         "for service worker, %s",
-                         ucs_status_string(status));
-                ucc_status = ucs_status_to_ucc_status(status);
-                goto err_cfg;
-            }
+            UCP_CHECK(ucp_config_modify(ucp_config, "NET_DEVICES",
+                                        ctx->cfg.service_devs),
+                      "failed to set UCX_NET_DEVICES for service worker",
+                      err_cfg, ctx);
         }
-        status = ucp_init(&ucp_params, ucp_config, &ucp_context_service);
-        if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib,
-                     "failed to init ucp context "
-                     "for service worker, %s",
-                     ucs_status_string(status));
-            ucc_status = ucs_status_to_ucc_status(status);
-            goto err_cfg;
-        }
-        status = ucp_worker_create(ucp_context_service, &worker_params,
-                                   &ucp_worker_service);
-        if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib, "failed to create ucp worker, %s",
-                     ucs_status_string(status));
-            ucc_status = ucs_status_to_ucc_status(status);
-            goto err_worker_create;
-        }
+        UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context_service),
+                  "failed to init ucp context for service worker", err_cfg,
+                  ctx);
+
+        UCP_CHECK(ucp_worker_create(ucp_context_service, &worker_params,
+                                    &ucp_worker_service),
+                  "failed to create ucp service worker", err_worker_create,
+                  ctx);
 
         ctx->service.ucp_context    = ucp_context_service;
         ctx->service.ucp_worker     = ucp_worker_service;
         ctx->service.worker_address = NULL;
-        if (UCC_OK != ucc_context_progress_register(
-                          params->context,
-                          (ucc_context_progress_fn_t)ucp_worker_progress,
-                          ctx->service.ucp_worker)) {
-            tl_error(ctx->super.super.lib,
-                     "failed to register progress function for service worker");
-            ucc_status = UCC_ERR_NO_MESSAGE;
-            goto err_thread_mode;
-        }
-        if (params->context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
-            /* Global ctx mode, we will have ctx_map so can use array for eps */
-            ctx->service.eps = ucc_calloc(params->context->params.oob.n_oob_eps,
-                                          sizeof(ucp_ep_h), "service.eps");
-            if (!ctx->service.eps) {
-                tl_error(ctx->super.super.lib,
-                         "failed to allocate %zd bytes for service.eps",
-                         params->context->params.oob.n_oob_eps *
-                             sizeof(ucp_ep_h));
-                ucc_status = UCC_ERR_NO_MEMORY;
-                goto err_thread_mode;
-            }
-        } else {
-            ctx->service.eps     = NULL;
-            ctx->service.ep_hash = kh_init(tl_ucp_ep_hash);
-        }
+
+        CHECK(UCC_OK != ucc_context_progress_register(
+                            params->context,
+                            (ucc_context_progress_fn_t)ucp_worker_progress,
+                            ctx->service.ucp_worker),
+              "failed to register progress function for service worker",
+              err_thread_mode, UCC_ERR_NO_MESSAGE, ctx);
+
+        CHECK(
+            UCC_OK != ucc_tl_ucp_eps_ephash_init(params, ctx,
+                                                 &ctx->service.ep_hash,
+                                                 &ctx->service.eps),
+            "failed to allocate memory for endpoint storage for service worker",
+            err_thread_mode, UCC_ERR_NO_MESSAGE, ctx);
 
     } else {
         ctx->service.is_used = 0;
@@ -127,13 +132,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_ucp_config->super,
                               params->context);
     memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
-    status = ucp_config_read(params->prefix, NULL, &ucp_config);
-    if (UCS_OK != status) {
-        tl_error(self->super.super.lib, "failed to read ucp configuration, %s",
-                 ucs_status_string(status));
-        ucc_status = ucs_status_to_ucc_status(status);
-        goto err_cfg;
-    }
+    UCP_CHECK(ucp_config_read(params->prefix, NULL, &ucp_config),
+              "failed to read ucp configuration", err_cfg, self);
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK;
@@ -153,23 +153,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         ucp_params.estimated_num_eps = params->estimated_num_eps;
     }
 
-    status = ucp_init(&ucp_params, ucp_config, &ucp_context);
-    if (UCS_OK != status) {
-        tl_error(self->super.super.lib, "failed to init ucp context, %s",
-                 ucs_status_string(status));
-        ucc_status = ucs_status_to_ucc_status(status);
-        goto err_cfg;
-    }
+    UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context),
+              "failed to init ucp context", err_cfg, self);
 
     context_attr.field_mask = UCP_ATTR_FIELD_MEMORY_TYPES;
-    status = ucp_context_query(ucp_context, &context_attr);
-    if (UCS_OK != status) {
-        tl_error(self->super.super.lib,
-                 "failed to query supported memory types, %s",
-                 ucs_status_string(status));
-        ucc_status = ucs_status_to_ucc_status(status);
-        goto err_worker_create;
-    }
+    UCP_CHECK(ucp_context_query(ucp_context, &context_attr),
+              "failed to query supported memory types", err_worker_create,
+              self);
+
     self->ucp_memory_types = context_attr.memory_types;
     worker_params.field_mask = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
     switch (params->thread_mode) {
@@ -185,13 +176,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         ucc_assert(0);
         break;
     }
-    status = ucp_worker_create(ucp_context, &worker_params, &ucp_worker);
-    if (UCS_OK != status) {
-        tl_error(self->super.super.lib, "failed to create ucp worker, %s",
-                 ucs_status_string(status));
-        ucc_status = ucs_status_to_ucc_status(status);
-        goto err_worker_create;
-    }
+
+    UCP_CHECK(ucp_worker_create(ucp_context, &worker_params, &ucp_worker),
+              "failed to create ucp worker", err_worker_create, self);
 
     if (params->thread_mode == UCC_THREAD_MULTIPLE) {
         worker_attr.field_mask = UCP_WORKER_ATTR_FIELD_THREAD_MODE;
@@ -218,14 +205,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                  "failed to initialize tl_ucp_req mpool");
         goto err_thread_mode;
     }
-    if (UCC_OK != ucc_context_progress_register(
-                      params->context,
-                      (ucc_context_progress_fn_t)ucp_worker_progress,
-                      self->ucp_worker)) {
-        tl_error(self->super.super.lib, "failed to register progress function");
-        ucc_status = UCC_ERR_NO_MESSAGE;
-        goto err_thread_mode;
-    }
+
+    CHECK(UCC_OK != ucc_context_progress_register(
+                        params->context,
+                        (ucc_context_progress_fn_t)ucp_worker_progress,
+                        self->ucp_worker),
+          "failed to register progress function", err_thread_mode,
+          UCC_ERR_NO_MESSAGE, self);
 
     self->remote_info  = NULL;
     self->n_rinfo_segs = 0;
@@ -239,28 +225,17 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
             goto err_thread_mode;
         }
     }
-    if (params->context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
-        /* Global ctx mode, we will have ctx_map so can use array for eps */
-        self->eps = ucc_calloc(params->context->params.oob.n_oob_eps,
-                               sizeof(ucp_ep_h), "ucp_eps");
-        if (!self->eps) {
-            tl_error(self->super.super.lib,
-                     "failed to allocate %zd bytes for ucp_eps",
-                     params->context->params.oob.n_oob_eps * sizeof(ucp_ep_h));
-            ucc_status = UCC_ERR_NO_MEMORY;
-            goto err_thread_mode;
-        }
-    } else {
-        self->eps     = NULL;
-        self->ep_hash = kh_init(tl_ucp_ep_hash);
-    }
-    ucc_status = ucc_tl_ucp_context_service_init(ucp_params, ucp_config,
-                                                 worker_params, params, self);
+
+    CHECK(UCC_OK != ucc_tl_ucp_eps_ephash_init(params, self, &self->ep_hash,
+                                               &self->eps),
+          "failed to allocate memory for endpoint storage", err_thread_mode,
+          UCC_ERR_NO_MESSAGE, self);
+
+    CHECK(UCC_OK != ucc_tl_ucp_context_service_init(
+                        ucp_params, ucp_config, worker_params, params, self),
+          "failed to init service worker", err_cfg, UCC_ERR_NO_MESSAGE, self);
+
     ucp_config_release(ucp_config);
-    if (UCC_OK != ucc_status) {
-        tl_error(self->super.super.lib, "failed to init service worker");
-        goto err_cfg;
-    }
 
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
