@@ -312,12 +312,10 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
     return UCC_OK;
 }
 
-static inline void ucc_tl_ucp_cleanup_worker(ucp_worker_h      ucp_worker,
-                                             tl_ucp_ep_hash_t *ep_hash,
-                                             ucp_ep_h *        eps,
-                                             ucp_context_h     ucp_context,
-                                             ucp_address_t *   worker_address,
-                                             ucc_tl_ucp_context_t *ctx)
+static inline void ucc_tl_ucp_eps_cleanup(ucp_worker_h      ucp_worker,
+                                          tl_ucp_ep_hash_t *ep_hash,
+                                          ucp_ep_h *        eps,
+                                          ucc_tl_ucp_context_t *ctx)
 {
     ucc_tl_ucp_close_eps(ucp_worker, ep_hash, eps, ctx);
     if (eps) {
@@ -325,6 +323,13 @@ static inline void ucc_tl_ucp_cleanup_worker(ucp_worker_h      ucp_worker,
     } else {
         kh_destroy(tl_ucp_ep_hash, ep_hash);
     }
+}
+
+static inline void ucc_tl_ucp_worker_cleanup(ucp_worker_h      ucp_worker,
+                                             ucp_context_h     ucp_context,
+                                             ucp_address_t *   worker_address,
+                                             ucc_tl_ucp_context_t *ctx)
+{
     ucc_context_progress_deregister(
         ctx->super.super.ucc_context,
         (ucc_context_progress_fn_t)ucp_worker_progress, ucp_worker);
@@ -341,16 +346,21 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     if (self->remote_info) {
         ucc_tl_ucp_rinfo_destroy(self);
     }
+    ucc_mpool_cleanup(&self->req_mp, 1);
+    ucc_tl_ucp_eps_cleanup(self->ucp_worker, self->ep_hash, self->eps, self);
+    if (self->service.is_used) {
+        ucc_tl_ucp_eps_cleanup(self->service.ucp_worker, self->service.ep_hash,
+                                                      self->service.eps, self);
+    }
     if (UCC_TL_CTX_HAS_OOB(self)) {
         ucc_tl_ucp_context_barrier(self, &UCC_TL_CTX_OOB(self));
     }
-    ucc_mpool_cleanup(&self->req_mp, 1);
-    ucc_tl_ucp_cleanup_worker(self->ucp_worker, self->ep_hash, self->eps,
-                              self->ucp_context, self->worker_address, self);
+    ucc_tl_ucp_worker_cleanup(self->ucp_worker, self->ucp_context,
+                                                self->worker_address, self);
     if (self->service.is_used) {
-        ucc_tl_ucp_cleanup_worker(
-            self->service.ucp_worker, self->service.ep_hash, self->service.eps,
-            self->service.ucp_context, self->service.worker_address, self);
+        ucc_tl_ucp_worker_cleanup(
+            self->service.ucp_worker, self->service.ucp_context,
+                                        self->service.worker_address, self);
     }
 }
 
