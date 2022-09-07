@@ -183,6 +183,12 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_context_config_t, service_worker),
      UCC_CONFIG_TYPE_UINT},
 
+    {"SERVICE_THROTTLING_THRESH", "100",
+     "Number of call to ucc_context_progress function between two consecutive "
+     "calls to service worker progress function",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, service_throttling_thresh),
+     UCC_CONFIG_TYPE_UINT},
+
     {"SERVICE_TLS", "",
      "If not an empty string and UCC_TL_UCP_SERVICE_WORKER!=0, sets the "
      "UCX_TL configuration of the special service worker to that string",

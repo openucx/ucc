@@ -75,6 +75,7 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                oob_npolls;
     uint32_t                pre_reg_mem;
     uint32_t                service_worker;
+    uint32_t                service_throttling_thresh;
     char *                  service_tls;
     char *                  service_devs;
 } ucc_tl_ucp_context_config_t;
@@ -95,7 +96,7 @@ typedef struct ucc_tl_ucp_remote_info {
     size_t packed_key_len;
 } ucc_tl_ucp_remote_info_t;
 
-// struct used if a special service worker is set through UCC_TL_UCP_SERVICE_TLStypedef struct ucc_tl_ucp_worker {
+typedef struct ucc_tl_ucp_worker {
     ucp_context_h     ucp_context;
     ucp_worker_h      ucp_worker;
     size_t            ucp_addrlen;
@@ -109,6 +110,7 @@ typedef struct ucc_tl_ucp_context {
     ucc_tl_ucp_context_config_t cfg;
     ucc_tl_ucp_worker_t         worker;
     ucc_tl_ucp_worker_t         service_worker;
+    int                         service_worker_throttling_count;
     ucc_mpool_t                 req_mp;
     ucc_tl_ucp_remote_info_t *  remote_info;
     ucp_rkey_h *                rkeys;
