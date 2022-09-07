@@ -76,23 +76,31 @@ static inline ucc_status_t ucc_tl_ucp_context_service_init(
                                 &ucp_worker_service),
               "failed to create ucp service worker", err_worker_create, ctx);
 
-    ctx->service.ucp_context    = ucp_context_service;
-    ctx->service.ucp_worker     = ucp_worker_service;
-    ctx->service.worker_address = NULL;
+    ctx->service_worker.ucp_context    = ucp_context_service;
+    ctx->service_worker.ucp_worker     = ucp_worker_service;
+    ctx->service_worker.worker_address = NULL;
 
+<<<<<<< HEAD
     CHECK(UCC_OK != ucc_context_progress_register(
                         params->context,
                         (ucc_context_progress_fn_t)ucp_worker_progress,
-                        ctx->service.ucp_worker),
+                        ctx->service_worker.ucp_worker),
             "failed to register progress function for service worker",
             err_thread_mode, UCC_ERR_NO_MESSAGE, ctx);
 
     CHECK(
         UCC_OK != ucc_tl_ucp_eps_ephash_init(params, ctx,
-                                                &ctx->service.ep_hash,
-                                                &ctx->service.eps),
+                                                &ctx->service_worker.ep_hash,
+                                                &ctx->service_worker.eps),
         "failed to allocate memory for endpoint storage for service worker",
         err_thread_mode, UCC_ERR_NO_MESSAGE, ctx);
+=======
+    CHECK(UCC_OK != ucc_tl_ucp_eps_ephash_init(params, ctx,
+                                               &ctx->service_worker.ep_hash,
+                                               &ctx->service_worker.eps),
+          "failed to allocate memory for endpoint storage for service worker",
+          err_thread_mode, UCC_ERR_NO_MESSAGE, ctx);
+>>>>>>> 9a77945... clean add worker struct
 
     return UCC_OK;
 
@@ -182,9 +190,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         }
     }
 
-    self->ucp_context = ucp_context;
-    self->ucp_worker  = ucp_worker;
-    self->worker_address = NULL;
+    self->worker.ucp_context    = ucp_context;
+    self->worker.ucp_worker     = ucp_worker;
+    self->worker.worker_address = NULL;
 
     ucc_status = ucc_mpool_init(
         &self->req_mp, 0,
@@ -200,7 +208,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     CHECK(UCC_OK != ucc_context_progress_register(
                         params->context,
                         (ucc_context_progress_fn_t)ucp_worker_progress,
-                        self->ucp_worker),
+                        self->worker.ucp_worker),
           "failed to register progress function", err_thread_mode,
           UCC_ERR_NO_MESSAGE, self);
 
@@ -217,8 +225,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         }
     }
 
-    CHECK(UCC_OK != ucc_tl_ucp_eps_ephash_init(params, self, &self->ep_hash,
-                                               &self->eps),
+    CHECK(UCC_OK != ucc_tl_ucp_eps_ephash_init(
+                        params, self, &self->worker.ep_hash, &self->worker.eps),
           "failed to allocate memory for endpoint storage", err_thread_mode,
           UCC_ERR_NO_MESSAGE, self);
 
@@ -246,7 +254,7 @@ static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
                                        ucc_context_oob_coll_t *oob)
 {
     ucp_worker_h worker =
-        (ctx->cfg.service_worker != 0) ? ctx->service.ucp_worker : ctx->ucp_worker;
+        (ctx->cfg.service_worker != 0) ? ctx->service_worker.ucp_worker : ctx->worker.ucp_worker;
     char        *rbuf;
     ucc_status_t status;
     char         sbuf;
@@ -292,7 +300,7 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
     }
     for (i = 0; i < ctx->n_rinfo_segs; i++) {
         if (ctx->remote_info[i].mem_h) {
-            ucp_mem_unmap(ctx->ucp_context, ctx->remote_info[i].mem_h);
+            ucp_mem_unmap(ctx->worker.ucp_context, ctx->remote_info[i].mem_h);
         }
         if (ctx->remote_info[i].packed_key) {
             ucp_rkey_buffer_release(ctx->remote_info[i].packed_key);
@@ -306,32 +314,28 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
     return UCC_OK;
 }
 
-static inline void ucc_tl_ucp_eps_cleanup(ucp_worker_h      ucp_worker,
-                                          tl_ucp_ep_hash_t *ep_hash,
-                                          ucp_ep_h *        eps,
+static inline void ucc_tl_ucp_eps_cleanup(ucc_tl_ucp_worker_t   worker,
                                           ucc_tl_ucp_context_t *ctx)
 {
-    ucc_tl_ucp_close_eps(ucp_worker, ep_hash, eps, ctx);
-    if (eps) {
-        ucc_free(eps);
+    ucc_tl_ucp_close_eps(worker, ctx);
+    if (worker.eps) {
+        ucc_free(worker.eps);
     } else {
-        kh_destroy(tl_ucp_ep_hash, ep_hash);
+        kh_destroy(tl_ucp_ep_hash, worker.ep_hash);
     }
 }
 
-static inline void ucc_tl_ucp_worker_cleanup(ucp_worker_h      ucp_worker,
-                                             ucp_context_h     ucp_context,
-                                             ucp_address_t *   worker_address,
+static inline void ucc_tl_ucp_worker_cleanup(ucc_tl_ucp_worker_t   worker,
                                              ucc_tl_ucp_context_t *ctx)
 {
     ucc_context_progress_deregister(
         ctx->super.super.ucc_context,
-        (ucc_context_progress_fn_t)ucp_worker_progress, ucp_worker);
-    if (worker_address) {
-        ucp_worker_release_address(ucp_worker, worker_address);
+        (ucc_context_progress_fn_t)ucp_worker_progress, worker.ucp_worker);
+    if (worker.worker_address) {
+        ucp_worker_release_address(worker.ucp_worker, worker.worker_address);
     }
-    ucp_worker_destroy(ucp_worker);
-    ucp_cleanup(ucp_context);
+    ucp_worker_destroy(worker.ucp_worker);
+    ucp_cleanup(worker.ucp_context);
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
@@ -341,20 +345,16 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
         ucc_tl_ucp_rinfo_destroy(self);
     }
     ucc_mpool_cleanup(&self->req_mp, 1);
-    ucc_tl_ucp_eps_cleanup(self->ucp_worker, self->ep_hash, self->eps, self);
+    ucc_tl_ucp_eps_cleanup(self->worker, self);
     if (self->cfg.service_worker != 0) {
-        ucc_tl_ucp_eps_cleanup(self->service.ucp_worker, self->service.ep_hash,
-                                                      self->service.eps, self);
+        ucc_tl_ucp_eps_cleanup(self->service_worker, self);
     }
     if (UCC_TL_CTX_HAS_OOB(self)) {
         ucc_tl_ucp_context_barrier(self, &UCC_TL_CTX_OOB(self));
     }
-    ucc_tl_ucp_worker_cleanup(self->ucp_worker, self->ucp_context,
-                                                self->worker_address, self);
+    ucc_tl_ucp_worker_cleanup(self->worker, self);
     if (self->cfg.service_worker != 0) {
-        ucc_tl_ucp_worker_cleanup(
-            self->service.ucp_worker, self->service.ucp_context,
-                                        self->service.worker_address, self);
+        ucc_tl_ucp_worker_cleanup(self->service_worker, self);
     }
 }
 
@@ -376,12 +376,12 @@ ucc_status_t ucc_tl_ucp_populate_rcache(void *addr, size_t length,
     mmap_params.memory_type = mem_type;
 
     /* do map and umap to populate the cache */
-    status = ucp_mem_map(ctx->ucp_context, &mmap_params, &mh);
+    status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
     if (ucc_unlikely(status != UCS_OK)) {
         return ucs_status_to_ucc_status(status);
     }
 
-    status = ucp_mem_unmap(ctx->ucp_context, mh);
+    status = ucp_mem_unmap(ctx->worker.ucp_context, mh);
     if (ucc_unlikely(status != UCS_OK)) {
         return ucs_status_to_ucc_status(status);
     }
@@ -435,7 +435,7 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
         mmap_params.address = map.segments[i].address;
         mmap_params.length  = map.segments[i].len;
 
-        status = ucp_mem_map(ctx->ucp_context, &mmap_params, &mh);
+        status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
         if (UCS_OK != status) {
             tl_error(ctx->super.super.lib,
                      "ucp_mem_map failed with error code: %d", status);
@@ -443,9 +443,9 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
             goto fail_mem_map;
         }
         ctx->remote_info[i].mem_h = (void *)mh;
-        status =
-            ucp_rkey_pack(ctx->ucp_context, mh, &ctx->remote_info[i].packed_key,
-                          &ctx->remote_info[i].packed_key_len);
+        status                    = ucp_rkey_pack(ctx->worker.ucp_context, mh,
+                               &ctx->remote_info[i].packed_key,
+                               &ctx->remote_info[i].packed_key_len);
         if (UCS_OK != status) {
             tl_error(ctx->super.super.lib,
                      "failed to pack UCP key with error code: %d", status);
@@ -461,7 +461,7 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
 fail_mem_map:
     for (i = 0; i < nsegs; i++) {
         if (ctx->remote_info[i].mem_h) {
-            ucp_mem_unmap(ctx->ucp_context, ctx->remote_info[i].mem_h);
+            ucp_mem_unmap(ctx->worker.ucp_context, ctx->remote_info[i].mem_h);
         }
         if (ctx->remote_info[i].packed_key) {
             ucp_rkey_buffer_release(ctx->remote_info[i].packed_key);
@@ -513,18 +513,21 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
 
     if (attr->attr.mask & (UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
                            UCC_CONTEXT_ATTR_FIELD_CTX_ADDR)) {
-        if (NULL == ctx->worker_address) {
-            ucs_status = ucp_worker_get_address(
-                ctx->ucp_worker, &ctx->worker_address, &ctx->ucp_addrlen);
+        if (NULL == ctx->worker.worker_address) {
+            ucs_status = ucp_worker_get_address(ctx->worker.ucp_worker,
+                                                &ctx->worker.worker_address,
+                                                &ctx->worker.ucp_addrlen);
             if (UCS_OK != ucs_status) {
                 tl_error(ctx->super.super.lib,
                          "failed to get ucp worker address");
                 return ucs_status_to_ucc_status(ucs_status);
             }
-            if (ctx->cfg.service_worker != 0 && (NULL == ctx->service.worker_address)) {
-                ucs_status = ucp_worker_get_address(
-                    ctx->service.ucp_worker, &ctx->service.worker_address,
-                    &ctx->service.ucp_addrlen);
+            if (ctx->cfg.service_worker != 0 &&
+                (NULL == ctx->service_worker.worker_address)) {
+                ucs_status =
+                    ucp_worker_get_address(ctx->service_worker.ucp_worker,
+                                           &ctx->service_worker.worker_address,
+                                           &ctx->service_worker.ucp_addrlen);
                 if (UCS_OK != ucs_status) {
                     tl_error(
                         ctx->super.super.lib,
@@ -536,9 +539,10 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
     }
 
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
-        packed_length = TL_UCP_EP_ADDRLEN_SIZE + ctx->ucp_addrlen;
+        packed_length = TL_UCP_EP_ADDRLEN_SIZE + ctx->worker.ucp_addrlen;
         if (ctx->cfg.service_worker != 0) {
-            packed_length += TL_UCP_EP_ADDRLEN_SIZE + ctx->service.ucp_addrlen;
+            packed_length +=
+                TL_UCP_EP_ADDRLEN_SIZE + ctx->service_worker.ucp_addrlen;
         }
         if (NULL != ctx->remote_info) {
             packed_length += ctx->n_rinfo_segs * (sizeof(size_t) * 3);
@@ -549,16 +553,16 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
         attr->attr.ctx_addr_len = packed_length;
     }
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR) {
-        *offset = ctx->ucp_addrlen;
+        *offset = ctx->worker.ucp_addrlen;
         offset  = TL_UCP_EP_ADDR_WORKER(offset);
-        memcpy(offset, ctx->worker_address, ctx->ucp_addrlen);
-        offset = PTR_OFFSET(offset, ctx->ucp_addrlen);
+        memcpy(offset, ctx->worker.worker_address, ctx->worker.ucp_addrlen);
+        offset = PTR_OFFSET(offset, ctx->worker.ucp_addrlen);
         if (ctx->cfg.service_worker != 0) {
-            *offset = ctx->service.ucp_addrlen;
+            *offset = ctx->service_worker.ucp_addrlen;
             offset  = TL_UCP_EP_ADDR_WORKER(offset);
-            memcpy(offset, ctx->service.worker_address,
-                   ctx->service.ucp_addrlen);
-            offset = PTR_OFFSET(offset, ctx->service.ucp_addrlen);
+            memcpy(offset, ctx->service_worker.worker_address,
+                   ctx->service_worker.ucp_addrlen);
+            offset = PTR_OFFSET(offset, ctx->service_worker.ucp_addrlen);
         }
         if (NULL != ctx->remote_info) {
             ucc_tl_ucp_ctx_remote_pack_data(ctx, offset);

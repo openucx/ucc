@@ -20,7 +20,7 @@ static inline ucc_status_t ucc_tl_ucp_connect_ep(ucc_tl_ucp_context_t *ctx,
                                                  void *ucp_address)
 {
     ucp_worker_h worker =
-        (is_service) ? ctx->service.ucp_worker : ctx->ucp_worker;
+        (is_service) ? ctx->service_worker.ucp_worker : ctx->worker.ucp_worker;
     ucp_ep_params_t ep_params;
     ucs_status_t    status;
     if (*ep) {
@@ -65,28 +65,26 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
 /* Finds next non-NULL ep in the storage and returns that handle
    for closure. In case of "hash" storage it pops the item,
    in case of "array" sets it to NULL */
-static inline ucp_ep_h get_next_ep_to_close(tl_ucp_ep_hash_t *    ep_hash,
-                                            ucp_ep_h *            eps,
+static inline ucp_ep_h get_next_ep_to_close(ucc_tl_ucp_worker_t   worker,
                                             ucc_tl_ucp_context_t *ctx, int *i)
 {
     ucp_ep_h   ep = NULL;
     ucc_rank_t size;
 
-    if (eps) {
+    if (worker.eps) {
         size = (ucc_rank_t)ctx->super.super.ucc_context->params.oob.n_oob_eps;
         while (NULL == ep && (*i) < size) {
-            ep      = eps[*i];
-            eps[*i] = NULL;
+            ep             = worker.eps[*i];
+            worker.eps[*i] = NULL;
             (*i)++;
         }
     } else {
-        ep = tl_ucp_hash_pop(ep_hash);
+        ep = tl_ucp_hash_pop(worker.ep_hash);
     }
     return ep;
 }
 
-void ucc_tl_ucp_close_eps(ucp_worker_h worker, tl_ucp_ep_hash_t *ep_hash,
-                          ucp_ep_h *eps, ucc_tl_ucp_context_t *ctx)
+void ucc_tl_ucp_close_eps(ucc_tl_ucp_worker_t worker, ucc_tl_ucp_context_t *ctx)
 {
      int                          i = 0;
      ucp_ep_h                     ep;
@@ -96,13 +94,13 @@ void ucc_tl_ucp_close_eps(ucp_worker_h worker, tl_ucp_ep_hash_t *ep_hash,
 
      param.op_attr_mask = UCP_OP_ATTR_FIELD_FLAGS;
      param.flags        = 0; // 0 means FLUSH
-     ep                 = get_next_ep_to_close(ep_hash, eps, ctx, &i);
+     ep                 = get_next_ep_to_close(worker, ctx, &i);
      while (ep) {
          close_req = ucp_ep_close_nbx(ep, &param);
 
          if (UCS_PTR_IS_PTR(close_req)) {
              do {
-                 ucp_worker_progress(worker);
+                 ucp_worker_progress(worker.ucp_worker);
                  status = ucp_request_check_status(close_req);
              } while (status == UCS_INPROGRESS);
              ucp_request_free(close_req);
@@ -115,6 +113,6 @@ void ucc_tl_ucp_close_eps(ucp_worker_h worker, tl_ucp_ep_hash_t *ep_hash,
                       "error during ucp ep close, ep %p, status %s",
                       ep, ucs_status_string(status));
          }
-         ep = get_next_ep_to_close(ep_hash, eps, ctx, &i);
+         ep = get_next_ep_to_close(worker, ctx, &i);
      }
 }

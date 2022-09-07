@@ -95,30 +95,25 @@ typedef struct ucc_tl_ucp_remote_info {
     size_t packed_key_len;
 } ucc_tl_ucp_remote_info_t;
 
-// struct used if a special service worker is set through UCC_TL_UCP_SERVICE_TLS
-typedef struct ucc_tl_ucp_service {
+// struct used if a special service worker is set through UCC_TL_UCP_SERVICE_TLStypedef struct ucc_tl_ucp_worker {
     ucp_context_h     ucp_context;
     ucp_worker_h      ucp_worker;
     size_t            ucp_addrlen;
     ucp_address_t *   worker_address;
     tl_ucp_ep_hash_t *ep_hash;
     ucp_ep_h *        eps;
-} ucc_tl_ucp_service_t;
+} ucc_tl_ucp_worker_t;
+
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t            super;
     ucc_tl_ucp_context_config_t cfg;
-    ucp_context_h               ucp_context;
-    ucp_worker_h                ucp_worker;
-    size_t                      ucp_addrlen;
-    ucp_address_t *             worker_address;
+    ucc_tl_ucp_worker_t         worker;
+    ucc_tl_ucp_worker_t         service_worker;
     ucc_mpool_t                 req_mp;
-    tl_ucp_ep_hash_t *          ep_hash;
-    ucp_ep_h *                  eps;
     ucc_tl_ucp_remote_info_t *  remote_info;
     ucp_rkey_h *                rkeys;
     uint64_t                    n_rinfo_segs;
     uint64_t                    ucp_memory_types;
-    ucc_tl_ucp_service_t        service;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -131,6 +126,7 @@ typedef struct ucc_tl_ucp_team {
     ucc_tl_ucp_task_t         *preconnect_task;
     void *                     va_base[MAX_NR_SEGMENTS];
     size_t                     base_length[MAX_NR_SEGMENTS];
+    ucc_tl_ucp_worker_t *      worker;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
@@ -154,16 +150,8 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 #define USE_SERVICE_WORKER(_team)                                              \
     (IS_SERVICE_TEAM(_team) && UCC_TL_UCP_TEAM_CTX(_team)->cfg.service_worker)
 
-#define UCC_TL_UCP_TEAM_WORKER(_team)                                          \
-    (USE_SERVICE_WORKER(_team))                                                \
-        ? UCC_TL_UCP_TEAM_CTX(_team)->service.ucp_worker                       \
-        : UCC_TL_UCP_TEAM_CTX(_team)->ucp_worker
-
 #define UCC_TL_UCP_TASK_TEAM(_task)                                            \
     (ucc_derived_of((_task)->super.team, ucc_tl_ucp_team_t))
-
-#define UCC_TL_UCP_TASK_WORKER(_task)                                          \
-    UCC_TL_UCP_TEAM_WORKER(UCC_TL_UCP_TASK_TEAM(_task))
 
 #define UCC_TL_CTX_HAS_OOB(_ctx)                                               \
     ((_ctx)->super.super.ucc_context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB)

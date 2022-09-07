@@ -59,7 +59,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
                      task->tagged.tag, dest_group_rank,                        \
                      team->super.super.params.id,                              \
                      ucs_status_string(UCS_PTR_STATUS(ucp_status)));           \
-            ucp_request_cancel(UCC_TL_UCP_TEAM_WORKER(team), ucp_status);      \
+            ucp_request_cancel(team->worker->ucp_worker, ucp_status);          \
             ucp_request_free(ucp_status);                                      \
             return ucs_status_to_ucc_status(UCS_PTR_STATUS(ucp_status));       \
         }                                                                      \
@@ -152,7 +152,7 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     req_param.memory_type = ucc_memtype_to_ucs[mtype];
     req_param.user_data   = (void *)task;
     task->tagged.recv_posted++;
-    return ucp_tag_recv_nbx(UCC_TL_UCP_TEAM_WORKER(team), buffer, 1, ucp_tag,
+    return ucp_tag_recv_nbx(team->worker->ucp_worker, buffer, 1, ucp_tag,
                             ucp_tag_mask, &req_param);
 }
 
@@ -282,7 +282,7 @@ static inline ucc_status_t ucc_tl_ucp_flush(ucc_tl_ucp_team_t *team)
     ucp_request_param_t req_param = {0};
     ucs_status_ptr_t    req;
 
-    req = ucp_worker_flush_nbx(UCC_TL_UCP_TEAM_WORKER(team), &req_param);
+    req = ucp_worker_flush_nbx(team->worker->ucp_worker, &req_param);
     if (UCS_OK != req) {
         if (UCS_PTR_IS_ERR(req)) {
             return ucs_status_to_ucc_status(UCS_PTR_STATUS(req));
