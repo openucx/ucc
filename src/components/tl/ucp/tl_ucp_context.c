@@ -60,49 +60,40 @@ static inline ucc_status_t ucc_tl_ucp_context_service_init(
     ucp_worker_h  ucp_worker_service;
     ucs_status_t  status;
 
-    if (ctx->cfg.service_worker != 0) {
-        ctx->service.is_used = 1;
-        if (*ctx->cfg.service_tls) {
-            UCP_CHECK(
-                ucp_config_modify(ucp_config, "TLS", ctx->cfg.service_tls),
-                "failed to set UCX_TLS for service worker", err_cfg, ctx);
-        }
-        if (*ctx->cfg.service_devs) {
-            UCP_CHECK(ucp_config_modify(ucp_config, "NET_DEVICES",
-                                        ctx->cfg.service_devs),
-                      "failed to set UCX_NET_DEVICES for service worker",
-                      err_cfg, ctx);
-        }
-        UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context_service),
-                  "failed to init ucp context for service worker", err_cfg,
-                  ctx);
+    if (*ctx->cfg.service_tls) {
+        UCP_CHECK(ucp_config_modify(ucp_config, "TLS", ctx->cfg.service_tls),
+                  "failed to set UCX_TLS for service worker", err_cfg, ctx);
+    }
+    if (*ctx->cfg.service_devs) {
+        UCP_CHECK(
+            ucp_config_modify(ucp_config, "NET_DEVICES", ctx->cfg.service_devs),
+            "failed to set UCX_NET_DEVICES for service worker", err_cfg, ctx);
+    }
+    UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context_service),
+              "failed to init ucp context for service worker", err_cfg, ctx);
 
-        UCP_CHECK(ucp_worker_create(ucp_context_service, &worker_params,
-                                    &ucp_worker_service),
-                  "failed to create ucp service worker", err_worker_create,
-                  ctx);
+    UCP_CHECK(ucp_worker_create(ucp_context_service, &worker_params,
+                                &ucp_worker_service),
+              "failed to create ucp service worker", err_worker_create, ctx);
 
-        ctx->service.ucp_context    = ucp_context_service;
-        ctx->service.ucp_worker     = ucp_worker_service;
-        ctx->service.worker_address = NULL;
+    ctx->service.ucp_context    = ucp_context_service;
+    ctx->service.ucp_worker     = ucp_worker_service;
+    ctx->service.worker_address = NULL;
 
-        CHECK(UCC_OK != ucc_context_progress_register(
-                            params->context,
-                            (ucc_context_progress_fn_t)ucp_worker_progress,
-                            ctx->service.ucp_worker),
-              "failed to register progress function for service worker",
-              err_thread_mode, UCC_ERR_NO_MESSAGE, ctx);
-
-        CHECK(
-            UCC_OK != ucc_tl_ucp_eps_ephash_init(params, ctx,
-                                                 &ctx->service.ep_hash,
-                                                 &ctx->service.eps),
-            "failed to allocate memory for endpoint storage for service worker",
+    CHECK(UCC_OK != ucc_context_progress_register(
+                        params->context,
+                        (ucc_context_progress_fn_t)ucp_worker_progress,
+                        ctx->service.ucp_worker),
+            "failed to register progress function for service worker",
             err_thread_mode, UCC_ERR_NO_MESSAGE, ctx);
 
-    } else {
-        ctx->service.is_used = 0;
-    }
+    CHECK(
+        UCC_OK != ucc_tl_ucp_eps_ephash_init(params, ctx,
+                                                &ctx->service.ep_hash,
+                                                &ctx->service.eps),
+        "failed to allocate memory for endpoint storage for service worker",
+        err_thread_mode, UCC_ERR_NO_MESSAGE, ctx);
+
     return UCC_OK;
 
 err_thread_mode:
@@ -231,9 +222,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
           "failed to allocate memory for endpoint storage", err_thread_mode,
           UCC_ERR_NO_MESSAGE, self);
 
-    CHECK(UCC_OK != ucc_tl_ucp_context_service_init(
-                        ucp_params, ucp_config, worker_params, params, self),
-          "failed to init service worker", err_cfg, UCC_ERR_NO_MESSAGE, self);
+    if (self->cfg.service_worker) {
+        CHECK(
+            UCC_OK != ucc_tl_ucp_context_service_init(
+                          ucp_params, ucp_config, worker_params, params, self),
+            "failed to init service worker", err_cfg, UCC_ERR_NO_MESSAGE, self);
+    }
 
     ucp_config_release(ucp_config);
 
@@ -252,7 +246,7 @@ static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
                                        ucc_context_oob_coll_t *oob)
 {
     ucp_worker_h worker =
-        (ctx->service.is_used) ? ctx->service.ucp_worker : ctx->ucp_worker;
+        (ctx->cfg.service_worker != 0) ? ctx->service.ucp_worker : ctx->ucp_worker;
     char        *rbuf;
     ucc_status_t status;
     char         sbuf;
@@ -348,7 +342,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     }
     ucc_mpool_cleanup(&self->req_mp, 1);
     ucc_tl_ucp_eps_cleanup(self->ucp_worker, self->ep_hash, self->eps, self);
-    if (self->service.is_used) {
+    if (self->cfg.service_worker != 0) {
         ucc_tl_ucp_eps_cleanup(self->service.ucp_worker, self->service.ep_hash,
                                                       self->service.eps, self);
     }
@@ -357,7 +351,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     }
     ucc_tl_ucp_worker_cleanup(self->ucp_worker, self->ucp_context,
                                                 self->worker_address, self);
-    if (self->service.is_used) {
+    if (self->cfg.service_worker != 0) {
         ucc_tl_ucp_worker_cleanup(
             self->service.ucp_worker, self->service.ucp_context,
                                         self->service.worker_address, self);
@@ -527,7 +521,7 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
                          "failed to get ucp worker address");
                 return ucs_status_to_ucc_status(ucs_status);
             }
-            if (ctx->service.is_used && (NULL == ctx->service.worker_address)) {
+            if (ctx->cfg.service_worker != 0 && (NULL == ctx->service.worker_address)) {
                 ucs_status = ucp_worker_get_address(
                     ctx->service.ucp_worker, &ctx->service.worker_address,
                     &ctx->service.ucp_addrlen);
@@ -543,7 +537,7 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
 
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
         packed_length = TL_UCP_EP_ADDRLEN_SIZE + ctx->ucp_addrlen;
-        if (ctx->service.is_used) {
+        if (ctx->cfg.service_worker != 0) {
             packed_length += TL_UCP_EP_ADDRLEN_SIZE + ctx->service.ucp_addrlen;
         }
         if (NULL != ctx->remote_info) {
@@ -559,7 +553,7 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
         offset  = TL_UCP_EP_ADDR_WORKER(offset);
         memcpy(offset, ctx->worker_address, ctx->ucp_addrlen);
         offset = PTR_OFFSET(offset, ctx->ucp_addrlen);
-        if (ctx->service.is_used) {
+        if (ctx->cfg.service_worker != 0) {
             *offset = ctx->service.ucp_addrlen;
             offset  = TL_UCP_EP_ADDR_WORKER(offset);
             memcpy(offset, ctx->service.worker_address,

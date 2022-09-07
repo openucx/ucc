@@ -97,7 +97,6 @@ typedef struct ucc_tl_ucp_remote_info {
 
 // struct used if a special service worker is set through UCC_TL_UCP_SERVICE_TLS
 typedef struct ucc_tl_ucp_service {
-    int               is_used;
     ucp_context_h     ucp_context;
     ucp_worker_h      ucp_worker;
     size_t            ucp_addrlen;
@@ -153,7 +152,7 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
     ((_team)->super.super.params.scope == UCC_CL_LAST + 1)
 
 #define USE_SERVICE_WORKER(_team)                                              \
-    (IS_SERVICE_TEAM(_team) && UCC_TL_UCP_TEAM_CTX(_team)->service.is_used)
+    (IS_SERVICE_TEAM(_team) && UCC_TL_UCP_TEAM_CTX(_team)->cfg.service_worker)
 
 #define UCC_TL_UCP_TEAM_WORKER(_team)                                          \
     (USE_SERVICE_WORKER(_team))                                                \

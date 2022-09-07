@@ -51,14 +51,15 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
                                         ucc_rank_t core_rank, ucp_ep_h *ep)
 {
     ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
+    int                   use_service_worker = USE_SERVICE_WORKER(team);
     void                 *addr;
 
     addr = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
                                 core_rank, ucc_tl_ucp.super.super.id);
-    addr = USE_SERVICE_WORKER(team) ? TL_UCP_EP_ADDR_WORKER_SERVICE(addr)
-                                    : TL_UCP_EP_ADDR_WORKER(addr);
+    addr = use_service_worker ? TL_UCP_EP_ADDR_WORKER_SERVICE(addr)
+                              : TL_UCP_EP_ADDR_WORKER(addr);
 
-    return ucc_tl_ucp_connect_ep(ctx, USE_SERVICE_WORKER(team), ep, addr);
+    return ucc_tl_ucp_connect_ep(ctx, use_service_worker, ep, addr);
 }
 
 /* Finds next non-NULL ep in the storage and returns that handle

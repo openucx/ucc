@@ -31,7 +31,7 @@
 #define TL_UCP_EP_ADDR_WORKER_SERVICE(_addr)                                   \
     TL_UCP_EP_ADDR_WORKER(TL_UCP_EP_OFFSET_WORKER_INFO(_addr))
 #define TL_UCP_EP_ADDR_ONESIDED_INFO(_addr, _ctx)                              \
-    _ctx->service.is_used                                                      \
+    _ctx->cfg.service_worker                                                   \
         ? TL_UCP_EP_OFFSET_WORKER_INFO(TL_UCP_EP_OFFSET_WORKER_INFO(_addr))    \
         : TL_UCP_EP_OFFSET_WORKER_INFO(_addr)
 
