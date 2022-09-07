@@ -100,7 +100,10 @@ void ucc_tl_ucp_close_eps(ucc_tl_ucp_worker_t worker, ucc_tl_ucp_context_t *ctx)
 
          if (UCS_PTR_IS_PTR(close_req)) {
              do {
-                 ucp_worker_progress(worker.ucp_worker);
+                 ucp_worker_progress(ctx->worker.ucp_worker);
+                 if (ctx->cfg.service_worker != 0) {
+                     ucp_worker_progress(ctx->service_worker.ucp_worker);
+                 }
                  status = ucp_request_check_status(close_req);
              } while (status == UCS_INPROGRESS);
              ucp_request_free(close_req);

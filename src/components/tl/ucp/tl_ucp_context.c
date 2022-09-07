@@ -253,8 +253,6 @@ err_cfg:
 static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
                                        ucc_context_oob_coll_t *oob)
 {
-    ucp_worker_h worker =
-        (ctx->cfg.service_worker != 0) ? ctx->service_worker.ucp_worker : ctx->worker.ucp_worker;
     char        *rbuf;
     ucc_status_t status;
     char         sbuf;
@@ -275,7 +273,10 @@ static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
                                  &req)) {
         ucc_assert(req);
         while (UCC_OK != (status = oob->req_test(req))) {
-            ucp_worker_progress(worker);
+            ucp_worker_progress(ctx->worker.ucp_worker);
+            if (ctx->cfg.service_worker != 0) {
+                ucp_worker_progress(ctx->service_worker.ucp_worker);
+            }
             if (status < 0) {
                 tl_error(ctx->super.super.lib, "failed to test oob req");
                 break;
