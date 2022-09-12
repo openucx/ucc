@@ -13,6 +13,7 @@
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_list.h"
+#include "khash.h"
 
 #include <ucs/config/parser.h>
 #include <ucs/sys/preprocessor.h>
@@ -71,6 +72,15 @@ typedef struct ucc_file_config ucc_file_config_t;
 #define UCC_CONFIG_ALLOW_LIST_NEGATE    UCS_CONFIG_ALLOW_LIST_NEGATE
 #define UCC_CONFIG_ALLOW_LIST_ALLOW_ALL UCS_CONFIG_ALLOW_LIST_ALLOW_ALL
 #define UCC_CONFIG_ALLOW_LIST_ALLOW     UCS_CONFIG_ALLOW_LIST_ALLOW
+
+KHASH_MAP_INIT_STR(ucc_cfg_file, char *);
+KHASH_MAP_INIT_STR(ucc_sec, char *);
+KHASH_MAP_INIT_STR(ucc_sections, khash_t(ucc_sec) *);
+
+typedef struct ucc_file_config {
+    khash_t(ucc_cfg_file) vars;
+    khash_t(ucc_sections) sections;
+} ucc_file_config_t;
 
 /* Convenience structure used, for example, to represent TLS list.
    "requested" field is set to 1 if the list of entries was
@@ -142,6 +152,11 @@ static inline void ucc_config_parser_print_opts(FILE *stream, const char *title,
     ucs_config_parser_print_opts(stream, title, opts, fields, table_prefix,
                                  prefix, ucs_flags);
 }
+
+ucc_status_t ucc_apply_file_cfg(void *opts, ucc_config_field_t *fields,
+                                const char *env_prefix,
+                                const char *component_prefix,
+                                const char *section);
 
 void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
                                       ucc_config_print_flags_t flags,

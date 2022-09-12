@@ -9,13 +9,118 @@
 #include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
 #include "utils/ucc_malloc.h"
+#include "utils/ucc_parser.h"
+#include "utils/ucc_string.h"
 #include "coll_score/ucc_coll_score.h"
+
+static inline ucc_status_t
+ucc_tl_ucp_get_topo_ppn(ucc_tl_ucp_team_t *team, ucc_rank_t *ppn_min, ucc_rank_t *ppn_max) // add ppn_range
+{
+    ucc_ep_map_t            ctx_map;
+    ucc_subset_t            subset;
+    ucc_topo_t             *topo;
+//    ucc_rank_t              nnodes;
+    ucc_status_t            status;
+
+    status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
+                                      &UCC_TL_TEAM_MAP(team),
+                                      &ctx_map);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
+        return status;
+    }
+    subset.map    = ctx_map;
+    subset.myrank = UCC_TL_TEAM_RANK(team);
+
+    status = ucc_topo_init(subset, UCC_TL_CORE_CTX(team)->topo, &topo);
+
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to init team perf topo");
+        goto err_topo_init;
+    }
+
+    *ppn_min = ucc_topo_min_ppn(topo);
+    *ppn_max = ucc_topo_max_ppn(topo);
+//        nnodes = ucc_topo_nnodes(topo); // needed?
+    ucc_topo_cleanup(topo);
+err_topo_init:
+    ucc_ep_map_destroy_nested(&ctx_map);
+    return status;
+}
+
+static inline int ucc_parse_section_name(const char* name,
+                                         ucc_cpu_vendor_t _vendor,
+                                         ucc_cpu_model_t _model,
+                                         size_t _team_size,
+                                         ucc_cfg_ppn_range_t _ppn_range)
+{
+    char **split = ucc_str_split(name, " ");
+
+    ucc_cpu_vendor_t vendor = ucc_get_vendor_from_str(ucc_str_split(split[0], "=")[1]);
+    ucc_cpu_model_t model = ucc_get_model_from_str(ucc_str_split(split[1], "=")[1]);
+
+    const char *team_size_range = ucc_str_split(split[2], "=")[1];
+    ucc_rank_t team_size_begin = (size_t) atoi(ucc_str_split(team_size_range, "-")[0]);
+    ucc_rank_t team_size_end = team_size_begin;
+    if (ucc_str_split(team_size_range, "-")[1]) {
+        team_size_end = (size_t) atoi(ucc_str_split(team_size_range, "-")[1]);
+        printf("inside team size end\n");
+    }
+    printf("team_size_begin = %d, team_size_end = %d\n",team_size_begin, team_size_end);
+
+    const char *ppn_range = ucc_str_split(split[3], "=")[1];
+    ucc_rank_t ppn_min = (ucc_rank_t) atoi(ucc_str_split(ppn_range, "-")[0]);
+    ucc_rank_t ppn_max = ppn_min;
+    if (ucc_str_split(ppn_range, "-")[1]) {
+        ppn_max = (ucc_rank_t) atoi(ucc_str_split(ppn_range, "-")[1]);
+        printf("inside ppn str max\n");
+    }
+    printf("ppn_min_str = %d, ppn_max_str = %d\n",ppn_min, ppn_max);
+
+    return (vendor == _vendor && model == _model &&
+            _team_size >= team_size_begin && _team_size <= team_size_end &&
+            _ppn_range.begin >= ppn_min && _ppn_range.end <= ppn_max);
+}
+
+static ucc_status_t ucc_tl_ucp_cfg_add_section(ucc_tl_ucp_team_t *team,
+                                               ucc_file_config_t *cfg)//, const ucc_base_team_params_t *params)
+{
+    ucc_cpu_vendor_t          vendor = ucc_arch_get_cpu_vendor();
+    ucc_cpu_model_t           model  = ucc_arch_get_cpu_model();
+//    ucc_cfg_team_size_range_t team_sizes;
+    size_t team_size = UCC_TL_TEAM_SIZE(team);
+    ucc_cfg_ppn_range_t ppn_range;
+    khash_t(ucc_sections) *sections = &cfg->sections;
+    const char *sec_name;
+    ucc_status_t status;
+    int i;
+
+    status = ucc_tl_ucp_get_topo_ppn(team, &ppn_range.begin, &ppn_range.end);
+    if (UCC_OK != status) {
+        return status;
+    }
+    printf("ppn_min = %d, ppn_max = %d\n", ppn_range.begin, ppn_range.end);
+
+    for (i = kh_begin(sections); i != kh_end(sections); ++i) {
+        if (!kh_exist(sections, i)) continue;
+        sec_name = kh_key(sections, i);
+        if (ucc_parse_section_name(sec_name, vendor, model, team_size, ppn_range)) {
+            status = ucc_apply_file_cfg(&team->cfg,
+                                        ucc_tl_ucp_lib_config_table, "UCC_",
+                                        ucc_tl_ucp.super.tl_lib_config.prefix,
+                                        sec_name);
+            return status;
+        }
+    }
+    return UCC_ERR_NOT_FOUND;
+}
 
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
     ucc_tl_ucp_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_ucp_context_t);
+    ucc_status_t status = UCC_OK;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
@@ -28,10 +133,21 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    self->preconnect_task    = NULL;
-    self->seq_num            = 0;
-    self->status             = UCC_INPROGRESS;
-
+    self->preconnect_task = NULL;
+    self->seq_num         = 0;
+    self->status          = UCC_INPROGRESS;
+    memcpy(&self->cfg, &UCC_TL_UCP_TEAM_LIB(self)->cfg,
+           sizeof(ucc_tl_ucp_team_config_t));
+    if (ucc_global_config.file_cfg && !IS_SERVICE_TEAM(self) &&
+        UCC_TL_CORE_CTX(self)->topo != NULL) {
+        status = ucc_tl_ucp_cfg_add_section(self, ucc_global_config.file_cfg);
+        if (status != UCC_OK) {
+            ucc_debug("section not found");
+        }
+    }
+    if (!IS_SERVICE_TEAM(self)) {
+        printf("allreduce kn radix from cfg = %d\n", self->cfg.allreduce_kn_radix);
+    }
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }

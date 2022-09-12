@@ -10,6 +10,7 @@
 #include "components/tl/ucc_tl_log.h"
 #include "core/ucc_ee.h"
 #include "utils/ucc_mpool.h"
+#include "utils/arch/cpu.h"
 #include "tl_ucp_ep_hash.h"
 #include "schedule/ucc_schedule_pipelined.h"
 #include <ucp/api/ucp.h>
@@ -40,6 +41,34 @@ typedef struct ucc_tl_ucp_iface {
 } ucc_tl_ucp_iface_t;
 /* Extern iface should follow the pattern: ucc_tl_<tl_name> */
 extern ucc_tl_ucp_iface_t ucc_tl_ucp;
+
+typedef struct ucc_cfg_team_size_range {
+	ucc_rank_t begin;
+	ucc_rank_t end;
+} ucc_cfg_team_size_range_t;
+
+typedef struct ucc_cfg_ppn_range {
+	ucc_rank_t begin;
+	ucc_rank_t end;
+} ucc_cfg_ppn_range_t;
+
+typedef struct ucc_cfg_data_size_range {
+	size_t begin;
+	size_t end;
+} ucc_cfg_data_size_range_t;
+
+//typedef struct ucc_cfg_section_param {
+//    const char *name;
+//    const char *value;
+//} ucc_cfg_section_param_t;
+//
+//typedef struct ucc_cfg_section {
+//    ucc_cpu_vendor_t          vendor;
+//    ucc_cpu_model_t           model;
+//    ucc_cfg_team_size_range_t team_sizes;
+//    ucc_cfg_ppn_range_t       ppns;
+//    ucc_cfg_section_param_t  *params;
+//} ucc_cfg_section_t;
 
 typedef struct ucc_tl_ucp_lib_config {
     ucc_tl_lib_config_t   super;
@@ -75,6 +104,8 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                service_worker;
     uint32_t                service_throttling_thresh;
 } ucc_tl_ucp_context_config_t;
+
+typedef ucc_tl_ucp_lib_config_t ucc_tl_ucp_team_config_t;
 
 typedef struct ucc_tl_ucp_lib {
     ucc_tl_lib_t            super;
@@ -125,9 +156,12 @@ typedef struct ucc_tl_ucp_team {
     void *                     va_base[MAX_NR_SEGMENTS];
     size_t                     base_length[MAX_NR_SEGMENTS];
     ucc_tl_ucp_worker_t *      worker;
+    ucc_tl_ucp_team_config_t   cfg;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
+
+extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 
 #define UCC_TL_UCP_SUPPORTED_COLLS                                             \
     (UCC_COLL_TYPE_ALLGATHER |                                                 \

@@ -611,6 +611,6 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
         attr->attr.global_work_buffer_size =
             ONESIDED_SYNC_SIZE + ONESIDED_REDUCE_SIZE;
     }
-    attr->topo_required = 0;
+    attr->topo_required = 1; //0, always 1 or add flag?
     return UCC_OK;
 }
