@@ -15,7 +15,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
     ucc_tl_sharp_context_t         *ctx =
         ucc_derived_of(tl_context, ucc_tl_sharp_context_t);
     struct sharp_coll_comm_init_spec comm_spec;
-    int                              ret;
+    int                             ret;
+    ucc_status_t                    status;
+    struct sharp_coll_context      *sharp_ctx = ctx->sharp_context;
 
     if (!(params->params.mask & UCC_TEAM_PARAM_FIELD_OOB)) {
         tl_debug(ctx->super.super.lib, "team OOB required for sharp team");
@@ -24,6 +26,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
+    self->sharp_context = NULL;
+    self->rcache = NULL;
     self->oob_ctx.ctx = UCC_TL_TEAM_CTX(self);
     if (UCC_TL_SHARP_TEAM_LIB(self)->cfg.use_internal_oob) {
         self->oob_ctx.subset.map    = UCC_TL_TEAM_MAP(self);
@@ -32,12 +36,37 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
         self->oob_ctx.oob = &UCC_TL_TEAM_OOB(self);
     }
 
+    if (sharp_ctx == NULL) {
+        status = ucc_tl_sharp_context_init(ctx, &self->sharp_context, &self->oob_ctx);
+        if (status != UCC_OK) {
+            return status;
+        }
+
+        if (ctx->cfg.use_rcache) {
+            status = ucc_tl_sharp_rcache_create(self->sharp_context, &self->rcache);
+            if (status != UCC_OK) {
+                tl_error(ctx->super.super.lib, "failed to create rcache");
+                sharp_coll_finalize(self->sharp_context);
+                return UCC_ERR_NO_RESOURCE;
+            }
+        }
+
+        status = ucc_context_progress_register(
+                tl_context->ucc_context, (ucc_context_progress_fn_t)sharp_coll_progress,
+                self->sharp_context);
+        if (status != UCC_OK) {
+            tl_error(ctx->super.super.lib, "failed to register progress function");
+            return status;
+        }
+        sharp_ctx = self->sharp_context;
+    }
+
     comm_spec.rank              = UCC_TL_TEAM_RANK(self);
     comm_spec.size              = UCC_TL_TEAM_SIZE(self);
     comm_spec.group_world_ranks = NULL;
     comm_spec.oob_ctx           = &self->oob_ctx;
 
-    ret = sharp_coll_comm_init(ctx->sharp_context,
+    ret = sharp_coll_comm_init(sharp_ctx,
                                &comm_spec, &self->sharp_comm);
     if (ret < 0) {
         tl_error(ctx->super.super.lib,
@@ -53,7 +82,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_sharp_team_t)
 {
     tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+    if (self->rcache != NULL) {
+        ucc_rcache_destroy(self->rcache);
+    }
     sharp_coll_comm_destroy(self->sharp_comm);
+    if (self->sharp_context != NULL) {
+        ucc_context_progress_deregister(
+            self->super.super.context->ucc_context,
+            (ucc_context_progress_fn_t)sharp_coll_progress, self->sharp_context);
+            sharp_coll_finalize(self->sharp_context);
+    }
 }
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_sharp_team_t, ucc_base_team_t);
