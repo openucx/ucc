@@ -129,9 +129,10 @@ std::string TestCase::str() {
     _str += std::string(ucc_coll_type_str(args.coll_type)) +
             " team=" + team_str(team.type) +
             " mtype=" + ucc_memory_type_names[mem_type] +
-            " msgsize=" + std::to_string(msgsize);
+            " msgsize=" + std::to_string(msgsize) +
+            " persistent=" + (persistent ? "1" : "0");
     if (ucc_coll_inplace_supported(args.coll_type)) {
-        _str += std::string(" inplace=") + (inplace == TEST_INPLACE ? "1" : "0");
+        _str += std::string(" inplace=") + (inplace ? "1" : "0");
     }
     if (ucc_coll_is_rooted(args.coll_type)) {
         _str += std::string(" root=") + std::to_string(root);
@@ -161,8 +162,9 @@ void TestCase::tc_progress_ctx()
 
 TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
                    TestCaseParams params) :
-    team(_team), mem_type(params.mt),  msgsize(params.msgsize),
-    inplace(params.inplace), test_max_size(params.max_size)
+    team(_team), mem_type(params.mt), msgsize(params.msgsize),
+    inplace(params.inplace), persistent(params.persistent),
+    test_max_size(params.max_size)
 {
     int rank;
 
@@ -175,6 +177,16 @@ TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
     args.flags     = 0;
     args.mask      = 0;
     args.coll_type = ct;
+
+    if (inplace) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+    }
+
+    if (persistent) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+    }
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Irecv((void*)progress_buf, 1, MPI_CHAR, rank, 0, MPI_COMM_WORLD,

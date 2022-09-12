@@ -60,20 +60,13 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_MALLOC_CHECK(check_buf);
     fill_counts_and_displacements(size, count, counts, displacements);
 
-    if (TEST_NO_INPLACE == inplace) {
-        args.mask = 0;
+    if (!inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, counts[rank] * dt_size, mem_type));
-        sbuf = sbuf_mc_header->addr;
-    } else {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
-    }
-
-    if (TEST_NO_INPLACE == inplace) {
-        args.src.info.buffer          = sbuf;
-        args.src.info.datatype        = TEST_DT;
-        args.src.info.mem_type        = mem_type;
-        args.src.info.count           = counts[rank];
+        sbuf                   = sbuf_mc_header->addr;
+        args.src.info.buffer   = sbuf;
+        args.src.info.datatype = TEST_DT;
+        args.src.info.mem_type = mem_type;
+        args.src.info.count    = counts[rank];
     }
     args.dst.info_v.buffer        = rbuf;
     args.dst.info_v.counts        = (ucc_count_t*)counts;
@@ -84,27 +77,23 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestAllgatherv::set_input()
+ucc_status_t TestAllgatherv::set_input(int iter_persistent)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
     int    rank;
     void  *buf, *check;
 
     MPI_Comm_rank(team.comm, &rank);
-    if (inplace == TEST_NO_INPLACE) {
-        buf = sbuf;
-    } else {
+    if (inplace) {
         buf = PTR_OFFSET(rbuf, displacements[rank] * dt_size);
+    } else {
+        buf = sbuf;
     }
     check = PTR_OFFSET(check_buf, displacements[rank] * dt_size);
-    init_buffer(buf, counts[rank], TEST_DT, mem_type, rank);
+    init_buffer(buf, counts[rank], TEST_DT, mem_type,
+                rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check, buf, counts[rank] * dt_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));
-    return UCC_OK;
-}
-
-ucc_status_t TestAllgatherv::reset_sbuf()
-{
     return UCC_OK;
 }
 
