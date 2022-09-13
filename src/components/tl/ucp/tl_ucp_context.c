@@ -9,6 +9,7 @@
 #include "tl_ucp_coll.h"
 #include "tl_ucp_ep.h"
 #include "utils/ucc_math.h"
+#include "utils/ucc_string.h"
 #include "utils/arch/cpu.h"
 #include "schedule/ucc_schedule_pipelined.h"
 #include <limits.h>
@@ -68,25 +69,27 @@ ucc_tl_ucp_eps_ephash_init(const ucc_base_context_params_t *params,
     return UCC_OK;
 }
 
-static inline ucc_status_t ucc_tl_ucp_context_service_init(
-    ucp_params_t ucp_params, ucp_config_t *ucp_config,
-    ucp_worker_params_t worker_params, const ucc_base_context_params_t *params,
-    ucc_tl_ucp_context_t *ctx)
+static inline ucc_status_t
+ucc_tl_ucp_context_service_init(const char *prefix, ucp_params_t ucp_params,
+                                ucp_worker_params_t              worker_params,
+                                const ucc_base_context_params_t *params,
+                                ucc_tl_ucp_context_t *           ctx)
 {
-    ucc_status_t  ucc_status = UCC_OK;
+    ucc_status_t  ucc_status;
+    ucp_config_t *ucp_config;
     ucp_context_h ucp_context_service;
     ucp_worker_h  ucp_worker_service;
     ucs_status_t  status;
+    char *        service_prefix;
 
-    if (*ctx->cfg.service_tls) {
-        UCP_CHECK(ucp_config_modify(ucp_config, "TLS", ctx->cfg.service_tls),
-                  "failed to set UCX_TLS for service worker", err_cfg, ctx);
+    ucc_status = ucc_str_concat(prefix, "_SERVICE", &service_prefix);
+    if (UCC_OK != ucc_status) {
+        tl_error(ctx->super.super.lib, "failed to concat service prefix str");
+        return ucc_status;
     }
-    if (*ctx->cfg.service_devs) {
-        UCP_CHECK(
-            ucp_config_modify(ucp_config, "NET_DEVICES", ctx->cfg.service_devs),
-            "failed to set UCX_NET_DEVICES for service worker", err_cfg, ctx);
-    }
+    UCP_CHECK(ucp_config_read(service_prefix, NULL, &ucp_config),
+              "failed to read ucp configuration", err_cfg_read, ctx);
+
     UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context_service),
               "failed to init ucp context for service worker", err_cfg, ctx);
 
@@ -113,6 +116,9 @@ err_thread_mode:
 err_worker_create:
     ucp_cleanup(ucp_context_service);
 err_cfg:
+    ucp_config_release(ucp_config);
+err_cfg_read:
+    ucc_free(service_prefix);
     return ucc_status;
 }
 
@@ -131,12 +137,20 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     ucp_context_h       ucp_context;
     ucp_worker_h        ucp_worker;
     ucs_status_t        status;
+    char *              prefix;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_ucp_config->super,
                               params->context);
     memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
-    UCP_CHECK(ucp_config_read(params->prefix, NULL, &ucp_config),
-              "failed to read ucp configuration", err_cfg, self);
+
+    prefix = strdup(params->prefix);
+    if (!prefix) {
+        tl_error(self->super.super.lib, "failed to duplicate prefix str");
+        return UCC_ERR_NO_MEMORY;
+    }
+    prefix[strlen(prefix) - 1] = '\0';
+    UCP_CHECK(ucp_config_read(prefix, NULL, &ucp_config),
+              "failed to read ucp configuration", err_cfg_read, self);
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK;
@@ -235,13 +249,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
           UCC_ERR_NO_MESSAGE, self);
 
     if (self->cfg.service_worker) {
-        CHECK(
-            UCC_OK != ucc_tl_ucp_context_service_init(
-                          ucp_params, ucp_config, worker_params, params, self),
-            "failed to init service worker", err_cfg, UCC_ERR_NO_MESSAGE, self);
+        CHECK(UCC_OK != ucc_tl_ucp_context_service_init(
+                            prefix, ucp_params, worker_params, params, self),
+              "failed to init service worker", err_cfg, UCC_ERR_NO_MESSAGE,
+              self);
     }
-
-    ucp_config_release(ucp_config);
 
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
@@ -251,6 +263,9 @@ err_thread_mode:
 err_worker_create:
     ucp_cleanup(ucp_context);
 err_cfg:
+    ucp_config_release(ucp_config);
+err_cfg_read:
+    ucc_free(prefix);
     return ucc_status;
 }
 
