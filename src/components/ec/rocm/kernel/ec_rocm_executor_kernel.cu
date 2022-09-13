@@ -46,9 +46,11 @@ __device__ void executor_copy_aligned(T* __restrict__ d, T* __restrict__ s,
     char1 *s1 = (char1*)s;
     char1 *d1 = (char1*)d;
 
-#pragma unroll 4
-    for(int i = 0; i < num_iter; i++) {
-        d[i * step + idx] = s[i * step + idx];
+    for(int i = 0; i < num_iter; i+=4) {
+        d[i     * step + idx] = s[i     * step + idx];
+        d[(i+1) * step + idx] = s[(i+1) * step + idx];
+        d[(i+2) * step + idx] = s[(i+2) * step + idx];
+        d[(i+3) * step + idx] = s[(i+3) * step + idx];
     }
 
     if (idx < count % sizeof(T)) {
@@ -229,7 +231,6 @@ __device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
     const int num_iter = n / step + ((threadIdx.x < n % step) ? 1 : 0);
 
     for (size_t i = 0; i < num_iter; i++) {
-#pragma unroll
         for (int j = 0; j < task->num_vectors; j++) {
             dsts[j][idx] = srcs[j][idx];
         }
