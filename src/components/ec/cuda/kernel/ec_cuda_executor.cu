@@ -16,7 +16,10 @@ extern "C" {
 }
 #endif
 
+#define WARP_SIZE 32
+#define LOOP_UNROLL 8
 #define align_pow2(_n, _p) ((_n) & ((_p) - 1))
+typedef int4 vectype;
 
 __global__ void executor_start(ucc_ec_cuda_executor_state_t *state,
                                int *cidx)
@@ -30,36 +33,60 @@ __global__ void executor_shutdown_ack(ucc_ec_cuda_executor_state_t *state)
     *state = UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK;
 }
 
-template <typename T>
-__device__ void executor_copy(T* __restrict__ d, T* __restrict__ s,
-                              size_t count)
+template<int UNROLL>
+__device__ void executor_copy_task(ucc_eee_task_copy_t &task)
 {
-    size_t start = threadIdx.x;
-    const size_t step  = blockDim.x;
+    size_t      count     = task.len;
+    const char *s1        = reinterpret_cast<const char*>(task.src);
+    char       *d1        = reinterpret_cast<char *>(task.dst);
 
-    for (size_t i = start; i < count; i+=step) {
-        d[i] = s[i];
+    if (!(align_pow2((intptr_t)s1, sizeof(vectype)) ||
+          align_pow2((intptr_t)d1, sizeof(vectype)))) {
+        int            warp      = threadIdx.x / WARP_SIZE;
+        int            num_warps = blockDim.x / WARP_SIZE;
+        int            idx       = threadIdx.x % WARP_SIZE;
+        const vectype *s4        = reinterpret_cast<const vectype*>(s1);
+        vectype       *d4        = reinterpret_cast<vectype*>(d1);
+        size_t         num_lines = (count / (WARP_SIZE * UNROLL * sizeof(vectype))) *
+                                   (WARP_SIZE * UNROLL);
+        vectype        tmp[UNROLL];
+
+        for (size_t line = warp * WARP_SIZE * UNROLL + idx;
+            line < num_lines; line += num_warps * WARP_SIZE * UNROLL) {
+            #pragma unroll
+            for (int i = 0; i < UNROLL; i++) {
+                tmp[i] = s4[line + WARP_SIZE * i];
+            }
+
+            #pragma unroll
+            for (int i = 0; i < UNROLL; i++) {
+                d4[line + WARP_SIZE * i] = tmp[i];
+            }
+        }
+
+        count = count - num_lines * sizeof(vectype);
+        if (count == 0) {
+            return;
+        }
+
+        s4 = s4 + num_lines;
+        d4 = d4 + num_lines;
+        num_lines = count / sizeof(vectype);
+        for (int line = threadIdx.x; line < num_lines; line += blockDim.x) {
+            d4[line] =  s4[line];
+        }
+
+        count = count - num_lines * sizeof(vectype);
+        if (count == 0) {
+            return;
+        }
+
+        s1 = reinterpret_cast<const char*>(s4 + num_lines);
+        d1 = reinterpret_cast<char*>(d4 + num_lines);
     }
-}
 
-template <typename T>
-__device__ void executor_copy_aligned(T* __restrict__ d, T* __restrict__ s,
-                                      size_t count)
-{
-    size_t idx = threadIdx.x;
-    const size_t step  = blockDim.x;
-    const int n = count / sizeof(T);
-    const int num_iter = n / step + ((idx < n % step) ? 1 : 0);
-    char1 *s1 = (char1*)s;
-    char1 *d1 = (char1*)d;
-
-#pragma unroll
-    for(int i = 0; i < num_iter; i++) {
-        d[i * step + idx] = s[i * step + idx];
-    }
-
-    if (idx < count % sizeof(T)) {
-        d1[count - idx - 1] = s1[count - idx - 1];
+    for (size_t line = threadIdx.x; line < count; line += blockDim.x) {
+        d1[line] = s1[line];
     }
 }
 
@@ -126,21 +153,6 @@ __device__ void executor_reduce_strided_sum(const T* __restrict__ s1,
         }
      }
  }
-
-__device__ void executor_copy_task(ucc_eee_task_copy_t *task)
-{
-    bool aligned = !(align_pow2((intptr_t)task->dst, 16) ||
-                     align_pow2((intptr_t)task->src, 16));
-    if (aligned) {
-        executor_copy_aligned<uint4>((uint4 *)task->dst,
-                                     (uint4 *)task->src,
-                                     task->len);
-
-    } else {
-        executor_copy((char *)task->dst, (char *)task->src,
-                      task->len);
-    }
-}
 
 __device__ void executor_reduce_strided_task(ucc_eee_task_reduce_strided_t *task)
 {
@@ -226,9 +238,12 @@ __device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
 
     if (!aligned || min_size < 16) {
         for (int i = 0; i < task->num_vectors; i++) {
-            executor_copy((char*)task->dst[i],
-                          (char*)task->src[i],
-                          task->counts[i]);
+            ucc_eee_task_copy_t copy_task;
+
+            copy_task.src = task->src[i];
+            copy_task.dst = task->dst[i];
+            copy_task.len = task->counts[i];
+            executor_copy_task<LOOP_UNROLL>(copy_task);
         }
         return;
     }
@@ -247,10 +262,13 @@ __device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
     const size_t left = min_size + min_size % sizeof(uint4);
 
     for (int i = 0; i < task->num_vectors; i++) {
-        executor_copy((char*)task->dst[i] + left,
-                      (char*)task->src[i] + left,
-                      task->counts[i] - left);
-    }
+        ucc_eee_task_copy_t copy_task;
+
+        copy_task.src = (char*)task->src[i] + left;
+        copy_task.dst = (char*)task->dst[i] + left;
+        copy_task.len = task->counts[i] - left;
+        executor_copy_task<LOOP_UNROLL>(copy_task);
+   }
 }
 
 
@@ -293,7 +311,7 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
         }
         switch (args.task_type) {
         case UCC_EE_EXECUTOR_TASK_COPY:
-            executor_copy_task(&args.copy);
+            executor_copy_task<LOOP_UNROLL>(args.copy);
             break;
         case UCC_EE_EXECUTOR_TASK_REDUCE:
             executor_reduce_task(&args.reduce);
