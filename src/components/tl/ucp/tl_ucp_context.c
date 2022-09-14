@@ -89,9 +89,11 @@ ucc_tl_ucp_context_service_init(const char *prefix, ucp_params_t ucp_params,
     }
     UCP_CHECK(ucp_config_read(service_prefix, NULL, &ucp_config),
               "failed to read ucp configuration", err_cfg_read, ctx);
+    ucc_free(service_prefix);
 
     UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context_service),
               "failed to init ucp context for service worker", err_cfg, ctx);
+    ucp_config_release(ucp_config);
 
     UCP_CHECK(ucp_worker_create(ucp_context_service, &worker_params,
                                 &ucp_worker_service),
@@ -151,6 +153,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     prefix[strlen(prefix) - 1] = '\0';
     UCP_CHECK(ucp_config_read(prefix, NULL, &ucp_config),
               "failed to read ucp configuration", err_cfg_read, self);
+    ucc_free(prefix);
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK;
@@ -172,6 +175,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context),
               "failed to init ucp context", err_cfg, self);
+    ucp_config_release(ucp_config);
 
     context_attr.field_mask = UCP_ATTR_FIELD_MEMORY_TYPES;
     UCP_CHECK(ucp_context_query(ucp_context, &context_attr),
