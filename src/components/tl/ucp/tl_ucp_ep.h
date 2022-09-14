@@ -41,7 +41,7 @@ typedef struct ucc_tl_ucp_team    ucc_tl_ucp_team_t;
 ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
                                         ucc_rank_t team_rank, ucp_ep_h *ep);
 
-void ucc_tl_ucp_close_eps(ucc_tl_ucp_worker_t   worker,
+void ucc_tl_ucp_close_eps(ucc_tl_ucp_worker_t * worker,
                           ucc_tl_ucp_context_t *ctx);
 
 static inline ucc_context_addr_header_t *

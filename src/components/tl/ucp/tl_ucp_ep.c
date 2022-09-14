@@ -65,26 +65,27 @@ ucc_status_t ucc_tl_ucp_connect_team_ep(ucc_tl_ucp_team_t *team,
 /* Finds next non-NULL ep in the storage and returns that handle
    for closure. In case of "hash" storage it pops the item,
    in case of "array" sets it to NULL */
-static inline ucp_ep_h get_next_ep_to_close(ucc_tl_ucp_worker_t   worker,
+static inline ucp_ep_h get_next_ep_to_close(ucc_tl_ucp_worker_t * worker,
                                             ucc_tl_ucp_context_t *ctx, int *i)
 {
     ucp_ep_h   ep = NULL;
     ucc_rank_t size;
 
-    if (worker.eps) {
+    if (worker->eps) {
         size = (ucc_rank_t)ctx->super.super.ucc_context->params.oob.n_oob_eps;
         while (NULL == ep && (*i) < size) {
-            ep             = worker.eps[*i];
-            worker.eps[*i] = NULL;
+            ep              = worker->eps[*i];
+            worker->eps[*i] = NULL;
             (*i)++;
         }
     } else {
-        ep = tl_ucp_hash_pop(worker.ep_hash);
+        ep = tl_ucp_hash_pop(worker->ep_hash);
     }
     return ep;
 }
 
-void ucc_tl_ucp_close_eps(ucc_tl_ucp_worker_t worker, ucc_tl_ucp_context_t *ctx)
+void ucc_tl_ucp_close_eps(ucc_tl_ucp_worker_t * worker,
+                          ucc_tl_ucp_context_t *ctx)
 {
      int                          i = 0;
      ucp_ep_h                     ep;

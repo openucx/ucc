@@ -341,14 +341,14 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
     return UCC_OK;
 }
 
-static inline void ucc_tl_ucp_eps_cleanup(ucc_tl_ucp_worker_t   worker,
+static inline void ucc_tl_ucp_eps_cleanup(ucc_tl_ucp_worker_t * worker,
                                           ucc_tl_ucp_context_t *ctx)
 {
     ucc_tl_ucp_close_eps(worker, ctx);
-    if (worker.eps) {
-        ucc_free(worker.eps);
+    if (worker->eps) {
+        ucc_free(worker->eps);
     } else {
-        kh_destroy(tl_ucp_ep_hash, worker.ep_hash);
+        kh_destroy(tl_ucp_ep_hash, worker->ep_hash);
     }
 }
 
@@ -379,9 +379,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
             self);
     }
     ucc_mpool_cleanup(&self->req_mp, 1);
-    ucc_tl_ucp_eps_cleanup(self->worker, self);
+    ucc_tl_ucp_eps_cleanup(&self->worker, self);
     if (self->cfg.service_worker != 0) {
-        ucc_tl_ucp_eps_cleanup(self->service_worker, self);
+        ucc_tl_ucp_eps_cleanup(&self->service_worker, self);
     }
     if (UCC_TL_CTX_HAS_OOB(self)) {
         ucc_tl_ucp_context_barrier(self, &UCC_TL_CTX_OOB(self));
