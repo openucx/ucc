@@ -29,22 +29,18 @@
         goto go;                                                               \
     }
 
-unsigned ucc_tl_ucp_worker_progress(void *progress_arg)
+unsigned ucc_tl_ucp_service_worker_progress(void *progress_arg)
 {
     ucc_tl_ucp_context_t *ctx = (ucc_tl_ucp_context_t *)progress_arg;
-    unsigned              ret;
+    int                   throttling_count =
+        ucc_atomic_fadd32(&ctx->service_worker_throttling_count, 1);
 
-    ret = ucp_worker_progress(ctx->worker.ucp_worker);
-
-    if (ctx->cfg.service_worker != 0) {
-        int throttling_count =
-            ucc_atomic_fadd32(&ctx->service_worker_throttling_count, 1);
-        if (throttling_count == ctx->cfg.service_throttling_thresh) {
-            ctx->service_worker_throttling_count = 0;
-            ret |= ucp_worker_progress(ctx->service_worker.ucp_worker);
-        }
+    if (throttling_count == ctx->cfg.service_throttling_thresh) {
+        ctx->service_worker_throttling_count = 0;
+        return ucp_worker_progress(ctx->service_worker.ucp_worker);
     }
-    return ret;
+
+    return 0;
 }
 
 static inline ucc_status_t
@@ -110,6 +106,13 @@ ucc_tl_ucp_context_service_init(const char *prefix, ucp_params_t ucp_params,
           err_thread_mode, UCC_ERR_NO_MESSAGE, ctx);
 
     ctx->service_worker_throttling_count = 0;
+    CHECK(UCC_OK !=
+              ucc_context_progress_register(
+                  params->context,
+                  (ucc_context_progress_fn_t)ucc_tl_ucp_service_worker_progress,
+                  ctx),
+          "failed to register progress function for service worker",
+          err_thread_mode, UCC_ERR_NO_MESSAGE, ctx);
 
     return UCC_OK;
 
@@ -229,8 +232,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     CHECK(UCC_OK != ucc_context_progress_register(
                         params->context,
-                        (ucc_context_progress_fn_t)ucc_tl_ucp_worker_progress,
-                        self),
+                        (ucc_context_progress_fn_t)ucp_worker_progress,
+                        self->worker.ucp_worker),
           "failed to register progress function", err_thread_mode,
           UCC_ERR_NO_MESSAGE, self);
 
@@ -367,7 +370,14 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     }
     ucc_context_progress_deregister(
         self->super.super.ucc_context,
-        (ucc_context_progress_fn_t)ucc_tl_ucp_worker_progress, self);
+        (ucc_context_progress_fn_t)ucp_worker_progress,
+        self->worker.ucp_worker);
+    if (self->cfg.service_worker != 0) {
+        ucc_context_progress_deregister(
+            self->super.super.ucc_context,
+            (ucc_context_progress_fn_t)ucc_tl_ucp_service_worker_progress,
+            self);
+    }
     ucc_mpool_cleanup(&self->req_mp, 1);
     ucc_tl_ucp_eps_cleanup(self->worker, self);
     if (self->cfg.service_worker != 0) {
