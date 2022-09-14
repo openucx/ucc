@@ -117,6 +117,13 @@ ucc_status_t ucc_components_load(const char *framework_name,
     ucc_status_t            status;
     size_t                  pattern_size;
     ucc_component_iface_t **ifaces = NULL;
+    ucc_global_config_t *cfg = &ucc_global_config;
+
+    if(!cfg->initialized){
+        if(UCC_OK != (status = ucc_constructor())){
+            return status;
+        }
+    }
 
     framework->n_components = 0;
     framework->components   = NULL;
