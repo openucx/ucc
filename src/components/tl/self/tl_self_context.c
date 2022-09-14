@@ -22,8 +22,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_self_context_t,
     memcpy(&self->cfg, tl_self_config, sizeof(*tl_self_config));
 
     status = ucc_mpool_init(&self->req_mp, 0, sizeof(ucc_tl_self_task_t), 0,
-                            UCC_CACHE_LINE_SIZE, 8, UINT_MAX, NULL,
-                            params->thread_mode, "tl_self_req_mp");
+                            UCC_CACHE_LINE_SIZE, 8, UINT_MAX,
+                            &ucc_coll_task_mpool_ops, params->thread_mode,
+                            "tl_self_req_mp");
     if (status != UCC_OK) {
         tl_error(self->super.super.lib,
                  "failed to initialize tl_self_req mpool");

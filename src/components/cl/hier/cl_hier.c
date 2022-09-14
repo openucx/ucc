@@ -78,10 +78,10 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
                   allreduce_split_rail_pipeline_depth),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ALLREDUCE_SPLIT_RAIL_SEQUENTIAL", "n",
-     "Type of pipelined schedule for Split_Rail alg (sequential/parallel)",
-     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_split_rail_seq),
-     UCC_CONFIG_TYPE_BOOL},
+    {"ALLREDUCE_SPLIT_RAIL_PIPELINE_ORDER", "ordered",
+     "Type of pipelined schedule for Split_Rail alg (sequential/ordered/parallel)",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_split_rail_pipeline_order),
+     UCC_CONFIG_TYPE_ENUM(ucc_pipeline_order_names)},
 
     {NULL}};
 

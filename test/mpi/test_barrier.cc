@@ -13,12 +13,7 @@ TestBarrier::TestBarrier(ucc_test_team_t &team, TestCaseParams &params) :
     UCC_CHECK(ucc_collective_init(&args, &req, team.team));
 }
 
-ucc_status_t TestBarrier::set_input()
-{
-    return UCC_OK;
-}
-
-ucc_status_t TestBarrier::reset_sbuf()
+ucc_status_t TestBarrier::set_input(int iter_persistent) /* NOLINT */
 {
     return UCC_OK;
 }
@@ -79,7 +74,7 @@ void TestBarrier::run(bool triggered)
             MPI_Test(&rreq, &completed, MPI_STATUS_IGNORE);
             mpi_progress();
         }
-        if (i < size - 1) {
+        if (!persistent && i < size - 1) {
             UCC_CHECK(ucc_collective_finalize(req));
             UCC_CHECK(ucc_collective_init(&args, &req, team.team));
         }

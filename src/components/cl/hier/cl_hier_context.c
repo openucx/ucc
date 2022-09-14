@@ -52,8 +52,9 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
     }
 
     status = ucc_mpool_init(&self->sched_mp, 0, sizeof(ucc_cl_hier_schedule_t),
-                            0, UCC_CACHE_LINE_SIZE, 2, UINT_MAX, NULL,
-                            params->thread_mode, "cl_hier_sched_mp");
+                            0, UCC_CACHE_LINE_SIZE, 2, UINT_MAX,
+                            &ucc_coll_task_mpool_ops, params->thread_mode,
+                            "cl_hier_sched_mp");
     if (UCC_OK != status) {
         cl_error(cl_config->cl_lib, "failed to initialize cl_hier_sched mpool");
         goto out;

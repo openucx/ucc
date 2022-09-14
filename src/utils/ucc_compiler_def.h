@@ -17,6 +17,10 @@
 #include <assert.h>
 #endif
 
+#ifndef SIZE_MAX
+#define SIZE_MAX ((size_t) -1)
+#endif
+
 #define ucc_offsetof      ucs_offsetof
 #define ucc_container_of  ucs_container_of
 #define ucc_derived_of    ucs_derived_of
@@ -105,4 +109,13 @@ static inline ucs_status_t ucc_status_to_ucs_status(ucc_status_t status)
 #endif
 
 #define ucc_for_each_bit ucs_for_each_bit
+
+#define UCC_CHECK_GOTO(_cmd, _label, _status)                                  \
+    do {                                                                       \
+        _status = (_cmd);                                                      \
+        if (ucc_unlikely(_status != UCC_OK)) {                                 \
+            goto _label;                                                       \
+        }                                                                      \
+    } while (0)
+
 #endif

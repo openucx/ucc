@@ -4,33 +4,82 @@
  */
 #include "ucc_schedule.h"
 #include "utils/ucc_compiler_def.h"
+#include "utils/ucc_mpool.h"
 #include "components/base/ucc_base_iface.h"
 #include "coll_score/ucc_coll_score.h"
 #include "core/ucc_context.h"
 
-ucc_status_t ucc_event_manager_init(ucc_event_manager_t *em)
+static void ucc_coll_task_mpool_obj_init(ucc_mpool_t *mp, void *obj,
+                                         void *chunk)
 {
-    int i;
-    for (i = 0; i < MAX_LISTENERS; i++) {
-        em->listeners[i].task = NULL;
+    ucc_coll_task_t *task = obj;
+
+    ucc_coll_task_construct(task);
+}
+
+static void ucc_coll_task_mpool_obj_cleanup(ucc_mpool_t *mp, void *obj)
+{
+    ucc_coll_task_t *task = obj;
+
+    ucc_coll_task_destruct(task);
+}
+
+struct ucc_mpool_ops ucc_coll_task_mpool_ops = {
+    .chunk_alloc   = ucc_mpool_hugetlb_malloc,
+    .chunk_release = ucc_mpool_hugetlb_free,
+    .obj_init      = ucc_coll_task_mpool_obj_init,
+    .obj_cleanup   = ucc_coll_task_mpool_obj_cleanup
+};
+
+static ucc_status_t ucc_event_manager_init(ucc_coll_task_t *task)
+{
+    ucc_event_manager_t *em;
+
+    ucc_list_for_each(em, &task->em_list, list_elem) {
+        em->n_listeners = 0;
     }
     return UCC_OK;
 }
 
-void ucc_event_manager_subscribe(ucc_event_manager_t *em, ucc_event_t event,
-                                 ucc_coll_task_t *task,
-                                 ucc_task_event_handler_p handler)
+ucc_status_t ucc_event_manager_subscribe(ucc_coll_task_t *parent_task,
+                                         ucc_event_t event, ucc_coll_task_t *task,
+                                         ucc_task_event_handler_p handler)
 {
-    int i;
-    for (i = 0; i < MAX_LISTENERS; i++) {
-        if (!em->listeners[i].task) {
-            em->listeners[i].task    = task;
-            em->listeners[i].event   = event;
-            em->listeners[i].handler = handler;
-            break;
+    ucc_event_manager_t *em;
+
+    ucc_list_for_each(em, &parent_task->em_list, list_elem) {
+        if (em->n_listeners < MAX_LISTENERS) {
+        set:
+            em->listeners[em->n_listeners].task    = task;
+            em->listeners[em->n_listeners].event   = event;
+            em->listeners[em->n_listeners].handler = handler;
+            em->n_listeners++;
+            return UCC_OK;
         }
     }
-    ucc_assert(i < MAX_LISTENERS);
+    em              = ucc_malloc(sizeof(*em), "em");
+    if (ucc_unlikely(!em)) {
+        ucc_error("failed to allocate %zd bytes for event_manager", sizeof(*em));
+        return UCC_ERR_NO_MEMORY;
+    }
+    em->n_listeners = 0;
+    ucc_list_add_tail(&parent_task->em_list, &em->list_elem);
+    goto set;
+}
+
+void ucc_coll_task_construct(ucc_coll_task_t *task)
+{
+    ucc_list_head_init(&task->em_list);
+}
+
+void ucc_coll_task_destruct(ucc_coll_task_t *task)
+{
+    ucc_event_manager_t *em, *m;
+
+    ucc_list_for_each_safe(em, m, &task->em_list, list_elem) {
+        ucc_list_del(&em->list_elem);
+        free(em);
+    }
 }
 
 ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
@@ -51,7 +100,7 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
         memcpy(&task->bargs, bargs, sizeof(*bargs));
     }
     ucc_lf_queue_init_elem(&task->lf_elem);
-    return ucc_event_manager_init(&task->em);
+    return ucc_event_manager_init(task);
 }
 
 ucc_status_t ucc_coll_task_get_executor(ucc_coll_task_t *task,
@@ -76,17 +125,19 @@ static ucc_status_t
 ucc_task_error_handler(ucc_coll_task_t *parent_task,
                        ucc_coll_task_t *task)
 {
-    ucc_event_manager_t *em = &parent_task->em;
+    ucc_event_manager_t *em;
     ucc_coll_task_t     *listener;
-    int                 i;
+    int                  i;
 
     task->super.status = parent_task->super.status;
-    for (i = 0; i < MAX_LISTENERS; i++) {
-        listener = em->listeners[i].task;
-        if (listener &&
-            listener->super.status != parent_task->super.status) {
-            /* status has not been propagated yet */
-            ucc_task_error_handler(task, listener);
+
+    ucc_list_for_each(em, &parent_task->em_list, list_elem) {
+        for (i = 0; i < em->n_listeners; i++) {
+            listener = em->listeners[i].task;
+            if (listener->super.status != parent_task->super.status) {
+                /* status has not been propagated yet */
+                ucc_task_error_handler(task, listener);
+            }
         }
     }
     return UCC_OK;
@@ -95,14 +146,14 @@ ucc_task_error_handler(ucc_coll_task_t *parent_task,
 ucc_status_t ucc_event_manager_notify(ucc_coll_task_t *parent_task,
                                       ucc_event_t event)
 {
-    ucc_event_manager_t *em = &parent_task->em;
+    ucc_event_manager_t *em;
     ucc_coll_task_t     *task;
-    ucc_status_t        status;
-    int                 i;
+    ucc_status_t         status;
+    int                  i;
 
-    for (i = 0; i < MAX_LISTENERS; i++) {
-        task = em->listeners[i].task;
-        if (task) {
+    ucc_list_for_each(em, &parent_task->em_list, list_elem) {
+        for (i = 0; i < em->n_listeners; i++) {
+            task = em->listeners[i].task;
             if (ucc_unlikely(event == UCC_EVENT_ERROR)) {
                 ucc_task_error_handler(parent_task, task);
                 continue;
@@ -146,9 +197,11 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule,
     return status;
 }
 
-void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
+ucc_status_t ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
 {
-    ucc_event_manager_subscribe(&task->em, UCC_EVENT_COMPLETED_SCHEDULE,
+    ucc_status_t status;
+
+    status = ucc_event_manager_subscribe(task, UCC_EVENT_COMPLETED_SCHEDULE,
                                 &schedule->super,
                                 ucc_schedule_completed_handler);
     task->schedule                       = schedule;
@@ -156,6 +209,7 @@ void ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
     if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
         schedule->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     }
+    return status;
 }
 
 ucc_status_t ucc_schedule_start(ucc_coll_task_t *task)

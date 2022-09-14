@@ -50,10 +50,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     memcpy(&args, coll_args, sizeof(args));
     args.args.root = 0; /* TODO: we can select the rank closest to HCA */
     n_tasks        = 0;
-    status         = ucc_schedule_init(schedule, &args, team);
-    if (ucc_unlikely(UCC_OK != status)) {
-        goto out;
-    }
+    UCC_CHECK_GOTO(ucc_schedule_init(schedule, &args, team), out, status);
 
     if (SBGP_ENABLED(cl_team, NODE)) {
         ucc_assert(n_tasks == 0);
@@ -66,11 +63,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
                 args.args.src.info = args.args.dst.info;
             }
         }
-        status =
-            ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]);
-        if (ucc_unlikely(UCC_OK != status)) {
-            goto out;
-        }
+        UCC_CHECK_GOTO(
+            ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]),
+            out, status);
         n_tasks++;
         args.args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
         args.args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
@@ -79,11 +74,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     if (SBGP_ENABLED(cl_team, NODE_LEADERS)) {
         ucc_assert(cl_team->top_sbgp == UCC_HIER_SBGP_NODE_LEADERS);
         args.args.coll_type = UCC_COLL_TYPE_ALLREDUCE;
-        status = ucc_coll_init(SCORE_MAP(cl_team, NODE_LEADERS), &args,
-                               &tasks[n_tasks]);
-        if (ucc_unlikely(UCC_OK != status)) {
-            goto out;
-        }
+        UCC_CHECK_GOTO(ucc_coll_init(SCORE_MAP(cl_team, NODE_LEADERS), &args,
+                                     &tasks[n_tasks]),
+                       out, status);
         n_tasks++;
     }
 
@@ -93,21 +86,24 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
         /* For bcast src should point to origin dst of allreduce */
         args.args.src.info  = args.args.dst.info;
         args.args.coll_type = UCC_COLL_TYPE_BCAST;
-        status =
-            ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]);
-        if (ucc_unlikely(UCC_OK != status)) {
-            goto out;
-        }
+        UCC_CHECK_GOTO(
+            ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]),
+            out, status);
         n_tasks++;
     }
 
-    ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
-                                tasks[0], ucc_task_start_handler);
-    ucc_schedule_add_task(schedule, tasks[0]);
+    UCC_CHECK_GOTO(ucc_event_manager_subscribe(
+                       &schedule->super, UCC_EVENT_SCHEDULE_STARTED, tasks[0],
+                       ucc_task_start_handler),
+                   out, status);
+
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, tasks[0]), out, status);
     for (i = 1; i < n_tasks; i++) {
-        ucc_event_manager_subscribe(&tasks[i - 1]->em, UCC_EVENT_COMPLETED,
-                                    tasks[i], ucc_task_start_handler);
-        ucc_schedule_add_task(schedule, tasks[i]);
+        UCC_CHECK_GOTO(
+            ucc_event_manager_subscribe(tasks[i - 1], UCC_EVENT_COMPLETED,
+                                        tasks[i], ucc_task_start_handler),
+            out, status);
+        UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, tasks[i]), out, status);
     }
 
     schedule->super.post     = ucc_cl_hier_allreduce_rab_start;

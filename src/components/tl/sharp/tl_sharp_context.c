@@ -8,13 +8,6 @@
 #include "tl_sharp.h"
 #include "utils/arch/cpu.h"
 
-static ucc_mpool_ops_t ucc_tl_sharp_req_mpool_ops = {
-    .chunk_alloc   = ucc_mpool_hugetlb_malloc,
-    .chunk_release = ucc_mpool_hugetlb_free,
-    .obj_init      = NULL,
-    .obj_cleanup   = NULL
-};
-
 static int ucc_tl_sharp_oob_barrier(void *arg)
 {
     ucc_tl_sharp_oob_ctx_t *oob_ctx  = (ucc_tl_sharp_oob_ctx_t *)arg;
@@ -373,7 +366,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
 
     status = ucc_mpool_init(&self->req_mp, 0, sizeof(ucc_tl_sharp_task_t), 0,
                             UCC_CACHE_LINE_SIZE, 8, UINT_MAX,
-                            &ucc_tl_sharp_req_mpool_ops, params->thread_mode,
+                            &ucc_coll_task_mpool_ops, params->thread_mode,
                             "tl_sharp_req_mp");
     if (status != UCC_OK) {
         tl_error(self->super.super.lib,

@@ -33,13 +33,9 @@ TestReduce::TestReduce(ucc_test_team_t &_team, TestCaseParams &params) :
         args.dst.info.datatype = dt;
         args.dst.info.mem_type = mem_type;
     }
-    if ((rank != root) || (inplace == TEST_NO_INPLACE)) {
+    if ((rank != root) || (!inplace)) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize, mem_type));
         sbuf = sbuf_mc_header->addr;
-    }
-    if (inplace == TEST_INPLACE) {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 
     args.op                   = op;
@@ -52,7 +48,7 @@ TestReduce::TestReduce(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestReduce::set_input()
+ucc_status_t TestReduce::set_input(int iter_persistent)
 {
     size_t dt_size = ucc_dt_size(dt);
     size_t count   = msgsize / dt_size;
@@ -66,14 +62,9 @@ ucc_status_t TestReduce::set_input()
         buf = sbuf;
     }
 
-    init_buffer(buf, count, dt, mem_type, rank);
+    init_buffer(buf, count, dt, mem_type, rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check_buf, buf, count * dt_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));
-    return UCC_OK;
-}
-
-ucc_status_t TestReduce::reset_sbuf()
-{
     return UCC_OK;
 }
 
@@ -106,9 +97,11 @@ ucc_status_t TestReduce::check()
 
 std::string TestReduce::str() {
     return std::string("tc=")+ucc_coll_type_str(args.coll_type) +
-        " team=" + team_str(team.type) + " msgsize=" +
-        std::to_string(msgsize) + " inplace=" +
-        (inplace == TEST_INPLACE ? "1" : "0") + " dt=" +
-        ucc_datatype_str(dt) + " op=" + ucc_reduction_op_str(op) +
+        " team=" + team_str(team.type) +
+        " msgsize=" + std::to_string(msgsize) +
+        " inplace=" + (inplace ? "1" : "0") +
+        " persistent=" + (persistent ? "1" : "0") +
+        " dt=" + ucc_datatype_str(dt) +
+        " op=" + ucc_reduction_op_str(op) +
         " root=" + std::to_string(root);
 }
