@@ -214,13 +214,30 @@ __device__ void executor_reduce_task(ucc_eee_task_reduce_t *task)
     }
 }
 
+__device__ void executor_reduce_multi_dst_task(ucc_eee_task_reduce_multi_dst_t *task)
+{
+    ucc_eee_task_reduce_t reduce_task;
+
+    for (int i = 0; i < task->n_bufs; i++) {
+        reduce_task.count   = task->counts[i];
+        reduce_task.dt      = task->dt;
+        reduce_task.op      = task->op;
+        reduce_task.dst     = task->dst[i];
+        reduce_task.srcs[0] = task->src1[i];
+        reduce_task.srcs[1] = task->src2[i];
+        reduce_task.n_srcs  = 2;
+
+        executor_reduce_task(&reduce_task);
+    }
+}
+
 __device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
 {
     const size_t     step     = blockDim.x;
     size_t           min_size = task->counts[0];
     size_t           idx      = threadIdx.x;
-    __shared__ int4 *dsts[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
-    __shared__ int4 *srcs[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
+    __shared__ int4 *dsts[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
+    __shared__ int4 *srcs[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
     bool             aligned;
 
     for (int i = 0; i < task->num_vectors; i++) {
@@ -318,6 +335,9 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
             break;
         case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:
             executor_reduce_strided_task(&args.reduce_strided);
+            break;
+        case UCC_EE_EXECUTOR_TASK_REDUCE_MULTI_DST:
+            executor_reduce_multi_dst_task(&args.reduce_multi_dst);
             break;
         case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
             executor_copy_multi(&args.copy_multi);

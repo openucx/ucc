@@ -12,6 +12,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *params,
 {
     const ucc_tl_cuda_lib_config_t *tl_config =
         ucc_derived_of(config, ucc_tl_cuda_lib_config_t);
+    size_t min_scratch_size;
+
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_lib_t, &ucc_tl_cuda.super,
                               &tl_config->super);
     memcpy(&self->cfg, tl_config, sizeof(*tl_config));
@@ -20,6 +22,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *params,
     }
     if (self->cfg.allgather_ring_num_chunks > UCC_TL_CUDA_MAX_RING_CHUNKS) {
         self->cfg.allgather_ring_num_chunks = UCC_TL_CUDA_MAX_RING_CHUNKS;
+    }
+
+    /* min scratch size should be large enough so that
+       ucc_align_down_pow2(scratch_size / nrings / nchunks / dt_size / 2, 64) > 1
+     */
+
+    min_scratch_size = 128 * 16 * ucc_dt_size(UCC_DT_FLOAT128_COMPLEX) *
+                       self->cfg.allgather_ring_num_chunks;
+    if (self->cfg.scratch_size < min_scratch_size) {
+        self->cfg.scratch_size = min_scratch_size;
     }
     tl_info(&self->super, "initialized lib object: %p", self);
     return UCC_OK;

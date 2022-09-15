@@ -108,6 +108,24 @@ extern "C" {
         }                                                                      \
     }
 
+#define CUDA_REDUCE_WITH_OP_MULTI_DST(NAME, _OP)                               \
+    template <typename _Type>                             \
+    __global__ void UCC_REDUCE_CUDA_MULTI_DST_##NAME(                          \
+        ucc_eee_task_reduce_multi_dst_t arg)                                   \
+    {                                                                          \
+        size_t start = blockIdx.x * blockDim.x + threadIdx.x;                  \
+        size_t step  = blockDim.x * gridDim.x;                                 \
+        for (int j = 0; j < arg.n_bufs; j++) {                                 \
+            size_t count = arg.counts[j];                                      \
+            _Type *s2 = (_Type *)arg.src2[j];                                  \
+            _Type *s1 = (_Type *)arg.src1[j];                                  \
+            _Type *d  = (_Type *)arg.dst[j];                                   \
+            for (size_t i = start; i < count; i += step) {                     \
+                d[i] = _OP##_2(s1[i], s2[i]);                                  \
+            }                                                                  \
+        }                                                                      \
+    }
+
 CUDA_REDUCE_WITH_OP_DEFAULT(SUM, DO_OP_SUM);
 CUDA_REDUCE_WITH_OP_DEFAULT(PROD, DO_OP_PROD);
 CUDA_REDUCE_WITH_OP_DEFAULT(MIN, DO_OP_MIN);
@@ -130,18 +148,85 @@ CUDA_REDUCE_WITH_OP_STRIDED(BAND, DO_OP_BAND);
 CUDA_REDUCE_WITH_OP_STRIDED(BOR, DO_OP_BOR);
 CUDA_REDUCE_WITH_OP_STRIDED(BXOR, DO_OP_BXOR);
 
+CUDA_REDUCE_WITH_OP_MULTI_DST(SUM, DO_OP_SUM);
+CUDA_REDUCE_WITH_OP_MULTI_DST(PROD, DO_OP_PROD);
+CUDA_REDUCE_WITH_OP_MULTI_DST(MIN, DO_OP_MIN);
+CUDA_REDUCE_WITH_OP_MULTI_DST(MAX, DO_OP_MAX);
+CUDA_REDUCE_WITH_OP_MULTI_DST(LAND, DO_OP_LAND);
+CUDA_REDUCE_WITH_OP_MULTI_DST(LOR, DO_OP_LOR);
+CUDA_REDUCE_WITH_OP_MULTI_DST(LXOR, DO_OP_LXOR);
+CUDA_REDUCE_WITH_OP_MULTI_DST(BAND, DO_OP_BAND);
+CUDA_REDUCE_WITH_OP_MULTI_DST(BOR, DO_OP_BOR);
+CUDA_REDUCE_WITH_OP_MULTI_DST(BXOR, DO_OP_BXOR);
+
+#define align_pow2(_n, _p) ((_n) & ((_p) - 1))
+
+__device__ inline void add_float4(float4 &d, const float4 &x, const float4 &y)
+{
+    d.x = x.x + y.x;
+    d.y = x.y + y.y;
+    d.z = x.z + y.z;
+    d.w = x.w + y.w;
+}
+
+template <>
+__global__ void UCC_REDUCE_CUDA_MULTI_DST_SUM<float>(
+        ucc_eee_task_reduce_multi_dst_t arg)
+{
+    int    blocks_per_buf = gridDim.x / arg.n_bufs;
+    int    buf_id         = blockIdx.x / blocks_per_buf;
+    size_t step           = blockDim.x * blocks_per_buf;
+    int    idx            = threadIdx.x + (blockIdx.x % blocks_per_buf) * blockDim.x;
+    int    align;
+
+    align = align_pow2((intptr_t)arg.src1[buf_id], 16) |
+            align_pow2((intptr_t)arg.src2[buf_id], 16) |
+            align_pow2((intptr_t)arg.dst[buf_id], 16);
+
+    if (align == 0) {
+        /* aligned */
+        size_t        count = arg.counts[buf_id] / 4;
+        const float4 *s14   = (float4*)arg.src1[buf_id];
+        const float4 *s24   = (float4*)arg.src2[buf_id];
+        float4       *d4    = (float4*)arg.dst[buf_id];
+
+        for (size_t i = idx; i < count; i += step) {
+            add_float4(d4[i], s14[i], s24[i]);
+        }
+
+        if (idx < arg.counts[buf_id] % 4) {
+            size_t lidx = arg.counts[buf_id] - idx - 1;
+            ((float*)arg.dst[buf_id])[lidx] =
+                ((float*)arg.src1[buf_id])[lidx] + ((float*)arg.src2[buf_id])[lidx];
+
+        }
+    } else {
+        size_t       count = arg.counts[buf_id];
+        const float *s1    = (float*)arg.src1[buf_id];
+        const float *s2    = (float*)arg.src2[buf_id];
+        float       *d     = (float*)arg.dst[buf_id];
+
+        for (size_t i = idx; i < count; i += step) {
+            d[i] = s1[i] + s2[i];
+        }
+    }
+}
+
 #define LAUNCH_KERNEL_A(NAME, type, _AlphaType, _task, s, b, t)                \
     do {                                                                       \
         if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
             UCC_REDUCE_CUDA_DEFAULT_##NAME<type, _AlphaType>                   \
                 <<<b, t, 0, s>>>(_task->reduce, _task->flags);                 \
-        } else {                                                               \
+        } else if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED) {  \
             ucc_eee_task_reduce_strided_t *trs = &_task->reduce_strided;       \
-            UCC_REDUCE_CUDA_STRIDED_##NAME<type, _AlphaType><<<b, t, 0, s>>>(   \
+            UCC_REDUCE_CUDA_STRIDED_##NAME<type, _AlphaType><<<b, t, 0, s>>>(  \
                 (type *)trs->src1, (type *)trs->src2, (type *)trs->dst,        \
                 trs->count, trs->stride, trs->n_src2,                          \
                 (bool)(_task->flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA),    \
                 trs->alpha);                                                   \
+        } else {                                                               \
+            UCC_REDUCE_CUDA_MULTI_DST_##NAME<type>                             \
+                <<<b, t, 0, s>>>(_task->reduce_multi_dst);                     \
         }                                                                      \
     } while (0)
 
@@ -247,23 +332,34 @@ ucc_status_t ucc_ec_cuda_reduce(ucc_ee_executor_task_args_t *task,
     ucc_reduction_op_t op;
     ucc_datatype_t     dt;
     size_t             count;
+    int                i;
 
     if (task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
-        dt    = task->reduce.dt;
         count = task->reduce.count;
+        dt    = task->reduce.dt;
         op    = task->reduce.op;
-    } else {
-        ucc_assert(task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED);
-        dt    = task->reduce_strided.dt;
+        bk    = ucc_min((count + th - 1) / th, bk);
+    } else if (task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED) {
         count = task->reduce_strided.count;
+        dt    = task->reduce_strided.dt;
         op    = task->reduce_strided.op;
+        bk    = ucc_min((count + th - 1) / th, bk);
+    } else {
+        if (task->reduce_multi_dst.n_bufs == 0) {
+            return UCC_OK;
+        }
+        count = 0;
+        for (i = 0 ; i < task->reduce_multi_dst.n_bufs; i++) {
+            count += task->reduce_multi_dst.counts[i];
+        }
+        dt    = task->reduce_multi_dst.dt;
+        op    = task->reduce_multi_dst.op;
+        bk    = 4 * task->reduce_multi_dst.n_bufs;
     }
 
     if (count == 0) {
         return UCC_OK;
     }
-
-    bk = ucc_min((count + th - 1) / th, bk);
 
     switch (dt) {
     case UCC_DT_INT8:

@@ -24,10 +24,14 @@ ucc_cuda_executor_persistent_task_post(ucc_ee_executor_t *executor,
         if (task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
             dt = task_args->reduce.dt;
             op = task_args->reduce.op;
-        } else {
+        } else if (task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED) {
             dt = task_args->reduce_strided.dt;
             op = task_args->reduce_strided.op;
+        } else {
+            dt = task_args->reduce_multi_dst.dt;
+            op = task_args->reduce_multi_dst.op;
         }
+
         if (op != UCC_OP_SUM) {
             ec_error(&ucc_ec_cuda.super, "not supported reduction op: %s",
                      ucc_reduction_op_str(op));
