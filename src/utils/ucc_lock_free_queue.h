@@ -7,7 +7,7 @@
 #define UCC_LOCKFREE_QUEUE_H_
 
 #include "utils/ucc_spinlock.h"
-#include "utils/ucc_atomic.h"
+#include "utils/arch/atomic.h"
 #include "utils/ucc_list.h"
 #include <string.h>
 

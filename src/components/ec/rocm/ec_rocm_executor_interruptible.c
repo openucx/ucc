@@ -7,7 +7,7 @@
 
 #include "ec_rocm_executor.h"
 #include "components/mc/ucc_mc.h"
-#include "utils/ucc_atomic.h"
+#include "utils/arch/atomic.h"
 
 ucc_status_t ucc_rocm_executor_interruptible_get_stream(hipStream_t *stream)
 {

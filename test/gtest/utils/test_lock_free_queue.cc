@@ -6,7 +6,7 @@
 
 extern "C" {
 #include "utils/ucc_lock_free_queue.h"
-#include "utils/ucc_atomic.h"
+#include "utils/arch/atomic.h"
 #include "utils/ucc_malloc.h"
 #include <pthread.h>
 #include <stdio.h>
