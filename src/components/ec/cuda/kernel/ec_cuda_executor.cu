@@ -300,7 +300,7 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
     grid_group      grid        = this_grid();
     int cidx_local, pidx_local;
     volatile int *pidx, *cidx;
-    ucc_ee_executor_task_t *tasks;
+    ucc_ee_executor_task_args_t *tasks;
     __shared__ ucc_ee_executor_task_args_t args;
     __shared__ bool worker_done;
 
@@ -330,7 +330,7 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
             (*cidx)++;
             worker_done = (pidx_local == -1);
             if (!worker_done) {
-                args = tasks[cidx_local].args;
+                args = tasks[cidx_local];
             }
         }
         __syncthreads();
@@ -365,8 +365,8 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
         __syncthreads();
         __threadfence_system();
         if (is_master) {
-            tasks[cidx_local].status = UCC_OK;
-            cidx_local = (cidx_local + num_workers) %q_size;
+            tasks[cidx_local].task_type = UCC_EE_EXECUTOR_TASK_LAST;
+            cidx_local = (cidx_local + num_workers) % q_size;
         }
     }
 }

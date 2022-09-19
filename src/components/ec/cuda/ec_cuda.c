@@ -108,7 +108,8 @@ static void ucc_ec_cuda_executor_chunk_init(ucc_mpool_t *mp, void *obj,
                   (void**)(&eee->dev_pidx), (void *)&eee->pidx, 0));
     CUDA_FUNC(cudaMalloc((void**)&eee->dev_cidx, sizeof(*eee->dev_cidx)));
     CUDA_FUNC(cudaHostAlloc((void**)&eee->tasks,
-                            max_tasks * sizeof(ucc_ee_executor_task_t),
+                            max_tasks * MAX_SUBTASKS *
+                            sizeof(ucc_ee_executor_task_args_t),
                             cudaHostAllocMapped));
     CUDA_FUNC(cudaHostGetDevicePointer(
                   (void**)(&eee->dev_tasks), (void *)eee->tasks, 0));
@@ -292,6 +293,12 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         sizeof(ucc_ec_cuda_executor_interruptible_task_t), 0, UCC_CACHE_LINE_SIZE,
         16, UINT_MAX, NULL, UCC_THREAD_MULTIPLE,
         "interruptible executor tasks");
+
+    status = ucc_mpool_init(
+        &ucc_ec_cuda.executor_persistent_tasks, 0,
+        sizeof(ucc_ec_cuda_executor_persistent_task_t), 0, UCC_CACHE_LINE_SIZE,
+        16, UINT_MAX, NULL, UCC_THREAD_MULTIPLE,
+        "persistent executor tasks");
 
     if (cfg->strm_task_mode == UCC_EC_CUDA_TASK_KERNEL) {
         ucc_ec_cuda.strm_task_mode = UCC_EC_CUDA_TASK_KERNEL;
@@ -505,6 +512,7 @@ static ucc_status_t ucc_ec_cuda_finalize()
     ucc_mpool_cleanup(&ucc_ec_cuda.strm_reqs, 1);
     ucc_mpool_cleanup(&ucc_ec_cuda.executors, 1);
     ucc_mpool_cleanup(&ucc_ec_cuda.executor_interruptible_tasks, 1);
+    ucc_mpool_cleanup(&ucc_ec_cuda.executor_persistent_tasks, 1);
     ucc_free(ucc_ec_cuda.exec_streams);
 
     return UCC_OK;
