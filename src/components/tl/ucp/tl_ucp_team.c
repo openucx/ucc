@@ -64,18 +64,14 @@ static inline int ucc_parse_section_name(const char* name,
     ucc_rank_t team_size_end = team_size_begin;
     if (ucc_str_split(team_size_range, "-")[1]) {
         team_size_end = (size_t) atoi(ucc_str_split(team_size_range, "-")[1]);
-        printf("inside team size end\n");
     }
-    printf("team_size_begin = %d, team_size_end = %d\n",team_size_begin, team_size_end);
 
     const char *ppn_range = ucc_str_split(split[3], "=")[1];
     ucc_rank_t ppn_min = (ucc_rank_t) atoi(ucc_str_split(ppn_range, "-")[0]);
     ucc_rank_t ppn_max = ppn_min;
     if (ucc_str_split(ppn_range, "-")[1]) {
         ppn_max = (ucc_rank_t) atoi(ucc_str_split(ppn_range, "-")[1]);
-        printf("inside ppn str max\n");
     }
-    printf("ppn_min_str = %d, ppn_max_str = %d\n",ppn_min, ppn_max);
 
     return (vendor == _vendor && model == _model &&
             _team_size >= team_size_begin && _team_size <= team_size_end &&
@@ -99,7 +95,6 @@ static ucc_status_t ucc_tl_ucp_cfg_add_section(ucc_tl_ucp_team_t *team,
     if (UCC_OK != status) {
         return status;
     }
-    printf("ppn_min = %d, ppn_max = %d\n", ppn_range.begin, ppn_range.end);
 
     for (i = kh_begin(sections); i != kh_end(sections); ++i) {
         if (!kh_exist(sections, i)) continue;
