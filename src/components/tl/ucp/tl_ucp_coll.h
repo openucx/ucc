@@ -307,5 +307,20 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
                                        ucc_memory_type_t        mem_type,
                                        ucc_base_coll_init_fn_t *init);
 
+static inline unsigned ucc_tl_ucp_get_sra_kn_radix(ucc_tl_ucp_team_t *team,
+                                                   size_t             msgsize,
+                                                   ucc_memory_type_t  mem_type)
+{
+    ucc_mrange_uint_t *p =
+        &UCC_TL_UCP_TEAM_LIB(team)->cfg.allreduce_sra_kn_radix;
+    unsigned radix;
 
+    radix = ucc_mrange_uint_get(p, msgsize, mem_type);
+
+    if (UCC_UUNITS_AUTO == radix) {
+        /* auto selection based on team configuration */
+        return 4;
+    }
+    return radix;
+}
 #endif
