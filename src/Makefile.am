@@ -108,6 +108,7 @@ libucc_la_SOURCES =                   \
 	coll_score/ucc_coll_score.c       \
 	coll_score/ucc_coll_score_map.c   \
 	utils/ucc_component.c             \
+	utils/ucc_datastruct.c            \
 	utils/ucc_status.c                \
 	utils/ucc_mpool.c                 \
 	utils/ucc_math.c                  \

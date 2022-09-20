@@ -48,6 +48,7 @@ typedef struct ucc_file_config ucc_file_config_t;
 #define UCC_CONFIG_ALLOW_LIST_NEGATE    UCS_CONFIG_ALLOW_LIST_NEGATE
 #define UCC_CONFIG_ALLOW_LIST_ALLOW_ALL UCS_CONFIG_ALLOW_LIST_ALLOW_ALL
 #define UCC_CONFIG_ALLOW_LIST_ALLOW     UCS_CONFIG_ALLOW_LIST_ALLOW
+#define UCC_UUNITS_AUTO                 ((unsigned)-2)
 
 /* Convenience structure used, for example, to represent TLS list.
    "requested" field is set to 1 if the list of entries was
@@ -148,5 +149,24 @@ ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
 ucc_status_t ucc_parse_file_config(const char *        filename,
                                    ucc_file_config_t **cfg);
 void         ucc_release_file_config(ucc_file_config_t *cfg);
+
+int ucc_config_sscanf_uint_ranged(const char *buf, void *dest, const void *arg);
+
+int ucc_config_sprintf_uint_ranged(char *buf, size_t max, const void *src,
+                                   const void *arg);
+
+ucs_status_t ucc_config_clone_uint_ranged(const void *src, void *dest,
+                                          const void *arg);
+
+void         ucc_config_release_uint_ranged(void *ptr, const void *arg);
+
+#define UCC_CONFIG_TYPE_UINT_RANGED                                            \
+    {                                                                          \
+        ucc_config_sscanf_uint_ranged, ucc_config_sprintf_uint_ranged,         \
+            ucc_config_clone_uint_ranged, ucc_config_release_uint_ranged,      \
+            ucs_config_help_generic, "[<munit>-<munit>:[mtype]:value,"         \
+            "<munit>-<munit>:[mtype]:value,...,]default_value\n"               \
+            "#            value and default_value can be \"auto\""             \
+    }
 
 #endif

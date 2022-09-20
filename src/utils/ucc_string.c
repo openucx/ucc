@@ -6,6 +6,7 @@
 #include "ucc_string.h"
 #include "ucc_malloc.h"
 #include "ucc_log.h"
+#include "ucc_coll_utils.h"
 #include <ctype.h>
 #include <ucs/sys/string.h>
 
@@ -144,4 +145,78 @@ ucc_status_t ucc_str_concat(const char *str1, const char *str2, char **out)
     const char *strs[2] = {str1, str2};
 
     return ucc_str_concat_n(strs, 2, out);
+}
+
+ucc_status_t ucc_str_to_memunits_range(const char *str, size_t *start,
+                                       size_t *end)
+{
+    ucc_status_t status = UCC_OK;
+    char       **munits;
+    unsigned     n_munits;
+
+    munits = ucc_str_split(str, "-");
+    if (!munits) {
+        return UCC_ERR_NO_MEMORY;
+    }
+    n_munits = ucc_str_split_count(munits);
+    if (n_munits != 2 || UCC_OK != ucc_str_to_memunits(munits[0], start) ||
+        UCC_OK != ucc_str_to_memunits(munits[1], end)) {
+        status = UCC_ERR_INVALID_PARAM;
+    }
+
+    ucc_str_split_free(munits);
+    return status;
+}
+
+ucc_status_t ucc_str_to_mtype_map(const char *str, const char *delim,
+                                  uint32_t *mt_map)
+{
+    ucc_status_t      status = UCC_OK;
+    char **           tokens;
+    unsigned          i, n_tokens;
+    ucc_memory_type_t t;
+
+    *mt_map = 0;
+    tokens  = ucc_str_split(str, delim);
+    if (!tokens) {
+        return UCC_ERR_NO_MEMORY;
+    }
+    n_tokens = ucc_str_split_count(tokens);
+
+    for (i = 0; i < n_tokens; i++) {
+        t = ucc_mem_type_from_str(tokens[i]);
+        if (t == UCC_MEMORY_TYPE_LAST) {
+            /* entry does not match any memory type name */
+            status = UCC_ERR_NOT_FOUND;
+            goto out;
+        }
+        *mt_map |= UCC_BIT(t);
+    }
+out:
+    ucc_str_split_free(tokens);
+    return status;
+}
+
+void ucc_mtype_map_to_str(uint32_t mt_map, const char *delim,
+                          char *buf, size_t max)
+{
+    int    i;
+    size_t last;
+
+    for (i = 0; i < UCC_MEMORY_TYPE_LAST; i++) {
+        if (UCC_BIT(i) & mt_map) {
+            ucc_snprintf_safe(buf, max, "%s%s", ucc_mem_type_str(i), delim);
+            last = strlen(buf);
+            if (max - last <= 0) {
+                /* no more space in buf for next range*/
+                return;
+            }
+
+            max -= last;
+            buf += last;
+        }
+    }
+    /* remove last delimiter */
+    buf -= strlen(delim);
+    *buf = '\0';
 }
