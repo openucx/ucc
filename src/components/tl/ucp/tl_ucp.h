@@ -157,6 +157,7 @@ typedef struct ucc_tl_ucp_team {
     size_t                     base_length[MAX_NR_SEGMENTS];
     ucc_tl_ucp_worker_t *      worker;
     ucc_tl_ucp_team_config_t   cfg;
+    const char *               tuning_str;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

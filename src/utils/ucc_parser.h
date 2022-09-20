@@ -13,6 +13,7 @@
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_list.h"
+#include "utils/ini.h"
 #include "khash.h"
 
 #include <ucs/config/parser.h>
@@ -20,7 +21,6 @@
 #include <ucs/sys/compiler_def.h>
 #include <ucs/config/types.h>
 #include <ucs/config/parser.h>
-#include <ucs/config/ini.h>
 
 typedef ucs_config_field_t             ucc_config_field_t;
 typedef ucs_config_names_array_t       ucc_config_names_array_t;

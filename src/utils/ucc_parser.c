@@ -177,6 +177,22 @@ static int ucc_file_parse_handler(void *arg, const char *section,
     int      result;
     char    *dup;
 
+    if (!name) {
+        return 1;
+    }
+    if (NULL != getenv(name)) {
+        /* variable is set in env, skip it.
+           Env gets precedence over file */
+        ;
+        return 1;
+    }
+    if (strlen(name) < 4 || NULL == strstr(name, "UCC_")) {
+        ucc_warn("incorrect parameter name %s "
+                 "(param name should start with UCC_ or <PREFIX>_UCC_)",
+                 name);
+        return 0;
+    }
+
     if (strcmp(section,"") != 0) {
         /* has section */
         printf("section = %s, name = %s, value = %s\n", section, name, value);
@@ -203,22 +219,7 @@ static int ucc_file_parse_handler(void *arg, const char *section,
         }
         UCC_ADD_KEY_VALUE_TO_HASH(ucc_sec, cfg_section, name, value);
     }
-
-    if (!name) {
-        return 1;
-    }
-    if (NULL != getenv(name)) {
-        /* variable is set in env, skip it.
-           Env gets precedence over file */
-        ;
-        return 1;
-    }
-    if (strlen(name) < 4 || NULL == strstr(name, "UCC_")) {
-        ucc_warn("incorrect parameter name %s "
-                 "(param name should start with UCC_ or <PREFIX>_UCC_)",
-                 name);
-        return 0;
-    }
+    /* param not part of a section section */
     UCC_ADD_KEY_VALUE_TO_HASH(ucc_cfg_file, vars, name, value);
 }
 

@@ -87,9 +87,10 @@ static ucc_status_t ucc_tl_ucp_cfg_add_section(ucc_tl_ucp_team_t *team,
     size_t team_size = UCC_TL_TEAM_SIZE(team);
     ucc_cfg_ppn_range_t ppn_range;
     khash_t(ucc_sections) *sections = &cfg->sections;
+    khash_t(ucc_sec) *sec;
+    khiter_t i, j;
     const char *sec_name;
     ucc_status_t status;
-    int i;
 
     status = ucc_tl_ucp_get_topo_ppn(team, &ppn_range.begin, &ppn_range.end);
     if (UCC_OK != status) {
@@ -100,6 +101,11 @@ static ucc_status_t ucc_tl_ucp_cfg_add_section(ucc_tl_ucp_team_t *team,
         if (!kh_exist(sections, i)) continue;
         sec_name = kh_key(sections, i);
         if (ucc_parse_section_name(sec_name, vendor, model, team_size, ppn_range)) {
+            sec = kh_val(sections, i);
+            j = kh_get(ucc_sec, sec, "UCC_TL_UCP_TUNE");
+            if (j != kh_end(sec)) {
+                team->tuning_str = kh_val(sec, j);
+            }
             status = ucc_apply_file_cfg(&team->cfg,
                                         ucc_tl_ucp_lib_config_table, "UCC_",
                                         ucc_tl_ucp.super.tl_lib_config.prefix,
@@ -131,6 +137,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->preconnect_task = NULL;
     self->seq_num         = 0;
     self->status          = UCC_INPROGRESS;
+    self->tuning_str      = "";
     memcpy(&self->cfg, &UCC_TL_UCP_TEAM_LIB(self)->cfg,
            sizeof(ucc_tl_ucp_team_config_t));
     if (ucc_global_config.file_cfg && !IS_SERVICE_TEAM(self) &&
@@ -291,6 +298,17 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team), NULL,
             &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
             ucc_tl_ucp_alg_id_to_init, mem_types, mt_n);
+
+        /* If INVALID_PARAM - User provided incorrect input - try to proceed */
+        if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
+            (status != UCC_ERR_NOT_SUPPORTED)) {
+            goto err;
+        }
+    } else if (strcmp(team->tuning_str, "") != 0) {
+        status = ucc_coll_score_update_from_str(
+            team->tuning_str, score, UCC_TL_TEAM_SIZE(team), NULL,
+            &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
+            ucc_tl_ucp_alg_id_to_init);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
