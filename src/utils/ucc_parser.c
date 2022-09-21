@@ -195,8 +195,6 @@ static int ucc_file_parse_handler(void *arg, const char *section,
 
     if (strcmp(section,"") != 0) {
         /* has section */
-        printf("section = %s, name = %s, value = %s\n", section, name, value);
-
         iter = kh_get(ucc_sections, sections, section);
         if (iter == kh_end(sections)) { /* checks if section hash table already exists */
             cfg_section = ucc_calloc(1, sizeof(*cfg_section), "section_"+section+"_cfg");
@@ -219,6 +217,7 @@ static int ucc_file_parse_handler(void *arg, const char *section,
         }
         UCC_ADD_KEY_VALUE_TO_HASH(ucc_sec, cfg_section, name, value);
     }
+    cfg->has_tuning_sections = 1;
     /* param not part of a section section */
     UCC_ADD_KEY_VALUE_TO_HASH(ucc_cfg_file, vars, name, value);
 }
@@ -237,6 +236,7 @@ ucc_status_t ucc_parse_file_config(const char *        filename,
     }
     kh_init_inplace(ucc_cfg_file, &cfg->vars);
     kh_init_inplace(ucc_sections, &cfg->sections);
+    cfg->has_tuning_sections = 0;
     ret = ini_parse(filename, ucc_file_parse_handler, cfg);
     if (-1 == ret) {
         /* according to ucs/ini.h -1 means error in

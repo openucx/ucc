@@ -165,7 +165,6 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_status_t         status;
     ucc_base_coll_args_t bargs;
     size_t               max_frag_count, dt_size;
-    printf("in allreduce sra\n");
 
     dt_size = ucc_dt_size(coll_args->args.dst.info.datatype);
     status  = ucc_tl_ucp_get_schedule(tl_team, coll_args,

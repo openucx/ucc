@@ -80,6 +80,7 @@ KHASH_MAP_INIT_STR(ucc_sections, khash_t(ucc_sec) *);
 typedef struct ucc_file_config {
     khash_t(ucc_cfg_file) vars;
     khash_t(ucc_sections) sections;
+    int                   has_tuning_sections;
 } ucc_file_config_t;
 
 /* Convenience structure used, for example, to represent TLS list.

@@ -13,14 +13,27 @@
 #include "utils/ucc_string.h"
 #include "coll_score/ucc_coll_score.h"
 
-static inline ucc_status_t
-ucc_tl_ucp_get_topo_ppn(ucc_tl_ucp_team_t *team, ucc_rank_t *ppn_min, ucc_rank_t *ppn_max) // add ppn_range
+
+#define UCC_CHECK_RANGE(_range_str, _min, _max)                          \
+    ({                                                                   \
+        size_t begin, end;                                               \
+        begin = (size_t) atoi(ucc_str_split(_range_str, "-")[0]);        \
+        end   = begin;                                                   \
+        if (ucc_str_split(_range_str, "-")[1]) {                         \
+            end = (size_t) atoi(ucc_str_split(_range_str, "-")[1]);      \
+        }                                                                \
+        (_min >= begin && _max <= end);                                  \
+    })
+
+static inline ucc_status_t ucc_get_topo_info(ucc_tl_ucp_team_t *team,
+                                             ucc_rank_t        *ppn_min,
+                                             ucc_rank_t        *ppn_max,
+                                             ucc_rank_t        *nnodes)
 {
-    ucc_ep_map_t            ctx_map;
-    ucc_subset_t            subset;
-    ucc_topo_t             *topo;
-//    ucc_rank_t              nnodes;
-    ucc_status_t            status;
+    ucc_ep_map_t  ctx_map;
+    ucc_subset_t  subset;
+    ucc_topo_t   *topo;
+    ucc_status_t  status;
 
     status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
                                       &UCC_TL_TEAM_MAP(team),
@@ -41,7 +54,7 @@ ucc_tl_ucp_get_topo_ppn(ucc_tl_ucp_team_t *team, ucc_rank_t *ppn_min, ucc_rank_t
 
     *ppn_min = ucc_topo_min_ppn(topo);
     *ppn_max = ucc_topo_max_ppn(topo);
-//        nnodes = ucc_topo_nnodes(topo); // needed?
+    *nnodes  = ucc_topo_nnodes(topo);
     ucc_topo_cleanup(topo);
 err_topo_init:
     ucc_ep_map_destroy_nested(&ctx_map);
@@ -52,47 +65,68 @@ static inline int ucc_parse_section_name(const char* name,
                                          ucc_cpu_vendor_t _vendor,
                                          ucc_cpu_model_t _model,
                                          size_t _team_size,
-                                         ucc_cfg_ppn_range_t _ppn_range)
+                                         ucc_cfg_ppn_range_t _ppn_range,
+                                         ucc_rank_t _nnodes)
 {
     char **split = ucc_str_split(name, " ");
+    ucc_cpu_vendor_t vendor;
+    ucc_cpu_model_t  model;
+    char **cur_str;
 
-    ucc_cpu_vendor_t vendor = ucc_get_vendor_from_str(ucc_str_split(split[0], "=")[1]);
-    ucc_cpu_model_t model = ucc_get_model_from_str(ucc_str_split(split[1], "=")[1]);
-
-    const char *team_size_range = ucc_str_split(split[2], "=")[1];
-    ucc_rank_t team_size_begin = (size_t) atoi(ucc_str_split(team_size_range, "-")[0]);
-    ucc_rank_t team_size_end = team_size_begin;
-    if (ucc_str_split(team_size_range, "-")[1]) {
-        team_size_end = (size_t) atoi(ucc_str_split(team_size_range, "-")[1]);
+    while(*split) {
+        cur_str = ucc_str_split(*split, "=");
+        if (strcmp(cur_str[0], "vendor") == 0) {
+            vendor = ucc_get_vendor_from_str(cur_str[1]);
+            if (vendor != _vendor) {
+                return 0;
+            }
+        }
+        else if (strcmp(cur_str[0], "model") == 0) {
+            model = ucc_get_model_from_str(cur_str[1]);
+            if (model != _model) {
+                return 0;
+            }
+        }
+        else if (strcmp(cur_str[0], "team_size") == 0) {
+            if (!UCC_CHECK_RANGE(cur_str[1], _team_size, _team_size)) {
+                return 0;
+            }
+        }
+        else if (strcmp(cur_str[0], "ppn") == 0) {
+            if (!UCC_CHECK_RANGE(cur_str[1], _ppn_range.begin, _ppn_range.end)) {
+                return 0;
+            }
+        }
+        else if (strcmp(cur_str[0], "nnodes") == 0) {
+            if (!UCC_CHECK_RANGE(cur_str[1], _nnodes, _nnodes)) {
+                return 0;
+            }
+        } else {
+            ucc_warn("key %s not defined as part of tuning section params\n",
+                     cur_str[0]);
+            return 0;
+        }
+        split++;
     }
-
-    const char *ppn_range = ucc_str_split(split[3], "=")[1];
-    ucc_rank_t ppn_min = (ucc_rank_t) atoi(ucc_str_split(ppn_range, "-")[0]);
-    ucc_rank_t ppn_max = ppn_min;
-    if (ucc_str_split(ppn_range, "-")[1]) {
-        ppn_max = (ucc_rank_t) atoi(ucc_str_split(ppn_range, "-")[1]);
-    }
-
-    return (vendor == _vendor && model == _model &&
-            _team_size >= team_size_begin && _team_size <= team_size_end &&
-            _ppn_range.begin >= ppn_min && _ppn_range.end <= ppn_max);
+    return 1;
 }
 
 static ucc_status_t ucc_tl_ucp_cfg_add_section(ucc_tl_ucp_team_t *team,
-                                               ucc_file_config_t *cfg)//, const ucc_base_team_params_t *params)
+                                               ucc_file_config_t *cfg)
 {
     ucc_cpu_vendor_t          vendor = ucc_arch_get_cpu_vendor();
     ucc_cpu_model_t           model  = ucc_arch_get_cpu_model();
-//    ucc_cfg_team_size_range_t team_sizes;
     size_t team_size = UCC_TL_TEAM_SIZE(team);
-    ucc_cfg_ppn_range_t ppn_range;
     khash_t(ucc_sections) *sections = &cfg->sections;
     khash_t(ucc_sec) *sec;
     khiter_t i, j;
+    ucc_cfg_ppn_range_t ppn_range;
+    ucc_rank_t nnodes;
     const char *sec_name;
     ucc_status_t status;
 
-    status = ucc_tl_ucp_get_topo_ppn(team, &ppn_range.begin, &ppn_range.end);
+    status = ucc_get_topo_info(team, &ppn_range.begin, &ppn_range.end,
+                               &nnodes);
     if (UCC_OK != status) {
         return status;
     }
@@ -100,7 +134,8 @@ static ucc_status_t ucc_tl_ucp_cfg_add_section(ucc_tl_ucp_team_t *team,
     for (i = kh_begin(sections); i != kh_end(sections); ++i) {
         if (!kh_exist(sections, i)) continue;
         sec_name = kh_key(sections, i);
-        if (ucc_parse_section_name(sec_name, vendor, model, team_size, ppn_range)) {
+        if (ucc_parse_section_name(sec_name, vendor, model, team_size,
+                                   ppn_range, nnodes)) {
             sec = kh_val(sections, i);
             j = kh_get(ucc_sec, sec, "UCC_TL_UCP_TUNE");
             if (j != kh_end(sec)) {
@@ -146,9 +181,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         if (status != UCC_OK) {
             ucc_debug("section not found");
         }
-    }
-    if (!IS_SERVICE_TEAM(self)) {
-        printf("allreduce kn radix from cfg = %d\n", self->cfg.allreduce_kn_radix);
     }
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
