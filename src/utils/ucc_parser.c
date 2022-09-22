@@ -797,7 +797,8 @@ void ucc_config_release_pipeline_params(void *ptr, const void *arg)
 {
 }
 
-int ucc_config_sscanf_uint_ranged(const char *buf, void *dest, const void *arg)
+int ucc_config_sscanf_uint_ranged(const char *buf, void *dest,
+                                  const void *arg) //NOLINT
 {
     ucc_mrange_uint_t *p = dest;
     char             **ranges, **tokens;
@@ -875,7 +876,7 @@ err_ranges:
 }
 
 int ucc_config_sprintf_uint_ranged(char *buf, size_t max, const void *src,
-                                   const void *arg)
+                                   const void *arg) // NOLINT
 {
     const ucc_mrange_uint_t *s       = src;
     const size_t             tmp_max = 128;
@@ -918,12 +919,12 @@ int ucc_config_sprintf_uint_ranged(char *buf, size_t max, const void *src,
 }
 
 ucs_status_t ucc_config_clone_uint_ranged(const void *src, void *dest,
-                                          const void *arg)
+                                          const void *arg) //NOLINT
 {
     return ucc_status_to_ucs_status(ucc_mrange_uint_copy(dest, src));
 }
 
-void ucc_config_release_uint_ranged(void *ptr, const void *arg)
+void ucc_config_release_uint_ranged(void *ptr, const void *arg) //NOLINT
 {
     ucc_mrange_uint_destroy(ptr);
 }
