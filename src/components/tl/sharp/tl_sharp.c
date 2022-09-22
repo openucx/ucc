@@ -49,7 +49,7 @@ static ucc_config_field_t ucc_tl_sharp_context_config_table[] = {
      UCC_CONFIG_TYPE_UINT},
 
     {"CONTEXT_PER_TEAM", "n",
-     "Number of polls to do before calling user progress",
+     "Create SHARP context/tree per team",
      ucc_offsetof(ucc_tl_sharp_context_config_t, context_per_team),
      UCC_CONFIG_TYPE_BOOL},
 

@@ -293,7 +293,6 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
     init_spec.progress_func                  = NULL;
     init_spec.world_local_rank               = 0;
     init_spec.group_channel_idx              = 0;
-    init_spec.group_channel_idx              = 0;
     init_spec.oob_ctx                        = oob_ctx;
     init_spec.config                         = sharp_coll_default_config;
     init_spec.config.user_progress_num_polls = sharp_ctx->cfg.uprogress_num_polls;
@@ -395,6 +394,10 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
                                                        ucc_tl_sharp_lib_t);
     ucc_status_t status;
 
+    if (sharp_ctx->cfg.context_per_team) {
+        return UCC_OK;
+    }
+
     if (lib->cfg.use_internal_oob) {
         sharp_ctx->oob_ctx.subset.map.ep_num =
             UCC_TL_CTX_OOB(sharp_ctx).n_oob_eps;
@@ -402,10 +405,6 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
         sharp_ctx->oob_ctx.subset.myrank     = UCC_TL_CTX_OOB(sharp_ctx).oob_ep;
     } else {
         sharp_ctx->oob_ctx.oob      = &UCC_TL_CTX_OOB(sharp_ctx);
-    }
-
-    if (sharp_ctx->cfg.context_per_team) {
-        return UCC_OK;
     }
 
     status = ucc_tl_sharp_context_init(sharp_ctx, &sharp_ctx->sharp_context,
