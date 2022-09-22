@@ -188,7 +188,7 @@ static int ucc_file_parse_handler(void *arg, const char *section, //NOLINT
         ucc_error("failed to dup str for kh_val");
         return 0;
     }
-    kh_val(vars, iter) = dup;
+    kh_val(vars, iter) = dup; //NOLINT
     return 1;
 }
 
@@ -377,7 +377,8 @@ void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
     }
 }
 
-int ucc_config_sscanf_uint_ranged(const char *buf, void *dest, const void *arg)
+int ucc_config_sscanf_uint_ranged(const char *buf, void *dest,
+                                  const void *arg) //NOLINT
 {
     ucc_mrange_uint_t *p = dest;
     char             **ranges, **tokens;
@@ -455,7 +456,7 @@ err_ranges:
 }
 
 int ucc_config_sprintf_uint_ranged(char *buf, size_t max, const void *src,
-                                   const void *arg)
+                                   const void *arg) // NOLINT
 {
     const ucc_mrange_uint_t *s       = src;
     const size_t             tmp_max = 128;
@@ -498,12 +499,12 @@ int ucc_config_sprintf_uint_ranged(char *buf, size_t max, const void *src,
 }
 
 ucs_status_t ucc_config_clone_uint_ranged(const void *src, void *dest,
-                                          const void *arg)
+                                          const void *arg) //NOLINT
 {
     return ucc_status_to_ucs_status(ucc_mrange_uint_copy(dest, src));
 }
 
-void ucc_config_release_uint_ranged(void *ptr, const void *arg)
+void ucc_config_release_uint_ranged(void *ptr, const void *arg) //NOLINT
 {
     ucc_mrange_uint_destroy(ptr);
 }

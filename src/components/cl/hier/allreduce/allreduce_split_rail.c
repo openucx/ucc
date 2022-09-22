@@ -158,8 +158,9 @@ static ucc_status_t ucc_cl_hier_allreduce_split_rail_frag_init(
     rs_args.args.dst.info_v.counts   = counts;
     rs_args.args.dst.info_v.mem_type = coll_args->args.dst.info.mem_type;
     rs_args.args.dst.info_v.datatype = coll_args->args.dst.info.datatype;
+    /* linter thinks node_size can be 0 - false positive */
     rs_args.max_frag_count = ucc_buffer_block_count(
-        ucc_buffer_block_count(total_count, n_frags, 0), node_size, 0);
+        ucc_buffer_block_count(total_count, n_frags, 0), node_size, 0); //NOLINT
     rs_args.mask |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
 
 
