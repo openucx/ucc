@@ -107,7 +107,9 @@ AS_IF([test "x$cuda_checked" != "xyes"],
          AS_IF([test "x$cuda_happy" = "xyes"],
                [AS_IF([test "x$with_nvcc_gencode" = "xdefault"],
                       [AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
-                             [NVCC_ARCH="${ARCH7} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11} ${ARCH12}"])],
+			     [AS_IF([test $CUDA_MINOR_VERSION -lt 1],
+                                    [NVCC_ARCH="${ARCH7} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11}"],
+                                    [NVCC_ARCH="${ARCH7} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11} ${ARCH12}"])])],
                       [NVCC_ARCH="$with_nvcc_gencode"])
                 AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])])
          LDFLAGS="$save_LDFLAGS"
