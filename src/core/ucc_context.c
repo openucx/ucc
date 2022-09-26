@@ -551,10 +551,11 @@ poll:
     return UCC_OK;
 }
 
-ucc_status_t ucc_context_create(ucc_lib_h lib,
-                                const ucc_context_params_t *params,
-                                const ucc_context_config_h  config,
-                                ucc_context_h *context)
+ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
+                                          const ucc_context_params_t *params,
+                                          const ucc_context_config_h  config,
+                                          ucc_context_h              *context,
+                                          ucc_proc_info_t            *proc_info)
 {
     uint32_t                   topo_required = 0;
     ucc_base_context_params_t  b_params;
@@ -669,7 +670,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         ucc_error("failed to init progress queue for context %p", ctx);
         goto error_ctx_create;
     }
-    ctx->id.pi      = ucc_local_proc;
+    ctx->id.pi      = *proc_info;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
         params->oob.n_oob_eps > 1) {
@@ -780,6 +781,15 @@ error_ctx:
     ucc_free(ctx);
 error:
     return status;
+}
+
+ucc_status_t ucc_context_create(ucc_lib_h lib,
+                                const ucc_context_params_t *params,
+                                const ucc_context_config_h  config,
+                                ucc_context_h *context)
+{
+    return ucc_context_create_proc_info(lib, params, config, context,
+                                        &ucc_local_proc);
 }
 
 static ucc_status_t ucc_context_free_attr(ucc_context_attr_t *context_attr)
