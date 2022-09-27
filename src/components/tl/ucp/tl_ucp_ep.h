@@ -80,7 +80,7 @@ static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team,
             *ep = NULL;
             return status;
         }
-        if (team->worker->eps) {
+        if (!h) {
             team->worker->eps[ctx_rank] = *ep;
         } else {
             tl_ucp_hash_put(team->worker->ep_hash, h->ctx_id, *ep);

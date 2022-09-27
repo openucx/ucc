@@ -86,6 +86,7 @@ ucc_tl_ucp_context_service_init(const char *prefix, ucp_params_t ucp_params,
     UCP_CHECK(ucp_config_read(service_prefix, NULL, &ucp_config),
               "failed to read ucp configuration", err_cfg_read, ctx);
     ucc_free(service_prefix);
+    service_prefix = NULL;
 
     UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context_service),
               "failed to init ucp context for service worker", err_cfg, ctx);
@@ -123,7 +124,9 @@ err_worker_create:
 err_cfg:
     ucp_config_release(ucp_config);
 err_cfg_read:
-    ucc_free(service_prefix);
+    if (service_prefix) {
+        ucc_free(service_prefix);
+    }
     return ucc_status;
 }
 
@@ -156,7 +159,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     prefix[strlen(prefix) - 1] = '\0';
     UCP_CHECK(ucp_config_read(prefix, NULL, &ucp_config),
               "failed to read ucp configuration", err_cfg_read, self);
-    ucc_free(prefix);
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK;
@@ -261,6 +263,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
               "failed to init service worker", err_cfg, UCC_ERR_NO_MESSAGE,
               self);
     }
+    ucc_free(prefix);
+    prefix = NULL;
 
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
@@ -272,7 +276,9 @@ err_worker_create:
 err_cfg:
     ucp_config_release(ucp_config);
 err_cfg_read:
-    ucc_free(prefix);
+    if (prefix) {
+        ucc_free(prefix);
+    }
     return ucc_status;
 }
 
@@ -352,8 +358,7 @@ static inline void ucc_tl_ucp_eps_cleanup(ucc_tl_ucp_worker_t * worker,
     }
 }
 
-static inline void ucc_tl_ucp_worker_cleanup(ucc_tl_ucp_worker_t   worker,
-                                             ucc_tl_ucp_context_t *ctx)
+static inline void ucc_tl_ucp_worker_cleanup(ucc_tl_ucp_worker_t worker)
 {
     if (worker.worker_address) {
         ucp_worker_release_address(worker.ucp_worker, worker.worker_address);
@@ -386,9 +391,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
     if (UCC_TL_CTX_HAS_OOB(self)) {
         ucc_tl_ucp_context_barrier(self, &UCC_TL_CTX_OOB(self));
     }
-    ucc_tl_ucp_worker_cleanup(self->worker, self);
+    ucc_tl_ucp_worker_cleanup(self->worker);
     if (self->cfg.service_worker != 0) {
-        ucc_tl_ucp_worker_cleanup(self->service_worker, self);
+        ucc_tl_ucp_worker_cleanup(self->service_worker);
     }
 }
 
