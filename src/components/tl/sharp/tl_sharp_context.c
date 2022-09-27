@@ -261,17 +261,17 @@ static ucc_rcache_ops_t ucc_tl_sharp_rcache_ops = {
     .dump_region = ucc_tl_sharp_rcache_dump_region_cb
 };
 
-ucc_status_t  ucc_tl_sharp_rcache_create(struct sharp_coll_context *context,
-                                         ucc_rcache_t **rcache)
+ucc_status_t ucc_tl_sharp_rcache_create(struct sharp_coll_context *context,
+                                        ucc_rcache_t **rcache)
 {
-    ucc_rcache_params_t            rcache_params;
+    ucc_rcache_params_t rcache_params;
 
     rcache_params.alignment          = 64;
     rcache_params.ucm_event_priority = 1000;
     rcache_params.max_regions        = ULONG_MAX;
     rcache_params.max_size           = SIZE_MAX;
     rcache_params.region_struct_size = sizeof(ucc_tl_sharp_rcache_region_t);
-    rcache_params.max_alignment      = getpagesize();
+    rcache_params.max_alignment      = ucc_get_page_size();
     rcache_params.ucm_events         = UCM_EVENT_VM_UNMAPPED |
         UCM_EVENT_MEM_TYPE_FREE;
     rcache_params.context            = context;

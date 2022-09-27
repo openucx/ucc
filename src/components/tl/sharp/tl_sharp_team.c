@@ -46,8 +46,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
             status = ucc_tl_sharp_rcache_create(self->sharp_context, &self->rcache);
             if (status != UCC_OK) {
                 tl_error(ctx->super.super.lib, "failed to create rcache");
-                sharp_coll_finalize(self->sharp_context);
-                return UCC_ERR_NO_RESOURCE;
+                goto cleanup;
             }
         }
 
@@ -56,8 +55,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
                 self->sharp_context);
         if (status != UCC_OK) {
             tl_error(ctx->super.super.lib, "failed to register progress function");
-            return status;
+            goto cleanup;
         }
+
         sharp_ctx = self->sharp_context;
     } else {
         self->sharp_context = sharp_ctx;
@@ -75,11 +75,25 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
         tl_error(ctx->super.super.lib,
                 "sharp group create failed:%s(%d)",
                 sharp_coll_strerror(ret), ret);
-        return UCC_ERR_NO_RESOURCE;
+        status = UCC_ERR_NO_RESOURCE;
+        goto cleanup;
     }
 
     tl_info(self->super.super.context->lib, "initialized tl team: %p", self);
     return UCC_OK;
+cleanup:
+    if (ctx->cfg.context_per_team) {
+        if (self->rcache) {
+            ucc_rcache_destroy(self->rcache);
+        }
+        if (self->sharp_context) {
+            ucc_context_progress_deregister(
+                    tl_context->ucc_context, (ucc_context_progress_fn_t)sharp_coll_progress, self->sharp_context);
+            sharp_coll_finalize(self->sharp_context);
+        }
+    }
+
+    return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_sharp_team_t)
