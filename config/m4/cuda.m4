@@ -13,7 +13,7 @@ ARCH8="-gencode=arch=compute_60,code=sm_60 \
 ARCH9="-gencode=arch=compute_70,code=sm_70 \
 -gencode=arch=compute_70,code=compute_70"
 ARCH10="-gencode=arch=compute_75,code=sm_75"
-ARCH11="-gencode=arch=compute_80,code=sm_80 \
+ARCH110="-gencode=arch=compute_80,code=sm_80 \
 -gencode=arch=compute_80,code=compute_80"
 ARCH111="-gencode=arch=compute_86,code=sm_86 \
 -gencode=arch=compute_86,code=compute_86"
@@ -108,8 +108,8 @@ AS_IF([test "x$cuda_checked" != "xyes"],
                [AS_IF([test "x$with_nvcc_gencode" = "xdefault"],
                       [AS_IF([test $CUDA_MAJOR_VERSION -eq 11],
 			     [AS_IF([test $CUDA_MINOR_VERSION -lt 1],
-                                    [NVCC_ARCH="${ARCH7} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11}"],
-                                    [NVCC_ARCH="${ARCH7} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH11} ${ARCH111}"])])],
+                                    [NVCC_ARCH="${ARCH7} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH110}"],
+                                    [NVCC_ARCH="${ARCH7} ${ARCH8} ${ARCH9} ${ARCH10} ${ARCH110} ${ARCH111}"])])],
                       [NVCC_ARCH="$with_nvcc_gencode"])
                 AC_SUBST([NVCC_ARCH], ["$NVCC_ARCH"])])
          LDFLAGS="$save_LDFLAGS"
