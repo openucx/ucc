@@ -187,7 +187,7 @@ static int ucc_file_parse_handler(void *arg, const char *section, //NOLINT
         ucc_error("failed to dup str for kh_val");
         return 0;
     }
-    kh_val(vars, iter) = dup;
+    kh_val(vars, iter) = dup; //NOLINT
     return 1;
 }
 
