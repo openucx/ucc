@@ -139,6 +139,10 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatterv_ring_bidirectional),
      UCC_CONFIG_TYPE_BOOL},
 
+    {"USE_TOPO", "try", "allow usage of tl ucp topo",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, use_topo),
+     UCC_CONFIG_TYPE_TERNARY},
+
     {NULL}};
 
 static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {

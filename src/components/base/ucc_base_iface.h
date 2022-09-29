@@ -24,6 +24,7 @@ typedef struct ucc_coll_task ucc_coll_task_t;
 
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
+    int                        use_tuning;
 } ucc_base_lib_t;
 
 typedef struct ucc_base_config {
@@ -33,6 +34,7 @@ typedef struct ucc_base_config {
 typedef struct ucc_base_lib_config {
     ucc_base_config_t               super;
     ucc_log_component_config_t      log_component;
+    int                             use_tuning;
 } ucc_base_lib_config_t;
 
 typedef struct ucc_base_ctx_config {

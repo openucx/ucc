@@ -1,5 +1,3 @@
-/**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -10,35 +8,158 @@
 #include "schedule/ucc_schedule.h"
 #include "schedule/ucc_schedule_pipelined.h"
 #include "ucc_string.h"
+#include "ini.h"
 
-#define UCC_ADD_KEY_VALUE_TO_HASH(_type, _h, _name, _val)            \
-    khiter_t _iter;                                                  \
-    int      _res;                                                   \
-    char    *_dup;                                                   \
-    _iter = kh_get(_type, _h, _name);                                \
-    if (_iter != kh_end(_h)) {                                       \
-        ucc_warn("found duplicate '%s' in config file", _name);      \
-        return 0;                                                    \
-    } else {                                                         \
-        _dup = strdup(_name);                                        \
-        if (!_dup) {                                                 \
-            ucc_error("failed to dup str for kh_put");               \
-            return 0;                                                \
-        }                                                            \
-        _iter = kh_put(_type, _h, _dup, &_res);                      \
-        if (_res == UCS_KH_PUT_FAILED) {                             \
-            ucc_free(_dup);                                          \
-            ucc_error("inserting '%s' to config map failed", _name); \
-            return 0;                                                \
-        }                                                            \
-    }                                                                \
-    _dup = strdup(_val);                                             \
-    if (!_dup) {                                                     \
-        ucc_error("failed to dup str for kh_val");                   \
-        return 0;                                                    \
-    }                                                                \
-    kh_val(_h, _iter) = _dup;                                        \
+#define UCC_ADD_KEY_VALUE_TO_HASH(_type, _h, _name, _val)                \
+    do {                                                                 \
+        khiter_t _iter;                                                  \
+        int      _res;                                                   \
+        char    *_dup;                                                   \
+        _iter = kh_get(_type, _h, _name);                                \
+        if (_iter != kh_end(_h)) {                                       \
+            ucc_warn("found duplicate '%s' in config file", _name);      \
+            return 0;                                                    \
+        } else {                                                         \
+            _dup = strdup(_name);                                        \
+            if (!_dup) {                                                 \
+                ucc_error("failed to dup str for kh_put");               \
+                return 0;                                                \
+            }                                                            \
+            _iter = kh_put(_type, _h, _dup, &_res);                      \
+            if (_res == UCS_KH_PUT_FAILED) {                             \
+                ucc_free(_dup);                                          \
+                ucc_error("inserting '%s' to config map failed", _name); \
+                return 0;                                                \
+            }                                                            \
+        }                                                                \
+        _dup = strdup(_val);                                             \
+        if (!_dup) {                                                     \
+            ucc_error("failed to dup str for kh_val");                   \
+            return 0;                                                    \
+        }                                                                \
+        kh_val(_h, _iter) = _dup; /* NOLINT */                           \
+        return 1;                                                        \
+    } while (0)
+
+int ucc_check_section(ucc_section_desc_t sec_desc,
+                      ucc_cpu_vendor_t vendor,
+                      ucc_cpu_model_t model,
+                      size_t team_size,
+                      ucc_rank_t ppn_min,
+                      ucc_rank_t ppn_max,
+                      ucc_rank_t nnodes)
+{
+    if (sec_desc.mask & UCC_TUNING_DESC_FIELD_VENDOR) {
+        if (sec_desc.vendor != vendor) {
+            return 0;
+        }
+    }
+    if (sec_desc.mask & UCC_TUNING_DESC_FIELD_MODEL) {
+        if (sec_desc.model != model) {
+            return 0;
+        }
+    }
+    if (sec_desc.mask & UCC_TUNING_DESC_FIELD_TEAM_SIZE) {
+        if (team_size < sec_desc.min_team_size || team_size > sec_desc.max_team_size) {
+            return 0;
+        }
+    }
+    if (sec_desc.mask & UCC_TUNING_DESC_FIELD_PPN) {
+        if (ppn_min < sec_desc.min_ppn || ppn_max > sec_desc.max_ppn) {
+            return 0;
+        }
+    }
+    if (sec_desc.mask & UCC_TUNING_DESC_FIELD_NNODES) {
+        if (nnodes < sec_desc.min_nnodes || nnodes > sec_desc.max_nnodes) {
+            return 0;
+        }
+    }
     return 1;
+}
+
+static inline int ucc_check_range(char *range_str, size_t *begin, size_t *end)
+{
+    char **range = ucc_str_split(range_str, "-");
+    if (!range) {
+        ucc_warn("invalid range defined in section name\n");
+        return 0;
+    }
+    *begin = (size_t) atoi(range[0]);
+    *end   = *begin;
+    if (range[1]) {
+        *end = (size_t) atoi(range[1]);
+    }
+    ucc_str_split_free(range);
+    return 1;
+}
+
+static inline ucc_status_t ucc_parse_section_name_to_desc(const char *sec_name,
+                                                      ucc_section_desc_t *desc)
+{
+    ucc_cpu_vendor_t vendor;
+    ucc_cpu_model_t  model;
+    char **split, **cur_str;
+    unsigned n_split, i;
+
+    split = ucc_str_split(sec_name, " ");
+    if (!split) {
+        ucc_warn("invalid section name\n");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    desc->mask = 0;
+    n_split = ucc_str_split_count(split);
+    for (i = 0; i < n_split; i++) {
+        cur_str = ucc_str_split(split[i], "=");
+        if (!cur_str) {
+            ucc_warn("invalid section key=value definition\n");
+            goto err_cur_str;
+        }
+        if (strcasecmp(cur_str[0], "vendor") == 0) {
+            vendor = ucc_get_vendor_from_str(cur_str[1]);
+            desc->vendor = vendor;
+            desc->mask |= UCC_TUNING_DESC_FIELD_VENDOR;
+        }
+        else if (strcmp(cur_str[0], "model") == 0) {
+            model = ucc_get_model_from_str(cur_str[1]);
+            desc->model = model;
+            desc->mask |= UCC_TUNING_DESC_FIELD_MODEL;
+        }
+        else if (strcmp(cur_str[0], "team_size") == 0) {
+            if (!ucc_check_range(cur_str[1], (size_t *) &desc->min_team_size,
+                                 (size_t *) &desc->max_team_size)) {
+                goto err_key;
+            }
+            desc->mask |= UCC_TUNING_DESC_FIELD_TEAM_SIZE;
+        }
+        else if (strcmp(cur_str[0], "ppn") == 0) {
+            if (!ucc_check_range(cur_str[1], (size_t *) &desc->min_ppn,
+                                 (size_t *) &desc->max_ppn)) {
+                goto err_key;
+            }
+            desc->mask |= UCC_TUNING_DESC_FIELD_PPN;
+        }
+        else if (strcmp(cur_str[0], "nnodes") == 0) {
+            if (!ucc_check_range(cur_str[1], &desc->min_nnodes,
+                                 &desc->max_nnodes)) {
+                goto err_key;
+            }
+            desc->mask |= UCC_TUNING_DESC_FIELD_NNODES;
+        } else {
+            ucc_warn("key %s not defined as part of tuning section params\n",
+                     cur_str[0]);
+            goto err_key;
+        }
+        ucc_str_split_free(cur_str);
+    }
+    ucc_str_split_free(split);
+    return UCC_OK;
+err_key:
+    ucc_str_split_free(cur_str);
+err_cur_str:
+    ucc_str_split_free(split);
+    return UCC_ERR_INVALID_PARAM;
+}
 
 ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
                                           const ucc_config_names_array_t *src)
@@ -169,13 +290,14 @@ ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
 static int ucc_file_parse_handler(void *arg, const char *section,
                                   const char *name, const char *value)
 {
-    ucc_file_config_t *cfg          = arg;
+    ucc_file_config_t     *cfg      = arg;
     khash_t(ucc_cfg_file) *vars     = &cfg->vars;
     khash_t(ucc_sections) *sections = &cfg->sections;
-    khash_t(ucc_sec)      *cfg_section;
-    khiter_t iter;
-    int      result;
-    char    *dup;
+    ucc_section_wrap_t    *sec_wrap;
+    khiter_t               iter;
+    int                    result;
+    char                  *dup;
+    ucc_status_t           status;
 
     if (!name) {
         return 1;
@@ -193,32 +315,45 @@ static int ucc_file_parse_handler(void *arg, const char *section,
         return 0;
     }
 
-    if (strcmp(section,"") != 0) {
+    if (strlen(section) > 0) {
         /* has section */
         iter = kh_get(ucc_sections, sections, section);
-        if (iter == kh_end(sections)) { /* checks if section hash table already exists */
-            cfg_section = ucc_calloc(1, sizeof(*cfg_section), "section_"+section+"_cfg");
-            if (!cfg_section) {
-                ucc_error("failed to allocate %zd bytes for file config", sizeof(*cfg_section));
-                return UCC_ERR_NO_MEMORY; //0?
+        if (iter == kh_end(sections)) { /* section hash table doesn't exist */
+            sec_wrap = ucc_calloc(1, sizeof(*sec_wrap),
+                                  "section_"+section+"_cfg");
+            if (!sec_wrap) {
+                ucc_error("failed to allocate %zd bytes for section config",
+                          sizeof(*sec_wrap));
+                return 0;
             }
-            kh_init_inplace(ucc_sec, cfg_section);  /* new hash table for section */
             dup = strdup(section);
+            if (!dup) {
+                ucc_free(sec_wrap);
+                ucc_error("failed to dup str for kh_put");
+                return 0;
+            }
             iter = kh_put(ucc_sections, sections, dup, &result);
             if (result == UCS_KH_PUT_FAILED) {
+                ucc_free(sec_wrap);
                 ucc_free(dup);
                 ucc_error("inserting '%s' to config map failed", name);
                 return 0;
             }
-            kh_val(sections, iter) = cfg_section; /* putting the new hashtable in as value for section */
+            status = ucc_parse_section_name_to_desc(section, &sec_wrap->desc);
+            if (status != UCC_OK) {
+                ucc_free(sec_wrap);
+                ucc_free(dup);
+                return 0;
+            }
+            /* new hash table for section */
+            kh_init_inplace(ucc_sec, &sec_wrap->vals_h); // NOLINT
+            kh_val(sections, iter) = sec_wrap; // NOLINT
         } else {
-            iter = kh_get(ucc_sections, sections, section);
-            cfg_section = kh_val(sections, iter);
+            sec_wrap = kh_val(sections, iter);
         }
-        UCC_ADD_KEY_VALUE_TO_HASH(ucc_sec, cfg_section, name, value);
+        UCC_ADD_KEY_VALUE_TO_HASH(ucc_sec, &sec_wrap->vals_h, name, value);
     }
-    cfg->has_tuning_sections = 1;
-    /* param not part of a section section */
+    /* param not part of a section */
     UCC_ADD_KEY_VALUE_TO_HASH(ucc_cfg_file, vars, name, value);
 }
 
@@ -236,8 +371,7 @@ ucc_status_t ucc_parse_file_config(const char *        filename,
     }
     kh_init_inplace(ucc_cfg_file, &cfg->vars);
     kh_init_inplace(ucc_sections, &cfg->sections);
-    cfg->has_tuning_sections = 0;
-    ret = ini_parse(filename, ucc_file_parse_handler, cfg);
+    ret = ucc_ini_parse(filename, ucc_file_parse_handler, cfg);
     if (-1 == ret) {
         /* according to ucs/ini.h -1 means error in
            file open */
@@ -259,7 +393,8 @@ void ucc_release_file_config(ucc_file_config_t *cfg)
 {
     const char *key, *section_key;
     char       *value, *section_val;
-    khash_t(ucc_sec) *section;
+    khash_t(ucc_sec)   *section;
+    ucc_section_wrap_t *sec_wrap;
     int j;
 
     kh_foreach(&cfg->vars, key, value, {
@@ -267,7 +402,8 @@ void ucc_release_file_config(ucc_file_config_t *cfg)
         ucc_free(value);
     }) kh_destroy_inplace(ucc_cfg_file, &cfg->vars);
 
-    kh_foreach(&cfg->sections, key, section, {
+    kh_foreach(&cfg->sections, key, sec_wrap, {
+        section = &sec_wrap->vals_h;
         for (j = kh_begin(section); j != kh_end(section); ++j) {
         	if (!kh_exist(section, j)) continue;
         	section_key = kh_key(section, j);
@@ -289,13 +425,15 @@ static const char *ucc_file_config_get_by_section(ucc_file_config_t *cfg,
     khash_t(ucc_sections) *sections = &cfg->sections;
     khash_t(ucc_sec) *sec;
     khiter_t iter;
+    ucc_section_wrap_t *sec_wrap;
 
     iter = kh_get(ucc_sections, sections, section);
     if (iter == kh_end(sections)) {
         /* section not found*/
         return NULL;
     }
-    sec = kh_val(sections, iter);
+    sec_wrap = kh_val(sections, iter);
+    sec = &sec_wrap->vals_h;
     iter = kh_get(ucc_sec, sec, var_name);
     if (iter == kh_end(sec)) {
         /* variable not found in section*/
@@ -311,7 +449,7 @@ static const char *ucc_file_config_get(ucc_file_config_t *cfg,
     khash_t(ucc_cfg_file) *vars = &cfg->vars;
     khiter_t iter;
 
-    if (strcmp(section, "") != 0) {
+    if (strlen(section) > 0) {
         return (ucc_file_config_get_by_section(cfg, var_name, section));
     }
     iter = kh_get(ucc_cfg_file, vars, var_name);
@@ -368,7 +506,7 @@ ucc_status_t ucc_apply_file_cfg(void *opts, ucc_config_field_t *fields,
         if (strlen(fields->name) == 0) {
             status = ucc_apply_file_cfg(
                 opts, (ucc_config_field_t *)fields->parser.arg, env_prefix,
-                component_prefix, "");
+                component_prefix, section);
             if (UCC_OK != status) {
                 return status;
             }

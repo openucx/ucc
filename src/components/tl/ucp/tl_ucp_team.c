@@ -13,133 +13,60 @@
 #include "utils/ucc_string.h"
 #include "coll_score/ucc_coll_score.h"
 
-
-#define UCC_CHECK_RANGE(_range_str, _min, _max)                          \
-    ({                                                                   \
-        size_t begin, end;                                               \
-        begin = (size_t) atoi(ucc_str_split(_range_str, "-")[0]);        \
-        end   = begin;                                                   \
-        if (ucc_str_split(_range_str, "-")[1]) {                         \
-            end = (size_t) atoi(ucc_str_split(_range_str, "-")[1]);      \
-        }                                                                \
-        (_min >= begin && _max <= end);                                  \
-    })
-
-static inline ucc_status_t ucc_get_topo_info(ucc_tl_ucp_team_t *team,
-                                             ucc_rank_t        *ppn_min,
-                                             ucc_rank_t        *ppn_max,
-                                             ucc_rank_t        *nnodes)
+static inline ucc_status_t ucc_tl_ucp_get_topo(ucc_tl_ucp_team_t *team)
 {
-    ucc_ep_map_t  ctx_map;
     ucc_subset_t  subset;
-    ucc_topo_t   *topo;
     ucc_status_t  status;
 
     status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
                                       &UCC_TL_TEAM_MAP(team),
-                                      &ctx_map);
+                                      &team->ctx_map);
     if (UCC_OK != status) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
         return status;
     }
-    subset.map    = ctx_map;
+    subset.map    = team->ctx_map;
     subset.myrank = UCC_TL_TEAM_RANK(team);
 
-    status = ucc_topo_init(subset, UCC_TL_CORE_CTX(team)->topo, &topo);
+    status = ucc_topo_init(subset, UCC_TL_CORE_CTX(team)->topo, &team->topo);
 
     if (UCC_OK != status) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to init team perf topo");
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to init team topo");
         goto err_topo_init;
     }
 
-    *ppn_min = ucc_topo_min_ppn(topo);
-    *ppn_max = ucc_topo_max_ppn(topo);
-    *nnodes  = ucc_topo_nnodes(topo);
-    ucc_topo_cleanup(topo);
+    return UCC_OK;
 err_topo_init:
-    ucc_ep_map_destroy_nested(&ctx_map);
+    ucc_ep_map_destroy_nested(&team->ctx_map);
     return status;
-}
-
-static inline int ucc_parse_section_name(const char* name,
-                                         ucc_cpu_vendor_t _vendor,
-                                         ucc_cpu_model_t _model,
-                                         size_t _team_size,
-                                         ucc_cfg_ppn_range_t _ppn_range,
-                                         ucc_rank_t _nnodes)
-{
-    char **split = ucc_str_split(name, " ");
-    ucc_cpu_vendor_t vendor;
-    ucc_cpu_model_t  model;
-    char **cur_str;
-
-    while(*split) {
-        cur_str = ucc_str_split(*split, "=");
-        if (strcmp(cur_str[0], "vendor") == 0) {
-            vendor = ucc_get_vendor_from_str(cur_str[1]);
-            if (vendor != _vendor) {
-                return 0;
-            }
-        }
-        else if (strcmp(cur_str[0], "model") == 0) {
-            model = ucc_get_model_from_str(cur_str[1]);
-            if (model != _model) {
-                return 0;
-            }
-        }
-        else if (strcmp(cur_str[0], "team_size") == 0) {
-            if (!UCC_CHECK_RANGE(cur_str[1], _team_size, _team_size)) {
-                return 0;
-            }
-        }
-        else if (strcmp(cur_str[0], "ppn") == 0) {
-            if (!UCC_CHECK_RANGE(cur_str[1], _ppn_range.begin, _ppn_range.end)) {
-                return 0;
-            }
-        }
-        else if (strcmp(cur_str[0], "nnodes") == 0) {
-            if (!UCC_CHECK_RANGE(cur_str[1], _nnodes, _nnodes)) {
-                return 0;
-            }
-        } else {
-            ucc_warn("key %s not defined as part of tuning section params\n",
-                     cur_str[0]);
-            return 0;
-        }
-        split++;
-    }
-    return 1;
 }
 
 static ucc_status_t ucc_tl_ucp_cfg_add_section(ucc_tl_ucp_team_t *team,
                                                ucc_file_config_t *cfg)
 {
-    ucc_cpu_vendor_t          vendor = ucc_arch_get_cpu_vendor();
-    ucc_cpu_model_t           model  = ucc_arch_get_cpu_model();
-    size_t team_size = UCC_TL_TEAM_SIZE(team);
-    khash_t(ucc_sections) *sections = &cfg->sections;
-    khash_t(ucc_sec) *sec;
-    khiter_t i, j;
-    ucc_cfg_ppn_range_t ppn_range;
-    ucc_rank_t nnodes;
-    const char *sec_name;
-    ucc_status_t status;
-
-    status = ucc_get_topo_info(team, &ppn_range.begin, &ppn_range.end,
-                               &nnodes);
-    if (UCC_OK != status) {
-        return status;
-    }
+    size_t                 team_size = UCC_TL_TEAM_SIZE(team);
+    khash_t(ucc_sections) *sections  = &cfg->sections;
+    ucc_cpu_vendor_t       vendor    = ucc_arch_get_cpu_vendor();
+    ucc_cpu_model_t        model     = ucc_arch_get_cpu_model();
+    ucc_rank_t             ppn_min   = ucc_topo_min_ppn(team->topo);
+    ucc_rank_t             ppn_max   = ucc_topo_max_ppn(team->topo);
+    ucc_rank_t             nnodes    = ucc_topo_nnodes(team->topo);
+    khash_t(ucc_sec)      *sec_h;
+    khiter_t               i, j;
+    const char            *sec_name;
+    ucc_section_wrap_t    *sec;
+    ucc_status_t           status;
 
     for (i = kh_begin(sections); i != kh_end(sections); ++i) {
         if (!kh_exist(sections, i)) continue;
         sec_name = kh_key(sections, i);
-        if (ucc_parse_section_name(sec_name, vendor, model, team_size,
-                                   ppn_range, nnodes)) {
-            sec = kh_val(sections, i);
-            j = kh_get(ucc_sec, sec, "UCC_TL_UCP_TUNE");
-            if (j != kh_end(sec)) {
-                team->tuning_str = kh_val(sec, j);
+        sec      = kh_val(sections, i);
+        if (ucc_check_section(sec->desc, vendor, model, team_size,
+                              ppn_min, ppn_max, nnodes)) {
+            sec_h = &sec->vals_h;
+            j = kh_get(ucc_sec, sec_h, "UCC_TL_UCP_TUNE");
+            if (j != kh_end(sec_h)) {
+                team->tuning_str = kh_val(sec_h, j);
             }
             status = ucc_apply_file_cfg(&team->cfg,
                                         ucc_tl_ucp_lib_config_table, "UCC_",
@@ -173,15 +100,25 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->seq_num         = 0;
     self->status          = UCC_INPROGRESS;
     self->tuning_str      = "";
+
     memcpy(&self->cfg, &UCC_TL_UCP_TEAM_LIB(self)->cfg,
            sizeof(ucc_tl_ucp_team_config_t));
+
+    if (ctx->topo_required) {
+        status = ucc_tl_ucp_get_topo(self);
+        if (UCC_OK != status) {
+            return status;
+        }
+    }
+
     if (ucc_global_config.file_cfg && !IS_SERVICE_TEAM(self) &&
-        UCC_TL_CORE_CTX(self)->topo != NULL) {
+        ctx->topo_required && tl_context->lib->use_tuning) {
         status = ucc_tl_ucp_cfg_add_section(self, ucc_global_config.file_cfg);
         if (status != UCC_OK) {
             ucc_debug("section not found");
         }
     }
+
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
@@ -196,6 +133,12 @@ UCC_CLASS_DEFINE(ucc_tl_ucp_team_t, ucc_tl_team_t);
 
 ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 {
+    ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
+
+    if (UCC_TL_UCP_TEAM_CTX(team)->topo_required) {
+        ucc_ep_map_destroy_nested(&team->ctx_map);
+        ucc_topo_cleanup(team->topo);
+    }
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_ucp_team_t)(tl_team);
     return UCC_OK;
 }
@@ -336,11 +279,11 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
             (status != UCC_ERR_NOT_SUPPORTED)) {
             goto err;
         }
-    } else if (strcmp(team->tuning_str, "") != 0) {
+    } else if (strlen(team->tuning_str) > 0) {
         status = ucc_coll_score_update_from_str(
             team->tuning_str, score, UCC_TL_TEAM_SIZE(team), NULL,
             &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
-            ucc_tl_ucp_alg_id_to_init);
+            ucc_tl_ucp_alg_id_to_init, mem_types, mt_n);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&

@@ -10,7 +10,6 @@
 #include "components/tl/ucc_tl_log.h"
 #include "core/ucc_ee.h"
 #include "utils/ucc_mpool.h"
-#include "utils/arch/cpu.h"
 #include "tl_ucp_ep_hash.h"
 #include "schedule/ucc_schedule_pipelined.h"
 #include <ucp/api/ucp.h>
@@ -42,57 +41,30 @@ typedef struct ucc_tl_ucp_iface {
 /* Extern iface should follow the pattern: ucc_tl_<tl_name> */
 extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 
-typedef struct ucc_cfg_team_size_range {
-	ucc_rank_t begin;
-	ucc_rank_t end;
-} ucc_cfg_team_size_range_t;
-
-typedef struct ucc_cfg_ppn_range {
-	ucc_rank_t begin;
-	ucc_rank_t end;
-} ucc_cfg_ppn_range_t;
-
-typedef struct ucc_cfg_data_size_range {
-	size_t begin;
-	size_t end;
-} ucc_cfg_data_size_range_t;
-
-//typedef struct ucc_cfg_section_param {
-//    const char *name;
-//    const char *value;
-//} ucc_cfg_section_param_t;
-//
-//typedef struct ucc_cfg_section {
-//    ucc_cpu_vendor_t          vendor;
-//    ucc_cpu_model_t           model;
-//    ucc_cfg_team_size_range_t team_sizes;
-//    ucc_cfg_ppn_range_t       ppns;
-//    ucc_cfg_section_param_t  *params;
-//} ucc_cfg_section_t;
-
 typedef struct ucc_tl_ucp_lib_config {
-    ucc_tl_lib_config_t   super;
-    uint32_t              kn_radix;
-    uint32_t              fanin_kn_radix;
-    uint32_t              fanout_kn_radix;
-    uint32_t              barrier_kn_radix;
-    uint32_t              allreduce_kn_radix;
-    uint32_t              allreduce_sra_kn_radix;
-    uint32_t              reduce_scatter_kn_radix;
-    uint32_t              allgather_kn_radix;
-    uint32_t              bcast_kn_radix;
-    uint32_t              bcast_sag_kn_radix;
-    uint32_t              reduce_kn_radix;
-    uint32_t              gather_kn_radix;
-    uint32_t              gatherv_linear_num_posts;
-    uint32_t              scatter_kn_radix;
-    uint32_t              scatterv_linear_num_posts;
-    uint32_t              alltoall_pairwise_num_posts;
-    uint32_t              alltoallv_pairwise_num_posts;
-    ucc_pipeline_params_t allreduce_sra_kn_pipeline;
-    int                   reduce_avg_pre_op;
-    int                   reduce_scatter_ring_bidirectional;
-    int                   reduce_scatterv_ring_bidirectional;
+    ucc_tl_lib_config_t      super;
+    uint32_t                 kn_radix;
+    uint32_t                 fanin_kn_radix;
+    uint32_t                 fanout_kn_radix;
+    uint32_t                 barrier_kn_radix;
+    uint32_t                 allreduce_kn_radix;
+    uint32_t                 allreduce_sra_kn_radix;
+    uint32_t                 reduce_scatter_kn_radix;
+    uint32_t                 allgather_kn_radix;
+    uint32_t                 bcast_kn_radix;
+    uint32_t                 bcast_sag_kn_radix;
+    uint32_t                 reduce_kn_radix;
+    uint32_t                 gather_kn_radix;
+    uint32_t                 gatherv_linear_num_posts;
+    uint32_t                 scatter_kn_radix;
+    uint32_t                 scatterv_linear_num_posts;
+    uint32_t                 alltoall_pairwise_num_posts;
+    uint32_t                 alltoallv_pairwise_num_posts;
+    ucc_pipeline_params_t    allreduce_sra_kn_pipeline;
+    int                      reduce_avg_pre_op;
+    int                      reduce_scatter_ring_bidirectional;
+    int                      reduce_scatterv_ring_bidirectional;
+    ucc_ternary_auto_value_t use_topo;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {
@@ -143,6 +115,7 @@ typedef struct ucc_tl_ucp_context {
     ucp_rkey_h *                rkeys;
     uint64_t                    n_rinfo_segs;
     uint64_t                    ucp_memory_types;
+    int                         topo_required;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -158,6 +131,8 @@ typedef struct ucc_tl_ucp_team {
     ucc_tl_ucp_worker_t *      worker;
     ucc_tl_ucp_team_config_t   cfg;
     const char *               tuning_str;
+    ucc_topo_t                *topo;
+    ucc_ep_map_t               ctx_map;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

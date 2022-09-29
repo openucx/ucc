@@ -546,6 +546,7 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
 {
     ucc_tl_ucp_context_t *ctx = ucc_derived_of(context, ucc_tl_ucp_context_t);
     uint64_t *            offset = (uint64_t *)attr->attr.ctx_addr;
+    ucc_tl_ucp_lib_t     *lib = ucc_derived_of(context->lib, ucc_tl_ucp_lib_t);
     ucs_status_t          ucs_status;
     size_t                packed_length;
     int                   i;
@@ -611,10 +612,15 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
         attr->attr.global_work_buffer_size =
             ONESIDED_SYNC_SIZE + ONESIDED_REDUCE_SIZE;
     }
-    attr->topo_required = 0;
-    if (ucc_global_config.file_cfg &&
-        ucc_global_config.file_cfg->has_tuning_sections) {
-        attr->topo_required = 1;
+    if (lib->cfg.use_topo == UCC_TRY) {
+        if (context->ucc_context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
+            attr->topo_required = 1;
+        } else {
+            attr->topo_required = 0;
+        }
+    } else {
+        attr->topo_required = (lib->cfg.use_topo) ? 1 : 0;
     }
+    ctx->topo_required = attr->topo_required;
     return UCC_OK;
 }

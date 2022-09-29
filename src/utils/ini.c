@@ -20,8 +20,8 @@ https://github.com/benhoyt/inih
 
 #include "ini.h"
 
-#if !INI_USE_STACK
-#if INI_CUSTOM_ALLOCATOR
+#if !UCC_INI_USE_STACK
+#if UCC_INI_CUSTOM_ALLOCATOR
 #include <stddef.h>
 void* ini_malloc(size_t size);
 void ini_free(void* ptr);
@@ -65,10 +65,10 @@ static char* lskip(const char* s)
    be prefixed by a whitespace character to register as a comment. */
 static char* find_chars_or_comment(const char* s, const char* chars)
 {
-#if INI_ALLOW_INLINE_COMMENTS
+#if UCC_INI_ALLOW_INLINE_COMMENTS
     int was_space = 0;
     while (*s && (!chars || !strchr(chars, *s)) &&
-           !(was_space && strchr(INI_INLINE_COMMENT_PREFIXES, *s))) {
+           !(was_space && strchr(UCC_INI_INLINE_COMMENT_PREFIXES, *s))) {
         was_space = isspace((unsigned char)(*s));
         s++;
     }
@@ -93,18 +93,18 @@ static char* strncpy0(char* dest, const char* src, size_t size)
 }
 
 /* See documentation in header file. */
-int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
+int ucc_ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
                      void* user)
 {
     /* Uses a fair bit of stack (use heap instead if you need to) */
-#if INI_USE_STACK
-    char line[INI_MAX_LINE];
-    int max_line = INI_MAX_LINE;
+#if UCC_INI_USE_STACK
+    char line[UCC_INI_MAX_LINE];
+    int max_line = UCC_INI_MAX_LINE;
 #else
     char* line;
-    size_t max_line = INI_INITIAL_ALLOC;
+    size_t max_line = UCC_INI_INITIAL_ALLOC;
 #endif
-#if INI_ALLOW_REALLOC && !INI_USE_STACK
+#if UCC_INI_ALLOW_REALLOC && !UCC_INI_USE_STACK
     char* new_line;
     size_t offset;
 #endif
@@ -118,14 +118,14 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
     int lineno = 0;
     int error = 0;
 
-#if !INI_USE_STACK
-    line = (char*)ini_malloc(INI_INITIAL_ALLOC);
+#if !UCC_INI_USE_STACK
+    line = (char*)ini_malloc(UCC_INI_INITIAL_ALLOC);
     if (!line) {
         return -2;
     }
 #endif
 
-#if INI_HANDLER_LINENO
+#if UCC_INI_HANDLER_LINENO
 #define HANDLER(u, s, n, v) handler(u, s, n, v, lineno)
 #else
 #define HANDLER(u, s, n, v) handler(u, s, n, v)
@@ -133,12 +133,12 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
 
     /* Scan through stream line by line */
     while (reader(line, (int)max_line, stream) != NULL) {
-#if INI_ALLOW_REALLOC && !INI_USE_STACK
+#if UCC_INI_ALLOW_REALLOC && !INI_USE_STACK
         offset = strlen(line);
         while (offset == max_line - 1 && line[offset - 1] != '\n') {
             max_line *= 2;
-            if (max_line > INI_MAX_LINE)
-                max_line = INI_MAX_LINE;
+            if (max_line > UCC_INI_MAX_LINE)
+                max_line = UCC_INI_MAX_LINE;
             new_line = ini_realloc(line, max_line);
             if (!new_line) {
                 ini_free(line);
@@ -147,7 +147,7 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
             line = new_line;
             if (reader(line + offset, (int)(max_line - offset), stream) == NULL)
                 break;
-            if (max_line >= INI_MAX_LINE)
+            if (max_line >= UCC_INI_MAX_LINE)
                 break;
             offset += strlen(line + offset);
         }
@@ -156,7 +156,7 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
         lineno++;
 
         start = line;
-#if INI_ALLOW_BOM
+#if UCC_INI_ALLOW_BOM
         if (lineno == 1 && (unsigned char)start[0] == 0xEF &&
                            (unsigned char)start[1] == 0xBB &&
                            (unsigned char)start[2] == 0xBF) {
@@ -165,10 +165,10 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
 #endif
         start = lskip(rstrip(start));
 
-        if (strchr(INI_START_COMMENT_PREFIXES, *start)) {
+        if (strchr(UCC_INI_START_COMMENT_PREFIXES, *start)) {
             /* Start-of-line comment */
         }
-#if INI_ALLOW_MULTILINE
+#if UCC_INI_ALLOW_MULTILINE
         else if (*prev_name && *start && start > line) {
             /* Non-blank line with leading whitespace, treat as continuation
                of previous name's value (as per Python configparser). */
@@ -183,7 +183,7 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
                 *end = '\0';
                 strncpy0(section, start + 1, sizeof(section));
                 *prev_name = '\0';
-#if INI_CALL_HANDLER_ON_NEW_SECTION
+#if UCC_INI_CALL_HANDLER_ON_NEW_SECTION
                 if (!HANDLER(user, section, NULL, NULL) && !error)
                     error = lineno;
 #endif
@@ -200,7 +200,7 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
                 *end = '\0';
                 name = rstrip(start);
                 value = end + 1;
-#if INI_ALLOW_INLINE_COMMENTS
+#if UCC_INI_ALLOW_INLINE_COMMENTS
                 end = find_chars_or_comment(value, NULL);
                 if (*end)
                     *end = '\0';
@@ -215,7 +215,7 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
             }
             else if (!error) {
                 /* No '=' or ':' found on name[=:]value line */
-#if INI_ALLOW_NO_VALUE
+#if UCC_INI_ALLOW_NO_VALUE
                 *end = '\0';
                 name = rstrip(start);
                 if (!HANDLER(user, section, name, NULL) && !error)
@@ -226,13 +226,13 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
             }
         }
 
-#if INI_STOP_ON_FIRST_ERROR
+#if UCC_INI_STOP_ON_FIRST_ERROR
         if (error)
             break;
 #endif
     }
 
-#if !INI_USE_STACK
+#if !UCC_INI_USE_STACK
     ini_free(line);
 #endif
 
@@ -240,13 +240,13 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
 }
 
 /* See documentation in header file. */
-int ini_parse_file(FILE* file, ini_handler handler, void* user)
+int ucc_ini_parse_file(FILE* file, ini_handler handler, void* user)
 {
-    return ini_parse_stream((ini_reader)fgets, file, handler, user);
+    return ucc_ini_parse_stream((ini_reader)fgets, file, handler, user);
 }
 
 /* See documentation in header file. */
-int ini_parse(const char* filename, ini_handler handler, void* user)
+int ucc_ini_parse(const char* filename, ini_handler handler, void* user)
 {
     FILE* file;
     int error;
@@ -254,7 +254,7 @@ int ini_parse(const char* filename, ini_handler handler, void* user)
     file = fopen(filename, "r");
     if (!file)
         return -1;
-    error = ini_parse_file(file, handler, user);
+    error = ucc_ini_parse_file(file, handler, user);
     fclose(file);
     return error;
 }
@@ -287,11 +287,11 @@ static char* ini_reader_string(char* str, int num, void* stream) {
 }
 
 /* See documentation in header file. */
-int ini_parse_string(const char* string, ini_handler handler, void* user) {
+int ucc_ini_parse_string(const char* string, ini_handler handler, void* user) {
     ini_parse_string_ctx ctx;
 
     ctx.ptr = string;
     ctx.num_left = strlen(string);
-    return ini_parse_stream((ini_reader)ini_reader_string, &ctx, handler,
+    return ucc_ini_parse_stream((ini_reader)ini_reader_string, &ctx, handler,
                             user);
 }

@@ -43,4 +43,7 @@ docs/doxygen/doxygen-doc/ucc.tag: $(doxygen_doc_files) doxygen-doc
 .dot.pdf:
 	dot -T pdf -o $@ $<
 
+sharedir=$(prefix)/share
+dist_share_DATA=contrib/ucc.conf
+
 MOSTLYCLEANFILES = $(DX_CLEANFILES) $(DOT_CLEANFILES)

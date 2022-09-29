@@ -16,6 +16,10 @@ ucc_config_field_t ucc_base_lib_config_table[] = {
      "poll.",
      ucc_offsetof(ucc_base_lib_config_t, log_component), UCC_CONFIG_TYPE_LOG_COMP},
 
+    {"USE_TUNING", "y",
+     "Use perf tuning",
+     ucc_offsetof(ucc_base_lib_config_t, use_tuning), UCC_CONFIG_TYPE_BOOL},
+
     {NULL}};
 
 ucc_config_field_t ucc_base_ctx_config_table[] = {
