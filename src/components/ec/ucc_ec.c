@@ -102,7 +102,7 @@ ucc_status_t ucc_ec_finalize()
     ucc_ee_type_t  et;
     ucc_ec_base_t *ec;
 
-    for (et = UCC_EE_CPU_THREAD; et < UCC_EE_LAST; et++) {
+    for (et = UCC_EE_FIRST; et < UCC_EE_LAST; et++) {
         if (NULL != ec_ops[et]) {
             ec = ucc_container_of(ec_ops[et], ucc_ec_base_t, ops);
             ec->ref_cnt--;
