@@ -73,10 +73,10 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
      ucc_offsetof(ucc_ec_cuda_config_t, reduce_num_blocks),
      UCC_CONFIG_TYPE_ULUNITS},
 
-    {"USE_COOPERATIVE_LAUNCH", "0",
+    {"USE_COOPERATIVE_LAUNCH", "1",
      "whether to use cooperative launch in persistent kernel executor",
      ucc_offsetof(ucc_ec_cuda_config_t, use_cooperative_launch),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_BOOL},
 
     {NULL}
 
@@ -329,11 +329,11 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     if (cfg->use_cooperative_launch == 1) {
         cudaDeviceGetAttribute(&supportsCoopLaunch,
                                cudaDevAttrCooperativeLaunch, device);
-        if (CUDA_SUPPORTS_COOP_LAUNCH == 0 || supportsCoopLaunch == 0) {
-            ec_error(&ucc_ec_cuda.super,
+        if (!supportsCoopLaunch) {
+            cfg->use_cooperative_launch = 0;
+            ec_warn(&ucc_ec_cuda.super,
                      "CUDA cooperative groups are not supported. "
-                     "Please set UCC_EC_CUDA_USE_COOPERATIVE_LAUNCH to 0");
-            return UCC_ERR_NOT_SUPPORTED;
+                     "Fall back to non cooperative launch.");
         }
     }
 

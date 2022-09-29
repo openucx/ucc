@@ -15,14 +15,11 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#define WARP_SIZE 32
-#define LOOP_UNROLL 8
-#if CUDA_SUPPORTS_COOP_LAUNCH
 #include <cooperative_groups.h>
 using namespace cooperative_groups;
-#endif
 
+#define WARP_SIZE          32
+#define LOOP_UNROLL        8
 #define align_pow2(_n, _p) ((_n) & ((_p) - 1))
 typedef int4 vectype;
 
@@ -293,84 +290,13 @@ __device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
    }
 }
 
-__global__ void
-executor_kernel_cooperative(volatile ucc_ec_cuda_executor_t *eee, int q_size)
-{
-#if CUDA_SUPPORTS_COOP_LAUNCH
-    const uint32_t          worker_id   = blockIdx.x;
-    const uint32_t          num_workers = gridDim.x;
-    bool                    is_master   = (threadIdx.x == 0) ? true : false;
-    int                     cidx_local, pidx_local;
-    volatile int *          pidx, *cidx;
-    ucc_ee_executor_task_t *tasks;
-    __shared__ ucc_ee_executor_task_args_t args;
-    __shared__ bool                        worker_done;
-
-    if (is_master) {
-        *eee->dev_cidx  = 0;
-        *eee->dev_state = UCC_EC_CUDA_EXECUTOR_STARTED;
-        cidx_local      = worker_id;
-        pidx            = eee->dev_pidx;
-        cidx            = eee->dev_cidx;
-        tasks           = eee->dev_tasks;
-    }
-
-    worker_done     = false;
-    grid_group grid = this_grid();
-    grid.sync();
-    while (1) {
-        if (is_master) {
-            while ((*cidx % num_workers) != worker_id)
-                ;
-            do {
-                pidx_local = *pidx;
-            } while (*cidx == pidx_local);
-            (*cidx)++;
-            worker_done = (pidx_local == -1);
-            if (!worker_done) {
-                args = tasks[cidx_local].args;
-            }
-        }
-        __syncthreads();
-        if (worker_done) {
-            grid.sync();
-            if (is_master && (worker_id == 0)) {
-                *eee->dev_state = UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK;
-            }
-            return;
-        }
-        switch (args.task_type) {
-        case UCC_EE_EXECUTOR_TASK_COPY:
-            executor_copy_task(&args.copy);
-            break;
-        case UCC_EE_EXECUTOR_TASK_REDUCE:
-            executor_reduce_task(&args.reduce);
-            break;
-        case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:
-            executor_reduce_strided_task(&args.reduce_strided);
-            break;
-        case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
-            executor_copy_multi(&args.copy_multi);
-            break;
-        default:
-            break;
-        }
-        __syncthreads();
-        __threadfence_system();
-        if (is_master) {
-            tasks[cidx_local].status = UCC_OK;
-            cidx_local               = (cidx_local + num_workers) % q_size;
-        }
-    }
-#endif
-}
-
 __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
-                                int q_size)
+                                int q_size, bool useCoopLaunch)
 {
     const uint32_t  worker_id   = blockIdx.x;
     const uint32_t  num_workers = gridDim.x;
     bool            is_master   = (threadIdx.x == 0) ? true: false;
+    grid_group      grid        = this_grid();
     int cidx_local, pidx_local;
     volatile int *pidx, *cidx;
     ucc_ee_executor_task_t *tasks;
@@ -378,6 +304,10 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
     __shared__ bool worker_done;
 
     if (is_master) {
+        if (useCoopLaunch) {
+            *eee->dev_cidx  = 0;
+            *eee->dev_state = UCC_EC_CUDA_EXECUTOR_STARTED;
+        }
         cidx_local = worker_id;
         pidx       = eee->dev_pidx;
         cidx       = eee->dev_cidx;
@@ -385,7 +315,11 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
     }
 
     worker_done = false;
-    __syncthreads();
+    if (useCoopLaunch) {
+        grid.sync();
+    } else {
+        __syncthreads();
+    }
     while (1) {
         if (is_master) {
             while ((*cidx % num_workers) != worker_id);
@@ -400,6 +334,12 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
         }
         __syncthreads();
         if (worker_done) {
+            if (useCoopLaunch) {
+                grid.sync();
+                if (is_master && (worker_id == 0)) {
+                    *eee->dev_state = UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK;
+                }
+            }
             return;
         }
         switch (args.task_type) {
@@ -443,14 +383,14 @@ ucc_status_t ucc_ec_cuda_persistent_kernel_start(ucc_ec_cuda_executor_t *eee)
     int          useCoopLaunch = EC_CUDA_CONFIG->use_cooperative_launch;
 
     if (useCoopLaunch) {
-        void *kernelArgs[] = {&eee, &q_size};
+        void *kernelArgs[] = {&eee, &q_size, &useCoopLaunch};
         dim3  dimBlock(nt, 1, 1);
         dim3  dimGrid(nb, 1, 1);
-        cudaLaunchCooperativeKernel((void *)executor_kernel_cooperative,
-                                    dimGrid, dimBlock, kernelArgs, 0, stream);
+        cudaLaunchCooperativeKernel((void *)executor_kernel, dimGrid, dimBlock,
+                                    kernelArgs, 0, stream);
     } else {
         executor_start<<<1, 1, 0, stream>>>(eee->dev_state, eee->dev_cidx);
-        executor_kernel<<<nb, nt, 0, stream>>>(eee, q_size);
+        executor_kernel<<<nb, nt, 0, stream>>>(eee, q_size, 0);
         executor_shutdown_ack<<<1, 1, 0, stream>>>(eee->dev_state);
     }
     CUDA_CHECK(cudaGetLastError());
