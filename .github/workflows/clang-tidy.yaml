@@ -34,7 +34,11 @@ jobs:
       run: |
         echo "Workspace: ${GITHUB_WORKSPACE}"
         cd ${GITHUB_WORKSPACE}
-        run-clang-tidy-${CLANG_VER} -p /tmp/
+        run-clang-tidy-${CLANG_VER} -p /tmp/ 2>&1 | tee /tmp/clang_tidy.log
+        nerrors=$(grep 'error:' /tmp/clang_tidy.log | wc -l)
+        if [ $nerrors -ne 0 ]; then
+            exit 125;
+        fi
         make clean
         rm -rf /tmp/ucc
     - name: Run gtest ASAN
