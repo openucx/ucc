@@ -486,6 +486,7 @@ static ucc_status_t ucc_ec_cuda_finalize()
     ucc_mpool_cleanup(&ucc_ec_cuda.events, 1);
     ucc_mpool_cleanup(&ucc_ec_cuda.strm_reqs, 1);
     ucc_mpool_cleanup(&ucc_ec_cuda.executors, 1);
+    ucc_mpool_cleanup(&ucc_ec_cuda.executor_interruptible_tasks, 1);
     ucc_free(ucc_ec_cuda.exec_streams);
 
     return UCC_OK;

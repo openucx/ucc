@@ -200,8 +200,8 @@ __device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
     const size_t     step     = blockDim.x;
     size_t           min_size = task->counts[0];
     size_t           idx      = threadIdx.x;
-    __shared__ int4 *dsts[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
-    __shared__ int4 *srcs[UCC_EE_EXECUTOR_NUM_COPY_BUFS];
+    __shared__ int4 *dsts[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
+    __shared__ int4 *srcs[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
     bool             aligned;
 
     for (int i = 0; i < task->num_vectors; i++) {
