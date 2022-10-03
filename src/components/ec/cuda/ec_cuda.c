@@ -73,6 +73,11 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
      ucc_offsetof(ucc_ec_cuda_config_t, reduce_num_blocks),
      UCC_CONFIG_TYPE_ULUNITS},
 
+    {"USE_COOPERATIVE_LAUNCH", "1",
+     "whether to use cooperative launch in persistent kernel executor",
+     ucc_offsetof(ucc_ec_cuda_config_t, use_cooperative_launch),
+     UCC_CONFIG_TYPE_BOOL},
+
     {NULL}
 
 };
@@ -216,6 +221,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     cudaError_t           cuda_st;
     const char           *cu_err_st_str;
     struct cudaDeviceProp prop;
+    int                   supportsCoopLaunch = 0;
 
     ucc_ec_cuda.stream                   = NULL;
     ucc_ec_cuda.stream_initialized       = 0;
@@ -319,6 +325,18 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
+
+    if (cfg->use_cooperative_launch == 1) {
+        cudaDeviceGetAttribute(&supportsCoopLaunch,
+                               cudaDevAttrCooperativeLaunch, device);
+        if (!supportsCoopLaunch) {
+            cfg->use_cooperative_launch = 0;
+            ec_warn(&ucc_ec_cuda.super,
+                     "CUDA cooperative groups are not supported. "
+                     "Fall back to non cooperative launch.");
+        }
+    }
+
     ucc_ec_cuda.task_strm_type = cfg->task_strm_type;
     ucc_spinlock_init(&ucc_ec_cuda.init_spinlock, 0);
     return UCC_OK;
