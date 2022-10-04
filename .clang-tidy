@@ -9,7 +9,7 @@ Checks: >
     misc-static-assert,
     misc-unused-parameters,
     readability-redundant-control-flow
-WarningsAsErrors: ''
+WarningsAsErrors: '*'
 HeaderFilterRegex: ''
 AnalyzeTemporaryDtors: false
 FormatStyle:     none

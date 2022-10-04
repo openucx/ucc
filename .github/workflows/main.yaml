@@ -48,7 +48,7 @@ jobs:
     - name: Build OMPI
       run: |
         cd /tmp/ompi
-        ./autogen.pl --no-oshmem --exclude pml-cm,pml-ob1,mtl,coll-adapt,coll-han,coll-inter,coll-ftagree
+        ./autogen.pl  --exclude pml-cm,mtl,coll-adapt,coll-han,coll-inter,coll-ftagree
         ./configure --prefix=/tmp/ompi/install --enable-mpirun-prefix-by-default --disable-mpi-fortran --disable-man-pages --with-ucx=/tmp/ucx/install --with-ucc=/tmp/ucc/install
         make -j install
     - name: Get IMB
