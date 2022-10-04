@@ -185,7 +185,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
         if (self->scratch.rem[i]) {
             ucc_tl_cuda_unmap_memhandle((uintptr_t)self->scratch.rem_info[i].ptr,
                                         self->scratch.rem[i],
-                                        ucc_tl_cuda_get_cache(self, i));
+                                        ucc_tl_cuda_get_cache(self, i), 1);
         }
     }
 
