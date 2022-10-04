@@ -372,9 +372,14 @@ ucc_status_t thread_allgather_req_free(void *request)
 
 void proc_context_create(UccProcess_h proc, int id, ThreadAllgather *ta, bool is_global)
 {
-    ucc_status_t status;
+    const int            nnodes   = 2;
+    const int            nsockets = 2;
+    const int            nnumas   = 3;
+    ucc_status_t         status;
     ucc_context_config_h ctx_config;
     std::stringstream    err_msg;
+    ucc_proc_info_t      proc_info;
+    int node, local_ppn, local_rank, job_size, block;
 
     status = ucc_context_config_read(proc->lib_h, NULL, &ctx_config);
     if (status != UCC_OK) {
@@ -389,8 +394,27 @@ void proc_context_create(UccProcess_h proc, int id, ThreadAllgather *ta, bool is
         proc->ctx_params.oob.coll_info = (void*) &ta->reqs[id];
         proc->ctx_params.oob.n_oob_eps = ta->n_procs;
         proc->ctx_params.oob.oob_ep    = id;
+
+
+        /* Simulate multi-node topology for larger gtest coverage */
+        job_size = ta->n_procs;
+        block = ucc_buffer_block_count(job_size, nnodes, 0);
+        node    = id / block;
+        local_ppn = ucc_buffer_block_count(job_size, nnodes, node);
+        local_rank = id - ucc_buffer_block_offset(job_size, nnodes, node);
+
+        proc_info.host_hash = node + 1;
+        block = ucc_buffer_block_count(local_ppn, nsockets, 0);
+        proc_info.socket_id = local_rank / block;
+
+        block = ucc_buffer_block_count(local_ppn, nnumas, 0);
+        proc_info.numa_id = local_rank / block;
+
+        proc_info.pid = id + 1;
+    } else {
+        proc_info = ucc_local_proc;
     }
-    status = ucc_context_create(proc->lib_h, &proc->ctx_params, ctx_config, &proc->ctx_h);
+    status = ucc_context_create_proc_info(proc->lib_h, &proc->ctx_params, ctx_config, &proc->ctx_h, &proc_info);
     ucc_context_config_release(ctx_config);
     if (status != UCC_OK) {
         err_msg << "ucc_context_create failed";
