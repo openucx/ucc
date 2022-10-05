@@ -3,7 +3,68 @@
  *
  * See file LICENSE for terms.
  */
-## 1.0.0 (TBD)
+
+## Current
+
+## 1.1.0 (TBD)
+
+## Features
+
+## API
+- Added float 128 and float 32, 64, 128 (complex) data types
+- Added Active Sets based collectives to support dynamic groups as well as
+  point-to-point messaging
+- Added ucc_team_get_attr interface
+
+## Core
+- Config file support
+- Fixed component search
+
+## CL
+
+- Added split rail allreduce collective implementation
+- Enable hierarchical alltoallv and barrier
+- Fixed cleanup bugs
+
+
+## TL
+- Added SELF TL supporting team size one
+
+### UCP
+
+- Added service broadcast
+- Added reduce_scatterv ring algorithm
+- Added k-nomial based gather collective implementation
+- Added one-sided get based algorithms
+
+### SHARP
+- Fixed SHARP OOB
+- Added SHARP broadcast
+
+
+
+### GPU Collectives (CUDA, NCCL TL and RCCL TL)
+- Added support for CUDA TL (intranode collectives for NVIDIA GPUs)
+- Added multiring allgatherv, alltoall, reduce-scatter, and reduce-scatterv
+  multiring in CUDA TL
+- Added topo based ring construction in CUDA TL to maximize bandwidth
+- Added NCCL gather, scatter and its vector variant
+- Enable using multiple streams for collectives
+- Added support for RCCL gather (v), scatter (v), broadcast, allgather (v),
+  barrier, alltoall (v) and all reduce collectives
+- Added ROCm memory component
+- Adapted all GPU collectives to executor design
+
+
+### Tests
+- Added tests for triggered collectives in perftests
+- Fixed bugs in multi-threading tests
+
+### Utils
+- Added CPU model and vendor detection
+- Several bug fixes in all components
+
+## 1.0.0 (April 19th, 2022)
 
 ### Features
 
