@@ -551,6 +551,27 @@ poll:
     return UCC_OK;
 }
 
+static void remove_tl_ctx_from_array(ucc_tl_context_t **array, unsigned *size,
+                                     ucc_tl_context_t *tl_ctx)
+{
+    int i;
+
+    for (i = 0; i < (*size); i++) {
+        if (array[i] == tl_ctx) {
+            break;
+        }
+    }
+    if (i == (*size)) {
+        /* given tl_ctx is not part of array */
+        return;
+    }
+    /* decrement array size and do cyclic shift */
+    (*size)--;
+    for (; i < (*size); i++) {
+        array[i] = array[i + 1];
+    }
+}
+
 ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                                           const ucc_context_params_t *params,
                                           const ucc_context_config_h  config,
@@ -567,7 +588,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
     ucc_tl_lib_t              *tl_lib;
     ucc_context_t             *ctx;
     ucc_status_t               status;
-    uint64_t                   i;
+    uint64_t                   i, j;
     int                        num_cls;
 
     num_cls = config->n_cl_cfg;
@@ -760,9 +781,22 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         if (tl_lib->iface->context.create_epilog) {
             status = tl_lib->iface->context.create_epilog(&tl_ctx->super);
             if (UCC_OK != status) {
-                ucc_error("ctx create epilog for %s failed: %s",
-                          tl_lib->iface->super.name, ucc_status_string(status));
-                goto error_ctx_create;
+                if (ucc_tl_is_required(lib, tl_lib->iface, 1)) {
+                    ucc_error("ctx create epilog for %s failed: %s",
+                              tl_lib->iface->super.name, ucc_status_string(status));
+                    goto error_ctx_create;
+                } else {
+                    ucc_debug("ctx create epilog for %s failed: %s",
+                              tl_lib->iface->super.name, ucc_status_string(status));
+                    tl_lib->iface->context.destroy(&tl_ctx->super);
+                    for (j = 0; j < ctx->n_cl_ctx; j++) {
+                        remove_tl_ctx_from_array(ctx->cl_ctx[j]->tl_ctxs,
+                                                 &ctx->cl_ctx[j]->n_tl_ctxs,
+                                                 tl_ctx);
+                    }
+                    remove_tl_ctx_from_array(ctx->tl_ctx, &ctx->n_tl_ctx,
+                                             tl_ctx);
+                }
             }
         }
     }

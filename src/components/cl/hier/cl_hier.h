@@ -73,8 +73,6 @@ UCC_CLASS_DECLARE(ucc_cl_hier_lib_t, const ucc_base_lib_params_t *,
 
 typedef struct ucc_cl_hier_context {
     ucc_cl_context_t   super;
-    ucc_tl_context_t **tl_ctxs;
-    unsigned           n_tl_ctxs;
     ucc_mpool_t        sched_mp;
 } ucc_cl_hier_context_t;
 UCC_CLASS_DECLARE(ucc_cl_hier_context_t, const ucc_base_context_params_t *,
