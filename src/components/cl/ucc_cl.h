@@ -35,6 +35,7 @@ typedef struct ucc_cl_lib     ucc_cl_lib_t;
 typedef struct ucc_cl_iface   ucc_cl_iface_t;
 typedef struct ucc_cl_context ucc_cl_context_t;
 typedef struct ucc_cl_team    ucc_cl_team_t;
+typedef struct ucc_tl_context ucc_tl_context_t;
 
 typedef struct ucc_cl_lib_config {
     ucc_base_lib_config_t    super;
@@ -81,6 +82,8 @@ UCC_CLASS_DECLARE(ucc_cl_lib_t, ucc_cl_iface_t *, const ucc_cl_lib_config_t *);
 
 typedef struct ucc_cl_context {
     ucc_base_context_t super;
+    ucc_tl_context_t **tl_ctxs;
+    unsigned           n_tl_ctxs;
 } ucc_cl_context_t;
 UCC_CLASS_DECLARE(ucc_cl_context_t, const ucc_cl_context_config_t *,
                   ucc_context_t *);
