@@ -44,6 +44,7 @@
 
 
 ### GPU Collectives (CUDA, NCCL TL and RCCL TL)
+- Added RCCL TL to support RCCL collectives
 - Added support for CUDA TL (intranode collectives for NVIDIA GPUs)
 - Added multiring allgatherv, alltoall, reduce-scatter, and reduce-scatterv
   multiring in CUDA TL
