@@ -82,21 +82,26 @@ static inline ucc_status_t ucc_tl_sharp_status_to_ucc(int status)
 static ucc_tl_sharp_reg_t ucc_tl_sharp_reg_null = { .mr = NULL };
 
 static ucc_status_t
-ucc_tl_sharp_mem_register(ucc_tl_sharp_context_t *ctx, void *addr,
-                          size_t length, ucc_tl_sharp_reg_t **reg)
+ucc_tl_sharp_mem_register(ucc_tl_sharp_context_t *ctx, ucc_tl_sharp_team_t *team,
+                          void *addr, size_t length, ucc_tl_sharp_reg_t **reg)
 {
     ucc_rcache_region_t          *rregion;
     ucc_tl_sharp_rcache_region_t *region;
     ucc_status_t                  status;
     ucc_tl_sharp_reg_t           *r;
+    ucc_rcache_t                 *rcache;
+    struct sharp_coll_context    *sharp_ctx;
 
     if (length < ctx->cfg.reg_threshold) {
         *reg = &ucc_tl_sharp_reg_null;
         return UCC_OK;
     }
 
-    if (ctx->rcache) {
-        status = ucc_rcache_get(ctx->rcache, (void *)addr, length, NULL,
+    sharp_ctx = team->sharp_context;
+    rcache    = team->rcache;
+
+    if (rcache) {
+        status = ucc_rcache_get(rcache, (void *)addr, length, NULL,
                                 &rregion);
         if (status != UCC_OK) {
             tl_error(ctx->super.super.lib, "ucc_rcache_get failed");
@@ -111,7 +116,7 @@ ucc_tl_sharp_mem_register(ucc_tl_sharp_context_t *ctx, void *addr,
             return UCC_ERR_NO_MEMORY;
         }
 
-        sharp_coll_reg_mr(ctx->sharp_context, addr, length, &r->mr);
+        sharp_coll_reg_mr(sharp_ctx, addr, length, &r->mr);
         *reg = r;
     }
 
@@ -119,20 +124,24 @@ ucc_tl_sharp_mem_register(ucc_tl_sharp_context_t *ctx, void *addr,
 }
 
 static ucc_status_t
-ucc_tl_sharp_mem_deregister(ucc_tl_sharp_context_t *ctx,
-                            ucc_tl_sharp_reg_t *reg)
+ucc_tl_sharp_mem_deregister(ucc_tl_sharp_team_t *team, ucc_tl_sharp_reg_t *reg)
 {
     ucc_tl_sharp_rcache_region_t *region;
+    ucc_rcache_t *rcache;
+    struct       sharp_coll_context *sharp_ctx;
 
     if (reg == &ucc_tl_sharp_reg_null) {
         return UCC_OK;
     }
 
-    if (ctx->rcache) {
+    sharp_ctx = team->sharp_context;
+    rcache    = team->rcache;
+
+    if (rcache) {
         region = ucc_container_of(reg, ucc_tl_sharp_rcache_region_t, reg);
-        ucc_rcache_region_put(ctx->rcache, &region->super);
+        ucc_rcache_region_put(rcache, &region->super);
     } else {
-        sharp_coll_dereg_mr(ctx->sharp_context, reg->mr);
+        sharp_coll_dereg_mr(sharp_ctx, reg->mr);
         ucc_free(reg);
     }
 
@@ -149,14 +158,15 @@ void ucc_tl_sharp_collective_progress(ucc_coll_task_t *coll_task)
         if (completed) {
             if (TASK_ARGS(task).coll_type == UCC_COLL_TYPE_ALLREDUCE) {
                 if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-                    ucc_tl_sharp_mem_deregister(TASK_CTX(task),
+                    ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
                                                 task->allreduce.s_mem_h);
                 }
-                ucc_tl_sharp_mem_deregister(TASK_CTX(task),
+                ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
                                             task->allreduce.r_mem_h);
             }
             if (TASK_ARGS(task).coll_type == UCC_COLL_TYPE_BCAST) {
-                ucc_tl_sharp_mem_deregister(TASK_CTX(task), task->bcast.mem_h);
+                ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                            task->bcast.mem_h);
             }
             sharp_coll_req_free(task->req_handle);
             coll_task->status = UCC_OK;
@@ -206,11 +216,11 @@ ucc_status_t ucc_tl_sharp_allreduce_start(ucc_coll_task_t *coll_task)
     data_size  = ucc_dt_size(dt) * count;
 
     if (!UCC_IS_INPLACE(*args)) {
-        ucc_tl_sharp_mem_register(TASK_CTX(task), args->src.info.buffer,
-                                  data_size, &task->allreduce.s_mem_h);
+        ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->src.info.buffer,data_size,
+                                  &task->allreduce.s_mem_h);
     }
-    ucc_tl_sharp_mem_register(TASK_CTX(task), args->dst.info.buffer,
-                              data_size, &task->allreduce.r_mem_h);
+    ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->dst.info.buffer, data_size,
+                              &task->allreduce.r_mem_h);
 
     if (!UCC_IS_INPLACE(*args)) {
         reduce_spec.sbuf_desc.buffer.ptr        = args->src.info.buffer;
@@ -262,7 +272,7 @@ ucc_status_t ucc_tl_sharp_bcast_start(ucc_coll_task_t *coll_task)
 
     data_size = ucc_dt_size(dt) * count;
 
-    ucc_tl_sharp_mem_register(TASK_CTX(task), args->src.info.buffer, data_size,
+    ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->src.info.buffer, data_size,
                               &task->bcast.mem_h);
 
     bcast_spec.size                       = data_size;

@@ -127,6 +127,12 @@ static ucc_status_t ucc_cl_hier_allreduce_split_rail_frag_init(
     }
 
     node_size   = cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp->group_size;
+    if (ucc_unlikely(0 == node_size)) {
+        /* this check is only needed to suppress clang-tidy linter which
+           assumes potential devision-by-zero when node_size is passed to
+           ucc_buffer_block_count */
+        goto err_rs;
+    }
     node_rank   = cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp->group_rank;
     total_count = coll_args->args.dst.info.count;
 

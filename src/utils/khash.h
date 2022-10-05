@@ -446,7 +446,7 @@ static kh_inline khint_t __ac_X31_hash_string(const char *s)
 /*! @function
   @abstract     Const char* comparison function
  */
-#define kh_str_hash_equal(a, b) (strcmp(a, b) == 0)
+#define kh_str_hash_equal(a, b) (strcmp(a, b) == 0) /* NOLINT */
 
 static kh_inline khint_t __ac_Wang_hash(khint_t key)
 {

@@ -83,6 +83,14 @@ typedef struct ucc_context_config {
     uint32_t                  internal_oob;
 } ucc_context_config_t;
 
+/* Internal function for context creation that takes explicit
+   pointer for proc_info */
+ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
+                                          const ucc_context_params_t *params,
+                                          const ucc_context_config_h  config,
+                                          ucc_context_h              *context,
+                                          ucc_proc_info_t            *proc_info);
+
 /* Any internal UCC component (TL, CL, etc) may register its own
    progress callback fn (and argument for the callback) into core
    ucc context. Those callbacks will be triggered as part of
