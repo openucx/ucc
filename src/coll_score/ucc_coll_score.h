@@ -100,7 +100,8 @@ ucc_status_t ucc_coll_score_alloc_from_str(const char *            str,
    is provided in "str" and it does not have "score" qualifier then def_score
    is used for it. If the new range is provided in "str" and it does not have
    "alg_id" qualifier than "init" fn is used otherwise "init" is taken from
-   alg_fn mapper callback.
+   alg_fn mapper callback. "mtypes" parameter determines which memory types
+   will be udpated.
 
    This function has 2 usages (see tl_ucp_team.c: ucc_tl_ucp_team_get_scores
    function):
@@ -117,14 +118,12 @@ ucc_status_t ucc_coll_score_update_from_str(const char *            str,
                                             ucc_base_coll_init_fn_t init,
                                             ucc_base_team_t        *team,
                                             ucc_score_t             def_score,
-                                            ucc_alg_id_to_init_fn_t alg_fn);
+                                            ucc_alg_id_to_init_fn_t alg_fn,
+                                            ucc_memory_type_t      *mtypes,
+                                            int                     mt_n);
 
 ucc_status_t ucc_coll_score_merge_in(ucc_coll_score_t **dst,
                                      ucc_coll_score_t *src);
-
-ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
-                                   ucc_coll_score_t *update,
-                                   ucc_score_t       default_score);
 
 /* Initializes the default score datastruct with a set of coll_types specified
    as a bitmap, mem_types passed as array, default score value and default init fn.
@@ -155,4 +154,11 @@ void ucc_coll_score_set(ucc_coll_score_t *score,
                         ucc_score_t       value);
 
 void ucc_coll_score_map_print_info(const ucc_score_map_t *score);
+
+ucc_status_t ucc_coll_score_update(ucc_coll_score_t  *score,
+                                   ucc_coll_score_t  *update,
+                                   ucc_score_t        default_score,
+                                   ucc_memory_type_t *mtypes,
+                                   int                mt_n);
+
 #endif

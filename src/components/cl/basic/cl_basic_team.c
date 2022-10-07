@@ -182,7 +182,7 @@ ucc_status_t ucc_cl_basic_team_get_scores(ucc_base_team_t   *cl_team,
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             ctx->score_str, *score, UCC_CL_TEAM_SIZE(team), NULL, cl_team,
-            UCC_CL_BASIC_DEFAULT_SCORE, NULL);
+            UCC_CL_BASIC_DEFAULT_SCORE, NULL, NULL, 0);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
