@@ -166,7 +166,7 @@ static void ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
 
         busy[id] = 1;
         UCPCHECK_GOTO(ucc_tl_ucp_send_cb(reduce_target, frag_count * dt_size,
-                                         mem_type, sendto, team, task, cb[id]),
+                                         mem_type, sendto, team, task, cb[id], (void *)task),
                       task, out);
 
         recv_data_from = (rank - 2 - step + size) % size;
