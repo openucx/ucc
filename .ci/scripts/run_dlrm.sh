@@ -60,4 +60,5 @@ mpirun \
     -x LD_LIBRARY_PATH \
     -x MASTER_ADDR \
     -x CPU_GPU_MODE \
+    -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=nccl,ucp \
     /opt/nvidia/src/ucc/.ci/scripts/run_dlrm_s_pytorch.sh
