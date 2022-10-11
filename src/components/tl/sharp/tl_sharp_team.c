@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -218,7 +218,7 @@ ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t  *tl_team,
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_sharp_coll_init, &team->super.super,
-            UCC_TL_SHARP_DEFAULT_SCORE, NULL);
+            UCC_TL_SHARP_DEFAULT_SCORE, NULL, NULL, 0);
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {

@@ -347,7 +347,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
         status = ucc_coll_score_update_from_str(
             ucc_cl_hier_default_alg_select_str[i], score,
             UCC_TL_TEAM_SIZE(team), ucc_cl_hier_coll_init, &team->super.super,
-            UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_alg_id_to_init);
+            UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_alg_id_to_init, NULL, 0);
         if (UCC_OK != status) {
             cl_error(lib, "failed to apply default coll select setting: %s",
                      ucc_cl_hier_default_alg_select_str[i]);
@@ -358,7 +358,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_CL_TEAM_SIZE(team), NULL, cl_team,
-            UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_alg_id_to_init);
+            UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_alg_id_to_init, NULL, 0);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&

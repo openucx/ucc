@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
@@ -215,7 +215,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
         status = ucc_coll_score_update_from_str(
             ucc_tl_nccl_default_alg_select_str[i], score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_nccl_coll_init, &team->super.super, UCC_TL_NCCL_DEFAULT_SCORE,
-            ucc_tl_nccl_alg_id_to_init);
+            ucc_tl_nccl_alg_id_to_init, &mt, 1);
         if (ucc_unlikely(UCC_OK != status)) {
             tl_error(tl_team->context->lib,
                      "failed to apply default coll select setting: %s",
@@ -237,7 +237,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_nccl_coll_init, &team->super.super,
-            UCC_TL_NCCL_DEFAULT_SCORE, ucc_tl_nccl_alg_id_to_init);
+            UCC_TL_NCCL_DEFAULT_SCORE, ucc_tl_nccl_alg_id_to_init, &mt, 1);
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {
