@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -895,7 +895,7 @@ ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
     ucc_context_progress_entry_t *entry =
         ucc_malloc(sizeof(*entry), "progress_entry");
     if (!entry) {
-        ucc_error("failed to allocate %zd bytes for progress ntry",
+        ucc_error("failed to allocate %zd bytes for progress entry",
                   sizeof(*entry));
         return UCC_ERR_NO_MEMORY;
     }

@@ -96,6 +96,12 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
     ucc_status_t          status;
 
+    if (USE_SERVICE_WORKER(team)) {
+        team->worker = &ctx->service_worker;
+    } else {
+        team->worker = &ctx->worker;
+    }
+
     if (team->status == UCC_OK) {
         return UCC_OK;
     }
