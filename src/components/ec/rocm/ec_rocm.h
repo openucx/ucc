@@ -10,6 +10,7 @@
 
 #include "components/ec/base/ucc_ec_base.h"
 #include "components/ec/ucc_ec_log.h"
+#include "core/ucc_ee.h"
 #include "utils/ucc_mpool.h"
 #include "utils/arch/rocm_def.h"
 #include <hip/hip_runtime.h>
@@ -80,6 +81,8 @@ typedef struct ucc_ec_rocm_config {
     unsigned long                  exec_num_streams;
     unsigned long                  reduce_num_blocks;
     int                            reduce_num_threads;
+    int                            reduce_host_limit;
+    int                            copy_host_limit;
 } ucc_ec_rocm_config_t;
 
 typedef struct ucc_ec_rocm {
@@ -97,6 +100,7 @@ typedef struct ucc_ec_rocm {
     ucc_ec_rocm_task_stream_type_t task_strm_type;
     ucc_ec_rocm_task_post_fn       post_strm_task;
     ucc_spinlock_t                 init_spinlock;
+    ucc_ee_executor_t             *cpu_executor;
 } ucc_ec_rocm_t;
 
 typedef struct ucc_rocm_ec_event {

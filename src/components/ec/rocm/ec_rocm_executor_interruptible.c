@@ -7,7 +7,77 @@
 
 #include "ec_rocm_executor.h"
 #include "components/mc/ucc_mc.h"
+#include "components/ec/ucc_ec.h"
 #include "utils/ucc_atomic.h"
+
+static bool ucc_ec_rocm_copy_multi_use_host (const ucc_ee_executor_task_args_t* task_args)
+{
+    bool result = true;
+
+    for (int i = 0; i < task_args->copy_multi.num_vectors; i++) {
+        if (task_args->copy_multi.counts[i] > EC_ROCM_CONFIG->copy_host_limit) {
+            result = false;
+            break;
+        }
+    }
+
+    return result;
+}
+
+static int ucc_ec_rocm_total_reduce_len(const ucc_ee_executor_task_args_t* task_args)
+{
+    int             total_len = 0;
+    ucc_datatype_t  dt;
+    size_t          count;
+
+    if (task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
+        dt    = task_args->reduce.dt;
+        count = task_args->reduce.count;
+    } else {
+        ucc_assert(task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED);
+        dt    = task_args->reduce_strided.dt;
+        count = task_args->reduce_strided.count;
+    }
+    total_len += count * ucc_dt_size(dt);
+
+    return total_len;
+}
+
+static bool ucc_ec_rocm_host_dt_supported(const ucc_ee_executor_task_args_t*  task_args)
+{
+    bool            result = false;
+    ucc_datatype_t  dt;
+
+    if (task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
+        dt     = task_args->reduce.dt;
+    } else {
+        ucc_assert(task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED);
+        dt     = task_args->reduce_strided.dt;
+    }
+    if (dt != UCC_DT_BFLOAT16        &&
+        dt != UCC_DT_FLOAT16         &&
+        dt != UCC_DT_FLOAT32_COMPLEX &&
+        dt != UCC_DT_FLOAT64_COMPLEX) {
+        result = true;
+    }
+    return result;
+}
+
+static inline
+bool ec_rocm_use_host_ops(const ucc_ee_executor_task_args_t *_task_args)
+{
+    if ( (_task_args->task_type == UCC_EE_EXECUTOR_TASK_COPY                            &&
+          _task_args->copy.len <= EC_ROCM_CONFIG->copy_host_limit)                      ||
+         (_task_args->task_type == UCC_EE_EXECUTOR_TASK_COPY_MULTI                      &&
+          ucc_ec_rocm_copy_multi_use_host(_task_args))                                  ||
+         ((_task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE                         ||
+           _task_args->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED)                &&
+          ucc_ec_rocm_total_reduce_len(_task_args) <= EC_ROCM_CONFIG->reduce_host_limit &&
+          ucc_ec_rocm_host_dt_supported(_task_args) )) {
+        return true;
+    }
+    return false;
+}
 
 ucc_status_t ucc_rocm_executor_interruptible_get_stream(hipStream_t *stream)
 {
@@ -55,6 +125,15 @@ ucc_rocm_executor_interruptible_task_post(ucc_ee_executor_t *executor,
     ucc_ec_rocm_executor_interruptible_task_t *ee_task;
     hipStream_t stream;
     ucc_status_t status;
+
+    if (ec_rocm_use_host_ops(task_args)) {
+        status = ucc_ee_executor_task_post(ucc_ec_rocm.cpu_executor, task_args,
+                                           task);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ec_error(&ucc_ec_rocm.super, "failed to execute host ops from ROCm component");
+        }
+        return status;
+    }
 
     status = ucc_rocm_executor_interruptible_get_stream(&stream);
     if (ucc_unlikely(status != UCC_OK)) {
