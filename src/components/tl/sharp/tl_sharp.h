@@ -50,6 +50,7 @@ typedef struct ucc_tl_sharp_context_config {
     size_t                   reg_threshold;
     unsigned int             rand_seed;
     unsigned int             uprogress_num_polls;
+    int                      context_per_team;
 } ucc_tl_sharp_context_config_t;
 
 typedef struct ucc_tl_sharp_lib {
@@ -89,9 +90,11 @@ UCC_CLASS_DECLARE(ucc_tl_sharp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
 typedef struct ucc_tl_sharp_team {
-    ucc_tl_team_t           super;
-    struct sharp_coll_comm *sharp_comm;
-    ucc_tl_sharp_oob_ctx_t  oob_ctx;
+    ucc_tl_team_t             super;
+    struct sharp_coll_context *sharp_context;
+    ucc_rcache_t              *rcache;
+    struct sharp_coll_comm    *sharp_comm;
+    ucc_tl_sharp_oob_ctx_t    oob_ctx;
 } ucc_tl_sharp_team_t;
 
 typedef struct ucc_tl_sharp_task {
@@ -107,6 +110,12 @@ typedef struct ucc_tl_sharp_task {
         } bcast;
     };
 } ucc_tl_sharp_task_t;
+
+ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
+                                       struct sharp_coll_context **context,
+                                       ucc_tl_sharp_oob_ctx_t *oob_ctx);
+ucc_status_t  ucc_tl_sharp_rcache_create(struct sharp_coll_context *contex,
+                                         ucc_rcache_t **rcache);
 
 #define TASK_TEAM(_task)                                                       \
     (ucc_derived_of((_task)->super.team, ucc_tl_sharp_team_t))

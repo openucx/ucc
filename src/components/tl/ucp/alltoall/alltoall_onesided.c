@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -57,7 +57,7 @@ void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
 
     if ((*pSync < gsize) ||
         (task->onesided.put_completed < task->onesided.put_posted)) {
-        ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker);
+        ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->worker.ucp_worker);
         return;
     }
 
