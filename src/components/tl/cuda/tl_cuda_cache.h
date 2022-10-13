@@ -39,7 +39,7 @@ ucc_status_t ucc_tl_cuda_map_memhandle(const void *dptr, size_t size,
                                        ucc_tl_cuda_cache_t *cache);
 
 ucc_status_t ucc_tl_cuda_unmap_memhandle(uintptr_t d_bptr, void *mapped_addr,
-                                         ucc_tl_cuda_cache_t *cache);
+                                         ucc_tl_cuda_cache_t *cache, int force);
 
 ucc_tl_cuda_cache_t* ucc_tl_cuda_get_cache(ucc_tl_cuda_team_t *team,
                                            ucc_rank_t rank);
