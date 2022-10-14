@@ -245,8 +245,16 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
         goto err;
     }
 
+    status = tl_mlx5_create_rcache(ctx);
+    if (UCC_OK != status) {
+        tl_error(context->lib, "failed to create rcache");
+        goto out;
+
+    }
+
     ucc_free(sbcast_data);
     ucc_topo_cleanup(topo);
+
     return UCC_OK;
 
 err:
