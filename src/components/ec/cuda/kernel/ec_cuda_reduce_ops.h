@@ -56,18 +56,24 @@ cuFloatComplex operator* (const cuFloatComplex & first,
 }
 
 #define CUDA_REDUCE_WITH_OP_DEFAULT(NAME, _OP)                                  \
-    template <typename _Type, typename _AlphaType>                              \
-        __device__ ucc_status_t ucc_reduce_cuda_default_##NAME(                 \
-        ucc_eee_task_reduce_t task,                                             \
-        uint16_t              flags)                                            \
+    template <typename _Type, typename _AlphaType, bool triggered>              \
+    __device__ ucc_status_t ucc_reduce_cuda_default_##NAME(                     \
+        ucc_eee_task_reduce_t task, uint16_t flags)                             \
     {                                                                           \
-        size_t        start  = blockIdx.x * blockDim.x + threadIdx.x;           \
-        size_t        step   = blockDim.x * gridDim.x;                          \
         size_t        count  = task.count;                                      \
         int           n_srcs = task.n_srcs;                                     \
         const _Type **s      = (const _Type **)task.srcs;                       \
         _Type *       d      = (_Type *)task.dst;                               \
         size_t        i, j;                                                     \
+        size_t        start;                                                    \
+        size_t        step;                                                     \
+        if (triggered) {                                                        \
+            start = threadIdx.x;                                                \
+            step  = blockDim.x;                                                 \
+        } else {                                                                \
+            start = blockIdx.x * blockDim.x + threadIdx.x;                      \
+            step  = blockDim.x * gridDim.x;                                     \
+        }                                                                       \
                                                                                 \
         switch (n_srcs) {                                                       \
         case 2:                                                                 \
@@ -100,31 +106,36 @@ cuFloatComplex operator* (const cuFloatComplex & first,
             }                                                                   \
         }                                                                       \
     }                                                                           \
-    template <typename _Type, typename _AlphaType>                              \
-        __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(                         \
-            ucc_eee_task_reduce_t task,                                         \
-            uint16_t              flags)                                        \
+    template <typename _Type, typename _AlphaType, bool triggered>              \
+    __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task,  \
+                                                   uint16_t              flags) \
     {                                                                           \
-        ucc_reduce_cuda_default_ ##NAME<_Type, _AlphaType>(task, flags);        \
+        ucc_reduce_cuda_default_##NAME<_Type, _AlphaType, triggered>(task,      \
+                                                                     flags);    \
     }
 
 #define CUDA_REDUCE_WITH_OP_STRIDED(NAME, _OP)                                 \
-    template <typename _Type, typename _AlphaType>                             \
+    template <typename _Type, typename _AlphaType, bool triggered>             \
     __device__ ucc_status_t ucc_reduce_cuda_strided_##NAME(                    \
-        ucc_eee_task_reduce_strided_t task,                                    \
-        uint16_t                     flags)                                    \
+        ucc_eee_task_reduce_strided_t task, uint16_t flags)                    \
     {                                                                          \
         uint16_t     n_src2 = task.n_src2;                                     \
         size_t       count  = task.count;                                      \
         size_t       stride = task.stride;                                     \
-        size_t       start  = blockIdx.x * blockDim.x + threadIdx.x;           \
-        size_t       step   = blockDim.x * gridDim.x;                          \
         size_t       ld     = stride / sizeof(_Type);                          \
         const _Type *s1     = (const _Type *)task.src1;                        \
-        const _Type *s2     = (const _Type *) task.src2;                       \
-        _Type       *d      = (_Type *)task.dst;                               \
+        const _Type *s2     = (const _Type *)task.src2;                        \
+        _Type *      d      = (_Type *)task.dst;                               \
         size_t       i, j;                                                     \
-                                                                               \
+        size_t       start;                                                    \
+        size_t       step;                                                     \
+        if (triggered) {                                                       \
+            start = threadIdx.x;                                               \
+            step  = blockDim.x;                                                \
+        } else {                                                               \
+            start = blockIdx.x * blockDim.x + threadIdx.x;                     \
+            step  = blockDim.x * gridDim.x;                                    \
+        }                                                                      \
         ucc_assert(stride % sizeof(_Type) == 0);                               \
         switch (n_src2) {                                                      \
         case 1:                                                                \
@@ -157,26 +168,33 @@ cuFloatComplex operator* (const cuFloatComplex & first,
             }                                                                  \
         }                                                                      \
     }                                                                          \
-    template <typename _Type, typename _AlphaType>                             \
-        __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                        \
-            ucc_eee_task_reduce_strided_t task,                                \
-            uint16_t                     flags)                                \
+    template <typename _Type, typename _AlphaType, bool triggered>             \
+    __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                            \
+        ucc_eee_task_reduce_strided_t task, uint16_t flags)                    \
     {                                                                          \
-        ucc_reduce_cuda_strided_ ##NAME<_Type, _AlphaType>(task, flags);       \
+        ucc_reduce_cuda_strided_##NAME<_Type, _AlphaType, triggered>(task,     \
+                                                                     flags);   \
     }
 
 #define CUDA_REDUCE_WITH_OP_MULTI_DST(NAME, _OP)                               \
-    template <typename _Type>                                                  \
+    template <typename _Type, bool triggered>                                  \
     __global__ void UCC_REDUCE_CUDA_MULTI_DST_##NAME(                          \
         ucc_eee_task_reduce_multi_dst_t arg)                                   \
     {                                                                          \
-        size_t start = blockIdx.x * blockDim.x + threadIdx.x;                  \
-        size_t step  = blockDim.x * gridDim.x;                                 \
+        size_t start;                                                          \
+        size_t step;                                                           \
+        if (triggered) {                                                       \
+            start = threadIdx.x;                                               \
+            step  = blockDim.x;                                                \
+        } else {                                                               \
+            start = blockIdx.x * blockDim.x + threadIdx.x;                     \
+            step  = blockDim.x * gridDim.x;                                    \
+        }                                                                      \
         for (int j = 0; j < arg.n_bufs; j++) {                                 \
             size_t count = arg.counts[j];                                      \
-            _Type *s2 = (_Type *)arg.src2[j];                                  \
-            _Type *s1 = (_Type *)arg.src1[j];                                  \
-            _Type *d  = (_Type *)arg.dst[j];                                   \
+            _Type *s2    = (_Type *)arg.src2[j];                               \
+            _Type *s1    = (_Type *)arg.src1[j];                               \
+            _Type *d     = (_Type *)arg.dst[j];                                \
             for (size_t i = start; i < count; i += step) {                     \
                 d[i] = _OP##_2(s1[i], s2[i]);                                  \
             }                                                                  \

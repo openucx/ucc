@@ -22,8 +22,8 @@ __device__ inline void add_float4(float4 &d, const float4 &x, const float4 &y)
 }
 
 template <>
-__global__ void UCC_REDUCE_CUDA_MULTI_DST_SUM<float>(
-        ucc_eee_task_reduce_multi_dst_t arg)
+__global__ void
+UCC_REDUCE_CUDA_MULTI_DST_SUM<float, false>(ucc_eee_task_reduce_multi_dst_t arg)
 {
     int    blocks_per_buf = gridDim.x / arg.n_bufs;
     int    buf_id         = blockIdx.x / blocks_per_buf;
@@ -67,13 +67,13 @@ __global__ void UCC_REDUCE_CUDA_MULTI_DST_SUM<float>(
 #define LAUNCH_REDUCE_A(NAME, type, _AlphaType, _task, s, b, t)                \
     do {                                                                       \
         if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
-            UCC_REDUCE_CUDA_DEFAULT_##NAME<type, _AlphaType>                   \
+            UCC_REDUCE_CUDA_DEFAULT_##NAME<type, _AlphaType, false>            \
                 <<<b, t, 0, s>>>(_task->reduce, _task->flags);                 \
         } else if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED) {  \
-            UCC_REDUCE_CUDA_STRIDED_##NAME<type, _AlphaType>                   \
-            <<<b, t, 0, s>>>(_task->reduce_strided, _task->flags);             \
+            UCC_REDUCE_CUDA_STRIDED_##NAME<type, _AlphaType, false>            \
+                <<<b, t, 0, s>>>(_task->reduce_strided, _task->flags);         \
         } else {                                                               \
-            UCC_REDUCE_CUDA_MULTI_DST_##NAME<type>                             \
+            UCC_REDUCE_CUDA_MULTI_DST_##NAME<type, false>                      \
                 <<<b, t, 0, s>>>(_task->reduce_multi_dst);                     \
         }                                                                      \
     } while (0)
