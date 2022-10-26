@@ -32,8 +32,11 @@ static ucc_status_t ucc_cl_hier_alltoallv_finalize(ucc_coll_task_t *task)
     ucc_status_t status;
 
     UCC_CL_HIER_PROFILE_REQUEST_EVENT(task, "cl_hier_alltoallv_finalize", 0);
-    ucc_assert(schedule->super.super.n_tasks == 2);
-    ucc_mc_free(schedule->scratch);
+    ucc_assert(schedule->super.super.n_tasks == 1 ||
+               schedule->super.super.n_tasks == 2);
+    if (schedule->scratch) {
+        ucc_mc_free(schedule->scratch);
+    }
     status = ucc_schedule_finalize(task);
     ucc_cl_hier_put_schedule(&schedule->super.super);
     return status;
@@ -122,6 +125,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
 {
     ucc_cl_hier_team_t     *cl_team = ucc_derived_of(team, ucc_cl_hier_team_t);
     ucc_cl_hier_lib_t      *cl_lib  = UCC_CL_HIER_TEAM_LIB(cl_team);
+    int                     full_only = 0;
     ucc_cl_hier_schedule_t *cl_schedule;
     ucc_schedule_t         *schedule;
     ucc_status_t            status;
@@ -140,8 +144,8 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (!SBGP_ENABLED(cl_team, NODE) || !SBGP_ENABLED(cl_team, FULL)) {
-        cl_debug(team->context->lib, "alltoallv requires NODE and FULL sbgps");
+    if (!SBGP_ENABLED(cl_team, FULL)) {
+        cl_debug(team->context->lib, "alltoallv requires FULL sbgp");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -164,11 +168,20 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
 
     full_size = cl_team->sbgps[UCC_HIER_SBGP_FULL].sbgp->group_size;
     node_size = cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp->group_size;
-
     elem_size = c64 ? 8 : 4;
-    status    = ucc_mc_alloc(&cl_schedule->scratch,
-                             elem_size * (full_size + node_size) * 4,
-                             UCC_MEMORY_TYPE_HOST);
+
+    if (!SBGP_ENABLED(cl_team, NODE)) {
+        full_only = 1;
+        UCC_CHECK_GOTO(ucc_coll_init(
+                           cl_team->sbgps[UCC_HIER_SBGP_FULL].score_map,
+                           &args, &task_full),
+                       error, status);
+        goto full;
+    }
+
+    status = ucc_mc_alloc(&cl_schedule->scratch,
+                          elem_size * (full_size + node_size) * 4,
+                          UCC_MEMORY_TYPE_HOST);
     if (ucc_unlikely(UCC_OK != status)) {
         cl_error(team->context->lib,
                  "failed to allocate %zd bytes for full counts",
@@ -201,8 +214,8 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
                         cl_lib->cfg.a2av_node_thresh, sdt_size, rdt_size,
                         sc_full, sd_full, rc_full, rd_full);
     }
-    args.args.src.info_v.counts        = (ucc_aint_t *)sc_full;
-    args.args.dst.info_v.counts        = (ucc_aint_t *)rc_full;
+    args.args.src.info_v.counts        = (ucc_count_t *)sc_full;
+    args.args.dst.info_v.counts        = (ucc_count_t *)rc_full;
     args.args.src.info_v.displacements = (ucc_aint_t *)sd_full;
     args.args.dst.info_v.displacements = (ucc_aint_t *)rd_full;
 
@@ -214,32 +227,35 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
     sbgp = cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp;
 
     if (c64) {
-        SET_NODE_COUNTS(uint64_t, sbgp, coll_args, cl_lib->cfg.a2av_node_thresh,
-                        sdt_size, rdt_size, sc_node, sd_node, rc_node, rd_node);
-
+        SET_NODE_COUNTS(uint64_t, sbgp, coll_args,
+                        cl_lib->cfg.a2av_node_thresh, sdt_size, rdt_size,
+                        sc_node, sd_node, rc_node, rd_node);
     } else {
-        SET_NODE_COUNTS(uint32_t, sbgp, coll_args, cl_lib->cfg.a2av_node_thresh,
-                        sdt_size, rdt_size, sc_node, sd_node, rc_node, rd_node);
+        SET_NODE_COUNTS(uint32_t, sbgp, coll_args,
+                        cl_lib->cfg.a2av_node_thresh, sdt_size, rdt_size,
+                        sc_node, sd_node, rc_node, rd_node);
     }
 
-    args.args.src.info_v.counts        = (ucc_aint_t *)sc_node;
-    args.args.dst.info_v.counts        = (ucc_aint_t *)rc_node;
+    args.args.src.info_v.counts        = (ucc_count_t *)sc_node;
+    args.args.dst.info_v.counts        = (ucc_count_t *)rc_node;
     args.args.src.info_v.displacements = (ucc_aint_t *)sd_node;
     args.args.dst.info_v.displacements = (ucc_aint_t *)rd_node;
     UCC_CHECK_GOTO(ucc_coll_init(cl_team->sbgps[UCC_HIER_SBGP_NODE].score_map,
                                  &args, &task_node),
                    err_init_2, status);
 
-    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_node), err_init_2,
-                   status);
-    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_full), err_init_2,
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_node), err_init_3,
                    status);
     UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, task_node,
                                           UCC_EVENT_SCHEDULE_STARTED),
-                   err_init_2, status);
+                   err_init_3, status);
+full:
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task_full), err_init_3,
+                   status);
+
     UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, task_full,
                                           UCC_EVENT_SCHEDULE_STARTED),
-                   err_init_2, status);
+                   err_init_3, status);
 
     schedule->super.post           = ucc_cl_hier_alltoallv_start;
     schedule->super.progress       = NULL;
@@ -250,10 +266,16 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
     *task = &schedule->super;
     return UCC_OK;
 
+err_init_3:
+    if (!full_only) {
+        ucc_collective_finalize(&task_node->super);
+    }
 err_init_2:
     ucc_collective_finalize(&task_full->super);
 err_init_1:
-    ucc_mc_free(cl_schedule->scratch);
+    if (!full_only) {
+        ucc_mc_free(cl_schedule->scratch);
+    }
 error:
     ucc_cl_hier_put_schedule(schedule);
     return status;
