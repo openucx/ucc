@@ -19,8 +19,9 @@ ucc_status_t ucc_tl_nccl_alg_id_to_init(int alg_id, const char *alg_id_str,
                                         ucc_memory_type_t mem_type,
                                         ucc_base_coll_init_fn_t *init);
 
-ucc_tl_nccl_task_t * ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
-                                           ucc_base_team_t *team);
+ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
+                                   ucc_base_team_t *team,
+                                   ucc_tl_nccl_task_t **coll_task);
 
 void ucc_tl_nccl_free_task(ucc_tl_nccl_task_t *task);
 

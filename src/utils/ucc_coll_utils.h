@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -26,25 +27,25 @@
 
 #define UCC_MSG_SIZE_ASSYMETRIC (UCC_MSG_SIZE_INVALID - 1)
 
-#define UCC_IS_ROOT(_args, _myrank) ((_args).root == (_myrank))
-
-#define UCC_IS_INPLACE(_args) \
-    (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
+#define UCC_IS_INPLACE(_args)                                                  \
+    (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                             \
      ((_args).flags & UCC_COLL_ARGS_FLAG_IN_PLACE))
 
-#define UCC_IS_PERSISTENT(_args) \
-    (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
+#define UCC_IS_PERSISTENT(_args)                                               \
+    (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                             \
      ((_args).flags & UCC_COLL_ARGS_FLAG_PERSISTENT))
 
-#define UCC_COLL_TIMEOUT_REQUIRED(_task)                       \
-    (((_task)->bargs.args.mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
+#define UCC_IS_ROOT(_args, _myrank) ((_args).root == (_myrank))
+
+#define UCC_COLL_TIMEOUT_REQUIRED(_task)                                       \
+    (((_task)->bargs.args.mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                 \
      ((_task)->bargs.args.flags & UCC_COLL_ARGS_FLAG_TIMEOUT))
 
-#define UCC_COLL_SET_TIMEOUT(_task, _timeout) do {                 \
-        (_task)->bargs.args.mask   |= UCC_COLL_ARGS_FIELD_FLAGS;   \
-        (_task)->bargs.args.flags  |= UCC_COLL_ARGS_FLAG_TIMEOUT;  \
-        (_task)->bargs.args.timeout = _timeout;                    \
-        (_task)->start_time   = ucc_get_time();                    \
+#define UCC_COLL_SET_TIMEOUT(_task, _timeout) do {                             \
+        (_task)->bargs.args.mask   |= UCC_COLL_ARGS_FIELD_FLAGS;               \
+        (_task)->bargs.args.flags  |= UCC_COLL_ARGS_FLAG_TIMEOUT;              \
+        (_task)->bargs.args.timeout = _timeout;                                \
+        (_task)->start_time   = ucc_get_time();                                \
     } while(0)
 
 #define UCC_COLL_ARGS_COUNT64(_args)                                           \
@@ -66,7 +67,7 @@
 #define UCC_COLL_ARGS_CONTIG_BUFFER(_args)                                     \
     (UCC_COLL_IS_SRC_CONTIG(_args) && UCC_COLL_IS_DST_CONTIG(_args))
 
-#define UCC_COLL_ARGS_ACTIVE_SET(_args)             \
+#define UCC_COLL_ARGS_ACTIVE_SET(_args)                                        \
     ((_args)->mask & UCC_COLL_ARGS_FIELD_ACTIVE_SET)
 
 static inline size_t
@@ -321,5 +322,11 @@ static inline size_t ucc_buffer_block_offset_aligned(size_t total_count,
 
     return ucc_min(offset, total_count);
 }
+
+/* Returns non-zero if collective defined by args operates on predefined dt.
+   @param [in] args        pointer to the collective args.
+   @param [in] rank        rank to check, used only for rooted collective
+                           operations. */
+int ucc_coll_args_is_predefined_dt(ucc_coll_args_t *args, ucc_rank_t rank);
 
 #endif

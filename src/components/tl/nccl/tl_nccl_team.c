@@ -134,9 +134,9 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_nccl_task_t *task;
     ucc_status_t        status;
 
-    task = ucc_tl_nccl_init_task(coll_args, team);
-    if (ucc_unlikely(!task)) {
-        return UCC_ERR_NO_MESSAGE;
+    status = ucc_tl_nccl_init_task(coll_args, team, &task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
     }
 
     switch (coll_args->args.coll_type)

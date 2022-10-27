@@ -30,16 +30,8 @@ ucc_status_t ucc_tl_ucp_gatherv_init(ucc_tl_ucp_task_t *task)
     ucc_coll_args_t   *args  = &TASK_ARGS(task);
     ucc_rank_t         trank = UCC_TL_TEAM_RANK(team);
 
-    if (UCC_IS_ROOT(*args, trank)) {
-        if (!UCC_DT_IS_PREDEFINED(args->dst.info_v.datatype)) {
-            return UCC_ERR_NOT_SUPPORTED;
-        }
-    }
-
-    if (!UCC_IS_ROOT(*args, trank) || !UCC_IS_INPLACE(*args)) {
-        if (!UCC_DT_IS_PREDEFINED(args->src.info.datatype)) {
-            return UCC_ERR_NOT_SUPPORTED;
-        }
+    if (!ucc_coll_args_is_predefined_dt(args, trank)) {
+        return UCC_ERR_NOT_SUPPORTED;
     }
 
     return ucc_tl_ucp_gatherv_linear_init(task);

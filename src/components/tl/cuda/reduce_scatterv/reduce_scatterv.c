@@ -19,9 +19,9 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_init(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    task = ucc_tl_cuda_task_init(coll_args, team);
-    if (ucc_unlikely(!task)) {
-        return UCC_ERR_NO_MEMORY;
+    status = ucc_tl_cuda_task_init(coll_args, team, &task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
     }
 
     status = ucc_tl_cuda_reduce_scatterv_ring_init(task);

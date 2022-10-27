@@ -425,7 +425,13 @@ ucc_status_t ucc_tl_cuda_allgatherv_linear_init(ucc_base_coll_args_t *coll_args,
                                                 ucc_coll_task_t **    task_p)
 {
     ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
-    ucc_tl_cuda_task_t *task = ucc_tl_cuda_task_init(coll_args, team);
+    ucc_tl_cuda_task_t *task;
+    ucc_status_t        status;
+
+    status = ucc_tl_cuda_task_init(coll_args, team, &task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
 
     task->allgatherv_linear.get_count  = ucc_tl_cuda_allgatherv_get_count;
     task->allgatherv_linear.get_offset = ucc_tl_cuda_allgatherv_get_offset;

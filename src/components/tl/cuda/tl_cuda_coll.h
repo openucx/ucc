@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -69,18 +69,37 @@ static inline void ucc_tl_cuda_task_put(ucc_tl_cuda_task_t *task)
     ucc_mpool_put(task);
 }
 
-static inline ucc_tl_cuda_task_t *
-ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
-                      ucc_tl_cuda_team_t *team)
+static inline
+ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
+                                   ucc_tl_cuda_team_t *team,
+                                   ucc_tl_cuda_task_t **task_h)
 {
-    ucc_tl_cuda_task_t *task = ucc_tl_cuda_task_get(team);
-    uint32_t max_concurrent;
+    ucc_rank_t          trank          = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_lib_t  *lib            = UCC_TL_CUDA_TEAM_LIB(team);
+    uint32_t            max_concurrent = lib->cfg.max_concurrent;
+    ucc_tl_cuda_task_t *task;
+    ucc_status_t        status;
 
-    max_concurrent = UCC_TL_CUDA_TEAM_LIB(team)->cfg.max_concurrent;
-    ucc_coll_task_init(&task->super, coll_args, &team->super.super);
+    if (!ucc_coll_args_is_predefined_dt(&coll_args->args, trank)) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    task = ucc_tl_cuda_task_get(team);
+    if (ucc_unlikely(!task)) {
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    status = ucc_coll_task_init(&task->super, coll_args, &team->super.super);
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_tl_cuda_task_put(task);
+        return status;
+    }
+
     task->seq_num = team->seq_num++;
     task->coll_id = task->seq_num % max_concurrent;
-    return task;
+
+    *task_h = task;
+    return UCC_OK;
 }
 
 static inline ucc_status_t ucc_tl_cuda_get_sync(ucc_tl_cuda_task_t *task)

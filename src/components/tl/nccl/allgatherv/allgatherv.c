@@ -37,17 +37,6 @@ ucc_base_coll_alg_info_t
         }                                                                      \
     } while(0)
 
-#define CHECK_USERDEFINED_DT(_args, _team)                                     \
-    do {                                                                       \
-        if (!UCC_DT_IS_PREDEFINED((_args).src.info.datatype) ||                \
-            !UCC_DT_IS_PREDEFINED((_args).dst.info_v.datatype)) {              \
-            tl_error(UCC_TL_TEAM_LIB((_team)),                                 \
-                     "user defined datatype is not supported");                \
-            status = UCC_ERR_NOT_SUPPORTED;                                    \
-            goto out;                                                          \
-        }                                                                      \
-    } while(0)
-
 ucc_status_t ucc_tl_nccl_allgatherv_p2p_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
@@ -103,10 +92,10 @@ ucc_status_t ucc_tl_nccl_allgatherv_p2p_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_nccl_task_t *task;
 
     CHECK_INPLACE(*args, nccl_team);
-    CHECK_USERDEFINED_DT(*args, nccl_team);
-    task = ucc_tl_nccl_init_task(coll_args, team);
-    if (!task) {
-        return UCC_ERR_NO_MESSAGE;
+
+    status = ucc_tl_nccl_init_task(coll_args, team, &task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
     }
     task->super.post     = ucc_tl_nccl_allgatherv_p2p_start;
     *task_h = &task->super;
@@ -185,10 +174,9 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcopy_init(ucc_base_coll_args_t *coll_args,
     ucc_rank_t          peer;
 
     CHECK_INPLACE(*args, nccl_team);
-    CHECK_USERDEFINED_DT(*args, nccl_team);
-    task = ucc_tl_nccl_init_task(coll_args, team);
-    if (ucc_unlikely(!task)) {
-        return UCC_ERR_NO_MESSAGE;
+    status = ucc_tl_nccl_init_task(coll_args, team, &task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
     }
 
     sdt_size = ucc_dt_size(args->src.info.datatype);
@@ -267,11 +255,11 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcast_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_nccl_task_t *task;
 
     CHECK_INPLACE(*args, nccl_team);
-    CHECK_USERDEFINED_DT(*args, nccl_team);
-    task = ucc_tl_nccl_init_task(coll_args, team);
-    if (!task) {
-        return UCC_ERR_NO_MESSAGE;
+    status = ucc_tl_nccl_init_task(coll_args, team, &task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
     }
+
     task->super.post = ucc_tl_nccl_allgatherv_bcast_start;
     *task_h = &task->super;
 out:
