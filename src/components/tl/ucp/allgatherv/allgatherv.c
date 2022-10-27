@@ -30,7 +30,9 @@ ucc_status_t ucc_tl_ucp_allgatherv_init(ucc_tl_ucp_task_t *task)
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
+
     task->super.post     = ucc_tl_ucp_allgatherv_ring_start;
     task->super.progress = ucc_tl_ucp_allgatherv_ring_progress;
+
     return UCC_OK;
 }

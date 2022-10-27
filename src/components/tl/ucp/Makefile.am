@@ -1,6 +1,7 @@
 #
 # Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
+
 if TL_UCP_ENABLED
 
 if BUILD_TL_COLL_PLUGINS
@@ -8,10 +9,16 @@ SUBDIRS = .
 include makefile.coll_plugins.am
 endif
 
-barrier =                     \
-	barrier/barrier.h         \
-	barrier/barrier.c         \
-	barrier/barrier_knomial.c
+allgather =                       \
+	allgather/allgather.h         \
+	allgather/allgather.c         \
+	allgather/allgather_ring.c    \
+	allgather/allgather_knomial.c
+
+allgatherv =                     \
+	allgatherv/allgatherv.h      \
+	allgatherv/allgatherv.c      \
+	allgatherv/allgatherv_ring.c
 
 alltoall =                       \
 	alltoall/alltoall.h          \
@@ -24,61 +31,60 @@ alltoallv =                        \
 	alltoallv/alltoallv.c          \
 	alltoallv/alltoallv_pairwise.c
 
-bcast =                   \
-	bcast/bcast.h         \
-	bcast/bcast.c         \
-	bcast/bcast_knomial.c \
-	bcast/bcast_sag_knomial.c
-
 allreduce =                           \
 	allreduce/allreduce.h             \
 	allreduce/allreduce.c             \
 	allreduce/allreduce_knomial.c     \
 	allreduce/allreduce_sra_knomial.c
 
-allgather =                       \
-	allgather/allgather.h         \
-	allgather/allgather.c         \
-	allgather/allgather_ring.c    \
-	allgather/allgather_knomial.c
+barrier =                     \
+	barrier/barrier.h         \
+	barrier/barrier.c         \
+	barrier/barrier_knomial.c
 
-allgatherv =                      \
-	allgatherv/allgatherv.h       \
-	allgatherv/allgatherv.c       \
-	allgatherv/allgatherv_ring.c
+bcast =                       \
+	bcast/bcast.h             \
+	bcast/bcast.c             \
+	bcast/bcast_knomial.c     \
+	bcast/bcast_sag_knomial.c
 
-reduce =	                 \
-	reduce/reduce.h          \
-	reduce/reduce.c          \
+fanin =           \
+	fanin/fanin.h \
+	fanin/fanin.c
+
+fanout =            \
+	fanout/fanout.h \
+	fanout/fanout.c
+
+gather =                    \
+	gather/gather.h         \
+	gather/gather.c         \
+	gather/gather_knomial.c
+
+reduce =                    \
+	reduce/reduce.h         \
+	reduce/reduce.c         \
 	reduce/reduce_knomial.c
 
-reduce_scatter =	                        \
+reduce_scatter =                            \
 	reduce_scatter/reduce_scatter.h         \
 	reduce_scatter/reduce_scatter_knomial.c \
 	reduce_scatter/reduce_scatter_ring.c    \
 	reduce_scatter/reduce_scatter.c
 
-reduce_scatterv =	                        \
-	reduce_scatterv/reduce_scatterv.h         \
-	reduce_scatterv/reduce_scatterv_ring.c    \
+reduce_scatterv =                          \
+	reduce_scatterv/reduce_scatterv.h      \
+	reduce_scatterv/reduce_scatterv_ring.c \
 	reduce_scatterv/reduce_scatterv.c
 
-gather =	                 \
-	gather/gather.h          \
-	gather/gather.c          \
-	gather/gather_knomial.c
-
-scatter =	                   \
-	scatter/scatter.h          \
+scatter =                     \
+	scatter/scatter.h         \
 	scatter/scatter_knomial.c
 
-fanin =	                  \
-	fanin/fanin.h         \
-	fanin/fanin.c
-
-fanout =	                \
-	fanout/fanout.h         \
-	fanout/fanout.c
+scatterv =                     \
+	scatterv/scatterv.h        \
+	scatterv/scatterv.c        \
+	scatterv/scatterv_linear.c
 
 sources =                 \
 	tl_ucp.h              \
@@ -90,20 +96,21 @@ sources =                 \
 	tl_ucp_ep.c           \
 	tl_ucp_coll.c         \
 	tl_ucp_service_coll.c \
-	$(barrier)            \
+	$(allgather)          \
+	$(allgatherv)         \
 	$(alltoall)           \
 	$(alltoallv)          \
 	$(allreduce)          \
-	$(allgather)          \
-	$(allgatherv)         \
+	$(barrier)            \
 	$(bcast)              \
+	$(fanin)              \
+	$(fanout)             \
+	$(gather)             \
 	$(reduce)             \
 	$(reduce_scatter)     \
 	$(reduce_scatterv)    \
-	$(gather)    	      \
 	$(scatter)            \
-	$(fanin)              \
-	$(fanout)
+	$(scatterv)
 
 module_LTLIBRARIES = libucc_tl_ucp.la
 libucc_tl_ucp_la_SOURCES  = $(sources)

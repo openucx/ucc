@@ -21,6 +21,7 @@
 #include "gather/gather.h"
 #include "fanin/fanin.h"
 #include "fanout/fanout.h"
+#include "scatterv/scatterv.h"
 
 const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
@@ -132,6 +133,9 @@ ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
         break;
     case UCC_COLL_TYPE_FANOUT:
         status = ucc_tl_ucp_fanout_init(task);
+        break;
+    case UCC_COLL_TYPE_SCATTERV:
+        status = ucc_tl_ucp_scatterv_init(task);
         break;
     default:
         status = UCC_ERR_NOT_SUPPORTED;

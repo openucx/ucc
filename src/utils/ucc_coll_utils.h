@@ -26,6 +26,8 @@
 
 #define UCC_MSG_SIZE_ASSYMETRIC (UCC_MSG_SIZE_INVALID - 1)
 
+#define UCC_IS_ROOT(_args, _myrank) ((_args).root == (_myrank))
+
 #define UCC_IS_INPLACE(_args) \
     (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) && \
      ((_args).flags & UCC_COLL_ARGS_FLAG_IN_PLACE))
@@ -66,7 +68,6 @@
 
 #define UCC_COLL_ARGS_ACTIVE_SET(_args)             \
     ((_args)->mask & UCC_COLL_ARGS_FIELD_ACTIVE_SET)
-
 
 static inline size_t
 ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,

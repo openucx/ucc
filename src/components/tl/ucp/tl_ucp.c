@@ -107,6 +107,12 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, scatter_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"SCATTERV_LINEAR_NUM_POSTS", "16",
+     "Maximum number of outstanding send and receive messages in scatterv "
+     "linear algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, scatterv_linear_num_posts),
+     UCC_CONFIG_TYPE_UINT},
+
     {"REDUCE_AVG_PRE_OP", "1",
      "Reduce will perform division by team_size in early stages of the "
      "algorithm,\n"
@@ -264,37 +270,39 @@ UCC_TL_UCP_PROFILE_FUNC_VOID(ucc_tl_ucp_pre_register_mem, (team, addr, length,
 
 __attribute__((constructor)) static void tl_ucp_iface_init(void)
 {
-    ucc_tl_ucp.super.scoll.allreduce = ucc_tl_ucp_service_allreduce;
     ucc_tl_ucp.super.scoll.allgather = ucc_tl_ucp_service_allgather;
+    ucc_tl_ucp.super.scoll.allreduce = ucc_tl_ucp_service_allreduce;
     ucc_tl_ucp.super.scoll.bcast     = ucc_tl_ucp_service_bcast;
     ucc_tl_ucp.super.scoll.update_id = ucc_tl_ucp_service_update_id;
 
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLREDUCE)] =
-        ucc_tl_ucp_allreduce_algs;
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BCAST)] =
-        ucc_tl_ucp_bcast_algs;
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BARRIER)] =
-        ucc_tl_ucp_barrier_algs;
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLTOALL)] =
-        ucc_tl_ucp_alltoall_algs;
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLTOALLV)] =
-        ucc_tl_ucp_alltoallv_algs;
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTER)] =
-        ucc_tl_ucp_reduce_scatter_algs;
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTERV)] =
-        ucc_tl_ucp_reduce_scatterv_algs;
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE)] =
-        ucc_tl_ucp_reduce_algs;
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_GATHER)] =
-        ucc_tl_ucp_gather_algs;
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_FANIN)] =
-        ucc_tl_ucp_fanin_algs;
-    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_FANOUT)] =
-        ucc_tl_ucp_fanout_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHER)] =
         ucc_tl_ucp_allgather_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
         ucc_tl_ucp_allgatherv_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLREDUCE)] =
+        ucc_tl_ucp_allreduce_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLTOALL)] =
+        ucc_tl_ucp_alltoall_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLTOALLV)] =
+        ucc_tl_ucp_alltoallv_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BARRIER)] =
+        ucc_tl_ucp_barrier_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BCAST)] =
+        ucc_tl_ucp_bcast_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_FANIN)] =
+        ucc_tl_ucp_fanin_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_FANOUT)] =
+        ucc_tl_ucp_fanout_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_GATHER)] =
+        ucc_tl_ucp_gather_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE)] =
+        ucc_tl_ucp_reduce_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTER)] =
+        ucc_tl_ucp_reduce_scatter_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTERV)] =
+        ucc_tl_ucp_reduce_scatterv_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_SCATTERV)] =
+        ucc_tl_ucp_reduce_scatterv_algs;
 
     /* no need to check return value, plugins can be absent */
     (void)ucc_components_load("tlcp_ucp", &ucc_tl_ucp.super.coll_plugins);

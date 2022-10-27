@@ -38,8 +38,6 @@
     }                                                                          \
 } while(0)
 
-#define UCC_IS_ROOT(_args, _myrank) ((_args).root == (_myrank))
-
 #if ENABLE_DEBUG == 1
 static ucc_status_t ucc_check_coll_args(const ucc_coll_args_t *coll_args,
                                         ucc_rank_t rank)
