@@ -41,49 +41,12 @@ err_topo_init:
     return status;
 }
 
-static ucc_status_t ucc_tl_ucp_cfg_add_section(ucc_tl_ucp_team_t *team,
-                                               ucc_file_config_t *cfg)
-{
-    size_t                 team_size = UCC_TL_TEAM_SIZE(team);
-    khash_t(ucc_sections) *sections  = &cfg->sections;
-    ucc_cpu_vendor_t       vendor    = ucc_arch_get_cpu_vendor();
-    ucc_cpu_model_t        model     = ucc_arch_get_cpu_model();
-    ucc_rank_t             ppn_min   = ucc_topo_min_ppn(team->topo);
-    ucc_rank_t             ppn_max   = ucc_topo_max_ppn(team->topo);
-    ucc_rank_t             nnodes    = ucc_topo_nnodes(team->topo);
-    khash_t(ucc_sec)      *sec_h;
-    khiter_t               i, j;
-    const char            *sec_name;
-    ucc_section_wrap_t    *sec;
-    ucc_status_t           status;
-
-    for (i = kh_begin(sections); i != kh_end(sections); ++i) {
-        if (!kh_exist(sections, i)) continue;
-        sec_name = kh_key(sections, i);
-        sec      = kh_val(sections, i);
-        if (ucc_check_section(sec->desc, vendor, model, team_size,
-                              ppn_min, ppn_max, nnodes)) {
-            sec_h = &sec->vals_h;
-            j = kh_get(ucc_sec, sec_h, "UCC_TL_UCP_TUNE");
-            if (j != kh_end(sec_h)) {
-                team->tuning_str = kh_val(sec_h, j);
-            }
-            status = ucc_apply_file_cfg(&team->cfg,
-                                        ucc_tl_ucp_lib_config_table, "UCC_",
-                                        ucc_tl_ucp.super.tl_lib_config.prefix,
-                                        sec_name);
-            return status;
-        }
-    }
-    return UCC_ERR_NOT_FOUND;
-}
-
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
     ucc_tl_ucp_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_ucp_context_t);
-    ucc_status_t status = UCC_OK;
+    ucc_status_t status;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
@@ -113,7 +76,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
 
     if (ucc_global_config.file_cfg && !IS_SERVICE_TEAM(self) &&
         ctx->topo_required && tl_context->lib->use_tuning) {
-        status = ucc_tl_ucp_cfg_add_section(self, ucc_global_config.file_cfg);
+        status = ucc_add_team_sections(ucc_global_config.file_cfg, &self->cfg,
+                                       ucc_tl_ucp_lib_config_table, self->topo,
+                                       &self->tuning_str, "UCC_TL_UCP_TUNE",
+                                       ucc_tl_ucp.super.tl_lib_config.prefix,
+                                       UCC_TL_TEAM_SIZE(self));
         if (status != UCC_OK) {
             ucc_debug("section not found");
         }

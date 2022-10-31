@@ -15,6 +15,7 @@
 #include "utils/ucc_list.h"
 #include "utils/arch/cpu.h"
 #include "khash.h"
+#include "components/topo/ucc_topo.h"
 
 #include <ucs/config/parser.h>
 #include <ucs/sys/preprocessor.h>
@@ -76,19 +77,19 @@ typedef struct ucc_file_config ucc_file_config_t;
 #define UCC_CONFIG_TYPE_TERNARY         UCS_CONFIG_TYPE_TERNARY
 
 typedef enum ucc_ternary_auto_value {
-    UCC_NO   = 0,
-    UCC_YES  = 1,
-    UCC_TRY  = 2,
-    UCC_AUTO = 3,
+    UCC_NO   = UCS_NO,
+    UCC_YES  = UCS_YES,
+    UCC_TRY  = UCS_TRY,
+    UCC_AUTO = UCS_AUTO,
     UCC_TERNARY_LAST
 } ucc_ternary_auto_value_t;
 
 enum tuning_mask {
-    UCC_TUNING_DESC_FIELD_VENDOR    = UCC_BIT(1),
-    UCC_TUNING_DESC_FIELD_MODEL     = UCC_BIT(2),
-    UCC_TUNING_DESC_FIELD_TEAM_SIZE = UCC_BIT(3),
-    UCC_TUNING_DESC_FIELD_PPN       = UCC_BIT(4),
-    UCC_TUNING_DESC_FIELD_NNODES    = UCC_BIT(5)
+    UCC_TUNING_DESC_FIELD_VENDOR    = UCC_BIT(0),
+    UCC_TUNING_DESC_FIELD_MODEL     = UCC_BIT(1),
+    UCC_TUNING_DESC_FIELD_TEAM_SIZE = UCC_BIT(2),
+    UCC_TUNING_DESC_FIELD_PPN       = UCC_BIT(3),
+    UCC_TUNING_DESC_FIELD_NNODES    = UCC_BIT(4)
 };
 
 typedef struct ucc_section_desc {
@@ -99,8 +100,8 @@ typedef struct ucc_section_desc {
     ucc_rank_t       max_team_size;
     ucc_rank_t       min_ppn;
     ucc_rank_t       max_ppn;
-    size_t           min_nnodes;
-    size_t           max_nnodes;
+    ucc_rank_t       min_nnodes;
+    ucc_rank_t       max_nnodes;
 } ucc_section_desc_t;
 
 KHASH_MAP_INIT_STR(ucc_sec, char *);
@@ -146,6 +147,15 @@ int ucc_check_section(ucc_section_desc_t sec_desc,
                       ucc_rank_t ppn_min,
                       ucc_rank_t ppn_max,
                       ucc_rank_t nnodes);
+
+ucc_status_t ucc_add_team_sections(ucc_file_config_t        *cfg_file,
+                                   void                     *team_cfg,
+                                   ucc_config_field_t       *tl_field,
+                                   ucc_topo_t               *team_topo,
+                                   const char              **tuning_str,
+                                   const char               *tune_key,
+                                   const char               *prefix,
+                                   size_t                    team_size);
 
 static inline void
 ucc_config_parser_release_opts(void *opts, ucc_config_field_t *fields)

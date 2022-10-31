@@ -612,15 +612,10 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
         attr->attr.global_work_buffer_size =
             ONESIDED_SYNC_SIZE + ONESIDED_REDUCE_SIZE;
     }
-    if (lib->cfg.use_topo == UCC_TRY) {
-        if (context->ucc_context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
-            attr->topo_required = 1;
-        } else {
-            attr->topo_required = 0;
-        }
-    } else {
-        attr->topo_required = (lib->cfg.use_topo) ? 1 : 0;
-    }
-    ctx->topo_required = attr->topo_required;
+    attr->topo_required =
+        (((lib->cfg.use_topo == UCC_TRY || lib->cfg.use_topo == UCC_AUTO) &&
+          (context->ucc_context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB)) ||
+        lib->cfg.use_topo == UCC_YES) ? 1 : 0;
+    ctx->topo_required = attr->topo_required; // needed to be reached by team
     return UCC_OK;
 }
