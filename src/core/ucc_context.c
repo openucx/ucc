@@ -222,8 +222,8 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
             if (0 == strncmp(tokens[i], "cl/", 3)) {
                 cl_cfg = find_cl_context_config(config, component);
                 if (!cl_cfg) {
-                    ucc_error("required CL %s is not part of the context",
-                              component);
+                    ucc_info("required CL %s is not part of the context",
+                             component);
                     status = UCC_ERR_NOT_FOUND;
                     goto err;
                 }
@@ -238,8 +238,8 @@ ucc_status_t ucc_context_config_modify(ucc_context_config_t *config,
             } else if (0 == strncmp(tokens[i], "tl/", 3)) {
                 tl_cfg = find_tl_context_config(config, component);
                 if (!tl_cfg) {
-                    ucc_error("required TL %s is not part of the context",
-                              component);
+                    ucc_info("required TL %s is not part of the context",
+                             component);
                     status = UCC_ERR_NOT_FOUND;
                     goto err;
                 }
