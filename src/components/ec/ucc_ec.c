@@ -1,5 +1,6 @@
 /**
  * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -40,8 +41,7 @@ ucc_status_t ucc_ec_init(const ucc_ec_params_t *ec_params)
                 continue;
             }
             status = ucc_config_parser_fill_opts(
-                ec->config, ec->config_table.table, "UCC_",
-                ec->config_table.prefix, 1);
+                ec->config, &ec->config_table, "UCC_", 1);
             if (UCC_OK != status) {
                 ucc_info("failed to parse config for EC component: %s (%d)",
                          ec->super.name, status);

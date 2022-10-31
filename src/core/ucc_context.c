@@ -1,5 +1,6 @@
 /**
  * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -69,8 +70,9 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
         return UCC_ERR_NO_MEMORY;
     }
 
-    status = ucc_config_parser_fill_opts(config, ucc_context_config_table,
-                                         lib->full_prefix, NULL, 0);
+    status = ucc_config_parser_fill_opts(config,
+                                         UCC_CONFIG_GET_TABLE(ucc_context_config_table),
+                                         lib->full_prefix, 0);
     if (status != UCC_OK) {
         ucc_error("failed to read UCC core context config");
         goto err_config;
