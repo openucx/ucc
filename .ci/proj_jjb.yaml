@@ -37,7 +37,7 @@
           description: "Enable debug prints and traces, valid values are 0-9"
       - string:
           name: "UCC_VERSION"
-          default: "1.0.0"
+          default: "1.1.0"
           description: "UCC version"
     triggers:
 #      - github-pull-request:

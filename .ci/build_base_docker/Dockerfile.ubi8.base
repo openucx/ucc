@@ -1,5 +1,5 @@
 ARG CUDA_VER='11.8.0'
-FROM nvidia/cuda:${CUDA_VER}-devel-centos8
+FROM nvidia/cuda:${CUDA_VER}-devel-ubi8
 #==============================================================================
 ARG NVIDIA_ROOT_DIR=/opt/nvidia
 ENV SRC_DIR=${NVIDIA_ROOT_DIR}/src

@@ -15,7 +15,7 @@ volumes:
 
 env:
   CUDA_VER: '11.8.0'
-  UCC_URI_SUFFIX: 'ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}'
+  UCC_URI_SUFFIX: 'ucc/${UCC_VERSION}/x86_64/ubi8/cuda${CUDA_VER}'
   UCC_DOCKER_IMAGE_NAME: '${registry_host}${registry_path}/${UCC_URI_SUFFIX}'
   NVIDIA_ROOT_DIR: '/opt/nvidia'
   SRC_DIR: '${NVIDIA_ROOT_DIR}/src'
@@ -29,8 +29,8 @@ kubernetes:
 
 runs_on_dockers:
   - {
-    file: '.ci/build_base_docker/Dockerfile.centos8.base',
-    name: 'centos8',
+    file: '.ci/build_base_docker/Dockerfile.ubi8.base',
+    name: 'ubi8',
     tag: 'base',
     arch: 'x86_64',
     uri: '${UCC_URI_SUFFIX}',
