@@ -98,6 +98,11 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
                 [AC_DEFINE([UCS_HAVE_MPOOL_PARAMS], [1], [params interface for ucs_mpool_init])],
                 [],
                 [#include <ucs/datastruct/mpool.h>])
+
+            AC_CHECK_MEMBER(ucs_config_global_list_entry_t.flags,
+                [AC_DEFINE([UCS_HAVE_CONFIG_GLOBAL_LIST_ENTRY_FLAGS], [1], [flags for config table])],
+                [],
+                [#include <ucs/config/parser.h>])
         ],
         [
             AS_IF([test "x$with_ucx" != "xguess"],

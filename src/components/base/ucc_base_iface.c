@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "ucc_base_iface.h"
 #include "utils/ucc_malloc.h"
 #include "utils/ucc_log.h"
@@ -50,8 +56,7 @@ ucc_status_t ucc_base_config_read(const char *full_prefix,
         return UCC_ERR_NO_MEMORY;
     }
     cfg->cfg_entry = cfg_entry;
-    status = ucc_config_parser_fill_opts(cfg, cfg_entry->table, full_prefix,
-                                         cfg_entry->prefix, 0);
+    status = ucc_config_parser_fill_opts(cfg, cfg_entry, full_prefix, 0);
     if (UCC_OK != status) {
         ucc_free(cfg);
         *config = NULL;

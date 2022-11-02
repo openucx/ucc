@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -27,9 +28,31 @@ typedef ucs_config_allow_list_t        ucc_config_allow_list_t;
 
 typedef struct ucc_file_config ucc_file_config_t;
 
-#define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
+#if UCS_HAVE_CONFIG_GLOBAL_LIST_ENTRY_FLAGS
+#define UCC_CONFIG_DECLARE_TABLE(_table, _name, _prefix, _type)                \
+    static ucc_config_global_list_entry_t _table##_config_entry = {            \
+        .name   = _name,                                                       \
+        .prefix = _prefix,                                                     \
+        .table  = _table,                                                      \
+        .size   = sizeof(_type),                                               \
+        .list   = {NULL, NULL},                                                \
+        .flags  = 0                                                            \
+    };
+#else
+#define UCC_CONFIG_DECLARE_TABLE(_table, _name, _prefix, _type)                \
+    static ucc_config_global_list_entry_t _table##_config_entry = {            \
+        .name   = _name,                                                       \
+        .prefix = _prefix,                                                     \
+        .table  = _table,                                                      \
+        .size   = sizeof(_type),                                               \
+        .list   = {NULL, NULL},                                                \
+    };
+#endif
+
+#define UCC_CONFIG_GET_TABLE(_table)    &_table##_config_entry
 #define UCC_CONFIG_REGISTER_TABLE       UCS_CONFIG_REGISTER_TABLE
 #define UCC_CONFIG_REGISTER_TABLE_ENTRY UCS_CONFIG_REGISTER_TABLE_ENTRY
+#define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
 #define UCC_CONFIG_TYPE_STRING          UCS_CONFIG_TYPE_STRING
 #define UCC_CONFIG_TYPE_INT             UCS_CONFIG_TYPE_INT
 #define UCC_CONFIG_TYPE_UINT            UCS_CONFIG_TYPE_UINT
@@ -65,10 +88,10 @@ typedef struct ucc_config_names_list {
     };
 } ucc_config_names_list_t;
 
-ucc_status_t ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,
+ucc_status_t ucc_config_parser_fill_opts(void *opts,
+                                         ucs_config_global_list_entry_t *entry,
                                          const char *env_prefix,
-                                         const char *table_prefix,
-                                         int         ignore_errors);
+                                         int ignore_errors);
 
 static inline void
 ucc_config_parser_release_opts(void *opts, ucc_config_field_t *fields)
