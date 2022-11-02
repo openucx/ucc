@@ -1,4 +1,4 @@
-ARG CUDA_VER='11.4.2'
+ARG CUDA_VER='11.8.0'
 FROM harbor.mellanox.com/torch-ucc/ucc/1.0.0/x86_64/centos8/cuda${CUDA_VER}:base
 
 RUN rm -rf  ${SRC_DIR}/ucc

@@ -1,4 +1,4 @@
-ARG CUDA_VER='11.4.2'
+ARG CUDA_VER='11.8.0'
 FROM nvidia/cuda:${CUDA_VER}-devel-centos8
 #==============================================================================
 ARG NVIDIA_ROOT_DIR=/opt/nvidia
