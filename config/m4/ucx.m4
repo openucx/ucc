@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001-2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2001-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # See file LICENSE for terms.
 #
 
@@ -69,19 +69,29 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
 
         AS_IF([test "x$ucx_happy" = "xyes"],
         [
+            AC_COMPUTE_INT(ucx_major, [UCP_API_MAJOR], [#include <ucp/api/ucp_version.h>],
+                           [AC_MSG_WARN([failed to get UCX ver major])
+                            ucx_happy="no"])
+            AC_COMPUTE_INT(ucx_minor, [UCP_API_MINOR], [#include <ucp/api/ucp_version.h>],
+                           [AC_MSG_WARN([failed to get UCX ver minor])
+                            ucx_happy="no"])
+            AC_MSG_RESULT([Detected UCX version: ${ucx_major}.${ucx_minor}])
+            AS_IF([test $ucx_major -lt ${UCX_MIN_REQUIRED_MAJOR} && test $ucx_minor -lt ${UCX_MIN_REQUIRED_MINOR}],
+            [
+                AC_MSG_ERROR([Required UCX version: ${UCX_MIN_REQUIRED_MAJOR}.${UCX_MIN_REQUIRED_MINOR}])
+                ucx_happy="no"
+            ], [])
+
+        ])
+
+
+        AS_IF([test "x$ucx_happy" = "xyes"],
+        [
             AS_IF([test "x$check_ucx_dir" != "x"],
             [
-                AC_MSG_RESULT([UCX dir: $check_ucx_dir])
                 AC_SUBST(UCX_CPPFLAGS, "-I$check_ucx_dir/include/")
                 AC_SUBST(UCS_CPPFLAGS, "-I$check_ucx_dir/include/")
-                ucx_major=$(cat $check_ucx_dir/include/ucp/api/ucp_version.h | grep -Po "UCP_API_MAJOR\s+\K\d+")
-                ucx_minor=$(cat $check_ucx_dir/include/ucp/api/ucp_version.h | grep -Po "UCP_API_MINOR\s+\K\d+")
-                AC_MSG_RESULT([Detected UCX version: ${ucx_major}.${ucx_minor}])
-                AS_IF([test $ucx_major -eq 1 && test $ucx_minor -lt ${UCX_MIN_REQUIRED_MINOR}],
-                [
-                   AC_MSG_ERROR([Required UCX version: ${UCX_MIN_REQUIRED_MAJOR}.${UCX_MIN_REQUIRED_MINOR}])
-                   ucx_happy=no
-                ], [])
+                AC_MSG_RESULT([UCX dir: $check_ucx_dir])
             ])
 
             AS_IF([test "x$check_ucx_libdir" != "x"],
