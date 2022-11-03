@@ -56,9 +56,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
                 goto err_cfg;
             }
             status = ucc_config_parser_fill_opts(self->tlcp_configs[i],
-                                                 tlcp->config.table,
-                                                 params->full_prefix,
-                                                 ucc_tl_ucp.super.tl_lib_config.prefix, 0);
+                                                 &tlcp->config,
+                                                 params->full_prefix, 0);
             if (status != UCC_OK) {
                 tl_error(&self->super, "failed to read tlcp config");
                 goto err_cfg;

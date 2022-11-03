@@ -65,7 +65,7 @@ static ucc_config_field_t ucc_ec_rocm_config_table[] = {
      ucc_offsetof(ucc_ec_rocm_config_t, exec_max_tasks),
      UCC_CONFIG_TYPE_ULUNITS},
 
-    {"EXEC_NUM_STREAMS", "16",
+    {"EXEC_NUM_STREAMS", "8",
      "Number of streams used by interruptible executor",
      ucc_offsetof(ucc_ec_rocm_config_t, exec_num_streams),
      UCC_CONFIG_TYPE_ULUNITS},
@@ -74,6 +74,19 @@ static ucc_config_field_t ucc_ec_rocm_config_table[] = {
      "Number of thread blocks to use for reduction in interruptible mode",
      ucc_offsetof(ucc_ec_rocm_config_t, reduce_num_blocks),
      UCC_CONFIG_TYPE_ULUNITS},
+
+     {"REDUCE_HOST_LIMIT", "256",
+     "Maximum data size for which to use host-based reduction operations",
+      ucc_offsetof(ucc_ec_rocm_config_t, reduce_host_limit),
+      UCC_CONFIG_TYPE_MEMUNITS},
+
+     /* Disabled by default.
+      * Recommended settings: MI100: 64 bytes, MI200: 4kbytes
+      */
+     {"COPY_HOST_LIMIT", "0",
+     "Maximum data size for which to use host-based copy operations",
+      ucc_offsetof(ucc_ec_rocm_config_t, copy_host_limit),
+      UCC_CONFIG_TYPE_MEMUNITS},
 
     {NULL}
 

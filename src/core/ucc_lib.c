@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -402,8 +403,9 @@ ucc_status_t ucc_lib_config_read(const char *env_prefix, const char *filename,
                          strlen(base_prefix) + 1);
     }
 
-    status = ucc_config_parser_fill_opts(config, ucc_lib_config_table,
-                                         config->full_prefix, NULL, 0);
+    status = ucc_config_parser_fill_opts(config,
+                                         UCC_CONFIG_GET_TABLE(ucc_lib_config_table),
+                                         config->full_prefix, 0);
     if (status != UCC_OK) {
         ucc_error("failed to read UCC lib config");
         goto err_free_prefix;

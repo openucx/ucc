@@ -77,7 +77,7 @@ ucc_status_t ucc_tl_self_team_get_scores(ucc_base_team_t   *tl_team,
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_self_coll_init, &team->super.super,
-            UCC_TL_SELF_DEFAULT_SCORE, NULL);
+            UCC_TL_SELF_DEFAULT_SCORE, NULL, NULL, 0);
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {
             goto err;

@@ -74,6 +74,7 @@ typedef struct ucc_ec_cuda {
     ucc_mpool_t                    strm_reqs;
     ucc_mpool_t                    executors;
     ucc_mpool_t                    executor_interruptible_tasks;
+    ucc_mpool_t                    executor_persistent_tasks;
     ucc_thread_mode_t              thread_mode;
     ucc_ec_cuda_strm_task_mode_t   strm_task_mode;
     ucc_ec_cuda_task_stream_type_t task_strm_type;
@@ -96,6 +97,13 @@ typedef struct ucc_ec_cuda_executor_interruptible_task {
     void                   *event;
 } ucc_ec_cuda_executor_interruptible_task_t;
 
+#define MAX_SUBTASKS 12
+typedef struct ucc_ec_cuda_executor_persistent_task {
+    ucc_ee_executor_task_t       super;
+    int                          num_subtasks;
+    ucc_ee_executor_task_args_t *subtasks[MAX_SUBTASKS];
+} ucc_ec_cuda_executor_persistent_task_t;
+
 typedef struct ucc_ec_cuda_executor_task_ops {
     ucc_status_t (*task_post)(ucc_ee_executor_t *executor,
                               const ucc_ee_executor_task_args_t *task_args,
@@ -111,9 +119,9 @@ typedef struct ucc_ec_cuda_executor {
     ucc_spinlock_t                   tasks_lock;
     ucc_ec_cuda_executor_state_t     state;
     int                              pidx;
-    ucc_ee_executor_task_t          *tasks;
+    ucc_ee_executor_task_args_t     *tasks;
     ucc_ec_cuda_executor_state_t    *dev_state;
-    ucc_ee_executor_task_t          *dev_tasks;
+    ucc_ee_executor_task_args_t     *dev_tasks;
     int                             *dev_pidx;
     int                             *dev_cidx;
 } ucc_ec_cuda_executor_t;

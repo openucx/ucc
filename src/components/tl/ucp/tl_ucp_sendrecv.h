@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -56,10 +56,10 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
         if (ucc_unlikely(UCS_PTR_IS_ERR(ucp_status))) {                        \
             tl_error(UCC_TL_TEAM_LIB(team),                                    \
                      "tag %u; dest %d; team_id %u; errmsg %s",                 \
-                     task->tagged.tag,                                         \
-                     dest_group_rank, team->super.super.params.id,             \
+                     task->tagged.tag, dest_group_rank,                        \
+                     team->super.super.params.id,                              \
                      ucs_status_string(UCS_PTR_STATUS(ucp_status)));           \
-            ucp_request_cancel(UCC_TL_UCP_WORKER(team), ucp_status);           \
+            ucp_request_cancel(team->worker->ucp_worker, ucp_status);          \
             ucp_request_free(ucp_status);                                      \
             return ucs_status_to_ucc_status(UCS_PTR_STATUS(ucp_status));       \
         }                                                                      \
@@ -152,7 +152,7 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     req_param.memory_type = ucc_memtype_to_ucs[mtype];
     req_param.user_data   = (void *)task;
     task->tagged.recv_posted++;
-    return ucp_tag_recv_nbx(UCC_TL_UCP_WORKER(team), buffer, 1, ucp_tag,
+    return ucp_tag_recv_nbx(team->worker->ucp_worker, buffer, 1, ucp_tag,
                             ucp_tag_mask, &req_param);
 }
 
@@ -246,7 +246,7 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     offset = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),
                                   core_rank, ucc_tl_ucp.super.super.id);
 
-    base_offset = (ptrdiff_t)TL_UCP_EP_ADDR_ONESIDED_INFO(offset);
+    base_offset = (ptrdiff_t)(TL_UCP_EP_ADDR_ONESIDED_INFO(offset, ctx));
     rvas        = (uint64_t *)base_offset;
     key_sizes   = PTR_OFFSET(base_offset, (section_offset * 2));
     keys        = PTR_OFFSET(base_offset, (section_offset * 3));
@@ -282,8 +282,7 @@ static inline ucc_status_t ucc_tl_ucp_flush(ucc_tl_ucp_team_t *team)
     ucp_request_param_t req_param = {0};
     ucs_status_ptr_t    req;
 
-    req =
-        ucp_worker_flush_nbx(UCC_TL_UCP_TEAM_CTX(team)->ucp_worker, &req_param);
+    req = ucp_worker_flush_nbx(team->worker->ucp_worker, &req_param);
     if (UCS_OK != req) {
         if (UCS_PTR_IS_ERR(req)) {
             return ucs_status_to_ucc_status(UCS_PTR_STATUS(req));

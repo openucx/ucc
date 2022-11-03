@@ -96,7 +96,7 @@ static inline ucc_status_t ucc_tl_ucp_test_ring(ucc_tl_ucp_task_t *task)
             task->tagged.recv_posted == task->tagged.recv_completed) {
             return UCC_OK;
         }
-        ucp_worker_progress(TASK_CTX(task)->ucp_worker);
+        ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
     }
     return UCC_INPROGRESS;
 }

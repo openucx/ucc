@@ -291,8 +291,13 @@ err:
 }
 
 ucc_status_t ucc_tl_cuda_unmap_memhandle(uintptr_t d_bptr, void *mapped_addr,
-                                         ucc_tl_cuda_cache_t *cache)
+                                         ucc_tl_cuda_cache_t *cache, int force)
 {
+
+    if ((d_bptr == 0) || (mapped_addr == 0)) {
+        return UCC_OK;
+    }
+
 #if ENABLE_CACHE
     ucs_pgt_region_t *pgt_region;
     ucc_tl_cuda_cache_region_t *region;
@@ -300,11 +305,21 @@ ucc_status_t ucc_tl_cuda_unmap_memhandle(uintptr_t d_bptr, void *mapped_addr,
     /* use write lock because cache maybe modified */
     pthread_rwlock_wrlock(&cache->lock);
     pgt_region = ucs_pgtable_lookup(&cache->pgtable, d_bptr);
+
+    ucc_debug("%s: tl_cuda unmap addr:%p region:"
+                UCS_PGT_REGION_FMT, cache->name, (void*)d_bptr,
+                UCS_PGT_REGION_ARG(pgt_region));
+
     ucc_assert(pgt_region != NULL);
     region = ucc_derived_of(pgt_region, ucc_tl_cuda_cache_region_t);
 
     ucc_assert(region->refcount >= 1);
     region->refcount--;
+
+    if ((region->refcount == 0 ) && (force == 1)) {
+        ucs_pgtable_remove(&cache->pgtable, &region->super);
+        CUDA_FUNC(cudaIpcCloseMemHandle(mapped_addr));
+    }
 
     pthread_rwlock_unlock(&cache->lock);
 #else

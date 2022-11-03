@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -8,16 +8,17 @@
 #include "components/mc/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
+#include <sharp/api/version.h>
 
 UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
     ucc_tl_sharp_context_t         *ctx =
         ucc_derived_of(tl_context, ucc_tl_sharp_context_t);
-    struct sharp_coll_context      *sharp_ctx = ctx->sharp_context;
+    struct sharp_coll_context       *sharp_ctx = ctx->sharp_context;
     struct sharp_coll_comm_init_spec comm_spec;
-    int                             ret;
-    ucc_status_t                    status;
+    int                              ret;
+    ucc_status_t                     status;
 
     if (!(params->params.mask & UCC_TEAM_PARAM_FIELD_OOB)) {
         tl_debug(ctx->super.super.lib, "team OOB required for sharp team");
@@ -64,6 +65,48 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
         self->rcache        = ctx->rcache;
     }
 
+#if SHARP_API > SHARP_VERSION(3, 0)
+    if ((ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_INT8)] ==
+         SHARP_DTYPE_UNKNOWN) ||
+        (ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(SHARP_DTYPE_UINT8)] ==
+         SHARP_DTYPE_UNKNOWN) ||
+        (ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(SHARP_DTYPE_BFLOAT16)] ==
+         SHARP_DTYPE_UNKNOWN)) {
+        struct sharp_coll_caps sharp_caps;
+        ret = sharp_coll_caps_query(sharp_ctx, &sharp_caps);
+        if (ret < 0) {
+            tl_error(ctx->super.super.lib, "sharp_coll_caps_query failed: %s(%d)",
+                    sharp_coll_strerror(ret), ret);
+            goto cleanup;
+        }
+
+        if (sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_INT8)) {
+            tl_debug(ctx->super.super.lib, "enabling support for UCC_DT_INT8");
+            ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_INT8)] = SHARP_DTYPE_INT8;
+        } else {
+            tl_debug(ctx->super.super.lib, "disabling support for UCC_DT_INT8");
+            ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_INT8)] = SHARP_DTYPE_NULL;
+        }
+
+        if (sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_UINT8)) {
+            tl_debug(ctx->super.super.lib, "enabling support for UCC_DT_UINT8");
+            ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_UINT8)] = SHARP_DTYPE_UINT8;
+        } else {
+            tl_debug(ctx->super.super.lib, "disabling support for UCC_DT_UINT8");
+            ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_UINT8)] = SHARP_DTYPE_NULL;
+        }
+
+
+        if (sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_BFLOAT16)) {
+            tl_debug(ctx->super.super.lib, "enabling support for UCC_DT_BFLOAT16");
+            ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = UCC_DT_BFLOAT16;
+        } else {
+            tl_debug(ctx->super.super.lib, "disabling support for UCC_DT_BFLOAT16");
+            ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = SHARP_DTYPE_NULL;
+        }
+    }
+#endif
+
     comm_spec.rank              = UCC_TL_TEAM_RANK(self);
     comm_spec.size              = UCC_TL_TEAM_SIZE(self);
     comm_spec.group_world_ranks = NULL;
@@ -72,8 +115,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
     ret = sharp_coll_comm_init(sharp_ctx,
                                &comm_spec, &self->sharp_comm);
     if (ret < 0) {
-        tl_error(ctx->super.super.lib,
-                "sharp group create failed:%s(%d)",
+        tl_error(ctx->super.super.lib, "sharp group create failed:%s(%d)",
                 sharp_coll_strerror(ret), ret);
         status = UCC_ERR_NO_RESOURCE;
         goto cleanup;
@@ -88,7 +130,9 @@ cleanup:
         }
         if (self->sharp_context) {
             ucc_context_progress_deregister(
-                    tl_context->ucc_context, (ucc_context_progress_fn_t)sharp_coll_progress, self->sharp_context);
+                    tl_context->ucc_context,
+                    (ucc_context_progress_fn_t)sharp_coll_progress,
+                    self->sharp_context);
             sharp_coll_finalize(self->sharp_context);
         }
     }
@@ -218,7 +262,7 @@ ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t  *tl_team,
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_sharp_coll_init, &team->super.super,
-            UCC_TL_SHARP_DEFAULT_SCORE, NULL);
+            UCC_TL_SHARP_DEFAULT_SCORE, NULL, NULL, 0);
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {

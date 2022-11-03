@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -96,6 +96,12 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
     ucc_status_t          status;
 
+    if (USE_SERVICE_WORKER(team)) {
+        team->worker = &ctx->service_worker;
+    } else {
+        team->worker = &ctx->worker;
+    }
+
     if (team->status == UCC_OK) {
         return UCC_OK;
     }
@@ -155,11 +161,12 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     if (UCC_OK != status) {
         return status;
     }
+
     for (i = 0; i < UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR; i++) {
         status = ucc_coll_score_update_from_str(
             ucc_tl_ucp_default_alg_select_str[i], score, UCC_TL_TEAM_SIZE(team),
             ucc_tl_ucp_coll_init, &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
-            ucc_tl_ucp_alg_id_to_init);
+            ucc_tl_ucp_alg_id_to_init, mem_types, mt_n);
         if (UCC_OK != status) {
             tl_error(tl_team->context->lib,
                      "failed to apply default coll select setting: %s",
@@ -167,11 +174,12 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
             goto err;
         }
     }
+
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team), NULL,
             &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
-            ucc_tl_ucp_alg_id_to_init);
+            ucc_tl_ucp_alg_id_to_init, mem_types, mt_n);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&

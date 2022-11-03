@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -316,20 +317,24 @@ static ucc_status_t ucc_apply_file_cfg(void *opts, ucc_config_field_t *fields,
     return UCC_OK;
 }
 
-ucc_status_t ucc_config_parser_fill_opts(void *opts, ucc_config_field_t *fields,
-                                         const char *env_prefix,
-                                         const char *table_prefix,
-                                         int         ignore_errors)
+ucc_status_t ucc_config_parser_fill_opts(void *opts, ucs_config_global_list_entry_t *entry,
+                                         const char *env_prefix, int ignore_errors)
 {
     ucs_status_t ucs_status;
     ucc_status_t status;
 
-    ucs_status = ucs_config_parser_fill_opts(opts, fields, env_prefix,
-                                             table_prefix, ignore_errors);
-    status     = ucs_status_to_ucc_status(ucs_status);
+#if UCS_HAVE_CONFIG_GLOBAL_LIST_ENTRY_FLAGS
+    ucs_status = ucs_config_parser_fill_opts(opts, entry, env_prefix,
+                                             ignore_errors);
+#else
+    ucs_status = ucs_config_parser_fill_opts(opts, entry->table, env_prefix,
+                                             entry->prefix, 0);
+#endif
 
+    status     = ucs_status_to_ucc_status(ucs_status);
     if (UCC_OK == status && ucc_global_config.file_cfg) {
-        status = ucc_apply_file_cfg(opts, fields, env_prefix, table_prefix);
+        status = ucc_apply_file_cfg(opts, entry->table, env_prefix,
+                                    entry->prefix);
     }
 
     return status;
@@ -339,11 +344,11 @@ void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
                                       ucc_config_print_flags_t flags,
                                       ucc_list_link_t *        config_list)
 {
-    const ucc_config_global_list_entry_t *entry;
-    ucs_config_print_flags_t              ucs_flags;
-    ucc_status_t                          status;
-    char                                  title[64];
-    void *                                opts;
+    ucc_config_global_list_entry_t *entry;
+    ucs_config_print_flags_t        ucs_flags;
+    ucc_status_t                    status;
+    char                            title[64];
+    void *                          opts;
 
     ucs_flags = ucc_print_flags_to_ucs_print_flags(flags);
     ucc_list_for_each(entry, config_list, list)
@@ -360,8 +365,7 @@ void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
             continue;
         }
 
-        status = ucc_config_parser_fill_opts(opts, entry->table, prefix,
-                                             entry->prefix, 0);
+        status = ucc_config_parser_fill_opts(opts, entry, prefix, 0);
         if (status != UCC_OK) {
             ucc_free(opts);
             continue;

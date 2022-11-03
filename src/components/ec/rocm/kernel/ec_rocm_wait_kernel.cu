@@ -12,7 +12,7 @@ __global__ void wait_kernel(volatile uint32_t *status) {
     *status = UCC_EC_ROCM_TASK_STARTED;
     do {
         st = (ucc_status_t)*status;
-    } while(st != UCC_EC_ROCM_TASK_COMPLETED);
+    } while(st != (ucc_status_t)UCC_EC_ROCM_TASK_COMPLETED);
     *status = UCC_EC_ROCM_TASK_COMPLETED_ACK;
     return;
 }

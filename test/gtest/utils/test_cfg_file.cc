@@ -1,7 +1,9 @@
 /**
  * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
+
 extern "C" {
 #include "utils/ucc_parser.h"
 #include "core/ucc_global_opts.h"
@@ -42,6 +44,9 @@ static ucc_config_field_t ucc_gtest_config_table[] = {
     {NULL}
 };
 
+UCC_CONFIG_DECLARE_TABLE(ucc_gtest_config_table, "GTEST TABLE", "CFG_",
+                         ucc_gtest_config_t);
+
 class test_cfg_file : public ucc::test {
 public:
     ucc_file_config_t  *file_cfg;
@@ -61,8 +66,9 @@ public:
     void init_cfg() {
         ucc_status_t status;
         std::swap(ucc_global_config.file_cfg, file_cfg);
-        status = ucc_config_parser_fill_opts(&cfg, ucc_gtest_config_table,
-                                             "GTEST_UCC_", "CFG_", 1);
+        status = ucc_config_parser_fill_opts(
+            &cfg, UCC_CONFIG_GET_TABLE(ucc_gtest_config_table),
+            "GTEST_UCC_", 1);
         std::swap(ucc_global_config.file_cfg, file_cfg);
         EXPECT_EQ(UCC_OK, status);
     };

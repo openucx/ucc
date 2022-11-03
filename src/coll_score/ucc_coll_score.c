@@ -668,7 +668,7 @@ err:
 
 static ucc_status_t ucc_coll_score_parse_str(const char *str,
                                              ucc_coll_score_t *score,
-                                             ucc_rank_t team_size, //NOLINT
+                                             ucc_rank_t team_size,
                                              ucc_base_coll_init_fn_t init,
                                              ucc_base_team_t *team,
                                              ucc_alg_id_to_init_fn_t alg_fn)
@@ -720,7 +720,7 @@ static ucc_status_t ucc_coll_score_parse_str(const char *str,
     }
     if (tsizes) {
         /* Team size qualifier was provided: check if we should apply this
-           str setting to the  current team */
+           str setting to the current team */
         ts_skip = 1;
         for (i = 0; i < n_tsizes; i++) {
             if (team_size >= tsizes[2 * i] && team_size <= tsizes[2 * i + 1]) {
@@ -984,16 +984,26 @@ out:
     return status;
 }
 
-ucc_status_t ucc_coll_score_update(ucc_coll_score_t *score,
-                                   ucc_coll_score_t *update,
-                                   ucc_score_t       default_score)
+ucc_status_t ucc_coll_score_update(ucc_coll_score_t  *score,
+                                   ucc_coll_score_t  *update,
+                                   ucc_score_t        default_score,
+                                   ucc_memory_type_t *mtypes,
+                                   int                mt_n)
 {
     ucc_status_t      status;
     int               i, j;
+    ucc_memory_type_t mt;
+
+    if (mt_n == 0) {
+        mt_n = UCC_MEMORY_TYPE_LAST;
+    }
+
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
-        for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
+        for (j = 0; j < mt_n; j++) {
+            mt = (mtypes == NULL ? j : mtypes[j]);
             status = ucc_coll_score_update_one(
-                &score->scores[i][j], &update->scores[i][j], default_score);
+                &score->scores[i][mt],
+                &update->scores[i][mt], default_score);
             if (UCC_OK != status) {
                 return status;
             }
@@ -1008,7 +1018,9 @@ ucc_status_t ucc_coll_score_update_from_str(const char *            str,
                                             ucc_base_coll_init_fn_t init,
                                             ucc_base_team_t        *team,
                                             ucc_score_t             def_score,
-                                            ucc_alg_id_to_init_fn_t alg_fn)
+                                            ucc_alg_id_to_init_fn_t alg_fn,
+                                            ucc_memory_type_t      *mtypes,
+                                            int                     mt_n)
 {
     ucc_status_t      status;
     ucc_coll_score_t *score_str;
@@ -1017,7 +1029,7 @@ ucc_status_t ucc_coll_score_update_from_str(const char *            str,
     if (UCC_OK != status) {
         return status;
     }
-    status = ucc_coll_score_update(score, score_str, def_score);
+    status = ucc_coll_score_update(score, score_str, def_score, mtypes, mt_n);
     ucc_coll_score_free(score_str);
     return status;
 }
