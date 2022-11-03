@@ -140,22 +140,12 @@ ucc_status_t ucc_config_parser_fill_opts(void *opts,
                                          const char *env_prefix,
                                          int ignore_errors);
 
-int ucc_check_section(ucc_section_desc_t sec_desc,
-                      ucc_cpu_vendor_t vendor,
-                      ucc_cpu_model_t model,
-                      size_t team_size,
-                      ucc_rank_t ppn_min,
-                      ucc_rank_t ppn_max,
-                      ucc_rank_t nnodes);
-
-ucc_status_t ucc_add_team_sections(ucc_file_config_t        *cfg_file,
-                                   void                     *team_cfg,
-                                   ucc_config_field_t       *tl_field,
-                                   ucc_topo_t               *team_topo,
-                                   const char              **tuning_str,
-                                   const char               *tune_key,
-                                   const char               *prefix,
-                                   size_t                    team_size);
+ucc_status_t ucc_add_team_sections(void                *team_cfg,
+                                   ucc_config_field_t  *tl_field,
+                                   ucc_topo_t          *team_topo,
+                                   const char         **tuning_str,
+                                   const char          *tune_key,
+                                   const char          *prefix);
 
 static inline void
 ucc_config_parser_release_opts(void *opts, ucc_config_field_t *fields)
@@ -206,11 +196,6 @@ static inline void ucc_config_parser_print_opts(FILE *stream, const char *title,
     ucs_config_parser_print_opts(stream, title, opts, fields, table_prefix,
                                  prefix, ucs_flags);
 }
-
-ucc_status_t ucc_apply_file_cfg(void *opts, ucc_config_field_t *fields,
-                                const char *env_prefix,
-                                const char *component_prefix,
-                                const char *section);
 
 void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
                                       ucc_config_print_flags_t flags,

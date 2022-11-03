@@ -136,6 +136,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 {
     ucc_tl_ucp_context_config_t *tl_ucp_config =
         ucc_derived_of(config, ucc_tl_ucp_context_config_t);
+    ucc_tl_ucp_lib_t   *lib;
     ucc_status_t        ucc_status = UCC_OK;
     ucp_context_attr_t  context_attr;
     ucp_worker_params_t worker_params;
@@ -150,7 +151,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_ucp_config->super,
                               params->context);
     memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
-
+    lib = ucc_derived_of(self->super.super.lib, ucc_tl_ucp_lib_t);
     prefix = strdup(params->prefix);
     if (!prefix) {
         tl_error(self->super.super.lib, "failed to duplicate prefix str");
@@ -220,6 +221,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     self->worker.ucp_context    = ucp_context;
     self->worker.ucp_worker     = ucp_worker;
     self->worker.worker_address = NULL;
+
+    self->topo_required = (((lib->cfg.use_topo == UCC_TRY ||
+                             lib->cfg.use_topo == UCC_AUTO) &&
+                            (self->super.super.ucc_context->params.mask &
+                             UCC_CONTEXT_PARAM_FIELD_OOB)) ||
+                           lib->cfg.use_topo == UCC_YES) ? 1 : 0;
 
     ucc_status = ucc_mpool_init(
         &self->req_mp, 0,
@@ -546,7 +553,6 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
 {
     ucc_tl_ucp_context_t *ctx = ucc_derived_of(context, ucc_tl_ucp_context_t);
     uint64_t *            offset = (uint64_t *)attr->attr.ctx_addr;
-    ucc_tl_ucp_lib_t     *lib = ucc_derived_of(context->lib, ucc_tl_ucp_lib_t);
     ucs_status_t          ucs_status;
     size_t                packed_length;
     int                   i;
@@ -612,10 +618,6 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
         attr->attr.global_work_buffer_size =
             ONESIDED_SYNC_SIZE + ONESIDED_REDUCE_SIZE;
     }
-    attr->topo_required =
-        (((lib->cfg.use_topo == UCC_TRY || lib->cfg.use_topo == UCC_AUTO) &&
-          (context->ucc_context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB)) ||
-        lib->cfg.use_topo == UCC_YES) ? 1 : 0;
-    ctx->topo_required = attr->topo_required; // needed to be reached by team
+    attr->topo_required = ctx->topo_required;
     return UCC_OK;
 }

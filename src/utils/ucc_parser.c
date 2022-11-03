@@ -1,3 +1,5 @@
+/**
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -5,10 +7,10 @@
 #include "ucc_parser.h"
 #include "ucc_malloc.h"
 #include "ucc_log.h"
-#include "schedule/ucc_schedule.h"
-#include "schedule/ucc_schedule_pipelined.h"
 #include "ucc_string.h"
 #include "ini.h"
+#include "schedule/ucc_schedule.h"
+#include "schedule/ucc_schedule_pipelined.h"
 
 #define UCC_ADD_KEY_VALUE_TO_HASH(_type, _h, _name, _val)                \
     do {                                                                 \
@@ -41,13 +43,13 @@
         return 1;                                                        \
     } while (0)
 
-int ucc_check_section(ucc_section_desc_t sec_desc,
-                      ucc_cpu_vendor_t vendor,
-                      ucc_cpu_model_t model,
-                      size_t team_size,
-                      ucc_rank_t ppn_min,
-                      ucc_rank_t ppn_max,
-                      ucc_rank_t nnodes)
+static int ucc_check_section(ucc_section_desc_t sec_desc,
+                             ucc_cpu_vendor_t vendor,
+                             ucc_cpu_model_t model,
+                             ucc_rank_t team_size,
+                             ucc_rank_t ppn_min,
+                             ucc_rank_t ppn_max,
+                             ucc_rank_t nnodes)
 {
     if (sec_desc.mask & UCC_TUNING_DESC_FIELD_VENDOR) {
         if (sec_desc.vendor != vendor) {
@@ -60,7 +62,8 @@ int ucc_check_section(ucc_section_desc_t sec_desc,
         }
     }
     if (sec_desc.mask & UCC_TUNING_DESC_FIELD_TEAM_SIZE) {
-        if (team_size < sec_desc.min_team_size || team_size > sec_desc.max_team_size) {
+        if (team_size < sec_desc.min_team_size ||
+            team_size > sec_desc.max_team_size) {
             return 0;
         }
     }
@@ -111,8 +114,8 @@ split_err:
     return 0;
 }
 
-static inline ucc_status_t ucc_parse_section_name_to_desc(const char *sec_name,
-                                                      ucc_section_desc_t *desc)
+static inline ucc_status_t
+ucc_parse_section_name_to_desc(const char *sec_name, ucc_section_desc_t *desc)
 {
     char **split, **cur_str;
     unsigned n_split, i;
@@ -173,46 +176,6 @@ err_key:
 err_cur_str:
     ucc_str_split_free(split);
     return UCC_ERR_INVALID_PARAM;
-}
-
-ucc_status_t ucc_add_team_sections(ucc_file_config_t        *cfg_file,
-                                   void                     *team_cfg,
-                                   ucc_config_field_t       *tl_fields,
-                                   ucc_topo_t               *team_topo,
-                                   const char              **tuning_str,
-                                   const char               *tune_key,
-                                   const char               *prefix,
-                                   size_t                    team_size)
-{
-    khash_t(ucc_sections) *sections  = &cfg_file->sections;
-    ucc_cpu_vendor_t       vendor    = ucc_arch_get_cpu_vendor();
-    ucc_cpu_model_t        model     = ucc_arch_get_cpu_model();
-    ucc_rank_t             ppn_min   = ucc_topo_min_ppn(team_topo);
-    ucc_rank_t             ppn_max   = ucc_topo_max_ppn(team_topo);
-    ucc_rank_t             nnodes    = ucc_topo_nnodes(team_topo);
-    khash_t(ucc_sec)      *sec_h;
-    khiter_t               i, j;
-    const char            *sec_name;
-    ucc_section_wrap_t    *sec;
-    ucc_status_t           status;
-
-    for (i = kh_begin(sections); i != kh_end(sections); ++i) {
-        if (!kh_exist(sections, i)) continue;
-        sec_name = kh_key(sections, i);
-        sec      = kh_val(sections, i);
-        if (ucc_check_section(sec->desc, vendor, model, team_size,
-                              ppn_min, ppn_max, nnodes)) {
-            sec_h = &sec->vals_h;
-            j = kh_get(ucc_sec, sec_h, tune_key);
-            if (j != kh_end(sec_h)) {
-                *tuning_str = kh_val(sec_h, j);
-            }
-            status = ucc_apply_file_cfg(team_cfg, tl_fields, "UCC_", prefix,
-                                        sec_name);
-            return status;
-        }
-    }
-    return UCC_ERR_NOT_FOUND;
 }
 
 ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
@@ -420,7 +383,8 @@ ucc_status_t ucc_parse_file_config(const char *        filename,
 
     cfg = ucc_calloc(1, sizeof(*cfg), "file_cfg");
     if (!cfg) {
-        ucc_error("failed to allocate %zd bytes for file config", sizeof(*cfg));
+        ucc_error("failed to allocate %zd bytes for file config",
+                  sizeof(*cfg));
         return UCC_ERR_NO_MEMORY;
     }
     kh_init_inplace(ucc_cfg_file, &cfg->vars);
@@ -436,6 +400,7 @@ ucc_status_t ucc_parse_file_config(const char *        filename,
         status = UCC_ERR_INVALID_PARAM;
         goto out;
     }
+
     *cfg_p = cfg;
     return UCC_OK;
 out:
@@ -473,8 +438,8 @@ void ucc_release_file_config(ucc_file_config_t *cfg)
 }
 
 static const char *ucc_file_config_get_by_section(ucc_file_config_t *cfg,
-                                           const char        *var_name,
-                                           const char        *section)
+                                                  const char        *var_name,
+                                                  const char        *section)
 {
     khash_t(ucc_sections) *sections = &cfg->sections;
     khash_t(ucc_sec) *sec;
@@ -534,13 +499,15 @@ static ucc_status_t ucc_apply_file_cfg_value(void *              opts,
 
     base_prefix_var = strstr(var, "UCC_");
     cfg_value =
-        ucc_file_config_get(ucc_global_config.file_cfg, base_prefix_var, section);
+        ucc_file_config_get(ucc_global_config.file_cfg, base_prefix_var,
+                            section);
     if (cfg_value) {
         return ucc_config_parser_set_value(opts, fields, name, cfg_value);
     };
 
     if (base_prefix_var != var) {
-        cfg_value = ucc_file_config_get(ucc_global_config.file_cfg, var, section);
+        cfg_value = ucc_file_config_get(ucc_global_config.file_cfg, var,
+                                        section);
         if (cfg_value) {
             return ucc_config_parser_set_value(opts, fields, name, cfg_value);
         }
@@ -549,10 +516,10 @@ static ucc_status_t ucc_apply_file_cfg_value(void *              opts,
     return UCC_ERR_NOT_FOUND;
 }
 
-ucc_status_t ucc_apply_file_cfg(void *opts, ucc_config_field_t *fields,
-                                const char *env_prefix,
-                                const char *component_prefix,
-                                const char *section)
+static ucc_status_t ucc_apply_file_cfg(void *opts, ucc_config_field_t *fields,
+                                       const char *env_prefix,
+                                       const char *component_prefix,
+                                       const char *section)
 {
     ucc_status_t status = UCC_OK;
 
@@ -581,6 +548,52 @@ ucc_status_t ucc_apply_file_cfg(void *opts, ucc_config_field_t *fields,
         fields++;
     }
     return UCC_OK;
+}
+
+/* Team cfg table values have been previously copied from lib cfg.
+ * Here, tuning values from cfg file are applied overwriting specific values
+ * in team cfg table.
+ * Special case needed for param tune key which is equivalent to UCC_TL_#_TUNE.
+ * Returns: UCC_OK on success,
+ * error status if values from cfg file cannot be applied.
+*/
+ucc_status_t ucc_add_team_sections(void                *team_cfg,
+                                   ucc_config_field_t  *tl_fields,
+                                   ucc_topo_t          *team_topo,
+                                   const char         **tuning_str,
+                                   const char          *tune_key,
+                                   const char          *prefix)
+{
+    khash_t(ucc_sections) *sections  = &ucc_global_config.file_cfg->sections;
+    ucc_cpu_vendor_t       vendor    = ucc_arch_get_cpu_vendor();
+    ucc_cpu_model_t        model     = ucc_arch_get_cpu_model();
+    ucc_rank_t             ppn_min   = ucc_topo_min_ppn(team_topo);
+    ucc_rank_t             ppn_max   = ucc_topo_max_ppn(team_topo);
+    ucc_rank_t             nnodes    = ucc_topo_nnodes(team_topo);
+    ucc_rank_t             team_size = team_topo->set.map.ep_num;
+    khash_t(ucc_sec)      *sec_h;
+    khiter_t               i, j;
+    const char            *sec_name;
+    ucc_section_wrap_t    *sec;
+    ucc_status_t           status;
+
+    for (i = kh_begin(sections); i != kh_end(sections); ++i) {
+        if (!kh_exist(sections, i)) continue;
+        sec_name = kh_key(sections, i);
+        sec      = kh_val(sections, i);
+        if (ucc_check_section(sec->desc, vendor, model, team_size,
+                              ppn_min, ppn_max, nnodes)) {
+            sec_h = &sec->vals_h;
+            j = kh_get(ucc_sec, sec_h, tune_key);
+            if (j != kh_end(sec_h)) {
+                *tuning_str = kh_val(sec_h, j);
+            }
+            status = ucc_apply_file_cfg(team_cfg, tl_fields, "UCC_", prefix,
+                                        sec_name);
+            return status;
+        }
+    }
+    return UCC_ERR_NOT_FOUND;
 }
 
 ucc_status_t ucc_config_parser_fill_opts(void *opts, ucs_config_global_list_entry_t *entry,
