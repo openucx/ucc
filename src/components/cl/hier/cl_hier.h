@@ -55,6 +55,11 @@ typedef struct ucc_cl_hier_lib_config {
     ucc_pipeline_order_t    allreduce_split_rail_pipeline_order;
     size_t                  allreduce_split_rail_frag_thresh;
     size_t                  allreduce_split_rail_frag_size;
+    uint32_t                allreduce_rab_n_frags;
+    uint32_t                allreduce_rab_pipeline_depth;
+    int                     allreduce_rab_seq;
+    size_t                  allreduce_rab_frag_thresh;
+    size_t                  allreduce_rab_frag_size;
 
 } ucc_cl_hier_lib_config_t;
 
