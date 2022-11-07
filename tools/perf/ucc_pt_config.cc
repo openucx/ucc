@@ -40,6 +40,7 @@ const std::map<std::string, ucc_pt_op_type_t> ucc_pt_op_map = {
     {"gatherv", UCC_PT_OP_TYPE_GATHERV},
     {"reduce", UCC_PT_OP_TYPE_REDUCE},
     {"reduce_scatter", UCC_PT_OP_TYPE_REDUCE_SCATTER},
+    {"reduce_scatterv", UCC_PT_OP_TYPE_REDUCE_SCATTERV},
     {"scatter", UCC_PT_OP_TYPE_SCATTER},
     {"scatterv", UCC_PT_OP_TYPE_SCATTERV},
     {"memcpy", UCC_PT_OP_TYPE_MEMCPY},

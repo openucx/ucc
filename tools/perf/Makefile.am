@@ -9,30 +9,31 @@
 
 bin_PROGRAMS = ucc_perftest
 
-ucc_perftest_SOURCES =            \
-	ucc_perftest.cc               \
-	ucc_pt_config.cc              \
-	ucc_pt_comm.cc                \
-	ucc_pt_cuda.cc                \
-	ucc_pt_rocm.cc                \
-	ucc_pt_benchmark.cc           \
-	ucc_pt_bootstrap_mpi.cc       \
-	ucc_pt_coll.cc                \
-	ucc_pt_coll_allgather.cc      \
-	ucc_pt_coll_allgatherv.cc     \
-	ucc_pt_coll_allreduce.cc      \
-	ucc_pt_coll_alltoall.cc       \
-	ucc_pt_coll_alltoallv.cc      \
-	ucc_pt_coll_barrier.cc        \
-	ucc_pt_coll_bcast.cc          \
-	ucc_pt_coll_gather.cc         \
-	ucc_pt_coll_gatherv.cc        \
-	ucc_pt_coll_reduce.cc         \
-	ucc_pt_coll_reduce_scatter.cc \
-	ucc_pt_coll_scatter.cc        \
-	ucc_pt_coll_scatterv.cc       \
-	ucc_pt_op_memcpy.cc           \
-	ucc_pt_op_reduce.cc           \
+ucc_perftest_SOURCES =             \
+	ucc_perftest.cc                \
+	ucc_pt_config.cc               \
+	ucc_pt_comm.cc                 \
+	ucc_pt_cuda.cc                 \
+	ucc_pt_rocm.cc                 \
+	ucc_pt_benchmark.cc            \
+	ucc_pt_bootstrap_mpi.cc        \
+	ucc_pt_coll.cc                 \
+	ucc_pt_coll_allgather.cc       \
+	ucc_pt_coll_allgatherv.cc      \
+	ucc_pt_coll_allreduce.cc       \
+	ucc_pt_coll_alltoall.cc        \
+	ucc_pt_coll_alltoallv.cc       \
+	ucc_pt_coll_barrier.cc         \
+	ucc_pt_coll_bcast.cc           \
+	ucc_pt_coll_gather.cc          \
+	ucc_pt_coll_gatherv.cc         \
+	ucc_pt_coll_reduce.cc          \
+	ucc_pt_coll_reduce_scatter.cc  \
+	ucc_pt_coll_reduce_scatterv.cc \
+	ucc_pt_coll_scatter.cc         \
+	ucc_pt_coll_scatterv.cc        \
+	ucc_pt_op_memcpy.cc            \
+	ucc_pt_op_reduce.cc            \
 	ucc_pt_op_reduce_strided.cc
 
 CXX=$(MPICXX)
