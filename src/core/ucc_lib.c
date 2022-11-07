@@ -467,7 +467,7 @@ ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
 
     gl_status = UCC_OK;
     ucc_assert(lib->n_cl_libs_opened > 0);
-    ucc_assert(lib->cl_libs);
+    ucc_assert(lib->cl_libs != NULL);
     for (i = 0; i < lib->n_tl_libs_opened; i++) {
         lib->tl_libs[i]->iface->lib.finalize(&lib->tl_libs[i]->super);
     }

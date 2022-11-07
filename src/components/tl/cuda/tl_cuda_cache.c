@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -17,7 +17,7 @@
 #define ENABLE_CACHE 1
 
 static ucs_pgt_dir_t*
-ucc_tl_cuda_cache_pgt_dir_alloc(const ucs_pgtable_t *pgtable)
+ucc_tl_cuda_cache_pgt_dir_alloc(const ucs_pgtable_t *pgtable) //NOLINT: pgtable is unused
 {
     void *ptr;
     int ret;
@@ -27,14 +27,14 @@ ucc_tl_cuda_cache_pgt_dir_alloc(const ucs_pgtable_t *pgtable)
     return (ret == 0) ? ptr : NULL;
 }
 
-static void ucc_tl_cuda_cache_pgt_dir_release(const ucs_pgtable_t *pgtable,
+static void ucc_tl_cuda_cache_pgt_dir_release(const ucs_pgtable_t *pgtable, //NOLINT: pgtable is unused
                                               ucs_pgt_dir_t *dir)
 {
     free(dir);
 }
 
 static void
-ucc_tl_cuda_cache_region_collect_callback(const ucs_pgtable_t *pgtable,
+ucc_tl_cuda_cache_region_collect_callback(const ucs_pgtable_t *pgtable, //NOLINT: pgtable is unused
                                           ucs_pgt_region_t *pgt_region,
                                           void *arg)
 {

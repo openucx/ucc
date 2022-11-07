@@ -1,6 +1,7 @@
 #
-# Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
+# See file LICENSE for terms.
 
 cl_dirs = components/cl/basic \
 		  components/cl/hier
@@ -73,6 +74,7 @@ noinst_HEADERS =                      \
 	utils/profile/ucc_profile_off.h   \
 	utils/ucc_time.h                  \
 	utils/ucc_sys.h                   \
+	utils/ucc_assert.h                \
 	components/base/ucc_base_iface.h  \
 	components/cl/ucc_cl.h            \
 	components/cl/ucc_cl_log.h        \
@@ -121,6 +123,7 @@ libucc_la_SOURCES =                   \
 	utils/ucc_sys.c                   \
 	utils/arch/x86_64/cpu.c           \
 	utils/arch/aarch64/cpu.c          \
+	utils/ucc_assert.c                \
 	components/base/ucc_base_iface.c  \
 	components/cl/ucc_cl.c            \
 	components/tl/ucc_tl.c            \

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -54,8 +54,7 @@ typedef struct ucc_tl_cuda_topo {
     ucc_tl_cuda_topo_node_t *graph;
 } ucc_tl_cuda_topo_t;
 
-ucc_status_t ucc_tl_cuda_topo_get_pci_id(const ucc_base_lib_t *lib,
-                                         int device,
+ucc_status_t ucc_tl_cuda_topo_get_pci_id(int device,
                                          ucc_tl_cuda_device_pci_id_t *pci_id);
 
 ucc_status_t ucc_tl_cuda_topo_create(const ucc_base_lib_t *lib,

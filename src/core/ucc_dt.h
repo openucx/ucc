@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -7,7 +8,7 @@
 #define UCC_DT_H_
 #include "config.h"
 #include "ucc/api/ucc.h"
-#include "utils/ucc_compiler_def.h"
+#include "utils/ucc_assert.h"
 
 typedef struct ucc_dt_generic {
     void                     *context;

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "tl_cuda_team_topo.h"
 #include "tl_cuda.h"
 
@@ -14,6 +20,7 @@ ucc_tl_cuda_team_topo_add_ring(const ucc_tl_cuda_team_t *team,
     ucc_status_t status;
     int i, j;
 
+    ucc_assert(size > 1);
     for (i = 0; i < num_dups; i++) {
         topo->rings[topo->num_rings + i].ring  = NULL;
         topo->rings[topo->num_rings + i].iring = NULL;
@@ -117,6 +124,7 @@ ucc_tl_cuda_team_topo_init_rings(const ucc_tl_cuda_team_t *team,
     ucc_status_t status;
     int *graph;
 
+    ucc_assert(size > 1);
     topo->num_rings = 0;
     ring.ring = (ucc_rank_t*) ucc_malloc(size * sizeof(ucc_rank_t),
                                          "cuda_topo_ring");
@@ -125,17 +133,14 @@ ucc_tl_cuda_team_topo_init_rings(const ucc_tl_cuda_team_t *team,
         return UCC_ERR_NO_MEMORY;
     }
 
-    graph = (ucc_rank_t*) ucc_malloc(size * size * sizeof(int),
-                                     "cuda_topo_graph");
+    graph = (int*) ucc_malloc(size * size * sizeof(int), "cuda_topo_graph");
     if (!graph) {
         status = UCC_ERR_NO_MEMORY;
         tl_error(UCC_TL_TEAM_LIB(team), "failed to allocate topo graph");
         goto free_ring;
     }
 
-    for (i = 0; i < size * size; i++) {
-        graph[i] = topo->matrix[i];
-    }
+    memcpy(graph, topo->matrix, size * size * sizeof(int));
 
     num_rings = 0;
     min_width = 4;

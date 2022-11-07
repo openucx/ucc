@@ -66,7 +66,7 @@
         size_t ld    = stride / sizeof(_Type);                                 \
         size_t i;                                                              \
                                                                                \
-        ucc_assert(stride % sizeof(_Type) == 0);                               \
+        ucc_assert_system(stride % sizeof(_Type) == 0);                        \
         switch (n_src2) {                                                      \
         case 1:                                                                \
             for (i = start; i < count; i += step) {                            \

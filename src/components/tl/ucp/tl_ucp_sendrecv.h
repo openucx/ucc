@@ -240,7 +240,7 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
 
     *segment  = -1;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
-    ucc_assert(UCC_TL_CORE_TEAM(team));
+    ucc_assert(UCC_TL_CORE_TEAM(team) != NULL);
     peer = ucc_get_ctx_rank(UCC_TL_CORE_TEAM(team), core_rank);
 
     offset = ucc_get_team_ep_addr(UCC_TL_CORE_CTX(team), UCC_TL_CORE_TEAM(team),

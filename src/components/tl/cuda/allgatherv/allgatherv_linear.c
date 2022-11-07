@@ -110,8 +110,11 @@ static inline size_t get_scratch_size(ucc_tl_cuda_team_t *team,
 {
     size_t     dt_size = ucc_dt_size(dt);
     ucc_rank_t tsize   = UCC_TL_TEAM_SIZE(team);
-    size_t     div     = 2 * dt_size * tsize;
+    size_t     div;
 
+    ucc_assert((dt_size > 0) && (tsize > 0));
+
+    div = 2 * dt_size * tsize;
     return (UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size / div) * div;
 }
 
@@ -286,8 +289,6 @@ ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *task)
                 if (i == trank) {
                     continue;
                 }
-                rank_offset =
-                    task->allgatherv_linear.get_offset(task, i) * dt_size;
                 dbuf = PTR_OFFSET(TASK_SCRATCH(task, i),
                                   remote_offset + scratch_offset);
 

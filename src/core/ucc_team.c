@@ -1,6 +1,7 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
+ *
  * See file LICENSE for terms.
  */
 
@@ -332,7 +333,7 @@ static inline ucc_status_t ucc_team_exchange(ucc_context_t *context,
         return ucc_core_addr_exchange(context, NULL, &oob, &team->addr_storage);
     }
     /* We only need to exchange ctx_ranks and build map to ctx array */
-    ucc_assert(context->addr_storage.storage);
+    ucc_assert(context->addr_storage.storage != NULL);
     if (team->bp.params.mask & UCC_TEAM_PARAM_FIELD_EP_MAP) {
         team->ctx_map = team->bp.params.ep_map;
     } else {

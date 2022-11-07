@@ -177,7 +177,7 @@ ucc_status_t ucc_ec_cuda_reduce(ucc_ee_executor_task_args_t *task,
         return UCC_ERR_NOT_SUPPORTED;
 #endif
     case UCC_DT_BFLOAT16:
-        ucc_assert(2 == sizeof(__nv_bfloat16));
+        ucc_assert_system(2 == sizeof(__nv_bfloat16));
         DT_REDUCE_FLOAT(__nv_bfloat16, task, op, stream, bk, th);
         break;
     default:

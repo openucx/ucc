@@ -82,7 +82,7 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
 
 };
 
-static ucc_status_t ucc_ec_cuda_ee_executor_mpool_chunk_malloc(ucc_mpool_t *mp,
+static ucc_status_t ucc_ec_cuda_ee_executor_mpool_chunk_malloc(ucc_mpool_t *mp, //NOLINT: mp is unused
                                                                size_t *size_p,
                                                                void ** chunk_p)
 {
@@ -90,14 +90,14 @@ static ucc_status_t ucc_ec_cuda_ee_executor_mpool_chunk_malloc(ucc_mpool_t *mp,
                                    cudaHostAllocMapped));
 }
 
-static void ucc_ec_cuda_ee_executor_mpool_chunk_free(ucc_mpool_t *mp,
+static void ucc_ec_cuda_ee_executor_mpool_chunk_free(ucc_mpool_t *mp, //NOLINT: mp is unused
                                                      void *chunk)
 {
     CUDA_FUNC(cudaFreeHost(chunk));
 }
 
-static void ucc_ec_cuda_executor_chunk_init(ucc_mpool_t *mp, void *obj,
-                                            void *chunk)
+static void ucc_ec_cuda_executor_chunk_init(ucc_mpool_t *mp, void *obj, //NOLINT: mp is unused
+                                            void *chunk) //NOLINT: chunk is unused
 {
     ucc_ec_cuda_executor_t *eee       = (ucc_ec_cuda_executor_t*) obj;
     int                     max_tasks = EC_CUDA_CONFIG->exec_max_tasks;
@@ -118,7 +118,7 @@ static void ucc_ec_cuda_executor_chunk_init(ucc_mpool_t *mp, void *obj,
     }
 }
 
-static void ucc_ec_cuda_executor_chunk_cleanup(ucc_mpool_t *mp, void *obj)
+static void ucc_ec_cuda_executor_chunk_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp is unused
 {
     ucc_ec_cuda_executor_t *eee = (ucc_ec_cuda_executor_t*) obj;
 
@@ -137,7 +137,7 @@ static ucc_mpool_ops_t ucc_ec_cuda_ee_executor_mpool_ops = {
     .obj_cleanup   = ucc_ec_cuda_executor_chunk_cleanup,
 };
 
-static ucc_status_t ucc_ec_cuda_stream_req_mpool_chunk_malloc(ucc_mpool_t *mp,
+static ucc_status_t ucc_ec_cuda_stream_req_mpool_chunk_malloc(ucc_mpool_t *mp, //NOLINT: mp is unused
                                                               size_t *size_p,
                                                               void ** chunk_p)
 {
@@ -148,13 +148,13 @@ static ucc_status_t ucc_ec_cuda_stream_req_mpool_chunk_malloc(ucc_mpool_t *mp,
     return status;
 }
 
-static void ucc_ec_cuda_stream_req_mpool_chunk_free(ucc_mpool_t *mp,
+static void ucc_ec_cuda_stream_req_mpool_chunk_free(ucc_mpool_t *mp, //NOLINT: mp is unused
                                                     void *       chunk)
 {
     cudaFreeHost(chunk);
 }
 
-static void ucc_ec_cuda_stream_req_init(ucc_mpool_t *mp, void *obj, void *chunk)
+static void ucc_ec_cuda_stream_req_init(ucc_mpool_t *mp, void *obj, void *chunk) //NOLINT: mp is unused
 {
     ucc_ec_cuda_stream_request_t *req = (ucc_ec_cuda_stream_request_t*) obj;
 
@@ -169,14 +169,14 @@ static ucc_mpool_ops_t ucc_ec_cuda_stream_req_mpool_ops = {
     .obj_cleanup   = NULL
 };
 
-static void ucc_ec_cuda_event_init(ucc_mpool_t *mp, void *obj, void *chunk)
+static void ucc_ec_cuda_event_init(ucc_mpool_t *mp, void *obj, void *chunk) //NOLINT: mp is unused
 {
     ucc_ec_cuda_event_t *base = (ucc_ec_cuda_event_t *) obj;
 
     CUDA_FUNC(cudaEventCreateWithFlags(&base->event, cudaEventDisableTiming));
 }
 
-static void ucc_ec_cuda_event_cleanup(ucc_mpool_t *mp, void *obj)
+static void ucc_ec_cuda_event_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp is unused
 {
     ucc_ec_cuda_event_t *base = (ucc_ec_cuda_event_t *) obj;
 
@@ -252,6 +252,12 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         cfg->reduce_num_blocks = prop.maxGridSize[0];
     }
 
+    if (cfg->exec_num_streams < 1) {
+        ec_warn(&ucc_ec_cuda.super,
+                "number of streams is too small, min supported 1");
+        cfg->exec_num_streams = 1;
+    }
+
     /*create event pool */
     ucc_ec_cuda.exec_streams = ucc_calloc(cfg->exec_num_streams,
                                           sizeof(cudaStream_t),
@@ -293,12 +299,20 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         sizeof(ucc_ec_cuda_executor_interruptible_task_t), 0, UCC_CACHE_LINE_SIZE,
         16, UINT_MAX, NULL, UCC_THREAD_MULTIPLE,
         "interruptible executor tasks");
+    if (status != UCC_OK) {
+        ec_error(&ucc_ec_cuda.super, "failed to create interruptible tasks pool");
+        return status;
+    }
 
     status = ucc_mpool_init(
         &ucc_ec_cuda.executor_persistent_tasks, 0,
         sizeof(ucc_ec_cuda_executor_persistent_task_t), 0, UCC_CACHE_LINE_SIZE,
         16, UINT_MAX, NULL, UCC_THREAD_MULTIPLE,
         "persistent executor tasks");
+    if (status != UCC_OK) {
+        ec_error(&ucc_ec_cuda.super, "failed to create persistent tasks pool");
+        return status;
+    }
 
     if (cfg->strm_task_mode == UCC_EC_CUDA_TASK_KERNEL) {
         ucc_ec_cuda.strm_task_mode = UCC_EC_CUDA_TASK_KERNEL;

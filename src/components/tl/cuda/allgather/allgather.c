@@ -25,13 +25,13 @@ ucc_base_coll_alg_info_t
             .id = 0, .name = NULL, .desc = NULL}};
 
 size_t ucc_tl_cuda_allgather_get_count(const ucc_tl_cuda_task_t *task,
-                                       ucc_rank_t                block)
+                                       ucc_rank_t block) //NOLINT: block is unused
 {
     return TASK_ARGS(task).dst.info.count / UCC_TL_TEAM_SIZE(TASK_TEAM(task));
 }
 
 size_t ucc_tl_cuda_allgather_get_offset(const ucc_tl_cuda_task_t *task,
-                                        ucc_rank_t                block)
+                                        ucc_rank_t block)
 {
     return (TASK_ARGS(task).dst.info.count /
             UCC_TL_TEAM_SIZE(TASK_TEAM(task))) *

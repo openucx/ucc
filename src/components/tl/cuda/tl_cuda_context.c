@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -61,8 +61,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
                  "failed to initialize tl_cuda_topo");
         goto free_mpool;
     }
-    status = ucc_tl_cuda_topo_get_pci_id(self->super.super.lib, self->device,
-                                         &self->device_id);
+    status = ucc_tl_cuda_topo_get_pci_id(self->device, &self->device_id);
     if (status != UCC_OK) {
         tl_error(self->super.super.lib, "failed to get pci id");
         goto free_mpool;
