@@ -415,7 +415,7 @@ int ucc_pipeline_params_is_auto(const ucc_pipeline_params_t *p)
 }
 
 int ucc_config_sscanf_pipeline_params(const char *buf, void *dest,
-                                      const void *arg)
+                                      const void *arg) //NOLINT
 {
     ucc_pipeline_params_t *p = dest;
     ucc_status_t           status;
@@ -492,7 +492,7 @@ out:
 }
 
 int ucc_config_sprintf_pipeline_params(char *buf, size_t max, const void *src,
-                                       const void *arg)
+                                       const void *arg) //NOLINT
 {
     const ucc_pipeline_params_t *p = src;
     char                         thresh[32], frag_size[32];
@@ -511,7 +511,7 @@ int ucc_config_sprintf_pipeline_params(char *buf, size_t max, const void *src,
 }
 
 ucs_status_t ucc_config_clone_pipeline_params(const void *src, void *dest,
-                                              const void *arg)
+                                              const void *arg) //NOLINT
 {
     memcpy(dest, src, sizeof(ucc_pipeline_params_t));
     return UCS_OK;
