@@ -58,6 +58,15 @@ static ucc_status_t ucc_check_coll_args(const ucc_coll_args_t *coll_args,
                                            coll_args->dst.info);
         }
         break;
+    case UCC_COLL_TYPE_BCAST:
+    case UCC_COLL_TYPE_BARRIER:
+    case UCC_COLL_TYPE_FANIN:
+    case UCC_COLL_TYPE_FANOUT:
+        if (UCC_IS_INPLACE(*coll_args)) {
+            ucc_warn("Inplace flag for %s is not defined by UCC API",
+                     ucc_coll_type_str(coll_args->coll_type));
+        }
+        break;
     default:
         return UCC_OK;
     }
@@ -289,8 +298,8 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
 }
 
 UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init_and_post,
-                      (coll_args, request, team), ucc_coll_args_t *coll_args,
-                      ucc_coll_req_h *request, ucc_team_h team)
+                      (coll_args, request, team), ucc_coll_args_t *coll_args, //NOLINT
+                      ucc_coll_req_h *request, ucc_team_h team) //NOLINT
 {
     ucc_error("ucc_collective_init_and_post() is not implemented");
 

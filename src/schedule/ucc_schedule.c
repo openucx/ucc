@@ -9,15 +9,15 @@
 #include "coll_score/ucc_coll_score.h"
 #include "core/ucc_context.h"
 
-static void ucc_coll_task_mpool_obj_init(ucc_mpool_t *mp, void *obj,
-                                         void *chunk)
+static void ucc_coll_task_mpool_obj_init(ucc_mpool_t *mp, void *obj, //NOLINT
+                                         void *chunk) //NOLINT
 {
     ucc_coll_task_t *task = obj;
 
     ucc_coll_task_construct(task);
 }
 
-static void ucc_coll_task_mpool_obj_cleanup(ucc_mpool_t *mp, void *obj)
+static void ucc_coll_task_mpool_obj_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT
 {
     ucc_coll_task_t *task = obj;
 

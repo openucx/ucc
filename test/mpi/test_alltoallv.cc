@@ -134,21 +134,17 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestAlltoallv::set_input()
+ucc_status_t TestAlltoallv::set_input(int iter_persistent)
 {
     size_t dt_size = ucc_dt_size(TEST_DT);
     int    rank;
 
     MPI_Comm_rank(team.comm, &rank);
-    init_buffer(sbuf, sncounts, TEST_DT, mem_type, rank);
+    init_buffer(sbuf, sncounts, TEST_DT, mem_type,
+                rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check_buf, sbuf, sncounts * dt_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));
 
-    return UCC_OK;
-}
-
-ucc_status_t TestAlltoallv::reset_sbuf()
-{
     return UCC_OK;
 }
 

@@ -73,6 +73,11 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
      ucc_offsetof(ucc_ec_cuda_config_t, reduce_num_blocks),
      UCC_CONFIG_TYPE_ULUNITS},
 
+    {"USE_COOPERATIVE_LAUNCH", "1",
+     "whether to use cooperative launch in persistent kernel executor",
+     ucc_offsetof(ucc_ec_cuda_config_t, use_cooperative_launch),
+     UCC_CONFIG_TYPE_BOOL},
+
     {NULL}
 
 };
@@ -103,7 +108,8 @@ static void ucc_ec_cuda_executor_chunk_init(ucc_mpool_t *mp, void *obj,
                   (void**)(&eee->dev_pidx), (void *)&eee->pidx, 0));
     CUDA_FUNC(cudaMalloc((void**)&eee->dev_cidx, sizeof(*eee->dev_cidx)));
     CUDA_FUNC(cudaHostAlloc((void**)&eee->tasks,
-                            max_tasks * sizeof(ucc_ee_executor_task_t),
+                            max_tasks * MAX_SUBTASKS *
+                            sizeof(ucc_ee_executor_task_args_t),
                             cudaHostAllocMapped));
     CUDA_FUNC(cudaHostGetDevicePointer(
                   (void**)(&eee->dev_tasks), (void *)eee->tasks, 0));
@@ -216,6 +222,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     cudaError_t           cuda_st;
     const char           *cu_err_st_str;
     struct cudaDeviceProp prop;
+    int                   supportsCoopLaunch = 0;
 
     ucc_ec_cuda.stream                   = NULL;
     ucc_ec_cuda.stream_initialized       = 0;
@@ -287,6 +294,12 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         16, UINT_MAX, NULL, UCC_THREAD_MULTIPLE,
         "interruptible executor tasks");
 
+    status = ucc_mpool_init(
+        &ucc_ec_cuda.executor_persistent_tasks, 0,
+        sizeof(ucc_ec_cuda_executor_persistent_task_t), 0, UCC_CACHE_LINE_SIZE,
+        16, UINT_MAX, NULL, UCC_THREAD_MULTIPLE,
+        "persistent executor tasks");
+
     if (cfg->strm_task_mode == UCC_EC_CUDA_TASK_KERNEL) {
         ucc_ec_cuda.strm_task_mode = UCC_EC_CUDA_TASK_KERNEL;
         ucc_ec_cuda.post_strm_task = ucc_ec_cuda_post_kernel_stream_task;
@@ -319,6 +332,18 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
+
+    if (cfg->use_cooperative_launch == 1) {
+        cudaDeviceGetAttribute(&supportsCoopLaunch,
+                               cudaDevAttrCooperativeLaunch, device);
+        if (!supportsCoopLaunch) {
+            cfg->use_cooperative_launch = 0;
+            ec_warn(&ucc_ec_cuda.super,
+                     "CUDA cooperative groups are not supported. "
+                     "Fall back to non cooperative launch.");
+        }
+    }
+
     ucc_ec_cuda.task_strm_type = cfg->task_strm_type;
     ucc_spinlock_init(&ucc_ec_cuda.init_spinlock, 0);
     return UCC_OK;
@@ -486,6 +511,8 @@ static ucc_status_t ucc_ec_cuda_finalize()
     ucc_mpool_cleanup(&ucc_ec_cuda.events, 1);
     ucc_mpool_cleanup(&ucc_ec_cuda.strm_reqs, 1);
     ucc_mpool_cleanup(&ucc_ec_cuda.executors, 1);
+    ucc_mpool_cleanup(&ucc_ec_cuda.executor_interruptible_tasks, 1);
+    ucc_mpool_cleanup(&ucc_ec_cuda.executor_persistent_tasks, 1);
     ucc_free(ucc_ec_cuda.exec_streams);
 
     return UCC_OK;

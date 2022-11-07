@@ -5,7 +5,7 @@
 UCC is a collective communication operations API and library that is flexible, complete, and feature-rich for current and emerging programming models and runtimes.
 
 - [Design Goals](#design-goals)
-- [API](#api)
+- [API](https://openucx.github.io/ucc/)
 - [Building](#compiling-and-installing)
 - [Community](#community)
 - [Contributing](#contributing)

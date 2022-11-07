@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -87,6 +88,9 @@ out:
     return status;
 }
 
+UCC_CONFIG_REGISTER_TABLE(ucc_global_config_table, "UCC global", NULL,
+                          ucc_global_config, &ucc_config_global_list)
+
 ucc_status_t ucc_constructor(void)
 {
     ucc_global_config_t *cfg = &ucc_global_config;
@@ -95,7 +99,8 @@ ucc_status_t ucc_constructor(void)
     if (!cfg->initialized) {
         cfg->initialized = 1;
         status = ucc_config_parser_fill_opts(
-            &ucc_global_config, ucc_global_config_table, "UCC_", NULL, 1);
+            &ucc_global_config, UCC_CONFIG_GET_TABLE(ucc_global_config_table),
+            "UCC_", 1);
         if (UCC_OK != status) {
             ucc_error("failed to parse global options");
             return status;

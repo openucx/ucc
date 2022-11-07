@@ -115,13 +115,6 @@ ucc_tl_cuda_check_peers_ready(ucc_tl_cuda_task_t *task, int chunk, int step)
     return 1;
 }
 
-static inline size_t get_scratch_size(ucc_tl_cuda_team_t *team, int nrings,
-                                      int nchunks)
-{
-    return ucc_align_down_pow2((UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size /
-                                nrings / nchunks /2), 64) * 2 * nrings * nchunks;
-}
-
 static inline size_t
 ucc_tl_cuda_allgatherv_ring_scratch_offset(ucc_tl_cuda_task_t *task, int chunk,
                                            int ring)
@@ -129,7 +122,7 @@ ucc_tl_cuda_allgatherv_ring_scratch_offset(ucc_tl_cuda_task_t *task, int chunk,
     ucc_tl_cuda_team_t *team    = TASK_TEAM(task);
     int                 nrings  = task->allgatherv_ring.num_rings;
     int                 nchunks = task->allgatherv_ring.num_chunks;
-    size_t              ssize   = get_scratch_size(team, nrings, nchunks);
+    size_t              ssize   = get_scratch_size(team, nrings, nchunks, 1);
     size_t chunk_size, chunk_offset;
 
     chunk_size   = ucc_buffer_block_count(ssize/2, nchunks, chunk);
@@ -148,7 +141,7 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_progress_ring(ucc_tl_cuda_task_t *task,
     int                 nsteps   = (tsize == 2) ? tsize: tsize - 1;
     int                 nrings   = task->allgatherv_ring.num_rings;
     int                 nchunks  = task->allgatherv_ring.num_chunks;
-    size_t              ssize    = get_scratch_size(team, nrings, nchunks);
+    size_t              ssize    = get_scratch_size(team, nrings, nchunks, 1);
     ucc_ee_executor_t *exec;
     ucc_ee_executor_task_args_t eargs_loc, eargs_rem;
     ucc_ee_executor_task_t *etask;
@@ -368,6 +361,7 @@ void ucc_tl_cuda_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
                                                       task->bar);
     if (task->super.status == UCC_OK) {
         ucc_tl_cuda_put_sync(task);
+        UCC_TL_CUDA_PROFILE_REQUEST_EVENT(coll_task, "cuda_agv_ring_done", 0);
     }
 }
 
@@ -378,16 +372,27 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_lib_t  *lib     = UCC_TL_CUDA_TEAM_LIB(team);
     ucc_coll_args_t    *args    = &TASK_ARGS(task);
     ucc_rank_t          tsize   = UCC_TL_TEAM_SIZE(team);
-    int                 nrings  = lib->cfg.allgather_ring_max_rings;
     int                 nchunks = lib->cfg.allgather_ring_num_chunks;
+    int                 nrings;
     size_t              ssize;
     size_t              send_size;
     size_t              frag_size;
     ucc_rank_t          i;
 
-    nrings = ucc_min(nrings, team->topo->num_rings);
-    nrings = ucc_min(nrings, UCC_EE_EXECUTOR_NUM_COPY_BUFS);
-    ssize  = get_scratch_size(team, nrings, nchunks);
+    UCC_TL_CUDA_PROFILE_REQUEST_EVENT(coll_task, "cuda_agv_ring_start", 0);
+    send_size = task->allgatherv_ring.get_count(task, 0);
+    for (i = 1; i < tsize; i++) {
+        send_size = ucc_max(send_size, task->allgatherv_ring.get_count(task, i));
+    }
+    send_size = ucc_dt_size(task->allgatherv_ring.dt) * send_size;
+
+    if (send_size == 0) {
+        task->super.status = UCC_OK;
+        return ucc_task_complete(&task->super);
+    }
+
+    nrings = get_num_rings(team, send_size,
+                           lib->cfg.allgather_ring_max_rings);
     task->allgatherv_ring.sbuf         = args->src.info.buffer;
     task->allgatherv_ring.num_rings    = nrings;
     task->allgatherv_ring.num_chunks   = nchunks;
@@ -395,27 +400,15 @@ ucc_status_t ucc_tl_cuda_allgatherv_ring_start(ucc_coll_task_t *coll_task)
         task->allgatherv_ring.rbuf     = args->dst.info_v.buffer;
     } else {
         task->allgatherv_ring.rbuf     = args->dst.info.buffer;
+
     }
-
-    send_size = task->allgatherv_ring.get_count(task, 0);
-    for (i = 1; i < tsize; i++) {
-        send_size = ucc_max(send_size, task->allgatherv_ring.get_count(task, i));
-    }
-
-    if (send_size == 0) {
-        task->super.status = UCC_OK;
-        return ucc_task_complete(&task->super);
-    }
-
-    memset(task->allgatherv_ring.exec_task, 0,
-           2 *  task->allgatherv_ring.num_chunks *
-           sizeof(ucc_ee_executor_task_t*));
-
-    send_size = ucc_dt_size(task->allgatherv_ring.dt) * send_size;
+    ssize  = get_scratch_size(team, nrings, nchunks, 1);
     frag_size = ucc_min(ssize /  2, send_size);
     task->allgatherv_ring.num_frags = ucc_div_round_up(send_size, frag_size);
     task->allgatherv_ring.stage     = RING_STAGE_SYNC;
-
+    memset(task->allgatherv_ring.exec_task, 0,
+           2 *  task->allgatherv_ring.num_chunks *
+           sizeof(ucc_ee_executor_task_t*));
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 

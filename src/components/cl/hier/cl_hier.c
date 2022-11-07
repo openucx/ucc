@@ -63,6 +63,35 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
      ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_rab_pipeline),
      UCC_CONFIG_TYPE_PIPELINE_PARAMS},
 
+    {"ALLREDUCE_RAB_FRAG_THRESH", "inf",
+     "Threshold to enable fragmentation and pipelining of Rab "
+     "allreduce alg",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_rab_frag_thresh),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLREDUCE_RAB_FRAG_SIZE", "inf",
+     "Maximum allowed fragment size of Rab alg",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_rab_frag_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLREDUCE_RAB_N_FRAGS", "2",
+     "Number of fragments each allreduce is split into when Rab alg is "
+     "used\n"
+     "The actual number of fragments can be larger if fragment size exceeds\n"
+     "ALLREDUCE_RAB_FRAG_SIZE",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_rab_n_frags),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLREDUCE_RAB_PIPELINE_DEPTH", "2",
+     "Number of fragments simultaneously progressed by the Rab alg",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_rab_pipeline_depth),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLREDUCE_RAB_SEQUENTIAL", "n",
+     "Type of pipelined schedule for Rab alg (sequential/parallel)",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_rab_seq),
+     UCC_CONFIG_TYPE_BOOL},
+
     {NULL}};
 
 static ucs_config_field_t ucc_cl_hier_context_config_table[] = {

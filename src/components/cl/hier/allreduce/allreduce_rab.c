@@ -216,11 +216,11 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     if (coll_args->args.op == UCC_OP_AVG) {
         return UCC_ERR_NOT_SUPPORTED;
     }
+
     ucc_pipeline_nfrags_pdepth(&cfg->allreduce_rab_pipeline,
                                coll_args->args.dst.info.count *
                                ucc_dt_size(coll_args->args.dst.info.datatype),
                                &n_frags, &pipeline_depth);
-
     if (n_frags == 1) {
         return ucc_cl_hier_allreduce_rab_init_schedule(
             coll_args, team, (ucc_schedule_t **)task, n_frags);
@@ -235,7 +235,6 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
         coll_args, team, ucc_cl_hier_allreduce_rab_frag_init,
         ucc_cl_hier_allreduce_rab_frag_setup, pipeline_depth, n_frags,
         cfg->allreduce_rab_pipeline.order, &schedule->super);
-
     if (ucc_unlikely(status != UCC_OK)) {
         cl_error(team->context->lib,
                  "failed to init pipelined rab ar schedule");

@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -55,6 +56,3 @@ ucc_config_field_t ucc_global_config_table[] = {
      ucc_offsetof(ucc_global_config_t, cfg_filename), UCC_CONFIG_TYPE_STRING},
 
     {NULL}};
-
-UCC_CONFIG_REGISTER_TABLE(ucc_global_config_table, "UCC global", NULL,
-                          ucc_global_config, &ucc_config_global_list)

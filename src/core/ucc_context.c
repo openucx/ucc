@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -69,8 +70,9 @@ ucc_status_t ucc_context_config_read(ucc_lib_info_t *lib, const char *filename,
         return UCC_ERR_NO_MEMORY;
     }
 
-    status = ucc_config_parser_fill_opts(config, ucc_context_config_table,
-                                         lib->full_prefix, NULL, 0);
+    status = ucc_config_parser_fill_opts(config,
+                                         UCC_CONFIG_GET_TABLE(ucc_context_config_table),
+                                         lib->full_prefix, 0);
     if (status != UCC_OK) {
         ucc_error("failed to read UCC core context config");
         goto err_config;
@@ -551,10 +553,32 @@ poll:
     return UCC_OK;
 }
 
-ucc_status_t ucc_context_create(ucc_lib_h lib,
-                                const ucc_context_params_t *params,
-                                const ucc_context_config_h  config,
-                                ucc_context_h *context)
+static void remove_tl_ctx_from_array(ucc_tl_context_t **array, unsigned *size,
+                                     ucc_tl_context_t *tl_ctx)
+{
+    int i;
+
+    for (i = 0; i < (*size); i++) {
+        if (array[i] == tl_ctx) {
+            break;
+        }
+    }
+    if (i == (*size)) {
+        /* given tl_ctx is not part of array */
+        return;
+    }
+    /* decrement array size and do cyclic shift */
+    (*size)--;
+    for (; i < (*size); i++) {
+        array[i] = array[i + 1];
+    }
+}
+
+ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
+                                          const ucc_context_params_t *params,
+                                          const ucc_context_config_h  config,
+                                          ucc_context_h              *context,
+                                          ucc_proc_info_t            *proc_info)
 {
     uint32_t                   topo_required = 0;
     ucc_base_context_params_t  b_params;
@@ -566,7 +590,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
     ucc_tl_lib_t              *tl_lib;
     ucc_context_t             *ctx;
     ucc_status_t               status;
-    uint64_t                   i;
+    uint64_t                   i, j;
     int                        num_cls;
 
     num_cls = config->n_cl_cfg;
@@ -669,7 +693,7 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         ucc_error("failed to init progress queue for context %p", ctx);
         goto error_ctx_create;
     }
-    ctx->id.pi      = ucc_local_proc;
+    ctx->id.pi      = *proc_info;
     ctx->id.seq_num = ucc_atomic_fadd32(&ucc_context_seq_num, 1);
     if (params->mask & UCC_CONTEXT_PARAM_FIELD_OOB &&
         params->oob.n_oob_eps > 1) {
@@ -759,9 +783,22 @@ ucc_status_t ucc_context_create(ucc_lib_h lib,
         if (tl_lib->iface->context.create_epilog) {
             status = tl_lib->iface->context.create_epilog(&tl_ctx->super);
             if (UCC_OK != status) {
-                ucc_error("ctx create epilog for %s failed: %s",
-                          tl_lib->iface->super.name, ucc_status_string(status));
-                goto error_ctx_create;
+                if (ucc_tl_is_required(lib, tl_lib->iface, 1)) {
+                    ucc_error("ctx create epilog for %s failed: %s",
+                              tl_lib->iface->super.name, ucc_status_string(status));
+                    goto error_ctx_create;
+                } else {
+                    ucc_debug("ctx create epilog for %s failed: %s",
+                              tl_lib->iface->super.name, ucc_status_string(status));
+                    tl_lib->iface->context.destroy(&tl_ctx->super);
+                    for (j = 0; j < ctx->n_cl_ctx; j++) {
+                        remove_tl_ctx_from_array(ctx->cl_ctx[j]->tl_ctxs,
+                                                 &ctx->cl_ctx[j]->n_tl_ctxs,
+                                                 tl_ctx);
+                    }
+                    remove_tl_ctx_from_array(ctx->tl_ctx, &ctx->n_tl_ctx,
+                                             tl_ctx);
+                }
             }
         }
     }
@@ -780,6 +817,15 @@ error_ctx:
     ucc_free(ctx);
 error:
     return status;
+}
+
+ucc_status_t ucc_context_create(ucc_lib_h lib,
+                                const ucc_context_params_t *params,
+                                const ucc_context_config_h  config,
+                                ucc_context_h *context)
+{
+    return ucc_context_create_proc_info(lib, params, config, context,
+                                        &ucc_local_proc);
 }
 
 static ucc_status_t ucc_context_free_attr(ucc_context_attr_t *context_attr)
@@ -851,7 +897,7 @@ ucc_status_t ucc_context_progress_register(ucc_context_t *ctx,
     ucc_context_progress_entry_t *entry =
         ucc_malloc(sizeof(*entry), "progress_entry");
     if (!entry) {
-        ucc_error("failed to allocate %zd bytes for progress ntry",
+        ucc_error("failed to allocate %zd bytes for progress entry",
                   sizeof(*entry));
         return UCC_ERR_NO_MEMORY;
     }

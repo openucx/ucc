@@ -48,6 +48,11 @@ static ucc_config_field_t ucc_tl_sharp_context_config_table[] = {
      ucc_offsetof(ucc_tl_sharp_context_config_t, uprogress_num_polls),
      UCC_CONFIG_TYPE_UINT},
 
+    {"CONTEXT_PER_TEAM", "n",
+     "Create SHARP context/tree per team",
+     ucc_offsetof(ucc_tl_sharp_context_config_t, context_per_team),
+     UCC_CONFIG_TYPE_BOOL},
+
     {"RAND_SEED", "0",
      "Seed for random sharp job ID. (0 - use default).",
      ucc_offsetof(ucc_tl_sharp_context_config_t, rand_seed),

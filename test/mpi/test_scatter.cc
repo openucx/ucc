@@ -28,12 +28,12 @@ TestScatter::TestScatter(ucc_test_team_t &_team, TestCaseParams &params) :
     if (rank == root) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize * size, mem_type));
         sbuf = sbuf_mc_header->addr;
-        if (TEST_NO_INPLACE == inplace) {
-            UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize, mem_type));
-            rbuf = rbuf_mc_header->addr;
-        } else {
+        if (inplace) {
             rbuf_mc_header = NULL;
             rbuf = NULL;
+        } else {
+            UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize, mem_type));
+            rbuf = rbuf_mc_header->addr;
         }
     } else {
         UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize, mem_type));
@@ -44,19 +44,13 @@ TestScatter::TestScatter(ucc_test_team_t &_team, TestCaseParams &params) :
 
     check_buf = ucc_malloc(msgsize * size, "check buf");
     UCC_MALLOC_CHECK(check_buf);
-
-    if (TEST_INPLACE == inplace) {
-        args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
-        args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
-    }
-
     args.root = root;
     if (rank == root) {
         args.src.info.buffer   = sbuf;
         args.src.info.count    = single_rank_count * size;
         args.src.info.datatype = TEST_DT;
         args.src.info.mem_type = mem_type;
-        if (TEST_NO_INPLACE == inplace) {
+        if (!inplace) {
             args.dst.info.buffer   = rbuf;
             args.dst.info.count    = single_rank_count;
             args.dst.info.datatype = TEST_DT;
@@ -73,7 +67,7 @@ TestScatter::TestScatter(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
-ucc_status_t TestScatter::set_input()
+ucc_status_t TestScatter::set_input(int iter_persistent)
 {
     size_t dt_size           = ucc_dt_size(TEST_DT);
     size_t single_rank_count = msgsize / dt_size;
@@ -84,15 +78,11 @@ ucc_status_t TestScatter::set_input()
     MPI_Comm_size(team.comm, &size);
 
     if (rank == root) {
-        init_buffer(sbuf, single_rank_count * size, TEST_DT, mem_type, rank);
+        init_buffer(sbuf, single_rank_count * size, TEST_DT, mem_type,
+                    rank * (iter_persistent + 1));
         UCC_CHECK(ucc_mc_memcpy(check_buf, sbuf, single_rank_size * size,
                                 UCC_MEMORY_TYPE_HOST, mem_type));
     }
-    return UCC_OK;
-}
-
-ucc_status_t TestScatter::reset_sbuf()
-{
     return UCC_OK;
 }
 
@@ -115,7 +105,7 @@ ucc_status_t TestScatter::check()
     } while(!completed);
 
     if (rank == root) {
-        if (TEST_INPLACE == inplace) {
+        if (inplace) {
             return compare_buffers(sbuf, check_buf, single_rank_count * size,
                                    TEST_DT, mem_type);
         } else {

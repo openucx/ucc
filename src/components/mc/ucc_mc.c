@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -47,8 +48,7 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
                 continue;
             }
             status = ucc_config_parser_fill_opts(
-                mc->config, mc->config_table.table, "UCC_",
-                mc->config_table.prefix, 1);
+                mc->config, &mc->config_table, "UCC_", 1);
             if (UCC_OK != status) {
                 ucc_info("failed to parse config for mc: %s (%d)",
                          mc->super.name, status);

@@ -27,25 +27,25 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
         tls = &params->context->all_tls;
     }
 
-    self->tl_ctxs =
+    self->super.tl_ctxs =
         ucc_malloc(sizeof(ucc_tl_context_t *) * tls->count, "cl_hier_tl_ctxs");
-    if (!self->tl_ctxs) {
+    if (!self->super.tl_ctxs) {
         cl_error(cl_config->cl_lib, "failed to allocate %zd bytes for tl_ctxs",
                  sizeof(ucc_tl_context_t **) * tls->count);
         return UCC_ERR_NO_MEMORY;
     }
-    self->n_tl_ctxs = 0;
+    self->super.n_tl_ctxs = 0;
     for (i = 0; i < tls->count; i++) {
         status = ucc_tl_context_get(params->context, tls->names[i],
-                                    &self->tl_ctxs[self->n_tl_ctxs]);
+                                  &self->super.tl_ctxs[self->super.n_tl_ctxs]);
         if (UCC_OK != status) {
             cl_info(cl_config->cl_lib,
                     "TL %s context is not available, skipping", tls->names[i]);
         } else {
-            self->n_tl_ctxs++;
+            self->super.n_tl_ctxs++;
         }
     }
-    if (0 == self->n_tl_ctxs) {
+    if (0 == self->super.n_tl_ctxs) {
         cl_error(cl_config->cl_lib, "no TL contexts are available");
         status = UCC_ERR_NOT_FOUND;
         goto out;
@@ -64,7 +64,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
     return UCC_OK;
 
 out:
-    ucc_free(self->tl_ctxs);
+    ucc_free(self->super.tl_ctxs);
     return status;
 }
 
@@ -74,10 +74,10 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_hier_context_t)
     cl_info(self->super.super.lib, "finalizing cl context: %p", self);
 
     ucc_mpool_cleanup(&self->sched_mp, 1);
-    for (i = 0; i < self->n_tl_ctxs; i++) {
-        ucc_tl_context_put(self->tl_ctxs[i]);
+    for (i = 0; i < self->super.n_tl_ctxs; i++) {
+        ucc_tl_context_put(self->super.tl_ctxs[i]);
     }
-    ucc_free(self->tl_ctxs);
+    ucc_free(self->super.tl_ctxs);
 }
 
 UCC_CLASS_DEFINE(ucc_cl_hier_context_t, ucc_cl_context_t);

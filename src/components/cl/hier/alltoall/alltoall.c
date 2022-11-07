@@ -34,8 +34,8 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoall_init,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (!SBGP_ENABLED(cl_team, NODE) || !SBGP_ENABLED(cl_team, FULL)) {
-        cl_debug(team->context->lib, "alltoall requires NODE and FULL sbgps");
+    if (!SBGP_ENABLED(cl_team, FULL)) {
+        cl_debug(team->context->lib, "alltoall requires FULL sbgps");
         return UCC_ERR_NOT_SUPPORTED;
     }
 

@@ -93,6 +93,7 @@ ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
         break;
     case UCC_EE_EXECUTOR_TASK_REDUCE:
     case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:
+    case UCC_EE_EXECUTOR_TASK_REDUCE_MULTI_DST:
         status = ucc_ec_cuda_reduce((ucc_ee_executor_task_args_t *)task_args,
                                     stream);
         if (ucc_unlikely(status != UCC_OK)) {
@@ -138,6 +139,7 @@ ucc_cuda_executor_interruptible_task_finalize(ucc_ee_executor_task_t *task)
         ucc_derived_of(task, ucc_ec_cuda_executor_interruptible_task_t);
     ucc_status_t status;
 
+    ucc_assert(task->status == UCC_OK);
     status = ucc_ec_cuda_event_destroy(ee_task->event);
     ucc_mpool_put(task);
     return status;

@@ -17,6 +17,10 @@
 #include <assert.h>
 #endif
 
+#ifndef SIZE_MAX
+#define SIZE_MAX ((size_t) -1)
+#endif
+
 #define ucc_offsetof      ucs_offsetof
 #define ucc_container_of  ucs_container_of
 #define ucc_derived_of    ucs_derived_of
