@@ -78,9 +78,6 @@ UCC_REDUCE_CUDA_MULTI_DST_SUM<float, false>(ucc_eee_task_reduce_multi_dst_t arg)
         }                                                                      \
     } while (0)
 
-#define LAUNCH_KERNEL(NAME, type,  _task, s, b, t)  \
-    LAUNCH_KERNEL_A(NAME, type, type, _task, s, b, t)
-
 #define LAUNCH_REDUCE(NAME, type,  _task, s, b, t)  \
     LAUNCH_REDUCE_A(NAME, type, type, _task, s, b, t)
 
@@ -179,12 +176,10 @@ ucc_status_t ucc_ec_cuda_reduce(ucc_ee_executor_task_args_t *task,
 #else
         return UCC_ERR_NOT_SUPPORTED;
 #endif
-#if CUDART_VERSION >= 11000
     case UCC_DT_BFLOAT16:
         ucc_assert(2 == sizeof(__nv_bfloat16));
         DT_REDUCE_FLOAT(__nv_bfloat16, task, op, stream, bk, th);
         break;
-#endif
     default:
         ec_error(&ucc_ec_cuda.super, "unsupported reduction type (%s)",
                  ucc_datatype_str(dt));

@@ -115,63 +115,6 @@ __device__ void executor_reduce_float_sum_aligned_2(const float *s1,
     }
 }
 
-__device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
-{
-    const size_t     step     = blockDim.x;
-    size_t           min_size = task->counts[0];
-    size_t           idx      = threadIdx.x;
-    __shared__ int4 *dsts[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
-    __shared__ int4 *srcs[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
-    bool             aligned;
-
-    for (int i = 0; i < task->num_vectors; i++) {
-        dsts[i] = (int4*)task->dst[i];
-        srcs[i] = (int4*)task->src[i];
-        aligned = !(align_pow2((intptr_t)srcs[i], 16) ||
-                    align_pow2((intptr_t)dsts[i], 16));
-        if (!aligned) {
-            break;
-        }
-        if (task->counts[i] < min_size) {
-            min_size = task->counts[i];
-        }
-    }
-
-    if (!aligned || min_size < 16) {
-        for (int i = 0; i < task->num_vectors; i++) {
-            ucc_eee_task_copy_t copy_task;
-
-            copy_task.src = task->src[i];
-            copy_task.dst = task->dst[i];
-            copy_task.len = task->counts[i];
-            executor_copy_task<LOOP_UNROLL>(copy_task);
-        }
-        return;
-    }
-
-    const int n        = min_size / sizeof(uint4);
-    const int num_iter = n / step + ((threadIdx.x < n % step) ? 1 : 0);
-
-    for (size_t i = 0; i < num_iter; i++) {
-#pragma unroll
-        for (int j = 0; j < task->num_vectors; j++) {
-            dsts[j][idx] = srcs[j][idx];
-        }
-        idx += step;
-    }
-
-    const size_t left = min_size + min_size % sizeof(uint4);
-
-    for (int i = 0; i < task->num_vectors; i++) {
-        ucc_eee_task_copy_t copy_task;
-
-        copy_task.src = (char*)task->src[i] + left;
-        copy_task.dst = (char*)task->dst[i] + left;
-        copy_task.len = task->counts[i] - left;
-        executor_copy_task<LOOP_UNROLL>(copy_task);
-   }
-}
-
 #define LAUNCH_REDUCE_A(NAME, _Type, _AlphaType, _task, ...)                   \
     do {                                                                       \
         if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
@@ -203,9 +146,6 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
         s1      = task->reduce.srcs[0];
         s2      = task->reduce.srcs[1];
         d       = task->reduce.dst;
-        aligned = !(align_pow2((intptr_t)task->reduce.dst, 16) ||
-                         align_pow2((intptr_t)task->reduce.srcs[0], 16) ||
-                         align_pow2((intptr_t)task->reduce.srcs[1], 16));
     } else {
         ucc_assert(task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED);
         dt      = task->reduce_strided.dt;
@@ -215,10 +155,9 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
         s1      = task->reduce_strided.src1;
         s2      = task->reduce_strided.src2;
         d       = task->reduce_strided.dst;
-        aligned = !(align_pow2((intptr_t)task->reduce_strided.dst, 16) ||
-                     align_pow2((intptr_t)task->reduce_strided.src1, 16) ||
-                     align_pow2((intptr_t)task->reduce_strided.src2, 16));
     }
+    aligned = !(align_pow2((intptr_t)s1, 16) || align_pow2((intptr_t)s2, 16) ||
+                align_pow2((intptr_t)d, 16));
 
     if (count == 0) {
         return UCC_OK;
@@ -285,36 +224,14 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
 #else
         return UCC_ERR_NOT_SUPPORTED;
 #endif
-#if CUDART_VERSION >= 11000
     case UCC_DT_BFLOAT16:
         ucc_assert(2 == sizeof(__nv_bfloat16));
         DT_REDUCE_FLOAT(__nv_bfloat16, task, op);
         break;
-#endif
     default:
         return UCC_ERR_NOT_SUPPORTED;
     }
     return UCC_OK;
-}
-
-__device__ void executor_reduce_multi_dst_task(ucc_eee_task_reduce_multi_dst_t *task)
-{
-    ucc_ee_executor_task_args_t args;
-
-    args.task_type = UCC_EE_EXECUTOR_TASK_REDUCE;
-    args.flags     = 0;
-
-    for (int i = 0; i < task->n_bufs; i++) {
-        args.reduce.count   = task->counts[i];
-        args.reduce.dt      = task->dt;
-        args.reduce.op      = task->op;
-        args.reduce.dst     = task->dst[i];
-        args.reduce.srcs[0] = task->src1[i];
-        args.reduce.srcs[1] = task->src2[i];
-        args.reduce.n_srcs  = 2;
-
-        executor_reduce(&args);
-    }
 }
 
 template<bool useCoopLaunch>
@@ -375,14 +292,8 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
             executor_copy_task<LOOP_UNROLL>(args.copy);
             break;
         case UCC_EE_EXECUTOR_TASK_REDUCE:
-        case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:            
+        case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:
             executor_reduce(&args);
-            break;
-        case UCC_EE_EXECUTOR_TASK_REDUCE_MULTI_DST:
-            executor_reduce_multi_dst_task(&args.reduce_multi_dst);
-            break;
-        case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
-            executor_copy_multi(&args.copy_multi);
             break;
         default:
             break;
