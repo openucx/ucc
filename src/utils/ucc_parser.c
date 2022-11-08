@@ -8,6 +8,9 @@
 #include "ucc_malloc.h"
 #include "ucc_log.h"
 #include "khash.h"
+#include "schedule/ucc_schedule.h"
+#include "schedule/ucc_schedule_pipelined.h"
+#include "utils/ucc_string.h"
 
 ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
                                           const ucc_config_names_array_t *src)
@@ -378,4 +381,142 @@ void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
         ucs_config_parser_release_opts(opts, entry->table);
         ucc_free(opts);
     }
+}
+
+#define UCC_UUNITS_AUTO    ((unsigned)-2)
+
+static ucc_pipeline_params_t ucc_pipeline_params_auto = {
+    .threshold = 0,
+    .n_frags   = 0,
+    .frag_size = 0,
+    .pdepth    = 0,
+    .order     = 0
+};
+
+static ucc_pipeline_params_t ucc_pipeline_params_no = {
+    .threshold = SIZE_MAX,
+    .n_frags   = 0,
+    .frag_size = 0,
+    .pdepth    = 1,
+    .order     = 0
+};
+
+static ucc_pipeline_params_t ucc_pipeline_params_default = {
+    .threshold = SIZE_MAX,
+    .n_frags   = 2,
+    .frag_size = SIZE_MAX,
+    .pdepth    = 2,
+    .order     = UCC_PIPELINE_SEQUENTIAL
+};
+
+int ucc_pipeline_params_is_auto(const ucc_pipeline_params_t *p)
+{
+    return 0 == memcmp(p, &ucc_pipeline_params_auto, sizeof(*p));
+}
+
+int ucc_config_sscanf_pipeline_params(const char *buf, void *dest,
+                                      const void *arg) //NOLINT
+{
+    ucc_pipeline_params_t *p = dest;
+    ucc_status_t           status;
+    int                    i, n_tokens, order;
+    char **                tokens, **t2;
+
+    if (strlen(buf) == 0) {
+        return 0;
+    }
+
+    /* Special value: auto */
+    if (!strcasecmp(buf, UCS_VALUE_AUTO_STR)) {
+        *p = ucc_pipeline_params_auto;
+        return 1;
+    }
+
+    if (!strcasecmp(buf, "n")) {
+        *p = ucc_pipeline_params_no;
+        return 1;
+    }
+
+    *p     = ucc_pipeline_params_default;
+    tokens = ucc_str_split(buf, ":");
+    if (!tokens) {
+        return 0;
+    }
+    n_tokens = ucc_str_split_count(tokens);
+
+    for (i = 0; i < n_tokens; i++) {
+        if ((order = ucs_string_find_in_list(
+                 tokens[i], ucc_pipeline_order_names, 0)) >= 0) {
+            p->order = (ucc_pipeline_order_t)order;
+            continue;
+        }
+        t2 = ucc_str_split(tokens[i], "=");
+        if (!t2) {
+            goto out;
+        }
+        if (ucc_str_split_count(t2) != 2) {
+            goto out;
+        }
+        if (0 == strcmp(t2[0], "thresh")) {
+            status = ucc_str_to_memunits(t2[1], &p->threshold);
+            if (UCC_OK != status) {
+                goto out;
+            }
+        } else if (0 == strcmp(t2[0], "fragsize")) {
+            status = ucc_str_to_memunits(t2[1], &p->frag_size);
+            if (UCC_OK != status) {
+                goto out;
+            }
+        } else if (0 == strcmp(t2[0], "nfrags")) {
+            status = ucc_str_is_number(t2[1]);
+            if (UCC_OK != status) {
+                goto out;
+            }
+            p->n_frags = atoi(t2[1]);
+        } else if (0 == strcmp(t2[0], "pdepth")) {
+            status = ucc_str_is_number(t2[1]);
+            if (UCC_OK != status) {
+                goto out;
+            }
+            p->pdepth = atoi(t2[1]);
+        }
+        ucc_str_split_free(t2);
+    }
+    return 1;
+out:
+    if (t2) {
+        ucc_str_split_free(t2);
+    }
+    ucc_str_split_free(tokens);
+    return 0;
+}
+
+int ucc_config_sprintf_pipeline_params(char *buf, size_t max, const void *src,
+                                       const void *arg) //NOLINT
+{
+    const ucc_pipeline_params_t *p = src;
+    char                         thresh[32], frag_size[32];
+
+    if (ucc_pipeline_params_is_auto(p)) {
+        return snprintf(buf, max, "auto");
+    }
+    if (!memcmp(p, &ucc_pipeline_params_no, sizeof(*p))) {
+        return snprintf(buf, max, "n");
+    }
+    return snprintf(
+        buf, max, "thresh=%s:nfrags=%d:fragsize=%s:pdepth=%d:order=%s",
+        ucs_memunits_to_str(p->threshold, thresh, sizeof(thresh)), p->n_frags,
+        ucs_memunits_to_str(p->frag_size, frag_size, sizeof(frag_size)),
+        p->pdepth, ucc_pipeline_order_names[p->order]);
+}
+
+ucs_status_t ucc_config_clone_pipeline_params(const void *src, void *dest,
+                                              const void *arg) //NOLINT
+{
+    memcpy(dest, src, sizeof(ucc_pipeline_params_t));
+    return UCS_OK;
+}
+
+void ucc_config_release_pipeline_params(void *ptr, const void *arg)
+{
 }

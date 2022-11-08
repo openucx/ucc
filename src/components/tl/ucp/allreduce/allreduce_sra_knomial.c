@@ -135,23 +135,6 @@ out:
     return status;
 }
 
-static inline void get_sra_n_frags(size_t msgsize,
-                                   ucc_tl_ucp_team_t *team, int *n_frags,
-                                   int *pipeline_depth)
-{
-    //TODO make selection mem_type - specific
-    ucc_tl_ucp_lib_config_t *cfg     = &UCC_TL_UCP_TEAM_LIB(team)->cfg;
-    int min_num_frags;
-
-    *n_frags = 1;
-    if (msgsize > cfg->allreduce_sra_kn_frag_thresh) {
-        min_num_frags = ucc_div_round_up(msgsize,
-                                             cfg->allreduce_sra_kn_frag_size);
-        *n_frags = ucc_max(min_num_frags, cfg->allreduce_sra_kn_n_frags);
-    }
-    *pipeline_depth = ucc_min(*n_frags, cfg->allreduce_sra_kn_pipeline_depth);
-}
-
 static ucc_status_t
 ucc_tl_ucp_allreduce_sra_knomial_finalize(ucc_coll_task_t *task)
 {
@@ -197,8 +180,9 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
         max_frag_count = coll_args->args.dst.info.count;
     }
 
-    get_sra_n_frags(max_frag_count * dt_size, tl_team, &n_frags,
-                    &pipeline_depth);
+    ucc_pipeline_nfrags_pdepth(&cfg->allreduce_sra_kn_pipeline,
+                               max_frag_count * dt_size, &n_frags,
+                               &pipeline_depth);
 
     if (n_frags > 1) {
         bargs.mask         |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
@@ -209,7 +193,7 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
     status = ucc_schedule_pipelined_init(
         &bargs, team, ucc_tl_ucp_allreduce_sra_knomial_frag_init,
         ucc_tl_ucp_allreduce_sra_knomial_frag_setup, pipeline_depth, n_frags,
-        cfg->allreduce_sra_kn_pipeline_order, schedule_p);
+        cfg->allreduce_sra_kn_pipeline.order, schedule_p);
     if (UCC_OK != status) {
         tl_error(team->context->lib, "failed to init pipelined schedule");
         ucc_tl_ucp_put_schedule(&schedule_p->super);
