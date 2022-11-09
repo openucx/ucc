@@ -61,13 +61,15 @@ typedef struct ucc_event_manager {
 } ucc_event_manager_t;
 
 enum {
-    UCC_COLL_TASK_FLAG_CB            = UCC_BIT(0),
+    UCC_COLL_TASK_FLAG_CB               = UCC_BIT(0),
     /* executor is required for collective*/
-    UCC_COLL_TASK_FLAG_EXECUTOR      = UCC_BIT(1),
+    UCC_COLL_TASK_FLAG_EXECUTOR         = UCC_BIT(1),
     /* user visible task */
-    UCC_COLL_TASK_FLAG_TOP_LEVEL     = UCC_BIT(2),
+    UCC_COLL_TASK_FLAG_TOP_LEVEL        = UCC_BIT(2),
     /* stop executor in task complete*/
-    UCC_COLL_TASK_FLAG_EXECUTOR_STOP = UCC_BIT(3)
+    UCC_COLL_TASK_FLAG_EXECUTOR_STOP    = UCC_BIT(3),
+    /* destroy executor in task complete */
+    UCC_COLL_TASK_FLAG_EXECUTOR_DESTROY = UCC_BIT(4),
 };
 
 typedef struct ucc_coll_task {
@@ -80,7 +82,7 @@ typedef struct ucc_coll_task {
     ucc_status_t                       status;
     ucc_list_link_t                    em_list;
     ucc_base_coll_args_t               bargs;
-    ucc_base_team_t                   *team; //CL/TL team pointer
+    ucc_base_team_t                   *team; /* CL/TL team pointer */
     ucc_schedule_t                    *schedule;
     uint32_t                           flags;
     ucc_coll_post_fn_t                 post;
@@ -91,7 +93,6 @@ typedef struct ucc_coll_task {
     ucc_coll_callback_t                cb;
     ucc_ee_h                           ee;
     ucc_ev_t                          *ev;
-    void                              *ee_task;
     ucc_coll_task_t                   *triggered_task;
     ucc_ee_executor_t                 *executor;
     union {
@@ -184,7 +185,7 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         if (UCC_ERR_TIMED_OUT == status) {
             char coll_str[256];
             ucc_coll_str(task, coll_str, sizeof(coll_str));
-            ucc_warn("timeout %g sec has expired on %s",
+            ucc_warn("timeout %g sec. has expired on %s",
                      task->bargs.args.timeout, coll_str);
         } else {
             ucc_error("failure in task %p, %s", task,
@@ -200,10 +201,20 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         }
     }
 
+    if ((task->executor) && (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR_DESTROY)) {
+        status = ucc_ee_executor_finalize(task->executor);
+        if (ucc_unlikely(status != UCC_OK)) {
+            ucc_error("failed to finalize executor %s",
+                      ucc_status_string(status));
+        }
+        task->executor = NULL;
+    }
+
     task->super.status = status;
     if (has_cb) {
         cb.cb(cb.data, status);
     }
+
     if (has_sched && status == UCC_OK) {
         status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED_SCHEDULE);
     }

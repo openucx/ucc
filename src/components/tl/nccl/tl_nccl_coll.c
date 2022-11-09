@@ -149,9 +149,13 @@ ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
 
 ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_nccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-    ucc_status_t       status = UCC_OK ;
+    ucc_tl_nccl_task_t *task   = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_tl_nccl_team_t *team   = TASK_TEAM(task);
+    ucc_status_t        status = UCC_OK;
 
+    if (ucc_unlikely(task->super.super.status != UCC_OK)) {
+        team->comm_state = task->super.super.status;
+    }
     tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
     ucc_tl_nccl_free_task(task);
     return status;

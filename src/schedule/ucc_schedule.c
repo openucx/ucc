@@ -121,9 +121,8 @@ ucc_status_t ucc_coll_task_get_executor(ucc_coll_task_t *task,
     return st;
 }
 
-static ucc_status_t
-ucc_task_error_handler(ucc_coll_task_t *parent_task,
-                       ucc_coll_task_t *task)
+static ucc_status_t ucc_task_error_handler(ucc_coll_task_t *parent_task,
+                                           ucc_coll_task_t *task)
 {
     ucc_event_manager_t *em;
     ucc_coll_task_t     *listener;
@@ -197,7 +196,8 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule,
     return status;
 }
 
-ucc_status_t ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task)
+ucc_status_t ucc_schedule_add_task(ucc_schedule_t *schedule,
+                                   ucc_coll_task_t *task)
 {
     ucc_status_t status;
 
