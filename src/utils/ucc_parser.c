@@ -337,7 +337,7 @@ static int ucc_file_parse_handler(void *arg, const char *section,
         iter = kh_get(ucc_sections, sections, section);
         if (iter == kh_end(sections)) { /* section hash table doesn't exist */
             sec_wrap = ucc_calloc(1, sizeof(*sec_wrap),
-                                  "section_"+section+"_cfg");
+                                  strcat("section cfg: ", section));
             if (!sec_wrap) {
                 ucc_error("failed to allocate %zd bytes for section config",
                           sizeof(*sec_wrap));
@@ -562,7 +562,8 @@ ucc_status_t ucc_add_team_sections(void                *team_cfg,
                                    ucc_topo_t          *team_topo,
                                    const char         **tuning_str,
                                    const char          *tune_key,
-                                   const char          *prefix)
+                                   const char          *env_prefix,
+                                   const char          *component_prefix)
 {
     khash_t(ucc_sections) *sections  = &ucc_global_config.file_cfg->sections;
     ucc_cpu_vendor_t       vendor    = ucc_arch_get_cpu_vendor();
@@ -588,8 +589,8 @@ ucc_status_t ucc_add_team_sections(void                *team_cfg,
             if (j != kh_end(sec_h)) {
                 *tuning_str = kh_val(sec_h, j);
             }
-            status = ucc_apply_file_cfg(team_cfg, tl_fields, "UCC_", prefix,
-                                        sec_name);
+            status = ucc_apply_file_cfg(team_cfg, tl_fields, env_prefix,
+                                        component_prefix, sec_name);
             return status;
         }
     }

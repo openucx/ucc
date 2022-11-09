@@ -145,7 +145,8 @@ ucc_status_t ucc_add_team_sections(void                *team_cfg,
                                    ucc_topo_t          *team_topo,
                                    const char         **tuning_str,
                                    const char          *tune_key,
-                                   const char          *prefix);
+                                   const char          *env_prefix,
+                                   const char          *component_prefix);
 
 static inline void
 ucc_config_parser_release_opts(void *opts, ucc_config_field_t *fields)

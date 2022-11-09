@@ -79,6 +79,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         status = ucc_add_team_sections(&self->cfg, ucc_tl_ucp_lib_config_table,
                                        self->topo, &self->tuning_str,
                                        "UCC_TL_UCP_TUNE",
+                                       UCC_TL_CORE_CTX(self)->lib->full_prefix,
                                        ucc_tl_ucp.super.tl_lib_config.prefix);
         if (status != UCC_OK) {
             ucc_debug("section not found");
