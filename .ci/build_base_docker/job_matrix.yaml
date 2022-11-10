@@ -6,7 +6,6 @@ step_allow_single_selector: true
 registry_host: 'harbor.mellanox.com'
 registry_path: '/torch-ucc'
 registry_auth: '05d98651-e11c-4a57-9cc6-52df79014b89'
-DOCKER_BUILDKIT: '1'
 
 volumes:
   - { mountPath: '/hpc/local', hostPath: '/hpc/local' }
@@ -22,6 +21,7 @@ env:
   SRC_DIR: '${NVIDIA_ROOT_DIR}/src'
   BIN_DIR: '${NVIDIA_ROOT_DIR}/bin'
   DOCKER_OPT: '--pull always --network=host --uts=host --ipc=host --ulimit stack=67108864 --ulimit memlock=-1 --security-opt seccomp=unconfined --cap-add=SYS_ADMIN --device=/dev/infiniband/ --gpus all --user root'
+  DOCKER_BUILDKIT: '1'
 
 docker_opt: "$DOCKER_OPT"
 
