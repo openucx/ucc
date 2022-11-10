@@ -17,7 +17,20 @@ ENV UCC_INSTALL_DIR=${BIN_DIR}/ucc/build
 #==============================================================================
 RUN yum update -y
 
-COPY mlnx.repo /etc/yum.repos.d/mlnx.repo
+COPY <<EOF /etc/yum.repos.d/mlnx.repo
+[MLNX-BaseOS]
+name=RH $releasever - $basearch - Mirror
+baseurl=http://webrepo/rhel/8.6/x86_64/BaseOS/
+enabled=1
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+[MLNX-AppStream]
+name=RH $releasever - $basearch - Mirror
+baseurl=http://webrepo/rhel/8.6/x86_64/AppStream/
+enabled=1
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+EOF
 
 # '--nobest' is needed because there're some conflicts between ubi8 and mlnx repos
 RUN yum groupinstall -y \
