@@ -73,7 +73,7 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
      ucc_offsetof(ucc_ec_cuda_config_t, reduce_num_blocks),
      UCC_CONFIG_TYPE_ULUNITS},
 
-    {"USE_COOPERATIVE_LAUNCH", "1",
+    {"USE_COOPERATIVE_LAUNCH", "0",
      "whether to use cooperative launch in persistent kernel executor",
      ucc_offsetof(ucc_ec_cuda_config_t, use_cooperative_launch),
      UCC_CONFIG_TYPE_BOOL},

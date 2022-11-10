@@ -70,10 +70,12 @@ UCC_REDUCE_CUDA_MULTI_DST_SUM<float, false>(ucc_eee_task_reduce_multi_dst_t arg)
 #define LAUNCH_REDUCE_A(NAME, type, _AlphaType, _task, s, b, t)                \
     do {                                                                       \
         if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
-            UCC_REDUCE_CUDA_DEFAULT_##NAME<type, _AlphaType, false>            \
+            UCC_REDUCE_CUDA_DEFAULT_##NAME<type, _AlphaType, false,            \
+                                           REDUCE_LOOP_UNROLL_INTERRUPTIBLE>   \
                 <<<b, t, 0, s>>>(_task->reduce, _task->flags);                 \
         } else if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED) {  \
-            UCC_REDUCE_CUDA_STRIDED_##NAME<type, _AlphaType, false>            \
+            UCC_REDUCE_CUDA_STRIDED_##NAME<type, _AlphaType, false,            \
+                                           REDUCE_LOOP_UNROLL_INTERRUPTIBLE)>           \
                 <<<b, t, 0, s>>>(_task->reduce_strided, _task->flags);         \
         } else {                                                               \
             UCC_REDUCE_CUDA_MULTI_DST_##NAME<type, false>                      \
@@ -83,7 +85,6 @@ UCC_REDUCE_CUDA_MULTI_DST_SUM<float, false>(ucc_eee_task_reduce_multi_dst_t arg)
 
 #define LAUNCH_REDUCE(NAME, type,  _task, s, b, t)  \
     LAUNCH_REDUCE_A(NAME, type, type, _task, s, b, t)
-
 
 extern "C" {
 ucc_status_t ucc_ec_cuda_reduce(ucc_ee_executor_task_args_t *task,
