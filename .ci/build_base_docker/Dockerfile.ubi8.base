@@ -18,6 +18,8 @@ ENV UCC_INSTALL_DIR=${BIN_DIR}/ucc/build
 #==============================================================================
 RUN yum update -y
 
+RUN echo "INFO: DOCKER_BUILDKIT = ${DOCKER_BUILDKIT}"
+
 COPY <<EOF /etc/yum.repos.d/mlnx.repo
 [MLNX-BaseOS]
 name=RH $releasever - $basearch - Mirror
