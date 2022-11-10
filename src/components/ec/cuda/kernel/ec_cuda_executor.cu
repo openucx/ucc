@@ -4,17 +4,11 @@
  * See file LICENSE for terms.
  */
 
-#ifdef __cplusplus
 extern "C" {
-#endif
-
 #include "../ec_cuda.h"
-#include "utils/ucc_math.h"
 #include <inttypes.h>
-
-#ifdef __cplusplus
 }
-#endif
+#include "ec_cuda_reduce_ops.h"
 #include <cooperative_groups.h>
 using namespace cooperative_groups;
 
@@ -121,173 +115,123 @@ __device__ void executor_reduce_float_sum_aligned_2(const float *s1,
     }
 }
 
+#define LAUNCH_REDUCE_A(NAME, _Type, _AlphaType, _task, ...)                   \
+    do {                                                                       \
+        if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
+            return ucc_reduce_cuda_default_##NAME<_Type, _AlphaType, true>(    \
+                _task->reduce, _task->flags);                                  \
+        } else {                                                               \
+            return ucc_reduce_cuda_strided_##NAME<_Type, _AlphaType, true>(    \
+                _task->reduce_strided, _task->flags);                          \
+        }                                                                      \
+    } while (0)
 
-template <typename T>
-__device__ void executor_reduce_sum(const T **__restrict__ srcs,
-                                    uint16_t n_srcs, T *__restrict__ d,
-                                    size_t   count)
+#define LAUNCH_REDUCE(NAME, _Type, _task, ...)      \
+    LAUNCH_REDUCE_A(NAME, _Type, _Type, _task)
+
+__device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
 {
-    const size_t step  = blockDim.x;
-    const size_t start = threadIdx.x;
+    bool               aligned = false;
+    ucc_reduction_op_t op;
+    ucc_datatype_t     dt;
+    size_t             count;
+    uint16_t           n_src;
+    void              *s1, *s2, *d;
 
-    for (size_t i = start; i < count; i+=step) {
-        d[i] = srcs[0][i] + srcs[1][i];
-        for (size_t j = 2; j < n_srcs; j++) {
-            d[i] = d[i] + srcs[j][i];
-        }
+    if (task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
+        dt      = task->reduce.dt;
+        count   = task->reduce.count;
+        op      = task->reduce.op;
+        n_src   = task->reduce.n_srcs;
+        s1      = task->reduce.srcs[0];
+        s2      = task->reduce.srcs[1];
+        d       = task->reduce.dst;
+    } else {
+        ucc_assert(task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED);
+        dt      = task->reduce_strided.dt;
+        count   = task->reduce_strided.count;
+        op      = task->reduce_strided.op;
+        n_src   = task->reduce_strided.n_src2 + 1;
+        s1      = task->reduce_strided.src1;
+        s2      = task->reduce_strided.src2;
+        d       = task->reduce_strided.dst;
     }
-}
+    aligned = !(align_pow2((intptr_t)s1, 16) || align_pow2((intptr_t)s2, 16) ||
+                align_pow2((intptr_t)d, 16));
 
-template <typename T>
-__device__ void executor_reduce_strided_sum(const T* __restrict__ s1,
-                                            const T* __restrict__ s2,
-                                            T* __restrict__ d, size_t count,
-                                            size_t n_src2, size_t stride)
-{
-    const size_t step  = blockDim.x;
-    const size_t start = threadIdx.x;
-    const size_t ld    = stride / sizeof(T);
+    if (count == 0) {
+        return UCC_OK;
+    }
 
-    for (size_t i = start; i < count; i+=step) {
-        d[i] = s1[i] + s2[i];
-        for (size_t j = 1; j < n_src2; j++) {
-            d[i] = d[i] + s2[i + j*ld];
-        }
-     }
- }
-
-__device__ void executor_reduce_strided_task(ucc_eee_task_reduce_strided_t *task)
-{
-    bool aligned = !(align_pow2((intptr_t)task->dst, 16) ||
-                     align_pow2((intptr_t)task->src1, 16) ||
-                     align_pow2((intptr_t)task->src2, 16));
-
-    switch (task->dt) {
-    case UCC_DT_FLOAT32:
-        if (task->n_src2 == 1 && aligned) {
-            executor_reduce_float_sum_aligned_2((float *)task->src1,
-                       (float *)task->src2, (float *)task->dst, task->count);
-        } else {
-            executor_reduce_strided_sum<float>((float *)task->src1,
-                                               (float *)task->src2, (float *)task->dst,
-                                               task->count, task->n_src2, task->stride);
-        }
+    if (UCC_DT_FLOAT32 == dt && UCC_OP_SUM == op && aligned && n_src == 2) {
+            executor_reduce_float_sum_aligned_2((float *)s1, (float *)s2,
+                                                (float *)d, count);
+            return UCC_OK;
+    }
+    switch (dt) {
+    case UCC_DT_INT8:
+        DT_REDUCE_INT(int8_t, task, op);
         break;
-    case UCC_DT_FLOAT64:
-        executor_reduce_strided_sum<double>((double *)task->src1,
-                                            (double *)task->src2, (double *)task->dst,
-                                            task->count, task->n_src2, task->stride);
+    case UCC_DT_INT16:
+        DT_REDUCE_INT(int16_t, task, op);
         break;
     case UCC_DT_INT32:
-        executor_reduce_strided_sum<int32_t>((int32_t *)task->src1,
-                                             (int32_t *)task->src2, (int32_t *)task->dst,
-                                             task->count, task->n_src2, task->stride);
+        DT_REDUCE_INT(int32_t, task, op);
         break;
-    default:
+    case UCC_DT_INT64:
+        DT_REDUCE_INT(int64_t, task, op);
         break;
-    }
-}
-
-__device__ void executor_reduce_task(ucc_eee_task_reduce_t *task)
-{
-    bool aligned = !(align_pow2((intptr_t)task->dst, 16) ||
-                     align_pow2((intptr_t)task->srcs[0], 16) ||
-                     align_pow2((intptr_t)task->srcs[1], 16));
-    switch (task->dt) {
+    case UCC_DT_UINT8:
+        DT_REDUCE_INT(uint8_t, task, op);
+        break;
+    case UCC_DT_UINT16:
+        DT_REDUCE_INT(uint16_t, task, op);
+        break;
+    case UCC_DT_UINT32:
+        DT_REDUCE_INT(uint32_t, task, op);
+        break;
+    case UCC_DT_UINT64:
+        DT_REDUCE_INT(uint64_t, task, op);
+        break;
+    case UCC_DT_FLOAT16:
+        DT_REDUCE_FLOAT(__half, task, op);
+        break;
     case UCC_DT_FLOAT32:
-        if (task->n_srcs == 2 && aligned) {
-            executor_reduce_float_sum_aligned_2((float *)task->srcs[0],
-                      (float *)task->srcs[1], (float *)task->dst, task->count);
-        } else {
-            executor_reduce_sum<float>((const float **)task->srcs, task->n_srcs,
-                                       (float *)task->dst, task->count);
-        }
+#if SIZEOF_FLOAT == 4
+        DT_REDUCE_FLOAT(float, task, op);
         break;
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
     case UCC_DT_FLOAT64:
-        executor_reduce_sum<double>((const double **)task->srcs, task->n_srcs,
-                                    (double *)task->dst, task->count);
+#if SIZEOF_DOUBLE == 8
+        DT_REDUCE_FLOAT(double, task, op);
         break;
-    case UCC_DT_INT32:
-        executor_reduce_sum<int32_t>((const int32_t **)task->srcs, task->n_srcs,
-                                     (int32_t *)task->dst, task->count);
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
+    case UCC_DT_FLOAT32_COMPLEX:
+#if SIZEOF_CUFLOATCOMPLEX == 8
+        DT_REDUCE_FLOAT_COMPLEX(cuFloatComplex, float, task, op);
+        break;
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
+    case UCC_DT_FLOAT64_COMPLEX:
+#if SIZEOF_CUDOUBLECOMPLEX == 16
+        DT_REDUCE_FLOAT_COMPLEX(cuDoubleComplex, double, task, op);
+        break;
+#else
+        return UCC_ERR_NOT_SUPPORTED;
+#endif
+    case UCC_DT_BFLOAT16:
+        ucc_assert(2 == sizeof(__nv_bfloat16));
+        DT_REDUCE_FLOAT(__nv_bfloat16, task, op);
         break;
     default:
-        break;
+        return UCC_ERR_NOT_SUPPORTED;
     }
-}
-
-__device__ void executor_reduce_multi_dst_task(ucc_eee_task_reduce_multi_dst_t *task)
-{
-    ucc_eee_task_reduce_t reduce_task;
-
-    for (int i = 0; i < task->n_bufs; i++) {
-        reduce_task.count   = task->counts[i];
-        reduce_task.dt      = task->dt;
-        reduce_task.op      = task->op;
-        reduce_task.dst     = task->dst[i];
-        reduce_task.srcs[0] = task->src1[i];
-        reduce_task.srcs[1] = task->src2[i];
-        reduce_task.n_srcs  = 2;
-
-        executor_reduce_task(&reduce_task);
-    }
-}
-
-__device__ void executor_copy_multi(ucc_eee_task_copy_multi_t *task)
-{
-    const size_t     step     = blockDim.x;
-    size_t           min_size = task->counts[0];
-    size_t           idx      = threadIdx.x;
-    __shared__ int4 *dsts[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
-    __shared__ int4 *srcs[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
-    bool             aligned;
-
-    for (int i = 0; i < task->num_vectors; i++) {
-        dsts[i] = (int4*)task->dst[i];
-        srcs[i] = (int4*)task->src[i];
-        aligned = !(align_pow2((intptr_t)srcs[i], 16) ||
-                    align_pow2((intptr_t)dsts[i], 16));
-        if (!aligned) {
-            break;
-        }
-        if (task->counts[i] < min_size) {
-            min_size = task->counts[i];
-        }
-    }
-
-    if (!aligned || min_size < 16) {
-        for (int i = 0; i < task->num_vectors; i++) {
-            ucc_eee_task_copy_t copy_task;
-
-            copy_task.src = task->src[i];
-            copy_task.dst = task->dst[i];
-            copy_task.len = task->counts[i];
-            executor_copy_task<LOOP_UNROLL>(copy_task);
-        }
-        return;
-    }
-
-    const int n        = min_size / sizeof(uint4);
-    const int num_iter = n / step + ((threadIdx.x < n % step) ? 1 : 0);
-
-    for (size_t i = 0; i < num_iter; i++) {
-#pragma unroll
-        for (int j = 0; j < task->num_vectors; j++) {
-            dsts[j][idx] = srcs[j][idx];
-        }
-        idx += step;
-    }
-
-    const size_t left = min_size + min_size % sizeof(uint4);
-
-    for (int i = 0; i < task->num_vectors; i++) {
-        ucc_eee_task_copy_t copy_task;
-
-        copy_task.src = (char*)task->src[i] + left;
-        copy_task.dst = (char*)task->dst[i] + left;
-        copy_task.len = task->counts[i] - left;
-        executor_copy_task<LOOP_UNROLL>(copy_task);
-   }
+    return UCC_OK;
 }
 
 template<bool useCoopLaunch>
@@ -348,16 +292,8 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
             executor_copy_task<LOOP_UNROLL>(args.copy);
             break;
         case UCC_EE_EXECUTOR_TASK_REDUCE:
-            executor_reduce_task(&args.reduce);
-            break;
         case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:
-            executor_reduce_strided_task(&args.reduce_strided);
-            break;
-        case UCC_EE_EXECUTOR_TASK_REDUCE_MULTI_DST:
-            executor_reduce_multi_dst_task(&args.reduce_multi_dst);
-            break;
-        case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
-            executor_copy_multi(&args.copy_multi);
+            executor_reduce(&args);
             break;
         default:
             break;
@@ -371,9 +307,8 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
     }
 }
 
-#ifdef __cplusplus
+
 extern "C" {
-#endif
 
 ucc_status_t ucc_ec_cuda_persistent_kernel_start(ucc_ec_cuda_executor_t *eee)
 {
@@ -459,6 +394,5 @@ ucc_status_t ucc_ec_cuda_copy_multi_kernel(const ucc_ee_executor_task_args_t *ar
     return UCC_OK;
 }
 
-#ifdef __cplusplus
 }
-#endif
+
