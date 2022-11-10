@@ -15,21 +15,28 @@ ENV UCX_BUILD_TYPE=release-mt
 ENV UCX_INSTALL_DIR=${BIN_DIR}/ucx/build-${UCX_BUILD_TYPE}
 ENV UCC_INSTALL_DIR=${BIN_DIR}/ucc/build
 #==============================================================================
+RUN yum update -y
+
+COPY mlnx.repo /etc/yum.repos.d/mlnx.repo
+
+# '--nobest' is needed because there're some conflicts between ubi8 and mlnx repos
 RUN yum groupinstall -y \
     'Development Tools' \
-    'Infiniband Support'
-RUN yum config-manager --set-enabled powertools && yum install -y \
+    'Infiniband Support' \
+    --nobest
+
+RUN yum install -y \
     numactl \
     numactl-devel \
     openmpi \
     openmpi-devel \
     openssh-server \
     protobuf-compiler \
-    protobuf-devel \
     python36-devel \
     rdma-core-devel \
     vim \
     wget
+
 # Remove old UCX
 RUN rpm -e --nodeps ucx
 ENV PATH=/usr/lib64/openmpi/bin:$PATH
