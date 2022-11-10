@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -288,7 +288,7 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
     struct sharp_coll_init_spec  init_spec = {0};
     ucc_tl_sharp_lib_t          *lib       = ucc_derived_of(sharp_ctx->super.super.lib,
                                                             ucc_tl_sharp_lib_t);
-    ucc_status_t status;
+    int ret;
 
     init_spec.progress_func                  = NULL;
     init_spec.world_local_rank               = 0;
@@ -321,15 +321,15 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
     }
 
     //TODO: replace with unique context ID?
-    status = init_spec.oob_colls.bcast((void *)oob_ctx,
-                                        &init_spec.job_id,
-                                        sizeof(uint64_t), 0);
-    if (status != UCC_OK) {
-        tl_error(sharp_ctx->super.super.lib, "failed to broadcast SHARP job_id");
-        return status;
+    ret = init_spec.oob_colls.bcast((void *)oob_ctx, &init_spec.job_id,
+                                    sizeof(uint64_t), 0);
+    if (ret < 0) {
+        tl_error(sharp_ctx->super.super.lib,
+                 "failed to broadcast SHARP job_id");
+        return UCC_ERR_NO_MESSAGE;
     }
 
-    int ret = sharp_coll_init(&init_spec, context);
+    ret = sharp_coll_init(&init_spec, context);
     if (ret < 0 ) {
         tl_debug(sharp_ctx->super.super.lib, "Failed to initialize SHARP "
                  "collectives:%s(%d) job ID:%" PRIu64"\n",

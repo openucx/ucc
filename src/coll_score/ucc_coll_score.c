@@ -3,6 +3,7 @@
  *
  * See file LICENSE for terms.
  */
+
 #include "ucc_coll_score.h"
 #include "utils/ucc_string.h"
 #include "utils/ucc_log.h"
@@ -1000,7 +1001,7 @@ ucc_status_t ucc_coll_score_update(ucc_coll_score_t  *score,
 
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
         for (j = 0; j < mt_n; j++) {
-            mt = (mtypes == NULL ? j : mtypes[j]);
+            mt = (mtypes == NULL) ? (ucc_memory_type_t)j : mtypes[j];
             status = ucc_coll_score_update_one(
                 &score->scores[i][mt],
                 &update->scores[i][mt], default_score);

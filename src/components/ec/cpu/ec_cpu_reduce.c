@@ -75,8 +75,8 @@
 
 #define DO_DT_REDUCE_INT(type, _srcs, _dst, _op, _count, _n_srcs)              \
     do {                                                                       \
-        const type **restrict s = (const type **restrict)_srcs;                \
-        type *restrict        d = (type * restrict) _dst;                      \
+        const type **restrict s = (const type **)_srcs;                        \
+        type *restrict        d = (type * ) _dst;                              \
         switch (_op) {                                                         \
         case UCC_OP_AVG:                                                       \
         case UCC_OP_SUM:                                                       \
@@ -171,8 +171,8 @@
 
 #define DO_DT_REDUCE_FLOAT(type, _srcs, _dst, _op, _count, _n_srcs)            \
     do {                                                                       \
-        const type **restrict s = (const type **restrict)_srcs;                \
-        type *restrict        d = (type * restrict) _dst;                      \
+        const type **restrict s = (const type **)_srcs;                        \
+        type *restrict        d = (type *) _dst;                               \
         switch (_op) {                                                         \
         case UCC_OP_AVG:                                                       \
         case UCC_OP_SUM:                                                       \
@@ -201,8 +201,8 @@
 
 #define DO_DT_REDUCE_FLOAT_COMPLEX(type, _srcs, _dst, _op, _count, _n_srcs)    \
     do {                                                                       \
-        const type **restrict s = (const type **restrict)_srcs;                \
-        type *restrict        d = (type * restrict) _dst;                      \
+        const type **restrict s = (const type **)_srcs;                        \
+        type *restrict        d = (type *) _dst;                               \
         switch (_op) {                                                         \
         case UCC_OP_AVG:                                                       \
         case UCC_OP_SUM:                                                       \

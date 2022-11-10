@@ -667,7 +667,7 @@ static ucc_pipeline_params_t ucc_pipeline_params_auto = {
     .n_frags   = 0,
     .frag_size = 0,
     .pdepth    = 0,
-    .order     = 0
+    .order     = UCC_PIPELINE_PARALLEL,
 };
 
 static ucc_pipeline_params_t ucc_pipeline_params_no = {
@@ -675,7 +675,7 @@ static ucc_pipeline_params_t ucc_pipeline_params_no = {
     .n_frags   = 0,
     .frag_size = 0,
     .pdepth    = 1,
-    .order     = 0
+    .order     = UCC_PIPELINE_PARALLEL,
 };
 
 static ucc_pipeline_params_t ucc_pipeline_params_default = {
@@ -683,7 +683,7 @@ static ucc_pipeline_params_t ucc_pipeline_params_default = {
     .n_frags   = 2,
     .frag_size = SIZE_MAX,
     .pdepth    = 2,
-    .order     = UCC_PIPELINE_SEQUENTIAL
+    .order     = UCC_PIPELINE_SEQUENTIAL,
 };
 
 int ucc_pipeline_params_is_auto(const ucc_pipeline_params_t *p)

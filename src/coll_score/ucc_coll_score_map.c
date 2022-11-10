@@ -3,6 +3,7 @@
  *
  * See file LICENSE for terms.
  */
+
 #include "ucc_coll_score.h"
 #include "utils/ucc_coll_utils.h"
 #include "utils/ucc_string.h"
@@ -179,7 +180,7 @@ void ucc_coll_score_map_print_info(const ucc_score_map_t *map)
         coll_str[0] = '\0';
         left        = sizeof(coll_str);
         STR_APPEND(coll_str, left, 32, "%s:\n",
-                   ucc_coll_type_str(UCC_BIT(i)));
+                   ucc_coll_type_str((ucc_coll_type_t)UCC_BIT(i)));
         for (j = 0; j < UCC_MEMORY_TYPE_LAST; j++) {
             if (ucc_list_is_empty(&map->score->scores[i][j])) {
                 continue;
