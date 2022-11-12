@@ -101,6 +101,33 @@ static ucc_mpool_ops_t ucc_tl_nccl_req_mapped_mpool_ops = {
     .obj_cleanup   = ucc_tl_nccl_req_mpool_obj_cleanup
 };
 
+static ucc_status_t ucc_tl_nccl_managed_mpool_chunk_malloc(ucc_mpool_t *mp,
+                                                           size_t *size_p,
+                                                           void ** chunk_p)
+{
+    cudaError_t cu_st;
+
+    cu_st = cudaMallocManaged((void**)chunk_p, *size_p, cudaMemAttachGlobal);
+    if (cu_st != cudaSuccess) {
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    return UCC_OK;
+}
+
+static void ucc_tl_nccl_managed_mpool_chunk_free(ucc_mpool_t *mp,
+                                                 void *chunk)
+{
+    cudaFree(chunk);
+}
+
+static ucc_mpool_ops_t ucc_tl_nccl_managed_mpool_ops = {
+    .chunk_alloc   = ucc_tl_nccl_managed_mpool_chunk_malloc,
+    .chunk_release = ucc_tl_nccl_managed_mpool_chunk_free,
+    .obj_init      = NULL,
+    .obj_cleanup   = NULL
+};
+
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_context_t,
                     const ucc_base_context_params_t *params,
                     const ucc_base_config_t *config)
@@ -156,11 +183,23 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_context_t,
                  "failed to initialize tl_nccl_req mpool");
         return status;
     }
+
     // scratch buffer for barrier
-    cudaError_t cuda_st = cudaMalloc(&self->scratch_buf, sizeof(float));
+    cudaError_t cuda_st = cudaMalloc(&self->barrier_scratch, sizeof(float));
     if (cuda_st != cudaSuccess) {
         return UCC_ERR_NO_MEMORY;
     }
+
+    // scratch buffer for other collectives
+    status = ucc_mpool_init(&self->cpu_staging_scratch_mp, 0, UCC_TL_NCCL_SCRATCH_BUF_SIZE,
+                            0, 1, 1, UINT_MAX, &ucc_tl_nccl_managed_mpool_ops,
+                            params->thread_mode, "tl_nccl_managed_mp");
+    if (status != UCC_OK) {
+        tl_error(self->super.super.lib,
+                 "failed to initialize tl_nccl_managed mpool");
+        return status;
+    }
+
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 }
@@ -169,8 +208,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_nccl_context_t)
 {
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
     ucc_mpool_cleanup(&self->req_mp, 1);
-    cudaFree(self->scratch_buf);
-    self->scratch_buf = NULL;
+    cudaFree(self->barrier_scratch);
+    self->barrier_scratch = NULL;
+    ucc_mpool_cleanup(&self->cpu_staging_scratch_mp, 1);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_nccl_context_t, ucc_tl_context_t);

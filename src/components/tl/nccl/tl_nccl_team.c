@@ -224,14 +224,30 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
         }
     }
 
-    // add barrier, which might be triggered from host memory type
-    // use lower score
+    /******************************************************************************/
+    /* Add CPU collectives at a lower priority */
+    /******************************************************************************/
     status = ucc_coll_score_add_range(score, UCC_COLL_TYPE_BARRIER,
                                       UCC_MEMORY_TYPE_HOST, 0, UCC_MSG_MAX, 1,
                                       ucc_tl_nccl_coll_init, tl_team);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
+
+    status = ucc_coll_score_add_range(score, UCC_COLL_TYPE_BCAST,
+                                      UCC_MEMORY_TYPE_HOST, 0, UCC_MSG_MAX, 1,
+                                      ucc_tl_nccl_coll_init, tl_team);
+    if (ucc_unlikely(UCC_OK != status)) {
+        return status;
+    }
+
+    status = ucc_coll_score_add_range(score, UCC_COLL_TYPE_ALLGATHERV,
+                                      UCC_MEMORY_TYPE_HOST, 0, UCC_MSG_MAX, 1,
+                                      ucc_tl_nccl_coll_init, tl_team);
+    if (ucc_unlikely(UCC_OK != status)) {
+        return status;
+    }
+
 
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(

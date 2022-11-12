@@ -106,6 +106,7 @@ ucc_tl_nccl_task_t * ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
     task->super.finalize           = ucc_tl_nccl_coll_finalize;
     task->super.triggered_post     = ucc_tl_nccl_triggered_post;
     task->completed                = NULL;
+    task->cpu_coll_scratch_buf     = NULL;
     if (nccl_ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
         status = ucc_ec_create_event(&task->completed, UCC_EE_CUDA_STREAM);
         if (ucc_unlikely(status != UCC_OK)) {
@@ -411,8 +412,53 @@ ucc_status_t ucc_tl_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    task->super.post = ucc_tl_nccl_allgatherv_p2p_start;
+
+    ucc_coll_args_t *args = &TASK_ARGS(task);
+    if (args->src.info.mem_type == UCC_MEMORY_TYPE_HOST) {
+        task->super.post = ucc_tl_nccl_allgatherv_p2p_start_cpu;
+    } else {
+        task->super.post = ucc_tl_nccl_allgatherv_p2p_start_gpu;
+    }
+
     return UCC_OK;
+}
+
+static void CUDART_CB cpu_bcast_copy_in(void *data)
+{
+    ucc_coll_task_t *coll_task = (ucc_coll_task_t *) data;
+    ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t *args = &TASK_ARGS(task);
+    uintptr_t total_bytes = args->src.info.count * ucc_dt_size(args->src.info.datatype);
+    uintptr_t completed = task->cpu_coll_round * UCC_TL_NCCL_SCRATCH_BUF_SIZE;
+
+    uintptr_t rem_bytes = total_bytes - completed;
+    if (rem_bytes > UCC_TL_NCCL_SCRATCH_BUF_SIZE) {
+        rem_bytes = UCC_TL_NCCL_SCRATCH_BUF_SIZE;
+    }
+
+    memcpy(task->cpu_coll_scratch_buf, PTR_OFFSET(args->src.info.buffer, completed), rem_bytes);
+}
+
+static void CUDART_CB cpu_bcast_copy_out(void *data)
+{
+    ucc_coll_task_t *coll_task = (ucc_coll_task_t *) data;
+    ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
+    ucc_coll_args_t *args = &TASK_ARGS(task);
+    uintptr_t total_bytes = args->src.info.count * ucc_dt_size(args->src.info.datatype);
+    uintptr_t completed = task->cpu_coll_round * UCC_TL_NCCL_SCRATCH_BUF_SIZE;
+
+    uintptr_t rem_bytes = total_bytes - completed;
+    if (rem_bytes > UCC_TL_NCCL_SCRATCH_BUF_SIZE) {
+        rem_bytes = UCC_TL_NCCL_SCRATCH_BUF_SIZE;
+    }
+
+    memcpy(PTR_OFFSET(args->src.info.buffer, completed), task->cpu_coll_scratch_buf, rem_bytes);
+    task->cpu_coll_round++;
+
+    if (completed + rem_bytes == total_bytes) {
+        ucc_mpool_put(task->cpu_coll_scratch_buf);
+        task->cpu_coll_scratch_buf = NULL;
+    }
 }
 
 ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
@@ -458,9 +504,39 @@ ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
                            exit_coll, status, UCC_TL_TEAM_LIB(team));
         }
     } else {
-        NCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->nccl_comm,
-                                     stream),
-                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+        if (args->src.info.mem_type == UCC_MEMORY_TYPE_HOST) {
+            ucc_tl_nccl_context_t *ctx = TASK_CTX(task);
+            task->cpu_coll_scratch_buf = ucc_mpool_get(&ctx->cpu_staging_scratch_mp);
+            if (ucc_unlikely(!task->cpu_coll_scratch_buf)) {
+                status = UCC_ERR_NO_MEMORY;
+                goto exit_coll;
+            }
+            task->cpu_coll_round = 0;
+
+            uintptr_t total_bytes = count * ucc_dt_size(args->src.info.datatype);
+            int num_rounds = total_bytes / UCC_TL_NCCL_SCRATCH_BUF_SIZE +
+                !!(total_bytes % UCC_TL_NCCL_SCRATCH_BUF_SIZE);
+
+            for (int i = 0; i < num_rounds; i++) {
+                if (UCC_TL_TEAM_RANK(team) == root) {
+                    NCCLCHECK_GOTO(cudaLaunchHostFunc(stream, cpu_bcast_copy_in, (void *) coll_task),
+                                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+                }
+
+                NCCLCHECK_GOTO(ncclBroadcast(task->cpu_coll_scratch_buf, task->cpu_coll_scratch_buf, count, dt,
+                                             root, team->nccl_comm, stream),
+                               exit_coll, status, UCC_TL_TEAM_LIB(team));
+
+                if (UCC_TL_TEAM_RANK(team) != args->root) {
+                    NCCLCHECK_GOTO(cudaLaunchHostFunc(stream, cpu_bcast_copy_out, (void *) coll_task),
+                                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+                }
+            }
+        } else {
+            NCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->nccl_comm,
+                                         stream),
+                           exit_coll, status, UCC_TL_TEAM_LIB(team));
+        }
     }
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
@@ -595,7 +671,7 @@ ucc_status_t ucc_tl_nccl_barrier_init(ucc_tl_nccl_task_t *task)
     args->flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     args->op     = UCC_OP_SUM;
 
-    args->dst.info.buffer   = TASK_CTX(task)->scratch_buf;
+    args->dst.info.buffer   = TASK_CTX(task)->barrier_scratch;
     args->src.info.buffer   = args->dst.info.buffer;
     args->dst.info.datatype = args->src.info.datatype = UCC_DT_FLOAT32;
     args->dst.info.count = args->src.info.count = 1;
@@ -960,26 +1036,30 @@ ucc_status_t ucc_tl_nccl_alg_id_to_init(int alg_id, const char *alg_id_str,
         alg_id = alg_id_from_str(coll_type, alg_id_str);
     }
 
-    switch (coll_type) {
-    case UCC_COLL_TYPE_ALLGATHERV:
-        switch (alg_id) {
-        case UCC_TL_NCCL_ALLGATHERV_ALG_P2P:
-            *init = ucc_tl_nccl_allgatherv_p2p_init;
-            break;
-        case UCC_TL_NCCL_ALLGATHERV_ALG_BCOPY:
-            *init = ucc_tl_nccl_allgatherv_bcopy_init;
-            break;
-        case UCC_TL_NCCL_ALLGATHERV_ALG_BCAST:
-            *init = ucc_tl_nccl_allgatherv_bcast_init;
+    if (mem_type == UCC_MEMORY_TYPE_HOST) {
+        *init = ucc_tl_nccl_allgatherv_p2p_init;
+    } else {
+        switch (coll_type) {
+        case UCC_COLL_TYPE_ALLGATHERV:
+            switch (alg_id) {
+            case UCC_TL_NCCL_ALLGATHERV_ALG_P2P:
+                *init = ucc_tl_nccl_allgatherv_p2p_init;
+                break;
+            case UCC_TL_NCCL_ALLGATHERV_ALG_BCOPY:
+                *init = ucc_tl_nccl_allgatherv_bcopy_init;
+                break;
+            case UCC_TL_NCCL_ALLGATHERV_ALG_BCAST:
+                *init = ucc_tl_nccl_allgatherv_bcast_init;
+                break;
+            default:
+                status = UCC_ERR_INVALID_PARAM;
+                break;
+            };
             break;
         default:
-            status = UCC_ERR_INVALID_PARAM;
+            status = UCC_ERR_NOT_SUPPORTED;
             break;
-        };
-        break;
-    default:
-        status = UCC_ERR_NOT_SUPPORTED;
-        break;
+        }
     }
     return status;
 }

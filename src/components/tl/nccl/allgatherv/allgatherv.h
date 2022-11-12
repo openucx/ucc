@@ -22,7 +22,8 @@ enum {
 extern ucc_base_coll_alg_info_t
              ucc_tl_nccl_allgatherv_algs[UCC_TL_NCCL_ALLGATHERV_ALG_LAST + 1];
 
-ucc_status_t ucc_tl_nccl_allgatherv_p2p_start(ucc_coll_task_t *coll_task);
+ucc_status_t ucc_tl_nccl_allgatherv_p2p_start_cpu(ucc_coll_task_t *coll_task);
+ucc_status_t ucc_tl_nccl_allgatherv_p2p_start_gpu(ucc_coll_task_t *coll_task);
 
 ucc_status_t ucc_tl_nccl_allgatherv_p2p_init(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t *     team,

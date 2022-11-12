@@ -37,6 +37,8 @@
 #include "utils/profile/ucc_profile_off.h"
 #endif
 
+#define UCC_TL_NCCL_SCRATCH_BUF_SIZE (1024 * 1024)
+
 #define UCC_TL_NCCL_PROFILE_FUNC UCC_PROFILE_FUNC
 #define UCC_TL_NCCL_PROFILE_FUNC_VOID UCC_PROFILE_FUNC_VOID
 #define UCC_TL_NCCL_PROFILE_REQUEST_NEW UCC_PROFILE_REQUEST_NEW
@@ -75,7 +77,8 @@ typedef struct ucc_tl_nccl_context {
     ucc_tl_context_t             super;
     ucc_tl_nccl_context_config_t cfg;
     ucc_mpool_t                  req_mp;
-    void                        *scratch_buf;
+    ucc_mpool_t                  cpu_staging_scratch_mp;
+    void                        *barrier_scratch;
 } ucc_tl_nccl_context_t;
 UCC_CLASS_DECLARE(ucc_tl_nccl_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -93,6 +96,8 @@ typedef struct ucc_tl_nccl_task {
     ucc_status_t            host_status;
     ucc_status_t           *dev_status;
     void                   *completed;
+    void                   *cpu_coll_scratch_buf;
+    int                     cpu_coll_round;
     union {
         struct {
             ucc_mc_buffer_header_t *scratch;
