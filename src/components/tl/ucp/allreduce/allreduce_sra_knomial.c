@@ -93,6 +93,8 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
     ucc_datatype_t       dtype    = coll_args->args.dst.info.datatype;
     ucc_memory_type_t    mem_type = coll_args->args.dst.info.mem_type;
     ucc_base_coll_args_t args     = *coll_args;
+    ucc_mrange_uint_t   *p        =
+        &UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sra_kn_radix;
     ucc_schedule_t      *schedule;
     ucc_coll_task_t     *task, *rs_task;
     ucc_status_t         status;
@@ -111,10 +113,12 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
         count = coll_args->args.dst.info.count;
     }
 
-    cfg_radix = ucc_tl_ucp_get_sra_kn_radix(tl_team, count *
-                                            ucc_dt_size(dtype), mem_type);
-    radix = ucc_knomial_pattern_get_min_radix(cfg_radix,
-                                              UCC_TL_TEAM_SIZE(tl_team), count);
+    cfg_radix = ucc_tl_ucp_get_radix_from_range(tl_team,
+                                                count * ucc_dt_size(dtype),
+                                                mem_type, p);
+    radix     = ucc_knomial_pattern_get_min_radix(cfg_radix,
+                                                  UCC_TL_TEAM_SIZE(tl_team),
+                                                  count);
 
     /* 1st step of allreduce: knomial reduce_scatter */
     UCC_CHECK_GOTO(

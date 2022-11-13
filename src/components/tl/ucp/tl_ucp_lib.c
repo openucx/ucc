@@ -27,10 +27,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
     if (UCC_OK != status) {
         return status;
     }
+    status = ucc_mrange_uint_copy(&self->cfg.allreduce_kn_radix,
+                                  &tl_ucp_config->allreduce_kn_radix);
+    if (UCC_OK != status) {
+        return status;
+    }
+
     if (tl_ucp_config->kn_radix > 0) {
         self->cfg.barrier_kn_radix        = tl_ucp_config->kn_radix;
-        self->cfg.allreduce_kn_radix      = tl_ucp_config->kn_radix;
-        //self->cfg.allreduce_sra_kn_radix  = tl_ucp_config->kn_radix;
         self->cfg.reduce_scatter_kn_radix = tl_ucp_config->kn_radix;
         self->cfg.allgather_kn_radix      = tl_ucp_config->kn_radix;
         self->cfg.bcast_kn_radix          = tl_ucp_config->kn_radix;

@@ -648,7 +648,6 @@ static ucc_status_t ucc_coll_score_parse_str(const char *str,
     char                  **tokens;
     unsigned i, n_tokens, ct_n, c, m, n_ranges, r, n_tsizes;
 
-
     ct_n = n_ranges = n_tsizes = 0;
     tokens = ucc_str_split(str, ":");
     if (!tokens) {
