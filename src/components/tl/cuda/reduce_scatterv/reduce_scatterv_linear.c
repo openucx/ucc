@@ -14,6 +14,10 @@
  * fragmented buffered copy linear reduce scatterv algorithm
  *
  * Description:
+ *      scratch buffer is split into 2 parts to guarantee data consistency e.g.
+ *      when ranks in the ring are running at different steps of the algorithm.
+ *      2 parts is enough since max difference between ranks steps is 1
+ *
  *  Definitions:
  *      blockI  - full send buffer at Rank I
  *      fragI_J - fragment of send buffer at Rank I and step J
@@ -22,26 +26,27 @@
  *      N       - team size
  *
  *  Setup:
- *      max_frag_size = ucc_min(ucc_max(block1, block2, ..., block N),
+ *      max_frag_size = ucc_min(ucc_max(block0, block1, ..., block N -1 ),
  *                              scratch_size / 2 / N)
- *      NF            = ucc_max(block1, block2, ..., block N) / max_frag_size
+ *      NF            = ucc_max(block0, block1, ..., block N-1) / max_frag_size
  *      NS            = 1 + NF
  *
  *  Algorithm
  *      for rank R
- *      step 1:    copy fragR_1 to remote scratch buffers for all ranks
+ *      step 0:    copy fragR_0 to remote scratch buffers for all ranks
  *
- *      step 1:    reduce frag1_1, frag2_1, ..., fragN_1 from local scratch buffer
+ *      step 1:    reduce frag1_0, frag2_0, ..., fragN_0 from local scratch buffer
  *                 to local dst buffer
- *                 copy fragR_2 from local src buffer to remote scratch buffers
+ *                 copy fragR_1 from local src buffer to remote scratch buffers
  *                 for all ranks
+ *      ...
  *
- *      step NS-1: reduce frag1_(NS-2), frag2_(NS-2), ..., fragN_(NS-2) from local
+ *      step NS-2: reduce frag1_(NS-3), frag2_(NS-3), ..., fragN_(NS-3) from local
  *                 scratch buffer to local dst buffer
  *                 copy fragR_NS from local src buffer to remote scratch buffers
  *                 for all ranks
  *
- *      step NS:   reduce frag1_(NS-1), frag2_(NS-1), ..., fragN_(NS-1) from local
+ *      step NS-1: reduce frag1_(NS-2), frag2_(NS-2), ..., fragN_(NS-2) from local
  *                 scratch buffer to local dst buffer
  */
 
@@ -389,12 +394,9 @@ ucc_tl_cuda_reduce_scatterv_linear_start(ucc_coll_task_t *coll_task)
 
     task->reduce_scatterv_linear.stage = STAGE_SYNC;
     task->reduce_scatterv_linear.sbuf  = args->src.info.buffer;
-    if (args->coll_type == UCC_COLL_TYPE_REDUCE_SCATTERV) {
-        task->reduce_scatterv_linear.rbuf = args->dst.info_v.buffer;
-    } else {
-        task->reduce_scatterv_linear.rbuf = args->dst.info.buffer;
-    }
-
+    task->reduce_scatterv_linear.rbuf  =
+            (args->coll_type == UCC_COLL_TYPE_REDUCE_SCATTERV) ?
+            args->dst.info_v.buffer : args->dst.info.buffer;
     send_size = task->reduce_scatterv_linear.get_count(task, 0);
     for (i = 1; i < tsize; i++) {
         send_size =
@@ -411,7 +413,7 @@ ucc_tl_cuda_reduce_scatterv_linear_start(ucc_coll_task_t *coll_task)
     task->reduce_scatterv_linear.num_frags = ucc_div_round_up(send_size, frag_size);
 
     memset(task->reduce_scatterv_linear.exec_task, 0,
-           2 * tsize * sizeof(ucc_ee_executor_task_t*));
+           2 * sizeof(ucc_ee_executor_task_t*));
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
