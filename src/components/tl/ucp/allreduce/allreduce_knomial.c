@@ -199,7 +199,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allreduce_kn_start", 0);
     task->allreduce_kn.phase = UCC_KN_PHASE_INIT;
     ucc_assert(UCC_IS_INPLACE(TASK_ARGS(task)) ||
-               (TASK_ARGS(task).src.info.mem_type == meme_type));
+               (TASK_ARGS(task).src.info.mem_type == mem_type));
     cfg_radix = ucc_tl_ucp_get_radix_from_range(team, data_size,
                                                 mem_type, p);
     ucc_knomial_pattern_init(size, rank, ucc_min(cfg_radix, size),

@@ -825,12 +825,19 @@ int ucc_config_sscanf_uint_ranged(const char *buf, void *dest,
             goto err_ranges;
         }
         n_tokens = ucc_str_split_count(tokens);
-        if (n_tokens > 3 || UCC_OK != ucc_str_is_number(tokens[n_tokens - 1])) {
+        if (n_tokens > 3 ||
+            (UCC_OK != ucc_str_is_number(tokens[n_tokens - 1]) &&
+             strcasecmp(tokens[n_tokens - 1], UCS_VALUE_AUTO_STR) != 0)) {
             goto err_tokens;
         }
         if (n_tokens == 1) {
+            if (!strcasecmp(tokens[n_tokens - 1], UCS_VALUE_AUTO_STR)) {
+            /* Special value: auto */
+                p->default_value = UCC_UUNITS_AUTO;
+            } else {
             /* default value without range */
-            p->default_value = atoi(tokens[0]);
+                p->default_value = atoi(tokens[0]);
+            }
         } else {
             r = ucc_malloc(sizeof(*r), "mrange");
             if (!r) {
