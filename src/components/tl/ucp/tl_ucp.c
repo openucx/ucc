@@ -21,6 +21,7 @@
 #include "gather/gather.h"
 #include "fanout/fanout.h"
 #include "fanin/fanin.h"
+#include "scatterv/scatterv.h"
 
 ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib,
                                      ucc_base_lib_attr_t  *base_attr);
@@ -302,7 +303,7 @@ __attribute__((constructor)) static void tl_ucp_iface_init(void)
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTERV)] =
         ucc_tl_ucp_reduce_scatterv_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_SCATTERV)] =
-        ucc_tl_ucp_reduce_scatterv_algs;
+        ucc_tl_ucp_scatterv_algs;
 
     /* no need to check return value, plugins can be absent */
     (void)ucc_components_load("tlcp_ucp", &ucc_tl_ucp.super.coll_plugins);

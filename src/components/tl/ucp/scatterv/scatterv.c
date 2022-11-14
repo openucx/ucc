@@ -14,7 +14,7 @@ ucc_status_t ucc_tl_ucp_scatterv_linear_start(ucc_coll_task_t *task);
 void ucc_tl_ucp_scatterv_linear_progress(ucc_coll_task_t *task);
 
 ucc_base_coll_alg_info_t
-    ucc_tl_ucp_scatterv_linear_algs[UCC_TL_UCP_SCATTERV_ALG_LAST + 1] = {
+    ucc_tl_ucp_scatterv_algs[UCC_TL_UCP_SCATTERV_ALG_LAST + 1] = {
         [UCC_TL_UCP_SCATTERV_ALG_LINEAR] =
             {.id   = UCC_TL_UCP_SCATTERV_ALG_LINEAR,
              .name = "linear",

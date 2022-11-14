@@ -35,6 +35,7 @@ void ucc_tl_ucp_scatterv_linear_progress(ucc_coll_task_t *coll_task)
         dt_size = ucc_dt_size(TASK_ARGS(task).src.info_v.datatype);
 
         while (polls++ < task->n_polls) {
+            ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->worker.ucp_worker);
             while ((task->tagged.send_posted < gsize) &&
                    ((task->tagged.send_posted - task->tagged.send_completed) <
                     nreqs)) {
@@ -118,6 +119,6 @@ ucc_status_t ucc_tl_ucp_scatterv_linear_init(ucc_tl_ucp_task_t *task)
     task->super.post     = ucc_tl_ucp_scatterv_linear_start;
     task->super.progress = ucc_tl_ucp_scatterv_linear_progress;
 
-    task->n_polls = ucc_min(1, task->n_polls);
+    task->n_polls = ucc_max(1, task->n_polls);
     return UCC_OK;
 }
