@@ -28,14 +28,15 @@ ucc_status_t ucc_tl_ucp_gatherv_init(ucc_tl_ucp_task_t *task)
 {
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
     ucc_coll_args_t   *args  = &TASK_ARGS(task);
+    ucc_rank_t         trank = UCC_TL_TEAM_RANK(team);
 
-    if (UCC_TL_TEAM_RANK(team) == args->root) {
+    if (UCC_IS_ROOT(*args, trank)) {
         if (!UCC_DT_IS_PREDEFINED(args->dst.info_v.datatype)) {
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
-    if ((UCC_TL_TEAM_RANK(team) != args->root) ||
-        (!UCC_IS_INPLACE(*args))) {
+
+    if (!UCC_IS_ROOT(*args, trank) || !UCC_IS_INPLACE(*args)) {
         if (!UCC_DT_IS_PREDEFINED(args->src.info.datatype)) {
             return UCC_ERR_NOT_SUPPORTED;
         }

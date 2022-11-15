@@ -35,6 +35,7 @@ void ucc_tl_ucp_gatherv_linear_progress(ucc_coll_task_t *coll_task)
         dt_size = ucc_dt_size(TASK_ARGS(task).dst.info_v.datatype);
 
         while (polls++ < task->n_polls) {
+            ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->worker.ucp_worker);
             while ((task->tagged.recv_posted < gsize) &&
                    ((task->tagged.recv_posted - task->tagged.recv_completed) <
                     nreqs)) {
@@ -58,9 +59,8 @@ void ucc_tl_ucp_gatherv_linear_progress(ucc_coll_task_t *coll_task)
 out:
     if (task->super.status != UCC_INPROGRESS) {
         UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task,
-                                         "ucp_gatherv_pairwise_done", 0);
+                                         "ucp_gatherv_linear_done", 0);
     }
-    return;
 }
 
 ucc_status_t ucc_tl_ucp_gatherv_linear_start(ucc_coll_task_t *coll_task)
@@ -75,8 +75,7 @@ ucc_status_t ucc_tl_ucp_gatherv_linear_start(ucc_coll_task_t *coll_task)
     void              *rbuf;
     size_t             dt_size, data_displ, data_size;
 
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_gatherv_pairwise_start",
-                                     0);
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_gatherv_linear_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     if (UCC_IS_ROOT(*args, grank)) {
@@ -120,6 +119,6 @@ ucc_status_t ucc_tl_ucp_gatherv_linear_init(ucc_tl_ucp_task_t *task)
     task->super.post     = ucc_tl_ucp_gatherv_linear_start;
     task->super.progress = ucc_tl_ucp_gatherv_linear_progress;
 
-    task->n_polls = ucc_min(1, task->n_polls);
+    task->n_polls = ucc_max(1, task->n_polls);
     return UCC_OK;
 }

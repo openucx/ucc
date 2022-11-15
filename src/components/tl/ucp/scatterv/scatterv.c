@@ -36,8 +36,7 @@ ucc_status_t ucc_tl_ucp_scatterv_init(ucc_tl_ucp_task_t *task)
         }
     }
 
-    if (!UCC_IS_ROOT(*args, trank) ||
-        !UCC_IS_INPLACE(*args)) {
+    if (!UCC_IS_ROOT(*args, trank) || !UCC_IS_INPLACE(*args)) {
         if (!UCC_DT_IS_PREDEFINED(args->dst.info.datatype)) {
             return UCC_ERR_NOT_SUPPORTED;
         }
