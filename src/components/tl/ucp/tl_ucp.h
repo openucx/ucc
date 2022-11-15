@@ -56,6 +56,7 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t              reduce_kn_radix;
     uint32_t              gather_kn_radix;
     uint32_t              scatter_kn_radix;
+    uint32_t              scatterv_linear_num_posts;
     uint32_t              alltoall_pairwise_num_posts;
     uint32_t              alltoallv_pairwise_num_posts;
     ucc_pipeline_params_t allreduce_sra_kn_pipeline;
@@ -128,11 +129,20 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
 #define UCC_TL_UCP_SUPPORTED_COLLS                                             \
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV | UCC_COLL_TYPE_GATHER | \
-     UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
-     UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_BARRIER |   \
-     UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_FANIN | UCC_COLL_TYPE_FANOUT |       \
-     UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
+    (UCC_COLL_TYPE_ALLGATHER |                                                 \
+     UCC_COLL_TYPE_ALLGATHERV |                                                \
+     UCC_COLL_TYPE_ALLREDUCE |                                                 \
+     UCC_COLL_TYPE_ALLTOALL |                                                  \
+     UCC_COLL_TYPE_ALLTOALLV |                                                 \
+     UCC_COLL_TYPE_BARRIER |                                                   \
+     UCC_COLL_TYPE_BCAST |                                                     \
+     UCC_COLL_TYPE_FANIN |                                                     \
+     UCC_COLL_TYPE_FANOUT |                                                    \
+     UCC_COLL_TYPE_GATHER |                                                    \
+     UCC_COLL_TYPE_REDUCE |                                                    \
+     UCC_COLL_TYPE_REDUCE_SCATTER |                                            \
+     UCC_COLL_TYPE_REDUCE_SCATTERV |                                           \
+     UCC_COLL_TYPE_SCATTERV)
 
 #define UCC_TL_UCP_TEAM_LIB(_team)                                             \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_ucp_lib_t))
@@ -152,7 +162,8 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 #define UCC_TL_CTX_HAS_OOB(_ctx)                                               \
     ((_ctx)->super.super.ucc_context->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB)
 
-#define UCC_TL_CTX_OOB(_ctx) ((_ctx)->super.super.ucc_context->params.oob)
+#define UCC_TL_CTX_OOB(_ctx)                                                   \
+    ((_ctx)->super.super.ucc_context->params.oob)
 
 #define UCC_TL_UCP_REMOTE_RKEY(_ctx, _rank, _seg)                              \
     ((_ctx)->rkeys[_rank * _ctx->n_rinfo_segs + _seg])
