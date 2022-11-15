@@ -43,7 +43,7 @@
  *
  *      step NS-2: reduce frag1_(NS-3), frag2_(NS-3), ..., fragN_(NS-3) from local
  *                 scratch buffer to local dst buffer
- *                 copy fragR_NS from local src buffer to remote scratch buffers
+ *                 copy fragR_(NS-2) from local src buffer to remote scratch buffers
  *                 for all ranks
  *
  *      step NS-1: reduce frag1_(NS-2), frag2_(NS-2), ..., fragN_(NS-2) from local
@@ -86,7 +86,7 @@ ucc_tl_cuda_reduce_scatterv_linear_finalize(ucc_coll_task_t *coll_task)
 }
 
 /*
- * get maximum size of scratch memory evenly divisble by
+ * get maximum size of scratch memory evenly divisible by
  * (2 * team_size * datatype_size)
  */
 static inline size_t get_scratch_size(ucc_tl_cuda_team_t *team,
@@ -94,9 +94,9 @@ static inline size_t get_scratch_size(ucc_tl_cuda_team_t *team,
 {
     size_t     dt_size = ucc_dt_size(dt);
     ucc_rank_t tsize   = UCC_TL_TEAM_SIZE(team);
-    size_t     div     = 2 * dt_size * tsize;
+    size_t     divisor = 2 * dt_size * tsize;
 
-    return (UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size / div) * div;
+    return (UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size / divisor) * divisor;
 }
 
 /* get stride between consecutive rank slots in scratch memory */
@@ -106,7 +106,7 @@ static inline size_t get_scratch_stride(ucc_tl_cuda_team_t *team,
     size_t     step_ssize = get_scratch_size(team, dt) / 2;
     ucc_rank_t tsize      = UCC_TL_TEAM_SIZE(team);
 
-    return ucc_buffer_block_count(step_ssize, tsize, 0);
+    return step_ssize / tsize;
 }
 
 /* get offset of rank slot inside scratch  */
@@ -116,7 +116,7 @@ static inline size_t get_scratch_offset(ucc_tl_cuda_team_t *team,
     size_t     step_ssize = get_scratch_size(team, dt) / 2;
     ucc_rank_t tsize      = UCC_TL_TEAM_SIZE(team);
 
-    return ucc_buffer_block_offset(step_ssize, tsize, rank);
+    return rank * step_ssize / tsize;
 }
 
 ucc_status_t
@@ -143,6 +143,7 @@ ucc_status_t
 ucc_tl_cuda_reduce_scatterv_linear_setup_test(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+
     return ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), task->bar);
 }
 
@@ -158,12 +159,15 @@ ucc_tl_cuda_reduce_scatterv_linear_copy(ucc_tl_cuda_task_t *task,
     ucc_datatype_t      dt        = task->reduce_scatterv_linear.dt;
     size_t              dt_size   = ucc_dt_size(dt);
     int                 nfrags    = task->reduce_scatterv_linear.num_frags;
-    size_t scratch_offset, send_size, frag_size, frag_offset, rank_offset;
+    size_t scratch_offset, scratch_stride, send_size, frag_size, frag_offset,
+           rank_offset;
     ucc_ee_executor_task_args_t  eargs;
     ucc_rank_t i, nv;
 
     scratch_offset  = get_scratch_offset(team, dt, trank);
+    scratch_stride  = get_scratch_stride(team, dt);
     eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY_MULTI;
+    eargs.flags     = 0;
     for (i = 0, nv = 0; i < tsize; i++) {
         if (i == trank) {
             continue;
@@ -183,7 +187,7 @@ ucc_tl_cuda_reduce_scatterv_linear_copy(ucc_tl_cuda_task_t *task,
                 remote_offset + scratch_offset);
         } else {
             eargs.copy_multi.dst[nv] = PTR_OFFSET(TASK_SCRATCH(task, i),
-                remote_offset + scratch_offset - get_scratch_stride(team, dt));
+                remote_offset + scratch_offset - scratch_stride);
         }
         nv++;
     }
@@ -223,6 +227,7 @@ ucc_tl_cuda_reduce_scatterv_linear_reduce(ucc_tl_cuda_task_t *task,
     }
 
     eargs.task_type             = UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED;
+    eargs.flags                 = 0;
     eargs.reduce_strided.src1   = PTR_OFFSET(sbuf, (rank_offset + frag_offset) * dt_size);
     eargs.reduce_strided.src2   = PTR_OFFSET(TASK_SCRATCH(task, trank), local_offset);
     eargs.reduce_strided.stride = get_scratch_stride(team, dt);
@@ -247,11 +252,11 @@ ucc_tl_cuda_reduce_scatterv_linear_progress_frag(ucc_tl_cuda_task_t *task)
     size_t                  ssize     = get_scratch_size(team, dt);
     int                     nfrags    = task->reduce_scatterv_linear.num_frags;
     int                     num_steps = nfrags + 1;
-    ucc_ee_executor_task_t      *etask;
-    ucc_status_t                 st;
-    ucc_ee_executor_t           *exec;
-    int                          step, i;
-    void                        *sbuf, *rbuf;
+    ucc_ee_executor_task_t *etask;
+    ucc_status_t            st;
+    ucc_ee_executor_t      *exec;
+    int                     step, i;
+    void                   *sbuf, *rbuf;
     size_t local_offset, remote_offset, rank_offset;
 
     st = ucc_coll_task_get_executor(&task->super, &exec);
@@ -394,9 +399,6 @@ ucc_tl_cuda_reduce_scatterv_linear_start(ucc_coll_task_t *coll_task)
 
     task->reduce_scatterv_linear.stage = STAGE_SYNC;
     task->reduce_scatterv_linear.sbuf  = args->src.info.buffer;
-    task->reduce_scatterv_linear.rbuf  =
-            (args->coll_type == UCC_COLL_TYPE_REDUCE_SCATTERV) ?
-            args->dst.info_v.buffer : args->dst.info.buffer;
     send_size = task->reduce_scatterv_linear.get_count(task, 0);
     for (i = 1; i < tsize; i++) {
         send_size =
@@ -439,6 +441,9 @@ ucc_tl_cuda_reduce_scatterv_linear_init(ucc_base_coll_args_t *coll_args,
         ucc_tl_cuda_reduce_scatterv_get_count;
     task->reduce_scatterv_linear.get_offset =
         ucc_tl_cuda_reduce_scatterv_get_offset;
+    task->reduce_scatterv_linear.dt         =
+            coll_args->args.dst.info_v.datatype;
+    task->reduce_scatterv_linear.rbuf       = coll_args->args.dst.info_v.buffer;
     task->super.flags          |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post           = ucc_tl_cuda_reduce_scatterv_linear_start;
     task->super.progress       = ucc_tl_cuda_reduce_scatterv_linear_progress;

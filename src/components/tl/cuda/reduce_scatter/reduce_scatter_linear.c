@@ -11,10 +11,7 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_linear_init(ucc_base_coll_args_t *coll_a
                                                     ucc_base_team_t *     tl_team,
                                                     ucc_coll_task_t **    task_p)
 {
-    ucc_tl_cuda_team_t *team   = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
-    size_t              ssize  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size;
-    ucc_datatype_t      dt     = coll_args->args.dst.info.datatype;
-    size_t send_size, frag_size;
+    ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     ucc_tl_cuda_task_t *task;
     ucc_status_t status;
 
@@ -27,16 +24,12 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_linear_init(ucc_base_coll_args_t *coll_a
         return status;
     }
 
-    task->reduce_scatterv_linear.get_count  = ucc_tl_cuda_reduce_scatter_get_count;
-    task->reduce_scatterv_linear.get_offset = ucc_tl_cuda_reduce_scatter_get_offset;
+    task->reduce_scatterv_linear.get_count  =
+        ucc_tl_cuda_reduce_scatter_get_count;
+    task->reduce_scatterv_linear.get_offset =
+        ucc_tl_cuda_reduce_scatter_get_offset;
     task->reduce_scatterv_linear.dt         = coll_args->args.dst.info.datatype;
     task->reduce_scatterv_linear.rbuf       = coll_args->args.dst.info.buffer;
-
-    send_size = task->reduce_scatterv_linear.get_count(task, 0);
-    frag_size = ucc_min(ssize / ucc_dt_size(dt) / 2, send_size);
-
-    task->reduce_scatterv_linear.num_frags = ucc_div_round_up(send_size,
-                                                             frag_size);
     task->super.flags          |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post           = ucc_tl_cuda_reduce_scatterv_linear_start;
     task->super.triggered_post = ucc_triggered_post;
