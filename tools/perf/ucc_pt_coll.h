@@ -109,6 +109,23 @@ public:
     float get_bw(float time_ms, int grsize, ucc_pt_test_args_t args) override;
 };
 
+class ucc_pt_coll_gather: public ucc_pt_coll {
+public:
+    ucc_pt_coll_gather(ucc_datatype_t dt, ucc_memory_type mt,
+                       bool is_inplace, ucc_pt_comm *communicator);
+    ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
+    void free_args(ucc_pt_test_args_t &args) override;
+    float get_bw(float time_ms, int grsize, ucc_pt_test_args_t args) override;
+};
+
+class ucc_pt_coll_gatherv: public ucc_pt_coll {
+public:
+    ucc_pt_coll_gatherv(ucc_datatype_t dt, ucc_memory_type mt,
+                        bool is_inplace, ucc_pt_comm *communicator);
+    ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
+    void free_args(ucc_pt_test_args_t &args) override;
+};
+
 class ucc_pt_coll_reduce: public ucc_pt_coll {
 public:
     ucc_pt_coll_reduce(ucc_datatype_t dt, ucc_memory_type mt,
@@ -129,19 +146,11 @@ public:
     float get_bw(float time_ms, int grsize, ucc_pt_test_args_t args) override;
 };
 
-class ucc_pt_coll_gather: public ucc_pt_coll {
+class ucc_pt_coll_reduce_scatterv: public ucc_pt_coll {
 public:
-    ucc_pt_coll_gather(ucc_datatype_t dt, ucc_memory_type mt,
-                       bool is_inplace, ucc_pt_comm *communicator);
-    ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
-    void free_args(ucc_pt_test_args_t &args) override;
-    float get_bw(float time_ms, int grsize, ucc_pt_test_args_t args) override;
-};
-
-class ucc_pt_coll_gatherv: public ucc_pt_coll {
-public:
-    ucc_pt_coll_gatherv(ucc_datatype_t dt, ucc_memory_type mt,
-                        bool is_inplace, ucc_pt_comm *communicator);
+    ucc_pt_coll_reduce_scatterv(ucc_datatype_t dt, ucc_memory_type mt,
+                                ucc_reduction_op_t op, bool is_inplace,
+                                ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;
 };
