@@ -55,6 +55,7 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t              bcast_sag_kn_radix;
     uint32_t              reduce_kn_radix;
     uint32_t              gather_kn_radix;
+    uint32_t              gatherv_linear_num_posts;
     uint32_t              scatter_kn_radix;
     uint32_t              scatterv_linear_num_posts;
     uint32_t              alltoall_pairwise_num_posts;
@@ -139,6 +140,7 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
      UCC_COLL_TYPE_FANIN |                                                     \
      UCC_COLL_TYPE_FANOUT |                                                    \
      UCC_COLL_TYPE_GATHER |                                                    \
+     UCC_COLL_TYPE_GATHERV |                                                   \
      UCC_COLL_TYPE_REDUCE |                                                    \
      UCC_COLL_TYPE_REDUCE_SCATTER |                                            \
      UCC_COLL_TYPE_REDUCE_SCATTERV |                                           \

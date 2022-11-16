@@ -61,6 +61,11 @@ gather =                    \
 	gather/gather.c         \
 	gather/gather_knomial.c
 
+gatherv =                    \
+	gatherv/gatherv.h        \
+	gatherv/gatherv.c        \
+	gatherv/gatherv_linear.c
+
 reduce =                    \
 	reduce/reduce.h         \
 	reduce/reduce.c         \
@@ -106,6 +111,7 @@ sources =                 \
 	$(fanin)              \
 	$(fanout)             \
 	$(gather)             \
+	$(gatherv)            \
 	$(reduce)             \
 	$(reduce_scatter)     \
 	$(reduce_scatterv)    \

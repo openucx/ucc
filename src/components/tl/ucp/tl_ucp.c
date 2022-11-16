@@ -19,6 +19,7 @@
 #include "reduce_scatterv/reduce_scatterv.h"
 #include "reduce/reduce.h"
 #include "gather/gather.h"
+#include "gatherv/gatherv.h"
 #include "fanout/fanout.h"
 #include "fanin/fanin.h"
 #include "scatterv/scatterv.h"
@@ -102,6 +103,12 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
 
     {"GATHER_KN_RADIX", "4", "Radix of the knomial tree reduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, gather_kn_radix),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"GATHERV_LINEAR_NUM_POSTS", "0",
+     "Maximum number of outstanding send and receive messages in gatherv "
+     "linear algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, gatherv_linear_num_posts),
      UCC_CONFIG_TYPE_UINT},
 
     {"SCATTER_KN_RADIX", "4", "Radix of the knomial scatter algorithm",
@@ -228,7 +235,7 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
 
 UCC_TL_IFACE_DECLARE(ucp, UCP);
 
-ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1] = {
+ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST + 1] = {
     [UCC_MEMORY_TYPE_HOST]         = UCS_MEMORY_TYPE_HOST,
     [UCC_MEMORY_TYPE_CUDA]         = UCS_MEMORY_TYPE_CUDA,
     [UCC_MEMORY_TYPE_CUDA_MANAGED] = UCS_MEMORY_TYPE_CUDA_MANAGED,
@@ -296,6 +303,8 @@ __attribute__((constructor)) static void tl_ucp_iface_init(void)
         ucc_tl_ucp_fanout_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_GATHER)] =
         ucc_tl_ucp_gather_algs;
+    ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_GATHERV)] =
+        ucc_tl_ucp_gatherv_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE)] =
         ucc_tl_ucp_reduce_algs;
     ucc_tl_ucp.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTER)] =
