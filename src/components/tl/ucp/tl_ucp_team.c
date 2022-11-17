@@ -9,13 +9,44 @@
 #include "tl_ucp_coll.h"
 #include "tl_ucp_sendrecv.h"
 #include "utils/ucc_malloc.h"
+#include "utils/ucc_parser.h"
+#include "utils/ucc_string.h"
 #include "coll_score/ucc_coll_score.h"
+
+static inline ucc_status_t ucc_tl_ucp_get_topo(ucc_tl_ucp_team_t *team)
+{
+    ucc_subset_t  subset;
+    ucc_status_t  status;
+
+    status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
+                                      &UCC_TL_TEAM_MAP(team),
+                                      &team->ctx_map);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
+        return status;
+    }
+    subset.map    = team->ctx_map;
+    subset.myrank = UCC_TL_TEAM_RANK(team);
+
+    status = ucc_topo_init(subset, UCC_TL_CORE_CTX(team)->topo, &team->topo);
+
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to init team topo");
+        goto err_topo_init;
+    }
+
+    return UCC_OK;
+err_topo_init:
+    ucc_ep_map_destroy_nested(&team->ctx_map);
+    return status;
+}
 
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
     ucc_tl_ucp_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_ucp_context_t);
+    ucc_status_t status;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
@@ -28,9 +59,32 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    self->preconnect_task    = NULL;
-    self->seq_num            = 0;
-    self->status             = UCC_INPROGRESS;
+    self->preconnect_task = NULL;
+    self->seq_num         = 0;
+    self->status          = UCC_INPROGRESS;
+    self->tuning_str      = "";
+
+    memcpy(&self->cfg, &UCC_TL_UCP_TEAM_LIB(self)->cfg,
+           sizeof(ucc_tl_ucp_team_config_t));
+
+    if (ctx->topo_required) {
+        status = ucc_tl_ucp_get_topo(self);
+        if (UCC_OK != status) {
+            return status;
+        }
+    }
+
+    if (ucc_global_config.file_cfg && !IS_SERVICE_TEAM(self) &&
+        ctx->topo_required && tl_context->lib->use_tuning) {
+        status = ucc_add_team_sections(&self->cfg, ucc_tl_ucp_lib_config_table,
+                                       self->topo, &self->tuning_str,
+                                       "UCC_TL_UCP_TUNE",
+                                       UCC_TL_CORE_CTX(self)->lib->full_prefix,
+                                       ucc_tl_ucp.super.tl_lib_config.prefix);
+        if (status != UCC_OK) {
+            ucc_debug("section not found");
+        }
+    }
 
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
@@ -46,6 +100,12 @@ UCC_CLASS_DEFINE(ucc_tl_ucp_team_t, ucc_tl_team_t);
 
 ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 {
+    ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
+
+    if (UCC_TL_UCP_TEAM_CTX(team)->topo_required) {
+        ucc_ep_map_destroy_nested(&team->ctx_map);
+        ucc_topo_cleanup(team->topo);
+    }
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_ucp_team_t)(tl_team);
     return UCC_OK;
 }
@@ -178,6 +238,17 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team), NULL,
+            &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
+            ucc_tl_ucp_alg_id_to_init, mem_types, mt_n);
+
+        /* If INVALID_PARAM - User provided incorrect input - try to proceed */
+        if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
+            (status != UCC_ERR_NOT_SUPPORTED)) {
+            goto err;
+        }
+    } else if (strlen(team->tuning_str) > 0) {
+        status = ucc_coll_score_update_from_str(
+            team->tuning_str, score, UCC_TL_TEAM_SIZE(team), NULL,
             &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
             ucc_tl_ucp_alg_id_to_init, mem_types, mt_n);
 

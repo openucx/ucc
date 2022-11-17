@@ -64,6 +64,7 @@ noinst_HEADERS =                      \
 	utils/ucc_queue.h                 \
 	utils/ucc_proc_info.h             \
 	utils/khash.h                     \
+	utils/ini.h                       \
 	utils/ucc_spinlock.h              \
 	utils/ucc_mpool.h                 \
 	utils/ucc_rcache.h                \
@@ -107,6 +108,7 @@ libucc_la_SOURCES =                   \
 	schedule/ucc_schedule_pipelined.c \
 	coll_score/ucc_coll_score.c       \
 	coll_score/ucc_coll_score_map.c   \
+	utils/ini.c                       \
 	utils/ucc_component.c             \
 	utils/ucc_status.c                \
 	utils/ucc_mpool.c                 \

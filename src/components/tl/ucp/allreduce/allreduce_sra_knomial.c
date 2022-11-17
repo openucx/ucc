@@ -102,7 +102,7 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
-    cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sra_kn_radix;
+    cfg_radix = tl_team->cfg.allreduce_sra_kn_radix;
     radix = ucc_knomial_pattern_get_min_radix(cfg_radix,
                                               UCC_TL_TEAM_SIZE(tl_team), count);
 
@@ -159,7 +159,7 @@ ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
                                       ucc_coll_task_t     **task_h)
 {
     ucc_tl_ucp_team_t        *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_lib_config_t  *cfg     = &UCC_TL_UCP_TEAM_LIB(tl_team)->cfg;
+    ucc_tl_ucp_lib_config_t  *cfg     = &tl_team->cfg;
     int                       n_frags, pipeline_depth;
     ucc_schedule_pipelined_t *schedule_p;
     ucc_status_t         status;

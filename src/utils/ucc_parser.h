@@ -13,13 +13,15 @@
 #include "utils/ucc_datastruct.h"
 #include "utils/ucc_compiler_def.h"
 #include "utils/ucc_list.h"
+#include "utils/arch/cpu.h"
+#include "khash.h"
+#include "components/topo/ucc_topo.h"
 
 #include <ucs/config/parser.h>
 #include <ucs/sys/preprocessor.h>
 #include <ucs/sys/compiler_def.h>
 #include <ucs/config/types.h>
 #include <ucs/config/parser.h>
-#include <ucs/config/ini.h>
 
 typedef ucs_config_field_t             ucc_config_field_t;
 typedef ucs_config_names_array_t       ucc_config_names_array_t;
@@ -50,6 +52,7 @@ typedef struct ucc_file_config ucc_file_config_t;
 #endif
 
 #define UCC_CONFIG_GET_TABLE(_table)    &_table##_config_entry
+#define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
 #define UCC_CONFIG_REGISTER_TABLE       UCS_CONFIG_REGISTER_TABLE
 #define UCC_CONFIG_REGISTER_TABLE_ENTRY UCS_CONFIG_REGISTER_TABLE_ENTRY
 #define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
@@ -71,6 +74,50 @@ typedef struct ucc_file_config ucc_file_config_t;
 #define UCC_CONFIG_ALLOW_LIST_NEGATE    UCS_CONFIG_ALLOW_LIST_NEGATE
 #define UCC_CONFIG_ALLOW_LIST_ALLOW_ALL UCS_CONFIG_ALLOW_LIST_ALLOW_ALL
 #define UCC_CONFIG_ALLOW_LIST_ALLOW     UCS_CONFIG_ALLOW_LIST_ALLOW
+#define UCC_CONFIG_TYPE_TERNARY         UCS_CONFIG_TYPE_TERNARY
+
+typedef enum ucc_ternary_auto_value {
+    UCC_NO   = UCS_NO,
+    UCC_YES  = UCS_YES,
+    UCC_TRY  = UCS_TRY,
+    UCC_AUTO = UCS_AUTO,
+    UCC_TERNARY_LAST
+} ucc_ternary_auto_value_t;
+
+enum tuning_mask {
+    UCC_TUNING_DESC_FIELD_VENDOR    = UCC_BIT(0),
+    UCC_TUNING_DESC_FIELD_MODEL     = UCC_BIT(1),
+    UCC_TUNING_DESC_FIELD_TEAM_SIZE = UCC_BIT(2),
+    UCC_TUNING_DESC_FIELD_PPN       = UCC_BIT(3),
+    UCC_TUNING_DESC_FIELD_NNODES    = UCC_BIT(4)
+};
+
+typedef struct ucc_section_desc {
+    uint64_t         mask;
+    ucc_cpu_vendor_t vendor;
+    ucc_cpu_model_t  model;
+    ucc_rank_t       min_team_size;
+    ucc_rank_t       max_team_size;
+    ucc_rank_t       min_ppn;
+    ucc_rank_t       max_ppn;
+    ucc_rank_t       min_nnodes;
+    ucc_rank_t       max_nnodes;
+} ucc_section_desc_t;
+
+KHASH_MAP_INIT_STR(ucc_sec, char *);
+
+typedef struct ucc_section_wrap {
+    ucc_section_desc_t desc;
+    khash_t(ucc_sec)   vals_h;
+} ucc_section_wrap_t;
+
+KHASH_MAP_INIT_STR(ucc_cfg_file, char *);
+KHASH_MAP_INIT_STR(ucc_sections, ucc_section_wrap_t *);
+
+typedef struct ucc_file_config {
+    khash_t(ucc_cfg_file) vars;
+    khash_t(ucc_sections) sections;
+} ucc_file_config_t;
 
 /* Convenience structure used, for example, to represent TLS list.
    "requested" field is set to 1 if the list of entries was
@@ -92,6 +139,14 @@ ucc_status_t ucc_config_parser_fill_opts(void *opts,
                                          ucs_config_global_list_entry_t *entry,
                                          const char *env_prefix,
                                          int ignore_errors);
+
+ucc_status_t ucc_add_team_sections(void                *team_cfg,
+                                   ucc_config_field_t  *tl_field,
+                                   ucc_topo_t          *team_topo,
+                                   const char         **tuning_str,
+                                   const char          *tune_key,
+                                   const char          *env_prefix,
+                                   const char          *component_prefix);
 
 static inline void
 ucc_config_parser_release_opts(void *opts, ucc_config_field_t *fields)

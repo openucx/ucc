@@ -29,7 +29,7 @@ ucc_status_t ucc_tl_ucp_get_lib_attr(const ucc_base_lib_t *lib,
 ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
                                          ucc_base_ctx_attr_t      *base_attr);
 
-static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
+ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
 
@@ -138,6 +138,10 @@ static ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      "algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatterv_ring_bidirectional),
      UCC_CONFIG_TYPE_BOOL},
+
+    {"USE_TOPO", "try", "allow usage of tl ucp topo",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, use_topo),
+     UCC_CONFIG_TYPE_TERNARY},
 
     {NULL}};
 

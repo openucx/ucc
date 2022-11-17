@@ -42,28 +42,29 @@ typedef struct ucc_tl_ucp_iface {
 extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 
 typedef struct ucc_tl_ucp_lib_config {
-    ucc_tl_lib_config_t   super;
-    uint32_t              kn_radix;
-    uint32_t              fanin_kn_radix;
-    uint32_t              fanout_kn_radix;
-    uint32_t              barrier_kn_radix;
-    uint32_t              allreduce_kn_radix;
-    uint32_t              allreduce_sra_kn_radix;
-    uint32_t              reduce_scatter_kn_radix;
-    uint32_t              allgather_kn_radix;
-    uint32_t              bcast_kn_radix;
-    uint32_t              bcast_sag_kn_radix;
-    uint32_t              reduce_kn_radix;
-    uint32_t              gather_kn_radix;
-    uint32_t              gatherv_linear_num_posts;
-    uint32_t              scatter_kn_radix;
-    uint32_t              scatterv_linear_num_posts;
-    uint32_t              alltoall_pairwise_num_posts;
-    uint32_t              alltoallv_pairwise_num_posts;
-    ucc_pipeline_params_t allreduce_sra_kn_pipeline;
-    int                   reduce_avg_pre_op;
-    int                   reduce_scatter_ring_bidirectional;
-    int                   reduce_scatterv_ring_bidirectional;
+    ucc_tl_lib_config_t      super;
+    uint32_t                 kn_radix;
+    uint32_t                 fanin_kn_radix;
+    uint32_t                 fanout_kn_radix;
+    uint32_t                 barrier_kn_radix;
+    uint32_t                 allreduce_kn_radix;
+    uint32_t                 allreduce_sra_kn_radix;
+    uint32_t                 reduce_scatter_kn_radix;
+    uint32_t                 allgather_kn_radix;
+    uint32_t                 bcast_kn_radix;
+    uint32_t                 bcast_sag_kn_radix;
+    uint32_t                 reduce_kn_radix;
+    uint32_t                 gather_kn_radix;
+    uint32_t                 gatherv_linear_num_posts;
+    uint32_t                 scatter_kn_radix;
+    uint32_t                 scatterv_linear_num_posts;
+    uint32_t                 alltoall_pairwise_num_posts;
+    uint32_t                 alltoallv_pairwise_num_posts;
+    ucc_pipeline_params_t    allreduce_sra_kn_pipeline;
+    int                      reduce_avg_pre_op;
+    int                      reduce_scatter_ring_bidirectional;
+    int                      reduce_scatterv_ring_bidirectional;
+    ucc_ternary_auto_value_t use_topo;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {
@@ -75,6 +76,8 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                service_worker;
     uint32_t                service_throttling_thresh;
 } ucc_tl_ucp_context_config_t;
+
+typedef ucc_tl_ucp_lib_config_t ucc_tl_ucp_team_config_t;
 
 typedef struct ucc_tl_ucp_lib {
     ucc_tl_lib_t            super;
@@ -112,6 +115,7 @@ typedef struct ucc_tl_ucp_context {
     ucp_rkey_h *                rkeys;
     uint64_t                    n_rinfo_segs;
     uint64_t                    ucp_memory_types;
+    int                         topo_required;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -125,9 +129,15 @@ typedef struct ucc_tl_ucp_team {
     void *                     va_base[MAX_NR_SEGMENTS];
     size_t                     base_length[MAX_NR_SEGMENTS];
     ucc_tl_ucp_worker_t *      worker;
+    ucc_tl_ucp_team_config_t   cfg;
+    const char *               tuning_str;
+    ucc_topo_t                *topo;
+    ucc_ep_map_t               ctx_map;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
+
+extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 
 #define UCC_TL_UCP_SUPPORTED_COLLS                                             \
     (UCC_COLL_TYPE_ALLGATHER |                                                 \
