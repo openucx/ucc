@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
@@ -82,6 +82,7 @@ UCC_CLASS_DECLARE(ucc_tl_nccl_context_t, const ucc_base_context_params_t *,
 
 typedef struct ucc_tl_nccl_team {
     ucc_tl_team_t        super;
+    ucc_status_t         comm_state;
     ncclUniqueId        *unique_id;
     void                *oob_req;
     ncclComm_t           nccl_comm;

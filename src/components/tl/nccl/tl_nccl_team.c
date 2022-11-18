@@ -22,8 +22,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     size = UCC_TL_TEAM_SIZE(self);
-    self->unique_id = ucc_malloc(sizeof(ncclUniqueId) * (size + 1),
-                                 "tl_nccl_unique_id");
+    self->comm_state = UCC_OK;
+    self->unique_id  = ucc_malloc(sizeof(ncclUniqueId) * (size + 1),
+                                  "tl_nccl_unique_id");
     if (!self->unique_id) {
         tl_error(ctx->super.super.lib,
                  "failed to allocate %zd bytes for unique_id array",
@@ -57,7 +58,13 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_nccl_team_t)
 {
     tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
     if (self->nccl_comm) {
-        ncclCommDestroy(self->nccl_comm);
+        if (self->comm_state != UCC_OK) {
+            /* if communication error was detected ncclCommAbort should be used
+               since ncclCommDestroy could block */
+            ncclCommAbort(self->nccl_comm);
+        } else {
+            ncclCommDestroy(self->nccl_comm);
+        }
         cudaStreamDestroy(self->stream);
     }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -339,23 +339,6 @@ static void ucc_triggered_task_cb(void *task, ucc_status_t st)
     ucc_triggered_task_finalize((ucc_coll_task_t*)task);
 }
 
-static ucc_status_t ucc_triggered_coll_complete(ucc_coll_task_t *parent_task, //NOLINT
-                                                ucc_coll_task_t *task)
-{
-    ucc_trace("triggered collective complete, task %p, seq_num %u",
-              task, task->seq_num);
-    if (!(task->flags & UCC_COLL_TASK_FLAG_EXECUTOR)) {
-        /*  need to stop and finalize executor here in case if collective itself
-         *  doesn't need executor and executor was created as part of
-         *  triggered post
-         */
-        ucc_ee_executor_stop(task->executor);
-        ucc_ee_executor_finalize(task->executor);
-        task->executor = NULL;
-    }
-    return UCC_OK;
-}
-
 static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
                                          ucc_coll_task_t *task)
 {
@@ -366,21 +349,16 @@ static ucc_status_t ucc_trigger_complete(ucc_coll_task_t *parent_task,
 
     if (!(task->flags & UCC_COLL_TASK_FLAG_EXECUTOR)) {
         task->executor = parent_task->executor;
+        task->flags |= (UCC_COLL_TASK_FLAG_EXECUTOR_STOP |
+                        UCC_COLL_TASK_FLAG_EXECUTOR_DESTROY);
     }
+
     status = task->post(task);
     if (ucc_unlikely(status != UCC_OK)) {
         ucc_error("failed to post triggered coll, task %p, seq_num %u, %s",
                   task, task->seq_num, ucc_status_string(status));
-        return status;
     }
-
-    if (task->super.status == UCC_OK) {
-        return ucc_triggered_coll_complete(task, task);
-    }
-    ucc_assert(task->super.status == UCC_INPROGRESS);
-    // TODO use CB instead of EM
-    return ucc_event_manager_subscribe(task, UCC_EVENT_COMPLETED, task,
-                                       ucc_triggered_coll_complete);
+    return status;
 }
 
 static void ucc_trigger_test(ucc_coll_task_t *task)
@@ -391,15 +369,16 @@ static void ucc_trigger_test(ucc_coll_task_t *task)
     ucc_ee_executor_params_t  params;
 
     if (task->ev == NULL) {
-        if (task->ee->ee_type == UCC_EE_CUDA_STREAM || task->ee->ee_type == UCC_EE_ROCM_STREAM) {
+        if ((task->ee->ee_type == UCC_EE_CUDA_STREAM) ||
+            (task->ee->ee_type == UCC_EE_ROCM_STREAM)) {
             /* implicit event triggered */
-            task->ev = (ucc_ev_t *) 0xFFFF; /* dummy event */
+            task->ev       = (ucc_ev_t *) 0xFFFF; /* dummy event */
             task->executor = NULL;
         } else if (UCC_OK == ucc_ee_get_event_internal(task->ee, &ev,
                                                  &task->ee->event_in_queue)) {
             ucc_trace("triggered event arrived, ev_task %p", task);
-            task->ev      = ev;
-            task->ee_task = NULL;
+            task->ev       = ev;
+            task->executor = NULL;
         } else {
             task->status = UCC_OK;
             return;
