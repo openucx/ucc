@@ -143,8 +143,8 @@ cuFloatComplex operator* (const cuFloatComplex & first,
     __device__ ucc_status_t ucc_reduce_cuda_strided_##NAME(                     \
         ucc_eee_task_reduce_strided_t task, uint16_t flags)                     \
     {                                                                           \
-        size_t       count = task.count;                                        \
-        size_t       ld    = task.stride / sizeof(_Type);                       \
+        const size_t       count = task.count;                                        \
+        const size_t       ld    = task.stride / sizeof(_Type);                       \
         const _Type *s1    = (const _Type *)task.src1;                          \
         const _Type *s2    = (const _Type *)task.src2;                          \
         _Type *      d     = (_Type *)task.dst;                                 \
@@ -155,11 +155,13 @@ cuFloatComplex operator* (const cuFloatComplex & first,
                                   ? blockDim.x / WARP_SIZE                      \
                                   : (blockDim.x * gridDim.x) / WARP_SIZE;       \
         const int idx       = threadIdx.x % WARP_SIZE;                          \
-        size_t    num_lines =                                                   \
+        const size_t    num_lines =                                                   \
             (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL);              \
+        __shared__ int n_src2;\
         _Type  tmp1[UNROLL];                                                    \
         _Type  tmp2[UNROLL];                                                    \
         size_t i, j;                                                            \
+        n_src2 = task.n_src2;\
         ucc_assert(task.stride % sizeof(_Type) == 0);                           \
         for (size_t line = warp * WARP_SIZE * UNROLL + idx; line < num_lines;   \
              line += num_warps * WARP_SIZE * UNROLL) {                          \
@@ -167,7 +169,8 @@ cuFloatComplex operator* (const cuFloatComplex & first,
             {                                                                   \
                 tmp1[i] = s1[line + WARP_SIZE * i];                             \
             }                                                                   \
-            for (j = 0; j < task.n_src2; j++) {                                 \
+            for (j = 0; j < UCC_EE_EXECUTOR_NUM_BUFS; j++) {                                 \
+                if (j >= n_src2){break;}\
                 _Pragma("unroll") for (i = 0; i < UNROLL; i++)                  \
                 {                                                               \
                     tmp2[i] = s2[line + WARP_SIZE * i + j * ld];                \
@@ -188,25 +191,19 @@ cuFloatComplex operator* (const cuFloatComplex & first,
                 d[line + WARP_SIZE * i] = tmp1[i];                              \
             }                                                                   \
         }                                                                       \
-        count -= num_lines;                                                     \
-        if (!count) {                                                           \
-            return;                                                             \
-        }                                                                       \
-        s1 += num_lines;                                                        \
-        s2 += num_lines;                                                        \
-        d += num_lines;                                                         \
-        for (i = triggered ? threadIdx.x                                        \
-                           : threadIdx.x + blockIdx.x * blockDim.x;             \
+        for (i = triggered ? num_lines + threadIdx.x                                        \
+                           : num_lines + threadIdx.x + blockIdx.x * blockDim.x;             \
              i < count;                                                         \
              i += triggered ? blockDim.x : blockDim.x * gridDim.x) {            \
             d[i] = _OP(s1[i], s2[i]);                                           \
-            for (j = 1; j < task.n_src2; j++) {                                 \
+            for (j = 1; j < UCC_EE_EXECUTOR_NUM_BUFS; j++) {                                 \
+                if (j >= n_src2){break;}\
                 d[i] = _OP(d[i], s2[i + j * ld]);                               \
             }                                                                   \
         }                                                                       \
         if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                      \
-            for (i = triggered ? threadIdx.x                                    \
-                               : threadIdx.x + blockIdx.x * blockDim.x;         \
+            for (i = triggered ? num_lines + threadIdx.x                                    \
+                               : num_lines + threadIdx.x + blockIdx.x * blockDim.x;         \
                  i < count;                                                     \
                  i += triggered ? blockDim.x : blockDim.x * gridDim.x) {        \
                 d[i] = d[i] * (_AlphaType)task.alpha;                           \
