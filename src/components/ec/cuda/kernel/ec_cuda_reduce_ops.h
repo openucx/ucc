@@ -15,10 +15,10 @@ extern "C" {
 #include <cuda_bf16.h>
 #include <cuComplex.h>
 
-#define WARP_SIZE                          32
-#define COPY_LOOP_UNROLL                   8
-#define REDUCE_LOOP_UNROLL_TRIGGERED(TYPE) 32 / sizeof(TYPE)
-#define REDUCE_LOOP_UNROLL_INTERRUPTIBLE   1
+#define WARP_SIZE                32
+#define COPY_LOOP_UNROLL         8
+#define REDUCE_LOOP_UNROLL_TRIGGERED(TYPE) 16 / sizeof(TYPE)
+#define REDUCE_LOOP_UNROLL_INTERRUPTIBLE 1
 typedef int4 vectype;
 
 __device__ inline
@@ -64,10 +64,9 @@ cuFloatComplex operator* (const cuFloatComplex & first,
     __device__ ucc_status_t ucc_reduce_cuda_default_##NAME(                      \
         ucc_eee_task_reduce_t task, uint16_t flags)                              \
     {                                                                            \
-        size_t        count  = task.count;                                       \
-        const _Type **s      = (const _Type **)task.srcs;                        \
+        const size_t        count  = task.count;                                       \
         _Type *       d      = (_Type *)task.dst;                                \
-        int           n_srcs = task.n_srcs;                                      \
+        const int           n_srcs = task.n_srcs;                                      \
         const int     warp =                                                     \
             triggered ? threadIdx.x / WARP_SIZE                              \
                           : (threadIdx.x + blockIdx.x * blockDim.x) / WARP_SIZE; \
@@ -75,18 +74,21 @@ cuFloatComplex operator* (const cuFloatComplex & first,
                                   ? blockDim.x / WARP_SIZE                       \
                                   : (blockDim.x * gridDim.x) / WARP_SIZE;        \
         const int idx       = threadIdx.x % WARP_SIZE;                           \
-        size_t    num_lines =                                                    \
+        const size_t    num_lines =                                                    \
             (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL);               \
+        const _Type *s[UCC_EE_EXECUTOR_NUM_BUFS];                    \
         _Type  tmp1[UNROLL];                                                     \
         _Type  tmp2[UNROLL];                                                     \
         size_t i, j;                                                             \
+        memcpy(s, task.srcs, UCC_EE_EXECUTOR_NUM_BUFS * sizeof(_Type *));\
         for (size_t line = warp * WARP_SIZE * UNROLL + idx; line < num_lines;    \
              line += num_warps * WARP_SIZE * UNROLL) {                           \
             _Pragma("unroll") for (i = 0; i < UNROLL; i++)                       \
             {                                                                    \
                 tmp1[i] = s[0][line + WARP_SIZE * i];                            \
             }                                                                    \
-            for (j = 1; j < n_srcs; j++) {                                       \
+            for (j = 1; j < UCC_EE_EXECUTOR_NUM_BUFS; j++) {                                       \
+                if (j >= n_srcs){break;}\
                 _Pragma("unroll") for (i = 0; i < UNROLL; i++)                   \
                 {                                                                \
                     tmp2[i] = s[j][line + WARP_SIZE * i];                        \
@@ -113,7 +115,8 @@ cuFloatComplex operator* (const cuFloatComplex & first,
              i < count;                                                          \
              i += triggered ? blockDim.x : blockDim.x * gridDim.x) {             \
             d[i] = _OP(s[0][i], s[1][i]);                                        \
-            for (j = 2; j < n_srcs; j++) {                                       \
+            for (j = 2; j < UCC_EE_EXECUTOR_NUM_BUFS; j++) {                                       \
+                if (j >= n_srcs){break;}\
                 d[i] = _OP(d[i], s[j][i]);                                       \
             }                                                                    \
         }                                                                        \
