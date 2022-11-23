@@ -90,6 +90,70 @@ ucc_coll_args_is_mem_symmetric(const ucc_coll_args_t *args,
     return 0;
 }
 
+int ucc_coll_args_is_predefined_dt(ucc_coll_args_t *args, ucc_rank_t rank)
+{
+    switch (args->coll_type) {
+    case UCC_COLL_TYPE_BARRIER:
+    case UCC_COLL_TYPE_FANIN:
+    case UCC_COLL_TYPE_FANOUT:
+        return 1;
+    case UCC_COLL_TYPE_ALLREDUCE:
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+    case UCC_COLL_TYPE_ALLGATHER:
+    case UCC_COLL_TYPE_ALLTOALL:
+        return UCC_DT_IS_PREDEFINED(args->dst.info.datatype) &&
+               (UCC_IS_INPLACE(*args) ||
+                UCC_DT_IS_PREDEFINED(args->src.info.datatype));
+    case UCC_COLL_TYPE_ALLGATHERV:
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        return UCC_DT_IS_PREDEFINED(args->dst.info_v.datatype) &&
+               (UCC_IS_INPLACE(*args) ||
+                UCC_DT_IS_PREDEFINED(args->src.info.datatype));
+    case UCC_COLL_TYPE_ALLTOALLV:
+        return UCC_DT_IS_PREDEFINED(args->dst.info_v.datatype) &&
+               (UCC_IS_INPLACE(*args) ||
+                UCC_DT_IS_PREDEFINED(args->src.info_v.datatype));
+    case UCC_COLL_TYPE_BCAST:
+        return UCC_DT_IS_PREDEFINED(args->src.info.datatype);
+    case UCC_COLL_TYPE_GATHER:
+    case UCC_COLL_TYPE_REDUCE:
+        if (UCC_IS_ROOT(*args, rank)) {
+           return UCC_DT_IS_PREDEFINED(args->dst.info.datatype) &&
+                  (UCC_IS_INPLACE(*args) ||
+                   UCC_DT_IS_PREDEFINED(args->src.info.datatype));
+        } else {
+            return UCC_DT_IS_PREDEFINED(args->src.info.datatype);
+        }
+    case UCC_COLL_TYPE_GATHERV:
+        if (UCC_IS_ROOT(*args, rank)) {
+           return UCC_DT_IS_PREDEFINED(args->dst.info_v.datatype) &&
+                  (UCC_IS_INPLACE(*args) ||
+                   UCC_DT_IS_PREDEFINED(args->src.info.datatype));
+        } else {
+            return UCC_DT_IS_PREDEFINED(args->src.info.datatype);
+        }
+    case UCC_COLL_TYPE_SCATTER:
+        if (UCC_IS_ROOT(*args, rank)) {
+           return UCC_DT_IS_PREDEFINED(args->src.info.datatype) &&
+                  (UCC_IS_INPLACE(*args) ||
+                   UCC_DT_IS_PREDEFINED(args->dst.info.datatype));
+        } else {
+            return UCC_DT_IS_PREDEFINED(args->dst.info.datatype);
+        }
+    case UCC_COLL_TYPE_SCATTERV:
+        if (UCC_IS_ROOT(*args, rank)) {
+           return UCC_DT_IS_PREDEFINED(args->src.info_v.datatype) &&
+                  (UCC_IS_INPLACE(*args) ||
+                   UCC_DT_IS_PREDEFINED(args->dst.info.datatype));
+        } else {
+            return UCC_DT_IS_PREDEFINED(args->dst.info.datatype);
+        }
+    default:
+        ucc_error("invalid collective type %d", args->coll_type);
+        return -1;
+    }
+}
+
 ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
                                          ucc_rank_t rank)
 {

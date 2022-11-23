@@ -112,6 +112,11 @@ ucc_status_t ucc_tl_self_coll_copy_init(ucc_tl_self_task_t *task)
 {
     ucc_coll_args_t *args = &(task->super.bargs.args);
 
+    if (!ucc_coll_args_is_predefined_dt(args,
+                                        task->super.team->params.rank)) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     if (UCC_IS_INPLACE(*args)) {
         /* no copy is required for in-place */
         task->super.post     = ucc_tl_self_coll_start;
@@ -133,6 +138,11 @@ ucc_status_t ucc_tl_self_coll_copy_init(ucc_tl_self_task_t *task)
 ucc_status_t ucc_tl_self_alltoallv_init(ucc_tl_self_task_t *task)
 {
     ucc_coll_args_t *args = &(task->super.bargs.args);
+
+    if (!ucc_coll_args_is_predefined_dt(args,
+                                        task->super.team->params.rank)) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     if (UCC_IS_INPLACE(*args)) {
         /* no copy is required for in-place */
@@ -159,6 +169,11 @@ ucc_status_t ucc_tl_self_alltoallv_init(ucc_tl_self_task_t *task)
 ucc_status_t ucc_tl_self_coll_copyv_init(ucc_tl_self_task_t *task)
 {
     ucc_coll_args_t *args = &(task->super.bargs.args);
+
+    if (!ucc_coll_args_is_predefined_dt(args,
+                                        task->super.team->params.rank)) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     if (UCC_IS_INPLACE(*args)) {
         /* no copy is required for in-place */
@@ -187,6 +202,11 @@ ucc_status_t ucc_tl_self_coll_copyv_init(ucc_tl_self_task_t *task)
 ucc_status_t ucc_tl_self_scatterv_init(ucc_tl_self_task_t *task)
 {
     ucc_coll_args_t *args = &(task->super.bargs.args);
+
+    if (!ucc_coll_args_is_predefined_dt(args,
+                                        task->super.team->params.rank)) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     if (UCC_IS_INPLACE(*args)) {
         /* no copy is required for in-place */

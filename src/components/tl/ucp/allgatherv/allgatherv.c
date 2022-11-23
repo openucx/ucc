@@ -24,9 +24,7 @@ ucc_base_coll_alg_info_t
 
 ucc_status_t ucc_tl_ucp_allgatherv_init(ucc_tl_ucp_task_t *task)
 {
-    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info_v.datatype)) ||
-        (!UCC_IS_INPLACE(TASK_ARGS(task)) &&
-         (!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).src.info.datatype)))) {
+    if (!ucc_coll_args_is_predefined_dt(&TASK_ARGS(task), UCC_RANK_INVALID)) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
