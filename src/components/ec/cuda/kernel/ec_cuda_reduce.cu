@@ -75,7 +75,7 @@ UCC_REDUCE_CUDA_MULTI_DST_SUM<float, false>(ucc_eee_task_reduce_multi_dst_t arg)
                 <<<b, t, 0, s>>>(_task->reduce, _task->flags);                 \
         } else if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED) {  \
             UCC_REDUCE_CUDA_STRIDED_##NAME<type, _AlphaType, false,            \
-                                           REDUCE_LOOP_UNROLL_INTERRUPTIBLE>           \
+                                           REDUCE_LOOP_UNROLL_INTERRUPTIBLE>   \
                 <<<b, t, 0, s>>>(_task->reduce_strided, _task->flags);         \
         } else {                                                               \
             UCC_REDUCE_CUDA_MULTI_DST_##NAME<type, false>                      \

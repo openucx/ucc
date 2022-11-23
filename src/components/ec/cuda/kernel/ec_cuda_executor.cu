@@ -163,11 +163,11 @@ __device__ void executor_reduce_float_sum_aligned_2(const float *s1,
     do {                                                                       \
         if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
             return ucc_reduce_cuda_default_##NAME<                             \
-                _Type, _AlphaType, true, REDUCE_LOOP_UNROLL_TRIGGERED(_Type)>( \
+                _Type, _AlphaType, true, REDUCE_LOOP_UNROLL_TRIGGERED>(        \
                 _task->reduce, _task->flags);                                  \
         } else {                                                               \
             return ucc_reduce_cuda_strided_##NAME<                             \
-                _Type, _AlphaType, true, REDUCE_LOOP_UNROLL_TRIGGERED(_Type)>( \
+                _Type, _AlphaType, true, REDUCE_LOOP_UNROLL_TRIGGERED>(        \
                 _task->reduce_strided, _task->flags);                          \
         }                                                                      \
     } while (0)
@@ -210,7 +210,7 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
     }
 
     if (UCC_DT_FLOAT32 == dt && UCC_OP_SUM == op && aligned && n_src == 2) {
-        executor_reduce_float_sum_aligned_2<REDUCE_LOOP_UNROLL_TRIGGERED(float)>(
+        executor_reduce_float_sum_aligned_2<REDUCE_LOOP_UNROLL_TRIGGERED>(
             (float *)s1, (float *)s2, (float *)d, count);
         return UCC_OK;
     }
