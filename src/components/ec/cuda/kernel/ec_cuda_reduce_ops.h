@@ -66,7 +66,7 @@ cuFloatComplex operator* (const cuFloatComplex & first,
     {                                                                           \
         const size_t count  = task.count;                                       \
         _Type *      d      = (_Type *)task.dst;                                \
-        const int    n_srcs = task.n_srcs;                                      \
+        const uint16_t    n_srcs = task.n_srcs;                                      \
         const int    warp =                                                     \
             triggered ? threadIdx.x / WARP_SIZE                              \
                          : (threadIdx.x + blockIdx.x * blockDim.x) / WARP_SIZE; \
@@ -161,7 +161,7 @@ cuFloatComplex operator* (const cuFloatComplex & first,
         const int    idx       = threadIdx.x % WARP_SIZE;                       \
         const size_t num_lines =                                                \
             (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL);              \
-        __shared__ int n_src2;                                                  \
+        __shared__ uint16_t n_src2;                                                  \
         _Type          tmp1[UNROLL];                                            \
         _Type          tmp2[UNROLL];                                            \
         size_t         i, j;                                                    \
@@ -173,7 +173,7 @@ cuFloatComplex operator* (const cuFloatComplex & first,
             {                                                                   \
                 tmp1[i] = s1[line + WARP_SIZE * i];                             \
             }                                                                   \
-            for (j = 0; j < UCC_EE_EXECUTOR_NUM_BUFS; j++) {                    \
+            for (j = 0; j < USHRT_MAX; j++) {                                     \
                 if (j >= n_src2) {                                              \
                     break;                                                      \
                 }                                                               \
@@ -203,7 +203,7 @@ cuFloatComplex operator* (const cuFloatComplex & first,
              i < count;                                                         \
              i += triggered ? blockDim.x : blockDim.x * gridDim.x) {            \
             d[i] = _OP(s1[i], s2[i]);                                           \
-            for (j = 1; j < UCC_EE_EXECUTOR_NUM_BUFS; j++) {                    \
+            for (j = 1; j < USHRT_MAX; j++) {                                     \
                 if (j >= n_src2) {                                              \
                     break;                                                      \
                 }                                                               \
