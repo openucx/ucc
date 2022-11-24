@@ -98,6 +98,7 @@ gtest_SOURCES =                     \
 	utils/test_lock_free_queue.cc   \
 	utils/test_math.cc              \
 	utils/test_cfg_file.cc          \
+	utils/test_parser.cc            \
 	coll_score/test_score.cc        \
 	coll_score/test_score_str.cc    \
 	coll_score/test_score_update.cc \

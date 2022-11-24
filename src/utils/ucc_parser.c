@@ -660,6 +660,12 @@ void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
     }
 }
 
+ucc_status_t ucc_config_clone_table(const void *src, void *dst,
+                                    const void *arg)
+{
+    return ucs_status_to_ucc_status(ucs_config_clone_table(src, dst, arg));
+}
+
 static ucc_pipeline_params_t ucc_pipeline_params_auto = {
     .threshold = 0,
     .n_frags   = 0,

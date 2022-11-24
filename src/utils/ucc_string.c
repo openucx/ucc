@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -187,7 +187,7 @@ ucc_status_t ucc_str_to_mtype_map(const char *str, const char *delim,
         t = ucc_mem_type_from_str(tokens[i]);
         if (t == UCC_MEMORY_TYPE_LAST) {
             /* entry does not match any memory type name */
-            status = UCC_ERR_NOT_FOUND;
+            status = UCC_ERR_INVALID_PARAM;
             goto out;
         }
         *mt_map |= UCC_BIT(t);
@@ -207,7 +207,7 @@ void ucc_mtype_map_to_str(uint32_t mt_map, const char *delim,
         if (UCC_BIT(i) & mt_map) {
             ucc_snprintf_safe(buf, max, "%s%s", ucc_mem_type_str(i), delim);
             last = strlen(buf);
-            if (max - last <= 0) {
+            if (max - last -1 <= 0) {
                 /* no more space in buf for next range*/
                 return;
             }

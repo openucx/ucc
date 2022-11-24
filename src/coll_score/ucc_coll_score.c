@@ -700,7 +700,7 @@ static ucc_status_t ucc_coll_score_parse_str(const char *str,
             ct_n = UCC_COLL_TYPE_NUM;
         }
         if (!mtypes) {
-            mtypes = -1;
+            mtypes = UCC_MEM_TYPE_MASK_FULL;
         }
         if (!msg) {
             n_ranges = 1;

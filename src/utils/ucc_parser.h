@@ -230,6 +230,9 @@ void         ucc_release_file_config(ucc_file_config_t *cfg);
 
 typedef struct ucc_pipeline_params ucc_pipeline_params_t;
 
+ucc_status_t ucc_config_clone_table(const void *src, void *dst,
+                                    const void *arg);
+
 int ucc_pipeline_params_is_auto(const ucc_pipeline_params_t *p);
 
 int ucc_config_sscanf_pipeline_params(const char *buf, void *dest,

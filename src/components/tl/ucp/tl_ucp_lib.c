@@ -21,14 +21,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_lib_t, &ucc_tl_ucp.super,
                               &tl_ucp_config->super);
-    memcpy(&self->cfg, tl_ucp_config, sizeof(*tl_ucp_config));
-    status = ucc_mrange_uint_copy(&self->cfg.allreduce_sra_kn_radix,
-                                  &tl_ucp_config->allreduce_sra_kn_radix);
-    if (UCC_OK != status) {
-        return status;
-    }
-    status = ucc_mrange_uint_copy(&self->cfg.allreduce_kn_radix,
-                                  &tl_ucp_config->allreduce_kn_radix);
+    status = ucc_config_clone_table(tl_ucp_config, &self->cfg,
+                                    ucc_tl_ucp_lib_config_table);
     if (UCC_OK != status) {
         return status;
     }
