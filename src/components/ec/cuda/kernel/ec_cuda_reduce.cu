@@ -11,6 +11,7 @@
 
 extern "C" {
 #include "../ec_cuda.h"
+#include <inttypes.h>
 }
 #include "ec_cuda_reduce_ops.h"
 

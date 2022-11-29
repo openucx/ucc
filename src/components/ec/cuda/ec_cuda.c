@@ -49,12 +49,12 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
      UCC_CONFIG_TYPE_UINT},
 
     {"EXEC_NUM_WORKERS", "1",
-     "Number of thread blocks to use for cuda executor",
+     "Number of thread blocks to use for cuda persistent executor",
      ucc_offsetof(ucc_ec_cuda_config_t, exec_num_workers),
      UCC_CONFIG_TYPE_ULUNITS},
 
     {"EXEC_NUM_THREADS", "512",
-     "Number of thread per block to use for cuda executor",
+     "Number of threads per block to use for cuda persistent executor",
      ucc_offsetof(ucc_ec_cuda_config_t, exec_num_threads),
      UCC_CONFIG_TYPE_ULUNITS},
 
@@ -71,6 +71,12 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
     {"REDUCE_NUM_BLOCKS", "auto",
      "Number of thread blocks to use for reduction in interruptible mode",
      ucc_offsetof(ucc_ec_cuda_config_t, reduce_num_blocks),
+     UCC_CONFIG_TYPE_ULUNITS},
+
+    {"REDUCE_NUM_THREADS", "auto",
+     "Number of threads per block to use for reduction in interruptible "
+     "executor",
+     ucc_offsetof(ucc_ec_cuda_config_t, reduce_num_threads),
      UCC_CONFIG_TYPE_ULUNITS},
 
     {"USE_COOPERATIVE_LAUNCH", "0",
@@ -212,6 +218,28 @@ static ucc_status_t ucc_ec_cuda_post_driver_stream_task(uint32_t *status,
     return UCC_OK;
 }
 
+static inline void ucc_ec_cuda_set_threads_nbr(int *nt, int maxThreadsPerBlock)
+{
+    if (*nt != UCC_ULUNITS_AUTO) {
+        if (maxThreadsPerBlock < *nt) {
+            ec_warn(
+                &ucc_ec_cuda.super,
+                "number of threads per block is too large, max supported is %d",
+                maxThreadsPerBlock);
+        } else if (*nt % WARP_SIZE != 0) {
+            ec_warn(&ucc_ec_cuda.super,
+                    "number of threads per block must be divisible by "
+                    "WARP_SIZE(=%d)",
+                    WARP_SIZE);
+        } else {
+            return;
+        }
+    }
+
+    *nt = (maxThreadsPerBlock / WARP_SIZE) * WARP_SIZE;
+    return;
+}
+
 static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
 {
     ucc_ec_cuda_config_t *cfg = EC_CUDA_CONFIG;
@@ -239,12 +267,16 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     CUDA_CHECK(cudaGetDevice(&device));
 
     CUDA_CHECK(cudaGetDeviceProperties(&prop, device));
-    cfg->reduce_num_threads = prop.maxThreadsPerBlock;
+
+    ucc_ec_cuda_set_threads_nbr((int *)&cfg->exec_num_threads,
+                                prop.maxThreadsPerBlock);
+    ucc_ec_cuda_set_threads_nbr(&cfg->reduce_num_threads,
+                                prop.maxThreadsPerBlock);
 
     if (cfg->reduce_num_blocks != UCC_ULUNITS_AUTO) {
         if (prop.maxGridSize[0] < cfg->reduce_num_blocks) {
             ec_warn(&ucc_ec_cuda.super,
-                    "number of blocks is too large, max supported %d",
+                    "number of blocks is too large, max supported is %d",
                     prop.maxGridSize[0]);
             cfg->reduce_num_blocks = prop.maxGridSize[0];
         }

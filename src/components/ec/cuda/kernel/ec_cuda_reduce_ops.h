@@ -9,13 +9,13 @@
 
 extern "C" {
 #include "utils/ucc_math_op.h"
+#include "../ec_cuda.h"
 }
 
 #include "ec_cuda_half_sm52.h"
 #include <cuda_bf16.h>
 #include <cuComplex.h>
 
-#define WARP_SIZE                        32
 #define COPY_LOOP_UNROLL                 8
 #define REDUCE_LOOP_UNROLL_TRIGGERED     7
 #define REDUCE_LOOP_UNROLL_INTERRUPTIBLE 1
