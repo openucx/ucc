@@ -11,6 +11,7 @@
 #include "ucc_datastruct.h"
 #include "ucc_math.h"
 #include "utils/ucc_time.h"
+#include "utils/ucc_assert.h"
 #include <string.h>
 
 #define UCC_COLL_TYPE_NUM (ucc_ilog2(UCC_COLL_TYPE_LAST - 1) + 1)
@@ -179,7 +180,7 @@ static inline ucc_rank_t ucc_ep_map_eval(ucc_ep_map_t map, ucc_rank_t rank)
         r = (ucc_rank_t)map.cb.cb(rank, map.cb.cb_ctx);
         break;
     default:
-        r = -1;
+        r = UCC_RANK_INVALID;
     }
     return r;
 }

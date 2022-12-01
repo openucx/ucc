@@ -147,7 +147,7 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
         s2      = task->reduce.srcs[1];
         d       = task->reduce.dst;
     } else {
-        ucc_assert(task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED);
+        ucc_assert_system(task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED);
         dt      = task->reduce_strided.dt;
         count   = task->reduce_strided.count;
         op      = task->reduce_strided.op;
@@ -225,7 +225,7 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
         return UCC_ERR_NOT_SUPPORTED;
 #endif
     case UCC_DT_BFLOAT16:
-        ucc_assert(2 == sizeof(__nv_bfloat16));
+        ucc_assert_system(2 == sizeof(__nv_bfloat16));
         DT_REDUCE_FLOAT(__nv_bfloat16, task, op);
         break;
     default:
@@ -395,4 +395,3 @@ ucc_status_t ucc_ec_cuda_copy_multi_kernel(const ucc_ee_executor_task_args_t *ar
 }
 
 }
-

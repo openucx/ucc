@@ -16,6 +16,7 @@ ucc_status_t ucc_cuda_executor_interruptible_get_stream(cudaStream_t *stream)
     int             i, j;
     uint32_t        id;
 
+    ucc_assert(num_streams > 0);
     if (ucc_unlikely(!ucc_ec_cuda.exec_streams_initialized)) {
         ucc_spin_lock(&ucc_ec_cuda.init_spinlock);
         if (ucc_ec_cuda.exec_streams_initialized) {

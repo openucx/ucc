@@ -495,7 +495,7 @@ poll:
             goto poll;
         }
         addr_lens = (size_t *)addr_storage->storage;
-        ucc_assert(addr_storage->storage);
+        ucc_assert(addr_storage->storage != NULL);
         for (i = 0; i < addr_storage->size; i++) {
             if (addr_lens[i] > addr_storage->addr_len) {
                 addr_storage->addr_len = addr_lens[i];

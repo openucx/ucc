@@ -83,3 +83,11 @@ AS_IF([test "x$enable_debug" = xyes],
     CXXFLAGS="$CXXFLAGS -O3 -g -DNDEBUG"
     AC_DEFINE([UCS_MAX_LOG_LEVEL], [UCS_LOG_LEVEL_DEBUG], [Highest log level])
     ])
+
+#
+# Enables additional checks
+#
+AC_ARG_ENABLE([assert],
+    AS_HELP_STRING([--enable-assert], [Enable extra correctness checks (default is NO).]),
+    [AC_DEFINE([UCC_ENABLE_ASSERT], [1], [Enable asserts])],
+    [enable_assert=no])

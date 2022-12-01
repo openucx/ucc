@@ -395,13 +395,14 @@ ucc_tl_cuda_alltoallv_ce_triggered_post_setup(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-//NOLINTNEXTLINE
+//NOLINTNEXTLINE: task is unused
 size_t ucc_tl_cuda_alltoallv_get_size(const ucc_tl_cuda_task_t *task,
                                       size_t *sizes, ucc_rank_t block)
 {
     return sizes[block];
 }
 
+//NOLINTNEXTLINE: task is unused
 size_t ucc_tl_cuda_alltoallv_get_offset(const ucc_tl_cuda_task_t *task,
                                         size_t *displ, ucc_rank_t block)
 {

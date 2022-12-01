@@ -310,7 +310,7 @@ static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
     }
     if (UCC_OK == oob->allgather(&sbuf, rbuf, sizeof(char), oob->coll_info,
                                  &req)) {
-        ucc_assert(req);
+        ucc_assert(req != NULL);
         while (UCC_OK != (status = oob->req_test(req))) {
             ucp_worker_progress(ctx->worker.ucp_worker);
             if (ctx->cfg.service_worker != 0) {

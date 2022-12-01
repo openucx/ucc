@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -48,8 +48,7 @@ static void ucc_tl_cuda_topo_pci_id_to_str(const ucc_tl_cuda_device_pci_id_t *pc
                       pci_id->bus, pci_id->device, pci_id->function);
 }
 
-ucc_status_t ucc_tl_cuda_topo_get_pci_id(const ucc_base_lib_t *lib,
-                                         int device,
+ucc_status_t ucc_tl_cuda_topo_get_pci_id(int device,
                                          ucc_tl_cuda_device_pci_id_t *pci_id)
 {
     char pci_bus_id[MAX_PCI_BUS_ID_STR];
@@ -149,9 +148,8 @@ ucc_tl_cuda_topo_graph_add_link(ucc_tl_cuda_topo_t *topo,
     return UCC_OK;
 }
 
-static void ucc_tl_cuda_topo_free_link(ucc_tl_cuda_topo_link_t *link) {
-    return;
-}
+static void ucc_tl_cuda_topo_free_link(ucc_tl_cuda_topo_link_t *link) //NOLINT: link is unused
+{}
 
 static void ucc_tl_cuda_topo_graph_destroy(ucc_tl_cuda_topo_t *topo)
 {

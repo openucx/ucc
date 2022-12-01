@@ -1,5 +1,6 @@
 /**
  * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -16,6 +17,10 @@
 #define UCC_LOG_LEVEL_INFO  UCS_LOG_LEVEL_INFO
 #define UCC_LOG_LEVEL_DEBUG UCS_LOG_LEVEL_DEBUG
 #define UCC_LOG_LEVEL_TRACE UCS_LOG_LEVEL_TRACE
+
+#define ucc_log_get_buffer_size ucs_log_get_buffer_size
+#define ucc_log_fatal_error ucs_log_fatal_error
+#define ucc_log_flush ucs_log_flush
 
 /* Generic wrapper macro to invoke ucs logging backend */
 #define ucc_log_component(_level, _component, _fmt, ...)                       \

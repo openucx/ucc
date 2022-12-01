@@ -1,5 +1,6 @@
 /**
  * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -67,7 +68,7 @@ ucc_status_t ucc_ee_get_event_internal(ucc_ee_h ee, ucc_ev_t **ev, ucc_queue_hea
     elem = ucc_queue_pull(queue);
     ucc_spin_unlock(&ee->lock);
 
-    ucc_assert(elem);
+    ucc_assert(elem != NULL);
 
     event_desc = ucc_container_of(elem, ucc_event_desc_t, queue);
     *ev = &event_desc->ev;
