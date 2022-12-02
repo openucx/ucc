@@ -22,7 +22,7 @@ typedef struct ucc_tl_cuda_ring {
 } ucc_tl_cuda_ring_t;
 
 typedef struct ucc_tl_cuda_team_topo {
-    int                     *matrix;       /* nvlink adjacency matrix */
+    ucc_rank_t              *matrix;       /* nvlink adjacency matrix */
     int                      proxy_needed; /* is proxy needed for current rank */
     int                      num_proxies;  /* number of entries in proxies list */
     ucc_tl_cuda_proxy_t     *proxies;      /* list of pairs where current rank is proxy */

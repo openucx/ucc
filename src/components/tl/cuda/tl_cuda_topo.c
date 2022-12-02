@@ -334,7 +334,7 @@ exit_err:
 ucc_status_t ucc_tl_cuda_topo_num_links(const ucc_tl_cuda_topo_t *topo,
                                         const ucc_tl_cuda_device_pci_id_t *dev1,
                                         const ucc_tl_cuda_device_pci_id_t *dev2,
-                                        int *num_links)
+                                        ucc_rank_t *num_links)
 {
     ucc_status_t status;
     ucc_tl_cuda_topo_node_t *dev1_node, *dev2_node;

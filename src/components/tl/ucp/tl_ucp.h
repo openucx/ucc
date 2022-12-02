@@ -109,7 +109,7 @@ typedef struct ucc_tl_ucp_context {
     ucc_tl_ucp_context_config_t cfg;
     ucc_tl_ucp_worker_t         worker;
     ucc_tl_ucp_worker_t         service_worker;
-    int                         service_worker_throttling_count;
+    uint32_t                    service_worker_throttling_count;
     ucc_mpool_t                 req_mp;
     ucc_tl_ucp_remote_info_t *  remote_info;
     ucp_rkey_h *                rkeys;
