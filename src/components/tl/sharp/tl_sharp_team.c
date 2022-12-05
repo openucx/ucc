@@ -75,6 +75,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
         struct sharp_coll_caps sharp_caps;
         ret = sharp_coll_caps_query(sharp_ctx, &sharp_caps);
         if (ret < 0) {
+            status = sharp_status_to_ucc_status(ret);
             tl_error(ctx->super.super.lib, "sharp_coll_caps_query failed: %s(%d)",
                     sharp_coll_strerror(ret), ret);
             goto cleanup;
@@ -171,7 +172,8 @@ ucc_status_t ucc_tl_sharp_team_destroy(ucc_base_team_t *tl_team)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_sharp_team_create_test(ucc_base_team_t *tl_team)
+/* sharp team create is blocking, return UCC_OK always */
+ucc_status_t ucc_tl_sharp_team_create_test(ucc_base_team_t *tl_team) //NOLINT
 {
     return UCC_OK;
 }
@@ -184,12 +186,6 @@ static ucc_status_t ucc_tl_sharp_coll_finalize(ucc_coll_task_t *coll_task)
     UCC_TL_SHARP_PROFILE_REQUEST_FREE(task);
     ucc_mpool_put(task);
     return UCC_OK;
-}
-
-ucc_status_t ucc_tl_sharp_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
-                                         ucc_coll_task_t *coll_task)
-{
-    return UCC_ERR_NOT_SUPPORTED;
 }
 
 ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
@@ -207,7 +203,7 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
 
     task->req_handle           = NULL;
     task->super.finalize       = ucc_tl_sharp_coll_finalize;
-    task->super.triggered_post = ucc_tl_sharp_triggered_post;
+    task->super.triggered_post = ucc_triggered_post;
 
     switch (coll_args->args.coll_type)
     {
