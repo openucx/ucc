@@ -28,7 +28,7 @@ jobs:
     - name: Build UCC
       run: |
         ./autogen.sh
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-assert
         bear --cdb /tmp/compile_commands.json make
     - name: Run clang-tidy
       run: |
