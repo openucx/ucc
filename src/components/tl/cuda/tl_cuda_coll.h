@@ -10,7 +10,7 @@
 #include "tl_cuda.h"
 #include "components/mc/ucc_mc.h"
 
-#define UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR 2
+#define UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR 4
 extern const char
     *ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR];
 
@@ -54,6 +54,11 @@ static inline ucc_tl_cuda_task_t *ucc_tl_cuda_task_get(ucc_tl_cuda_team_t *team)
 {
     ucc_tl_cuda_context_t *ctx  = UCC_TL_CUDA_TEAM_CTX(team);
     ucc_tl_cuda_task_t    *task = ucc_mpool_get(&ctx->req_mp);
+
+    if (ucc_unlikely(!task)) {
+        tl_error(UCC_TL_CUDA_TEAM_LIB(team), "failed to get task from mpool");
+        return NULL;
+    }
 
     UCC_TL_CUDA_PROFILE_REQUEST_NEW(task, "tl_cuda_task", 0);
     task->super.status = UCC_OPERATION_INITIALIZED;

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -9,6 +9,8 @@
 #include "components/mc/base/ucc_mc_base.h"
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
+#include "reduce_scatter/reduce_scatter.h"
+#include "reduce_scatterv/reduce_scatterv.h"
 
 static ucc_config_field_t ucc_tl_cuda_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_cuda_lib_config_t, super),
@@ -89,4 +91,8 @@ __attribute__((constructor)) static void tl_cuda_iface_init(void)
         ucc_tl_cuda_allgather_algs;
     ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
         ucc_tl_cuda_allgatherv_algs;
+    ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTER)] =
+        ucc_tl_cuda_reduce_scatter_algs;
+    ucc_tl_cuda.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_REDUCE_SCATTERV)] =
+        ucc_tl_cuda_reduce_scatterv_algs;
 }

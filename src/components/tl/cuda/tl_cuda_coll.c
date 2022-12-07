@@ -34,7 +34,9 @@
 const char *
     ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR] = {
         UCC_TL_CUDA_ALLGATHER_DEFAULT_ALG_SELECT_STR,
-        UCC_TL_CUDA_ALLGATHERV_DEFAULT_ALG_SELECT_STR};
+        UCC_TL_CUDA_ALLGATHERV_DEFAULT_ALG_SELECT_STR,
+        UCC_TL_CUDA_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR,
+        UCC_TL_CUDA_REDUCE_SCATTERV_DEFAULT_ALG_SELECT_STR};
 
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
                                       ucc_tl_cuda_mem_info_t *mi)
@@ -179,6 +181,38 @@ ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
             break;
         case UCC_TL_CUDA_ALLGATHER_ALG_LINEAR:
             *init = ucc_tl_cuda_allgatherv_linear_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        };
+        break;
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        switch (alg_id) {
+        case UCC_TL_CUDA_REDUCE_SCATTER_ALG_AUTO:
+            *init = ucc_tl_cuda_reduce_scatter_init;
+            break;
+        case UCC_TL_CUDA_REDUCE_SCATTER_ALG_RING:
+            *init = ucc_tl_cuda_reduce_scatter_ring_init;
+            break;
+        case UCC_TL_CUDA_REDUCE_SCATTER_ALG_LINEAR:
+            *init = ucc_tl_cuda_reduce_scatter_linear_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        };
+        break;
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        switch (alg_id) {
+        case UCC_TL_CUDA_REDUCE_SCATTERV_ALG_AUTO:
+            *init = ucc_tl_cuda_reduce_scatterv_init;
+            break;
+        case UCC_TL_CUDA_REDUCE_SCATTERV_ALG_RING:
+            *init = ucc_tl_cuda_reduce_scatterv_ring_init;
+            break;
+        case UCC_TL_CUDA_REDUCE_SCATTERV_ALG_LINEAR:
+            *init = ucc_tl_cuda_reduce_scatterv_linear_init;
             break;
         default:
             status = UCC_ERR_INVALID_PARAM;
