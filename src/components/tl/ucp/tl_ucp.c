@@ -45,6 +45,42 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_pairwise_num_posts),
      UCC_CONFIG_TYPE_UINT},
 
+/* TODO: add radix to config once it's fully supported by the algorithm
+    {"ALLTOALLV_HYBRID_RADIX", "2",
+     "Radix of the Hybrid Alltoallv algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_radix),
+     UCC_CONFIG_TYPE_UINT},
+*/
+    {"ALLTOALLV_HYBRID_SEND_BUFFER_SIZE", "1",
+     "Number of maximum lengthed messages that can fit in the send buffer",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_send_buffer_size),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALLV_HYBRID_RECV_BUFFER_SIZE", "3",
+     "Number of maximum lengthed messages that can fit in the recv buffer",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_recv_buffer_size),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALLV_HYBRID_PAIRWISE_NUM_POSTS", "3",
+     "The maximum number of pairwise messages to send before waiting for completion",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_pairwise_num_posts),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALLV_HYBRID_SEND_LIMIT", "200",
+     "",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_send_limit),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLTOALLV_HYBRID_BUFF_SIZE", "256k",
+     "",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_buff_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLTOALLV_HYBRID_CHUNK_BYTE_LIMIT", "12k",
+     "",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_chunk_byte_limit),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
     {"KN_RADIX", "0",
      "Radix of all algorithms based on knomial pattern. When set to a "
      "positive value it is used as a convinience parameter to set all "

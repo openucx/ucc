@@ -166,6 +166,21 @@ typedef struct ucc_tl_ucp_task {
             void *                  scratch;
             ucc_mc_buffer_header_t *scratch_mc_header;
         } gather_kn;
+        struct {
+            size_t                  merge_buf_size;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            size_t                  byte_send_limit;
+            int                     phase;
+            uint32_t                radix;
+            uint32_t                cur_radix;
+            uint32_t                iteration;
+            ucc_rank_t              cur_out;
+            size_t                  traffic_in;
+            size_t                  traffic_out;
+            ucc_rank_t              num_in;
+            ucc_rank_t              num2send;
+            ucc_rank_t              num2recv;
+        } alltoallv_hybrid;
     };
 } ucc_tl_ucp_task_t;
 

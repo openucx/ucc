@@ -64,6 +64,13 @@ typedef struct ucc_tl_ucp_lib_config {
     int                      reduce_avg_pre_op;
     int                      reduce_scatter_ring_bidirectional;
     int                      reduce_scatterv_ring_bidirectional;
+    uint32_t                 alltoallv_hybrid_radix;
+    size_t                   alltoallv_hybrid_send_limit;
+    size_t                   alltoallv_hybrid_buff_size;
+    size_t                   alltoallv_hybrid_chunk_byte_limit;
+    uint32_t                 alltoallv_hybrid_send_buffer_size;
+    uint32_t                 alltoallv_hybrid_recv_buffer_size;
+    uint32_t                 alltoallv_hybrid_pairwise_num_posts;
     ucc_ternary_auto_value_t use_topo;
 } ucc_tl_ucp_lib_config_t;
 

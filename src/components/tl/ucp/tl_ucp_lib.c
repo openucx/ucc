@@ -7,7 +7,7 @@
 #include "tl_ucp.h"
 #include "utils/ucc_malloc.h"
 
-/* NOLINTNEXTLINE  params is not used*/
+/* NOLINTNEXTLINE  params is not used */
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
                     const ucc_base_config_t *config)
 {
@@ -37,7 +37,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
         self->cfg.scatter_kn_radix        = tl_ucp_config->kn_radix;
         self->cfg.gather_kn_radix         = tl_ucp_config->kn_radix;
     }
-
+    self->cfg.alltoallv_hybrid_radix = 2;
     self->tlcp_configs = NULL;
     if (n_plugins) {
         self->tlcp_configs = ucc_malloc(sizeof(void*)*n_plugins, "tlcp_configs");
