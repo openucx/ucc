@@ -759,6 +759,7 @@ int ucc_config_sscanf_pipeline_params(const char *buf, void *dest,
         }
         ucc_str_split_free(t2);
     }
+    ucc_str_split_free(tokens);
     return 1;
 out:
     if (t2) {

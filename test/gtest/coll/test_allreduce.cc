@@ -269,8 +269,7 @@ TYPED_TEST(test_allreduce_alg, sra_knomial_pipelined) {
     int           n_procs = 15;
     ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
                              {"UCC_TL_UCP_TUNE", "allreduce:@sra_knomial:inf"},
-                             {"UCC_TL_UCP_ALLREDUCE_SRA_KN_FRAG_THRESH", "1024"},
-                             {"UCC_TL_UCP_ALLREDUCE_SRA_KN_N_FRAGS", "11"}};
+                             {"UCC_TL_UCP_ALLREDUCE_SRA_KN_PIPELINE", "thresh=1024:nfrags=11"}};
     UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
     UccTeam_h     team   = job.create_team(n_procs);
     int           repeat = 3;
