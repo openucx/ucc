@@ -1,13 +1,17 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
 
+#ifndef UINT32_MAX
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 #include "../ec_cuda.h"
 #ifdef __cplusplus
 }

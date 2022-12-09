@@ -4,9 +4,13 @@
  * See file LICENSE for terms.
  */
 
+#ifndef UINT32_MAX
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
+#endif
+
 extern "C" {
 #include "../ec_cuda.h"
-#include <inttypes.h>
 }
 #include "ec_cuda_reduce_ops.h"
 #include <cooperative_groups.h>
