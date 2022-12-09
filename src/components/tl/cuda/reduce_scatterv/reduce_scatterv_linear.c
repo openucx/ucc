@@ -432,6 +432,10 @@ ucc_tl_cuda_reduce_scatterv_linear_init(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
+    if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_conntected(team->topo))) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     status = ucc_tl_cuda_task_init(coll_args, team, &task);
     if (ucc_unlikely(status != UCC_OK)) {
         return status;

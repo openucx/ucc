@@ -49,4 +49,10 @@ ucc_tl_cuda_team_topo_is_direct(const ucc_tl_team_t *team,
     return topo->matrix[r1 * team->super.params.size + r2] != 0;
 }
 
+static inline int
+ucc_tl_cuda_team_topo_is_fully_conntected(const ucc_tl_cuda_team_topo_t *topo)
+{
+    return topo->num_proxies == 0;
+}
+
 #endif
