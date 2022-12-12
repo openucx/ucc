@@ -1,7 +1,9 @@
 /**
-* Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+* Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
 * See file LICENSE for terms.
 */
+
 #include "ucc_proc_info.h"
 #include "ucc_log.h"
 #include "utils/ucc_malloc.h"
@@ -208,6 +210,13 @@ static ucc_status_t ucc_get_bound_numa_id(ucc_numa_id_t *numaid)
     char *       error;
     void *       handle, *cpumask;
     int          i, numa_node, n_cfg_cpus, nn;
+    int (*ucc_numa_available)(void);
+    int (*ucc_numa_num_configured_cpus)(void);
+    void *(*ucc_numa_allocate_cpumask)(void);
+    void *(*ucc_numa_sched_getaffinity)(int, void *);
+    int (*ucc_numa_bitmask_isbitset)(void *, int);
+    int (*ucc_numa_node_of_cpu)(int);
+    int (*ucc_numa_bitmask_free)(void *);
 
     handle = dlopen("libnuma.so", RTLD_LAZY);
     if (!handle) {
@@ -215,18 +224,20 @@ static ucc_status_t ucc_get_bound_numa_id(ucc_numa_id_t *numaid)
         return UCC_ERR_NOT_FOUND;
     }
 
-    int (*ucc_numa_available)(void) =
-        LOAD_NUMA_SYM("numa_available");
-    int (*ucc_numa_num_configured_cpus)(void) =
-        LOAD_NUMA_SYM("numa_num_configured_cpus");
-    void *(*ucc_numa_allocate_cpumask)(void) =
-        LOAD_NUMA_SYM("numa_allocate_cpumask");
-    void *(*ucc_numa_sched_getaffinity)(int, void *) =
-        LOAD_NUMA_SYM("numa_sched_getaffinity");
-    int (*ucc_numa_bitmask_isbitset)(void *, int) =
-        LOAD_NUMA_SYM("numa_bitmask_isbitset");
-    int (*ucc_numa_node_of_cpu)(int)     = LOAD_NUMA_SYM("numa_node_of_cpu");
-    int (*ucc_numa_bitmask_free)(void *) = LOAD_NUMA_SYM("numa_bitmask_free");
+    ucc_numa_available           =
+        (int(*)(void))LOAD_NUMA_SYM("numa_available");
+    ucc_numa_num_configured_cpus =
+        (int(*)(void))LOAD_NUMA_SYM("numa_num_configured_cpus");
+    ucc_numa_allocate_cpumask    =
+        (void*(*)(void))LOAD_NUMA_SYM("numa_allocate_cpumask");
+    ucc_numa_sched_getaffinity   =
+        (void*(*)(int, void*))LOAD_NUMA_SYM("numa_sched_getaffinity");
+    ucc_numa_bitmask_isbitset    =
+        (int(*)(void*, int))LOAD_NUMA_SYM("numa_bitmask_isbitset");
+    ucc_numa_node_of_cpu         =
+        (int(*)(int))LOAD_NUMA_SYM("numa_node_of_cpu");
+    ucc_numa_bitmask_free        =
+        (int(*)(void*))LOAD_NUMA_SYM("numa_bitmask_free");
 
     if (-1 == ucc_numa_available()) {
         ucc_debug("libnuma is not available");

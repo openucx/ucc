@@ -4,15 +4,6 @@
 #
 
 if TL_CUDA_ENABLED
-alltoall =                       \
-	alltoall/alltoall.h          \
-	alltoall/alltoall.c          \
-	alltoall/alltoall_ce.c
-
-alltoallv =                      \
-	alltoallv/alltoallv.h      	 \
-	alltoallv/alltoallv.c        \
-	alltoallv/alltoallv_ce.c
 
 allgather =                      \
 	allgather/allgather.h        \
@@ -26,15 +17,27 @@ allgatherv =                       \
 	allgatherv/allgatherv_ring.c   \
 	allgatherv/allgatherv_linear.c
 
-reduce_scatter =                         \
-	reduce_scatter/reduce_scatter.h      \
-	reduce_scatter/reduce_scatter.c      \
-	reduce_scatter/reduce_scatter_ring.c
+alltoall =                 \
+	alltoall/alltoall.h    \
+	alltoall/alltoall.c    \
+	alltoall/alltoall_ce.c
 
-reduce_scatterv =                          \
-	reduce_scatterv/reduce_scatterv.h      \
-	reduce_scatterv/reduce_scatterv.c      \
-	reduce_scatterv/reduce_scatterv_ring.c
+alltoallv =                  \
+	alltoallv/alltoallv.h    \
+	alltoallv/alltoallv.c    \
+	alltoallv/alltoallv_ce.c
+
+reduce_scatter =                           \
+	reduce_scatter/reduce_scatter.h        \
+	reduce_scatter/reduce_scatter.c        \
+	reduce_scatter/reduce_scatter_ring.c   \
+	reduce_scatter/reduce_scatter_linear.c
+
+reduce_scatterv =                            \
+	reduce_scatterv/reduce_scatterv.h        \
+	reduce_scatterv/reduce_scatterv.c        \
+	reduce_scatterv/reduce_scatterv_ring.c   \
+	reduce_scatterv/reduce_scatterv_linear.c
 
 
 sources =               \
@@ -47,10 +50,10 @@ sources =               \
 	tl_cuda_cache.c     \
 	tl_cuda_topo.c      \
 	tl_cuda_team_topo.c \
-	$(alltoall)         \
-	$(alltoallv)        \
 	$(allgather)        \
 	$(allgatherv)       \
+	$(alltoall)         \
+	$(alltoallv)        \
 	$(reduce_scatter)   \
 	$(reduce_scatterv)
 

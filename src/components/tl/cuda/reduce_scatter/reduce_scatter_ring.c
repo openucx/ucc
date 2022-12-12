@@ -5,38 +5,33 @@
  */
 
 #include "reduce_scatterv/reduce_scatterv.h"
+#include "reduce_scatter/reduce_scatter.h"
 
-size_t ucc_tl_cuda_reduce_scatter_ring_count(const ucc_tl_cuda_task_t *task,
-                                             ucc_rank_t block) //NOLINT
+ucc_status_t ucc_tl_cuda_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
+                                                  ucc_base_team_t *     tl_team,
+                                                  ucc_coll_task_t **    task_p)
 {
-    const ucc_coll_args_t *args  = &TASK_ARGS(task);
-    size_t                 count = args->dst.info.count;
-
-    if (UCC_IS_INPLACE(*args)) {
-        count = args->dst.info.count / UCC_TL_TEAM_SIZE(TASK_TEAM(task));
-    }
-    return count;
-}
-
-size_t ucc_tl_cuda_reduce_scatter_ring_get_offset(const ucc_tl_cuda_task_t *task,
-                                                  ucc_rank_t block)
-{
-    return ucc_tl_cuda_reduce_scatter_ring_count(task, block) * block;
-}
-
-ucc_status_t ucc_tl_cuda_reduce_scatter_ring_init(ucc_tl_cuda_task_t *task)
-{
-    ucc_tl_cuda_team_t *team   = TASK_TEAM(task);
-    ucc_coll_args_t    *args   = &TASK_ARGS(task);
+    ucc_tl_cuda_team_t *team   = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     size_t              ssize  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size;
-    ucc_datatype_t      dt     = args->dst.info.datatype;
+    ucc_datatype_t      dt     = coll_args->args.dst.info.datatype;
+    ucc_tl_cuda_task_t *task;
     size_t send_size, frag_size;
+    ucc_status_t status;
 
-    task->reduce_scatterv_ring.get_count  = ucc_tl_cuda_reduce_scatter_ring_count;
-    task->reduce_scatterv_ring.get_offset = ucc_tl_cuda_reduce_scatter_ring_get_offset;
-    task->reduce_scatterv_ring.dt         = args->dst.info.datatype;
-    task->reduce_scatterv_ring.sbuf       = args->src.info.buffer;
-    task->reduce_scatterv_ring.rbuf       = args->dst.info.buffer;
+    if (coll_args->args.op == UCC_OP_AVG) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    status = ucc_tl_cuda_task_init(coll_args, team, &task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+
+    task->reduce_scatterv_ring.get_count  = ucc_tl_cuda_reduce_scatter_get_count;
+    task->reduce_scatterv_ring.get_offset = ucc_tl_cuda_reduce_scatter_get_offset;
+    task->reduce_scatterv_ring.dt         = coll_args->args.dst.info.datatype;
+    task->reduce_scatterv_ring.sbuf       = coll_args->args.src.info.buffer;
+    task->reduce_scatterv_ring.rbuf       = coll_args->args.dst.info.buffer;
 
     send_size = task->reduce_scatterv_ring.get_count(task, 0);
     frag_size = ucc_min(ssize / ucc_dt_size(dt) / 2, send_size);
@@ -49,5 +44,6 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_ring_init(ucc_tl_cuda_task_t *task)
     task->super.finalize                 = ucc_tl_cuda_reduce_scatterv_ring_finalize;
     task->bar                            = TASK_BAR(task);
 
+    *task_p = &task->super;
     return UCC_OK;
 }

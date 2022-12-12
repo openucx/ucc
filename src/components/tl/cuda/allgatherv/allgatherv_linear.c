@@ -29,7 +29,7 @@
  *
  *  Algorithm
  *      for rank R
- *      step 1:    copy fragR_1 to remote scratch buffers for all ranks
+ *      step 0:    copy fragR_1 to remote scratch buffers for all ranks
  *                 if not inplace copy local src buffer to local dst buffer
  *
  *      step 1:    copy frag1_1, frag2_1, ..., fragN_1 from local scratch buffer

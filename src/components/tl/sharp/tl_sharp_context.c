@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -28,7 +28,7 @@ static int ucc_tl_sharp_oob_barrier(void *arg)
     status = oob_coll->allgather(&sbuf, rbuf, sizeof(char),
                                  oob_coll->coll_info, &req);
     if (UCC_OK == status) {
-        ucc_assert(req);
+        ucc_assert(req != NULL);
         while (UCC_OK != (status = oob_coll->req_test(req))) {
             if (status < 0) {
                 tl_error(ctx->super.super.lib, "failed to test oob req");
@@ -66,7 +66,7 @@ static int ucc_tl_sharp_oob_gather(void *arg, int root, void *sbuf,
 
     status = oob_coll->allgather(sbuf, rbuf, msg_size, oob_coll->coll_info, &req);
     if (UCC_OK == status) {
-        ucc_assert(req);
+        ucc_assert(req != NULL);
         while (UCC_OK != (status = oob_coll->req_test(req))) {
             if (status < 0) {
                 tl_error(ctx->super.super.lib, "failed to test oob req");
@@ -103,7 +103,7 @@ static int ucc_tl_sharp_oob_bcast(void *arg, void *buf, int size, int root)
     status = oob_coll->allgather(buf, tmp_rbuf, msg_size, oob_coll ->coll_info,
                                  &req);
     if (UCC_OK == status) {
-        ucc_assert(req);
+        ucc_assert(req != NULL);
         while (UCC_OK != (status = oob_coll ->req_test(req))) {
             if (status < 0) {
                 tl_error(ctx->super.super.lib, "failed to test oob req");
@@ -212,10 +212,11 @@ static int ucc_tl_sharp_service_bcast(void *arg, void *buf, int size, int root)
     return status;
 }
 
+/* rcache, arg, flags unused */
 static ucs_status_t
-ucc_tl_sharp_rcache_mem_reg_cb(void *context, ucc_rcache_t *rcache,
-                               void *arg, ucc_rcache_region_t *rregion,
-                               uint16_t flags)
+ucc_tl_sharp_rcache_mem_reg_cb(void *context, ucc_rcache_t *rcache, //NOLINT
+                               void *arg, ucc_rcache_region_t *rregion, //NOLINT
+                               uint16_t flags) //NOLINT
 {
     ucc_tl_sharp_rcache_region_t *region;
     void                         *address;
@@ -235,7 +236,8 @@ ucc_tl_sharp_rcache_mem_reg_cb(void *context, ucc_rcache_t *rcache,
     }
 }
 
-static void ucc_tl_sharp_rcache_mem_dereg_cb(void *context, ucc_rcache_t *rcache,
+/* rcache is unused */
+static void ucc_tl_sharp_rcache_mem_dereg_cb(void *context, ucc_rcache_t *rcache, //NOLINT
                                              ucc_rcache_region_t *rregion)
 {
     ucc_tl_sharp_rcache_region_t *region = ucc_derived_of(rregion,
@@ -244,8 +246,9 @@ static void ucc_tl_sharp_rcache_mem_dereg_cb(void *context, ucc_rcache_t *rcache
     sharp_coll_dereg_mr((struct sharp_coll_context *)context, region->reg.mr);
 }
 
+/* context, rcache unused */
 static void
-ucc_tl_sharp_rcache_dump_region_cb(void *context, ucs_rcache_t *rcache,
+ucc_tl_sharp_rcache_dump_region_cb(void *context, ucs_rcache_t *rcache, //NOLINT
                                    ucs_rcache_region_t *rregion, char *buf,
                                    size_t max)
 {
@@ -288,7 +291,7 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
     struct sharp_coll_init_spec  init_spec = {0};
     ucc_tl_sharp_lib_t          *lib       = ucc_derived_of(sharp_ctx->super.super.lib,
                                                             ucc_tl_sharp_lib_t);
-    ucc_status_t status;
+    int ret;
 
     init_spec.progress_func                  = NULL;
     init_spec.world_local_rank               = 0;
@@ -321,15 +324,15 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
     }
 
     //TODO: replace with unique context ID?
-    status = init_spec.oob_colls.bcast((void *)oob_ctx,
-                                        &init_spec.job_id,
-                                        sizeof(uint64_t), 0);
-    if (status != UCC_OK) {
-        tl_error(sharp_ctx->super.super.lib, "failed to broadcast SHARP job_id");
-        return status;
+    ret = init_spec.oob_colls.bcast((void *)oob_ctx, &init_spec.job_id,
+                                    sizeof(uint64_t), 0);
+    if (ret < 0) {
+        tl_error(sharp_ctx->super.super.lib,
+                 "failed to broadcast SHARP job_id");
+        return UCC_ERR_NO_MESSAGE;
     }
 
-    int ret = sharp_coll_init(&init_spec, context);
+    ret = sharp_coll_init(&init_spec, context);
     if (ret < 0 ) {
         tl_debug(sharp_ctx->super.super.lib, "Failed to initialize SHARP "
                  "collectives:%s(%d) job ID:%" PRIu64"\n",

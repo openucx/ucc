@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -88,6 +88,25 @@ ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t   *tl_team,
 UCC_TL_IFACE_DECLARE(sharp, SHARP);
 
 ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context);
+
+ucc_status_t sharp_status_to_ucc_status(int status)
+{
+    switch (status) {
+    case SHARP_COLL_SUCCESS:
+        return UCC_OK;
+    case SHARP_COLL_ENOMEM:
+        return UCC_ERR_NO_MEMORY;
+    case SHARP_COLL_ENOT_SUPP:
+        return UCC_ERR_NOT_SUPPORTED;
+    case SHARP_COLL_EINVAL:
+        return UCC_ERR_INVALID_PARAM;
+    case SHARP_COLL_ENO_RESOURCE:
+        return UCC_ERR_NO_RESOURCE;
+    default:
+        break;
+    }
+    return UCC_ERR_NO_MESSAGE;
+}
 
 __attribute__((constructor)) static void tl_sharp_iface_init(void)
 {

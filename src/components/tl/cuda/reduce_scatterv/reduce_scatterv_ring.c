@@ -328,40 +328,34 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_start(ucc_coll_task_t *coll_task)
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
-size_t ucc_tl_cuda_reduce_scatterv_ring_get_count(const ucc_tl_cuda_task_t *task,
-                                                  ucc_rank_t block)
+ucc_status_t
+ucc_tl_cuda_reduce_scatterv_ring_init(ucc_base_coll_args_t *coll_args,
+                                      ucc_base_team_t *     tl_team,
+                                      ucc_coll_task_t **    task_p)
 {
-    const ucc_coll_args_t *args  = &TASK_ARGS(task);
+    ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
+    ucc_tl_cuda_task_t *task;
+    ucc_status_t status;
 
-    return ucc_coll_args_get_count(args, args->dst.info_v.counts, block);
-}
-
-size_t ucc_tl_cuda_reduce_scatterv_ring_get_offset(const ucc_tl_cuda_task_t *task,
-                                                   ucc_rank_t block)
-{
-    size_t     offset = 0;
-    ucc_rank_t i;
-
-    for (i = 0; i < block; i++) {
-        offset += task->reduce_scatterv_ring.get_count(task, i);
+    if (coll_args->args.op == UCC_OP_AVG) {
+        return UCC_ERR_NOT_SUPPORTED;
     }
 
-    return offset;
-}
-
-ucc_status_t ucc_tl_cuda_reduce_scatterv_ring_init(ucc_tl_cuda_task_t *task)
-{
-    ucc_coll_args_t *args   = &TASK_ARGS(task);
+    status = ucc_tl_cuda_task_init(coll_args, team, &task);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
 
     task->super.flags                    |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post                      = ucc_tl_cuda_reduce_scatterv_ring_start;
     task->super.triggered_post            = ucc_triggered_post;
     task->super.progress                  = ucc_tl_cuda_reduce_scatterv_ring_progress;
     task->super.finalize                  = ucc_tl_cuda_reduce_scatterv_ring_finalize;
-    task->reduce_scatterv_ring.get_count  = ucc_tl_cuda_reduce_scatterv_ring_get_count;
-    task->reduce_scatterv_ring.get_offset = ucc_tl_cuda_reduce_scatterv_ring_get_offset;
-    task->reduce_scatterv_ring.dt         = args->dst.info_v.datatype;
+    task->reduce_scatterv_ring.get_count  = ucc_tl_cuda_reduce_scatterv_get_count;
+    task->reduce_scatterv_ring.get_offset = ucc_tl_cuda_reduce_scatterv_get_offset;
+    task->reduce_scatterv_ring.dt         = coll_args->args.dst.info_v.datatype;
     task->bar                             = TASK_BAR(task);
 
+    *task_p = &task->super;
     return UCC_OK;
 }

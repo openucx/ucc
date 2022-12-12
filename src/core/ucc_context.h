@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -53,18 +54,23 @@ typedef struct ucc_context {
     ucc_cl_context_t       **cl_ctx;
     ucc_tl_context_t       **tl_ctx;
     ucc_tl_context_t        *service_ctx;
-    int                      n_cl_ctx;
-    int                      n_tl_ctx;
-    int                      n_addr_packed; /*< Number of LT/CL components whose addresses are packed
-                                              into ucc_context->attr.addr */
+    unsigned                 n_cl_ctx;
+    unsigned                 n_tl_ctx;
+/**
+ *  Number of TL/CL components whose addresses are packed into
+ *  ucc_context->attr.addr
+ */
+    int                      n_addr_packed;
     ucc_config_names_array_t all_tls;
     ucc_list_link_t          progress_list;
     ucc_progress_queue_t    *pq;
     ucc_team_id_pool_t       ids;
     ucc_context_id_t         id;
     ucc_addr_storage_t       addr_storage;
-    ucc_rank_t               rank; /*< rank of a process in the "global" (with
-                                     OOB) context */
+/**
+ *  rank of a process in the "global" (with OOB) context
+ */
+    ucc_rank_t               rank;
     ucc_context_topo_t      *topo;
     uint64_t                 cl_flags;
     ucc_tl_team_t           *service_team;

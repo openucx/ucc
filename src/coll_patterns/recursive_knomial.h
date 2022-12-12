@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -202,8 +202,7 @@ enum {
 
 #define UCC_KN_CHECK_PHASE(_p)                                                 \
     case _p:                                                                   \
-        goto _p;                                                               \
-        break;
+        goto _p;
 
 #define UCC_KN_REDUCE_GOTO_PHASE(_phase)                                       \
     do {                                                                       \

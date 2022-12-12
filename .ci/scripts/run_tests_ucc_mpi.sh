@@ -136,7 +136,7 @@ for MT in "" "-T"; do
     echo "INFO: UCC MPI unit tests (CL/HIER+split_rail+pipeline) ..."
     # shellcheck disable=SC2086
     clhier_args=" -x UCC_CLS=basic,hier -x UCC_CL_HIER_TUNE=allreduce:@split_rail:inf -x UCC_CL_HIER_TLS=ucp -x UCC_TL_NCCL_TUNE=0 "
-    clhier_args+=" -x UCC_CL_HIER_ALLREDUCE_SPLIT_RAIL_FRAG_THRESH=0 -x UCC_CL_HIER_ALLREDUCE_SPLIT_RAIL_FRAG_SIZE=256K "
+    clhier_args+=" -x UCC_CL_HIER_ALLREDUCE_SPLIT_RAIL_PIPELINE=thresh=0:fragsize=256K "
     clhier_colls="allreduce"
     mpirun $(mpi_params $PPN) $clhier_args $EXE $MT $TG --mtypes host,cuda -c $clhier_colls
     echo "INFO: UCC MPI unit tests (CL/HIER+split_rail+pipeline) ... DONE"

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001-2014, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2001-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # Copyright (c) UT-Battelle, LLC. 2017. ALL RIGHTS RESERVED.
 # Copyright (C) ARM Ltd. 2016-2020.  ALL RIGHTS RESERVED.
 # See file LICENSE for terms.
@@ -445,12 +445,15 @@ AC_LANG_POP
 # --diag_suppress 1215 - Suppress deprecated API warning for PGI18 compiler
 # --diag_suppress 1901 - Use of a const variable in a constant expression is nonstandard in C
 # --diag_suppress 1902 - Use of a const variable in a constant expression is nonstandard in C (same as 1901)
+# --diag_suppress 301  - Suppress typedef name has already been declared (with same type) [duplicate_typedef]
+
 ADD_COMPILER_FLAGS_IF_SUPPORTED([[--display_error_number],
                                  [--diag_suppress 181],
                                  [--diag_suppress 381],
                                  [--diag_suppress 1215],
                                  [--diag_suppress 1901],
-                                 [--diag_suppress 1902]],
+                                 [--diag_suppress 1902],
+                                 [--diag_suppress 301]],
                                 [AC_LANG_SOURCE([[int main(int argc, char **argv){return 0;}]])])
 
 

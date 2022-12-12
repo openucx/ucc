@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "ucc_pt_config.h"
 BEGIN_C_DECLS
 #include "utils/ucc_string.h"
@@ -79,21 +85,24 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
         switch (c) {
             case 'c':
                 if (ucc_pt_op_map.count(optarg) == 0) {
-                    std::cerr << "invalid opeartion" << std::endl;
+                    std::cerr << "invalid opeartion: " << optarg
+                              << std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
                 bench.op_type = ucc_pt_op_map.at(optarg);
                 break;
             case 'o':
                 if (ucc_pt_reduction_op_map.count(optarg) == 0) {
-                    std::cerr << "invalid reduction operation" << std::endl;
+                    std::cerr << "invalid reduction operation: " << optarg
+                              <<  std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
                 bench.op = ucc_pt_reduction_op_map.at(optarg);
                 break;
             case 'm':
                 if (ucc_pt_memtype_map.count(optarg) == 0) {
-                    std::cerr << "invalid memory type" << std::endl;
+                    std::cerr << "invalid memory type: " << optarg
+                              <<std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
                 bench.mt = ucc_pt_memtype_map.at(optarg);
@@ -101,7 +110,8 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                 break;
             case 'd':
                 if (ucc_pt_datatype_map.count(optarg) == 0) {
-                    std::cerr << "invalid datatype" << std::endl;
+                    std::cerr << "invalid datatype:" << optarg
+                              << std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
                 bench.dt = ucc_pt_datatype_map.at(optarg);

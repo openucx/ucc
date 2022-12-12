@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -172,7 +173,7 @@ ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *ctx_topo,
         topo->sbgps[i].status = UCC_SBGP_NOT_INIT;
     }
     topo->n_sockets           = -1;
-    topo->node_leader_rank    = -1;
+    topo->node_leader_rank    = UCC_RANK_INVALID;
     topo->node_leader_rank_id = 0;
     topo->set                 = set;
     topo->min_ppn             = UCC_RANK_MAX;
