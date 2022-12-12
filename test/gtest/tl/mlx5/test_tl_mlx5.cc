@@ -64,6 +64,10 @@ void test_tl_mlx5::SetUp()
                                                   "ucc_tl_mlx5_create_ah");
     ASSERT_EQ(nullptr, dlerror());
 
+    create_umr_qp = (ucc_tl_mlx5_create_umr_qp_fn_t)dlsym(
+        tl_mlx5_so_handle, "ucc_tl_mlx5_create_umr_qp");
+    ASSERT_EQ(nullptr, dlerror());
+
     status = create_ibv_ctx(&devname, &ctx, &lib);
     if (UCC_OK != status) {
         std::cerr << "no ib devices";
@@ -201,5 +205,28 @@ UCC_TEST_F(test_tl_mlx5_dc, create_ah)
     ucc_status_t status;
 
     status = create_ah(pd, port_attr.lid, port, &ah, &lib);
+    EXPECT_EQ(UCC_OK, status);
+}
+
+class test_tl_mlx5_umr_qp : public test_tl_mlx5 {
+  public:
+    struct ibv_qp *qp;
+    test_tl_mlx5_umr_qp()
+    {
+        qp = NULL;
+    }
+    ~test_tl_mlx5_umr_qp()
+    {
+        if (qp) {
+            ibv_destroy_qp(qp);
+        }
+    }
+};
+
+UCC_TEST_F(test_tl_mlx5_umr_qp, create)
+{
+    ucc_status_t status;
+
+    status = create_umr_qp(ctx, pd, cq, port, &qp, &qp_conf, &lib);
     EXPECT_EQ(UCC_OK, status);
 }

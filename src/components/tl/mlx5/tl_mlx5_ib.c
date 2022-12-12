@@ -431,20 +431,28 @@ ucc_status_t ucc_tl_mlx5_create_umr_qp(struct ibv_context *ctx,
     umr_init_attr_ex.cap.max_recv_wr  = 1;
     umr_init_attr_ex.cap.max_send_sge = 1;
     umr_init_attr_ex.cap.max_recv_sge = 1;
-    // `max_inline_data` determines the WQE size that the QP will support.
-    // The 'max_inline_data' should be modified only when the number of
-    // arrays to interleave is greater than 3.
-    //TODO query the devices what is max supported
-    umr_init_attr_ex.cap.max_inline_data =
-        828; // the max number possible, Sergey Gorenko's email
-    umr_init_attr_ex.qp_type = IBV_QPT_RC;
+    umr_init_attr_ex.qp_type          = IBV_QPT_RC;
     umr_init_attr_ex.comp_mask =
         IBV_QP_INIT_ATTR_SEND_OPS_FLAGS | IBV_QP_INIT_ATTR_PD;
     umr_init_attr_ex.pd = pd;
     umr_init_attr_ex.send_ops_flags |= IBV_QP_EX_WITH_SEND;
-    *qp = mlx5dv_create_qp(ctx, &umr_init_attr_ex, &umr_mlx5dv_qp_attr);
+
+    /* In order to create UMRs using mlx5dv_wr_mr_list we need to have
+        inline data support. Try to find max supported inline data size.
+        Loop starting from 828 (expected max for cx7), if not supported 
+        decrease and go by multiples of 128 */
+    umr_init_attr_ex.cap.max_inline_data = 828;
+    do {
+        *qp = mlx5dv_create_qp(ctx, &umr_init_attr_ex, &umr_mlx5dv_qp_attr);
+        if (umr_init_attr_ex.cap.max_inline_data == 828) {
+            umr_init_attr_ex.cap.max_inline_data = 768;
+        } else {
+            umr_init_attr_ex.cap.max_inline_data -= 128;
+        }
+    } while (*qp == NULL && umr_init_attr_ex.cap.max_inline_data > 0);
+
     if (*qp == NULL) {
-        tl_error(lib, "failed to create UMR QP, %m");
+        tl_error(lib, "failed to create UMR QP with inline_data, %m");
         return UCC_ERR_NO_MESSAGE;
     }
     qp_ex = ibv_qp_to_qp_ex(*qp);

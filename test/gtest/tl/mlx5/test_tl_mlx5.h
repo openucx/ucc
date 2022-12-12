@@ -32,11 +32,15 @@ typedef ucc_status_t (*ucc_tl_mlx5_init_dci_fn_t)(
     struct ibv_cq *cq, uint8_t port_num, int tx_depth,
     ucc_tl_mlx5_ib_qp_conf_t *qp_conf, ucc_base_lib_t *lib);
 
-typedef ucc_status_t (*ucc_tl_mlx5_create_ah_fn_t)(struct ibv_pd * pd,
+typedef ucc_status_t (*ucc_tl_mlx5_create_ah_fn_t)(struct ibv_pd  *pd,
                                                    uint16_t        lid,
                                                    uint8_t         port_num,
                                                    struct ibv_ah **ah_ptr,
                                                    ucc_base_lib_t *lib);
+
+typedef ucc_status_t (*ucc_tl_mlx5_create_umr_qp_fn_t)(
+    struct ibv_context *ctx, struct ibv_pd *pd, struct ibv_cq *cq, int ib_port,
+    struct ibv_qp **qp, ucc_tl_mlx5_ib_qp_conf_t *qp_conf, ucc_base_lib_t *lib);
 
 class test_tl_mlx5 : public ucc::test {
     void *tl_mlx5_so_handle;
@@ -49,6 +53,7 @@ class test_tl_mlx5 : public ucc::test {
     ucc_tl_mlx5_init_dct_fn_t        init_dct;
     ucc_tl_mlx5_init_dci_fn_t        init_dci;
     ucc_tl_mlx5_create_ah_fn_t       create_ah;
+    ucc_tl_mlx5_create_umr_qp_fn_t   create_umr_qp;
     ucc_tl_mlx5_ib_qp_conf_t         qp_conf;
     struct ibv_port_attr             port_attr;
     struct ibv_context *             ctx;
