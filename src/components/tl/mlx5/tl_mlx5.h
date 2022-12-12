@@ -37,14 +37,23 @@ typedef struct ucc_tl_mlx5_iface {
 /* Extern iface should follow the pattern: ucc_tl_<tl_name> */
 extern ucc_tl_mlx5_iface_t ucc_tl_mlx5;
 
+typedef struct ucc_tl_mlx5_ib_qp_conf {
+    uint32_t            qp_rnr_retry;
+    uint32_t            qp_rnr_timer;
+    uint32_t            qp_retry_cnt;
+    uint32_t            qp_timeout;
+    uint32_t            qp_max_atomic;
+} ucc_tl_mlx5_ib_qp_conf_t;
+
 typedef struct ucc_tl_mlx5_lib_config {
-    ucc_tl_lib_config_t super;
-    int                 block_size;
-    int                 num_dci_qps;
-    int                 dc_threshold;
-    size_t              dm_buf_size;
-    unsigned long       dm_buf_num;
-    int                 dm_host;
+    ucc_tl_lib_config_t      super;
+    int                      block_size;
+    int                      num_dci_qps;
+    int                      dc_threshold;
+    size_t                   dm_buf_size;
+    unsigned long            dm_buf_num;
+    int                      dm_host;
+    ucc_tl_mlx5_ib_qp_conf_t qp_conf;
 } ucc_tl_mlx5_lib_config_t;
 
 typedef struct ucc_tl_mlx5_context_config {

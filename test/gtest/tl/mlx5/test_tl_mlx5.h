@@ -18,19 +18,19 @@ typedef ucc_status_t (*ucc_tl_mlx5_create_rc_qp_fn_t)(
     struct ibv_context *ctx, struct ibv_pd *pd, struct ibv_cq *cq, int ib_port,
     int tx_depth, ucc_tl_mlx5_qp_t *qp, uint32_t *qpn, ucc_base_lib_t *lib);
 
-typedef ucc_status_t (*ucc_tl_mlx5_qp_connect_fn_t)(struct ibv_qp *qp,
-                                                    uint32_t       qp_num,
-                                                    uint16_t lid, int port,
-                                                    ucc_base_lib_t *lib);
+typedef ucc_status_t (*ucc_tl_mlx5_qp_connect_fn_t)(
+    struct ibv_qp *qp, uint32_t qp_num, uint16_t lid, int port,
+    ucc_tl_mlx5_ib_qp_conf_t *qp_conf, ucc_base_lib_t *lib);
 
 typedef ucc_status_t (*ucc_tl_mlx5_init_dct_fn_t)(
     struct ibv_pd *pd, struct ibv_context *ctx, struct ibv_cq *cq,
     struct ibv_srq *srq, uint8_t port_num, struct ibv_qp **dct_qp,
-    uint32_t *qpn, ucc_base_lib_t *lib);
+    uint32_t *qpn, ucc_tl_mlx5_ib_qp_conf_t *qp_conf, ucc_base_lib_t *lib);
 
 typedef ucc_status_t (*ucc_tl_mlx5_init_dci_fn_t)(
     ucc_tl_mlx5_dci_t *dci, struct ibv_pd *pd, struct ibv_context *ctx,
-    struct ibv_cq *cq, uint8_t port_num, int tx_depth, ucc_base_lib_t *lib);
+    struct ibv_cq *cq, uint8_t port_num, int tx_depth,
+    ucc_tl_mlx5_ib_qp_conf_t *qp_conf, ucc_base_lib_t *lib);
 
 typedef ucc_status_t (*ucc_tl_mlx5_create_ah_fn_t)(struct ibv_pd * pd,
                                                    uint16_t        lid,
@@ -40,7 +40,6 @@ typedef ucc_status_t (*ucc_tl_mlx5_create_ah_fn_t)(struct ibv_pd * pd,
 
 class test_tl_mlx5 : public ucc::test {
     void *tl_mlx5_so_handle;
-
   public:
     ucc_base_lib_t                   lib;
     ucc_tl_mlx5_create_ibv_ctx_fn_t  create_ibv_ctx;
@@ -50,6 +49,7 @@ class test_tl_mlx5 : public ucc::test {
     ucc_tl_mlx5_init_dct_fn_t        init_dct;
     ucc_tl_mlx5_init_dci_fn_t        init_dci;
     ucc_tl_mlx5_create_ah_fn_t       create_ah;
+    ucc_tl_mlx5_ib_qp_conf_t         qp_conf;
     struct ibv_port_attr             port_attr;
     struct ibv_context *             ctx;
     struct ibv_pd *                  pd;

@@ -8,10 +8,15 @@
 
 test_tl_mlx5::test_tl_mlx5()
 {
-    tl_mlx5_so_handle = NULL;
-    ctx               = NULL;
-    pd                = NULL;
-    cq                = NULL;
+    tl_mlx5_so_handle     = NULL;
+    ctx                   = NULL;
+    pd                    = NULL;
+    cq                    = NULL;
+    qp_conf.qp_rnr_retry  = 7;
+    qp_conf.qp_rnr_timer  = 20;
+    qp_conf.qp_retry_cnt  = 7;
+    qp_conf.qp_timeout    = 18;
+    qp_conf.qp_max_atomic = 1;
 }
 
 void test_tl_mlx5::SetUp()
@@ -124,7 +129,7 @@ UCC_TEST_F(test_tl_mlx5_rc_qp, connect)
     status = create_rc_qp(ctx, pd, cq, port, 4, &qp, &qpn, &lib);
     EXPECT_EQ(UCC_OK, status);
 
-    status = qp_connect(qp.qp, qpn, port_attr.lid, port, &lib);
+    status = qp_connect(qp.qp, qpn, port_attr.lid, port, &qp_conf, &lib);
     EXPECT_EQ(UCC_OK, status);
 }
 
@@ -178,7 +183,8 @@ UCC_TEST_F(test_tl_mlx5_dc, init_dct)
 {
     ucc_status_t status;
 
-    status = init_dct(pd, ctx, cq, srq, port, &dct_qp, &dct_qpn, &lib);
+    status =
+        init_dct(pd, ctx, cq, srq, port, &dct_qp, &dct_qpn, &qp_conf, &lib);
     EXPECT_EQ(UCC_OK, status);
 }
 
@@ -186,7 +192,7 @@ UCC_TEST_F(test_tl_mlx5_dc, init_dci)
 {
     ucc_status_t status;
 
-    status = init_dci(&dci, pd, ctx, cq, port, 4, &lib);
+    status = init_dci(&dci, pd, ctx, cq, port, 4, &qp_conf, &lib);
     EXPECT_EQ(UCC_OK, status);
 }
 
