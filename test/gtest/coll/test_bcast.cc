@@ -58,10 +58,16 @@ public:
     {
         for (auto r = 0; r < ctxs.size(); r++) {
             ucc_coll_args_t *coll  = ctxs[r]->args;
-            size_t           count = coll->dst.info.count;
-            ucc_datatype_t   dtype = coll->dst.info.datatype;
-            clear_buffer(coll->dst.info.buffer, count * ucc_dt_size(dtype),
-                         mem_type, 0);
+            size_t           count = coll->src.info.count;
+            ucc_datatype_t   dtype = coll->src.info.datatype;
+            if (r != root) {
+                clear_buffer(coll->src.info.buffer, count * ucc_dt_size(dtype),
+                             mem_type, 0);
+            } else {
+                UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
+                                        ctxs[r]->rbuf_size, mem_type,
+                                        UCC_MEMORY_TYPE_HOST));
+            }
         }
     }
 
