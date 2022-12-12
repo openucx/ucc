@@ -66,7 +66,6 @@ ucc_cl_hier_bcast_2step_frag_setup(ucc_schedule_pipelined_t *schedule_p,
 static inline ucc_rank_t
 find_root_net_rank(ucc_host_id_t root_host_id, ucc_cl_hier_team_t *cl_team)
 {
-    ucc_rank_t  net_rank  = UCC_RANK_INVALID;
     ucc_sbgp_t *sbgp      = cl_team->sbgps[UCC_HIER_SBGP_NODE_LEADERS].sbgp;
     ucc_team_t *core_team = cl_team->super.super.params.team;
     ucc_rank_t  i, rank;
@@ -74,27 +73,24 @@ find_root_net_rank(ucc_host_id_t root_host_id, ucc_cl_hier_team_t *cl_team)
     for (i = 0; i < sbgp->group_size; i++) {
         rank = ucc_ep_map_eval(sbgp->map, i);
         if (ucc_team_rank_host_id(rank, core_team) == root_host_id) {
-            net_rank = i;
-            break;
+            return i;
         }
     }
-    return net_rank;
+    return UCC_RANK_INVALID;
 }
 
 static inline ucc_rank_t
 find_root_node_rank(ucc_rank_t root, ucc_cl_hier_team_t *cl_team)
 {
-    ucc_rank_t  node_rank  = UCC_RANK_INVALID;
     ucc_sbgp_t *sbgp       = cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp;
     ucc_rank_t  i;
 
     for (i = 0; i < sbgp->group_size; i++) {
         if (ucc_ep_map_eval(sbgp->map, i) == root) {
-            node_rank = i;
-            break;
+            return i;
         }
     }
-    return node_rank;
+    return UCC_RANK_INVALID;
 }
 
 static ucc_status_t
