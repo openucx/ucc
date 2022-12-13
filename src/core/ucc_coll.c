@@ -402,8 +402,10 @@ static void ucc_trigger_test(ucc_coll_task_t *task)
             /* triggered task doesn't need executor, init and start executor on
              * trigger task
              */
-            params.mask    = UCC_EE_EXECUTOR_PARAM_FIELD_TYPE;
-            params.ee_type = task->ee->ee_type;
+            params.mask       = UCC_EE_EXECUTOR_PARAM_FIELD_TYPE |
+                                UCC_EE_EXECUTOR_PARAM_FIELD_TASK_TYPES;
+            params.ee_type    = task->ee->ee_type;
+            params.task_types = 0;
             status = ucc_ee_executor_init(&params, &task->executor);
             if (ucc_unlikely(status != UCC_OK)) {
                 ucc_error("error in ee executor init, %s",

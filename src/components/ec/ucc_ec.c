@@ -119,25 +119,6 @@ ucc_status_t ucc_ec_finalize()
     return UCC_OK;
 }
 
-ucc_status_t ucc_ec_task_post(void *ee_context, ucc_ee_type_t ee_type,
-                              void **ee_task)
-{
-    UCC_CHECK_EC_AVAILABLE(ee_type);
-    return ec_ops[ee_type]->task_post(ee_context, ee_task);
-}
-
-ucc_status_t ucc_ec_task_query(void *ee_task, ucc_ee_type_t ee_type)
-{
-    UCC_CHECK_EC_AVAILABLE(ee_type);
-    return ec_ops[ee_type]->task_query(ee_task);
-}
-
-ucc_status_t ucc_ec_task_end(void *ee_task, ucc_ee_type_t ee_type)
-{
-    UCC_CHECK_EC_AVAILABLE(ee_type);
-    return ec_ops[ee_type]->task_end(ee_task);
-}
-
 ucc_status_t ucc_ec_create_event(void **event, ucc_ee_type_t ee_type)
 {
     UCC_CHECK_EC_AVAILABLE(ee_type);

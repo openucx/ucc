@@ -69,7 +69,8 @@ ucc_ee_h ucc_pt_comm::get_ee()
                 throw std::runtime_error(ucc_status_string(status));
             }
         } else {
-            std::cerr << "execution engine is not supported for given memory type";
+            std::cerr << "execution engine is not supported for given memory type"
+                      << std::endl;
             throw std::runtime_error("not supported");
         }
     }
@@ -91,7 +92,8 @@ ucc_ee_executor_t* ucc_pt_comm::get_executor()
         } else if (cfg.mt == UCC_MEMORY_TYPE_ROCM) {
             executor_params.ee_type = UCC_EE_ROCM_STREAM;
         } else {
-            std::cerr << "executor is not supported for given memory type";
+            std::cerr << "executor is not supported for given memory type"
+                      << std::endl;
             throw std::runtime_error("not supported");
         }
         status = ucc_ee_executor_init(&executor_params, &executor);
@@ -197,7 +199,8 @@ ucc_status_t ucc_pt_comm::finalize()
         if (cfg.mt == UCC_MEMORY_TYPE_CUDA) {
             ucc_pt_cudaStreamDestroy((cudaStream_t)stream);
         } else {
-            std::cerr << "execution engine is not supported for given memory type";
+            std::cerr << "execution engine is not supported for given memory type"
+                      << std::endl;
             throw std::runtime_error("not supported");
         }
     }

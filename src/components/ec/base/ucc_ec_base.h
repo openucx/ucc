@@ -44,9 +44,6 @@ typedef struct ucc_ec_attr {
 } ucc_ec_attr_t;
 
 typedef struct ucc_ec_ops {
-    ucc_status_t (*task_post)(void *ee_context, void **ee_req);
-    ucc_status_t (*task_query)(void *ee_req);
-    ucc_status_t (*task_end)(void *ee_req);
     ucc_status_t (*create_event)(void **event);
     ucc_status_t (*destroy_event)(void *event);
     ucc_status_t (*event_post)(void *ee_context, void *event);
@@ -59,7 +56,8 @@ typedef struct ucc_ee_executor {
 } ucc_ee_executor_t;
 
 enum ucc_ee_executor_params_field {
-    UCC_EE_EXECUTOR_PARAM_FIELD_TYPE    = UCC_BIT(0),
+    UCC_EE_EXECUTOR_PARAM_FIELD_TYPE       = UCC_BIT(0),
+    UCC_EE_EXECUTOR_PARAM_FIELD_TASK_TYPES = UCC_BIT(1),
 };
 
 typedef enum ucc_ee_executor_task_type {
@@ -74,6 +72,7 @@ typedef enum ucc_ee_executor_task_type {
 typedef struct ucc_ee_executor_params {
     uint64_t        mask;
     ucc_ee_type_t   ee_type;
+    uint64_t        task_types;
 } ucc_ee_executor_params_t;
 
 #define UCC_EE_EXECUTOR_NUM_BUFS 9
