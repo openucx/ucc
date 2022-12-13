@@ -77,7 +77,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
     if (ucc_unlikely(UCS_OK != status)) {
-        tl_error(UCC_TASK_LIB(task), "failure in send completion %s",
+        tl_error(UCC_TASK_LIB(task), "failure in recv completion %s",
                  ucs_status_string(status));
         task->super.status = ucs_status_to_ucc_status(status);
     }

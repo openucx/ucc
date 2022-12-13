@@ -26,6 +26,8 @@ ucc_pt_config::ucc_pt_config() {
     bench.large_thresh   = 64 * 1024;
     bench.full_print     = false;
     bench.n_bufs         = 2;
+    bench.root           = 0;
+    bench.root_shift     = 0;
     comm.mt              = bench.mt;
 }
 
@@ -81,11 +83,11 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
     int c;
     ucc_status_t st;
 
-    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:ihFT")) != -1) {
+    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:r:S:ihFT")) != -1) {
         switch (c) {
             case 'c':
                 if (ucc_pt_op_map.count(optarg) == 0) {
-                    std::cerr << "invalid opeartion: " << optarg
+                    std::cerr << "invalid operation: " << optarg
                               << std::endl;
                     return UCC_ERR_INVALID_PARAM;
                 }
@@ -130,6 +132,12 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                     return st;
                 }
                 break;
+            case 'r':
+                std::stringstream(optarg) >> bench.root;
+                break;
+            case 'S':
+                std::stringstream(optarg) >> bench.root_shift;
+                break;
             case 'n':
                 std::stringstream(optarg) >> bench.n_iter_small;
                 bench.n_iter_large = bench.n_iter_small;
@@ -168,12 +176,14 @@ void ucc_pt_config::print_help()
     std::cout << "  -i: inplace collective"<<std::endl;
     std::cout << "  -d <dt name>: datatype"<<std::endl;
     std::cout << "  -o <op name>: reduction operation type"<<std::endl;
+    std::cout << "  -r <number>: root for rooted collectives"<<std::endl;
     std::cout << "  -m <mtype name>: memory type"<<std::endl;
     std::cout << "  -n <number>: number of iterations"<<std::endl;
     std::cout << "  -w <number>: number of warmup iterations"<<std::endl;
     std::cout << "  -N <number>: number of buffers"<<std::endl;
     std::cout << "  -T: triggered collective"<<std::endl;
     std::cout << "  -F: enable full print"<<std::endl;
+    std::cout << "  -S: <number>: root shift for rooted collectives"<<std::endl;
     std::cout << "  -h: show this help message"<<std::endl;
     std::cout << std::endl;
 }

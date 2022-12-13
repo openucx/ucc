@@ -17,7 +17,6 @@ class ucc_pt_benchmark {
     ucc_pt_comm *comm;
     ucc_pt_coll *coll;
 
-    ucc_status_t barrier();
     void print_header();
     void print_time(size_t count, ucc_pt_test_args_t args, double time);
 public:

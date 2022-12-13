@@ -137,7 +137,7 @@ ucc_status_t ucc_pt_comm::init()
     UCCCHECK_GOTO(ucc_init(&lib_params, lib_config, &lib), free_lib_config, st);
 
     if (UCC_OK != ucc_mc_available(cfg.mt)) {
-        std::cerr << "Selected memory type " << ucc_mem_type_str(cfg.mt) <<
+        std::cerr << "selected memory type " << ucc_mem_type_str(cfg.mt) <<
             " is not available" << std::endl;
         return UCC_ERR_INVALID_PARAM;
     }
