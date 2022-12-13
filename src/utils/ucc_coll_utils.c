@@ -160,7 +160,7 @@ ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
     ucc_rank_t             root = args->root;
 
     if (!ucc_coll_args_is_mem_symmetric(args, rank)) {
-        return UCC_MEMORY_TYPE_ASSYMETRIC;
+        return UCC_MEMORY_TYPE_ASYMMETRIC;
     }
     switch (args->coll_type) {
     case UCC_COLL_TYPE_BARRIER:
@@ -227,7 +227,7 @@ size_t ucc_coll_args_msgsize(const ucc_coll_args_t *args,
            Local args information is not enough.
            This prohibits algorithm selection based on msg size thresholds w/o additinoal exchange.
         */
-        return UCC_MSG_SIZE_ASSYMETRIC;
+        return UCC_MSG_SIZE_ASYMMETRIC;
     case UCC_COLL_TYPE_REDUCE:
         return (root == rank)
                    ? args->dst.info.count * ucc_dt_size(args->dst.info.datatype)
