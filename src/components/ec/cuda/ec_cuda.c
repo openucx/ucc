@@ -237,7 +237,6 @@ static inline void ucc_ec_cuda_set_threads_nbr(int *nt, int maxThreadsPerBlock)
     }
 
     *nt = (maxThreadsPerBlock / WARP_SIZE) * WARP_SIZE;
-    return;
 }
 
 static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)

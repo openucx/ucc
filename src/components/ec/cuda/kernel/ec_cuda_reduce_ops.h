@@ -15,9 +15,10 @@ extern "C" {
 #include "ec_cuda_half_sm52.h"
 #include <cuda_bf16.h>
 #include <cuComplex.h>
+#include <assert.h>
 
 #define COPY_LOOP_UNROLL                 8
-#define REDUCE_LOOP_UNROLL_TRIGGERED     7
+#define REDUCE_LOOP_UNROLL_TRIGGERED     6
 #define REDUCE_LOOP_UNROLL_INTERRUPTIBLE 1
 typedef int4 vectype;
 
@@ -61,8 +62,8 @@ cuFloatComplex operator* (const cuFloatComplex & first,
 
 #define CUDA_REDUCE_WITH_OP_DEFAULT(NAME, _OP)                                    \
     template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>    \
-    __device__ ucc_status_t ucc_reduce_cuda_default_##NAME(                       \
-        ucc_eee_task_reduce_t task, uint16_t flags)                               \
+    __device__ void ucc_reduce_cuda_default_##NAME(ucc_eee_task_reduce_t task,    \
+                                                   uint16_t              flags)   \
     {                                                                             \
         const size_t   count  = task.count;                                       \
         _Type *        d      = (_Type *)task.dst;                                \
@@ -144,7 +145,7 @@ cuFloatComplex operator* (const cuFloatComplex & first,
 
 #define CUDA_REDUCE_WITH_OP_STRIDED(NAME, _OP)                                  \
     template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>  \
-    __device__ ucc_status_t ucc_reduce_cuda_strided_##NAME(                     \
+    __device__ void ucc_reduce_cuda_strided_##NAME(                             \
         ucc_eee_task_reduce_strided_t task, uint16_t flags)                     \
     {                                                                           \
         const size_t count = task.count;                                        \
@@ -166,7 +167,7 @@ cuFloatComplex operator* (const cuFloatComplex & first,
         _Type               tmp2[UNROLL];                                       \
         size_t              i, j;                                               \
         n_src2 = task.n_src2;                                                   \
-        ucc_assert(task.stride % sizeof(_Type) == 0);                           \
+        assert(task.stride % sizeof(_Type) == 0);                               \
         for (size_t line = warp * WARP_SIZE * UNROLL + idx; line < num_lines;   \
              line += num_warps * WARP_SIZE * UNROLL) {                          \
             _Pragma("unroll") for (i = 0; i < UNROLL; i++)                      \

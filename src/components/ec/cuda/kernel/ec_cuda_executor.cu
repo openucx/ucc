@@ -11,7 +11,6 @@
 
 extern "C" {
 #include "../ec_cuda.h"
-#include <inttypes.h>
 }
 #include "ec_cuda_reduce_ops.h"
 #include <cooperative_groups.h>
@@ -163,14 +162,15 @@ __device__ void executor_reduce_float_sum_aligned_2(const float *s1,
 #define LAUNCH_REDUCE_A(NAME, _Type, _AlphaType, _task, ...)                   \
     do {                                                                       \
         if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
-            return ucc_reduce_cuda_default_##NAME<                             \
-                _Type, _AlphaType, true, REDUCE_LOOP_UNROLL_TRIGGERED>(        \
+            ucc_reduce_cuda_default_##NAME<_Type, _AlphaType, true,            \
+                                           REDUCE_LOOP_UNROLL_TRIGGERED>(      \
                 _task->reduce, _task->flags);                                  \
         } else {                                                               \
-            return ucc_reduce_cuda_strided_##NAME<                             \
-                _Type, _AlphaType, true, REDUCE_LOOP_UNROLL_TRIGGERED>(        \
+            ucc_reduce_cuda_strided_##NAME<_Type, _AlphaType, true,            \
+                                           REDUCE_LOOP_UNROLL_TRIGGERED>(      \
                 _task->reduce_strided, _task->flags);                          \
         }                                                                      \
+        return UCC_OK;                                                         \
     } while (0)
 
 #define LAUNCH_REDUCE(NAME, _Type, _task, ...)      \
