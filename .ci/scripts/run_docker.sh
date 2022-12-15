@@ -58,7 +58,7 @@ for HOST in $(cat "$HOSTFILE"); do
     if [ -n "${STALE_DOCKER_CONTAINER_LIST}" ]; then
         echo "WARNING: stale docker container (name: ${DOCKER_CONTAINER_NAME}) is detected on ${HOST} (to be stopped)"
         echo "INFO: Stopping stale docker container (name: ${DOCKER_CONTAINER_NAME}) on ${HOST}..."
-        ssh "${HOST}" docker stop ${DOCKER_CONTAINER_NAME}
+        ssh "${HOST}" docker stop "$STALE_DOCKER_CONTAINER_LIST"
         echo "INFO: Stopping stale docker container (name: ${DOCKER_CONTAINER_NAME}) on ${HOST}... DONE"
     fi
 done
