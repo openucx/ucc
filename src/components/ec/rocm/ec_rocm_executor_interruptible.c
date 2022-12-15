@@ -87,6 +87,7 @@ ucc_status_t ucc_rocm_executor_interruptible_get_stream(hipStream_t *stream)
     int             i, j;
     uint32_t        id;
 
+    ucc_assert(num_streams > 0);
     if (ucc_unlikely(!ucc_ec_rocm.exec_streams_initialized)) {
         ucc_spin_lock(&ucc_ec_rocm.init_spinlock);
         if (ucc_ec_rocm.exec_streams_initialized) {

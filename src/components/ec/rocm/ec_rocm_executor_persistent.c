@@ -68,7 +68,7 @@ ucc_rocm_executor_persistent_task_test(const ucc_ee_executor_task_t *task)
 }
 
 ucc_status_t
-ucc_rocm_executor_persistent_task_finalize(ucc_ee_executor_task_t *task)
+ucc_rocm_executor_persistent_task_finalize(ucc_ee_executor_task_t *task) //NOLINT: task is unused
 {
     return UCC_OK;
 }

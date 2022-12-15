@@ -92,7 +92,7 @@ static ucc_config_field_t ucc_ec_rocm_config_table[] = {
 
 };
 
-static ucc_status_t ucc_ec_rocm_ee_executor_mpool_chunk_malloc(ucc_mpool_t *mp,
+static ucc_status_t ucc_ec_rocm_ee_executor_mpool_chunk_malloc(ucc_mpool_t *mp, //NOLINT: mp is unused
                                                                size_t *size_p,
                                                                void ** chunk_p)
 {
@@ -100,14 +100,14 @@ static ucc_status_t ucc_ec_rocm_ee_executor_mpool_chunk_malloc(ucc_mpool_t *mp,
                                    hipHostMallocMapped));
 }
 
-static void ucc_ec_rocm_ee_executor_mpool_chunk_free(ucc_mpool_t *mp,
+static void ucc_ec_rocm_ee_executor_mpool_chunk_free(ucc_mpool_t *mp, //NOLINT: mp is unused
                                                      void *chunk)
 {
     ROCM_FUNC(hipHostFree(chunk));
 }
 
-static void ucc_ec_rocm_executor_chunk_init(ucc_mpool_t *mp, void *obj,
-                                            void *chunk)
+static void ucc_ec_rocm_executor_chunk_init(ucc_mpool_t *mp, void *obj, //NOLINT: mp is unused
+                                            void *chunk) //NOLINT: chunk is unused
 {
     ucc_ec_rocm_executor_t *eee       = (ucc_ec_rocm_executor_t*) obj;
     int                     max_tasks = EC_ROCM_CONFIG->exec_max_tasks;
@@ -127,7 +127,7 @@ static void ucc_ec_rocm_executor_chunk_init(ucc_mpool_t *mp, void *obj,
     }
 }
 
-static void ucc_ec_rocm_executor_chunk_cleanup(ucc_mpool_t *mp, void *obj)
+static void ucc_ec_rocm_executor_chunk_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp is unused
 {
     ucc_ec_rocm_executor_t *eee = (ucc_ec_rocm_executor_t*) obj;
 
@@ -147,7 +147,7 @@ static ucc_mpool_ops_t ucc_ec_rocm_ee_executor_mpool_ops = {
 };
 
 
-static ucc_status_t ucc_ec_rocm_stream_req_mpool_chunk_malloc(ucc_mpool_t *mp,
+static ucc_status_t ucc_ec_rocm_stream_req_mpool_chunk_malloc(ucc_mpool_t *mp, //NOLINT: mp is unused
                                                               size_t *size_p,
                                                               void ** chunk_p)
 {
@@ -158,13 +158,13 @@ static ucc_status_t ucc_ec_rocm_stream_req_mpool_chunk_malloc(ucc_mpool_t *mp,
     return status;
 }
 
-static void ucc_ec_rocm_stream_req_mpool_chunk_free(ucc_mpool_t *mp,
+static void ucc_ec_rocm_stream_req_mpool_chunk_free(ucc_mpool_t *mp, //NOLINT: mp is unused
                                                     void *       chunk)
 {
     hipHostFree(chunk);
 }
 
-static void ucc_ec_rocm_stream_req_init(ucc_mpool_t *mp, void *obj, void *chunk)
+static void ucc_ec_rocm_stream_req_init(ucc_mpool_t *mp, void *obj, void *chunk) //NOLINT: mp is unused
 {
     ucc_ec_rocm_stream_request_t *req = (ucc_ec_rocm_stream_request_t*) obj;
 
@@ -179,7 +179,7 @@ static ucc_mpool_ops_t ucc_ec_rocm_stream_req_mpool_ops = {
     .obj_cleanup   = NULL
 };
 
-static void ucc_ec_rocm_event_init(ucc_mpool_t *mp, void *obj, void *chunk)
+static void ucc_ec_rocm_event_init(ucc_mpool_t *mp, void *obj, void *chunk) //NOLINT: mp is unused
 {
     ucc_ec_rocm_event_t *base = (ucc_ec_rocm_event_t *) obj;
 
@@ -190,7 +190,7 @@ static void ucc_ec_rocm_event_init(ucc_mpool_t *mp, void *obj, void *chunk)
     }
 }
 
-static void ucc_ec_rocm_event_cleanup(ucc_mpool_t *mp, void *obj)
+static void ucc_ec_rocm_event_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp is unused
 {
     ucc_ec_rocm_event_t *base = (ucc_ec_rocm_event_t *) obj;
 
@@ -267,6 +267,12 @@ static ucc_status_t ucc_ec_rocm_init(const ucc_ec_params_t *ec_params)
         cfg->reduce_num_blocks = prop.maxGridSize[0];
     }
 
+    if (cfg->exec_num_streams < 1) {
+        ec_warn(&ucc_ec_rocm.super,
+                "number of streams is too small, min supported 1");
+        cfg->exec_num_streams = 1;
+    }
+
     /*create event pool */
     ucc_ec_rocm.exec_streams = ucc_calloc(cfg->exec_num_streams,
                                           sizeof(hipStream_t),
@@ -280,7 +286,7 @@ static ucc_status_t ucc_ec_rocm_init(const ucc_ec_params_t *ec_params)
                             &ucc_ec_rocm_event_mpool_ops, UCC_THREAD_MULTIPLE,
                             "ROCM Event Objects");
     if (status != UCC_OK) {
-        ec_error(&ucc_ec_rocm.super, "Error to create event pool");
+        ec_error(&ucc_ec_rocm.super, "failed to create event pool");
         return status;
     }
 
@@ -290,7 +296,7 @@ static ucc_status_t ucc_ec_rocm_init(const ucc_ec_params_t *ec_params)
         UCC_CACHE_LINE_SIZE, 16, UINT_MAX, &ucc_ec_rocm_stream_req_mpool_ops,
         UCC_THREAD_MULTIPLE, "ROCM Event Objects");
     if (status != UCC_OK) {
-        ec_error(&ucc_ec_rocm.super, "Error to create event pool");
+        ec_error(&ucc_ec_rocm.super, "failed to create stream pool");
         return status;
     }
 
@@ -308,6 +314,10 @@ static ucc_status_t ucc_ec_rocm_init(const ucc_ec_params_t *ec_params)
         sizeof(ucc_ec_rocm_executor_interruptible_task_t), 0, UCC_CACHE_LINE_SIZE,
         16, UINT_MAX, NULL, UCC_THREAD_MULTIPLE,
         "interruptible executor tasks");
+    if (status != UCC_OK) {
+        ec_error(&ucc_ec_rocm.super, "failed to create interruptible tasks pool");
+        return status;
+    }
     
     if (cfg->strm_task_mode == UCC_EC_ROCM_TASK_KERNEL) {
         ucc_ec_rocm.strm_task_mode = UCC_EC_ROCM_TASK_KERNEL;
@@ -381,7 +391,8 @@ ucc_status_t ucc_ec_rocm_task_post(void *ee_stream, void **ee_req)
         rocm_event = ucc_mpool_get(&ucc_ec_rocm.events);
         if (ucc_unlikely(!rocm_event)) {
 	    ec_error(&ucc_ec_rocm.super, "Failed to allocate rocm event");
-	    goto free_event;
+	    status = UCC_ERR_NO_MEMORY;
+	    goto free_req;
 	}
         ROCMCHECK(hipEventRecord(rocm_event->event, req->stream));
         ROCMCHECK(hipStreamWaitEvent(ucc_ec_rocm.stream, rocm_event->event, 0));
@@ -389,7 +400,7 @@ ucc_status_t ucc_ec_rocm_task_post(void *ee_stream, void **ee_req)
                                             cfg->stream_blocking_wait,
                                             ucc_ec_rocm.stream);
         if (ucc_unlikely(status != UCC_OK)) {
-            goto free_req;
+            goto free_event;
         }
         ROCMCHECK(hipEventRecord(rocm_event->event, ucc_ec_rocm.stream));
         ROCMCHECK(hipStreamWaitEvent(req->stream, rocm_event->event, 0));

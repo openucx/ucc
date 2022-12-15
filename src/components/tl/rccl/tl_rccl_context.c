@@ -38,8 +38,8 @@ void ucc_tl_rccl_driver_collective_progress(ucc_coll_task_t *coll_task)
 #endif
 }
 
-static void ucc_tl_rccl_req_mpool_obj_init(ucc_mpool_t *mp, void *obj,
-                                           void *chunk)
+static void ucc_tl_rccl_req_mpool_obj_init(ucc_mpool_t *mp, void *obj, //NOLINT: mp is unused
+                                           void *chunk) //NOLINT: chunk is unused
 {
     ucc_tl_rccl_task_t *req = (ucc_tl_rccl_task_t*) obj;
 
@@ -47,7 +47,7 @@ static void ucc_tl_rccl_req_mpool_obj_init(ucc_mpool_t *mp, void *obj,
     req->super.progress = ucc_tl_rccl_event_collective_progress;
 }
 
-static void ucc_tl_rccl_req_mpool_obj_cleanup(ucc_mpool_t *mp, void *obj)
+static void ucc_tl_rccl_req_mpool_obj_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp is unused
 {
     ucc_coll_task_destruct(obj);
 }

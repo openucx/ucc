@@ -91,7 +91,7 @@ ucc_tl_rccl_task_t * ucc_tl_rccl_init_task(ucc_base_coll_args_t *coll_args,
 
     task = ucc_mpool_get(&rccl_ctx->req_mp);
     if (ucc_unlikely(!task)) {
-	tl_error(UCC_TASK_LIB(task),"Failed to allocate task");
+	tl_error(team->context->lib,"Failed to allocate task");
 	return NULL;
     }
     ucc_coll_task_init(&task->super, coll_args, team);
@@ -118,7 +118,7 @@ void ucc_tl_rccl_free_task(ucc_tl_rccl_task_t *task)
     ucc_mpool_put(task);
 }
 
-ucc_status_t ucc_tl_rccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
+ucc_status_t ucc_tl_rccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, //NOLINT: ev is unused
                                         ucc_coll_task_t *coll_task)
 {
     ucc_tl_rccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_rccl_task_t);

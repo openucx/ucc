@@ -106,7 +106,7 @@ static ucc_status_t ucc_mc_rocm_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_rocm_chunk_alloc(ucc_mpool_t *mp,
+static ucc_status_t ucc_mc_rocm_chunk_alloc(ucc_mpool_t *mp, //NOLINT
                                             size_t *size_p,
                                             void **chunk_p)
 {
@@ -119,8 +119,8 @@ static ucc_status_t ucc_mc_rocm_chunk_alloc(ucc_mpool_t *mp,
     return UCC_OK;
 }
 
-static void ucc_mc_rocm_chunk_init(ucc_mpool_t *mp,
-                                   void *obj, void *chunk)
+static void ucc_mc_rocm_chunk_init(ucc_mpool_t *mp, //NOLINT
+                                   void *obj, void *chunk) //NOLINT
 {
     ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t *)obj;
     hipError_t st             = hipMalloc(&h->addr, MC_ROCM_CONFIG->mpool_elem_size);
@@ -138,12 +138,12 @@ static void ucc_mc_rocm_chunk_init(ucc_mpool_t *mp,
     h->mt        = UCC_MEMORY_TYPE_ROCM;
 }
 
-static void ucc_mc_rocm_chunk_release(ucc_mpool_t *mp, void *chunk)
+static void ucc_mc_rocm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT: mp is unused
 {
     ucc_free(chunk);
 }
 
-static void ucc_mc_rocm_chunk_cleanup(ucc_mpool_t *mp, void *obj)
+static void ucc_mc_rocm_chunk_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp is unused
 {
     ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t *)obj;
     hipError_t st;
