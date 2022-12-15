@@ -124,6 +124,7 @@ static ucc_status_t ucc_tl_ucp_team_preconnect(ucc_tl_ucp_team_t *team)
         team->preconnect_task->super.bargs.args.mask = 0;
     }
     if (UCC_INPROGRESS == ucc_tl_ucp_test(team->preconnect_task)) {
+        ucp_worker_progress(team->worker->ucp_worker);
         return UCC_INPROGRESS;
     }
     for (i = team->preconnect_task->tagged.send_posted; i < size; i++) {
