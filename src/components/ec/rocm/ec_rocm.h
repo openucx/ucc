@@ -19,19 +19,6 @@
 #include <hip_fp16.h>
 #include <hip_bfloat16.h>
 
-typedef enum ucc_ec_rocm_strm_task_mode {
-    UCC_EC_ROCM_TASK_KERNEL,
-    UCC_EC_ROCM_TASK_MEM_OPS,
-    UCC_EC_ROCM_TASK_AUTO,
-    UCC_EC_ROCM_TASK_LAST,
-} ucc_ec_rocm_strm_task_mode_t;
-
-typedef enum ucc_ec_rocm_task_stream_type {
-    UCC_EC_ROCM_USER_STREAM,
-    UCC_EC_ROCM_INTERNAL_STREAM,
-    UCC_EC_ROCM_TASK_STREAM_LAST
-} ucc_ec_rocm_task_stream_type_t;
-
 typedef enum ucc_ec_task_status {
     UCC_EC_ROCM_TASK_COMPLETED,
     UCC_EC_ROCM_TASK_POSTED,
@@ -72,9 +59,6 @@ typedef ucc_status_t (*ucc_ec_rocm_task_post_fn) (uint32_t *dev_status,
 
 typedef struct ucc_ec_rocm_config {
     ucc_ec_config_t                super;
-    ucc_ec_rocm_strm_task_mode_t   strm_task_mode;
-    ucc_ec_rocm_task_stream_type_t task_strm_type;
-    int                            stream_blocking_wait;
     unsigned long                  exec_num_workers;
     unsigned long                  exec_num_threads;
     unsigned long                  exec_max_tasks;
@@ -96,9 +80,6 @@ typedef struct ucc_ec_rocm {
     ucc_mpool_t                    executors;
     ucc_mpool_t                    executor_interruptible_tasks;
     ucc_thread_mode_t              thread_mode;
-    ucc_ec_rocm_strm_task_mode_t   strm_task_mode;
-    ucc_ec_rocm_task_stream_type_t task_strm_type;
-    ucc_ec_rocm_task_post_fn       post_strm_task;
     ucc_spinlock_t                 init_spinlock;
     ucc_ee_executor_t             *cpu_executor;
 } ucc_ec_rocm_t;
