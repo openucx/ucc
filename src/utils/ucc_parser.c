@@ -660,7 +660,11 @@ void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
     }
 }
 
-#define UCC_UUNITS_AUTO    ((unsigned)-2)
+ucc_status_t ucc_config_clone_table(const void *src, void *dst,
+                                    const void *arg)
+{
+    return ucs_status_to_ucc_status(ucs_config_clone_table(src, dst, arg));
+}
 
 static ucc_pipeline_params_t ucc_pipeline_params_auto = {
     .threshold = 0,
@@ -797,4 +801,143 @@ ucs_status_t ucc_config_clone_pipeline_params(const void *src, void *dest,
 
 void ucc_config_release_pipeline_params(void *ptr, const void *arg)
 {
+}
+
+int ucc_config_sscanf_uint_ranged(const char *buf, void *dest,
+                                  const void *arg) //NOLINT
+{
+    ucc_mrange_uint_t *p = dest;
+    char             **ranges, **tokens;
+    unsigned           n_ranges, i, j, n_tokens;
+    size_t             start, end;
+    ucc_mrange_t      *r;
+    uint32_t           mt_map;
+
+    ucc_list_head_init(&p->ranges);
+    /* Special value: auto */
+    if (!strcasecmp(buf, UCS_VALUE_AUTO_STR)) {
+        p->default_value = UCC_UUNITS_AUTO;
+        return 1;
+    }
+
+    ranges = ucc_str_split(buf, ",");
+    if (!ranges) {
+        return 0;
+    }
+    n_ranges = ucc_str_split_count(ranges);
+    for (i = 0; i < n_ranges; i++) {
+        tokens = ucc_str_split(ranges[i], ":");
+        if (!tokens) {
+            goto err_ranges;
+        }
+        n_tokens = ucc_str_split_count(tokens);
+        if (n_tokens > 3 ||
+            (UCC_OK != ucc_str_is_number(tokens[n_tokens - 1]) &&
+             strcasecmp(tokens[n_tokens - 1], UCS_VALUE_AUTO_STR) != 0)) {
+            goto err_tokens;
+        }
+        if (n_tokens == 1) {
+            if (!strcasecmp(tokens[n_tokens - 1], UCS_VALUE_AUTO_STR)) {
+            /* Special value: auto */
+                p->default_value = UCC_UUNITS_AUTO;
+            } else {
+            /* default value without range */
+                p->default_value = atoi(tokens[0]);
+            }
+        } else {
+            r = ucc_malloc(sizeof(*r), "mrange");
+            if (!r) {
+                goto err_tokens;
+            }
+            r->mtypes = -1; //mask all types
+            r->start  = 0;
+            r->end    = SIZE_MAX;
+
+            for (j = 0; j < n_tokens; j++) {
+                if (UCC_OK == ucc_str_is_number(tokens[j])) {
+                    /* value */
+                    r->value = atoi(tokens[j]);
+                    continue;
+                }
+                if (UCC_OK == ucc_str_to_mtype_map(tokens[j], "^", &mt_map)) {
+                    r->mtypes = mt_map;
+                    continue;
+                }
+                if (UCC_OK ==
+                    ucc_str_to_memunits_range(tokens[j], &start, &end)) {
+                    r->start = start;
+                    r->end   = end;
+                    continue;
+                }
+                ucc_free(r);
+                goto err_tokens;
+            }
+
+            ucc_list_add_tail(&p->ranges, &r->list_elem);
+        }
+        ucc_str_split_free(tokens);
+    }
+    ucc_str_split_free(ranges);
+
+    return 1;
+
+err_tokens:
+    ucc_str_split_free(tokens);
+err_ranges:
+    ucc_str_split_free(ranges);
+    return 0;
+}
+
+int ucc_config_sprintf_uint_ranged(char *buf, size_t max, const void *src,
+                                   const void *arg) // NOLINT
+{
+    const ucc_mrange_uint_t *s       = src;
+    const size_t             tmp_max = 128;
+    ucc_mrange_t            *r;
+    char                     tmp_start[tmp_max];
+    char                     tmp_end[tmp_max];
+    char                     tmp_mtypes[tmp_max];
+    size_t                   last;
+
+    ucc_list_for_each(r, &s->ranges, list_elem) {
+        ucs_memunits_to_str(r->start, tmp_start, tmp_max);
+        ucs_memunits_to_str(r->end, tmp_end, tmp_max);
+        if (r->mtypes == -1) {
+            ucc_snprintf_safe(buf, max, "%s-%s:%u", tmp_start, tmp_end,
+                              r->value);
+        } else {
+            ucc_mtype_map_to_str(r->mtypes, "^", tmp_mtypes, tmp_max);
+            ucc_snprintf_safe(buf, max, "%s-%s:%s:%u", tmp_start, tmp_end,
+                              tmp_mtypes, r->value);
+        }
+        last = strlen(buf);
+        if (max - last - 1 <= 0) {
+            /* no more space in buf for next range*/
+            return 1;
+        }
+
+        buf[last]     = ',';
+        buf[last + 1] = '\0';
+        max -= last + 1;
+        buf += last + 1;
+    }
+
+    if (s->default_value == UCC_UUNITS_AUTO) {
+        ucc_snprintf_safe(buf, max, "%s", "auto");
+    } else {
+        ucc_snprintf_safe(buf, max, "%u", s->default_value);
+    }
+
+    return 1;
+}
+
+ucs_status_t ucc_config_clone_uint_ranged(const void *src, void *dest,
+                                          const void *arg) //NOLINT
+{
+    return ucc_status_to_ucs_status(ucc_mrange_uint_copy(dest, src));
+}
+
+void ucc_config_release_uint_ranged(void *ptr, const void *arg) //NOLINT
+{
+    ucc_mrange_uint_destroy(ptr);
 }

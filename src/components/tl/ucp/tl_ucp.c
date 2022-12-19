@@ -64,15 +64,15 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, fanout_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ALLREDUCE_KN_RADIX", "4",
+    {"ALLREDUCE_KN_RADIX", "auto",
      "Radix of the recursive-knomial allreduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_kn_radix),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_UINT_RANGED},
 
-    {"ALLREDUCE_SRA_KN_RADIX", "4",
+    {"ALLREDUCE_SRA_KN_RADIX", "auto",
      "Radix of the scatter-reduce-allgather (SRA) knomial allreduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_radix),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_UINT_RANGED},
 
     {"ALLREDUCE_SRA_KN_PIPELINE", "n",
      "Pipelining settings for SRA Knomial allreduce algorithm",

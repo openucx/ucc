@@ -71,6 +71,8 @@
 #define UCC_COLL_ARGS_ACTIVE_SET(_args)                                        \
     ((_args)->mask & UCC_COLL_ARGS_FIELD_ACTIVE_SET)
 
+#define UCC_MEM_TYPE_MASK_FULL -1
+
 static inline size_t
 ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
                         ucc_rank_t idx)

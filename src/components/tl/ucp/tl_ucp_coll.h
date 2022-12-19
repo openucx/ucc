@@ -15,6 +15,7 @@
 #include "components/ec/ucc_ec.h"
 #include "tl_ucp_tag.h"
 
+#define UCC_UUNITS_AUTO_RADIX 4
 #define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 5
 extern const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
@@ -307,5 +308,20 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
                                        ucc_memory_type_t        mem_type,
                                        ucc_base_coll_init_fn_t *init);
 
+static inline unsigned
+ucc_tl_ucp_get_radix_from_range(ucc_tl_ucp_team_t *team,
+                                size_t             msgsize,
+                                ucc_memory_type_t  mem_type,
+                                ucc_mrange_uint_t *p)
+{
+    unsigned radix;
 
+    radix = ucc_mrange_uint_get(p, msgsize, mem_type);
+
+    if (UCC_UUNITS_AUTO == radix) {
+        /* auto selection based on team configuration */
+        return UCC_UUNITS_AUTO_RADIX;
+    }
+    return radix;
+}
 #endif

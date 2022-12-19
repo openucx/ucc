@@ -75,6 +75,7 @@ typedef struct ucc_file_config ucc_file_config_t;
 #define UCC_CONFIG_ALLOW_LIST_ALLOW_ALL UCS_CONFIG_ALLOW_LIST_ALLOW_ALL
 #define UCC_CONFIG_ALLOW_LIST_ALLOW     UCS_CONFIG_ALLOW_LIST_ALLOW
 #define UCC_CONFIG_TYPE_TERNARY         UCS_CONFIG_TYPE_TERNARY
+#define UCC_UUNITS_AUTO                 ((unsigned)-2)
 
 typedef enum ucc_ternary_auto_value {
     UCC_NO   = UCS_NO,
@@ -229,6 +230,9 @@ void         ucc_release_file_config(ucc_file_config_t *cfg);
 
 typedef struct ucc_pipeline_params ucc_pipeline_params_t;
 
+ucc_status_t ucc_config_clone_table(const void *src, void *dst,
+                                    const void *arg);
+
 int ucc_pipeline_params_is_auto(const ucc_pipeline_params_t *p);
 
 int ucc_config_sscanf_pipeline_params(const char *buf, void *dest,
@@ -241,6 +245,25 @@ ucs_status_t ucc_config_clone_pipeline_params(const void *src, void *dest,
                                               const void *arg);
 
 void ucc_config_release_pipeline_params(void *ptr, const void *arg);
+
+int ucc_config_sscanf_uint_ranged(const char *buf, void *dest, const void *arg);
+
+int ucc_config_sprintf_uint_ranged(char *buf, size_t max, const void *src,
+                                   const void *arg);
+
+ucs_status_t ucc_config_clone_uint_ranged(const void *src, void *dest,
+                                          const void *arg);
+
+void         ucc_config_release_uint_ranged(void *ptr, const void *arg);
+
+#define UCC_CONFIG_TYPE_UINT_RANGED                                            \
+    {                                                                          \
+        ucc_config_sscanf_uint_ranged, ucc_config_sprintf_uint_ranged,         \
+            ucc_config_clone_uint_ranged, ucc_config_release_uint_ranged,      \
+            ucs_config_help_generic, "[<munit>-<munit>:[mtype]:value,"         \
+            "<munit>-<munit>:[mtype]:value,...,]default_value\n"               \
+            "#            value and default_value can be \"auto\""             \
+    }
 
 #define UCC_CONFIG_TYPE_PIPELINE_PARAMS                                        \
     {                                                                          \

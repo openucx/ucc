@@ -475,44 +475,6 @@ out:
     return status;
 }
 
-static ucc_status_t str_to_mem_type(const char *str, unsigned *mt_n,
-                                    ucc_memory_type_t **mt)
-{
-    ucc_status_t      status = UCC_OK;
-    char **           tokens;
-    unsigned          i, n_tokens;
-    ucc_memory_type_t t;
-    tokens = ucc_str_split(str, ",");
-    if (!tokens) {
-        status = UCC_ERR_INVALID_PARAM;
-        goto out;
-    }
-    n_tokens = ucc_str_split_count(tokens);
-    *mt = ucc_malloc(n_tokens * sizeof(ucc_memory_type_t), "ucc_mem_types");
-    if (!(*mt)) {
-        ucc_error("failed to allocate %zd bytes for ucc_mem_types",
-                  sizeof(ucc_memory_type_t) * n_tokens);
-        status = UCC_ERR_NO_MEMORY;
-        goto out;
-    }
-    *mt_n = 0;
-    for (i = 0; i < n_tokens; i++) {
-        t = ucc_mem_type_from_str(tokens[i]);
-        if (t == UCC_MEMORY_TYPE_LAST) {
-            /* entry does not match any memory type name */
-            ucc_free(*mt);
-            *mt    = NULL;
-            status = UCC_ERR_NOT_FOUND;
-            goto out;
-        }
-        (*mt)[*mt_n] = t;
-        (*mt_n)++;
-    }
-out:
-    ucc_str_split_free(tokens);
-    return status;
-}
-
 static ucc_status_t str_to_score(const char *str, ucc_score_t *score)
 {
     if (0 == strcasecmp("inf", str)) {
@@ -676,17 +638,17 @@ static ucc_status_t ucc_coll_score_parse_str(const char *str,
 {
     ucc_status_t            status   = UCC_OK;
     ucc_coll_type_t        *ct       = NULL;
-    ucc_memory_type_t      *mt       = NULL;
     size_t                 *msg      = NULL;
     ucc_rank_t             *tsizes   = NULL;
     ucc_base_coll_init_fn_t alg_init = NULL;
     const char*             alg_id   = NULL;
     ucc_score_t             score_v  = UCC_SCORE_INVALID;
     int                     ts_skip  = 0;
+    uint32_t                mtypes   = 0;
     char                  **tokens;
-    unsigned i, n_tokens, ct_n, mt_n, c, m, n_ranges, r, n_tsizes;
+    unsigned i, n_tokens, ct_n, c, m, n_ranges, r, n_tsizes;
 
-    mt_n = ct_n = n_ranges = n_tsizes = 0;
+    ct_n = n_ranges = n_tsizes = 0;
     tokens = ucc_str_split(str, ":");
     if (!tokens) {
         status = UCC_ERR_INVALID_PARAM;
@@ -697,7 +659,8 @@ static ucc_status_t ucc_coll_score_parse_str(const char *str,
         if (!ct && UCC_OK == str_to_coll_type(tokens[i], &ct_n, &ct)) {
             continue;
         }
-        if (!mt && UCC_OK == str_to_mem_type(tokens[i], &mt_n, &mt)) {
+        if (!mtypes && UCC_OK == ucc_str_to_mtype_map(tokens[i], ",",
+                                                      &mtypes)) {
             continue;
         }
         if ((UCC_SCORE_INVALID == score_v) &&
@@ -733,18 +696,23 @@ static ucc_status_t ucc_coll_score_parse_str(const char *str,
     if (!ts_skip && (UCC_SCORE_INVALID != score_v || NULL != alg_id)) {
         /* Score provided but not coll_types/mem_types.
            This means: apply score to ALL coll_types/mem_types */
-        if (!ct)
+        if (!ct) {
             ct_n = UCC_COLL_TYPE_NUM;
-        if (!mt)
-            mt_n = UCC_MEMORY_TYPE_LAST;
-        if (!msg)
+        }
+        if (!mtypes) {
+            mtypes = UCC_MEM_TYPE_MASK_FULL;
+        }
+        if (!msg) {
             n_ranges = 1;
+        }
         for (c = 0; c < ct_n; c++) {
-            for (m = 0; m < mt_n; m++) {
+            for (m = 0; m < UCC_MEMORY_TYPE_LAST; m++) {
+                if (!(UCC_BIT(m) & mtypes)) {
+                    continue;
+                }
                 ucc_coll_type_t   coll_type = ct ? ct[c] :
                                                    (ucc_coll_type_t)UCC_BIT(c);
-                ucc_memory_type_t mem_type  = mt ? mt[m] :
-                                                   (ucc_memory_type_t)m;
+                ucc_memory_type_t mem_type  = (ucc_memory_type_t)m;
                 if (alg_id) {
                     if (!alg_fn) {
                         status = UCC_ERR_NOT_SUPPORTED;
@@ -799,7 +767,6 @@ static ucc_status_t ucc_coll_score_parse_str(const char *str,
     }
 out:
     ucc_free(ct);
-    ucc_free(mt);
     ucc_free(msg);
     ucc_free(tsizes);
     ucc_str_split_free(tokens);

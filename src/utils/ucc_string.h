@@ -6,7 +6,7 @@
 #ifndef UCC_STRING_H_
 #define UCC_STRING_H_
 #include "config.h"
-#include "ucc/api/ucc_status.h"
+#include "ucc/api/ucc_def.h"
 
 #define      ucc_memunits_range_str ucs_memunits_range_str
 
@@ -29,5 +29,16 @@ ucc_status_t ucc_str_concat(const char *str1, const char *str2,
                             char **out);
 
 ucc_status_t ucc_str_concat_n(const char *strs[], int n, char **out);
+
+ucc_status_t ucc_str_to_mtype_map(const char *str, const char* delim,
+                                  uint32_t *mt_map);
+
+void ucc_mtype_map_to_str(uint32_t mt_map, const char *delim,
+                          char *buf, size_t max);
+
+ucc_status_t ucc_str_to_memunits_range(const char *str, size_t *start,
+                                       size_t *end);
+
+
 
 #endif
