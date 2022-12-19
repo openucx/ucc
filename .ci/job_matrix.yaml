@@ -28,15 +28,9 @@ kubernetes:
   cloud: 'swx-k8s'
 
 runs_on_dockers:
-  - {
-    file: '.ci/Dockerfile.centos8',
-    name: 'centos8',
-    tag: '${BUILD_NUMBER}',
-    arch: 'x86_64',
-    uri: '${UCC_URI_SUFFIX}',
-    build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}',
-    cloud: 'swx-k8s'
-  }
+  - {file: '.ci/Dockerfile.centos8',name: 'centos8',tag: '${BUILD_NUMBER}',arch: 'x86_64',uri: '${UCC_URI_SUFFIX}',build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}', cloud: 'swx-k8s'}
+  - {file: '.ci/Dockerfile.ubuntu2004',name: 'ubuntu2004', tag: '${BUILD_NUMBER}' ,arch: 'x86_64' ,uri: '${UCC_URI_SUFFIX}',build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}', cloud: 'swx-k8s'}
+
 
 # bare metal
 runs_on_agents:
