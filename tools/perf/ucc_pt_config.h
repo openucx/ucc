@@ -85,6 +85,8 @@ struct ucc_pt_benchmark_config {
     int                n_warmup_large;
     int                n_bufs;
     bool               full_print;
+    int                root;
+    int                root_shift;
 };
 
 struct ucc_pt_config {

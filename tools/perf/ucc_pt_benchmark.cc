@@ -146,6 +146,7 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
         comp_ev.ev_context_size = 0;
     }
 
+    args.root = config.root % comm->get_size();
     for (int i = 0; i < nwarmup + niter; i++) {
         double s = get_time_us();
         UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
@@ -172,6 +173,7 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
         if (i >= nwarmup) {
             time += f - s;
         }
+        args.root = (args.root + config.root_shift) % comm->get_size();
         UCCCHECK_GOTO(comm->barrier(), exit_err, st);
     }
     if (niter != 0) {
