@@ -161,6 +161,14 @@ ucc_cpu_model_t ucc_arch_get_cpu_model()
                 return UCC_CPU_MODEL_AMD_ROME;
             }
         }
+
+        if (family == 0x19) {
+            switch (model) {
+            case 0x00:
+            case 0x01:
+                return UCC_CPU_MODEL_AMD_MILAN;
+            }
+        }
     }
 
     return UCC_CPU_MODEL_UNKNOWN;
