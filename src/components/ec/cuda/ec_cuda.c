@@ -226,7 +226,7 @@ static inline void ucc_ec_cuda_set_threads_nbr(int *nt, int maxThreadsPerBlock)
                 &ucc_ec_cuda.super,
                 "number of threads per block is too large, max supported is %d",
                 maxThreadsPerBlock);
-        } else if (*nt % WARP_SIZE != 0) {
+        } else if ((*nt % WARP_SIZE) != 0) {
             ec_warn(&ucc_ec_cuda.super,
                     "number of threads per block must be divisible by "
                     "WARP_SIZE(=%d)",
