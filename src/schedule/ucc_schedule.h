@@ -171,12 +171,12 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
     /* If task is part of a  schedule then it can be
        released during ucc_event_manager_notify(EVENT_COMPLETED_SCHEDULE) below.
        Sequence: notify => schedule->n_completed_tasks++ =>
-       shedule->super.status = UCC_OK => user releases schedule from another
+       schedule->super.status = UCC_OK => user releases schedule from another
        thread => schedule_finalize => schedule finalizes all the tasks.
        After that the task ptr should not be accessed.
-       This is why notification of schedule is done separatly in the end of
+       This is why notification of schedule is done separately in the end of
        this function. Internal implementation must make sure that tasks
-       with schedules are not released during a callabck (if set). */
+       with schedules are not released during a callback (if set). */
 
     if (ucc_likely(status == UCC_OK)) {
         status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);

@@ -94,7 +94,7 @@ BEGIN_C_DECLS
   */
 
 /**
-  * @defgroup UCC_EVENT_DT Events and Triggered operations' datastructures
+  * @defgroup UCC_EVENT_DT Events and Triggered operations' data-structures
   * @{
   *  Data-structures associated with event-driven collective execution
   * @}

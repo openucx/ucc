@@ -26,7 +26,7 @@ ucc_status_t ucc_tl_ucp_allreduce_init(ucc_tl_ucp_task_t *task);
         if (!UCC_IS_INPLACE(_args) &&                                          \
             (_args.src.info.mem_type != _args.dst.info.mem_type)) {            \
             tl_error(UCC_TL_TEAM_LIB(_team),                                   \
-                     "assymetric src/dst memory types are not supported yet"); \
+                     "asymmetric src/dst memory types are not supported yet"); \
             status = UCC_ERR_NOT_SUPPORTED;                                    \
             goto out;                                                          \
         }                                                                      \

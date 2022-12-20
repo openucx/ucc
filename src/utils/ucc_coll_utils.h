@@ -18,7 +18,7 @@
 
 #define UCC_COLL_TYPE_ALL ((UCC_COLL_TYPE_LAST << 1) - 3)
 
-#define UCC_MEMORY_TYPE_ASSYMETRIC                                             \
+#define UCC_MEMORY_TYPE_ASYMMETRIC                                             \
     ((ucc_memory_type_t)((int)UCC_MEMORY_TYPE_LAST + 1))
 
 #define UCC_MEMORY_TYPE_NOT_APPLY                                              \
@@ -26,7 +26,7 @@
 
 #define UCC_MSG_SIZE_INVALID SIZE_MAX
 
-#define UCC_MSG_SIZE_ASSYMETRIC (UCC_MSG_SIZE_INVALID - 1)
+#define UCC_MSG_SIZE_ASYMMETRIC (UCC_MSG_SIZE_INVALID - 1)
 
 #define UCC_IS_INPLACE(_args)                                                  \
     (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) &&                             \
@@ -122,8 +122,8 @@ static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
         return "Rocm";
     case UCC_MEMORY_TYPE_ROCM_MANAGED:
         return "RocmManaged";
-    case UCC_MEMORY_TYPE_ASSYMETRIC:
-        return "assymetric";
+    case UCC_MEMORY_TYPE_ASYMMETRIC:
+        return "asymmetric";
     case UCC_MEMORY_TYPE_NOT_APPLY:
         return "n/a";
     default:
