@@ -15,13 +15,13 @@ ucc_status_t ucc_tl_cuda_allgather_linear_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_cuda_task_t *task;
     ucc_status_t        status;
 
+    if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_conntected(team->topo))) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     status = ucc_tl_cuda_task_init(coll_args, team, &task);
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
-    }
-
-    if (ucc_unlikely(!task)) {
-        return UCC_ERR_NO_MEMORY;
     }
 
     task->allgatherv_linear.get_count  = ucc_tl_cuda_allgather_get_count;

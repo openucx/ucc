@@ -42,5 +42,11 @@ ucc_status_t ucc_tl_cuda_allgather_init(ucc_base_coll_args_t *coll_args,
                                         ucc_base_team_t *tl_team,
                                         ucc_coll_task_t **task_p)
 {
-    return ucc_tl_cuda_allgather_ring_init(coll_args, tl_team, task_p);
+    ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
+
+    if (ucc_tl_cuda_team_topo_is_fully_conntected(team->topo)) {
+        return ucc_tl_cuda_allgather_linear_init(coll_args, tl_team, task_p);
+    } else {
+        return ucc_tl_cuda_allgather_ring_init(coll_args, tl_team, task_p);
+    }
 }
