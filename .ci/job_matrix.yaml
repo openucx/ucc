@@ -15,8 +15,8 @@ volumes:
 
 env:
   CUDA_VER: '11.4.2'
-  UCC_URI_SUFFIX: 'ucc/${UCC_VERSION}/x86_64/cuda${CUDA_VER}'
-  UCC_DOCKER_IMAGE_NAME: '${registry_host}${registry_path}/${UCC_URI_SUFFIX}'
+  
+  UCC_DOCKER_IMAGE_NAME: '${registry_host}${registry_path}'
   NVIDIA_ROOT_DIR: '/opt/nvidia'
   SRC_DIR: '${NVIDIA_ROOT_DIR}/src'
   BIN_DIR: '${NVIDIA_ROOT_DIR}/bin'
@@ -28,8 +28,8 @@ kubernetes:
   cloud: 'swx-k8s'
 
 runs_on_dockers:
-  - {file: '.ci/Dockerfile.centos8',name: 'centos8',tag: '${BUILD_NUMBER}',arch: 'x86_64',uri: '${UCC_URI_SUFFIX}',build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}', cloud: 'swx-k8s'}
-  - {file: '.ci/Dockerfile.ubuntu2004',name: 'ubuntu2004', tag: '${BUILD_NUMBER}' ,arch: 'x86_64' ,uri: '${UCC_URI_SUFFIX}',build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}', cloud: 'swx-k8s'}
+  - {file: '.ci/Dockerfile.centos8',name: 'centos8',tag: '${BUILD_NUMBER}',arch: 'x86_64',build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}', cloud: 'swx-k8s'}
+  - {file: '.ci/Dockerfile.ubuntu2004',name: 'ubuntu2004', tag: '${BUILD_NUMBER}' ,arch: 'x86_64' ,build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}', cloud: 'swx-k8s'}
 
 
 # bare metal
