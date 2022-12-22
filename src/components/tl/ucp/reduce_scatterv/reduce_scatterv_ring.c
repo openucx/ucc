@@ -88,19 +88,6 @@ static inline void ucc_ring_frag_block_offset(ucc_tl_ucp_task_t *task,
     *block_offset = get_block_offset(&TASK_ARGS(task), block);
 }
 
-static inline ucc_status_t ucc_tl_ucp_test_ring(ucc_tl_ucp_task_t *task)
-{
-    int polls = 0;
-    while (polls++ < task->n_polls) {
-        if (task->tagged.send_posted - task->tagged.send_completed <= 1 &&
-            task->tagged.recv_posted == task->tagged.recv_completed) {
-            return UCC_OK;
-        }
-        ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
-    }
-    return UCC_INPROGRESS;
-}
-
 static void ucc_tl_ucp_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *     task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);

@@ -291,6 +291,7 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
 static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
 {
     int polls = 0;
+
     if (UCC_TL_UCP_TASK_P2P_COMPLETE(task)) {
         return UCC_OK;
     }
@@ -299,6 +300,26 @@ static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
             return UCC_OK;
         }
         ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);
+    }
+    return UCC_INPROGRESS;
+}
+
+#define UCC_TL_UCP_TASK_RING_P2P_COMPLETE(_task)                               \
+    ((((_task)->tagged.send_posted - (_task)->tagged.send_completed) <= 1) &&  \
+     ((_task)->tagged.recv_posted == (_task)->tagged.recv_completed))
+
+static inline ucc_status_t ucc_tl_ucp_test_ring(ucc_tl_ucp_task_t *task)
+{
+    int polls = 0;
+
+    if (UCC_TL_UCP_TASK_RING_P2P_COMPLETE(task)) {
+        return UCC_OK;
+    }
+    while (polls++ < task->n_polls) {
+        if (UCC_TL_UCP_TASK_RING_P2P_COMPLETE(task)) {
+            return UCC_OK;
+        }
+        ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
     }
     return UCC_INPROGRESS;
 }
