@@ -55,7 +55,7 @@ typedef struct ucc_tl_ucp_alltoallv_hybrid_buf_meta {
              (_task)->alltoallv_hybrid.scratch_mc_header->addr;                \
         })
 
-#define TASK_CALC(_task, _tsize) ({                                            \
+#define TASK_TMP(_task, _tsize) ({                                             \
             PTR_OFFSET(TASK_SCRATCH(_task), 2*_tsize*sizeof(int));             \
         })
 
@@ -78,9 +78,7 @@ typedef struct ucc_tl_ucp_alltoallv_hybrid_buf_meta {
                        (_i) * _buff_size);                                                              \
         })
 
-#define CEIL(x,y) (((x)%(y))?((x)/(y)+1)*(y):(x))
-
-#define ALIGN(x) CEIL(x, 4)
+#define ALIGN(x) ucc_ceil(x, 4)
 
 #define IS_DIRECT_SEND(_seg) ((_seg) & UCC_BIT(ALLTOALLV_HYBRID_SEG_SEND_DIRECT))
 
@@ -141,14 +139,17 @@ static void send_completion(void *request, ucs_status_t status,
 {
     ucc_tl_ucp_alltoallv_hybrid_merge_bin_t *bin =
         (ucc_tl_ucp_alltoallv_hybrid_merge_bin_t*)user_data;
+
     if (ucc_unlikely(UCS_OK != status)) {
         tl_error(UCC_TASK_LIB(bin->task), "failure in alltoallv_hybird completion %s",
                  ucs_status_string(status));
         bin->task->super.status = ucs_status_to_ucc_status(status);
     }
+
     if (request) {
         ucp_request_free(request);
     }
+
     bin->task->tagged.send_completed++;
     bin->len = 0;
 }
@@ -164,7 +165,7 @@ static ucc_status_t ucc_tl_ucp_alltoallv_hybrid_finalize(ucc_coll_task_t *coll_t
 }
 
 static inline void radix_setup(ucc_tl_ucp_task_t *task, int id, ucc_rank_t tsize,
-                               int merge_buf_size,
+                               size_t merge_buf_size,
                                ucc_tl_ucp_alltoallv_hybrid_buf_meta_t** meta,
                                void** merge_buf, void** tmp_buf)
 {
@@ -180,6 +181,7 @@ static inline int get_send_block_count(ucc_rank_t tsize, int radix,
                                        int node_edge_id, int radix_pow)
 {
     int send_count, k;
+
     k = tsize / radix_pow;
     send_count = (k / radix) * radix_pow;
     if ((k % radix) > node_edge_id) {
@@ -187,6 +189,7 @@ static inline int get_send_block_count(ucc_rank_t tsize, int radix,
     } else if ((k % radix) == node_edge_id) {
         send_count += (tsize % radix_pow);
     }
+
     return send_count;
 }
 
@@ -281,7 +284,7 @@ static int fit_in_send_buffer(int num,
 
 static inline
 ucc_status_t get_send_buffer(void *p_tmp_send_region,
-                             ucc_tl_ucp_alltoallv_hybrid_buf_meta_t* p_scratch_space_meta_data,
+                             ucc_tl_ucp_alltoallv_hybrid_buf_meta_t* meta,
                              int num_bins, int required_buf_size,
                              ucc_tl_ucp_task_t *task, void **buf)
 {
@@ -290,20 +293,21 @@ ucc_status_t get_send_buffer(void *p_tmp_send_region,
     int send_buf_offset;
 
     /* get send buffer pointer */
-    send_buf_offset = fit_in_send_buffer(num_bins, p_scratch_space_meta_data,
-                                         required_buf_size, merge_buf_size);
+    send_buf_offset = fit_in_send_buffer(num_bins, meta, required_buf_size,
+                                         merge_buf_size);
     if (send_buf_offset < 0) {
         do {
             ucp_worker_progress(TASK_CTX(task)->worker.ucp_worker);
-            send_buf_offset = fit_in_send_buffer(num_bins, p_scratch_space_meta_data,
-                                                 required_buf_size, merge_buf_size);
+            send_buf_offset = fit_in_send_buffer(num_bins, meta,
+                                                 required_buf_size,
+                                                 merge_buf_size);
         } while ((send_buf_offset < 0) && (polls++ < task->n_polls));
         if (send_buf_offset < 0) {
             return UCC_INPROGRESS;
         }
     }
 
-    p_scratch_space_meta_data->bins[p_scratch_space_meta_data->cur_bin].start = send_buf_offset;
+    meta->bins[meta->cur_bin].start = send_buf_offset;
     *buf = PTR_OFFSET(p_tmp_send_region, send_buf_offset);
     return UCC_OK;
 }
@@ -312,19 +316,24 @@ ucc_status_t get_send_buffer(void *p_tmp_send_region,
  * packed_send_buf (output) contains the send buffer that is ready to be sent
  * returns length of the buffer to be sent
  */
-static size_t pack_send_data(ucc_tl_ucp_task_t *task, int step, ucc_rank_t tsize,
+static size_t pack_send_data(ucc_tl_ucp_task_t *task, int step,
                              int send_count, int node_edge_id, size_t dt_size,
                              int send_limit, int step_header_size,
-                             int *BytesForPacking, void *op_metadata,
-                             char* seg_st, void *packed_send_buf)
+                             void *packed_send_buf)
 {
-    int           tmp_send_region_size = task->alltoallv_hybrid.merge_buf_size;
-    uint32_t      radix                = task->alltoallv_hybrid.radix;
-    void        **src_iovec            = TASK_PTRS(task, tsize);
-    void         *user_sbuf            = TASK_ARGS(task).src.info_v.buffer;
-    int           sparse_cnt           = 0;
-    int           n                    = send_count;
-    int           logi                 = 1;
+    ucc_tl_ucp_team_t *team                 = TASK_TEAM(task);
+    ucc_rank_t         tsize                = UCC_TL_TEAM_SIZE(team);
+    int               *BytesForPacking      = TASK_TMP(task, tsize);
+    char              *seg_st               = TASK_SEG(task, tsize);
+    int                tmp_send_region_size = task->alltoallv_hybrid.merge_buf_size;
+    uint32_t           radix                = task->alltoallv_hybrid.radix;
+    void             **src_iovec            = TASK_PTRS(task, tsize);
+    void              *user_sbuf            = TASK_ARGS(task).src.info_v.buffer;
+    int                sparse_cnt           = 0;
+    int                n                    = send_count;
+    int                logi                 = 1;
+    void              *op_metadata          = task->alltoallv_hybrid.scratch_mc_header->addr;
+
     ucc_rank_t index;
     int send_len, snd_offset, i, k;
     unsigned int temp_count;
@@ -387,7 +396,7 @@ static size_t pack_send_data(ucc_tl_ucp_task_t *task, int step, ucc_rank_t tsize
      * in sparse format.
      */
     if ((sparse_cnt / 2) < send_count) {
-        /* sparse format */
+        /* sparse format: store nonzero messages and source rank index */
         ((unsigned int *)packed_send_buf)[0] = sparse_cnt;
         /* compute space requirement for sparse data exchange header */
         offset = calculate_head_size(sparse_cnt*2, dt_size) * dt_size;
@@ -414,7 +423,7 @@ static size_t pack_send_data(ucc_tl_ucp_task_t *task, int step, ucc_rank_t tsize
             offset = offset + temp_count * dt_size;
         }
     } else {
-        /* dense format */
+        /* dense format: store all message information even if message size is 0 */
         ((unsigned int *)packed_send_buf)[0] = DENSE_PACK_FORMAT;
         offset = step_header_size;
         for (i = 0; i < send_count; i++){
@@ -432,15 +441,15 @@ static size_t pack_send_data(ucc_tl_ucp_task_t *task, int step, ucc_rank_t tsize
 
 static inline
 ucc_status_t send_data(void *buf, int send_size, ucc_rank_t dst,
-                       ucc_tl_ucp_alltoallv_hybrid_buf_meta_t* p_scratch_space_meta_data,
+                       ucc_tl_ucp_alltoallv_hybrid_buf_meta_t *meta,
                        ucc_tl_ucp_task_t *task)
 {
     ucc_status_t status;
 
-    ucc_assert(p_scratch_space_meta_data->bins[p_scratch_space_meta_data->cur_bin].len != 0);
+    ucc_assert(meta->bins[meta->cur_bin].len != 0);
     status = ucc_tl_ucp_send_cb(buf, send_size, UCC_MEMORY_TYPE_HOST, dst, TASK_TEAM(task), task,
                                 send_completion,
-                                (void*)&p_scratch_space_meta_data->bins[p_scratch_space_meta_data->cur_bin]);
+                                (void*)&meta->bins[meta->cur_bin]);
     task->alltoallv_hybrid.phase = UCC_ALLTOALLV_HYBRID_PHASE_SENT;
     return status;
 }
@@ -501,7 +510,7 @@ int receive_buffer_recycler(ucc_rank_t tsize, unsigned int* rcv_start, int* rcv_
                 rcv_start[cur] = offset;
                 offset += rcv_len[cur];
             } else {
-                assert(offset == rcv_start[cur]);
+                ucc_assert(offset == rcv_start[cur]);
                 offset += rcv_len[cur];
             }
         }
@@ -515,7 +524,7 @@ static
 ucc_status_t post_recv(ucc_rank_t recvfrom, ucc_rank_t tsize, size_t dt_size,
                        int node_edge_id, int step, ucc_rank_t trank,
                        void *op_metadata, int tmp_buf_size, char *seg_st,
-                       ucc_tl_ucp_alltoallv_hybrid_buf_meta_t* p_scratch_space_meta_data,
+                       ucc_tl_ucp_alltoallv_hybrid_buf_meta_t *meta,
                        int step_buf_size, int *BytesForPacking,
                        void *p_tmp_recv_region, ucc_tl_ucp_task_t *task)
 {
@@ -530,15 +539,15 @@ ucc_status_t post_recv(ucc_rank_t recvfrom, ucc_rank_t tsize, size_t dt_size,
         return UCC_OK;
     }
     recv_size = step_buf_size;
-    /* Yaniv: Check if we have space for maximum recieve. If not, recycle */
-    if (p_scratch_space_meta_data->offset*dt_size + recv_size > tmp_buf_size) {
+    /* check if we have space for maximum recieve. If not, recycle */
+    if (meta->offset*dt_size + recv_size > tmp_buf_size) {
         new_offset = receive_buffer_recycler(tsize, (int *)op_metadata, (int *)op_metadata + tsize,
                                              seg_st, p_tmp_recv_region, dt_size, BytesForPacking,
                                              step, user_rbuf, rdisps, trank, radix, node_edge_id);
-        p_scratch_space_meta_data->offset = new_offset;
+        meta->offset = new_offset;
     }
-    ucc_assert(p_scratch_space_meta_data->offset*dt_size + recv_size <= tmp_buf_size);
-    dst_buf = PTR_OFFSET(p_tmp_recv_region, p_scratch_space_meta_data->offset*dt_size);
+    ucc_assert(meta->offset*dt_size + recv_size <= tmp_buf_size);
+    dst_buf = PTR_OFFSET(p_tmp_recv_region, meta->offset*dt_size);
 
     status = ucc_tl_ucp_recv_nb(dst_buf, recv_size, UCC_MEMORY_TYPE_HOST,
                                 recvfrom, TASK_TEAM(task), task);
@@ -549,7 +558,7 @@ ucc_status_t post_recv(ucc_rank_t recvfrom, ucc_rank_t tsize, size_t dt_size,
     task->alltoallv_hybrid.phase = UCC_ALLTOALLV_HYBRID_PHASE_START;
     task->alltoallv_hybrid.cur_radix++;
     if (task->alltoallv_hybrid.cur_radix == radix) {
-        /* setup the contol variables for the next phase of processing */
+        /* setup the control variables for the next phase of processing */
         task->alltoallv_hybrid.phase     = UCC_ALLTOALLV_HYBRID_PHASE_RECV;
         task->alltoallv_hybrid.cur_radix = 1;
     }
@@ -567,7 +576,7 @@ static ucc_status_t complete_current_step_receives(ucc_rank_t tsize, int step,
     uint32_t  radix                = task->alltoallv_hybrid.radix;
     int      *rcounts              = (int*)TASK_ARGS(task).dst.info_v.counts;
     int       polls                = 0;
-    ucc_tl_ucp_alltoallv_hybrid_buf_meta_t *p_scratch_space_meta_data;
+    ucc_tl_ucp_alltoallv_hybrid_buf_meta_t *meta;
     unsigned int rcv_sparse, next_p, cur_p;
     void *p_tmp_recv_region, *p_tmp_send_region, *dst_buf, *temp_offset;
     int i, k, n, node_edge_id, recv_count, cur_buf_length, recv_size;
@@ -585,8 +594,7 @@ static ucc_status_t complete_current_step_receives(ucc_rank_t tsize, int step,
     while (task->alltoallv_hybrid.cur_radix < radix) {
         node_edge_id = task->alltoallv_hybrid.cur_radix;
         radix_setup(task, node_edge_id - 1, tsize, tmp_send_region_size,
-                    &p_scratch_space_meta_data, &p_tmp_send_region,
-                    &p_tmp_recv_region);
+                    &meta, &p_tmp_send_region, &p_tmp_recv_region);
 
         n = get_send_block_count(tsize, radix, node_edge_id, step);
         if (!n) {
@@ -598,8 +606,7 @@ static ucc_status_t complete_current_step_receives(ucc_rank_t tsize, int step,
         /* fill in the information to be be used in subsequenst aggrgation
          * steps to extract data received for packing.
          */
-        dst_buf = PTR_OFFSET(p_tmp_recv_region,
-                             p_scratch_space_meta_data->offset * dt_size);
+        dst_buf = PTR_OFFSET(p_tmp_recv_region, meta->offset * dt_size);
         rcv_sparse = ((unsigned int *)dst_buf)[0];
         i = get_bruck_step_start(step, node_edge_id);
         if (rcv_sparse == DENSE_PACK_FORMAT) {
@@ -677,7 +684,7 @@ static ucc_status_t complete_current_step_receives(ucc_rank_t tsize, int step,
             }
             ucc_assert(next_p == tsize);
         }
-        p_scratch_space_meta_data->offset += recv_size;
+        meta->offset += recv_size;
         task->alltoallv_hybrid.cur_radix++;
     }
 
@@ -694,7 +701,7 @@ static inline void hybrid_reverse_rotation(ucc_tl_ucp_task_t *task)
     void              *user_sbuf      = TASK_ARGS(task).src.info_v.buffer;
     void              *user_rbuf      = TASK_ARGS(task).dst.info_v.buffer;
     int               *rdisps         = (int*)TASK_ARGS(task).dst.info_v.displacements;
-    void              *ml_buf_metainfo = task->alltoallv_hybrid.scratch_mc_header->addr;
+    void              *metainfo = task->alltoallv_hybrid.scratch_mc_header->addr;
     size_t dt_size;
     int i, idx, cur_buf_index, cur_buf_size;
     char loc;
@@ -702,8 +709,8 @@ static inline void hybrid_reverse_rotation(ucc_tl_ucp_task_t *task)
 
     dt_size = ucc_dt_size(TASK_ARGS(task).dst.info_v.datatype);
     for (i = 0; i < tsize; i++ ) {
-        cur_buf_index = ((int *)ml_buf_metainfo)[i];
-        cur_buf_size  = ((int *)ml_buf_metainfo)[i + tsize];
+        cur_buf_index = ((int *)metainfo)[i];
+        cur_buf_size  = ((int *)metainfo)[i + tsize];
         if (cur_buf_index != COUNT_DIRECT ){
             loc = GET_BRUCK_DIGIT(seg_st[i]);
             idx = (trank - i + tsize ) % tsize;
@@ -713,7 +720,7 @@ static inline void hybrid_reverse_rotation(ucc_tl_ucp_task_t *task)
                        PTR_OFFSET(user_sbuf, cur_buf_index * dt_size),
                        cur_buf_size * dt_size);
             } else {
-                /* This block of data is in ml temp buffer */
+                /* This block of data is in scratch buffer */
                 lb = TASK_BUF(task, loc - 1, tsize);
                 memcpy(PTR_OFFSET(user_rbuf, rdisps[idx] * dt_size),
                        PTR_OFFSET(lb, merge_buf_size + cur_buf_index*dt_size),
@@ -752,7 +759,7 @@ ucc_status_t pairwise_manager(ucc_rank_t trank, ucc_rank_t tsize,
 
         while (!(IS_DIRECT_SEND(seg_st[*cur]) || IS_DIRECT_RECV(seg_st[*cur]))) {
             ++(*cur);
-            assert(*cur < tsize);
+            ucc_assert(*cur < tsize);
         }
 
         if (IS_DIRECT_SEND(seg_st[*cur])) {
@@ -792,7 +799,7 @@ ucc_status_t pairwise_manager(ucc_rank_t trank, ucc_rank_t tsize,
         ++(*cur);
     } else {
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            return UCC_OK;
+            return UCC_INPROGRESS;
         }
         task->alltoallv_hybrid.num_in      = 0;
         task->alltoallv_hybrid.traffic_in  = 0;
@@ -813,7 +820,7 @@ static void ucc_tl_ucp_alltoallv_hybrid_progress(ucc_coll_task_t *coll_task)
     void              *op_metadata     = task->alltoallv_hybrid.scratch_mc_header->addr;
     size_t             merge_buf_size  = task->alltoallv_hybrid.merge_buf_size;
     size_t             send_limit      = task->alltoallv_hybrid.byte_send_limit;
-    int               *BytesForPacking = TASK_CALC(task, gsize);
+    int               *BytesForPacking = TASK_TMP(task, gsize);
     size_t             buff_size       = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoallv_hybrid_buff_size;
     size_t             tmp_buf_size    = buff_size - (merge_buf_size + sizeof(ucc_tl_ucp_alltoallv_hybrid_buf_meta_t));
     size_t             dt_size         = ucc_dt_size(coll_task->bargs.args.dst.info_v.datatype);
@@ -821,7 +828,7 @@ static void ucc_tl_ucp_alltoallv_hybrid_progress(ucc_coll_task_t *coll_task)
     int node_edge_id, step, i, istep, step_header_size, step_buf_size;
     size_t snd_count, send_size;
     void *p_tmp_recv_region, *p_tmp_send_region, *buf;
-    ucc_tl_ucp_alltoallv_hybrid_buf_meta_t *p_scratch_space_meta_data;
+    ucc_tl_ucp_alltoallv_hybrid_buf_meta_t *meta;
     ucc_status_t status;
 
     istep = 1;
@@ -840,8 +847,7 @@ static void ucc_tl_ucp_alltoallv_hybrid_progress(ucc_coll_task_t *coll_task)
              */
             node_edge_id = task->alltoallv_hybrid.cur_radix;
             radix_setup(task, node_edge_id - 1, gsize, merge_buf_size,
-                        &p_scratch_space_meta_data, &p_tmp_send_region,
-                        &p_tmp_recv_region);
+                        &meta, &p_tmp_send_region, &p_tmp_recv_region);
             /* figure out number of desinaiton ranks the will be included in the current send */
             snd_count = get_send_block_count(gsize, radix, node_edge_id, step);
             if (!snd_count) {
@@ -865,22 +871,20 @@ static void ucc_tl_ucp_alltoallv_hybrid_progress(ucc_coll_task_t *coll_task)
                  * where i is the index in the array. Buddy buffer algorithm may
                  * increase this value.
                  */
-                status = get_send_buffer(p_tmp_send_region, p_scratch_space_meta_data,
-                                         NUM_BINS, step_buf_size, task, &buf);
+                status = get_send_buffer(p_tmp_send_region, meta, NUM_BINS,
+                                         step_buf_size, task, &buf);
                 if (UCC_OK != status) {
                     task->super.status = status;
                     goto out;
                 }
 
                 /* pack the data */
-                send_size = pack_send_data(task, step, gsize, snd_count, node_edge_id,
+                send_size = pack_send_data(task, step, snd_count, node_edge_id,
                                            dt_size, send_limit,
-                                           step_header_size, BytesForPacking,
-                                           op_metadata, seg_st, buf);
+                                           step_header_size, buf);
                 ucc_assert(step_buf_size >= send_size);
-                p_scratch_space_meta_data->bins[p_scratch_space_meta_data->cur_bin].len = send_size;
-                status = send_data(buf, send_size, sendto, p_scratch_space_meta_data,
-                                   task);
+                meta->bins[meta->cur_bin].len = send_size;
+                status = send_data(buf, send_size, sendto, meta, task);
                 if (ucc_unlikely(UCC_OK != status)) {
                     task->super.status = status;
                     goto out;
@@ -888,9 +892,8 @@ static void ucc_tl_ucp_alltoallv_hybrid_progress(ucc_coll_task_t *coll_task)
             }
 
             status = post_recv(recvfrom, gsize, dt_size, node_edge_id,
-                               step, grank, op_metadata,
-                               tmp_buf_size, seg_st, p_scratch_space_meta_data,
-                               step_buf_size, BytesForPacking,
+                               step, grank, op_metadata, tmp_buf_size, seg_st,
+                               meta, step_buf_size, BytesForPacking,
                                p_tmp_recv_region, task);
             if (ucc_unlikely(UCC_OK != status)) {
                 task->super.status = status;
@@ -946,38 +949,6 @@ static inline void meta_init(ucc_tl_ucp_alltoallv_hybrid_buf_meta_t* meta,
     }
 }
 
-static ucc_status_t ucc_tl_ucp_alltoallv_hybrid_start(ucc_coll_task_t *coll_task)
-{
-    ucc_tl_ucp_task_t *task   = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team   = TASK_TEAM(task);
-    uint32_t           radix  = task->alltoallv_hybrid.radix;
-    ucc_rank_t         tsize  = UCC_TL_TEAM_SIZE(team);
-    ucc_tl_ucp_alltoallv_hybrid_buf_meta_t *lbm;
-    int i;
-
-    lbm = TASK_LB(task, tsize);
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_alltoallv_hybrid_start",
-                                     0);
-    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-
-    task->alltoallv_hybrid.num_in      = 0;
-    task->alltoallv_hybrid.cur_out     = 1;
-    task->alltoallv_hybrid.cur_radix   = 1;
-    task->alltoallv_hybrid.traffic_in  = 0;
-    task->alltoallv_hybrid.traffic_out = 0;
-    task->alltoallv_hybrid.num2send    = 0;
-    task->alltoallv_hybrid.num2recv    = 0;
-    task->alltoallv_hybrid.phase       = UCC_ALLTOALLV_HYBRID_PHASE_START;
-    task->alltoallv_hybrid.iteration   = 1;
-
-    memset(TASK_SEG(task, tsize), 0, tsize*sizeof(char));
-    for (i = 0; i < radix - 1; ++i){
-        meta_init(&lbm[i], task);
-    }
-    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
-}
-
-
 static inline void copy_brucks_rotation(void *scratch,
                                         void *scounts, void *sdisps,
                                         ucc_rank_t trank, ucc_rank_t tsize)
@@ -996,6 +967,41 @@ static inline void copy_brucks_rotation(void *scratch,
     }
 }
 
+static ucc_status_t ucc_tl_ucp_alltoallv_hybrid_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_ucp_task_t *task   = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team   = TASK_TEAM(task);
+    uint32_t           radix  = task->alltoallv_hybrid.radix;
+    ucc_rank_t         tsize  = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t         trank  = UCC_TL_TEAM_RANK(team);
+    ucc_coll_args_t   *args   = &TASK_ARGS(task);
+    ucc_tl_ucp_alltoallv_hybrid_buf_meta_t *lbm;
+    int i;
+
+    lbm = TASK_LB(task, tsize);
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_alltoallv_hybrid_start",
+                                     0);
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
+    copy_brucks_rotation(task->alltoallv_hybrid.scratch_mc_header->addr,
+                         args->src.info_v.counts, args->src.info_v.displacements,
+                         trank, tsize);
+
+    task->alltoallv_hybrid.num_in      = 0;
+    task->alltoallv_hybrid.cur_out     = 1;
+    task->alltoallv_hybrid.cur_radix   = 1;
+    task->alltoallv_hybrid.traffic_in  = 0;
+    task->alltoallv_hybrid.traffic_out = 0;
+    task->alltoallv_hybrid.num2send    = 0;
+    task->alltoallv_hybrid.num2recv    = 0;
+    task->alltoallv_hybrid.phase       = UCC_ALLTOALLV_HYBRID_PHASE_START;
+    task->alltoallv_hybrid.iteration   = 1;
+
+    memset(TASK_SEG(task, tsize), 0, tsize*sizeof(char));
+    for (i = 0; i < radix - 1; ++i){
+        meta_init(&lbm[i], task);
+    }
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+}
 
 ucc_status_t ucc_tl_ucp_alltoallv_hybrid_init(ucc_base_coll_args_t *coll_args,
                                               ucc_base_team_t      *team,
@@ -1003,7 +1009,6 @@ ucc_status_t ucc_tl_ucp_alltoallv_hybrid_init(ucc_base_coll_args_t *coll_args,
 {
     ucc_tl_ucp_team_t *tl_team    = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         tsize      = UCC_TL_TEAM_SIZE(tl_team);
-    ucc_rank_t         trank      = UCC_TL_TEAM_RANK(tl_team);
     uint32_t           radix      = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoallv_hybrid_radix;
     size_t             buff_size  = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoallv_hybrid_buff_size;
     uint32_t           snd_size   = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.alltoallv_hybrid_send_buffer_size;
@@ -1045,20 +1050,15 @@ ucc_status_t ucc_tl_ucp_alltoallv_hybrid_init(ucc_base_coll_args_t *coll_args,
     }
 
     /* TODO: fix for radix > 2 */
-    max_snd_count = CEIL(tsize, radix) / radix;
+    max_snd_count = ucc_ceil(tsize, radix) / radix;
 
     calc_limit = ((buff_size - 256) / (snd_size + rcv_size) -
-                  CEIL(sizeof(int) * (max_snd_count + 1), dt_size)) / max_snd_count;
+                  ucc_ceil(sizeof(int) * (max_snd_count + 1), dt_size)) / max_snd_count;
     calc_limit -= (calc_limit % 4);
     ucc_assert(calc_limit>0);
     task->alltoallv_hybrid.byte_send_limit = calc_limit;
     task->alltoallv_hybrid.merge_buf_size  =
-        ALIGN((calc_limit*max_snd_count + CEIL(sizeof(int) * (max_snd_count + 1), dt_size)) * snd_size);
-
-    copy_brucks_rotation(task->alltoallv_hybrid.scratch_mc_header->addr,
-                         coll_args->args.src.info_v.counts,
-                         coll_args->args.src.info_v.displacements,
-                         trank, tsize);
+        ALIGN((calc_limit*max_snd_count + ucc_ceil(sizeof(int) * (max_snd_count + 1), dt_size)) * snd_size);
 
     *task_h = &task->super;
     return UCC_OK;

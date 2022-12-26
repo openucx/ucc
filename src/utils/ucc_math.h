@@ -11,9 +11,11 @@
 #include "ucc_datastruct.h"
 #include "ucc/api/ucc.h"
 #include "ucc_compiler_def.h"
+
 #define ucc_min(_a, _b) ucs_min((_a), (_b))
 #define ucc_max(_a, _b) ucs_max((_a), (_b))
 #define ucc_ilog2(_v)   ucs_ilog2((_v))
+#define ucc_ceil(_a, _b) (((_a)%(_b))?((_a)/(_b)+1)*(_b):(_a))
 
 #define DO_OP_MAX(_v1, _v2) (_v1 > _v2 ? _v1 : _v2)
 #define DO_OP_MIN(_v1, _v2) (_v1 < _v2 ? _v1 : _v2)
