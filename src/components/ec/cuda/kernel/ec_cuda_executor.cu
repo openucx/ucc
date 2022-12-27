@@ -16,10 +16,7 @@ extern "C" {
 #include <cooperative_groups.h>
 using namespace cooperative_groups;
 
-#define WARP_SIZE          32
-#define LOOP_UNROLL        8
 #define align_pow2(_n, _p) ((_n) & ((_p) - 1))
-typedef int4 vectype;
 
 __global__ void executor_start(ucc_ec_cuda_executor_state_t *state,
                                int *cidx)
@@ -98,36 +95,82 @@ __device__ inline void add_float4(float4 &d, const float4 &x, const float4 &y)
     d.w = x.w + y.w;
 }
 
+template <int UNROLL>
 __device__ void executor_reduce_float_sum_aligned_2(const float *s1,
                                                     const float *s2, float *d,
                                                     size_t count)
 {
-    const float4 *s14      = (const float4*)s1;
-    const float4 *s24      = (const float4*)s2;
-    float4       *d4       = (float4*)d;
-    const size_t  idx      = threadIdx.x;
-    const size_t  step     = blockDim.x;
-    const int     n        = count / 4;
-    const int     num_iter = n / step + ((idx < n % step) ? 1 : 0);
+    const float4 *s14       = reinterpret_cast<const float4 *>(s1);
+    const float4 *s24       = reinterpret_cast<const float4 *>(s2);
+    float4 *      d4        = reinterpret_cast<float4 *>(d);
+    const int     warp      = threadIdx.x / WARP_SIZE;
+    const int     num_warps = blockDim.x / WARP_SIZE;
+    const int     idx       = threadIdx.x % WARP_SIZE;
+    size_t        num_lines =
+        (count * sizeof(float) / (WARP_SIZE * UNROLL * sizeof(float4))) *
+        (WARP_SIZE * UNROLL);
+    float4 tmp1[UNROLL];
+    float4 tmp2[UNROLL];
 
-    for(int i = 0; i < num_iter; i++) {
-        add_float4(d4[i * step + idx], s14[i * step + idx],
-                   s24[i * step + idx]);
+    for (size_t line = warp * WARP_SIZE * UNROLL + idx; line < num_lines;
+         line += num_warps * WARP_SIZE * UNROLL) {
+#pragma unroll
+        for (int i = 0; i < UNROLL; i++) {
+            tmp1[i] = s14[line + WARP_SIZE * i];
+        }
+#pragma unroll
+        for (int i = 0; i < UNROLL; i++) {
+            tmp2[i] = s24[line + WARP_SIZE * i];
+        }
+#pragma unroll
+        for (int i = 0; i < UNROLL; i++) {
+            add_float4(tmp1[i], tmp1[i], tmp2[i]);
+        }
+#pragma unroll
+        for (int i = 0; i < UNROLL; i++) {
+            d4[line + WARP_SIZE * i] = tmp1[i];
+        }
     }
-    if (idx < count % 4) {
-        d[count - idx - 1] = s1[count - idx - 1] + s2[count - idx - 1];
+
+    count = count - num_lines * sizeof(vectype) / sizeof(float);
+    if (count == 0) {
+        return;
+    }
+
+    s14       = s14 + num_lines;
+    s24       = s24 + num_lines;
+    d4        = d4 + num_lines;
+    num_lines = count * sizeof(float) / sizeof(vectype);
+    for (int line = threadIdx.x; line < num_lines; line += blockDim.x) {
+        add_float4(d4[line], s14[line], s24[line]);
+    }
+
+    count = count - num_lines * sizeof(vectype) / sizeof(float);
+    if (count == 0) {
+        return;
+    }
+
+    s1 = reinterpret_cast<const float *>(s14 + num_lines);
+    s2 = reinterpret_cast<const float *>(s24 + num_lines);
+    d  = reinterpret_cast<float *>(d4 + num_lines);
+
+    for (size_t line = threadIdx.x; line < count; line += blockDim.x) {
+        d[line] = s1[line] + s2[line];
     }
 }
 
 #define LAUNCH_REDUCE_A(NAME, _Type, _AlphaType, _task, ...)                   \
     do {                                                                       \
         if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
-            return ucc_reduce_cuda_default_##NAME<_Type, _AlphaType, true>(    \
+            ucc_reduce_cuda_default_##NAME<_Type, _AlphaType, true,            \
+                                           REDUCE_LOOP_UNROLL_TRIGGERED>(      \
                 _task->reduce, _task->flags);                                  \
         } else {                                                               \
-            return ucc_reduce_cuda_strided_##NAME<_Type, _AlphaType, true>(    \
+            ucc_reduce_cuda_strided_##NAME<_Type, _AlphaType, true,            \
+                                           REDUCE_LOOP_UNROLL_TRIGGERED>(      \
                 _task->reduce_strided, _task->flags);                          \
         }                                                                      \
+        return UCC_OK;                                                         \
     } while (0)
 
 #define LAUNCH_REDUCE(NAME, _Type, _task, ...)      \
@@ -168,9 +211,9 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
     }
 
     if (UCC_DT_FLOAT32 == dt && UCC_OP_SUM == op && aligned && n_src == 2) {
-            executor_reduce_float_sum_aligned_2((float *)s1, (float *)s2,
-                                                (float *)d, count);
-            return UCC_OK;
+        executor_reduce_float_sum_aligned_2<REDUCE_LOOP_UNROLL_TRIGGERED>(
+            (float *)s1, (float *)s2, (float *)d, count);
+        return UCC_OK;
     }
     switch (dt) {
     case UCC_DT_INT8:
@@ -293,7 +336,7 @@ __global__ void executor_kernel(volatile ucc_ec_cuda_executor_t *eee,
         }
         switch (args.task_type) {
         case UCC_EE_EXECUTOR_TASK_COPY:
-            executor_copy_task<LOOP_UNROLL>(args.copy);
+            executor_copy_task<COPY_LOOP_UNROLL>(args.copy);
             break;
         case UCC_EE_EXECUTOR_TASK_REDUCE:
         case UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED:

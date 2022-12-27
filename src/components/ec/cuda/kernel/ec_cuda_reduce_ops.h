@@ -9,11 +9,18 @@
 
 extern "C" {
 #include "utils/ucc_math_op.h"
+#include "../ec_cuda.h"
 }
 
 #include "ec_cuda_half_sm52.h"
 #include <cuda_bf16.h>
 #include <cuComplex.h>
+#include <assert.h>
+
+#define COPY_LOOP_UNROLL                 8
+#define REDUCE_LOOP_UNROLL_TRIGGERED     6
+#define REDUCE_LOOP_UNROLL_INTERRUPTIBLE 1
+typedef int4 vectype;
 
 __device__ inline
 cuDoubleComplex operator+ (const cuDoubleComplex & first,
@@ -53,114 +60,165 @@ cuFloatComplex operator* (const cuFloatComplex & first,
                                cuCimagf(first) * second);
 }
 
-#define CUDA_REDUCE_WITH_OP_DEFAULT(NAME, _OP)                                 \
-    template <typename _Type, typename _AlphaType, bool triggered>             \
-    __device__ ucc_status_t ucc_reduce_cuda_default_##NAME(                    \
-        ucc_eee_task_reduce_t task, uint16_t flags)                            \
-    {                                                                          \
-        size_t        count  = task.count;                                     \
-        int           n_srcs = task.n_srcs;                                    \
-        const _Type **s      = (const _Type **)task.srcs;                      \
-        _Type *       d      = (_Type *)task.dst;                              \
-        size_t        start =                                                  \
-            triggered ? threadIdx.x : threadIdx.x + blockIdx.x * blockDim.x;   \
-        size_t step = triggered ? blockDim.x : blockDim.x * gridDim.x;         \
-        size_t i, j;                                                           \
-        switch (n_srcs) {                                                      \
-        case 2:                                                                \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP##_2(s[0][i], s[1][i]);                              \
-            }                                                                  \
-            break;                                                             \
-        case 3:                                                                \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP##_3(s[0][i], s[1][i], s[2][i]);                     \
-            }                                                                  \
-            break;                                                             \
-        case 4:                                                                \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP##_4(s[0][i], s[1][i], s[2][i], s[3][i]);            \
-            }                                                                  \
-            break;                                                             \
-        default:                                                               \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP(s[0][i], s[1][i]);                                  \
-                for (j = 2; j < n_srcs; j++) {                                 \
-                    d[i] = _OP(d[i], s[j][i]);                                 \
-                }                                                              \
-            }                                                                  \
-            break;                                                             \
-        }                                                                      \
-        if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                     \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = d[i] * (_AlphaType)task.alpha;                          \
-            }                                                                  \
-        }                                                                      \
-        return UCC_OK;                                                         \
-    }                                                                          \
-    template <typename _Type, typename _AlphaType, bool triggered>             \
-    __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task, \
-                                                   uint16_t flags)             \
-    {                                                                          \
-        ucc_reduce_cuda_default_##NAME<_Type, _AlphaType, triggered>(task,     \
-                                                                     flags);   \
+#define CUDA_REDUCE_WITH_OP_DEFAULT(NAME, _OP)                                    \
+    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>    \
+    __device__ void ucc_reduce_cuda_default_##NAME(ucc_eee_task_reduce_t task,    \
+                                                   uint16_t              flags)   \
+    {                                                                             \
+        const size_t   count  = task.count;                                       \
+        _Type *        d      = (_Type *)task.dst;                                \
+        const uint16_t n_srcs = task.n_srcs;                                      \
+        const int      warp =                                                     \
+            triggered ? threadIdx.x / WARP_SIZE                              \
+                           : (threadIdx.x + blockIdx.x * blockDim.x) / WARP_SIZE; \
+        const int    num_warps = triggered                                        \
+                                     ? blockDim.x / WARP_SIZE                     \
+                                     : (blockDim.x * gridDim.x) / WARP_SIZE;      \
+        const int    idx       = threadIdx.x % WARP_SIZE;                         \
+        const size_t num_lines =                                                  \
+            (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL);                \
+        const int start =                                                         \
+            triggered ? num_lines + threadIdx.x                                   \
+                      : num_lines + threadIdx.x + blockIdx.x * blockDim.x;        \
+        const int    step = triggered ? blockDim.x : blockDim.x * gridDim.x;      \
+        const _Type *s[UCC_EE_EXECUTOR_NUM_BUFS];                                 \
+        _Type        tmp1[UNROLL];                                                \
+        _Type        tmp2[UNROLL];                                                \
+        size_t       i, j;                                                        \
+        memcpy(s, task.srcs, UCC_EE_EXECUTOR_NUM_BUFS * sizeof(_Type *));         \
+        for (size_t line = warp * WARP_SIZE * UNROLL + idx; line < num_lines;     \
+             line += num_warps * WARP_SIZE * UNROLL) {                            \
+            _Pragma("unroll") for (i = 0; i < UNROLL; i++)                        \
+            {                                                                     \
+                tmp1[i] = s[0][line + WARP_SIZE * i];                             \
+            }                                                                     \
+            for (j = 1; j < UCC_EE_EXECUTOR_NUM_BUFS; j++) {                      \
+                if (j >= n_srcs) {                                                \
+                    break;                                                        \
+                }                                                                 \
+                _Pragma("unroll") for (i = 0; i < UNROLL; i++)                    \
+                {                                                                 \
+                    tmp2[i] = s[j][line + WARP_SIZE * i];                         \
+                }                                                                 \
+                _Pragma("unroll") for (i = 0; i < UNROLL; i++)                    \
+                {                                                                 \
+                    tmp1[i] = _OP(tmp1[i], tmp2[i]);                              \
+                }                                                                 \
+            }                                                                     \
+            if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                    \
+                _Pragma("unroll") for (i = 0; i < UNROLL; i++)                    \
+                {                                                                 \
+                    tmp1[i] = tmp1[i] * (_AlphaType)task.alpha;                   \
+                }                                                                 \
+            }                                                                     \
+            _Pragma("unroll") for (i = 0; i < UNROLL; i++)                        \
+            {                                                                     \
+                d[line + WARP_SIZE * i] = tmp1[i];                                \
+            }                                                                     \
+        }                                                                         \
+        for (i = start; i < count; i += step) {                                   \
+            d[i] = _OP(s[0][i], s[1][i]);                                         \
+            for (j = 2; j < UCC_EE_EXECUTOR_NUM_BUFS; j++) {                      \
+                if (j >= n_srcs) {                                                \
+                    break;                                                        \
+                }                                                                 \
+                d[i] = _OP(d[i], s[j][i]);                                        \
+            }                                                                     \
+        }                                                                         \
+        if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                        \
+            for (i = start; i < count; i += step) {                               \
+                d[i] = d[i] * (_AlphaType)task.alpha;                             \
+            }                                                                     \
+        }                                                                         \
+    }                                                                             \
+    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>    \
+    __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task,    \
+                                                   uint16_t              flags)   \
+    {                                                                             \
+        ucc_reduce_cuda_default_##NAME<_Type, _AlphaType, triggered, UNROLL>(     \
+            task, flags);                                                         \
     }
 
-#define CUDA_REDUCE_WITH_OP_STRIDED(NAME, _OP)                                 \
-    template <typename _Type, typename _AlphaType, bool triggered>             \
-    __device__ ucc_status_t ucc_reduce_cuda_strided_##NAME(                    \
-        ucc_eee_task_reduce_strided_t task, uint16_t flags)                    \
-    {                                                                          \
-        uint16_t     n_src2 = task.n_src2;                                     \
-        size_t       count  = task.count;                                      \
-        size_t       stride = task.stride;                                     \
-        size_t       ld     = stride / sizeof(_Type);                          \
-        const _Type *s1     = (const _Type *)task.src1;                        \
-        const _Type *s2     = (const _Type *)task.src2;                        \
-        _Type *      d      = (_Type *)task.dst;                               \
-        size_t       start =                                                   \
-            triggered ? threadIdx.x : threadIdx.x + blockIdx.x * blockDim.x;   \
-        size_t step = triggered ? blockDim.x : blockDim.x * gridDim.x;         \
-        size_t i, j;                                                           \
-        ucc_assert_system(stride % sizeof(_Type) == 0);                        \
-        switch (n_src2) {                                                      \
-        case 1:                                                                \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP##_2(s1[i], s2[i]);                                  \
-            }                                                                  \
-            break;                                                             \
-        case 2:                                                                \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP##_3(s1[i], s2[i], s2[i + ld]);                      \
-            }                                                                  \
-            break;                                                             \
-        case 3:                                                                \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP##_4(s1[i], s2[i], s2[i + ld], s2[i + 2 * ld]);      \
-            }                                                                  \
-            break;                                                             \
-        default:                                                               \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = _OP(s1[i], s2[i]);                                      \
-                for (j = 1; j < n_src2; j++) {                                 \
-                    d[i] = _OP(d[i], s2[i + j * ld]);                          \
-                }                                                              \
-            }                                                                  \
-            break;                                                             \
-        }                                                                      \
-        if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                     \
-            for (i = start; i < count; i += step) {                            \
-                d[i] = d[i] * (_AlphaType)task.alpha;                          \
-            }                                                                  \
-        }                                                                      \
-        return UCC_OK;                                                         \
-    }                                                                          \
-    template <typename _Type, typename _AlphaType, bool triggered>             \
-    __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                            \
-        ucc_eee_task_reduce_strided_t task, uint16_t flags)                    \
-    {                                                                          \
-        ucc_reduce_cuda_strided_##NAME<_Type, _AlphaType, triggered>(task,     \
-                                                                     flags);   \
+#define CUDA_REDUCE_WITH_OP_STRIDED(NAME, _OP)                                  \
+    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>  \
+    __device__ void ucc_reduce_cuda_strided_##NAME(                             \
+        ucc_eee_task_reduce_strided_t task, uint16_t flags)                     \
+    {                                                                           \
+        const size_t count = task.count;                                        \
+        const size_t ld    = task.stride / sizeof(_Type);                       \
+        const _Type *s1    = (const _Type *)task.src1;                          \
+        const _Type *s2    = (const _Type *)task.src2;                          \
+        _Type *      d     = (_Type *)task.dst;                                 \
+        const int    warp =                                                     \
+            triggered ? threadIdx.x / WARP_SIZE                              \
+                         : (threadIdx.x + blockIdx.x * blockDim.x) / WARP_SIZE; \
+        const int    num_warps = triggered                                      \
+                                     ? blockDim.x / WARP_SIZE                   \
+                                     : (blockDim.x * gridDim.x) / WARP_SIZE;    \
+        const int    idx       = threadIdx.x % WARP_SIZE;                       \
+        const size_t num_lines =                                                \
+            (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL);              \
+        const int start =                                                       \
+            triggered ? num_lines + threadIdx.x                                 \
+                      : num_lines + threadIdx.x + blockIdx.x * blockDim.x;      \
+        const int step = triggered ? blockDim.x : blockDim.x * gridDim.x;       \
+        __shared__ uint16_t n_src2;                                             \
+        _Type               tmp1[UNROLL];                                       \
+        _Type               tmp2[UNROLL];                                       \
+        size_t              i, j;                                               \
+        n_src2 = task.n_src2;                                                   \
+        ucc_assert_system(task.stride % sizeof(_Type) == 0);                    \
+        for (size_t line = warp * WARP_SIZE * UNROLL + idx; line < num_lines;   \
+             line += num_warps * WARP_SIZE * UNROLL) {                          \
+            _Pragma("unroll") for (i = 0; i < UNROLL; i++)                      \
+            {                                                                   \
+                tmp1[i] = s1[line + WARP_SIZE * i];                             \
+            }                                                                   \
+            for (j = 0; j < USHRT_MAX; j++) {                                   \
+                if (j >= n_src2) {                                              \
+                    break;                                                      \
+                }                                                               \
+                _Pragma("unroll") for (i = 0; i < UNROLL; i++)                  \
+                {                                                               \
+                    tmp2[i] = s2[line + WARP_SIZE * i + j * ld];                \
+                }                                                               \
+                _Pragma("unroll") for (i = 0; i < UNROLL; i++)                  \
+                {                                                               \
+                    tmp1[i] = _OP(tmp1[i], tmp2[i]);                            \
+                }                                                               \
+            }                                                                   \
+            if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                  \
+                _Pragma("unroll") for (i = 0; i < UNROLL; i++)                  \
+                {                                                               \
+                    tmp1[i] = tmp1[i] * (_AlphaType)task.alpha;                 \
+                }                                                               \
+            }                                                                   \
+            _Pragma("unroll") for (i = 0; i < UNROLL; i++)                      \
+            {                                                                   \
+                d[line + WARP_SIZE * i] = tmp1[i];                              \
+            }                                                                   \
+        }                                                                       \
+        for (i = start; i < count; i += step) {                                 \
+            d[i] = _OP(s1[i], s2[i]);                                           \
+            for (j = 1; j < USHRT_MAX; j++) {                                   \
+                if (j >= n_src2) {                                              \
+                    break;                                                      \
+                }                                                               \
+                d[i] = _OP(d[i], s2[i + j * ld]);                               \
+            }                                                                   \
+        }                                                                       \
+        if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                      \
+            for (i = start; i < count; i += step) {                             \
+                d[i] = d[i] * (_AlphaType)task.alpha;                           \
+            }                                                                   \
+        }                                                                       \
+    }                                                                           \
+    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>  \
+    __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                             \
+        ucc_eee_task_reduce_strided_t task, uint16_t flags)                     \
+    {                                                                           \
+        ucc_reduce_cuda_strided_##NAME<_Type, _AlphaType, triggered, UNROLL>(   \
+            task, flags);                                                       \
     }
 
 #define CUDA_REDUCE_WITH_OP_MULTI_DST(NAME, _OP)                               \
