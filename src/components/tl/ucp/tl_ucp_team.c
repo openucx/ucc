@@ -64,9 +64,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->status          = UCC_INPROGRESS;
     self->tuning_str      = "";
 
-    memcpy(&self->cfg, &UCC_TL_UCP_TEAM_LIB(self)->cfg,
-           sizeof(ucc_tl_ucp_team_config_t));
-
+    status = ucc_config_clone_table(&UCC_TL_UCP_TEAM_LIB(self)->cfg, &self->cfg,
+                                    ucc_tl_ucp_lib_config_table);
+    if (UCC_OK != status) {
+        return status;
+    }
     if (ctx->topo_required) {
         status = ucc_tl_ucp_get_topo(self);
         if (UCC_OK != status) {
@@ -92,6 +94,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_team_t)
 {
+    ucc_config_parser_release_opts(&self->cfg, ucc_tl_ucp_lib_config_table);
     tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
 }
 
