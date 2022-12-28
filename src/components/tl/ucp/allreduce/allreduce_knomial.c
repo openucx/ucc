@@ -221,8 +221,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
     ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
     size_t             data_size = count * ucc_dt_size(dt);
     ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
-    ucc_mrange_uint_t *p         =
-        &UCC_TL_UCP_TEAM_LIB(team)->cfg.allreduce_kn_radix;
+    ucc_mrange_uint_t *p         = &team->cfg.allreduce_kn_radix;
     ucc_kn_radix_t     radix, cfg_radix;
     ucc_status_t       status;
 

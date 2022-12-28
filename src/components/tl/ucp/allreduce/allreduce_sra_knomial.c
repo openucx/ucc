@@ -93,8 +93,7 @@ static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
     ucc_datatype_t       dtype    = coll_args->args.dst.info.datatype;
     ucc_memory_type_t    mem_type = coll_args->args.dst.info.mem_type;
     ucc_base_coll_args_t args     = *coll_args;
-    ucc_mrange_uint_t   *p        =
-        &UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sra_kn_radix;
+    ucc_mrange_uint_t   *p        = &tl_team->cfg.allreduce_sra_kn_radix;
     ucc_schedule_t      *schedule;
     ucc_coll_task_t     *task, *rs_task;
     ucc_status_t         status;
