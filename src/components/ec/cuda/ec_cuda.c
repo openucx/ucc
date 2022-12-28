@@ -243,11 +243,8 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
 {
     ucc_ec_cuda_config_t *cfg = EC_CUDA_CONFIG;
     ucc_status_t          status;
-    int                   device, num_devices, attr;
-    CUdevice              cu_dev;
-    CUresult              cu_st;
+    int                   device, num_devices;
     cudaError_t           cuda_st;
-    const char           *cu_err_st_str;
     struct cudaDeviceProp prop;
     int                   supportsCoopLaunch = 0;
 
@@ -351,9 +348,13 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     } else {
         ucc_ec_cuda.strm_task_mode = UCC_EC_CUDA_TASK_MEM_OPS;
         ucc_ec_cuda.post_strm_task = ucc_ec_cuda_post_driver_stream_task;
-
+#if CUDA_VERSION < 12000
+        CUresult cu_st;
+        CUdevice cu_dev;
+        int attr;
         cu_st = cuCtxGetDevice(&cu_dev);
         if (cu_st != CUDA_SUCCESS){
+            const char *cu_err_st_str;
             cuGetErrorString(cu_st, &cu_err_st_str);
             ec_debug(&ucc_ec_cuda.super, "cuCtxGetDevice() failed: %s",
                      cu_err_st_str);
@@ -376,6 +377,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
                      "CUDA MEM OPS are not supported or disabled");
             return UCC_ERR_NOT_SUPPORTED;
         }
+#endif
     }
 
     if (cfg->use_cooperative_launch == 1) {
