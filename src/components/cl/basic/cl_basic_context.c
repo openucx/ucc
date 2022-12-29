@@ -78,7 +78,8 @@ ucc_cl_basic_get_context_attr(const ucc_base_context_t *context,
     }
 
     /* CL BASIC reports topo_required if any of the TL available
-       TL contexts needs it */
+     * TL contexts needs it
+     */
     attr->topo_required = 0;
     for (i = 0; i < ctx->super.n_tl_ctxs; i++) {
         memset(&tl_attr, 0, sizeof(tl_attr));

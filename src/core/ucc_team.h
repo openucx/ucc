@@ -1,5 +1,6 @@
 /**
  * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -12,21 +13,20 @@
 #include "ucc_context.h"
 #include "utils/ucc_math.h"
 #include "components/base/ucc_base_iface.h"
+#include "components/cl/ucc_cl.h"
+#include "components/tl/ucc_tl.h"
 #include "coll_score/ucc_coll_score.h"
 
-typedef struct ucc_context          ucc_context_t;
-typedef struct ucc_cl_team          ucc_cl_team_t;
-typedef struct ucc_tl_team          ucc_tl_team_t;
 typedef struct ucc_service_coll_req ucc_service_coll_req_t;
 typedef enum {
     UCC_TEAM_ADDR_EXCHANGE,
     UCC_TEAM_SERVICE_TEAM,
     UCC_TEAM_ALLOC_ID,
     UCC_TEAM_CL_CREATE,
+    UCC_TEAM_ACTIVE,
 } ucc_team_state_t;
 
 typedef struct ucc_team {
-    ucc_status_t            status;
     ucc_team_state_t        state;
     ucc_context_t **        contexts;
     uint32_t                num_contexts;

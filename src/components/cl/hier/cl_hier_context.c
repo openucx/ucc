@@ -37,7 +37,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
     self->super.n_tl_ctxs = 0;
     for (i = 0; i < tls->count; i++) {
         status = ucc_tl_context_get(params->context, tls->names[i],
-                                  &self->super.tl_ctxs[self->super.n_tl_ctxs]);
+                                    &self->super.tl_ctxs[self->super.n_tl_ctxs]);
         if (UCC_OK != status) {
             cl_info(cl_config->cl_lib,
                     "TL %s context is not available, skipping", tls->names[i]);
@@ -45,6 +45,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_context_t,
             self->super.n_tl_ctxs++;
         }
     }
+
     if (0 == self->super.n_tl_ctxs) {
         cl_error(cl_config->cl_lib, "no TL contexts are available");
         status = UCC_ERR_NOT_FOUND;
