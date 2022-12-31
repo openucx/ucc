@@ -80,6 +80,7 @@ err:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_lib_t)
 {
+    ucc_config_parser_release_opts(&self->cfg, ucc_tl_ucp_lib_config_table);
     tl_info(&self->super, "finalizing lib object: %p", self);
 }
 

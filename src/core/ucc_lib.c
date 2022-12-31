@@ -194,7 +194,7 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
     }
     /* Check if the combination of the selected CLs provides all the
        requested coll_types: not an error, just print a message if not
-       all the colls are supproted */
+       all the colls are supported */
     if (params.mask & UCC_LIB_PARAM_FIELD_COLL_TYPES &&
         ((params.coll_types & supported_coll_types) != params.coll_types)) {
         ucc_debug("selected set of CLs does not provide all the requested "
