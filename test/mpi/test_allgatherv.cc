@@ -1,13 +1,11 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
 
 #include "test_mpi.h"
 #include "mpi_util.h"
-
-#define TEST_DT UCC_DT_UINT32
 
 static void fill_counts_and_displacements(int size, int count,
                                           int *counts, int *displs)
@@ -36,7 +34,8 @@ static void fill_counts_and_displacements(int size, int count,
 TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_ALLGATHERV, params)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
+    dt             = params.dt;
+    size_t dt_size = ucc_dt_size(dt);
     size_t count   = msgsize / dt_size;
     int    rank, size;
 
@@ -64,14 +63,14 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, counts[rank] * dt_size, mem_type));
         sbuf                   = sbuf_mc_header->addr;
         args.src.info.buffer   = sbuf;
-        args.src.info.datatype = TEST_DT;
+        args.src.info.datatype = dt;
         args.src.info.mem_type = mem_type;
         args.src.info.count    = counts[rank];
     }
     args.dst.info_v.buffer        = rbuf;
     args.dst.info_v.counts        = (ucc_count_t*)counts;
     args.dst.info_v.displacements = (ucc_aint_t*)displacements;
-    args.dst.info_v.datatype      = TEST_DT;
+    args.dst.info_v.datatype      = dt;
     args.dst.info_v.mem_type      = mem_type;
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
@@ -79,7 +78,7 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
 
 ucc_status_t TestAllgatherv::set_input(int iter_persistent)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
+    size_t dt_size = ucc_dt_size(dt);
     int    rank;
     void  *buf, *check;
 
@@ -90,8 +89,7 @@ ucc_status_t TestAllgatherv::set_input(int iter_persistent)
         buf = sbuf;
     }
     check = PTR_OFFSET(check_buf, displacements[rank] * dt_size);
-    init_buffer(buf, counts[rank], TEST_DT, mem_type,
-                rank * (iter_persistent + 1));
+    init_buffer(buf, counts[rank], dt, mem_type, rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check, buf, counts[rank] * dt_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));
     return UCC_OK;
@@ -108,7 +106,7 @@ TestAllgatherv::~TestAllgatherv() {
 
 ucc_status_t TestAllgatherv::check()
 {
-    MPI_Datatype dt          = ucc_dt_to_mpi(TEST_DT);
+    MPI_Datatype mpi_dt      = ucc_dt_to_mpi(dt);
     int          total_count = 0;
     int          size, rank, completed, i;
     MPI_Request  req;
@@ -118,12 +116,13 @@ ucc_status_t TestAllgatherv::check()
     for (i = 0 ; i < size; i++) {
         total_count += counts[i];
     }
-    MPI_Iallgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, check_buf, (int*)counts,
-                    (int*)displacements, dt, team.comm, &req);
+    MPI_Iallgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, check_buf,
+                    (int *)counts, (int *)displacements, mpi_dt, team.comm,
+                    &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
     } while(!completed);
 
-    return compare_buffers(rbuf, check_buf, total_count, TEST_DT, mem_type);
+    return compare_buffers(rbuf, check_buf, total_count, dt, mem_type);
 }

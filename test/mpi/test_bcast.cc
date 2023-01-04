@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -7,12 +7,11 @@
 #include "test_mpi.h"
 #include "mpi_util.h"
 
-#define TEST_DT UCC_DT_UINT32
-
 TestBcast::TestBcast(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_BCAST, params)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
+    dt             = params.dt;
+    size_t dt_size = ucc_dt_size(dt);
     size_t count   = msgsize / dt_size;
     int rank, size;
 
@@ -31,7 +30,7 @@ TestBcast::TestBcast(ucc_test_team_t &_team, TestCaseParams &params) :
 
     args.src.info.buffer   = sbuf;
     args.src.info.count    = count;
-    args.src.info.datatype = TEST_DT;
+    args.src.info.datatype = dt;
     args.src.info.mem_type = mem_type;
     args.root              = root;
     UCC_CHECK(set_input());
@@ -40,14 +39,13 @@ TestBcast::TestBcast(ucc_test_team_t &_team, TestCaseParams &params) :
 
 ucc_status_t TestBcast::set_input(int iter_persistent)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
+    size_t dt_size = ucc_dt_size(dt);
     size_t count   = msgsize / dt_size;
     int    rank;
 
     MPI_Comm_rank(team.comm, &rank);
     if (rank == root) {
-        init_buffer(sbuf, count, TEST_DT, mem_type,
-                    rank * (iter_persistent + 1));
+        init_buffer(sbuf, count, dt, mem_type, rank * (iter_persistent + 1));
         UCC_CHECK(ucc_mc_memcpy(check_buf, sbuf, count * dt_size,
                   UCC_MEMORY_TYPE_HOST, mem_type));
     }
@@ -57,17 +55,18 @@ ucc_status_t TestBcast::set_input(int iter_persistent)
 ucc_status_t TestBcast::check()
 {
     size_t       count = args.src.info.count;
-    MPI_Datatype dt    = ucc_dt_to_mpi(TEST_DT);
+    MPI_Datatype mpi_dt = ucc_dt_to_mpi(dt);
     int          rank, completed;
     MPI_Request  req;
 
     MPI_Comm_rank(team.comm, &rank);
-    MPI_Ibcast(check_buf, count, dt, root, team.comm, &req);
+    MPI_Ibcast(check_buf, count, mpi_dt, root, team.comm, &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
     } while(!completed);
 
-    return (rank == root) ? UCC_OK :
-        compare_buffers(sbuf, check_buf, count, TEST_DT, mem_type);
+    return (rank == root)
+               ? UCC_OK
+               : compare_buffers(sbuf, check_buf, count, dt, mem_type);
 }

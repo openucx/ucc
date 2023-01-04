@@ -358,13 +358,12 @@ bool ucc_coll_has_msgrange(ucc_coll_type_t c)
 bool ucc_coll_has_datatype(ucc_coll_type_t c)
 {
     switch(c) {
-    case UCC_COLL_TYPE_ALLREDUCE:
-    case UCC_COLL_TYPE_REDUCE:
-    case UCC_COLL_TYPE_REDUCE_SCATTER:
-    case UCC_COLL_TYPE_REDUCE_SCATTERV:
-        return true;
-    default:
+    case UCC_COLL_TYPE_BARRIER:
+    case UCC_COLL_TYPE_FANIN:
+    case UCC_COLL_TYPE_FANOUT:
         return false;
+    default:
+        return true;
     }
 }
 

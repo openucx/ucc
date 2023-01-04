@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -137,6 +137,10 @@ std::string TestCase::str() {
     if (ucc_coll_is_rooted(args.coll_type)) {
         _str += std::string(" root=") + std::to_string(root);
     }
+    if (ucc_coll_has_datatype(args.coll_type)) {
+        _str += std::string(" dt=") + ucc_datatype_str(dt);
+    }
+
     return _str;
 }
 
@@ -161,10 +165,10 @@ void TestCase::tc_progress_ctx()
 }
 
 TestCase::TestCase(ucc_test_team_t &_team, ucc_coll_type_t ct,
-                   TestCaseParams params) :
-    team(_team), mem_type(params.mt), msgsize(params.msgsize),
-    inplace(params.inplace), persistent(params.persistent),
-    test_max_size(params.max_size)
+                   TestCaseParams params):
+      team(_team), mem_type(params.mt), msgsize(params.msgsize),
+      inplace(params.inplace), persistent(params.persistent),
+      test_max_size(params.max_size), dt(params.dt)
 {
     int rank;
 

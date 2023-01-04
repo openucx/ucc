@@ -176,6 +176,7 @@ void set_gpu_device(test_set_gpu_device_t set_device);
 #endif
 int ucc_coll_inplace_supported(ucc_coll_type_t c);
 int ucc_coll_is_rooted(ucc_coll_type_t c);
+bool ucc_coll_has_datatype(ucc_coll_type_t c);
 
 typedef struct ucc_test_team {
 #ifdef HAVE_CUDA
@@ -276,7 +277,9 @@ protected:
     MPI_Request progress_request;
     uint8_t     progress_buf[1];
     size_t test_max_size;
-public:
+    ucc_datatype_t dt;
+
+  public:
     void mpi_progress(void);
     test_skip_cause_t test_skip;
     static std::shared_ptr<TestCase> init_single(
@@ -380,13 +383,16 @@ public:
 };
 
 class TestAllgather : public TestCase {
-public:
+    ucc_datatype_t dt;
+
+  public:
     TestAllgather(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input(int iter_persistent = 0) override;
     ucc_status_t check();
 };
 
 class TestAllgatherv : public TestCase {
+    ucc_datatype_t dt;
     int *counts;
     int *displacements;
 public:
@@ -407,6 +413,7 @@ public:
 };
 
 class TestAlltoall : public TestCase {
+    ucc_datatype_t dt;
     bool is_onesided;
 public:
     TestAlltoall(ucc_test_team_t &team, TestCaseParams &params);
@@ -415,6 +422,7 @@ public:
 };
 
 class TestAlltoallv : public TestCase {
+    ucc_datatype_t dt;
     size_t sncounts;
     size_t rncounts;
     int *scounts;
@@ -450,20 +458,25 @@ public:
 };
 
 class TestBcast : public TestCase {
-public:
+    ucc_datatype_t dt;
+
+  public:
     TestBcast(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input(int iter_persistent = 0) override;
     ucc_status_t check();
 };
 
 class TestGather : public TestCase {
-public:
+    ucc_datatype_t dt;
+
+  public:
     TestGather(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input(int iter_persistent = 0) override;
     ucc_status_t check();
 };
 
 class TestGatherv : public TestCase {
+    ucc_datatype_t dt;
     uint32_t *counts;
     uint32_t *displacements;
 public:
@@ -507,13 +520,16 @@ class TestReduceScatterv : public TestCase {
 };
 
 class TestScatter : public TestCase {
-public:
+    ucc_datatype_t dt;
+
+  public:
     TestScatter(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input(int iter_persistent = 0) override;
     ucc_status_t check();
 };
 
 class TestScatterv : public TestCase {
+    ucc_datatype_t dt;
     uint32_t *counts;
     uint32_t *displacements;
 public:

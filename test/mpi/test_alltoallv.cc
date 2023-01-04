@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -8,8 +8,6 @@
 
 #include "test_mpi.h"
 #include "mpi_util.h"
-
-#define TEST_DT UCC_DT_UINT32
 
 template<typename T>
 void * TestAlltoallv::mpi_counts_to_ucc(int *mpi_counts, size_t _ncount)
@@ -24,7 +22,8 @@ void * TestAlltoallv::mpi_counts_to_ucc(int *mpi_counts, size_t _ncount)
 TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_ALLTOALLV, params)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
+    dt                                         = params.dt;
+    size_t                             dt_size = ucc_dt_size(dt);
     size_t count   = msgsize/dt_size;
     std::uniform_int_distribution<int> urd(count/2, count);
     std::default_random_engine         eng;
@@ -105,11 +104,11 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_MALLOC_CHECK(check_buf);
 
     args.src.info_v.buffer = sbuf;
-    args.src.info_v.datatype = TEST_DT;
+    args.src.info_v.datatype = dt;
     args.src.info_v.mem_type = mem_type;
 
     args.dst.info_v.buffer = rbuf;
-    args.dst.info_v.datatype = TEST_DT;
+    args.dst.info_v.datatype = dt;
     args.dst.info_v.mem_type = mem_type;
 
     if (TEST_FLAG_VSIZE_64BIT == count_bits) {
@@ -136,12 +135,11 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
 
 ucc_status_t TestAlltoallv::set_input(int iter_persistent)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
+    size_t dt_size = ucc_dt_size(dt);
     int    rank;
 
     MPI_Comm_rank(team.comm, &rank);
-    init_buffer(sbuf, sncounts, TEST_DT, mem_type,
-                rank * (iter_persistent + 1));
+    init_buffer(sbuf, sncounts, dt, mem_type, rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check_buf, sbuf, sncounts * dt_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));
 
@@ -162,21 +160,20 @@ TestAlltoallv::~TestAlltoallv()
 
 ucc_status_t TestAlltoallv::check()
 {
-    size_t      dt_size = ucc_dt_size(TEST_DT);
+    size_t      dt_size = ucc_dt_size(dt);
     MPI_Request req;
     int         completed;
     void       *check;
 
     check = PTR_OFFSET(check_buf, sncounts * dt_size);
-    MPI_Ialltoallv(check_buf, scounts, sdispls, ucc_dt_to_mpi(TEST_DT),
-                   check, rcounts, rdispls, ucc_dt_to_mpi(TEST_DT),
-                   team.comm, &req);
+    MPI_Ialltoallv(check_buf, scounts, sdispls, ucc_dt_to_mpi(dt), check,
+                   rcounts, rdispls, ucc_dt_to_mpi(dt), team.comm, &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
     } while(!completed);
 
-    return compare_buffers(rbuf, check, rncounts, TEST_DT, mem_type);
+    return compare_buffers(rbuf, check, rncounts, dt, mem_type);
 }
 
 std::string TestAlltoallv::str()

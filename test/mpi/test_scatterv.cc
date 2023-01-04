@@ -7,8 +7,6 @@
 #include "test_mpi.h"
 #include "mpi_util.h"
 
-#define TEST_DT UCC_DT_UINT32
-
 static void fill_counts_and_displacements(int size, int count,
                                           uint32_t *counts, uint32_t *displs)
 {
@@ -36,7 +34,8 @@ static void fill_counts_and_displacements(int size, int count,
 TestScatterv::TestScatterv(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_SCATTERV, params)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
+    dt             = params.dt;
+    size_t dt_size = ucc_dt_size(dt);
     size_t count   = msgsize / dt_size;
     int    rank, size;
 
@@ -84,18 +83,18 @@ TestScatterv::TestScatterv(ucc_test_team_t &_team, TestCaseParams &params) :
         args.src.info_v.buffer        = sbuf;
         args.src.info_v.counts        = (ucc_count_t*)counts;
         args.src.info_v.displacements = (ucc_aint_t*)displacements;
-        args.src.info_v.datatype      = TEST_DT;
+        args.src.info_v.datatype      = dt;
         args.src.info_v.mem_type      = mem_type;
         if (!inplace) {
             args.dst.info.buffer   = rbuf;
             args.dst.info.count    = counts[rank];
-            args.dst.info.datatype = TEST_DT;
+            args.dst.info.datatype = dt;
             args.dst.info.mem_type = mem_type;
         }
     } else {
         args.dst.info.buffer   = rbuf;
         args.dst.info.count    = counts[rank];
-        args.dst.info.datatype = TEST_DT;
+        args.dst.info.datatype = dt;
         args.dst.info.mem_type = mem_type;
     }
 
@@ -105,7 +104,7 @@ TestScatterv::TestScatterv(ucc_test_team_t &_team, TestCaseParams &params) :
 
 ucc_status_t TestScatterv::set_input(int iter_persistent)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
+    size_t dt_size = ucc_dt_size(dt);
     size_t count   = msgsize / dt_size;
     int    rank, size;
 
@@ -113,7 +112,7 @@ ucc_status_t TestScatterv::set_input(int iter_persistent)
     MPI_Comm_size(team.comm, &size);
 
     if (rank == root) {
-        init_buffer(sbuf, count * size, TEST_DT, mem_type,
+        init_buffer(sbuf, count * size, dt, mem_type,
                     rank * (iter_persistent + 1));
         UCC_CHECK(ucc_mc_memcpy(check_buf, sbuf, count * size * dt_size,
                                 UCC_MEMORY_TYPE_HOST, mem_type));
@@ -133,18 +132,18 @@ TestScatterv::~TestScatterv()
 
 ucc_status_t TestScatterv::check()
 {
-    size_t        dt_size = ucc_dt_size(TEST_DT);
+    size_t        dt_size = ucc_dt_size(dt);
     size_t        count   = msgsize / dt_size;
-    MPI_Datatype  dt      = ucc_dt_to_mpi(TEST_DT);
+    MPI_Datatype  mpi_dt  = ucc_dt_to_mpi(dt);
     MPI_Request   req;
     int           size, rank, completed;
 
     MPI_Comm_size(team.comm, &size);
     MPI_Comm_rank(team.comm, &rank);
 
-    MPI_Iscatterv(check_buf, (int*)counts, (int*)displacements, dt,
+    MPI_Iscatterv(check_buf, (int *)counts, (int *)displacements, mpi_dt,
                   (rank == root) ? MPI_IN_PLACE : check_buf, counts[rank],
-                  dt, root, team.comm, &req);
+                  mpi_dt, root, team.comm, &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
@@ -152,16 +151,13 @@ ucc_status_t TestScatterv::check()
 
     if (rank == root) {
         if (inplace) {
-            return compare_buffers(sbuf, check_buf, count * size,
-                                   TEST_DT, mem_type);
+            return compare_buffers(sbuf, check_buf, count * size, dt, mem_type);
         } else {
-            return compare_buffers(rbuf,
-                                   PTR_OFFSET(check_buf,
-                                              displacements[rank] * dt_size),
-                                   counts[rank], TEST_DT, mem_type);
+            return compare_buffers(
+                rbuf, PTR_OFFSET(check_buf, displacements[rank] * dt_size),
+                counts[rank], dt, mem_type);
         }
     } else {
-        return compare_buffers(rbuf, check_buf, counts[rank], TEST_DT,
-                               mem_type);
+        return compare_buffers(rbuf, check_buf, counts[rank], dt, mem_type);
     }
 }
