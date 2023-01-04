@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
@@ -10,6 +10,7 @@
 
 #include "tl_nccl.h"
 
+#define UCC_TL_NCCL_DT_FOR_UNSUPPORTED       UCC_DT_INT8
 #define UCC_TL_NCCL_N_DEFAULT_ALG_SELECT_STR 1
 extern const char
     *ucc_tl_nccl_default_alg_select_str[UCC_TL_NCCL_N_DEFAULT_ALG_SELECT_STR];
