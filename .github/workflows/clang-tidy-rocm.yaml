@@ -1,0 +1,52 @@
+name: Linter-ROCM
+
+on: [push, pull_request]
+
+env:
+  OPEN_UCX_LINK: https://github.com/openucx/ucx
+  OPEN_UCX_BRANCH: master
+  CLANG_VER: 12
+  ROCM_VER: 5-4
+  LIBRARY_PATH: /tmp/ucx/install/lib
+  LD_LIBRARY_PATH: /tmp/ucx/install/lib
+jobs:
+  clang-tidy:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends wget lsb-core software-properties-common gpg curl
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| sudo apt-key add -
+        sudo apt-add-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-${CLANG_VER} main"
+        sudo apt-get install -y --no-install-recommends doxygen doxygen-latex clang-tidy-${CLANG_VER} bear
+    - name: Install extra dependencies
+      run: |
+        curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/rocm-keyring.gpg
+        echo 'deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/rocm-keyring.gpg]  https://repo.radeon.com/rocm/apt/debian focal main' | sudo tee /etc/apt/sources.list.d/rocm.list
+        sudo apt-get update
+        sudo apt-get install -y rocm-hip-sdk
+    - name: Get UCX
+      run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
+    - name: Build UCX
+      run: |
+        cd /tmp/ucx && ./autogen.sh
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install --with-rocm=/opt/rocm
+        make -j install
+    - uses: actions/checkout@v1
+    - name: Build UCC
+      run: |
+        ./autogen.sh
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --with-rocm=/opt/rocm --with-rccl=/opt/rocm --enable-assert
+        bear --exclude ${GITHUB_WORKSPACE}/src/components/ec/rocm/kernel/ --exclude ${GITHUB_WORKSPACE}/src/components/mc/rocm/kernel/ --cdb /tmp/compile_commands.json make
+    - name: Run clang-tidy
+      run: |
+        echo "Workspace: ${GITHUB_WORKSPACE}"
+        cd ${GITHUB_WORKSPACE}
+        run-clang-tidy-${CLANG_VER} -p /tmp/ 2>&1 | tee /tmp/clang_tidy.log
+        nerrors=$(grep 'error:' /tmp/clang_tidy.log | wc -l)
+        if [ $nerrors -ne 0 ]; then
+            exit 125;
+        fi
+        make clean
+        rm -rf /tmp/ucc
