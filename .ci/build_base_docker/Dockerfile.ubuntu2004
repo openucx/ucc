@@ -1,0 +1,108 @@
+ARG CUDA_VER='12.0.0'
+FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu20.04
+#==============================================================================
+ARG NVIDIA_ROOT_DIR=/opt/nvidia
+ENV DEBIAN_FRONTEND=noninteractive
+ENV SRC_DIR=${NVIDIA_ROOT_DIR}/src
+ENV PKG_DIR=${NVIDIA_ROOT_DIR}/pkg
+ENV BIN_DIR=${NVIDIA_ROOT_DIR}/bin
+ENV WORKLOADS_DIR=${NVIDIA_ROOT_DIR}/workloads
+ENV TORCH_UCC_GITHUB_URL=https://github.com/facebookresearch/torch_ucc.git
+ENV TORCH_UCC_BRANCH=main
+ENV CUDA_HOME=/usr/local/cuda
+ENV UCX_GITHUB_URL=https://github.com/openucx/ucx.git
+ENV UCX_BRANCH=master
+ENV UCX_BUILD_TYPE=release-mt
+ENV UCX_INSTALL_DIR=${BIN_DIR}/ucx/build-${UCX_BUILD_TYPE}
+ENV UCC_INSTALL_DIR=${BIN_DIR}/ucc/build
+#==============================================================================
+# RUN apt-get install -y \
+#     'Development Tools' \
+#     'Infiniband Support'
+RUN apt-get -q update && apt -qy install \
+    build-essential \
+    gcc \
+    g++ \
+    libibumad3 \
+    rdma-core \
+    libibverbs1 \
+    librdmacm1 \
+    infiniband-diags \
+    libibnetdisc5 \
+    ibverbs-providers \
+    numactl \
+    openmpi-bin \
+    libopenmpi-dev \
+    openssh-server \
+    protobuf-compiler \
+    libprotobuf-dev \
+    python3 \
+    libibverbs-dev \
+    vim \
+    apt-utils \ 
+    git \ 
+    wget
+
+
+# Authorize SSH Host
+RUN apt-get install -y openssh-server &&\
+    mkdir -p ~/.ssh && \
+    chmod 0700 ~/.ssh && \
+    ssh-keygen -f $HOME/.ssh/id_rsa -t rsa -N '' && \ 
+    cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys && \
+    chmod og-wx ~/.ssh/authorized_keys && \
+    echo "StrictHostKeyChecking no" >> ~/.ssh/config && \
+    /etc/init.d/ssh start
+
+
+ENV PATH=/usr/lib64/openmpi/bin:$PATH
+RUN echo "export PATH=\"/usr/lib64/openmpi/bin:\$PATH\"" >> /etc/bashrc && \
+    export LD_LIBRARY_PATH=\"/usr/lib/x86_64-linux-gnu/openmpi/lib:\${LD_LIBRARY_PATH}\" >> /etc/bashrc
+RUN cd /tmp && wget https://github.com/Kitware/CMake/releases/download/v3.20.4/cmake-3.20.4-linux-x86_64.sh && \
+    chmod +x /tmp/cmake-3.20.4-linux-x86_64.sh && /tmp/cmake-3.20.4-linux-x86_64.sh --skip-license --prefix=/usr && \
+    rm -f /tmp/cmake-3.20.4-linux-x86_64.sh
+#==============================================================================
+# Configure SSH
+RUN mkdir -p /var/run/sshd && \
+    cat /etc/ssh/ssh_config | grep -v StrictHostKeyChecking > /etc/ssh/ssh_config.new && \
+    echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config.new && \
+    mv /etc/ssh/ssh_config.new /etc/ssh/ssh_config && \
+    ssh-keygen -A &&  \
+    rm -f /run/nologin
+
+
+#==============================================================================
+RUN mkdir -p ${SRC_DIR} && \
+    mkdir -p ${PKG_DIR} && \
+    mkdir -p ${BIN_DIR} && \
+    mkdir -p ${WORKLOADS_DIR}
+
+RUN git clone ${TORCH_UCC_GITHUB_URL} ${SRC_DIR} && \
+    cd ${SRC_DIR} && \
+    git checkout ${TORCH_UCC_BRANCH}
+
+RUN mkdir -p ${SRC_DIR}/ucx && \
+    git clone --recursive ${UCX_GITHUB_URL} ${SRC_DIR}/ucx && \
+    cd ${SRC_DIR}/ucx && \
+    git checkout ${UCX_BRANCH}
+
+COPY . ${SRC_DIR}/ucc
+#==============================================================================
+# Build UCX
+RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucx.sh
+ENV PATH=${UCX_INSTALL_DIR}/bin:${PATH}
+#==============================================================================
+# Configure Python
+RUN ${SRC_DIR}/ucc/.ci/scripts/configure_python.sh
+#==============================================================================
+# Install PyTorch
+RUN ${SRC_DIR}/ucc/.ci/scripts/install_torch.sh
+#==============================================================================
+# Install workloads
+WORKDIR ${WORKLOADS_DIR}
+RUN git clone https://github.com/facebookresearch/dlrm.git && \
+    cd ${WORKLOADS_DIR}/dlrm && \
+    pip3 install -r ${WORKLOADS_DIR}/dlrm/requirements.txt && \
+    pip3 install tensorboard
+RUN git clone https://github.com/facebookresearch/param.git && \
+    pip3 install -r ${WORKLOADS_DIR}/param/requirements.txt
