@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -9,6 +9,8 @@
 
 #include "components/tl/ucc_tl_log.h"
 #include "utils/khash.h"
+
+#define MAX_PCI_BUS_ID_STR 16
 
 typedef struct ucc_tl_cuda_device_id {
     uint16_t domain;   /* range: 0 to ffff */
@@ -67,4 +69,6 @@ ucc_status_t ucc_tl_cuda_topo_num_links(const ucc_tl_cuda_topo_t *topo,
                                         const ucc_tl_cuda_device_pci_id_t *dev2,
                                         ucc_rank_t *num_links);
 
+void ucc_tl_cuda_topo_pci_id_to_str(const ucc_tl_cuda_device_pci_id_t *pci_id,
+                                    char *str, size_t max);
 #endif

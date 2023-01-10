@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -106,7 +106,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         }
     }
 ids_exchange:
-    self->ids[UCC_TL_TEAM_SIZE(self)].device = ctx->device;
     self->ids[UCC_TL_TEAM_SIZE(self)].pci_id = ctx->device_id;
     self->ids[UCC_TL_TEAM_SIZE(self)].shm    = shm_id;
     status = self->oob.allgather(&self->ids[UCC_TL_TEAM_SIZE(self)], self->ids,
