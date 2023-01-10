@@ -1,7 +1,7 @@
 ---
 job: 'ucc'
 
-step_allow_single_selector: true
+step_allow_single_selector: false
 
 registry_host: 'harbor.mellanox.com'
 registry_path: '/torch-ucc'
