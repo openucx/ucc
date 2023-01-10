@@ -22,6 +22,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     size = UCC_TL_TEAM_SIZE(self);
+    if (size < 2) {
+        tl_debug(tl_context->lib,
+                 "team size %d is too small, minimal size is 2",
+                 UCC_TL_TEAM_SIZE(self));
+        return UCC_ERR_NOT_SUPPORTED;
+    }
     self->comm_state = UCC_OK;
     self->unique_id  = ucc_malloc(sizeof(ncclUniqueId) * (size + 1),
                                   "tl_nccl_unique_id");
