@@ -868,13 +868,34 @@ typedef struct ucc_oob_coll {
 typedef ucc_oob_coll_t ucc_context_oob_coll_t;
 typedef ucc_oob_coll_t ucc_team_oob_coll_t;
 
+enum {
+    UCC_MEM_MAP_FIELD_KEY      = UCC_BIT(0),
+    UCC_MEM_MAP_FIELD_MEM_TYPE = UCC_BIT(1),
+};
+
+typedef enum {
+    UCC_KEY_TYPE_MKEY,
+    UCC_KEY_TYPE_MEMH,
+} ucc_key_type_t;
+
+typedef struct ucc_rma_key {
+    void          *key;
+    size_t         key_len;
+    ucc_key_type_t key_type;
+} ucc_rma_key_t;
+
 /**
  *
  *  @ingroup UCC_CONTEXT_DT
  */
 typedef struct ucc_mem_map {
-    void *   address; /*!< the address of a buffer to be attached to a UCC context */
-    size_t   len;     /*!< the length of the buffer */
+    uint64_t mask;
+    void    *address; /*!< The address of a buffer to be attached to a UCC
+                           context */
+    size_t            len; /*!< The length of the buffer */
+    ucc_rma_key_t     key[2]; /*!< Memory keys or handles associated with
+                                   this buffer */
+    ucc_memory_type_t mem_type; /*!< The type of memory */
 } ucc_mem_map_t;
 
 /**
