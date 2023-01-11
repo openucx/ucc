@@ -4,7 +4,7 @@ job: 'ucc'
 step_allow_single_selector: false
 
 registry_host: 'harbor.mellanox.com'
-registry_path: '/torch-ucc'
+registry_path: 'torch-ucc'
 registry_auth: '05d98651-e11c-4a57-9cc6-52df79014b89'
 
 volumes:
@@ -31,7 +31,7 @@ kubernetes:
 
 runs_on_dockers:
   - {file: '.ci/Dockerfile.centos8',name: 'centos8',tag: '${BUILD_NUMBER}',arch: 'x86_64',build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}', cloud: 'swx-k8s'}
-  - {file: '.ci/Dockerfile.ubuntu2004',name: 'ubuntu2004', tag: '${BUILD_NUMBER}' ,arch: 'x86_64' ,build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}', cloud: 'swx-k8s'}
+  # - {file: '.ci/Dockerfile.ubuntu2004',name: 'ubuntu2004', tag: '${BUILD_NUMBER}' ,arch: 'x86_64' ,build_args: '--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}', cloud: 'swx-k8s'}
 
 
 # bare metal
@@ -52,15 +52,15 @@ steps:
       docker create -ti --rm $DOCKER_OPT ${DOCKER_IMAGE_NAME} /bin/bash > ${WORKSPACE}/ucc_docker.id
       docker start $(cat ${WORKSPACE}/ucc_docker.id)
     
-  - name: Start docker Ubuntu20
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
-    containerSelector: "{name:'ubuntu2004'}"
-    run: |
-        echo "INFO: Start docker containers"
-        DOCKER_IMAGE_NAME="${UCC_DOCKER_IMAGE_NAME_UBUNTU}:${BUILD_ID}"
-        docker pull ${DOCKER_IMAGE_NAME}
-        docker create -ti --rm $DOCKER_OPT ${DOCKER_IMAGE_NAME} /bin/bash > ${WORKSPACE}/ucc_docker.id
-        docker start $(cat ${WORKSPACE}/ucc_docker.id)
+  # - name: Start docker Ubuntu20
+  #   agentSelector: "{nodeLabel: 'swx-clx01'}"
+  #   containerSelector: "{name:'ubuntu2004'}"
+  #   run: |
+  #       echo "INFO: Start docker containers"
+  #       DOCKER_IMAGE_NAME="${UCC_DOCKER_IMAGE_NAME_UBUNTU}:${BUILD_ID}"
+  #       docker pull ${DOCKER_IMAGE_NAME}
+  #       docker create -ti --rm $DOCKER_OPT ${DOCKER_IMAGE_NAME} /bin/bash > ${WORKSPACE}/ucc_docker.id
+  #       docker start $(cat ${WORKSPACE}/ucc_docker.id)
     
 
 

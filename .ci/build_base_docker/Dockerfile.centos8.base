@@ -26,7 +26,7 @@ RUN yum config-manager --set-enabled powertools && yum install -y \
     openssh-server \
     protobuf-compiler \
     protobuf-devel \
-    python36-devel \
+    python3 \
     rdma-core-devel \
     vim \
     wget
