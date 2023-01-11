@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
@@ -78,8 +78,7 @@ const char
 
 static inline void
 ucc_tl_nccl_check_and_convert_buffer(ucc_coll_buffer_info_t *buffer_info,
-                                     ucc_datatype_t          new_datatype,
-                                     ucc_tl_nccl_task_t *    task)
+                                     ucc_datatype_t          new_datatype)
 {
     if (ucc_to_nccl_dtype[UCC_DT_PREDEFINED_ID(buffer_info->datatype)] ==
         ncclDataTypeUnsupported) {
@@ -109,11 +108,11 @@ static inline ucc_status_t ucc_tl_nccl_check_and_convert_buffer_reduction(
             switch (buffer_info->datatype) {
             case UCC_DT_FLOAT32_COMPLEX:
                 ucc_tl_nccl_check_and_convert_buffer(buffer_info,
-                                                     UCC_DT_FLOAT32, task);
+                                                     UCC_DT_FLOAT32);
                 return UCC_OK;
             case UCC_DT_FLOAT64_COMPLEX:
                 ucc_tl_nccl_check_and_convert_buffer(buffer_info,
-                                                     UCC_DT_FLOAT64, task);
+                                                     UCC_DT_FLOAT64);
                 return UCC_OK;
             default:
                 break;
@@ -438,11 +437,11 @@ ucc_status_t ucc_tl_nccl_allgather_init(ucc_tl_nccl_task_t *task)
 
     if (!UCC_IS_INPLACE(*args)) {
         ucc_tl_nccl_check_and_convert_buffer(
-            &args->src.info, UCC_TL_NCCL_DT_FOR_UNSUPPORTED, task);
+            &args->src.info, UCC_TL_NCCL_DT_FOR_UNSUPPORTED);
     }
 
     ucc_tl_nccl_check_and_convert_buffer(&args->dst.info,
-                                         UCC_TL_NCCL_DT_FOR_UNSUPPORTED, task);
+                                         UCC_TL_NCCL_DT_FOR_UNSUPPORTED);
 
     task->super.post = ucc_tl_nccl_allgather_start;
     return UCC_OK;
@@ -514,7 +513,7 @@ exit_coll:
 ucc_status_t ucc_tl_nccl_bcast_init(ucc_tl_nccl_task_t *task)
 {
     ucc_tl_nccl_check_and_convert_buffer(&TASK_ARGS(task).src.info,
-                                         UCC_TL_NCCL_DT_FOR_UNSUPPORTED, task);
+                                         UCC_TL_NCCL_DT_FOR_UNSUPPORTED);
 
     task->super.post = ucc_tl_nccl_bcast_start;
     return UCC_OK;
@@ -606,9 +605,10 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
 {
-    ucc_coll_args_t *args = &TASK_ARGS(task);
+    ucc_coll_args_t *args    = &TASK_ARGS(task);
     int              is_root =
         UCC_IS_ROOT(TASK_ARGS(task), UCC_TL_TEAM_RANK(TASK_TEAM(task)));
+
     if (is_root) {
         if (ucc_tl_nccl_check_and_convert_buffer_reduction(&args->dst.info,
                                                            task) != UCC_OK) {
