@@ -5,7 +5,6 @@
  */
 
 #include "ec_cuda_executor.h"
-#include "components/mc/ucc_mc.h"
 #include "utils/ucc_atomic.h"
 
 ucc_status_t ucc_cuda_executor_interruptible_get_stream(cudaStream_t *stream)

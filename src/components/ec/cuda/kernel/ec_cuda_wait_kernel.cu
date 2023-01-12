@@ -17,18 +17,14 @@ extern "C" {
 }
 #endif
 
-__global__ void wait_kernel(volatile uint32_t *status) {
-    ucc_status_t st;
-    *status = UCC_EC_CUDA_TASK_STARTED;
-    do {
-        st = (ucc_status_t)*status;
-    } while(st != UCC_EC_CUDA_TASK_COMPLETED);
-    *status = UCC_EC_CUDA_TASK_COMPLETED_ACK;
-    return;
-}
+__global__ void wait_kernel(volatile ucc_ec_cuda_executor_state_t *state) {
+    ucc_ec_cuda_executor_state_t st;
 
-__global__ void wait_kernel_nb(volatile uint32_t *status) {
-    *status = UCC_EC_CUDA_TASK_COMPLETED_ACK;
+    *state = UCC_EC_CUDA_EXECUTOR_STARTED;
+    do {
+        st = *state;
+    } while (st != UCC_EC_CUDA_EXECUTOR_SHUTDOWN);
+    *state = UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK;
     return;
 }
 
@@ -36,15 +32,11 @@ __global__ void wait_kernel_nb(volatile uint32_t *status) {
 extern "C" {
 #endif
 
-ucc_status_t ucc_ec_cuda_post_kernel_stream_task(uint32_t *status,
-                                                 int blocking_wait,
-                                                 cudaStream_t stream)
+ucc_status_t
+ucc_ec_cuda_post_kernel_stream_task(ucc_ec_cuda_executor_state_t *state,
+                                    cudaStream_t stream)
 {
-    if (blocking_wait) {
-        wait_kernel<<<1, 1, 0, stream>>>(status);
-    } else {
-        wait_kernel_nb<<<1, 1, 0, stream>>>(status);
-    }
+    wait_kernel<<<1, 1, 0, stream>>>(state);
     CUDA_CHECK(cudaGetLastError());
     return UCC_OK;
 }

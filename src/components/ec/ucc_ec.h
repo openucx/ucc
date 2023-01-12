@@ -17,13 +17,6 @@ ucc_status_t ucc_ec_get_attr(ucc_ec_attr_t *attr);
 
 ucc_status_t ucc_ec_finalize();
 
-ucc_status_t ucc_ec_task_post(void *ee_context, ucc_ee_type_t ee_type,
-                              void **ee_task);
-
-ucc_status_t ucc_ec_task_query(void *ee_task, ucc_ee_type_t ee_type);
-
-ucc_status_t ucc_ec_task_end(void *ee_task, ucc_ee_type_t ee_type);
-
 ucc_status_t ucc_ec_create_event(void **event, ucc_ee_type_t ee_type);
 
 ucc_status_t ucc_ec_destroy_event(void *event, ucc_ee_type_t ee_type);

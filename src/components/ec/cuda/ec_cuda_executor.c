@@ -6,14 +6,19 @@
 
 #include "ec_cuda_executor.h"
 
+ucc_status_t ucc_cuda_executor_interruptible_start(ucc_ee_executor_t *executor);
+
+ucc_status_t ucc_cuda_executor_interruptible_stop(ucc_ee_executor_t *executor);
+
 ucc_status_t ucc_cuda_executor_persistent_start(ucc_ee_executor_t *executor,
                                                 void *ee_context);
 
 ucc_status_t ucc_cuda_executor_persistent_stop(ucc_ee_executor_t *executor);
 
-ucc_status_t ucc_cuda_executor_interruptible_start(ucc_ee_executor_t *executor);
+ucc_status_t ucc_cuda_executor_persistent_wait_start(ucc_ee_executor_t *executor,
+                                                     void *ee_context);
 
-ucc_status_t ucc_cuda_executor_interruptible_stop(ucc_ee_executor_t *executor);
+ucc_status_t ucc_cuda_executor_persistent_wait_stop(ucc_ee_executor_t *executor);
 
 ucc_status_t ucc_cuda_executor_init(const ucc_ee_executor_params_t *params,
                                     ucc_ee_executor_t **executor)
@@ -23,6 +28,13 @@ ucc_status_t ucc_cuda_executor_init(const ucc_ee_executor_params_t *params,
     if (ucc_unlikely(!eee)) {
         ec_error(&ucc_ec_cuda.super, "failed to allocate executor");
         return UCC_ERR_NO_MEMORY;
+    }
+
+    if (params->mask & UCC_EE_EXECUTOR_PARAM_FIELD_TASK_TYPES) {
+        eee->requested_ops = params->task_types;
+    } else {
+        /* if no task types provided assume all tasks types required */
+        eee->requested_ops = 1;
     }
 
     ec_debug(&ucc_ec_cuda.super, "executor init, eee: %p", eee);
@@ -90,10 +102,19 @@ ucc_status_t ucc_cuda_executor_task_finalize(ucc_ee_executor_task_t *task)
 ucc_status_t ucc_cuda_executor_start(ucc_ee_executor_t *executor,
                                      void *ee_context)
 {
+    ucc_ec_cuda_executor_t *eee = ucc_derived_of(executor,
+                                                 ucc_ec_cuda_executor_t);
+
     if (!ee_context) {
         return ucc_cuda_executor_interruptible_start(executor);
     } else {
-        return ucc_cuda_executor_persistent_start(executor, ee_context);
+        if (eee->requested_ops == 0) {
+            /* no operations requested, just mark stream busy */
+            return ucc_cuda_executor_persistent_wait_start(executor,
+                                                           ee_context);
+        } else {
+            return ucc_cuda_executor_persistent_start(executor, ee_context);
+        }
     }
 }
 
@@ -104,6 +125,10 @@ ucc_status_t ucc_cuda_executor_stop(ucc_ee_executor_t *executor)
     if (eee->mode == UCC_EC_CUDA_EXECUTOR_MODE_INTERRUPTIBLE) {
         return ucc_cuda_executor_interruptible_stop(executor);
     } else {
-        return ucc_cuda_executor_persistent_stop(executor);
+        if (eee->requested_ops == 0) {
+            return ucc_cuda_executor_persistent_wait_stop(executor);
+        } else {
+            return ucc_cuda_executor_persistent_stop(executor);
+        }
     }
 }

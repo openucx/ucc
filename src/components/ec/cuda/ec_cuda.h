@@ -21,19 +21,6 @@ typedef enum ucc_ec_cuda_strm_task_mode {
     UCC_EC_CUDA_TASK_LAST,
 } ucc_ec_cuda_strm_task_mode_t;
 
-typedef enum ucc_ec_cuda_task_stream_type {
-    UCC_EC_CUDA_USER_STREAM,
-    UCC_EC_CUDA_INTERNAL_STREAM,
-    UCC_EC_CUDA_TASK_STREAM_LAST
-} ucc_ec_cuda_task_stream_type_t;
-
-typedef enum ucc_ec_task_status {
-    UCC_EC_CUDA_TASK_COMPLETED,
-    UCC_EC_CUDA_TASK_POSTED,
-    UCC_EC_CUDA_TASK_STARTED,
-    UCC_EC_CUDA_TASK_COMPLETED_ACK
-} ucc_ec_task_status_t;
-
 typedef enum ucc_ec_cuda_executor_state {
     UCC_EC_CUDA_EXECUTOR_INITIALIZED,
     UCC_EC_CUDA_EXECUTOR_POSTED,
@@ -54,8 +41,6 @@ typedef ucc_status_t (*ucc_ec_cuda_task_post_fn) (uint32_t *dev_status,
 typedef struct ucc_ec_cuda_config {
     ucc_ec_config_t                super;
     ucc_ec_cuda_strm_task_mode_t   strm_task_mode;
-    ucc_ec_cuda_task_stream_type_t task_strm_type;
-    int                            stream_blocking_wait;
     unsigned long                  exec_num_workers;
     unsigned long                  exec_num_threads;
     unsigned long                  exec_max_tasks;
@@ -72,14 +57,11 @@ typedef struct ucc_ec_cuda {
     int                            exec_streams_initialized;
     cudaStream_t                  *exec_streams;
     ucc_mpool_t                    events;
-    ucc_mpool_t                    strm_reqs;
     ucc_mpool_t                    executors;
     ucc_mpool_t                    executor_interruptible_tasks;
     ucc_mpool_t                    executor_persistent_tasks;
     ucc_thread_mode_t              thread_mode;
     ucc_ec_cuda_strm_task_mode_t   strm_task_mode;
-    ucc_ec_cuda_task_stream_type_t task_strm_type;
-    ucc_ec_cuda_task_post_fn       post_strm_task;
     ucc_spinlock_t                 init_spinlock;
 } ucc_ec_cuda_t;
 
@@ -116,6 +98,7 @@ typedef struct ucc_ec_cuda_executor_task_ops {
 typedef struct ucc_ec_cuda_executor {
     ucc_ee_executor_t                super;
     ucc_ec_cuda_executor_mode_t      mode;
+    uint64_t                         requested_ops;
     ucc_ec_cuda_executor_task_ops_t  ops;
     ucc_spinlock_t                   tasks_lock;
     ucc_ec_cuda_executor_state_t     state;
