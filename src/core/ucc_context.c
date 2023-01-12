@@ -530,8 +530,11 @@ poll:
     {
         /* Compute storage rank and check proc info uniqeness */
         ucc_rank_t r = UCC_RANK_MAX;
-        ucc_context_addr_header_t *h, *h2;
+        int j;
+        ucc_context_addr_header_t *h, *h0;
 
+        addr_storage->flags = UCC_ADDR_STORAGE_FLAG_TLS_SYMMETRIC;
+        h0 = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, 0);
         for (i = 0; i < addr_storage->size; i++) {
             h = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, i);
             if (UCC_CTX_ID_EQUAL(context->id, h->ctx_id)) {
@@ -543,25 +546,19 @@ poll:
                 }
                 r = i;
             }
+            if (h->n_components == h0->n_components) {
+                /*check if TLs array is the same*/
+                for (j = 0; j < h->n_components; j++) {
+                    if (h->components[j].id != h0->components[j].id) {
+                        addr_storage->flags = 0;
+                        break;
+                    }
+                }
+            } else {
+                addr_storage->flags = 0;
+            }
         }
         addr_storage->rank = r;
-        /*check if TLs arrays is symmetric*/
-        addr_storage->flags = UCC_ADDR_STORAGE_FLAG_TLS_SYMMETRIC;
-        h = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, 0);
-
-        for (r = 1; r < addr_storage->size; r++) {
-            h2 = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, r);
-            if (h->n_components != h2->n_components) {
-                addr_storage->flags = 0;
-                break;
-            }
-            for (i = 0; i < h->n_components; i++) {
-                if (h->components[i].id != h2->components[i].id) {
-                    addr_storage->flags = 0;
-                    break;
-                }
-            }
-        }
     }
 
     return UCC_OK;

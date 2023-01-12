@@ -112,7 +112,7 @@ static ucc_mpool_ops_t ucc_ec_rocm_ee_executor_mpool_ops = {
     .obj_cleanup   = ucc_ec_rocm_executor_chunk_cleanup,
 };
 
-static void ucc_ec_rocm_event_init(ucc_mpool_t *mp, void *obj, void *chunk)
+static void ucc_ec_rocm_event_init(ucc_mpool_t *mp, void *obj, void *chunk) //NOLINT: mp is unused
 {
     ucc_ec_rocm_event_t *base = (ucc_ec_rocm_event_t *) obj;
 
@@ -212,6 +212,10 @@ static ucc_status_t ucc_ec_rocm_init(const ucc_ec_params_t *ec_params)
         sizeof(ucc_ec_rocm_executor_interruptible_task_t), 0, UCC_CACHE_LINE_SIZE,
         16, UINT_MAX, NULL, UCC_THREAD_MULTIPLE,
         "interruptible executor tasks");
+    if (status != UCC_OK) {
+        ec_error(&ucc_ec_rocm.super, "failed to create interruptible tasks pool");
+        return status;
+    }
 
     ucc_spinlock_init(&ucc_ec_rocm.init_spinlock, 0);
     return UCC_OK;
