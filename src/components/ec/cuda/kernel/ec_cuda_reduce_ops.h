@@ -138,6 +138,7 @@ cuFloatComplex operator* (const cuFloatComplex & first,
             s1     = s[0];                                                       \
         }                                                                        \
         CUDA_REDUCE_WITH_OP_CHUNK(0, UNROLL, WARP_SIZE, _OP);                    \
+        /* second call for data remainder */\
         CUDA_REDUCE_WITH_OP_CHUNK(                                               \
             (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL), 1, 1, _OP);   \
     }                                                                            \
