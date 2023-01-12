@@ -381,13 +381,15 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
         tl_lib = ctx_config->tl_cfgs[i]->tl_lib;
         status = tl_lib->iface->lib.get_attr(&tl_lib->super, &attr);
         if (UCC_OK != status) {
-            ucc_error("failed to query tl lib %s attr", tl_lib->iface->super.name);
+            ucc_error("failed to query tl lib %s attr",
+                       tl_lib->iface->super.name);
             return status;
         }
         if ((attr.flags & UCC_BASE_LIB_FLAG_CTX_SERVICE_TEAM_REQUIRED) &&
             (!ctx_service_team)) {
-            ucc_debug("can not create tl/%s context because context service team "
-                      "is not available for it", tl_lib->iface->super.name);
+            ucc_debug("can not create tl/%s context because context service "
+                      "team is not available for it",
+                      tl_lib->iface->super.name);
             continue;
         }
         status = tl_lib->iface->context.create(
@@ -439,20 +441,15 @@ err:
     return status;
 }
 
-ucc_status_t ucc_core_addr_exchange(ucc_context_t          *context,
-                                    ucc_context_oob_coll_t *c_oob,
-                                    ucc_team_oob_coll_t    *t_oob,
-                                    ucc_addr_storage_t     *addr_storage)
+ucc_status_t ucc_core_addr_exchange(ucc_context_t *context, ucc_oob_coll_t *oob,
+                                    ucc_addr_storage_t *addr_storage)
 {
-    ucc_team_oob_coll_t *oob;
-    ucc_context_attr_t   attr;
-    ucc_status_t         status;
-    int                  i;
-    size_t *             addr_lens;
-    size_t               max_addrlen;
+    size_t             *addr_lens;
+    ucc_context_attr_t  attr;
+    ucc_status_t        status;
+    ucc_rank_t          i;
+    size_t              max_addrlen;
 
-    ucc_assert(c_oob || t_oob);
-    oob = c_oob ? (ucc_team_oob_coll_t *)c_oob : t_oob;
 poll:
     if (addr_storage->oob_req) {
         status = oob->req_test(addr_storage->oob_req);
@@ -470,7 +467,7 @@ poll:
         if (NULL == addr_storage->storage) {
             addr_storage->size = oob->n_oob_eps;
             attr.mask          = UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
-                        UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
+                                 UCC_CONTEXT_ATTR_FIELD_CTX_ADDR;
             status = ucc_context_get_attr(context, &attr);
             if (UCC_OK != status) {
                 ucc_error("failed to query ctx address");
@@ -533,8 +530,11 @@ poll:
     {
         /* Compute storage rank and check proc info uniqeness */
         ucc_rank_t r = UCC_RANK_MAX;
-        ucc_context_addr_header_t *h;
+        int j;
+        ucc_context_addr_header_t *h, *h0;
 
+        addr_storage->flags = UCC_ADDR_STORAGE_FLAG_TLS_SYMMETRIC;
+        h0 = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, 0);
         for (i = 0; i < addr_storage->size; i++) {
             h = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, i);
             if (UCC_CTX_ID_EQUAL(context->id, h->ctx_id)) {
@@ -544,7 +544,18 @@ poll:
                     ucc_error("proc info collision: %d %d", r, i);
                     return UCC_ERR_NO_MESSAGE;
                 }
-                r = (ucc_rank_t)i;
+                r = i;
+            }
+            if (h->n_components == h0->n_components) {
+                /*check if TLs array is the same*/
+                for (j = 0; j < h->n_components; j++) {
+                    if (h->components[j].id != h0->components[j].id) {
+                        addr_storage->flags = 0;
+                        break;
+                    }
+                }
+            } else {
+                addr_storage->flags = 0;
             }
         }
         addr_storage->rank = r;
@@ -700,7 +711,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         do {
             /* UCC context create is blocking fn, so we can wait here for the
                completion of addr exchange */
-            status = ucc_core_addr_exchange(ctx, &ctx->params.oob, NULL,
+            status = ucc_core_addr_exchange(ctx, &ctx->params.oob,
                                             &ctx->addr_storage);
             if (status < 0) {
                 ucc_error("failed to exchange addresses during context creation");
@@ -969,15 +980,13 @@ static ucc_status_t ucc_context_pack_addr(ucc_context_t             *context,
                       cl_lib->super.log_component.name);
             return status;
         }
-        if (attr.attr.ctx_addr_len > 0) {
-            total_len += attr.attr.ctx_addr_len;
-            packed++;
-            if (h) {
-                h->components[last_packed].id     = cl_lib->iface->super.id;
-                h->components[last_packed].offset = offset;
-                last_packed++;
-                offset += attr.attr.ctx_addr_len;
-            }
+        total_len += attr.attr.ctx_addr_len;
+        packed++;
+        if (h) {
+            h->components[last_packed].id     = cl_lib->iface->super.id;
+            h->components[last_packed].offset = offset;
+            last_packed++;
+            offset += attr.attr.ctx_addr_len;
         }
     }
 
@@ -991,21 +1000,20 @@ static ucc_status_t ucc_context_pack_addr(ucc_context_t             *context,
                       tl_lib->super.log_component.name);
             return status;
         }
-        if (attr.attr.ctx_addr_len > 0) {
-            total_len += attr.attr.ctx_addr_len;
-            packed++;
-            if (h) {
-                h->components[last_packed].id     = tl_lib->iface->super.id;
-                h->components[last_packed].offset = offset;
-                last_packed++;
-                offset += attr.attr.ctx_addr_len;
-            }
+        total_len += attr.attr.ctx_addr_len;
+        packed++;
+        if (h) {
+            h->components[last_packed].id     = tl_lib->iface->super.id;
+            h->components[last_packed].offset = offset;
+            last_packed++;
+            offset += attr.attr.ctx_addr_len;
         }
     }
 
     if (addr_len) {
         *addr_len = total_len + UCC_CONTEXT_ADDR_HEADER_SIZE(packed);
     }
+
     if (n_packed) {
         *n_packed = packed;
     }
@@ -1028,7 +1036,7 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
                 ucc_error("failed to calc ucc context address length");
                 return status;
             }
-            context->attr.mask        |= UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN;
+            context->attr.mask |= UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN;
         }
         context_attr->ctx_addr_len = context->attr.ctx_addr_len;
     }

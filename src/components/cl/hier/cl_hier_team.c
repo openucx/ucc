@@ -15,30 +15,32 @@
     _team->sbgps[UCC_HIER_SBGP_##_sbgp].state     = UCC_HIER_SBGP_##_enable;
 
 /* The function below must enable/disable those hier sbgps that will be
-   used to construct hierarchical schedules.
-   Currently just enable two sbgps as example and for testing purposes.
-   Next step is to enable sbgps based on the requested hierarchical algs. */
+ * used to construct hierarchical schedules.
+ * Currently just enable two sbgps as example and for testing purposes.
+ * Next step is to enable sbgps based on the requested hierarchical algs.
+ */
+
 static void ucc_cl_hier_enable_sbgps(ucc_cl_hier_team_t *team)
 {
     SBGP_SET(team, NET, ENABLED);
     SBGP_SET(team, NODE, ENABLED);
     SBGP_SET(team, NODE_LEADERS, ENABLED);
-    SBGP_SET(team, FULL, ENABLED); //todo parse score if a2av is enabled
+    SBGP_SET(team, FULL, ENABLED); /* TODO: parse score if a2av is enabled */
 }
 
 UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
                     const ucc_base_team_params_t *params)
 {
-    ucc_cl_hier_context_t *ctx =
-        ucc_derived_of(cl_context, ucc_cl_hier_context_t);
-    ucc_cl_hier_lib_t *lib = ucc_derived_of(cl_context->lib, ucc_cl_hier_lib_t);
-    int                i, j, t, n_sbgp_teams;
-    ucc_status_t       status;
-    ucc_hier_sbgp_t   *hs;
+    ucc_cl_hier_context_t *ctx = ucc_derived_of(cl_context,
+                                                ucc_cl_hier_context_t);
+    ucc_cl_hier_lib_t     *lib = ucc_derived_of(cl_context->lib,
+                                                ucc_cl_hier_lib_t);
+    int                        i, j, t, n_sbgp_teams;
+    ucc_status_t               status;
+    ucc_hier_sbgp_t           *hs;
     ucc_config_names_array_t  *tls;
     ucc_subset_t               subset;
     struct ucc_team_team_desc *d;
-
     if (!params->team->topo) {
         cl_info(cl_context->lib,
                 "can't create hier team without topology data");
@@ -51,17 +53,17 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     }
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params);
-
     memset(self->sbgps, 0, sizeof(self->sbgps));
     ucc_cl_hier_enable_sbgps(self);
     n_sbgp_teams = 0;
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
-        hs            = &self->sbgps[i];
+        hs = &self->sbgps[i];
         if (hs->state == UCC_HIER_SBGP_ENABLED) {
             hs->sbgp = ucc_topo_get_sbgp(params->team->topo, hs->sbgp_type);
             if (hs->sbgp->status != UCC_SBGP_ENABLED) {
                 /* SBGP of that type either not exists or the calling process
-                   is not part of subgroup */
+                 * is not part of subgroup
+                 */
                 cl_debug(cl_context->lib, "sbgp %s is not enabled",
                          ucc_sbgp_str(hs->sbgp_type));
                 hs->state = UCC_HIER_SBGP_DISABLED;
@@ -70,9 +72,9 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
             hs->n_tls = 0;
             tls       = &lib->cfg.sbgp_tls[i].array;
             for (j = 0; j < tls->count; j++) {
-                status =
-                    ucc_tl_context_get(ctx->super.super.ucc_context,
-                                       tls->names[j], &hs->tl_ctxs[hs->n_tls]);
+                status = ucc_tl_context_get(ctx->super.super.ucc_context,
+                                            tls->names[j],
+                                            &hs->tl_ctxs[hs->n_tls]);
                 if (UCC_OK != status) {
                     cl_debug(cl_context->lib,
                              "tl context %s is not available for sbgp %s",
@@ -85,37 +87,39 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
             }
         }
     }
+
     status = ucc_team_multiple_req_alloc(&self->team_create_req, n_sbgp_teams);
     if (UCC_OK != status) {
         cl_error(cl_context->lib, "failed to allocate team req multiple");
         goto err;
     }
 
-    j                              = 0;
-    self->team_create_req->n_teams = n_sbgp_teams;
-    /* Initialize base params for ALL tl teams we need to create:
-       for each hier sbgp we have n_tls potentially requested tl teams */
+    /* initialize base params for ALL tl teams we need to create:
+     * for each hier sbgp we have n_tls potentially requested tl teams
+     */
+    j = 0;
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
         hs = &self->sbgps[i];
         if (hs->state == UCC_HIER_SBGP_ENABLED) {
             for (t = 0; t < hs->n_tls; t++) {
-                d                         = &self->team_create_req->descs[j];
-                d->param.team             = params->team;
-                d->param.rank             = hs->sbgp->group_rank;
-                d->param.size             = hs->sbgp->group_size;
-                d->param.params.mask =
-                    UCC_TEAM_PARAM_FIELD_EP_RANGE | UCC_TEAM_PARAM_FIELD_EP |
-                    UCC_TEAM_PARAM_FIELD_TEAM_SIZE | UCC_TEAM_PARAM_FIELD_OOB;
+                d                        = &self->team_create_req->descs[j];
+                d->param.params.mask     = UCC_TEAM_PARAM_FIELD_EP_RANGE |
+                                           UCC_TEAM_PARAM_FIELD_EP |
+                                           UCC_TEAM_PARAM_FIELD_TEAM_SIZE |
+                                           UCC_TEAM_PARAM_FIELD_OOB;
+                d->param.team            = params->team;
+                d->param.rank            = hs->sbgp->group_rank;
+                d->param.size            = hs->sbgp->group_size;
                 d->param.params.ep       = (uint64_t)hs->sbgp->group_rank;
                 d->param.params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
-                d->ctx                   = hs->tl_ctxs[t];
                 d->param.scope           = UCC_CL_HIER;
                 d->param.id              = params->id;
                 d->param.scope_id        = i;
                 d->param.map             = hs->sbgp->map;
+                d->ctx                   = hs->tl_ctxs[t];
                 subset.myrank            = hs->sbgp->group_rank;
                 subset.map               = hs->sbgp->map;
-                /* Internal oob will execute allgather over subset */
+                /* internal oob will execute allgather over subset */
                 status = ucc_internal_oob_init(params->team, subset,
                                                &d->param.params.oob);
                 if (UCC_OK != status) {
@@ -211,7 +215,6 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
     ucc_hier_sbgp_t           *hs;
 
     status = ucc_tl_team_create_multiple(team->team_create_req);
-
     if (status != UCC_OK) {
         return status;
     }
@@ -219,7 +222,8 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
     team->n_tl_teams = 0;
 
     /* TL teams are created: get scores and merge them to produce
-       score map for each sbgp */
+     * score map for each sbgp
+     */
     for (i = 0; i < team->team_create_req->n_teams; i++) {
         d                       = &team->team_create_req->descs[i];
         ucc_hier_sbgp_type_t st = (ucc_hier_sbgp_type_t)d->args[0];
@@ -235,7 +239,7 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
                 cl_warn(ctx->super.super.lib, "failed to get tl %s scores",
                         UCC_TL_TEAM_IFACE(d->team)->super.name);
                 continue;
-                //goto cleanup ?
+                /* TODO: goto cleanup? */
             }
             if (hs->score == NULL) {
                 hs->score = score;
@@ -265,7 +269,8 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
         if (hs->score == NULL) {
             if (hs->state == UCC_HIER_SBGP_ENABLED) {
                 /* we tried to enable that sbgp, which means the subgroup
-                   exists. however failed to create a single team there */
+                 * exists. however failed to create a single team there
+                 */
                 cl_error(ctx->super.super.lib,
                          "no tl teams were created for sbgp %s",
                          ucc_sbgp_str(hs->sbgp_type));
@@ -360,7 +365,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
             ctx->score_str, score, UCC_CL_TEAM_SIZE(team), NULL, cl_team,
             UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_alg_id_to_init, NULL, 0);
 
-        /* If INVALID_PARAM - User provided incorrect input - try to proceed */
+        /* if INVALID_PARAM - user provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {
             goto err;

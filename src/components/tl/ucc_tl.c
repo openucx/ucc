@@ -6,6 +6,7 @@
 
 #include "ucc_tl.h"
 #include "utils/ucc_log.h"
+#include "core/ucc_team.h"
 
 ucc_config_field_t ucc_tl_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_lib_config_t, super),
@@ -107,8 +108,7 @@ ucc_status_t ucc_tl_context_put(ucc_tl_context_t *tl_context)
 }
 
 ucc_status_t
-ucc_team_multiple_req_alloc(ucc_team_multiple_req_t **req,
-                                   int n_teams)
+ucc_team_multiple_req_alloc(ucc_team_multiple_req_t **req, int n_teams)
 {
     ucc_team_multiple_req_t *r;
 
@@ -132,11 +132,59 @@ void ucc_team_multiple_req_free(ucc_team_multiple_req_t *req)
     ucc_free(req);
 }
 
+static ucc_status_t ucc_tl_is_reachable(const ucc_base_team_params_t *params,
+                                        unsigned long tl_id)
+{
+    ucc_team_t                *core_team    = params->team;
+    ucc_context_t             *core_context = core_team->contexts[0];
+    ucc_addr_storage_t        *addr_storage;
+    ucc_context_addr_header_t *addr_header;
+    ucc_rank_t                 i, rank;
+    int                        j, use_ctx;
+
+    ucc_assert(core_team->num_contexts == 1);
+
+    if (params->size == 1) {
+        return UCC_OK;
+    }
+
+    if (core_context->addr_storage.storage) {
+        addr_storage = &core_context->addr_storage;
+        use_ctx = 1;
+    } else {
+        addr_storage = &core_team->addr_storage;
+        use_ctx = 0;
+    }
+
+    if (addr_storage->flags & UCC_ADDR_STORAGE_FLAG_TLS_SYMMETRIC) {
+        return UCC_OK;
+    }
+
+    for (i = 0; i < params->size; i++) {
+        rank = ucc_ep_map_eval(params->map, i);
+        if (use_ctx) {
+            rank = ucc_ep_map_eval(core_team->ctx_map, rank);
+        }
+        addr_header = UCC_ADDR_STORAGE_RANK_HEADER(addr_storage, rank);
+        for (j = 0; j < addr_header->n_components; j++) {
+            if (addr_header->components[j].id == tl_id) {
+                break;
+            }
+        }
+        if (j == addr_header->n_components) {
+            return UCC_ERR_NOT_FOUND;
+        }
+    }
+
+    return UCC_OK;
+}
+
 ucc_status_t ucc_tl_team_create_multiple(ucc_team_multiple_req_t *req)
 {
-    int *id = &req->last;
+    int             *id = &req->last;
     ucc_base_team_t *b_team;
     ucc_status_t     status;
+    ucc_tl_lib_t    *lib;
 
     if (*id == req->n_teams) {
         return UCC_OK;
@@ -147,9 +195,17 @@ ucc_status_t ucc_tl_team_create_multiple(ucc_team_multiple_req_t *req)
         if (*id == req->n_teams) {
             return UCC_OK;
         }
-        status = UCC_TL_CTX_IFACE(req->descs[*id].ctx)
-                     ->team.create_post(&((req->descs[*id].ctx->super)),
-                                        &req->descs[*id].param, &b_team);
+        lib = ucc_derived_of(req->descs[*id].ctx->super.lib, ucc_tl_lib_t);
+        status = ucc_tl_is_reachable(&req->descs[*id].param,
+                                     lib->iface->super.id);
+        if (UCC_OK != status) {
+            ucc_debug("TL %s is not reachable, skipping\n",
+                      lib->iface->super.name);
+        } else {
+            status = UCC_TL_CTX_IFACE(req->descs[*id].ctx)
+                        ->team.create_post(&((req->descs[*id].ctx->super)),
+                                            &req->descs[*id].param, &b_team);
+        }
         if (UCC_OK != status) {
             req->descs[*id].status = status;
             req->descs[*id].team   = NULL;
