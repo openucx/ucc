@@ -58,7 +58,7 @@ AC_DEFUN([CHECK_SPECIFIC_ATTRIBUTE], [
         #
         # Try to compile using the C compiler
         #
-        AC_TRY_COMPILE([$3],[],
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[$3]],[[]])],
                        [ucx_cv_attribute_[$1]=1],
                        [ucx_cv_attribute_[$1]=0])
 	CFLAGS="$SAVE_CFLAGS"
@@ -73,7 +73,7 @@ AC_DEFUN([CHECK_SPECIFIC_ATTRIBUTE], [
 #  Enable/disable turning on machine-specific optimizations
 #
 AC_ARG_ENABLE(optimizations,
-              AC_HELP_STRING([--enable-optimizations],
+              AS_HELP_STRING([--enable-optimizations],
                              [Enable non-portable machine-specific CPU optimizations, default: NO]),
               [],
               [enable_optimizations=no])
@@ -88,7 +88,7 @@ AC_ARG_ENABLE(optimizations,
 AC_DEFUN([COMPILER_CPU_OPTIMIZATION],
 [
     AC_ARG_WITH([$1],
-                [AC_HELP_STRING([--with-$1], [Use $2 compiler option.])],
+                [AS_HELP_STRING([--with-$1], [Use $2 compiler option.])],
                 [],
                 [with_$1=$enable_optimizations])
 
