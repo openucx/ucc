@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -13,7 +13,6 @@
 
 pthread_mutex_t nvml_lock = PTHREAD_MUTEX_INITIALIZER;
 
-#define MAX_PCI_BUS_ID_STR 16
 #define MAX_PCI_DEVICES    32
 
 #define NVMLCHECK_GOTO(_cmd, _label, _status, _lib)                            \
@@ -41,8 +40,8 @@ ucc_tl_cuda_topo_pci_id_from_str(const char * bus_id_str,
 }
 
 // TODO: add to topo print
-static void ucc_tl_cuda_topo_pci_id_to_str(const ucc_tl_cuda_device_pci_id_t *pci_id,
-                                           char *str, size_t max)
+void ucc_tl_cuda_topo_pci_id_to_str(const ucc_tl_cuda_device_pci_id_t *pci_id,
+                                    char *str, size_t max)
 {
     ucc_snprintf_safe(str, max, "%04x:%02x:%02x.%d", pci_id->domain,
                       pci_id->bus, pci_id->device, pci_id->function);
@@ -215,22 +214,35 @@ exit:
 static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
 {
     ucc_status_t status = UCC_OK;
-    cudaError_t cuda_st;
-    char pci_bus_str[MAX_PCI_BUS_ID_STR];
     nvmlDevice_t nvml_dev;
     nvmlFieldValue_t nvml_value;
     nvmlPciInfo_t nvml_pci;
     ucc_tl_cuda_topo_dev_type_t dev_type;
     ucc_tl_cuda_device_pci_id_t pci_id;
     ucc_tl_cuda_topo_node_t *node, *peer_node;
-    int num_gpus;
-    int i, num_nvlinks, link;
+    int num_gpus, num_nvlinks, link, i;
+    nvmlReturn_t nvml_st;
 
-    cuda_st = cudaGetDeviceCount(&num_gpus);
-    if ((cuda_st != cudaSuccess) || (num_gpus == 0)){
-        tl_info(topo->lib, "cudaGetDeviceCount failed or no GPU devices found");
-        return UCC_ERR_NO_RESOURCE;
+    nvml_st = nvmlInit_v2();
+    if (nvml_st != NVML_SUCCESS) {
+        tl_info(topo->lib, "failed to init NVML: %s", nvmlErrorString(nvml_st));
+        return UCC_ERR_NO_MESSAGE;
     }
+
+    nvml_st = nvmlDeviceGetCount(&num_gpus);
+    if (nvml_st != NVML_SUCCESS) {
+        tl_info(topo->lib, "nvmlDeviceGetCount failed: %s",
+                nvmlErrorString(nvml_st));
+        status = UCC_ERR_NO_RESOURCE;
+        goto exit_nvml_shutdown;
+    }
+
+    if (num_gpus == 0) {
+        tl_info(topo->lib, "no GPU devices found");
+        status = UCC_ERR_NO_RESOURCE;
+        goto exit_nvml_shutdown;
+    }
+
     topo->num_nodes = 0;
     topo->graph = (ucc_tl_cuda_topo_node_t*)ucc_malloc(MAX_PCI_DEVICES *
                                                        sizeof(*topo->graph),
@@ -241,25 +253,24 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
     }
     kh_init_inplace(bus_to_node, &topo->bus_to_node_hash);
     pthread_mutex_lock(&nvml_lock);
-    NVMLCHECK_GOTO(nvmlInit_v2(), exit_free_graph, status, topo->lib);
     nvml_value.fieldId = NVML_FI_DEV_NVLINK_LINK_COUNT;
     for (i = 0; i < num_gpus; i++) {
-        CUDA_CHECK_GOTO(cudaDeviceGetPCIBusId(pci_bus_str, MAX_PCI_BUS_ID_STR, i),
-                        exit_nvml_shutdown, status);
-        status = ucc_tl_cuda_topo_pci_id_from_str(pci_bus_str, &pci_id);
-        if (status != UCC_OK) {
-            goto exit_nvml_shutdown;
-        }
+        NVMLCHECK_GOTO(nvmlDeviceGetHandleByIndex(i, &nvml_dev),
+                       exit_free_graph, status, topo->lib);
+        NVMLCHECK_GOTO(nvmlDeviceGetPciInfo(nvml_dev, &nvml_pci),
+                       exit_free_graph, status, topo->lib);
+        pci_id.domain   = nvml_pci.domain;
+        pci_id.bus      = nvml_pci.bus;
+        pci_id.device   = nvml_pci.device;
+        pci_id.function = 0;
         status = ucc_tl_cuda_topo_graph_add_device(&pci_id,
                                                    UCC_TL_CUDA_TOPO_DEV_TYPE_GPU,
                                                    topo, &node);
         if (status != UCC_OK) {
-            goto exit_nvml_shutdown;
+            goto exit_free_graph;
         }
-        NVMLCHECK_GOTO(nvmlDeviceGetHandleByPciBusId_v2(pci_bus_str, &nvml_dev),
-                       exit_nvml_shutdown, status, topo->lib);
         NVMLCHECK_GOTO(nvmlDeviceGetFieldValues(nvml_dev, 1, &nvml_value),
-                       exit_nvml_shutdown, status, topo->lib);
+                       exit_free_graph, status, topo->lib);
         num_nvlinks = ((nvml_value.nvmlReturn == NVML_SUCCESS) &&
                        (nvml_value.valueType == NVML_VALUE_TYPE_UNSIGNED_INT)) ?
                       nvml_value.value.uiVal : 0;
@@ -268,7 +279,7 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
                                                           &dev_type);
             if (status != UCC_OK) {
                 tl_info(topo->lib, "failed to get remote device type");
-                goto exit_nvml_shutdown;
+                goto exit_free_graph;
             }
             if (dev_type == UCC_TL_CUDA_TOPO_DEV_TYPE_LAST) {
                /* nvlink connected device is not supported by cuda tl */
@@ -276,7 +287,7 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
             }
             NVMLCHECK_GOTO(nvmlDeviceGetNvLinkRemotePciInfo_v2(nvml_dev, link,
                                                                &nvml_pci),
-                           exit_nvml_shutdown, status, topo->lib);
+                           exit_free_graph, status, topo->lib);
             pci_id.domain   = nvml_pci.domain;
             pci_id.bus      = nvml_pci.bus;
             pci_id.device   = nvml_pci.device;
@@ -284,11 +295,11 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
             status = ucc_tl_cuda_topo_graph_add_device(&pci_id, dev_type, topo,
                                                        &peer_node);
             if (status != UCC_OK) {
-                goto exit_nvml_shutdown;
+                goto exit_free_graph;
             }
             status = ucc_tl_cuda_topo_graph_add_link(topo, node, peer_node);
             if (status != UCC_OK) {
-                goto exit_nvml_shutdown;
+                goto exit_free_graph;
             }
         }
     }
@@ -296,11 +307,11 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
     pthread_mutex_unlock(&nvml_lock);
     return UCC_OK;
 
-exit_nvml_shutdown:
-    nvmlShutdown();
 exit_free_graph:
     ucc_tl_cuda_topo_graph_destroy(topo);
     pthread_mutex_unlock(&nvml_lock);
+exit_nvml_shutdown:
+    nvmlShutdown();
     return status;
 }
 

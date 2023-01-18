@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -124,7 +124,6 @@ typedef struct ucc_tl_cuda_mem_info {
 } ucc_tl_cuda_mem_info_t;
 
 typedef struct ucc_tl_cuda_rank_id {
-    int                         device;
     ucc_tl_cuda_device_pci_id_t pci_id;
     ucc_tl_cuda_mem_info_t      scratch_info;
     int                         shm;
