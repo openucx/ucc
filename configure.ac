@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2001-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # This software product is a proprietary product of Mellanox Technologies Ltd.
 # (the "Company") and all right, title, and interest and to the software product,
 # including all associated intellectual property rights, are and shall
@@ -10,6 +10,7 @@
 # $COPYRIGHT$
 # $HEADER$
 
+AC_PREREQ([2.63])
 define([ucc_ver_major], 1)
 define([ucc_ver_minor], 2)
 define([ucc_ver_patch], 0)
@@ -27,7 +28,6 @@ AC_INIT([ucc], [ucc_ver_major.ucc_ver_minor])
 : ${CXXFLAGS=""}
 
 AC_USE_SYSTEM_EXTENSIONS
-AC_GNU_SOURCE
 AC_CONFIG_HEADERS([config.h])
 
 UCC_TOP_BUILDDIR="`pwd`"
@@ -73,8 +73,7 @@ AM_PROG_AS
 AC_PROG_LN_S
 AC_PROG_MKDIR_P
 AC_PROG_INSTALL
-AC_PROG_LIBTOOL
-AC_HEADER_STDC
+LT_INIT
 CFLAGS="$CFLAGS_save"
 
 AC_CHECK_SIZEOF(float)
