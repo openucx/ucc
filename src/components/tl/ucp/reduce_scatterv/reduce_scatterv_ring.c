@@ -33,8 +33,8 @@ static void send_completion_1(void *request, ucs_status_t status,
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
 
-    send_completion_common(request, status, user_data);
     task->reduce_scatterv_ring.s_scratch_busy[0] = 0;
+    send_completion_common(request, status, user_data);
 }
 
 static void send_completion_2(void *request, ucs_status_t status,
@@ -42,8 +42,8 @@ static void send_completion_2(void *request, ucs_status_t status,
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
 
-    send_completion_common(request, status, user_data);
     task->reduce_scatterv_ring.s_scratch_busy[1] = 0;
+    send_completion_common(request, status, user_data);
 }
 
 static inline void ucc_ring_frag_count(ucc_tl_ucp_task_t *task,
@@ -106,8 +106,8 @@ static void ucc_tl_ucp_reduce_scatterv_ring_progress(ucc_coll_task_t *coll_task)
     ucc_status_t            status;
     size_t max_block_size, block_offset, frag_count, frag_offset, final_offset;
     int    step, is_avg, id;
-    char * busy;
     void * r_scratch, *s_scratch[2], *reduce_target;
+    volatile char *busy;
 
     final_offset = 0;
     if (UCC_IS_INPLACE(*args)) {
