@@ -33,8 +33,8 @@ static void send_completion_1(void *request, ucs_status_t status,
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
 
-    send_completion_common(request, status, user_data);
     task->reduce_scatter_ring.s_scratch_busy[0] = 0;
+    send_completion_common(request, status, user_data);
 }
 
 static void send_completion_2(void *request, ucs_status_t status,
@@ -42,8 +42,8 @@ static void send_completion_2(void *request, ucs_status_t status,
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
 
-    send_completion_common(request, status, user_data);
     task->reduce_scatter_ring.s_scratch_busy[1] = 0;
+    send_completion_common(request, status, user_data);
 }
 
 static inline void ucc_ring_frag_count(ucc_tl_ucp_task_t *task, size_t count,
@@ -99,8 +99,8 @@ static void ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
     ucc_status_t            status;
     size_t max_block_size, block_offset, frag_count, frag_offset, final_offset;
     int    step, is_avg, id;
-    char  *busy;
     void  *r_scratch, *s_scratch[2], *reduce_target;
+    volatile char *busy;
 
     final_offset = 0;
     if (UCC_IS_INPLACE(*args)) {
@@ -318,7 +318,6 @@ ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
                                     ucc_base_team_t *     team,
                                     ucc_coll_task_t **    task_h)
 {
-
     ucc_tl_ucp_team_t *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         size     = UCC_TL_TEAM_SIZE(tl_team);
     size_t             count    = coll_args->args.dst.info.count;
