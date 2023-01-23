@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -304,6 +304,12 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
                      "CUDA cooperative groups are not supported. "
                      "Fall back to non cooperative launch.");
         }
+    }
+
+    if (cfg->use_cooperative_launch == 1) {
+        ec_info(&ucc_ec_cuda.super, "use CUDA cooperative launch");
+    } else {
+        ec_info(&ucc_ec_cuda.super, "do not use CUDA cooperative launch");
     }
 
     ucc_spinlock_init(&ucc_ec_cuda.init_spinlock, 0);
