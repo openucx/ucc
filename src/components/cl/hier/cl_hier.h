@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -13,6 +13,7 @@
 #include "coll_score/ucc_coll_score.h"
 #include "utils/ucc_mpool.h"
 #include "schedule/ucc_schedule_pipelined.h"
+#include "core/ucc_service_coll.h"
 
 #ifdef HAVE_PROFILING_CL_HIER
 #include "utils/profile/ucc_profile_on.h"
@@ -98,13 +99,20 @@ typedef struct ucc_hier_sbgp {
     int                   n_tls;
 } ucc_hier_sbgp_t;
 
+typedef struct ucc_cl_hier_team_create_req {
+    ucc_team_multiple_req_t *create_req;
+    ucc_service_coll_req_t  *global_status_req;
+    ucc_status_t             local_status;
+    ucc_status_t             global_status;
+} ucc_cl_hier_team_create_req_t;
+
 typedef struct ucc_cl_hier_team {
-    ucc_cl_team_t            super;
-    ucc_team_multiple_req_t *team_create_req;
-    unsigned                 n_tl_teams;
-    ucc_coll_score_t        *score;
-    ucc_hier_sbgp_t          sbgps[UCC_HIER_SBGP_LAST];
-    ucc_hier_sbgp_type_t     top_sbgp;
+    ucc_cl_team_t                  super;
+    ucc_cl_hier_team_create_req_t *team_req;
+    unsigned                       n_tl_teams;
+    ucc_coll_score_t              *score;
+    ucc_hier_sbgp_t                sbgps[UCC_HIER_SBGP_LAST];
+    ucc_hier_sbgp_type_t           top_sbgp;
 } ucc_cl_hier_team_t;
 UCC_CLASS_DECLARE(ucc_cl_hier_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -282,7 +282,8 @@ static ucc_status_t ucc_team_create_cls(ucc_context_t *context,
         status   = cl_iface->team.create_test(b_team);
         if (status < 0) {
             team->n_cl_teams--;
-            ucc_info("failed to create CL %s team", cl_iface->super.name);
+            ucc_info("failed to create CL %s team, team_id %d",
+                     cl_iface->super.name, team->id);
             cl_iface->team.destroy(b_team);
         } else if (status == UCC_INPROGRESS) {
             return status;
@@ -294,12 +295,14 @@ static ucc_status_t ucc_team_create_cls(ucc_context_t *context,
         status   = cl_iface->team.create_post(&context->cl_ctx[i]->super,
                                               &team->bp, &b_team);
         if (status != UCC_OK) {
-            ucc_info("failed to create CL %s team", cl_iface->super.name);
+            ucc_info("failed to create CL %s team, team_id %d",
+                     cl_iface->super.name, team->id);
             continue;
         }
         status = cl_iface->team.create_test(b_team);
         if (status < 0) {
-            ucc_info("failed to create CL %s team", cl_iface->super.name);
+            ucc_info("failed to create CL %s team, team_id %d",
+                     cl_iface->super.name, team->id);
             cl_iface->team.destroy(b_team);
             continue;
         }
