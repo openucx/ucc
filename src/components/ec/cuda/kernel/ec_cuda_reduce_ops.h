@@ -84,7 +84,7 @@ cuFloatComplex operator* (const cuFloatComplex & first,
                 }                                                              \
                 _Pragma("unroll") for (i = 0; i < unroll; i++)                 \
                 {                                                              \
-                    if constexpr (strided) {                                   \
+                    if (strided) {                                             \
                         tmp2[i] = s2[line + warp_size * i + j * ld];           \
                     } else {                                                   \
                         tmp2[i] = s[1 + j][line + warp_size * i];              \
@@ -115,30 +115,35 @@ cuFloatComplex operator* (const cuFloatComplex & first,
     {                                                                            \
         _Type *        d     = (_Type *)task.dst;                                \
         const size_t   count = task.count;                                       \
-        constexpr bool strided =                                                 \
+        const bool strided =                                                     \
             std::is_same<_TaskType, ucc_eee_task_reduce_strided_t>::value;       \
-        constexpr int MAXSRCS =                                                  \
+        const int MAXSRCS =                                                      \
             strided ? USHRT_MAX : UCC_EE_EXECUTOR_NUM_BUFS;                      \
-        constexpr int       ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS; \
+        const int       ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS;     \
         _Type *             s[ALLOC_SIZE];                                       \
         _Type *             s1;                                                  \
         _Type *             s2;                                                  \
         __shared__ uint16_t n_src2;                                              \
         size_t              ld;                                                  \
         size_t              i, j, line;                                          \
-        if constexpr (strided) {                                                 \
-            n_src2 = task.n_src2;                                                \
-            s1     = (_Type *)task.src1;                                         \
-            s2     = (_Type *)task.src2;                                         \
-            ld     = task.stride / sizeof(_Type);                                \
-            ucc_assert_system(task.stride % sizeof(_Type) == 0);                 \
+        if (strided) {                                                           \
+            auto task_strided_p =                                                \
+                    reinterpret_cast<ucc_eee_task_reduce_strided_t*>(&task);     \
+            n_src2 = task_strided_p->n_src2;                                     \
+            s1     = (_Type *)task_strided_p->src1;                              \
+            s2     = (_Type *)task_strided_p->src2;                              \
+            ld     = task_strided_p->stride / sizeof(_Type);                     \
+            ucc_assert_system(task_strided_p->stride % sizeof(_Type) == 0);      \
         } else {                                                                 \
-            memcpy(s, task.srcs, UCC_EE_EXECUTOR_NUM_BUFS * sizeof(_Type *));    \
-            n_src2 = task.n_srcs - 1;                                            \
+            auto task_default_p =                                                \
+                        reinterpret_cast<ucc_eee_task_reduce_t*>(&task);         \
+            memcpy(s, task_default_p->srcs,                                      \
+                                    UCC_EE_EXECUTOR_NUM_BUFS * sizeof(_Type *)); \
+            n_src2 = task_default_p->n_srcs - 1;                                 \
             s1     = s[0];                                                       \
         }                                                                        \
         CUDA_REDUCE_WITH_OP_CHUNK(0, UNROLL, WARP_SIZE, _OP);                    \
-        /* second call for data remainder */\
+        /* second call for data remainder */                                     \
         CUDA_REDUCE_WITH_OP_CHUNK(                                               \
             (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL), 1, 1, _OP);   \
     }                                                                            \
