@@ -115,11 +115,11 @@ cuFloatComplex operator* (const cuFloatComplex & first,
     {                                                                            \
         _Type *        d     = (_Type *)task.dst;                                \
         const size_t   count = task.count;                                       \
-        constexpr bool strided =                                                 \
+        const bool strided =                                                     \
             std::is_same<_TaskType, ucc_eee_task_reduce_strided_t>::value;       \
-        constexpr int MAXSRCS =                                                  \
+        const int MAXSRCS =                                                      \
             strided ? USHRT_MAX : UCC_EE_EXECUTOR_NUM_BUFS;                      \
-        constexpr int       ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS; \
+        const int       ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS;     \
         _Type *             s[ALLOC_SIZE];                                       \
         _Type *             s1;                                                  \
         _Type *             s2;                                                  \
