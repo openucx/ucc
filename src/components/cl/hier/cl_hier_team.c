@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -42,7 +42,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     ucc_subset_t               subset;
     struct ucc_team_team_desc *d;
     if (!params->team->topo) {
-        cl_info(cl_context->lib,
+        cl_debug(cl_context->lib,
                 "can't create hier team without topology data");
         return UCC_ERR_INVALID_PARAM;
     }
@@ -139,7 +139,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
         cl_error(cl_context->lib, "failed to post tl team create (%d)", status);
         goto err;
     }
-    cl_info(cl_context->lib, "posted cl team: %p", self);
+    cl_debug(cl_context->lib, "posted cl team: %p", self);
     return UCC_OK;
 err:
     ucc_team_multiple_req_free(self->team_create_req);
@@ -148,7 +148,7 @@ err:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_hier_team_t)
 {
-    cl_info(self->super.super.context->lib, "finalizing cl team: %p", self);
+    cl_debug(self->super.super.context->lib, "finalizing cl team: %p", self);
 }
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_cl_hier_team_t, ucc_base_team_t);
@@ -256,9 +256,9 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
                     hs->score = score_merge;
                 }
             }
-            cl_info(ctx->super.super.lib, "initialized tl %s team for sbgp %s",
-                    UCC_TL_CTX_IFACE(d->ctx)->super.name,
-                    ucc_sbgp_str(hs->sbgp_type));
+            cl_debug(ctx->super.super.lib, "initialized tl %s team for sbgp %s",
+                     UCC_TL_CTX_IFACE(d->ctx)->super.name,
+                     ucc_sbgp_str(hs->sbgp_type));
         } else {
             cl_debug(ctx->super.super.lib, "failed to create tl %s team",
                      UCC_TL_CTX_IFACE(d->ctx)->super.name);

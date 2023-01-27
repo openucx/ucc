@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -36,7 +36,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
         goto err_mpool;
     }
 
-    tl_info(self->super.super.lib, "initialized tl context: %p", self);
+    tl_debug(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 
 err_mpool:
@@ -45,7 +45,7 @@ err_mpool:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
 {
-    tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_mlx5_context_t, ucc_tl_context_t);

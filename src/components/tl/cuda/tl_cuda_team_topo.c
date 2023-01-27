@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -166,7 +166,7 @@ ucc_tl_cuda_team_topo_init_rings(const ucc_tl_cuda_team_t *team,
 
     if (num_rings == 0) {
         status = UCC_ERR_NOT_SUPPORTED;
-        tl_info(UCC_TL_TEAM_LIB(team), "no rings found");
+        tl_debug(UCC_TL_TEAM_LIB(team), "no rings found");
         goto free_graph;
     }
 
@@ -308,9 +308,9 @@ ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
                                                 pci_str[0], MAX_PCI_BUS_ID_STR);
                 ucc_tl_cuda_topo_pci_id_to_str(&team->ids[j].pci_id,
                                                 pci_str[1], MAX_PCI_BUS_ID_STR);
-                tl_info(UCC_TL_TEAM_LIB(team), "no proxy found between "
-                        "dev %s (%d) and dev %s (%d), "
-                        "cuda topology is not supported",
+                tl_debug(UCC_TL_TEAM_LIB(team), "no proxy found between "
+                         "dev %s (%d) and dev %s (%d), "
+                         "cuda topology is not supported",
                         pci_str[0], i, pci_str[j], j);
                 status = UCC_ERR_NOT_SUPPORTED;
                 goto free_data;

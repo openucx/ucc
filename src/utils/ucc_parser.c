@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -400,6 +400,7 @@ ucc_status_t ucc_parse_file_config(const char *        filename,
         status = UCC_ERR_INVALID_PARAM;
         goto out;
     }
+    cfg->filename = strdup(filename);
 
     *cfg_p = cfg;
     return UCC_OK;
@@ -416,6 +417,7 @@ void ucc_release_file_config(ucc_file_config_t *cfg)
     ucc_section_wrap_t *sec_wrap;
     int j;
 
+    ucc_free(cfg->filename);
     kh_foreach(&cfg->vars, key, value, {
         ucc_free((void *)key);
         ucc_free(value);

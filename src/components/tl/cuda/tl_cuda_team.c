@@ -34,7 +34,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     self->scratch.loc = NULL;
 
     if (!ucc_team_map_is_single_node(params->team, params->map)) {
-        tl_info(tl_context->lib, "multinode team is not supported");
+        tl_debug(tl_context->lib, "multinode team is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -106,7 +106,7 @@ ids_exchange:
         tl_error(tl_context->lib, "failed to start oob allgather");
         goto free_devices;
     }
-    tl_info(tl_context->lib, "posted tl team: %p", self);
+    tl_debug(tl_context->lib, "posted tl team: %p", self);
 
     self->seq_num = 1;
     return UCC_OK;
@@ -131,7 +131,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
     cudaError_t st;
     int i, j;
 
-    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+    tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
     if (self->topo) {
         ucc_tl_cuda_team_topo_destroy(self->topo);
     }
@@ -311,7 +311,7 @@ barrier:
         }
     }
     team->oob_req = NULL;
-    tl_info(tl_team->context->lib, "initialized tl team: %p", team);
+    tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
     return UCC_OK;
 
 exit_err:

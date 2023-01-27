@@ -30,6 +30,13 @@ ucc_config_field_t ucc_global_config_table[] = {
      ucc_offsetof(ucc_global_config_t, log_component),
      UCC_CONFIG_TYPE_LOG_COMP},
 
+    {"COLL_TRACE", "n",
+     "If UCC logging level is INFO or higher UCC will print info message"
+     "on each collective.\n",
+     ucc_offsetof(ucc_global_config_t, coll_trace),
+     UCC_CONFIG_TYPE_BOOL
+    },
+
     {"PROFILE_MODE", "",
      "Profile collection modes. If none is specified, profiling is disabled.\n"
      " - log   - Record all timestamps.\n"

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -58,7 +58,7 @@ static ucc_status_t ucc_mc_cuda_init(const ucc_mc_params_t *mc_params)
     ucc_mc_cuda.thread_mode = mc_params->thread_mode;
     cuda_st = cudaGetDeviceCount(&num_devices);
     if ((cuda_st != cudaSuccess) || (num_devices == 0)) {
-        mc_info(&ucc_mc_cuda.super, "cuda devices are not found");
+        mc_debug(&ucc_mc_cuda.super, "cuda devices are not found");
         return UCC_ERR_NO_RESOURCE;
     }
     CUDADRV_FUNC(cuDriverGetVersion(&driver_ver));

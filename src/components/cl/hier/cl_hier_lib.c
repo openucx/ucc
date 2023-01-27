@@ -50,7 +50,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_lib_t, const ucc_base_lib_params_t *params,
     self->tls.array.count = requested_sbgp_tls.count;
     self->tls.array.names = requested_sbgp_tls.names;
 
-    cl_info(&self->super, "initialized lib object: %p", self);
+    cl_debug(&self->super, "initialized lib object: %p", self);
     return status;
 }
 
@@ -58,7 +58,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_hier_lib_t)
 {
     int i;
 
-    cl_info(&self->super, "finalizing lib object: %p", self);
+    cl_debug(&self->super, "finalizing lib object: %p", self);
     for (i = 0; i < UCC_HIER_SBGP_LAST; i++) {
         ucc_config_names_array_free(&self->cfg.sbgp_tls[i].array);
     }

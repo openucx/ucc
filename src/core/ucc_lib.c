@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -129,8 +129,8 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
                           cl_iface->super.name);
                 goto error_cl_init;
             } else {
-                ucc_info("lib_init failed for component: %s, skipping",
-                         cl_iface->super.name);
+                ucc_debug("lib_init failed for component: %s, skipping",
+                          cl_iface->super.name);
                 ucc_base_config_release(&cl_config->super.super);
                 continue;
             }
@@ -141,11 +141,13 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
         status = cl_iface->lib.get_attr(&cl_lib->super,
                                         &attrs[lib->n_cl_libs_opened].super);
         if (UCC_OK != status) {
-            ucc_error("failed to query cl lib %s attr", cl_lib->iface->super.name);
+            ucc_error("failed to query cl lib %s attr",
+                      cl_lib->iface->super.name);
             return status;
         }
-        ucc_info("lib_prefix \"%s\": initialized component \"%s\" score %d",
-                 config->full_prefix, cl_iface->super.name, cl_iface->super.score);
+        ucc_debug("lib_prefix \"%s\": initialized component \"%s\" score %d",
+                  config->full_prefix, cl_iface->super.name,
+                  cl_iface->super.score);
         if (attrs[lib->n_cl_libs_opened].super.attr.thread_mode > highest_tm) {
             highest_tm = attrs[lib->n_cl_libs_opened].super.attr.thread_mode;
         }
@@ -273,8 +275,8 @@ static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
                                         &b_lib);
             ucc_base_config_release(&tl_config->super.super);
             if (UCC_OK != status) {
-                ucc_info("lib_init failed for component: %s, skipping",
-                         tl_iface->super.name);
+                ucc_debug("lib_init failed for component: %s, skipping",
+                          tl_iface->super.name);
                 continue;
             }
             tl_lib = ucc_derived_of(b_lib, ucc_tl_lib_t);

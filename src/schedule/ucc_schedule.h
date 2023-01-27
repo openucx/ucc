@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -184,7 +185,8 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         /* error in task status */
         if (UCC_ERR_TIMED_OUT == status) {
             char coll_str[256];
-            ucc_coll_str(task, coll_str, sizeof(coll_str));
+            ucc_coll_str(task, coll_str, sizeof(coll_str),
+                         UCC_LOG_LEVEL_DEBUG);
             ucc_warn("timeout %g sec. has expired on %s",
                      task->bargs.args.timeout, coll_str);
         } else {

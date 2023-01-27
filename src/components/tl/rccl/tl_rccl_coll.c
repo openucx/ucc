@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  # Copyright (C) Advanced Micro Devices, Inc. 2022. ALL RIGHTS RESERVED.
  *
@@ -127,7 +127,7 @@ ucc_status_t ucc_tl_rccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev, //NOLINT: ev 
 
     ucc_assert(ee->ee_type == UCC_EE_ROCM_STREAM);
     coll_task->ee = ee;
-    tl_info(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
+    tl_debug(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
 
     status = coll_task->post(coll_task);
     if (ucc_likely(status == UCC_OK)) {
@@ -152,7 +152,7 @@ ucc_status_t ucc_tl_rccl_coll_finalize(ucc_coll_task_t *coll_task)
     ucc_tl_rccl_task_t *task  = ucc_derived_of(coll_task, ucc_tl_rccl_task_t);
     ucc_status_t       status = UCC_OK ;
 
-    tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
+    tl_debug(UCC_TASK_LIB(task), "finalizing coll task %p", task);
     ucc_tl_rccl_free_task(task);
     return status;
 }
@@ -617,7 +617,7 @@ ucc_status_t ucc_tl_rccl_gather_start(ucc_coll_task_t *coll_task)
         ucc_dt = args->dst.info.datatype;
         count  = args->dst.info.count / UCC_TL_TEAM_SIZE(team);
         if (UCC_IS_INPLACE(*args)) {
-            src = PTR_OFFSET(dst, UCC_TL_TEAM_RANK(team) * count 
+            src = PTR_OFFSET(dst, UCC_TL_TEAM_RANK(team) * count
                              * ucc_dt_size(args->dst.info.datatype));
         }
     }

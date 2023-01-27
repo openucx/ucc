@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  * Copyright (C) Advanced Micro Devices, Inc. 2022. ALL RIGHTS RESERVED.
  *
@@ -79,12 +79,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_rccl_context_t,
     }
 
     if (self->cfg.sync_type != UCC_TL_RCCL_COMPLETION_SYNC_TYPE_EVENT) {
-        tl_info(self->super.super.lib, "fallback to event completion sync");
+        tl_debug(self->super.super.lib, "fallback to event completion sync");
         self->cfg.sync_type = UCC_TL_RCCL_COMPLETION_SYNC_TYPE_EVENT;
     }
 
     ucc_assert(self->cfg.sync_type == UCC_TL_RCCL_COMPLETION_SYNC_TYPE_EVENT);
-    tl_info(self->super.super.lib, "using event completion sync");
+    tl_debug(self->super.super.lib, "using event completion sync");
     status = ucc_mpool_init(&self->req_mp, 0, sizeof(ucc_tl_rccl_task_t), 0,
                             UCC_CACHE_LINE_SIZE, 8, UINT_MAX,
                             &ucc_tl_rccl_req_mpool_ops, params->thread_mode,
@@ -99,13 +99,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_rccl_context_t,
     if (hip_st != hipSuccess) {
         return UCC_ERR_NO_MEMORY;
     }
-    tl_info(self->super.super.lib, "initialized tl context: %p", self);
+    tl_debug(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_rccl_context_t)
 {
-    tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
     ucc_mpool_cleanup(&self->req_mp, 1);
     hipFree(self->scratch_buf);
     self->scratch_buf = NULL;

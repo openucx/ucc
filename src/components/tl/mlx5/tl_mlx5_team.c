@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -25,7 +25,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
 {
-    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+    tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
 }
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_mlx5_team_t, ucc_base_team_t);

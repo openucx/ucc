@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -80,14 +80,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         }
     }
 
-    tl_info(tl_context->lib, "posted tl team: %p", self);
+    tl_debug(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_team_t)
 {
     ucc_config_parser_release_opts(&self->cfg, ucc_tl_ucp_lib_config_table);
-    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+    tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
 }
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_ucp_team_t, ucc_base_team_t);
@@ -177,7 +177,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
         }
     }
 
-    tl_info(tl_team->context->lib, "initialized tl team: %p", team);
+    tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
     team->status = UCC_OK;
     return UCC_OK;
 

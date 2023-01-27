@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -122,7 +122,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
         goto cleanup;
     }
 
-    tl_info(self->super.super.context->lib, "initialized tl team: %p", self);
+    tl_debug(self->super.super.context->lib, "initialized tl team: %p", self);
     return UCC_OK;
 cleanup:
     if (ctx->cfg.context_per_team) {
@@ -145,7 +145,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_sharp_team_t)
 {
     ucc_tl_sharp_context_t *ctx = ucc_derived_of(UCC_TL_TEAM_CTX(self), ucc_tl_sharp_context_t);
 
-    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+    tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
     sharp_coll_comm_destroy(self->sharp_comm);
 
     if (ctx->cfg.context_per_team) {
@@ -182,7 +182,7 @@ static ucc_status_t ucc_tl_sharp_coll_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_sharp_task_t *task = ucc_derived_of(coll_task, ucc_tl_sharp_task_t);
 
-    tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
+    tl_debug(UCC_TASK_LIB(task), "finalizing coll task %p", task);
     UCC_TL_SHARP_PROFILE_REQUEST_FREE(task);
     ucc_mpool_put(task);
     return UCC_OK;
@@ -226,7 +226,7 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
         goto free_task;
     }
 
-    tl_info(UCC_TASK_LIB(task), "init coll task %p", task);
+    tl_debug(UCC_TASK_LIB(task), "init coll task %p", task);
     *task_h = &task->super;
     return status;
 

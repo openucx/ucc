@@ -225,20 +225,21 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
 
     nvml_st = nvmlInit_v2();
     if (nvml_st != NVML_SUCCESS) {
-        tl_info(topo->lib, "failed to init NVML: %s", nvmlErrorString(nvml_st));
+        tl_debug(topo->lib, "failed to init NVML: %s",
+                 nvmlErrorString(nvml_st));
         return UCC_ERR_NO_MESSAGE;
     }
 
     nvml_st = nvmlDeviceGetCount(&num_gpus);
     if (nvml_st != NVML_SUCCESS) {
-        tl_info(topo->lib, "nvmlDeviceGetCount failed: %s",
-                nvmlErrorString(nvml_st));
+        tl_debug(topo->lib, "nvmlDeviceGetCount failed: %s",
+                 nvmlErrorString(nvml_st));
         status = UCC_ERR_NO_RESOURCE;
         goto exit_nvml_shutdown;
     }
 
     if (num_gpus == 0) {
-        tl_info(topo->lib, "no GPU devices found");
+        tl_debug(topo->lib, "no GPU devices found");
         status = UCC_ERR_NO_RESOURCE;
         goto exit_nvml_shutdown;
     }
@@ -278,7 +279,7 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
             status = ucc_tl_cuda_topo_get_remote_dev_type(topo, nvml_dev, link,
                                                           &dev_type);
             if (status != UCC_OK) {
-                tl_info(topo->lib, "failed to get remote device type");
+                tl_debug(topo->lib, "failed to get remote device type");
                 goto exit_free_graph;
             }
             if (dev_type == UCC_TL_CUDA_TOPO_DEV_TYPE_LAST) {

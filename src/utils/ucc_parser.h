@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -116,8 +116,9 @@ KHASH_MAP_INIT_STR(ucc_cfg_file, char *);
 KHASH_MAP_INIT_STR(ucc_sections, ucc_section_wrap_t *);
 
 typedef struct ucc_file_config {
-    khash_t(ucc_cfg_file) vars;
-    khash_t(ucc_sections) sections;
+    char                  *filename;
+    khash_t(ucc_cfg_file)  vars;
+    khash_t(ucc_sections)  sections;
 } ucc_file_config_t;
 
 /* Convenience structure used, for example, to represent TLS list.

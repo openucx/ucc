@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -814,7 +814,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         }
     }
 
-    ucc_info("created ucc context %p for lib %s", ctx, lib->full_prefix);
+    ucc_debug("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;
     return UCC_OK;
 

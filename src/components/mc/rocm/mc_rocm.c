@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (C) Advanced Micro Devices, Inc. 2022. ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
@@ -40,7 +40,7 @@ static ucc_status_t ucc_mc_rocm_init(const ucc_mc_params_t *mc_params)
     ucc_mc_rocm.thread_mode = mc_params->thread_mode;
     rocm_st = hipGetDeviceCount(&num_devices);
     if ((rocm_st != hipSuccess) || (num_devices == 0)) {
-        mc_info(&ucc_mc_rocm.super, "rocm devices are not found");
+        mc_debug(&ucc_mc_rocm.super, "rocm devices are not found");
         return hip_error_to_ucc_status(rocm_st);
     }
 
