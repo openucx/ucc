@@ -35,15 +35,15 @@
 #define UCC_TL_CUDA_TEAM_CTX(_team)                                            \
     (ucc_derived_of((_team)->super.super.context, ucc_tl_cuda_context_t))
 
-#define UCC_TL_CUDA_TEAM_SYNC(_team, _rank, _id)                                    \
-    ({                                                                              \
-        size_t _ctrl_size_rank =                                                    \
-            (sizeof(ucc_tl_cuda_sync_t) +                                           \
-             sizeof(ucc_tl_cuda_sync_data_t) * (UCC_TL_TEAM_SIZE(_team) - 1));      \
-        size_t _ctrl_size = _ctrl_size_rank * UCC_TL_TEAM_SIZE(_team);              \
-        void  *_sync      = PTR_OFFSET(_team->sync, _ctrl_size * (_id) +            \
-                                                        _ctrl_size_rank * (_rank)); \
-        (ucc_tl_cuda_sync_t *)_sync;                                                \
+#define UCC_TL_CUDA_TEAM_SYNC(_team, _rank, _id)                               \
+    ({                                                                         \
+        size_t _ctrl_size_rank =                                               \
+            (sizeof(ucc_tl_cuda_sync_t) +                                      \
+             sizeof(ucc_tl_cuda_sync_data_t) * (UCC_TL_TEAM_SIZE(_team) - 1)); \
+        size_t _ctrl_size = _ctrl_size_rank * UCC_TL_TEAM_SIZE(_team);         \
+        void  *_sync      = PTR_OFFSET(_team->sync, _ctrl_size * (_id) +       \
+                                       _ctrl_size_rank * (_rank));             \
+        (ucc_tl_cuda_sync_t *)_sync;                                           \
     })
 
 #define UCC_TL_CUDA_TEAM_BARRIER(_team, _id)                                   \

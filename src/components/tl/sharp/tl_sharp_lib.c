@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -42,5 +42,27 @@ ucc_status_t ucc_tl_sharp_get_lib_attr(const ucc_base_lib_t *lib,
     }
     attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
     attr->super.attr.coll_types  = UCC_TL_SHARP_SUPPORTED_COLLS;
+    if (base_attr->mask & UCC_BASE_LIB_ATTR_FIELD_MIN_TEAM_SIZE) {
+        if (lib == NULL) {
+            return UCC_ERR_INVALID_PARAM;
+        }
+        attr->super.min_team_size = lib->min_team_size;
+    }
+
+    if (base_attr->mask & UCC_BASE_LIB_ATTR_FIELD_MAX_TEAM_SIZE) {
+        if (lib == NULL) {
+            return UCC_ERR_INVALID_PARAM;
+        }
+        attr->super.max_team_size = UCC_RANK_MAX;
+    }
+
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_sharp_get_lib_properties(ucc_base_lib_properties_t *prop)
+{
+    prop->default_team_size = 4;
+    prop->min_team_size     = 2;
+    prop->max_team_size     = UCC_RANK_MAX;
     return UCC_OK;
 }

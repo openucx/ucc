@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -16,14 +16,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_self_team_t, ucc_base_context_t *tl_context,
         ucc_derived_of(tl_context, ucc_tl_self_context_t);
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
-
-    if (UCC_TL_TEAM_SIZE(self) > 1) {
-        tl_trace(tl_context->lib,
-                 "team size %d is too large, max supported 1, skip",
-                 UCC_TL_TEAM_SIZE(self));
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
     tl_info(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
