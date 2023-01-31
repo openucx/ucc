@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -128,8 +128,8 @@ public:
         .coll_types  = UCC_COLL_TYPE_BARRIER | UCC_COLL_TYPE_ALLTOALL |
                       UCC_COLL_TYPE_ALLTOALLV | UCC_COLL_TYPE_ALLREDUCE |
                       UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |
-                      UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_GATHER |
-                      UCC_COLL_TYPE_BCAST};
+                      UCC_COLL_TYPE_REDUCE | UCC_COLL_TYPE_BCAST |
+                      UCC_COLL_TYPE_GATHER | UCC_COLL_TYPE_SCATTER};
     static constexpr ucc_context_params_t default_ctx_params = {
         .mask = UCC_CONTEXT_PARAM_FIELD_TYPE,
         .type = UCC_CONTEXT_EXCLUSIVE
