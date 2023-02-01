@@ -63,6 +63,11 @@ static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
      ucc_offsetof(ucc_cl_hier_lib_config_t, allreduce_rab_pipeline),
      UCC_CONFIG_TYPE_PIPELINE_PARAMS},
 
+    {"BCAST_2STEP_PIPELINE", "n",
+     "Pipelining settings for RAB bcast algorithm",
+     ucc_offsetof(ucc_cl_hier_lib_config_t, bcast_2step_pipeline),
+     UCC_CONFIG_TYPE_PIPELINE_PARAMS},
+
     {NULL}};
 
 static ucs_config_field_t ucc_cl_hier_context_config_table[] = {
@@ -102,4 +107,6 @@ __attribute__((constructor)) static void cl_hier_iface_init(void)
         ucc_cl_hier_alltoall_algs;
     ucc_cl_hier.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLTOALLV)] =
         ucc_cl_hier_alltoallv_algs;
+    ucc_cl_hier.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BCAST)] =
+        ucc_cl_hier_bcast_algs;
 }

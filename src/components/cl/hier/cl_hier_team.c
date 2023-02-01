@@ -159,8 +159,9 @@ ucc_status_t ucc_cl_hier_team_destroy(ucc_base_team_t *cl_team)
     ucc_cl_hier_team_t    *team   = ucc_derived_of(cl_team, ucc_cl_hier_team_t);
     ucc_cl_hier_context_t *ctx    = UCC_CL_HIER_TEAM_CTX(team);
     ucc_status_t           status = UCC_OK;
-    int                    i, j;
-    ucc_hier_sbgp_t       *hs;
+    int                        i, j;
+    ucc_hier_sbgp_t           *hs;
+    struct ucc_team_team_desc *d;
 
     if (NULL == team->team_create_req) {
         status = ucc_team_multiple_req_alloc(&team->team_create_req,
@@ -180,9 +181,10 @@ ucc_status_t ucc_cl_hier_team_destroy(ucc_base_team_t *cl_team)
                 for (j = 0; j < hs->n_tls; j++) {
                     if (hs->tl_teams[j]) {
                         ucc_tl_context_put(hs->tl_ctxs[j]);
-                        team->team_create_req
-                            ->descs[team->team_create_req->n_teams++]
-                            .team = hs->tl_teams[j];
+                        d = &team->team_create_req->descs[
+                            team->team_create_req->n_teams++];
+                        d->team             = hs->tl_teams[j];
+                        d->param.params.oob = d->team->super.params.params.oob;
                     }
                 }
             }
@@ -193,6 +195,8 @@ ucc_status_t ucc_cl_hier_team_destroy(ucc_base_team_t *cl_team)
         return status;
     }
     for (i = 0; i < team->team_create_req->n_teams; i++) {
+        ucc_internal_oob_finalize(&team->team_create_req->
+                                   descs[i].param.params.oob);
         if (team->team_create_req->descs[i].status != UCC_OK) {
             cl_error(ctx->super.super.lib, "tl team destroy failed (%d)",
                      status);

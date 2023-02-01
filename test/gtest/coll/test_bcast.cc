@@ -58,10 +58,16 @@ public:
     {
         for (auto r = 0; r < ctxs.size(); r++) {
             ucc_coll_args_t *coll  = ctxs[r]->args;
-            size_t           count = coll->dst.info.count;
-            ucc_datatype_t   dtype = coll->dst.info.datatype;
-            clear_buffer(coll->dst.info.buffer, count * ucc_dt_size(dtype),
-                         mem_type, 0);
+            size_t           count = coll->src.info.count;
+            ucc_datatype_t   dtype = coll->src.info.datatype;
+            if (r != root) {
+                clear_buffer(coll->src.info.buffer, count * ucc_dt_size(dtype),
+                             mem_type, 0);
+            } else {
+                UCC_CHECK(ucc_mc_memcpy(coll->src.info.buffer, ctxs[r]->init_buf,
+                                        ctxs[r]->rbuf_size, mem_type,
+                                        UCC_MEMORY_TYPE_HOST));
+            }
         }
     }
 
@@ -232,3 +238,40 @@ INSTANTIATE_TEST_CASE_P(
 #endif
         ::testing::Values(1,3,65536), // count
         ::testing::Values(0,1))); // root
+
+class test_bcast_alg : public test_bcast
+{};
+
+UCC_TEST_F(test_bcast_alg, 2step) {
+    int           n_procs = 15;
+    ucc_job_env_t env     = {{"UCC_CL_HIER_TUNE", "bcast:@2step:0-inf:inf"},
+                             {"UCC_CLS", "all"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 1;
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+
+    for (auto count : {8, 65536}) {
+        for (int root = 0; root < n_procs; root++) {
+            for (auto m : mt) {
+                this->set_root(root);
+                SET_MEM_TYPE(m);
+                this->data_init(n_procs, UCC_DT_INT8, count, ctxs, false);
+                UccReq req(team, ctxs);
+
+                for (auto i = 0; i < repeat; i++) {
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->reset(ctxs);
+                }
+                this->data_fini(ctxs);
+            }
+        }
+    }
+}
