@@ -57,6 +57,16 @@
 #define ucc_trace_poll(_fmt, ...)                                              \
     ucc_log_component_global(UCS_LOG_LEVEL_TRACE_POLL, _fmt, ##__VA_ARGS__)
 
+/* Collective trace logger */
+#define ucc_log_component_collective_trace(_level, fmt, ...)                   \
+    ucc_log_component(_level, ucc_global_config.coll_trace, fmt,               \
+                      ##__VA_ARGS__)
+
+#define ucc_coll_trace_info(_fmt, ...)                                         \
+    ucc_log_component_collective_trace(UCS_LOG_LEVEL_INFO, _fmt, ##__VA_ARGS__)
+#define ucc_coll_trace_debug(_fmt, ...)                                        \
+    ucc_log_component_collective_trace(UCS_LOG_LEVEL_DEBUG, _fmt, ##__VA_ARGS__)
+
 
 static inline const char* ucc_coll_type_str(ucc_coll_type_t ct)
 {

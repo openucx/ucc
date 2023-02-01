@@ -246,21 +246,23 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     }
     task->seq_num = team->seq_num++;
 
-    if (ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_INFO) {
-        if (ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_DEBUG ||
-            ucc_global_config.coll_trace) {
-            char coll_str[256];
-            ucc_coll_str(task, coll_str, sizeof(coll_str),
-                        ucc_global_config.log_component.log_level);
-            if (ucc_global_config.log_component.log_level == UCC_LOG_LEVEL_INFO) {
-                if (team->rank == 0) {
-                    ucc_info("coll_init: %s", coll_str);
-                }
-            } else {
-                ucc_debug("coll_init: %s", coll_str);
+    if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DIAG) {
+        char coll_str[256];
+        ucc_coll_str(task, coll_str, sizeof(coll_str),
+                     ucc_global_config.coll_trace.log_level);
+        if (ucc_global_config.coll_trace.log_level <= UCC_LOG_LEVEL_DEBUG) {
+            if (team->rank == 0) {
+                ucc_log_component_collective_trace(
+                    ucc_global_config.coll_trace.log_level, "coll_init: %s",
+                    coll_str);
             }
+        } else {
+            ucc_log_component_collective_trace(
+                ucc_global_config.coll_trace.log_level, "coll_init: %s",
+                coll_str);
         }
     }
+
     ucc_assert(task->super.status == UCC_OPERATION_INITIALIZED);
     *request = &task->super;
 

@@ -190,9 +190,10 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule,
 {
     ucc_status_t status;
 
-    status            = ucc_coll_task_init(&schedule->super, bargs, team);
-    schedule->ctx     = team->context->ucc_context;
-    schedule->n_tasks = 0;
+    status                = ucc_coll_task_init(&schedule->super, bargs, team);
+    schedule->super.flags |= UCC_COLL_TASK_FLAG_IS_SCHEDULE;
+    schedule->ctx         = team->context->ucc_context;
+    schedule->n_tasks     = 0;
     return status;
 }
 
@@ -202,8 +203,8 @@ ucc_status_t ucc_schedule_add_task(ucc_schedule_t *schedule,
     ucc_status_t status;
 
     status = ucc_event_manager_subscribe(task, UCC_EVENT_COMPLETED_SCHEDULE,
-                                &schedule->super,
-                                ucc_schedule_completed_handler);
+                                         &schedule->super,
+                                         ucc_schedule_completed_handler);
     task->schedule                       = schedule;
     schedule->tasks[schedule->n_tasks++] = task;
     if (task->flags & UCC_COLL_TASK_FLAG_EXECUTOR) {
