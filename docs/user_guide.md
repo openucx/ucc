@@ -50,6 +50,14 @@ necessary, an issue report is appreciated at
 [the Github tracker](https://github.com/openucx/ucc/issues) so that this can be considered
 for future tuning of UCC heuristics.
 
+Also a MPI or other programming model implementation might need to execute a collective not
+supported by UCC, e.g. because the datatype or reduction operator support is lacking. In
+these cases the implementation can't call into UCC but need to leverage another collective
+implementation. See [Logging](#logging) for an example how to detect this in case of Open MPI.
+If UCC support is missing an issue report describing the use case is appreciated at
+[the Github tracker](https://github.com/openucx/ucc/issues) so that this can be considered
+for future UCC development.
+
 ## CLs and TLs
 
 UCC collective implementations are compositions of one or more **T**eam **L**ayers (TLs).
@@ -164,7 +172,6 @@ Supported memory types are:
 - `cuda`: for pinned CUDA Device memory (`cudaMalloc`).
 - `cuda_managed`: for CUDA Managed Memory (`cudaMallocManaged`).
 - `rocm`: for pinned ROCm Device memory.
-- `rocm_managed`: for ROCm Managed Memory.
 
 The supported collective types and algorithms can be queried with
 
@@ -187,6 +194,95 @@ If for a given combination, multiple TLs have the same highest score, it is impl
 which of those TLs with the highest score is selected.
 
 ## Logging
+
+To detect if Open MPI leverages UCC for a given collective one can set `OMPI_MCA_coll_ucc_verbose=3` checking for output like
+
+```
+coll_ucc_alltoall.c:70 - mca_coll_ucc_alltoall() running ucc alltoall
+```
+
+For example Open MPI leverages UCC for `MPI_Alltoall` used by `osu_alltoall` from the
+[OSU Microbenchmarks](https://mvapich.cse.ohio-state.edu/benchmarks/) as can be seen by the log message
+
+```
+coll_ucc_alltoall.c:70 - mca_coll_ucc_alltoall() running ucc alltoall
+```
+
+in the output of
+
+```
+$ OMPI_MCA_coll_ucc_verbose=3 srun ./c/mpi/collective/osu_alltoall -i 1 -x 0 -d cuda -m 1048576:1048576
+
+[...] snip
+
+# OSU MPI-CUDA All-to-All Personalized Exchange Latency Test v7.0
+# Size       Avg Latency(us)
+ coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+ coll_ucc_alltoall.c:70 - mca_coll_ucc_alltoall() running ucc alltoall
+ coll_ucc_alltoall.c:70 - mca_coll_ucc_alltoall() running ucc alltoall
+ coll_ucc_alltoall.c:70 - mca_coll_ucc_alltoall() running ucc alltoall
+ coll_ucc_alltoall.c:70 - mca_coll_ucc_alltoall() running ucc alltoall
+ coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+ coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+ coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+ coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+ coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+1048576           2586333.78
+
+[...] snip
+
+```
+
+For `MPI_Alltoallw` Open MPI can't leverage UCC so the output of `osu_alltoallw` looks different.
+It only contains the log messages for the barriers needed for correct timing and reduces needed
+to calculate timing statistics:
+
+```
+$ OMPI_MCA_coll_ucc_verbose=3 srun ./c/mpi/collective/osu_alltoallw -i 1 -x 0 -d cuda -m 1048576:1048576
+
+[...] snip
+
+# OSU MPI-CUDA All-to-Allw Personalized Exchange Latency Test v7.0
+# Size       Avg Latency(us)
+coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_barrier.c:31 - mca_coll_ucc_barrier() running ucc barrier
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+coll_ucc_reduce.c:70 - mca_coll_ucc_reduce() running ucc reduce
+1048576             11434.97
+
+[...] snip
+
+```
 
 To debug the choices made by UCC heuristics, setting `UCC_LOG_LEVEL=INFO` provides valuable
 information. E.g. it prints score map with all collectives, TLs and memory types supported
