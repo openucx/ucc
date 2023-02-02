@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
@@ -76,12 +76,52 @@ const char
     *ucc_tl_nccl_default_alg_select_str[UCC_TL_NCCL_N_DEFAULT_ALG_SELECT_STR] = {
         UCC_TL_NCCL_ALLGATHERV_DEFAULT_ALG_SELECT_STR};
 
-static inline ucc_status_t ucc_nccl_check_dt_supported(ucc_datatype_t dt1,
-                                                       ucc_datatype_t dt2)
+static inline void
+ucc_tl_nccl_check_and_convert_buffer(ucc_coll_buffer_info_t *buffer_info,
+                                     ucc_datatype_t          new_datatype)
 {
-    if (ucc_unlikely((dt1 != dt2)  ||
-                     (ucc_to_nccl_dtype[UCC_DT_PREDEFINED_ID(dt1)]
-                      == ncclDataTypeUnsupported))) {
+    if (ucc_to_nccl_dtype[UCC_DT_PREDEFINED_ID(buffer_info->datatype)] ==
+        ncclDataTypeUnsupported) {
+        ucc_assert(ucc_dt_size(buffer_info->datatype) %
+                       ucc_dt_size(new_datatype) ==
+                   0);
+        buffer_info->count *=
+            ucc_dt_size(buffer_info->datatype) / ucc_dt_size(new_datatype);
+        buffer_info->datatype = new_datatype;
+    }
+}
+
+static inline ucc_status_t ucc_tl_nccl_check_and_convert_buffer_reduction(
+    ucc_coll_buffer_info_t *buffer_info, ucc_tl_nccl_task_t *task)
+{
+    ucc_reduction_op_t op = TASK_ARGS(task).op;
+
+    if (ucc_to_nccl_reduce_op[op] == ncclOpUnsupported) {
+        tl_debug(UCC_TASK_LIB(task), "reduction operation %s is not supported",
+                 ucc_reduction_op_str(op));
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (ucc_to_nccl_dtype[UCC_DT_PREDEFINED_ID(buffer_info->datatype)] ==
+        ncclDataTypeUnsupported) {
+        if (op == UCC_OP_SUM) {
+            switch (buffer_info->datatype) {
+            case UCC_DT_FLOAT32_COMPLEX:
+                ucc_tl_nccl_check_and_convert_buffer(buffer_info,
+                                                     UCC_DT_FLOAT32);
+                return UCC_OK;
+            case UCC_DT_FLOAT64_COMPLEX:
+                ucc_tl_nccl_check_and_convert_buffer(buffer_info,
+                                                     UCC_DT_FLOAT64);
+                return UCC_OK;
+            default:
+                break;
+            }
+        }
+        tl_debug(UCC_TASK_LIB(task),
+                 "datatype %s is not supported for reduction operation %s",
+                 ucc_datatype_str(buffer_info->datatype),
+                 ucc_reduction_op_str(op));
         return UCC_ERR_NOT_SUPPORTED;
     }
     return UCC_OK;
@@ -343,15 +383,17 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_OK !=
-        ucc_nccl_check_dt_supported(TASK_ARGS(task).dst.info.datatype,
-                                    TASK_ARGS(task).dst.info.datatype)) {
-        tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
+    ucc_coll_args_t *args = &TASK_ARGS(task);
+
+    if (!UCC_IS_INPLACE(*args)) {
+        if (ucc_tl_nccl_check_and_convert_buffer_reduction(&args->src.info,
+                                                           task) != UCC_OK) {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
     }
 
-    if (ucc_to_nccl_reduce_op[TASK_ARGS(task).op] == ncclOpUnsupported) {
-        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
+    if (ucc_tl_nccl_check_and_convert_buffer_reduction(&args->dst.info, task) !=
+        UCC_OK) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -391,16 +433,16 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_allgather_init(ucc_tl_nccl_task_t *task)
 {
-    ucc_datatype_t dt1 = UCC_IS_INPLACE(TASK_ARGS(task))
-                             ? TASK_ARGS(task).dst.info.datatype
-                             : TASK_ARGS(task).src.info.datatype;
-    ucc_datatype_t dt2 = TASK_ARGS(task).dst.info.datatype;
+    ucc_coll_args_t *args = &TASK_ARGS(task);
 
-    if (UCC_OK != ucc_nccl_check_dt_supported(dt1, dt2)) {
-        /* TODO: can we use ncclChar if datatype is not supported? */
-        tl_error(UCC_TASK_LIB(task), "datatype is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
+    if (!UCC_IS_INPLACE(*args)) {
+        ucc_tl_nccl_check_and_convert_buffer(
+            &args->src.info, UCC_TL_NCCL_DT_FOR_UNSUPPORTED);
     }
+
+    ucc_tl_nccl_check_and_convert_buffer(&args->dst.info,
+                                         UCC_TL_NCCL_DT_FOR_UNSUPPORTED);
+
     task->super.post = ucc_tl_nccl_allgather_start;
     return UCC_OK;
 }
@@ -470,13 +512,8 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_bcast_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_OK !=
-        ucc_nccl_check_dt_supported(TASK_ARGS(task).src.info.datatype,
-                                    TASK_ARGS(task).src.info.datatype)) {
-        /* TODO: can we use ncclChar if datatype is not supported? */
-        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
+    ucc_tl_nccl_check_and_convert_buffer(&TASK_ARGS(task).src.info,
+                                         UCC_TL_NCCL_DT_FOR_UNSUPPORTED);
 
     task->super.post = ucc_tl_nccl_bcast_start;
     return UCC_OK;
@@ -515,15 +552,17 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_reduce_scatter_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_OK !=
-        ucc_nccl_check_dt_supported(TASK_ARGS(task).dst.info.datatype,
-                                    TASK_ARGS(task).dst.info.datatype)) {
-        tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
+    ucc_coll_args_t *args = &TASK_ARGS(task);
+
+    if (!UCC_IS_INPLACE(*args)) {
+        if (ucc_tl_nccl_check_and_convert_buffer_reduction(&args->src.info,
+                                                           task) != UCC_OK) {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
     }
 
-    if (ucc_to_nccl_reduce_op[TASK_ARGS(task).op] == ncclOpUnsupported) {
-        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
+    if (ucc_tl_nccl_check_and_convert_buffer_reduction(&args->dst.info, task) !=
+        UCC_OK) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -566,22 +605,22 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_reduce_init(ucc_tl_nccl_task_t *task)
 {
-    ucc_tl_nccl_team_t *team = TASK_TEAM(task);
-    ucc_datatype_t dt;
+    ucc_coll_args_t *args    = &TASK_ARGS(task);
+    int              is_root =
+        UCC_IS_ROOT(TASK_ARGS(task), UCC_TL_TEAM_RANK(TASK_TEAM(task)));
 
-    dt = (TASK_ARGS(task).root == UCC_TL_TEAM_RANK(team))
-        ? TASK_ARGS(task).dst.info.datatype
-        : TASK_ARGS(task).src.info.datatype;
-
-    if (UCC_OK !=
-        ucc_nccl_check_dt_supported(dt, dt)) {
-        tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
+    if (is_root) {
+        if (ucc_tl_nccl_check_and_convert_buffer_reduction(&args->dst.info,
+                                                           task) != UCC_OK) {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
     }
 
-    if (ucc_to_nccl_reduce_op[TASK_ARGS(task).op] == ncclOpUnsupported) {
-        tl_debug(UCC_TASK_LIB(task), "reduction operation is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
+    if (!(is_root && UCC_IS_INPLACE(*args))) {
+        if (ucc_tl_nccl_check_and_convert_buffer_reduction(&args->src.info,
+                                                           task) != UCC_OK) {
+            return UCC_ERR_NOT_SUPPORTED;
+        }
     }
 
     task->super.post = ucc_tl_nccl_reduce_start;
