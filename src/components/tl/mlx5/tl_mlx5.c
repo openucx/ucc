@@ -42,6 +42,26 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      "transpose staging",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, dm_host), UCC_CONFIG_TYPE_BOOL},
 
+    {"QP_RNR_RETRY", "7", "IB QP rnr retry count",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, qp_conf.qp_rnr_retry),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"QP_RNR_TIMER", "20", "IB QP rnr timer",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, qp_conf.qp_rnr_timer),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"QP_RETRY_COUNT", "7", "IB QP retry count",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, qp_conf.qp_retry_cnt),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"QP_TIMEOUT", "18", "IB QP timeout",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, qp_conf.qp_timeout),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"QP_MAX_ATOMIC", "1", "max num of outstanding atomics in IB QP",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, qp_conf.qp_max_atomic),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
