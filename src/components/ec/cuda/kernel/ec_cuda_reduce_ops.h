@@ -108,58 +108,55 @@ cuFloatComplex operator* (const cuFloatComplex & first,
         }                                                                      \
     } while (0)
 
-#define CUDA_REDUCE_WITH_OP(NAME, _OP)                                           \
-    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL,   \
-              typename _TaskType>                                                \
-    __device__ void ucc_reduce_cuda_##NAME(_TaskType task, uint16_t flags)       \
-    {                                                                            \
-        _Type *        d     = (_Type *)task.dst;                                \
-        const size_t   count = task.count;                                       \
-        const bool strided =                                                     \
-            std::is_same<_TaskType, ucc_eee_task_reduce_strided_t>::value;       \
-        const int MAXSRCS =                                                      \
-            strided ? USHRT_MAX : UCC_EE_EXECUTOR_NUM_BUFS;                      \
-        const int       ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS;     \
-        _Type *             s[ALLOC_SIZE];                                       \
-        _Type *             s1;                                                  \
-        _Type *             s2;                                                  \
-        __shared__ uint16_t n_src2;                                              \
-        size_t              ld;                                                  \
-        size_t              i, j, line;                                          \
-        if (strided) {                                                           \
-            auto task_strided_p =                                                \
-                    reinterpret_cast<ucc_eee_task_reduce_strided_t*>(&task);     \
-            n_src2 = task_strided_p->n_src2;                                     \
-            s1     = (_Type *)task_strided_p->src1;                              \
-            s2     = (_Type *)task_strided_p->src2;                              \
-            ld     = task_strided_p->stride / sizeof(_Type);                     \
-            ucc_assert_system(task_strided_p->stride % sizeof(_Type) == 0);      \
-        } else {                                                                 \
-            auto task_default_p =                                                \
-                        reinterpret_cast<ucc_eee_task_reduce_t*>(&task);         \
-            memcpy(s, task_default_p->srcs,                                      \
-                                    UCC_EE_EXECUTOR_NUM_BUFS * sizeof(_Type *)); \
-            n_src2 = task_default_p->n_srcs - 1;                                 \
-            s1     = s[0];                                                       \
-        }                                                                        \
-        CUDA_REDUCE_WITH_OP_CHUNK(0, UNROLL, WARP_SIZE, _OP);                    \
-        /* second call for data remainder */                                     \
-        CUDA_REDUCE_WITH_OP_CHUNK(                                               \
-            (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL), 1, 1, _OP);   \
-    }                                                                            \
-    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>   \
-    __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task,   \
-                                                   uint16_t              flags)  \
-    {                                                                            \
-        ucc_reduce_cuda_##NAME<_Type, _AlphaType, triggered, UNROLL,             \
-                               ucc_eee_task_reduce_t>(task, flags);              \
-    }                                                                            \
-    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>   \
-    __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                              \
-        ucc_eee_task_reduce_strided_t task, uint16_t flags)                      \
-    {                                                                            \
-        ucc_reduce_cuda_##NAME<_Type, _AlphaType, triggered, UNROLL,             \
-                               ucc_eee_task_reduce_strided_t>(task, flags);      \
+#define CUDA_REDUCE_WITH_OP(NAME, _OP)                                          \
+    template <typename _Type, typename _AlphaType, bool triggered,              \
+              bool strided, int UNROLL, typename _TaskType>                     \
+    __device__ void ucc_reduce_cuda_##NAME(_TaskType task, uint16_t flags)      \
+    {                                                                           \
+        _Type *      d       = (_Type *)task.dst;                               \
+        const size_t count   = task.count;                                      \
+        const int    MAXSRCS = strided ? USHRT_MAX : UCC_EE_EXECUTOR_NUM_BUFS;  \
+        const int    ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS;       \
+        _Type *      s[ALLOC_SIZE];                                             \
+        _Type *      s1;                                                        \
+        _Type *      s2;                                                        \
+        __shared__ uint16_t n_src2;                                             \
+        size_t              ld;                                                 \
+        size_t              i, j, line;                                         \
+        if (strided) {                                                          \
+            ucc_eee_task_reduce_strided_t *task_strided_p =                     \
+                (ucc_eee_task_reduce_strided_t *)&task;                         \
+            n_src2 = task_strided_p->n_src2;                                    \
+            s1     = (_Type *)task_strided_p->src1;                             \
+            s2     = (_Type *)task_strided_p->src2;                             \
+            ld     = task_strided_p->stride / sizeof(_Type);                    \
+            ucc_assert_system(task_strided_p->stride % sizeof(_Type) == 0);     \
+        } else {                                                                \
+            ucc_eee_task_reduce_t *task_default_p =                             \
+                (ucc_eee_task_reduce_t *)&task;                                 \
+            memcpy(s, task_default_p->srcs,                                     \
+                   UCC_EE_EXECUTOR_NUM_BUFS * sizeof(_Type *));                 \
+            n_src2 = task_default_p->n_srcs - 1;                                \
+            s1     = s[0];                                                      \
+        }                                                                       \
+        CUDA_REDUCE_WITH_OP_CHUNK(0, UNROLL, WARP_SIZE, _OP);                   \
+        /* second call for data remainder */                                    \
+        CUDA_REDUCE_WITH_OP_CHUNK(                                              \
+            (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL), 1, 1, _OP);  \
+    }                                                                           \
+    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>  \
+    __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task,  \
+                                                   uint16_t              flags) \
+    {                                                                           \
+        ucc_reduce_cuda_##NAME<_Type, _AlphaType, triggered, false, UNROLL,     \
+                               ucc_eee_task_reduce_t>(task, flags);             \
+    }                                                                           \
+    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>  \
+    __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                             \
+        ucc_eee_task_reduce_strided_t task, uint16_t flags)                     \
+    {                                                                           \
+        ucc_reduce_cuda_##NAME<_Type, _AlphaType, triggered, true, UNROLL,      \
+                               ucc_eee_task_reduce_strided_t>(task, flags);     \
     }
 
 #define CUDA_REDUCE_WITH_OP_MULTI_DST(NAME, _OP)                               \
