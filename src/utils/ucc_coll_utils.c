@@ -539,6 +539,7 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
                   int verbosity)
 {
     ucc_team_t *team  = task->bargs.team;
+    int rc;
 
     if (verbosity >= UCC_LOG_LEVEL_DIAG) {
         ucc_coll_args_str(&task->bargs.args, team->rank, team->size, str, len);
@@ -550,17 +551,24 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
 
         if (task->team->context->lib->log_component.name[0] == 'C') {
             /* it's not CL BASIC task */
-            strncpy(cl_info, task->team->context->lib->log_component.name, 16);
+            strncpy(cl_info, task->team->context->lib->log_component.name,
+                    sizeof(cl_info));
             ucc_coll_task_components_str(task, tl_info, &tl_info_len);
         } else {
-            strncpy(cl_info, "CL_BASIC", 16);
-            strncpy(tl_info , task->team->context->lib->log_component.name, 16);
+            strncpy(cl_info, "CL_BASIC", sizeof(cl_info));
+            strncpy(tl_info , task->team->context->lib->log_component.name,
+                    sizeof(tl_info));
         }
         ucc_coll_args_str(&task->bargs.args, team->rank, team->size, str, len);
-        ucc_snprintf_safe(task_info, sizeof(task_info), "; %s {%s}, team_id %d",
-                          cl_info, tl_info, team->id);
+        rc = ucc_snprintf_safe(task_info, sizeof(task_info),
+                               "; %s {%s}, team_id %d",
+                               cl_info, tl_info, team->id);
+        if (rc < 0) {
+            return;
+        }
         strncat(str, task_info, len - strlen(str));
     }
+
     if (verbosity >= UCC_LOG_LEVEL_DEBUG) {
         char task_info[64];
         ucc_snprintf_safe(task_info, sizeof(task_info),

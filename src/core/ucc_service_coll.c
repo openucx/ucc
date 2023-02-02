@@ -139,11 +139,13 @@ ucc_status_t ucc_service_coll_test(ucc_service_coll_req_t *req)
     return status;
 }
 
+ucc_status_t ucc_collective_finalize_internal(ucc_coll_task_t *task);
+
 ucc_status_t ucc_service_coll_finalize(ucc_service_coll_req_t *req)
 {
     ucc_status_t status;
 
-    status = ucc_collective_finalize(&req->task->super);
+    status = ucc_collective_finalize_internal(req->task);
     ucc_free(req);
     return status;
 }
