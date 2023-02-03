@@ -1,3 +1,11 @@
+/**
+* Copyright (c) NVIDIA CORPORATION & AFFILIATES, 2001-2023. ALL RIGHTS RESERVED.
+* Copyright (C) Advanced Micro Devices, Inc. 2019. ALL RIGHTS RESERVED.
+* Copyright (C) Shanghai Zhaoxin Semiconductor Co., Ltd. 2020. ALL RIGHTS RESERVED.
+*
+* See file LICENSE for terms.
+*/
+
 #if defined(__x86_64__)
 
 #ifdef HAVE_CONFIG_H
@@ -88,7 +96,8 @@ ucc_cpu_model_t ucc_arch_get_cpu_model()
     uint32_t model, family;
 
     /* Get CPU model/family */
-    ucc_x86_cpuid(X86_CPUID_GET_MODEL, ucc_unaligned_ptr(&version.reg), &_ebx, &_ecx, &_edx);
+    ucc_x86_cpuid(X86_CPUID_GET_MODEL, ucc_unaligned_ptr(&version.reg),
+                  &_ebx, &_ecx, &_edx);
 
     model  = version.model;
     family = version.family;
@@ -97,7 +106,8 @@ ucc_cpu_model_t ucc_arch_get_cpu_model()
     if (family == 0xf) {
         family += version.ext_family;
     }
-    if ((family == 0x6) || (family == 0x7) || (family == 0xf) || (family == 0x17)) {
+    if ((family == 0x6) || (family == 0x7) || (family == 0xf) ||
+        (family == 0x17) || (family == 0x19)) {
         model = (version.ext_model << 4) | model;
     }
 
@@ -167,6 +177,8 @@ ucc_cpu_model_t ucc_arch_get_cpu_model()
             case 0x00:
             case 0x01:
                 return UCC_CPU_MODEL_AMD_MILAN;
+            case 0x11:
+                return UCC_CPU_MODEL_AMD_GENOA;
             }
         }
     }

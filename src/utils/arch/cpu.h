@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2001-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+* Copyright (c) NVIDIA CORPORATION & AFFILIATES, 2001-2023. ALL RIGHTS RESERVED.
 * Copyright (C) ARM Ltd. 2016.  ALL RIGHTS RESERVED.
 * Copyright (C) Shanghai Zhaoxin Semiconductor Co., Ltd. 2020. ALL RIGHTS RESERVED.
 *
@@ -30,6 +30,7 @@ typedef enum ucc_cpu_model {
     UCC_CPU_MODEL_AMD_NAPLES,
     UCC_CPU_MODEL_AMD_ROME,
     UCC_CPU_MODEL_AMD_MILAN,
+    UCC_CPU_MODEL_AMD_GENOA,
     UCC_CPU_MODEL_ZHAOXIN_ZHANGJIANG,
     UCC_CPU_MODEL_ZHAOXIN_WUDAOKOU,
     UCC_CPU_MODEL_ZHAOXIN_LUJIAZUI,
@@ -89,6 +90,8 @@ static inline ucc_cpu_model_t ucc_get_model_from_str(const char *m_name)
         return UCC_CPU_MODEL_AMD_ROME;
     if (strcasecmp(m_name, "milan") == 0)
         return UCC_CPU_MODEL_AMD_MILAN;
+    if (strcasecmp(m_name, "genoa") == 0)
+        return UCC_CPU_MODEL_AMD_GENOA;
     if (strcasecmp(m_name, "zhangjiang") == 0)
         return UCC_CPU_MODEL_ZHAOXIN_ZHANGJIANG;
     if (strcasecmp(m_name, "wudaokou") == 0)
