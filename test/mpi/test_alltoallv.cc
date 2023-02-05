@@ -22,11 +22,11 @@ void * TestAlltoallv::mpi_counts_to_ucc(int *mpi_counts, size_t _ncount)
 TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_ALLTOALLV, params)
 {
-    dt                                         = params.dt;
-    size_t                             dt_size = ucc_dt_size(dt);
+    dt             = params.dt;
+    size_t dt_size = ucc_dt_size(dt);
     size_t count   = msgsize/dt_size;
     std::uniform_int_distribution<int> urd(count/2, count);
-    std::default_random_engine         eng;
+    std::default_random_engine eng;
     int rank;
     int nprocs;
     int rank_count;
@@ -110,6 +110,20 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     args.dst.info_v.buffer = rbuf;
     args.dst.info_v.datatype = dt;
     args.dst.info_v.mem_type = mem_type;
+
+    if (TEST_FLAG_VSIZE_64BIT == count_bits ||
+        TEST_FLAG_VSIZE_64BIT == displ_bits) {
+        if (msgsize % 64 != 0) {
+            test_skip = TEST_SKIP_NOT_SUPPORTED;
+        }
+    } else {
+        if (msgsize % 32 != 0) {
+            test_skip = TEST_SKIP_NOT_SUPPORTED;
+        }
+    }
+    if (TEST_SKIP_NONE != skip_reduce(test_skip, team.comm)) {
+        return;
+    }
 
     if (TEST_FLAG_VSIZE_64BIT == count_bits) {
         args.src.info_v.counts = scounts64 =
