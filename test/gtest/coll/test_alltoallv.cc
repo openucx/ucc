@@ -277,7 +277,7 @@ UCC_TEST_P(test_alltoallv_alg, hybrid)
 
     ASSERT_NE(inplace, TEST_INPLACE);
     ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
-                             {"UCC_TL_UCP_TUNE", "alltoallv:@1:inf"}};
+                             {"UCC_TL_UCP_TUNE", "alltoallv:@hybrid:inf"}};
     UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
     UccTeam_h     team    = job.create_team(n_procs);
     UccCollCtxVec ctxs;

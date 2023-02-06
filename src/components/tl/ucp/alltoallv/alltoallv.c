@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -14,7 +14,7 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLTOALLV_ALG_PAIRWISE,
              .name = "pairwise",
              .desc = "O(N) pairwise exchange with adjustable number "
-             "of outstanding sends/recvs"},
+                     "of outstanding sends/recvs"},
         [UCC_TL_UCP_ALLTOALLV_ALG_HYBRID] =
             {.id   = UCC_TL_UCP_ALLTOALLV_ALG_HYBRID,
              .name = "hybrid",
