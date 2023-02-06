@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -22,19 +22,13 @@ void * TestAlltoallv::mpi_counts_to_ucc(int *mpi_counts, size_t _ncount)
 TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_ALLTOALLV, params)
 {
-    dt             = params.dt;
-    size_t dt_size = ucc_dt_size(dt);
-    size_t count   = msgsize/dt_size;
-    std::uniform_int_distribution<int> urd(count/2, count);
     std::default_random_engine eng;
-    int rank;
-    int nprocs;
-    int rank_count;
+    size_t                     dt_size, count;
+    int                        rank, nprocs, rank_count;
 
-    eng.seed(test_rand_seed);
-    MPI_Comm_rank(team.comm, &rank);
-    MPI_Comm_size(team.comm, &nprocs);
-
+    dt         = params.dt;
+    dt_size    = ucc_dt_size(dt);
+    count      = msgsize / dt_size;
     sncounts   = 0;
     rncounts   = 0;
     scounts    = NULL;
@@ -47,6 +41,9 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     rdispls64  = NULL;
     count_bits = params.count_bits;
     displ_bits = params.displ_bits;
+
+    std::uniform_int_distribution<int> urd(count / 2, count);
+    eng.seed(test_rand_seed);
 
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &nprocs);

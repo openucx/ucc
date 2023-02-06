@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -10,14 +10,16 @@
 TestBcast::TestBcast(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_BCAST, params)
 {
-    dt             = params.dt;
-    size_t dt_size = ucc_dt_size(dt);
-    size_t count   = msgsize / dt_size;
     int rank, size;
+    size_t dt_size, count;
+
+    dt      = params.dt;
+    dt_size = ucc_dt_size(dt);
+    count   = msgsize / dt_size;
+    root    = params.root;
 
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
-    root = params.root;
 
     if (skip_reduce(test_max_size < msgsize, TEST_SKIP_MEM_LIMIT, team.comm)) {
         return;

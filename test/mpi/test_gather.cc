@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -10,12 +10,14 @@
 TestGather::TestGather(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_GATHER, params)
 {
-    dt                       = params.dt;
-    size_t dt_size           = ucc_dt_size(dt);
-    size_t single_rank_count = msgsize / dt_size;
     int    rank, size;
+    size_t dt_size, single_rank_count;
 
-    root = params.root;
+    dt                = params.dt;
+    dt_size           = ucc_dt_size(dt);
+    single_rank_count = msgsize / dt_size;
+    root              = params.root;
+
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
 

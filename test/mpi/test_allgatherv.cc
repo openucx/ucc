@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -34,13 +34,15 @@ static void fill_counts_and_displacements(int size, int count,
 TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_ALLGATHERV, params)
 {
-    dt             = params.dt;
-    size_t dt_size = ucc_dt_size(dt);
-    size_t count   = msgsize / dt_size;
     int    rank, size;
+    size_t dt_size, count;
 
+    dt            = params.dt;
+    dt_size       = ucc_dt_size(dt);
+    count         = msgsize / dt_size;
     counts        = NULL;
     displacements = NULL;
+
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
 

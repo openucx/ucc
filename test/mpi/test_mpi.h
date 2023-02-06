@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -279,7 +279,7 @@ protected:
     size_t test_max_size;
     ucc_datatype_t dt;
 
-  public:
+public:
     void mpi_progress(void);
     test_skip_cause_t test_skip;
     static std::shared_ptr<TestCase> init_single(
@@ -383,16 +383,13 @@ public:
 };
 
 class TestAllgather : public TestCase {
-    ucc_datatype_t dt;
-
-  public:
+public:
     TestAllgather(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input(int iter_persistent = 0) override;
     ucc_status_t check();
 };
 
 class TestAllgatherv : public TestCase {
-    ucc_datatype_t dt;
     int *counts;
     int *displacements;
 public:
@@ -403,7 +400,6 @@ public:
 };
 
 class TestAllreduce : public TestCase {
-    ucc_datatype_t dt;
     ucc_reduction_op_t op;
 public:
     TestAllreduce(ucc_test_team_t &team, TestCaseParams &params);
@@ -413,7 +409,6 @@ public:
 };
 
 class TestAlltoall : public TestCase {
-    ucc_datatype_t dt;
     bool is_onesided;
 public:
     TestAlltoall(ucc_test_team_t &team, TestCaseParams &params);
@@ -422,7 +417,6 @@ public:
 };
 
 class TestAlltoallv : public TestCase {
-    ucc_datatype_t dt;
     size_t sncounts;
     size_t rncounts;
     int *scounts;
@@ -458,25 +452,20 @@ public:
 };
 
 class TestBcast : public TestCase {
-    ucc_datatype_t dt;
-
-  public:
+public:
     TestBcast(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input(int iter_persistent = 0) override;
     ucc_status_t check();
 };
 
 class TestGather : public TestCase {
-    ucc_datatype_t dt;
-
-  public:
+public:
     TestGather(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input(int iter_persistent = 0) override;
     ucc_status_t check();
 };
 
 class TestGatherv : public TestCase {
-    ucc_datatype_t dt;
     uint32_t *counts;
     uint32_t *displacements;
 public:
@@ -487,7 +476,6 @@ public:
 };
 
 class TestReduce : public TestCase {
-	ucc_datatype_t dt;
 	ucc_reduction_op_t op;
 public:
     TestReduce(ucc_test_team_t &team, TestCaseParams &params);
@@ -497,7 +485,6 @@ public:
 };
 
 class TestReduceScatter : public TestCase {
-    ucc_datatype_t dt;
     ucc_reduction_op_t op;
 public:
     TestReduceScatter(ucc_test_team_t &team, TestCaseParams &params);
@@ -508,7 +495,6 @@ public:
 };
 
 class TestReduceScatterv : public TestCase {
-    ucc_datatype_t     dt;
     ucc_reduction_op_t op;
     int *              counts;
   public:
@@ -520,16 +506,13 @@ class TestReduceScatterv : public TestCase {
 };
 
 class TestScatter : public TestCase {
-    ucc_datatype_t dt;
-
-  public:
+public:
     TestScatter(ucc_test_team_t &team, TestCaseParams &params);
     ucc_status_t set_input(int iter_persistent = 0) override;
     ucc_status_t check();
 };
 
 class TestScatterv : public TestCase {
-    ucc_datatype_t dt;
     uint32_t *counts;
     uint32_t *displacements;
 public:
