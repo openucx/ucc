@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -44,6 +44,38 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      "pairwise algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_pairwise_num_posts),
      UCC_CONFIG_TYPE_UINT},
+
+/* TODO: add radix to config once it's fully supported by the algorithm
+    {"ALLTOALLV_HYBRID_RADIX", "2",
+     "Radix of the Hybrid Alltoallv algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_radix),
+     UCC_CONFIG_TYPE_UINT},
+*/
+    {"ALLTOALLV_HYBRID_NUM_SCRATCH_SENDS", "1",
+     "Number of send operations issued from scratch buffer per radix step",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_num_scratch_sends),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALLV_HYBRID_NUM_SCRATCH_RECVS", "3",
+     "Number of recv operations issued from scratch buffer per radix step",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_num_scratch_recvs),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALLV_HYBRID_PAIRWISE_NUM_POSTS", "3",
+     "The maximum number of pairwise messages to send before waiting for "
+     "completion",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_pairwise_num_posts),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALLV_HYBRID_BUFF_SIZE", "256k",
+     "Total size of scratch buffer, used for sends and receives",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_buff_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLTOALLV_HYBRID_CHUNK_BYTE_LIMIT", "12k",
+     "Max size of data send in pairwise step of hybrid alltoallv algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_chunk_byte_limit),
+     UCC_CONFIG_TYPE_MEMUNITS},
 
     {"KN_RADIX", "0",
      "Radix of all algorithms based on knomial pattern. When set to a "

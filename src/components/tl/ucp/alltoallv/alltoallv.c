@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -8,16 +8,17 @@
 #include "tl_ucp.h"
 #include "alltoallv.h"
 
-ucc_status_t ucc_tl_ucp_alltoallv_pairwise_start(ucc_coll_task_t *task);
-ucc_status_t ucc_tl_ucp_alltoallv_pairwise_progress(ucc_coll_task_t *task);
-
 ucc_base_coll_alg_info_t
     ucc_tl_ucp_alltoallv_algs[UCC_TL_UCP_ALLTOALLV_ALG_LAST + 1] = {
         [UCC_TL_UCP_ALLTOALLV_ALG_PAIRWISE] =
             {.id   = UCC_TL_UCP_ALLTOALLV_ALG_PAIRWISE,
              .name = "pairwise",
              .desc = "O(N) pairwise exchange with adjustable number "
-             "of outstanding sends/recvs"},
+                     "of outstanding sends/recvs"},
+        [UCC_TL_UCP_ALLTOALLV_ALG_HYBRID] =
+            {.id   = UCC_TL_UCP_ALLTOALLV_ALG_HYBRID,
+             .name = "hybrid",
+             .desc = "hybrid a2av alg "},
         [UCC_TL_UCP_ALLTOALLV_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 

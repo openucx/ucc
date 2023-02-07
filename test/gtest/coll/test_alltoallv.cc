@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -94,7 +95,7 @@ public:
                          0);
         }
     }
-    bool  data_validate(UccCollCtxVec ctxs)
+    bool data_validate(UccCollCtxVec ctxs)
     {
         bool                   ret = true;
         std::vector<uint8_t *> dsts(ctxs.size());
@@ -156,12 +157,12 @@ class test_alltoallv_0 : public test_alltoallv <uint64_t>,
 
 UCC_TEST_P(test_alltoallv_0, single)
 {
-    const int            team_id = std::get<0>(GetParam());
+    const int            team_id  = std::get<0>(GetParam());
     ucc_memory_type_t    mem_type = std::get<1>(GetParam());
-    gtest_ucc_inplace_t  inplace = std::get<2>(GetParam());
-    const ucc_datatype_t dtype   = std::get<3>(GetParam());
-    UccTeam_h            team    = UccJob::getStaticTeams()[team_id];
-    int                  size    = team->procs.size();
+    gtest_ucc_inplace_t  inplace  = std::get<2>(GetParam());
+    const ucc_datatype_t dtype    = std::get<3>(GetParam());
+    UccTeam_h            team     = UccJob::getStaticTeams()[team_id];
+    int                  size     = team->procs.size();
     UccCollCtxVec        ctxs;
 
     coll_mask = UCC_COLL_ARGS_FIELD_FLAGS;
@@ -213,12 +214,12 @@ class test_alltoallv_1 : public test_alltoallv <uint32_t>,
 
 UCC_TEST_P(test_alltoallv_1, single)
 {
-    const int            team_id = std::get<0>(GetParam());
+    const int            team_id  = std::get<0>(GetParam());
     ucc_memory_type_t    mem_type = std::get<1>(GetParam());
-    gtest_ucc_inplace_t  inplace = std::get<2>(GetParam());
-    const ucc_datatype_t dtype   = std::get<3>(GetParam());
-    UccTeam_h            team    = UccJob::getStaticTeams()[team_id];
-    int                  size    = team->procs.size();
+    gtest_ucc_inplace_t  inplace  = std::get<2>(GetParam());
+    const ucc_datatype_t dtype    = std::get<3>(GetParam());
+    UccTeam_h            team     = UccJob::getStaticTeams()[team_id];
+    int                  size     = team->procs.size();
     UccCollCtxVec        ctxs;
 
     set_inplace(inplace);
@@ -264,6 +265,32 @@ class test_alltoallv_2 : public test_alltoallv<uint64_t>,
 class test_alltoallv_3 : public test_alltoallv<uint32_t>,
         public ::testing::WithParamInterface<Param_1> {};
 
+class test_alltoallv_alg : public test_alltoallv<uint32_t>,
+        public ::testing::WithParamInterface<Param_1> {};
+
+UCC_TEST_P(test_alltoallv_alg, hybrid)
+{
+    int                  n_procs  = 15;
+    ucc_memory_type_t    mem_type = std::get<0>(GetParam());
+    gtest_ucc_inplace_t  inplace  = std::get<1>(GetParam());
+    const ucc_datatype_t dtype    = std::get<2>(GetParam());
+
+    ASSERT_NE(inplace, TEST_INPLACE);
+    ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
+                             {"UCC_TL_UCP_TUNE", "alltoallv:@hybrid:inf"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team    = job.create_team(n_procs);
+    UccCollCtxVec ctxs;
+
+    SET_MEM_TYPE(mem_type);
+    data_init(n_procs, dtype, 16, ctxs, false);
+    UccReq req(team, ctxs);
+    req.start();
+    req.wait();
+
+    EXPECT_EQ(true, data_validate(ctxs));
+    data_fini(ctxs);
+}
 
 UCC_TEST_P(test_alltoallv_2, multiple)
 {
@@ -326,6 +353,13 @@ UCC_TEST_P(test_alltoallv_3, multiple)
         data_fini(ctx);
     }
 }
+
+INSTANTIATE_TEST_CASE_P(
+        alltoallv_algs, test_alltoallv_alg,
+        ::testing::Combine(
+            ::testing::Values(UCC_MEMORY_TYPE_HOST),
+            ::testing::Values(TEST_NO_INPLACE),
+            PREDEFINED_DTYPES));
 
 INSTANTIATE_TEST_CASE_P(
         64, test_alltoallv_2,
