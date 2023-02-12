@@ -16,10 +16,14 @@ extern "C" {
 #include <cuda_bf16.h>
 #include <cuComplex.h>
 
-#define COPY_LOOP_UNROLL                 8
-#define REDUCE_LOOP_UNROLL_TRIGGERED     6
-#define REDUCE_LOOP_UNROLL_INTERRUPTIBLE 1
+#define COPY_LOOP_UNROLL                  8
+#define REDUCE_LOOP_UNROLL_TRIGGERED_SIX  6
+#define REDUCE_LOOP_UNROLL_TRIGGERED_FOUR 4
+#define REDUCE_LOOP_UNROLL_TRIGGERED_TWO  2
+#define REDUCE_LOOP_UNROLL_INTERRUPTIBLE  1
 typedef int4 vectype;
+typedef vectype PACK_TYPE;
+// typedef ulong2 PACK_TYPE;
 
 __device__ inline
 cuDoubleComplex operator+ (const cuDoubleComplex & first,
@@ -59,104 +63,149 @@ cuFloatComplex operator* (const cuFloatComplex & first,
                                cuCimagf(first) * second);
 }
 
-#define CUDA_REDUCE_WITH_OP_CHUNK(offset, unroll, warp_size, _OP)              \
+template <typename T, typename PackType> __device__ int ptrAlignPack(T *ptr)
+{
+    return (uint64_t)ptr % alignof(PackType);
+}
+
+template <typename T, typename PackType>
+__forceinline__ __device__ void LoadPack(T* d, T* s)
+{
+    *(reinterpret_cast<PackType*>(d)) = *(reinterpret_cast<PackType*>(s));
+}
+
+#define CUDA_REDUCE_WITH_OP_CHUNK(unroll, unroll_group_size, _OP, PackType)\
     do {                                                                       \
-        const int warp =                                                       \
-            triggered ? threadIdx.x / warp_size                                \
-                      : (threadIdx.x + blockIdx.x * blockDim.x) / warp_size;   \
-        const int    num_warps = triggered                                     \
-                                     ? blockDim.x / warp_size                  \
-                                     : (blockDim.x * gridDim.x) / warp_size;   \
-        const int    idx       = threadIdx.x % warp_size;                      \
-        const size_t num_lines =                                               \
-            (count / (warp_size * unroll)) * (warp_size * unroll);             \
-        _Type tmp1[unroll];                                                    \
-        _Type tmp2[unroll];                                                    \
-        for (line = offset + warp * warp_size * unroll + idx;                  \
-             line < num_lines; line += num_warps * warp_size * unroll) {       \
+        const int    vectorize  = sizeof(PackType) / sizeof(Type);\
+        const int    group      = triggered ?\
+            threadIdx.x / unroll_group_size\
+            : (threadIdx.x + blockIdx.x * blockDim.x) / unroll_group_size;\
+        const int    num_groups = triggered                                     \
+                                 ? blockDim.x / unroll_group_size                  \
+                                 : (blockDim.x * gridDim.x) / unroll_group_size;   \
+        const int    idx        = threadIdx.x % unroll_group_size;                      \
+        const size_t start      =                                                   \
+            offset + (group * unroll_group_size * unroll + idx) * vectorize;            \
+        const size_t step       = num_groups * unroll_group_size\
+                                                        * unroll * vectorize;        \
+        const size_t end        = offset + ((count - offset) /\
+                                    (unroll_group_size * unroll * vectorize)) *   \
+                         (unroll_group_size * unroll * vectorize);                     \
+        Type tmp1[unroll][vectorize];                                         \
+        Type tmp2[unroll][vectorize];                                         \
+        ucc_assert_system(blockDim.x % unroll_group_size == 0);                        \
+        for (line = start; line < end; line += step) {                         \
             _Pragma("unroll") for (i = 0; i < unroll; i++)                     \
             {                                                                  \
-                tmp1[i] = s1[line + warp_size * i];                            \
+                LoadPack<Type, PackType>(tmp1[i],                                \
+                            &s1[line + vectorize * unroll_group_size * i]); \
             }                                                                  \
-            for (j = 0; j < MAXSRCS; j++) {                                    \
-                if (j >= n_src2) {                                             \
-                    break;                                                     \
-                }                                                              \
+            for (j = 0; j < MAXSRCS && j < n_src2; j++) {                                    \
                 _Pragma("unroll") for (i = 0; i < unroll; i++)                 \
                 {                                                              \
                     if (strided) {                                             \
-                        tmp2[i] = s2[line + warp_size * i + j * ld];           \
+                        LoadPack<Type, PackType>(tmp2[i], &s2[line +\
+                                vectorize * unroll_group_size * i + j * ld]);\
                     } else {                                                   \
-                        tmp2[i] = s[1 + j][line + warp_size * i];              \
+                        LoadPack<Type, PackType>(tmp2[i],&s[1 + j][line +\
+                                    vectorize * unroll_group_size * i]);      \
                     }                                                          \
                 }                                                              \
                 _Pragma("unroll") for (i = 0; i < unroll; i++)                 \
                 {                                                              \
-                    tmp1[i] = _OP(tmp1[i], tmp2[i]);                           \
+                    _Pragma("unroll") for (k = 0; k < vectorize; k++)          \
+                    {                                                          \
+                        tmp1[i][k] = _OP(tmp1[i][k], tmp2[i][k]);              \
+                    }                                                          \
                 }                                                              \
             }                                                                  \
             if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                 \
                 _Pragma("unroll") for (i = 0; i < unroll; i++)                 \
                 {                                                              \
-                    tmp1[i] = tmp1[i] * (_AlphaType)task.alpha;                \
+                    _Pragma("unroll") for (k = 0; k < vectorize; k++)          \
+                    {                                                          \
+                        tmp1[i][k] = tmp1[i][k] * (AlphaType)task.alpha;      \
+                    }                                                          \
                 }                                                              \
             }                                                                  \
             _Pragma("unroll") for (i = 0; i < unroll; i++)                     \
             {                                                                  \
-                d[line + warp_size * i] = tmp1[i];                             \
+                LoadPack<Type, PackType>(&d[line +\
+                                vectorize * unroll_group_size * i], tmp1[i]);\
             }                                                                  \
+        }                                                                      \
+        offset = max(offset, end);                                             \
+        if (offset == count) {                                                 \
+            return;                                                            \
         }                                                                      \
     } while (0)
 
-#define CUDA_REDUCE_WITH_OP(NAME, _OP)                                          \
-    template <typename _Type, typename _AlphaType, bool triggered,              \
-              bool strided, int UNROLL, typename _TaskType>                     \
-    __device__ void ucc_reduce_cuda_##NAME(_TaskType task, uint16_t flags)      \
-    {                                                                           \
-        _Type *      d       = (_Type *)task.dst;                               \
-        const size_t count   = task.count;                                      \
-        const int    MAXSRCS = strided ? USHRT_MAX : UCC_EE_EXECUTOR_NUM_BUFS;  \
-        const int    ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS;       \
-        _Type *      s[ALLOC_SIZE];                                             \
-        _Type *      s1;                                                        \
-        _Type *      s2;                                                        \
-        __shared__ uint16_t n_src2;                                             \
-        size_t              ld;                                                 \
-        size_t              i, j, line;                                         \
+#define CUDA_REDUCE_WITH_OP(NAME, _OP)                                           \
+    template <typename Type, typename AlphaType, bool triggered,               \
+              bool strided, int UNROLL, typename TaskType>                      \
+    __device__ void ucc_reduce_cuda_##NAME(TaskType task, uint16_t flags)       \
+    {                                                                            \
+        Type *       d            = (Type *)task.dst;                          \
+        bool          alignWithPack     = 0;                                          \
+        size_t        offset       = 0;                                          \
+        const size_t  count        = task.count;                                 \
+        const int MAXSRCS =                                                  \
+            strided ? USHRT_MAX : UCC_EE_EXECUTOR_NUM_BUFS;                      \
+        const int       ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS; \
+        Type *             s[ALLOC_SIZE];                                       \
+        Type *             s1;                                                  \
+        Type *             s2;                                                  \
+        __shared__ uint16_t n_src2;                                              \
+        size_t              ld;                                                  \
+        size_t              i, j, k, line;                                       \
         if (strided) {                                                          \
             ucc_eee_task_reduce_strided_t *task_strided_p =                     \
                 (ucc_eee_task_reduce_strided_t *)&task;                         \
             n_src2 = task_strided_p->n_src2;                                    \
-            s1     = (_Type *)task_strided_p->src1;                             \
-            s2     = (_Type *)task_strided_p->src2;                             \
-            ld     = task_strided_p->stride / sizeof(_Type);                    \
-            ucc_assert_system(task_strided_p->stride % sizeof(_Type) == 0);     \
-        } else {                                                                \
-            ucc_eee_task_reduce_t *task_default_p =                             \
-                (ucc_eee_task_reduce_t *)&task;                                 \
-            memcpy(s, task_default_p->srcs,                                     \
-                   UCC_EE_EXECUTOR_NUM_BUFS * sizeof(_Type *));                 \
-            n_src2 = task_default_p->n_srcs - 1;                                \
-            s1     = s[0];                                                      \
-        }                                                                       \
-        CUDA_REDUCE_WITH_OP_CHUNK(0, UNROLL, WARP_SIZE, _OP);                   \
-        /* second call for data remainder */                                    \
-        CUDA_REDUCE_WITH_OP_CHUNK(                                              \
-            (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL), 1, 1, _OP);  \
-    }                                                                           \
-    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>  \
-    __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task,  \
-                                                   uint16_t              flags) \
-    {                                                                           \
-        ucc_reduce_cuda_##NAME<_Type, _AlphaType, triggered, false, UNROLL,     \
-                               ucc_eee_task_reduce_t>(task, flags);             \
-    }                                                                           \
-    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>  \
-    __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                             \
-        ucc_eee_task_reduce_strided_t task, uint16_t flags)                     \
-    {                                                                           \
-        ucc_reduce_cuda_##NAME<_Type, _AlphaType, triggered, true, UNROLL,      \
-                               ucc_eee_task_reduce_strided_t>(task, flags);     \
+            s1     = (Type *)task_strided_p->src1;                              \
+            s2     = (Type *)task_strided_p->src2;                              \
+            ld     = task_strided_p->stride / sizeof(Type);                     \
+            ucc_assert_system(task_strided_p->stride % sizeof(Type) == 0);      \
+            alignWithPack |= ptrAlignPack<Type, PACK_TYPE>(s1);                                  \
+            alignWithPack |= ptrAlignPack<Type, PACK_TYPE>(s2);                                  \
+            alignWithPack |= ((task_strided_p->stride %\
+                                                sizeof(PACK_TYPE)) != 0);       \
+        } else {                                                                 \
+            ucc_eee_task_reduce_t *task_default_p =                              \
+                (ucc_eee_task_reduce_t *)&task;                                  \
+            memcpy(s, task_default_p->srcs,                                      \
+                   UCC_EE_EXECUTOR_NUM_BUFS * sizeof(Type *));                  \
+            n_src2 = task_default_p->n_srcs - 1;                                 \
+            s1     = s[0];                                                       \
+            for (int i = 0; i < MAXSRCS && i <= n_src2; i++)                     \
+                alignWithPack |= ptrAlignPack<Type, PACK_TYPE>(s[i]);                            \
+        }                                                                        \
+        alignWithPack |= ptrAlignPack<Type, PACK_TYPE>(d);                                       \
+        alignWithPack |= sizeof(PACK_TYPE) % sizeof(Type) != 0;                        \
+        if (triggered && alignWithPack == 0) {                                        \
+            /* if buffers align, use vectorized loads and unrolling */           \
+            CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, PACK_TYPE);     \
+            /* call with vectorization but without unrolling */                  \
+            CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, PACK_TYPE);                  \
+        }                                                                        \
+        /* call with unrolling but without vectorization */                      \
+        CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, Type);                    \
+        /* last call without unrolling nor vectorization for data remainder */   \
+        CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, Type);                                 \
+    }                                                                            \
+    template <typename Type, typename AlphaType, bool triggered, int UNROLL>   \
+    __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task,   \
+                                                   uint16_t              flags)  \
+    {                                                                            \
+        ucc_reduce_cuda_##NAME<Type, AlphaType, triggered, false, UNROLL,      \
+                               ucc_eee_task_reduce_t>(task, flags);              \
+    }                                                                            \
+    template <typename Type, typename AlphaType, bool triggered, int UNROLL>   \
+    __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                              \
+        ucc_eee_task_reduce_strided_t task, uint16_t flags)                      \
+    {                                                                            \
+        ucc_reduce_cuda_##NAME<Type, AlphaType, triggered, true, UNROLL,       \
+                               ucc_eee_task_reduce_strided_t>(task, flags);      \
     }
 
 #define CUDA_REDUCE_WITH_OP_MULTI_DST(NAME, _OP)                               \

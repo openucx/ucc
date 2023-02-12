@@ -87,195 +87,105 @@ __device__ void executor_copy_task(ucc_eee_task_copy_t &task)
     }
 }
 
-__device__ inline void add_float4(float4 &d, const float4 &x, const float4 &y)
-{
-    d.x = x.x + y.x;
-    d.y = x.y + y.y;
-    d.z = x.z + y.z;
-    d.w = x.w + y.w;
-}
-
-template <int UNROLL>
-__device__ void executor_reduce_float_sum_aligned_2(const float *s1,
-                                                    const float *s2, float *d,
-                                                    size_t count)
-{
-    const float4 *s14       = reinterpret_cast<const float4 *>(s1);
-    const float4 *s24       = reinterpret_cast<const float4 *>(s2);
-    float4 *      d4        = reinterpret_cast<float4 *>(d);
-    const int     warp      = threadIdx.x / WARP_SIZE;
-    const int     num_warps = blockDim.x / WARP_SIZE;
-    const int     idx       = threadIdx.x % WARP_SIZE;
-    size_t        num_lines =
-        (count * sizeof(float) / (WARP_SIZE * UNROLL * sizeof(float4))) *
-        (WARP_SIZE * UNROLL);
-    float4 tmp1[UNROLL];
-    float4 tmp2[UNROLL];
-
-    for (size_t line = warp * WARP_SIZE * UNROLL + idx; line < num_lines;
-         line += num_warps * WARP_SIZE * UNROLL) {
-#pragma unroll
-        for (int i = 0; i < UNROLL; i++) {
-            tmp1[i] = s14[line + WARP_SIZE * i];
-        }
-#pragma unroll
-        for (int i = 0; i < UNROLL; i++) {
-            tmp2[i] = s24[line + WARP_SIZE * i];
-        }
-#pragma unroll
-        for (int i = 0; i < UNROLL; i++) {
-            add_float4(tmp1[i], tmp1[i], tmp2[i]);
-        }
-#pragma unroll
-        for (int i = 0; i < UNROLL; i++) {
-            d4[line + WARP_SIZE * i] = tmp1[i];
-        }
-    }
-
-    count = count - num_lines * sizeof(vectype) / sizeof(float);
-    if (count == 0) {
-        return;
-    }
-
-    s14       = s14 + num_lines;
-    s24       = s24 + num_lines;
-    d4        = d4 + num_lines;
-    num_lines = count * sizeof(float) / sizeof(vectype);
-    for (int line = threadIdx.x; line < num_lines; line += blockDim.x) {
-        add_float4(d4[line], s14[line], s24[line]);
-    }
-
-    count = count - num_lines * sizeof(vectype) / sizeof(float);
-    if (count == 0) {
-        return;
-    }
-
-    s1 = reinterpret_cast<const float *>(s14 + num_lines);
-    s2 = reinterpret_cast<const float *>(s24 + num_lines);
-    d  = reinterpret_cast<float *>(d4 + num_lines);
-
-    for (size_t line = threadIdx.x; line < count; line += blockDim.x) {
-        d[line] = s1[line] + s2[line];
-    }
-}
-
-#define LAUNCH_REDUCE_A(NAME, _Type, _AlphaType, _task, ...)                   \
+#define LAUNCH_REDUCE_A(NAME, _Type, _AlphaType, _task, _unroll,...)                   \
     do {                                                                       \
         if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
-            ucc_reduce_cuda_##NAME<_Type, _AlphaType, true, false,             \
-                                   REDUCE_LOOP_UNROLL_TRIGGERED,               \
+            ucc_reduce_cuda_##NAME<_Type, _AlphaType, true, false, _unroll,\
                                    ucc_eee_task_reduce_t>(_task->reduce,       \
                                                           _task->flags);       \
         } else {                                                               \
-            ucc_reduce_cuda_##NAME<_Type, _AlphaType, true, true,              \
-                                   REDUCE_LOOP_UNROLL_TRIGGERED,               \
+            ucc_reduce_cuda_##NAME<_Type, _AlphaType, true, true, _unroll,\
                                    ucc_eee_task_reduce_strided_t>(             \
                 _task->reduce_strided, _task->flags);                          \
         }                                                                      \
         return UCC_OK;                                                         \
     } while (0)
 
-#define LAUNCH_REDUCE(NAME, _Type, _task, ...)      \
-    LAUNCH_REDUCE_A(NAME, _Type, _Type, _task)
+#define LAUNCH_REDUCE(NAME, _Type, _task, _unroll, ...)      \
+    LAUNCH_REDUCE_A(NAME, _Type, _Type, _task, _unroll)
 
 __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
 {
-    bool               aligned = false;
     ucc_reduction_op_t op;
     ucc_datatype_t     dt;
     size_t             count;
-    uint16_t           n_src;
-    void              *s1, *s2, *d;
 
     if (task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {
         dt      = task->reduce.dt;
         count   = task->reduce.count;
         op      = task->reduce.op;
-        n_src   = task->reduce.n_srcs;
-        s1      = task->reduce.srcs[0];
-        s2      = task->reduce.srcs[1];
-        d       = task->reduce.dst;
     } else {
         ucc_assert_system(task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE_STRIDED);
         dt      = task->reduce_strided.dt;
         count   = task->reduce_strided.count;
         op      = task->reduce_strided.op;
-        n_src   = task->reduce_strided.n_src2 + 1;
-        s1      = task->reduce_strided.src1;
-        s2      = task->reduce_strided.src2;
-        d       = task->reduce_strided.dst;
     }
-    aligned = !(align_pow2((intptr_t)s1, 16) || align_pow2((intptr_t)s2, 16) ||
-                align_pow2((intptr_t)d, 16));
-
     if (count == 0) {
         return UCC_OK;
     }
 
-    if (UCC_DT_FLOAT32 == dt && UCC_OP_SUM == op && aligned && n_src == 2) {
-        executor_reduce_float_sum_aligned_2<REDUCE_LOOP_UNROLL_TRIGGERED>(
-            (float *)s1, (float *)s2, (float *)d, count);
-        return UCC_OK;
-    }
     switch (dt) {
     case UCC_DT_INT8:
-        DT_REDUCE_INT(int8_t, task, op);
+        DT_REDUCE_INT(int8_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
         break;
     case UCC_DT_INT16:
-        DT_REDUCE_INT(int16_t, task, op);
+        DT_REDUCE_INT(int16_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
     case UCC_DT_INT32:
-        DT_REDUCE_INT(int32_t, task, op);
+        DT_REDUCE_INT(int32_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
         break;
     case UCC_DT_INT64:
-        DT_REDUCE_INT(int64_t, task, op);
+        DT_REDUCE_INT(int64_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
         break;
     case UCC_DT_UINT8:
-        DT_REDUCE_INT(uint8_t, task, op);
+        DT_REDUCE_INT(uint8_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
         break;
     case UCC_DT_UINT16:
-        DT_REDUCE_INT(uint16_t, task, op);
+        DT_REDUCE_INT(uint16_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
     case UCC_DT_UINT32:
-        DT_REDUCE_INT(uint32_t, task, op);
+        DT_REDUCE_INT(uint32_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
         break;
     case UCC_DT_UINT64:
-        DT_REDUCE_INT(uint64_t, task, op);
+        DT_REDUCE_INT(uint64_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
         break;
     case UCC_DT_FLOAT16:
-        DT_REDUCE_FLOAT(__half, task, op);
+        DT_REDUCE_FLOAT(__half, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
         break;
     case UCC_DT_FLOAT32:
 #if SIZEOF_FLOAT == 4
-        DT_REDUCE_FLOAT(float, task, op);
+        DT_REDUCE_FLOAT(float, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
         break;
 #else
         return UCC_ERR_NOT_SUPPORTED;
 #endif
     case UCC_DT_FLOAT64:
 #if SIZEOF_DOUBLE == 8
-        DT_REDUCE_FLOAT(double, task, op);
+        DT_REDUCE_FLOAT(double, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
         break;
 #else
         return UCC_ERR_NOT_SUPPORTED;
 #endif
     case UCC_DT_FLOAT32_COMPLEX:
 #if SIZEOF_CUFLOATCOMPLEX == 8
-        DT_REDUCE_FLOAT_COMPLEX(cuFloatComplex, float, task, op);
+        DT_REDUCE_FLOAT_COMPLEX(cuFloatComplex, float, task, op,
+                                            REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
         break;
 #else
         return UCC_ERR_NOT_SUPPORTED;
 #endif
     case UCC_DT_FLOAT64_COMPLEX:
 #if SIZEOF_CUDOUBLECOMPLEX == 16
-        DT_REDUCE_FLOAT_COMPLEX(cuDoubleComplex, double, task, op);
+        DT_REDUCE_FLOAT_COMPLEX(cuDoubleComplex, double, task, op,
+                                            REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
         break;
 #else
         return UCC_ERR_NOT_SUPPORTED;
 #endif
     case UCC_DT_BFLOAT16:
         ucc_assert_system(2 == sizeof(__nv_bfloat16));
-        DT_REDUCE_FLOAT(__nv_bfloat16, task, op);
+        DT_REDUCE_FLOAT(__nv_bfloat16, task, op,
+                                            REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
     default:
         return UCC_ERR_NOT_SUPPORTED;
