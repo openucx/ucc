@@ -87,21 +87,21 @@ __device__ void executor_copy_task(ucc_eee_task_copy_t &task)
     }
 }
 
-#define LAUNCH_REDUCE_A(NAME, _Type, _AlphaType, _task, _unroll,...)                   \
+#define LAUNCH_REDUCE_A(NAME, _Type, _AlphaType, _task, _unroll, ...)          \
     do {                                                                       \
         if (_task->task_type == UCC_EE_EXECUTOR_TASK_REDUCE) {                 \
-            ucc_reduce_cuda_##NAME<_Type, _AlphaType, true, false, _unroll,\
+            ucc_reduce_cuda_##NAME<_Type, _AlphaType, true, false, _unroll,    \
                                    ucc_eee_task_reduce_t>(_task->reduce,       \
                                                           _task->flags);       \
         } else {                                                               \
-            ucc_reduce_cuda_##NAME<_Type, _AlphaType, true, true, _unroll,\
+            ucc_reduce_cuda_##NAME<_Type, _AlphaType, true, true, _unroll,     \
                                    ucc_eee_task_reduce_strided_t>(             \
                 _task->reduce_strided, _task->flags);                          \
         }                                                                      \
         return UCC_OK;                                                         \
     } while (0)
 
-#define LAUNCH_REDUCE(NAME, _Type, _task, _unroll, ...)      \
+#define LAUNCH_REDUCE(NAME, _Type, _task, _unroll, ...)                        \
     LAUNCH_REDUCE_A(NAME, _Type, _Type, _task, _unroll)
 
 __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
@@ -169,7 +169,7 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
     case UCC_DT_FLOAT32_COMPLEX:
 #if SIZEOF_CUFLOATCOMPLEX == 8
         DT_REDUCE_FLOAT_COMPLEX(cuFloatComplex, float, task, op,
-                                            REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
+                                REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
         break;
 #else
         return UCC_ERR_NOT_SUPPORTED;
@@ -177,7 +177,7 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
     case UCC_DT_FLOAT64_COMPLEX:
 #if SIZEOF_CUDOUBLECOMPLEX == 16
         DT_REDUCE_FLOAT_COMPLEX(cuDoubleComplex, double, task, op,
-                                            REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
+                                REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
         break;
 #else
         return UCC_ERR_NOT_SUPPORTED;
@@ -185,7 +185,7 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
     case UCC_DT_BFLOAT16:
         ucc_assert_system(2 == sizeof(__nv_bfloat16));
         DT_REDUCE_FLOAT(__nv_bfloat16, task, op,
-                                            REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
+                        REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
     default:
         return UCC_ERR_NOT_SUPPORTED;
