@@ -26,7 +26,12 @@ local_npic_filepath="${local_npic_dir}${o_filename}"
 
 mkdir -p $pic_dir
 
-cmd="${@:3} -Xcompiler -fPIC -o ${pic_filepath}"
+tmpcmd="${@:3}"
+if [[ "$tmpcmd" == *"hipcc"* ]]; then
+  cmd="${@:3} -fPIC -o ${pic_filepath}"
+else
+  cmd="${@:3} -Xcompiler -fPIC -o ${pic_filepath}"
+fi
 echo $cmd
 $cmd
 
