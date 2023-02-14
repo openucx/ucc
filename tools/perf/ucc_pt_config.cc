@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -70,12 +70,17 @@ const std::map<std::string, ucc_datatype_t> ucc_pt_datatype_map = {
     {"float16", UCC_DT_FLOAT16},
     {"bfloat16", UCC_DT_BFLOAT16},
     {"int32", UCC_DT_INT32},
+    {"uint32", UCC_DT_UINT32},
     {"float32", UCC_DT_FLOAT32},
+    {"float32_complex", UCC_DT_FLOAT32_COMPLEX},
     {"int64", UCC_DT_INT64},
     {"uint64", UCC_DT_UINT64},
     {"float64", UCC_DT_FLOAT64},
+    {"float64_complex", UCC_DT_FLOAT64_COMPLEX},
     {"int128", UCC_DT_INT128},
     {"uint128", UCC_DT_UINT128},
+    {"float128", UCC_DT_FLOAT64},
+    {"float128_complex", UCC_DT_FLOAT128_COMPLEX},
 };
 
 ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
