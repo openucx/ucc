@@ -52,10 +52,10 @@ ucc_status_t ucc_tl_cuda_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
     attr->super.attr.coll_types  = UCC_TL_CUDA_SUPPORTED_COLLS;
     attr->super.flags            = 0;
     if (base_attr->mask & UCC_BASE_LIB_ATTR_FIELD_MIN_TEAM_SIZE) {
-        attr->super.min_team_size    = lib->min_team_size;
+        attr->super.min_team_size = lib->min_team_size;
     }
     if (base_attr->mask & UCC_BASE_LIB_ATTR_FIELD_MAX_TEAM_SIZE) {
-        attr->super.max_team_size    = UCC_TL_CUDA_MAX_PEERS;
+        attr->super.max_team_size = UCC_TL_CUDA_MAX_PEERS;
     }
     return UCC_OK;
 }

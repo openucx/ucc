@@ -40,7 +40,7 @@ ucc_status_t ucc_tl_mlx5_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
     }
 
     if (base_attr->mask & UCC_BASE_LIB_ATTR_FIELD_MAX_TEAM_SIZE) {
-        attr->super.max_team_size    = UCC_RANK_MAX;
+        attr->super.max_team_size = UCC_RANK_MAX;
     }
 
     return UCC_OK;
