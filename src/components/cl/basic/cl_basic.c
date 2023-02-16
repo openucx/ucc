@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -10,6 +10,8 @@ ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
                                        ucc_base_lib_attr_t  *base_attr);
 ucc_status_t ucc_cl_basic_get_context_attr(const ucc_base_context_t *context,
                                            ucc_base_ctx_attr_t      *base_attr);
+
+ucc_status_t ucc_cl_basic_get_lib_properties(ucc_base_lib_properties_t *prop);
 
 static ucc_config_field_t ucc_cl_basic_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_cl_basic_lib_config_t, super),

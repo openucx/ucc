@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -25,6 +25,7 @@ typedef struct ucc_coll_task ucc_coll_task_t;
 typedef struct ucc_base_lib {
     ucc_log_component_config_t log_component;
     int                        use_tuning;
+    unsigned long              min_team_size;
 } ucc_base_lib_t;
 
 typedef struct ucc_base_config {
@@ -35,6 +36,7 @@ typedef struct ucc_base_lib_config {
     ucc_base_config_t               super;
     ucc_log_component_config_t      log_component;
     int                             use_tuning;
+    unsigned long                   min_team_size;
 } ucc_base_lib_config_t;
 
 typedef struct ucc_base_ctx_config {
@@ -48,15 +50,31 @@ enum {
     UCC_BASE_LIB_FLAG_CTX_SERVICE_TEAM_REQUIRED = UCC_BIT(3)
 };
 
+enum {
+    UCC_BASE_LIB_ATTR_FIELD_MIN_TEAM_SIZE = UCC_BIT(0),
+    UCC_BASE_LIB_ATTR_FIELD_MAX_TEAM_SIZE = UCC_BIT(1),
+    UCC_BASE_LIB_ATTR_FIELD_FLAGS         = UCC_BIT(2),
+};
+
 typedef struct ucc_base_lib_attr_t {
+    uint64_t       mask;
     ucc_lib_attr_t attr;
+    ucc_rank_t     min_team_size;
+    ucc_rank_t     max_team_size;
     uint64_t       flags;
 } ucc_base_lib_attr_t;
+
+typedef struct ucc_base_lib_properties {
+    ucc_rank_t min_team_size;
+    ucc_rank_t max_team_size;
+    ucc_rank_t default_team_size;
+} ucc_base_lib_properties_t;
 
 typedef struct ucc_base_lib_params {
     ucc_lib_params_t params;
     char            *full_prefix;
 } ucc_base_lib_params_t;
+
 extern ucc_config_field_t ucc_base_lib_config_table[];
 extern ucc_config_field_t ucc_base_ctx_config_table[];
 
@@ -67,6 +85,7 @@ typedef struct ucc_base_lib_iface {
     void         (*finalize)(ucc_base_lib_t *lib);
     ucc_status_t (*get_attr)(const ucc_base_lib_t *lib,
                              ucc_base_lib_attr_t  *attr);
+    ucc_status_t (*get_properties)(ucc_base_lib_properties_t *prop);
 } ucc_base_lib_iface_t;
 
 typedef struct ucc_base_context_params {
@@ -190,7 +209,8 @@ typedef struct ucc_base_coll_alg_info {
         .super.lib.init    = UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_lib_t), \
         .super.lib.finalize =                                                  \
             UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_lib_t),               \
-        .super.lib.get_attr = ucc_##_f##_name##_get_lib_attr,                  \
+        .super.lib.get_attr       = ucc_##_f##_name##_get_lib_attr,            \
+        .super.lib.get_properties = ucc_##_f##_name##_get_lib_properties,      \
         .super.context.create =                                                \
             UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_context_t),              \
         .super.context.create_epilog = NULL,                                   \

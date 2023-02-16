@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -88,5 +88,13 @@ ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
             return status;
         }
     }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_cl_basic_get_lib_properties(ucc_base_lib_properties_t *prop)
+{
+    prop->default_team_size = 1;
+    prop->min_team_size     = 1;
+    prop->max_team_size     = UCC_RANK_MAX;
     return UCC_OK;
 }

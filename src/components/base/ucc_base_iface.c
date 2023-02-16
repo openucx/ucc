@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -14,11 +14,17 @@ ucc_config_field_t ucc_base_lib_config_table[] = {
      "selected will be printed.\n"
      "Possible values are: fatal, error, warn, info, debug, trace, data, func, "
      "poll.",
-     ucc_offsetof(ucc_base_lib_config_t, log_component), UCC_CONFIG_TYPE_LOG_COMP},
+     ucc_offsetof(ucc_base_lib_config_t, log_component),
+     UCC_CONFIG_TYPE_LOG_COMP},
 
     {"USE_TUNING", "y",
      "Use perf tuning",
      ucc_offsetof(ucc_base_lib_config_t, use_tuning), UCC_CONFIG_TYPE_BOOL},
+
+    {"MIN_TEAM_SIZE", "auto",
+     "mininaml team size for which component can be used",
+     ucc_offsetof(ucc_base_lib_config_t, min_team_size),
+     UCC_CONFIG_TYPE_ULUNITS},
 
     {NULL}};
 

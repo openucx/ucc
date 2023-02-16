@@ -10,7 +10,7 @@
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *params,
                     const ucc_base_config_t *config)
 {
-    const ucc_tl_cuda_lib_config_t *tl_config =
+    const ucc_tl_cuda_lib_config_t *tl_config     =
         ucc_derived_of(config, ucc_tl_cuda_lib_config_t);
     size_t min_scratch_size;
 
@@ -25,9 +25,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *params,
     }
 
     /* min scratch size should be large enough so that
-       ucc_align_down_pow2(scratch_size / nrings / nchunks / dt_size / 2, 64) > 1
+     * ucc_align_down_pow2(scratch_size / nrings / nchunks / dt_size / 2, 64) > 1
      */
-
     min_scratch_size = 128 * 16 * ucc_dt_size(UCC_DT_FLOAT128_COMPLEX) *
                        self->cfg.allgather_ring_num_chunks;
     if (self->cfg.scratch_size < min_scratch_size) {
@@ -49,8 +48,22 @@ ucc_status_t ucc_tl_cuda_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
 {
     ucc_tl_lib_attr_t *attr      = ucc_derived_of(base_attr, ucc_tl_lib_attr_t);
 
-    attr->super.flags            = 0;
     attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
     attr->super.attr.coll_types  = UCC_TL_CUDA_SUPPORTED_COLLS;
+    attr->super.flags            = 0;
+    if (base_attr->mask & UCC_BASE_LIB_ATTR_FIELD_MIN_TEAM_SIZE) {
+        attr->super.min_team_size = lib->min_team_size;
+    }
+    if (base_attr->mask & UCC_BASE_LIB_ATTR_FIELD_MAX_TEAM_SIZE) {
+        attr->super.max_team_size = UCC_TL_CUDA_MAX_PEERS;
+    }
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_cuda_get_lib_properties(ucc_base_lib_properties_t *prop)
+{
+    prop->default_team_size = 2;
+    prop->min_team_size     = 2;
+    prop->max_team_size     = UCC_TL_CUDA_MAX_PEERS;
     return UCC_OK;
 }
