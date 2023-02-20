@@ -49,7 +49,7 @@ class test_mc_reduce : public testing::Test {
             if (triggered) {
                 cudaStream_t       stream;
                 if (cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking) !=
-                    0) {
+                    cudaSuccess) {
                     std::cerr << "failed to create cuda stream" << std::endl;
                     return UCC_ERR_NO_RESOURCE;
                 }
@@ -94,7 +94,7 @@ class test_mc_reduce : public testing::Test {
         ucc_ee_executor_finalize(executor);
 #ifdef HAVE_CUDA
         if (triggered) {
-            if (cudaStreamDestroy((cudaStream_t)ee_context) != 0) {
+            if (cudaStreamDestroy((cudaStream_t)ee_context) != cudaSuccess) {
                 std::cerr << "failed to destory cuda stream" << std::endl;
                 return UCC_ERR_NO_MESSAGE;
             }
