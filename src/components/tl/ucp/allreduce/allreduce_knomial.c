@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -191,8 +191,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     size_t             count     = TASK_ARGS(task).dst.info.count;
     ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
     size_t             data_size = count * ucc_dt_size(dt);
-    ucc_mrange_uint_t *p         =
-        &UCC_TL_UCP_TEAM_LIB(team)->cfg.allreduce_kn_radix;
+    ucc_mrange_uint_t *p         = &team->cfg.allreduce_kn_radix;
     ucc_kn_radix_t     cfg_radix;
     ucc_status_t       status;
 
