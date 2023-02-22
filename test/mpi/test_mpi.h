@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -176,6 +176,7 @@ void set_gpu_device(test_set_gpu_device_t set_device);
 #endif
 int ucc_coll_inplace_supported(ucc_coll_type_t c);
 int ucc_coll_is_rooted(ucc_coll_type_t c);
+bool ucc_coll_has_datatype(ucc_coll_type_t c);
 
 typedef struct ucc_test_team {
 #ifdef HAVE_CUDA
@@ -276,6 +277,8 @@ protected:
     MPI_Request progress_request;
     uint8_t     progress_buf[1];
     size_t test_max_size;
+    ucc_datatype_t dt;
+
 public:
     void mpi_progress(void);
     test_skip_cause_t test_skip;
@@ -397,7 +400,6 @@ public:
 };
 
 class TestAllreduce : public TestCase {
-    ucc_datatype_t dt;
     ucc_reduction_op_t op;
 public:
     TestAllreduce(ucc_test_team_t &team, TestCaseParams &params);
@@ -474,7 +476,6 @@ public:
 };
 
 class TestReduce : public TestCase {
-	ucc_datatype_t dt;
 	ucc_reduction_op_t op;
 public:
     TestReduce(ucc_test_team_t &team, TestCaseParams &params);
@@ -484,7 +485,6 @@ public:
 };
 
 class TestReduceScatter : public TestCase {
-    ucc_datatype_t dt;
     ucc_reduction_op_t op;
 public:
     TestReduceScatter(ucc_test_team_t &team, TestCaseParams &params);
@@ -495,7 +495,6 @@ public:
 };
 
 class TestReduceScatterv : public TestCase {
-    ucc_datatype_t     dt;
     ucc_reduction_op_t op;
     int *              counts;
   public:

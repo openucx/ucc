@@ -1,13 +1,11 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
 
 #include "test_mpi.h"
 #include "mpi_util.h"
-
-#define TEST_DT UCC_DT_UINT32
 
 static void fill_counts_and_displacements(int size, int count,
                                           uint32_t *counts, uint32_t *displs)
@@ -36,13 +34,16 @@ static void fill_counts_and_displacements(int size, int count,
 TestGatherv::TestGatherv(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_GATHERV, params)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
-    size_t count   = msgsize / dt_size;
     int    rank, size;
+    size_t dt_size, count;
 
+    dt            = params.dt;
+    dt_size       = ucc_dt_size(dt);
+    count         = msgsize / dt_size;
     root          = params.root;
     counts        = NULL;
     displacements = NULL;
+
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
 
@@ -82,18 +83,18 @@ TestGatherv::TestGatherv(ucc_test_team_t &_team, TestCaseParams &params) :
         args.dst.info_v.buffer        = rbuf;
         args.dst.info_v.counts        = (ucc_count_t*)counts;
         args.dst.info_v.displacements = (ucc_aint_t*)displacements;
-        args.dst.info_v.datatype      = TEST_DT;
+        args.dst.info_v.datatype      = dt;
         args.dst.info_v.mem_type      = mem_type;
         if (!inplace) {
             args.src.info.buffer   = sbuf;
             args.src.info.count    = counts[rank];
-            args.src.info.datatype = TEST_DT;
+            args.src.info.datatype = dt;
             args.src.info.mem_type = mem_type;
         }
     } else {
         args.src.info.buffer   = sbuf;
         args.src.info.count    = counts[rank];
-        args.src.info.datatype = TEST_DT;
+        args.src.info.datatype = dt;
         args.src.info.mem_type = mem_type;
     }
 
@@ -103,7 +104,7 @@ TestGatherv::TestGatherv(ucc_test_team_t &_team, TestCaseParams &params) :
 
 ucc_status_t TestGatherv::set_input(int iter_persistent)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
+    size_t dt_size = ucc_dt_size(dt);
     int    rank;
     void  *buf, *check;
 
@@ -119,8 +120,7 @@ ucc_status_t TestGatherv::set_input(int iter_persistent)
     }
     check = PTR_OFFSET(check_buf, displacements[rank] * dt_size);
 
-    init_buffer(buf, counts[rank], TEST_DT, mem_type,
-                rank * (iter_persistent + 1));
+    init_buffer(buf, counts[rank], dt, mem_type, rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check, buf, counts[rank] * dt_size,
                             UCC_MEMORY_TYPE_HOST, mem_type));
     return UCC_OK;
@@ -138,22 +138,23 @@ TestGatherv::~TestGatherv()
 
 ucc_status_t TestGatherv::check()
 {
-    size_t       count = msgsize / ucc_dt_size(TEST_DT);
-    MPI_Datatype dt    = ucc_dt_to_mpi(TEST_DT);
+    size_t       count  = msgsize / ucc_dt_size(dt);
+    MPI_Datatype mpi_dt = ucc_dt_to_mpi(dt);
     MPI_Request  req;
     int          size, rank, completed;
 
     MPI_Comm_size(team.comm, &size);
     MPI_Comm_rank(team.comm, &rank);
 
-    MPI_Iallgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-                    check_buf, (int*)counts, (int*)displacements, dt,
-                    team.comm, &req);
+    MPI_Iallgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, check_buf,
+                    (int *)counts, (int *)displacements, mpi_dt, team.comm,
+                    &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
     } while(!completed);
 
-    return (rank != root) ? UCC_OK :
-        compare_buffers(rbuf, check_buf, count * size, TEST_DT, mem_type);
+    return (rank != root)
+               ? UCC_OK
+               : compare_buffers(rbuf, check_buf, count * size, dt, mem_type);
 }

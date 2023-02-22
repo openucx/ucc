@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -7,18 +7,18 @@
 #include "test_mpi.h"
 #include "mpi_util.h"
 
-#define TEST_DT UCC_DT_UINT32
-
 TestAlltoall::TestAlltoall(ucc_test_team_t &_team, TestCaseParams &params) :
     TestCase(_team, UCC_COLL_TYPE_ALLTOALL, params)
 {
-    size_t dt_size           = ucc_dt_size(TEST_DT);
-    size_t single_rank_count = msgsize / dt_size;
-    void  *work_buf          = nullptr;
-    int    rank;
-    int    nprocs;
+    void*  work_buf = nullptr;
+    int    rank, nprocs;
+    size_t dt_size, single_rank_count;
 
-    is_onesided = (params.buffers != nullptr);
+    dt                = params.dt;
+    dt_size           = ucc_dt_size(dt);
+    single_rank_count = msgsize / dt_size;
+    is_onesided       = (params.buffers != nullptr);
+
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &nprocs);
 
@@ -54,13 +54,13 @@ TestAlltoall::TestAlltoall(ucc_test_team_t &_team, TestCaseParams &params) :
     if (!inplace) {
         args.src.info.buffer      = sbuf;
         args.src.info.count       = single_rank_count * nprocs;
-        args.src.info.datatype    = TEST_DT;
+        args.src.info.datatype    = dt;
         args.src.info.mem_type    = mem_type;
     }
 
     args.dst.info.buffer      = rbuf;
     args.dst.info.count       = single_rank_count * nprocs;
-    args.dst.info.datatype    = TEST_DT;
+    args.dst.info.datatype    = dt;
     args.dst.info.mem_type    = mem_type;
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
@@ -68,8 +68,8 @@ TestAlltoall::TestAlltoall(ucc_test_team_t &_team, TestCaseParams &params) :
 
 ucc_status_t TestAlltoall::set_input(int iter_persistent)
 {
-    size_t dt_size = ucc_dt_size(TEST_DT);
-    size_t single_rank_count = msgsize / dt_size;
+    size_t      dt_size           = ucc_dt_size(dt);
+    size_t      single_rank_count = msgsize / dt_size;
     MPI_Request req;
     void *      buf;
     int         rank, nprocs, completed;
@@ -81,7 +81,7 @@ ucc_status_t TestAlltoall::set_input(int iter_persistent)
     } else {
         buf = sbuf;
     }
-    init_buffer(buf, single_rank_count * nprocs, TEST_DT, mem_type,
+    init_buffer(buf, single_rank_count * nprocs, dt, mem_type,
                 rank * (iter_persistent + 1));
     UCC_CHECK(ucc_mc_memcpy(check_buf, buf,
                             single_rank_count * nprocs * dt_size,
@@ -106,14 +106,13 @@ ucc_status_t TestAlltoall::check()
     MPI_Comm_size(team.comm, &size);
     single_rank_count = args.src.info.count / size;
 
-    MPI_Ialltoall(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-                  check_buf, single_rank_count, ucc_dt_to_mpi(TEST_DT),
-                  team.comm, &req);
+    MPI_Ialltoall(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, check_buf,
+                  single_rank_count, ucc_dt_to_mpi(dt), team.comm, &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
     } while(!completed);
 
-    return compare_buffers(rbuf, check_buf, single_rank_count * size, TEST_DT,
+    return compare_buffers(rbuf, check_buf, single_rank_count * size, dt,
                            mem_type);
 }
