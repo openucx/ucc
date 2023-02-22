@@ -45,7 +45,7 @@ ucc_status_t ucc_tl_rccl_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_cuda_get_lib_properties(ucc_base_lib_properties_t *prop)
+ucc_status_t ucc_tl_rccl_get_lib_properties(ucc_base_lib_properties_t *prop)
 {
     prop->default_team_size = 2;
     prop->min_team_size     = 2;
