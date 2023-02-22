@@ -42,6 +42,8 @@ AS_IF([test "x$with_sharp" != "xno"],
             [
                 AC_SUBST(SHARP_CPPFLAGS, "-I$check_sharp_dir/include/ ")
                 AC_SUBST(SHARP_LDFLAGS, "-lsharp_coll -L$check_sharp_dir/lib")
+                AC_CHECK_DECLS([SHARP_COLL_HIDE_ERRORS], [], [], [[#include <sharp/api/sharp_coll.h>]])
+                AC_CHECK_DECLS([SHARP_COLL_DISABLE_LAZY_GROUP_RESOURCE_ALLOC], [], [], [[#include <sharp/api/sharp_coll.h>]])
             ],
             [
                 AS_IF([test "x$with_sharp" != "xguess"],

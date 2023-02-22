@@ -300,6 +300,17 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
     init_spec.config                         = sharp_coll_default_config;
     init_spec.config.user_progress_num_polls = sharp_ctx->cfg.uprogress_num_polls;
     init_spec.config.ib_dev_list             = sharp_ctx->cfg.dev_list;
+#if HAVE_DECL_SHARP_COLL_HIDE_ERRORS
+    if (lib->super.super.log_component.log_level < UCC_LOG_LEVEL_DEBUG) {
+        init_spec.config.flags               |= SHARP_COLL_HIDE_ERRORS;
+    }
+#endif
+#if HAVE_DECL_SHARP_COLL_DISABLE_LAZY_GROUP_RESOURCE_ALLOC
+    if(!sharp_ctx->cfg.enable_lazy_group_alloc) {
+        init_spec.config.flags               |= SHARP_COLL_DISABLE_LAZY_GROUP_RESOURCE_ALLOC;
+    }
+#endif
+
     init_spec.job_id                         = ((getpid() ^ pthread_self())
                                                 ^ rand_r(&sharp_ctx->cfg.rand_seed));
     init_spec.enable_thread_support          =
