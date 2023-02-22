@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -17,8 +17,9 @@ enum {
 extern ucc_base_coll_alg_info_t
              ucc_tl_ucp_bcast_algs[UCC_TL_UCP_BCAST_ALG_LAST + 1];
 
+/* SAG bcast supports team size 2, but Knomial is always better in this case */
 #define UCC_TL_UCP_BCAST_DEFAULT_ALG_SELECT_STR \
-    "bcast:0-32k:@0#bcast:32k-inf:@1"
+    "bcast:0-inf:[2-2]:@0#bcast:0-32k:[3-inf]:@0#bcast:32k-inf:[3-inf]:@1"
 
 static inline int ucc_tl_ucp_bcast_alg_from_str(const char *str)
 {
