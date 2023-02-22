@@ -38,6 +38,7 @@ runs_on_dockers:
     cloud: 'swx-k8s'
   }
 
+
 # bare metal
 runs_on_agents:
   - nodeLabel: 'swx-clx01'
@@ -81,6 +82,12 @@ steps:
     run: |
       echo "INFO: Run UCC MPI tests"
       ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
+  #============================================================================
+  - name: Run Coverity
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    run: |
+      echo "Running coverity"
+      ${WORKSPACE}/.ci/scripts/coverity.sh
   #============================================================================
   - name: Run DLRM tests (UCC/GPU)
     agentSelector: "{nodeLabel: 'swx-clx01'}"
