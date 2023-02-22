@@ -93,6 +93,7 @@ gtest_SOURCES =                     \
 	coll/test_allreduce.cc          \
 	coll/test_reduce_scatter.cc     \
 	coll/test_reduce_scatterv.cc    \
+	coll/test_scatter.cc         	\
 	utils/test_string.cc            \
 	utils/test_ep_map.cc            \
 	utils/test_lock_free_queue.cc   \
