@@ -1,0 +1,75 @@
+# vim: filetype=dockerfile
+FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NEXUS=swx-repos.mtr.labs.mlnx
+ARG _ARCH=x86_64
+ARG _MOFED_REL=5.6-2.0.9.0
+ARG _DISTRO=ubuntu20.04
+ARG _URL=http://r-fserv-105.mtr.labs.mlnx/MLNX_OFED//MLNX_OFED_LINUX-$_MOFED_REL/MLNX_OFED_LINUX-$_MOFED_REL-$_DISTRO-$_ARCH/
+ARG _UID=6213
+ARG _GID=101
+ARG _LOGIN=swx-jenkins
+ARG _HOME=/var/home/$_LOGIN
+RUN apt-get -q update ; apt -yq upgrade && apt -qy install sudo
+RUN mkdir -p $_HOME \
+    && mkdir -p /root/.gnupg \
+    && groupadd -f -g "$_GID" "$_LOGIN" \
+    && useradd -u "$_UID" -g "$_GID" -s /bin/bash -m -d ${_HOME} "$_LOGIN" \
+    && chown $_LOGIN $_HOME \
+    && echo "${_LOGIN} ALL=(ALL) NOPASSWD: ALL\nroot ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers \
+    && truncate -s 0 ~/.bash_history
+
+SHELL ["/bin/bash", "-c"]
+
+USER root
+
+
+RUN cd /tmp/ && lftp -c mirror $_URL && \
+    cd MLNX_OFED_LINUX-$_MOFED_REL-$_DISTRO-$_ARCH && chmod +x mlnxofedinstall && \
+    echo $_MOFED_REL > .mlnx && uname -m > .arch && \
+    perl ./mlnxofedinstall -q --without-fw-update --user-space-only --skip-distro-check \
+    --skip-unsupported-devices-check --force --upstream-libs; \
+    cd /tmp && rm -rf MLNX_OFED_LINUX-$_MOFED_REL-$_DISTRO-$_ARCH
+
+
+
+
+
+
+
+# Authorize SSH Host
+RUN apt-get install -y openssh-server &&\
+    mkdir -p ~/.ssh && \
+    chmod 0700 ~/.ssh && \
+    ssh-keygen -f $HOME/.ssh/id_rsa -t rsa -N '' && \ 
+    cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys && \
+    chmod og-wx ~/.ssh/authorized_keys && \
+    echo "StrictHostKeyChecking no" >> ~/.ssh/config && \
+    /etc/init.d/ssh start
+
+
+# python2 verification requirements
+ADD verification/requirements.txt /root/requirements.txt
+RUN ln -s /usr/bin/python2 /usr/bin/python
+
+RUN cd /tmp \
+    && curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py \
+    && python2 get-pip.py \
+    && rm -rf /tmp/get-pip.py \
+    && pip2 install -r /root/requirements.txt
+
+#handle running services
+COPY .ci/systemctl.py /usr/bin/systemctl
+RUN chmod a+x /usr/bin/systemctl
+
+# To install the Yarn package manager, run:
+RUN curl -sL https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
+RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" > /etc/apt/sources.list.d/yarn.list
+RUN apt-get update && apt-get -y install yarn
+
+    
+# clean up
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN rm -rf /tmp/*
+
+WORKDIR /tmp
