@@ -417,8 +417,7 @@ ucc_status_t ucc_tl_mlx5_create_umr_qp(struct ibv_context *ctx,
     memset(&umr_mlx5dv_qp_attr, 0, sizeof(umr_mlx5dv_qp_attr));
     memset(&umr_init_attr_ex, 0, sizeof(umr_init_attr_ex));
 
-    umr_mlx5dv_qp_attr.comp_mask =
-        MLX5DV_QP_INIT_ATTR_MASK_SEND_OPS_FLAGS;
+    umr_mlx5dv_qp_attr.comp_mask      = MLX5DV_QP_INIT_ATTR_MASK_SEND_OPS_FLAGS;
     umr_mlx5dv_qp_attr.send_ops_flags = MLX5DV_QP_EX_WITH_MR_LIST |
                                         MLX5DV_QP_EX_WITH_MR_INTERLEAVED |
                                         MLX5DV_QP_EX_WITH_RAW_WQE;

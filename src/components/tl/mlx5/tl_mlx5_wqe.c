@@ -96,8 +96,8 @@ ucc_status_t ucc_tl_mlx5_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey,
 /* The strided block format is as the following:
  * | repeat_block | entry_block | entry_block |...| entry_block |
  * While the repeat entry contains details on the list of the block_entries. */
-static void umr_pointer_seg_init(uint32_t                      repeat_count,
-                                 uint16_t                      num_interleaved,
+static void umr_pointer_seg_init(uint32_t repeat_count,
+                                 uint16_t num_interleaved,
                                  struct mlx5dv_mr_interleaved *data,
                                  struct mlx5_wqe_umr_pointer_seg *pseg,
                                  uint32_t ptr_mkey, void *ptr_address,
@@ -121,10 +121,10 @@ static void umr_pointer_seg_init(uint32_t                      repeat_count,
     eb               = rb->entries;
 
     /*
-	 * ------------------------------------------------------------
-	 * | repeat_block | entry_block | entry_block |...| entry_block
-	 * ------------------------------------------------------------
-	 */
+     * ------------------------------------------------------------
+     * | repeat_block | entry_block | entry_block |...| entry_block
+     * ------------------------------------------------------------
+     */
     for (i = 0; i < num_interleaved; i++, eb++) {
         byte_count += data[i].bytes_count;
         eb->va         = htobe64(data[i].addr);
@@ -141,7 +141,7 @@ static void umr_pointer_seg_init(uint32_t                      repeat_count,
 ucc_status_t ucc_tl_mlx5_post_umr(struct ibv_qp *     qp,
                                   struct mlx5dv_mkey *dv_mkey,
                                   uint32_t access_flags, uint32_t repeat_count,
-                                  uint16_t                      num_entries,
+                                  uint16_t num_entries,
                                   struct mlx5dv_mr_interleaved *data,
                                   uint32_t ptr_mkey, void *ptr_address)
 {
@@ -149,9 +149,9 @@ ucc_status_t ucc_tl_mlx5_post_umr(struct ibv_qp *     qp,
     uint64_t reglen = 0;
     uint32_t opmode = 0x0;
     uint32_t n_ds   = (sizeof(struct mlx5_wqe_ctrl_seg) +
-                     sizeof(struct mlx5_wqe_umr_ctrl_seg) +
-                     sizeof(struct mlx5_wqe_mkey_context_seg) +
-                     sizeof(struct mlx5_wqe_umr_pointer_seg)) / DS_SIZE;
+                       sizeof(struct mlx5_wqe_umr_ctrl_seg) +
+                       sizeof(struct mlx5_wqe_mkey_context_seg) +
+                       sizeof(struct mlx5_wqe_umr_pointer_seg)) / DS_SIZE;
     uint8_t fm_ce_se =
         MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE | MLX5_WQE_CTRL_CQ_UPDATE;
     struct ibv_qp_ex *   qp_ex = ibv_qp_to_qp_ex(qp);
@@ -204,10 +204,10 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn,
 
 {
 
-    uint32_t                      opcode = MLX5_OPCODE_RDMA_WRITE;
-    uint32_t                      opmode = 0x0;
-    struct ibv_qp_ex *            qp_ex = ibv_qp_to_qp_ex(qp);
-    struct mlx5dv_qp_ex *         mqp   = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
+    uint32_t                      opcode   = MLX5_OPCODE_RDMA_WRITE;
+    uint32_t                      opmode   = 0x0;
+    struct ibv_qp_ex *            qp_ex    = ibv_qp_to_qp_ex(qp);
+    struct mlx5dv_qp_ex *         mqp      = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
     uint8_t                       fm_ce_se = MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE;
     struct mlx5_wqe_ctrl_seg *    ctrl;
     struct mlx5_wqe_data_seg *    data;
@@ -233,7 +233,6 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn,
         tl_mlx5_ah_to_av(ah, &dseg->av);
         dseg->av.dqp_dct |= htobe32(qpn | MLX5_EXTENDED_UD_AV);
         dseg->av.key.dc_key = htobe64(DC_KEY);
-
         rseg = PTR_OFFSET(dseg, sizeof(*dseg));
     } else {
         rseg = PTR_OFFSET(ctrl, sizeof(*ctrl));
@@ -252,8 +251,8 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn,
 
 #define ACTION_RETRY        0x0ULL
 #define ACTION_SEND_ERR_CQE 0x1ULL
-#define ACTION           ACTION_RETRY
-#define MLX5_OPCODE_WAIT 0xF
+#define ACTION              ACTION_RETRY
+#define MLX5_OPCODE_WAIT    0xF
 
 typedef struct wait_on_data_seg {
     __be32 op; /* 4 bits op + 1 inv */
@@ -268,15 +267,18 @@ ucc_status_t ucc_tl_mlx5_post_wait_on_data(struct ibv_qp *qp, uint64_t value,
                                            void *task_ptr)
 {
 
-    uint32_t                  opcode = MLX5_OPCODE_WAIT;
-    uint32_t                  opmode = 0x1; //wait on data
-    uint32_t                  n_ds   = 3;   //CTRL + Wait on Data of Size 2
+    uint32_t             opcode = MLX5_OPCODE_WAIT;
+    uint32_t             opmode = 0x1; //wait on data
+    uint32_t             n_ds   = 3;   //CTRL + Wait on Data of Size 2
+    struct ibv_qp_ex *   qp_ex  = ibv_qp_to_qp_ex(qp);
+    struct mlx5dv_qp_ex *mqp    = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
+    uint8_t fm_ce_se            = MLX5_WQE_CTRL_FENCE | MLX5_WQE_CTRL_CQ_UPDATE;
     char                      wqe_desc[n_ds * DS_SIZE];
-    struct ibv_qp_ex *        qp_ex = ibv_qp_to_qp_ex(qp);
-    struct mlx5dv_qp_ex *     mqp   = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
-    uint8_t fm_ce_se = MLX5_WQE_CTRL_FENCE | MLX5_WQE_CTRL_CQ_UPDATE;
     struct mlx5_wqe_ctrl_seg *ctrl;
     wait_on_data_seg_t *      wseg;
+
+    // required alignement on the buffer
+    ucc_assert(addr % 8 == 0);
 
     memset(wqe_desc, 0, n_ds * DS_SIZE);
     /* SET CTRL SEG */
