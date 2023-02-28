@@ -265,4 +265,63 @@ static inline void ucc_kn_ag_pattern_next_iter(ucc_knomial_pattern_t *p)
     }
 }
 
+static inline void ucc_kn_rsx_pattern_init(ucc_rank_t size, ucc_rank_t rank,
+                                           ucc_kn_radix_t radix, size_t count,
+                                           ucc_knomial_pattern_t *p)
+{
+    ucc_knomial_pattern_init(size, rank, radix, p);
+    p->type              = KN_PATTERN_REDUCE_SCATTERX;
+    p->count             = count;
+    p->block_size_counts = count;
+    p->block_size        = size - p->n_extra;
+}
+
+static inline void
+ucc_kn_rs_pattern_peer_seg(ucc_rank_t peer, ucc_knomial_pattern_t *p,
+                           size_t *peer_seg_count, size_t *peer_seg_offset)
+{
+    ucc_rank_t step_radix, seg_index;
+
+    *peer_seg_count  = 0;
+    *peer_seg_offset = 0;
+
+    switch (p->type) {
+    case KN_PATTERN_REDUCE_SCATTERX:
+        step_radix = ucc_kn_compute_step_radix(p);
+        seg_index  = ucc_kn_compute_seg_index(peer, p->radix_pow, p);
+        *peer_seg_offset = ucc_buffer_block_offset(p->block_size_counts,
+                                                   step_radix, seg_index);
+        *peer_seg_count  = ucc_buffer_block_count(p->block_size_counts,
+                                                  step_radix, seg_index);
+        return;
+    case KN_PATTERN_REDUCE_SCATTER:
+    case KN_PATTERN_REDUCE_SCATTERV:
+        /* not implemented */
+        ucc_assert(0);
+    default:
+        ucc_assert(0);
+    }
+}
+
+static inline void ucc_kn_rs_pattern_next_iter(ucc_knomial_pattern_t *p)
+{
+    size_t offset, bs;
+
+    ucc_kn_rs_pattern_peer_seg(p->rank, p, &bs, &offset);
+    p->block_size_counts = bs;
+
+    switch (p->type) {
+    case KN_PATTERN_REDUCE_SCATTERX:
+        p->block_offset += offset;
+        ucc_knomial_pattern_next_iteration(p);
+        return;
+    case KN_PATTERN_REDUCE_SCATTER:
+    case KN_PATTERN_REDUCE_SCATTERV:
+        /* not implemented */
+        ucc_assert(0);
+    default:
+        ucc_assert(0);
+    }
+}
+
 #endif

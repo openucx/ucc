@@ -192,6 +192,12 @@ ucc_knomial_pattern_next_iteration(ucc_knomial_pattern_t *p)
     p->radix_pow *= p->radix;
 }
 
+static inline void ucc_knomial_pattern_prev_iteration(ucc_knomial_pattern_t *p)
+{
+    p->iteration--;
+    p->radix_pow /= p->radix;
+}
+
 static inline void
 ucc_knomial_pattern_next_iteration_backward(ucc_knomial_pattern_t *p)
 {
