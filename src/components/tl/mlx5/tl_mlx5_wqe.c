@@ -292,7 +292,7 @@ ucc_status_t ucc_tl_mlx5_post_wait_on_data(struct ibv_qp *qp, uint64_t value,
     wseg->lkey    = htobe32(lkey);
     wseg->va_fail = htobe64((addr) | (ACTION));
     wseg->data = value;
-    wseg->data_mask = 0;
+    wseg->data_mask = 1;
     mlx5dv_wr_raw_wqe(mqp, wqe_desc);
     if (ibv_wr_complete(qp_ex)) {
         return UCC_ERR_NO_MESSAGE;
