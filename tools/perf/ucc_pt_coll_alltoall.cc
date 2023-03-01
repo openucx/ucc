@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "ucc_pt_coll.h"
 #include "ucc_perftest.h"
 #include <ucc/api/ucc.h>
@@ -36,18 +42,18 @@ ucc_status_t ucc_pt_coll_alltoall::init_args(size_t single_rank_count,
 
     args = coll_args;
     args.dst.info.count = single_rank_count * comm_size;
-    UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size, args.dst.info.mem_type), exit,
+    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, size, args.dst.info.mem_type), exit,
                   st);
     args.dst.info.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
         args.src.info.count = single_rank_count * comm_size;
-        UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size, args.src.info.mem_type),
+        UCCCHECK_GOTO(ucc_pt_alloc(&src_header, size, args.src.info.mem_type),
                       free_dst, st);
         args.src.info.buffer = src_header->addr;
     }
     return UCC_OK;
 free_dst:
-    ucc_mc_free(dst_header);
+    ucc_pt_free(dst_header);
 exit:
     return st;
 }
@@ -57,9 +63,9 @@ void ucc_pt_coll_alltoall::free_args(ucc_pt_test_args_t &test_args)
     ucc_coll_args_t &args = test_args.coll_args;
 
     if (!UCC_IS_INPLACE(args)) {
-        ucc_mc_free(src_header);
+        ucc_pt_free(src_header);
     }
-    ucc_mc_free(dst_header);
+    ucc_pt_free(dst_header);
 }
 
 float ucc_pt_coll_alltoall::get_bw(float time_ms, int grsize,

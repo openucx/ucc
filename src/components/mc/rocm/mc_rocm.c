@@ -251,6 +251,32 @@ static ucc_status_t ucc_mc_rocm_memcpy(void *dst, const void *src, size_t len,
     return UCC_OK;
 }
 
+static ucc_status_t ucc_mc_rocm_memset(void *ptr, int val, size_t len)
+{
+    hipError_t st;
+
+    UCC_MC_ROCM_INIT_STREAM();
+    st = hipMemsetAsync(ptr, val, len, ucc_mc_rocm.stream);
+    if (ucc_unlikely(st != hipSuccess)) {
+        hipGetLastError();
+        mc_error(&ucc_mc_rocm.super,
+                 "failed to launch hipMemsetAsync, dst %p, len %zd "
+                 "hip error %d(%s)",
+                 ptr, len, st, hipGetErrorString(st));
+        return hip_error_to_ucc_status(st);
+    }
+    st = hipStreamSynchronize(ucc_mc_rocm.stream);
+    if (ucc_unlikely(st != hipSuccess)) {
+        hipGetLastError();
+        mc_error(&ucc_mc_rocm.super,
+                 "failed to synchronize mc_rocm.stream "
+                 "hip error %d(%s)",
+                 st, hipGetErrorString(st));
+        return hip_error_to_ucc_status(st);
+    }
+    return UCC_OK;
+}
+
 static ucc_status_t ucc_mc_rocm_mem_query(const void *ptr,
                                           ucc_mem_attr_t *mem_attr)
 {
@@ -330,6 +356,7 @@ ucc_mc_rocm_t ucc_mc_rocm = {
     .super.ops.mem_alloc          = ucc_mc_rocm_mem_pool_alloc_with_init,
     .super.ops.mem_free           = ucc_mc_rocm_mem_pool_free,
     .super.ops.memcpy             = ucc_mc_rocm_memcpy,
+    .super.ops.memset             = ucc_mc_rocm_memset,
     .super.config_table =
         {
             .name   = "ROCM memory component",

@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "ucc_pt_coll.h"
 #include "ucc_perftest.h"
 #include <ucc/api/ucc.h>
@@ -29,7 +35,7 @@ ucc_status_t ucc_pt_coll_bcast::init_args(size_t count,
 
     args = coll_args;
     args.src.info.count = count;
-    UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size, args.src.info.mem_type), exit,
+    UCCCHECK_GOTO(ucc_pt_alloc(&src_header, size, args.src.info.mem_type), exit,
                   st);
     args.src.info.buffer = src_header->addr;
 exit:
@@ -38,7 +44,7 @@ exit:
 
 void ucc_pt_coll_bcast::free_args(ucc_pt_test_args_t &test_args)
 {
-    ucc_mc_free(src_header);
+    ucc_pt_free(src_header);
 }
 
 float ucc_pt_coll_bcast::get_bw(float time_ms, int grsize,

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -35,5 +35,7 @@ ucc_status_t ucc_mc_memcpy(void *dst, const void *src, size_t len,
                            ucc_memory_type_t dst_mem,
                            ucc_memory_type_t src_mem);
 
+ucc_status_t ucc_mc_memset(void *ptr, int value, size_t size,
+                           ucc_memory_type_t mem_type);
 
 #endif
