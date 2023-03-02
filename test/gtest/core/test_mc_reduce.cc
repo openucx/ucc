@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -8,12 +8,17 @@ extern "C" {
 #include "components/ec/ucc_ec.h"
 }
 
-template<typename T>
+#ifdef HAVE_CUDA
+#include <cuda_runtime.h>
+#endif
+
+template <typename T, bool triggered>
 class test_mc_reduce : public testing::Test {
   protected:
     const int COUNT = 1024;
-    ucc_memory_type_t mem_type;
+    ucc_memory_type_t  mem_type;
     ucc_ee_executor_t *executor;
+    void              *ee_context = NULL;
 
     virtual void SetUp() override
     {
@@ -40,6 +45,17 @@ class test_mc_reduce : public testing::Test {
         switch (mtype) {
         case UCC_MEMORY_TYPE_CUDA:
             coll_ee_type = UCC_EE_CUDA_STREAM;
+#ifdef HAVE_CUDA
+            if (triggered) {
+                cudaStream_t       stream;
+                if (cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking) !=
+                    cudaSuccess) {
+                    std::cerr << "failed to create cuda stream" << std::endl;
+                    return UCC_ERR_NO_RESOURCE;
+                }
+                ee_context = (void *)stream;
+            }
+#endif
             break;
         case UCC_MEMORY_TYPE_HOST:
             coll_ee_type = UCC_EE_CPU_THREAD;
@@ -57,7 +73,7 @@ class test_mc_reduce : public testing::Test {
                       << ucc_status_string(status) << std::endl;
             return status;
         }
-        status = ucc_ee_executor_start(executor, NULL);
+        status = ucc_ee_executor_start(executor, ee_context);
         if (UCC_OK != status) {
             std::cerr << "failed to start executor: "
                       << ucc_status_string(status) << std::endl;
@@ -76,6 +92,14 @@ class test_mc_reduce : public testing::Test {
                       << ucc_status_string(status) << std::endl;
         }
         ucc_ee_executor_finalize(executor);
+#ifdef HAVE_CUDA
+        if (triggered) {
+            if (cudaStreamDestroy((cudaStream_t)ee_context) != cudaSuccess) {
+                std::cerr << "failed to destory cuda stream" << std::endl;
+                return UCC_ERR_NO_MESSAGE;
+            }
+        }
+#endif
         return status;
     }
 
@@ -338,16 +362,24 @@ using TypeOpPairsFloat = ::testing::Types<ARITHMETIC_OP_PAIRS(FLOAT32),
                                           TypeOpPair<UCC_DT_FLOAT64, avg>,
                                           TypeOpPair<UCC_DT_BFLOAT16, avg>>;
 
-template<typename T>
-class test_mc_reduce_int : public test_mc_reduce<T> {};
+using TypeOpPairsFloatCuda = ::testing::Types<
+    ARITHMETIC_OP_PAIRS(FLOAT32), ARITHMETIC_OP_PAIRS(FLOAT64),
+    ARITHMETIC_OP_PAIRS(BFLOAT16), TypeOpPair<UCC_DT_FLOAT32_COMPLEX, sum>,
+    TypeOpPair<UCC_DT_FLOAT32_COMPLEX, prod>,
+    TypeOpPair<UCC_DT_FLOAT64_COMPLEX, sum>,
+    TypeOpPair<UCC_DT_FLOAT64_COMPLEX, prod>, TypeOpPair<UCC_DT_FLOAT32, avg>,
+    TypeOpPair<UCC_DT_FLOAT64, avg>, TypeOpPair<UCC_DT_BFLOAT16, avg>>;
+
+template <typename T>
+class test_mc_reduce_int : public test_mc_reduce<T, false> {};
 TYPED_TEST_CASE(test_mc_reduce_int, TypeOpPairsInt);
 
-template<typename T>
-class test_mc_reduce_uint : public test_mc_reduce<T> {};
+template <typename T>
+class test_mc_reduce_uint : public test_mc_reduce<T, false> {};
 TYPED_TEST_CASE(test_mc_reduce_uint, TypeOpPairsUint);
 
-template<typename T>
-class test_mc_reduce_float : public test_mc_reduce<T> {};
+template <typename T>
+class test_mc_reduce_float : public test_mc_reduce<T, false> {};
 TYPED_TEST_CASE(test_mc_reduce_float, TypeOpPairsFloat);
 
 #define DECLARE_REDUCE_TEST(_type, _mt)             \
@@ -385,4 +417,26 @@ DECLARE_REDUCE_MULTI_TEST(uint, CUDA);
 DECLARE_REDUCE_MULTI_TEST(float, CUDA);
 
 DECLARE_REDUCE_MULTI_ALPHA_TEST(float, CUDA);
+
+template <typename T>
+class test_mc_reduce_int_triggered : public test_mc_reduce<T, true> {};
+TYPED_TEST_CASE(test_mc_reduce_int_triggered, TypeOpPairsInt);
+
+template <typename T>
+class test_mc_reduce_uint_triggered : public test_mc_reduce<T, true> {};
+TYPED_TEST_CASE(test_mc_reduce_uint_triggered, TypeOpPairsUint);
+
+template <typename T>
+class test_mc_reduce_float_triggered : public test_mc_reduce<T, true> {};
+TYPED_TEST_CASE(test_mc_reduce_float_triggered, TypeOpPairsFloatCuda);
+
+DECLARE_REDUCE_TEST(int_triggered, CUDA);
+DECLARE_REDUCE_TEST(uint_triggered, CUDA);
+DECLARE_REDUCE_TEST(float_triggered, CUDA);
+
+DECLARE_REDUCE_MULTI_TEST(int_triggered, CUDA);
+DECLARE_REDUCE_MULTI_TEST(uint_triggered, CUDA);
+DECLARE_REDUCE_MULTI_TEST(float_triggered, CUDA);
+
+DECLARE_REDUCE_MULTI_ALPHA_TEST(float_triggered, CUDA);
 #endif
