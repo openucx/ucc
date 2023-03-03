@@ -1501,7 +1501,8 @@ typedef struct ucc_team_attr {
  *  @b Description
  *
  *  @ref ucc_team_create_post is a nonblocking collective operation to create
- *  the team handle. It takes in parameters ucc_context_h and ucc_team_params_t.
+ *  the team handle. Overlapping of multiple ucc\_team\_create\_post operations
+ *  are invalid. The post takes in parameters ucc_context_h and ucc_team_params_t.
  *  The ucc_team_params_t provides user configuration to customize the team and,
  *  ucc_context_h provides the resources for the team and collectives.
  *  The routine returns immediately after posting the operation with the
