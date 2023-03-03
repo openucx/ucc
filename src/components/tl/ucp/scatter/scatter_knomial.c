@@ -85,12 +85,12 @@ void ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     }
 
     while (!ucc_knomial_pattern_loop_done(p)) {
-        step_radix  = ucc_sra_kn_compute_step_radix(rank, size, p);
+        step_radix  = ucc_kn_compute_step_radix(p);
         block_count = ucc_sra_kn_compute_block_count(count, rank, p);
         sbuf        = (rank == root)
                            ? args->src.info.buffer : args->dst.info.buffer;
         rbuf        = args->dst.info.buffer;
-        local_seg_index = ucc_sra_kn_compute_seg_index(rank, p->radix_pow, p);
+        local_seg_index = ucc_kn_compute_seg_index(rank, p->radix_pow, p);
         local_seg_count = ucc_sra_kn_compute_seg_size(block_count, step_radix,
                                                       local_seg_index);
 
@@ -104,8 +104,7 @@ void ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
         if (rank != root && task->scatter_kn.recv_dist == p->radix_pow &&
             task->tagged.recv_posted == 0) {
             for (loop_step = 1; loop_step < radix; loop_step++) {
-                peer = ucc_knomial_pattern_get_loop_peer(p, rank, size,
-                                                             loop_step);
+                peer = ucc_knomial_pattern_get_loop_peer(p, rank, loop_step);
                 if (peer == UCC_KN_PEER_NULL)
                     continue;
                 vpeer = ucc_knomial_pattern_loop_rank(p, peer);
@@ -133,12 +132,11 @@ void ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
             (task->tagged.recv_posted > 0 &&
              task->tagged.recv_posted == task->tagged.recv_completed)) {
             for (loop_step = 1; loop_step < radix; loop_step++) {
-                peer = ucc_knomial_pattern_get_loop_peer(p, rank, size,
-                                                             loop_step);
+                peer = ucc_knomial_pattern_get_loop_peer(p, rank, loop_step);
                 if (peer == UCC_KN_PEER_NULL)
                     continue;
                 peer_seg_index =
-                    ucc_sra_kn_compute_seg_index(peer, p->radix_pow, p);
+                    ucc_kn_compute_seg_index(peer, p->radix_pow, p);
                 peer_seg_count = ucc_sra_kn_compute_seg_size(
                     block_count, step_radix, peer_seg_index);
                 peer_seg_offset = ucc_sra_kn_compute_seg_offset(
@@ -149,7 +147,7 @@ void ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
                     (ucc_rank_t)args->root, size), team, task), task, out);
             }
             local_seg_index =
-                ucc_sra_kn_compute_seg_index(rank, p->radix_pow, p);
+                ucc_kn_compute_seg_index(rank, p->radix_pow, p);
             offset = ucc_sra_kn_compute_seg_offset(
                 block_count, step_radix, local_seg_index);
             task->scatter_kn.send_offset += offset * dt_size;

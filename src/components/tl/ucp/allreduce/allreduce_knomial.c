@@ -34,7 +34,6 @@ void ucc_tl_ucp_allreduce_knomial_progress(ucc_coll_task_t *coll_task)
     size_t                 count      = args->dst.info.count;
     ucc_datatype_t         dt         = args->dst.info.datatype;
     size_t                 data_size  = count * ucc_dt_size(dt);
-    ucc_rank_t             size       = (ucc_rank_t)task->subset.map.ep_num;
     ucc_rank_t             rank       = task->subset.myrank;
     void                  *send_buf;
     ptrdiff_t              recv_offset;
@@ -91,7 +90,7 @@ UCC_KN_PHASE_EXTRA_REDUCE:
     }
     while(!ucc_knomial_pattern_loop_done(p)) {
         for (loop_step = 1; loop_step < radix; loop_step++) {
-            peer = ucc_knomial_pattern_get_loop_peer(p, rank, size, loop_step);
+            peer = ucc_knomial_pattern_get_loop_peer(p, rank, loop_step);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
             peer = ucc_ep_map_eval(task->subset.map, peer);
@@ -109,7 +108,7 @@ UCC_KN_PHASE_EXTRA_REDUCE:
 
         recv_offset = 0;
         for (loop_step = 1; loop_step < radix; loop_step++) {
-            peer = ucc_knomial_pattern_get_loop_peer(p, rank, size, loop_step);
+            peer = ucc_knomial_pattern_get_loop_peer(p, rank, loop_step);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
             peer = ucc_ep_map_eval(task->subset.map, peer);

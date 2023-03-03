@@ -16,7 +16,7 @@
 #include "tl_ucp_tag.h"
 
 #define UCC_UUNITS_AUTO_RADIX 4
-#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 5
+#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 6
 extern const char
     *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
 

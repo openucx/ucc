@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -8,6 +9,7 @@
 
 using Param_0 = std::tuple<int, ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
 using Param_1 = std::tuple<ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
+using Param_2 = std::tuple<ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t, std::string>;
 
 class test_allgather : public UccCollArgs, public ucc::test
 {
@@ -249,3 +251,55 @@ INSTANTIATE_TEST_CASE_P(
 #endif
         ::testing::Values(1,3,8192), // count
         ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE)));
+
+class test_allgather_alg : public test_allgather,
+        public ::testing::WithParamInterface<Param_2> {};
+
+UCC_TEST_P(test_allgather_alg, alg)
+{
+    const ucc_datatype_t      dtype    = std::get<0>(GetParam());
+    const ucc_memory_type_t   mem_type = std::get<1>(GetParam());
+    const int                 count    = std::get<2>(GetParam());
+    const gtest_ucc_inplace_t inplace  = std::get<3>(GetParam());
+    int                       n_procs  = 5;
+    char                      tune[32];
+
+    sprintf(tune, "allgather:@%s:inf", std::get<4>(GetParam()).c_str());
+    ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
+                             {"UCC_TL_UCP_TUNE", tune}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team    = job.create_team(n_procs);
+    UccCollCtxVec ctxs;
+
+    set_inplace(inplace);
+    SET_MEM_TYPE(mem_type);
+
+    data_init(n_procs, dtype, count, ctxs, false);
+    UccReq    req(team, ctxs);
+    req.start();
+    req.wait();
+    EXPECT_EQ(true, data_validate(ctxs));
+    data_fini(ctxs);
+}
+
+INSTANTIATE_TEST_CASE_P(
+    , test_allgather_alg,
+    ::testing::Combine(
+        PREDEFINED_DTYPES,
+#ifdef HAVE_CUDA
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
+#else
+        ::testing::Values(UCC_MEMORY_TYPE_HOST),
+#endif
+        ::testing::Values(1,3,8192), // count
+        ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE),
+        ::testing::Values("knomial", "ring")),
+        [](const testing::TestParamInfo<test_allgather_alg::ParamType>& info) {
+            std::string name;
+            name += ucc_datatype_str(std::get<0>(info.param));
+            name += std::string("_") + std::string(ucc_mem_type_str(std::get<1>(info.param)));
+            name += std::string("_count_")+std::to_string(std::get<2>(info.param));
+            name += std::string("_inplace_")+std::to_string(std::get<3>(info.param));
+            name += std::string("_")+std::get<4>(info.param);
+            return name;
+        });
