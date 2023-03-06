@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -246,11 +246,23 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     }
     task->seq_num = team->seq_num++;
 
-    if (ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
-        char coll_debug_str[256];
-        ucc_coll_str(task, coll_debug_str, sizeof(coll_debug_str));
-        ucc_debug("coll_init: %s", coll_debug_str);
+    if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DIAG) {
+        char coll_str[256];
+        ucc_coll_str(task, coll_str, sizeof(coll_str),
+                     ucc_global_config.coll_trace.log_level);
+        if (ucc_global_config.coll_trace.log_level <= UCC_LOG_LEVEL_DEBUG) {
+            if (team->rank == 0) {
+                ucc_log_component_collective_trace(
+                    ucc_global_config.coll_trace.log_level, "coll_init: %s",
+                    coll_str);
+            }
+        } else {
+            ucc_log_component_collective_trace(
+                ucc_global_config.coll_trace.log_level, "coll_init: %s",
+                coll_str);
+        }
     }
+
     ucc_assert(task->super.status == UCC_OPERATION_INITIALIZED);
     *request = &task->super;
 
@@ -283,7 +295,22 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
 {
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
     ucc_status_t status;
-    ucc_debug("coll_post: req %p, seq_num %u", task, task->seq_num);
+
+    if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DEBUG) {
+        ucc_rank_t rank = task->team->params.team->rank;
+        if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {
+            if (rank == 0) {
+                ucc_log_component_collective_trace(
+                    ucc_global_config.coll_trace.log_level,
+                    "coll post: req %p, seq_num %u", task, task->seq_num);
+            }
+        } else {
+            ucc_log_component_collective_trace(
+                ucc_global_config.coll_trace.log_level,
+                "coll post: rank %d req %p, seq_num %u", rank, task,
+                task->seq_num);
+        }
+    }
 
     COLL_POST_STATUS_CHECK(task);
     if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
@@ -300,6 +327,34 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
     return task->post(task);
 }
 
+ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ev)
+{
+    ucc_coll_task_t *task = ucc_derived_of(ev->req, ucc_coll_task_t);
+
+    if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DEBUG) {
+        ucc_rank_t rank = task->team->params.team->rank;
+        if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {
+            if (rank == 0) {
+                ucc_log_component_collective_trace(
+                    ucc_global_config.coll_trace.log_level,
+                    "coll triggered_post: req %p, seq_num %u", task,
+                    task->seq_num);
+            }
+        } else {
+            ucc_log_component_collective_trace(
+                ucc_global_config.coll_trace.log_level,
+                "coll triggered_post: rank %d req %p, seq_num %u", rank, task,
+                task->seq_num);
+        }
+    }
+
+    COLL_POST_STATUS_CHECK(task);
+    if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
+        task->start_time = ucc_get_time();
+    }
+    return task->triggered_post(ee, ev, task);
+}
+
 UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init_and_post,
                       (coll_args, request, team), ucc_coll_args_t *coll_args, //NOLINT
                       ucc_coll_req_h *request, ucc_team_h team) //NOLINT
@@ -309,13 +364,10 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init_and_post,
     return UCC_ERR_NOT_IMPLEMENTED;
 }
 
-UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
-                      ucc_coll_req_h request)
+ucc_status_t ucc_collective_finalize_internal(ucc_coll_task_t *task)
 {
-    ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
     ucc_status_t st;
 
-    ucc_debug("coll_finalize: req %p, seq_num %u", task, task->seq_num);
     if (ucc_unlikely(task->super.status == UCC_INPROGRESS)) {
         ucc_error("attempt to finalize task with status UCC_INPROGRESS");
         return UCC_ERR_INVALID_PARAM;
@@ -324,11 +376,33 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
     if (task->executor) {
         st = ucc_ee_executor_finalize(task->executor);
         if (ucc_unlikely(st != UCC_OK)) {
-            ucc_error("executor finalize error: %s",
-                      ucc_status_string(st));
+            ucc_error("executor finalize error: %s", ucc_status_string(st));
         }
     }
     return task->finalize(task);
+}
+
+UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
+                      ucc_coll_req_h request)
+{
+    ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
+
+    if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DEBUG) {
+        ucc_rank_t rank = task->team->params.team->rank;
+        if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {
+            if (rank == 0) {
+                ucc_log_component_collective_trace(
+                    ucc_global_config.coll_trace.log_level,
+                    "coll finalize: req %p, seq_num %u", task, task->seq_num);
+            }
+        } else {
+            ucc_log_component_collective_trace(
+                ucc_global_config.coll_trace.log_level,
+                "coll finalize: rank %d req %p, seq_num %u", rank, task,
+                task->seq_num);
+        }
+    }
+    return ucc_collective_finalize_internal(task);
 }
 
 static ucc_status_t ucc_triggered_task_finalize(ucc_coll_task_t *task)
@@ -479,17 +553,4 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
     }
 
     return ucc_progress_queue_enqueue(UCC_TASK_CORE_CTX(ev_task)->pq, ev_task);
-}
-
-ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ev)
-{
-    ucc_coll_task_t *task = ucc_derived_of(ev->req, ucc_coll_task_t);
-
-    ucc_debug("triggered_post: task %p, seq_num %u", task, task->seq_num);
-
-    COLL_POST_STATUS_CHECK(task);
-    if (UCC_COLL_TIMEOUT_REQUIRED(task)) {
-        task->start_time = ucc_get_time();
-    }
-    return task->triggered_post(ee, ev, task);
 }

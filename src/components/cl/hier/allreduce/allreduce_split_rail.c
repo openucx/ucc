@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -264,7 +264,7 @@ ucc_cl_hier_split_rail_allreduce_start(ucc_coll_task_t *task)
     ucc_schedule_pipelined_t *schedule =
         ucc_derived_of(task, ucc_schedule_pipelined_t);
 
-    cl_info(task->team->context->lib,
+    cl_debug(task->team->context->lib,
             "posting split_rail ar, sbuf %p, rbuf %p, count %zd, dt %s, op %s, "
             "inplace %d, pdepth %d, frags_total %d",
             task->bargs.args.src.info.buffer, task->bargs.args.dst.info.buffer,

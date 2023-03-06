@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -44,8 +45,7 @@ typedef ucc_status_t (*ucc_task_event_handler_p)(ucc_coll_task_t *parent,
 /* triggered post setup function will be launched before starting executor */
 typedef ucc_status_t (*ucc_coll_triggered_post_setup_fn_t)(ucc_coll_task_t *task);
 
-typedef ucc_status_t (*ucc_coll_triggered_post_fn_t)(ucc_ee_h ee,
-                                                     ucc_ev_t *ev,
+typedef ucc_status_t (*ucc_coll_triggered_post_fn_t)(ucc_ee_h ee, ucc_ev_t *ev,
                                                      ucc_coll_task_t *task);
 
 typedef struct ucc_em_listener {
@@ -70,6 +70,8 @@ enum {
     UCC_COLL_TASK_FLAG_EXECUTOR_STOP    = UCC_BIT(3),
     /* destroy executor in task complete */
     UCC_COLL_TASK_FLAG_EXECUTOR_DESTROY = UCC_BIT(4),
+    /* if set task can be casted to scheulde */
+    UCC_COLL_TASK_FLAG_IS_SCHEDULE      = UCC_BIT(5),
 };
 
 typedef struct ucc_coll_task {
@@ -145,7 +147,8 @@ ucc_status_t ucc_schedule_init(ucc_schedule_t *schedule,
                                ucc_base_coll_args_t *bargs,
                                ucc_base_team_t *team);
 
-ucc_status_t ucc_schedule_add_task(ucc_schedule_t *schedule, ucc_coll_task_t *task);
+ucc_status_t ucc_schedule_add_task(ucc_schedule_t *schedule,
+                                   ucc_coll_task_t *task);
 
 ucc_status_t ucc_schedule_start(ucc_coll_task_t *task);
 
@@ -184,7 +187,8 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
         /* error in task status */
         if (UCC_ERR_TIMED_OUT == status) {
             char coll_str[256];
-            ucc_coll_str(task, coll_str, sizeof(coll_str));
+            ucc_coll_str(task, coll_str, sizeof(coll_str),
+                         UCC_LOG_LEVEL_DEBUG);
             ucc_warn("timeout %g sec. has expired on %s",
                      task->bargs.args.timeout, coll_str);
         } else {

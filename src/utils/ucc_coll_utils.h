@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -212,7 +212,8 @@ ucc_ep_map_t ucc_ep_map_from_array_64(uint64_t **array, ucc_rank_t size,
                                       ucc_rank_t full_size, int need_free);
 
 typedef struct ucc_coll_task ucc_coll_task_t;
-void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len);
+void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
+                  int verbosity);
 
 /* Creates a rank map that reverses rank order, ie
    rank r -> size - 1 - r */

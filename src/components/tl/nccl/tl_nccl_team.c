@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  *
  * See file LICENSE for terms.
@@ -56,7 +56,7 @@ free_unique_id:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_nccl_team_t)
 {
-    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+    tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
     if (self->nccl_comm) {
         if (self->comm_state != UCC_OK) {
             /* if communication error was detected ncclCommAbort should be used
@@ -111,13 +111,13 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
     nccl_status = ncclCommInitRank(&team->nccl_comm, UCC_TL_TEAM_SIZE(team),
                                    team->unique_id[0], UCC_TL_TEAM_RANK(team));
     if (nccl_status != ncclSuccess) {
-        tl_info(tl_team->context->lib, "NCCL error %d %s",
+        tl_debug(tl_team->context->lib, "NCCL error %d %s",
                 nccl_status, ncclGetErrorString(nccl_status));
         status = UCC_ERR_NO_MESSAGE;
         goto free_stream;
     }
     ucc_free(team->unique_id);
-    tl_info(tl_team->context->lib, "initialized tl team: %p", team);
+    tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
     return UCC_OK;
 
 free_stream:
@@ -189,7 +189,7 @@ ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
     if (ucc_unlikely(status != UCC_OK)) {
         goto free_task;
     }
-    tl_info(UCC_TASK_LIB(task), "init coll task %p", task);
+    tl_debug(UCC_TASK_LIB(task), "init coll task %p", task);
     *task_h = &task->super;
     return status;
 

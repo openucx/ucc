@@ -1,8 +1,9 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
+
 #include "ucc_coll_utils.h"
 #include "components/base/ucc_base_iface.h"
 #include "core/ucc_team.h"
@@ -198,8 +199,8 @@ ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
     return UCC_MEMORY_TYPE_UNKNOWN;
 }
 
-size_t ucc_coll_args_msgsize(const ucc_coll_args_t *args,
-                             ucc_rank_t rank, ucc_rank_t size)
+size_t ucc_coll_args_msgsize(const ucc_coll_args_t *args, ucc_rank_t rank,
+                             ucc_rank_t size)
 {
     ucc_rank_t             root = args->root;
 
@@ -244,7 +245,7 @@ size_t ucc_coll_args_msgsize(const ucc_coll_args_t *args,
                  : args->dst.info.count * ucc_dt_size(args->dst.info.datatype) *
                    size;
     default:
-        break;
+        ucc_assert(args->coll_type == UCC_COLL_TYPE_LAST);
     }
     return 0;
 }
@@ -317,10 +318,8 @@ ucc_ep_map_t ucc_ep_map_from_array_64(uint64_t **array, ucc_rank_t size,
                                          need_free, 1);
 }
 
-static inline int
-ucc_coll_args_is_rooted(const ucc_base_coll_args_t *bargs)
+static inline int ucc_coll_args_is_rooted(ucc_coll_type_t ct)
 {
-    ucc_coll_type_t ct = bargs->args.coll_type;
     if (ct == UCC_COLL_TYPE_REDUCE || ct == UCC_COLL_TYPE_BCAST ||
         ct == UCC_COLL_TYPE_GATHER || ct == UCC_COLL_TYPE_SCATTER ||
         ct == UCC_COLL_TYPE_FANIN || ct == UCC_COLL_TYPE_FANOUT ||
@@ -330,55 +329,254 @@ ucc_coll_args_is_rooted(const ucc_base_coll_args_t *bargs)
     return 0;
 }
 
-void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len)
+static inline int ucc_coll_args_is_reduction(ucc_coll_type_t ct)
 {
-    const ucc_base_coll_args_t *args  = &task->bargs;
-    ucc_team_t                *team  = args->team;
-    ucc_coll_type_t            ct    = args->args.coll_type;
-    size_t                     left  = len;
-    char                       tmp[64];
+    if (ct == UCC_COLL_TYPE_ALLREDUCE || ct == UCC_COLL_TYPE_REDUCE ||
+        ct == UCC_COLL_TYPE_REDUCE_SCATTER ||
+        ct == UCC_COLL_TYPE_REDUCE_SCATTERV) {
+        return 1;
+    }
+    return 0;
+}
 
-    ucc_snprintf_safe(str, left, "req %p, seq_num %u, %s, team_id %u, size %u, "
-                      "rank %u, ctx_rank %u: %s %s inplace=%u",
-                      task, task->seq_num,
-                      task->team->context->lib->log_component.name,
-                      team->id, team->size, team->rank,
-                      ucc_ep_map_eval(team->ctx_map, team->rank),
-                      ucc_coll_type_str(ct),
-                      ucc_mem_type_str(ucc_coll_args_mem_type(&args->args,
-                                                              team->rank)),
-                      UCC_IS_INPLACE(args->args));
+#define COLL_ARGS_HEADER_STR_MAX_SIZE 32
+void ucc_coll_args_str(const ucc_coll_args_t *args, ucc_rank_t trank,
+                       ucc_rank_t tsize, char *str, size_t len)
+{
+    ucc_coll_type_t        ct                                 = args->coll_type;
+    ucc_rank_t             root                               = args->root;
+    ucc_coll_buffer_info_t src_info                           = {0};
+    ucc_coll_buffer_info_t dst_info                           = {0};
+    char                   hdr[COLL_ARGS_HEADER_STR_MAX_SIZE] = "";
+    char tmp[32];
+    size_t count;
+    int left, has_src, has_dst;
 
-    if (ucc_coll_args_is_rooted(args)) {
-        ucc_snprintf_safe(tmp, sizeof(tmp), " root=%u", (ucc_rank_t)args->args.root);
-        left = len - strlen(str);
-        strncat(str, tmp, left);
+    ucc_snprintf_safe(hdr, COLL_ARGS_HEADER_STR_MAX_SIZE, "%s",
+                      ucc_coll_type_str(ct));
+    if (ucc_coll_args_is_reduction(ct)) {
+        ucc_snprintf_safe(tmp, sizeof(tmp), " %s",
+                          ucc_reduction_op_str(args->op));
+        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr);
+        strncat(hdr, tmp, left);
     }
 
-    if (ct ==  UCC_COLL_TYPE_ALLTOALLV) {
-        size_t sbytes = ucc_coll_args_get_total_count(&args->args,
-                           args->args.src.info_v.counts, team->size ) *
-                           ucc_dt_size(args->args.src.info_v.datatype);
-        size_t rbytes = ucc_coll_args_get_total_count(&args->args,
-                           args->args.dst.info_v.counts, team->size ) *
-                           ucc_dt_size(args->args.dst.info_v.datatype);
-        ucc_snprintf_safe(tmp, sizeof(tmp), " sbytes=%zd rbytes=%zd",
-                          sbytes, rbytes);
+    if (UCC_IS_INPLACE(*args)) {
+        ucc_snprintf_safe(tmp, sizeof(tmp), " inplace");
+        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr);
+        strncat(hdr, tmp, left);
+    }
+
+    if (ucc_coll_args_is_rooted(ct)) {
+        ucc_snprintf_safe(tmp, sizeof(tmp), " root %u", root);
+        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr);
+        strncat(hdr, tmp, left);
+    }
+
+    has_src = has_dst = 0;
+    switch (ct) {
+    case UCC_COLL_TYPE_ALLGATHER:
+    case UCC_COLL_TYPE_ALLREDUCE:
+    case UCC_COLL_TYPE_ALLTOALL:
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        dst_info = args->dst.info;
+        has_dst = 1;
+        if (!UCC_IS_INPLACE(*args)) {
+            src_info = args->src.info;
+            has_src = 1;
+        }
+        break;
+    case UCC_COLL_TYPE_ALLGATHERV:
+    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+        count = ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
+                                              tsize);
+        dst_info.buffer   = args->dst.info_v.buffer;
+        dst_info.count    = count;
+        dst_info.datatype = args->dst.info_v.datatype;
+        dst_info.mem_type = args->dst.info_v.mem_type;
+        has_dst = 1;
+        if (!UCC_IS_INPLACE(*args)) {
+            src_info = args->src.info;
+            has_src = 1;
+        }
+        break;
+    case UCC_COLL_TYPE_ALLTOALLV:
+        count = ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
+                                              tsize);
+        dst_info.buffer   = args->dst.info_v.buffer;
+        dst_info.count    = count;
+        dst_info.datatype = args->dst.info_v.datatype;
+        dst_info.mem_type = args->dst.info_v.mem_type;
+        has_dst = 1;
+        if (!UCC_IS_INPLACE(*args)) {
+            count = ucc_coll_args_get_total_count(args, args->src.info_v.counts,
+                                                  tsize);
+            src_info.buffer   = args->src.info_v.buffer;
+            src_info.count    = count;
+            src_info.datatype = args->src.info_v.datatype;
+            src_info.mem_type = args->src.info_v.mem_type;
+            has_src = 1;
+        }
+    case UCC_COLL_TYPE_BARRIER:
+    case UCC_COLL_TYPE_FANIN:
+    case UCC_COLL_TYPE_FANOUT:
+        break;
+    case UCC_COLL_TYPE_BCAST:
+        src_info = args->src.info;
+        has_src = 1;
+        break;
+    case UCC_COLL_TYPE_GATHER:
+    case UCC_COLL_TYPE_REDUCE:
+        if (UCC_IS_ROOT(*args, trank)) {
+            dst_info = args->dst.info;
+            has_dst = 1;
+        }
+        if (!UCC_IS_ROOT(*args, trank) || !UCC_IS_INPLACE(*args)) {
+            src_info = args->src.info;
+            has_src = 1;
+        }
+        break;
+    case UCC_COLL_TYPE_GATHERV:
+        if (UCC_IS_ROOT(*args, trank)) {
+            count = ucc_coll_args_get_total_count(args, args->dst.info_v.counts,
+                                                  tsize);
+            dst_info.buffer   = args->dst.info_v.buffer;
+            dst_info.count    = count;
+            dst_info.datatype = args->dst.info_v.datatype;
+            dst_info.mem_type = args->dst.info_v.mem_type;
+            has_dst = 1;
+        }
+        if (!UCC_IS_ROOT(*args, trank) || !UCC_IS_INPLACE(*args)) {
+            src_info = args->src.info;
+            has_src = 1;
+        }
+        break;
+    case UCC_COLL_TYPE_SCATTER:
+        if (UCC_IS_ROOT(*args, trank)) {
+            src_info = args->src.info;
+            has_src = 1;
+        }
+        if (!UCC_IS_ROOT(*args, trank) || !UCC_IS_INPLACE(*args)) {
+            dst_info = args->dst.info;
+            has_dst = 1;
+        }
+        break;
+    case UCC_COLL_TYPE_SCATTERV:
+        if (UCC_IS_ROOT(*args, trank)) {
+            count = ucc_coll_args_get_total_count(args, args->src.info_v.counts,
+                                                  tsize);
+            src_info.buffer   = args->src.info_v.buffer;
+            src_info.count    = count;
+            src_info.datatype = args->src.info_v.datatype;
+            src_info.mem_type = args->src.info_v.mem_type;
+            has_src = 1;
+        }
+        if (!UCC_IS_ROOT(*args, trank) || !UCC_IS_INPLACE(*args)) {
+            dst_info = args->dst.info;
+            has_dst = 1;
+        }
+        break;
+    default:
+        ucc_assert(args->coll_type == UCC_COLL_TYPE_LAST);
+        return;
+    }
+
+    if (has_src && has_dst) {
+        ucc_snprintf_safe(str, len,
+                          "%s: src={%p, %zd, %s, %s}, dst={%p, %zd, %s, %s}",
+                          hdr, src_info.buffer, src_info.count,
+                          ucc_datatype_str(src_info.datatype),
+                          ucc_mem_type_str(src_info.mem_type),
+                          dst_info.buffer, dst_info.count,
+                          ucc_datatype_str(dst_info.datatype),
+                          ucc_mem_type_str(dst_info.mem_type));
+    } else if (has_src && !has_dst) {
+        ucc_snprintf_safe(str, len,
+                          "%s: src={%p, %zd, %s, %s}",
+                          hdr, src_info.buffer, src_info.count,
+                          ucc_datatype_str(src_info.datatype),
+                          ucc_mem_type_str(src_info.mem_type));
+    } else if (!has_src && has_dst) {
+        ucc_snprintf_safe(str, len,
+                          "%s: dst={%p, %zd, %s, %s}",
+                          hdr, dst_info.buffer, dst_info.count,
+                          ucc_datatype_str(dst_info.datatype),
+                          ucc_mem_type_str(dst_info.mem_type));
     } else {
-        ucc_snprintf_safe(tmp, sizeof(tmp), " bytes=%zd",
-                          ucc_coll_args_msgsize(&args->args, team->rank,
-                                                team->size));
+        ucc_snprintf_safe(str, len, "%s", hdr);
     }
-    left = len - strlen(str);
-    strncat(str, tmp, left);
+}
 
-    if (ct == UCC_COLL_TYPE_ALLREDUCE ||
-        ct == UCC_COLL_TYPE_REDUCE) {
-        ucc_snprintf_safe(tmp, sizeof(tmp), " %s %s",
-                          ucc_datatype_str(args->args.src.info.datatype),
-                          ucc_reduction_op_str(args->args.op));
-        left = len - strlen(str);
-        strncat(str, tmp, left);
+void ucc_coll_task_components_str(const ucc_coll_task_t *task, char *str,
+                                  size_t *len)
+{
+    ucc_schedule_t *schedule;
+    int i;
+
+    if (task->flags & UCC_COLL_TASK_FLAG_IS_SCHEDULE) {
+        schedule = ucc_derived_of(task, ucc_schedule_t);
+        for (i = 0; i < schedule->n_tasks; i++) {
+            ucc_coll_task_components_str(schedule->tasks[i], str, len);
+        }
+    } else {
+        if (!strstr(str, task->team->context->lib->log_component.name)) {
+            if (*len == 0) {
+                sprintf(str + *len, "%s",
+                        task->team->context->lib->log_component.name);
+                *len = strlen(task->team->context->lib->log_component.name) +
+                       *len;
+            } else {
+                sprintf(str + *len, ", %s",
+                        task->team->context->lib->log_component.name);
+                *len = strlen(task->team->context->lib->log_component.name) +
+                       *len + 2;
+            }
+        }
+    }
+}
+
+void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
+                  int verbosity)
+{
+    ucc_team_t *team  = task->bargs.team;
+    int rc;
+
+    if (verbosity >= UCC_LOG_LEVEL_DIAG) {
+        ucc_coll_args_str(&task->bargs.args, team->rank, team->size, str, len);
+    }
+
+    if (verbosity >= UCC_LOG_LEVEL_INFO) {
+        size_t tl_info_len = 0;
+        char task_info[64], cl_info[16], tl_info[32];
+
+        if (task->team->context->lib->log_component.name[0] == 'C') {
+            /* it's not CL BASIC task */
+            strncpy(cl_info, task->team->context->lib->log_component.name,
+                    sizeof(cl_info));
+            ucc_coll_task_components_str(task, tl_info, &tl_info_len);
+        } else {
+            strncpy(cl_info, "CL_BASIC", sizeof(cl_info));
+            strncpy(tl_info , task->team->context->lib->log_component.name,
+                    sizeof(tl_info));
+        }
+        ucc_coll_args_str(&task->bargs.args, team->rank, team->size, str, len);
+        rc = ucc_snprintf_safe(task_info, sizeof(task_info),
+                               "; %s {%s}, team_id %d",
+                               cl_info, tl_info, team->id);
+        if (rc < 0) {
+            return;
+        }
+        strncat(str, task_info, len - strlen(str));
+    }
+
+    if (verbosity >= UCC_LOG_LEVEL_DEBUG) {
+        char task_info[64];
+        ucc_snprintf_safe(task_info, sizeof(task_info),
+                          " rank %u, ctx_rank %u, seq_num %d, req %p",
+                          team->rank,
+                          ucc_ep_map_eval(team->ctx_map, team->rank),
+                          task->seq_num, task);
+        strncat(str, task_info, len - strlen(str));
     }
 }
 

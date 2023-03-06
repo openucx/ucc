@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -185,7 +185,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     ucc_ec_cuda.thread_mode = ec_params->thread_mode;
     cuda_st = cudaGetDeviceCount(&num_devices);
     if ((cuda_st != cudaSuccess) || (num_devices == 0)) {
-        ec_info(&ucc_ec_cuda.super, "CUDA devices are not found");
+        ec_debug(&ucc_ec_cuda.super, "CUDA devices are not found");
         return UCC_ERR_NO_RESOURCE;
     }
     CUDA_CHECK(cudaGetDevice(&device));
@@ -283,8 +283,8 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
 
         if (cfg->strm_task_mode == UCC_EC_CUDA_TASK_AUTO) {
             if (attr == 0) {
-                ec_info(&ucc_ec_cuda.super,
-                        "CUDA MEM OPS are not supported or disabled");
+                ec_debug(&ucc_ec_cuda.super,
+                         "CUDA MEM OPS are not supported or disabled");
                 ucc_ec_cuda.strm_task_mode = UCC_EC_CUDA_TASK_KERNEL;
             }
         } else if (attr == 0) {

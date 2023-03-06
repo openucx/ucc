@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -29,18 +29,18 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
 
     cuda_st = cudaGetDeviceCount(&num_devices);
     if (cuda_st != cudaSuccess) {
-        tl_info(self->super.super.lib, "failed to get number of GPU devices"
-                "%d %s", cuda_st, cudaGetErrorName(cuda_st));
-        return UCC_ERR_NO_MESSAGE;
+        tl_debug(self->super.super.lib, "failed to get number of GPU devices"
+                 "%d %s", cuda_st, cudaGetErrorName(cuda_st));
+        return UCC_ERR_NO_RESOURCE;
     } else if (num_devices == 0) {
-        tl_info(self->super.super.lib, "no GPU devices found");
+        tl_debug(self->super.super.lib, "no GPU devices found");
         return UCC_ERR_NO_RESOURCE;
     }
 
     cu_st = cuCtxGetCurrent(&cu_ctx);
     if (cu_ctx == NULL || cu_st != CUDA_SUCCESS) {
-        tl_info(self->super.super.lib,
-                "cannot create CUDA TL context without active CUDA context");
+        tl_debug(self->super.super.lib,
+                 "cannot create CUDA TL context without active CUDA context");
         return UCC_ERR_NO_RESOURCE;
     }
 
@@ -68,7 +68,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
     }
 
     self->ipc_cache = kh_init(tl_cuda_ep_hash);
-    tl_info(self->super.super.lib, "initialized tl context: %p", self);
+    tl_debug(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 
 free_mpool:
@@ -78,7 +78,7 @@ free_mpool:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_context_t)
 {
-    tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
     ucc_tl_cuda_topo_destroy(self->topo);
     ucc_mpool_cleanup(&self->req_mp, 1);
 }

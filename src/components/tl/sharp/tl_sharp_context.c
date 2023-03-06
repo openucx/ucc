@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -306,16 +306,18 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
                     (sharp_ctx->tm == UCC_THREAD_MULTIPLE) ? 1 : 0;
 
     if (lib->cfg.use_internal_oob) {
-        tl_info(sharp_ctx->super.super.lib, "using internal oob.  rank:%u size:%lu",
-                                            oob_ctx->subset.myrank, oob_ctx->subset.map.ep_num);
+        tl_debug(sharp_ctx->super.super.lib,
+                 "using internal oob.  rank:%u size:%lu",
+                 oob_ctx->subset.myrank, oob_ctx->subset.map.ep_num);
         init_spec.world_rank                 = oob_ctx->subset.myrank;
         init_spec.world_size                 = oob_ctx->subset.map.ep_num;
         init_spec.oob_colls.barrier          = ucc_tl_sharp_service_barrier;
         init_spec.oob_colls.bcast            = ucc_tl_sharp_service_bcast;
         init_spec.oob_colls.gather           = ucc_tl_sharp_service_gather;
     } else {
-        tl_info(sharp_ctx->super.super.lib, "using user provided oob. rank:%u size:%u",
-                                        oob_ctx->oob->oob_ep, oob_ctx->oob->n_oob_eps);
+        tl_debug(sharp_ctx->super.super.lib,
+                 "using user provided oob. rank:%u size:%u",
+                 oob_ctx->oob->oob_ep, oob_ctx->oob->n_oob_eps);
         init_spec.world_rank        = oob_ctx->oob->oob_ep;
         init_spec.world_size        = oob_ctx->oob->n_oob_eps;
         init_spec.oob_colls.barrier = ucc_tl_sharp_oob_barrier;
@@ -334,7 +336,7 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
 
     ret = sharp_coll_init(&init_spec, context);
     if (ret < 0 ) {
-        tl_debug(sharp_ctx->super.super.lib, "Failed to initialize SHARP "
+        tl_debug(sharp_ctx->super.super.lib, "failed to initialize SHARP "
                  "collectives:%s(%d) job ID:%" PRIu64"\n",
                  sharp_coll_strerror(ret), ret, init_spec.job_id);
         return UCC_ERR_NO_RESOURCE;
@@ -383,7 +385,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
         goto err;
     }
 
-   tl_info(self->super.super.lib, "initialized tl context: %p", self);
+   tl_debug(self->super.super.lib, "initialized tl context: %p", self);
    return UCC_OK;
 
 err:
@@ -438,7 +440,7 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_sharp_context_t)
 {
-    tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
 
     if (self->rcache != NULL) {
         ucc_rcache_destroy(self->rcache);

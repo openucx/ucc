@@ -183,7 +183,7 @@ ucc_status_t ucc_tl_nccl_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
 
     ucc_assert(ee->ee_type == UCC_EE_CUDA_STREAM);
     coll_task->ee = ee;
-    tl_info(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
+    tl_debug(UCC_TASK_LIB(task), "triggered post. task:%p", coll_task);
     status = coll_task->post(coll_task);
     if (ucc_likely(status == UCC_OK)) {
         post_event.ev_type         = UCC_EVENT_COLLECTIVE_POST;
@@ -205,7 +205,7 @@ ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
     if (ucc_unlikely(task->super.super.status != UCC_OK)) {
         team->comm_state = task->super.super.status;
     }
-    tl_info(UCC_TASK_LIB(task), "finalizing coll task %p", task);
+    tl_debug(UCC_TASK_LIB(task), "finalizing coll task %p", task);
     ucc_tl_nccl_free_task(task);
     return status;
 }

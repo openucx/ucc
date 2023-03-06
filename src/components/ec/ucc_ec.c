@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -43,15 +43,15 @@ ucc_status_t ucc_ec_init(const ucc_ec_params_t *ec_params)
             status = ucc_config_parser_fill_opts(
                 ec->config, &ec->config_table, "UCC_", 1);
             if (UCC_OK != status) {
-                ucc_info("failed to parse config for EC component: %s (%d)",
-                         ec->super.name, status);
+                ucc_debug("failed to parse config for EC component: %s (%d)",
+                          ec->super.name, status);
                 ucc_free(ec->config);
                 continue;
             }
             status = ec->init(ec_params);
             if (UCC_OK != status) {
-                ucc_info("ec_init failed for component: %s, skipping (%d)",
-                         ec->super.name, status);
+                ucc_debug("ec_init failed for component: %s, skipping (%d)",
+                          ec->super.name, status);
                 ucc_config_parser_release_opts(ec->config,
                                                ec->config_table.table);
                 ucc_free(ec->config);

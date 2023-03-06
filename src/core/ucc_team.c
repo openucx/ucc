@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -282,7 +282,7 @@ static ucc_status_t ucc_team_create_cls(ucc_context_t *context,
         status   = cl_iface->team.create_test(b_team);
         if (status < 0) {
             team->n_cl_teams--;
-            ucc_info("failed to create CL %s team", cl_iface->super.name);
+            ucc_debug("failed to create CL %s team", cl_iface->super.name);
             cl_iface->team.destroy(b_team);
         } else if (status == UCC_INPROGRESS) {
             return status;
@@ -294,12 +294,12 @@ static ucc_status_t ucc_team_create_cls(ucc_context_t *context,
         status   = cl_iface->team.create_post(&context->cl_ctx[i]->super,
                                               &team->bp, &b_team);
         if (status != UCC_OK) {
-            ucc_info("failed to create CL %s team", cl_iface->super.name);
+            ucc_debug("failed to create CL %s team", cl_iface->super.name);
             continue;
         }
         status = cl_iface->team.create_test(b_team);
         if (status < 0) {
-            ucc_info("failed to create CL %s team", cl_iface->super.name);
+            ucc_debug("failed to create CL %s team", cl_iface->super.name);
             cl_iface->team.destroy(b_team);
             continue;
         }
@@ -468,10 +468,10 @@ out:
     if (UCC_OK == status &&
         ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_INFO &&
         team->rank == 0) {
-        ucc_info("===== COLL_SCORE_MAP (team_id %d) =====",
-                 team->id);
+        ucc_info("===== COLL_SCORE_MAP (team_id %d, size %u) =====",
+                 team->id, team->size);
         ucc_coll_score_map_print_info(team->score_map);
-        ucc_info("=======================================");
+        ucc_info("================================================");
     }
     /* TODO: add team/coll selection and check if some teams are never
              used after selection and clean them up */
@@ -497,6 +497,7 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
     ucc_cl_iface_t *cl_iface;
     int             i;
     ucc_status_t    status;
+
     if (team->service_team) {
         if (UCC_OK != (status = UCC_TL_CTX_IFACE(team->contexts[0]->service_ctx)
                        ->team.destroy(&team->service_team->super))) {
@@ -520,6 +521,11 @@ static ucc_status_t ucc_team_destroy_single(ucc_team_h team)
 
     if (team->contexts[0]->service_team && team->size > 1) {
         ucc_internal_oob_finalize(&team->bp.params.oob);
+    }
+
+    if ((ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_INFO) &&
+        (team->rank == 0)) {
+        ucc_info("team destroyed, team_id %d", team->id);
     }
 
     ucc_coll_score_free_map(team->score_map);
@@ -628,7 +634,7 @@ static ucc_status_t ucc_team_alloc_id(ucc_team_t *team)
     if (pos > 0) {
         ucc_assert(pos <= 64);
         team->id = (uint16_t)(i*64+pos);
-        ucc_info("allocated ID %d for team %p", team->id, team);
+        ucc_debug("allocated ID %d for team %p", team->id, team);
     } else {
         ucc_warn("could not allocate team id, whole id space is occupied, "
                  "try increasing UCC_TEAM_IDS_POOL_SIZE");

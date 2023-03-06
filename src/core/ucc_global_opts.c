@@ -13,6 +13,7 @@ UCC_LIST_HEAD(ucc_config_global_list);
 
 ucc_global_config_t ucc_global_config = {
     .log_component    = {UCC_LOG_LEVEL_WARN, "UCC"},
+    .coll_trace       = {UCC_LOG_LEVEL_WARN, "UCC_COLL"},
     .component_path   = NULL,
     .install_path     = NULL,
     .initialized      = 0,
@@ -29,6 +30,15 @@ ucc_config_field_t ucc_global_config_table[] = {
      "poll.",
      ucc_offsetof(ucc_global_config_t, log_component),
      UCC_CONFIG_TYPE_LOG_COMP},
+
+    {"COLL_TRACE", "warn",
+     "UCC collective logging level. Higher level will result in more verbose "
+     "collective info. \n "
+     "Possible values are: fatal, error, warn, info, debug, trace, data, func, "
+     "poll.",
+     ucc_offsetof(ucc_global_config_t, coll_trace),
+     UCC_CONFIG_TYPE_LOG_COMP
+    },
 
     {"PROFILE_MODE", "",
      "Profile collection modes. If none is specified, profiling is disabled.\n"

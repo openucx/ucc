@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -13,6 +13,8 @@
 #include "utils/ucc_string.h"
 #include "utils/ucc_proc_info.h"
 #include "utils/profile/ucc_profile.h"
+#include "ucc/api/ucc_version.h"
+#include <dlfcn.h>
 
 static ucc_status_t ucc_check_config_file(void)
 {
@@ -95,6 +97,8 @@ ucc_status_t ucc_constructor(void)
 {
     ucc_global_config_t *cfg = &ucc_global_config;
     ucc_status_t         status;
+    Dl_info              dl_info;
+    int                  ret;
 
     if (!cfg->initialized) {
         cfg->initialized = 1;
@@ -170,6 +174,17 @@ ucc_status_t ucc_constructor(void)
         ucc_profile_init(cfg->profile_mode, cfg->profile_file,
                          cfg->profile_log_size);
 #endif
+        if (ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_INFO) {
+            ret = dladdr(ucc_init_version, &dl_info);
+            if (ret == 0) {
+                ucc_error("failed to get ucc_init_version handler");
+                return UCC_ERR_NO_MESSAGE;
+            }
+            ucc_info("version: %s, loaded from: %s, cfg file: %s",
+                     ucc_get_version_string(), dl_info.dli_fname,
+                     ucc_global_config.file_cfg ?
+                     ucc_global_config.file_cfg->filename: "n/a");
+        }
     }
     return UCC_OK;
 }

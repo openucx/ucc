@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -36,7 +36,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_self_context_t,
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_self_context_t)
 {
-    tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
     ucc_mpool_cleanup(&self->req_mp, 1);
 }
 
