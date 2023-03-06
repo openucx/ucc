@@ -205,7 +205,8 @@ void ucc_mtype_map_to_str(uint32_t mt_map, const char *delim,
 
     for (i = 0; i < UCC_MEMORY_TYPE_LAST; i++) {
         if (UCC_BIT(i) & mt_map) {
-            ucc_snprintf_safe(buf, max, "%s%s", ucc_mem_type_str(i), delim);
+            ucc_snprintf_safe(buf, max, "%s%s",
+                              ucc_mem_type_str((ucc_memory_type_t)i), delim);
             last = strlen(buf);
             if (max - last -1 <= 0) {
                 /* no more space in buf for next range*/
