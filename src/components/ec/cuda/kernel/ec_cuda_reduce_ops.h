@@ -83,14 +83,11 @@ __forceinline__ __device__ void LoadVec(T *d, T *s)
             triggered ? blockDim.x / unroll_group_size                         \
                       : (blockDim.x * gridDim.x) / unroll_group_size;          \
         const int    idx = threadIdx.x % unroll_group_size;                    \
+        const int    factor = unroll_group_size * unroll * vectorize;          \
         const size_t start =                                                   \
             offset + (group * unroll_group_size * unroll + idx) * vectorize;   \
-        const size_t step =                                                    \
-            num_groups * unroll_group_size * unroll * vectorize;               \
-        const size_t end =                                                     \
-            offset +                                                           \
-            ((count - offset) / (unroll_group_size * unroll * vectorize)) *    \
-                (unroll_group_size * unroll * vectorize);                      \
+        const size_t step = num_groups * factor;                               \
+        const size_t end = offset + ((count - offset) / factor) * factor;      \
         Type tmp1[unroll][vectorize];                                          \
         Type tmp2[unroll][vectorize];                                          \
         ucc_assert_system(blockDim.x % unroll_group_size == 0);                \
@@ -183,7 +180,12 @@ __forceinline__ __device__ void LoadVec(T *d, T *s)
                 alignedVec |= ptrAlignVec<Type, vectype>(s[i]);                 \
         }                                                                       \
         alignedVec |= ptrAlignVec<Type, vectype>(d);                            \
-        alignedVec |= sizeof(vectype) % sizeof(Type) != 0;                      \
+        ucc_assert_system(sizeof(vectype) % sizeof(Type) == 0);                 \
+        /* Successive calls to CUDA_REDUCE_WITH_OP_CHUNK to reduce the buffer.*/\
+        /* Each call enables or disables vectorization and/or loop unrollin   */\
+        /* optimizations. Each one of the four calls except the last one may  */\
+        /* only reduce the buffer partially and leave data remainder to be    */\
+        /* treated by the subsequent calls.                                   */\
         if (triggered && alignedVec == 0) {                                     \
             /* if buffers align, use vectorized loads and unrolling */          \
             CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, vectype);         \
@@ -192,7 +194,7 @@ __forceinline__ __device__ void LoadVec(T *d, T *s)
         }                                                                       \
         /* call with unrolling but without vectorization */                     \
         CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, Type);                \
-        /* last call without unrolling nor vectorization for data remainder */  \
+        /* last call without unrolling nor vectorization */                     \
         CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, Type);                             \
     }                                                                           \
     template <typename Type, typename AlphaType, bool triggered, int UNROLL>    \
