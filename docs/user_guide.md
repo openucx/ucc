@@ -193,6 +193,8 @@ in the [UCC Wiki](https://github.com/openucx/ucc/wiki) for more information and 
 If for a given combination, multiple TLs have the same highest score, it is implementation-defined
 which of those TLs with the highest score is selected.
 
+Tuning UCC heuristics is also possible with the UCC configuration file (`ucc.conf`). This file provides a unified way of tailoring the behavior of UCC components - CLs, TLs, and ECs. It can contain any UCC variables of the format `VAR = VALUE`, e.g. `UCC_TL_NCCL_TUNE=allreduce:cuda:inf#alltoall:0` to force NCCL allreduce for "cuda" buffers and disable NCCL for alltoall. See [`contrib/ucc.conf`](../contrib/ucc.conf) for an example and the [FAQ](https://github.com/openucx/ucc/wiki/FAQ#13-ucc-configuration-file-and-priority) for further details.
+
 ## Logging
 
 To detect if Open MPI leverages UCC for a given collective one can set `OMPI_MCA_coll_ucc_verbose=3` checking for output like
@@ -304,6 +306,36 @@ ucc_coll_score_map.c:185  UCC  INFO       CudaManaged: {0..4095}:TL_UCP:10 {4K..
 ucc_coll_score_map.c:185  UCC  INFO       Rocm: {0..4095}:TL_UCP:10 {4K..inf}:TL_UCP:10
 ucc_coll_score_map.c:185  UCC  INFO       RocmManaged: {0..4095}:TL_UCP:10 {4K..inf}:TL_UCP:10
 [...] snip
+```
+
+The next release of UCC add the `UCC_COLL_TRACE` environment variable:
+
+```
+$ ucc_info -caf | grep -B6 UCC_COLL_TRACE
+#
+# UCC collective logging level. Higher level will result in more verbose collective info.
+#  Possible values are: fatal, error, warn, info, debug, trace, data, func, poll.
+#
+# syntax:    [FATAL|ERROR|WARN|DIAG|INFO|DEBUG|TRACE|REQ|DATA|ASYNC|FUNC|POLL]
+#
+UCC_COLL_TRACE=WARN
+```
+
+With `UCC_COLL_TRACE=INFO` UCC reports for every collective which CL and TL has been selected:
+
+```
+$ UCC_COLL_TRACE=INFO srun ./c/mpi/collective/osu_allreduce -i 1 -x 0 -d cuda -m 1048576:1048576
+
+# OSU MPI-CUDA Allreduce Latency Test v7.0
+# Size       Avg Latency(us)
+[1678205653.808236] [node_name:903  :0]        ucc_coll.c:255  UCC_COLL INFO  coll_init: Barrier; CL_BASIC {TL_UCP}, team_id 32768
+[1678205653.809882] [node_name:903  :0]        ucc_coll.c:255  UCC_COLL INFO  coll_init: Allreduce sum: src={0x7fc1f3a03800, 262144, float32, Cuda}, dst={0x7fc195800000, 262144, float32, Cuda}; CL_BASIC {TL_NCCL}, team_id 32768
+[1678205653.810344] [node_name:903  :0]        ucc_coll.c:255  UCC_COLL INFO  coll_init: Barrier; CL_BASIC {TL_UCP}, team_id 32768
+[1678205653.810582] [node_name:903  :0]        ucc_coll.c:255  UCC_COLL INFO  coll_init: Reduce min root 0: src={0x7ffef34d5898, 1, float64, Host}, dst={0x7ffef34d58b0, 1, float64, Host}; CL_BASIC {TL_UCP}, team_id 32768
+[1678205653.810641] [node_name:903  :0]        ucc_coll.c:255  UCC_COLL INFO  coll_init: Reduce max root 0: src={0x7ffef34d5898, 1, float64, Host}, dst={0x7ffef34d58a8, 1, float64, Host}; CL_BASIC {TL_UCP}, team_id 32768
+[1678205653.810651] [node_name:903  :0]        ucc_coll.c:255  UCC_COLL INFO  coll_init: Reduce sum root 0: src={0x7ffef34d5898, 1, float64, Host}, dst={0x7ffef34d58a0, 1, float64, Host}; CL_BASIC {TL_UCP}, team_id 32768
+1048576               582.07
+[1678205653.810705] [node_name:903  :0]        ucc_coll.c:255  UCC_COLL INFO  coll_init: Barrier; CL_BASIC {TL_UCP}, team_id 32768
 ```
 
 ## Known Issues
