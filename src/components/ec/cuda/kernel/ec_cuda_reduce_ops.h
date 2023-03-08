@@ -17,7 +17,6 @@ extern "C" {
 #include <cuComplex.h>
 
 #define COPY_LOOP_UNROLL                  8
-#define REDUCE_LOOP_UNROLL_TRIGGERED_SIX  6
 #define REDUCE_LOOP_UNROLL_TRIGGERED_FOUR 4
 #define REDUCE_LOOP_UNROLL_TRIGGERED_TWO  2
 #define REDUCE_LOOP_UNROLL_INTERRUPTIBLE  1

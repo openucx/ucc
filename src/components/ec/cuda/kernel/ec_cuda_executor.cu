@@ -132,10 +132,10 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
         DT_REDUCE_INT(int16_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
     case UCC_DT_INT32:
-        DT_REDUCE_INT(int32_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
+        DT_REDUCE_INT(int32_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
     case UCC_DT_INT64:
-        DT_REDUCE_INT(int64_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
+        DT_REDUCE_INT(int64_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
     case UCC_DT_UINT8:
         DT_REDUCE_INT(uint8_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
@@ -144,24 +144,24 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
         DT_REDUCE_INT(uint16_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
     case UCC_DT_UINT32:
-        DT_REDUCE_INT(uint32_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
+        DT_REDUCE_INT(uint32_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
     case UCC_DT_UINT64:
-        DT_REDUCE_INT(uint64_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
+        DT_REDUCE_INT(uint64_t, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
     case UCC_DT_FLOAT16:
         DT_REDUCE_FLOAT(__half, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_TWO);
         break;
     case UCC_DT_FLOAT32:
 #if SIZEOF_FLOAT == 4
-        DT_REDUCE_FLOAT(float, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
+        DT_REDUCE_FLOAT(float, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
 #else
         return UCC_ERR_NOT_SUPPORTED;
 #endif
     case UCC_DT_FLOAT64:
 #if SIZEOF_DOUBLE == 8
-        DT_REDUCE_FLOAT(double, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
+        DT_REDUCE_FLOAT(double, task, op, REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
 #else
         return UCC_ERR_NOT_SUPPORTED;
@@ -169,7 +169,7 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
     case UCC_DT_FLOAT32_COMPLEX:
 #if SIZEOF_CUFLOATCOMPLEX == 8
         DT_REDUCE_FLOAT_COMPLEX(cuFloatComplex, float, task, op,
-                                REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
+                                REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
 #else
         return UCC_ERR_NOT_SUPPORTED;
@@ -177,7 +177,7 @@ __device__ ucc_status_t executor_reduce(ucc_ee_executor_task_args_t *task)
     case UCC_DT_FLOAT64_COMPLEX:
 #if SIZEOF_CUDOUBLECOMPLEX == 16
         DT_REDUCE_FLOAT_COMPLEX(cuDoubleComplex, double, task, op,
-                                REDUCE_LOOP_UNROLL_TRIGGERED_SIX);
+                                REDUCE_LOOP_UNROLL_TRIGGERED_FOUR);
         break;
 #else
         return UCC_ERR_NOT_SUPPORTED;
