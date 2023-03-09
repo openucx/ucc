@@ -26,9 +26,15 @@ AC_INIT([ucc], [ucc_ver_major.ucc_ver_minor])
 : ${CPPFLAGS=""}
 : ${CFLAGS=""}
 : ${CXXFLAGS=""}
+config_flags="$*"
 
 AC_USE_SYSTEM_EXTENSIONS
 AC_CONFIG_HEADERS([config.h])
+
+#
+# Save config flags for version dump tool
+#
+AC_DEFINE_UNQUOTED([UCC_CONFIGURE_FLAGS], ["$config_flags"], [UCC configure flags])
 
 UCC_TOP_BUILDDIR="`pwd`"
 AC_SUBST(UCC_TOP_BUILDDIR)

@@ -12,6 +12,7 @@ void print_version()
 {
     printf("# UCC version=%s revision %s\n", UCC_VERSION_STRING,
            UCC_GIT_REVISION);
+    printf("# Configured with: %s\n", UCC_CONFIGURE_FLAGS);
 }
 
 void print_build_config()
