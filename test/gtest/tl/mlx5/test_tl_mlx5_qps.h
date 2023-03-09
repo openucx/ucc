@@ -60,10 +60,10 @@ class test_tl_mlx5_rc_qp : public test_tl_mlx5_qp {
             tl_mlx5_so_handle, "ucc_tl_mlx5_create_umr_qp");
         ASSERT_EQ(nullptr, dlerror());
 
-        qp.qp        = NULL;
-        umr_qp.qp    = NULL;
-        tx_depth     = 4;
-        umr_qp_conf  = qp_conf;
+        qp.qp       = NULL;
+        umr_qp.qp   = NULL;
+        tx_depth    = 4;
+        umr_qp_conf = qp_conf;
     }
 
     ~test_tl_mlx5_rc_qp()

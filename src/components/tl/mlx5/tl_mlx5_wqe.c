@@ -151,11 +151,12 @@ ucc_status_t ucc_tl_mlx5_post_umr(struct ibv_qp *     qp,
     uint32_t n_ds   = (sizeof(struct mlx5_wqe_ctrl_seg) +
                        sizeof(struct mlx5_wqe_umr_ctrl_seg) +
                        sizeof(struct mlx5_wqe_mkey_context_seg) +
-                       sizeof(struct mlx5_wqe_umr_pointer_seg)) / DS_SIZE;
+                       sizeof(struct mlx5_wqe_umr_pointer_seg)) /
+                       DS_SIZE;
     uint8_t fm_ce_se =
         MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE | MLX5_WQE_CTRL_CQ_UPDATE;
-    struct ibv_qp_ex *   qp_ex = ibv_qp_to_qp_ex(qp);
-    struct mlx5dv_qp_ex *mqp = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
+    struct ibv_qp_ex *                qp_ex = ibv_qp_to_qp_ex(qp);
+    struct mlx5dv_qp_ex *             mqp = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
     struct mlx5_wqe_ctrl_seg *        ctrl;
     struct mlx5_wqe_umr_ctrl_seg *    umr_ctrl_seg;
     struct mlx5_wqe_mkey_context_seg *mk_seg;
@@ -204,19 +205,21 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn,
 
 {
 
-    uint32_t                      opcode   = MLX5_OPCODE_RDMA_WRITE;
-    uint32_t                      opmode   = 0x0;
-    struct ibv_qp_ex *            qp_ex    = ibv_qp_to_qp_ex(qp);
-    struct mlx5dv_qp_ex *         mqp      = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
-    uint8_t                       fm_ce_se = MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE;
-    struct mlx5_wqe_ctrl_seg *    ctrl;
-    struct mlx5_wqe_data_seg *    data;
+    uint32_t                  opcode   = MLX5_OPCODE_RDMA_WRITE;
+    uint32_t                  opmode   = 0x0;
+    struct ibv_qp_ex *        qp_ex    = ibv_qp_to_qp_ex(qp);
+    struct mlx5dv_qp_ex *     mqp      = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
+    uint8_t                   fm_ce_se = MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE;
+    uint32_t                  n_ds     =
+        (sizeof(struct mlx5_wqe_ctrl_seg) +
+         (ah ? sizeof(struct mlx5_wqe_datagram_seg) : 0) +
+         sizeof(struct mlx5_wqe_raddr_seg) + sizeof(struct mlx5_wqe_data_seg)) /
+        DS_SIZE;
+    struct mlx5_wqe_ctrl_seg *ctrl;
+    struct mlx5_wqe_data_seg *data;
     struct mlx5_wqe_datagram_seg *dseg;
     struct mlx5_wqe_raddr_seg *   rseg;
-    uint32_t n_ds = (sizeof(*ctrl) + (ah ? sizeof(*dseg) : 0) + sizeof(*rseg) +
-                     sizeof(*data)) /
-                    DS_SIZE;
-    char wqe_desc[n_ds * DS_SIZE];
+    char   wqe_desc[n_ds * DS_SIZE];
 
     qp_ex->wr_id = wr_id;
     memset(wqe_desc, 0, n_ds * DS_SIZE);
@@ -233,7 +236,7 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn,
         tl_mlx5_ah_to_av(ah, &dseg->av);
         dseg->av.dqp_dct |= htobe32(qpn | MLX5_EXTENDED_UD_AV);
         dseg->av.key.dc_key = htobe64(DC_KEY);
-        rseg = PTR_OFFSET(dseg, sizeof(*dseg));
+        rseg                = PTR_OFFSET(dseg, sizeof(*dseg));
     } else {
         rseg = PTR_OFFSET(ctrl, sizeof(*ctrl));
     }
@@ -273,7 +276,7 @@ ucc_status_t ucc_tl_mlx5_post_wait_on_data(struct ibv_qp *qp, uint64_t value,
     struct ibv_qp_ex *   qp_ex  = ibv_qp_to_qp_ex(qp);
     struct mlx5dv_qp_ex *mqp    = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
     uint8_t fm_ce_se            = MLX5_WQE_CTRL_FENCE | MLX5_WQE_CTRL_CQ_UPDATE;
-    char                      wqe_desc[n_ds * DS_SIZE];
+    char    wqe_desc[n_ds * DS_SIZE];
     struct mlx5_wqe_ctrl_seg *ctrl;
     wait_on_data_seg_t *      wseg;
 
@@ -283,17 +286,17 @@ ucc_status_t ucc_tl_mlx5_post_wait_on_data(struct ibv_qp *qp, uint64_t value,
     memset(wqe_desc, 0, n_ds * DS_SIZE);
     /* SET CTRL SEG */
     ibv_wr_start(qp_ex);
-    qp_ex->wr_id     = ((uint64_t)(uintptr_t)task_ptr) | 0x1;
-    ctrl             = (void *)wqe_desc;
+    qp_ex->wr_id = ((uint64_t)(uintptr_t)task_ptr) | 0x1;
+    ctrl         = (void *)wqe_desc;
     mlx5dv_set_ctrl_seg(ctrl, /* pi */ 0x0, opcode, opmode, qp->qp_num,
                         fm_ce_se, n_ds, 0x0, 0x0);
 
     /* SET TRANSPOSE SEG */
-    wseg = PTR_OFFSET(ctrl, DS_SIZE);
-    wseg->op      = htobe32(0x1); //0x1 - OP_EQUAL
-    wseg->lkey    = htobe32(lkey);
-    wseg->va_fail = htobe64((addr) | (ACTION));
-    wseg->data = value;
+    wseg            = PTR_OFFSET(ctrl, DS_SIZE);
+    wseg->op        = htobe32(0x1); //0x1 - OP_EQUAL
+    wseg->lkey      = htobe32(lkey);
+    wseg->va_fail   = htobe64((addr) | (ACTION));
+    wseg->data      = value;
     wseg->data_mask = 1;
     mlx5dv_wr_raw_wqe(mqp, wqe_desc);
     if (ibv_wr_complete(qp_ex)) {
