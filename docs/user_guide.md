@@ -308,7 +308,7 @@ ucc_coll_score_map.c:185  UCC  INFO       RocmManaged: {0..4095}:TL_UCP:10 {4K..
 [...] snip
 ```
 
-The next release of UCC add the `UCC_COLL_TRACE` environment variable:
+UCC 1.2.0 or newer supports the `UCC_COLL_TRACE` environment variable:
 
 ```
 $ ucc_info -caf | grep -B6 UCC_COLL_TRACE
