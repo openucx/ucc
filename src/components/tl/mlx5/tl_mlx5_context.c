@@ -12,6 +12,8 @@
 #include "tl_mlx5_coll.h"
 #include "utils/arch/cpu.h"
 #include "tl_mlx5_pd.h"
+#include "tl_mlx5_ib.h"
+
 
 #define PD_OWNER_RANK 0
 
@@ -21,10 +23,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
 {
     ucc_tl_mlx5_context_config_t *tl_mlx5_config =
         ucc_derived_of(config, ucc_tl_mlx5_context_config_t);
-    int          port       = -1, devname_len;
-    char *       ib_devname = NULL, *pos;
+    int          port       = -1;
+    char *       ib_devname = NULL;
     ucc_status_t status;
-    char         tmp[128];
+    int          devname_len;
+    char         tmp[128], *pos;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_mlx5_config->super,
                               params->context);
@@ -91,9 +94,6 @@ err_mpool:
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
 {
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
-    if (self->rcache) {
-        ucc_rcache_destroy(self->rcache);
-    }
 
     if (self->shared_pd) {
         ucc_tl_mlx5_remove_shared_ctx_pd(self);
@@ -125,7 +125,7 @@ ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context) /* NOLINT */
 {
     ucc_tl_mlx5_context_t *ctx = ucc_derived_of(context, ucc_tl_mlx5_context_t);
     ucc_context_t *        core_ctx = context->ucc_context;
-    const char *template            = "/tmp/ucc.mlx5.XXXXXX";
+    const char *     template       = "/tmp/ucc.mlx5.XXXXXX";
     const char *     sockname       = "/sock";
     size_t           sock_dir_len   = strlen(template) + 1;
     size_t           sock_path_len  = sock_dir_len + strlen(sockname);
@@ -136,10 +136,9 @@ ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context) /* NOLINT */
     ucc_sbgp_t *     sbgp;
     ucc_tl_team_t *  steam;
     ucc_coll_task_t *req;
+    int              sock;
 
-    int sock;
-
-    ucc_assert(core_ctx->service_team);
+    ucc_assert(core_ctx->service_team != NULL);
     ucc_assert(core_ctx->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB);
 
     s.map.type   = UCC_EP_MAP_FULL;

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022-2023.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -13,8 +13,8 @@ typedef struct ucc_tl_mlx5_team ucc_tl_mlx5_team_t;
 
 ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
                                       const char *           sock_path,
-                                      ucc_rank_t group_size, int is_asr,
-                                      int asr_sock);
+                                      ucc_rank_t group_size, int is_ctx_owner,
+                                      int ctx_owner_sock);
 
 ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx);
 

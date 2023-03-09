@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ * Copyright (C) Mellanox Technologies Ltd. 2022-2023.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -230,8 +230,8 @@ listen_fail:
 
 ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
                                       const char *           sock_path,
-                                      ucc_rank_t group_size, int is_asr,
-                                      int asr_sock)
+                                      ucc_rank_t group_size, int is_ctx_owner,
+                                      int ctx_owner_sock)
 {
     int                ctx_fd    = ctx->ib_ctx->cmd_fd;
     uint32_t           pd_handle = ctx->ib_pd->handle;
@@ -241,7 +241,7 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
     uint32_t     shared_pd_handle;
     ucc_status_t status;
 
-    if (!is_asr) {
+    if (!is_ctx_owner) {
         status =
             client_recv_data(&shared_ctx_fd, &shared_pd_handle, sock_path, lib);
         if (UCC_OK != status) {
@@ -262,8 +262,8 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
         }
         ctx->is_imported = 1;
     } else {
-        status =
-            server_send_data(ctx_fd, pd_handle, group_size - 1, asr_sock, lib);
+        status = server_send_data(ctx_fd, pd_handle, group_size - 1,
+                                  ctx_owner_sock, lib);
         if (UCC_OK != status) {
             tl_error(lib, "Failed to Share ctx & pd from server side");
             return status;
