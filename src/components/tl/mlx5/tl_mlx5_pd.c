@@ -113,15 +113,19 @@ ucc_status_t ucc_tl_mlx5_socket_init(ucc_tl_mlx5_context_t *ctx,
     if (bind(sock, (struct sockaddr *)addr, sizeof(struct sockaddr_un)) == -1) {
         tl_error(ctx->super.super.lib, "failed to bind server socket errno %d",
                  errno);
-        return UCC_ERR_NO_MESSAGE;
+        goto out;
     }
     if (listen(sock, group_size) == -1) {
         tl_error(ctx->super.super.lib,
                  "failed to listen to server socket errno %d", errno);
-        return UCC_ERR_NO_MESSAGE;
+        goto out;
     }
     *sock_p = sock;
     return UCC_OK;
+
+out:
+    close(sock);
+    return UCC_ERR_NO_MESSAGE;
 }
 
 static ucc_status_t client_recv_data(int *              shared_cmd_fd,
@@ -219,11 +223,11 @@ static ucc_status_t server_send_data(int command_fd, uint32_t pd_handle,
     return UCC_OK;
 
 listen_fail:
-    if (remove(addr.sun_path) == -1) {
-        tl_error(lib, "socket file removal failed");
-    }
     if (close(sock) == -1) {
         tl_error(lib, "failed to close server socket errno %d", errno);
+    }
+    if (remove(addr.sun_path) == -1) {
+        tl_error(lib, "socket file removal failed");
     }
     return UCC_ERR_NO_MESSAGE;
 }
@@ -235,7 +239,7 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
 {
     int                ctx_fd    = ctx->shared_ctx->cmd_fd;
     uint32_t           pd_handle = ctx->shared_pd->handle;
-    ucc_tl_mlx5_lib_t *lib =
+    ucc_tl_mlx5_lib_t *lib       =
         ucc_derived_of(ctx->super.super.lib, ucc_tl_mlx5_lib_t);
     int          shared_ctx_fd;
     uint32_t     shared_pd_handle;
@@ -274,19 +278,23 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
 
 ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx)
 {
-    if (ctx->is_imported) {
-        ibv_unimport_pd(ctx->shared_pd);
-    } else {
-        if (ibv_dealloc_pd(ctx->shared_pd)) {
-            tl_error(ctx->super.super.lib, "failed to dealloc PD, errno %d",
-                     errno);
-            return UCC_ERR_NO_MESSAGE;
+    if (ctx->shared_pd) {
+        if (ctx->is_imported) {
+            ibv_unimport_pd(ctx->shared_pd);
+        } else {
+            if (ibv_dealloc_pd(ctx->shared_pd)) {
+                tl_error(ctx->super.super.lib, "failed to dealloc PD, errno %d",
+                        errno);
+                return UCC_ERR_NO_MESSAGE;
+            }
         }
     }
 
-    if (ibv_close_device(ctx->shared_ctx)) {
-        tl_error(ctx->super.super.lib, "fail to close ib ctx");
-        return UCC_ERR_NO_MESSAGE;
+    if (ctx->shared_ctx) {
+        if (ibv_close_device(ctx->shared_ctx)) {
+            tl_error(ctx->super.super.lib, "fail to close ib ctx");
+            return UCC_ERR_NO_MESSAGE;
+        }
     }
 
     return UCC_OK;

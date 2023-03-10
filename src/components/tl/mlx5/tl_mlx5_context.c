@@ -49,11 +49,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
 {
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
 
-    if (self->shared_pd) {
-        if (ucc_tl_mlx5_remove_shared_ctx_pd(self) != UCC_OK) {
-            tl_error(self->super.super.lib, "failed to free ib ctx and pd");
-        };
-    }
+    if (ucc_tl_mlx5_remove_shared_ctx_pd(self) != UCC_OK) {
+        tl_error(self->super.super.lib, "failed to free ib ctx and pd");
+    };
 
     ucc_mpool_cleanup(&self->req_mp, 1);
 }
@@ -76,17 +74,27 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
     int          port       = -1;
     char *       ib_devname = NULL;
     int          devname_len;
-    char         tmp[128], *pos;
+    char         tmp[128], *pos, *end_pos;
     ucc_status_t status;
 
     if (ctx->cfg.devices.count > 0) {
         ib_devname  = ctx->cfg.devices.names[0];
         pos         = strstr(ib_devname, ":");
-        devname_len = (int)(pos - ib_devname);
+        end_pos     = ib_devname + strlen(ib_devname);
+        if (!pos) {
+            devname_len = strlen(ib_devname);
+        } else {
+            devname_len = (int)(pos - ib_devname);
+            pos++;
+            port = (int)strtol(pos, &end_pos, 10);
+            if (errno != 0 || pos == end_pos) {
+                tl_error(ctx->super.super.lib, "wrong device's port number");
+                return UCC_ERR_INVALID_PARAM;
+            }
+        }
         strncpy(tmp, ib_devname, devname_len);
         tmp[devname_len] = '\0';
         ib_devname       = tmp;
-        port             = atoi(pos + 1);
     }
     status = ucc_tl_mlx5_create_ibv_ctx(&ib_devname, &ctx->shared_ctx,
                                         ctx->super.super.lib);
@@ -157,14 +165,11 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
         goto out;
     }
 
-    ctx->is_imported = sbgp->group_rank == PD_OWNER_RANK;
+    ctx->is_imported = sbgp->group_rank != PD_OWNER_RANK;
 
-    if (ctx->is_imported) {
+    if (!ctx->is_imported) {
         ucc_strncpy_safe(sock_path, template, sock_dir_len);
-        if (NULL == mkdtemp(sock_path)) {
-            tl_error(context->lib, "failed to create tmp file for socket path");
-            sock_path[0] = '\0';
-        } else {
+        if (mkdtemp(sock_path) != NULL) {
             status = ucc_tl_mlx5_ib_ctx_pd_init(ctx);
             if (status != UCC_OK) {
                 tl_error(context->lib, "failed to create ib ctx and pd");
@@ -178,6 +183,9 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
                 sock_path[0] = '\0';
                 tl_error(context->lib, "failed to init socket to share ib_ctx");
             }
+        } else {
+            tl_error(context->lib, "failed to create tmp file for socket path");
+            sock_path[0] = '\0';
         }
     }
     steam = core_ctx->service_team;
@@ -207,8 +215,8 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     }
 
     status = ucc_tl_mlx5_share_ctx_pd(ctx, sock_path, sbgp->group_size,
-                                      sbgp->group_rank == PD_OWNER_RANK, sock);
-    if (sbgp->group_rank == PD_OWNER_RANK) {
+                                      !ctx->is_imported, sock);
+    if (!ctx->is_imported) {
         sock_path[sock_dir_len - 1] = '\0';
         rmdir(sock_path);
     }
@@ -218,6 +226,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     }
 
 out:
+    ucc_tl_mlx5_remove_shared_ctx_pd(ctx);
     ucc_topo_cleanup(topo);
     return status;
 }
