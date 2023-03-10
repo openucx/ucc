@@ -63,10 +63,8 @@ UCC_TEST_P(test_tl_mlx5_transpose, transposeWqe)
         ibv_reg_mr(pd, dst, nrows * ncols * elem_size, IBV_ACCESS_LOCAL_WRITE);
     GTEST_ASSERT_NE(nullptr, dst_mr);
 
-    ibv_wr_start(qp.qp_ex);
     post_transpose(qp.qp, src_mr->lkey, dst_mr->rkey, (uintptr_t)src,
                    (uintptr_t)dst, elem_size, nrows, ncols, IBV_SEND_SIGNALED);
-    GTEST_ASSERT_EQ(ibv_wr_complete(qp.qp_ex), 0);
 
     while (!completions_num) {
         completions_num = ibv_poll_cq(cq, 1, wcs);
@@ -113,11 +111,9 @@ UCC_TEST_P(test_tl_mlx5_rdma_write, rdmaWriteWqe)
                         IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
     GTEST_ASSERT_NE(nullptr, dst_mr);
 
-    ibv_wr_start(qp.qp_ex);
     post_rdma_write(qp.qp, qpn, nullptr, (uintptr_t)src, msgsize * sizeof(DT),
                     src_mr->lkey, (uintptr_t)dst, dst_mr->rkey,
                     IBV_SEND_SIGNALED | IBV_SEND_FENCE, 0);
-    GTEST_ASSERT_EQ(ibv_wr_complete(qp.qp_ex), 0);
 
     while (!completions_num) {
         completions_num = ibv_poll_cq(cq, 1, wcs);
@@ -272,11 +268,9 @@ UCC_TEST_P(test_tl_mlx5_umr_wqe, umrWqe)
     GTEST_ASSERT_EQ(wcs[0].wr_id, 0);
 
     // RDMA Write
-    ibv_wr_start(qp.qp_ex);
     post_rdma_write(qp.qp, qpn, nullptr, (uintptr_t)0, dst_size, umr_mkey->lkey,
                     (uintptr_t)dst, dst_mr->rkey,
                     IBV_SEND_SIGNALED | IBV_SEND_FENCE, 0);
-    GTEST_ASSERT_EQ(ibv_wr_complete(qp.qp_ex), 0);
 
     completions_num = 0;
     while (!completions_num) {

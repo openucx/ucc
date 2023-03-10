@@ -89,7 +89,13 @@ ucc_status_t ucc_tl_mlx5_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey,
     data = PTR_OFFSET(data, DS_SIZE);
     mlx5dv_set_data_seg(data, ncols * nrows * element_size, dst_mr_key,
                         dst_addr);
+
+    ibv_wr_start(qp_ex);
     mlx5dv_wr_raw_wqe(mqp, wqe_desc);
+    if (!ibv_wr_complete(qp_ex)) {
+        return UCC_ERR_NO_MESSAGE;
+    }
+
     return UCC_OK;
 }
 
@@ -164,7 +170,6 @@ ucc_status_t ucc_tl_mlx5_post_umr(struct ibv_qp *     qp,
     char                              wqe_desc[n_ds * DS_SIZE];
     int                               xlat_size;
 
-    ibv_wr_start(qp_ex);
     memset(wqe_desc, 0, n_ds * DS_SIZE);
 
     ctrl = (void *)wqe_desc;
@@ -192,6 +197,7 @@ ucc_status_t ucc_tl_mlx5_post_umr(struct ibv_qp *     qp,
     mk_seg->len = htobe64(reglen);
     umr_ctrl_seg->klm_octowords =
         htobe16(ucc_align_up(xlat_size, 64) / DS_SIZE);
+    ibv_wr_start(qp_ex);
     mlx5dv_wr_raw_wqe(mqp, wqe_desc);
     ibv_wr_complete(qp_ex);
     return UCC_OK;
@@ -212,8 +218,8 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn,
     uint8_t                   fm_ce_se = MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE;
     uint32_t                  n_ds     =
         (sizeof(struct mlx5_wqe_ctrl_seg) +
-         (ah ? sizeof(struct mlx5_wqe_datagram_seg) : 0) +
-         sizeof(struct mlx5_wqe_raddr_seg) + sizeof(struct mlx5_wqe_data_seg)) /
+        (ah ? sizeof(struct mlx5_wqe_datagram_seg) : 0) +
+        sizeof(struct mlx5_wqe_raddr_seg) + sizeof(struct mlx5_wqe_data_seg)) /
         DS_SIZE;
     struct mlx5_wqe_ctrl_seg *ctrl;
     struct mlx5_wqe_data_seg *data;
@@ -234,7 +240,7 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn,
     if (ah) {
         dseg = PTR_OFFSET(ctrl, sizeof(*ctrl));
         tl_mlx5_ah_to_av(ah, &dseg->av);
-        dseg->av.dqp_dct |= htobe32(qpn | MLX5_EXTENDED_UD_AV);
+        dseg->av.dqp_dct   |= htobe32(qpn | MLX5_EXTENDED_UD_AV);
         dseg->av.key.dc_key = htobe64(DC_KEY);
         rseg                = PTR_OFFSET(dseg, sizeof(*dseg));
     } else {
@@ -248,7 +254,12 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn,
     data = PTR_OFFSET(rseg, sizeof(*rseg));
     mlx5dv_set_data_seg(data, len, src_mr_lkey, src_mkey_addr);
 
+    ibv_wr_start(qp_ex);
     mlx5dv_wr_raw_wqe(mqp, wqe_desc);
+    if (!ibv_wr_complete(qp_ex)) {
+        return UCC_ERR_NO_MESSAGE;
+    }
+
     return UCC_OK;
 }
 
