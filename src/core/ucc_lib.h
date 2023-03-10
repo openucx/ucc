@@ -36,9 +36,6 @@ typedef struct ucc_lib_info {
     ucc_cl_lib_attr_t *cl_attrs;
 } ucc_lib_info_t;
 
-void ucc_get_version(unsigned *major_version, unsigned *minor_version,
-                     unsigned *release_number);
-
 int ucc_tl_is_required(ucc_lib_info_t *lib, ucc_tl_iface_t *tl_iface,
                        int forced);
 #endif
