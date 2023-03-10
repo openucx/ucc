@@ -7,13 +7,11 @@
 #include "tl_mlx5.h"
 #include "utils/ucc_math.h"
 #include "schedule/ucc_schedule.h"
-
 #include <limits.h>
 #include "tl_mlx5_coll.h"
 #include "utils/arch/cpu.h"
 #include "tl_mlx5_pd.h"
 #include "tl_mlx5_ib.h"
-
 
 #define PD_OWNER_RANK 0
 
@@ -23,17 +21,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
 {
     ucc_tl_mlx5_context_config_t *tl_mlx5_config =
         ucc_derived_of(config, ucc_tl_mlx5_context_config_t);
-    int          port       = -1;
-    char *       ib_devname = NULL;
     ucc_status_t status;
-    int          devname_len;
-    char         tmp[128], *pos;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_mlx5_config->super,
                               params->context);
     memcpy(&self->cfg, tl_mlx5_config, sizeof(*tl_mlx5_config));
-    self->rcache    = NULL;
-    self->shared_pd = NULL;
+    self->rcache     = NULL;
+    self->shared_pd  = NULL;
+    self->shared_ctx = NULL;
 
     status = ucc_mpool_init(
         &self->req_mp, 0,
@@ -43,52 +38,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
     if (UCC_OK != status) {
         tl_error(self->super.super.lib,
                  "failed to initialize tl_mlx5_req mpool");
-        goto err_mpool;
+        return status;
     }
 
-    if (self->cfg.devices.count > 0) {
-        ib_devname  = self->cfg.devices.names[0];
-        pos         = strstr(ib_devname, ":");
-        devname_len = (int)(pos - ib_devname);
-        strncpy(tmp, ib_devname, devname_len);
-        tmp[devname_len] = '\0';
-        ib_devname       = tmp;
-        port             = atoi(pos + 1);
-    }
-    status = ucc_tl_mlx5_create_ibv_ctx(&ib_devname, &self->ib_ctx,
-                                        self->super.super.lib);
-    if (UCC_OK != status) {
-        tl_error(self->super.super.lib, "failed to allocate ibv_context");
-        goto release_mpool;
-    }
-    if (port == -1) {
-        port = ucc_tl_mlx5_get_active_port(self->ib_ctx);
-    }
-    self->ib_port = port;
-    if (-1 == port || !ucc_tl_mlx5_check_port_active(self->ib_ctx, port)) {
-        status = UCC_ERR_NO_RESOURCE;
-        tl_error(self->super.super.lib, "no active ports found on %s",
-                 ib_devname);
-        goto destroy_context;
-    }
-    tl_debug(self->super.super.lib, "using %s:%d", ib_devname, port);
-
-    self->ib_pd = ibv_alloc_pd(self->ib_ctx);
-    if (!self->ib_pd) {
-        status = UCC_ERR_NO_RESOURCE;
-        tl_error(self->super.super.lib, "failed to allocate ib_pd");
-        goto destroy_context;
-    }
     tl_info(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
-
-destroy_context:
-    ibv_close_device(self->ib_ctx);
-release_mpool:
-    ucc_mpool_cleanup(&self->req_mp, 1);
-
-err_mpool:
-    return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
@@ -96,15 +50,12 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
     tl_info(self->super.super.lib, "finalizing tl context: %p", self);
 
     if (self->shared_pd) {
-        ucc_tl_mlx5_remove_shared_ctx_pd(self);
-    }
-
-    if (ibv_dealloc_pd(self->ib_pd)) {
-        tl_error(self->super.super.lib, "failed to dealloc PD errno %d", errno);
+        if (ucc_tl_mlx5_remove_shared_ctx_pd(self) != UCC_OK) {
+            tl_error(self->super.super.lib, "failed to free ib ctx and pd");
+        };
     }
 
     ucc_mpool_cleanup(&self->req_mp, 1);
-    ibv_close_device(self->ib_ctx);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_mlx5_context_t, ucc_tl_context_t);
@@ -120,11 +71,60 @@ ucc_tl_mlx5_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
     return UCC_OK;
 }
 
-ucc_status_t
-ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context) /* NOLINT */
+ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
+{
+    int          port       = -1;
+    char *       ib_devname = NULL;
+    int          devname_len;
+    char         tmp[128], *pos;
+    ucc_status_t status;
+
+    if (ctx->cfg.devices.count > 0) {
+        ib_devname  = ctx->cfg.devices.names[0];
+        pos         = strstr(ib_devname, ":");
+        devname_len = (int)(pos - ib_devname);
+        strncpy(tmp, ib_devname, devname_len);
+        tmp[devname_len] = '\0';
+        ib_devname       = tmp;
+        port             = atoi(pos + 1);
+    }
+    status = ucc_tl_mlx5_create_ibv_ctx(&ib_devname, &ctx->shared_ctx,
+                                        ctx->super.super.lib);
+    if (UCC_OK != status) {
+        tl_error(ctx->super.super.lib, "failed to allocate ibv_context");
+        return UCC_ERR_NO_RESOURCE;
+    }
+    if (port == -1) {
+        port = ucc_tl_mlx5_get_active_port(ctx->shared_ctx);
+    }
+    ctx->ib_port = port;
+    if (-1 == port || !ucc_tl_mlx5_check_port_active(ctx->shared_ctx, port)) {
+        status = UCC_ERR_NO_RESOURCE;
+        tl_error(ctx->super.super.lib, "no active ports found on %s",
+                 ib_devname);
+        goto destroy_context;
+    }
+    tl_debug(ctx->super.super.lib, "using %s:%d", ib_devname, port);
+
+    ctx->shared_pd = ibv_alloc_pd(ctx->shared_ctx);
+    if (!ctx->shared_pd) {
+        status = UCC_ERR_NO_RESOURCE;
+        tl_error(ctx->super.super.lib, "failed to allocate ib_pd");
+        goto destroy_context;
+    }
+
+    return UCC_OK;
+
+destroy_context:
+    ibv_close_device(ctx->shared_ctx);
+
+    return UCC_ERR_NO_RESOURCE;
+}
+
+ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
 {
     ucc_tl_mlx5_context_t *ctx = ucc_derived_of(context, ucc_tl_mlx5_context_t);
-    ucc_context_t *        core_ctx = context->ucc_context;
+    ucc_context_t *  core_ctx       = context->ucc_context;
     const char *     template       = "/tmp/ucc.mlx5.XXXXXX";
     const char *     sockname       = "/sock";
     size_t           sock_dir_len   = strlen(template) + 1;
@@ -157,18 +157,26 @@ ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context) /* NOLINT */
         goto out;
     }
 
-    if (sbgp->group_rank == PD_OWNER_RANK) {
+    ctx->is_imported = sbgp->group_rank == PD_OWNER_RANK;
+
+    if (ctx->is_imported) {
         ucc_strncpy_safe(sock_path, template, sock_dir_len);
         if (NULL == mkdtemp(sock_path)) {
             tl_error(context->lib, "failed to create tmp file for socket path");
             sock_path[0] = '\0';
         } else {
+            status = ucc_tl_mlx5_ib_ctx_pd_init(ctx);
+            if (status != UCC_OK) {
+                tl_error(context->lib, "failed to create ib ctx and pd");
+                goto out;
+            }
+
             strncat(sock_path, sockname, strlen(sockname));
             status = ucc_tl_mlx5_socket_init(ctx, sbgp->group_size, &sock,
                                              sock_path);
             if (UCC_OK != status) {
                 sock_path[0] = '\0';
-                tl_error(context->lib, "failed to init asr socket");
+                tl_error(context->lib, "failed to init socket to share ib_ctx");
             }
         }
     }

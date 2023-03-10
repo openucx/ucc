@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2022-2023.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -233,8 +233,8 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
                                       ucc_rank_t group_size, int is_ctx_owner,
                                       int ctx_owner_sock)
 {
-    int                ctx_fd    = ctx->ib_ctx->cmd_fd;
-    uint32_t           pd_handle = ctx->ib_pd->handle;
+    int                ctx_fd    = ctx->shared_ctx->cmd_fd;
+    uint32_t           pd_handle = ctx->shared_pd->handle;
     ucc_tl_mlx5_lib_t *lib =
         ucc_derived_of(ctx->super.super.lib, ucc_tl_mlx5_lib_t);
     int          shared_ctx_fd;
@@ -268,9 +268,6 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
             tl_error(lib, "Failed to Share ctx & pd from server side");
             return status;
         }
-        ctx->is_imported = 0;
-        ctx->shared_ctx  = ctx->ib_ctx;
-        ctx->shared_pd   = ctx->ib_pd;
     }
     return UCC_OK;
 }
@@ -279,10 +276,18 @@ ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx)
 {
     if (ctx->is_imported) {
         ibv_unimport_pd(ctx->shared_pd);
-        if (ibv_close_device(ctx->shared_ctx)) {
-            tl_error(ctx->super.super.lib, "imported context close failed");
+    } else {
+        if (ibv_dealloc_pd(ctx->shared_pd)) {
+            tl_error(ctx->super.super.lib, "failed to dealloc PD, errno %d",
+                     errno);
             return UCC_ERR_NO_MESSAGE;
         }
     }
+
+    if (ibv_close_device(ctx->shared_ctx)) {
+        tl_error(ctx->super.super.lib, "fail to close ib ctx");
+        return UCC_ERR_NO_MESSAGE;
+    }
+
     return UCC_OK;
 }
