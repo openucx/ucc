@@ -42,7 +42,9 @@ class test_scatterv : public UccCollArgs, public ucc::test {
             if (r == root) {
                 all_counts = 0;
                 counts = (int*)malloc(sizeof(int) * nprocs);
+                ASSERT_NE(counts, nullptr);
                 displs = (int*)malloc(sizeof(int) * nprocs);
+                ASSERT_NE(displs, nullptr);
 
                 for (int i = 0; i < nprocs; i++) {
                     counts[i] = (nprocs - i) * count;
@@ -52,7 +54,7 @@ class test_scatterv : public UccCollArgs, public ucc::test {
                 
                 ctxs[r]->init_buf =
                     ucc_malloc(ucc_dt_size(dtype) * all_counts, "init buf");
-                EXPECT_NE(ctxs[r]->init_buf, nullptr);
+                ASSERT_NE(ctxs[r]->init_buf, nullptr);
                 uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
                 for (int p = 0; p < nprocs; p++) {
                     for (int i = 0; i < ucc_dt_size(dtype) * counts[p]; i++) {
@@ -115,9 +117,9 @@ class test_scatterv : public UccCollArgs, public ucc::test {
         size_t           my_count;
 
         for (auto r = 0; r < ctxs.size(); r++) {
-            coll = ctxs[r]->args;
-            my_count = coll->dst.info.count;
             if (r != root || !inplace) {
+                coll = ctxs[r]->args;
+                my_count = coll->dst.info.count;
                 clear_buffer(coll->dst.info.buffer,
                     my_count * ucc_dt_size(dtype),
                     mem_type, 0);
@@ -126,9 +128,9 @@ class test_scatterv : public UccCollArgs, public ucc::test {
     }
     bool data_validate(UccCollCtxVec ctxs)
     {
-        bool     ret               = true;
-        int      root              = ctxs[0]->args->root;
-        size_t   dt_size = ucc_dt_size((ctxs[0])->args->dst.info.datatype);
+        bool     ret  = true;
+        int      root = ctxs[0]->args->root;
+        size_t   dt_size;
         size_t   my_count;
         uint8_t *dsts;
 
@@ -136,12 +138,11 @@ class test_scatterv : public UccCollArgs, public ucc::test {
             if (r == root && inplace) {
                 continue;
             }
+            dt_size  = ucc_dt_size((ctxs[r])->args->dst.info.datatype);
             my_count = (ctxs[r])->args->dst.info.count;
             if (UCC_MEMORY_TYPE_HOST != mem_type) {
                 dsts = (uint8_t *)ucc_malloc(my_count * dt_size, "dsts buf");
-                EXPECT_NE(dsts, nullptr);
-            }
-            if (UCC_MEMORY_TYPE_HOST != mem_type) {
+                ucc_assert(dsts != nullptr);
                 UCC_CHECK(ucc_mc_memcpy(dsts, ctxs[r]->args->dst.info.buffer,
                                         my_count * dt_size,
                                         UCC_MEMORY_TYPE_HOST, mem_type));
@@ -153,10 +154,10 @@ class test_scatterv : public UccCollArgs, public ucc::test {
                 if ((uint8_t)((i + r) % 256) !=
                     dsts[i]) {
                     ret = false;
-                    i   = my_count * dt_size;
+                    break;
                 }
             }
-            
+
             if (UCC_MEMORY_TYPE_HOST != mem_type) {
                 ucc_free(dsts);
                 if (!ret) {
@@ -188,6 +189,10 @@ UCC_TEST_P(test_scatterv_0, single)
     int                       size     = team->procs.size();
     UccCollCtxVec             ctxs;
 
+    if (size <= root) {
+        GTEST_SKIP();
+    }
+
     set_inplace(inplace);
     SET_MEM_TYPE(mem_type);
     set_root(root);
@@ -212,6 +217,10 @@ UCC_TEST_P(test_scatterv_0, single_persistent)
     int                       size     = team->procs.size();
     const int                 n_calls  = 3;
     UccCollCtxVec             ctxs;
+
+    if (size <= root) {
+        GTEST_SKIP();
+    }
 
     set_inplace(inplace);
     SET_MEM_TYPE(mem_type);
@@ -263,8 +272,8 @@ UCC_TEST_P(test_scatterv_1, multiple_host)
         int           size = team->procs.size();
         UccCollCtxVec ctx;
 
-        if (size == 1 && root > 0) {
-            /* skip team size 1 and root > 0, which are invalid */
+        if (size <= root) {
+            /* skip invalid */
             continue;
         }
 

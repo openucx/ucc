@@ -39,7 +39,7 @@ class test_gatherv : public UccCollArgs, public ucc::test {
 
             ctxs[r]->init_buf =
                 ucc_malloc(ucc_dt_size(dtype) * my_count, "init buf");
-            EXPECT_NE(ctxs[r]->init_buf, nullptr);
+            ASSERT_NE(ctxs[r]->init_buf, nullptr);
             for (int i = 0; i < my_count * ucc_dt_size(dtype); i++) {
                 uint8_t *sbuf = (uint8_t *)ctxs[r]->init_buf;
                 sbuf[i]       = ((i + r) % 256);
@@ -48,7 +48,9 @@ class test_gatherv : public UccCollArgs, public ucc::test {
             if (r == root) {
                 all_counts = 0;
                 counts = (int*)malloc(sizeof(int) * nprocs);
+                ASSERT_NE(counts, nullptr);
                 displs = (int*)malloc(sizeof(int) * nprocs);
+                ASSERT_NE(displs, nullptr);
 
                 for (int i = 0; i < nprocs; i++) {
                     counts[i] = (nprocs - i) * count;
@@ -140,13 +142,14 @@ class test_gatherv : public UccCollArgs, public ucc::test {
 
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             dsts = (uint8_t *)ucc_malloc(ctxs[root]->rbuf_size, "dsts buf");
-            EXPECT_NE(dsts, nullptr);
+            ucc_assert(dsts != nullptr);
             UCC_CHECK(ucc_mc_memcpy(dsts, ctxs[root]->args->dst.info_v.buffer,
                                     ctxs[root]->rbuf_size,
                                     UCC_MEMORY_TYPE_HOST, mem_type));
         } else {
             dsts = (uint8_t *)ctxs[root]->args->dst.info_v.buffer;
         }
+
         for (int r = 0; r < ctxs.size(); r++) {
             my_count = ctxs[r]->args->src.info.count;
             for (int i = 0; i < my_count * dt_size; i++) {
@@ -157,6 +160,7 @@ class test_gatherv : public UccCollArgs, public ucc::test {
                 }
             }
         }
+
         if (UCC_MEMORY_TYPE_HOST != mem_type) {
             ucc_free(dsts);
         }
@@ -184,6 +188,10 @@ UCC_TEST_P(test_gatherv_0, single)
     int                       size     = team->procs.size();
     UccCollCtxVec             ctxs;
 
+    if (size <= root) {
+        GTEST_SKIP();
+    }
+
     set_inplace(inplace);
     SET_MEM_TYPE(mem_type);
     set_root(root);
@@ -208,6 +216,10 @@ UCC_TEST_P(test_gatherv_0, single_persistent)
     int                       size     = team->procs.size();
     const int                 n_calls  = 3;
     UccCollCtxVec             ctxs;
+
+    if (size <= root) {
+        GTEST_SKIP();
+    }
 
     set_inplace(inplace);
     SET_MEM_TYPE(mem_type);
@@ -259,8 +271,8 @@ UCC_TEST_P(test_gatherv_1, multiple_host)
         int           size = team->procs.size();
         UccCollCtxVec ctx;
 
-        if (size == 1 && root > 0) {
-            /* skip team size 1 and root > 0, which are invalid */
+        if (size <= root) {
+            /* skip invalid */
             continue;
         }
 
