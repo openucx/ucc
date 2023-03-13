@@ -89,13 +89,7 @@ ucc_status_t ucc_tl_mlx5_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey,
     data = PTR_OFFSET(data, DS_SIZE);
     mlx5dv_set_data_seg(data, ncols * nrows * element_size, dst_mr_key,
                         dst_addr);
-
-    ibv_wr_start(qp_ex);
     mlx5dv_wr_raw_wqe(mqp, wqe_desc);
-    if (!ibv_wr_complete(qp_ex)) {
-        return UCC_ERR_NO_MESSAGE;
-    }
-
     return UCC_OK;
 }
 
@@ -254,12 +248,7 @@ ucc_status_t ucc_tl_mlx5_post_rdma(struct ibv_qp *qp, uint32_t qpn,
     data = PTR_OFFSET(rseg, sizeof(*rseg));
     mlx5dv_set_data_seg(data, len, src_mr_lkey, src_mkey_addr);
 
-    ibv_wr_start(qp_ex);
     mlx5dv_wr_raw_wqe(mqp, wqe_desc);
-    if (!ibv_wr_complete(qp_ex)) {
-        return UCC_ERR_NO_MESSAGE;
-    }
-
     return UCC_OK;
 }
 
