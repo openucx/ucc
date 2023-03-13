@@ -42,14 +42,14 @@ runs_on_dockers:
 # bare metal
 runs_on_agents:
   # - nodeLabel: 'swx-clx01'
-  - nodeLabel: 'ucx_arm'
+  - nodeLabel: 'swx-clx01'
 
 timeout_minutes: 360
 
 steps:
   #============================================================================
   - name: Start docker
-    agentSelector: "{nodeLabel: 'ucx_arm'}"
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
     #containerSelector: "{name:'skip-container'}"
     run: |
       echo "INFO: Start docker containers"
@@ -60,7 +60,7 @@ steps:
 
   #============================================================================
   - name: Run UCC / Torch-UCC tests
-    agentSelector: "{nodeLabel: 'ucx_arm'}"
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
     run: |
       echo "INFO: Run UCC tests"
       hostname
@@ -72,32 +72,32 @@ steps:
       docker rm --force $(cat ${WORKSPACE}/ucc_docker.id)
   #============================================================================
   - name: Run docker containers
-    agentSelector: "{nodeLabel: 'ucx_arm'}"
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
     #containerSelector: "{name:'skip-container'}"
     run: |
       echo "INFO: Run docker containers"
       ${WORKSPACE}/.ci/scripts/run_docker.sh
   #============================================================================
   - name: Run UCC MPI tests
-    agentSelector: "{nodeLabel: 'ucx_arm'}"
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
     run: |
       echo "INFO: Run UCC MPI tests"
       ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
   #============================================================================
   - name: Run Coverity
-    agentSelector: "{nodeLabel: 'ucx_arm'}"
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
     run: |
       echo "Running coverity"
       ${WORKSPACE}/.ci/scripts/coverity.sh
   #============================================================================
   - name: Run DLRM tests (UCC/GPU)
-    agentSelector: "{nodeLabel: 'ucx_arm'}"
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
     run: |
       echo "INFO: Run DLRM tests (UCC/GPU)"
       ${WORKSPACE}/.ci/scripts/run_dlrm_docker.sh
   #============================================================================
   - name: Stop docker containers
-    agentSelector: "{nodeLabel: 'ucx_arm'}"
+    agentSelector: "{nodeLabel: 'swx-clx01'}"
     run: |
       echo "INFO: Stop docker containers"
       ${WORKSPACE}/.ci/scripts/stop_docker.sh
