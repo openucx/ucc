@@ -1,83 +1,90 @@
-#!/bin/bash -eExl
+#!/bin/bash -eEl
+progname=$(basename $0)
 
-realdir=$(realpath $(dirname $0))
-source ${realdir}/common.sh
-source ${realdir}/../az-helpers.sh
+function usage() 
+{
+	cat << HEREDOC
 
-COV_MODULE="tools/cov-2019.12"
+   Usage: $progname [--pre_script "./autogen.sh;./configure"] [--build_cmd "make all"] [--ignore_files "devx gtest"]  [--verbose]
 
-#
-# Run Coverity and report errors
-# The argument is a UCC build type: devel or release
-#
-modules_for_coverity() {
-	res=0
-	az_module_load $COV_MODULE
-	res=$(($res+$?))
-	az_module_load $CUDA_MODULE
-	res=$(($res+$?))
-	az_module_load $GDRCOPY_MODULE
-	res=$(($res+$?))
-	az_module_load $JDK_MODULE
-	res=$(($res+$?))
-	az_module_load $MVN_MODULE
-	res=$(($res+$?))
-	az_module_load $XPMEM_MODULE
-	res=$(($res+$?))
-	return $res
+   optional arguments:
+     -h, --help           			show this help message and exit
+     -p, --pre_script STRING        Preparation commands to run prior running coverity
+     -b, --build_script STRING      Build command to pass to coverity
+     -i, --ignore_files STRING  	Space separated list of files/dirs to ignore
+     -v, --verbose        			increase the verbosity of the bash script
+
+HEREDOC
+exit 0
 }
 
-modules_for_coverity_unload() {
-	res=0
-	az_module_unload $COV_MODULE
-	res=$(($res+$?))
-	az_module_unload $CUDA_MODULE
-	res=$(($res+$?))
-	az_module_unload $GDRCOPY_MODULE
-	res=$(($res+$?))
-	az_module_unload $JDK_MODULEF
-	res=$(($res+$?))
-	az_module_unload $MVN_MODULE
-	res=$(($res+$?))
-	az_module_unload $XPMEM_MODULE
-	res=$(($res+$?))
-	return $res
-}
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -p|--pre_script) pre_cmd="$2"; shift ;;
+        -b|--build_script) build_cmd="$2"; shift ;;
+        -i|--ignore_files) ignore_list="$2"; shift ;;
+        -h|--help) usage ;;
+        -v|--verbose) set +x ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
 
-run_coverity() {
+topdir=$(git rev-parse --show-toplevel)
+cd $topdir
 
-	az_init_modules
-	modules_for_coverity
 
-	ucc_build_type=$1
+if [ ! -d .git ]; then
+	echo "Error: should be run from project root"
+	exit 1
+fi
 
-	xpmem_root=$(module show $XPMEM_MODULE 2>&1 | awk '/CPATH/ {print $3}' | sed -e 's,/include,,')
-	with_xpmem="--with-xpmem=$xpmem_root"
 
-	${WORKSPACE}/contrib/configure-$ucc_build_type --prefix=$ucc_inst --with-cuda --with-gdrcopy --with-java $with_xpmem
-	cov_build_id="cov_build_${ucc_build_type}"
-	cov_build="$ucc_build_dir/$cov_build_id"
-	rm -rf $cov_build
-	mkdir -p $cov_build
-	cov-build --dir $cov_build $MAKEP all
-	if [ "${ucc_build_type}" == "devel" ]; then
-		cov-manage-emit --dir $cov_build --tu-pattern "file('.*/test/gtest/common/googletest/*')" delete
-	fi
-	cov-analyze --jobs $parallel_jobs $COV_OPT --security --concurrency --dir $cov_build
-	nerrors=$(cov-format-errors --dir $cov_build | awk '/Processing [0-9]+ errors?/ { print $2 }')
-	rc=$(($rc+$nerrors))
+ncpus=$(cat /proc/cpuinfo|grep processor|wc -l)
+export AUTOMAKE_JOBS=$ncpus
 
-	if [ $nerrors -gt 0 ]; then
-		cov-format-errors --dir $cov_build --emacs-style
-		cp -ar $cov_build $WORKSPACE/$cov_build_id
-		echo "not ok 1 Coverity Detected $nerrors failures"
-	else
-		echo "ok 1 Coverity found no issues"
-		rm -rf $cov_build
-	fi
-	modules_for_coverity_unload
-	return $rc
-}
+if [ -n "${pre_cmd}" ]; then
 
-prepare_build
-run_coverity "$@"
+    echo "==== Running Pre-commands ===="
+
+    set +eE
+    /bin/bash -c "$pre_cmd"
+    rc=$?
+
+    if [ $rc -ne 0 ]; then
+        echo pre-commands failed
+        exit 1
+    fi
+
+    set -eE
+fi
+
+cov_build="cov_build"
+rm -rf $cov_build
+
+module load tools/cov
+
+echo "==== Running coverity ===="
+
+cov-build --dir $cov_build $build_cmd all
+
+if [ -n "${ignore_list}" ]; then
+
+    echo "==== Adding ignore list ===="
+
+    for item in ${ignore_list}; do
+        cov-manage-emit --dir ${cov_build} --tu-pattern "file(${item})" delete ||:
+    done
+fi
+
+echo "==== Running anaysis ===="
+
+cov-analyze --jobs $ncpus $COV_OPT --security --concurrency --dir $cov_build
+cov-format-errors --dir $cov_build --emacs-style |& tee cov_${variant}.log
+
+nerrors=$(cov-format-errors --dir $cov_build | awk '/Processing [0-9]+ errors?/ { print $2 }')
+rc=$(($rc+$nerrors))
+
+echo status $rc
+
+exit $rc
