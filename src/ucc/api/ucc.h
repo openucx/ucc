@@ -704,6 +704,27 @@ void ucc_lib_config_print(const ucc_lib_config_h config, FILE *stream,
 ucc_status_t ucc_lib_config_modify(ucc_lib_config_h config, const char *name,
                                    const char *value);
 
+/**
+ * @ingroup UCC_LIB
+ * @brief Get UCC library version.
+ *
+ * This routine returns the UCC library version.
+ *
+ * @param [out] major_version       Filled with library major version.
+ * @param [out] minor_version       Filled with library minor version.
+ * @param [out] release_number      Filled with library release number.
+ */
+void ucc_get_version(unsigned *major_version, unsigned *minor_version,
+                     unsigned *release_number);
+
+/**
+ * @ingroup UCC_LIB
+ * @brief Get UCC library version as a string.
+ *
+ * This routine returns the UCC library version as a string which consists of:
+ * "major.minor.release".
+ */
+const char *ucc_get_version_string(void);
 
 /**
  * @ingroup UCC_LIB

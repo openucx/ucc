@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) Advanced Micro Devices, Inc. 2023. ALL RIGHTS RESERVED.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include <getopt.h>
 #include <sstream>
 #include "test_mpi.h"
@@ -626,6 +633,12 @@ int main(int argc, char *argv[])
             "   elapsed     : " <<
             std::chrono::duration_cast<std::chrono::seconds>(end - begin).count()
                   << "s" << std::endl;
+
+	if (skipped == test->results.size()) {
+            std::cout << "\n All tests have been skipped, indicating most likely "
+                         "a problem\n";
+            failed = 1;
+	}
     }
 test_exit:
     delete test;
