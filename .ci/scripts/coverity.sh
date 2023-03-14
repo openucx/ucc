@@ -66,7 +66,7 @@ rm -rf $cov_build
 
 echo "==== Running coverity ===="
 
-cov-build --dir $cov_build $build_cmd all
+cov-build --dir $cov_build $build_cmd 
 
 if [ -n "${ignore_list}" ]; then
 
