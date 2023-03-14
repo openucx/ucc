@@ -42,10 +42,10 @@ runs_on_dockers:
 runs_on_agents:
   - nodeLabel: 'swx-clx01'
 
-timeout_minutes: 360
+timeout_minutes: 360s
 
 steps:
-  #============================================================================
+  #=================================================================================
   - name: Start docker
     agentSelector: "{nodeLabel: 'swx-clx01'}"
     #containerSelector: "{name:'skip-container'}"
