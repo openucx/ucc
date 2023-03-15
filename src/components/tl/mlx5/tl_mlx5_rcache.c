@@ -1,5 +1,5 @@
 /**
- * Copyright (C) Mellanox Technologies Ltd. 2022.  ALL RIGHTS RESERVED.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -10,11 +10,11 @@ static ucs_status_t rcache_reg_mr(void *context, ucs_rcache_t *rcache,
                                   void *arg, ucc_rcache_region_t *rregion,
                                   uint16_t flags)
 {
-    ucc_tl_mlx5_context_t *ctx  = (ucc_tl_mlx5_context_t *)context;
-    void *                 addr = (void *)rregion->super.start;
+    ucc_tl_mlx5_context_t *ctx      = (ucc_tl_mlx5_context_t *)context;
+    void *                 addr     = (void *)rregion->super.start;
+    ucc_tl_mlx5_reg_t *    mlx5_reg = ucc_tl_mlx5_get_rcache_reg_data(rregion);
+    int *                  change_flag = (int *)arg;
     size_t length = (size_t)(rregion->super.end - rregion->super.start);
-    ucc_tl_mlx5_reg_t *mlx5_reg    = ucc_tl_mlx5_get_rcache_reg_data(rregion);
-    int *              change_flag = (int *)arg;
 
     mlx5_reg->region = rregion;
     *change_flag     = 1;
@@ -47,12 +47,12 @@ ucc_status_t tl_mlx5_create_rcache(ucc_tl_mlx5_context_t *ctx)
 
     rcache_params.region_struct_size =
         sizeof(ucc_rcache_region_t) + sizeof(ucc_tl_mlx5_reg_t);
-    rcache_params.alignment     = UCS_PGT_ADDR_ALIGN;
-    rcache_params.max_alignment = getpagesize();
-    rcache_params.ucm_events = UCM_EVENT_VM_UNMAPPED | UCM_EVENT_MEM_TYPE_FREE;
+    rcache_params.alignment          = UCS_PGT_ADDR_ALIGN;
+    rcache_params.max_alignment      = getpagesize();
     rcache_params.ucm_event_priority = 1000;
     rcache_params.context            = (void *)ctx;
     rcache_params.ops                = &rcache_ucc_ops;
+    rcache_params.ucm_events = UCM_EVENT_VM_UNMAPPED | UCM_EVENT_MEM_TYPE_FREE;
 
     status = ucc_rcache_create(&rcache_params, "reg cache", &ctx->rcache);
 
