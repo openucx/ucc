@@ -62,7 +62,7 @@ fi
 cov_build="cov_build"
 rm -rf $cov_build
 
-# module load tools/cov
+module load tools/cov
 
 echo "==== Running coverity ===="
 
