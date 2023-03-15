@@ -1723,6 +1723,36 @@ typedef enum {
 /**
  *  @ingroup UCC_COLLECTIVES_DT
  */
+typedef enum {
+    UCC_COLL_ARGS_HINT_OPTMIZE_OVERLAP_CPU  = UCC_BIT(0), /*!< When the flag is
+                                                            set, the user
+                                                            prefers the library
+                                                            to choose an
+                                                            algorithm
+                                                            implementation
+                                                            optimized for the
+                                                            best overlap of CPU
+                                                            resources. */
+    UCC_COLL_ARGS_HINT_OPTMIZE_OVERLAP_GPU  = UCC_BIT(1), /*!< When the flag is
+                                                            set, the user
+                                                            prefers the library
+                                                            to choose an
+                                                            algorithm
+                                                            implementation
+                                                            optimized for the
+                                                            best overlap of GPU
+                                                            resources. */
+    UCC_COLL_ARGS_HINT_OPTIMIZE_LATENCY     = UCC_BIT(2) /*!<  When the flag is
+                                                           set, the user prefers
+                                                           the library to choose
+                                                           an algorithm
+                                                           implementation
+                                                           optimized for the
+                                                           latency. */
+} ucc_coll_args_hints_t;
+/**
+ *  @ingroup UCC_COLLECTIVES_DT
+ */
 typedef struct ucc_coll_buffer_info_v {
     void             *buffer; /*!< Starting address of the send/recv buffer */
     ucc_count_t      *counts; /*!< Array of counts of type @ref ucc_count_t
@@ -1842,6 +1872,9 @@ typedef struct ucc_coll_args {
         int64_t  stride;
         uint64_t size;
     } active_set;
+    uint64_t                        hints; /*!< Hints for the collective
+                                             operation to choose optimizations.
+                                            */
 } ucc_coll_args_t;
 
 /**
