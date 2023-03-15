@@ -12,6 +12,7 @@
 #include "utils/ucc_coll_utils.h"
 #include "tl_ucp_sendrecv.h"
 #include "components/mc/ucc_mc.h"
+#include "coll_patterns/bruck_alltoall.h"
 
 /*
 scratch structure
@@ -92,35 +93,6 @@ typedef struct ucc_tl_ucp_alltoallv_hybrid_buf_meta {
 
 #define SET_BRUCK_DIGIT(_seg, _digit) \
     ((_seg) = (((_digit) << ALLTOALLV_HYBRID_SEG_DIGIT) + ((_seg) & UCC_MASK(ALLTOALLV_HYBRID_SEG_DIGIT))))
-
-#define GET_NEXT_BRUCK_NUM(_num, _radix, _pow) \
-    ((((_num) + 1) % (_pow))?((_num) + 1):(((_num) + 1) + (_pow) * ((_radix) - 1)))
-
-#define GET_PREV_BRUCK_NUM(_num, _radix, _pow) \
-    (((_num) % (_pow))?((_num) - 1):(((_num) - 1) - (_pow) * ((_radix) - 1)))
-
-static inline ucc_rank_t get_bruck_step_start(uint32_t pow, uint32_t d)
-{
-    return pow * d;
-}
-
-static inline ucc_rank_t get_bruck_step_finish(ucc_rank_t n, uint32_t radix,
-                                               uint32_t d, uint32_t pow)
-{
-    return ucc_min(n + pow - 1 - (n - d * pow) % (pow * radix), n);
-}
-
-static inline ucc_rank_t get_bruck_recv_peer(ucc_rank_t trank, ucc_rank_t tsize,
-                                             ucc_rank_t step, uint32_t digit)
-{
-    return (trank - step * digit + tsize * digit) % tsize;
-}
-
-static inline ucc_rank_t get_bruck_send_peer(ucc_rank_t trank, ucc_rank_t tsize,
-                                             ucc_rank_t step, uint32_t digit)
-{
-    return (trank + step * digit) % tsize;
-}
 
 static inline ucc_rank_t get_pairwise_send_peer(ucc_rank_t trank, ucc_rank_t tsize,
                                                 ucc_rank_t step)

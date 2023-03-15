@@ -24,14 +24,58 @@
 #include "fanout/fanout.h"
 #include "scatterv/scatterv.h"
 
-const char
-    *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
-        UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR,
-        UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR,
-        UCC_TL_UCP_BCAST_DEFAULT_ALG_SELECT_STR,
-        UCC_TL_UCP_ALLTOALL_DEFAULT_ALG_SELECT_STR,
-        UCC_TL_UCP_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR,
-        UCC_TL_UCP_REDUCE_SCATTERV_DEFAULT_ALG_SELECT_STR};
+ucc_status_t ucc_tl_ucp_team_default_score_str_alloc(ucc_tl_ucp_team_t *team,
+    char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR])
+{
+    ucc_status_t st = UCC_OK;
+
+    default_select_str[0] = strdup(UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR);
+    if (!default_select_str[0]) {
+        st = UCC_ERR_NO_MEMORY;
+        goto exit;
+    }
+    default_select_str[1] = strdup(UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR);
+    if (!default_select_str[1]) {
+        st = UCC_ERR_NO_MEMORY;
+        goto exit;
+    }
+
+    default_select_str[2] = strdup(UCC_TL_UCP_BCAST_DEFAULT_ALG_SELECT_STR);
+    if (!default_select_str[2]) {
+        st = UCC_ERR_NO_MEMORY;
+        goto exit;
+    }
+
+    default_select_str[3] = ucc_tl_ucp_alltoall_score_str_get(team);
+    if (!default_select_str[3]) {
+        st = UCC_ERR_NO_MEMORY;
+        goto exit;
+    }
+
+    default_select_str[4] = strdup(UCC_TL_UCP_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR);
+    if (!default_select_str[4]) {
+        st = UCC_ERR_NO_MEMORY;
+        goto exit;
+    }
+
+    default_select_str[5] = strdup(UCC_TL_UCP_REDUCE_SCATTERV_DEFAULT_ALG_SELECT_STR);
+    if (!default_select_str[5]) {
+        st = UCC_ERR_NO_MEMORY;
+        goto exit;
+    }
+exit:
+    return st;
+}
+
+void ucc_tl_ucp_team_default_score_str_free(
+    char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR])
+{
+    int i;
+
+    for (i = 0; i < UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR; i++) {
+        ucc_free(default_select_str[i]);
+    }
+}
 
 void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                                    void *user_data)
@@ -231,6 +275,9 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
         switch (alg_id) {
         case UCC_TL_UCP_ALLTOALL_ALG_PAIRWISE:
             *init = ucc_tl_ucp_alltoall_pairwise_init;
+            break;
+        case UCC_TL_UCP_ALLTOALL_ALG_BRUCK:
+            *init = ucc_tl_ucp_alltoall_bruck_init;
             break;
         case UCC_TL_UCP_ALLTOALL_ALG_ONESIDED:
             *init = ucc_tl_ucp_alltoall_onesided_init;

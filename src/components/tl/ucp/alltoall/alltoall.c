@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -14,12 +14,29 @@ void ucc_tl_ucp_alltoall_pairwise_progress(ucc_coll_task_t *task);
 ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *task);
 void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *task);
 
+char* ucc_tl_ucp_alltoall_score_str_get(ucc_tl_ucp_team_t *team)
+{
+    int max_size = sizeof(UCC_TL_UCP_ALLTOALL_DEFAULT_ALG_SELECT_STR_PATTERN) +
+                   32;
+    char *str;
+
+    str = ucc_malloc(max_size * sizeof(char));
+    ucc_snprintf_safe(str, max_size,
+                      UCC_TL_UCP_ALLTOALL_DEFAULT_ALG_SELECT_STR_PATTERN,
+                      129 * UCC_TL_TEAM_SIZE(team));
+    return str;
+}
+
 ucc_base_coll_alg_info_t
     ucc_tl_ucp_alltoall_algs[UCC_TL_UCP_ALLTOALL_ALG_LAST + 1] = {
         [UCC_TL_UCP_ALLTOALL_ALG_PAIRWISE] =
             {.id   = UCC_TL_UCP_ALLTOALL_ALG_PAIRWISE,
              .name = "pairwise",
              .desc = "pairwise two-sided implementation"},
+        [UCC_TL_UCP_ALLTOALL_ALG_BRUCK] =
+            {.id   = UCC_TL_UCP_ALLTOALL_ALG_BRUCK,
+             .name = "bruck",
+             .desc = "Bruck alltoall"},
         [UCC_TL_UCP_ALLTOALL_ALG_ONESIDED] =
             {.id   = UCC_TL_UCP_ALLTOALL_ALG_ONESIDED,
              .name = "onesided",

@@ -17,8 +17,12 @@
 
 #define UCC_UUNITS_AUTO_RADIX 4
 #define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 6
-extern const char
-    *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
+
+ucc_status_t ucc_tl_ucp_team_default_score_str_alloc(ucc_tl_ucp_team_t *team,
+    char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR]);
+
+void ucc_tl_ucp_team_default_score_str_free(
+    char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR]);
 
 #define CALC_KN_TREE_DIST(_size, _radix, _dist)                               \
     do {                                                                      \
@@ -207,6 +211,11 @@ typedef struct ucc_tl_ucp_task {
             ucc_rank_t              num2send;
             ucc_rank_t              num2recv;
         } alltoallv_hybrid;
+        struct {
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_rank_t              iteration;
+            int                     phase;
+        } alltoall_bruck;
     };
 } ucc_tl_ucp_task_t;
 
@@ -346,7 +355,7 @@ static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
     return UCC_INPROGRESS;
 }
 
-#define UCC_TL_UCP_TASK_RECV_COMPLETE(_task)                                    \
+#define UCC_TL_UCP_TASK_RECV_COMPLETE(_task)                                   \
     (((_task)->tagged.recv_posted == (_task)->tagged.recv_completed))
 
 static inline ucc_status_t ucc_tl_ucp_test_recv(ucc_tl_ucp_task_t *task)
