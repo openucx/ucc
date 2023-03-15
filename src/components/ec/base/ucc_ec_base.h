@@ -79,7 +79,7 @@ typedef struct ucc_ee_executor_params {
 
 /* Maximum number of buffers for UCC_EE_EXECUTOR_TASK_REDUCE_MULTI_DST and
    UCC_EE_EXECUTOR_TASK_COPY_MULTI operations */
-#define UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS 6
+#define UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS 7
 
 /* Reduces "n_srcs" buffers (each contains "count" elements of type "dt")
    into "dst" buffer.

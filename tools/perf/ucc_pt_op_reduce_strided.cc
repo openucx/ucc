@@ -22,6 +22,10 @@ ucc_pt_op_reduce_strided::ucc_pt_op_reduce_strided(ucc_datatype_t dt,
     has_range_     = true;
     has_bw_        = true;
 
+    if (nbufs == UCC_PT_DEFAULT_N_BUFS) {
+        nbufs = 2;
+    }
+
     if (nbufs < 2) {
         throw std::runtime_error("dt reduce op requires at least 2 bufs");
     }

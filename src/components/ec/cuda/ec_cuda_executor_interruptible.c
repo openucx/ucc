@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -54,7 +54,11 @@ ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
 {
     cudaStream_t stream = NULL;
     ucc_ec_cuda_executor_interruptible_task_t *ee_task;
-    ucc_status_t                               status;
+    ucc_status_t status;
+    cudaGraphNode_t nodes[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
+    size_t num_nodes = UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS;
+    int i;
+
 
     status = ucc_cuda_executor_interruptible_get_stream(&stream);
     if (ucc_unlikely(status != UCC_OK)) {
@@ -85,10 +89,46 @@ ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
         }
         break;
     case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
-        status = ucc_ec_cuda_copy_multi_kernel(task_args, stream);
-        if (ucc_unlikely(status != UCC_OK)) {
-            ec_error(&ucc_ec_cuda.super, "failed to start copy multi op");
-            goto free_task;
+        if ((task_args->copy_multi.counts[0] > EC_CUDA_CONFIG->exec_copy_thresh) &&
+            (task_args->copy_multi.num_vectors > 2)) {
+            cudaGraphGetNodes(ee_task->graph, nodes, &num_nodes);
+            for (i = 0; i < task_args->copy_multi.num_vectors; i++) {
+                status = CUDA_FUNC(
+                    cudaGraphExecMemcpyNodeSetParams1D(ee_task->graph_exec, nodes[i],
+                                                       task_args->copy_multi.dst[i],
+                                                       task_args->copy_multi.src[i],
+                                                       task_args->copy_multi.counts[i],
+                                                       cudaMemcpyDefault));
+                if (ucc_unlikely(status != UCC_OK)) {
+                    ec_error(&ucc_ec_cuda.super, "failed to instantiate graph");
+                    goto free_task;
+                }
+
+            }
+            for (; i < UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS; i++) {
+                status = CUDA_FUNC(
+                    cudaGraphExecMemcpyNodeSetParams1D(ee_task->graph_exec, nodes[i],
+                                                       task_args->copy_multi.dst[0],
+                                                       task_args->copy_multi.src[0],
+                                                       1, cudaMemcpyDefault));
+                if (ucc_unlikely(status != UCC_OK)) {
+                    ec_error(&ucc_ec_cuda.super, "failed to instantiate graph");
+                    goto free_task;
+                }
+            }
+
+            status = CUDA_FUNC(cudaGraphLaunch(ee_task->graph_exec, stream));
+            if (ucc_unlikely(status != UCC_OK)) {
+                ec_error(&ucc_ec_cuda.super, "failed to instantiate graph");
+                goto free_task;
+            }
+
+        } else {
+            status = ucc_ec_cuda_copy_multi_kernel(task_args, stream);
+            if (ucc_unlikely(status != UCC_OK)) {
+                ec_error(&ucc_ec_cuda.super, "failed to start copy multi op");
+                goto free_task;
+            }
         }
         break;
     case UCC_EE_EXECUTOR_TASK_REDUCE:
@@ -141,6 +181,10 @@ ucc_cuda_executor_interruptible_task_finalize(ucc_ee_executor_task_t *task)
 
     ucc_assert(task->status == UCC_OK);
     status = ucc_ec_cuda_event_destroy(ee_task->event);
+    // if (ee_task->graph) {
+    //     cudaGraphExecDestroy(ee_task->graph_exec);
+    //     cudaGraphDestroy(ee_task->graph);
+    // }
     ucc_mpool_put(task);
     return status;
 }

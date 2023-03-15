@@ -15,6 +15,8 @@
 #include <ucc/api/ucc.h>
 #include "utils/ucc_log.h"
 
+#define UCC_PT_DEFAULT_N_BUFS 0
+
 enum ucc_pt_bootstrap_type_t {
     UCC_PT_BOOTSTRAP_MPI,
     UCC_PT_BOOTSTRAP_UCX
