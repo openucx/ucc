@@ -223,7 +223,11 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     if (status != UCC_OK) {
         tl_error(context->lib, "failed to share ctx and pd");
         goto out;
+    } else {
+        tl_debug(context->lib, "sharing pd and ib_ctx completed successfully");
     }
+
+    return UCC_OK;
 
 out:
     ucc_tl_mlx5_remove_shared_ctx_pd(ctx);

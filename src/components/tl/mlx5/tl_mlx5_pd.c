@@ -10,12 +10,10 @@
 typedef struct {
     int          sock, fd;
     uint32_t     pd_handle;
-    ucc_status_t return_val;
 } connection_t;
 
-void *do_sendmsg(void *ptr)
+ucc_status_t do_sendmsg(connection_t *conn)
 {
-    connection_t *  conn = (connection_t *)ptr;
     struct msghdr   msg  = {};
     struct cmsghdr *cmsghdr;
     struct iovec    iov[1];
@@ -44,10 +42,9 @@ void *do_sendmsg(void *ptr)
 
     nbytes = sendmsg(conn->sock, &msg, 0);
     if (nbytes == -1) {
-        conn->return_val = UCC_ERR_NO_MESSAGE;
+        return UCC_ERR_NO_MESSAGE;
     }
-    conn->return_val = UCC_OK;
-    pthread_exit(NULL);
+    return UCC_OK;
 }
 
 static ucc_status_t do_recvmsg(int sock, int *shared_cmd_fd,
@@ -175,61 +172,46 @@ static ucc_status_t server_send_data(int command_fd, uint32_t pd_handle,
                                      int group_size, int sock,
                                      ucc_tl_mlx5_lib_t *lib)
 {
-    int                i = 0;
+    int                i;
     connection_t       connection[group_size];
-    pthread_t          thread[group_size];
     struct sockaddr_un addr;
     socklen_t          addrlen;
+    ucc_status_t       status;
 
-    while (i < group_size) {
+    for (i = 0; i < group_size; i++) {
         /* accept incoming connections */
-        connection[i].sock      = accept(sock, NULL, 0);
         connection[i].fd        = command_fd;
         connection[i].pd_handle = pd_handle;
-        if (connection[i].sock != -1) {
-            /* start a new thread but do not wait for it */
-            pthread_create(&thread[i], 0, do_sendmsg, (void *)&connection[i]);
-            i++;
+        connection[i].sock      = accept(sock, NULL, 0);
+        if (connection[i].sock == -1) {
+            tl_error(lib,
+                     "failed to accept socket connection request %d,"
+                     " errno %d",
+                     i, errno);
+            goto listen_fail;
         }
-    }
-
-    for (i = 0; i < group_size; i++) {
-        pthread_join(thread[i], NULL);
-    }
-
-    addrlen = sizeof(addr);
-    getsockname(sock, (struct sockaddr *)&addr, &addrlen);
-
-    for (i = 0; i < group_size; i++) {
-        if (connection[i].return_val != UCC_OK) {
+        status = do_sendmsg(&connection[i]);
+        if (status != UCC_OK) {
             tl_error(lib, "failed to send cmd_fd");
             goto listen_fail;
         }
     }
 
-    if (close(sock) == -1) {
-        tl_error(lib, "failed to close server socket errno %d", errno);
-        if (remove(addr.sun_path) == -1) {
-            tl_error(lib, "socket file removal failed");
-        }
-        return UCC_ERR_NO_MESSAGE;
-    }
-
-    if (remove(addr.sun_path) == -1) {
-        tl_error(lib, "socket file removal failed");
-        return UCC_ERR_NO_MESSAGE;
-    }
-
-    return UCC_OK;
+    addrlen = sizeof(addr);
+    getsockname(sock, (struct sockaddr *)&addr, &addrlen);
 
 listen_fail:
     if (close(sock) == -1) {
         tl_error(lib, "failed to close server socket errno %d", errno);
+        status = UCC_ERR_NO_MESSAGE;
     }
+
     if (remove(addr.sun_path) == -1) {
         tl_error(lib, "socket file removal failed");
+        status = UCC_ERR_NO_MESSAGE;
     }
-    return UCC_ERR_NO_MESSAGE;
+
+    return status;
 }
 
 ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
@@ -237,28 +219,26 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
                                       ucc_rank_t group_size, int is_ctx_owner,
                                       int ctx_owner_sock)
 {
-    int                ctx_fd    = ctx->shared_ctx->cmd_fd;
-    uint32_t           pd_handle = ctx->shared_pd->handle;
-    ucc_tl_mlx5_lib_t *lib       =
+    ucc_tl_mlx5_lib_t *lib =
         ucc_derived_of(ctx->super.super.lib, ucc_tl_mlx5_lib_t);
-    int          shared_ctx_fd;
-    uint32_t     shared_pd_handle;
+    int          ctx_fd;
+    uint32_t     pd_handle;
     ucc_status_t status;
 
     if (!is_ctx_owner) {
-        status =
-            client_recv_data(&shared_ctx_fd, &shared_pd_handle, sock_path, lib);
+        status = client_recv_data(&ctx_fd, &pd_handle, sock_path, lib);
         if (UCC_OK != status) {
+            tl_error(lib, "failed to share ctx & pd from client side");
             return status;
         }
-        ctx->shared_ctx = ibv_import_device(shared_ctx_fd);
+        ctx->shared_ctx = ibv_import_device(ctx_fd);
         if (!ctx->shared_ctx) {
             tl_error(lib, "Import context failed");
             return UCC_ERR_NO_MESSAGE;
         }
-        ctx->shared_pd = ibv_import_pd(ctx->shared_ctx, shared_pd_handle);
+        ctx->shared_pd = ibv_import_pd(ctx->shared_ctx, pd_handle);
         if (!ctx->shared_pd) {
-            tl_error(lib, "Import PD failed");
+            tl_error(lib, "import PD failed");
             if (ibv_close_device(ctx->shared_ctx)) {
                 tl_error(lib, "imported context close failed");
             }
@@ -266,10 +246,12 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
         }
         ctx->is_imported = 1;
     } else {
+        ctx_fd    = ctx->shared_ctx->cmd_fd;
+        pd_handle = ctx->shared_pd->handle;
         status = server_send_data(ctx_fd, pd_handle, group_size - 1,
                                   ctx_owner_sock, lib);
         if (UCC_OK != status) {
-            tl_error(lib, "Failed to Share ctx & pd from server side");
+            tl_error(lib, "failed to share ctx & pd from server side");
             return status;
         }
     }
