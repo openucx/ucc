@@ -90,45 +90,27 @@ ucc_sra_kn_get_offset_and_seglen(size_t count, size_t dt_size, ucc_rank_t rank,
                                  ptrdiff_t *offset, size_t *seglen)
 {
     ptrdiff_t             _offset     = 0;
-    size_t                block_count = count;
-    ucc_rank_t            step_radix  = 0;
     size_t                my_seg_len  = 0;
-    ucc_rank_t            k, r, peer, my_si;
+    ucc_rank_t            my_si, step_radix;
     size_t                my_seg_offset;
     ucc_knomial_pattern_t p;
 
     ucc_knomial_pattern_init(size, rank, radix, &p);
-
     if (KN_NODE_EXTRA == p.node_type) {
-        if (offset)
-            *offset = 0;
-        if (seglen)
-            *seglen = count;
-        return;
+        goto out;
     }
+
     while (!ucc_knomial_pattern_loop_done(&p)) {
-        r = 0;
-        for (k = 1; k < p.radix; k++) {
-            peer = ucc_knomial_pattern_get_loop_peer(&p, rank, k);
-            if (peer == UCC_KN_PEER_NULL)
-                continue;
-            r++;
-        }
-        step_radix = r + 1;
-        my_si      = ucc_kn_compute_seg_index(rank, p.radix_pow, &p);
-        my_seg_offset =
-            ucc_sra_kn_compute_seg_offset(block_count, step_radix, my_si);
+        step_radix    = ucc_kn_compute_step_radix(&p);
+        my_si         = ucc_kn_compute_seg_index(rank, p.radix_pow, &p);
+        my_seg_offset = ucc_sra_kn_compute_seg_offset(count, step_radix, my_si);
+        count         = ucc_sra_kn_compute_seg_size(count, step_radix, my_si);
         _offset += my_seg_offset * dt_size;
-        if (!ucc_knomial_pattern_loop_last_iteration(&p)) {
-            block_count =
-                ucc_sra_kn_compute_seg_size(block_count, step_radix, my_si);
-        }
         ucc_knomial_pattern_next_iteration(&p);
     }
-    if (step_radix) {
-        my_seg_len =
-            ucc_sra_kn_compute_seg_size(block_count, step_radix, my_si);
-    }
+    my_seg_len = count;
+
+out:
     if (offset)
         *offset = _offset;
     if (seglen)
