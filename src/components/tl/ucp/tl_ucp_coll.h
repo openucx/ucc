@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -136,12 +136,14 @@ typedef struct ucc_tl_ucp_task {
             ucc_knomial_pattern_t   p;
             ucc_rank_t              recv_dist;
             ptrdiff_t               send_offset;
+            size_t                  recv_size;
         } scatter_kn;
         struct {
             int                     phase;
             ucc_knomial_pattern_t   p;
             void                   *sbuf;
             ucc_ee_executor_task_t *etask;
+            ucc_rank_t              recv_dist;
         } allgather_kn;
         struct {
             ucc_rank_t              dist;
@@ -312,6 +314,25 @@ static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
     }
     while (polls++ < task->n_polls) {
         if (UCC_TL_UCP_TASK_P2P_COMPLETE(task)) {
+            return UCC_OK;
+        }
+        ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);
+    }
+    return UCC_INPROGRESS;
+}
+
+#define UCC_TL_UCP_TASK_RECV_COMPLETE(_task)                                    \
+    (((_task)->tagged.recv_posted == (_task)->tagged.recv_completed))
+
+static inline ucc_status_t ucc_tl_ucp_test_recv(ucc_tl_ucp_task_t *task)
+{
+    int polls = 0;
+
+    if (UCC_TL_UCP_TASK_RECV_COMPLETE(task)) {
+        return UCC_OK;
+    }
+    while (polls++ < task->n_polls) {
+        if (UCC_TL_UCP_TASK_RECV_COMPLETE(task)) {
             return UCC_OK;
         }
         ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);
