@@ -211,6 +211,25 @@ ucc_knomial_pattern_get_min_radix(ucc_kn_radix_t cfg_radix,
     return radix;
 }
 
+/* Calculates for each rank at which distance it should recieve */
+static inline ucc_rank_t
+ucc_knomial_calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
+                           ucc_rank_t radix, ucc_rank_t root)
+{
+    if (rank == root) {
+        return 0;
+    }
+    ucc_rank_t root_base = 0 ;
+    ucc_rank_t dist = 1;
+    while (dist <= team_size) {
+        if (rank < root_base + radix * dist) {
+            break;
+        }
+        dist *= radix;
+    }
+    return dist;
+}
+
 /* A set of convenience macros used to implement sw based progress
    of the algorithms that use kn pattern */
 enum {

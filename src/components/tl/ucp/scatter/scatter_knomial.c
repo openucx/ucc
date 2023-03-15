@@ -14,46 +14,22 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 
-#define SAVE_STATE(_phase)                                                    \
-    do {                                                                      \
-        task->scatter_kn.phase = _phase;                                      \
+#define SAVE_STATE(_phase)                                                     \
+    do {                                                                       \
+        task->scatter_kn.phase = _phase;                                       \
     } while (0)
-
-#define GET_BASE_PEER(_radix, _rank, _dist, _peer)                            \
-    do {                                                                      \
-        _peer = _rank - ((_rank / _dist) % _radix) * _dist;                   \
-} while (0)
 
 enum {
     UCC_SCATTER_KN_PHASE_INIT,
     UCC_SCATTER_KN_PHASE_LOOP, /* main loop of recursive k-ing */
 };
 
-/* Calculates for each rank at which distance it should recieve */
-ucc_rank_t calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
-                                     ucc_rank_t radix, ucc_rank_t root)
-{
-    if (rank == root) {
-        return 0;
-    }
-    ucc_rank_t root_base;
-    ucc_rank_t dist = 1;
-    GET_BASE_PEER(radix, root, dist, root_base);
-    while (dist <= team_size) {
-        if (rank >= root_base && rank < root_base + radix * dist) {
-            break;
-        }
-        dist *= radix;
-        GET_BASE_PEER(radix, root_base, dist, root_base);
-    }
-    return dist;
-}
-
 void ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t     *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t       *args = &TASK_ARGS(task);
-    ucc_tl_ucp_team_t     *team = TASK_TEAM(task);
+    ucc_tl_ucp_task_t     *task      = ucc_derived_of(coll_task,
+                                                      ucc_tl_ucp_task_t);
+    ucc_coll_args_t       *args      = &TASK_ARGS(task);
+    ucc_tl_ucp_team_t     *team      = TASK_TEAM(task);
     ucc_kn_radix_t         radix     = task->scatter_kn.p.radix;
     ucc_knomial_pattern_t *p         = &task->scatter_kn.p;
     void                  *rbuf      = args->dst.info.buffer;
@@ -108,8 +84,8 @@ void ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
                     continue;
                 vpeer = ucc_knomial_pattern_loop_rank(p, peer);
                 vroot = ucc_knomial_pattern_loop_rank(p, root);
-                peer_recv_dist =
-                    calc_recv_dist(team_size, vpeer, radix, vroot);
+                peer_recv_dist = ucc_knomial_calc_recv_dist(team_size, vpeer,
+                                                            radix, vroot);
                 task->scatter_kn.recv_size = local_seg_count * dt_size;
                 if (peer_recv_dist < task->scatter_kn.recv_dist) {
                     UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(rbuf,
@@ -129,7 +105,7 @@ void ucc_tl_ucp_scatter_knomial_progress(ucc_coll_task_t *coll_task)
          from previous iteration has completed.
         */
         if ((root == rank) || (task->tagged.recv_posted > 0)) {
-            ucc_assert(task->tagged.recv_posted == task->tagged.recv_completed);
+            ucc_assert(UCC_TL_UCP_TASK_RECV_COMPLETE(task));
             for (loop_step = 1; loop_step < radix; loop_step++) {
                 peer = ucc_knomial_pattern_get_loop_peer(p, rank, loop_step);
                 if (peer == UCC_KN_PEER_NULL)
@@ -195,8 +171,9 @@ ucc_status_t ucc_tl_ucp_scatter_knomial_start(ucc_coll_task_t *coll_task)
     task->scatter_kn.phase = UCC_SCATTER_KN_PHASE_INIT;
     vroot = ucc_knomial_pattern_loop_rank(p, VRANK(root, root, size));
     vrank = ucc_knomial_pattern_loop_rank(p, VRANK(rank, root, size));
-    task->scatter_kn.recv_dist = calc_recv_dist(size - p->n_extra, vrank,
-                                                p->radix, vroot);
+    task->scatter_kn.recv_dist = ucc_knomial_calc_recv_dist(size - p->n_extra,
+                                                            vrank, p->radix,
+                                                            vroot);
     task->scatter_kn.send_offset = 0;
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);

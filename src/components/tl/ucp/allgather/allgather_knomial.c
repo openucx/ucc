@@ -30,22 +30,6 @@
  * a new virtual rank number - "vrank".
  * As such allgather must keep to this ranking to be aligned with scatter.
  */
-static ucc_rank_t calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
-                                 ucc_rank_t radix, ucc_rank_t root)
-{
-    if (rank == root) {
-        return 0;
-    }
-    ucc_rank_t root_base = 0 ;
-    ucc_rank_t dist = 1;
-    while (dist <= team_size) {
-        if (rank < root_base + radix * dist) {
-            break;
-        }
-        dist *= radix;
-    }
-    return dist;
-}
 
 void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
 {
@@ -121,7 +105,7 @@ UCC_KN_PHASE_EXTRA:
             if (peer == UCC_KN_PEER_NULL)
                 continue;
             if (coll_task->bargs.args.coll_type == UCC_COLL_TYPE_BCAST) {
-                peer_dist = calc_recv_dist(size - p->n_extra,
+                peer_dist = ucc_knomial_calc_recv_dist(size - p->n_extra,
                         ucc_knomial_pattern_loop_rank(p, peer), p->radix, 0);
                 if (peer_dist < task->allgather_kn.recv_dist) {
                     continue;
@@ -143,9 +127,9 @@ UCC_KN_PHASE_EXTRA:
                                        &peer_seg_offset);
 
             if (coll_task->bargs.args.coll_type == UCC_COLL_TYPE_BCAST) {
-                peer_dist = calc_recv_dist(size - p->n_extra,
+                peer_dist = ucc_knomial_calc_recv_dist(size - p->n_extra,
                         ucc_knomial_pattern_loop_rank(p, peer), p->radix, 0);
-                if (peer_dist >  task->allgather_kn.recv_dist) {
+                if (peer_dist > task->allgather_kn.recv_dist) {
                     continue;
                 }
             }
@@ -232,7 +216,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
         offset = ucc_sra_kn_get_offset(args->dst.info.count,
                                     ucc_dt_size(args->dst.info.datatype), rank,
                                     size, radix);
-        task->allgather_kn.recv_dist = calc_recv_dist(
+        task->allgather_kn.recv_dist = ucc_knomial_calc_recv_dist(
             size - p->n_extra,
             ucc_knomial_pattern_loop_rank(p, rank),
             p->radix, 0);
