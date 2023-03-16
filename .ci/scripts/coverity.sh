@@ -1,5 +1,8 @@
 #!/bin/bash -eEl
 progname=$(basename $0)
+cov_exclude_file_list="test/gtest"
+
+WS_URL=file://$WORKSPACE
 
 function usage() 
 {
@@ -29,62 +32,63 @@ while [[ "$#" -gt 0 ]]; do
     esac
     shift
 done
-
-topdir=$(git rev-parse --show-toplevel)
-cd $topdir
-
-
-if [ ! -d .git ]; then
-	echo "Error: should be run from project root"
-	exit 1
-fi
-
-
-ncpus=$(cat /proc/cpuinfo|grep processor|wc -l)
-export AUTOMAKE_JOBS=$ncpus
-
-if [ -n "${pre_cmd}" ]; then
-
-    echo "==== Running Pre-commands ===="
-
-    set +eE
-    /bin/bash -c "$pre_cmd"
-    rc=$?
-
-    if [ $rc -ne 0 ]; then
-        echo pre-commands failed
-        exit 1
-    fi
-
-    set -eE
-fi
-
-cov_build="cov_build"
-rm -rf $cov_build
-
 module load tools/cov
 
-echo "==== Running coverity ===="
-
-cov-build --dir $cov_build $build_cmd 
-
-if [ -n "${ignore_list}" ]; then
-
-    echo "==== Adding ignore list ===="
-
-    for item in ${ignore_list}; do
-        cov-manage-emit --dir ${cov_build} --tu-pattern "file(${item})" delete ||:
-    done
-fi
-
-echo "==== Running anaysis ===="
-
-cov-analyze --jobs $ncpus $COV_OPT --security --concurrency --dir $cov_build
-cov-format-errors --dir $cov_build --emacs-style |& tee cov_${variant}.log
-
+echo "Build with coverity"
+cov_dir=${WORKSPACE}/jenkins/cov
+cov_build_id="cov_build_${BUILD_NUMBER}"
+cov_build="$cov_dir/$cov_build_id"
+nproc=$(grep processor /proc/cpuinfo|wc -l)
+make_opt="-j$(($nproc / 2 + 1))"
+rm -rf $cov_build
+set +eE
+cov-build --dir $cov_build make $make_opt all
+echo  "============ After Cov_build ==========="
+set +eE
+for excl in $cov_exclude_file_list; do
+    cov-manage-emit --dir $cov_build --tu-pattern "file('$excl')" delete
+done
+set -eE
+cov-analyze --dir $cov_build
+cov_web_path="$(echo $cov_build | sed -e s,$WORKSPACE,,g)"
 nerrors=$(cov-format-errors --dir $cov_build | awk '/Processing [0-9]+ errors?/ { print $2 }')
 rc=$(($rc+$nerrors))
+index_html=$(cd $cov_build && find . -name index.html | cut -c 3-)
+cov_url="$WS_URL/$cov_web_path/${index_html}"
+cov_file="$cov_build/${index_html}"
 
-echo status $rc
+filtered_nerrors=0
+rm -f jenkins_sidelinks.txt
+echo 1..1 > coverity.tap
+if [ $nerrors -gt 0 ]; then
+    cat $cov_file  | grep -i -e '</\?TABLE\|</\?TD\|</\?TR\|</\?TH' | \
+                     sed 's/^[\ \t]*//g' | tr -d '\n' | \
+                     sed 's/<\/TR[^>]*>/\n/Ig'  | \
+                     sed 's/<\/\?\(TABLE\|TR\)[^>]*>//Ig' | \
+                     sed 's/^<T[DH][^>]*>\|<\/\?T[DH][^>]*>$//Ig' | \
+                     sed 's/<\/T[DH][^>]*><T[DH][^>]*>/%/Ig' | \
+                     cut -d"%" -f2,4,3 > $cov_build/index.csv
 
-exit $rc
+    filter_csv="$WORKSPACE/contrib/jenkins_tests/filter.csv"
+    FILTER="grep -G -x -v -f $filter_csv $cov_build/index.csv"
+    filtered_nerrors=$FILTER | wc -l
+fi
+
+if [ $filtered_nerrors -gt 0 ]; then
+    echo "not ok 1 Coverity Detected $filtered_nerrors failures # $cov_url" >> coverity.tap
+    info="Coverity found $filtered_nerrors errors"
+    status="error"
+else
+    echo ok 1 Coverity found no issues >> coverity.tap
+    info="Coverity found no issues"
+    status="success"
+fi
+if [ -n "$ghprbGhRepository" ]; then
+    context="MellanoxLab/coverity"
+    do_github_status "repo='$ghprbGhRepository' sha1='$ghprbActualCommit' target_url='$cov_url' state='$status' info='$info' context='$context'"
+fi
+
+echo Coverity report: $cov_url
+printf "%s\t%s\n" Coverity $cov_url >> jenkins_sidelinks.txt
+
+module unload tools/cov
