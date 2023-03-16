@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "ucc_pt_coll.h"
 #include "ucc_perftest.h"
 #include <ucc/api/ucc.h>
@@ -59,13 +65,13 @@ ucc_status_t ucc_pt_coll_reduce_scatterv::init_args(size_t count,
     displs = (ucc_aint_t*)ucc_malloc(tsize * sizeof(uint32_t), "displ buf");
     UCC_MALLOC_CHECK_GOTO(displs, free_counts, st);
 
-    UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size_dst, args.dst.info_v.mem_type),
+    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, size_dst, args.dst.info_v.mem_type),
                   free_displs, st);
     args.dst.info_v.buffer = dst_header->addr;
     if (!UCC_IS_INPLACE(args)) {
         args.src.info.count = count * tsize;
         UCCCHECK_GOTO(
-            ucc_mc_alloc(&src_header, size_src, args.src.info.mem_type),
+            ucc_pt_alloc(&src_header, size_src, args.src.info.mem_type),
             free_dst, st);
         args.src.info.buffer = src_header->addr;
     }
@@ -81,7 +87,7 @@ ucc_status_t ucc_pt_coll_reduce_scatterv::init_args(size_t count,
     return UCC_OK;
 
 free_dst:
-    ucc_mc_free(dst_header);
+    ucc_pt_free(dst_header);
 free_displs:
     ucc_free(displs);
 free_counts:
@@ -105,11 +111,11 @@ void ucc_pt_coll_reduce_scatterv::free_args(ucc_pt_test_args_t &test_args)
     }
 
     if (dst_header) {
-        ucc_mc_free(dst_header);
+        ucc_pt_free(dst_header);
         dst_header = nullptr;
     }
     if (src_header) {
-        ucc_mc_free(src_header);
+        ucc_pt_free(src_header);
         src_header = nullptr;
     }
 }

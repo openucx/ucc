@@ -155,6 +155,13 @@ UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_memcpy,
     return mc_ops[mt]->memcpy(dst, src, len, dst_mem, src_mem);
 }
 
+ucc_status_t ucc_mc_memset(void *ptr, int value, size_t size,
+                           ucc_memory_type_t mem_type)
+{
+    UCC_CHECK_MC_AVAILABLE(mem_type);
+    return mc_ops[mem_type]->memset(ptr, value, size);
+}
+
 ucc_status_t ucc_mc_flush(ucc_memory_type_t mem_type)
 {
     UCC_CHECK_MC_AVAILABLE(mem_type);

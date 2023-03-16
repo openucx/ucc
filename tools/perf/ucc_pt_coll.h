@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -13,6 +13,11 @@ extern "C" {
 #include <components/ec/ucc_ec.h>
 #include <components/mc/ucc_mc.h>
 }
+
+ucc_status_t ucc_pt_alloc(ucc_mc_buffer_header_t **h_ptr, size_t len,
+                          ucc_memory_type_t mem_type);
+
+ucc_status_t ucc_pt_free(ucc_mc_buffer_header_t *h_ptr);
 
 typedef union {
     ucc_coll_args_t             coll_args;

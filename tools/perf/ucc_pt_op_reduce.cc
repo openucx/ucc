@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "ucc_pt_coll.h"
 #include "ucc_perftest.h"
 #include <ucc/api/ucc.h>
@@ -38,8 +44,8 @@ ucc_status_t ucc_pt_op_reduce::init_args(size_t count,
     ucc_status_t st;
     int i;
 
-    UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size, mem_type), exit, st);
-    UCCCHECK_GOTO(ucc_mc_alloc(&src_header, size * num_bufs, mem_type),
+    UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, size, mem_type), exit, st);
+    UCCCHECK_GOTO(ucc_pt_alloc(&src_header, size * num_bufs, mem_type),
                   free_dst, st);
 
     args.task_type     = UCC_EE_EXECUTOR_TASK_REDUCE;
@@ -55,7 +61,7 @@ ucc_status_t ucc_pt_op_reduce::init_args(size_t count,
 
     return UCC_OK;
 free_dst:
-    ucc_mc_free(dst_header);
+    ucc_pt_free(dst_header);
 exit:
     return st;
 }
@@ -71,6 +77,6 @@ float ucc_pt_op_reduce::get_bw(float time_ms, int grsize,
 
 void ucc_pt_op_reduce::free_args(ucc_pt_test_args_t &test_args)
 {
-    ucc_mc_free(src_header);
-    ucc_mc_free(dst_header);
+    ucc_pt_free(src_header);
+    ucc_pt_free(dst_header);
 }

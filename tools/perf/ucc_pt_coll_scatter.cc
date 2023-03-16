@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "ucc_pt_coll.h"
 #include "ucc_perftest.h"
 #include <ucc/api/ucc.h>
@@ -42,19 +48,19 @@ ucc_status_t ucc_pt_coll_scatter::init_args(size_t single_rank_count,
     if (is_root) {
         args.src.info.count = single_rank_count * comm->get_size();
         UCCCHECK_GOTO(
-            ucc_mc_alloc(&src_header, size_src, args.src.info.mem_type),
+            ucc_pt_alloc(&src_header, size_src, args.src.info.mem_type),
             exit, st_src);
         args.src.info.buffer = src_header->addr;
     }
     if (!is_root || !UCC_IS_INPLACE(args)) {
-        UCCCHECK_GOTO(ucc_mc_alloc(&dst_header, size_dst, args.dst.info.mem_type),
+        UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, size_dst, args.dst.info.mem_type),
                       free_src, st_dst);
         args.dst.info.buffer = dst_header->addr;
         return UCC_OK;
     }
 free_src:
     if (is_root && st_src == UCC_OK) {
-        ucc_mc_free(src_header);
+        ucc_pt_free(src_header);
     }
     return st_dst;
 exit:
@@ -77,9 +83,9 @@ void ucc_pt_coll_scatter::free_args(ucc_pt_test_args_t &test_args)
     bool             is_root = (comm->get_rank() == args.root);
 
     if (!is_root || !UCC_IS_INPLACE(args)) {
-        ucc_mc_free(dst_header);
+        ucc_pt_free(dst_header);
     }
     if (is_root) {
-        ucc_mc_free(src_header);
+        ucc_pt_free(src_header);
     }
 }
