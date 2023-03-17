@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -114,7 +114,8 @@ typedef struct ucc_tl_sharp_task {
 
 ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
                                        struct sharp_coll_context **context,
-                                       ucc_tl_sharp_oob_ctx_t *oob_ctx);
+                                       ucc_tl_sharp_oob_ctx_t *oob_ctx,
+                                       ucc_topo_t *topo);
 ucc_status_t ucc_tl_sharp_rcache_create(struct sharp_coll_context *contex,
                                         ucc_rcache_t **rcache);
 

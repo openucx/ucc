@@ -13,12 +13,14 @@
 UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
-    ucc_tl_sharp_context_t         *ctx =
+    ucc_tl_sharp_context_t          *ctx =
         ucc_derived_of(tl_context, ucc_tl_sharp_context_t);
     struct sharp_coll_context       *sharp_ctx = ctx->sharp_context;
     struct sharp_coll_comm_init_spec comm_spec;
     int                              ret;
     ucc_status_t                     status;
+    ucc_topo_t                      *topo;
+    ucc_subset_t                     set;
 
     if (!(params->params.mask & UCC_TEAM_PARAM_FIELD_OOB)) {
         tl_debug(ctx->super.super.lib, "team OOB required for sharp team");
@@ -30,18 +32,30 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
     self->sharp_context = NULL;
     self->rcache        = NULL;
     self->oob_ctx.ctx   = UCC_TL_TEAM_CTX(self);
+
+    set.myrank = UCC_TL_TEAM_RANK(self);
+    set.map    = UCC_TL_TEAM_MAP(self);
+
     if (UCC_TL_SHARP_TEAM_LIB(self)->cfg.use_internal_oob) {
-        self->oob_ctx.subset.map    = UCC_TL_TEAM_MAP(self);
-        self->oob_ctx.subset.myrank = UCC_TL_TEAM_RANK(self);
+        self->oob_ctx.subset = set;
     } else {
         self->oob_ctx.oob = &UCC_TL_TEAM_OOB(self);
     }
 
     if (sharp_ctx == NULL) {
-        status = ucc_tl_sharp_context_init(ctx, &self->sharp_context, &self->oob_ctx);
+        status = ucc_topo_init(set, ctx->super.super.ucc_context->topo, &topo);
+        if (UCC_OK != status) {
+            tl_error(ctx->super.super.lib, "failed to init team topo");
+            return status;
+        }
+
+        status = ucc_tl_sharp_context_init(ctx, &self->sharp_context,
+                                           &self->oob_ctx, topo);
         if (status != UCC_OK) {
             return status;
         }
+
+        ucc_topo_cleanup(topo);
 
         if (ctx->cfg.use_rcache) {
             status = ucc_tl_sharp_rcache_create(self->sharp_context, &self->rcache);
@@ -217,7 +231,7 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
         status = ucc_tl_sharp_bcast_init(task);
         break;
     default:
-        tl_error(UCC_TASK_LIB(task),
+        tl_debug(UCC_TASK_LIB(task),
                  "collective %d is not supported by sharp tl",
                  coll_args->args.coll_type);
         status = UCC_ERR_NOT_SUPPORTED;

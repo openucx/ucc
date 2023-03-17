@@ -286,15 +286,23 @@ ucc_status_t ucc_tl_sharp_rcache_create(struct sharp_coll_context *context,
 
 ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
                                        struct sharp_coll_context **context,
-                                       ucc_tl_sharp_oob_ctx_t *oob_ctx)
+                                       ucc_tl_sharp_oob_ctx_t *oob_ctx,
+                                       ucc_topo_t *topo)
 {
     struct sharp_coll_init_spec  init_spec = {0};
     ucc_tl_sharp_lib_t          *lib       = ucc_derived_of(sharp_ctx->super.super.lib,
                                                             ucc_tl_sharp_lib_t);
+    ucc_sbgp_t                  *sbgp;
     int ret;
 
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
+    if (sbgp->status != UCC_SBGP_ENABLED) {
+        tl_error(sharp_ctx->super.super.lib, "NODE SBGP is not enabled");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     init_spec.progress_func                  = NULL;
-    init_spec.world_local_rank               = 0;
+    init_spec.world_local_rank               = sbgp->group_rank;
     init_spec.group_channel_idx              = 0;
     init_spec.oob_ctx                        = oob_ctx;
     init_spec.config                         = sharp_coll_default_config;
@@ -406,28 +414,40 @@ err:
 ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
 {
     ucc_tl_sharp_context_t *sharp_ctx = ucc_derived_of(context, ucc_tl_sharp_context_t);
+    ucc_context_t          *core_ctx  = context->ucc_context;
     ucc_tl_sharp_lib_t     *lib       = ucc_derived_of(sharp_ctx->super.super.lib,
                                                        ucc_tl_sharp_lib_t);
-    ucc_status_t status;
+    ucc_status_t            status;
+    ucc_topo_t             *topo;
+    ucc_subset_t            set;
 
     if (sharp_ctx->cfg.context_per_team) {
         return UCC_OK;
     }
 
+    set.map.type   = UCC_EP_MAP_FULL;
+    set.myrank     = UCC_TL_CTX_OOB(sharp_ctx).oob_ep;
+    set.map.ep_num = UCC_TL_CTX_OOB(sharp_ctx).n_oob_eps;
+
     if (lib->cfg.use_internal_oob) {
-        sharp_ctx->oob_ctx.subset.map.ep_num =
-            UCC_TL_CTX_OOB(sharp_ctx).n_oob_eps;
-        sharp_ctx->oob_ctx.subset.map.type   = UCC_EP_MAP_FULL;
-        sharp_ctx->oob_ctx.subset.myrank     = UCC_TL_CTX_OOB(sharp_ctx).oob_ep;
+        sharp_ctx->oob_ctx.subset = set;
     } else {
         sharp_ctx->oob_ctx.oob      = &UCC_TL_CTX_OOB(sharp_ctx);
     }
 
+    status = ucc_topo_init(set, core_ctx->topo, &topo);
+    if (UCC_OK != status) {
+        tl_error(sharp_ctx->super.super.lib, "failed to init topo");
+        return status;
+    }
+
     status = ucc_tl_sharp_context_init(sharp_ctx, &sharp_ctx->sharp_context,
-                                       &sharp_ctx->oob_ctx);
+                                       &sharp_ctx->oob_ctx, topo);
     if (status != UCC_OK) {
         return status;
     }
+
+    ucc_topo_cleanup(topo);
 
     if (sharp_ctx->cfg.use_rcache) {
         status = ucc_tl_sharp_rcache_create(sharp_ctx->sharp_context, &sharp_ctx->rcache);
@@ -476,7 +496,7 @@ ucc_status_t ucc_tl_sharp_get_context_attr(const ucc_base_context_t *context, /*
         attr->attr.ctx_addr_len = 0;
     }
 
-    attr->topo_required = 0;
+    attr->topo_required = 1;
 
     return UCC_OK;
 }
