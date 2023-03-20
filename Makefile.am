@@ -26,7 +26,9 @@ endif #!DOCS_ONLY
 include $(srcdir)/docs/doxygen/doxygen.am
 
 .PHONY: docs docs-clean
-
+.PHONY: clean
+clean:
+    [tab]@rm -f $(PROGRAMS) *.o core
 DOCLIST = docs/doxygen/doxygen-doc/ucc.tag
 
 FORMAT = pdf
@@ -39,6 +41,25 @@ docs-clean:
 	$(RM) $(DOT_CLEANFILES)
 
 docs/doxygen/doxygen-doc/ucc.tag: $(doxygen_doc_files) doxygen-doc
+
+clean-generic:
+
+distclean-generic:
+	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
+	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+
+maintainer-clean-generic:
+	@echo "This command is intended for maintainers to use"
+	@echo "it deletes files that may require special tools to rebuild."
+clean: clean-recursive
+
+clean-am: clean-generic clean-libtool mostlyclean-am
+
+distclean: distclean-recursive
+	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
+	-rm -f Makefile
+distclean-am: clean-am distclean-generic distclean-libtool \
+	distclean-tags
 
 .dot.pdf:
 	dot -T pdf -o $@ $<

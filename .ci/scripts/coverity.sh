@@ -1,38 +1,34 @@
-#!/bin/bash -eE
-#
-# Copyright (c) 2001-2017 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# See file LICENSE for terms.
-#
-source $(dirname $0)/globals.sh
+#!/bin/bash -eEl
 
-check_filter "Checking for coverity ..." "on"
+topdir=$(git rev-parse --show-toplevel)
+cd $topdir
 
-cov_exclude_file_list="test/gtest"
 
-if ! module_load tools/cov; then
-	echo "WARNING: coverity is not found"
-	exit 0
+if [ ! -d .git ]; then
+	echo "Error: should be run from project root"
+	exit 1
 fi
 
-echo "Build with coverity"
-cov_dir=${WORKSPACE}/${prefix}/cov
-cov_build_id="cov_build_${BUILD_NUMBER}"
-cov_build="$cov_dir/$cov_build_id"
+echo "==== Running coverity ===="
+
+ncpus=$(cat /proc/cpuinfo|grep processor|wc -l)
+export AUTOMAKE_JOBS=$ncpus
+
+./autogen.sh
+./configure 
+make -j $ncpus clean
+
+cov_build="cov_build"
 rm -rf $cov_build
 
-set +eE
-make $make_opt clean 2>&1 > /dev/null
-module load $mpi_module
-${WORKSPACE}/contrib/configure-devel --with-mpi=$OMPI_HOME --prefix=$sharp_dir -C
-cov-build --dir $cov_build make $make_opt all
+module load tools/cov
 
-set +eE
-for excl in $cov_exclude_file_list; do
-    cov-manage-emit --dir $cov_build --tu-pattern "file('$excl')" delete
-done
-set -eE
+cov-build --dir $cov_build make -j $ncpus all
+cov-analyze --jobs $ncpus $COV_OPT --security --concurrency --dir $cov_build
+cov-format-errors --dir $cov_build --emacs-style |& tee cov.log
 
-cov-analyze --dir $cov_build
+
+
 module unload $mpi_module
 set -eE
 
@@ -100,3 +96,8 @@ echo Coverity report: $cov_url
 printf "%s\t%s\n" Coverity $cov_url >> jenkins_sidelinks.txt
 
 module unload tools/cov
+
+numerrors=$(cov-format-errors --dir $cov_build | awk '/Processing [0-9]+ errors?/ { print $2 }')
+rc=$(($rc+$numerrors))
+
+exit $rc

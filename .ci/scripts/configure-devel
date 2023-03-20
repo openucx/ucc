@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Copyright (c) 2001-2016 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (C) UT-Battelle, LLC. 2014. ALL RIGHTS RESERVED.
+# See file LICENSE for terms.
+#
+
+#
+# SHArP build for development.
+# Full logging and an runtime checks.
+#
+
+basedir=$(cd $(dirname $0) && pwd)
+$basedir/../configure \
+        --with-valgrind \
+	--enable-frame-pointer \
+	--enable-debug \
+    --enable-params-check \
+    --enable-stats \
+	--enable-gtest \
+	"$@"
