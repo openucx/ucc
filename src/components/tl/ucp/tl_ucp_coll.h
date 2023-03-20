@@ -71,8 +71,15 @@ extern const char
         }                                                                      \
     } while (0)
 
+
+enum ucc_tl_ucp_task_flags {
+    /*indicates whether subset field of tl_ucp_task is set*/
+    UCC_TL_UCP_TASK_FLAG_SUBSET = UCC_BIT(0),
+};
+
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
+    uint32_t        flags;
     union {
         struct {
             uint32_t        send_posted;
@@ -146,6 +153,23 @@ typedef struct ucc_tl_ucp_task {
             ucc_rank_t              recv_dist;
         } allgather_kn;
         struct {
+            /*
+             * get send/recv block depends on subset type being used.
+             * For service allgather we need to get context endpoints but keep
+             * subset numbering.
+             * For regular allgather with rank reordering both endpoints
+             * and blocks permutation are necessary.
+             */
+            ucc_rank_t (*get_send_block)(ucc_subset_t *subset,
+                                         ucc_rank_t trank,
+                                         ucc_rank_t tsize,
+                                         int step);
+            ucc_rank_t (*get_recv_block)(ucc_subset_t *subset,
+                                         ucc_rank_t trank,
+                                         ucc_rank_t tsize,
+                                         int step);
+        } allgather_ring;
+        struct {
             ucc_rank_t              dist;
             uint32_t                radix;
         } bcast_kn;
@@ -218,6 +242,7 @@ static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
 
     UCC_TL_UCP_PROFILE_REQUEST_NEW(task, "tl_ucp_task", 0);
     task->super.flags       = 0;
+    task->flags             = 0;
     task->n_polls           = ctx->cfg.n_polls;
     task->super.team        = &team->super.super;
     task->subset.map.type   = UCC_EP_MAP_FULL;
@@ -278,6 +303,7 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args)) {
         task->tagged.tag = (coll_args->mask & UCC_COLL_ARGS_FIELD_TAG)
             ? coll_args->args.tag : UCC_TL_UCP_ACTIVE_SET_TAG;
+        task->flags        |= UCC_TL_UCP_TASK_FLAG_SUBSET;
         task->subset.map    = ucc_active_set_to_ep_map(&coll_args->args);
         task->subset.myrank =
             ucc_ep_map_local_rank(task->subset.map,

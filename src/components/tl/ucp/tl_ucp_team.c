@@ -55,6 +55,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->seq_num         = 0;
     self->status          = UCC_INPROGRESS;
     self->tuning_str      = "";
+    self->topo            = NULL;
 
     status = ucc_config_clone_table(&UCC_TL_UCP_TEAM_LIB(self)->cfg, &self->cfg,
                                     ucc_tl_ucp_lib_config_table);
@@ -80,6 +81,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         }
     }
 
+    if (!self->topo && self->cfg.use_reordering) {
+        tl_debug(tl_context->lib,
+                 "topo is not available, disabling ranks reordering");
+        self->cfg.use_reordering = 0;
+    }
     tl_debug(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
