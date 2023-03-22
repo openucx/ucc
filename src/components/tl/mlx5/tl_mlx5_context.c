@@ -61,7 +61,8 @@ ucc_tl_mlx5_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
+ucc_status_t
+ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context) /* NOLINT */
 {
     return UCC_OK;
 }
