@@ -33,6 +33,11 @@ static ucs_config_field_t ucc_tl_nccl_context_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_nccl_context_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_context_config_table)},
 
+    {"LAZY_INIT", "yes",
+     "Initialize NCCL communicator on first collective",
+     ucc_offsetof(ucc_tl_nccl_context_config_t, lazy_init),
+     UCC_CONFIG_TYPE_BOOL},
+
     {"SYNC", "auto",
      "Determines how UCC tests completion of NCCL collective",
      ucs_offsetof(ucc_tl_nccl_context_config_t, sync_type),

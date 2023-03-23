@@ -62,6 +62,7 @@ typedef enum ucc_tl_nccl_completion_sync_type {
 
 typedef struct ucc_tl_nccl_context_config {
     ucc_tl_context_config_t            super;
+    int                                lazy_init;
     ucc_tl_nccl_completion_sync_type_t sync_type;
 } ucc_tl_nccl_context_config_t;
 
@@ -80,9 +81,15 @@ typedef struct ucc_tl_nccl_context {
 UCC_CLASS_DECLARE(ucc_tl_nccl_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+enum {
+    TL_NCCL_COMM_STATE_READY,
+    TL_NCCL_COMM_STATE_INIT,
+    TL_NCCL_COMM_STATE_ERROR
+};
+
 typedef struct ucc_tl_nccl_team {
     ucc_tl_team_t        super;
-    ucc_status_t         comm_state;
+    int                  comm_state;
     ncclUniqueId        *unique_id;
     void                *oob_req;
     ncclComm_t           nccl_comm;
@@ -118,6 +125,8 @@ typedef struct ucc_tl_nccl_task {
      UCC_COLL_TYPE_BARRIER        | UCC_COLL_TYPE_GATHER     |                 \
      UCC_COLL_TYPE_GATHERV        | UCC_COLL_TYPE_SCATTER    |                 \
      UCC_COLL_TYPE_SCATTERV)
+
+ucc_status_t ucc_tl_nccl_comm_init(ucc_tl_nccl_team_t *team);
 
 UCC_CLASS_DECLARE(ucc_tl_nccl_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

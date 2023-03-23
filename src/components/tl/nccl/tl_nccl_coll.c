@@ -131,6 +131,7 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t *team,
                                    ucc_tl_nccl_task_t **coll_task)
 {
+    ucc_tl_nccl_team_t    *nccl_team = ucc_derived_of(team, ucc_tl_nccl_team_t);
     ucc_tl_nccl_context_t *nccl_ctx  = ucc_derived_of(team->context,
                                                       ucc_tl_nccl_context_t);
     ucc_tl_nccl_task_t    *task;
@@ -140,6 +141,11 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
         tl_error(team->context->lib,
                  "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    status = ucc_tl_nccl_comm_init(nccl_team);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
     }
 
     task = ucc_mpool_get(&nccl_ctx->req_mp);
@@ -203,7 +209,7 @@ ucc_status_t ucc_tl_nccl_coll_finalize(ucc_coll_task_t *coll_task)
     ucc_status_t        status = UCC_OK;
 
     if (ucc_unlikely(task->super.super.status != UCC_OK)) {
-        team->comm_state = task->super.super.status;
+        team->comm_state = TL_NCCL_COMM_STATE_ERROR;
     }
     tl_debug(UCC_TASK_LIB(task), "finalizing coll task %p", task);
     ucc_tl_nccl_free_task(task);
