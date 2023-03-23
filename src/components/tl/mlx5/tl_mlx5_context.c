@@ -107,7 +107,6 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
     }
     ctx->ib_port = port;
     if (-1 == port || !ucc_tl_mlx5_check_port_active(ctx->shared_ctx, port)) {
-        status = UCC_ERR_NO_RESOURCE;
         tl_error(ctx->super.super.lib, "no active ports found on %s",
                  ib_devname);
         goto destroy_context;
@@ -116,7 +115,6 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
 
     ctx->shared_pd = ibv_alloc_pd(ctx->shared_ctx);
     if (!ctx->shared_pd) {
-        status = UCC_ERR_NO_RESOURCE;
         tl_error(ctx->super.super.lib, "failed to allocate ib_pd");
         goto destroy_context;
     }
@@ -137,6 +135,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     const char *     sockname       = "/sock";
     size_t           sock_dir_len   = strlen(template) + 1;
     size_t           sock_path_len  = sock_dir_len + strlen(sockname);
+    int              sock           = 0;
     char             sock_path[sock_path_len];
     ucc_subset_t     s;
     ucc_status_t     status;
@@ -144,7 +143,6 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     ucc_sbgp_t *     sbgp;
     ucc_tl_team_t *  steam;
     ucc_coll_task_t *req;
-    int              sock;
 
     ucc_assert(core_ctx->service_team != NULL);
     ucc_assert(core_ctx->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB);

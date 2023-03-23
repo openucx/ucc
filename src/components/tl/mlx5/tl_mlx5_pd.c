@@ -172,11 +172,11 @@ static ucc_status_t server_send_data(int command_fd, uint32_t pd_handle,
                                      int group_size, int sock,
                                      ucc_tl_mlx5_lib_t *lib)
 {
+    ucc_status_t       status = UCC_OK;
     int                i;
     connection_t       connection[group_size];
     struct sockaddr_un addr;
     socklen_t          addrlen;
-    ucc_status_t       status;
 
     for (i = 0; i < group_size; i++) {
         /* accept incoming connections */
