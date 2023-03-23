@@ -30,8 +30,8 @@ typedef ucc_status_t (*ucc_tl_mlx5_qp_connect_fn_t)(
     ucc_tl_mlx5_ib_qp_conf_t *qp_conf, ucc_base_lib_t *lib);
 
 typedef ucc_status_t (*ucc_tl_mlx5_create_rc_qp_fn_t)(
-    struct ibv_context *ctx, struct ibv_pd *pd, struct ibv_cq *cq, int ib_port,
-    int tx_depth, ucc_tl_mlx5_qp_t *qp, uint32_t *qpn, ucc_base_lib_t *lib);
+    struct ibv_context *ctx, struct ibv_pd *pd, struct ibv_cq *cq, int tx_depth,
+    ucc_tl_mlx5_qp_t *qp, uint32_t *qpn, ucc_base_lib_t *lib);
 
 class test_tl_mlx5_rc_qp : public test_tl_mlx5_qp {
   public:
@@ -78,8 +78,8 @@ class test_tl_mlx5_rc_qp : public test_tl_mlx5_qp {
 
     void create_qp()
     {
-        GTEST_ASSERT_EQ(
-            create_rc_qp(ctx, pd, cq, port, tx_depth, &qp, &qpn, &lib), UCC_OK);
+        GTEST_ASSERT_EQ(create_rc_qp(ctx, pd, cq, tx_depth, &qp, &qpn, &lib),
+                        UCC_OK);
     }
 
     void create_umr_qp()
