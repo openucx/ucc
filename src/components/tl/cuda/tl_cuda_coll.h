@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -9,10 +9,27 @@
 
 #include "tl_cuda.h"
 #include "components/mc/ucc_mc.h"
+#include "utils/arch/cuda_def.h"
 
 #define UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR 4
 extern const char
     *ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR];
+
+#if ENABLE_DEBUG == 1
+/* TODO: possible need to check CUDA context */
+#define UCC_TL_CUDA_CHECK_DEVICE_MATCH(_team) do {                             \
+    int _dev;                                                                  \
+    CUDA_CHECK(cudaGetDevice(&_dev));                                          \
+    if (_dev != (_team)->device) {                                             \
+        tl_error(UCC_TL_TEAM_LIB(_team), "CUDA device mismatch, "              \
+                 "current device %d, team device %d\n", _dev,                  \
+                 (_team)->device);                                             \
+        return UCC_ERR_INVALID_PARAM;                                          \
+    }                                                                          \
+} while(0)
+#else
+#define UCC_TL_CUDA_CHECK_DEVICE_MATCH(_team)
+#endif
 
 #define TASK_TEAM(_task)                                                       \
     (ucc_derived_of((_task)->super.team, ucc_tl_cuda_team_t))
@@ -85,6 +102,11 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_cuda_task_t *task;
     ucc_status_t        status;
 
+    status = ucc_tl_cuda_comm_init(team);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+    UCC_TL_CUDA_CHECK_DEVICE_MATCH(team);
     if (!ucc_coll_args_is_predefined_dt(&coll_args->args, trank)) {
         return UCC_ERR_NOT_SUPPORTED;
     }

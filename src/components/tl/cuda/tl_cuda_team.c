@@ -15,19 +15,221 @@
 #include "utils/ucc_sys.h"
 #include <sys/shm.h>
 
+ucc_status_t ucc_tl_cuda_comm_init_post(ucc_tl_cuda_team_t *team)
+{
+    ucc_base_lib_t        *tl_lib         = UCC_TL_TEAM_LIB(team);
+    ucc_tl_cuda_lib_t     *tl_cuda_lib    = ucc_derived_of(tl_lib,
+                                                           ucc_tl_cuda_lib_t);
+    const ucc_rank_t       tsize          = UCC_TL_TEAM_SIZE(team);
+    const ucc_rank_t       trank          = UCC_TL_TEAM_RANK(team);
+    const uint32_t         max_concurrent = tl_cuda_lib->cfg.max_concurrent;
+    ucc_tl_cuda_rank_id_t *rank_id        = GET_RANK_ID(team->ids, tsize,
+                                                        max_concurrent);
+    ucc_tl_cuda_sync_t *sync;
+    ucc_status_t status;
+    CUresult cu_st;
+    CUcontext cu_ctx;
+    size_t scratch_size, rank_id_size;
+    int i;
+
+    rank_id_size = sizeof(ucc_tl_cuda_rank_id_t) +
+                   (max_concurrent - 1) * sizeof(cudaIpcEventHandle_t);
+    cu_st = cuCtxGetCurrent(&cu_ctx);
+    if (cu_ctx == NULL || cu_st != CUDA_SUCCESS) {
+        tl_debug(tl_lib,
+                 "cannot create CUDA TL team without active CUDA context");
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    status = CUDA_FUNC(cudaGetDevice(&team->device));
+    if (status != UCC_OK) {
+        tl_debug(tl_lib, "failed to get current device id");
+        return status;
+    }
+
+    status = ucc_tl_cuda_topo_get_pci_id(team->device, &team->device_id);
+    if (status != UCC_OK) {
+        tl_error(tl_lib, "failed to get pci id");
+        return status;
+    }
+
+    status = CUDA_FUNC(cudaStreamCreateWithFlags(&team->stream,
+                       cudaStreamNonBlocking));
+    if (status != UCC_OK) {
+        tl_error(tl_lib, "failed to create CUDA stream");
+        return status;
+    }
+
+/* create IPC events and get handles */
+    for (i = 0; i < tl_cuda_lib->cfg.max_concurrent; i++) {
+        sync = UCC_TL_CUDA_TEAM_SYNC(team, trank, i);
+        CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&sync->ipc_event_local,
+                                                  cudaEventDisableTiming |
+                                                  cudaEventInterprocess),
+                        free_stream, status);
+        CUDA_CHECK_GOTO(cudaIpcGetEventHandle(&rank_id->ev_handle[i],
+                                              sync->ipc_event_local),
+                        free_stream, status);
+    }
+
+/* allocate and map scratch buffer */
+    scratch_size = tl_cuda_lib->cfg.max_concurrent *
+                   tl_cuda_lib->cfg.scratch_size;
+    status = CUDA_FUNC(cudaMalloc(&team->scratch.loc, scratch_size));
+    if (status != UCC_OK) {
+        tl_error(tl_lib, "failed to alloc scratch buffer");
+        goto free_stream;
+    }
+
+    status = ucc_tl_cuda_mem_info_get(team->scratch.loc, scratch_size,
+                                      &rank_id->scratch_info);
+    if (status != UCC_OK) {
+        tl_error(tl_lib, "failed to get scratch memory info");
+        goto free_scratch;
+    }
+
+    rank_id->pci_id = team->device_id;
+    status = team->oob.allgather(rank_id, team->ids, rank_id_size,
+                                 team->oob.coll_info, &team->oob_req);
+    if (UCC_OK != status) {
+        tl_error(tl_lib, "failed to start oob allgather");
+        goto free_scratch;
+    }
+
+    return UCC_OK;
+
+free_scratch:
+    cudaFree(team->scratch.loc);
+free_stream:
+    cudaStreamDestroy(team->stream);
+    return status;
+}
+
+ucc_status_t ucc_tl_cuda_comm_init_test(ucc_tl_cuda_team_t *team)
+{
+    ucc_base_lib_t     *tl_lib         = UCC_TL_TEAM_LIB(team);
+    ucc_tl_cuda_lib_t  *tl_cuda_lib    = ucc_derived_of(tl_lib, ucc_tl_cuda_lib_t);
+    const ucc_rank_t    tsize          = UCC_TL_TEAM_SIZE(team);
+    const ucc_rank_t    trank          = UCC_TL_TEAM_RANK(team);
+    const uint32_t      max_concurrent = tl_cuda_lib->cfg.max_concurrent;
+    ucc_tl_cuda_rank_id_t *rank_id;
+    ucc_rank_t r, p;
+    ucc_status_t status;
+    ucc_tl_cuda_sync_t *sync;
+
+    status = team->oob.req_test(team->oob_req);
+    if (status == UCC_INPROGRESS) {
+        return UCC_INPROGRESS;
+    } else if (status < 0) {
+        team->oob.req_free(team->oob_req);
+        tl_error(tl_lib, "OOB allgather failed");
+        team->state = TL_CUDA_STATE_ERROR;
+        return status;
+    }
+    team->oob.req_free(team->oob_req);
+
+    status = ucc_tl_cuda_team_topo_create(&team->super, &team->topo);
+    if (status != UCC_OK) {
+        tl_debug(tl_lib, "failed to craete team topo %d (%s)", status,
+                 ucc_status_string(status));
+        return status;
+    }
+
+    if (UCC_TL_TEAM_LIB(team)->log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
+        ucc_tl_cuda_team_topo_print_proxies(&team->super, team->topo);
+        ucc_tl_cuda_team_topo_print_rings(&team->super, team->topo);
+    }
+
+    /* map memory handles for remote scratch buffers */
+    for (r = 0; r < tsize; r++) {
+        if ((r == trank) ||
+            !ucc_tl_cuda_team_topo_is_direct(&team->super, team->topo, r,
+                                             trank)) {
+            team->scratch.rem[r] = NULL;
+            continue;
+        }
+        rank_id = GET_RANK_ID(team->ids, r, max_concurrent);
+        status = ucc_tl_cuda_map_memhandle(rank_id->scratch_info.ptr,
+                                           rank_id->scratch_info.length,
+                                           rank_id->scratch_info.handle,
+                                           &team->scratch.rem[r],
+                                           ucc_tl_cuda_get_cache(team, r));
+        memcpy(&team->scratch.rem_info[r], &rank_id->scratch_info,
+               sizeof(ucc_tl_cuda_mem_info_t));
+        if (status != UCC_OK) {
+            goto exit_err;
+        }
+    }
+
+    for (r = 0; r < tl_cuda_lib->cfg.max_concurrent; r++) {
+        sync = UCC_TL_CUDA_TEAM_SYNC(team, trank, r);
+        for (p = 0; p < tsize; p++) {
+            if (p == trank) {
+                continue;
+            }
+            rank_id = GET_RANK_ID(team->ids, p, max_concurrent);
+            CUDA_CHECK_GOTO(cudaIpcOpenEventHandle(&sync->data[p].ipc_event_remote,
+                                                   rank_id->ev_handle[r]),
+                            exit_err, status);
+        }
+    }
+
+    return UCC_OK;
+
+exit_err:
+    return status;
+}
+
+ucc_status_t ucc_tl_cuda_comm_init(ucc_tl_cuda_team_t *team)
+{
+    ucc_status_t status;
+
+    if (team->state == TL_CUDA_STATE_READY) {
+        return UCC_OK;
+    } else if (team->state == TL_CUDA_STATE_ERROR) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    status = ucc_tl_cuda_comm_init_post(team);
+    if (status != UCC_OK) {
+        tl_debug(team->super.super.context->lib, "comm init post error %d %s",
+                 status, ucc_status_string(status));
+        team->state = TL_CUDA_STATE_ERROR;
+        return status;
+    }
+
+    do {
+        /* blocking coll, fix it when we can fallback during collecitve post */
+        status = ucc_tl_cuda_comm_init_test(team);
+    } while (status == UCC_INPROGRESS);
+    if (status != UCC_OK) {
+        tl_debug(team->super.super.context->lib, "comm init test error %d %s",
+                 status, ucc_status_string(status));
+        team->state = TL_CUDA_STATE_ERROR;
+        return status;
+    }
+    team->state = TL_CUDA_STATE_READY;
+    return UCC_OK;
+}
+
+
 UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
-    ucc_tl_cuda_context_t *ctx =
-        ucc_derived_of(tl_context, ucc_tl_cuda_context_t);
-    ucc_tl_cuda_lib_t     *lib =
-        ucc_derived_of(tl_context->lib, ucc_tl_cuda_lib_t);
+    ucc_tl_cuda_context_t *ctx            = ucc_derived_of(tl_context,
+                                                           ucc_tl_cuda_context_t);
+    ucc_tl_cuda_lib_t     *lib            = ucc_derived_of(tl_context->lib,
+                                                           ucc_tl_cuda_lib_t);
+    const ucc_rank_t       tsize          = params->size;
+    const ucc_rank_t       trank          = params->rank;
+    const uint32_t         max_concurrent = lib->cfg.max_concurrent;
+    size_t rank_id_size;
     ucc_tl_cuda_shm_barrier_t *bar;
     ucc_status_t status;
     int shm_id, i, j;
-    size_t ctrl_size, alloc_size, scratch_size;
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
+    size_t ctrl_size, alloc_size;
+    ucc_tl_cuda_rank_id_t *rank_id;
 
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     self->oob         = params->params.oob;
     self->stream      = NULL;
     self->topo        = NULL;
@@ -38,36 +240,23 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    self->ids = ucc_malloc((UCC_TL_TEAM_SIZE(self) + 1) * sizeof(*(self->ids)),
-                            "ids");
+    rank_id_size = sizeof(ucc_tl_cuda_rank_id_t) +
+                   (max_concurrent - 1) * sizeof(cudaIpcEventHandle_t);
+    self->ids = ucc_malloc((tsize + 1) * rank_id_size, "ids");
     if (!self->ids) {
         tl_error(tl_context->lib, "failed to alloc ranks id");
         return UCC_ERR_NO_MEMORY;
     }
 
-    scratch_size = lib->cfg.max_concurrent * lib->cfg.scratch_size;
-    status = CUDA_FUNC(cudaMalloc(&self->scratch.loc, scratch_size));
-    if (status != UCC_OK) {
-        tl_error(tl_context->lib, "failed to alloc scratch buffer");
-        goto free_ids;
-    }
-
-    status = ucc_tl_cuda_mem_info_get(self->scratch.loc, scratch_size,
-                            &self->ids[UCC_TL_TEAM_SIZE(self)].scratch_info);
-    if (status != UCC_OK) {
-        tl_error(tl_context->lib, "failed to get scratch memory info");
-        goto free_scratch;
-    }
-
+    /* TODO: maybe lesss, check */
     ctrl_size = (sizeof(ucc_tl_cuda_sync_t) + sizeof(ucc_tl_cuda_sync_data_t) *
-                (UCC_TL_TEAM_SIZE(self) - 1)) * UCC_TL_TEAM_SIZE(self) *
-                lib->cfg.max_concurrent +
-                sizeof(ucc_tl_cuda_shm_barrier_t) * lib->cfg.max_concurrent +
-                sizeof(ucc_tl_cuda_sync_state_t) * lib->cfg.max_concurrent;
+                (tsize - 1)) * tsize * max_concurrent +
+                sizeof(ucc_tl_cuda_shm_barrier_t) * max_concurrent +
+                sizeof(ucc_tl_cuda_sync_state_t) * max_concurrent;
 
     shm_id = -1;
     self->sync = (void*)-1;
-    if (UCC_TL_TEAM_RANK(self) == 0) {
+    if (trank == 0) {
         alloc_size = ctrl_size;
         status = ucc_sysv_alloc(&alloc_size, (void**)&self->sync, &shm_id);
         if (status != UCC_OK) {
@@ -77,13 +266,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
             goto ids_exchange;
         }
         memset(self->sync, 0, ctrl_size);
-        self->bar  = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(self, 0,
-                                                       lib->cfg.max_concurrent);
-        for (i = 0; i < lib->cfg.max_concurrent; i++) {
+        self->bar = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(self, 0,
+                                                       max_concurrent);
+        for (i = 0; i < max_concurrent; i++) {
             bar = UCC_TL_CUDA_TEAM_BARRIER(self, i);
-            for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
-                status = ucc_tl_cuda_shm_barrier_init(UCC_TL_TEAM_SIZE(self),
-                                                      j, bar);
+            for (j = 0; j < tsize; j++) {
+                status = ucc_tl_cuda_shm_barrier_init(tsize, j, bar);
                 if (status != UCC_OK) {
                     tl_error(tl_context->lib,
                              "failed to initialize shm barrier");
@@ -97,10 +285,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         }
     }
 ids_exchange:
-    self->ids[UCC_TL_TEAM_SIZE(self)].pci_id = ctx->device_id;
-    self->ids[UCC_TL_TEAM_SIZE(self)].shm    = shm_id;
-    status = self->oob.allgather(&self->ids[UCC_TL_TEAM_SIZE(self)], self->ids,
-                                 sizeof(ucc_tl_cuda_rank_id_t),
+    rank_id= GET_RANK_ID(self->ids, tsize, max_concurrent);
+    rank_id->shm = shm_id;
+    status = self->oob.allgather(rank_id, self->ids, rank_id_size,
                                  self->oob.coll_info, &self->oob_req);
     if (UCC_OK != status) {
         tl_error(tl_context->lib, "failed to start oob allgather");
@@ -108,6 +295,7 @@ ids_exchange:
     }
     tl_debug(tl_context->lib, "posted tl team: %p", self);
 
+    self->state = TL_CUDA_STATE_SHM_ID_EXCHANGE;
     self->seq_num = 1;
     return UCC_OK;
 
@@ -116,10 +304,6 @@ free_devices:
         ucc_sysv_free(self->sync);
         self->sync = (void*)(-1);
     }
-free_scratch:
-    cudaFree(self->scratch.loc);
-free_ids:
-    ucc_free(self->ids);
     return status;
 }
 
@@ -196,126 +380,83 @@ ucc_status_t ucc_tl_cuda_team_destroy(ucc_base_team_t *tl_team)
 
 ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
 {
-    ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
-    ucc_tl_cuda_lib_t  *lib  = ucc_derived_of(tl_team->context->lib,
-                                              ucc_tl_cuda_lib_t);
+    ucc_tl_cuda_team_t    *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
+    ucc_tl_cuda_context_t *ctx  = ucc_derived_of(UCC_TL_TEAM_CTX(team),
+                                                 ucc_tl_cuda_context_t);
+    ucc_tl_cuda_lib_t     *lib  = ucc_derived_of(tl_team->context->lib,
+                                                 ucc_tl_cuda_lib_t);
+    const ucc_rank_t       trank = UCC_TL_TEAM_RANK(team);
     ucc_status_t status;
-    ucc_tl_cuda_sync_t *sync;
-    ucc_tl_cuda_shm_barrier_t *bar;
-    volatile ucc_tl_cuda_sync_t *peer_sync;
-    int i, j, shm_id;
+    int shm_id;
 
-    if (team->oob_req == NULL) {
+    if (team->state == TL_CUDA_STATE_READY) {
         return UCC_OK;
-    } else if (team->oob_req == (void*)0x1) {
-        goto barrier;
-    }
-    status = team->oob.req_test(team->oob_req);
-    if (status == UCC_INPROGRESS) {
-        return UCC_INPROGRESS;
-    } else if (status < 0) {
-        tl_error(tl_team->context->lib, "oob allgather failed");
-        goto exit_err;
-    }
-    team->oob.req_free(team->oob_req);
-    team->oob_req = (void*)0x1;
-    status = ucc_tl_cuda_team_topo_create(&team->super, &team->topo);
-    if (status != UCC_OK) {
-        goto exit_err;
+    } else if (team->state == TL_CUDA_STATE_ERROR) {
+        return UCC_ERR_NO_MESSAGE;
     }
 
-    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
-        if (i == UCC_TL_TEAM_RANK(team) ||
-            !ucc_tl_cuda_team_topo_is_direct(&team->super, team->topo, i,
-                                             UCC_TL_TEAM_RANK(team))) {
-            team->scratch.rem[i] = NULL;
-            continue;
+    if (team->state == TL_CUDA_STATE_SHM_ID_EXCHANGE) {
+        status = team->oob.req_test(team->oob_req);
+        if (status == UCC_INPROGRESS) {
+            return UCC_INPROGRESS;
+        } else if (status < 0) {
+            tl_error(tl_team->context->lib, "OOB allgather failed");
+            team->oob.req_free(team->oob_req);
+            team->state = TL_CUDA_STATE_ERROR;
+            return status;
         }
-        status = ucc_tl_cuda_map_memhandle(team->ids[i].scratch_info.ptr,
-                                           team->ids[i].scratch_info.length,
-                                           team->ids[i].scratch_info.handle,
-                                           &team->scratch.rem[i],
-                                           ucc_tl_cuda_get_cache(team, i));
-        memcpy(&team->scratch.rem_info[i], &team->ids[i].scratch_info,
-               sizeof(ucc_tl_cuda_mem_info_t));
-        if (status != UCC_OK) {
-            goto exit_err;
-        }
-    }
-
-    if (UCC_TL_TEAM_LIB(team)->log_component.log_level >= UCC_LOG_LEVEL_DEBUG) {
-        ucc_tl_cuda_team_topo_print_proxies(&team->super, team->topo);
-        ucc_tl_cuda_team_topo_print_rings(&team->super, team->topo);
-    }
-
-    shm_id = team->ids[0].shm;
-    if (shm_id < 0) {
-        tl_error(tl_team->context->lib, "failed to create shmem region");
-        status = UCC_ERR_NO_MEMORY;
-        goto exit_err;
-    }
-    if (UCC_TL_TEAM_RANK(team) != 0) {
-        team->sync = shmat(shm_id, NULL, 0);
-        if (team->sync == (void *)-1) {
-            tl_error(tl_team->context->lib, "failed to shmat errno: %d (%s)",
-                     errno, strerror(errno));
+        team->oob.req_free(team->oob_req);
+        shm_id = GET_RANK_ID(team->ids, 0, lib->cfg.max_concurrent)->shm;
+        if (shm_id < 0) {
+            tl_error(tl_team->context->lib, "failed to create shmem region");
+            team->state = TL_CUDA_STATE_ERROR;
             status = UCC_ERR_NO_MEMORY;
-            goto exit_err;
+            return status;
         }
-        team->bar = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(team, 0,
-                                                       lib->cfg.max_concurrent);
-    }
-    team->sync_state = (ucc_tl_cuda_sync_state_t*)PTR_OFFSET(team->bar,
-                            sizeof(ucc_tl_cuda_shm_barrier_t) *
-                            lib->cfg.max_concurrent);
-    CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
-                    cudaStreamNonBlocking), exit_err, status);
-    for (i = 0; i < lib->cfg.max_concurrent; i++) {
-        sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
-        CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&sync->ipc_event_local,
-                                                cudaEventDisableTiming |
-                                                cudaEventInterprocess),
-                        exit_err, status);
-        CUDA_CHECK_GOTO(cudaIpcGetEventHandle(&sync->ev_handle,
-                                             sync->ipc_event_local),
-                        exit_err, status);
-    }
-
-    ucc_memory_cpu_store_fence();
-    bar = UCC_TL_CUDA_TEAM_BARRIER(team, 0);
-    status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), bar);
-    if (status != UCC_OK) {
-        tl_error(tl_team->context->lib, "failed to start shm barrier");
-        goto exit_err;
-    }
-
-barrier:
-    bar = UCC_TL_CUDA_TEAM_BARRIER(team, 0);
-    status = ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), bar);
-    if (status == UCC_INPROGRESS) {
-        return status;
-    } else if (status != UCC_OK) {
-        goto exit_err;
-    }
-
-    for (i = 0; i < lib->cfg.max_concurrent; i++) {
-        sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
-        for (j = 0 ; j < UCC_TL_TEAM_SIZE(team); j++) {
-            if (j == UCC_TL_TEAM_RANK(team)) {
-                continue;
+        if (trank != 0) {
+            team->sync = shmat(shm_id, NULL, 0);
+            if (team->sync == (void *)-1) {
+                tl_error(tl_team->context->lib, "failed to shmat errno: %d (%s)",
+                        errno, strerror(errno));
+                team->state = TL_CUDA_STATE_ERROR;
+                status = UCC_ERR_NO_MEMORY;
+                return status;
             }
-            peer_sync = UCC_TL_CUDA_TEAM_SYNC(team, j, i);
-            CUDA_CHECK_GOTO(cudaIpcOpenEventHandle(&sync->data[j].ipc_event_remote,
-                                                   peer_sync->ev_handle),
-                            exit_err, status);
+            team->bar = (ucc_tl_cuda_shm_barrier_t*)
+                UCC_TL_CUDA_TEAM_SYNC(team, 0, lib->cfg.max_concurrent);
+        }
+        team->sync_state = (ucc_tl_cuda_sync_state_t*)
+            PTR_OFFSET(team->bar, sizeof(ucc_tl_cuda_shm_barrier_t) *
+                        lib->cfg.max_concurrent);
+        team->state = TL_CUDA_STATE_COMM_INIT;
+        if (!ctx->cfg.lazy_init) {
+            status = ucc_tl_cuda_comm_init_post(team);
+            if (status != UCC_OK) {
+                team->state = TL_CUDA_STATE_ERROR;
+                return status;
+            }
+        } else {
+            return UCC_OK;
+        }
+
+    }
+    if (team->state == TL_CUDA_STATE_COMM_INIT) {
+        if (ctx->cfg.lazy_init) {
+            return UCC_OK;
+        }
+        status = ucc_tl_cuda_comm_init_test(team);
+        if (status == UCC_INPROGRESS) {
+            return status;
+        } else if (status < 0) {
+            team->state = TL_CUDA_STATE_ERROR;
+            return status;
+        } else {
+            team->state = TL_CUDA_STATE_ERROR;
         }
     }
-    team->oob_req = NULL;
+
     tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
     return UCC_OK;
-
-exit_err:
-    return status;
 }
 
 ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,

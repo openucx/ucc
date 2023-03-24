@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -12,24 +12,6 @@
 #include "reduce_scatter/reduce_scatter.h"
 #include "reduce_scatterv/reduce_scatterv.h"
 #include "utils/arch/cpu.h"
-#include "utils/arch/cuda_def.h"
-
-
-#if ENABLE_DEBUG == 1
-/* TODO: possible need to check CUDA context */
-#define UCC_TL_CUDA_CHECK_DEVICE_MATCH(_team) do {                             \
-    int _dev;                                                                  \
-    CUDA_CHECK(cudaGetDevice(&_dev));                                          \
-    if (_dev != UCC_TL_CUDA_TEAM_CTX(_team)->device) {                         \
-        tl_error(UCC_TL_TEAM_LIB(_team), "CUDA device mismatch, "              \
-                 "current device %d, team device %d\n", _dev,                  \
-                 UCC_TL_CUDA_TEAM_CTX(_team)->device);                         \
-        return UCC_ERR_INVALID_PARAM;                                          \
-    }                                                                          \
-} while(0)
-#else
-#define UCC_TL_CUDA_CHECK_DEVICE_MATCH(_team)
-#endif
 
 const char *
     ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR] = {

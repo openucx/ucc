@@ -59,6 +59,11 @@ static ucs_config_field_t ucc_tl_cuda_context_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_cuda_context_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_context_config_table)},
 
+    {"LAZY_INIT", "yes",
+     "Initialize team on first collective",
+     ucc_offsetof(ucc_tl_cuda_context_config_t, lazy_init),
+     UCC_CONFIG_TYPE_BOOL},
+
     {NULL}};
 
 ucc_status_t ucc_tl_cuda_get_context_attr(const ucc_base_context_t *context,
