@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -260,7 +260,6 @@ full:
     schedule->super.post           = ucc_cl_hier_alltoallv_start;
     schedule->super.progress       = NULL;
     schedule->super.finalize       = ucc_cl_hier_alltoallv_finalize;
-    schedule->super.triggered_post = ucc_triggered_post;
     schedule->super.triggered_post_setup =
         ucc_cl_hier_alltoallv_triggered_post_setup;
     *task = &schedule->super;

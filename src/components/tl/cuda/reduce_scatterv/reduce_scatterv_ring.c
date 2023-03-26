@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -348,7 +348,6 @@ ucc_tl_cuda_reduce_scatterv_ring_init(ucc_base_coll_args_t *coll_args,
 
     task->super.flags                    |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post                      = ucc_tl_cuda_reduce_scatterv_ring_start;
-    task->super.triggered_post            = ucc_triggered_post;
     task->super.progress                  = ucc_tl_cuda_reduce_scatterv_ring_progress;
     task->super.finalize                  = ucc_tl_cuda_reduce_scatterv_ring_finalize;
     task->reduce_scatterv_ring.get_count  = ucc_tl_cuda_reduce_scatterv_get_count;
