@@ -6,9 +6,10 @@
 
 #include "tl_mlx5.h"
 
-static ucs_status_t rcache_reg_mr(void *context, ucs_rcache_t *rcache,
-                                  void *arg, ucc_rcache_region_t *rregion,
-                                  uint16_t flags)
+static ucs_status_t
+rcache_reg_mr(void *context, ucs_rcache_t *rcache, //NOLINT: rcache is unused
+              void *arg, ucc_rcache_region_t *rregion,
+              uint16_t flags) //NOLINT: flags is unused
 {
     ucc_tl_mlx5_context_t *ctx      = (ucc_tl_mlx5_context_t *)context;
     void *                 addr     = (void *)rregion->super.start;
@@ -27,7 +28,8 @@ static ucs_status_t rcache_reg_mr(void *context, ucs_rcache_t *rcache,
     return UCS_OK;
 }
 
-static void rcache_dereg_mr(void *context, ucc_rcache_t *rcache,
+static void rcache_dereg_mr(void *        context, //NOLINT: context is unused
+                            ucc_rcache_t *rcache,  //NOLINT: rcache is unused
                             ucc_rcache_region_t *rregion)
 {
     ucc_tl_mlx5_reg_t *mlx5_reg = ucc_tl_mlx5_get_rcache_reg_data(rregion);

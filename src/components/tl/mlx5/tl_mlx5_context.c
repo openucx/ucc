@@ -248,8 +248,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     status = tl_mlx5_create_rcache(ctx);
     if (UCC_OK != status) {
         tl_error(context->lib, "failed to create rcache");
-        goto out;
-
+        goto err;
     }
 
     ucc_free(sbcast_data);
