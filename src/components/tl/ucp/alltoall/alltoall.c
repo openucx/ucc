@@ -8,6 +8,9 @@
 #include "tl_ucp.h"
 #include "alltoall.h"
 
+#define ALLTOALL_MAX_PATTERN_SIZE (sizeof(UCC_TL_UCP_ALLTOALL_DEFAULT_ALG_SELECT_STR_PATTERN) + 32)
+#define ALLTOALL_DEFAULT_ALG_SWITCH 129
+
 ucc_status_t ucc_tl_ucp_alltoall_pairwise_start(ucc_coll_task_t *task);
 void ucc_tl_ucp_alltoall_pairwise_progress(ucc_coll_task_t *task);
 
@@ -16,14 +19,13 @@ void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *task);
 
 char* ucc_tl_ucp_alltoall_score_str_get(ucc_tl_ucp_team_t *team)
 {
-    int max_size = sizeof(UCC_TL_UCP_ALLTOALL_DEFAULT_ALG_SELECT_STR_PATTERN) +
-                   32;
+    int max_size = ALLTOALL_MAX_PATTERN_SIZE;
     char *str;
 
     str = ucc_malloc(max_size * sizeof(char));
     ucc_snprintf_safe(str, max_size,
                       UCC_TL_UCP_ALLTOALL_DEFAULT_ALG_SELECT_STR_PATTERN,
-                      129 * UCC_TL_TEAM_SIZE(team));
+                      ALLTOALL_DEFAULT_ALG_SWITCH * UCC_TL_TEAM_SIZE(team));
     return str;
 }
 

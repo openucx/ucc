@@ -47,7 +47,7 @@ static inline int find_seg_index(int seg_index, int level, int nsegs_per_rblock)
 {
     int block, blockseg;
 
-    if ( 0 == seg_index) {
+    if (0 == seg_index) {
         return -1;
     }
 
@@ -206,7 +206,7 @@ ucc_status_t ucc_tl_ucp_alltoall_bruck_init(ucc_base_coll_args_t *coll_args,
     ucc_rank_t         tsize    = UCC_TL_TEAM_SIZE(tl_team);
     ucc_coll_args_t   *args     = &coll_args->args;
     size_t             seg_size = ucc_dt_size(args->src.info.datatype) *
-                                  args->src.info.count / tsize;;
+                                  args->src.info.count / tsize;
     size_t scratch_size;
     ucc_tl_ucp_task_t *task;
     ucc_status_t status;

@@ -243,7 +243,6 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
         }
     }
 
-
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team), NULL,
