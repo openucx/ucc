@@ -20,7 +20,7 @@ extern const char
 #define UCC_TL_CUDA_CHECK_DEVICE_MATCH(_team) do {                             \
     int _dev;                                                                  \
     CUDA_CHECK(cudaGetDevice(&_dev));                                          \
-    if (_dev != (_team)->device) {                                             \
+    if (((_team)->device != -1) && _dev != (_team)->device) {                  \
         tl_error(UCC_TL_TEAM_LIB(_team), "CUDA device mismatch, "              \
                  "current device %d, team device %d\n", _dev,                  \
                  (_team)->device);                                             \

@@ -142,7 +142,6 @@ typedef struct ucc_tl_cuda_sync {
     ucc_tl_cuda_mem_info_t mem_info_src;
     ucc_tl_cuda_mem_info_t mem_info_dst;
     cudaEvent_t            ipc_event_local;
-    cudaIpcEventHandle_t   ev_handle;
     union {
         struct {
             size_t sbytes[UCC_TL_CUDA_MAX_PEERS];

@@ -38,13 +38,17 @@ ucc_status_t ucc_tl_cuda_comm_init_post(ucc_tl_cuda_team_t *team)
     if (cu_ctx == NULL || cu_st != CUDA_SUCCESS) {
         tl_debug(tl_lib,
                  "cannot create CUDA TL team without active CUDA context");
-        return UCC_ERR_NO_RESOURCE;
+        team->device_id = TL_CUDA_DEVICE_INVALID;
+        team->state     = TL_CUDA_STATE_ERROR;
+        goto exchnage_rank_ids;
     }
 
     status = CUDA_FUNC(cudaGetDevice(&team->device));
     if (status != UCC_OK) {
         tl_debug(tl_lib, "failed to get current device id");
-        return status;
+        team->device_id = TL_CUDA_DEVICE_INVALID;
+        team->state     = TL_CUDA_STATE_ERROR;
+        goto exchnage_rank_ids;
     }
 
     status = ucc_tl_cuda_topo_get_pci_id(team->device, &team->device_id);
@@ -88,6 +92,7 @@ ucc_status_t ucc_tl_cuda_comm_init_post(ucc_tl_cuda_team_t *team)
         goto free_scratch;
     }
 
+exchnage_rank_ids:
     rank_id->pci_id = team->device_id;
     status = team->oob.allgather(rank_id, team->ids, rank_id_size,
                                  team->oob.coll_info, &team->oob_req);
@@ -127,6 +132,17 @@ ucc_status_t ucc_tl_cuda_comm_init_test(ucc_tl_cuda_team_t *team)
         return status;
     }
     team->oob.req_free(team->oob_req);
+    /* check all ranks have valid CUDA device set */
+    for (r = 0; r < tsize; r++) {
+        rank_id = GET_RANK_ID(team->ids, r, max_concurrent);
+        if (ucc_tl_cuda_topo_device_id_equal(&rank_id->pci_id,
+                                             &TL_CUDA_DEVICE_INVALID)) {
+            tl_debug(tl_lib, "rank %d device is invalid, team can't be created",
+                     r);
+            team->state = TL_CUDA_STATE_ERROR;
+            return UCC_ERR_NO_RESOURCE;
+        }
+    }
 
     status = ucc_tl_cuda_team_topo_create(&team->super, &team->topo);
     if (status != UCC_OK) {
@@ -230,10 +246,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
     ucc_tl_cuda_rank_id_t *rank_id;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
-    self->oob         = params->params.oob;
-    self->stream      = NULL;
-    self->topo        = NULL;
-    self->scratch.loc = NULL;
+    self->oob    = params->params.oob;
+    self->stream = NULL;
+    self->topo   = NULL;
+    self->device = -1;
+    memset(&self->scratch, 0, sizeof(ucc_tl_cuda_scratch_t));
 
     if (!ucc_team_map_is_single_node(params->team, params->map)) {
         tl_debug(tl_context->lib, "multinode team is not supported");

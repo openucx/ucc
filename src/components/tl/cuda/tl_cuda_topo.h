@@ -19,6 +19,8 @@ typedef struct ucc_tl_cuda_device_id {
     uint8_t  function; /* range: 0 to 7 */
 } ucc_tl_cuda_device_pci_id_t;
 
+extern const ucc_tl_cuda_device_pci_id_t TL_CUDA_DEVICE_INVALID;
+
 typedef enum ucc_tl_cuda_topo_dev_type {
     UCC_TL_CUDA_TOPO_DEV_TYPE_GPU,
     UCC_TL_CUDA_TOPO_DEV_TYPE_SWITCH,

@@ -25,6 +25,13 @@ pthread_mutex_t nvml_lock = PTHREAD_MUTEX_INITIALIZER;
         }                                                                      \
     } while (0)
 
+const ucc_tl_cuda_device_pci_id_t TL_CUDA_DEVICE_INVALID = {
+    .domain   = 0xFFFF,
+    .bus      = 0xFF,
+    .device   = 0xFF,
+    .function = 0xFF,
+};
+
 static ucc_status_t
 ucc_tl_cuda_topo_pci_id_from_str(const char * bus_id_str,
                                  ucc_tl_cuda_device_pci_id_t *pci_id)
