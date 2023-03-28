@@ -61,17 +61,20 @@ typedef struct ucc_event_manager {
 } ucc_event_manager_t;
 
 enum {
-    UCC_COLL_TASK_FLAG_CB               = UCC_BIT(0),
+    UCC_COLL_TASK_FLAG_CB                    = UCC_BIT(0),
     /* executor is required for collective*/
-    UCC_COLL_TASK_FLAG_EXECUTOR         = UCC_BIT(1),
+    UCC_COLL_TASK_FLAG_EXECUTOR              = UCC_BIT(1),
     /* user visible task */
-    UCC_COLL_TASK_FLAG_TOP_LEVEL        = UCC_BIT(2),
+    UCC_COLL_TASK_FLAG_TOP_LEVEL             = UCC_BIT(2),
     /* stop executor in task complete*/
-    UCC_COLL_TASK_FLAG_EXECUTOR_STOP    = UCC_BIT(3),
+    UCC_COLL_TASK_FLAG_EXECUTOR_STOP         = UCC_BIT(3),
     /* destroy executor in task complete */
-    UCC_COLL_TASK_FLAG_EXECUTOR_DESTROY = UCC_BIT(4),
+    UCC_COLL_TASK_FLAG_EXECUTOR_DESTROY      = UCC_BIT(4),
     /* if set task can be casted to scheulde */
-    UCC_COLL_TASK_FLAG_IS_SCHEDULE      = UCC_BIT(5),
+    UCC_COLL_TASK_FLAG_IS_SCHEDULE           = UCC_BIT(5),
+    /* if set task can be casted to scheulde */
+    UCC_COLL_TASK_FLAG_IS_PIPELINED_SCHEDULE = UCC_BIT(6),
+
 };
 
 typedef struct ucc_coll_task {
@@ -99,16 +102,16 @@ typedef struct ucc_coll_task {
     ucc_ee_executor_t                 *executor;
     union {
         /* used for st & locked mt progress queue */
-        ucc_list_link_t              list_elem;
+        ucc_list_link_t                list_elem;
         /* used for lf mt progress queue */
-        ucc_lf_queue_elem_t          lf_elem;
+        ucc_lf_queue_elem_t            lf_elem;
     };
-    uint8_t  n_deps;
-    uint8_t  n_deps_satisfied;
-    uint8_t  n_deps_base;
-    double   start_time; /* timestamp of the start time:
-                            either post or triggered_post */
-    uint32_t seq_num;
+    uint8_t                            n_deps;
+    uint8_t                            n_deps_satisfied;
+    uint8_t                            n_deps_base;
+    /* timestamp of the start time: either post or triggered_post */
+    double                             start_time;
+    uint32_t                           seq_num;
 } ucc_coll_task_t;
 
 extern struct ucc_mpool_ops ucc_coll_task_mpool_ops;
@@ -156,7 +159,7 @@ ucc_status_t ucc_task_start_handler(ucc_coll_task_t *parent,
                                     ucc_coll_task_t *task);
 ucc_status_t ucc_schedule_finalize(ucc_coll_task_t *task);
 
-ucc_status_t ucc_dependency_handler(ucc_coll_task_t *parent, /* NOLINT */
+ucc_status_t ucc_dependency_handler(ucc_coll_task_t *parent,
                                     ucc_coll_task_t *task);
 
 ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
@@ -227,13 +230,12 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 }
 
 static inline ucc_status_t ucc_task_subscribe_dep(ucc_coll_task_t *target,
-                                          ucc_coll_task_t *subscriber,
-                                          ucc_event_t      event)
+                                                  ucc_coll_task_t *subscriber,
+                                                  ucc_event_t event)
 {
     ucc_status_t status =
     ucc_event_manager_subscribe(target, event, subscriber,
                                 ucc_dependency_handler);
-
     subscriber->n_deps++;
     return status;
 }

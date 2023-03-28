@@ -164,7 +164,8 @@ ucc_cl_hier_bcast_2step_init_schedule(ucc_base_coll_args_t *coll_args,
                                    UCC_EVENT_SCHEDULE_STARTED);
         } else {
             ucc_task_subscribe_dep(tasks[first_task],
-                              tasks[(first_task + 1) % 2], UCC_EVENT_COMPLETED);
+                                   tasks[(first_task + 1) % 2],
+                                   UCC_EVENT_COMPLETED);
         }
         ucc_schedule_add_task(schedule, tasks[(first_task + 1) % 2]);
     }

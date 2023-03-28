@@ -78,7 +78,7 @@ ucc_cl_hier_allreduce_rab_frag_setup(ucc_schedule_pipelined_t *schedule_p,
 
 static ucc_status_t
 ucc_cl_hier_allreduce_rab_init_schedule(ucc_base_coll_args_t *coll_args,
-                                        ucc_base_team_t *     team,
+                                        ucc_base_team_t *team,
                                         ucc_schedule_t **sched_p, int n_frags)
 {
     ucc_cl_hier_team_t  *cl_team = ucc_derived_of(team, ucc_cl_hier_team_t);
@@ -99,10 +99,13 @@ ucc_cl_hier_allreduce_rab_init_schedule(ucc_base_coll_args_t *coll_args,
     UCC_CHECK_GOTO(ucc_schedule_init(schedule, &args, team), out, status);
 
     if (n_frags > 1) {
-        args.max_frag_count =
-            ucc_buffer_block_count(args.args.dst.info.count, n_frags, 0);
-        args.mask |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
+        args.max_frag_count = ucc_buffer_block_count(args.args.dst.info.count,
+                                                     n_frags, 0);
+        args.mask           |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
     }
+    ucc_assert(SBGP_ENABLED(cl_team, NODE) ||
+               SBGP_ENABLED(cl_team, NODE_LEADERS));
+
     if (SBGP_ENABLED(cl_team, NODE)) {
         ucc_assert(n_tasks == 0);
         if (cl_team->top_sbgp == UCC_HIER_SBGP_NODE) {
@@ -143,18 +146,33 @@ ucc_cl_hier_allreduce_rab_init_schedule(ucc_base_coll_args_t *coll_args,
         n_tasks++;
     }
 
-    UCC_CHECK_GOTO(ucc_event_manager_subscribe(
-                       &schedule->super, UCC_EVENT_SCHEDULE_STARTED, tasks[0],
-                       ucc_task_start_handler),
-                   out, status);
-
+    /* subscription logic is different depending on top level schedule type
+     * being used
+     */
     UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, tasks[0]), out, status);
-    for (i = 1; i < n_tasks; i++) {
-        UCC_CHECK_GOTO(
-            ucc_event_manager_subscribe(tasks[i - 1], UCC_EVENT_COMPLETED,
-                                        tasks[i], ucc_task_start_handler),
-            out, status);
-        UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, tasks[i]), out, status);
+    if (n_frags > 1) {
+        UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, tasks[0],
+                                            UCC_EVENT_SCHEDULE_STARTED),
+                    out, status);
+        for (i = 1; i < n_tasks; i++) {
+            UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, tasks[i]), out, status);
+            UCC_CHECK_GOTO(ucc_task_subscribe_dep(tasks[i-1], tasks[i],
+                                                UCC_EVENT_COMPLETED),
+                        out, status);
+        }
+    } else {
+        UCC_CHECK_GOTO(ucc_event_manager_subscribe(
+                        &schedule->super, UCC_EVENT_SCHEDULE_STARTED, tasks[0],
+                        ucc_task_start_handler),
+                    out, status);
+        for (i = 1; i < n_tasks; i++) {
+            UCC_CHECK_GOTO(
+                ucc_event_manager_subscribe(tasks[i - 1], UCC_EVENT_COMPLETED,
+                                            tasks[i], ucc_task_start_handler),
+                out, status);
+            UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, tasks[i]), out,
+                          status);
+        }
     }
 
     schedule->super.post           = ucc_cl_hier_allreduce_rab_start;
@@ -206,9 +224,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
                          ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
                          ucc_coll_task_t **task)
 {
-    ucc_cl_hier_team_t *cl_team   = ucc_derived_of(team, ucc_cl_hier_team_t);
-    ucc_cl_hier_lib_config_t *cfg = &UCC_CL_HIER_TEAM_LIB(cl_team)->cfg;
-    ucc_cl_hier_schedule_t *  schedule;
+    ucc_cl_hier_team_t       *cl_team = ucc_derived_of(team, ucc_cl_hier_team_t);
+    ucc_cl_hier_lib_config_t *cfg     = &UCC_CL_HIER_TEAM_LIB(cl_team)->cfg;
+    ucc_cl_hier_schedule_t   *schedule;
     int                       n_frags, pipeline_depth;
     ucc_status_t              status;
 
