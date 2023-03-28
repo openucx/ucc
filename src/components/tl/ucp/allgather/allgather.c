@@ -22,12 +22,5 @@ ucc_base_coll_alg_info_t
 
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task)
 {
-    if (!ucc_coll_args_is_predefined_dt(&TASK_ARGS(task), UCC_RANK_INVALID)) {
-        tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
-    task->super.post     = ucc_tl_ucp_allgather_ring_start;
-    task->super.progress = ucc_tl_ucp_allgather_ring_progress;
-    return UCC_OK;
+    return ucc_tl_ucp_allgather_ring_init_common(task);
 }

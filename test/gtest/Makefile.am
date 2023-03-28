@@ -88,12 +88,14 @@ gtest_SOURCES =                     \
 	coll/test_allgather.cc          \
 	coll/test_allgatherv.cc         \
 	coll/test_gather.cc         	\
+	coll/test_gatherv.cc         	\
 	coll/test_bcast.cc              \
 	coll/test_reduce.cc             \
 	coll/test_allreduce.cc          \
 	coll/test_reduce_scatter.cc     \
 	coll/test_reduce_scatterv.cc    \
 	coll/test_scatter.cc         	\
+	coll/test_scatterv.cc         	\
 	utils/test_string.cc            \
 	utils/test_ep_map.cc            \
 	utils/test_lock_free_queue.cc   \
