@@ -37,7 +37,7 @@ ucc_status_t ucc_tl_mlx5_team_destroy(ucc_base_team_t *tl_team)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team)
+ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team) /* NOLINT */
 {
     return UCC_OK;
 }
@@ -77,9 +77,9 @@ err:
     return status;
 }
 
-ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args,
-                                   ucc_base_team_t *     team,
-                                   ucc_coll_task_t **    task)
+ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args, /* NOLINT */
+                                   ucc_base_team_t *     team,      /* NOLINT */
+                                   ucc_coll_task_t **    task)      /* NOLINT */
 {
     return UCC_OK;
 }

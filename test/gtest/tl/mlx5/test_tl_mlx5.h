@@ -15,8 +15,8 @@ typedef ucc_status_t (*ucc_tl_mlx5_create_ibv_ctx_fn_t)(
 typedef int (*ucc_tl_mlx5_get_active_port_fn_t)(struct ibv_context *ctx);
 
 typedef ucc_status_t (*ucc_tl_mlx5_create_rc_qp_fn_t)(
-    struct ibv_context *ctx, struct ibv_pd *pd, struct ibv_cq *cq, int ib_port,
-    int tx_depth, ucc_tl_mlx5_qp_t *qp, uint32_t *qpn, ucc_base_lib_t *lib);
+    struct ibv_context *ctx, struct ibv_pd *pd, struct ibv_cq *cq, int tx_depth,
+    ucc_tl_mlx5_qp_t *qp, uint32_t *qpn, ucc_base_lib_t *lib);
 
 typedef ucc_status_t (*ucc_tl_mlx5_qp_connect_fn_t)(
     struct ibv_qp *qp, uint32_t qp_num, uint16_t lid, int port,
