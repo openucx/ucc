@@ -51,7 +51,7 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
      UCC_CONFIG_TYPE_ULUNITS},
 
     {"EXEC_COPY_LARGE_THRESH", "1M",
-     "Memcopy size to switch from kernel copy to cudaMemcpy",
+     "Single memcopy size to switch from kernel copy to cudaMemcpy",
      ucc_offsetof(ucc_ec_cuda_config_t, exec_copy_thresh),
      UCC_CONFIG_TYPE_MEMUNITS},
 
@@ -164,9 +164,9 @@ static void ucc_ec_cuda_graph_init(ucc_mpool_t *mp, void *obj, void *chunk) //NO
             cudaGraphAddMemcpyNode1D(&memcpy_node, task->graph, NULL, 0,
                                      (void*)1, (void*)1, 1, cudaMemcpyDefault));
     }
+
     CUDA_FUNC(
-        cudaGraphInstantiate(&task->graph_exec, task->graph, NULL,
-                             NULL, 0));
+        cudaGraphInstantiateWithFlags(&task->graph_exec, task->graph, 0));
 }
 
 static void ucc_ec_cuda_graph_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp is unused

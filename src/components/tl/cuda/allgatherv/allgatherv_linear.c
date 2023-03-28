@@ -157,7 +157,7 @@ ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *task)
     ucc_status_t            st;
     int                     step, i;
     void *                  sbuf, *dbuf;
-    ucc_rank_t              peer;//, nv;
+    ucc_rank_t              peer;
     size_t send_size, frag_size, frag_offset, local_offset, remote_offset,
         scratch_offset, rank_offset;
     ucc_ee_executor_task_args_t eargs;
@@ -191,7 +191,6 @@ ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *task)
             continue;
         }
 
-
         for (i = 0; i < tsize; i++) {
             if (get_rank_step(task, i, 0) < step) {
                 return UCC_INPROGRESS;
@@ -222,7 +221,7 @@ ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *task)
             }
             eargs.task_type =  UCC_EE_EXECUTOR_TASK_COPY_MULTI;
             for (i = 0; i < tsize - 1; i++) {
-                peer = (trank + i + 1) % UCC_TL_TEAM_SIZE(team);
+                peer = (trank + i + 1) % tsize;
                 scratch_offset = get_scratch_offset(team, dt, trank);
                 dbuf           = PTR_OFFSET(TASK_SCRATCH(task, peer),
                                   remote_offset + scratch_offset);
@@ -252,7 +251,7 @@ ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *task)
         } else if (step == (num_steps - 1)) {
             eargs.task_type =  UCC_EE_EXECUTOR_TASK_COPY_MULTI;
             for (i = 0; i < tsize - 1; i++) {
-                peer = (trank + i + 1) % UCC_TL_TEAM_SIZE(team);
+                peer = (trank + i + 1) % tsize;
                 scratch_offset = get_scratch_offset(team, dt, peer);
                 rank_offset =
                     task->allgatherv_linear.get_offset(task, peer) * dt_size;
@@ -290,7 +289,7 @@ ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *task)
             scratch_offset = get_scratch_offset(team, dt, trank);
             eargs.task_type =  UCC_EE_EXECUTOR_TASK_COPY_MULTI;
             for (i = 0; i < tsize - 1; i++) {
-                peer = (trank + i + 1) % UCC_TL_TEAM_SIZE(team);
+                peer = (trank + i + 1) % tsize;
                 dbuf = PTR_OFFSET(TASK_SCRATCH(task, peer),
                                   remote_offset + scratch_offset);
                 eargs.copy_multi.src[i]    = sbuf;
@@ -306,7 +305,7 @@ ucc_tl_cuda_allgatherv_linear_progress_frag(ucc_tl_cuda_task_t *task)
 
             eargs.task_type =  UCC_EE_EXECUTOR_TASK_COPY_MULTI;
             for (i = 0; i < tsize - 1; i++) {
-                peer = (trank + i + 1) % UCC_TL_TEAM_SIZE(team);
+                peer = (trank + i + 1) % tsize;
                 scratch_offset = get_scratch_offset(team, dt, peer);
                 rank_offset =
                     task->allgatherv_linear.get_offset(task, peer) * dt_size;

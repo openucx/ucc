@@ -91,7 +91,12 @@ ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
     case UCC_EE_EXECUTOR_TASK_COPY_MULTI:
         if ((task_args->copy_multi.counts[0] > EC_CUDA_CONFIG->exec_copy_thresh) &&
             (task_args->copy_multi.num_vectors > 2)) {
-            cudaGraphGetNodes(ee_task->graph, nodes, &num_nodes);
+            status = CUDA_FUNC(cudaGraphGetNodes(ee_task->graph, nodes,
+                                                 &num_nodes));
+            if (ucc_unlikely(status != UCC_OK)) {
+                ec_error(&ucc_ec_cuda.super, "failed to get graph nodes");
+                goto free_task;
+            }
             for (i = 0; i < task_args->copy_multi.num_vectors; i++) {
                 status = CUDA_FUNC(
                     cudaGraphExecMemcpyNodeSetParams1D(ee_task->graph_exec, nodes[i],
@@ -181,10 +186,6 @@ ucc_cuda_executor_interruptible_task_finalize(ucc_ee_executor_task_t *task)
 
     ucc_assert(task->status == UCC_OK);
     status = ucc_ec_cuda_event_destroy(ee_task->event);
-    // if (ee_task->graph) {
-    //     cudaGraphExecDestroy(ee_task->graph_exec);
-    //     cudaGraphDestroy(ee_task->graph);
-    // }
     ucc_mpool_put(task);
     return status;
 }

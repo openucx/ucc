@@ -14,6 +14,8 @@
 #include <cuda_runtime.h>
 
 #define WARP_SIZE 32
+#define MAX_SUBTASKS 12
+
 typedef enum ucc_ec_cuda_strm_task_mode {
     UCC_EC_CUDA_TASK_KERNEL,
     UCC_EC_CUDA_TASK_MEM_OPS,
@@ -76,7 +78,6 @@ typedef struct ucc_ec_cuda_stream_request {
     cudaStream_t        stream;
 } ucc_ec_cuda_stream_request_t;
 
-#define MAX_SUBTASKS 12
 typedef struct ucc_ec_cuda_executor_interruptible_task {
     ucc_ee_executor_task_t  super;
     void                   *event;
