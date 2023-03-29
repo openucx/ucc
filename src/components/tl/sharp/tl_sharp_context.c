@@ -293,16 +293,19 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
     ucc_tl_sharp_lib_t          *lib       = ucc_derived_of(sharp_ctx->super.super.lib,
                                                             ucc_tl_sharp_lib_t);
     ucc_sbgp_t                  *sbgp;
-    int ret;
+    int                          local_rank;
+    int                          ret;
 
     sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     if (sbgp->status != UCC_SBGP_ENABLED) {
-        tl_error(sharp_ctx->super.super.lib, "NODE SBGP is not enabled");
-        return UCC_ERR_NOT_SUPPORTED;
+        tl_debug(sharp_ctx->super.super.lib, "NODE SBGP is not enabled");
+        local_rank = 0;
+    } else {
+        local_rank = sbgp->group_rank;
     }
 
     init_spec.progress_func                  = NULL;
-    init_spec.world_local_rank               = sbgp->group_rank;
+    init_spec.world_local_rank               = local_rank;
     init_spec.group_channel_idx              = 0;
     init_spec.oob_ctx                        = oob_ctx;
     init_spec.config                         = sharp_coll_default_config;
