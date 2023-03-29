@@ -108,7 +108,9 @@ gtest_SOURCES =                     \
 	active_set/test_active_set.cc
 
 if TL_MLX5_ENABLED
-    gtest_SOURCES  += tl/mlx5/test_tl_mlx5.cc
+    gtest_SOURCES  += tl/mlx5/test_tl_mlx5.cc \
+                      tl/mlx5/test_tl_mlx5_qps.cc\
+                      tl/mlx5/test_tl_mlx5_wqe.cc
     gtest_LDADD    += $(IBVERBS_LIBADD) $(MLX5DV_LIBADD)
 endif
 
