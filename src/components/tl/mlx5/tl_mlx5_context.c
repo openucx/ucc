@@ -41,13 +41,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
         return status;
     }
 
-    tl_info(self->super.super.lib, "initialized tl context: %p", self);
+    tl_debug(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
 {
-    tl_info(self->super.super.lib, "finalizing tl context: %p", self);
+    tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
 
     if (ucc_tl_mlx5_remove_shared_ctx_pd(self) != UCC_OK) {
         tl_error(self->super.super.lib, "failed to free ib ctx and pd");
