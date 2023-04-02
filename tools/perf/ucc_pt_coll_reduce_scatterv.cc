@@ -19,6 +19,7 @@ ucc_pt_coll_reduce_scatterv::ucc_pt_coll_reduce_scatterv(ucc_datatype_t dt,
     has_reduction_ = true;
     has_range_     = true;
     has_bw_        = false;
+    root_shift_    = 0;
 
     coll_args.coll_type = UCC_COLL_TYPE_REDUCE_SCATTERV;
     coll_args.mask = 0;

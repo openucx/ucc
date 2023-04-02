@@ -11,16 +11,17 @@
 #include <utils/ucc_coll_utils.h>
 
 ucc_pt_coll_bcast::ucc_pt_coll_bcast(ucc_datatype_t dt, ucc_memory_type mt,
-                       ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
+                                     int root_shift, ucc_pt_comm *communicator)
+                   : ucc_pt_coll(communicator)
 {
     has_inplace_   = false;
     has_reduction_ = false;
     has_range_     = true;
     has_bw_        = true;
+    root_shift_    = root_shift;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_BCAST;
-    coll_args.root = 0;
     coll_args.src.info.datatype = dt;
     coll_args.src.info.mem_type = mt;
 }
@@ -33,7 +34,8 @@ ucc_status_t ucc_pt_coll_bcast::init_args(size_t count,
     size_t           size     = count * dt_size;
     ucc_status_t     st;
 
-    args = coll_args;
+    coll_args.root      = test_args.coll_args.root;
+    args                = coll_args;
     args.src.info.count = count;
     UCCCHECK_GOTO(ucc_pt_alloc(&src_header, size, args.src.info.mem_type), exit,
                   st);

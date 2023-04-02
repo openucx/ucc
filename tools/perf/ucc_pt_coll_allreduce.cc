@@ -19,6 +19,7 @@ ucc_pt_coll_allreduce::ucc_pt_coll_allreduce(ucc_datatype_t dt,
     has_reduction_ = true;
     has_range_     = true;
     has_bw_        = true;
+    root_shift_    = 0;
 
     coll_args.coll_type = UCC_COLL_TYPE_ALLREDUCE;
     coll_args.mask = 0;

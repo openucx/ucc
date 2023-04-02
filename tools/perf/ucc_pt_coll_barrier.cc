@@ -11,6 +11,7 @@ ucc_pt_coll_barrier::ucc_pt_coll_barrier(ucc_pt_comm *communicator) :
     has_reduction_ = false;
     has_range_     = false;
     has_bw_        = false;
+    root_shift_    = 0;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_BARRIER;

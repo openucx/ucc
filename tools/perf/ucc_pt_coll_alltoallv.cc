@@ -18,6 +18,7 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
     has_reduction_ = false;
     has_range_     = true;
     has_bw_        = false;
+    root_shift_    = 0;
 
     coll_args.mask                = UCC_COLL_ARGS_FIELD_FLAGS;
     coll_args.coll_type           = UCC_COLL_TYPE_ALLTOALLV;

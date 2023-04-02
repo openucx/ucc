@@ -48,3 +48,8 @@ bool ucc_pt_coll::has_bw()
 {
     return has_bw_;
 }
+
+int ucc_pt_coll::root_shift()
+{
+    return root_shift_;
+}
