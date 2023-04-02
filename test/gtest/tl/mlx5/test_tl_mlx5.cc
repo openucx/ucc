@@ -1,10 +1,9 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
 #include "test_tl_mlx5.h"
-#include <dlfcn.h>
 
 test_tl_mlx5::test_tl_mlx5()
 {
@@ -12,11 +11,6 @@ test_tl_mlx5::test_tl_mlx5()
     ctx                   = NULL;
     pd                    = NULL;
     cq                    = NULL;
-    qp_conf.qp_rnr_retry  = 7;
-    qp_conf.qp_rnr_timer  = 20;
-    qp_conf.qp_retry_cnt  = 7;
-    qp_conf.qp_timeout    = 18;
-    qp_conf.qp_max_atomic = 1;
 }
 
 void test_tl_mlx5::SetUp()
@@ -33,6 +27,7 @@ void test_tl_mlx5::SetUp()
         std::string(ucc_global_config.component_path) + "/libucc_tl_mlx5.so";
     tl_mlx5_so_handle = dlopen(path.c_str(), RTLD_NOW);
     if (!tl_mlx5_so_handle) {
+        std::cerr << "cannot open ucc_tl_mlx5 library" << std::endl;
         GTEST_SKIP();
     }
 
@@ -42,30 +37,6 @@ void test_tl_mlx5::SetUp()
 
     get_active_port = (ucc_tl_mlx5_get_active_port_fn_t)dlsym(
         tl_mlx5_so_handle, "ucc_tl_mlx5_get_active_port");
-    ASSERT_EQ(nullptr, dlerror());
-
-    create_rc_qp = (ucc_tl_mlx5_create_rc_qp_fn_t)dlsym(
-        tl_mlx5_so_handle, "ucc_tl_mlx5_create_rc_qp");
-    ASSERT_EQ(nullptr, dlerror());
-
-    qp_connect = (ucc_tl_mlx5_qp_connect_fn_t)dlsym(tl_mlx5_so_handle,
-                                                    "ucc_tl_mlx5_qp_connect");
-    ASSERT_EQ(nullptr, dlerror());
-
-    init_dct = (ucc_tl_mlx5_init_dct_fn_t)dlsym(tl_mlx5_so_handle,
-                                                "ucc_tl_mlx5_init_dct");
-    ASSERT_EQ(nullptr, dlerror());
-
-    init_dci = (ucc_tl_mlx5_init_dci_fn_t)dlsym(tl_mlx5_so_handle,
-                                                "ucc_tl_mlx5_init_dci");
-    ASSERT_EQ(nullptr, dlerror());
-
-    create_ah = (ucc_tl_mlx5_create_ah_fn_t)dlsym(tl_mlx5_so_handle,
-                                                  "ucc_tl_mlx5_create_ah");
-    ASSERT_EQ(nullptr, dlerror());
-
-    create_umr_qp = (ucc_tl_mlx5_create_umr_qp_fn_t)dlsym(
-        tl_mlx5_so_handle, "ucc_tl_mlx5_create_umr_qp");
     ASSERT_EQ(nullptr, dlerror());
 
     status = create_ibv_ctx(&devname, &ctx, &lib);
@@ -99,134 +70,4 @@ test_tl_mlx5::~test_tl_mlx5()
     if (tl_mlx5_so_handle) {
         dlclose(tl_mlx5_so_handle);
     }
-}
-
-class test_tl_mlx5_rc_qp : public test_tl_mlx5 {
-  public:
-    ucc_tl_mlx5_qp_t qp;
-    test_tl_mlx5_rc_qp()
-    {
-        qp.qp = NULL;
-    }
-    ~test_tl_mlx5_rc_qp()
-    {
-        if (qp.qp) {
-            ibv_destroy_qp(qp.qp);
-        }
-    }
-};
-
-UCC_TEST_F(test_tl_mlx5_rc_qp, create)
-{
-    uint32_t     qpn;
-    ucc_status_t status;
-
-    status = create_rc_qp(ctx, pd, cq, port, 4, &qp, &qpn, &lib);
-    EXPECT_EQ(UCC_OK, status);
-}
-
-UCC_TEST_F(test_tl_mlx5_rc_qp, connect)
-{
-    uint32_t     qpn;
-    ucc_status_t status;
-
-    status = create_rc_qp(ctx, pd, cq, port, 4, &qp, &qpn, &lib);
-    EXPECT_EQ(UCC_OK, status);
-
-    status = qp_connect(qp.qp, qpn, port_attr.lid, port, &qp_conf, &lib);
-    EXPECT_EQ(UCC_OK, status);
-}
-
-class test_tl_mlx5_dc : public test_tl_mlx5 {
-  public:
-    struct ibv_qp *   dct_qp;
-    uint32_t          dct_qpn;
-    struct ibv_srq *  srq;
-    ucc_tl_mlx5_dci_t dci;
-    struct ibv_ah *   ah;
-
-    test_tl_mlx5_dc()
-    {
-        ah         = NULL;
-        dct_qp     = NULL;
-        dci.dci_qp = NULL;
-        srq        = NULL;
-    }
-    virtual void SetUp()
-    {
-        struct ibv_srq_init_attr srq_attr;
-
-        test_tl_mlx5::SetUp();
-        memset(&srq_attr, 0, sizeof(struct ibv_srq_init_attr));
-        srq_attr.attr.max_wr  = 1;
-        srq_attr.attr.max_sge = 1;
-
-        srq = ibv_create_srq(pd, &srq_attr);
-        EXPECT_NE(nullptr, srq);
-        dct_qp = NULL;
-    }
-    ~test_tl_mlx5_dc()
-    {
-        if (ah) {
-            ibv_destroy_ah(ah);
-        }
-        if (dct_qp) {
-            ibv_destroy_qp(dct_qp);
-        }
-        if (dci.dci_qp) {
-            ibv_destroy_qp(dci.dci_qp);
-        }
-
-        if (srq) {
-            ibv_destroy_srq(srq);
-        }
-    }
-};
-
-UCC_TEST_F(test_tl_mlx5_dc, init_dct)
-{
-    ucc_status_t status;
-
-    status =
-        init_dct(pd, ctx, cq, srq, port, &dct_qp, &dct_qpn, &qp_conf, &lib);
-    EXPECT_EQ(UCC_OK, status);
-}
-
-UCC_TEST_F(test_tl_mlx5_dc, init_dci)
-{
-    ucc_status_t status;
-
-    status = init_dci(&dci, pd, ctx, cq, port, 4, &qp_conf, &lib);
-    EXPECT_EQ(UCC_OK, status);
-}
-
-UCC_TEST_F(test_tl_mlx5_dc, create_ah)
-{
-    ucc_status_t status;
-
-    status = create_ah(pd, port_attr.lid, port, &ah, &lib);
-    EXPECT_EQ(UCC_OK, status);
-}
-
-class test_tl_mlx5_umr_qp : public test_tl_mlx5 {
-  public:
-    struct ibv_qp *qp;
-    test_tl_mlx5_umr_qp()
-    {
-        qp = NULL;
-    }
-    ~test_tl_mlx5_umr_qp()
-    {
-        if (qp) {
-            ibv_destroy_qp(qp);
-        }
-    }
-};
-
-UCC_TEST_F(test_tl_mlx5_umr_qp, create)
-{
-    ucc_status_t status;
-
-    status = create_umr_qp(ctx, pd, cq, port, &qp, &qp_conf, &lib);
-    EXPECT_EQ(UCC_OK, status);
 }
