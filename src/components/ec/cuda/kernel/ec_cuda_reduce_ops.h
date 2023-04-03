@@ -63,7 +63,7 @@ cuFloatComplex operator* (const cuFloatComplex & first,
 
 template <typename T, typename VecType> __device__ int ptrAlignVec(T *ptr)
 {
-    return (uint64_t)ptr % alignof(VecType);
+    return (uint64_t)ptr % sizeof(VecType);
 }
 
 template <typename T, typename VecType>
