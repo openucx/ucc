@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 #include "ucc_schedule.h"
@@ -96,6 +96,7 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
     task->executor             = NULL;
     task->super.status         = UCC_OPERATION_INITIALIZED;
     task->triggered_post_setup = NULL;
+    task->triggered_post       = ucc_triggered_post;
     if (bargs) {
         memcpy(&task->bargs, bargs, sizeof(*bargs));
     }

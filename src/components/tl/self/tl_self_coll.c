@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -24,7 +24,6 @@ ucc_tl_self_coll_init_task(ucc_base_coll_args_t *coll_args,
     ucc_coll_task_init(&task->super, coll_args, team);
     UCC_TL_SELF_PROFILE_REQUEST_NEW(task, "tl_self_task", 0);
     task->super.finalize       = ucc_tl_self_coll_finalize;
-    task->super.triggered_post = ucc_triggered_post;
     task->src                  = NULL;
     task->dst                  = NULL;
     task->size                 = 0;

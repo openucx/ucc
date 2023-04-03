@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -160,7 +160,6 @@ ucc_cl_hier_allreduce_rab_init_schedule(ucc_base_coll_args_t *coll_args,
     schedule->super.post           = ucc_cl_hier_allreduce_rab_start;
     schedule->super.progress       = NULL;
     schedule->super.finalize       = ucc_cl_hier_allreduce_rab_finalize;
-    schedule->super.triggered_post = ucc_triggered_post;
     *sched_p                       = schedule;
     return UCC_OK;
 
@@ -243,7 +242,6 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_rab_init,
     }
 
     schedule->super.super.super.post = ucc_cl_hier_rab_allreduce_start;
-    schedule->super.super.super.triggered_post = ucc_triggered_post;
     schedule->super.super.super.finalize = ucc_cl_hier_ar_rab_schedule_finalize;
     *task                                = &schedule->super.super.super;
     return UCC_OK;

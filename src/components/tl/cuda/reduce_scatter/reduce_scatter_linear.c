@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -36,7 +36,6 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_linear_init(ucc_base_coll_args_t *coll_a
     task->reduce_scatterv_linear.rbuf       = coll_args->args.dst.info.buffer;
     task->super.flags          |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post           = ucc_tl_cuda_reduce_scatterv_linear_start;
-    task->super.triggered_post = ucc_triggered_post;
     task->super.progress       = ucc_tl_cuda_reduce_scatterv_linear_progress;
     task->super.finalize       = ucc_tl_cuda_reduce_scatterv_linear_finalize;
     task->bar                  = TASK_BAR(task);

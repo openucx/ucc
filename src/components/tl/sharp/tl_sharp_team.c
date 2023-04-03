@@ -217,7 +217,6 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
 
     task->req_handle           = NULL;
     task->super.finalize       = ucc_tl_sharp_coll_finalize;
-    task->super.triggered_post = ucc_triggered_post;
 
     switch (coll_args->args.coll_type)
     {
