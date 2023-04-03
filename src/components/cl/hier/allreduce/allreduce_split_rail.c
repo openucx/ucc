@@ -324,7 +324,6 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_split_rail_init,
     }
 
     schedule->super.super.super.post = ucc_cl_hier_split_rail_allreduce_start;
-    schedule->super.super.super.triggered_post = ucc_triggered_post;
     schedule->super.super.super.finalize =
         ucc_cl_hier_ar_split_rail_schedule_finalize;
     *task = &schedule->super.super.super;
