@@ -16,15 +16,15 @@ ucc_status_t do_sendmsg(connection_t *conn)
 {
     struct msghdr   msg  = {};
     struct cmsghdr *cmsghdr;
-    struct iovec    iov[1];
+    struct iovec    iov;
     ssize_t         nbytes;
     int *           p;
     char            buf[CMSG_SPACE(sizeof(int))];
-    uint32_t        handles[1];
+    uint32_t        handle;
 
-    handles[0]      = conn->pd_handle;
-    iov[0].iov_base = handles;
-    iov[0].iov_len  = sizeof(handles);
+    handle       = conn->pd_handle;
+    iov.iov_base = &handle;
+    iov.iov_len  = sizeof(handle);
     memset(buf, 0x0b, sizeof(buf));
     cmsghdr             = (struct cmsghdr *)buf;
     cmsghdr->cmsg_len   = CMSG_LEN(sizeof(int));
@@ -32,8 +32,8 @@ ucc_status_t do_sendmsg(connection_t *conn)
     cmsghdr->cmsg_type  = SCM_RIGHTS;
     msg.msg_name        = NULL;
     msg.msg_namelen     = 0;
-    msg.msg_iov         = iov;
-    msg.msg_iovlen      = sizeof(iov) / sizeof(iov[0]);
+    msg.msg_iov         = &iov;
+    msg.msg_iovlen      = 1;
     msg.msg_control     = cmsghdr;
     msg.msg_controllen  = CMSG_LEN(sizeof(int));
     msg.msg_flags       = 0;
@@ -50,16 +50,16 @@ ucc_status_t do_sendmsg(connection_t *conn)
 static ucc_status_t do_recvmsg(int sock, int *shared_cmd_fd,
                                uint32_t *shared_pd_handle)
 {
-    uint32_t        handles[1] = {};
+    uint32_t        handle;
     struct msghdr   msg;
     struct cmsghdr *cmsghdr;
-    struct iovec    iov[1];
+    struct iovec    iov;
     ssize_t         nbytes;
     int *           p;
     char            buf[CMSG_SPACE(sizeof(int))];
 
-    iov[0].iov_base = handles;
-    iov[0].iov_len  = sizeof(handles);
+    iov.iov_base = &handle;
+    iov.iov_len  = sizeof(handle);
 
     memset(buf, 0x0d, sizeof(buf));
     cmsghdr             = (struct cmsghdr *)buf;
@@ -68,8 +68,8 @@ static ucc_status_t do_recvmsg(int sock, int *shared_cmd_fd,
     cmsghdr->cmsg_type  = SCM_RIGHTS;
     msg.msg_name        = NULL;
     msg.msg_namelen     = 0;
-    msg.msg_iov         = iov;
-    msg.msg_iovlen      = sizeof(iov) / sizeof(iov[0]);
+    msg.msg_iov         = &iov;
+    msg.msg_iovlen      = 1;
     msg.msg_control     = cmsghdr;
     msg.msg_controllen  = CMSG_LEN(sizeof(int));
     msg.msg_flags       = 0;
@@ -82,7 +82,7 @@ static ucc_status_t do_recvmsg(int sock, int *shared_cmd_fd,
     p = (int *)CMSG_DATA(cmsghdr);
 
     *shared_cmd_fd    = *p;
-    *shared_pd_handle = handles[0];
+    *shared_pd_handle = handle;
 
     return UCC_OK;
 }
@@ -125,14 +125,16 @@ out:
     return UCC_ERR_NO_MESSAGE;
 }
 
-static ucc_status_t client_recv_data(int *              shared_cmd_fd,
-                                     uint32_t *         shared_pd_handle,
-                                     const char *       sock_path,
+static ucc_status_t client_recv_data(int *shared_cmd_fd,
+                                     uint32_t *shared_pd_handle,
+                                     const char *sock_path,
                                      ucc_tl_mlx5_lib_t *lib)
 {
     struct sockaddr_storage sockaddr = {};
+    ucc_status_t            status   = UCC_OK;
     struct sockaddr_un *    addr;
     int                     sock;
+
     sock = socket(PF_LOCAL, SOCK_STREAM, 0);
     if (sock == -1) {
         tl_error(lib, "failed to create client socket errno %d", errno);
@@ -147,29 +149,26 @@ static ucc_status_t client_recv_data(int *              shared_cmd_fd,
     while (connect(sock, (struct sockaddr *)addr, SUN_LEN(addr)) == -1) {
         if (errno != ENOENT) {
             tl_error(lib, "failed to connect client socket errno %d", errno);
-            goto fail;
+            status = UCC_ERR_NO_MESSAGE;
+            goto out;
         }
     }
     if (do_recvmsg(sock, shared_cmd_fd, shared_pd_handle) != UCC_OK) {
         tl_error(lib, "Failed to recv msg");
-        goto fail;
+        status = UCC_ERR_NO_MESSAGE;
+        goto out;
     }
 
+out:
     if (close(sock) == -1) {
         tl_error(lib, "Failed to close client socket errno %d", errno);
-        return UCC_ERR_NO_MESSAGE;
+        status = UCC_ERR_NO_MESSAGE;
     }
-    return UCC_OK;
-
-fail:
-    if (close(sock) == -1) {
-        tl_error(lib, "Failed to close client socket errno %d", errno);
-    }
-    return UCC_ERR_NO_MESSAGE;
+    return status;
 }
 
 static ucc_status_t server_send_data(int command_fd, uint32_t pd_handle,
-                                     int group_size, int sock,
+                                     ucc_rank_t group_size, int sock,
                                      ucc_tl_mlx5_lib_t *lib)
 {
     ucc_status_t       status = UCC_OK;
@@ -200,14 +199,14 @@ static ucc_status_t server_send_data(int command_fd, uint32_t pd_handle,
     addrlen = sizeof(addr);
     getsockname(sock, (struct sockaddr *)&addr, &addrlen);
 
-listen_fail:
-    if (close(sock) == -1) {
-        tl_error(lib, "failed to close server socket errno %d", errno);
+    if (remove(addr.sun_path) == -1) {
+        tl_error(lib, "socket file removal failed");
         status = UCC_ERR_NO_MESSAGE;
     }
 
-    if (remove(addr.sun_path) == -1) {
-        tl_error(lib, "socket file removal failed");
+listen_fail:
+    if (close(sock) == -1) {
+        tl_error(lib, "failed to close server socket errno %d", errno);
         status = UCC_ERR_NO_MESSAGE;
     }
 
@@ -233,7 +232,7 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
         }
         ctx->shared_ctx = ibv_import_device(ctx_fd);
         if (!ctx->shared_ctx) {
-            tl_error(lib, "Import context failed");
+            tl_error(lib, "import context failed");
             return UCC_ERR_NO_MESSAGE;
         }
         ctx->shared_pd = ibv_import_pd(ctx->shared_ctx, pd_handle);
@@ -244,7 +243,6 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
             }
             return UCC_ERR_NO_MESSAGE;
         }
-        ctx->is_imported = 1;
     } else {
         ctx_fd    = ctx->shared_ctx->cmd_fd;
         pd_handle = ctx->shared_pd->handle;
@@ -274,7 +272,7 @@ ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx)
 
     if (ctx->shared_ctx) {
         if (ibv_close_device(ctx->shared_ctx)) {
-            tl_error(ctx->super.super.lib, "fail to close ib ctx");
+            tl_error(ctx->super.super.lib, "failed to close ib ctx");
             return UCC_ERR_NO_MESSAGE;
         }
     }

@@ -96,11 +96,11 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
         tmp[devname_len] = '\0';
         ib_devname       = tmp;
     }
-    status = ucc_tl_mlx5_create_ibv_ctx(&ib_devname, &ctx->shared_ctx,
-                                        ctx->super.super.lib);
+
+    status = ucc_tl_mlx5_create_ibv_ctx(&ib_devname, &ctx->shared_ctx, ctx->super.super.lib);
     if (UCC_OK != status) {
         tl_error(ctx->super.super.lib, "failed to allocate ibv_context");
-        return UCC_ERR_NO_RESOURCE;
+        return status;
     }
     if (port == -1) {
         port = ucc_tl_mlx5_get_active_port(ctx->shared_ctx);
@@ -170,7 +170,6 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
         if (mkdtemp(sock_path) != NULL) {
             status = ucc_tl_mlx5_ib_ctx_pd_init(ctx);
             if (status != UCC_OK) {
-                tl_error(context->lib, "failed to create ib ctx and pd");
                 goto out;
             }
 
@@ -221,10 +220,9 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     if (status != UCC_OK) {
         tl_error(context->lib, "failed to share ctx and pd");
         goto out;
-    } else {
-        tl_debug(context->lib, "sharing pd and ib_ctx completed successfully");
     }
 
+    ucc_topo_cleanup(topo);
     return UCC_OK;
 
 out:
