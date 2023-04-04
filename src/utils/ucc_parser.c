@@ -728,7 +728,7 @@ int ucc_config_sscanf_pipeline_params(const char *buf, void *dest,
     n_tokens = ucc_str_split_count(tokens);
 
     for (i = 0; i < n_tokens; i++) {
-        if ((order = ucs_string_find_in_list(
+        if ((order = ucc_string_find_in_list(
                  tokens[i], ucc_pipeline_order_names, 0)) >= 0) {
             p->order = (ucc_pipeline_order_t)order;
             continue;
