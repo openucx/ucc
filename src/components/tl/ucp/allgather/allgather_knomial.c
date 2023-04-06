@@ -100,7 +100,7 @@ UCC_KN_PHASE_EXTRA:
                                    &local_seg_offset);
         sbuf = PTR_OFFSET(rbuf, local_seg_offset * dt_size);
 
-        for (loop_step = 1; loop_step < radix; loop_step++) {
+        for (loop_step = radix - 1; loop_step > 0; loop_step--) {
             peer = ucc_knomial_pattern_get_loop_peer(p, rank, loop_step);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
@@ -111,7 +111,6 @@ UCC_KN_PHASE_EXTRA:
                     continue;
                 }
             }
-
             UCPCHECK_GOTO(ucc_tl_ucp_send_nb(sbuf, local_seg_count * dt_size,
                                              mem_type,
                                              INV_VRANK(peer, broot, size), team,
