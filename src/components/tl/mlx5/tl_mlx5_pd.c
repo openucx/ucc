@@ -259,15 +259,7 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
 ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx)
 {
     if (ctx->shared_pd) {
-        if (ctx->is_imported) {
-            ibv_unimport_pd(ctx->shared_pd);
-        } else {
-            if (ibv_dealloc_pd(ctx->shared_pd)) {
-                tl_error(ctx->super.super.lib, "failed to dealloc PD, errno %d",
-                        errno);
-                return UCC_ERR_NO_MESSAGE;
-            }
-        }
+        ibv_unimport_pd(ctx->shared_pd);
     }
 
     if (ctx->shared_ctx) {

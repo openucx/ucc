@@ -260,11 +260,12 @@ ucc_status_t ucc_tl_mlx5_a2a_init_progress(ucc_tl_mlx5_team_t *tl_team)
     ucc_rank_t             node_size = a2a->node.sbgp->group_size;
     ucc_rank_t             node_rank = a2a->node.sbgp->group_rank;
     ucc_base_lib_t *       lib       = UCC_TL_TEAM_LIB(team);
+    size_t op_seg_size = OP_SEGMENT_SIZE(a2a);
     ucc_status_t           status;
     ucc_tl_mlx5_a2a_op_t * op;
     int                    i, asr_cq_size, net_size, ret;
     struct ibv_port_attr   port_attr;
-    size_t                 local_data_size, umr_buf_size, op_seg_size;
+    size_t                 local_data_size, umr_buf_size;
     net_exchange_t *       local_data, *global_data, *remote_data;
 
     status = ucc_service_coll_test(team->scoll_req);

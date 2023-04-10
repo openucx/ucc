@@ -113,6 +113,7 @@ static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
     coll_task->status       = UCC_INPROGRESS;
     coll_task->super.status = UCC_INPROGRESS;
 
+    errno = 0;
     if (UCC_OK !=
         ucc_rcache_get(ctx->rcache, (void *)TASK_ARGS(task).src.info.buffer,
                        task->alltoall.msg_size * UCC_TL_TEAM_SIZE(team),

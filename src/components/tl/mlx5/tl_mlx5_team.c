@@ -77,12 +77,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     }
 
     status = ucc_tl_mlx5_a2a_init_start(self);
+    tl_debug(tl_context->lib, "posted tl team: %p", self);
     return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
 {
-    tl_info(self->super.super.context->lib, "finalizing tl team: %p", self);
+    tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
 
     ucc_tl_mlx5_a2a_cleanup(self);
     ucc_tl_mlx5_dm_cleanup(self);
@@ -106,6 +107,7 @@ ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args, /* NOLINT */
 {
     return UCC_OK;
 }
+
 ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team)
 {
     ucc_tl_mlx5_team_t *team = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
