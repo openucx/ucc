@@ -7,6 +7,8 @@
 #include "test_tl_mlx5_qps.h"
 #include "components/tl/mlx5/tl_mlx5_wqe.h"
 
+#define DT uint8_t
+
 typedef ucc_status_t (*ucc_tl_mlx5_post_rdma_fn_t)(
     struct ibv_qp *qp, uint32_t qpn, struct ibv_ah *ah, uintptr_t src_mkey_addr,
     size_t len, uint32_t src_mr_lkey, uintptr_t dst_addr, uint32_t dst_mr_key,
@@ -67,11 +69,6 @@ class test_tl_mlx5_wqe : public test_tl_mlx5_rc_qp {
     }
 };
 
-class test_tl_mlx5_rdma_write
-    : public test_tl_mlx5_wqe,
-      public ::testing::WithParamInterface<RdmaWriteParams> {
-};
-
 class test_tl_mlx5_transpose
     : public test_tl_mlx5_wqe,
       public ::testing::WithParamInterface<TransposeParams> {
@@ -83,3 +80,62 @@ class test_tl_mlx5_wait_on_data : public test_tl_mlx5_wqe {
 class test_tl_mlx5_umr_wqe : public test_tl_mlx5_wqe,
                              public ::testing::WithParamInterface<UmrParams> {
 };
+
+class test_tl_mlx5_rdma_write
+    : public test_tl_mlx5_wqe,
+      public ::testing::WithParamInterface<RdmaWriteParams> {
+public:
+    int bufsize;
+    DT *src, *dst;
+    struct ibv_mr *src_mr, *dst_mr;
+
+    void buffers_init()
+    {
+        src = (DT*) malloc(bufsize);
+        GTEST_ASSERT_NE(src, nullptr);
+        dst = (DT*) malloc(bufsize);
+        GTEST_ASSERT_NE(dst, nullptr);
+
+        for (int i = 0; i < bufsize; i++) {
+            src[i] = i % 256;
+            dst[i] = 0;
+        }
+
+        src_mr = ibv_reg_mr(pd, src, bufsize,
+                            IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+        GTEST_ASSERT_NE(nullptr, src_mr);
+        dst_mr = ibv_reg_mr(pd, dst, bufsize,
+                            IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+        GTEST_ASSERT_NE(nullptr, dst_mr);
+
+    }
+
+    void wait_for_completion()
+    {
+        int completions_num = 0;
+        struct ibv_wc  wcs[1];
+
+        while (!completions_num) {
+            completions_num = ibv_poll_cq(cq, 1, wcs);
+        }
+
+        GTEST_ASSERT_EQ(completions_num, 1);
+        GTEST_ASSERT_EQ(wcs[0].status, IBV_WC_SUCCESS);
+    }
+
+    void validate_buffers()
+    {
+        for (int i = 0; i < bufsize; i++) {
+            GTEST_ASSERT_EQ(src[i], dst[i]);
+        }
+    }
+
+    void TearDown()
+    {
+        GTEST_ASSERT_EQ(ibv_dereg_mr(src_mr), UCC_OK);
+        GTEST_ASSERT_EQ(ibv_dereg_mr(dst_mr), UCC_OK);
+        free(src);
+        free(dst);
+    }
+};
+

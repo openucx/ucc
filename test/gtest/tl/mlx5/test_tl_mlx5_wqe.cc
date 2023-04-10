@@ -6,8 +6,7 @@
 #include "test_tl_mlx5_wqe.h"
 #include "utils/arch/cpu.h"
 #include <tuple>
-
-#define DT uint8_t
+#include <cmath>
 
 // Rounds up a given integer to the closet power of two
 static int roundUpToPowerOfTwo(int a)
@@ -92,51 +91,56 @@ INSTANTIATE_TEST_SUITE_P(, test_tl_mlx5_transpose,
                                             ::testing::Values(1, 5, 32, 64),
                                             ::testing::Values(1, 3, 8, 128)));
 
-UCC_TEST_P(test_tl_mlx5_rdma_write, rdmaWriteWqe)
+UCC_TEST_P(test_tl_mlx5_rdma_write, RdmaWriteWqe)
 {
-    int            msgsize         = GetParam();
-    int            completions_num = 0;
-    DT             src[msgsize], dst[msgsize];
-    struct ibv_wc  wcs[1];
-    struct ibv_mr *src_mr, *dst_mr;
-    int            i;
+    struct ibv_sge     sg;
+    struct ibv_send_wr wr;
 
-    for (i = 0; i < msgsize; i++) {
-        src[i] = i % 256;
-        dst[i] = 0;
-    }
+    bufsize = GetParam();
+    buffers_init();
 
-    src_mr = ibv_reg_mr(pd, src, msgsize * sizeof(DT),
-                        IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-    GTEST_ASSERT_NE(nullptr, src_mr);
-    dst_mr = ibv_reg_mr(pd, dst, msgsize * sizeof(DT),
-                        IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-    GTEST_ASSERT_NE(nullptr, dst_mr);
+    memset(&sg, 0, sizeof(sg));
+    sg.addr   = (uintptr_t)src;
+    sg.length = bufsize;
+    sg.lkey   = src_mr->lkey;
+
+    memset(&wr, 0, sizeof(wr));
+    wr.wr_id               = 0;
+    wr.sg_list             = &sg;
+    wr.num_sge             = 1;
+    wr.opcode              = IBV_WR_RDMA_WRITE;
+    wr.send_flags          = IBV_SEND_SIGNALED | IBV_SEND_FENCE;
+    wr.next                = NULL;
+    wr.wr.rdma.remote_addr = (uintptr_t)dst;
+    wr.wr.rdma.rkey        = dst_mr->rkey;
+
+    // This work request is posted with wr_id = 0
+    GTEST_ASSERT_EQ(ibv_post_send(qp.qp, &wr, NULL), 0);
+    wait_for_completion();
+
+    validate_buffers();
+}
+
+
+UCC_TEST_P(test_tl_mlx5_rdma_write, CustomRdmaWriteWqe)
+{
+    bufsize = GetParam();
+    buffers_init();
 
     ibv_wr_start(qp.qp_ex);
-    post_rdma_write(qp.qp, qpn, nullptr, (uintptr_t)src, msgsize * sizeof(DT),
+    post_rdma_write(qp.qp, qpn, nullptr, (uintptr_t)src, bufsize,
                     src_mr->lkey, (uintptr_t)dst, dst_mr->rkey,
                     IBV_SEND_SIGNALED | IBV_SEND_FENCE, 0);
     GTEST_ASSERT_EQ(ibv_wr_complete(qp.qp_ex), 0);
+    wait_for_completion();
 
-    while (!completions_num) {
-        completions_num = ibv_poll_cq(cq, 1, wcs);
-    }
-    GTEST_ASSERT_EQ(completions_num, 1);
-    GTEST_ASSERT_EQ(wcs[0].status, IBV_WC_SUCCESS);
-    GTEST_ASSERT_EQ(wcs[0].wr_id, 0);
-
-    //validation
-    for (i = 0; i < msgsize; i++) {
-        GTEST_ASSERT_EQ(src[i], dst[i]);
-    }
-
-    GTEST_ASSERT_EQ(ibv_dereg_mr(src_mr), UCC_OK);
-    GTEST_ASSERT_EQ(ibv_dereg_mr(dst_mr), UCC_OK);
+    validate_buffers();
 }
 
 INSTANTIATE_TEST_SUITE_P(, test_tl_mlx5_rdma_write,
-                         ::testing::Values(1, 8, 128, 1024));
+                         ::testing::Values(1, 31, 128, 1024));
+
+
 
 UCC_TEST_F(test_tl_mlx5_wait_on_data, waitOnDataWqe)
 {
