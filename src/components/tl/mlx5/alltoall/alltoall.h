@@ -9,8 +9,6 @@
 #include "tl_mlx5.h"
 #include "tl_mlx5_ib.h"
 
-#define ATOMIC_IN_MEMIC 1
-
 #define SEQ_INDEX(_seq_num) ((_seq_num) % MAX_OUTSTANDING_OPS)
 
 #define MLX5_ASR_RANK                0

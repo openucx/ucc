@@ -51,19 +51,7 @@ UCC_CLASS_DEFINE(ucc_tl_mlx5_team_t, ucc_tl_team_t);
 
 ucc_status_t ucc_tl_mlx5_team_destroy(ucc_base_team_t *tl_team)
 {
-    UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_mlx5_team_t)(tl_team);
-    return UCC_OK;
-}
-
-ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
-                                         ucc_coll_score_t **score_p)
-{
     ucc_tl_mlx5_team_t *team = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
-    ucc_base_context_t *ctx  = UCC_TL_TEAM_CTX(team);
-    ucc_base_lib_t *    lib  = UCC_TL_TEAM_LIB(team);
-    ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_HOST;
-    ucc_coll_score_t *  score;
-    ucc_status_t        status;
 
     status = ucc_coll_score_alloc(&score);
     if (UCC_OK != status) {
@@ -84,10 +72,6 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
     }
     *score_p = score;
     return UCC_OK;
-err:
-    ucc_coll_score_free(score);
-    *score_p = NULL;
-    return status;
 }
 
 ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args, /* NOLINT */

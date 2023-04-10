@@ -184,7 +184,7 @@ static ucc_status_t ucc_tl_mlx5_a2a_alloc_atomic(ucc_tl_mlx5_team_t *team)
     struct ibv_alloc_dm_attr dm_attr;
     memset(&dm_attr, 0, sizeof(dm_attr));
     dm_attr.length           = size;
-    a2a->net.atomic.counters = ibv_alloc_dm(ctx->ib_ctx, &dm_attr);
+    a2a->net.atomic.counters = ibv_alloc_dm(ctx->shared_ctx, &dm_attr);
 #else
     a2a->net.atomic.counters = ucc_malloc(size, "atomic");
 #endif
@@ -359,7 +359,7 @@ ucc_status_t ucc_tl_mlx5_a2a_init_progress(ucc_tl_mlx5_team_t *tl_team)
             a2a->is_dc =
                 (net_size >= UCC_TL_MLX5_TEAM_LIB(team)->cfg.dc_threshold);
 
-            ibv_query_port(ctx->ib_ctx, ctx->ib_port, &port_attr);
+            ibv_query_port(ctx->shared_ctx, ctx->ib_port, &port_attr);
 
             a2a->net.ctrl_mr = ibv_reg_mr(
                 ctx->shared_pd, a2a->node.storage,
@@ -422,7 +422,7 @@ ucc_status_t ucc_tl_mlx5_a2a_init_progress(ucc_tl_mlx5_team_t *tl_team)
                 for (i = 0; i < a2a->num_dci_qps; i++) {
                     status = ucc_tl_mlx5_init_dci(
                         &a2a->net.dcis[i], ctx->shared_pd, ctx->shared_ctx,
-                        a2a->net.cq, ctx->ib_port, tx_depth, lib);
+                        a2a->net.cq, ctx->ib_port, tx_depth, &UCC_TL_MLX5_TEAM_LIB(team)->cfg.qp_conf, lib);
                     if (UCC_OK != status) {
                         return status;
                     }
@@ -431,7 +431,7 @@ ucc_status_t ucc_tl_mlx5_a2a_init_progress(ucc_tl_mlx5_team_t *tl_team)
                 //DCT
                 status = ucc_tl_mlx5_init_dct(
                     ctx->shared_pd, ctx->shared_ctx, a2a->net.cq, a2a->net.srq,
-                    ctx->ib_port, &a2a->net.dct_qp, local_data->qpn, lib);
+                    ctx->ib_port, &a2a->net.dct_qp, local_data->qpn, &UCC_TL_MLX5_TEAM_LIB(team)->cfg.qp_conf, lib);
                 if (UCC_OK != status) {
                     return status;
                 }
@@ -448,7 +448,7 @@ ucc_status_t ucc_tl_mlx5_a2a_init_progress(ucc_tl_mlx5_team_t *tl_team)
                 for (i = 0; i < a2a->net.net_size; i++) {
                     status = ucc_tl_mlx5_create_rc_qp(
                         ctx->shared_ctx, ctx->shared_pd, a2a->net.cq,
-                        ctx->ib_port, tx_depth, &a2a->net.rc_qps[i],
+                        tx_depth, &a2a->net.rc_qps[i],
                         &local_data->qpn[i], lib);
                     if (UCC_OK != status) {
                         return status;
@@ -514,9 +514,9 @@ ucc_status_t ucc_tl_mlx5_a2a_init_progress(ucc_tl_mlx5_team_t *tl_team)
             remote_data = PTR_OFFSET(global_data, i * local_data_size);
             if (a2a->is_dc) {
                 a2a->net.remote_dctns[i] = remote_data->qpn[0];
-                status = ucc_tl_mlx5_create_ah(&a2a->net.ahs[i],
-                                               remote_data->port_lid,
-                                               ctx->ib_port, team);
+                status = ucc_tl_mlx5_create_ah(ctx->shared_pd, remote_data->port_lid,
+                                   ctx->ib_port, &a2a->net.ahs[i],
+                                   lib);
                 if (UCC_OK != status) {
                     tl_error(lib, "failed to create ah, %s",
                              ucc_status_string(status));
@@ -526,7 +526,7 @@ ucc_status_t ucc_tl_mlx5_a2a_init_progress(ucc_tl_mlx5_team_t *tl_team)
                 status = ucc_tl_mlx5_qp_connect(
                     a2a->net.rc_qps[i].qp,
                     remote_data->qpn[a2a->net.sbgp->group_rank],
-                    remote_data->port_lid, ctx->ib_port, lib);
+                    remote_data->port_lid, ctx->ib_port, &UCC_TL_MLX5_TEAM_LIB(team)->cfg.qp_conf, lib);
                 if (UCC_OK != status) {
                     tl_error(lib, "failed to connect rc qps, %s",
                              ucc_status_string(status));

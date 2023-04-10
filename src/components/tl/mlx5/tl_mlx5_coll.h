@@ -70,16 +70,21 @@ static inline void ucc_tl_mlx5_put_task(ucc_tl_mlx5_task_t *task)
     ucc_mpool_put(task);
 }
 
-static inline ucc_tl_mlx5_schedule_t *
+static inline ucc_status_t
 ucc_tl_mlx5_get_schedule(ucc_tl_mlx5_team_t *  team,
-                         ucc_base_coll_args_t *coll_args)
+                         ucc_base_coll_args_t *coll_args,
+                         ucc_tl_mlx5_schedule_t **schedule)
 {
     ucc_tl_mlx5_context_t * ctx      = UCC_TL_MLX5_TEAM_CTX(team);
-    ucc_tl_mlx5_schedule_t *schedule = ucc_mpool_get(&ctx->req_mp);
 
+    *schedule = ucc_mpool_get(&ctx->req_mp);
+
+    if (ucc_unlikely(!(*schedule))) {
+        return UCC_ERR_NO_MEMORY;
+    }
     UCC_TL_MLX5_PROFILE_REQUEST_NEW(schedule, "tl_mlx5_sched", 0);
-    ucc_schedule_init(&schedule->super, coll_args, &team->super.super);
-    return schedule;
+
+    return ucc_schedule_init(&((*schedule)->super), coll_args, &team->super.super);
 }
 
 static inline void ucc_tl_mlx5_put_schedule(ucc_tl_mlx5_schedule_t *schedule)

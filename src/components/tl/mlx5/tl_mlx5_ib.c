@@ -6,8 +6,6 @@
 
 #include "tl_mlx5_ib.h"
 
-<<<<<<< HEAD
-#define DC_KEY 1
 #define UCC_QP_PKEY_INDEX 0
 #define UCC_QP_PSN 0x123
 #define UCC_QP_ACCESS_FLAGS (IBV_ACCESS_LOCAL_WRITE  | \

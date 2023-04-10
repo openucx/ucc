@@ -780,13 +780,13 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
     ucc_tl_mlx5_team_t *tl_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
     ucc_tl_mlx5_a2a_t * a2a     = tl_team->a2a;
     int             is_asr = (a2a->node.sbgp->group_rank == a2a->node.asr_rank);
-    ucc_status_t    status = UCC_OK;
     int             i, n_tasks = is_asr ? 4 : 2, curr_task = 0;
     ucc_schedule_t *schedule;
     ucc_tl_mlx5_schedule_t *task;
     size_t                  msg_size;
     int                     block_size;
     ucc_coll_task_t *       tasks[4];
+    ucc_status_t status;
 
     if (UCC_IS_INPLACE(coll_args->args)) {
         return UCC_ERR_NOT_SUPPORTED;
@@ -800,7 +800,10 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    task     = ucc_tl_mlx5_get_schedule(tl_team, coll_args);
+    status = ucc_tl_mlx5_get_schedule(tl_team, coll_args, &task);
+    if (ucc_unlikely(UCC_OK != status)) {
+        return status;
+    }
     schedule = &task->super;
 
     for (i = 0; i < n_tasks; i++) {
@@ -861,11 +864,11 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
     }
 
     ucc_schedule_add_task(schedule, tasks[0]);
-    ucc_event_manager_subscribe(&schedule->super.em, UCC_EVENT_SCHEDULE_STARTED,
+    ucc_event_manager_subscribe(&schedule->super, UCC_EVENT_SCHEDULE_STARTED,
                                 tasks[0], ucc_task_start_handler);
     for (i = 0; i < (n_tasks - 1); i++) {
         ucc_schedule_add_task(schedule, tasks[i + 1]);
-        ucc_event_manager_subscribe(&tasks[i]->em, UCC_EVENT_COMPLETED,
+        ucc_event_manager_subscribe(tasks[i], UCC_EVENT_COMPLETED,
                                     tasks[i + 1], ucc_task_start_handler);
     }
 
@@ -907,6 +910,7 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
     ucc_tl_mlx5_team_t *team = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
     ucc_base_context_t *ctx  = UCC_TL_TEAM_CTX(team);
     ucc_base_lib_t *    lib  = UCC_TL_TEAM_LIB(team);
+    ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_HOST;
     ucc_coll_score_t *  score;
     ucc_status_t        status;
 
@@ -934,10 +938,12 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
         return status;
     }
 
+    // TODO: support for cuda mt
+
     if (strlen(ctx->score_str) > 0) {
         status = ucc_coll_score_update_from_str(
             ctx->score_str, score, UCC_TL_TEAM_SIZE(team), NULL, tl_team,
-            UCC_TL_MLX5_DEFAULT_SCORE, NULL);
+            UCC_TL_MLX5_DEFAULT_SCORE, NULL, &mt, 1);
 
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
@@ -951,11 +957,4 @@ err:
     ucc_coll_score_free(score);
     *score_p = NULL;
     return status;
-}
-
-ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args,
-                                   ucc_base_team_t *     team,
-                                   ucc_coll_task_t **    task)
-{
-    return UCC_OK;
 }
