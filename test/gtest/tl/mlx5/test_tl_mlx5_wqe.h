@@ -29,12 +29,25 @@ typedef ucc_status_t (*ucc_tl_mlx5_post_umr_fn_t)(
     uint32_t repeat_count, uint16_t num_entries,
     struct mlx5dv_mr_interleaved *data, uint32_t ptr_mkey, void *ptr_address);
 
+typedef ucc_status_t (*ucc_tl_mlx5_dm_alloc_reg_fn_t)(struct ibv_context *ib_ctx,
+                                             struct ibv_pd *pd,
+                                             int dm_host,
+                                             size_t buf_size,
+                                             size_t *buf_num_p,
+                                             struct ibv_dm ** ptr,
+                                             struct ibv_mr ** mr,
+                                             ucc_base_lib_t* lib);
+
 //    (msgsize)
 using RdmaWriteParams = int;
+//    (buf_size)
+using DmParams = int;
 //    (nrows, ncols, element_size)
 using TransposeParams = std::tuple<int, int, int>;
 //    (nbr_srcs, bytes_count, repeat_count, bytes_skip)
 using UmrParams = std::tuple<int, int, int, int>;
+//    (buffer_size, buffer_nums)
+using AllocDmParams = std::tuple<int, int>;
 
 class test_tl_mlx5_wqe : public test_tl_mlx5_rc_qp {
   public:
@@ -139,3 +152,68 @@ public:
     }
 };
 
+class test_tl_mlx5_dm : public test_tl_mlx5_rdma_write
+{
+public:
+    struct ibv_dm * dm_ptr;
+    struct ibv_alloc_dm_attr  dm_attr;
+    struct ibv_mr * dm_mr;
+
+    void buffers_init()
+    {
+        test_tl_mlx5_rdma_write::buffers_init();
+
+        struct ibv_device_attr_ex attr;
+        memset(&attr, 0, sizeof(attr));
+        GTEST_ASSERT_EQ(ibv_query_device_ex(ctx, NULL, &attr), 0);
+        if (attr.max_dm_size < bufsize) {
+            if (!attr.max_dm_size) {
+                GTEST_SKIP() << "device doesn't support dm allocation";
+            } else {
+                GTEST_SKIP() << "the requested buffer size (="
+                             << bufsize
+                             << ") for device memory should be less than "
+                             << attr.max_dm_size;
+            }
+        }
+
+        memset(&dm_attr, 0, sizeof(dm_attr));
+        dm_attr.length = bufsize;
+        dm_ptr = ibv_alloc_dm(ctx, &dm_attr);
+        ASSERT_TRUE(dm_ptr != NULL);
+        ASSERT_TRUE(errno != 0);
+
+        dm_mr =
+            ibv_reg_dm_mr(pd, dm_ptr, 0, dm_attr.length,
+                          IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
+                              IBV_ACCESS_ZERO_BASED);
+        GTEST_ASSERT_NE(dm_mr, nullptr);
+    }
+
+    void TearDown()
+    {
+        if (dm_mr) {
+            ibv_dereg_mr(dm_mr);
+        }
+        if (dm_ptr) {
+            ibv_free_dm(dm_ptr);
+        }
+        test_tl_mlx5_rdma_write::TearDown();
+    }
+};
+
+
+class test_tl_mlx5_dm_alloc_reg : public test_tl_mlx5_wqe,
+                public ::testing::WithParamInterface<AllocDmParams> 
+{
+public:
+    ucc_tl_mlx5_dm_alloc_reg_fn_t dm_alloc_reg;
+    void SetUp()
+    {
+        test_tl_mlx5_wqe::SetUp();
+
+        dm_alloc_reg = (ucc_tl_mlx5_dm_alloc_reg_fn_t)dlsym(tl_mlx5_so_handle,
+                                                    "ucc_tl_mlx5_dm_alloc_reg");
+        ASSERT_EQ(nullptr, dlerror());
+    }
+};

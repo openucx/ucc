@@ -140,6 +140,102 @@ UCC_TEST_P(test_tl_mlx5_rdma_write, CustomRdmaWriteWqe)
 INSTANTIATE_TEST_SUITE_P(, test_tl_mlx5_rdma_write,
                          ::testing::Values(1, 31, 128, 1024));
 
+UCC_TEST_P(test_tl_mlx5_dm, MemcpyToDeviceMemory)
+{
+    bufsize = GetParam();
+    buffers_init();
+
+    if (bufsize % 4 != 0)
+    {
+        GTEST_SKIP() << "for memcpy involving device memory, buffer size "
+                     << "must be a multiple of 4";
+    }
+
+    GTEST_ASSERT_EQ(
+        ibv_memcpy_to_dm(dm_ptr, 0, (void*) src, bufsize), 0);
+    GTEST_ASSERT_EQ(
+        ibv_memcpy_from_dm((void*) dst, dm_ptr, 0, bufsize), 0);
+
+    validate_buffers();
+}
+
+UCC_TEST_P(test_tl_mlx5_dm, RdmaToDeviceMemory)
+{
+    struct ibv_sge     sg;
+    struct ibv_send_wr wr;
+
+    bufsize = GetParam();
+    buffers_init();
+
+
+    // RDMA write from host source to device memory
+    memset(&sg, 0, sizeof(sg));
+    sg.addr   = (uintptr_t)src;
+    sg.length = bufsize;
+    sg.lkey   = src_mr->lkey;
+
+    memset(&wr, 0, sizeof(wr));
+    wr.wr_id               = 0;
+    wr.sg_list             = &sg;
+    wr.num_sge             = 1;
+    wr.opcode              = IBV_WR_RDMA_WRITE;
+    wr.send_flags          = IBV_SEND_SIGNALED | IBV_SEND_FENCE;
+    wr.next                = NULL;
+    wr.wr.rdma.remote_addr = (uintptr_t)0;
+    wr.wr.rdma.rkey        = dm_mr->rkey;
+
+    GTEST_ASSERT_EQ(ibv_post_send(qp.qp, &wr, NULL), 0);
+    wait_for_completion();
+
+
+    // RDMA write from device memory to host destination
+    memset(&sg, 0, sizeof(sg));
+    sg.addr   = (uintptr_t)0;
+    sg.length = bufsize;
+    sg.lkey   = dm_mr->lkey;
+
+    memset(&wr, 0, sizeof(wr));
+    wr.wr_id               = 0;
+    wr.sg_list             = &sg;
+    wr.num_sge             = 1;
+    wr.opcode              = IBV_WR_RDMA_WRITE;
+    wr.send_flags          = IBV_SEND_SIGNALED | IBV_SEND_FENCE;
+    wr.next                = NULL;
+    wr.wr.rdma.remote_addr = (uintptr_t)dst;
+    wr.wr.rdma.rkey        = dst_mr->rkey;
+
+    GTEST_ASSERT_EQ(ibv_post_send(qp.qp, &wr, NULL), 0);
+    wait_for_completion();
+
+    validate_buffers();
+}
+
+UCC_TEST_P(test_tl_mlx5_dm, CustomRdmaToDeviceMemory)
+{
+    bufsize = GetParam();
+    buffers_init();
+
+    // RDMA write from host source to device memory
+    ibv_wr_start(qp.qp_ex);
+    post_rdma_write(qp.qp, qpn, nullptr, (uintptr_t)src, bufsize,
+                    src_mr->lkey, (uintptr_t)0, dm_mr->rkey,
+                    IBV_SEND_SIGNALED | IBV_SEND_FENCE, 0);
+    GTEST_ASSERT_EQ(ibv_wr_complete(qp.qp_ex), 0);
+    wait_for_completion();
+
+    // RDMA write from device memory to host destination
+    ibv_wr_start(qp.qp_ex);
+    post_rdma_write(qp.qp, qpn, nullptr, (uintptr_t)0, bufsize,
+                    dm_mr->lkey, (uintptr_t)dst, dst_mr->rkey,
+                    IBV_SEND_SIGNALED | IBV_SEND_FENCE, 0);
+    GTEST_ASSERT_EQ(ibv_wr_complete(qp.qp_ex), 0);
+    wait_for_completion();
+
+    validate_buffers();
+}
+
+INSTANTIATE_TEST_SUITE_P(, test_tl_mlx5_dm,
+                         ::testing::Values(1, 12, 31, 32, 8192, 8193, 32768, 65536));
 
 
 UCC_TEST_F(test_tl_mlx5_wait_on_data, waitOnDataWqe)
@@ -314,3 +410,30 @@ INSTANTIATE_TEST_SUITE_P(, test_tl_mlx5_umr_wqe,
                                             ::testing::Values(5, 64),
                                             ::testing::Values(1, 3, 16),
                                             ::testing::Values(0, 7)));
+
+
+
+UCC_TEST_P(test_tl_mlx5_dm_alloc_reg, DeviceMemoryAllocation)
+{
+    size_t buf_size = std::get<0>(GetParam());
+    size_t buf_num = std::get<1>(GetParam());
+    struct ibv_dm * ptr = nullptr;
+    struct ibv_mr * mr = nullptr;
+    ucc_status_t status;
+
+    status = dm_alloc_reg(ctx, pd, 0, buf_size, &buf_num, &ptr, &mr, &lib);
+    if (status == UCC_ERR_NO_MEMORY || status == UCC_ERR_NO_RESOURCE)
+    {
+        GTEST_SKIP() << "cannot allocate " << buf_num << " chunk(s) of size "
+                     << buf_size <<" in device memory";
+    }
+    GTEST_ASSERT_EQ(status, UCC_OK);
+
+    ibv_dereg_mr(mr);
+    ibv_free_dm(ptr);
+}
+
+INSTANTIATE_TEST_SUITE_P(, test_tl_mlx5_dm_alloc_reg,
+                         ::testing::Combine(::testing::Values(1, 2, 1024,8191, 8192, 8193,32768, 65536, 262144),
+                                            ::testing::Values(UCC_ULUNITS_AUTO, 1,3,8)));
+
