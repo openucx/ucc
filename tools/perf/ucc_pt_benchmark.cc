@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include <iomanip>
 #include "ucc_pt_benchmark.h"
 #include "components/mc/ucc_mc.h"

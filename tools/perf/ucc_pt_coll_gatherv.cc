@@ -70,7 +70,7 @@ ucc_status_t ucc_pt_coll_gatherv::init_args(size_t count,
                       << " in " << STR(_call) << "\n";
             if (is_root || root_shift_) {
                 goto free_dst;
-            } else  {
+            } else {
                 goto exit;
             }
         }

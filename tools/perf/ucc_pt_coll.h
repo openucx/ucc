@@ -30,7 +30,7 @@ protected:
     bool has_reduction_;
     bool has_range_;
     bool has_bw_;
-    int root_shift_;
+    int  root_shift_;
     ucc_pt_comm *comm;
     ucc_coll_args_t coll_args;
     ucc_ee_executor_task_args_t executor_args;
@@ -52,7 +52,6 @@ public:
     bool has_inplace();
     bool has_range();
     bool has_bw();
-    int  root_shift();
     virtual ~ucc_pt_coll() {};
 };
 
