@@ -23,6 +23,8 @@ sources =             \
 	tl_mlx5_ib.c      \
 	tl_mlx5_pd.h      \
 	tl_mlx5_pd.c      \
+	tl_mlx5_dm.c      \
+	tl_mlx5_dm.h      \
 	tl_mlx5_rcache.c  \
 	tl_mlx5_wqe.h     \
 	tl_mlx5_wqe.c     \

@@ -147,4 +147,13 @@ ucc_status_t ucc_tl_mlx5_asr_socket_init(ucc_tl_mlx5_context_t *ctx,
                                          ucc_rank_t group_size, int *socket,
                                          const char *sock_path);
 
+ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
+                                             struct ibv_pd *pd,
+                                             int dm_host,
+                                             size_t buf_size,
+                                             size_t *buf_num_p,
+                                             struct ibv_dm ** ptr,
+                                             struct ibv_mr ** mr,
+                                             ucc_base_lib_t* lib);
+
 #endif
