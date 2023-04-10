@@ -116,6 +116,8 @@ typedef struct ucc_tl_mlx5_team {
     struct ibv_dm *         dm_ptr;
     struct ibv_mr *         dm_mr;
     ucc_tl_mlx5_a2a_t *     a2a;
+    ucc_topo_t *            topo;
+    ucc_ep_map_t            ctx_map;
 } ucc_tl_mlx5_team_t;
 UCC_CLASS_DECLARE(ucc_tl_mlx5_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

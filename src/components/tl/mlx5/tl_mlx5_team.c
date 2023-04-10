@@ -11,9 +11,41 @@
 #include "core/ucc_team.h"
 #include <sys/shm.h>
 
-static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops;
-static ucc_status_t    ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team);
-static void            ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team);
+static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
+{
+    ucc_subset_t  subset;
+    ucc_status_t  status;
+
+    status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
+                                      &UCC_TL_TEAM_MAP(team),
+                                      &team->ctx_map);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
+        return status;
+    }
+    subset.map    = team->ctx_map;
+    subset.myrank = UCC_TL_TEAM_RANK(team);
+
+    status = ucc_topo_init(subset, UCC_TL_CORE_CTX(team)->topo, &team->topo);
+
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to init team topo");
+        goto err_topo_init;
+    }
+
+    return UCC_OK;
+err_topo_init:
+    ucc_ep_map_destroy_nested(&team->ctx_map);
+    return status;
+
+}
+
+static void ucc_tl_mlx5_topo_destroy(ucc_tl_mlx5_team_t *team)
+{
+    ucc_ep_map_destroy_nested(&team->ctx_map);
+    ucc_topo_cleanup(team->topo);
+
+}
 
 UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
@@ -37,6 +69,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
             return status;
         }
     }
+
+    status = ucc_tl_mlx5_topo_init(self); 
+    if (status != UCC_OK){
+        tl_error(ctx->super.super.lib, "failed to init team topo");
+        return status;
+    }
+
     status = ucc_tl_mlx5_a2a_init_start(self);
     return status;
 }
@@ -56,24 +95,8 @@ ucc_status_t ucc_tl_mlx5_team_destroy(ucc_base_team_t *tl_team)
 {
     ucc_tl_mlx5_team_t *team = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
 
-    status = ucc_coll_score_alloc(&score);
-    if (UCC_OK != status) {
-        tl_error(lib, "failed to alloc score_t");
-        return status;
-    }
-
-    if (strlen(ctx->score_str) > 0) {
-        status = ucc_coll_score_update_from_str(
-            ctx->score_str, score, UCC_TL_TEAM_SIZE(team), NULL, tl_team,
-            UCC_TL_MLX5_DEFAULT_SCORE, NULL, &mt, 1);
-
-        /* If INVALID_PARAM - User provided incorrect input - try to proceed */
-        if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
-            (status != UCC_ERR_NOT_SUPPORTED)) {
-            goto err;
-        }
-    }
-    *score_p = score;
+    ucc_tl_mlx5_topo_destroy(team);
+    UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_mlx5_team_t)(tl_team);
     return UCC_OK;
 }
 

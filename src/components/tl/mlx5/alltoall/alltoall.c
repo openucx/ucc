@@ -68,13 +68,24 @@ ucc_status_t ucc_tl_mlx5_a2a_init_start(ucc_tl_mlx5_team_t *team)
     if (!a2a) {
         return UCC_ERR_NO_MEMORY;
     }
-    node      = ucc_topo_get_sbgp(UCC_TL_CORE_TEAM(team)->topo, UCC_SBGP_NODE);
+
+    topo      = team->topo;
+    node      = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
+    net       = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
     node_size = node->group_size;
-    net =
-        ucc_topo_get_sbgp(UCC_TL_CORE_TEAM(team)->topo, UCC_SBGP_NODE_LEADERS);
-    topo      = UCC_TL_CORE_TEAM(team)->topo;
     nnodes    = ucc_topo_nnodes(topo);
     team_size = UCC_TL_TEAM_SIZE(team);
+
+    if (ucc_topo_min_ppn(topo) != ucc_topo_max_ppn(topo)) {
+        tl_debug(ctx->super.super.lib,
+                 "disabling mlx5 a2a for team with non-uniform ppn, "
+                 "min_ppn %d, max_ppn %d",
+                 ucc_topo_min_ppn(topo), ucc_topo_max_ppn(topo));
+        status = UCC_ERR_NOT_SUPPORTED;
+        goto err;
+    }
+    ppn = ucc_topo_max_ppn(topo);
+
     if (net->status == UCC_SBGP_NOT_EXISTS) {
         tl_debug(ctx->super.super.lib,
                  "disabling mlx5 a2a for single node team");
@@ -88,16 +99,6 @@ ucc_status_t ucc_tl_mlx5_a2a_init_start(ucc_tl_mlx5_team_t *team)
         status = UCC_ERR_NOT_SUPPORTED;
         goto err;
     }
-
-    if (!topo || ucc_topo_min_ppn(topo) != ucc_topo_max_ppn(topo)) {
-        tl_debug(ctx->super.super.lib,
-                 "disabling mlx5 a2a for team with non-uniform ppn, "
-                 "min_ppn %d, max_ppn %d",
-                 ucc_topo_min_ppn(topo), ucc_topo_max_ppn(topo));
-        status = UCC_ERR_NOT_SUPPORTED;
-        goto err;
-    }
-    ppn = ucc_topo_max_ppn(topo);
 
     a2a->node_size = node_size;
     ucc_assert(team_size == ppn * nnodes);
