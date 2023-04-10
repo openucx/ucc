@@ -32,11 +32,11 @@ static void ucc_tl_mlx5_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
     ucc_free(chunk);
 }
 
-ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {
-    .chunk_alloc   = ucc_tl_mlx5_dm_chunk_alloc,
-    .chunk_release = ucc_tl_mlx5_dm_chunk_release,
-    .obj_init      = ucc_tl_mlx5_dm_chunk_init,
-    .obj_cleanup   = NULL};
+ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {.chunk_alloc = ucc_tl_mlx5_dm_chunk_alloc,
+                                      .chunk_release =
+                                          ucc_tl_mlx5_dm_chunk_release,
+                                      .obj_init    = ucc_tl_mlx5_dm_chunk_init,
+                                      .obj_cleanup = NULL};
 
 void ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team)
 {
@@ -55,33 +55,28 @@ void ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team)
 }
 
 ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
-                                             struct ibv_pd *pd,
-                                             int dm_host,
-                                             size_t buf_size,
-                                             size_t *buf_num_p,
-                                             struct ibv_dm ** ptr,
-                                             struct ibv_mr ** mr,
-                                             ucc_base_lib_t* lib)
+                                      struct ibv_pd *pd, int dm_host,
+                                      size_t buf_size, size_t *buf_num_p,
+                                      struct ibv_dm **ptr, struct ibv_mr **mr,
+                                      ucc_base_lib_t *lib)
 {
-    struct ibv_dm * dm_ptr = NULL;
-    struct ibv_mr * dm_mr;
+    struct ibv_dm *           dm_ptr = NULL;
+    struct ibv_mr *           dm_mr;
     struct ibv_device_attr_ex attr;
     struct ibv_alloc_dm_attr  dm_attr;
-    int max_chunks_to_alloc, min_chunks_to_alloc, i;
+    int                       max_chunks_to_alloc, min_chunks_to_alloc, i;
 
     if (dm_host) {
-        max_chunks_to_alloc = (*buf_num_p == UCC_ULUNITS_AUTO) ? 8
-                                                            : *buf_num_p;
-        dm_attr.length  = max_chunks_to_alloc * buf_size;
-        dm_ptr    = ucc_malloc(dm_attr.length, "memic_host");
+        max_chunks_to_alloc = (*buf_num_p == UCC_ULUNITS_AUTO) ? 8 : *buf_num_p;
+        dm_attr.length      = max_chunks_to_alloc * buf_size;
+        dm_ptr              = ucc_malloc(dm_attr.length, "memic_host");
         if (!dm_ptr) {
             tl_error(lib, " memic_host allocation failed");
             return UCC_ERR_NO_MEMORY;
         }
 
-        dm_mr =
-            ibv_reg_mr(pd, dm_ptr, dm_attr.length,
-                       IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+        dm_mr = ibv_reg_mr(pd, dm_ptr, dm_attr.length,
+                           IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
         if (!dm_mr) {
             tl_error(lib, "failed to reg host memory");
             ucc_free(dm_ptr);
@@ -90,43 +85,41 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
     } else {
         attr.comp_mask = 0;
         if (ibv_query_device_ex(ib_ctx, NULL, &attr)) {
-            tl_error(lib, "failed to query device (errno=%d)",
-                     errno);
+            tl_error(lib, "failed to query device (errno=%d)", errno);
             return UCC_ERR_NO_MESSAGE;
         }
         if (!attr.max_dm_size) {
-            tl_error(lib,
-                     "device doesn't support dm allocation");
+            tl_error(lib, "device doesn't support dm allocation");
             return UCC_ERR_NO_RESOURCE;
         }
 
         memset(&dm_attr, 0, sizeof(dm_attr));
         if (*buf_num_p == UCC_ULUNITS_AUTO) {
-            max_chunks_to_alloc = attr.max_dm_size / buf_size - 1; //keep reserved memory
+            max_chunks_to_alloc =
+                attr.max_dm_size / buf_size - 1; //keep reserved memory
             min_chunks_to_alloc = 1;
             if (!max_chunks_to_alloc) {
                 tl_error(lib,
-                        "requested buffer size (=%ld) is too large, "
-                        "should be set to be strictly less than %ld. "
-                        "max allocation size is %ld",
-                        buf_size, attr.max_dm_size /2, attr.max_dm_size);
+                         "requested buffer size (=%ld) is too large, "
+                         "should be set to be strictly less than %ld. "
+                         "max allocation size is %ld",
+                         buf_size, attr.max_dm_size / 2, attr.max_dm_size);
                 return UCC_ERR_NO_RESOURCE;
             }
         } else {
             max_chunks_to_alloc = min_chunks_to_alloc = *buf_num_p;
         }
-        if (attr.max_dm_size < buf_size * min_chunks_to_alloc)
-        {
+        if (attr.max_dm_size < buf_size * min_chunks_to_alloc) {
             tl_error(lib,
-                    "cannot allocated %i buffer(s) of size %ld, "
-                    "max allocation size is %ld", min_chunks_to_alloc,
-                        buf_size, attr.max_dm_size);
+                     "cannot allocated %i buffer(s) of size %ld, "
+                     "max allocation size is %ld",
+                     min_chunks_to_alloc, buf_size, attr.max_dm_size);
             return UCC_ERR_NO_MEMORY;
         }
         for (i = max_chunks_to_alloc; i >= min_chunks_to_alloc; i--) {
             dm_attr.length = i * buf_size;
-            errno = 0;
-            dm_ptr   = ibv_alloc_dm(ib_ctx, &dm_attr);
+            errno          = 0;
+            dm_ptr         = ibv_alloc_dm(ib_ctx, &dm_attr);
             if (dm_ptr) {
                 ucc_assert(errno == 0);
                 break;
@@ -134,23 +127,23 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
         }
         if (!dm_ptr) {
             tl_error(lib,
-                     "dev mem allocation failed, requested %ld, attr.max %zd, errno %d",
+                     "dev mem allocation failed, requested %ld, attr.max %zd, "
+                     "errno %d",
                      dm_attr.length, attr.max_dm_size, errno);
-            return errno == ENOMEM || errno == ENOSPC? 
-                    UCC_ERR_NO_MEMORY : UCC_ERR_NO_MESSAGE;
+            return errno == ENOMEM || errno == ENOSPC ? UCC_ERR_NO_MEMORY
+                                                      : UCC_ERR_NO_MESSAGE;
         }
-        dm_mr =
-            ibv_reg_dm_mr(pd, dm_ptr, 0, dm_attr.length,
-                          IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
-                              IBV_ACCESS_ZERO_BASED);
+        dm_mr = ibv_reg_dm_mr(pd, dm_ptr, 0, dm_attr.length,
+                              IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
+                                  IBV_ACCESS_ZERO_BASED);
         if (!dm_mr) {
             tl_error(lib, "failed to reg memic");
             ibv_free_dm(dm_ptr);
             return UCC_ERR_NO_MESSAGE;
         }
     }
-    *ptr = dm_ptr;
-    *mr  = dm_mr;
+    *ptr       = dm_ptr;
+    *mr        = dm_mr;
     *buf_num_p = i;
 
     return UCC_OK;
@@ -158,25 +151,21 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
 
 ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
 {
-    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
-    ucc_tl_mlx5_lib_config_t* cfg = &UCC_TL_MLX5_TEAM_LIB(team)->cfg;
+    ucc_tl_mlx5_context_t *   ctx = UCC_TL_MLX5_TEAM_CTX(team);
+    ucc_tl_mlx5_lib_config_t *cfg = &UCC_TL_MLX5_TEAM_LIB(team)->cfg;
     ucc_status_t              status;
 
-    status = ucc_tl_mlx5_dm_alloc_reg(ctx->shared_ctx,
-                                      ctx->shared_pd,
-                                      cfg->dm_host,
-                                      cfg->dm_buf_size,
-                                      &cfg->dm_buf_num,
-                                      &team->dm_ptr,
-                                      &team->dm_mr,
-                                      UCC_TL_TEAM_LIB(team));
+    status = ucc_tl_mlx5_dm_alloc_reg(
+        ctx->shared_ctx, ctx->shared_pd, cfg->dm_host, cfg->dm_buf_size,
+        &cfg->dm_buf_num, &team->dm_ptr, &team->dm_mr, UCC_TL_TEAM_LIB(team));
     if (status != UCC_OK) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to alloc and register device memory");
+        tl_error(UCC_TL_TEAM_LIB(team),
+                 "failed to alloc and register device memory");
         return status;
     }
     team->oob_req = NULL;
 
-// TODO: fix case dm_host=true
+    // TODO: fix case dm_host=true
     status = ucc_mpool_init(&team->dm_pool, 0, sizeof(ucc_tl_mlx5_dm_chunk_t),
                             0, UCC_CACHE_LINE_SIZE, cfg->dm_buf_num,
                             cfg->dm_buf_num, &ucc_tl_mlx5_dm_ops,
@@ -188,4 +177,3 @@ ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
     }
     return UCC_OK;
 }
-

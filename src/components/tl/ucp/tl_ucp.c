@@ -214,8 +214,10 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      "If set to 0, uses the same worker for collectives and "
      "service. If not, creates a special worker for service collectives "
      "for which any UCX_ configuration env var is passed with the prefix "
-     "UCC_TL_UCP_SERVICE_. For example, UCX_TL and UCX_NET_DEVICES are configured "
-     "through UCC_TL_UCP_SERVICE_TLS and UCC_TL_UCP_SERVICE_NET_DEVICES respectively",
+     "UCC_TL_UCP_SERVICE_. For example, UCX_TL and UCX_NET_DEVICES are "
+     "configured "
+     "through UCC_TL_UCP_SERVICE_TLS and UCC_TL_UCP_SERVICE_NET_DEVICES "
+     "respectively",
      ucc_offsetof(ucc_tl_ucp_context_config_t, service_worker),
      UCC_CONFIG_TYPE_BOOL},
 

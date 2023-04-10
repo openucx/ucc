@@ -49,14 +49,14 @@ typedef struct ucc_tl_mlx5_ib_qp_conf {
 } ucc_tl_mlx5_ib_qp_conf_t;
 
 typedef struct ucc_tl_mlx5_lib_config {
-    ucc_tl_lib_config_t super;
+    ucc_tl_lib_config_t      super;
     int                 asr_barrier;
-    int                 block_size;
-    int                 num_dci_qps;
-    int                 dc_threshold;
-    size_t              dm_buf_size;
-    size_t              dm_buf_num;
-    int                 dm_host;
+    int                      block_size;
+    int                      num_dci_qps;
+    int                      dc_threshold;
+    size_t                   dm_buf_size;
+    size_t                   dm_buf_num;
+    int                      dm_host;
     ucc_tl_mlx5_ib_qp_conf_t qp_conf;
 } ucc_tl_mlx5_lib_config_t;
 
@@ -150,12 +150,9 @@ ucc_status_t ucc_tl_mlx5_asr_socket_init(ucc_tl_mlx5_context_t *ctx,
                                          const char *sock_path);
 
 ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
-                                             struct ibv_pd *pd,
-                                             int dm_host,
-                                             size_t buf_size,
-                                             size_t *buf_num_p,
-                                             struct ibv_dm ** ptr,
-                                             struct ibv_mr ** mr,
-                                             ucc_base_lib_t* lib);
+                                      struct ibv_pd *pd, int dm_host,
+                                      size_t buf_size, size_t *buf_num_p,
+                                      struct ibv_dm **ptr, struct ibv_mr **mr,
+                                      ucc_base_lib_t *lib);
 
 #endif

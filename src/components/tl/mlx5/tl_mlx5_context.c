@@ -35,8 +35,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
     status = ucc_mpool_init(
         &self->req_mp, 0,
         ucc_max(sizeof(ucc_tl_mlx5_task_t), sizeof(ucc_tl_mlx5_schedule_t)), 0,
-        UCC_CACHE_LINE_SIZE, 8, UINT_MAX, &ucc_coll_task_mpool_ops, params->thread_mode,
-        "tl_mlx5_req_mp");
+        UCC_CACHE_LINE_SIZE, 8, UINT_MAX, &ucc_coll_task_mpool_ops,
+        params->thread_mode, "tl_mlx5_req_mp");
     if (UCC_OK != status) {
         tl_error(self->super.super.lib,
                  "failed to initialize tl_mlx5_req mpool");
@@ -133,7 +133,7 @@ destroy_context:
 }
 
 typedef struct ucc_tl_mlx5_context_create_sbcast_data {
-    int ib_port;
+    int  ib_port;
     char sock_path[];
 } ucc_tl_mlx5_context_create_sbcast_data_t;
 
@@ -145,7 +145,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     const char *     sockname       = "/sock";
     size_t           sock_dir_len   = strlen(template) + 1;
     size_t           sock_path_len  = sock_dir_len + strlen(sockname);
-    size_t           sbcast_data_length = sizeof(int) + sock_path_len;
+    size_t           sbcast_data_length   = sizeof(int) + sock_path_len;
     int              sock           = 0;
     char             sock_path[sock_path_len];
     ucc_subset_t     s;
@@ -154,11 +154,13 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     ucc_sbgp_t *     sbgp;
     ucc_tl_team_t *  steam;
     ucc_coll_task_t *req;
-    ucc_tl_mlx5_context_create_sbcast_data_t* sbcast_data;
+    ucc_tl_mlx5_context_create_sbcast_data_t *sbcast_data;
 
-    sbcast_data = (ucc_tl_mlx5_context_create_sbcast_data_t*)ucc_malloc(sbcast_data_length);
+    sbcast_data = (ucc_tl_mlx5_context_create_sbcast_data_t *)ucc_malloc(
+        sbcast_data_length);
     if (!sbcast_data) {
-        tl_error(context->lib, "failed to allocate buffer for sharing ib_ctx info");
+        tl_error(context->lib,
+                 "failed to allocate buffer for sharing ib_ctx info");
         return UCC_ERR_NO_MEMORY;
     }
 

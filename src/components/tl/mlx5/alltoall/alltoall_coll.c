@@ -787,7 +787,7 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
     size_t                  msg_size;
     int                     block_size;
     ucc_coll_task_t *       tasks[4];
-    ucc_status_t status;
+    ucc_status_t            status;
 
     if (UCC_IS_INPLACE(coll_args->args)) {
         return UCC_ERR_NOT_SUPPORTED;
@@ -869,8 +869,8 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
                                 tasks[0], ucc_task_start_handler);
     for (i = 0; i < (n_tasks - 1); i++) {
         ucc_schedule_add_task(schedule, tasks[i + 1]);
-        ucc_event_manager_subscribe(tasks[i], UCC_EVENT_COMPLETED,
-                                    tasks[i + 1], ucc_task_start_handler);
+        ucc_event_manager_subscribe(tasks[i], UCC_EVENT_COMPLETED, tasks[i + 1],
+                                    ucc_task_start_handler);
     }
 
     tasks[curr_task]->post     = ucc_tl_mlx5_reg_fanin_start;

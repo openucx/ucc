@@ -29,14 +29,10 @@ typedef ucc_status_t (*ucc_tl_mlx5_post_umr_fn_t)(
     uint32_t repeat_count, uint16_t num_entries,
     struct mlx5dv_mr_interleaved *data, uint32_t ptr_mkey, void *ptr_address);
 
-typedef ucc_status_t (*ucc_tl_mlx5_dm_alloc_reg_fn_t)(struct ibv_context *ib_ctx,
-                                             struct ibv_pd *pd,
-                                             int dm_host,
-                                             size_t buf_size,
-                                             size_t *buf_num_p,
-                                             struct ibv_dm ** ptr,
-                                             struct ibv_mr ** mr,
-                                             ucc_base_lib_t* lib);
+typedef ucc_status_t (*ucc_tl_mlx5_dm_alloc_reg_fn_t)(
+    struct ibv_context *ib_ctx, struct ibv_pd *pd, int dm_host, size_t buf_size,
+    size_t *buf_num_p, struct ibv_dm **ptr, struct ibv_mr **mr,
+    ucc_base_lib_t *lib);
 
 //    (msgsize)
 using RdmaWriteParams = int;
@@ -97,16 +93,16 @@ class test_tl_mlx5_umr_wqe : public test_tl_mlx5_wqe,
 class test_tl_mlx5_rdma_write
     : public test_tl_mlx5_wqe,
       public ::testing::WithParamInterface<RdmaWriteParams> {
-public:
-    int bufsize;
-    DT *src, *dst;
+  public:
+    int            bufsize;
+    DT *           src, *dst;
     struct ibv_mr *src_mr, *dst_mr;
 
     void buffers_init()
     {
-        src = (DT*) malloc(bufsize);
+        src = (DT *)malloc(bufsize);
         GTEST_ASSERT_NE(src, nullptr);
-        dst = (DT*) malloc(bufsize);
+        dst = (DT *)malloc(bufsize);
         GTEST_ASSERT_NE(dst, nullptr);
 
         for (int i = 0; i < bufsize; i++) {
@@ -120,13 +116,12 @@ public:
         dst_mr = ibv_reg_mr(pd, dst, bufsize,
                             IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
         GTEST_ASSERT_NE(nullptr, dst_mr);
-
     }
 
     void wait_for_completion()
     {
-        int completions_num = 0;
-        struct ibv_wc  wcs[1];
+        int           completions_num = 0;
+        struct ibv_wc wcs[1];
 
         while (!completions_num) {
             completions_num = ibv_poll_cq(cq, 1, wcs);
@@ -152,12 +147,11 @@ public:
     }
 };
 
-class test_tl_mlx5_dm : public test_tl_mlx5_rdma_write
-{
-public:
-    struct ibv_dm * dm_ptr;
-    struct ibv_alloc_dm_attr  dm_attr;
-    struct ibv_mr * dm_mr;
+class test_tl_mlx5_dm : public test_tl_mlx5_rdma_write {
+  public:
+    struct ibv_dm *          dm_ptr;
+    struct ibv_alloc_dm_attr dm_attr;
+    struct ibv_mr *          dm_mr;
 
     void buffers_init()
     {
@@ -170,8 +164,7 @@ public:
             if (!attr.max_dm_size) {
                 GTEST_SKIP() << "device doesn't support dm allocation";
             } else {
-                GTEST_SKIP() << "the requested buffer size (="
-                             << bufsize
+                GTEST_SKIP() << "the requested buffer size (=" << bufsize
                              << ") for device memory should be less than "
                              << attr.max_dm_size;
             }
@@ -179,14 +172,13 @@ public:
 
         memset(&dm_attr, 0, sizeof(dm_attr));
         dm_attr.length = bufsize;
-        dm_ptr = ibv_alloc_dm(ctx, &dm_attr);
+        dm_ptr         = ibv_alloc_dm(ctx, &dm_attr);
         ASSERT_TRUE(dm_ptr != NULL);
         ASSERT_TRUE(errno != 0);
 
-        dm_mr =
-            ibv_reg_dm_mr(pd, dm_ptr, 0, dm_attr.length,
-                          IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
-                              IBV_ACCESS_ZERO_BASED);
+        dm_mr = ibv_reg_dm_mr(pd, dm_ptr, 0, dm_attr.length,
+                              IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
+                                  IBV_ACCESS_ZERO_BASED);
         GTEST_ASSERT_NE(dm_mr, nullptr);
     }
 
@@ -202,18 +194,17 @@ public:
     }
 };
 
-
-class test_tl_mlx5_dm_alloc_reg : public test_tl_mlx5_wqe,
-                public ::testing::WithParamInterface<AllocDmParams> 
-{
-public:
+class test_tl_mlx5_dm_alloc_reg
+    : public test_tl_mlx5_wqe,
+      public ::testing::WithParamInterface<AllocDmParams> {
+  public:
     ucc_tl_mlx5_dm_alloc_reg_fn_t dm_alloc_reg;
     void SetUp()
     {
         test_tl_mlx5_wqe::SetUp();
 
-        dm_alloc_reg = (ucc_tl_mlx5_dm_alloc_reg_fn_t)dlsym(tl_mlx5_so_handle,
-                                                    "ucc_tl_mlx5_dm_alloc_reg");
+        dm_alloc_reg = (ucc_tl_mlx5_dm_alloc_reg_fn_t)dlsym(
+            tl_mlx5_so_handle, "ucc_tl_mlx5_dm_alloc_reg");
         ASSERT_EQ(nullptr, dlerror());
     }
 };

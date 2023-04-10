@@ -31,7 +31,8 @@ ucc_status_t ucc_tl_mlx5_a2a_init_umr(ucc_tl_mlx5_a2a_t *a2a,
         return UCC_ERR_NO_MESSAGE;
     }
     status = ucc_tl_mlx5_create_umr_qp(a2a->ctx, a2a->pd, a2a->net.umr_cq,
-                                       a2a->ib_port, &a2a->net.umr_qp, &cfg.qp_conf, lib);
+                                       a2a->ib_port, &a2a->net.umr_qp,
+                                       &cfg.qp_conf, lib);
     if (status != UCC_OK) {
         goto err;
     }

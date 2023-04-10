@@ -11,7 +11,7 @@
 
 #define SEQ_INDEX(_seq_num) ((_seq_num) % MAX_OUTSTANDING_OPS)
 
-#define MLX5_ASR_RANK                0 // has to be 0 with current implementation of UCC_SBGP_NODE_LEADERS
+#define MLX5_ASR_RANK 0 // has to be 0 with current implementation of UCC_SBGP_NODE_LEADERS
 #define MLX5_NUM_OF_BLOCKS_SIZE_BINS 8
 #define MAX_TRANSPOSE_SIZE           8192 // HW transpose unit is limited to matrix size
 #define MAX_MSG_SIZE                 128 // HW transpose unit is limited to element size

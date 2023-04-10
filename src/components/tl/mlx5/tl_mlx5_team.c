@@ -13,12 +13,11 @@
 
 static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
 {
-    ucc_subset_t  subset;
-    ucc_status_t  status;
+    ucc_subset_t subset;
+    ucc_status_t status;
 
     status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
-                                      &UCC_TL_TEAM_MAP(team),
-                                      &team->ctx_map);
+                                      &UCC_TL_TEAM_MAP(team), &team->ctx_map);
     if (UCC_OK != status) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
         return status;
@@ -37,14 +36,12 @@ static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
 err_topo_init:
     ucc_ep_map_destroy_nested(&team->ctx_map);
     return status;
-
 }
 
 static void ucc_tl_mlx5_topo_destroy(ucc_tl_mlx5_team_t *team)
 {
     ucc_ep_map_destroy_nested(&team->ctx_map);
     ucc_topo_cleanup(team->topo);
-
 }
 
 UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
@@ -64,14 +61,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
         /* MEMIC alloc, todo move to CTX and share on node*/
         status = ucc_tl_mlx5_dm_init(self);
         if (UCC_OK != status) {
-            tl_error(UCC_TL_TEAM_LIB(self),
-                        "failed to init device memory");
+            tl_error(UCC_TL_TEAM_LIB(self), "failed to init device memory");
             return status;
         }
     }
 
-    status = ucc_tl_mlx5_topo_init(self); 
-    if (status != UCC_OK){
+    status = ucc_tl_mlx5_topo_init(self);
+    if (status != UCC_OK) {
         tl_error(ctx->super.super.lib, "failed to init team topo");
         return status;
     }
