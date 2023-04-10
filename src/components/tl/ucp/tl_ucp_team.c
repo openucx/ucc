@@ -12,6 +12,93 @@
 #include "utils/ucc_parser.h"
 #include "utils/ucc_string.h"
 #include "coll_score/ucc_coll_score.h"
+#include "core/ucc_service_coll.h"
+
+
+#define UCC_MIN_RADIX 2
+
+// typedef struct ucc_tl_ucp_opt_radix_params {
+//     ucc_rank_t *n_trees;
+//     ucc_rank_t *remainders;
+// } ucc_tl_ucp_opt_radix_params_t;
+
+// static ucc_rank_t
+// ucc_tl_ucp_get_opt_radix(ucc_tl_ucp_opt_radix_params_t *radix_params,
+//                          ucc_rank_t max_radix)
+// {
+//     ucc_rank_t min_val = radix_params->remainders[UCC_MIN_RADIX];
+//     ucc_rank_t min_i   = UCC_MIN_RADIX;
+//     ucc_rank_t i;
+
+//     for (i = UCC_MIN_RADIX+1; i <= max_radix + 1; i++) {
+//         if (radix_params->remainders[i] == 0) {
+//             return i;
+//         }
+//         if (radix_params->remainders[i] < min_val ||
+//             (radix_params->remainders[i] == min_val &&
+//             radix_params->n_trees[i] < radix_params->n_trees[min_i])) {
+//             min_val = radix_params->remainders[i];
+//             min_i   = i;
+//         }
+//     }
+//     return min_i;
+// }
+
+static ucc_rank_t ucc_tl_ucp_get_opt_radix(ucc_rank_t team_size,
+                                           ucc_rank_t max_radix)
+{
+    ucc_rank_t remainder = 0, n_trees = 0;
+    ucc_rank_t min_val, min_trees; // = radix_params->remainders[UCC_MIN_RADIX];
+    ucc_rank_t min_i; //   = UCC_MIN_RADIX;
+    ucc_rank_t r, fs;
+
+    for (r = UCC_MIN_RADIX; r <= max_radix; r++) {
+        fs = r;
+        while (fs < team_size) {
+            fs = fs * r;
+        }
+        fs       = (fs == team_size) ? fs : fs / r;
+        n_trees  = team_size / fs;
+        remainder = team_size - (team_size / fs) * fs;
+        if (remainder == 0) {
+            return r;
+        }
+        if (r == UCC_MIN_RADIX || remainder < min_val ||
+            (remainder == min_val && n_trees < min_trees)) {
+            min_val   = remainder;
+            min_trees = n_trees;
+            min_i     = r;
+        }
+        // radix_params->remainders[r] = leftover;
+        // radix_params->n_trees[r]    = n_trees;
+    }
+    return min_i;
+}
+
+static ucc_status_t ucc_tl_ucp_socket_size_allreduce(ucc_tl_ucp_team_t *team,
+                                                     ucc_rank_t socket_size,
+                                                     ucc_rank_t *min_socket_size)
+{
+    ucc_rank_t sbuf = socket_size;
+    ucc_service_coll_req_t *req;
+    ucc_subset_t            subset;
+    ucc_status_t            status;
+
+    subset.map    = team->ctx_map;
+    subset.myrank = UCC_TL_TEAM_RANK(team);
+    status = ucc_service_allreduce(UCC_TL_CORE_TEAM(team), &sbuf, min_socket_size, UCC_DT_UINT32,
+                                   sizeof(ucc_rank_t), UCC_OP_MIN, subset,
+                                   &req);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_UCP_TEAM_LIB(team), "failed start service allreduce");
+        goto free_data;
+    }
+
+    while (ucc_service_coll_test(req) == UCC_INPROGRESS) {};
+    ucc_service_coll_finalize(req);
+free_data:
+    return status;
+}
 
 static inline ucc_status_t ucc_tl_ucp_get_topo(ucc_tl_ucp_team_t *team)
 {
@@ -46,6 +133,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
 {
     ucc_tl_ucp_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_ucp_context_t);
+    ucc_rank_t   max_radix, socket_size, min_socket_size;
     ucc_status_t status;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
@@ -56,6 +144,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->status          = UCC_INPROGRESS;
     self->tuning_str      = "";
     self->topo            = NULL;
+    self->opt_radix       = 4; // TODO: change to default
 
     status = ucc_config_clone_table(&UCC_TL_UCP_TEAM_LIB(self)->cfg, &self->cfg,
                                     ucc_tl_ucp_lib_config_table);
@@ -66,6 +155,17 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         status = ucc_tl_ucp_get_topo(self);
         if (UCC_OK != status) {
             return status;
+        }
+        if(!IS_SERVICE_TEAM(self)) {
+            socket_size  = ucc_topo_get_sbgp(self->topo, UCC_SBGP_SOCKET)->group_size;
+            status = ucc_tl_ucp_socket_size_allreduce(self, socket_size, &min_socket_size);
+            if (UCC_OK != status) {
+                return status;
+            }
+            max_radix = ucc_min(UCC_TL_TEAM_SIZE(self), min_socket_size);//, UCC_TL_TEAM_SIZE(self) - socket_size);
+            printf("rank=%d, socket_size=%d, min_socket_size=%d, team_size=%d, max_radix=%d\n",UCC_TL_TEAM_RANK(self), socket_size, min_socket_size, UCC_TL_TEAM_SIZE(self), max_radix);
+            self->opt_radix = ucc_tl_ucp_get_opt_radix(UCC_TL_TEAM_SIZE(self), max_radix);
+            printf("opt radix = %d\n",self->opt_radix);
         }
     }
 
