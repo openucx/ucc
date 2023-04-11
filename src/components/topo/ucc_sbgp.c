@@ -504,6 +504,9 @@ ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
         sbgp->map = ucc_ep_map_from_array(&sbgp->rank_map, sbgp->group_size,
                                           ucc_subset_size(&topo->set), 1);
     }
+    if (sbgp->rank_map && sbgp->status == UCC_SBGP_NOT_EXISTS) {
+        ucc_free(sbgp->rank_map);
+    }
     return status;
 }
 

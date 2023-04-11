@@ -417,6 +417,10 @@ ucc_tl_ucp_get_radix_from_range(ucc_tl_ucp_team_t *team,
 
     if (UCC_UUNITS_AUTO == radix) {
         /* auto selection based on team configuration */
+        if (UCC_TL_UCP_TEAM_CTX(team)->topo_required &&
+            !IS_SERVICE_TEAM(team) && team->cfg.calc_opt_radix) {
+            return team->opt_radix;
+        }
         return UCC_UUNITS_AUTO_RADIX;
     }
     return radix;
