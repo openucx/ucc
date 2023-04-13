@@ -44,6 +44,8 @@ using TransposeParams = std::tuple<int, int, int>;
 using UmrParams = std::tuple<int, int, int, int>;
 //    (buffer_size, buffer_nums)
 using AllocDmParams = std::tuple<int, int>;
+//    (wait_on_value, init_ctrl_value)
+using WaitOnDataParams = std::tuple<uint64_t, uint64_t>;
 
 class test_tl_mlx5_wqe : public test_tl_mlx5_rc_qp {
   public:
@@ -83,7 +85,9 @@ class test_tl_mlx5_transpose
       public ::testing::WithParamInterface<TransposeParams> {
 };
 
-class test_tl_mlx5_wait_on_data : public test_tl_mlx5_wqe {
+class test_tl_mlx5_wait_on_data
+    : public test_tl_mlx5_wqe,
+      public ::testing::WithParamInterface<WaitOnDataParams> {
 };
 
 class test_tl_mlx5_umr_wqe : public test_tl_mlx5_wqe,

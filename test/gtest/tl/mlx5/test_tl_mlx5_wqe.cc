@@ -232,8 +232,10 @@ INSTANTIATE_TEST_SUITE_P(, test_tl_mlx5_dm,
                          ::testing::Values(1, 12, 31, 32, 8192, 8193, 32768,
                                            65536));
 
-UCC_TEST_F(test_tl_mlx5_wait_on_data, waitOnDataWqe)
+UCC_TEST_P(test_tl_mlx5_wait_on_data, waitOnDataWqe)
 {
+    uint64_t           wait_on_value   = std::get<0>(GetParam());
+    uint64_t           init_ctrl_value = std::get<1>(GetParam());
     uint64_t           buffer[3];
     volatile uint64_t *ctrl, *src, *dst;
     int                completions_num;
@@ -249,6 +251,8 @@ UCC_TEST_F(test_tl_mlx5_wait_on_data, waitOnDataWqe)
     ctrl = &buffer[0];
     src  = &buffer[1];
     dst  = &buffer[2];
+
+    *ctrl = init_ctrl_value;
 
     memset(&sg, 0, sizeof(sg));
     sg.addr   = (uintptr_t)src;
@@ -266,16 +270,18 @@ UCC_TEST_F(test_tl_mlx5_wait_on_data, waitOnDataWqe)
     wr.wr.rdma.rkey        = buffer_mr->rkey;
 
     // This work request is posted with wr_id = 1
-    GTEST_ASSERT_EQ(
-        post_wait_on_data(qp.qp, 1, buffer_mr->lkey, (uintptr_t)ctrl, nullptr),
-        UCC_OK);
+    GTEST_ASSERT_EQ(post_wait_on_data(qp.qp, wait_on_value, buffer_mr->lkey,
+                                      (uintptr_t)ctrl, nullptr),
+                    UCC_OK);
     // This work request is posted with wr_id = 0
     GTEST_ASSERT_EQ(ibv_post_send(qp.qp, &wr, NULL), 0);
+
+    sleep(1);
 
     *src = 0xdeadbeef;
     //memory barrier
     ucc_memory_cpu_fence();
-    *ctrl = 1;
+    *ctrl = wait_on_value;
 
     while (1) {
         completions_num = ibv_poll_cq(cq, 1, wcs);
@@ -293,6 +299,11 @@ UCC_TEST_F(test_tl_mlx5_wait_on_data, waitOnDataWqe)
 
     GTEST_ASSERT_EQ(ibv_dereg_mr(buffer_mr), UCC_OK);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    , test_tl_mlx5_wait_on_data,
+    ::testing::Combine(::testing::Values(1, 1024, 1025, 0xF0F30F00, 0xFFFFFFFF),
+                       ::testing::Values(0, 0xF0F30F01)));
 
 UCC_TEST_P(test_tl_mlx5_umr_wqe, umrWqe)
 {
