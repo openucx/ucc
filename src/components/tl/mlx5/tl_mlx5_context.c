@@ -127,15 +127,21 @@ destroy_context:
     return UCC_ERR_NO_RESOURCE;
 }
 
+typedef struct ucc_tl_mlx5_context_create_sbcast_data {
+    int  ib_port;
+    char sock_path[];
+} ucc_tl_mlx5_context_create_sbcast_data_t;
+
 ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
 {
     ucc_tl_mlx5_context_t *ctx = ucc_derived_of(context, ucc_tl_mlx5_context_t);
-    ucc_context_t *  core_ctx       = context->ucc_context;
-    const char *     template       = "/tmp/ucc.mlx5.XXXXXX";
-    const char *     sockname       = "/sock";
-    size_t           sock_dir_len   = strlen(template) + 1;
-    size_t           sock_path_len  = sock_dir_len + strlen(sockname);
-    int              sock           = 0;
+    ucc_context_t *  core_ctx           = context->ucc_context;
+    const char *     template           = "/tmp/ucc.mlx5.XXXXXX";
+    const char *     sockname           = "/sock";
+    size_t           sock_dir_len       = strlen(template) + 1;
+    size_t           sock_path_len      = sock_dir_len + strlen(sockname);
+    int              sock               = 0;
+    size_t           sbcast_data_length = sizeof(int) + sock_path_len;
     char             sock_path[sock_path_len];
     ucc_subset_t     s;
     ucc_status_t     status;
@@ -143,6 +149,15 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     ucc_sbgp_t *     sbgp;
     ucc_tl_team_t *  steam;
     ucc_coll_task_t *req;
+    ucc_tl_mlx5_context_create_sbcast_data_t *sbcast_data;
+
+    sbcast_data = (ucc_tl_mlx5_context_create_sbcast_data_t *)ucc_malloc(
+        sbcast_data_length);
+    if (!sbcast_data) {
+        tl_error(context->lib,
+                 "failed to allocate buffer for sharing ib_ctx info");
+        return UCC_ERR_NO_MEMORY;
+    }
 
     ucc_assert(core_ctx->service_team != NULL);
     ucc_assert(core_ctx->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB);
@@ -154,15 +169,17 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     status = ucc_topo_init(s, core_ctx->topo, &topo);
     if (UCC_OK != status) {
         tl_error(context->lib, "failed to init mlx5 ctx topo");
-        return status;
+        goto err_topo;
     }
 
     sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     if (sbgp->status != UCC_SBGP_ENABLED) {
         status = UCC_OK;
-        goto out;
+        goto err;
     }
 
+    ctx->shared_ctx  = NULL;
+    ctx->shared_pd   = NULL;
     ctx->is_imported = sbgp->group_rank != PD_OWNER_RANK;
 
     if (!ctx->is_imported) {
@@ -170,7 +187,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
         if (mkdtemp(sock_path) != NULL) {
             status = ucc_tl_mlx5_ib_ctx_pd_init(ctx);
             if (status != UCC_OK) {
-                goto out;
+                goto err;
             }
 
             strncat(sock_path, sockname, strlen(sockname));
@@ -184,17 +201,19 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
             tl_error(context->lib, "failed to create tmp file for socket path");
             sock_path[0] = '\0';
         }
+        sbcast_data->ib_port = ctx->ib_port;
+        memcpy(sbcast_data->sock_path, sock_path, sizeof(sock_path));
     }
     steam = core_ctx->service_team;
 
     s.map    = sbgp->map;
     s.myrank = sbgp->group_rank;
     status   = UCC_TL_TEAM_IFACE(steam)->scoll.bcast(
-        &steam->super, sock_path, sizeof(sock_path), PD_OWNER_RANK, s, &req);
+        &steam->super, sbcast_data, sbcast_data_length, PD_OWNER_RANK, s, &req);
 
     if (UCC_OK != status) {
         tl_error(context->lib, "failed to start mlx5 ctx bcast");
-        goto out;
+        goto err;
     }
 
     while (UCC_INPROGRESS == (status = ucc_collective_test(&req->super))) {
@@ -204,11 +223,15 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
 
     if (UCC_OK != status) {
         tl_error(context->lib, "failure during mlx5 ctx bcast");
-        goto out;
+        goto err;
     }
+
+    ctx->ib_port = sbcast_data->ib_port;
+    memcpy(sock_path, sbcast_data->sock_path, sizeof(sock_path));
+
     if (strlen(sock_path) == 0) {
         status = UCC_ERR_NO_MESSAGE;
-        goto out;
+        goto err;
     }
 
     status = ucc_tl_mlx5_share_ctx_pd(ctx, sock_path, sbgp->group_size,
@@ -219,14 +242,17 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     }
     if (status != UCC_OK) {
         tl_error(context->lib, "failed to share ctx and pd");
-        goto out;
+        goto err;
     }
 
+    ucc_free(sbcast_data);
     ucc_topo_cleanup(topo);
     return UCC_OK;
 
-out:
+err:
     ucc_tl_mlx5_remove_shared_ctx_pd(ctx);
     ucc_topo_cleanup(topo);
+err_topo:
+    ucc_free(sbcast_data);
     return status;
 }
