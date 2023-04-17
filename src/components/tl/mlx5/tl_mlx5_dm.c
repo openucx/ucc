@@ -82,6 +82,7 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
             ucc_free(dm_ptr);
             return UCC_ERR_NO_MESSAGE;
         }
+        *buf_num_p = max_chunks_to_alloc;
     } else {
         attr.comp_mask = 0;
         if (ibv_query_device_ex(ib_ctx, NULL, &attr)) {
@@ -141,10 +142,10 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
             ibv_free_dm(dm_ptr);
             return UCC_ERR_NO_MESSAGE;
         }
+        *buf_num_p = i;
     }
     *ptr       = dm_ptr;
     *mr        = dm_mr;
-    *buf_num_p = i;
 
     return UCC_OK;
 }
