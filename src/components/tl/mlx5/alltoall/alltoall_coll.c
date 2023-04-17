@@ -486,6 +486,8 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
     }
 
     if (task->alltoall.started == a2a->net.net_size) {
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_block_send_done",
+                                            0);
         status = ucc_tl_mlx5_post_wait_on_data(
             a2a->net.umr_qp, a2a->net.net_size, a2a->net.atomic.mr->lkey,
             (uintptr_t)
@@ -496,7 +498,7 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
 #endif
                            seq_index * sizeof(tl_mlx5_atomic_t)),
             task);
-        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_block_send_done",
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_block_post_wait_on_data_done",
                                           0);
     }
     return status;
