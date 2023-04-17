@@ -67,6 +67,11 @@ static ucc_config_field_t ucc_tl_sharp_context_config_table[] = {
      ucc_offsetof(ucc_tl_sharp_context_config_t, rand_seed),
      UCC_CONFIG_TYPE_UINT},
 
+    {"TEAM_MAX_PPN", "1",
+     "SHARP team max PPN threshold",
+     ucc_offsetof(ucc_tl_sharp_context_config_t, team_max_ppn),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_sharp_lib_t, ucc_base_lib_t,
