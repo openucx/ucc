@@ -88,6 +88,7 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
         end_pos     = ib_devname + strlen(ib_devname);
         if (!pos) {
             devname_len = strlen(ib_devname);
+            strcpy(tmp, ib_devname);
         } else {
             devname_len = (int)(pos - ib_devname);
             pos++;
@@ -96,8 +97,8 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
                 tl_error(ctx->super.super.lib, "wrong device's port number");
                 return UCC_ERR_INVALID_PARAM;
             }
+            strncpy(tmp, ib_devname, devname_len);
         }
-        strncpy(tmp, ib_devname, devname_len);
         tmp[devname_len] = '\0';
         ib_devname       = tmp;
     }
