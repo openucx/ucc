@@ -11,17 +11,17 @@
 #include <utils/ucc_coll_utils.h>
 
 ucc_pt_coll_scatterv::ucc_pt_coll_scatterv(ucc_datatype_t dt,
-                         ucc_memory_type mt, bool is_inplace,
+                         ucc_memory_type mt, bool is_inplace, int root_shift,
                          ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
 {
     has_inplace_   = true;
     has_reduction_ = false;
     has_range_     = true;
     has_bw_        = false;
+    root_shift_    = root_shift;
 
     coll_args.mask                = 0;
-    coll_args.root                = 0;
-    coll_args.coll_type            = UCC_COLL_TYPE_SCATTERV;
+    coll_args.coll_type           = UCC_COLL_TYPE_SCATTERV;
     coll_args.src.info_v.datatype = dt;
     coll_args.src.info_v.mem_type = mt;
     coll_args.dst.info.datatype   = dt;
@@ -43,9 +43,10 @@ ucc_status_t ucc_pt_coll_scatterv::init_args(size_t count,
     ucc_status_t st;
     bool is_root;
 
-    args    = coll_args;
-    is_root = (comm->get_rank() == args.root);
-    if (is_root) {
+    coll_args.root = test_args.coll_args.root;
+    args           = coll_args;
+    is_root        = (comm->get_rank() == args.root);
+    if (is_root || root_shift_) {
         args.src.info_v.counts = (ucc_count_t *)
             ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");
         UCC_MALLOC_CHECK_GOTO(args.src.info_v.counts, exit, st);
@@ -61,15 +62,15 @@ ucc_status_t ucc_pt_coll_scatterv::init_args(size_t count,
             ((uint32_t*)args.src.info_v.displacements)[i] = count * i;
         }
     }
-    if (!is_root || !UCC_IS_INPLACE(args)) {
+    if (!is_root || !UCC_IS_INPLACE(args) || root_shift_) {
         args.dst.info.count = count;
         st = ucc_pt_alloc(&dst_header, size_dst, args.dst.info.mem_type);
         if (UCC_OK != st) {
             std::cerr << "UCC perftest error: " << ucc_status_string(st)
                       << " in " << STR(_call) << "\n";
-            if (is_root) {
+            if (is_root || root_shift_) {
                 goto free_src;
-            } else  {
+            } else {
                 goto exit;
             }
         }
@@ -91,10 +92,10 @@ void ucc_pt_coll_scatterv::free_args(ucc_pt_test_args_t &test_args)
     ucc_coll_args_t &args    = test_args.coll_args;
     bool             is_root = (comm->get_rank() == args.root);
 
-    if (!is_root || !UCC_IS_INPLACE(args)) {
+    if (!is_root || !UCC_IS_INPLACE(args) || root_shift_) {
         ucc_pt_free(dst_header);
     }
-    if (is_root) {
+    if (is_root || root_shift_) {
         ucc_pt_free(src_header);
         ucc_free(args.src.info_v.displacements);
         ucc_free(args.src.info_v.counts);

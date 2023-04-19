@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include <iomanip>
 #include "ucc_pt_benchmark.h"
 #include "components/mc/ucc_mc.h"
@@ -31,17 +37,19 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
         coll = new ucc_pt_coll_barrier(comm);
         break;
     case UCC_PT_OP_TYPE_BCAST:
-        coll = new ucc_pt_coll_bcast(cfg.dt, cfg.mt, comm);
+        coll = new ucc_pt_coll_bcast(cfg.dt, cfg.mt, cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_GATHER:
-        coll = new ucc_pt_coll_gather(cfg.dt, cfg.mt, cfg.inplace, comm);
+        coll = new ucc_pt_coll_gather(cfg.dt, cfg.mt, cfg.inplace,
+                                      cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_GATHERV:
-        coll = new ucc_pt_coll_gatherv(cfg.dt, cfg.mt, cfg.inplace, comm);
+        coll = new ucc_pt_coll_gatherv(cfg.dt, cfg.mt, cfg.inplace,
+                                       cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_REDUCE:
         coll = new ucc_pt_coll_reduce(cfg.dt, cfg.mt, cfg.op, cfg.inplace,
-                                      comm);
+                                      cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_REDUCE_SCATTER:
         coll = new ucc_pt_coll_reduce_scatter(cfg.dt, cfg.mt, cfg.op,
@@ -52,10 +60,12 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
                                                cfg.inplace, comm);
         break;
     case UCC_PT_OP_TYPE_SCATTER:
-        coll = new ucc_pt_coll_scatter(cfg.dt, cfg.mt, cfg.inplace, comm);
+        coll = new ucc_pt_coll_scatter(cfg.dt, cfg.mt, cfg.inplace,
+                                       cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_SCATTERV:
-        coll = new ucc_pt_coll_scatterv(cfg.dt, cfg.mt, cfg.inplace, comm);
+        coll = new ucc_pt_coll_scatterv(cfg.dt, cfg.mt, cfg.inplace,
+                                        cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_MEMCPY:
         coll = new ucc_pt_op_memcpy(cfg.dt, cfg.mt, comm);
@@ -89,6 +99,7 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
             iter = config.n_iter_large;
             warmup = config.n_warmup_large;
         }
+        args.coll_args.root = config.root;
         UCCCHECK_GOTO(coll->init_args(cnt, args), exit_err, st);
         if ((uint64_t)config.op_type < (uint64_t)UCC_COLL_TYPE_LAST) {
             UCCCHECK_GOTO(run_single_coll_test(args.coll_args, warmup, iter, time),

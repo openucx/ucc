@@ -11,16 +11,16 @@
 #include <utils/ucc_coll_utils.h>
 
 ucc_pt_coll_gather::ucc_pt_coll_gather(ucc_datatype_t dt,
-                         ucc_memory_type mt, bool is_inplace,
+                         ucc_memory_type mt, bool is_inplace, int root_shift,
                          ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
 {
     has_inplace_   = true;
     has_reduction_ = false;
     has_range_     = true;
     has_bw_        = true;
+    root_shift_    = root_shift;
 
     coll_args.mask              = 0;
-    coll_args.root              = 0;
     coll_args.coll_type         = UCC_COLL_TYPE_GATHER;
     coll_args.src.info.datatype = dt;
     coll_args.src.info.mem_type = mt;
@@ -42,17 +42,18 @@ ucc_status_t ucc_pt_coll_gather::init_args(size_t single_rank_count,
     ucc_status_t st_src, st_dst;
     bool is_root;
 
+    coll_args.root      = test_args.coll_args.root;
     args                = coll_args;
     args.dst.info.count = single_rank_count * comm->get_size();
     args.src.info.count = single_rank_count;
     is_root = (comm->get_rank() == args.root);
-    if (is_root) {
+    if (is_root || root_shift_) {
         UCCCHECK_GOTO(ucc_pt_alloc(&dst_header, size_dst, args.dst.info.mem_type),
                       exit, st_dst);
         args.dst.info.buffer = dst_header->addr;
     }
 
-    if (!is_root || !UCC_IS_INPLACE(args)) {
+    if (!is_root || !UCC_IS_INPLACE(args) || root_shift_) {
         UCCCHECK_GOTO(
             ucc_pt_alloc(&src_header, size_src, args.src.info.mem_type),
             free_dst, st_src);
@@ -60,7 +61,7 @@ ucc_status_t ucc_pt_coll_gather::init_args(size_t single_rank_count,
     }
     return UCC_OK;
 free_dst:
-    if (is_root && st_dst == UCC_OK) {
+    if ((is_root || root_shift_) && st_dst == UCC_OK) {
         ucc_pt_free(dst_header);
     }
     return st_src;
@@ -84,10 +85,10 @@ void ucc_pt_coll_gather::free_args(ucc_pt_test_args_t &test_args)
     ucc_coll_args_t &args    = test_args.coll_args;
     bool             is_root = (comm->get_rank() == args.root);
 
-    if (!is_root || !UCC_IS_INPLACE(args)) {
+    if (!is_root || !UCC_IS_INPLACE(args) || root_shift_) {
         ucc_pt_free(src_header);
     }
-    if (is_root) {
+    if (is_root || root_shift_) {
         ucc_pt_free(dst_header);
     }
 }
