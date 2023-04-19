@@ -1724,7 +1724,7 @@ typedef enum {
  *  @ingroup UCC_COLLECTIVES_DT
  */
 typedef enum {
-    UCC_COLL_ARGS_HINT_OPTMIZE_OVERLAP_CPU  = UCC_BIT(0), /*!< When the flag is
+    UCC_COLL_ARGS_HINT_OPTMIZE_OVERLAP_CPU  = UCC_BIT(24), /*!< When the flag is
                                                             set, the user
                                                             prefers the library
                                                             to choose an
@@ -1733,7 +1733,7 @@ typedef enum {
                                                             optimized for the
                                                             best overlap of CPU
                                                             resources. */
-    UCC_COLL_ARGS_HINT_OPTMIZE_OVERLAP_GPU  = UCC_BIT(1), /*!< When the flag is
+    UCC_COLL_ARGS_HINT_OPTMIZE_OVERLAP_GPU  = UCC_BIT(25), /*!< When the flag is
                                                             set, the user
                                                             prefers the library
                                                             to choose an
@@ -1742,14 +1742,23 @@ typedef enum {
                                                             optimized for the
                                                             best overlap of GPU
                                                             resources. */
-    UCC_COLL_ARGS_HINT_OPTIMIZE_LATENCY     = UCC_BIT(2) /*!<  When the flag is
+    UCC_COLL_ARGS_HINT_OPTIMIZE_LATENCY     = UCC_BIT(26), /*!<  When the flag is
                                                            set, the user prefers
                                                            the library to choose
                                                            an algorithm
                                                            implementation
                                                            optimized for the
                                                            latency. */
+
+    UCC_COLL_ARGS_HINT_CONTIG_SRC_BUFFER    = UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER,
+                                                /*!< When the flag is set, the source
+                                                 * buffer is contiguous. */
+    UCC_COLL_ARGS_HINT_CONTIG_DST_BUFFER    = UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER
+                                                /*!< When the flag is set, the
+                                                 * destination buffer is
+                                                 * contiguous. */
 } ucc_coll_args_hints_t;
+
 /**
  *  @ingroup UCC_COLLECTIVES_DT
  */
@@ -1850,7 +1859,8 @@ typedef struct ucc_coll_args {
                                              operation is selected.
                                              The field is only specified for collectives
                                              that use pre-defined datatypes */
-    uint64_t                        flags;
+    uint64_t                        flags; /*!< Provide flags and hints for the
+                                             collective operations */
     uint64_t                        root; /*!< Root endpoint for rooted
                                              collectives */
     ucc_error_type_t                error_type; /*!< Error type */
@@ -1872,9 +1882,6 @@ typedef struct ucc_coll_args {
         int64_t  stride;
         uint64_t size;
     } active_set;
-    uint64_t                        hints; /*!< Hints for the collective
-                                             operation to choose optimizations.
-                                            */
 } ucc_coll_args_t;
 
 /**
