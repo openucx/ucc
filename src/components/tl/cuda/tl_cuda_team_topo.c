@@ -247,6 +247,7 @@ ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
     }
 
     topo->num_proxies = num_proxies;
+    topo->is_fully_connected = (num_proxies == 0) ? 1 : 0;
     if (num_proxies == 0) {
         return UCC_OK;
     }

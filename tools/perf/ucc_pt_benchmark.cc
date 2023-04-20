@@ -1,5 +1,9 @@
 /**
+<<<<<<< HEAD
  * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+=======
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+>>>>>>> REVIEW: fix review comments
  *
  * See file LICENSE for terms.
  */
@@ -68,7 +72,7 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
                                         cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_MEMCPY:
-        coll = new ucc_pt_op_memcpy(cfg.dt, cfg.mt, comm);
+        coll = new ucc_pt_op_memcpy(cfg.dt, cfg.mt, cfg.n_bufs, comm);
         break;
     case UCC_PT_OP_TYPE_REDUCEDT:
         coll = new ucc_pt_op_reduce(cfg.dt, cfg.mt, cfg.op, cfg.n_bufs, comm);

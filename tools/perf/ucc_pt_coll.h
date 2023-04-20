@@ -185,8 +185,9 @@ public:
 class ucc_pt_op_memcpy: public ucc_pt_coll {
     ucc_memory_type_t mem_type;
     ucc_datatype_t    data_type;
+    int               num_bufs;
 public:
-    ucc_pt_op_memcpy(ucc_datatype_t dt, ucc_memory_type mt,
+    ucc_pt_op_memcpy(ucc_datatype_t dt, ucc_memory_type mt, int nbufs,
                      ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;

@@ -162,31 +162,32 @@ ucc_tl_cuda_reduce_scatterv_linear_copy(ucc_tl_cuda_task_t *task,
     size_t scratch_offset, scratch_stride, send_size, frag_size, frag_offset,
            rank_offset;
     ucc_ee_executor_task_args_t  eargs;
-    ucc_rank_t i, nv;
+    ucc_rank_t i, nv, peer;
 
     scratch_offset  = get_scratch_offset(team, dt, trank);
     scratch_stride  = get_scratch_stride(team, dt);
     eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY_MULTI;
     eargs.flags     = 0;
     for (i = 0, nv = 0; i < tsize; i++) {
-        if (i == trank) {
+        peer = (trank + i) % UCC_TL_TEAM_SIZE(team);
+        if (peer == trank) {
             continue;
         }
-        send_size   = task->reduce_scatterv_linear.get_count(task, i);
+        send_size   = task->reduce_scatterv_linear.get_count(task, peer);
         frag_size   = ucc_buffer_block_count(send_size, nfrags, step);
         frag_offset = ucc_buffer_block_offset(send_size, nfrags, step);
-        rank_offset = task->reduce_scatterv_linear.get_offset(task, i);
+        rank_offset = task->reduce_scatterv_linear.get_offset(task, peer);
 
         if (frag_size == 0) {
             continue;
         }
         eargs.copy_multi.src[nv]    = PTR_OFFSET(sbuf, (rank_offset + frag_offset) * dt_size);
         eargs.copy_multi.counts[nv] = frag_size * dt_size;
-        if (trank < i) {
-            eargs.copy_multi.dst[nv] = PTR_OFFSET(TASK_SCRATCH(task, i),
+        if (trank < peer) {
+            eargs.copy_multi.dst[nv] = PTR_OFFSET(TASK_SCRATCH(task, peer),
                 remote_offset + scratch_offset);
         } else {
-            eargs.copy_multi.dst[nv] = PTR_OFFSET(TASK_SCRATCH(task, i),
+            eargs.copy_multi.dst[nv] = PTR_OFFSET(TASK_SCRATCH(task, peer),
                 remote_offset + scratch_offset - scratch_stride);
         }
         nv++;
@@ -312,16 +313,22 @@ ucc_tl_cuda_reduce_scatterv_linear_progress_frag(ucc_tl_cuda_task_t *task)
         }
 
         if (step == 0) {
-            ucc_tl_cuda_reduce_scatterv_linear_copy(task, exec, sbuf, step,
+            st = ucc_tl_cuda_reduce_scatterv_linear_copy(task, exec, sbuf, step,
                 remote_offset, &task->reduce_scatterv_linear.exec_task[0]);
         } else if (step == (num_steps - 1)) {
-            ucc_tl_cuda_reduce_scatterv_linear_reduce(task, exec, sbuf, rbuf,
+            st = ucc_tl_cuda_reduce_scatterv_linear_reduce(task, exec, sbuf, rbuf,
                 step - 1, local_offset, &task->reduce_scatterv_linear.exec_task[1]);
         } else {
-            ucc_tl_cuda_reduce_scatterv_linear_copy(task, exec, sbuf, step,
+            st = ucc_tl_cuda_reduce_scatterv_linear_copy(task, exec, sbuf, step,
                 remote_offset, &task->reduce_scatterv_linear.exec_task[0]);
-            ucc_tl_cuda_reduce_scatterv_linear_reduce(task, exec, sbuf, rbuf,
+            if (ucc_unlikely(st != UCC_OK)) {
+                return st;
+            }
+            st = ucc_tl_cuda_reduce_scatterv_linear_reduce(task, exec, sbuf, rbuf,
                 step - 1, local_offset, &task->reduce_scatterv_linear.exec_task[1]);
+        }
+        if (ucc_unlikely(st != UCC_OK)) {
+            return st;
         }
 
         if ((task->reduce_scatterv_linear.exec_task[0] == NULL) &&
@@ -432,7 +439,8 @@ ucc_tl_cuda_reduce_scatterv_linear_init(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_conntected(team->topo))) {
+    if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_conntected(team->topo) ||
+        UCC_TL_TEAM_SIZE(team) - 1 > UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
