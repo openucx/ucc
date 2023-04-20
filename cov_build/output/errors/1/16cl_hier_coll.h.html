@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html><head><title>Coverity error reader: /auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/cl_hier_coll.h</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"></head>
+<body link="#000000" vlink="#000000"><pre>
+<b><a name="line1">1    </a></b>	/**
+<b><a name="line2">2    </a></b>	 * Copyright (c) 2020-2022, NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.
+<b><a name="line3">3    </a></b>	 *
+<b><a name="line4">4    </a></b>	 * See file LICENSE for terms.
+<b><a name="line5">5    </a></b>	 */
+<b><a name="line6">6    </a></b>	#ifndef UCC_CL_HIER_COLL_H_
+<b><a name="line7">7    </a></b>	#define UCC_CL_HIER_COLL_H_
+<b><a name="line8">8    </a></b>	
+<b><a name="line9">9    </a></b>	#include &quot;cl_hier.h&quot;
+<b><a name="line10">10   </a></b>	#include &quot;schedule/ucc_schedule_pipelined.h&quot;
+<b><a name="line11">11   </a></b>	#include &quot;components/mc/ucc_mc.h&quot;
+<b><a name="line12">12   </a></b>	#include &quot;allreduce/allreduce.h&quot;
+<b><a name="line13">13   </a></b>	#include &quot;alltoallv/alltoallv.h&quot;
+</pre>
+<table summary="events" bgcolor=#e0e0e0>
+<tr><td><font color="red">
+<a name="error:0"></a>
+<!-- merge-key 7323bfb1ee0150f81f268d321b158a6a -->
+<b>(1) Event include_recursion</b>: </font></td>
+<td><font color="red">#include file &quot;alltoall/../alltoall/alltoall.h&quot; includes itself: alltoall.h -&gt; cl_hier_coll.h -&gt; alltoall.h</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:1"></a>
+<!-- merge-key 7323bfb1ee0150f81f268d321b158a6a -->
+<b>(2) Event primary_file</b>: </font></td>
+<td><font color="red">During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.c'</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:2"></a>
+<a name="error"></a>
+<!-- merge-key 7323bfb1ee0150f81f268d321b158a6a -->
+<b>(3) Event caretline</b>: </font></td>
+<td><font color="red">                              ^</font></td>
+</tr>
+</table>
+<pre><b><a name="line14">14   </a></b>	#include &quot;alltoall/alltoall.h&quot;
+<b><a name="line15">15   </a></b>	#include &quot;barrier/barrier.h&quot;
+<b><a name="line16">16   </a></b>	
+<b><a name="line17">17   </a></b>	#define UCC_CL_HIER_N_DEFAULT_ALG_SELECT_STR 1
+<b><a name="line18">18   </a></b>	
+<b><a name="line19">19   </a></b>	extern const char
+<b><a name="line20">20   </a></b>	    *ucc_cl_hier_default_alg_select_str[UCC_CL_HIER_N_DEFAULT_ALG_SELECT_STR];
+<b><a name="line21">21   </a></b>	
+<b><a name="line22">22   </a></b>	typedef struct ucc_cl_hier_schedule_t {
+<b><a name="line23">23   </a></b>	    ucc_schedule_pipelined_t super;
+<b><a name="line24">24   </a></b>	    ucc_mc_buffer_header_t  *scratch;
+<b><a name="line25">25   </a></b>	    union {
+<b><a name="line26">26   </a></b>	        struct {
+<b><a name="line27">27   </a></b>	            uint64_t *counts;
+<b><a name="line28">28   </a></b>	        } allreduce_split_rail;
+<b><a name="line29">29   </a></b>	    };
+<b><a name="line30">30   </a></b>	} ucc_cl_hier_schedule_t;
+<b><a name="line31">31   </a></b>	
+<b><a name="line32">32   </a></b>	static inline ucc_cl_hier_schedule_t *
+<b><a name="line33">33   </a></b>	ucc_cl_hier_get_schedule(ucc_cl_hier_team_t *team)
+<b><a name="line34">34   </a></b>	{
+<b><a name="line35">35   </a></b>	    ucc_cl_hier_context_t  *ctx      = UCC_CL_HIER_TEAM_CTX(team);
+<b><a name="line36">36   </a></b>	    ucc_cl_hier_schedule_t *schedule = ucc_mpool_get(&amp;ctx-&gt;sched_mp);
+<b><a name="line37">37   </a></b>	
+<b><a name="line38">38   </a></b>	    schedule-&gt;scratch = NULL;
+<b><a name="line39">39   </a></b>	    UCC_CL_HIER_PROFILE_REQUEST_NEW(schedule, &quot;cl_hier_sched_p&quot;, 0);
+<b><a name="line40">40   </a></b>	    return schedule;
+<b><a name="line41">41   </a></b>	}
+<b><a name="line42">42   </a></b>	
+<b><a name="line43">43   </a></b>	static inline void ucc_cl_hier_put_schedule(ucc_schedule_t *schedule)
+<b><a name="line44">44   </a></b>	{
+<b><a name="line45">45   </a></b>	    UCC_CL_HIER_PROFILE_REQUEST_FREE(schedule);
+<b><a name="line46">46   </a></b>	    ucc_mpool_put(schedule);
+<b><a name="line47">47   </a></b>	}
+<b><a name="line48">48   </a></b>	
+<b><a name="line49">49   </a></b>	ucc_status_t ucc_cl_hier_alg_id_to_init(int alg_id, const char *alg_id_str,
+<b><a name="line50">50   </a></b>	                                        ucc_coll_type_t   coll_type,
+<b><a name="line51">51   </a></b>	                                        ucc_memory_type_t mem_type, //NOLINT
+<b><a name="line52">52   </a></b>	                                        ucc_base_coll_init_fn_t *init);
+<b><a name="line53">53   </a></b>	#endif
+<b><a name="line54">54   </a></b>	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre></body>
+</html>

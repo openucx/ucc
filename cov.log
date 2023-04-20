@@ -1,0 +1,147 @@
+Error: PARSE_ERROR:
+/usr/include/x86_64-linux-gnu/bits/mathcalls.h:53:
+undefined_identifier: identifier "_Float32" is undefined
+/usr/include/x86_64-linux-gnu/bits/mathcalls.h:53:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/coll_score/ucc_coll_score.c'
+/usr/include/x86_64-linux-gnu/bits/mathcalls.h:53:
+caretline: ^
+Error: PARSE_ERROR:
+/usr/include/x86_64-linux-gnu/bits/mathcalls.h:55:
+undefined_identifier: identifier "_Float32" is undefined
+/usr/include/x86_64-linux-gnu/bits/mathcalls.h:55:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/coll_score/ucc_coll_score.c'
+/usr/include/x86_64-linux-gnu/bits/mathcalls.h:55:
+caretline: ^
+Error: PARSE_ERROR:
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:21:
+undefined_identifier: identifier "_Float128" is undefined
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:21:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c'
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:21:
+caretline: ^
+Error: PARSE_ERROR:
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:25:
+undefined_identifier: identifier "_Float128" is undefined
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:25:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c'
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:25:
+caretline: ^
+Error: PARSE_ERROR:
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:30:
+undefined_identifier: identifier "_Float128" is undefined
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:30:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c'
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:30:
+caretline: ^
+Error: PARSE_ERROR:
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:33:
+undefined_identifier: identifier "_Float128" is undefined
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:33:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c'
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:33:
+caretline: ^
+Error: PARSE_ERROR:
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:36:
+undefined_identifier: identifier "_Float128" is undefined
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:36:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c'
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:36:
+caretline: ^
+Error: PARSE_ERROR:
+/usr/include/stdlib.h:140:
+undefined_identifier: identifier "_Float32" is undefined
+/usr/include/stdlib.h:140:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_component.c'
+/usr/include/stdlib.h:140:
+caretline:        ^
+Error: PARSE_ERROR:
+/usr/include/stdlib.h:146:
+undefined_identifier: identifier "_Float64" is undefined
+/usr/include/stdlib.h:146:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_component.c'
+/usr/include/stdlib.h:146:
+caretline:        ^
+Error: PARSE_ERROR:
+/usr/include/stdlib.h:152:
+undefined_identifier: identifier "_Float128" is undefined
+/usr/include/stdlib.h:152:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_component.c'
+/usr/include/stdlib.h:152:
+caretline:        ^
+Error: PARSE_ERROR:
+/usr/include/stdlib.h:158:
+undefined_identifier: identifier "_Float32x" is undefined
+/usr/include/stdlib.h:158:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_component.c'
+/usr/include/stdlib.h:158:
+caretline:        ^
+Error: PARSE_ERROR:
+/usr/include/stdlib.h:164:
+undefined_identifier: identifier "_Float64x" is undefined
+/usr/include/stdlib.h:164:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_component.c'
+/usr/include/stdlib.h:164:
+caretline:        ^
+Error: PW.INCLUDE_RECURSION:
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h:13:
+include_recursion: #include file "./utils/ucc_log.h" includes itself: ucc_log.h -> ucc_global_opts.h -> ucc_log.h
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h:13:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/coll_score/ucc_coll_score.c'
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h:13:
+caretline:                           ^
+Error: PW.INCLUDE_RECURSION:
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h:13:
+include_recursion: #include file "/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h" includes itself: ucc_log.h -> ucc_global_opts.h -> ucc_log.h
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h:13:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/basic/cl_basic.c'
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h:13:
+caretline:                           ^
+Error: PW.INCLUDE_RECURSION:
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+include_recursion: #include file "allreduce/../alltoall/../cl_hier_coll.h" includes itself: cl_hier_coll.h -> alltoall.h -> cl_hier_coll.h
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/allreduce/allreduce_rab.c'
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+caretline:                             ^
+Error: PW.INCLUDE_RECURSION:
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/cl_hier_coll.h:14:
+include_recursion: #include file "alltoall/../alltoall/alltoall.h" includes itself: alltoall.h -> cl_hier_coll.h -> alltoall.h
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/cl_hier_coll.h:14:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.c'
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/cl_hier_coll.h:14:
+caretline:                               ^
+Error: PW.INCLUDE_RECURSION:
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+include_recursion: #include file "alltoallv/../alltoall/../cl_hier_coll.h" includes itself: cl_hier_coll.h -> alltoall.h -> cl_hier_coll.h
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoallv/alltoallv.c'
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+caretline:                             ^
+Error: PW.INCLUDE_RECURSION:
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+include_recursion: #include file "barrier/../alltoall/../cl_hier_coll.h" includes itself: cl_hier_coll.h -> alltoall.h -> cl_hier_coll.h
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/barrier/barrier.c'
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+caretline:                             ^
+Error: PW.INCLUDE_RECURSION:
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+include_recursion: #include file "alltoall/../cl_hier_coll.h" includes itself: cl_hier_coll.h -> alltoall.h -> cl_hier_coll.h
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/cl_hier_coll.c'
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h:9:
+caretline:                             ^
+Error: PW.INCLUDE_RECURSION:
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h:11:
+include_recursion: #include file "./core/ucc_global_opts.h" includes itself: ucc_global_opts.h -> ucc_log.h -> ucc_global_opts.h
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h:11:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/ec/ucc_ec.c'
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h:11:
+caretline:                                  ^
+Error: PW.INCLUDE_RECURSION:
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h:11:
+include_recursion: #include file "/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h" includes itself: ucc_global_opts.h -> ucc_log.h -> ucc_global_opts.h
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h:11:
+primary_file: During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/mc/cpu/mc_cpu.c'
+/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h:11:
+caretline:                                  ^

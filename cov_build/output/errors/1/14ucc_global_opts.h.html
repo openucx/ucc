@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html><head><title>Coverity error reader: /auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"></head>
+<body link="#000000" vlink="#000000"><pre>
+<b><a name="line1">1    </a></b>	/**
+<b><a name="line2">2    </a></b>	 * Copyright (c) 2020-2021, NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.
+<b><a name="line3">3    </a></b>	 * See file LICENSE for terms.
+<b><a name="line4">4    </a></b>	 */
+<b><a name="line5">5    </a></b>	
+<b><a name="line6">6    </a></b>	#ifndef UCC_GLOBAL_OPTS_H_
+<b><a name="line7">7    </a></b>	#define UCC_GLOBAL_OPTS_H_
+<b><a name="line8">8    </a></b>	
+<b><a name="line9">9    </a></b>	#include &quot;config.h&quot;
+<b><a name="line10">10   </a></b>	#include &quot;utils/ucc_component.h&quot;
+<b><a name="line11">11   </a></b>	
+<b><a name="line12">12   </a></b>	#include &quot;utils/ucc_parser.h&quot;
+</pre>
+<table summary="events" bgcolor=#e0e0e0>
+<tr><td><font color="red">
+<a name="error:0"></a>
+<!-- merge-key ebdcc6c244cbac6f10c708a0d023761a -->
+<b>(1) Event include_recursion</b>: </font></td>
+<td><font color="red">#include file &quot;/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h&quot; includes itself: ucc_log.h -&gt; ucc_global_opts.h -&gt; ucc_log.h</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:1"></a>
+<!-- merge-key ebdcc6c244cbac6f10c708a0d023761a -->
+<b>(2) Event primary_file</b>: </font></td>
+<td><font color="red">During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/basic/cl_basic.c'</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:2"></a>
+<a name="error"></a>
+<!-- merge-key ebdcc6c244cbac6f10c708a0d023761a -->
+<b>(3) Event caretline</b>: </font></td>
+<td><font color="red">                          ^</font></td>
+</tr>
+</table>
+<pre><b><a name="line13">13   </a></b>	#include &quot;utils/ucc_log.h&quot;
+<b><a name="line14">14   </a></b>	
+<b><a name="line15">15   </a></b>	typedef struct ucc_global_config {
+<b><a name="line16">16   </a></b>	    /* Log level above which log messages will be printed*/
+<b><a name="line17">17   </a></b>	    ucc_log_component_config_t log_component;
+<b><a name="line18">18   </a></b>	    ucc_component_framework_t  cl_framework;
+<b><a name="line19">19   </a></b>	    ucc_component_framework_t  tl_framework;
+<b><a name="line20">20   </a></b>	    ucc_component_framework_t  mc_framework;
+<b><a name="line21">21   </a></b>	    ucc_component_framework_t  ec_framework;
+<b><a name="line22">22   </a></b>	
+<b><a name="line23">23   </a></b>	    /* Coll component libraries path */
+<b><a name="line24">24   </a></b>	    char *component_path;
+<b><a name="line25">25   </a></b>	    char *install_path;
+<b><a name="line26">26   </a></b>	    int   initialized;
+<b><a name="line27">27   </a></b>	    /* Profiling mode */
+<b><a name="line28">28   </a></b>	    unsigned                   profile_mode;
+<b><a name="line29">29   </a></b>	
+<b><a name="line30">30   </a></b>	    /* Profiling output file name */
+<b><a name="line31">31   </a></b>	    char *profile_file;
+<b><a name="line32">32   </a></b>	
+<b><a name="line33">33   </a></b>	    /* Limit for profiling log size */
+<b><a name="line34">34   </a></b>	    size_t                     profile_log_size;
+<b><a name="line35">35   </a></b>	    char *                     cfg_filename;
+<b><a name="line36">36   </a></b>	    ucc_file_config_t *        file_cfg;
+<b><a name="line37">37   </a></b>	} ucc_global_config_t;
+<b><a name="line38">38   </a></b>	
+<b><a name="line39">39   </a></b>	extern ucc_global_config_t ucc_global_config;
+<b><a name="line40">40   </a></b>	extern ucc_config_field_t  ucc_global_config_table[];
+<b><a name="line41">41   </a></b>	
+<b><a name="line42">42   </a></b>	ucc_status_t ucc_constructor(void);
+<b><a name="line43">43   </a></b>	extern ucs_list_link_t ucc_config_global_list;
+<b><a name="line44">44   </a></b>	
+<b><a name="line45">45   </a></b>	#endif
+<b><a name="line46">46   </a></b>	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre></body>
+</html>

@@ -1,0 +1,324 @@
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PW.INCLUDE_RECURSION</checker>
+<file>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h</file>
+<function>unknown</function>
+<score>20</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>include_recursion</tag>
+<description>{CovLStr{v1}{#include file {0} includes itself{1}}{&quot;./utils/ucc_log.h&quot;}{: ucc_log.h -&gt; ucc_global_opts.h -&gt; ucc_log.h}}</description>
+<line>13</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/coll_score/ucc_coll_score.c}}}}</description>
+<line>13</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>                          ^</description>
+<line>13</line>
+</event>
+<mergekey>ebdcc6c244cbac6f10c708a0d023761a</mergekey>
+<extra>#include &quot;utils/ucc_log.h&quot;</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Build system issues</category>
+<impact>Low</impact>
+<type>Recursion in included headers</type>
+<localEffect>Compilation errors or even run-time errors (in the presence of function overloading) can result.</localEffect>
+<longDescription>Recursion in included header files</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PW.INCLUDE_RECURSION</checker>
+<file>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h</file>
+<function>unknown</function>
+<score>20</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>include_recursion</tag>
+<description>{CovLStr{v1}{#include file {0} includes itself{1}}{&quot;/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h&quot;}{: ucc_log.h -&gt; ucc_global_opts.h -&gt; ucc_log.h}}</description>
+<line>13</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/basic/cl_basic.c}}}}</description>
+<line>13</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>                          ^</description>
+<line>13</line>
+</event>
+<mergekey>ebdcc6c244cbac6f10c708a0d023761a</mergekey>
+<extra>#include &quot;utils/ucc_log.h&quot;</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Build system issues</category>
+<impact>Low</impact>
+<type>Recursion in included headers</type>
+<localEffect>Compilation errors or even run-time errors (in the presence of function overloading) can result.</localEffect>
+<longDescription>Recursion in included header files</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PW.INCLUDE_RECURSION</checker>
+<file>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h</file>
+<function>unknown</function>
+<score>20</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>include_recursion</tag>
+<description>{CovLStr{v1}{#include file {0} includes itself{1}}{&quot;allreduce/../alltoall/../cl_hier_coll.h&quot;}{: cl_hier_coll.h -&gt; alltoall.h -&gt; cl_hier_coll.h}}</description>
+<line>9</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/allreduce/allreduce_rab.c}}}}</description>
+<line>9</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>                            ^</description>
+<line>9</line>
+</event>
+<mergekey>c242e0e938b39c4957edb7f62761045f</mergekey>
+<extra>#include &quot;../cl_hier_coll.h&quot;</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Build system issues</category>
+<impact>Low</impact>
+<type>Recursion in included headers</type>
+<localEffect>Compilation errors or even run-time errors (in the presence of function overloading) can result.</localEffect>
+<longDescription>Recursion in included header files</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PW.INCLUDE_RECURSION</checker>
+<file>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/cl_hier_coll.h</file>
+<function>unknown</function>
+<score>20</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>include_recursion</tag>
+<description>{CovLStr{v1}{#include file {0} includes itself{1}}{&quot;alltoall/../alltoall/alltoall.h&quot;}{: alltoall.h -&gt; cl_hier_coll.h -&gt; alltoall.h}}</description>
+<line>14</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.c}}}}</description>
+<line>14</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>                              ^</description>
+<line>14</line>
+</event>
+<mergekey>7323bfb1ee0150f81f268d321b158a6a</mergekey>
+<extra>#include &quot;alltoall/alltoall.h&quot;</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Build system issues</category>
+<impact>Low</impact>
+<type>Recursion in included headers</type>
+<localEffect>Compilation errors or even run-time errors (in the presence of function overloading) can result.</localEffect>
+<longDescription>Recursion in included header files</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PW.INCLUDE_RECURSION</checker>
+<file>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h</file>
+<function>unknown</function>
+<score>20</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>include_recursion</tag>
+<description>{CovLStr{v1}{#include file {0} includes itself{1}}{&quot;alltoallv/../alltoall/../cl_hier_coll.h&quot;}{: cl_hier_coll.h -&gt; alltoall.h -&gt; cl_hier_coll.h}}</description>
+<line>9</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoallv/alltoallv.c}}}}</description>
+<line>9</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>                            ^</description>
+<line>9</line>
+</event>
+<mergekey>c242e0e938b39c4957edb7f62761045f</mergekey>
+<extra>#include &quot;../cl_hier_coll.h&quot;</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Build system issues</category>
+<impact>Low</impact>
+<type>Recursion in included headers</type>
+<localEffect>Compilation errors or even run-time errors (in the presence of function overloading) can result.</localEffect>
+<longDescription>Recursion in included header files</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PW.INCLUDE_RECURSION</checker>
+<file>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h</file>
+<function>unknown</function>
+<score>20</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>include_recursion</tag>
+<description>{CovLStr{v1}{#include file {0} includes itself{1}}{&quot;barrier/../alltoall/../cl_hier_coll.h&quot;}{: cl_hier_coll.h -&gt; alltoall.h -&gt; cl_hier_coll.h}}</description>
+<line>9</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/barrier/barrier.c}}}}</description>
+<line>9</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>                            ^</description>
+<line>9</line>
+</event>
+<mergekey>c242e0e938b39c4957edb7f62761045f</mergekey>
+<extra>#include &quot;../cl_hier_coll.h&quot;</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Build system issues</category>
+<impact>Low</impact>
+<type>Recursion in included headers</type>
+<localEffect>Compilation errors or even run-time errors (in the presence of function overloading) can result.</localEffect>
+<longDescription>Recursion in included header files</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PW.INCLUDE_RECURSION</checker>
+<file>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h</file>
+<function>unknown</function>
+<score>20</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>include_recursion</tag>
+<description>{CovLStr{v1}{#include file {0} includes itself{1}}{&quot;alltoall/../cl_hier_coll.h&quot;}{: cl_hier_coll.h -&gt; alltoall.h -&gt; cl_hier_coll.h}}</description>
+<line>9</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/cl_hier_coll.c}}}}</description>
+<line>9</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>                            ^</description>
+<line>9</line>
+</event>
+<mergekey>c242e0e938b39c4957edb7f62761045f</mergekey>
+<extra>#include &quot;../cl_hier_coll.h&quot;</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Build system issues</category>
+<impact>Low</impact>
+<type>Recursion in included headers</type>
+<localEffect>Compilation errors or even run-time errors (in the presence of function overloading) can result.</localEffect>
+<longDescription>Recursion in included header files</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PW.INCLUDE_RECURSION</checker>
+<file>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h</file>
+<function>unknown</function>
+<score>20</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>include_recursion</tag>
+<description>{CovLStr{v1}{#include file {0} includes itself{1}}{&quot;./core/ucc_global_opts.h&quot;}{: ucc_global_opts.h -&gt; ucc_log.h -&gt; ucc_global_opts.h}}</description>
+<line>11</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/ec/ucc_ec.c}}}}</description>
+<line>11</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>                                 ^</description>
+<line>11</line>
+</event>
+<mergekey>a6aee6e520f4bff2f5f947d7dfcc0ac1</mergekey>
+<extra>#include &quot;core/ucc_global_opts.h&quot;</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Build system issues</category>
+<impact>Low</impact>
+<type>Recursion in included headers</type>
+<localEffect>Compilation errors or even run-time errors (in the presence of function overloading) can result.</localEffect>
+<longDescription>Recursion in included header files</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PW.INCLUDE_RECURSION</checker>
+<file>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h</file>
+<function>unknown</function>
+<score>20</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>include_recursion</tag>
+<description>{CovLStr{v1}{#include file {0} includes itself{1}}{&quot;/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/core/ucc_global_opts.h&quot;}{: ucc_global_opts.h -&gt; ucc_log.h -&gt; ucc_global_opts.h}}</description>
+<line>11</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/mc/cpu/mc_cpu.c}}}}</description>
+<line>11</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>                                 ^</description>
+<line>11</line>
+</event>
+<mergekey>a6aee6e520f4bff2f5f947d7dfcc0ac1</mergekey>
+<extra>#include &quot;core/ucc_global_opts.h&quot;</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Build system issues</category>
+<impact>Low</impact>
+<type>Recursion in included headers</type>
+<localEffect>Compilation errors or even run-time errors (in the presence of function overloading) can result.</localEffect>
+<longDescription>Recursion in included header files</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>

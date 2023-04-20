@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE coverity SYSTEM "config.dtd">
+<coverity>
+<title>Coverity Errors</title>
+<error>
+<checker>PARSE_ERROR</checker>
+<file>nil</file>
+<function>nil</function>
+<num>12</num>
+</error>
+<error>
+<checker>PW.INCLUDE_RECURSION</checker>
+<file>nil</file>
+<function>nil</function>
+<num>9</num>
+</error>
+<error>
+<checker>Total</checker>
+<file>nil</file>
+<function>nil</function>
+<num>21</num>
+</error>
+</coverity>

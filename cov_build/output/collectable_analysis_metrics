@@ -1,0 +1,117 @@
+{
+  "cov-analyze" : {
+    "command-line-options" : {
+      args : [
+        "jobs",
+        "enable-fnptr",
+        "fnptr-models",
+        "all",
+        "paths",
+        "security",
+        "concurrency",
+        "dir",
+        "config"
+      ]
+    },
+    time : 2,
+    "line-counts" : {
+      "C/C++" : {
+        "blank-lines" : 10566,
+        "code-lines" : 49770,
+        "comment-lines" : 15637
+      },
+      Java : {
+        "blank-lines" : 0,
+        "code-lines" : 0,
+        "comment-lines" : 0
+      },
+      "C#" : {
+        "blank-lines" : 0,
+        "code-lines" : 0,
+        "comment-lines" : 0
+      },
+      JavaScript : {
+        "blank-lines" : 0,
+        "code-lines" : 0,
+        "comment-lines" : 0
+      },
+      "Objective-C/C++" : {
+        "blank-lines" : 0,
+        "code-lines" : 0,
+        "comment-lines" : 0
+      },
+      PHP : {
+        "blank-lines" : 0,
+        "code-lines" : 0,
+        "comment-lines" : 0
+      },
+      Python : {
+        "blank-lines" : 0,
+        "code-lines" : 0,
+        "comment-lines" : 0
+      },
+      Ruby : {
+        "blank-lines" : 0,
+        "code-lines" : 0,
+        "comment-lines" : 0
+      }
+    },
+    "file-statistics-by-extension" : {
+      c : {
+        files : 108,
+        "total-bytes" : 742697
+      },
+      h : {
+        files : 294,
+        "total-bytes" : 2290076
+      }
+    },
+    ident : "8.5.0 (build c8d197a567 p-kent-push-26368.915)",
+    platform : "Linux 5.4.0-107-generic x86_64",
+    "short-platform" : "linux64",
+    extver : "8.5.0",
+    intver : "c8d197a567 p-kent-push-26368.915",
+    "aw-peak-mem-bytes" : 55599104,
+    "am+aw-peak-mem-bytes" : 30560256,
+    "bytecode-functions" : 0,
+    concurrency : true,
+    cxx : true,
+    "enable-parse-warnings" : true,
+    failures : 0,
+    "files-analyzed" : 3,
+    force : false,
+    "function-metrics-count" : 12,
+    "functions-analyzed" : 12,
+    "incremental-hits" : 0,
+    "incremental-misses" : 48,
+    "dyncg-sites-resolved" : 0,
+    "dyncg-sites-total" : 0,
+    "max-mem" : 512,
+    "memout-count" : 0,
+    "pathout-count" : 0,
+    paths : 20000,
+    "paths-analyzed" : 406,
+    "peak-mem-bytes" : 61399040,
+    security : true,
+    "tus-count" : 108,
+    "web-app-archives" : 0,
+    "string-graph-nodes" : 0,
+    "web-app-entry-points" : 0,
+    "web-app-views-unused" : 0,
+    "ta.code_age_thresholds" : "0, 0",
+    "enabled-checkers" : "ALLOC_FREE_MISMATCH ARRAY_VS_SINGLETON ASSERT_SIDE_EFFECT ATOMICITY BAD_ALLOC_ARITHMETIC BAD_ALLOC_STRLEN BAD_CHECK_OF_WAIT_COND BAD_COMPARE BAD_EQ BAD_EQ_TYPES BAD_FREE BAD_LOCK_OBJECT BAD_OVERRIDE BAD_SHIFT BAD_SIZEOF BUFFER_SIZE CALL_SUPER CHAR_IO CHECKED_RETURN CHROOT COM.ADDROF_LEAK COM.BAD_FREE COM.BSTR.ALLOC COM.BSTR.BAD_COMPARE COM.BSTR.CONV COM.BSTR.NE_NON_BSTR CONSTANT_EXPRESSION_RESULT COPY_PASTE_ERROR CTOR_DTOR_LEAK DC.DANGEROUS DC.DEADLOCK DC.STREAM_BUFFER DC.WEAK_CRYPTO DEADCODE DELETE_ARRAY DELETE_VOID DIVIDE_BY_ZERO EVALUATION_ORDER EXPLICIT_THIS_EXPECTED FB.* FORWARD_NULL GUARDED_BY_VIOLATION HIBERNATE_BAD_HASHCODE IDENTICAL_BRANCHES IDENTIFIER_TYPO INCOMPATIBLE_CAST INFINITE_LOOP INTEGER_OVERFLOW INVALIDATE_ITERATOR LOCK LOCK_EVASION LOCK_INVERSION MISMATCHED_ITERATOR MISSING_BREAK MISSING_COMMA MISSING_LOCK MISSING_MOVE_ASSIGNMENT MISSING_RESTORE MISSING_RETURN MISSING_THROW MIXED_ENUMS NEGATIVE_RETURNS NESTING_INDENT_MISMATCH NON_STATIC_GUARDING_STATIC NO_EFFECT NULL_RETURNS OPEN_ARGS ORDER_REVERSAL ORM_LOAD_NULL_CHECK ORM_UNNECESSARY_GET OVERFLOW_BEFORE_WIDEN OVERRUN PARSE_ERROR PASS_BY_VALUE PW.* READLINK REGEX_CONFUSION RESOURCE_LEAK RETURN_LOCAL REVERSE_INULL REVERSE_NEGATIVE RISKY_CRYPTO SECURE_TEMP SERVLET_ATOMICITY SIGN_EXTENSION SINGLETON_RACE SIZEOF_MISMATCH SLEEP STACK_USE STRAY_SEMICOLON STREAM_FORMAT_STATE STRING_NULL STRING_OVERFLOW STRING_SIZE SWAPPED_ARGUMENTS TAINTED_SCALAR TAINTED_STRING TOCTOU UNCAUGHT_EXCEPT UNINIT UNINIT_CTOR UNINTENDED_GLOBAL UNINTENDED_INTEGER_DIVISION UNREACHABLE UNUSED_VALUE USELESS_CALL USE_AFTER_FREE VARARGS VIRTUAL_DTOR VOLATILE_ATOMICITY WRAPPER_ESCAPE WRONG_METHOD",
+    "PARSE_ERROR-new-defect-count" : 12,
+    "PW.INCLUDE_RECURSION-new-defect-count" : 9,
+    "total-new-defect-count" : 21,
+    "total-input-files" : -1,
+    "matching-input-files" : -1
+  },
+  "cov-build" : {
+    "build-successes" : 8,
+    "builds-with-recoverable-errors" : 0,
+    "build-failures" : 206,
+    "cs-webapps-detected" : 0,
+    "cs-webapp-successes" : 0,
+    "cs-webapp-compilation-secs" : 0
+  }
+}

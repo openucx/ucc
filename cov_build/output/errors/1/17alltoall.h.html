@@ -1,0 +1,114 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html><head><title>Coverity error reader: /auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoall/alltoall.h</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"></head>
+<body link="#000000" vlink="#000000"><pre>
+<b><a name="line1">1    </a></b>	/**
+<b><a name="line2">2    </a></b>	 * Copyright (c) 2022, NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.
+<b><a name="line3">3    </a></b>	 *
+<b><a name="line4">4    </a></b>	 * See file LICENSE for terms.
+<b><a name="line5">5    </a></b>	 */
+<b><a name="line6">6    </a></b>	
+<b><a name="line7">7    </a></b>	#ifndef ALLTOALL_H_
+<b><a name="line8">8    </a></b>	#define ALLTOALL_H_
+</pre>
+<table summary="events" bgcolor=#e0e0e0>
+<tr><td><font color="red">
+<a name="error:0"></a>
+<!-- merge-key c242e0e938b39c4957edb7f62761045f -->
+<b>(1) Event include_recursion</b>: </font></td>
+<td><font color="red">#include file &quot;alltoallv/../alltoall/../cl_hier_coll.h&quot; includes itself: cl_hier_coll.h -&gt; alltoall.h -&gt; cl_hier_coll.h</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:1"></a>
+<!-- merge-key c242e0e938b39c4957edb7f62761045f -->
+<b>(2) Event primary_file</b>: </font></td>
+<td><font color="red">During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/cl/hier/alltoallv/alltoallv.c'</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:2"></a>
+<a name="error"></a>
+<!-- merge-key c242e0e938b39c4957edb7f62761045f -->
+<b>(3) Event caretline</b>: </font></td>
+<td><font color="red">                            ^</font></td>
+</tr>
+</table>
+<pre><b><a name="line9">9    </a></b>	#include &quot;../cl_hier_coll.h&quot;
+<b><a name="line10">10   </a></b>	
+<b><a name="line11">11   </a></b>	enum
+<b><a name="line12">12   </a></b>	{
+<b><a name="line13">13   </a></b>	    UCC_CL_HIER_ALLTOALL_ALG_NODE_SPLIT,
+<b><a name="line14">14   </a></b>	    UCC_CL_HIER_ALLTOALL_ALG_LAST,
+<b><a name="line15">15   </a></b>	};
+<b><a name="line16">16   </a></b>	
+<b><a name="line17">17   </a></b>	extern ucc_base_coll_alg_info_t
+<b><a name="line18">18   </a></b>	    ucc_cl_hier_alltoall_algs[UCC_CL_HIER_ALLTOALL_ALG_LAST + 1];
+<b><a name="line19">19   </a></b>	
+<b><a name="line20">20   </a></b>	ucc_status_t ucc_cl_hier_alltoall_init(ucc_base_coll_args_t *coll_args,
+<b><a name="line21">21   </a></b>	                                       ucc_base_team_t *     team,
+<b><a name="line22">22   </a></b>	                                       ucc_coll_task_t **    task);
+<b><a name="line23">23   </a></b>	
+<b><a name="line24">24   </a></b>	static inline int ucc_cl_hier_alltoall_alg_from_str(const char *str)
+<b><a name="line25">25   </a></b>	{
+<b><a name="line26">26   </a></b>	    int i;
+<b><a name="line27">27   </a></b>	    for (i = 0; i &lt; UCC_CL_HIER_ALLTOALL_ALG_LAST; i++) {
+<b><a name="line28">28   </a></b>	        if (0 == strcasecmp(str, ucc_cl_hier_alltoall_algs[i].name)) {
+<b><a name="line29">29   </a></b>	            break;
+<b><a name="line30">30   </a></b>	        }
+<b><a name="line31">31   </a></b>	    }
+<b><a name="line32">32   </a></b>	    return i;
+<b><a name="line33">33   </a></b>	}
+<b><a name="line34">34   </a></b>	
+<b><a name="line35">35   </a></b>	#endif
+<b><a name="line36">36   </a></b>	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre></body>
+</html>

@@ -220,3 +220,17 @@ void ucc_mtype_map_to_str(uint32_t mt_map, const char *delim,
     buf -= strlen(delim);
     *buf = '\0';
 }
+ssize_t ucc_string_find_in_list(const char *str, const char **string_list,
+                                int case_sensitive)
+{
+    size_t i;
+
+    for (i = 0; string_list[i] != NULL; ++i) {
+        if ((case_sensitive && (strcmp(string_list[i], str) == 0)) ||
+            (!case_sensitive && (strcasecmp(string_list[i], str) == 0))) {
+            return i;
+        }
+    }
+
+    return -1;
+}

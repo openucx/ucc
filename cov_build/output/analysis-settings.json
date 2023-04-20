@@ -1,0 +1,15 @@
+{
+  covAnalyzeArgs : [
+    "--fb-include",
+    "coverity-default",
+    "--all",
+    "--concurrency",
+    "--enable-fnptr",
+    "--fnptr-models",
+    "--paths",
+    "20000",
+    "--security"
+  ],
+  fileOptions : [],
+  fileCheckerOptions : []
+}

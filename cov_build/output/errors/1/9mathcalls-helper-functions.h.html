@@ -1,0 +1,122 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html><head><title>Coverity error reader: /usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"></head>
+<body link="#000000" vlink="#000000"><pre>
+<b><a name="line1">1    </a></b>	/* Prototype declarations for math classification macros helpers.
+<b><a name="line2">2    </a></b>	   Copyright (C) 2017-2020 Free Software Foundation, Inc.
+<b><a name="line3">3    </a></b>	   This file is part of the GNU C Library.
+<b><a name="line4">4    </a></b>	
+<b><a name="line5">5    </a></b>	   The GNU C Library is free software; you can redistribute it and/or
+<b><a name="line6">6    </a></b>	   modify it under the terms of the GNU Lesser General Public
+<b><a name="line7">7    </a></b>	   License as published by the Free Software Foundation; either
+<b><a name="line8">8    </a></b>	   version 2.1 of the License, or (at your option) any later version.
+<b><a name="line9">9    </a></b>	
+<b><a name="line10">10   </a></b>	   The GNU C Library is distributed in the hope that it will be useful,
+<b><a name="line11">11   </a></b>	   but WITHOUT ANY WARRANTY; without even the implied warranty of
+<b><a name="line12">12   </a></b>	   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+<b><a name="line13">13   </a></b>	   Lesser General Public License for more details.
+<b><a name="line14">14   </a></b>	
+<b><a name="line15">15   </a></b>	   You should have received a copy of the GNU Lesser General Public
+<b><a name="line16">16   </a></b>	   License along with the GNU C Library; if not, see
+<b><a name="line17">17   </a></b>	   &lt;https://www.gnu.org/licenses/&gt;.  */
+<b><a name="line18">18   </a></b>	
+<b><a name="line19">19   </a></b>	
+<b><a name="line20">20   </a></b>	/* Classify given number.  */
+<b><a name="line21">21   </a></b>	__MATHDECL_1 (int, __fpclassify,, (_Mdouble_ __value))
+<b><a name="line22">22   </a></b>	     __attribute__ ((__const__));
+<b><a name="line23">23   </a></b>	
+<b><a name="line24">24   </a></b>	/* Test for negative number.  */
+<b><a name="line25">25   </a></b>	__MATHDECL_1 (int, __signbit,, (_Mdouble_ __value))
+<b><a name="line26">26   </a></b>	     __attribute__ ((__const__));
+<b><a name="line27">27   </a></b>	
+<b><a name="line28">28   </a></b>	/* Return 0 if VALUE is finite or NaN, +1 if it
+<b><a name="line29">29   </a></b>	   is +Infinity, -1 if it is -Infinity.  */
+</pre>
+<table summary="events" bgcolor=#e0e0e0>
+<tr><td><font color="red">
+<a name="error:0"></a>
+<!-- merge-key 9978014307f55965593a03b0f0dfe1c0 -->
+<b>(1) Event undefined_identifier</b>: </font></td>
+<td><font color="red">identifier &quot;_Float128&quot; is undefined</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:1"></a>
+<!-- merge-key 9978014307f55965593a03b0f0dfe1c0 -->
+<b>(2) Event primary_file</b>: </font></td>
+<td><font color="red">During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c'</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:2"></a>
+<a name="error"></a>
+<!-- merge-key 9978014307f55965593a03b0f0dfe1c0 -->
+<b>(3) Event caretline</b>: </font></td>
+<td><font color="red">^</font></td>
+</tr>
+</table>
+<pre><b><a name="line30">30   </a></b>	__MATHDECL_1 (int, __isinf,, (_Mdouble_ __value)) __attribute__ ((__const__));
+<b><a name="line31">31   </a></b>	
+<b><a name="line32">32   </a></b>	/* Return nonzero if VALUE is finite and not NaN.  Used by isfinite macro.  */
+<b><a name="line33">33   </a></b>	__MATHDECL_1 (int, __finite,, (_Mdouble_ __value)) __attribute__ ((__const__));
+<b><a name="line34">34   </a></b>	
+<b><a name="line35">35   </a></b>	/* Return nonzero if VALUE is not a number.  */
+<b><a name="line36">36   </a></b>	__MATHDECL_1 (int, __isnan,, (_Mdouble_ __value)) __attribute__ ((__const__));
+<b><a name="line37">37   </a></b>	
+<b><a name="line38">38   </a></b>	/* Test equality.  */
+<b><a name="line39">39   </a></b>	__MATHDECL_1 (int, __iseqsig,, (_Mdouble_ __x, _Mdouble_ __y));
+<b><a name="line40">40   </a></b>	
+<b><a name="line41">41   </a></b>	/* Test for signaling NaN.  */
+<b><a name="line42">42   </a></b>	__MATHDECL_1 (int, __issignaling,, (_Mdouble_ __value))
+<b><a name="line43">43   </a></b>	     __attribute__ ((__const__));
+<b><a name="line44">44   </a></b>	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre></body>
+</html>

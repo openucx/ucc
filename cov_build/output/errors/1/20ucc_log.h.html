@@ -1,0 +1,256 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html><head><title>Coverity error reader: /auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_log.h</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"></head>
+<body link="#000000" vlink="#000000"><pre>
+<b><a name="line1">1    </a></b>	/**
+<b><a name="line2">2    </a></b>	 * Copyright (c) 2020-2022, NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.
+<b><a name="line3">3    </a></b>	 *
+<b><a name="line4">4    </a></b>	 * See file LICENSE for terms.
+<b><a name="line5">5    </a></b>	 */
+<b><a name="line6">6    </a></b>	
+<b><a name="line7">7    </a></b>	#ifndef UCC_LOG_H_
+<b><a name="line8">8    </a></b>	#define UCC_LOG_H_
+<b><a name="line9">9    </a></b>	
+<b><a name="line10">10   </a></b>	#include &quot;config.h&quot;
+</pre>
+<table summary="events" bgcolor=#e0e0e0>
+<tr><td><font color="red">
+<a name="error:0"></a>
+<!-- merge-key a6aee6e520f4bff2f5f947d7dfcc0ac1 -->
+<b>(1) Event include_recursion</b>: </font></td>
+<td><font color="red">#include file &quot;./core/ucc_global_opts.h&quot; includes itself: ucc_global_opts.h -&gt; ucc_log.h -&gt; ucc_global_opts.h</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:1"></a>
+<!-- merge-key a6aee6e520f4bff2f5f947d7dfcc0ac1 -->
+<b>(2) Event primary_file</b>: </font></td>
+<td><font color="red">During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/ec/ucc_ec.c'</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:2"></a>
+<a name="error"></a>
+<!-- merge-key a6aee6e520f4bff2f5f947d7dfcc0ac1 -->
+<b>(3) Event caretline</b>: </font></td>
+<td><font color="red">                                 ^</font></td>
+</tr>
+</table>
+<pre><b><a name="line11">11   </a></b>	#include &quot;core/ucc_global_opts.h&quot;
+<b><a name="line12">12   </a></b>	#include &quot;core/ucc_dt.h&quot;
+<b><a name="line13">13   </a></b>	#include &lt;ucs/debug/log_def.h&gt;
+<b><a name="line14">14   </a></b>	
+<b><a name="line15">15   </a></b>	#define UCC_LOG_LEVEL_ERROR UCS_LOG_LEVEL_ERROR
+<b><a name="line16">16   </a></b>	#define UCC_LOG_LEVEL_WARN  UCS_LOG_LEVEL_WARN
+<b><a name="line17">17   </a></b>	#define UCC_LOG_LEVEL_INFO  UCS_LOG_LEVEL_INFO
+<b><a name="line18">18   </a></b>	#define UCC_LOG_LEVEL_DEBUG UCS_LOG_LEVEL_DEBUG
+<b><a name="line19">19   </a></b>	#define UCC_LOG_LEVEL_TRACE UCS_LOG_LEVEL_TRACE
+<b><a name="line20">20   </a></b>	
+<b><a name="line21">21   </a></b>	#define ucc_log_get_buffer_size ucs_log_get_buffer_size
+<b><a name="line22">22   </a></b>	#define ucc_log_fatal_error ucs_log_fatal_error
+<b><a name="line23">23   </a></b>	#define ucc_log_flush ucs_log_flush
+<b><a name="line24">24   </a></b>	
+<b><a name="line25">25   </a></b>	/* Generic wrapper macro to invoke ucs logging backend */
+<b><a name="line26">26   </a></b>	#define ucc_log_component(_level, _component, _fmt, ...)                       \
+<b><a name="line27">27   </a></b>	    do {                                                                       \
+<b><a name="line28">28   </a></b>	        ucs_log_component(_level, &amp;_component, _fmt, ##__VA_ARGS__);           \
+<b><a name="line29">29   </a></b>	    } while (0)
+<b><a name="line30">30   </a></b>	
+<b><a name="line31">31   </a></b>	/* Global logger: to be used anywhere when special log level settings are not required */
+<b><a name="line32">32   </a></b>	#define ucc_log_component_global(_level, fmt, ...)                             \
+<b><a name="line33">33   </a></b>	    ucc_log_component(_level, ucc_global_config.log_component, fmt,            \
+<b><a name="line34">34   </a></b>	                      ##__VA_ARGS__)
+<b><a name="line35">35   </a></b>	#define ucc_error(_fmt, ...)                                                   \
+<b><a name="line36">36   </a></b>	    ucc_log_component_global(UCS_LOG_LEVEL_ERROR, _fmt, ##__VA_ARGS__)
+<b><a name="line37">37   </a></b>	#define ucc_warn(_fmt, ...)                                                    \
+<b><a name="line38">38   </a></b>	    ucc_log_component_global(UCS_LOG_LEVEL_WARN, _fmt, ##__VA_ARGS__)
+<b><a name="line39">39   </a></b>	#define ucc_info(_fmt, ...)                                                    \
+<b><a name="line40">40   </a></b>	    ucc_log_component_global(UCS_LOG_LEVEL_INFO, _fmt, ##__VA_ARGS__)
+<b><a name="line41">41   </a></b>	#define ucc_debug(_fmt, ...)                                                   \
+<b><a name="line42">42   </a></b>	    ucc_log_component_global(UCS_LOG_LEVEL_DEBUG, _fmt, ##__VA_ARGS__)
+<b><a name="line43">43   </a></b>	#define ucc_trace(_fmt, ...)                                                   \
+<b><a name="line44">44   </a></b>	    ucc_log_component_global(UCS_LOG_LEVEL_TRACE, _fmt, ##__VA_ARGS__)
+<b><a name="line45">45   </a></b>	#define ucc_trace_req(_fmt, ...)                                               \
+<b><a name="line46">46   </a></b>	    ucc_log_component_global(UCS_LOG_LEVEL_TRACE_REQ, _fmt, ##__VA_ARGS__)
+<b><a name="line47">47   </a></b>	#define ucc_trace_data(_fmt, ...)                                              \
+<b><a name="line48">48   </a></b>	    ucc_log_component_global(UCS_LOG_LEVEL_TRACE_DATA, _fmt, ##__VA_ARGS__)
+<b><a name="line49">49   </a></b>	#define ucc_trace_async(_fmt, ...)                                             \
+<b><a name="line50">50   </a></b>	    ucc_log_component_global(UCS_LOG_LEVEL_TRACE_ASYNC, _fmt, ##__VA_ARGS__)
+<b><a name="line51">51   </a></b>	#define ucc_trace_func(_fmt, ...)                                              \
+<b><a name="line52">52   </a></b>	    ucc_log_component_global(UCS_LOG_LEVEL_TRACE_FUNC, &quot;%s(&quot; _fmt &quot;)&quot;,         \
+<b><a name="line53">53   </a></b>	                             __FUNCTION__, ##__VA_ARGS__)
+<b><a name="line54">54   </a></b>	#define ucc_trace_poll(_fmt, ...)                                              \
+<b><a name="line55">55   </a></b>	    ucc_log_component_global(UCS_LOG_LEVEL_TRACE_POLL, _fmt, ##__VA_ARGS__)
+<b><a name="line56">56   </a></b>	
+<b><a name="line57">57   </a></b>	
+<b><a name="line58">58   </a></b>	static inline const char* ucc_coll_type_str(ucc_coll_type_t ct)
+<b><a name="line59">59   </a></b>	{
+<b><a name="line60">60   </a></b>	    switch(ct) {
+<b><a name="line61">61   </a></b>	    case UCC_COLL_TYPE_BARRIER:
+<b><a name="line62">62   </a></b>	        return &quot;Barrier&quot;;
+<b><a name="line63">63   </a></b>	    case UCC_COLL_TYPE_BCAST:
+<b><a name="line64">64   </a></b>	        return &quot;Bcast&quot;;
+<b><a name="line65">65   </a></b>	    case UCC_COLL_TYPE_ALLREDUCE:
+<b><a name="line66">66   </a></b>	        return &quot;Allreduce&quot;;
+<b><a name="line67">67   </a></b>	    case UCC_COLL_TYPE_REDUCE:
+<b><a name="line68">68   </a></b>	        return &quot;Reduce&quot;;
+<b><a name="line69">69   </a></b>	    case UCC_COLL_TYPE_ALLTOALL:
+<b><a name="line70">70   </a></b>	        return &quot;Alltoall&quot;;
+<b><a name="line71">71   </a></b>	    case UCC_COLL_TYPE_ALLTOALLV:
+<b><a name="line72">72   </a></b>	        return &quot;Alltoallv&quot;;
+<b><a name="line73">73   </a></b>	    case UCC_COLL_TYPE_ALLGATHER:
+<b><a name="line74">74   </a></b>	        return &quot;Allgather&quot;;
+<b><a name="line75">75   </a></b>	    case UCC_COLL_TYPE_ALLGATHERV:
+<b><a name="line76">76   </a></b>	        return &quot;Allgatherv&quot;;
+<b><a name="line77">77   </a></b>	    case UCC_COLL_TYPE_GATHER:
+<b><a name="line78">78   </a></b>	        return &quot;Gather&quot;;
+<b><a name="line79">79   </a></b>	    case UCC_COLL_TYPE_GATHERV:
+<b><a name="line80">80   </a></b>	        return &quot;Gatherv&quot;;
+<b><a name="line81">81   </a></b>	    case UCC_COLL_TYPE_SCATTER:
+<b><a name="line82">82   </a></b>	        return &quot;Scatter&quot;;
+<b><a name="line83">83   </a></b>	    case UCC_COLL_TYPE_SCATTERV:
+<b><a name="line84">84   </a></b>	        return &quot;Scatterv&quot;;
+<b><a name="line85">85   </a></b>	    case UCC_COLL_TYPE_FANIN:
+<b><a name="line86">86   </a></b>	        return &quot;Fanin&quot;;
+<b><a name="line87">87   </a></b>	    case UCC_COLL_TYPE_FANOUT:
+<b><a name="line88">88   </a></b>	        return &quot;Fanout&quot;;
+<b><a name="line89">89   </a></b>	    case UCC_COLL_TYPE_REDUCE_SCATTER:
+<b><a name="line90">90   </a></b>	        return &quot;Reduce_scatter&quot;;
+<b><a name="line91">91   </a></b>	    case UCC_COLL_TYPE_REDUCE_SCATTERV:
+<b><a name="line92">92   </a></b>	        return &quot;Reduce_scatterv&quot;;
+<b><a name="line93">93   </a></b>	    default:
+<b><a name="line94">94   </a></b>	        break;
+<b><a name="line95">95   </a></b>	    }
+<b><a name="line96">96   </a></b>	    return 0;
+<b><a name="line97">97   </a></b>	}
+<b><a name="line98">98   </a></b>	
+<b><a name="line99">99   </a></b>	static inline const char* ucc_datatype_str(ucc_datatype_t dt)
+<b><a name="line100">100  </a></b>	{
+<b><a name="line101">101  </a></b>	    switch (dt) {
+<b><a name="line102">102  </a></b>	    case UCC_DT_INT8:
+<b><a name="line103">103  </a></b>	        return &quot;int8&quot;;
+<b><a name="line104">104  </a></b>	    case UCC_DT_UINT8:
+<b><a name="line105">105  </a></b>	        return &quot;uint8&quot;;
+<b><a name="line106">106  </a></b>	    case UCC_DT_INT16:
+<b><a name="line107">107  </a></b>	        return &quot;int16&quot;;
+<b><a name="line108">108  </a></b>	    case UCC_DT_UINT16:
+<b><a name="line109">109  </a></b>	        return &quot;uint16&quot;;
+<b><a name="line110">110  </a></b>	    case UCC_DT_FLOAT16:
+<b><a name="line111">111  </a></b>	        return &quot;float16&quot;;
+<b><a name="line112">112  </a></b>	    case UCC_DT_BFLOAT16:
+<b><a name="line113">113  </a></b>	        return &quot;bfloat16&quot;;
+<b><a name="line114">114  </a></b>	    case UCC_DT_INT32:
+<b><a name="line115">115  </a></b>	        return &quot;int32&quot;;
+<b><a name="line116">116  </a></b>	    case UCC_DT_UINT32:
+<b><a name="line117">117  </a></b>	        return &quot;uint32&quot;;
+<b><a name="line118">118  </a></b>	    case UCC_DT_FLOAT32:
+<b><a name="line119">119  </a></b>	        return &quot;float32&quot;;
+<b><a name="line120">120  </a></b>	    case UCC_DT_INT64:
+<b><a name="line121">121  </a></b>	        return &quot;int64&quot;;
+<b><a name="line122">122  </a></b>	    case UCC_DT_UINT64:
+<b><a name="line123">123  </a></b>	        return &quot;uint64&quot;;
+<b><a name="line124">124  </a></b>	    case UCC_DT_FLOAT64:
+<b><a name="line125">125  </a></b>	        return &quot;float64&quot;;
+<b><a name="line126">126  </a></b>	    case UCC_DT_FLOAT128:
+<b><a name="line127">127  </a></b>	        return &quot;float128&quot;;
+<b><a name="line128">128  </a></b>	    case UCC_DT_INT128:
+<b><a name="line129">129  </a></b>	        return &quot;int128&quot;;
+<b><a name="line130">130  </a></b>	    case UCC_DT_UINT128:
+<b><a name="line131">131  </a></b>	        return &quot;uint128&quot;;
+<b><a name="line132">132  </a></b>	    case UCC_DT_FLOAT32_COMPLEX:
+<b><a name="line133">133  </a></b>	        return &quot;float32_complex&quot;;
+<b><a name="line134">134  </a></b>	    case UCC_DT_FLOAT64_COMPLEX:
+<b><a name="line135">135  </a></b>	        return &quot;float64_complex&quot;;
+<b><a name="line136">136  </a></b>	    case UCC_DT_FLOAT128_COMPLEX:
+<b><a name="line137">137  </a></b>	        return &quot;float128_complex&quot;;
+<b><a name="line138">138  </a></b>	    default:
+<b><a name="line139">139  </a></b>	        return &quot;userdefined&quot;;
+<b><a name="line140">140  </a></b>	    }
+<b><a name="line141">141  </a></b>	}
+<b><a name="line142">142  </a></b>	
+<b><a name="line143">143  </a></b>	static inline const char* ucc_reduction_op_str(ucc_reduction_op_t op)
+<b><a name="line144">144  </a></b>	{
+<b><a name="line145">145  </a></b>	    switch(op) {
+<b><a name="line146">146  </a></b>	    case UCC_OP_SUM:
+<b><a name="line147">147  </a></b>	        return &quot;sum&quot;;
+<b><a name="line148">148  </a></b>	    case UCC_OP_PROD:
+<b><a name="line149">149  </a></b>	        return &quot;prod&quot;;
+<b><a name="line150">150  </a></b>	    case UCC_OP_MAX:
+<b><a name="line151">151  </a></b>	        return &quot;max&quot;;
+<b><a name="line152">152  </a></b>	    case UCC_OP_MIN:
+<b><a name="line153">153  </a></b>	        return &quot;min&quot;;
+<b><a name="line154">154  </a></b>	    case UCC_OP_LAND:
+<b><a name="line155">155  </a></b>	        return &quot;land&quot;;
+<b><a name="line156">156  </a></b>	    case UCC_OP_LOR:
+<b><a name="line157">157  </a></b>	        return &quot;lor&quot;;
+<b><a name="line158">158  </a></b>	    case UCC_OP_LXOR:
+<b><a name="line159">159  </a></b>	        return &quot;lxor&quot;;
+<b><a name="line160">160  </a></b>	    case UCC_OP_BAND:
+<b><a name="line161">161  </a></b>	        return &quot;band&quot;;
+<b><a name="line162">162  </a></b>	    case UCC_OP_BOR:
+<b><a name="line163">163  </a></b>	        return &quot;bor&quot;;
+<b><a name="line164">164  </a></b>	    case UCC_OP_BXOR:
+<b><a name="line165">165  </a></b>	        return &quot;bxor&quot;;
+<b><a name="line166">166  </a></b>	    case UCC_OP_MAXLOC:
+<b><a name="line167">167  </a></b>	        return &quot;maxloc&quot;;
+<b><a name="line168">168  </a></b>	    case UCC_OP_MINLOC:
+<b><a name="line169">169  </a></b>	        return &quot;minloc&quot;;
+<b><a name="line170">170  </a></b>	    case UCC_OP_AVG:
+<b><a name="line171">171  </a></b>	        return &quot;avg&quot;;
+<b><a name="line172">172  </a></b>	    default:
+<b><a name="line173">173  </a></b>	        return NULL;
+<b><a name="line174">174  </a></b>	    }
+<b><a name="line175">175  </a></b>	}
+<b><a name="line176">176  </a></b>	
+<b><a name="line177">177  </a></b>	#endif
+<b><a name="line178">178  </a></b>	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre></body>
+</html>

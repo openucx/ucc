@@ -1,0 +1,439 @@
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/x86_64-linux-gnu/bits/mathcalls.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<in_macro>true</in_macro>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float32&quot;}}</description>
+<line>53</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/coll_score/ucc_coll_score.c}}}}</description>
+<line>53</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>^</description>
+<line>53</line>
+</event>
+<mergekey>b4e2eb288a75736ce10352a5c549471d</mergekey>
+<extra>__MATHCALL (acos,, (_Mdouble_ __x));</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/x86_64-linux-gnu/bits/mathcalls.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<in_macro>true</in_macro>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float32&quot;}}</description>
+<line>55</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/coll_score/ucc_coll_score.c}}}}</description>
+<line>55</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>^</description>
+<line>55</line>
+</event>
+<mergekey>f72c8c8950ab683666dfd57868073592</mergekey>
+<extra>__MATHCALL (asin,, (_Mdouble_ __x));</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<in_macro>true</in_macro>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float128&quot;}}</description>
+<line>21</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c}}}}</description>
+<line>21</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>^</description>
+<line>21</line>
+</event>
+<mergekey>97aa29eb98707a82199d21fa0c652924</mergekey>
+<extra>__MATHDECL_1 (int, __fpclassify,, (_Mdouble_ __value))</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<in_macro>true</in_macro>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float128&quot;}}</description>
+<line>25</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c}}}}</description>
+<line>25</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>^</description>
+<line>25</line>
+</event>
+<mergekey>e409ad75a691fcdadb07d3144267a51b</mergekey>
+<extra>__MATHDECL_1 (int, __signbit,, (_Mdouble_ __value))</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<in_macro>true</in_macro>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float128&quot;}}</description>
+<line>30</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c}}}}</description>
+<line>30</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>^</description>
+<line>30</line>
+</event>
+<mergekey>9978014307f55965593a03b0f0dfe1c0</mergekey>
+<extra>__MATHDECL_1 (int, __isinf,, (_Mdouble_ __value)) __attribute__ ((__const__));</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<in_macro>true</in_macro>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float128&quot;}}</description>
+<line>33</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c}}}}</description>
+<line>33</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>^</description>
+<line>33</line>
+</event>
+<mergekey>901a53cc95107454b1fd6e6c17481790</mergekey>
+<extra>__MATHDECL_1 (int, __finite,, (_Mdouble_ __value)) __attribute__ ((__const__));</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<in_macro>true</in_macro>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float128&quot;}}</description>
+<line>36</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/components/topo/ucc_sbgp.c}}}}</description>
+<line>36</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>^</description>
+<line>36</line>
+</event>
+<mergekey>8f4f15d446ef476c7eaea5092826b98d</mergekey>
+<extra>__MATHDECL_1 (int, __isnan,, (_Mdouble_ __value)) __attribute__ ((__const__));</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/stdlib.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float32&quot;}}</description>
+<line>140</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_component.c}}}}</description>
+<line>140</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>       ^</description>
+<line>140</line>
+</event>
+<mergekey>93049b45120e093a521d486dca2a542c</mergekey>
+<extra>extern _Float32 strtof32 (const char *__restrict __nptr,</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/stdlib.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float64&quot;}}</description>
+<line>146</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_component.c}}}}</description>
+<line>146</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>       ^</description>
+<line>146</line>
+</event>
+<mergekey>cbc0b2fd15759a6b02f847302c45c017</mergekey>
+<extra>extern _Float64 strtof64 (const char *__restrict __nptr,</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/stdlib.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float128&quot;}}</description>
+<line>152</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_component.c}}}}</description>
+<line>152</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>       ^</description>
+<line>152</line>
+</event>
+<mergekey>696a6bcc0d6898580f71a741a5ebc173</mergekey>
+<extra>extern _Float128 strtof128 (const char *__restrict __nptr,</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/stdlib.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float32x&quot;}}</description>
+<line>158</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_component.c}}}}</description>
+<line>158</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>       ^</description>
+<line>158</line>
+</event>
+<mergekey>11d66d9f2400885d1995e7a54c037bf8</mergekey>
+<extra>extern _Float32x strtof32x (const char *__restrict __nptr,</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>
+<error>
+<domain>STATIC_C</domain>
+<lang>C</lang>
+<checker>PARSE_ERROR</checker>
+<file>/usr/include/stdlib.h</file>
+<function>unknown</function>
+<score>60</score>
+<ordered>true</ordered>
+<event>
+<main>true</main>
+<tag>undefined_identifier</tag>
+<description>{CovLStr{v1}{identifier {0} is undefined}{&quot;_Float64x&quot;}}</description>
+<line>164</line>
+</event>
+<event>
+<tag>primary_file</tag>
+<description>{CovLStrv2{{t{During compilation of file '{0}'}{/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/utils/ucc_component.c}}}}</description>
+<line>164</line>
+</event>
+<event>
+<tag>caretline</tag>
+<description>       ^</description>
+<line>164</line>
+</event>
+<mergekey>bd69d3c205dea6d11732b364985c1892</mergekey>
+<extra>extern _Float64x strtof64x (const char *__restrict __nptr,</extra>
+<subcategory>none</subcategory>
+<typePropertiesGroup>
+<category>Parse warnings</category>
+<impact>Low</impact>
+<type>Unrecoverable parse warning</type>
+<localEffect>The functions in the compilation unit will not be analyzed for other defects; any callers of these functions will not be able to use the summary of the skipped functions.</localEffect>
+<longDescription>A parse error caused an entire compilation unit to be skipped by Coverity Static Analysis</longDescription>
+<qualityKind>true</qualityKind>
+</typePropertiesGroup>
+</error>

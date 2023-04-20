@@ -1,0 +1,11 @@
+cov-analyze --jobs 48 --enable-fnptr --fnptr-models --all --paths 20000 --security --concurrency --dir cov_build 
+Analysis summary report:
+------------------------
+Files analyzed                 : 3
+Total LoC input to cov-analyze : 49770
+Functions analyzed             : 12
+Paths analyzed                 : 406
+Time taken by analysis         : 00:00:02
+Defect occurrences found       : 21 Total
+                                 12 PARSE_ERROR
+                                  9 PW.INCLUDE_RECURSION

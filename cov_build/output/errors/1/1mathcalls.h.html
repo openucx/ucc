@@ -1,0 +1,480 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html><head><title>Coverity error reader: /usr/include/x86_64-linux-gnu/bits/mathcalls.h</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"></head>
+<body link="#000000" vlink="#000000"><pre>
+<b><a name="line1">1    </a></b>	/* Prototype declarations for math functions; helper file for &lt;math.h&gt;.
+<b><a name="line2">2    </a></b>	   Copyright (C) 1996-2020 Free Software Foundation, Inc.
+<b><a name="line3">3    </a></b>	   This file is part of the GNU C Library.
+<b><a name="line4">4    </a></b>	
+<b><a name="line5">5    </a></b>	   The GNU C Library is free software; you can redistribute it and/or
+<b><a name="line6">6    </a></b>	   modify it under the terms of the GNU Lesser General Public
+<b><a name="line7">7    </a></b>	   License as published by the Free Software Foundation; either
+<b><a name="line8">8    </a></b>	   version 2.1 of the License, or (at your option) any later version.
+<b><a name="line9">9    </a></b>	
+<b><a name="line10">10   </a></b>	   The GNU C Library is distributed in the hope that it will be useful,
+<b><a name="line11">11   </a></b>	   but WITHOUT ANY WARRANTY; without even the implied warranty of
+<b><a name="line12">12   </a></b>	   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+<b><a name="line13">13   </a></b>	   Lesser General Public License for more details.
+<b><a name="line14">14   </a></b>	
+<b><a name="line15">15   </a></b>	   You should have received a copy of the GNU Lesser General Public
+<b><a name="line16">16   </a></b>	   License along with the GNU C Library; if not, see
+<b><a name="line17">17   </a></b>	   &lt;https://www.gnu.org/licenses/&gt;.  */
+<b><a name="line18">18   </a></b>	
+<b><a name="line19">19   </a></b>	/* NOTE: Because of the special way this file is used by &lt;math.h&gt;, this
+<b><a name="line20">20   </a></b>	   file must NOT be protected from multiple inclusion as header files
+<b><a name="line21">21   </a></b>	   usually are.
+<b><a name="line22">22   </a></b>	
+<b><a name="line23">23   </a></b>	   This file provides prototype declarations for the math functions.
+<b><a name="line24">24   </a></b>	   Most functions are declared using the macro:
+<b><a name="line25">25   </a></b>	
+<b><a name="line26">26   </a></b>	   __MATHCALL (NAME,[_r], (ARGS...));
+<b><a name="line27">27   </a></b>	
+<b><a name="line28">28   </a></b>	   This means there is a function `NAME' returning `double' and a function
+<b><a name="line29">29   </a></b>	   `NAMEf' returning `float'.  Each place `_Mdouble_' appears in the
+<b><a name="line30">30   </a></b>	   prototype, that is actually `double' in the prototype for `NAME' and
+<b><a name="line31">31   </a></b>	   `float' in the prototype for `NAMEf'.  Reentrant variant functions are
+<b><a name="line32">32   </a></b>	   called `NAME_r' and `NAMEf_r'.
+<b><a name="line33">33   </a></b>	
+<b><a name="line34">34   </a></b>	   Functions returning other types like `int' are declared using the macro:
+<b><a name="line35">35   </a></b>	
+<b><a name="line36">36   </a></b>	   __MATHDECL (TYPE, NAME,[_r], (ARGS...));
+<b><a name="line37">37   </a></b>	
+<b><a name="line38">38   </a></b>	   This is just like __MATHCALL but for a function returning `TYPE'
+<b><a name="line39">39   </a></b>	   instead of `_Mdouble_'.  In all of these cases, there is still
+<b><a name="line40">40   </a></b>	   both a `NAME' and a `NAMEf' that takes `float' arguments.
+<b><a name="line41">41   </a></b>	
+<b><a name="line42">42   </a></b>	   Note that there must be no whitespace before the argument passed for
+<b><a name="line43">43   </a></b>	   NAME, to make token pasting work with -traditional.  */
+<b><a name="line44">44   </a></b>	
+<b><a name="line45">45   </a></b>	#ifndef _MATH_H
+<b><a name="line46">46   </a></b>	# error &quot;Never include &lt;bits/mathcalls.h&gt; directly; include &lt;math.h&gt; instead.&quot;
+<b><a name="line47">47   </a></b>	#endif
+<b><a name="line48">48   </a></b>	
+<b><a name="line49">49   </a></b>	
+<b><a name="line50">50   </a></b>	/* Trigonometric functions.  */
+<b><a name="line51">51   </a></b>	
+<b><a name="line52">52   </a></b>	/* Arc cosine of X.  */
+<b><a name="line53">53   </a></b>	__MATHCALL (acos,, (_Mdouble_ __x));
+<b><a name="line54">54   </a></b>	/* Arc sine of X.  */
+</pre>
+<table summary="events" bgcolor=#e0e0e0>
+<tr><td><font color="red">
+<a name="error:0"></a>
+<!-- merge-key f72c8c8950ab683666dfd57868073592 -->
+<b>(1) Event undefined_identifier</b>: </font></td>
+<td><font color="red">identifier &quot;_Float32&quot; is undefined</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:1"></a>
+<!-- merge-key f72c8c8950ab683666dfd57868073592 -->
+<b>(2) Event primary_file</b>: </font></td>
+<td><font color="red">During compilation of file '/auto/mtrswgwork/ekaidrikov/hpcx/ucc/src/coll_score/ucc_coll_score.c'</font></td>
+</tr>
+<tr><td><font color="red">
+<a name="error:2"></a>
+<a name="error"></a>
+<!-- merge-key f72c8c8950ab683666dfd57868073592 -->
+<b>(3) Event caretline</b>: </font></td>
+<td><font color="red">^</font></td>
+</tr>
+</table>
+<pre><b><a name="line55">55   </a></b>	__MATHCALL (asin,, (_Mdouble_ __x));
+<b><a name="line56">56   </a></b>	/* Arc tangent of X.  */
+<b><a name="line57">57   </a></b>	__MATHCALL (atan,, (_Mdouble_ __x));
+<b><a name="line58">58   </a></b>	/* Arc tangent of Y/X.  */
+<b><a name="line59">59   </a></b>	__MATHCALL (atan2,, (_Mdouble_ __y, _Mdouble_ __x));
+<b><a name="line60">60   </a></b>	
+<b><a name="line61">61   </a></b>	/* Cosine of X.  */
+<b><a name="line62">62   </a></b>	__MATHCALL_VEC (cos,, (_Mdouble_ __x));
+<b><a name="line63">63   </a></b>	/* Sine of X.  */
+<b><a name="line64">64   </a></b>	__MATHCALL_VEC (sin,, (_Mdouble_ __x));
+<b><a name="line65">65   </a></b>	/* Tangent of X.  */
+<b><a name="line66">66   </a></b>	__MATHCALL (tan,, (_Mdouble_ __x));
+<b><a name="line67">67   </a></b>	
+<b><a name="line68">68   </a></b>	/* Hyperbolic functions.  */
+<b><a name="line69">69   </a></b>	
+<b><a name="line70">70   </a></b>	/* Hyperbolic cosine of X.  */
+<b><a name="line71">71   </a></b>	__MATHCALL (cosh,, (_Mdouble_ __x));
+<b><a name="line72">72   </a></b>	/* Hyperbolic sine of X.  */
+<b><a name="line73">73   </a></b>	__MATHCALL (sinh,, (_Mdouble_ __x));
+<b><a name="line74">74   </a></b>	/* Hyperbolic tangent of X.  */
+<b><a name="line75">75   </a></b>	__MATHCALL (tanh,, (_Mdouble_ __x));
+<b><a name="line76">76   </a></b>	
+<b><a name="line77">77   </a></b>	#ifdef __USE_GNU
+<b><a name="line78">78   </a></b>	/* Cosine and sine of X.  */
+<b><a name="line79">79   </a></b>	__MATHDECL_VEC (void,sincos,,
+<b><a name="line80">80   </a></b>			(_Mdouble_ __x, _Mdouble_ *__sinx, _Mdouble_ *__cosx));
+<b><a name="line81">81   </a></b>	#endif
+<b><a name="line82">82   </a></b>	
+<b><a name="line83">83   </a></b>	#if defined __USE_XOPEN_EXTENDED || defined __USE_ISOC99
+<b><a name="line84">84   </a></b>	/* Hyperbolic arc cosine of X.  */
+<b><a name="line85">85   </a></b>	__MATHCALL (acosh,, (_Mdouble_ __x));
+<b><a name="line86">86   </a></b>	/* Hyperbolic arc sine of X.  */
+<b><a name="line87">87   </a></b>	__MATHCALL (asinh,, (_Mdouble_ __x));
+<b><a name="line88">88   </a></b>	/* Hyperbolic arc tangent of X.  */
+<b><a name="line89">89   </a></b>	__MATHCALL (atanh,, (_Mdouble_ __x));
+<b><a name="line90">90   </a></b>	#endif
+<b><a name="line91">91   </a></b>	
+<b><a name="line92">92   </a></b>	/* Exponential and logarithmic functions.  */
+<b><a name="line93">93   </a></b>	
+<b><a name="line94">94   </a></b>	/* Exponential function of X.  */
+<b><a name="line95">95   </a></b>	__MATHCALL_VEC (exp,, (_Mdouble_ __x));
+<b><a name="line96">96   </a></b>	
+<b><a name="line97">97   </a></b>	/* Break VALUE into a normalized fraction and an integral power of 2.  */
+<b><a name="line98">98   </a></b>	__MATHCALL (frexp,, (_Mdouble_ __x, int *__exponent));
+<b><a name="line99">99   </a></b>	
+<b><a name="line100">100  </a></b>	/* X times (two to the EXP power).  */
+<b><a name="line101">101  </a></b>	__MATHCALL (ldexp,, (_Mdouble_ __x, int __exponent));
+<b><a name="line102">102  </a></b>	
+<b><a name="line103">103  </a></b>	/* Natural logarithm of X.  */
+<b><a name="line104">104  </a></b>	__MATHCALL_VEC (log,, (_Mdouble_ __x));
+<b><a name="line105">105  </a></b>	
+<b><a name="line106">106  </a></b>	/* Base-ten logarithm of X.  */
+<b><a name="line107">107  </a></b>	__MATHCALL (log10,, (_Mdouble_ __x));
+<b><a name="line108">108  </a></b>	
+<b><a name="line109">109  </a></b>	/* Break VALUE into integral and fractional parts.  */
+<b><a name="line110">110  </a></b>	__MATHCALL (modf,, (_Mdouble_ __x, _Mdouble_ *__iptr)) __nonnull ((2));
+<b><a name="line111">111  </a></b>	
+<b><a name="line112">112  </a></b>	#if __GLIBC_USE (IEC_60559_FUNCS_EXT_C2X)
+<b><a name="line113">113  </a></b>	/* Compute exponent to base ten.  */
+<b><a name="line114">114  </a></b>	__MATHCALL (exp10,, (_Mdouble_ __x));
+<b><a name="line115">115  </a></b>	#endif
+<b><a name="line116">116  </a></b>	
+<b><a name="line117">117  </a></b>	#if defined __USE_XOPEN_EXTENDED || defined __USE_ISOC99
+<b><a name="line118">118  </a></b>	/* Return exp(X) - 1.  */
+<b><a name="line119">119  </a></b>	__MATHCALL (expm1,, (_Mdouble_ __x));
+<b><a name="line120">120  </a></b>	
+<b><a name="line121">121  </a></b>	/* Return log(1 + X).  */
+<b><a name="line122">122  </a></b>	__MATHCALL (log1p,, (_Mdouble_ __x));
+<b><a name="line123">123  </a></b>	
+<b><a name="line124">124  </a></b>	/* Return the base 2 signed integral exponent of X.  */
+<b><a name="line125">125  </a></b>	__MATHCALL (logb,, (_Mdouble_ __x));
+<b><a name="line126">126  </a></b>	#endif
+<b><a name="line127">127  </a></b>	
+<b><a name="line128">128  </a></b>	#ifdef __USE_ISOC99
+<b><a name="line129">129  </a></b>	/* Compute base-2 exponential of X.  */
+<b><a name="line130">130  </a></b>	__MATHCALL (exp2,, (_Mdouble_ __x));
+<b><a name="line131">131  </a></b>	
+<b><a name="line132">132  </a></b>	/* Compute base-2 logarithm of X.  */
+<b><a name="line133">133  </a></b>	__MATHCALL (log2,, (_Mdouble_ __x));
+<b><a name="line134">134  </a></b>	#endif
+<b><a name="line135">135  </a></b>	
+<b><a name="line136">136  </a></b>	
+<b><a name="line137">137  </a></b>	/* Power functions.  */
+<b><a name="line138">138  </a></b>	
+<b><a name="line139">139  </a></b>	/* Return X to the Y power.  */
+<b><a name="line140">140  </a></b>	__MATHCALL_VEC (pow,, (_Mdouble_ __x, _Mdouble_ __y));
+<b><a name="line141">141  </a></b>	
+<b><a name="line142">142  </a></b>	/* Return the square root of X.  */
+<b><a name="line143">143  </a></b>	__MATHCALL (sqrt,, (_Mdouble_ __x));
+<b><a name="line144">144  </a></b>	
+<b><a name="line145">145  </a></b>	#if defined __USE_XOPEN || defined __USE_ISOC99
+<b><a name="line146">146  </a></b>	/* Return `sqrt(X*X + Y*Y)'.  */
+<b><a name="line147">147  </a></b>	__MATHCALL (hypot,, (_Mdouble_ __x, _Mdouble_ __y));
+<b><a name="line148">148  </a></b>	#endif
+<b><a name="line149">149  </a></b>	
+<b><a name="line150">150  </a></b>	#if defined __USE_XOPEN_EXTENDED || defined __USE_ISOC99
+<b><a name="line151">151  </a></b>	/* Return the cube root of X.  */
+<b><a name="line152">152  </a></b>	__MATHCALL (cbrt,, (_Mdouble_ __x));
+<b><a name="line153">153  </a></b>	#endif
+<b><a name="line154">154  </a></b>	
+<b><a name="line155">155  </a></b>	
+<b><a name="line156">156  </a></b>	/* Nearest integer, absolute value, and remainder functions.  */
+<b><a name="line157">157  </a></b>	
+<b><a name="line158">158  </a></b>	/* Smallest integral value not less than X.  */
+<b><a name="line159">159  </a></b>	__MATHCALLX (ceil,, (_Mdouble_ __x), (__const__));
+<b><a name="line160">160  </a></b>	
+<b><a name="line161">161  </a></b>	/* Absolute value of X.  */
+<b><a name="line162">162  </a></b>	__MATHCALLX (fabs,, (_Mdouble_ __x), (__const__));
+<b><a name="line163">163  </a></b>	
+<b><a name="line164">164  </a></b>	/* Largest integer not greater than X.  */
+<b><a name="line165">165  </a></b>	__MATHCALLX (floor,, (_Mdouble_ __x), (__const__));
+<b><a name="line166">166  </a></b>	
+<b><a name="line167">167  </a></b>	/* Floating-point modulo remainder of X/Y.  */
+<b><a name="line168">168  </a></b>	__MATHCALL (fmod,, (_Mdouble_ __x, _Mdouble_ __y));
+<b><a name="line169">169  </a></b>	
+<b><a name="line170">170  </a></b>	#ifdef __USE_MISC
+<b><a name="line171">171  </a></b>	# if ((!defined __cplusplus \
+<b><a name="line172">172  </a></b>	       || __cplusplus &lt; 201103L /* isinf conflicts with C++11.  */ \
+<b><a name="line173">173  </a></b>	       || __MATH_DECLARING_DOUBLE == 0)) /* isinff or isinfl don't.  */ \
+<b><a name="line174">174  </a></b>	      &amp;&amp; !__MATH_DECLARING_FLOATN
+<b><a name="line175">175  </a></b>	/* Return 0 if VALUE is finite or NaN, +1 if it
+<b><a name="line176">176  </a></b>	   is +Infinity, -1 if it is -Infinity.  */
+<b><a name="line177">177  </a></b>	__MATHDECL_1 (int,isinf,, (_Mdouble_ __value)) __attribute__ ((__const__));
+<b><a name="line178">178  </a></b>	# endif
+<b><a name="line179">179  </a></b>	
+<b><a name="line180">180  </a></b>	# if !__MATH_DECLARING_FLOATN
+<b><a name="line181">181  </a></b>	/* Return nonzero if VALUE is finite and not NaN.  */
+<b><a name="line182">182  </a></b>	__MATHDECL_1 (int,finite,, (_Mdouble_ __value)) __attribute__ ((__const__));
+<b><a name="line183">183  </a></b>	
+<b><a name="line184">184  </a></b>	/* Return the remainder of X/Y.  */
+<b><a name="line185">185  </a></b>	__MATHCALL (drem,, (_Mdouble_ __x, _Mdouble_ __y));
+<b><a name="line186">186  </a></b>	
+<b><a name="line187">187  </a></b>	
+<b><a name="line188">188  </a></b>	/* Return the fractional part of X after dividing out `ilogb (X)'.  */
+<b><a name="line189">189  </a></b>	__MATHCALL (significand,, (_Mdouble_ __x));
+<b><a name="line190">190  </a></b>	# endif
+<b><a name="line191">191  </a></b>	
+<b><a name="line192">192  </a></b>	#endif /* Use misc.  */
+<b><a name="line193">193  </a></b>	
+<b><a name="line194">194  </a></b>	#ifdef __USE_ISOC99
+<b><a name="line195">195  </a></b>	/* Return X with its signed changed to Y's.  */
+<b><a name="line196">196  </a></b>	__MATHCALLX (copysign,, (_Mdouble_ __x, _Mdouble_ __y), (__const__));
+<b><a name="line197">197  </a></b>	#endif
+<b><a name="line198">198  </a></b>	
+<b><a name="line199">199  </a></b>	#ifdef __USE_ISOC99
+<b><a name="line200">200  </a></b>	/* Return representation of qNaN for double type.  */
+<b><a name="line201">201  </a></b>	__MATHCALL (nan,, (const char *__tagb));
+<b><a name="line202">202  </a></b>	#endif
+<b><a name="line203">203  </a></b>	
+<b><a name="line204">204  </a></b>	
+<b><a name="line205">205  </a></b>	#if defined __USE_MISC || (defined __USE_XOPEN &amp;&amp; !defined __USE_XOPEN2K)
+<b><a name="line206">206  </a></b>	# if ((!defined __cplusplus \
+<b><a name="line207">207  </a></b>	       || __cplusplus &lt; 201103L /* isnan conflicts with C++11.  */ \
+<b><a name="line208">208  </a></b>	       || __MATH_DECLARING_DOUBLE == 0)) /* isnanf or isnanl don't.  */ \
+<b><a name="line209">209  </a></b>	      &amp;&amp; !__MATH_DECLARING_FLOATN
+<b><a name="line210">210  </a></b>	/* Return nonzero if VALUE is not a number.  */
+<b><a name="line211">211  </a></b>	__MATHDECL_1 (int,isnan,, (_Mdouble_ __value)) __attribute__ ((__const__));
+<b><a name="line212">212  </a></b>	# endif
+<b><a name="line213">213  </a></b>	#endif
+<b><a name="line214">214  </a></b>	
+<b><a name="line215">215  </a></b>	#if defined __USE_MISC || (defined __USE_XOPEN &amp;&amp; __MATH_DECLARING_DOUBLE)
+<b><a name="line216">216  </a></b>	/* Bessel functions.  */
+<b><a name="line217">217  </a></b>	__MATHCALL (j0,, (_Mdouble_));
+<b><a name="line218">218  </a></b>	__MATHCALL (j1,, (_Mdouble_));
+<b><a name="line219">219  </a></b>	__MATHCALL (jn,, (int, _Mdouble_));
+<b><a name="line220">220  </a></b>	__MATHCALL (y0,, (_Mdouble_));
+<b><a name="line221">221  </a></b>	__MATHCALL (y1,, (_Mdouble_));
+<b><a name="line222">222  </a></b>	__MATHCALL (yn,, (int, _Mdouble_));
+<b><a name="line223">223  </a></b>	#endif
+<b><a name="line224">224  </a></b>	
+<b><a name="line225">225  </a></b>	
+<b><a name="line226">226  </a></b>	#if defined __USE_XOPEN || defined __USE_ISOC99
+<b><a name="line227">227  </a></b>	/* Error and gamma functions.  */
+<b><a name="line228">228  </a></b>	__MATHCALL (erf,, (_Mdouble_));
+<b><a name="line229">229  </a></b>	__MATHCALL (erfc,, (_Mdouble_));
+<b><a name="line230">230  </a></b>	__MATHCALL (lgamma,, (_Mdouble_));
+<b><a name="line231">231  </a></b>	#endif
+<b><a name="line232">232  </a></b>	
+<b><a name="line233">233  </a></b>	#ifdef __USE_ISOC99
+<b><a name="line234">234  </a></b>	/* True gamma function.  */
+<b><a name="line235">235  </a></b>	__MATHCALL (tgamma,, (_Mdouble_));
+<b><a name="line236">236  </a></b>	#endif
+<b><a name="line237">237  </a></b>	
+<b><a name="line238">238  </a></b>	#if defined __USE_MISC || (defined __USE_XOPEN &amp;&amp; !defined __USE_XOPEN2K)
+<b><a name="line239">239  </a></b>	# if !__MATH_DECLARING_FLOATN
+<b><a name="line240">240  </a></b>	/* Obsolete alias for `lgamma'.  */
+<b><a name="line241">241  </a></b>	__MATHCALL (gamma,, (_Mdouble_));
+<b><a name="line242">242  </a></b>	# endif
+<b><a name="line243">243  </a></b>	#endif
+<b><a name="line244">244  </a></b>	
+<b><a name="line245">245  </a></b>	#ifdef __USE_MISC
+<b><a name="line246">246  </a></b>	/* Reentrant version of lgamma.  This function uses the global variable
+<b><a name="line247">247  </a></b>	   `signgam'.  The reentrant version instead takes a pointer and stores
+<b><a name="line248">248  </a></b>	   the value through it.  */
+<b><a name="line249">249  </a></b>	__MATHCALL (lgamma,_r, (_Mdouble_, int *__signgamp));
+<b><a name="line250">250  </a></b>	#endif
+<b><a name="line251">251  </a></b>	
+<b><a name="line252">252  </a></b>	
+<b><a name="line253">253  </a></b>	#if defined __USE_XOPEN_EXTENDED || defined __USE_ISOC99
+<b><a name="line254">254  </a></b>	/* Return the integer nearest X in the direction of the
+<b><a name="line255">255  </a></b>	   prevailing rounding mode.  */
+<b><a name="line256">256  </a></b>	__MATHCALL (rint,, (_Mdouble_ __x));
+<b><a name="line257">257  </a></b>	
+<b><a name="line258">258  </a></b>	/* Return X + epsilon if X &lt; Y, X - epsilon if X &gt; Y.  */
+<b><a name="line259">259  </a></b>	__MATHCALL (nextafter,, (_Mdouble_ __x, _Mdouble_ __y));
+<b><a name="line260">260  </a></b>	# if defined __USE_ISOC99 &amp;&amp; !defined __LDBL_COMPAT &amp;&amp; !__MATH_DECLARING_FLOATN
+<b><a name="line261">261  </a></b>	__MATHCALL (nexttoward,, (_Mdouble_ __x, long double __y));
+<b><a name="line262">262  </a></b>	# endif
+<b><a name="line263">263  </a></b>	
+<b><a name="line264">264  </a></b>	# if __GLIBC_USE (IEC_60559_BFP_EXT_C2X) || __MATH_DECLARING_FLOATN
+<b><a name="line265">265  </a></b>	/* Return X - epsilon.  */
+<b><a name="line266">266  </a></b>	__MATHCALL (nextdown,, (_Mdouble_ __x));
+<b><a name="line267">267  </a></b>	/* Return X + epsilon.  */
+<b><a name="line268">268  </a></b>	__MATHCALL (nextup,, (_Mdouble_ __x));
+<b><a name="line269">269  </a></b>	# endif
+<b><a name="line270">270  </a></b>	
+<b><a name="line271">271  </a></b>	/* Return the remainder of integer divison X / Y with infinite precision.  */
+<b><a name="line272">272  </a></b>	__MATHCALL (remainder,, (_Mdouble_ __x, _Mdouble_ __y));
+<b><a name="line273">273  </a></b>	
+<b><a name="line274">274  </a></b>	# ifdef __USE_ISOC99
+<b><a name="line275">275  </a></b>	/* Return X times (2 to the Nth power).  */
+<b><a name="line276">276  </a></b>	__MATHCALL (scalbn,, (_Mdouble_ __x, int __n));
+<b><a name="line277">277  </a></b>	# endif
+<b><a name="line278">278  </a></b>	
+<b><a name="line279">279  </a></b>	/* Return the binary exponent of X, which must be nonzero.  */
+<b><a name="line280">280  </a></b>	__MATHDECL (int,ilogb,, (_Mdouble_ __x));
+<b><a name="line281">281  </a></b>	#endif
+<b><a name="line282">282  </a></b>	
+<b><a name="line283">283  </a></b>	#if __GLIBC_USE (IEC_60559_BFP_EXT_C2X) || __MATH_DECLARING_FLOATN
+<b><a name="line284">284  </a></b>	/* Like ilogb, but returning long int.  */
+<b><a name="line285">285  </a></b>	__MATHDECL (long int, llogb,, (_Mdouble_ __x));
+<b><a name="line286">286  </a></b>	#endif
+<b><a name="line287">287  </a></b>	
+<b><a name="line288">288  </a></b>	#ifdef __USE_ISOC99
+<b><a name="line289">289  </a></b>	/* Return X times (2 to the Nth power).  */
+<b><a name="line290">290  </a></b>	__MATHCALL (scalbln,, (_Mdouble_ __x, long int __n));
+<b><a name="line291">291  </a></b>	
+<b><a name="line292">292  </a></b>	/* Round X to integral value in floating-point format using current
+<b><a name="line293">293  </a></b>	   rounding direction, but do not raise inexact exception.  */
+<b><a name="line294">294  </a></b>	__MATHCALL (nearbyint,, (_Mdouble_ __x));
+<b><a name="line295">295  </a></b>	
+<b><a name="line296">296  </a></b>	/* Round X to nearest integral value, rounding halfway cases away from
+<b><a name="line297">297  </a></b>	   zero.  */
+<b><a name="line298">298  </a></b>	__MATHCALLX (round,, (_Mdouble_ __x), (__const__));
+<b><a name="line299">299  </a></b>	
+<b><a name="line300">300  </a></b>	/* Round X to the integral value in floating-point format nearest but
+<b><a name="line301">301  </a></b>	   not larger in magnitude.  */
+<b><a name="line302">302  </a></b>	__MATHCALLX (trunc,, (_Mdouble_ __x), (__const__));
+<b><a name="line303">303  </a></b>	
+<b><a name="line304">304  </a></b>	/* Compute remainder of X and Y and put in *QUO a value with sign of x/y
+<b><a name="line305">305  </a></b>	   and magnitude congruent `mod 2^n' to the magnitude of the integral
+<b><a name="line306">306  </a></b>	   quotient x/y, with n &gt;= 3.  */
+<b><a name="line307">307  </a></b>	__MATHCALL (remquo,, (_Mdouble_ __x, _Mdouble_ __y, int *__quo));
+<b><a name="line308">308  </a></b>	
+<b><a name="line309">309  </a></b>	
+<b><a name="line310">310  </a></b>	/* Conversion functions.  */
+<b><a name="line311">311  </a></b>	
+<b><a name="line312">312  </a></b>	/* Round X to nearest integral value according to current rounding
+<b><a name="line313">313  </a></b>	   direction.  */
+<b><a name="line314">314  </a></b>	__MATHDECL (long int,lrint,, (_Mdouble_ __x));
+<b><a name="line315">315  </a></b>	__extension__
+<b><a name="line316">316  </a></b>	__MATHDECL (long long int,llrint,, (_Mdouble_ __x));
+<b><a name="line317">317  </a></b>	
+<b><a name="line318">318  </a></b>	/* Round X to nearest integral value, rounding halfway cases away from
+<b><a name="line319">319  </a></b>	   zero.  */
+<b><a name="line320">320  </a></b>	__MATHDECL (long int,lround,, (_Mdouble_ __x));
+<b><a name="line321">321  </a></b>	__extension__
+<b><a name="line322">322  </a></b>	__MATHDECL (long long int,llround,, (_Mdouble_ __x));
+<b><a name="line323">323  </a></b>	
+<b><a name="line324">324  </a></b>	
+<b><a name="line325">325  </a></b>	/* Return positive difference between X and Y.  */
+<b><a name="line326">326  </a></b>	__MATHCALL (fdim,, (_Mdouble_ __x, _Mdouble_ __y));
+<b><a name="line327">327  </a></b>	
+<b><a name="line328">328  </a></b>	/* Return maximum numeric value from X and Y.  */
+<b><a name="line329">329  </a></b>	__MATHCALLX (fmax,, (_Mdouble_ __x, _Mdouble_ __y), (__const__));
+<b><a name="line330">330  </a></b>	
+<b><a name="line331">331  </a></b>	/* Return minimum numeric value from X and Y.  */
+<b><a name="line332">332  </a></b>	__MATHCALLX (fmin,, (_Mdouble_ __x, _Mdouble_ __y), (__const__));
+<b><a name="line333">333  </a></b>	
+<b><a name="line334">334  </a></b>	/* Multiply-add function computed as a ternary operation.  */
+<b><a name="line335">335  </a></b>	__MATHCALL (fma,, (_Mdouble_ __x, _Mdouble_ __y, _Mdouble_ __z));
+<b><a name="line336">336  </a></b>	#endif /* Use ISO C99.  */
+<b><a name="line337">337  </a></b>	
+<b><a name="line338">338  </a></b>	#if __GLIBC_USE (IEC_60559_BFP_EXT_C2X) || __MATH_DECLARING_FLOATN
+<b><a name="line339">339  </a></b>	/* Round X to nearest integer value, rounding halfway cases to even.  */
+<b><a name="line340">340  </a></b>	__MATHCALLX (roundeven,, (_Mdouble_ __x), (__const__));
+<b><a name="line341">341  </a></b>	
+<b><a name="line342">342  </a></b>	/* Round X to nearest signed integer value, not raising inexact, with
+<b><a name="line343">343  </a></b>	   control of rounding direction and width of result.  */
+<b><a name="line344">344  </a></b>	__MATHDECL (__intmax_t, fromfp,, (_Mdouble_ __x, int __round,
+<b><a name="line345">345  </a></b>					  unsigned int __width));
+<b><a name="line346">346  </a></b>	
+<b><a name="line347">347  </a></b>	/* Round X to nearest unsigned integer value, not raising inexact,
+<b><a name="line348">348  </a></b>	   with control of rounding direction and width of result.  */
+<b><a name="line349">349  </a></b>	__MATHDECL (__uintmax_t, ufromfp,, (_Mdouble_ __x, int __round,
+<b><a name="line350">350  </a></b>					    unsigned int __width));
+<b><a name="line351">351  </a></b>	
+<b><a name="line352">352  </a></b>	/* Round X to nearest signed integer value, raising inexact for
+<b><a name="line353">353  </a></b>	   non-integers, with control of rounding direction and width of
+<b><a name="line354">354  </a></b>	   result.  */
+<b><a name="line355">355  </a></b>	__MATHDECL (__intmax_t, fromfpx,, (_Mdouble_ __x, int __round,
+<b><a name="line356">356  </a></b>					   unsigned int __width));
+<b><a name="line357">357  </a></b>	
+<b><a name="line358">358  </a></b>	/* Round X to nearest unsigned integer value, raising inexact for
+<b><a name="line359">359  </a></b>	   non-integers, with control of rounding direction and width of
+<b><a name="line360">360  </a></b>	   result.  */
+<b><a name="line361">361  </a></b>	__MATHDECL (__uintmax_t, ufromfpx,, (_Mdouble_ __x, int __round,
+<b><a name="line362">362  </a></b>					     unsigned int __width));
+<b><a name="line363">363  </a></b>	
+<b><a name="line364">364  </a></b>	/* Return value with maximum magnitude.  */
+<b><a name="line365">365  </a></b>	__MATHCALLX (fmaxmag,, (_Mdouble_ __x, _Mdouble_ __y), (__const__));
+<b><a name="line366">366  </a></b>	
+<b><a name="line367">367  </a></b>	/* Return value with minimum magnitude.  */
+<b><a name="line368">368  </a></b>	__MATHCALLX (fminmag,, (_Mdouble_ __x, _Mdouble_ __y), (__const__));
+<b><a name="line369">369  </a></b>	
+<b><a name="line370">370  </a></b>	/* Canonicalize floating-point representation.  */
+<b><a name="line371">371  </a></b>	__MATHDECL_1 (int, canonicalize,, (_Mdouble_ *__cx, const _Mdouble_ *__x));
+<b><a name="line372">372  </a></b>	#endif
+<b><a name="line373">373  </a></b>	
+<b><a name="line374">374  </a></b>	#if __GLIBC_USE (IEC_60559_BFP_EXT) || __MATH_DECLARING_FLOATN
+<b><a name="line375">375  </a></b>	/* Total order operation.  */
+<b><a name="line376">376  </a></b>	__MATHDECL_1 (int, totalorder,, (const _Mdouble_ *__x,
+<b><a name="line377">377  </a></b>					 const _Mdouble_ *__y))
+<b><a name="line378">378  </a></b>	     __attribute_pure__;
+<b><a name="line379">379  </a></b>	
+<b><a name="line380">380  </a></b>	/* Total order operation on absolute values.  */
+<b><a name="line381">381  </a></b>	__MATHDECL_1 (int, totalordermag,, (const _Mdouble_ *__x,
+<b><a name="line382">382  </a></b>					    const _Mdouble_ *__y))
+<b><a name="line383">383  </a></b>	     __attribute_pure__;
+<b><a name="line384">384  </a></b>	
+<b><a name="line385">385  </a></b>	/* Get NaN payload.  */
+<b><a name="line386">386  </a></b>	__MATHCALL (getpayload,, (const _Mdouble_ *__x));
+<b><a name="line387">387  </a></b>	
+<b><a name="line388">388  </a></b>	/* Set quiet NaN payload.  */
+<b><a name="line389">389  </a></b>	__MATHDECL_1 (int, setpayload,, (_Mdouble_ *__x, _Mdouble_ __payload));
+<b><a name="line390">390  </a></b>	
+<b><a name="line391">391  </a></b>	/* Set signaling NaN payload.  */
+<b><a name="line392">392  </a></b>	__MATHDECL_1 (int, setpayloadsig,, (_Mdouble_ *__x, _Mdouble_ __payload));
+<b><a name="line393">393  </a></b>	#endif
+<b><a name="line394">394  </a></b>	
+<b><a name="line395">395  </a></b>	#if (defined __USE_MISC || (defined __USE_XOPEN_EXTENDED \
+<b><a name="line396">396  </a></b>				    &amp;&amp; __MATH_DECLARING_DOUBLE	  \
+<b><a name="line397">397  </a></b>				    &amp;&amp; !defined __USE_XOPEN2K8))  \
+<b><a name="line398">398  </a></b>	     &amp;&amp; !__MATH_DECLARING_FLOATN
+<b><a name="line399">399  </a></b>	/* Return X times (2 to the Nth power).  */
+<b><a name="line400">400  </a></b>	__MATHCALL (scalb,, (_Mdouble_ __x, _Mdouble_ __n));
+<b><a name="line401">401  </a></b>	#endif
+<b><a name="line402">402  </a></b>	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre></body>
+</html>

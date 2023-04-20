@@ -7,6 +7,7 @@
 #define UCC_STRING_H_
 #include "config.h"
 #include "ucc/api/ucc_def.h"
+#include <sys/types.h>
 
 #define      ucc_memunits_range_str ucs_memunits_range_str
 
@@ -38,6 +39,9 @@ void ucc_mtype_map_to_str(uint32_t mt_map, const char *delim,
 
 ucc_status_t ucc_str_to_memunits_range(const char *str, size_t *start,
                                        size_t *end);
+
+ssize_t ucc_string_find_in_list(const char *str, const char **string_list,
+                                       int case_sensitive);
 
 
 

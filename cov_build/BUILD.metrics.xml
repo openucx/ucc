@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE coverity SYSTEM "config.dtd">
+<coverity>
+
+<metrics>
+    <metric>
+        <name>time</name>
+        <value>115</value>
+    </metric>
+    <metric>
+        <name>args</name>
+        <value>cov-build --dir cov_build</value>
+    </metric>
+    <metric>
+        <name>host</name>
+        <value>swx-clx01</value>
+    </metric>
+    <metric>
+        <name>short-platform</name>
+        <value>linux64</value>
+    </metric>
+    <metric>
+        <name>platform</name>
+        <value>Linux 5.4.0-107-generic x86_64</value>
+    </metric>
+    <metric>
+        <name>ident</name>
+        <value>8.5.0 (build c8d197a567 p-kent-push-26368.915)</value>
+    </metric>
+    <metric>
+        <name>user</name>
+        <value>root</value>
+    </metric>
+    <metric>
+        <name>cwd</name>
+        <value>/auto/mtrswgwork/ekaidrikov/hpcx/ucc</value>
+    </metric>
+    <metric>
+        <name>config</name>
+        <value>/hpc/local/commercial/coverity/cov-sa/config/coverity_config.xml</value>
+    </metric>
+    <metric>
+        <name>intermediatedir</name>
+        <value>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/cov_build</value>
+    </metric>
+    <metric>
+        <name>outputdir</name>
+        <value>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/cov_build/output</value>
+    </metric>
+    <metric>
+        <name>emitdir</name>
+        <value>/auto/mtrswgwork/ekaidrikov/hpcx/ucc/cov_build/emit</value>
+    </metric>
+    <metric>
+        <name>force</name>
+        <value>no</value>
+    </metric>
+    <metric>
+        <name>cygwin</name>
+        <value>no</value>
+    </metric>
+    <metric>
+        <name>failures</name>
+        <value>206</value>
+    </metric>
+    <metric>
+        <name>successes</name>
+        <value>8</value>
+    </metric>
+    <metric>
+        <name>recoverable-errors</name>
+        <value>0</value>
+    </metric>
+    <metric>
+        <name>cs-webapps-detected</name>
+        <value>0</value>
+    </metric>
+    <metric>
+        <name>cs-webapp-successes</name>
+        <value>0</value>
+    </metric>
+    <metric>
+        <name>cs-webapp-compilation-secs</name>
+        <value>0</value>
+    </metric>
+    <metric>
+        <name>buildcmd</name>
+        <value>make -j 48</value>
+    </metric>
+</metrics>
+</coverity>

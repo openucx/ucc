@@ -1,0 +1,87 @@
+cmdline: command line: cov-analyze --jobs 48 --enable-fnptr --fnptr-models --all --paths 20000 --security --concurrency --dir cov_build 
+cmdline: parsed cmdline: [
+cmdline:   { name: "jobs", args: [ "48" ] },
+cmdline:   { name: "enable-fnptr" },
+cmdline:   { name: "fnptr-models" },
+cmdline:   { name: "all" },
+cmdline:   { name: "paths", args: [ "20000" ] },
+cmdline:   { name: "security" },
+cmdline:   { name: "concurrency" },
+cmdline:   { name: "dir", args: [ "cov_build" ] },
+cmdline:   { name: "config", args: [ "/hpc/local/commercial/coverity/cov-sa/config/coverity_config.xml" ] },
+cmdline: ]
+startup: am_pid=3544932
+startup: detected platform: Linux 5.4.0-107-generic x86_64
+startup: target platform: linux64
+startup: Detected 48 logical cpus
+startup: Detected 24 cpu cores
+startup: host name: swx-clx01
+startup: user name: root
+startup: Analysis version: 8.5.0 (c8d197a567 p-kent-push-26368.915)
+startup: temp directory: /tmp/cov-root/42cdb2cc3bbf3c0faf5e411de8857dbb
+startup: enable_constraint_fpp=0
+startup: current time: 2023-Apr-20 17:33:18
+startup: Detected amount of memory: 264006796kb
+startup: Limiting memory to 237606116kb
+wlink: Skipping web-app linking, no archives
+emitdb: callgraph.cpp:2680 11111111
+emitdb: callgraph.cpp:2703 11000011
+emitdb: callgraph.cpp:2723 11000011
+rta: Not running RTA because it doesn't apply to current languages
+emitdb: callgraph.cpp:2733 11000000
+dyncg: N/A or no data
+directives: Optimizing dataflow configuration
+general: Starting analysis
+dm-access-lib: AM listening for DM at 127.0.0.1:42923
+dm-access-lib: AM starting DM with command line: /hpc/local/commercial/coverity/cov-sa/bin/cov-internal-dm --AM-port 42923 --log-file /auto/mtrswgwork/ekaidrikov/hpcx/ucc/cov_build/output/distributor.log -j 48 --AW-timeout 36000 /hpc/local/commercial/coverity/cov-sa/bin/cov-analyze --worker --message-size-limit 104857600
+dm-access-lib: DM started: dm_pid=3544935
+dm-access-lib: AM got connection from DM: (local) 127.0.0.1:42923 - 127.0.0.1:47648 (remote)
+wurlegend: <phase><n> dw_id wup_bytes dw_ms wur_bytes aw_ms [mem] paths (rest are labeled)
+wur: stat2 3 1746 77 56 0 mem=13611008 max=55578624 12 n: batch 2
+wur: stat1 5 8833 82 491 4 mem=13631488 max=55599104 66 nr=9 n: batch 1
+wur: stat0 5 813 1 15 1 2 nr=2 n: batch 0
+wur: conc4 5 2265 11 971 8 5 n: lskip in TU 52
+wur: conc6 3 1928 18 1300 15 7 n: strncpy0 in TU 52
+wur: conc0 6 1814 78 792 2 mem=13619200 max=55586816 1 n: ucc_get_version in TU 78
+wur: conc1 7 1743 78 315 2 mem=13619200 max=55586816 1 n: ucc_get_version_string in TU 78
+wur: conc5 2 2762 84 1058 6 mem=13623296 max=55590912 5 n: rstrip in TU 52
+wur: conc11 8 4776 86 404 4 mem=13627392 max=55595008 13 n: ucc_status_string in TU 45
+wur: conc2 1 3604 94 1426 15 mem=13623296 max=55590912 15 n: find_chars_or_comment in TU 52
+wur: conc3 4 2235 96 1679 19 mem=13619200 max=55586816 10 n: ini_reader_string in TU 52
+wur: conc7 1 10142 120 2197 119 124 n: ucc_ini_parse_stream in TU 52
+wur: conc8 1 3385 3 1027 3 4 n: ucc_ini_parse_file in TU 52
+wur: conc10 2 3944 7 1149 7 4 n: ucc_ini_parse_string in TU 52
+wur: conc9 1 4600 6 1225 5 7 n: ucc_ini_parse in TU 52
+wur: conctd2 1 1940 4 89 4 9 n: ucc_ini_parse in TU 52
+wur: conctd1 2 1502 4 72 5 8 n: ucc_ini_parse_string in TU 52
+wur: conctd11 3 437 5 13 4 1 n: ucc_get_version in TU 78
+wur: conctd10 4 366 4 13 3 1 n: ucc_get_version_string in TU 78
+wur: conctd3 2 1229 1 65 0 8 n: ucc_ini_parse_file in TU 52
+wur: conctd0 5 2439 6 47 5 15 n: ucc_status_string in TU 45
+wur: conctd4 1 4453 8 113 6 52 n: ucc_ini_parse_stream in TU 52
+wur: conctd7 2 869 1 52 1 4 n: lskip in TU 52
+wur: conctd9 1 1581 1 70 1 17 n: find_chars_or_comment in TU 52
+wur: conctd5 3 551 1 13 1 7 n: strncpy0 in TU 52
+wur: conctd6 5 1098 3 67 1 5 n: rstrip in TU 52
+wur: conctd8 4 858 3 82 2 10 n: ini_reader_string in TU 52
+wur: gen0 2 2879 7 65 7 2 nr=2 n: batch 0
+wur: gen2 3 4445 14 57 13 15 n: batch 2
+wur: gen1 1 31563 138 178 137 389 nr=9 n: batch 1
+analysis: 0ms: beginning TU reports pass
+summary: Analysis summary report:
+summary: ------------------------
+summary: Files analyzed                 : 3
+summary: Total LoC input to cov-analyze : 49770
+summary: Functions analyzed             : 12
+summary: Paths analyzed                 : 406
+summary: Time taken by analysis         : 00:00:02
+summary: Defect occurrences found       : 21 Total
+summary:                                  12 PARSE_ERROR
+summary:                                   9 PW.INCLUDE_RECURSION
+summary: Number of functions: 12
+summary: out_of_memory count: 0
+summary: paths_exceeded count: 0
+summary: recoverable failures: 0
+mem: AM peak mem bytes: 61399040
+assert: suppressed asserts: workers=0, master=0
+failures: recoverable failures: workers=0, master=0
