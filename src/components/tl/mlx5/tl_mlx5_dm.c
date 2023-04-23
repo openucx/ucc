@@ -224,6 +224,7 @@ ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
     if (status != UCC_OK) {
         goto err_dm_alloc;
     }
+
     team->dm_offset = NULL;
 
     status = ucc_mpool_init(
