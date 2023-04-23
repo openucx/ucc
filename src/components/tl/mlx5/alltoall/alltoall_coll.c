@@ -91,40 +91,66 @@ static ucc_status_t ucc_tl_mlx5_poll_cq(struct ibv_cq *cq, ucc_base_lib_t *lib)
 static ucc_status_t ucc_tl_mlx5_node_fanin(ucc_tl_mlx5_team_t     *team,
                                            ucc_tl_mlx5_schedule_t *task)
 {
-    ucc_tl_mlx5_alltoall_t      *a2a       = team->a2a;
-    int                          seq_index = task->alltoall.seq_index;
-    int                          i;
-    ucc_tl_mlx5_alltoall_ctrl_t *ctrl_v;
+    ucc_tl_mlx5_a2a_t *     a2a       = team->a2a;
+    int                     seq_index = task->alltoall.seq_index;
+    int                     npolls    = UCC_TL_MLX5_TEAM_CTX(team)->cfg.npolls;
+    int                     radix     = UCC_TL_MLX5_TEAM_LIB(team)->cfg.fanin_kn_radix;
+    int                     vrank     = a2a->node.sbgp->group_rank - a2a->node.asr_rank;
+    int                     *dist     = &a2a->node.fanin_dist;
+    int                     size      = a2a->node.sbgp->group_size;
+    int                     seq_num   = task->alltoall.seq_num;
+    int                     c_flag    = 0;
+    int                     polls;
+    int                     peer, vpeer, pos, i;
+    ucc_tl_mlx5_a2a_ctrl_t *ctrl_v;
 
-    if (a2a->node.sbgp->group_rank != a2a->node.asr_rank) {
-        ucc_tl_mlx5_get_my_ctrl(a2a, seq_index)->seq_num =
-            task->alltoall.seq_num;
-    } else {
-        for (i = 0; i < a2a->node.sbgp->group_size; i++) {
-            if (i == a2a->node.sbgp->group_rank) {
-                continue;
-            }
-            ctrl_v = ucc_tl_mlx5_get_ctrl(a2a, seq_index, i);
-            if (ctrl_v->seq_num != task->alltoall.seq_num) {
-                return UCC_INPROGRESS;
+
+    while (*dist <= a2a->node.fanin_max_dist) {
+        if (vrank % *dist == 0) {
+            pos = (vrank / *dist) % radix;
+            if (pos == 0) {
+                while (a2a->node.fanin_index < radix) {
+                    vpeer = vrank + a2a->node.fanin_index * *dist;
+                    if (vpeer >= size) {
+                        a2a->node.fanin_index = radix;
+                        break;
+                    }
+                    peer = (vpeer + a2a->node.asr_rank) % size;
+                    ctrl_v = ucc_tl_mlx5_get_ctrl(a2a, seq_index, peer);
+                    for (polls = 0; polls < npolls; polls++) {
+                        if (ctrl_v->seq_num == seq_num) {
+                            a2a->node.fanin_index++;
+                            break;
+                        }
+                    }
+                    if (polls == npolls) {
+                        return UCC_INPROGRESS;
+                    }
+                }
+            } else {
+                ucc_tl_mlx5_get_my_ctrl(a2a, seq_index)->seq_num = seq_num;
+                UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanin_done", 0);
+                return UCC_OK;
             }
         }
-        for (i = 0; i < a2a->node.sbgp->group_size; i++) {
-            if (i == a2a->node.sbgp->group_rank) {
-                continue;
-            }
-            ctrl_v = ucc_tl_mlx5_get_ctrl(a2a, seq_index, i);
-            ucc_tl_mlx5_get_my_ctrl(a2a, seq_index)->mkey_cache_flag |=
-                ctrl_v->mkey_cache_flag;
-        }
+        *dist *= radix;
+        a2a->node.fanin_index = 1;
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanin_step_done", 0);
     }
     UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanin_done", 0);
+    for (i = 0; i < size; i++) {
+        ctrl_v = ucc_tl_mlx5_get_ctrl(a2a, seq_index, i);
+        ucc_assert(i == a2a->node.sbgp->group_rank || ctrl_v->seq_num == seq_num);
+        c_flag |= ctrl_v->mkey_cache_flag;
+    }
+    ucc_tl_mlx5_get_my_ctrl(a2a, seq_index)->mkey_cache_flag = c_flag;
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_retrieve_cache_flags_done", 0);
     return UCC_OK;
 }
 
 /* Each rank registers sbuf and rbuf and place the registration data
-   in the shared memory location. Next, all rank in node nitify the
-   ASR the registration data is ready using SHM Fanin */
+   in the shared memory location. Next, all rank in node notify the
+   ASR that the registration data is ready using SHM Fanin */
 static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_mlx5_schedule_t      *task            = TASK_SCHEDULE(coll_task);
@@ -137,7 +163,7 @@ static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
     ucc_tl_mlx5_rcache_region_t *send_ptr;
     ucc_tl_mlx5_rcache_region_t *recv_ptr;
 
-    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanin_start", 0);
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_reg_start", 0);
     tl_debug(UCC_TASK_LIB(task), "register memory buffers");
     coll_task->status       = UCC_INPROGRESS;
     coll_task->super.status = UCC_INPROGRESS;
@@ -187,11 +213,18 @@ static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
     /* Start fanin */
     ucc_tl_mlx5_get_my_ctrl(a2a, seq_index)->mkey_cache_flag = flag;
     ucc_tl_mlx5_update_mkeys_entries(a2a, task, flag);
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_reg_done", 0);
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanin_start", 0);
+
+    a2a->node.fanin_index = 1;
+    a2a->node.fanin_dist  = 1;
+    for (a2a->node.fanin_max_dist = 1;
+         a2a->node.fanin_max_dist < a2a->node.sbgp->group_size;
+         a2a->node.fanin_max_dist *= UCC_TL_MLX5_TEAM_LIB(team)->cfg.fanin_kn_radix){}
 
     if (UCC_OK == ucc_tl_mlx5_node_fanin(team, task)) {
         tl_debug(UCC_TL_MLX5_TEAM_LIB(team), "fanin complete");
         coll_task->status = UCC_OK;
-        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanin_done", 0);
         return ucc_task_complete(coll_task);
     }
 
@@ -204,7 +237,6 @@ void ucc_tl_mlx5_reg_fanin_progress(ucc_coll_task_t *coll_task)
     ucc_tl_mlx5_schedule_t *task = TASK_SCHEDULE(coll_task);
     ucc_tl_mlx5_team_t     *team = SCHEDULE_TEAM(task);
 
-    ucc_assert(team->a2a->node.sbgp->group_rank == team->a2a->node.asr_rank);
     if (UCC_OK == ucc_tl_mlx5_node_fanin(team, task)) {
         tl_debug(UCC_TL_MLX5_TEAM_LIB(team), "fanin complete");
         coll_task->status = UCC_OK;
@@ -242,7 +274,11 @@ static ucc_status_t ucc_tl_mlx5_fanout_start(ucc_coll_task_t *coll_task)
 
     tl_debug(UCC_TASK_LIB(task), "fanout start");
     /* start task if completion event received */
-    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanout_start", 0);
+    if (team->a2a->node.sbgp->group_rank == team->a2a->node.asr_rank) {
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_wait-on-data_start", 0);
+    } else {
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanout_start", 0);
+    }
     /* Start fanout */
     ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
     return UCC_OK;
@@ -265,6 +301,8 @@ static void ucc_tl_mlx5_fanout_progress(ucc_coll_task_t *coll_task)
             coll_task->status = UCC_INPROGRESS;
             return;
         }
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_wait-on-data_complete", 0);
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanout_start", 0);
     }
 
     if (UCC_OK == ucc_tl_mlx5_node_fanout(team, task)) {
@@ -289,14 +327,20 @@ static ucc_status_t ucc_tl_mlx5_asr_barrier_start(ucc_coll_task_t *coll_task)
     coll_task->super.status = UCC_INPROGRESS;
 
     task->alltoall.started = 0;
+
     UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_barrier_start", 0);
+
     // despite while statement in poll_umr_cq, non blocking because have independent cq,
     // will be finished in a finite time
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_populate_UMR_start", 0);
     ucc_tl_mlx5_populate_send_recv_mkeys(team, task);
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_populate_UMR_end", 0);
 
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_barrier_start", 0);
     //Reset atomic notification counter to 0
 #if ATOMIC_IN_MEMIC
     tl_mlx5_atomic_t zero = 0;
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_ibv_memcpy_start", 0);
     if (0 !=
         ibv_memcpy_to_dm(a2a->net.atomic.counters,
                          task->alltoall.seq_index * sizeof(tl_mlx5_atomic_t),
@@ -304,6 +348,7 @@ static ucc_status_t ucc_tl_mlx5_asr_barrier_start(ucc_coll_task_t *coll_task)
         tl_error(UCC_TASK_LIB(task), "failed to reset atomic in memic");
         return UCC_ERR_NO_MESSAGE;
     }
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_ibv_memcpy_done", 0);
 #else
     a2a->net.atomic.counters[task->alltoall.seq_index] = 0;
 #endif
@@ -342,13 +387,13 @@ static ucc_status_t ucc_tl_mlx5_asr_barrier_start(ucc_coll_task_t *coll_task)
                 status = send_done(team, i);
             }
             if (status != UCC_OK) {
-                tl_error(UCC_TASK_LIB(task), "failed  sending barrier notice");
+                tl_error(UCC_TASK_LIB(task), "failed sending barrier notice");
                 return status;
             }
+            UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_barrier_send_posted", 0);
         }
         coll_task->status = UCC_OK;
-        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_barreir_done",
-                                          0);
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_barrier_done", 0);
         return ucc_task_complete(coll_task);
     }
     return UCC_OK;

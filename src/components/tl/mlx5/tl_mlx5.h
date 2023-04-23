@@ -60,12 +60,14 @@ typedef struct ucc_tl_mlx5_lib_config {
     int                                     dm_host;
     ucc_tl_mlx5_ib_qp_conf_t                qp_conf;
     ucc_tl_mlx5_mcast_coll_comm_init_spec_t mcast_conf;
+    int                                     fanin_kn_radix;
 } ucc_tl_mlx5_lib_config_t;
 
 typedef struct ucc_tl_mlx5_context_config {
     ucc_tl_context_config_t         super;
     ucs_config_names_array_t        devices;
     ucc_tl_mlx5_mcast_ctx_params_t  mcast_ctx_conf;
+    int                             npolls;
 } ucc_tl_mlx5_context_config_t;
 
 typedef struct ucc_tl_mlx5_lib {
