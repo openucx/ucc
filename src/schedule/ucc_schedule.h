@@ -174,7 +174,7 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 
     ucc_assert((status == UCC_OK) || (status < 0));
 
-    /* If task is part of a  schedule then it can be
+    /* If task is part of a schedule then it can be
        released during ucc_event_manager_notify(EVENT_COMPLETED_SCHEDULE) below.
        Sequence: notify => schedule->n_completed_tasks++ =>
        schedule->super.status = UCC_OK => user releases schedule from another
