@@ -24,45 +24,53 @@
 #include "fanout/fanout.h"
 #include "scatterv/scatterv.h"
 
+const ucc_tl_ucp_default_alg_desc_t
+    ucc_tl_ucp_default_alg_descs[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
+        {
+            .select_str = UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR,
+            .str_get_fn = NULL
+        },
+        {
+            .select_str = NULL,
+            .str_get_fn = ucc_tl_ucp_alltoall_score_str_get
+        },
+        {
+            .select_str = UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR,
+            .str_get_fn = NULL
+        },
+        {
+            .select_str = UCC_TL_UCP_BCAST_DEFAULT_ALG_SELECT_STR,
+            .str_get_fn = NULL
+        },
+        {
+            .select_str = UCC_TL_UCP_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR,
+            .str_get_fn = NULL
+        },
+        {
+            .select_str = UCC_TL_UCP_REDUCE_SCATTERV_DEFAULT_ALG_SELECT_STR,
+            .str_get_fn = NULL
+        },
+};
+
 ucc_status_t ucc_tl_ucp_team_default_score_str_alloc(ucc_tl_ucp_team_t *team,
     char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR])
 {
     ucc_status_t st = UCC_OK;
+    int i;
 
-    default_select_str[0] = strdup(UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR);
-    if (!default_select_str[0]) {
-        st = UCC_ERR_NO_MEMORY;
-        goto exit;
-    }
-    default_select_str[1] = strdup(UCC_TL_UCP_ALLREDUCE_DEFAULT_ALG_SELECT_STR);
-    if (!default_select_str[1]) {
-        st = UCC_ERR_NO_MEMORY;
-        goto exit;
-    }
+    for (i = 0; i < UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR; i++) {
+        if (ucc_tl_ucp_default_alg_descs[i].select_str) {
+            default_select_str[i] = strdup(ucc_tl_ucp_default_alg_descs[i].select_str);
+        } else {
+            default_select_str[i] = ucc_tl_ucp_default_alg_descs[i].str_get_fn(team);
+        }
+        if (!default_select_str[i]) {
+            st = UCC_ERR_NO_MEMORY;
+            goto exit;
+        }
 
-    default_select_str[2] = strdup(UCC_TL_UCP_BCAST_DEFAULT_ALG_SELECT_STR);
-    if (!default_select_str[2]) {
-        st = UCC_ERR_NO_MEMORY;
-        goto exit;
     }
 
-    default_select_str[3] = ucc_tl_ucp_alltoall_score_str_get(team);
-    if (!default_select_str[3]) {
-        st = UCC_ERR_NO_MEMORY;
-        goto exit;
-    }
-
-    default_select_str[4] = strdup(UCC_TL_UCP_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR);
-    if (!default_select_str[4]) {
-        st = UCC_ERR_NO_MEMORY;
-        goto exit;
-    }
-
-    default_select_str[5] = strdup(UCC_TL_UCP_REDUCE_SCATTERV_DEFAULT_ALG_SELECT_STR);
-    if (!default_select_str[5]) {
-        st = UCC_ERR_NO_MEMORY;
-        goto exit;
-    }
 exit:
     return st;
 }

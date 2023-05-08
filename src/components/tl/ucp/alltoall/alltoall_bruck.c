@@ -18,17 +18,7 @@ enum {
     PHASE_SENDRECV
 };
 
-static inline int lognum(int n){
-    int count = 1, lognum = 0;
-
-    while (count < n) {
-        count = count << 1;
-        lognum++;
-    }
-    return lognum;
-}
-
-static inline int msb_pos_for_level(unsigned int nthbit, unsigned int number)
+static inline int msb_pos_for_level(unsigned int nthbit, ucc_rank_t number)
 {
 
     int msb_set = -1;
@@ -43,7 +33,7 @@ static inline int msb_pos_for_level(unsigned int nthbit, unsigned int number)
     return msb_set;
 }
 
-static inline int find_seg_index(int seg_index, int level, int nsegs_per_rblock)
+static inline int find_seg_index(ucc_rank_t seg_index, int level, int nsegs_per_rblock)
 {
     int block, blockseg;
 

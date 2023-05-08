@@ -75,6 +75,11 @@ void ucc_tl_ucp_team_default_score_str_free(
         }                                                                      \
     } while (0)
 
+typedef char* (*ucc_tl_ucp_score_str_get_fn_t)(ucc_tl_ucp_team_t *team);
+typedef struct ucc_tl_ucp_default_alg_desc {
+    char                          *select_str;
+    ucc_tl_ucp_score_str_get_fn_t  str_get_fn;
+} ucc_tl_ucp_default_alg_desc_t;
 
 enum ucc_tl_ucp_task_flags {
     /*indicates whether subset field of tl_ucp_task is set*/
