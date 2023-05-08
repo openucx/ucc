@@ -34,7 +34,6 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_linear_init(ucc_base_coll_args_t *coll_a
     task->reduce_scatterv_linear.get_offset =
         ucc_tl_cuda_reduce_scatter_get_offset;
     task->reduce_scatterv_linear.dt         = coll_args->args.dst.info.datatype;
-    task->reduce_scatterv_linear.rbuf       = coll_args->args.dst.info.buffer;
     task->super.flags          |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post           = ucc_tl_cuda_reduce_scatterv_linear_start;
     task->super.progress       = ucc_tl_cuda_reduce_scatterv_linear_progress;

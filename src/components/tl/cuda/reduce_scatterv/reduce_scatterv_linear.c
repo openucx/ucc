@@ -217,8 +217,8 @@ ucc_tl_cuda_reduce_scatterv_linear_reduce(ucc_tl_cuda_task_t *task,
     size_t send_size, frag_size, frag_offset, rank_offset;
     ucc_ee_executor_task_args_t  eargs;
 
-    send_size  = task->reduce_scatterv_linear.get_count(task, trank);
-    frag_size  = ucc_buffer_block_count(send_size, nfrags, step);
+    send_size   = task->reduce_scatterv_linear.get_count(task, trank);
+    frag_size   = ucc_buffer_block_count(send_size, nfrags, step);
     frag_offset = ucc_buffer_block_offset(send_size, nfrags, step);
     rank_offset = task->reduce_scatterv_linear.get_offset(task, trank);
 
@@ -404,6 +404,15 @@ ucc_tl_cuda_reduce_scatterv_linear_start(ucc_coll_task_t *coll_task)
     ucc_rank_t          i;
     size_t              send_size, frag_size, ssize;
 
+    /* need to set rbuf in collective start since frag_setup of pipeline
+     * schedule can update pointer
+     */
+    if (args->coll_type == UCC_COLL_TYPE_REDUCE_SCATTER) {
+        task->reduce_scatterv_linear.rbuf = args->dst.info.buffer;
+    } else {
+        task->reduce_scatterv_linear.rbuf = args->dst.info_v.buffer;
+    }
+
     task->reduce_scatterv_linear.stage = STAGE_SYNC;
     task->reduce_scatterv_linear.sbuf  = args->src.info.buffer;
     send_size = task->reduce_scatterv_linear.get_count(task, 0);
@@ -455,7 +464,6 @@ ucc_tl_cuda_reduce_scatterv_linear_init(ucc_base_coll_args_t *coll_args,
         ucc_tl_cuda_reduce_scatterv_get_offset;
     task->reduce_scatterv_linear.dt         =
             coll_args->args.dst.info_v.datatype;
-    task->reduce_scatterv_linear.rbuf       = coll_args->args.dst.info_v.buffer;
     task->super.flags          |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post           = ucc_tl_cuda_reduce_scatterv_linear_start;
     task->super.progress       = ucc_tl_cuda_reduce_scatterv_linear_progress;
