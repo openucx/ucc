@@ -7,6 +7,8 @@
 #include "ucc_coll_utils.h"
 #include "components/base/ucc_base_iface.h"
 #include "core/ucc_team.h"
+#include "schedule/ucc_schedule_pipelined.h"
+
 #define STR_TYPE_CHECK(_str, _p, _prefix)                                      \
     do {                                                                       \
         if ((0 == strcasecmp(_UCC_PP_MAKE_STRING(_p), _str))) {                \
@@ -511,9 +513,16 @@ void ucc_coll_task_components_str(const ucc_coll_task_t *task, char *str,
                                   size_t *len)
 {
     ucc_schedule_t *schedule;
+    ucc_schedule_pipelined_t *schedule_pipelined;
     int i;
 
-    if (task->flags & UCC_COLL_TASK_FLAG_IS_SCHEDULE) {
+    if (task->flags & UCC_COLL_TASK_FLAG_IS_PIPELINED_SCHEDULE) {
+        schedule_pipelined = ucc_derived_of(task, ucc_schedule_pipelined_t);
+        for (i = 0; i < schedule_pipelined->n_frags; i++) {
+            ucc_coll_task_components_str(&schedule_pipelined->frags[i]->super,
+                                         str, len);
+        }
+    } else if (task->flags & UCC_COLL_TASK_FLAG_IS_SCHEDULE) {
         schedule = ucc_derived_of(task, ucc_schedule_t);
         for (i = 0; i < schedule->n_tasks; i++) {
             ucc_coll_task_components_str(schedule->tasks[i], str, len);

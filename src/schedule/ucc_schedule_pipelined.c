@@ -1,7 +1,9 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
+
 #include "ucc_schedule.h"
 #include "ucc_schedule_pipelined.h"
 #include "coll_score/ucc_coll_score.h"
@@ -17,23 +19,23 @@ const char* ucc_pipeline_order_names[] = {
 static ucc_status_t ucc_frag_start_handler(ucc_coll_task_t *parent,
                                            ucc_coll_task_t *task)
 {
-    ucc_schedule_pipelined_t *schedule =
-        ucc_derived_of(parent, ucc_schedule_pipelined_t);
-    ucc_schedule_t *frag               = ucc_derived_of(task, ucc_schedule_t);
-    ucc_status_t    status;
+    ucc_schedule_pipelined_t *schedule = ucc_derived_of(parent,
+                                                        ucc_schedule_pipelined_t);
+    ucc_schedule_t           *frag     = ucc_derived_of(task, ucc_schedule_t);
+    ucc_status_t st;
 
     task->start_time = parent->start_time;
     if (schedule->frag_setup) {
-        status =
-            schedule->frag_setup(schedule, frag, schedule->n_frags_started);
-        if (UCC_OK != status) {
+        st = schedule->frag_setup(schedule, frag, schedule->n_frags_started);
+        if (ucc_unlikely(UCC_OK != st)) {
             ucc_error("failed to setup fragment %d of pipelined schedule",
                       schedule->n_frags_started);
-            return status;
+            return st;
         }
     }
-    schedule->next_frag_to_post =
-        (schedule->next_frag_to_post + 1) % schedule->n_frags;
+
+    schedule->next_frag_to_post = (schedule->next_frag_to_post + 1) %
+                                  schedule->n_frags;
     ucc_trace_req("sched %p started frag %p frag_num %d next_to_post %d",
                   schedule, frag, schedule->n_frags_started,
                   schedule->next_frag_to_post);
@@ -106,7 +108,11 @@ ucc_status_t ucc_schedule_pipelined_finalize(ucc_coll_task_t *task)
     for (i = 0; i < schedule_p->n_frags; i++) {
         schedule_p->frags[i]->super.finalize(&frags[i]->super);
     }
-    ucc_recursive_spinlock_destroy(&schedule_p->lock);
+
+    if (UCC_TASK_THREAD_MODE(task) == UCC_THREAD_MULTIPLE) {
+        ucc_recursive_spinlock_destroy(&schedule_p->lock);
+    }
+
     return UCC_OK;
 }
 
@@ -140,12 +146,15 @@ ucc_status_t ucc_schedule_pipelined_post(ucc_coll_task_t *task)
     return ucc_schedule_start(task);
 }
 
-ucc_status_t ucc_schedule_pipelined_init(
-    ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
-    ucc_schedule_frag_init_fn_t  frag_init,
-    ucc_schedule_frag_setup_fn_t frag_setup, int n_frags, int n_frags_total,
-    ucc_pipeline_order_t order, ucc_schedule_pipelined_t *schedule)
+ucc_status_t ucc_schedule_pipelined_init(ucc_base_coll_args_t *coll_args,
+                                         ucc_base_team_t *team,
+                                         ucc_schedule_frag_init_fn_t frag_init,
+                                         ucc_schedule_frag_setup_fn_t frag_setup,
+                                         int n_frags, int n_frags_total,
+                                         ucc_pipeline_order_t order,
+                                         ucc_schedule_pipelined_t *schedule)
 {
+    ucc_event_t      task_dependency_event = UCC_EVENT_LAST;
     int              i, j;
     ucc_status_t     status;
     ucc_schedule_t **frags;
@@ -156,14 +165,37 @@ ucc_status_t ucc_schedule_pipelined_init(
         return UCC_ERR_INVALID_PARAM;
     }
 
+    if (n_frags > 1) {
+        /* determine dependency between frags */
+        switch (order) {
+            case UCC_PIPELINE_PARALLEL:
+                /* no dependency between tasks of different fragments */
+                task_dependency_event = UCC_EVENT_LAST;
+                break;
+            case UCC_PIPELINE_ORDERED:
+                /* next fragment starts when previous has started */
+                task_dependency_event = UCC_EVENT_TASK_STARTED;
+                break;
+            case UCC_PIPELINE_SEQUENTIAL:
+                /* next fragment starts when previous has completed */
+                task_dependency_event = UCC_EVENT_COMPLETED;
+                break;
+            default:
+                return UCC_ERR_INVALID_PARAM;
+        }
+    }
+
     status = ucc_schedule_init(&schedule->super, coll_args, team);
     if (ucc_unlikely(status != UCC_OK)) {
         ucc_error("failed to init pipelined schedule");
         return status;
     }
 
-    ucc_recursive_spinlock_init(&schedule->lock, 0);
+    if (UCC_TASK_THREAD_MODE(&schedule->super.super) == UCC_THREAD_MULTIPLE) {
+        ucc_recursive_spinlock_init(&schedule->lock, 0);
+    }
 
+    schedule->super.super.flags    |= UCC_COLL_TASK_FLAG_IS_PIPELINED_SCHEDULE;
     schedule->super.n_tasks        = n_frags_total;
     schedule->n_frags              = n_frags;
     schedule->order                = order;
@@ -175,7 +207,7 @@ ucc_status_t ucc_schedule_pipelined_init(
     frags                          = schedule->frags;
     for (i = 0; i < n_frags; i++) {
         status = frag_init(coll_args, schedule, team, &frags[i]);
-        if (UCC_OK != status) {
+        if (ucc_unlikely(UCC_OK != status)) {
             ucc_error("failed to initialize fragment for pipeline");
             goto err;
         }
@@ -186,16 +218,15 @@ ucc_status_t ucc_schedule_pipelined_init(
         frags[i]->super.status       = UCC_OPERATION_INITIALIZED;
         frags[i]->super.super.status = UCC_OPERATION_INITIALIZED;
     }
+
     for (i = 0; i < n_frags; i++) {
         for (j = 0; j < frags[i]->n_tasks; j++) {
             frags[i]->tasks[j]->n_deps_base = frags[i]->tasks[j]->n_deps;
-            if (n_frags > 1 && UCC_PIPELINE_PARALLEL != order) {
+            if (task_dependency_event != UCC_EVENT_LAST) {
                 UCC_CHECK_GOTO(
                     ucc_event_manager_subscribe(
-                        frags[(i > 0) ? (i - 1) : (n_frags - 1)]->tasks[j],
-                        UCC_PIPELINE_ORDERED == order
-                        ? UCC_EVENT_TASK_STARTED
-                        : UCC_EVENT_COMPLETED, frags[i]->tasks[j],
+                        frags[(i + n_frags - 1) % n_frags]->tasks[j],
+                        task_dependency_event, frags[i]->tasks[j],
                         ucc_dependency_handler),
                     err, status);
                 frags[i]->tasks[j]->n_deps_base++;

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -22,12 +22,13 @@ typedef struct ucc_tl_cuda_ring {
 } ucc_tl_cuda_ring_t;
 
 typedef struct ucc_tl_cuda_team_topo {
-    ucc_rank_t              *matrix;       /* nvlink adjacency matrix */
-    int                      proxy_needed; /* is proxy needed for current rank */
-    int                      num_proxies;  /* number of entries in proxies list */
-    ucc_tl_cuda_proxy_t     *proxies;      /* list of pairs where current rank is proxy */
-    int                      num_rings;    /* number of entries in rings list */
-    ucc_tl_cuda_ring_t      *rings;        /* list of rings for ring algorithms */
+    ucc_rank_t          *matrix;             /* nvlink adjacency matrix */
+    int                  proxy_needed;       /* is proxy needed for current rank */
+    int                  num_proxies;        /* number of entries in proxies list */
+    ucc_tl_cuda_proxy_t *proxies;            /* list of pairs where current rank is proxy */
+    int                  num_rings;          /* number of entries in rings list */
+    ucc_tl_cuda_ring_t  *rings;              /* list of rings for ring algorithms */
+    int                  is_fully_connected; /* no proxies in team topo */
 } ucc_tl_cuda_team_topo_t;
 
 ucc_status_t ucc_tl_cuda_team_topo_create(const ucc_tl_team_t *team,
@@ -52,7 +53,7 @@ ucc_tl_cuda_team_topo_is_direct(const ucc_tl_team_t *team,
 static inline int
 ucc_tl_cuda_team_topo_is_fully_conntected(const ucc_tl_cuda_team_topo_t *topo)
 {
-    return topo->num_proxies == 0;
+    return topo->is_fully_connected;
 }
 
 #endif

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -12,6 +12,7 @@
 
 enum {
     UCC_TL_UCP_ALLTOALL_ALG_PAIRWISE,
+    UCC_TL_UCP_ALLTOALL_ALG_BRUCK,
     UCC_TL_UCP_ALLTOALL_ALG_ONESIDED,
     UCC_TL_UCP_ALLTOALL_ALG_LAST
 };
@@ -19,19 +20,27 @@ enum {
 extern ucc_base_coll_alg_info_t
     ucc_tl_ucp_alltoall_algs[UCC_TL_UCP_ALLTOALL_ALG_LAST + 1];
 
-#define UCC_TL_UCP_ALLTOALL_DEFAULT_ALG_SELECT_STR "alltoall:0-inf:@0"
+#define UCC_TL_UCP_ALLTOALL_DEFAULT_ALG_SELECT_STR_PATTERN \
+"alltoall:host:0-%d:@bruck"
+
+char* ucc_tl_ucp_alltoall_score_str_get(ucc_tl_ucp_team_t *team);
 
 ucc_status_t ucc_tl_ucp_alltoall_init(ucc_tl_ucp_task_t *task);
 
-ucc_status_t ucc_tl_ucp_alltoall_pairwise_init(ucc_base_coll_args_t *coll_args,
-                                               ucc_base_team_t      *team,
-                                               ucc_coll_task_t     **task_h);
-
 ucc_status_t ucc_tl_ucp_alltoall_pairwise_init_common(ucc_tl_ucp_task_t *task);
 
+ucc_status_t ucc_tl_ucp_alltoall_pairwise_init(ucc_base_coll_args_t *coll_args,
+                                               ucc_base_team_t *team,
+                                               ucc_coll_task_t **task_h);
+
+ucc_status_t ucc_tl_ucp_alltoall_bruck_init(ucc_base_coll_args_t *coll_args,
+                                            ucc_base_team_t *team,
+                                            ucc_coll_task_t **task_h);
+
+
 ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
-                                               ucc_base_team_t *     team,
-                                               ucc_coll_task_t **    task_h);
+                                               ucc_base_team_t *team,
+                                               ucc_coll_task_t **task_h);
 
 #define ALLTOALL_CHECK_INPLACE(_args, _team)                                   \
     do {                                                                       \

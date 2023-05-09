@@ -52,6 +52,7 @@ typedef struct ucc_tl_sharp_context_config {
     unsigned int             uprogress_num_polls;
     int                      context_per_team;
     int                      enable_lazy_group_alloc;
+    int                      team_max_ppn;
 } ucc_tl_sharp_context_config_t;
 
 typedef struct ucc_tl_sharp_lib {
@@ -96,6 +97,7 @@ typedef struct ucc_tl_sharp_team {
     ucc_rcache_t              *rcache;
     struct sharp_coll_comm    *sharp_comm;
     ucc_tl_sharp_oob_ctx_t    oob_ctx;
+    ucc_topo_t                *topo;
 } ucc_tl_sharp_team_t;
 
 typedef struct ucc_tl_sharp_task {

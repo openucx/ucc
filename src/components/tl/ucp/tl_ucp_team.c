@@ -205,6 +205,8 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     ucc_tl_coll_plugin_iface_t *tlcp;
     ucc_status_t                status;
     unsigned                    i;
+    char                       *ucc_tl_ucp_default_alg_select_str
+                                          [UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
 
     for (i = 0; i < UCC_MEMORY_TYPE_LAST; i++) {
         if (tl_ctx->ucp_memory_types & UCC_BIT(ucc_memtype_to_ucs[i])) {
@@ -223,7 +225,11 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     if (UCC_OK != status) {
         return status;
     }
-
+    status = ucc_tl_ucp_team_default_score_str_alloc(team,
+        ucc_tl_ucp_default_alg_select_str);
+    if (UCC_OK != status) {
+        return status;
+    }
     for (i = 0; i < UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR; i++) {
         status = ucc_coll_score_update_from_str(
             ucc_tl_ucp_default_alg_select_str[i], score, UCC_TL_TEAM_SIZE(team),
@@ -273,9 +279,11 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
             goto err;
         }
     }
+    ucc_tl_ucp_team_default_score_str_free(ucc_tl_ucp_default_alg_select_str);
     *score_p = score;
     return UCC_OK;
 err:
+    ucc_tl_ucp_team_default_score_str_free(ucc_tl_ucp_default_alg_select_str);
     ucc_coll_score_free(score);
     return status;
 }

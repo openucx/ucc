@@ -89,6 +89,7 @@ noinst_HEADERS =                      \
 	components/ec/ucc_ec_log.h        \
 	coll_patterns/recursive_knomial.h \
 	coll_patterns/sra_knomial.h       \
+	coll_patterns/bruck_alltoall.h    \
 	components/topo/ucc_topo.h        \
 	components/topo/ucc_sbgp.h
 
