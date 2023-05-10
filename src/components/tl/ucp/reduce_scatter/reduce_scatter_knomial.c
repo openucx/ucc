@@ -94,7 +94,7 @@ UCC_KN_PHASE_EXTRA_REDUCE:
                                  ? args->dst.info.buffer
                                  : args->src.info.buffer)
                           : task->reduce_scatter_kn.scratch;
-        for (loop_step = 1; loop_step < radix; loop_step++) {
+        for (loop_step = radix - 1; loop_step > 0; loop_step--) {
             peer = ucc_knomial_pattern_get_loop_peer(p, rank, loop_step);
             if (peer == UCC_KN_PEER_NULL)
                 continue;
