@@ -327,13 +327,8 @@ ucc_status_t ucc_tl_sharp_bcast_init(ucc_tl_sharp_task_t *task)
 {
     ucc_coll_args_t *args = &TASK_ARGS(task);
 
-    if (!ucc_coll_args_is_predefined_dt(args, UCC_RANK_INVALID)) {
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
-    if (ucc_to_sharp_memtype[args->src.info.mem_type] == SHARP_MEM_TYPE_LAST ||
-        ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(args->src.info.datatype)] ==
-            SHARP_DTYPE_NULL) {
+    if ((ucc_to_sharp_memtype[args->src.info.mem_type] == SHARP_MEM_TYPE_LAST) ||
+        !ucc_coll_args_is_predefined_dt(args, UCC_RANK_INVALID)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
