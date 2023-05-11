@@ -288,6 +288,36 @@ void UccTestMpi::set_ops(std::vector<ucc_reduction_op_t> &_ops)
     ops = _ops;
 }
 
+int ucc_coll_reduce_supported(ucc_reduction_op_t op, ucc_datatype_t dt)
+{
+    switch (dt) {
+    case UCC_DT_INT8:
+    case UCC_DT_INT16:
+    case UCC_DT_INT32:
+    case UCC_DT_INT64:
+    case UCC_DT_INT128:
+    case UCC_DT_UINT8:
+    case UCC_DT_UINT16:
+    case UCC_DT_UINT32:
+    case UCC_DT_UINT64:
+    case UCC_DT_UINT128:
+        return (op != UCC_OP_AVG);
+    case UCC_DT_FLOAT16:
+    case UCC_DT_FLOAT32:
+    case UCC_DT_FLOAT64:
+    case UCC_DT_BFLOAT16:
+    case UCC_DT_FLOAT128:
+        return (op == UCC_OP_SUM || op == UCC_OP_PROD || op == UCC_OP_MAX ||
+                op == UCC_OP_MIN);
+    case UCC_DT_FLOAT32_COMPLEX:
+    case UCC_DT_FLOAT64_COMPLEX:
+    case UCC_DT_FLOAT128_COMPLEX:
+        return (op == UCC_OP_SUM || op == UCC_OP_PROD || op == UCC_OP_AVG);
+    default:
+        return 0;
+    }
+}
+
 int ucc_coll_inplace_supported(ucc_coll_type_t c)
 {
     switch(c) {
@@ -576,20 +606,7 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                     for (auto m: test_msgsizes) {
                         for (auto dt: test_dtypes) {
                             for (auto op: test_ops) {
-                                if (op == UCC_OP_AVG &&
-                                    !(dt == UCC_DT_FLOAT16 ||
-                                      dt == UCC_DT_FLOAT32 ||
-                                      dt == UCC_DT_FLOAT64 ||
-                                      dt == UCC_DT_FLOAT128 ||
-                                      dt == UCC_DT_FLOAT32_COMPLEX ||
-                                      dt == UCC_DT_FLOAT64_COMPLEX ||
-                                      dt == UCC_DT_FLOAT128_COMPLEX)) {
-                                    continue;
-                                }
-                                if ((op == UCC_OP_MIN || op == UCC_OP_MAX) &&
-                                    (dt == UCC_DT_FLOAT32_COMPLEX ||
-                                     dt == UCC_DT_FLOAT64_COMPLEX ||
-                                     dt == UCC_DT_FLOAT128_COMPLEX)) {
+                                if (!ucc_coll_reduce_supported(op, dt)) {
                                     continue;
                                 }
                                 if (mt != UCC_MEMORY_TYPE_HOST &&
