@@ -308,7 +308,7 @@ int ucc_coll_reduce_supported(ucc_reduction_op_t op, ucc_datatype_t dt)
     case UCC_DT_BFLOAT16:
     case UCC_DT_FLOAT128:
         return (op == UCC_OP_SUM || op == UCC_OP_PROD || op == UCC_OP_MAX ||
-                op == UCC_OP_MIN);
+                op == UCC_OP_MIN || op == UCC_OP_AVG);
     case UCC_DT_FLOAT32_COMPLEX:
     case UCC_DT_FLOAT64_COMPLEX:
     case UCC_DT_FLOAT128_COMPLEX:
