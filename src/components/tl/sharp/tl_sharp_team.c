@@ -133,8 +133,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
     ret = sharp_coll_comm_init(sharp_ctx,
                                &comm_spec, &self->sharp_comm);
     if (ret < 0) {
-        tl_error(ctx->super.super.lib, "sharp group create failed:%s(%d)",
-                sharp_coll_strerror(ret), ret);
+        tl_debug(ctx->super.super.lib, "sharp group create failed:%s(%d)",
+                 sharp_coll_strerror(ret), ret);
         status = UCC_ERR_NO_RESOURCE;
         goto cleanup;
     }
