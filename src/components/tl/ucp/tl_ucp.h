@@ -144,9 +144,6 @@ typedef struct ucc_tl_ucp_team {
     ucc_topo_t                *topo;
     ucc_ep_map_t               ctx_map;
     ucc_rank_t                 opt_radix;
-    ucc_rank_t                 min_socket_size;
-    ucc_rank_t                 socket_size;
-    ucc_service_coll_req_t    *allreduce_service_req;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

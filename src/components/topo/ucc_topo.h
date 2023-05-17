@@ -60,6 +60,10 @@ typedef struct ucc_topo {
                          for ucc_team topo it is team->ctx_map */
     ucc_rank_t   min_ppn; /*< min ppn across the nodes for a team */
     ucc_rank_t   max_ppn; /*< max ppn across the nodes for a team */
+    ucc_rank_t   min_socket_size; /*< min ppn on a socket/numa,
+                                    across the nodes for a team */
+    ucc_rank_t   max_socket_size; /*< max ppn on a socket/numa,
+                                    across the nodes for a team */
 } ucc_topo_t;
 
 /* Initializes ctx level topo structure using addr_storage.
