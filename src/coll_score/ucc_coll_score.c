@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -956,7 +956,8 @@ ucc_status_t ucc_coll_score_update(ucc_coll_score_t  *score,
                                    ucc_coll_score_t  *update,
                                    ucc_score_t        default_score,
                                    ucc_memory_type_t *mtypes,
-                                   int                mt_n)
+                                   int                mt_n,
+                                   uint64_t           colls)
 {
     ucc_status_t      status;
     int               i, j;
@@ -967,6 +968,9 @@ ucc_status_t ucc_coll_score_update(ucc_coll_score_t  *score,
     }
 
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
+        if (!(colls & UCS_BIT(i))) {
+            continue;
+        }
         for (j = 0; j < mt_n; j++) {
             mt = (mtypes == NULL) ? (ucc_memory_type_t)j : mtypes[j];
             status = ucc_coll_score_update_one(
@@ -980,25 +984,28 @@ ucc_status_t ucc_coll_score_update(ucc_coll_score_t  *score,
     return UCC_OK;
 }
 
-ucc_status_t ucc_coll_score_update_from_str(const char *            str,
-                                            ucc_coll_score_t       *score,
-                                            ucc_rank_t              team_size,
-                                            ucc_base_coll_init_fn_t init,
-                                            ucc_base_team_t        *team,
-                                            ucc_score_t             def_score,
-                                            ucc_alg_id_to_init_fn_t alg_fn,
-                                            ucc_memory_type_t      *mtypes,
-                                            int                     mt_n)
+ucc_status_t
+ucc_coll_score_update_from_str(const char *str,
+                               const ucc_coll_score_team_info_t *info,
+                               ucc_base_team_t *team,
+                               ucc_coll_score_t *score)
 {
     ucc_status_t      status;
     ucc_coll_score_t *score_str;
-    status = ucc_coll_score_alloc_from_str(str, &score_str, team_size, init,
-                                           team, alg_fn);
+
+    status = ucc_coll_score_alloc_from_str(str, &score_str, info->size,
+                                           info->init, team, info->alg_fn);
     if (UCC_OK != status) {
         return status;
     }
-    status = ucc_coll_score_update(score, score_str, def_score, mtypes, mt_n);
+
+    status = ucc_coll_score_update(score, score_str,
+                                   info->default_score,
+                                   info->supported_mem_types,
+                                   info->num_mem_types,
+                                   info->supported_colls);
     ucc_coll_score_free(score_str);
+
     return status;
 }
 

@@ -260,7 +260,15 @@ ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t  *tl_team,
     ucc_base_context_t  *ctx  = UCC_TL_TEAM_CTX(team);
     ucc_coll_score_t    *score;
     ucc_status_t         status;
+    ucc_coll_score_team_info_t team_info;
 
+    team_info.alg_fn              = NULL;
+    team_info.default_score       = UCC_TL_SHARP_DEFAULT_SCORE;
+    team_info.init                = ucc_tl_sharp_coll_init;
+    team_info.num_mem_types       = 0;
+    team_info.supported_mem_types = NULL; /* all memory types supported*/
+    team_info.supported_colls     = UCC_TL_SHARP_SUPPORTED_COLLS;
+    team_info.size                = UCC_TL_TEAM_SIZE(team);
     /* There can be a different logic for different coll_type/mem_type.
        Right now just init everything the same way. */
     status =
@@ -273,10 +281,8 @@ ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t  *tl_team,
     }
 
     if (strlen(ctx->score_str) > 0) {
-        status = ucc_coll_score_update_from_str(
-            ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
-            ucc_tl_sharp_coll_init, &team->super.super,
-            UCC_TL_SHARP_DEFAULT_SCORE, NULL, NULL, 0);
+        status = ucc_coll_score_update_from_str(ctx->score_str, &team_info,
+                                                &team->super.super, score);
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {
