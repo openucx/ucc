@@ -10,6 +10,39 @@
 #include "core/ucc_team.h"
 #include <sys/shm.h>
 
+static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
+{
+    ucc_subset_t subset;
+    ucc_status_t status;
+    
+    status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
+                                      &UCC_TL_TEAM_MAP(team), &team->ctx_map);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
+        return status;
+    }
+    subset.map    = team->ctx_map;
+    subset.myrank = UCC_TL_TEAM_RANK(team);
+
+    status = ucc_topo_init(subset, UCC_TL_CORE_CTX(team)->topo, &team->topo);
+
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(team), "failed to init team topo");
+        goto err_topo_init;
+    }
+
+    return UCC_OK;
+err_topo_init:
+    ucc_ep_map_destroy_nested(&team->ctx_map);
+    return status;
+}
+
+static void ucc_tl_mlx5_topo_cleanup(ucc_tl_mlx5_team_t *team)
+{
+    ucc_ep_map_destroy_nested(&team->ctx_map);
+    ucc_topo_cleanup(team->topo);
+}
+
 UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
@@ -31,6 +64,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
         }
     }
 
+    status = ucc_tl_mlx5_topo_init(self);
+    if (status != UCC_OK) {
+        tl_error(ctx->super.super.lib, "failed to init team topo");
+        ucc_tl_mlx5_dm_cleanup(self);
+        return status;
+    }
+
     tl_debug(tl_context->lib, "posted tl team: %p", self);
     return status;
 }
@@ -40,6 +80,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
     tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
 
     ucc_tl_mlx5_dm_cleanup(self);
+    ucc_tl_mlx5_topo_cleanup(self);
 }
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_mlx5_team_t, ucc_base_team_t);
