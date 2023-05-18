@@ -33,8 +33,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
     status = ucc_mpool_init(
         &self->req_mp, 0,
         ucc_max(sizeof(ucc_tl_mlx5_task_t), sizeof(ucc_tl_mlx5_schedule_t)), 0,
-        UCC_CACHE_LINE_SIZE, 8, UINT_MAX, NULL, params->thread_mode,
-        "tl_mlx5_req_mp");
+        UCC_CACHE_LINE_SIZE, 8, UINT_MAX, &ucc_coll_task_mpool_ops,
+        params->thread_mode, "tl_mlx5_req_mp");
     if (UCC_OK != status) {
         tl_error(self->super.super.lib,
                  "failed to initialize tl_mlx5_req mpool");
@@ -48,6 +48,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
 {
     tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
+    if (self->rcache) {
+        ucc_rcache_destroy(self->rcache);
+    }
 
     if (ucc_tl_mlx5_remove_shared_ctx_pd(self) != UCC_OK) {
         tl_error(self->super.super.lib, "failed to free ib ctx and pd");
@@ -245,7 +248,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
         goto err;
     }
 
-    status = tl_mlx5_create_rcache(ctx);
+    status = tl_mlx5_rcache_create(ctx);
     if (UCC_OK != status) {
         tl_error(context->lib, "failed to create rcache");
         goto err;
