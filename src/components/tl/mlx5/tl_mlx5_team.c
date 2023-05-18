@@ -5,6 +5,7 @@
  */
 
 #include "tl_mlx5.h"
+#include "tl_mlx5_dm.h"
 #include "coll_score/ucc_coll_score.h"
 #include "core/ucc_team.h"
 #include <sys/shm.h>
@@ -20,12 +21,25 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
 
     self->a2a    = NULL;
     self->dm_ptr = NULL;
+
+    if (ucc_topo_get_sbgp(UCC_TL_CORE_TEAM(self)->topo, UCC_SBGP_NODE)
+            ->group_rank == 0) {
+        status = ucc_tl_mlx5_dm_init(self);
+        if (UCC_OK != status) {
+            tl_error(UCC_TL_TEAM_LIB(self), "failed to init device memory");
+            return status;
+        }
+    }
+
+    tl_debug(tl_context->lib, "posted tl team: %p", self);
     return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
 {
     tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
+
+    ucc_tl_mlx5_dm_cleanup(self);
 }
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_mlx5_team_t, ucc_base_team_t);

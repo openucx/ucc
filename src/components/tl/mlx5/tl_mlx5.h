@@ -84,6 +84,13 @@ typedef struct ucc_tl_mlx5_context {
 UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_tl_mlx5_schedule ucc_tl_mlx5_schedule_t;
+typedef struct ucc_tl_mlx5_dm_chunk_t {
+    ptrdiff_t offset; // 0 based offset from the beginning of
+                      // memic_mr (obtained with ibv_reg_dm_mr)
+    ucc_tl_mlx5_schedule_t *task;
+} ucc_tl_mlx5_dm_chunk_t;
+
 typedef struct ucc_tl_mlx5_a2a ucc_tl_mlx5_a2a_t;
 typedef struct ucc_tl_mlx5_team {
     ucc_tl_team_t           super;
@@ -126,5 +133,11 @@ typedef struct ucc_tl_mlx5_rcache_region {
 
 #define IS_SERVICE_TEAM(_team)                                                 \
     ((_team)->super.super.params.scope == UCC_CL_LAST + 1)
+
+ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
+                                      struct ibv_pd *pd, int dm_host,
+                                      size_t buf_size, size_t *buf_num_p,
+                                      struct ibv_dm **ptr, struct ibv_mr **mr,
+                                      ucc_base_lib_t *lib);
 
 #endif
