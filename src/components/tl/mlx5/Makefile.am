@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 if TL_MLX5_ENABLED
@@ -12,9 +12,11 @@ sources =             \
 	tl_mlx5_team.c    \
 	tl_mlx5_coll.h    \
 	tl_mlx5_ib.h	  \
+	tl_mlx5_ib.c      \
 	tl_mlx5_wqe.h	  \
 	tl_mlx5_wqe.c	  \
-	tl_mlx5_ib.c
+	tl_mlx5_pd.h      \
+	tl_mlx5_pd.c
 
 module_LTLIBRARIES = libucc_tl_mlx5.la
 libucc_tl_mlx5_la_SOURCES  = $(sources)
