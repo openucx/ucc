@@ -19,12 +19,12 @@ static ucc_status_t ucc_tl_mlx5_dm_chunk_alloc(ucc_mpool_t *mp, //NOLINT
 static void ucc_tl_mlx5_dm_chunk_init(ucc_mpool_t *mp,        //NOLINT
                                       void *obj, void *chunk) //NOLINT
 {
-    ucc_tl_mlx5_dm_chunk_t *c = (ucc_tl_mlx5_dm_chunk_t *)obj;
-    ucc_tl_mlx5_team_t *    team =
+    ucc_tl_mlx5_dm_chunk_t *c    = (ucc_tl_mlx5_dm_chunk_t *)obj;
+    ucc_tl_mlx5_team_t     *team =
         ucc_container_of(mp, ucc_tl_mlx5_team_t, dm_pool);
-    const size_t memic_chunk = UCC_TL_MLX5_DM_CHUNK_SIZE;
+
     c->offset                = (ptrdiff_t)team->oob_req;
-    team->oob_req            = PTR_OFFSET(team->oob_req, memic_chunk);
+    team->oob_req            = PTR_OFFSET(team->oob_req, UCC_TL_MLX5_DM_CHUNK_SIZE);
 }
 
 static void ucc_tl_mlx5_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
@@ -122,7 +122,6 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
             errno          = 0;
             dm_ptr         = ibv_alloc_dm(ib_ctx, &dm_attr);
             if (dm_ptr) {
-                ucc_assert(errno == 0);
                 break;
             }
         }
