@@ -11,10 +11,11 @@ rcache_reg_mr(void *context, ucs_rcache_t *rcache, //NOLINT: rcache is unused
               void *arg, ucc_rcache_region_t *rregion,
               uint16_t flags) //NOLINT: flags is unused
 {
-    ucc_tl_mlx5_context_t *ctx      = (ucc_tl_mlx5_context_t *)context;
-    void *                 addr     = (void *)rregion->super.start;
-    ucc_tl_mlx5_reg_t *    mlx5_reg = ucc_tl_mlx5_get_rcache_reg_data(rregion);
-    size_t                 length   = (size_t)(rregion->super.end
+    ucc_tl_mlx5_context_t *ctx         = (ucc_tl_mlx5_context_t *)context;
+    void *                 addr        = (void *)rregion->super.start;
+    ucc_tl_mlx5_reg_t *    mlx5_reg    = ucc_tl_mlx5_get_rcache_reg_data(
+                                                                      rregion);
+    size_t                 length      = (size_t)(rregion->super.end
                                                        - rregion->super.start);
     int *                  change_flag = (int *)arg;
 
