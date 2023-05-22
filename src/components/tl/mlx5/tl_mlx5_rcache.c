@@ -13,13 +13,13 @@ rcache_reg_mr(void *context, ucs_rcache_t *rcache, //NOLINT: rcache is unused
 {
     ucc_tl_mlx5_context_t *ctx         = (ucc_tl_mlx5_context_t *)context;
     void *                 addr        = (void *)rregion->super.start;
-    ucc_tl_mlx5_reg_t *    mlx5_reg    = ucc_tl_mlx5_get_rcache_reg_data(
-                                                                      rregion);
+    ucc_tl_mlx5_reg_t *    mlx5_reg    = ucc_derived_of(rregion,
+                                                            ucc_tl_mlx5_reg_t);
     size_t                 length      = (size_t)(rregion->super.end
                                                        - rregion->super.start);
     int *                  change_flag = (int *)arg;
 
-    mlx5_reg->region = rregion;
+    mlx5_reg->super  = rregion;
     *change_flag     = 1;
     mlx5_reg->mr     = ibv_reg_mr(ctx->shared_pd, addr, length,
                               IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
@@ -30,13 +30,13 @@ rcache_reg_mr(void *context, ucs_rcache_t *rcache, //NOLINT: rcache is unused
     return UCS_OK;
 }
 
-static void rcache_dereg_mr(void *        context, //NOLINT: context is unused
+static void rcache_dereg_mr(void *context, //NOLINT: context is unused
                             ucc_rcache_t *rcache,  //NOLINT: rcache is unused
                             ucc_rcache_region_t *rregion)
 {
-    ucc_tl_mlx5_reg_t *mlx5_reg = ucc_tl_mlx5_get_rcache_reg_data(rregion);
+    ucc_tl_mlx5_reg_t *mlx5_reg = ucc_derived_of(rregion, ucc_tl_mlx5_reg_t);
 
-    ucc_assert(mlx5_reg->region == rregion);
+    ucc_assert(mlx5_reg->super == rregion);
     ibv_dereg_mr(mlx5_reg->mr);
     mlx5_reg->mr = NULL;
 }
