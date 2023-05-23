@@ -98,10 +98,15 @@ UCC_CLASS_DECLARE(ucc_tl_mlx5_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
 ucc_status_t tl_mlx5_rcache_create(ucc_tl_mlx5_context_t *ctx);
+
 typedef struct ucc_tl_mlx5_reg {
-    ucc_rcache_region_t *super;
     struct ibv_mr       *mr;
 } ucc_tl_mlx5_reg_t;
+
+typedef struct ucc_tl_mlx5_rcache_region {
+    ucc_rcache_region_t super;
+    ucc_tl_mlx5_reg_t   reg;
+} ucc_tl_mlx5_rcache_region_t;
 
 #define UCC_TL_MLX5_SUPPORTED_COLLS (UCC_COLL_TYPE_ALLTOALL)
 
