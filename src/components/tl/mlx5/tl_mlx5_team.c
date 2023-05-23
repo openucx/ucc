@@ -117,7 +117,7 @@ ucc_status_t ucc_tl_mlx5_team_destroy(ucc_base_team_t *tl_team)
     return UCC_OK;
 }
 
-static inline ucc_status_t ucc_tl_mlx5_a2a_team_test(ucc_base_team_t *team)
+static inline ucc_status_t ucc_tl_mlx5_alltoall_team_test(ucc_base_team_t *team)
 {
     ucc_tl_mlx5_team_t *tl_team   = ucc_derived_of(team, ucc_tl_mlx5_team_t);
 
@@ -253,7 +253,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         goto initial_sync_post;
     }
 
-    a2a_status = ucc_tl_mlx5_a2a_team_test(team);
+    a2a_status = ucc_tl_mlx5_alltoall_team_test(team);
     if (a2a_status < 0) {
         tl_warn(team->context->lib, "ALLTOALL tl team: %p creation failed %d",
                 team, a2a_status);
