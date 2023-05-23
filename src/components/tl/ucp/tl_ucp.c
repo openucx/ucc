@@ -189,11 +189,6 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, use_reordering),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"CALC_OPT_RADIX", "y",
-     "Opt radix in TL UCP for Bcast SAG and Allreduce SRA. Requires topo info",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, calc_opt_radix),
-     UCC_CONFIG_TYPE_BOOL},
-
     {NULL}};
 
 static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {

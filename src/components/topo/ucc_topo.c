@@ -180,6 +180,8 @@ ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *ctx_topo,
     topo->max_ppn             = 0;
     topo->min_socket_size     = UCC_RANK_MAX;
     topo->max_socket_size     = 0;
+    topo->min_numa_size       = UCC_RANK_MAX;
+    topo->max_numa_size       = 0;
     topo->all_sockets         = NULL;
     topo->all_numas           = NULL;
 

@@ -60,10 +60,14 @@ typedef struct ucc_topo {
                          for ucc_team topo it is team->ctx_map */
     ucc_rank_t   min_ppn; /*< min ppn across the nodes for a team */
     ucc_rank_t   max_ppn; /*< max ppn across the nodes for a team */
-    ucc_rank_t   min_socket_size; /*< min ppn on a socket/numa,
-                                    across the nodes for a team */
-    ucc_rank_t   max_socket_size; /*< max ppn on a socket/numa,
-                                    across the nodes for a team */
+    ucc_rank_t   min_socket_size; /*< min number of processes on a socket,
+                                      across all nodes of a team */
+    ucc_rank_t   max_socket_size; /*< max number of processes on a socket,
+                                      across all nodes of a team */
+    ucc_rank_t   min_numa_size; /*< min number of processes on a numa,
+                                    across all nodes of a team */
+    ucc_rank_t   max_numa_size; /*< max number of processes on a numa,
+                                    across all nodes of a team */
 } ucc_topo_t;
 
 /* Initializes ctx level topo structure using addr_storage.
@@ -128,6 +132,58 @@ static inline ucc_rank_t ucc_topo_max_ppn(ucc_topo_t *topo)
 static inline int ucc_topo_isoppn(ucc_topo_t *topo)
 {
     return ucc_topo_max_ppn(topo) == ucc_topo_min_ppn(topo);
+}
+
+/* Returns min socket size across the nodes */
+static inline ucc_rank_t ucc_topo_min_socket_size(ucc_topo_t *topo)
+{
+    ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+
+    if (sbgp->status == UCC_SBGP_NOT_INIT) {
+        ucc_assert(topo->topo->sock_bound);
+        return UCC_RANK_INVALID;
+    }
+
+    return topo->min_socket_size;
+}
+
+/* Returns max socket size across the nodes */
+static inline ucc_rank_t ucc_topo_max_socket_size(ucc_topo_t *topo)
+{
+     ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+
+    if (sbgp->status == UCC_SBGP_NOT_INIT) {
+        ucc_assert(topo->topo->sock_bound);
+        return UCC_RANK_INVALID;
+    }
+
+    return topo->max_socket_size;
+}
+
+/* Returns min numa size across the nodes */
+static inline ucc_rank_t ucc_topo_min_numa_size(ucc_topo_t *topo)
+{
+    ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+
+    if (sbgp->status == UCC_SBGP_NOT_INIT) {
+        ucc_assert(topo->topo->numa_bound);
+        return UCC_RANK_INVALID;
+    }
+
+    return topo->min_numa_size;
+}
+
+/* Returns max numa size across the nodes */
+static inline ucc_rank_t ucc_topo_max_numa_size(ucc_topo_t *topo)
+{
+    ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+
+    if (sbgp->status == UCC_SBGP_NOT_INIT) {
+        ucc_assert(topo->topo->numa_bound);
+        return UCC_RANK_INVALID;
+    }
+
+    return topo->max_numa_size;
 }
 
 static inline int ucc_topo_n_sockets(ucc_topo_t *topo)

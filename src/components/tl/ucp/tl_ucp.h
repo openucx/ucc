@@ -74,7 +74,6 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t                 alltoallv_hybrid_pairwise_num_posts;
     ucc_ternary_auto_value_t use_topo;
     int                      use_reordering;
-    int                      calc_opt_radix;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {

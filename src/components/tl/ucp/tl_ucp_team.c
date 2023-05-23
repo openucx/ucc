@@ -13,38 +13,6 @@
 #include "utils/ucc_string.h"
 #include "coll_score/ucc_coll_score.h"
 
-#define UCC_MIN_RADIX 2
-
-static ucc_rank_t ucc_tl_ucp_get_opt_radix(ucc_rank_t team_size,
-                                           ucc_rank_t max_radix)
-{
-    ucc_rank_t remainder = 0, n_trees = 0, min_val = 0, min_i = UCC_MIN_RADIX;
-    ucc_rank_t min_trees, r, fs;
-
-    max_radix = (max_radix >= UCC_MIN_RADIX) ? max_radix : UCC_MIN_RADIX;
-    min_trees = max_radix;
-
-    for (r = UCC_MIN_RADIX; r <= max_radix; r++) {
-        fs = r;
-        while (fs < team_size) {
-            fs = fs * r;
-        }
-        fs        = (fs == team_size) ? fs : fs / r;
-        n_trees   = team_size / fs;
-        remainder = team_size - (team_size / fs) * fs;
-        if (remainder == 0) {
-            return r;
-        }
-        if (r == UCC_MIN_RADIX || (r > UCC_MIN_RADIX && (remainder < min_val ||
-            (remainder == min_val && n_trees < min_trees)))) {
-            min_val   = remainder;
-            min_trees = n_trees;
-            min_i     = r;
-        }
-    }
-    return min_i;
-}
-
 static inline ucc_status_t ucc_tl_ucp_get_topo(ucc_tl_ucp_team_t *team)
 {
     ucc_subset_t  subset;
@@ -121,17 +89,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                  "topo is not available, disabling ranks reordering");
         self->cfg.use_reordering = 0;
     }
-    if (self->topo && !IS_SERVICE_TEAM(self) && self->cfg.calc_opt_radix) {
-        status = ucc_sbgp_create(self->topo, UCC_SBGP_NODE_LEADERS);
-        if (UCC_OK != status) {
-            ucc_ep_map_destroy_nested(&self->ctx_map);
-            ucc_topo_cleanup(self->topo);
-            return status;
-        }
+
+    if (self->topo && !IS_SERVICE_TEAM(self) && self->topo->topo->sock_bound) {
         max_radix       = ucc_min(UCC_TL_TEAM_SIZE(self),
-                                  self->topo->min_socket_size);
-        self->opt_radix = ucc_tl_ucp_get_opt_radix(UCC_TL_TEAM_SIZE(self),
-                                                   max_radix);
+                                  ucc_topo_min_socket_size(self->topo));
+
+        self->opt_radix = ucc_kn_get_opt_radix(UCC_TL_TEAM_SIZE(self),
+                                               max_radix);
     }
 
     tl_debug(tl_context->lib, "posted tl team: %p", self);
@@ -151,7 +115,7 @@ ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 {
     ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
 
-    if (UCC_TL_UCP_TEAM_CTX(team)->topo_required) {
+    if (team->topo) {
         ucc_ep_map_destroy_nested(&team->ctx_map);
         ucc_topo_cleanup(team->topo);
     }

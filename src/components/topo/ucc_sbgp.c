@@ -176,14 +176,22 @@ static inline ucc_status_t sbgp_create_node(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
 static ucc_status_t sbgp_create_node_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
                                              int ctx_nlr)
 {
-    ucc_subset_t *set              = &topo->set;
-    ucc_rank_t    comm_size        = ucc_subset_size(set);
-    ucc_rank_t    comm_rank        = set->myrank;
-    int           i_am_node_leader = 0;
-    ucc_rank_t    nnodes           = topo->topo->nnodes;
-    ucc_rank_t    n_node_leaders;
-    ucc_rank_t   *nl_array_1, *nl_array_2, *nl_array_3;
-    int           i;
+    ucc_subset_t *set               = &topo->set;
+    ucc_rank_t    comm_size         = ucc_subset_size(set);
+    ucc_rank_t    comm_rank         = set->myrank;
+    ucc_rank_t    min_sbgp_size     = UCC_RANK_MAX;
+    ucc_rank_t    max_sbgp_size     = 0;
+    ucc_rank_t    max_ctx_sbgp_size = 0;
+    ucc_rank_t   *nl_array_3        = NULL;
+    int           i_am_node_leader  = 0;
+    int           socket_bound      = topo->topo->sock_bound;
+    int           numa_bound        = topo->topo->numa_bound;
+    int           bound             = socket_bound || numa_bound;
+    ucc_rank_t    nnodes            = topo->topo->nnodes;
+    ucc_rank_t    n_node_leaders, ctx_rank, i;
+    ucc_rank_t   *nl_array_1, *nl_array_2;
+    ucc_host_id_t host_id;
+    uint8_t       sbgp_id;
 
     ucc_assert(comm_size != 0 && nnodes != 0);
 
@@ -205,34 +213,44 @@ static ucc_status_t sbgp_create_node_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
         return UCC_ERR_NO_MEMORY;
     }
 
-    nl_array_3 = ucc_malloc(comm_size * nnodes * sizeof(ucc_rank_t),
-                            "nl_array_3");
-    if (!nl_array_3) {
-        ucc_error("failed to allocate %zd bytes for nl_array_3",
-                  comm_size * nnodes * sizeof(ucc_rank_t));
-        ucc_free(nl_array_1);
-        ucc_free(nl_array_2);
-        return UCC_ERR_NO_MEMORY;
+    if (bound) {
+        max_ctx_sbgp_size = socket_bound ? topo->topo->max_n_sockets :
+                                           topo->topo->max_n_numas;
+        nl_array_3 = ucc_malloc(max_ctx_sbgp_size * nnodes *
+                                sizeof(ucc_rank_t), "nl_array_3");
+        if (!nl_array_3) {
+            ucc_error("failed to allocate %zd bytes for nl_array_3",
+                      max_ctx_sbgp_size * nnodes * sizeof(ucc_rank_t));
+            ucc_free(nl_array_1);
+            ucc_free(nl_array_2);
+            return UCC_ERR_NO_MEMORY;
+        }
+
+        for (i = 0; i < nnodes * max_ctx_sbgp_size; i++) {
+            nl_array_3[i] = 0;
+        }
     }
 
     for (i = 0; i < nnodes; i++) {
         nl_array_1[i] = 0;
         nl_array_2[i] = UCC_RANK_MAX;
     }
-    for (i = 0; i < nnodes * comm_size; i++) {
-        nl_array_3[i] = 0;
-    }
 
     for (i = 0; i < comm_size; i++) {
-        ucc_rank_t      ctx_rank  = ucc_ep_map_eval(set->map, i);
-        ucc_host_id_t   host_id   = topo->topo->procs[ctx_rank].host_id;
-        ucc_socket_id_t socket_id = topo->topo->procs[ctx_rank].socket_id;
+        ctx_rank  = ucc_ep_map_eval(set->map, i);
+        host_id   = topo->topo->procs[ctx_rank].host_id;
+        if (bound) {
+            sbgp_id = socket_bound ? topo->topo->procs[ctx_rank].socket_id :
+                                     topo->topo->procs[ctx_rank].numa_id;
+            nl_array_3[sbgp_id + host_id * max_ctx_sbgp_size]++;
+        }
+
         if (nl_array_1[host_id] == 0 || nl_array_1[host_id] == ctx_nlr) {
             nl_array_2[host_id] = i;
         }
         nl_array_1[host_id]++;
-        nl_array_3[socket_id + host_id * comm_size]++;
     }
+
     for (i = 0; i < nnodes; i++) {
         if (nl_array_1[i] > topo->max_ppn) {
             topo->max_ppn = nl_array_1[i];
@@ -241,17 +259,23 @@ static ucc_status_t sbgp_create_node_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
             topo->min_ppn = nl_array_1[i];
         }
     }
-    //TODO: add for numa as well?
-    for (i = 0; i < nnodes * comm_size; i++) {
-        if (nl_array_3[i] == 0) {
-            continue;
+
+    if (bound) {
+        for (i = 0; i < nnodes * max_ctx_sbgp_size; i++) {
+            if (nl_array_3[i] == 0) {
+                continue;
+            }
+            min_sbgp_size = ucc_min(min_sbgp_size, nl_array_3[i]);
+            max_sbgp_size = ucc_max(max_sbgp_size, nl_array_3[i]);
         }
-        if (nl_array_3[i] < topo->min_socket_size) {
-            topo->min_socket_size = nl_array_3[i];
+        if (socket_bound) {
+            topo->min_socket_size = min_sbgp_size;
+            topo->max_socket_size = max_sbgp_size;
+        } else {
+            topo->min_numa_size = min_sbgp_size;
+            topo->max_numa_size = max_sbgp_size;
         }
-        if (nl_array_3[i] > topo->max_socket_size) {
-            topo->max_socket_size = nl_array_3[i];
-        }
+        ucc_free(nl_array_3);
     }
 
     n_node_leaders = 0;
@@ -272,7 +296,6 @@ static ucc_status_t sbgp_create_node_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
     }
 skip:
     ucc_free(nl_array_2);
-    ucc_free(nl_array_3);
 
     if (n_node_leaders > 1) {
         sbgp->group_size = n_node_leaders;
