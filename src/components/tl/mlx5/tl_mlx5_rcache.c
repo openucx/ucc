@@ -32,7 +32,7 @@ rcache_reg_mr(void *context, ucc_rcache_t *rcache, //NOLINT: rcache is unused
 }
 
 static void rcache_dereg_mr(void *context, //NOLINT: context is unused
-                            ucc_rcache_t *rcache,  //NOLINT: rcache is unused
+                            ucc_rcache_t *rcache, //NOLINT: rcache is unused
                             ucc_rcache_region_t *rregion)
 {
     ucc_tl_mlx5_rcache_region_t *mlx5_rregion =
@@ -41,7 +41,7 @@ static void rcache_dereg_mr(void *context, //NOLINT: context is unused
     ibv_dereg_mr(mlx5_rregion->reg.mr);
 }
 
-static void ucc_tl_mlx5_rcache_dump_region_cb(void *context,
+static void ucc_tl_mlx5_rcache_dump_region_cb(void *context, //NOLINT
                                               ucc_rcache_t *rcache, //NOLINT
                                               ucs_rcache_region_t *rregion,
                                               char *buf, size_t max)
