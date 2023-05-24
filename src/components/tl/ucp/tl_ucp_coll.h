@@ -416,12 +416,7 @@ ucc_tl_ucp_get_radix_from_range(ucc_tl_ucp_team_t *team,
     radix = ucc_mrange_uint_get(p, msgsize, mem_type);
 
     if (UCC_UUNITS_AUTO == radix) {
-        /* auto selection based on team configuration */
-        if (team->topo && team->topo->topo->sock_bound &&
-            !IS_SERVICE_TEAM(team)) {
-            return team->opt_radix;
-        }
-        return UCC_UUNITS_AUTO_RADIX;
+        return team->opt_radix;
     }
     return radix;
 }

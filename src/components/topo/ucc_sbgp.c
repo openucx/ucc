@@ -226,9 +226,7 @@ static ucc_status_t sbgp_create_node_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
             return UCC_ERR_NO_MEMORY;
         }
 
-        for (i = 0; i < nnodes * max_ctx_sbgp_size; i++) {
-            nl_array_3[i] = 0;
-        }
+        memset(nl_array_3, 0, max_ctx_sbgp_size * nnodes * sizeof(ucc_rank_t));
     }
 
     for (i = 0; i < nnodes; i++) {

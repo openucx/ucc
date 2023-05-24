@@ -234,13 +234,14 @@ ucc_knomial_calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
 /* Calculates (sub) opt radix for Allreduce SRA and Bcast SAG,
    by minimizing n_extra ranks */
 static inline ucc_rank_t ucc_kn_get_opt_radix(ucc_rank_t team_size,
-                                              ucc_rank_t max_radix)
+                                              ucc_kn_radix_t max_radix)
 {
-    ucc_rank_t remainder = 0, n_trees = 0, min_val = 0,
-               min_i = UCC_KN_MIN_RADIX;
-    ucc_rank_t min_trees, r, fs;
+    ucc_rank_t     remainder = 0, n_trees = 0, min_val = 0;
+    ucc_kn_radix_t min_i     = UCC_KN_MIN_RADIX;
+    ucc_kn_radix_t r, fs;
+    ucc_rank_t     min_trees;
 
-    max_radix = (max_radix >= UCC_KN_MIN_RADIX) ? max_radix : UCC_KN_MIN_RADIX;
+    max_radix = ucc_max(max_radix, UCC_KN_MIN_RADIX);
     min_trees = max_radix;
 
     for (r = UCC_KN_MIN_RADIX; r <= max_radix; r++) {
