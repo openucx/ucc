@@ -55,11 +55,18 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     self->a2a    = NULL;
     self->dm_ptr = NULL;
 
-    if (ucc_topo_get_sbgp(UCC_TL_CORE_TEAM(self)->topo, UCC_SBGP_NODE)
+    status = ucc_tl_mlx5_topo_init(self);
+    if (status != UCC_OK) {
+        tl_error(ctx->super.super.lib, "failed to init team topo");
+        return status;
+    }
+
+    if (ucc_topo_get_sbgp(self->topo, UCC_SBGP_NODE)
             ->group_rank == 0) {
         status = ucc_tl_mlx5_dm_init(self);
         if (UCC_OK != status) {
             tl_error(UCC_TL_TEAM_LIB(self), "failed to init device memory");
+            ucc_tl_mlx5_topo_cleanup(self);
             return status;
         }
     }

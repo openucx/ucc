@@ -6,15 +6,7 @@
 
 #include "tl_mlx5_dm.h"
 
-static ucc_status_t ucc_tl_mlx5_dm_chunk_alloc(ucc_mpool_t *mp, //NOLINT
-                                               size_t *size_p, void **chunk_p)
-{
-    *chunk_p = ucc_malloc(*size_p, "mlx5 dm");
-    if (!*chunk_p) {
-        return UCC_ERR_NO_MEMORY;
-    }
-    return UCC_OK;
-}
+#define DM_HOST_AUTO_NUM_CHUNKS 8
 
 static void ucc_tl_mlx5_dm_chunk_init(ucc_mpool_t *mp,        //NOLINT
                                       void *obj, void *chunk) //NOLINT
@@ -23,8 +15,9 @@ static void ucc_tl_mlx5_dm_chunk_init(ucc_mpool_t *mp,        //NOLINT
     ucc_tl_mlx5_team_t     *team =
         ucc_container_of(mp, ucc_tl_mlx5_team_t, dm_pool);
 
-    c->offset                = (ptrdiff_t)team->oob_req;
-    team->oob_req            = PTR_OFFSET(team->oob_req, UCC_TL_MLX5_DM_CHUNK_SIZE);
+    c->offset       = (ptrdiff_t)team->dm_offset;
+    team->dm_offset = PTR_OFFSET(team->dm_offset,
+                                  UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_buf_size);
 }
 
 static void ucc_tl_mlx5_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
@@ -32,7 +25,7 @@ static void ucc_tl_mlx5_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
     ucc_free(chunk);
 }
 
-ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {.chunk_alloc = ucc_tl_mlx5_dm_chunk_alloc,
+ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {.chunk_alloc = ucc_mpool_hugetlb_malloc,
                                       .chunk_release =
                                           ucc_tl_mlx5_dm_chunk_release,
                                       .obj_init    = ucc_tl_mlx5_dm_chunk_init,
@@ -67,7 +60,8 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
     int                       max_chunks_to_alloc, min_chunks_to_alloc, i;
 
     if (dm_host) {
-        max_chunks_to_alloc = (*buf_num_p == UCC_ULUNITS_AUTO) ? 8 : *buf_num_p;
+        max_chunks_to_alloc = (*buf_num_p == UCC_ULUNITS_AUTO) ?
+                                    DM_HOST_AUTO_NUM_CHUNKS : *buf_num_p;
         dm_attr.length      = max_chunks_to_alloc * buf_size;
         dm_ptr              = ucc_malloc(dm_attr.length, "memic_host");
         if (!dm_ptr) {
@@ -93,8 +87,7 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
             tl_error(lib, "device doesn't support dm allocation");
             return UCC_ERR_NO_RESOURCE;
         }
-
-        memset(&dm_attr, 0, sizeof(dm_attr));
+        max_chunks_to_alloc = min_chunks_to_alloc = *buf_num_p;
         if (*buf_num_p == UCC_ULUNITS_AUTO) {
             max_chunks_to_alloc =
                 attr.max_dm_size / buf_size - 1; //keep reserved memory
@@ -107,16 +100,15 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
                          buf_size, attr.max_dm_size / 2, attr.max_dm_size);
                 return UCC_ERR_NO_RESOURCE;
             }
-        } else {
-            max_chunks_to_alloc = min_chunks_to_alloc = *buf_num_p;
         }
         if (attr.max_dm_size < buf_size * min_chunks_to_alloc) {
             tl_error(lib,
-                     "cannot allocated %i buffer(s) of size %ld, "
+                     "cannot allocate %i buffer(s) of size %ld, "
                      "max allocation size is %ld",
                      min_chunks_to_alloc, buf_size, attr.max_dm_size);
             return UCC_ERR_NO_MEMORY;
         }
+        memset(&dm_attr, 0, sizeof(dm_attr));
         for (i = max_chunks_to_alloc; i >= min_chunks_to_alloc; i--) {
             dm_attr.length = i * buf_size;
             errno          = 0;
@@ -151,7 +143,7 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
 
 ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
 {
-    ucc_tl_mlx5_context_t *   ctx = UCC_TL_MLX5_TEAM_CTX(team);
+    ucc_tl_mlx5_context_t    *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     ucc_tl_mlx5_lib_config_t *cfg = &UCC_TL_MLX5_TEAM_LIB(team)->cfg;
     ucc_status_t              status;
 
@@ -163,13 +155,13 @@ ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
                  "failed to alloc and register device memory");
         return status;
     }
-    team->oob_req = NULL;
+    team->dm_offset = NULL;
 
-    // TODO: fix case dm_host=true
     status = ucc_mpool_init(&team->dm_pool, 0, sizeof(ucc_tl_mlx5_dm_chunk_t),
                             0, UCC_CACHE_LINE_SIZE, cfg->dm_buf_num,
                             cfg->dm_buf_num, &ucc_tl_mlx5_dm_ops,
-                            UCC_THREAD_MULTIPLE, "mlx5 dm pool");
+                            ctx->super.super.ucc_context->thread_mode,
+                            "mlx5 dm pool");
     if (status != UCC_OK) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to init dm pool");
         ucc_tl_mlx5_dm_cleanup(team);

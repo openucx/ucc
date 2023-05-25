@@ -5,7 +5,6 @@
  */
 
 #include "tl_mlx5.h"
-#define UCC_TL_MLX5_DM_CHUNK_SIZE 8192
 
 ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
                                       struct ibv_pd *pd, int dm_host,
