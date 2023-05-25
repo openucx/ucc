@@ -92,16 +92,25 @@ typedef struct ucc_tl_mlx5_dm_chunk {
 } ucc_tl_mlx5_dm_chunk_t;
 
 typedef struct ucc_tl_mlx5_a2a ucc_tl_mlx5_a2a_t;
+
+typedef enum
+{
+    TL_MLX5_TEAM_STATE_INIT,
+    TL_MLX5_TEAM_STATE_POSTED,
+} ucc_tl_mlx5_team_state_t;
+
 typedef struct ucc_tl_mlx5_team {
-    ucc_tl_team_t           super;
-    ucc_service_coll_req_t *scoll_req;
-    void *                  dm_offset;
-    ucc_mpool_t             dm_pool;
-    struct ibv_dm *         dm_ptr;
-    struct ibv_mr *         dm_mr;
-    ucc_tl_mlx5_a2a_t *     a2a;
-    ucc_topo_t *            topo;
-    ucc_ep_map_t            ctx_map;
+    ucc_tl_team_t            super;
+    ucc_status_t             status[2];
+    ucc_service_coll_req_t  *scoll_req;
+    ucc_tl_mlx5_team_state_t state;
+    void                    *dm_offset;
+    ucc_mpool_t              dm_pool;
+    struct ibv_dm           *dm_ptr;
+    struct ibv_mr           *dm_mr;
+    ucc_tl_mlx5_a2a_t       *a2a;
+    ucc_topo_t              *topo;
+    ucc_ep_map_t             ctx_map;
 } ucc_tl_mlx5_team_t;
 UCC_CLASS_DECLARE(ucc_tl_mlx5_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

@@ -66,20 +66,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
         status = ucc_tl_mlx5_dm_init(self);
         if (UCC_OK != status) {
             tl_error(UCC_TL_TEAM_LIB(self), "failed to init device memory");
-            ucc_tl_mlx5_topo_cleanup(self);
-            return status;
         }
     }
 
-    status = ucc_tl_mlx5_topo_init(self);
-    if (status != UCC_OK) {
-        tl_error(ctx->super.super.lib, "failed to init team topo");
-        ucc_tl_mlx5_dm_cleanup(self);
-        return status;
-    }
+    self->status[0] = status;
+    self->state = TL_MLX5_TEAM_STATE_INIT;
 
     tl_debug(tl_context->lib, "posted tl team: %p", self);
-    return status;
+    return UCC_OK;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
@@ -99,8 +93,46 @@ ucc_status_t ucc_tl_mlx5_team_destroy(ucc_base_team_t *tl_team)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *tl_team) /* NOLINT */
+ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
 {
+    ucc_tl_mlx5_team_t *tl_team   = ucc_derived_of(team, ucc_tl_mlx5_team_t);
+    ucc_team_t         *core_team = UCC_TL_CORE_TEAM(tl_team);
+    ucc_subset_t        subset    = {.map.type   = UCC_EP_MAP_FULL,
+                                     .map.ep_num = core_team->size,
+                                     .myrank     = core_team->rank};
+    ucc_status_t        status;
+
+    switch (tl_team->state) {
+    case TL_MLX5_TEAM_STATE_INIT:
+        status = ucc_service_allreduce(
+                    core_team, &tl_team->status[0], &tl_team->status[1],
+                    UCC_DT_INT32, 1, UCC_OP_MIN, subset, &tl_team->scoll_req);
+        if (status < 0) {
+            tl_error(UCC_TL_TEAM_LIB(tl_team),
+                            "failed to collect global status");
+        }
+        tl_team->state = TL_MLX5_TEAM_STATE_POSTED;
+    case TL_MLX5_TEAM_STATE_POSTED:
+        status = ucc_service_coll_test(tl_team->scoll_req);
+        if (status < 0) {
+            tl_error(UCC_TL_TEAM_LIB(tl_team),
+                     "failure during service coll exchange: %s",
+                     ucc_status_string(status));
+            return status;
+        }
+        if (UCC_INPROGRESS == status) {
+            return status;
+        }
+        ucc_assert(status == UCC_OK);
+        ucc_service_coll_finalize(tl_team->scoll_req);
+        if (tl_team->status[1] != UCC_OK) {
+            tl_error(UCC_TL_TEAM_LIB(tl_team),
+                     "node leader failed during device memory init: %s",
+                     ucc_status_string(tl_team->status[1]));
+            return tl_team->status[1];
+        }
+    }
+
     return UCC_OK;
 }
 
