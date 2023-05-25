@@ -129,6 +129,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
             tl_error(UCC_TL_TEAM_LIB(tl_team),
                      "node leader failed during device memory init: %s",
                      ucc_status_string(tl_team->status[1]));
+            ucc_tl_mlx5_team_destroy(team);
             return tl_team->status[1];
         }
     }
