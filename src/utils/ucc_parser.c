@@ -80,7 +80,8 @@ static int ucc_check_section(ucc_section_desc_t sec_desc,
     return 1;
 }
 
-static inline int ucc_check_range(char *range_str, size_t *begin, size_t *end)
+static inline int ucc_check_range(char *range_str, ucc_rank_t *begin,
+                                  ucc_rank_t *end)
 {
     char   **range = ucc_str_split(range_str, "-");
     char    *str_end;
@@ -143,22 +144,22 @@ ucc_parse_section_name_to_desc(const char *sec_name, ucc_section_desc_t *desc)
             desc->mask |= UCC_TUNING_DESC_FIELD_MODEL;
         }
         else if (strcmp(cur_str[0], "team_size") == 0) {
-            if (!ucc_check_range(cur_str[1], (size_t *) &desc->min_team_size,
-                                 (size_t *) &desc->max_team_size)) {
+            if (!ucc_check_range(cur_str[1], &desc->min_team_size,
+                                 &desc->max_team_size)) {
                 goto err_key;
             }
             desc->mask |= UCC_TUNING_DESC_FIELD_TEAM_SIZE;
         }
         else if (strcmp(cur_str[0], "ppn") == 0) {
-            if (!ucc_check_range(cur_str[1], (size_t *) &desc->min_ppn,
-                                 (size_t *) &desc->max_ppn)) {
+            if (!ucc_check_range(cur_str[1], &desc->min_ppn,
+                                 &desc->max_ppn)) {
                 goto err_key;
             }
             desc->mask |= UCC_TUNING_DESC_FIELD_PPN;
         }
         else if (strcmp(cur_str[0], "nnodes") == 0) {
-            if (!ucc_check_range(cur_str[1], (size_t *) &desc->min_nnodes,
-                                 (size_t *) &desc->max_nnodes)) {
+            if (!ucc_check_range(cur_str[1], &desc->min_nnodes,
+                                 &desc->max_nnodes)) {
                 goto err_key;
             }
             desc->mask |= UCC_TUNING_DESC_FIELD_NNODES;
