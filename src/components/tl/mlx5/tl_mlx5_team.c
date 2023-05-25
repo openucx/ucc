@@ -61,8 +61,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
         return status;
     }
 
-    if (ucc_topo_get_sbgp(self->topo, UCC_SBGP_NODE)
-            ->group_rank == 0) {
+    if (ucc_topo_get_sbgp(self->topo, UCC_SBGP_NODE)->group_rank == 0) {
         status = ucc_tl_mlx5_dm_init(self);
         if (UCC_OK != status) {
             tl_error(UCC_TL_TEAM_LIB(self), "failed to init device memory");
@@ -70,7 +69,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     }
 
     self->status[0] = status;
-    self->state = TL_MLX5_TEAM_STATE_INIT;
+    self->state     = TL_MLX5_TEAM_STATE_INIT;
 
     tl_debug(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
@@ -109,7 +108,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
                     UCC_DT_INT32, 1, UCC_OP_MIN, subset, &tl_team->scoll_req);
         if (status < 0) {
             tl_error(UCC_TL_TEAM_LIB(tl_team),
-                            "failed to collect global status");
+                     "failed to collect global status");
         }
         tl_team->state = TL_MLX5_TEAM_STATE_POSTED;
     case TL_MLX5_TEAM_STATE_POSTED:

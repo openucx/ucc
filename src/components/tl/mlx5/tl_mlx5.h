@@ -86,8 +86,8 @@ UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t *,
 
 typedef struct ucc_tl_mlx5_schedule ucc_tl_mlx5_schedule_t;
 typedef struct ucc_tl_mlx5_dm_chunk {
-    ptrdiff_t offset; /* 0 based offset from the beginning of
-                         memic_mr (obtained with ibv_reg_dm_mr) */
+    ptrdiff_t               offset; /* 0 based offset from the beginning of
+                                       memic_mr (obtained with ibv_reg_dm_mr) */
     ucc_tl_mlx5_schedule_t *task;
 } ucc_tl_mlx5_dm_chunk_t;
 

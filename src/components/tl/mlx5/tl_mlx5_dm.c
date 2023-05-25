@@ -17,7 +17,7 @@ static void ucc_tl_mlx5_dm_chunk_init(ucc_mpool_t *mp,        //NOLINT
 
     c->offset       = (ptrdiff_t)team->dm_offset;
     team->dm_offset = PTR_OFFSET(team->dm_offset,
-                                  UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_buf_size);
+                                 UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_buf_size);
 }
 
 static void ucc_tl_mlx5_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
@@ -60,8 +60,9 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
     int                       max_chunks_to_alloc, min_chunks_to_alloc, i;
 
     if (dm_host) {
-        max_chunks_to_alloc = (*buf_num_p == UCC_ULUNITS_AUTO) ?
-                                    DM_HOST_AUTO_NUM_CHUNKS : *buf_num_p;
+        max_chunks_to_alloc = (*buf_num_p == UCC_ULUNITS_AUTO)
+                                  ? DM_HOST_AUTO_NUM_CHUNKS
+                                  : *buf_num_p;
         dm_attr.length      = max_chunks_to_alloc * buf_size;
         dm_ptr              = ucc_malloc(dm_attr.length, "memic_host");
         if (!dm_ptr) {
