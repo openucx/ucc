@@ -16,6 +16,9 @@ enum {
     UCC_TL_UCP_ALLTOALLV_ALG_LAST
 };
 
+#define UCC_TL_UCP_ALLTOALLV_DEFAULT_ALG_SELECT_STR                           \
+    "alltoallv:host:[64-inf]:@hybrid"
+
 extern ucc_base_coll_alg_info_t
              ucc_tl_ucp_alltoallv_algs[UCC_TL_UCP_ALLTOALLV_ALG_LAST + 1];
 
