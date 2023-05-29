@@ -272,7 +272,19 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     }
     ucc_free(prefix);
     prefix = NULL;
+    ucc_component_framework_t  *plugins = &UCC_TL_CTX_IFACE(&self->super)->coll_plugins;
+    ucc_tl_coll_plugin_iface_t *tlcp;
 
+    if (plugins->n_components != 0) {
+        if (plugins->n_components > 1) {
+            tl_warn(self->super.super.lib,
+                    "multiple plugins are not supported");
+        }
+        tlcp = ucc_derived_of(plugins->components[0],
+                              ucc_tl_coll_plugin_iface_t);
+        tlcp->context_create(params, config, &self->super.super,
+                             &self->super.coll_plugin_context);
+    }
     tl_debug(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
 
@@ -376,7 +388,18 @@ static inline void ucc_tl_ucp_worker_cleanup(ucc_tl_ucp_worker_t worker)
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_ucp_context_t)
 {
+    ucc_component_framework_t  *plugins = &UCC_TL_CTX_IFACE(&self->super)->coll_plugins;
+    ucc_tl_coll_plugin_iface_t *tlcp;
+
     tl_debug(self->super.super.lib, "finalizing tl context: %p", self);
+
+     if (plugins->n_components != 0) {
+        tlcp = ucc_derived_of(plugins->components[0],
+                              ucc_tl_coll_plugin_iface_t);
+        tlcp->context_destroy(&self->super.super,
+                              self->super.coll_plugin_context);
+    }
+
     if (self->remote_info) {
         ucc_tl_ucp_rinfo_destroy(self);
     }
