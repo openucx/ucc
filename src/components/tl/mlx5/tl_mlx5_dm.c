@@ -25,7 +25,7 @@ static void ucc_tl_mlx5_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
     ucc_free(chunk);
 }
 
-ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {.chunk_alloc = ucc_mpool_hugetlb_malloc,
+static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {.chunk_alloc = ucc_mpool_hugetlb_malloc,
                                       .chunk_release =
                                           ucc_tl_mlx5_dm_chunk_release,
                                       .obj_init    = ucc_tl_mlx5_dm_chunk_init,
@@ -53,11 +53,11 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
                                       struct ibv_dm **ptr, struct ibv_mr **mr,
                                       ucc_base_lib_t *lib)
 {
-    struct ibv_dm *           dm_ptr = NULL;
-    struct ibv_mr *           dm_mr;
-    struct ibv_device_attr_ex attr;
-    struct ibv_alloc_dm_attr  dm_attr;
-    int                       max_chunks_to_alloc, min_chunks_to_alloc, i;
+    struct ibv_dm             *dm_ptr = NULL;
+    struct ibv_mr             *dm_mr;
+    struct ibv_device_attr_ex  attr;
+    struct ibv_alloc_dm_attr   dm_attr;
+    int                        max_chunks_to_alloc, min_chunks_to_alloc, i;
 
     if (dm_host) {
         max_chunks_to_alloc = (*buf_num_p == UCC_ULUNITS_AUTO)

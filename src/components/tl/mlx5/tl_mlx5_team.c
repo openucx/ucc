@@ -109,6 +109,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         if (status < 0) {
             tl_error(UCC_TL_TEAM_LIB(tl_team),
                      "failed to collect global status");
+            return status;
         }
         tl_team->state = TL_MLX5_TEAM_STATE_POSTED;
     case TL_MLX5_TEAM_STATE_POSTED:
