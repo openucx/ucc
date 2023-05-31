@@ -53,6 +53,14 @@
         (ucc_tl_cuda_shm_barrier_t *)_bar;                                     \
     })
 
+#define GET_RANK_ID(_ids, _trank, _max_concurrent)                             \
+    ({                                                                         \
+        size_t _rank_id_size = sizeof(ucc_tl_cuda_rank_id_t) +                 \
+            (_max_concurrent - 1) * sizeof(cudaIpcEventHandle_t);              \
+        void *_rank_id = PTR_OFFSET(_ids, _trank * _rank_id_size);             \
+        (ucc_tl_cuda_rank_id_t*)_rank_id;                                      \
+    })
+
 #ifdef HAVE_PROFILING_TL_CUDA
 #include "utils/profile/ucc_profile.h"
 #else
@@ -81,6 +89,7 @@ typedef struct ucc_tl_cuda_lib_config {
 
 typedef struct ucc_tl_cuda_context_config {
     ucc_tl_context_config_t super;
+    int                     lazy_init;
 } ucc_tl_cuda_context_config_t;
 
 typedef struct ucc_tl_cuda_lib {
@@ -93,8 +102,6 @@ UCC_CLASS_DECLARE(ucc_tl_cuda_lib_t, const ucc_base_lib_params_t *,
 typedef struct ucc_tl_cuda_context {
     ucc_tl_context_t             super;
     ucc_tl_cuda_context_config_t cfg;
-    int                          device;
-    ucc_tl_cuda_device_pci_id_t  device_id;
     ucc_tl_cuda_topo_t          *topo;
     ucc_mpool_t                  req_mp;
     tl_cuda_ep_hash_t           *ipc_cache;
@@ -127,6 +134,7 @@ typedef struct ucc_tl_cuda_rank_id {
     ucc_tl_cuda_device_pci_id_t pci_id;
     ucc_tl_cuda_mem_info_t      scratch_info;
     int                         shm;
+    cudaIpcEventHandle_t        ev_handle[1]; /* max concurent */
 } ucc_tl_cuda_rank_id_t;
 
 typedef struct ucc_tl_cuda_sync {
@@ -134,7 +142,6 @@ typedef struct ucc_tl_cuda_sync {
     ucc_tl_cuda_mem_info_t mem_info_src;
     ucc_tl_cuda_mem_info_t mem_info_dst;
     cudaEvent_t            ipc_event_local;
-    cudaIpcEventHandle_t   ev_handle;
     union {
         struct {
             size_t sbytes[UCC_TL_CUDA_MAX_PEERS];
@@ -152,19 +159,31 @@ typedef struct ucc_tl_cuda_scratch {
     ucc_tl_cuda_mem_info_t rem_info[UCC_TL_CUDA_MAX_PEERS];
 } ucc_tl_cuda_scratch_t;
 
+enum {
+    TL_CUDA_STATE_READY,
+    TL_CUDA_STATE_SHM_ID_EXCHANGE,
+    TL_CUDA_STATE_COMM_INIT,
+    TL_CUDA_STATE_ERROR
+};
+
 typedef struct ucc_tl_cuda_team {
-    ucc_tl_team_t              super;
-    uint32_t                   seq_num;
-    ucc_tl_cuda_team_topo_t   *topo;
-    ucc_tl_cuda_sync_t        *sync;
-    ucc_tl_cuda_sync_state_t  *sync_state;
-    ucc_tl_cuda_shm_barrier_t *bar;
-    ucc_tl_cuda_scratch_t      scratch;
-    cudaStream_t               stream;
-    ucc_tl_cuda_rank_id_t     *ids;
-    ucc_team_oob_coll_t        oob;
-    void                      *oob_req;
+    ucc_tl_team_t                super;
+    int                          state;
+    uint32_t                     seq_num;
+    int                          device;
+    ucc_tl_cuda_device_pci_id_t  device_id;
+    ucc_tl_cuda_team_topo_t     *topo;
+    ucc_tl_cuda_sync_t          *sync;
+    ucc_tl_cuda_sync_state_t    *sync_state;
+    ucc_tl_cuda_shm_barrier_t   *bar;
+    ucc_tl_cuda_scratch_t        scratch;
+    cudaStream_t                 stream;
+    ucc_tl_cuda_rank_id_t       *ids;
+    ucc_team_oob_coll_t          oob;
+    void                        *oob_req;
 } ucc_tl_cuda_team_t;
+
+ucc_status_t ucc_tl_cuda_comm_init(ucc_tl_cuda_team_t *team);
 
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

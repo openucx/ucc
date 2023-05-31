@@ -229,17 +229,20 @@ static ucc_status_t
 ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
                                    ucc_tl_cuda_team_topo_t *topo)
 {
-    ucc_rank_t size        = UCC_TL_TEAM_SIZE(team);
-    ucc_rank_t rank        = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t num_proxies = 0;
+    ucc_tl_cuda_lib_t     *tl_cuda_lib       = ucc_derived_of(UCC_TL_TEAM_LIB(team),
+                                                              ucc_tl_cuda_lib_t);
+    const ucc_rank_t       size              = UCC_TL_TEAM_SIZE(team);
+    const ucc_rank_t       rank              = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t             num_proxies       = 0;
+    const uint32_t         max_concurrent    = tl_cuda_lib->cfg.max_concurrent;
     ucc_rank_t i, j, k, proxy;
     float *data;
     float score, min_score;
     ucc_status_t status;
     char pci_str[2][MAX_PCI_BUS_ID_STR];
+    ucc_tl_cuda_rank_id_t *rank_id, *peer_id;
 
     topo->proxy_needed = 0;
-
     for (i = 0; i < size * size; i++) {
         if (topo->matrix[i] == 0) {
             num_proxies++;
@@ -279,6 +282,7 @@ ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
 
     num_proxies = 0;
     for (i = 0; i < size; i++) {
+        rank_id = GET_RANK_ID(team->ids, i, max_concurrent);
         for (j = 0; j < size; j++) {
             if (ucc_tl_cuda_team_topo_is_direct(&team->super, topo, i, j)) {
                 continue;
@@ -305,10 +309,11 @@ ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
                 }
             }
             if (proxy == UCC_RANK_INVALID) {
-                ucc_tl_cuda_topo_pci_id_to_str(&team->ids[i].pci_id,
-                                                pci_str[0], MAX_PCI_BUS_ID_STR);
-                ucc_tl_cuda_topo_pci_id_to_str(&team->ids[j].pci_id,
-                                                pci_str[1], MAX_PCI_BUS_ID_STR);
+                peer_id = GET_RANK_ID(team->ids, j, max_concurrent);
+                ucc_tl_cuda_topo_pci_id_to_str(&rank_id->pci_id,
+                                               pci_str[0], MAX_PCI_BUS_ID_STR);
+                ucc_tl_cuda_topo_pci_id_to_str(&peer_id->pci_id,
+                                               pci_str[1], MAX_PCI_BUS_ID_STR);
                 tl_debug(UCC_TL_TEAM_LIB(team), "no proxy found between "
                          "dev %s (%d) and dev %s (%d), "
                          "cuda topology is not supported",
@@ -341,21 +346,27 @@ static ucc_status_t
 ucc_tl_cuda_team_topo_init_matrix(const ucc_tl_cuda_team_t *team,
                                   ucc_rank_t *matrix)
 {
-    ucc_tl_cuda_topo_t *topo = UCC_TL_CUDA_TEAM_CTX(team)->topo;
-    int                 size = UCC_TL_TEAM_SIZE(team);
+    ucc_tl_cuda_lib_t  *tl_cuda_lib    = ucc_derived_of(UCC_TL_TEAM_LIB(team),
+                                                        ucc_tl_cuda_lib_t);
+    ucc_tl_cuda_topo_t *topo           = UCC_TL_CUDA_TEAM_CTX(team)->topo;
+    const int           size           = UCC_TL_TEAM_SIZE(team);
+    const uint32_t      max_concurrent = tl_cuda_lib->cfg.max_concurrent;
+    ucc_tl_cuda_rank_id_t *rank_id, *peer_id;
     ucc_status_t status;
     int i, j;
 
     for (i = 0; i < size; i++) {
         matrix[i + i*size] = UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE;
+        rank_id = GET_RANK_ID(team->ids, i, max_concurrent);
         for (j = i + 1; j < size; j++) {
-            if (ucc_tl_cuda_topo_device_id_equal(&team->ids[i].pci_id,
-                                                 &team->ids[j].pci_id)) {
+            peer_id = GET_RANK_ID(team->ids, j, max_concurrent);
+            if (ucc_tl_cuda_topo_device_id_equal(&rank_id->pci_id,
+                                                 &peer_id->pci_id)) {
                 matrix[i + j*size] = UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE;
             } else {
                 status = ucc_tl_cuda_topo_num_links(topo,
-                                                    &team->ids[i].pci_id,
-                                                    &team->ids[j].pci_id,
+                                                    &rank_id->pci_id,
+                                                    &peer_id->pci_id,
                                                     &matrix[i + j*size]);
                 if (status != UCC_OK) {
                     return status;
@@ -427,17 +438,23 @@ void ucc_tl_cuda_team_topo_print_proxies(const ucc_tl_team_t *tl_team,
                                          const ucc_tl_cuda_team_topo_t *topo)
 {
     ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
-    ucc_rank_t          size = UCC_TL_TEAM_SIZE(team);
-    ucc_rank_t          rank = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_lib_t  *tl_cuda_lib    = ucc_derived_of(UCC_TL_TEAM_LIB(team),
+                                                        ucc_tl_cuda_lib_t);
+    const ucc_rank_t    size = UCC_TL_TEAM_SIZE(team);
+    const ucc_rank_t    rank = UCC_TL_TEAM_RANK(team);
+    const uint32_t      max_concurrent = tl_cuda_lib->cfg.max_concurrent;
     ucc_rank_t i;
     char pci_str[3][MAX_PCI_BUS_ID_STR];
+    ucc_tl_cuda_rank_id_t *rank_id, *peer_id;
 
+    rank_id = GET_RANK_ID(team->ids, rank, max_concurrent);
     for (i = 0; i < size; i++) {
         if (ucc_tl_cuda_team_topo_is_direct(tl_team, topo, rank, i)) {
-            ucc_tl_cuda_topo_pci_id_to_str(&team->ids[rank].pci_id,
-                                            pci_str[0], MAX_PCI_BUS_ID_STR);
-            ucc_tl_cuda_topo_pci_id_to_str(&team->ids[i].pci_id,
-                                            pci_str[1], MAX_PCI_BUS_ID_STR);
+            peer_id = GET_RANK_ID(team->ids, i, max_concurrent);
+            ucc_tl_cuda_topo_pci_id_to_str(&rank_id->pci_id,
+                                           pci_str[0], MAX_PCI_BUS_ID_STR);
+            ucc_tl_cuda_topo_pci_id_to_str(&peer_id->pci_id,
+                                           pci_str[1], MAX_PCI_BUS_ID_STR);
             if (topo->matrix[rank * size +i] == UCC_TL_CUDA_TEAM_TOPO_SAME_DEVICE)
             {
                 tl_debug(UCC_TL_TEAM_LIB(team),
@@ -454,12 +471,15 @@ void ucc_tl_cuda_team_topo_print_proxies(const ucc_tl_team_t *tl_team,
     }
 
     for (i = 0; i < topo->num_proxies; i++) {
-        ucc_tl_cuda_topo_pci_id_to_str(&team->ids[topo->proxies[i].src].pci_id,
-                                        pci_str[0], MAX_PCI_BUS_ID_STR);
-        ucc_tl_cuda_topo_pci_id_to_str(&team->ids[topo->proxies[i].dst].pci_id,
-                                        pci_str[1], MAX_PCI_BUS_ID_STR);
-        ucc_tl_cuda_topo_pci_id_to_str(&team->ids[topo->proxies[i].proxy].pci_id,
-                                        pci_str[2], MAX_PCI_BUS_ID_STR);
+        rank_id = GET_RANK_ID(team->ids, topo->proxies[i].src, max_concurrent);
+        ucc_tl_cuda_topo_pci_id_to_str(&rank_id->pci_id,
+                                       pci_str[0], MAX_PCI_BUS_ID_STR);
+        rank_id = GET_RANK_ID(team->ids, topo->proxies[i].dst, max_concurrent);
+        ucc_tl_cuda_topo_pci_id_to_str(&rank_id->pci_id,
+                                       pci_str[1], MAX_PCI_BUS_ID_STR);
+        rank_id = GET_RANK_ID(team->ids, topo->proxies[i].proxy, max_concurrent);
+        ucc_tl_cuda_topo_pci_id_to_str(&rank_id->pci_id,
+                                       pci_str[2], MAX_PCI_BUS_ID_STR);
         tl_debug(UCC_TL_TEAM_LIB(team),
                  "dev %s (%d) to dev %s (%d): proxy dev %s (%d)",
                  pci_str[0], topo->proxies[i].src,

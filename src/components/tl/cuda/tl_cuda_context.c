@@ -20,8 +20,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
     ucc_status_t status;
     int num_devices;
     cudaError_t cuda_st;
-    CUcontext cu_ctx;
-    CUresult cu_st;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_cuda_config->super,
                               params->context);
@@ -37,13 +35,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
         return UCC_ERR_NO_RESOURCE;
     }
 
-    cu_st = cuCtxGetCurrent(&cu_ctx);
-    if (cu_ctx == NULL || cu_st != CUDA_SUCCESS) {
-        tl_debug(self->super.super.lib,
-                 "cannot create CUDA TL context without active CUDA context");
-        return UCC_ERR_NO_RESOURCE;
-    }
-
     status = ucc_mpool_init(&self->req_mp, 0, sizeof(ucc_tl_cuda_task_t), 0,
                             UCC_CACHE_LINE_SIZE, 8, UINT_MAX,
                             &ucc_coll_task_mpool_ops, params->thread_mode,
@@ -54,16 +45,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_context_t,
         return status;
     }
 
-    CUDA_CHECK_GOTO(cudaGetDevice(&self->device), free_mpool, status);
     status = ucc_tl_cuda_topo_create(self->super.super.lib, &self->topo);
     if (status != UCC_OK) {
         tl_error(self->super.super.lib,
                  "failed to initialize tl_cuda_topo");
-        goto free_mpool;
-    }
-    status = ucc_tl_cuda_topo_get_pci_id(self->device, &self->device_id);
-    if (status != UCC_OK) {
-        tl_error(self->super.super.lib, "failed to get pci id");
         goto free_mpool;
     }
 

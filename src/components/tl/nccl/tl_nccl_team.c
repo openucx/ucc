@@ -12,6 +12,44 @@
 #include "coll_score/ucc_coll_score.h"
 #include "utils/arch/cuda_def.h"
 
+ucc_status_t ucc_tl_nccl_comm_init(ucc_tl_nccl_team_t *team)
+{
+    ucc_status_t status;
+    ncclResult_t nccl_status;
+
+    if (team->comm_state == TL_NCCL_COMM_STATE_READY) {
+        return UCC_OK;
+    } else if (team->comm_state == TL_NCCL_COMM_STATE_ERROR) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
+                    cudaStreamNonBlocking), err, status);
+    nccl_status = ncclCommInitRank(&team->nccl_comm, UCC_TL_TEAM_SIZE(team),
+                                   team->unique_id[0], UCC_TL_TEAM_RANK(team));
+    if (nccl_status != ncclSuccess) {
+        tl_debug(team->super.super.context->lib, "NCCL error %d %s",
+                 nccl_status, ncclGetErrorString(nccl_status));
+        if (nccl_status == ncclInvalidUsage) {
+            /*
+             * handles the case when trying to inititize multiple ranks
+             * on the same GPU. Return "not supported" and fallback to other TL
+             */
+            status = UCC_ERR_NOT_SUPPORTED;
+        } else {
+            status = UCC_ERR_NO_RESOURCE;
+        }
+        team->comm_state = TL_NCCL_COMM_STATE_ERROR;
+        goto free_stream;
+    }
+    team->comm_state = TL_NCCL_COMM_STATE_READY;
+    return UCC_OK;
+
+free_stream:
+    cudaStreamDestroy(team->stream);
+err:
+    return status;
+}
+
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
@@ -22,7 +60,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
     size = UCC_TL_TEAM_SIZE(self);
-    self->comm_state = UCC_OK;
+    self->nccl_comm  = NULL;
+    self->comm_state = TL_NCCL_COMM_STATE_INIT;
     self->unique_id  = ucc_malloc(sizeof(ncclUniqueId) * (size + 1),
                                   "tl_nccl_unique_id");
     if (!self->unique_id) {
@@ -58,7 +97,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_nccl_team_t)
 {
     tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
     if (self->nccl_comm) {
-        if (self->comm_state != UCC_OK) {
+        if (self->comm_state == TL_NCCL_COMM_STATE_ERROR) {
             /* if communication error was detected ncclCommAbort should be used
                since ncclCommDestroy could block */
             ncclCommAbort(self->nccl_comm);
@@ -67,6 +106,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_nccl_team_t)
         }
         cudaStreamDestroy(self->stream);
     }
+    ucc_free(self->unique_id);
 }
 
 UCC_CLASS_DEFINE_DELETE_FUNC(ucc_tl_nccl_team_t, ucc_base_team_t);
@@ -80,9 +120,10 @@ ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team)
 
 ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
 {
-    ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
+    ucc_tl_nccl_team_t    *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
+    ucc_tl_nccl_context_t *ctx  = ucc_derived_of(tl_team->context,
+                                                 ucc_tl_nccl_context_t);
     ucc_status_t status;
-    ncclResult_t nccl_status;
     ncclUniqueId errorid;
 
     status = UCC_TL_TEAM_OOB(team).req_test(team->oob_req);
@@ -92,38 +133,38 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
     if (status != UCC_OK) {
         UCC_TL_TEAM_OOB(team).req_free(team->oob_req);
         tl_error(tl_team->context->lib, "oob req test failed");
-        goto free_unique_id;
+        goto err;
     }
     status = UCC_TL_TEAM_OOB(team).req_free(team->oob_req);
     if (status != UCC_OK) {
         tl_error(tl_team->context->lib, "oob req free failed");
-        goto free_unique_id;
+        goto err;
+    }
+    team->unique_id = ucc_realloc(team->unique_id, sizeof(ncclUniqueId),
+                                  "nccl unique id");
+    if (!team->unique_id) {
+        tl_error(tl_team->context->lib,
+                 "failed to realloc %zd bytest for ncclUniqueId",
+                 sizeof(ncclUniqueId));
+         return UCC_ERR_NO_MEMORY;
     }
     /* check unique id is valid */
     memset(&errorid, 0, sizeof(errorid));
     if (!memcmp(&errorid, team->unique_id, sizeof(errorid))) {
         tl_error(tl_team->context->lib, "incorrect unique id");
-        goto free_unique_id;
+        goto err;
     }
 
-    CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
-                    cudaStreamNonBlocking), free_unique_id, status);
-    nccl_status = ncclCommInitRank(&team->nccl_comm, UCC_TL_TEAM_SIZE(team),
-                                   team->unique_id[0], UCC_TL_TEAM_RANK(team));
-    if (nccl_status != ncclSuccess) {
-        tl_debug(tl_team->context->lib, "NCCL error %d %s",
-                nccl_status, ncclGetErrorString(nccl_status));
-        status = UCC_ERR_NO_MESSAGE;
-        goto free_stream;
+    if (!ctx->cfg.lazy_init) {
+        status = ucc_tl_nccl_comm_init(team);
+        if (status != UCC_OK) {
+            goto err;
+        }
     }
-    ucc_free(team->unique_id);
+
     tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
     return UCC_OK;
-
-free_stream:
-    cudaStreamDestroy(team->stream);
-free_unique_id:
-    ucc_free(team->unique_id);
+err:
     return status;
 }
 

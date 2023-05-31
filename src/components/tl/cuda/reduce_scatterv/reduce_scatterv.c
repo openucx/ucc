@@ -50,7 +50,12 @@ ucc_status_t ucc_tl_cuda_reduce_scatterv_init(ucc_base_coll_args_t *coll_args,
                                              ucc_coll_task_t **task_p)
 {
     ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
+    ucc_status_t status;
 
+    status = ucc_tl_cuda_comm_init(team);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
     if (ucc_tl_cuda_team_topo_is_fully_conntected(team->topo)) {
         return ucc_tl_cuda_reduce_scatterv_linear_init(coll_args, tl_team,
                                                        task_p);

@@ -242,6 +242,11 @@ ucc_status_t ucc_tl_team_create_multiple(ucc_team_multiple_req_t *req)
     }
     req->descs[*id].status = UCC_TL_CTX_IFACE(req->descs[*id].ctx)
                                ->team.create_test(&req->descs[*id].team->super);
+    if (req->descs[*id].status < 0) {
+        /* if team create failed in team create test need to clenup resources */
+        UCC_TL_CTX_IFACE(req->descs[*id].ctx)->team.destroy(
+            &req->descs[*id].team->super);
+    }
     return UCC_INPROGRESS;
 }
 
