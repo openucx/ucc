@@ -82,6 +82,25 @@ void ucc_coll_task_destruct(ucc_coll_task_t *task)
     }
 }
 
+ucc_status_t ucc_dummy_post(ucc_coll_task_t *task)
+{
+    task->status = UCC_OK;
+    return ucc_task_complete(task);
+}
+
+ucc_status_t ucc_dummy_finalize(ucc_coll_task_t *task)
+{
+    ucc_mpool_put(task);
+    return UCC_OK;
+}
+
+/* NOLINTNEXTLINE task argument is not used*/
+void ucc_dummy_progress(ucc_coll_task_t *task)
+{
+    /* this function should never be called */
+    ucc_assert(0);
+}
+
 ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
                                 ucc_base_coll_args_t *bargs,
                                 ucc_base_team_t *team)
@@ -97,6 +116,9 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
     task->super.status         = UCC_OPERATION_INITIALIZED;
     task->triggered_post_setup = NULL;
     task->triggered_post       = ucc_triggered_post;
+    task->post                 = ucc_dummy_post;
+    task->finalize             = ucc_dummy_finalize;
+    task->progress             = ucc_dummy_progress;
     if (bargs) {
         memcpy(&task->bargs, bargs, sizeof(*bargs));
     }

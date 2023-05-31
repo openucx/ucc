@@ -356,6 +356,14 @@ ucc_status_t ucc_init_version(unsigned api_major_version,
         goto error;
     }
 
+    status = ucc_mpool_init(&lib->stub_tasks_mp, 0, sizeof(ucc_coll_task_t), 0,
+                            UCC_CACHE_LINE_SIZE, 8, UINT_MAX,
+                            &ucc_coll_task_mpool_ops, UCC_THREAD_MULTIPLE,
+                            "stub_tasks");
+    if (status != UCC_OK) {
+        goto error;
+    }
+
     *lib_p = lib;
     return UCC_OK;
 error:
@@ -473,6 +481,8 @@ ucc_status_t ucc_finalize(ucc_lib_info_t *lib)
     gl_status = UCC_OK;
     ucc_assert(lib->n_cl_libs_opened > 0);
     ucc_assert(lib->cl_libs != NULL);
+
+    ucc_mpool_cleanup(&lib->stub_tasks_mp, 1);
     for (i = 0; i < lib->n_tl_libs_opened; i++) {
         lib->tl_libs[i]->iface->lib.finalize(&lib->tl_libs[i]->super);
     }
