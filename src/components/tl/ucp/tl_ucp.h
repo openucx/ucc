@@ -57,6 +57,7 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t                 gather_kn_radix;
     uint32_t                 gatherv_linear_num_posts;
     uint32_t                 scatter_kn_radix;
+    ucc_on_off_auto_value_t  scatter_kn_enable_recv_zcopy;
     uint32_t                 scatterv_linear_num_posts;
     uint32_t                 alltoall_pairwise_num_posts;
     uint32_t                 alltoallv_pairwise_num_posts;

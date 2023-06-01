@@ -75,6 +75,7 @@ typedef struct ucc_file_config ucc_file_config_t;
 #define UCC_CONFIG_ALLOW_LIST_ALLOW_ALL UCS_CONFIG_ALLOW_LIST_ALLOW_ALL
 #define UCC_CONFIG_ALLOW_LIST_ALLOW     UCS_CONFIG_ALLOW_LIST_ALLOW
 #define UCC_CONFIG_TYPE_TERNARY         UCS_CONFIG_TYPE_TERNARY
+#define UCC_CONFIG_TYPE_ON_OFF_AUTO     UCS_CONFIG_TYPE_ON_OFF_AUTO
 #define UCC_UUNITS_AUTO                 ((unsigned)-2)
 
 typedef enum ucc_ternary_auto_value {
@@ -84,6 +85,13 @@ typedef enum ucc_ternary_auto_value {
     UCC_AUTO = UCS_AUTO,
     UCC_TERNARY_LAST
 } ucc_ternary_auto_value_t;
+
+typedef enum ucc_on_off_auto_value {
+    UCC_CONFIG_OFF  = UCS_CONFIG_OFF,
+    UCC_CONFIG_ON   = UCS_CONFIG_ON,
+    UCC_CONFIG_AUTO = UCS_CONFIG_AUTO,
+    UCC_CONFIG_ON_OFF_LAST
+} ucc_on_off_auto_value_t;
 
 enum tuning_mask {
     UCC_TUNING_DESC_FIELD_VENDOR    = UCC_BIT(0),

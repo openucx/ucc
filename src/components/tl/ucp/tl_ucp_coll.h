@@ -152,6 +152,7 @@ typedef struct ucc_tl_ucp_task {
             ucc_knomial_pattern_t   p;
             ucc_rank_t              recv_dist;
             ptrdiff_t               send_offset;
+            ptrdiff_t               recv_offset;
             size_t                  recv_size;
         } scatter_kn;
         struct {
