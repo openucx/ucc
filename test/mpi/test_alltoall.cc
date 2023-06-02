@@ -74,6 +74,7 @@ ucc_status_t TestAlltoall::set_input(int iter_persistent)
     void *      buf;
     int         rank, nprocs, completed;
 
+    this->iter_persistent = iter_persistent;
     MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &nprocs);
     if (inplace) {
@@ -99,19 +100,18 @@ ucc_status_t TestAlltoall::set_input(int iter_persistent)
 
 ucc_status_t TestAlltoall::check()
 {
-    int         size, completed;
+    int         size, rank;
     size_t      single_rank_count;
-    MPI_Request req;
 
+    MPI_Comm_rank(team.comm, &rank);
     MPI_Comm_size(team.comm, &size);
     single_rank_count = args.src.info.count / size;
 
-    MPI_Ialltoall(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, check_buf,
-                  single_rank_count, ucc_dt_to_mpi(dt), team.comm, &req);
-    do {
-        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
-        ucc_context_progress(team.ctx);
-    } while(!completed);
+    for (int i = 0; i < size; i++) {
+        init_buffer(PTR_OFFSET(check_buf, i * single_rank_count * ucc_dt_size(dt)),
+                    single_rank_count, dt, mem_type, i * (iter_persistent + 1),
+                    single_rank_count * rank);
+    }
 
     return compare_buffers(rbuf, check_buf, single_rank_count * size, dt,
                            mem_type);

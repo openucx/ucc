@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -25,7 +25,7 @@ void init_buffer_host(void *buf, size_t count, int _value)
 }
 
 void init_buffer(void *_buf, size_t count, ucc_datatype_t dt,
-                 ucc_memory_type_t mt, int value)
+                 ucc_memory_type_t mt, int value, int offset)
 {
     void *buf = NULL;
     if (mt == UCC_MEMORY_TYPE_CUDA || mt == UCC_MEMORY_TYPE_ROCM) {
@@ -37,6 +37,8 @@ void init_buffer(void *_buf, size_t count, ucc_datatype_t dt,
         std::cerr << "Unsupported mt\n";
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
+
+    value += offset;
     switch(dt) {
     case UCC_DT_INT8:
         init_buffer_host<int8_t>(buf, count, value);

@@ -53,6 +53,7 @@ ucc_status_t TestAllgather::set_input(int iter_persistent)
     int    rank;
     void  *buf, *check;
 
+    this->iter_persistent = iter_persistent;
     MPI_Comm_rank(team.comm, &rank);
     if (inplace) {
         buf   = PTR_OFFSET(rbuf, rank * single_rank_size);
@@ -70,18 +71,16 @@ ucc_status_t TestAllgather::set_input(int iter_persistent)
 
 ucc_status_t TestAllgather::check()
 {
-    int size, completed;
-    MPI_Comm_size(team.comm, &size);
-    size_t       single_rank_count = args.dst.info.count / size;
-    MPI_Datatype mpi_dt            = ucc_dt_to_mpi(dt);
-    MPI_Request  req;
+    size_t dt_size, single_rank_count;
+    int size;
 
-    MPI_Iallgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, check_buf,
-                   single_rank_count, mpi_dt, team.comm, &req);
-    do {
-        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
-        ucc_context_progress(team.ctx);
-    } while(!completed);
+    MPI_Comm_size(team.comm, &size);
+    single_rank_count = args.dst.info.count / size;
+    dt_size = ucc_dt_size(dt);
+    for (int i = 0; i < size; i++) {
+        init_buffer(PTR_OFFSET(check_buf, i * single_rank_count * dt_size),
+                    single_rank_count, dt, mem_type, i * (iter_persistent + 1));
+    }
 
     return compare_buffers(rbuf, check_buf, single_rank_count * size, dt,
                            mem_type);
