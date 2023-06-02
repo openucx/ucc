@@ -17,7 +17,9 @@ sources =             \
 	tl_mlx5_wqe.c	  \
 	tl_mlx5_pd.h      \
 	tl_mlx5_pd.c      \
-	tl_mlx5_rcache.c
+	tl_mlx5_rcache.c  \
+	tl_mlx5_dm.c      \
+	tl_mlx5_dm.h
 
 module_LTLIBRARIES = libucc_tl_mlx5.la
 libucc_tl_mlx5_la_SOURCES  = $(sources)
