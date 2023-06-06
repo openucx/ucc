@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -455,7 +455,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_init(ucc_tl_cuda_task_t *task)
 
     task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post           = ucc_tl_cuda_alltoallv_ce_start;
-    task->super.triggered_post = ucc_triggered_post;
     task->super.triggered_post_setup =
         ucc_tl_cuda_alltoallv_ce_triggered_post_setup;
     task->super.progress = ucc_tl_cuda_alltoallv_ce_progress;

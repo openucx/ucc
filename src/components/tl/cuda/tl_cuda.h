@@ -215,12 +215,10 @@ struct ucc_tl_cuda_task {
         struct {
             int                     stage;
             int                     num_frags;
-            int                     num_posted;
-            int                     num_completed;
             ucc_datatype_t          dt;
             void *                  sbuf;
             void *                  rbuf;
-            ucc_ee_executor_task_t *exec_task[2 * UCC_TL_CUDA_MAX_PEERS];
+            ucc_ee_executor_task_t *exec_task[2];
             size_t (*get_count)(const ucc_tl_cuda_task_t *task,
                                 ucc_rank_t                block);
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,

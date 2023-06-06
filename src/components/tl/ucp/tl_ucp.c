@@ -150,6 +150,11 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, scatter_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"SCATTER_KN_ENABLE_RECV_ZCOPY", "auto",
+     "Receive scatter data to user buffer with correct offset using zcopy",
+     ucs_offsetof(ucc_tl_ucp_lib_config_t, scatter_kn_enable_recv_zcopy),
+     UCS_CONFIG_TYPE_ON_OFF_AUTO},
+
     {"SCATTERV_LINEAR_NUM_POSTS", "16",
      "Maximum number of outstanding send and receive messages in scatterv "
      "linear algorithm",
@@ -169,14 +174,20 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      UCC_CONFIG_TYPE_BOOL},
 
     {"REDUCE_SCATTERV_RING_BIDIRECTIONAL", "y",
-     "Launch 2 inverted rings concurrently  during ReduceScatterV Ring "
+     "Launch 2 inverted rings concurrently during ReduceScatterV Ring "
      "algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatterv_ring_bidirectional),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"USE_TOPO", "try", "allow usage of tl ucp topo",
+    {"USE_TOPO", "try",
+     "Allow usage of tl ucp topo",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, use_topo),
      UCC_CONFIG_TYPE_TERNARY},
+
+    {"RANKS_REORDERING", "y",
+     "Use topology information in TL UCP to reorder ranks. Requires topo info",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, use_reordering),
+     UCC_CONFIG_TYPE_BOOL},
 
     {NULL}};
 

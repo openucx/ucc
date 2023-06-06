@@ -57,10 +57,14 @@ void ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
             }
         }
         dist /= radix;
-        if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        if (UCC_INPROGRESS == ucc_tl_ucp_test_recv(task)) {
             task->bcast_kn.dist = dist;
             return;
         }
+    }
+    if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        task->bcast_kn.dist = dist;
+        return;
     }
 
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -16,9 +16,13 @@
 #include "tl_ucp_tag.h"
 
 #define UCC_UUNITS_AUTO_RADIX 4
-#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 6
-extern const char
-    *ucc_tl_ucp_default_alg_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
+#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 7
+
+ucc_status_t ucc_tl_ucp_team_default_score_str_alloc(ucc_tl_ucp_team_t *team,
+    char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR]);
+
+void ucc_tl_ucp_team_default_score_str_free(
+    char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR]);
 
 #define CALC_KN_TREE_DIST(_size, _radix, _dist)                               \
     do {                                                                      \
@@ -71,8 +75,20 @@ extern const char
         }                                                                      \
     } while (0)
 
+typedef char* (*ucc_tl_ucp_score_str_get_fn_t)(ucc_tl_ucp_team_t *team);
+typedef struct ucc_tl_ucp_default_alg_desc {
+    char                          *select_str;
+    ucc_tl_ucp_score_str_get_fn_t  str_get_fn;
+} ucc_tl_ucp_default_alg_desc_t;
+
+enum ucc_tl_ucp_task_flags {
+    /*indicates whether subset field of tl_ucp_task is set*/
+    UCC_TL_UCP_TASK_FLAG_SUBSET = UCC_BIT(0),
+};
+
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
+    uint32_t        flags;
     union {
         struct {
             uint32_t        send_posted;
@@ -136,13 +152,33 @@ typedef struct ucc_tl_ucp_task {
             ucc_knomial_pattern_t   p;
             ucc_rank_t              recv_dist;
             ptrdiff_t               send_offset;
+            ptrdiff_t               recv_offset;
+            size_t                  recv_size;
         } scatter_kn;
         struct {
             int                     phase;
             ucc_knomial_pattern_t   p;
             void                   *sbuf;
             ucc_ee_executor_task_t *etask;
+            ucc_rank_t              recv_dist;
         } allgather_kn;
+        struct {
+            /*
+             * get send/recv block depends on subset type being used.
+             * For service allgather we need to get context endpoints but keep
+             * subset numbering.
+             * For regular allgather with rank reordering both endpoints
+             * and blocks permutation are necessary.
+             */
+            ucc_rank_t (*get_send_block)(ucc_subset_t *subset,
+                                         ucc_rank_t trank,
+                                         ucc_rank_t tsize,
+                                         int step);
+            ucc_rank_t (*get_recv_block)(ucc_subset_t *subset,
+                                         ucc_rank_t trank,
+                                         ucc_rank_t tsize,
+                                         int step);
+        } allgather_ring;
         struct {
             ucc_rank_t              dist;
             uint32_t                radix;
@@ -181,6 +217,11 @@ typedef struct ucc_tl_ucp_task {
             ucc_rank_t              num2send;
             ucc_rank_t              num2recv;
         } alltoallv_hybrid;
+        struct {
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_rank_t              iteration;
+            int                     phase;
+        } alltoall_bruck;
     };
 } ucc_tl_ucp_task_t;
 
@@ -216,6 +257,7 @@ static inline ucc_tl_ucp_task_t *ucc_tl_ucp_get_task(ucc_tl_ucp_team_t *team)
 
     UCC_TL_UCP_PROFILE_REQUEST_NEW(task, "tl_ucp_task", 0);
     task->super.flags       = 0;
+    task->flags             = 0;
     task->n_polls           = ctx->cfg.n_polls;
     task->super.team        = &team->super.super;
     task->subset.map.type   = UCC_EP_MAP_FULL;
@@ -276,6 +318,7 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args)) {
         task->tagged.tag = (coll_args->mask & UCC_COLL_ARGS_FIELD_TAG)
             ? coll_args->args.tag : UCC_TL_UCP_ACTIVE_SET_TAG;
+        task->flags        |= UCC_TL_UCP_TASK_FLAG_SUBSET;
         task->subset.map    = ucc_active_set_to_ep_map(&coll_args->args);
         task->subset.myrank =
             ucc_ep_map_local_rank(task->subset.map,
@@ -295,7 +338,6 @@ ucc_tl_ucp_init_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
     }
 
     task->super.finalize       = ucc_tl_ucp_coll_finalize;
-    task->super.triggered_post = ucc_triggered_post;
     return task;
 }
 
@@ -312,6 +354,25 @@ static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
     }
     while (polls++ < task->n_polls) {
         if (UCC_TL_UCP_TASK_P2P_COMPLETE(task)) {
+            return UCC_OK;
+        }
+        ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);
+    }
+    return UCC_INPROGRESS;
+}
+
+#define UCC_TL_UCP_TASK_RECV_COMPLETE(_task)                                   \
+    (((_task)->tagged.recv_posted == (_task)->tagged.recv_completed))
+
+static inline ucc_status_t ucc_tl_ucp_test_recv(ucc_tl_ucp_task_t *task)
+{
+    int polls = 0;
+
+    if (UCC_TL_UCP_TASK_RECV_COMPLETE(task)) {
+        return UCC_OK;
+    }
+    while (polls++ < task->n_polls) {
+        if (UCC_TL_UCP_TASK_RECV_COMPLETE(task)) {
             return UCC_OK;
         }
         ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);

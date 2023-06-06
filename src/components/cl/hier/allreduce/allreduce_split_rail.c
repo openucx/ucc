@@ -175,8 +175,8 @@ static ucc_status_t ucc_cl_hier_allreduce_split_rail_frag_init(
         rs_args.args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
         rs_args.args.src.info.buffer   = coll_args->args.dst.info.buffer;
         rs_args.args.src.info.datatype = coll_args->args.dst.info.datatype;
-        rs_args.args.dst.info_v.buffer = PTR_OFFSET(
-            coll_args->args.dst.info.buffer, displs[node_rank] * dt_size);
+        rs_args.args.dst.info_v.buffer = coll_args->args.dst.info.buffer;
+
     } else {
         rs_args.args.dst.info_v.buffer = PTR_OFFSET(
             coll_args->args.dst.info.buffer, displs[node_rank] * dt_size);
@@ -324,7 +324,6 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allreduce_split_rail_init,
     }
 
     schedule->super.super.super.post = ucc_cl_hier_split_rail_allreduce_start;
-    schedule->super.super.super.triggered_post = ucc_triggered_post;
     schedule->super.super.super.finalize =
         ucc_cl_hier_ar_split_rail_schedule_finalize;
     *task = &schedule->super.super.super;

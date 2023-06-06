@@ -50,6 +50,11 @@ static ucc_config_field_t ucc_ec_cuda_config_table[] = {
      ucc_offsetof(ucc_ec_cuda_config_t, exec_num_streams),
      UCC_CONFIG_TYPE_ULUNITS},
 
+    {"EXEC_COPY_LARGE_THRESH", "1M",
+     "Single memcopy size to switch from kernel copy to cudaMemcpy",
+     ucc_offsetof(ucc_ec_cuda_config_t, exec_copy_thresh),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
     {"REDUCE_NUM_BLOCKS", "auto",
      "Number of thread blocks to use for reduction in interruptible mode",
      ucc_offsetof(ucc_ec_cuda_config_t, reduce_num_blocks),
@@ -144,6 +149,40 @@ static ucc_mpool_ops_t ucc_ec_cuda_event_mpool_ops = {
     .chunk_release = ucc_mpool_hugetlb_free,
     .obj_init      = ucc_ec_cuda_event_init,
     .obj_cleanup   = ucc_ec_cuda_event_cleanup,
+};
+
+static void ucc_ec_cuda_graph_init(ucc_mpool_t *mp, void *obj, void *chunk) //NOLINT: mp is unused
+{
+    ucc_ec_cuda_executor_interruptible_task_t *task =
+         (ucc_ec_cuda_executor_interruptible_task_t *) obj;
+    cudaGraphNode_t memcpy_node;
+    int i;
+
+    CUDA_FUNC(cudaGraphCreate(&task->graph, 0));
+    for (i = 0; i < UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS; i++) {
+        CUDA_FUNC(
+            cudaGraphAddMemcpyNode1D(&memcpy_node, task->graph, NULL, 0,
+                                     (void*)1, (void*)1, 1, cudaMemcpyDefault));
+    }
+
+    CUDA_FUNC(
+        cudaGraphInstantiateWithFlags(&task->graph_exec, task->graph, 0));
+}
+
+static void ucc_ec_cuda_graph_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp is unused
+{
+    ucc_ec_cuda_executor_interruptible_task_t *task =
+         (ucc_ec_cuda_executor_interruptible_task_t *) obj;
+
+    CUDA_FUNC(cudaGraphExecDestroy(task->graph_exec));
+    CUDA_FUNC(cudaGraphDestroy(task->graph));
+}
+
+static ucc_mpool_ops_t ucc_ec_cuda_interruptible_task_mpool_ops = {
+    .chunk_alloc   = ucc_mpool_hugetlb_malloc,
+    .chunk_release = ucc_mpool_hugetlb_free,
+    .obj_init      = ucc_ec_cuda_graph_init,
+    .obj_cleanup   = ucc_ec_cuda_graph_cleanup,
 };
 
 static inline void ucc_ec_cuda_set_threads_nbr(int *nt, int maxThreadsPerBlock)
@@ -243,8 +282,8 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     status = ucc_mpool_init(
         &ucc_ec_cuda.executor_interruptible_tasks, 0,
         sizeof(ucc_ec_cuda_executor_interruptible_task_t), 0, UCC_CACHE_LINE_SIZE,
-        16, UINT_MAX, NULL, UCC_THREAD_MULTIPLE,
-        "interruptible executor tasks");
+        16, UINT_MAX, &ucc_ec_cuda_interruptible_task_mpool_ops,
+        UCC_THREAD_MULTIPLE, "interruptible executor tasks");
     if (status != UCC_OK) {
         ec_error(&ucc_ec_cuda.super, "failed to create interruptible tasks pool");
         return status;

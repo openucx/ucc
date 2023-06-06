@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -167,6 +167,12 @@ static ucc_status_t ucc_mc_cpu_memcpy(void *dst, const void *src, size_t len,
     return UCC_OK;
 }
 
+static ucc_status_t ucc_mc_cpu_memset(void *ptr, int value, size_t len)
+{
+    memset(ptr, value, len);
+    return UCC_OK;
+}
+
 static ucc_status_t ucc_mc_cpu_mem_query(const void *ptr, //NOLINT
                                          ucc_mem_attr_t *mem_attr) //NOLINT
 {
@@ -199,6 +205,7 @@ ucc_mc_cpu_t ucc_mc_cpu = {
     .super.ops.mem_alloc          = ucc_mc_cpu_mem_pool_alloc_with_init,
     .super.ops.mem_free           = ucc_mc_cpu_mem_pool_free,
     .super.ops.memcpy             = ucc_mc_cpu_memcpy,
+    .super.ops.memset             = ucc_mc_cpu_memset,
     .super.ops.flush              = NULL,
     .super.config_table =
         {

@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -370,6 +371,75 @@ static inline ucc_status_t sbgp_create_full(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
     return UCC_OK;
 }
 
+typedef struct proc_info_id {
+    ucc_proc_info_t info;
+    ucc_rank_t      id;
+} proc_info_id_t;
+
+static int ucc_compare_proc_info_id(const void *a, const void *b)
+{
+    const ucc_proc_info_t *d1 = &((const proc_info_id_t *)a)->info;
+    const ucc_proc_info_t *d2 = &((const proc_info_id_t *)b)->info;
+
+    if (d1->host_hash != d2->host_hash) {
+        return d1->host_hash > d2->host_hash ? 1 : -1;
+    } else if (d1->socket_id != d2->socket_id) {
+        return d1->socket_id - d2->socket_id;
+    } else if (d1->numa_id != d2->numa_id) {
+        return d1->numa_id - d2->numa_id;
+    } else {
+        return d1->pid - d2->pid;
+    }
+}
+
+static ucc_status_t sbgp_create_full_ordered(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
+{
+    ucc_rank_t      gsize = ucc_subset_size(&topo->set);
+    proc_info_id_t *sorted;
+    ucc_rank_t      i;
+
+    ucc_assert(gsize > 0);
+    sbgp->status     = UCC_SBGP_ENABLED;
+    sbgp->group_size = gsize;
+    sbgp->group_rank = topo->set.myrank;
+
+    sorted = (proc_info_id_t *)ucc_malloc(gsize * sizeof(proc_info_id_t),
+                                          "proc_sorted");
+    if (ucc_unlikely(!sorted)) {
+        ucc_error("failed to allocate %zd bytes for sorted proc info",
+                  gsize * sizeof(proc_info_id_t));
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    for (i = 0; i < gsize; i++) {
+        sorted[i].info = topo->topo->procs[i];
+        sorted[i].id   = i;
+    }
+
+    sbgp->rank_map = ucc_malloc(sizeof(ucc_rank_t) * gsize, "rank_map");
+    if (ucc_unlikely(!sbgp->rank_map)) {
+        ucc_error("failed to allocate %zd bytes for rank_map",
+                  gsize * sizeof(ucc_rank_t));
+        ucc_free(sorted);
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    qsort(sorted, gsize, sizeof(proc_info_id_t), ucc_compare_proc_info_id);
+    for (i = 0; i < gsize; i++) {
+        if (sorted[i].id == topo->set.myrank) {
+            sbgp->group_rank = i;
+        }
+        sbgp->rank_map[i] = sorted[i].id;
+    }
+
+    /*TODO: try to detect map by numa,socket,node and use UCC_EP_MAP_CB to save
+     *      memory
+     */
+
+    ucc_free(sorted);
+    return UCC_OK;
+}
+
 ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
 {
     ucc_status_t status   = UCC_OK;
@@ -385,6 +455,9 @@ ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
         break;
     case UCC_SBGP_FULL:
         status = sbgp_create_full(topo, sbgp);
+        break;
+    case UCC_SBGP_FULL_HOST_ORDERED:
+        status = sbgp_create_full_ordered(topo, sbgp);
         break;
     case UCC_SBGP_SOCKET:
     case UCC_SBGP_NUMA:

@@ -50,9 +50,8 @@ ucc_status_t ucc_tl_mlx5_init_dci(ucc_tl_mlx5_dci_t *dci, struct ibv_pd *pd,
 
 ucc_status_t ucc_tl_mlx5_create_rc_qp(struct ibv_context *ctx,
                                       struct ibv_pd *pd, struct ibv_cq *cq,
-                                      int ib_port, int tx_depth,
-                                      ucc_tl_mlx5_qp_t *qp, uint32_t *qpn,
-                                      ucc_base_lib_t *lib);
+                                      int tx_depth, ucc_tl_mlx5_qp_t *qp,
+                                      uint32_t *qpn, ucc_base_lib_t *lib);
 
 ucc_status_t ucc_tl_mlx5_create_ah(struct ibv_pd *pd, uint16_t lid,
                                    uint8_t port_num, struct ibv_ah **ah_ptr,

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -189,7 +189,7 @@ ucc_status_t ucc_tl_sharp_barrier_start(ucc_coll_task_t *coll_task)
     UCC_TL_SHARP_PROFILE_REQUEST_EVENT(coll_task, "sharp_barrier_start", 0);
 
     ret = sharp_coll_do_barrier_nb(team->sharp_comm, &task->req_handle);
-    if (ret != SHARP_COLL_SUCCESS) {
+    if (ucc_unlikely(ret != SHARP_COLL_SUCCESS)) {
         tl_error(UCC_TASK_LIB(task), "sharp_coll_do_barrier_nb failed:%s",
                  sharp_coll_strerror(ret));
         coll_task->status = ucc_tl_sharp_status_to_ucc(ret);
@@ -249,7 +249,7 @@ ucc_status_t ucc_tl_sharp_allreduce_start(ucc_coll_task_t *coll_task)
     reduce_spec.op                          = op_type;
 
     ret = sharp_coll_do_allreduce_nb(team->sharp_comm, &reduce_spec, &task->req_handle);
-    if (ret != SHARP_COLL_SUCCESS) {
+    if (ucc_unlikely(ret != SHARP_COLL_SUCCESS)) {
         tl_error(UCC_TASK_LIB(task), "sharp_coll_do_allreduce_nb failed:%s",
                  sharp_coll_strerror(ret));
         coll_task->status = ucc_tl_sharp_status_to_ucc(ret);
@@ -276,8 +276,8 @@ ucc_status_t ucc_tl_sharp_bcast_start(ucc_coll_task_t *coll_task)
 
     data_size = ucc_dt_size(dt) * count;
 
-    ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->src.info.buffer, data_size,
-                              &task->bcast.mem_h);
+    ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->src.info.buffer,
+                              data_size, &task->bcast.mem_h);
 
     bcast_spec.size                       = data_size;
     bcast_spec.root                       = root;
@@ -291,9 +291,15 @@ ucc_status_t ucc_tl_sharp_bcast_start(ucc_coll_task_t *coll_task)
     ret = sharp_coll_do_bcast_nb(team->sharp_comm, &bcast_spec,
                                  &task->req_handle);
 
-    if (ret != SHARP_COLL_SUCCESS) {
-        tl_error(UCC_TASK_LIB(task), "sharp_coll_do_bcast_nb failed:%s",
-                 sharp_coll_strerror(ret));
+    if (ucc_unlikely(ret != SHARP_COLL_SUCCESS)) {
+        if (ret == SHARP_COLL_ENOT_SUPP) {
+            tl_debug(UCC_TASK_LIB(task),
+                     "sharp_coll_do_bcast_nb not supported, msgsize %zd",
+                     data_size);
+        } else {
+            tl_error(UCC_TASK_LIB(task), "sharp_coll_do_bcast_nb failed:%s",
+                     sharp_coll_strerror(ret));
+        }
         coll_task->status = ucc_tl_sharp_status_to_ucc(ret);
         return ucc_task_complete(coll_task);
     }
@@ -325,15 +331,17 @@ ucc_status_t ucc_tl_sharp_allreduce_init(ucc_tl_sharp_task_t *task)
 
 ucc_status_t ucc_tl_sharp_bcast_init(ucc_tl_sharp_task_t *task)
 {
-    ucc_coll_args_t *args = &TASK_ARGS(task);
+    ucc_coll_args_t *args  = &TASK_ARGS(task);
+    size_t           data_size;
 
-    if (!ucc_coll_args_is_predefined_dt(args, UCC_RANK_INVALID)) {
-        return UCC_ERR_NOT_SUPPORTED;
-    }
+    data_size = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
 
-    if (ucc_to_sharp_memtype[args->src.info.mem_type] == SHARP_MEM_TYPE_LAST ||
-        ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(args->src.info.datatype)] ==
-            SHARP_DTYPE_NULL) {
+    /* check SHARP supports memory type, dataype is contig and
+       data size is even in case of older sharp versions */
+    if ((ucc_to_sharp_memtype[args->src.info.mem_type] == SHARP_MEM_TYPE_LAST) ||
+        !ucc_coll_args_is_predefined_dt(args, UCC_RANK_INVALID) ||
+        ((data_size % 2 != 0) &&
+        ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_INT8)] == SHARP_DTYPE_NULL)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 

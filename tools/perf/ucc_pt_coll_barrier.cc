@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
+
 #include "ucc_pt_coll.h"
 #include "ucc_perftest.h"
 #include <ucc/api/ucc.h>
@@ -11,6 +17,7 @@ ucc_pt_coll_barrier::ucc_pt_coll_barrier(ucc_pt_comm *communicator) :
     has_reduction_ = false;
     has_range_     = false;
     has_bw_        = false;
+    root_shift_    = 0;
 
     coll_args.mask = 0;
     coll_args.coll_type = UCC_COLL_TYPE_BARRIER;

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -30,6 +30,8 @@
 #define UCC_TL_MLX5_PROFILE_REQUEST_NEW   UCC_PROFILE_REQUEST_NEW
 #define UCC_TL_MLX5_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
 #define UCC_TL_MLX5_PROFILE_REQUEST_FREE  UCC_PROFILE_REQUEST_FREE
+
+#define DC_KEY 1
 
 typedef struct ucc_tl_mlx5_iface {
     ucc_tl_iface_t super;
@@ -72,8 +74,6 @@ UCC_CLASS_DECLARE(ucc_tl_mlx5_lib_t, const ucc_base_lib_params_t *,
 typedef struct ucc_tl_mlx5_context {
     ucc_tl_context_t             super;
     ucc_tl_mlx5_context_config_t cfg;
-    struct ibv_context *         ib_ctx;
-    struct ibv_pd *              ib_pd;
     struct ibv_context *         shared_ctx;
     struct ibv_pd *              shared_pd;
     ucc_rcache_t *               rcache;
@@ -84,18 +84,47 @@ typedef struct ucc_tl_mlx5_context {
 UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
+typedef struct ucc_tl_mlx5_schedule ucc_tl_mlx5_schedule_t;
+typedef struct ucc_tl_mlx5_dm_chunk {
+    ptrdiff_t               offset; /* 0 based offset from the beginning of
+                                       memic_mr (obtained with ibv_reg_dm_mr) */
+    ucc_tl_mlx5_schedule_t *task;
+} ucc_tl_mlx5_dm_chunk_t;
+
 typedef struct ucc_tl_mlx5_a2a ucc_tl_mlx5_a2a_t;
+
+typedef enum
+{
+    TL_MLX5_TEAM_STATE_INIT,
+    TL_MLX5_TEAM_STATE_POSTED,
+} ucc_tl_mlx5_team_state_t;
+
 typedef struct ucc_tl_mlx5_team {
-    ucc_tl_team_t           super;
-    ucc_service_coll_req_t *scoll_req;
-    void *                  oob_req;
-    ucc_mpool_t             dm_pool;
-    struct ibv_dm *         dm_ptr;
-    struct ibv_mr *         dm_mr;
-    ucc_tl_mlx5_a2a_t *     a2a;
+    ucc_tl_team_t            super;
+    ucc_status_t             status[2];
+    ucc_service_coll_req_t  *scoll_req;
+    ucc_tl_mlx5_team_state_t state;
+    void                    *dm_offset;
+    ucc_mpool_t              dm_pool;
+    struct ibv_dm           *dm_ptr;
+    struct ibv_mr           *dm_mr;
+    ucc_tl_mlx5_a2a_t       *a2a;
+    ucc_topo_t              *topo;
+    ucc_ep_map_t             ctx_map;
 } ucc_tl_mlx5_team_t;
 UCC_CLASS_DECLARE(ucc_tl_mlx5_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
+
+ucc_status_t tl_mlx5_rcache_create(ucc_tl_mlx5_context_t *ctx);
+
+typedef struct ucc_tl_mlx5_reg {
+    struct ibv_mr       *mr;
+} ucc_tl_mlx5_reg_t;
+
+typedef struct ucc_tl_mlx5_rcache_region {
+    ucc_rcache_region_t super;
+    ucc_tl_mlx5_reg_t   reg;
+} ucc_tl_mlx5_rcache_region_t;
 
 #define UCC_TL_MLX5_SUPPORTED_COLLS (UCC_COLL_TYPE_ALLTOALL)
 

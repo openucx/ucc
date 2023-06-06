@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -10,6 +10,24 @@
 #include "allreduce/allreduce.h"
 #include "allgather/allgather.h"
 #include "bcast/bcast.h"
+
+//NOLINTNEXTLINE subset unused
+static ucc_rank_t ucc_tl_ucp_service_ring_get_send_block(ucc_subset_t *subset,
+                                                         ucc_rank_t trank,
+                                                         ucc_rank_t tsize,
+                                                         int step)
+{
+    return (trank - step + tsize) % tsize;
+}
+
+//NOLINTNEXTLINE subset unused
+static ucc_rank_t ucc_tl_ucp_service_ring_get_recv_block(ucc_subset_t *subset,
+                                                         ucc_rank_t trank,
+                                                         ucc_rank_t tsize,
+                                                         int step)
+{
+    return (trank - step - 1 + tsize) % tsize;
+}
 
 static ucc_status_t ucc_tl_ucp_service_coll_start_executor(ucc_coll_task_t *task)
 {
@@ -87,6 +105,7 @@ ucc_status_t ucc_tl_ucp_service_allreduce(ucc_base_team_t *team, void *sbuf,
     if (status != UCC_OK) {
         goto free_task;
     }
+    task->flags          = UCC_TL_UCP_TASK_FLAG_SUBSET;
     task->subset         = subset;
     task->tagged.tag     = UCC_TL_UCP_SERVICE_TAG;
     task->n_polls        = UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.oob_npolls;
@@ -126,6 +145,8 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
 {
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t   *task     = ucc_tl_ucp_get_task(tl_team);
+    uint32_t             npolls   =
+        UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.oob_npolls;
     int                  in_place =
         (sbuf == PTR_OFFSET(rbuf, msgsize * ucc_ep_map_eval(subset.map,
                                                             subset.myrank)));
@@ -149,11 +170,14 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
     if (status != UCC_OK) {
         goto free_task;
     }
-    task->subset         = subset;
-    task->tagged.tag     = UCC_TL_UCP_SERVICE_TAG;
-    task->n_polls        = UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.oob_npolls;
-    task->super.progress = ucc_tl_ucp_allgather_ring_progress;
-    task->super.finalize = ucc_tl_ucp_coll_finalize;
+    task->allgather_ring.get_send_block = ucc_tl_ucp_service_ring_get_send_block;
+    task->allgather_ring.get_recv_block = ucc_tl_ucp_service_ring_get_recv_block;
+    task->flags                         = UCC_TL_UCP_TASK_FLAG_SUBSET;
+    task->subset                        = subset;
+    task->tagged.tag                    = UCC_TL_UCP_SERVICE_TAG;
+    task->n_polls                       = npolls;
+    task->super.progress                = ucc_tl_ucp_allgather_ring_progress;
+    task->super.finalize                = ucc_tl_ucp_coll_finalize;
 
     status = ucc_tl_ucp_allgather_ring_start(&task->super);
     if (status != UCC_OK) {
@@ -194,6 +218,7 @@ ucc_status_t ucc_tl_ucp_service_bcast(ucc_base_team_t *team, void *buf,
     if (status != UCC_OK) {
         goto free_task;
     }
+    task->flags          = UCC_TL_UCP_TASK_FLAG_SUBSET;
     task->subset         = subset;
     task->tagged.tag     = UCC_TL_UCP_SERVICE_TAG;
     task->n_polls        = UCC_TL_UCP_TEAM_CTX(tl_team)->cfg.oob_npolls;

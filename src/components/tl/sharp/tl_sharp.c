@@ -30,7 +30,7 @@ static ucc_config_field_t ucc_tl_sharp_context_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_sharp_context_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_context_config_table)},
 
-    {"DEVICES", "mlx5_0:1",
+    {"DEVICES", "",
      "SHARP device list",
      ucc_offsetof(ucc_tl_sharp_context_config_t, dev_list),
      UCC_CONFIG_TYPE_STRING},
@@ -55,9 +55,21 @@ static ucc_config_field_t ucc_tl_sharp_context_config_table[] = {
      ucc_offsetof(ucc_tl_sharp_context_config_t, context_per_team),
      UCC_CONFIG_TYPE_BOOL},
 
+#if HAVE_DECL_SHARP_COLL_DISABLE_LAZY_GROUP_RESOURCE_ALLOC
+    {"ENABLE_LAZY_GROUP_ALLOC", "n",
+     "Enable lazy group resource allocation",
+     ucc_offsetof(ucc_tl_sharp_context_config_t, enable_lazy_group_alloc),
+     UCC_CONFIG_TYPE_BOOL},
+#endif
+
     {"RAND_SEED", "0",
      "Seed for random sharp job ID. (0 - use default).",
      ucc_offsetof(ucc_tl_sharp_context_config_t, rand_seed),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"TEAM_MAX_PPN", "1",
+     "SHARP team max PPN threshold",
+     ucc_offsetof(ucc_tl_sharp_context_config_t, team_max_ppn),
      UCC_CONFIG_TYPE_UINT},
 
     {NULL}};

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -16,9 +16,11 @@ extern "C" {
 #include <cuda_bf16.h>
 #include <cuComplex.h>
 
-#define COPY_LOOP_UNROLL                 8
-#define REDUCE_LOOP_UNROLL_TRIGGERED     6
-#define REDUCE_LOOP_UNROLL_INTERRUPTIBLE 1
+#define COPY_LOOP_UNROLL                  8
+#define REDUCE_LOOP_UNROLL_TRIGGERED_FOUR 4
+#define REDUCE_LOOP_UNROLL_TRIGGERED_TWO  2
+#define REDUCE_LOOP_UNROLL_TRIGGERED_ONE  1
+#define REDUCE_LOOP_UNROLL_INTERRUPTIBLE  1
 typedef int4 vectype;
 
 __device__ inline
@@ -59,103 +61,154 @@ cuFloatComplex operator* (const cuFloatComplex & first,
                                cuCimagf(first) * second);
 }
 
-#define CUDA_REDUCE_WITH_OP_CHUNK(offset, unroll, warp_size, _OP)              \
+template <typename T, typename VecType> __device__ int ptrAlignVec(T *ptr)
+{
+    return (uint64_t)ptr % sizeof(VecType);
+}
+
+template <typename T, typename VecType>
+__forceinline__ __device__ void LoadVec(T *d, T *s)
+{
+    *(reinterpret_cast<VecType *>(d)) = *(reinterpret_cast<VecType *>(s));
+}
+
+#define CUDA_REDUCE_WITH_OP_CHUNK(unroll, unroll_group_size, _OP, VecType)     \
     do {                                                                       \
-        const int warp =                                                       \
-            triggered ? threadIdx.x / warp_size                                \
-                      : (threadIdx.x + blockIdx.x * blockDim.x) / warp_size;   \
-        const int    num_warps = triggered                                     \
-                                     ? blockDim.x / warp_size                  \
-                                     : (blockDim.x * gridDim.x) / warp_size;   \
-        const int    idx       = threadIdx.x % warp_size;                      \
-        const size_t num_lines =                                               \
-            (count / (warp_size * unroll)) * (warp_size * unroll);             \
-        _Type tmp1[unroll];                                                    \
-        _Type tmp2[unroll];                                                    \
-        for (line = offset + warp * warp_size * unroll + idx;                  \
-             line < num_lines; line += num_warps * warp_size * unroll) {       \
+        const int vectorize = sizeof(VecType) / sizeof(Type);                  \
+        const int group =                                                      \
+            triggered                                                          \
+                ? threadIdx.x / unroll_group_size                              \
+                : (threadIdx.x + blockIdx.x * blockDim.x) / unroll_group_size; \
+        const int num_groups =                                                 \
+            triggered ? blockDim.x / unroll_group_size                         \
+                      : (blockDim.x * gridDim.x) / unroll_group_size;          \
+        const int    idx = threadIdx.x % unroll_group_size;                    \
+        const int    factor = unroll_group_size * unroll * vectorize;          \
+        const size_t start =                                                   \
+            offset + (group * unroll_group_size * unroll + idx) * vectorize;   \
+        const size_t step = num_groups * factor;                               \
+        const size_t end = offset + ((count - offset) / factor) * factor;      \
+        Type tmp1[unroll][vectorize];                                          \
+        Type tmp2[unroll][vectorize];                                          \
+        ucc_assert_system(blockDim.x % unroll_group_size == 0);                \
+        for (line = start; line < end; line += step) {                         \
             _Pragma("unroll") for (i = 0; i < unroll; i++)                     \
             {                                                                  \
-                tmp1[i] = s1[line + warp_size * i];                            \
+                LoadVec<Type, VecType>(                                        \
+                    tmp1[i], &s1[line + vectorize * unroll_group_size * i]);   \
             }                                                                  \
-            for (j = 0; j < MAXSRCS; j++) {                                    \
-                if (j >= n_src2) {                                             \
-                    break;                                                     \
-                }                                                              \
+            for (j = 0; j < MAXSRCS && j < n_src2; j++) {                      \
                 _Pragma("unroll") for (i = 0; i < unroll; i++)                 \
                 {                                                              \
                     if (strided) {                                             \
-                        tmp2[i] = s2[line + warp_size * i + j * ld];           \
+                        LoadVec<Type, VecType>(                                \
+                            tmp2[i],                                           \
+                            &s2[line + vectorize * unroll_group_size * i +     \
+                                j * ld]);                                      \
                     } else {                                                   \
-                        tmp2[i] = s[1 + j][line + warp_size * i];              \
+                        LoadVec<Type, VecType>(                                \
+                            tmp2[i],                                           \
+                            &s[1 + j]                                          \
+                              [line + vectorize * unroll_group_size * i]);     \
                     }                                                          \
                 }                                                              \
                 _Pragma("unroll") for (i = 0; i < unroll; i++)                 \
                 {                                                              \
-                    tmp1[i] = _OP(tmp1[i], tmp2[i]);                           \
+                    _Pragma("unroll") for (k = 0; k < vectorize; k++)          \
+                    {                                                          \
+                        tmp1[i][k] = _OP(tmp1[i][k], tmp2[i][k]);              \
+                    }                                                          \
                 }                                                              \
             }                                                                  \
             if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                 \
                 _Pragma("unroll") for (i = 0; i < unroll; i++)                 \
                 {                                                              \
-                    tmp1[i] = tmp1[i] * (_AlphaType)task.alpha;                \
+                    _Pragma("unroll") for (k = 0; k < vectorize; k++)          \
+                    {                                                          \
+                        tmp1[i][k] = tmp1[i][k] * (AlphaType)task.alpha;       \
+                    }                                                          \
                 }                                                              \
             }                                                                  \
             _Pragma("unroll") for (i = 0; i < unroll; i++)                     \
             {                                                                  \
-                d[line + warp_size * i] = tmp1[i];                             \
+                LoadVec<Type, VecType>(                                        \
+                    &d[line + vectorize * unroll_group_size * i], tmp1[i]);    \
             }                                                                  \
+        }                                                                      \
+        offset = max(offset, end);                                             \
+        if (offset == count) {                                                 \
+            return;                                                            \
         }                                                                      \
     } while (0)
 
 #define CUDA_REDUCE_WITH_OP(NAME, _OP)                                          \
-    template <typename _Type, typename _AlphaType, bool triggered,              \
-              bool strided, int UNROLL, typename _TaskType>                     \
-    __device__ void ucc_reduce_cuda_##NAME(_TaskType task, uint16_t flags)      \
+    template <typename Type, typename AlphaType, bool triggered, bool strided,  \
+              int UNROLL, typename TaskType>                                    \
+    __device__ void ucc_reduce_cuda_##NAME(TaskType task, uint16_t flags)       \
     {                                                                           \
-        _Type *      d       = (_Type *)task.dst;                               \
-        const size_t count   = task.count;                                      \
+        Type *       d          = (Type *)task.dst;                             \
+        bool         alignedVec = 0;                                            \
+        size_t       offset     = 0;                                            \
+        const size_t count      = task.count;                                   \
         const int    MAXSRCS = strided ? USHRT_MAX : UCC_EE_EXECUTOR_NUM_BUFS;  \
         const int    ALLOC_SIZE = strided ? 1 : UCC_EE_EXECUTOR_NUM_BUFS;       \
-        _Type *      s[ALLOC_SIZE];                                             \
-        _Type *      s1;                                                        \
-        _Type *      s2;                                                        \
+        Type *       s[ALLOC_SIZE];                                             \
+        Type *       s1;                                                        \
+        Type *       s2;                                                        \
         __shared__ uint16_t n_src2;                                             \
         size_t              ld;                                                 \
-        size_t              i, j, line;                                         \
+        size_t              i, j, k, line;                                      \
         if (strided) {                                                          \
             ucc_eee_task_reduce_strided_t *task_strided_p =                     \
                 (ucc_eee_task_reduce_strided_t *)&task;                         \
             n_src2 = task_strided_p->n_src2;                                    \
-            s1     = (_Type *)task_strided_p->src1;                             \
-            s2     = (_Type *)task_strided_p->src2;                             \
-            ld     = task_strided_p->stride / sizeof(_Type);                    \
-            ucc_assert_system(task_strided_p->stride % sizeof(_Type) == 0);     \
+            s1     = (Type *)task_strided_p->src1;                              \
+            s2     = (Type *)task_strided_p->src2;                              \
+            ld     = task_strided_p->stride / sizeof(Type);                     \
+            ucc_assert_system(task_strided_p->stride % sizeof(Type) == 0);      \
+            alignedVec |= ptrAlignVec<Type, vectype>(s1);                       \
+            alignedVec |= ptrAlignVec<Type, vectype>(s2);                       \
+            alignedVec |= ((task_strided_p->stride % sizeof(vectype)) != 0);    \
         } else {                                                                \
             ucc_eee_task_reduce_t *task_default_p =                             \
                 (ucc_eee_task_reduce_t *)&task;                                 \
             memcpy(s, task_default_p->srcs,                                     \
-                   UCC_EE_EXECUTOR_NUM_BUFS * sizeof(_Type *));                 \
+                   UCC_EE_EXECUTOR_NUM_BUFS * sizeof(Type *));                  \
             n_src2 = task_default_p->n_srcs - 1;                                \
             s1     = s[0];                                                      \
+            for (int i = 0; i < MAXSRCS && i <= n_src2; i++)                    \
+                alignedVec |= ptrAlignVec<Type, vectype>(s[i]);                 \
         }                                                                       \
-        CUDA_REDUCE_WITH_OP_CHUNK(0, UNROLL, WARP_SIZE, _OP);                   \
-        /* second call for data remainder */                                    \
-        CUDA_REDUCE_WITH_OP_CHUNK(                                              \
-            (count / (WARP_SIZE * UNROLL)) * (WARP_SIZE * UNROLL), 1, 1, _OP);  \
+        alignedVec |= ptrAlignVec<Type, vectype>(d);                            \
+        ucc_assert_system(sizeof(vectype) % sizeof(Type) == 0);                 \
+        /* Successive calls to CUDA_REDUCE_WITH_OP_CHUNK to reduce the buffer.*/\
+        /* Each call enables or disables vectorization and/or loop unrollin   */\
+        /* optimizations. Each one of the four calls except the last one may  */\
+        /* only reduce the buffer partially and leave data remainder to be    */\
+        /* treated by the subsequent calls.                                   */\
+        if (triggered && alignedVec == 0) {                                     \
+            /* if buffers align, use vectorized loads and unrolling */          \
+            CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, vectype);         \
+            /* call with vectorization but without unrolling */                 \
+            CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, vectype);                      \
+        }                                                                       \
+        /* call with unrolling but without vectorization */                     \
+        CUDA_REDUCE_WITH_OP_CHUNK(UNROLL, WARP_SIZE, _OP, Type);                \
+        /* last call without unrolling nor vectorization */                     \
+        CUDA_REDUCE_WITH_OP_CHUNK(1, 1, _OP, Type);                             \
     }                                                                           \
-    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>  \
+    template <typename Type, typename AlphaType, bool triggered, int UNROLL>    \
     __global__ void UCC_REDUCE_CUDA_DEFAULT_##NAME(ucc_eee_task_reduce_t task,  \
                                                    uint16_t              flags) \
     {                                                                           \
-        ucc_reduce_cuda_##NAME<_Type, _AlphaType, triggered, false, UNROLL,     \
+        ucc_reduce_cuda_##NAME<Type, AlphaType, triggered, false, UNROLL,       \
                                ucc_eee_task_reduce_t>(task, flags);             \
     }                                                                           \
-    template <typename _Type, typename _AlphaType, bool triggered, int UNROLL>  \
+    template <typename Type, typename AlphaType, bool triggered, int UNROLL>    \
     __global__ void UCC_REDUCE_CUDA_STRIDED_##NAME(                             \
         ucc_eee_task_reduce_strided_t task, uint16_t flags)                     \
     {                                                                           \
-        ucc_reduce_cuda_##NAME<_Type, _AlphaType, triggered, true, UNROLL,      \
+        ucc_reduce_cuda_##NAME<Type, AlphaType, triggered, true, UNROLL,        \
                                ucc_eee_task_reduce_strided_t>(task, flags);     \
     }
 

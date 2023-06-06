@@ -228,15 +228,18 @@ exit_coll:
 
 ucc_status_t ucc_tl_rccl_alltoall_init(ucc_tl_rccl_task_t *task)
 {
+    ucc_datatype_t dt1 = TASK_ARGS(task).src.info.datatype;
+    ucc_datatype_t dt2 = TASK_ARGS(task).dst.info.datatype;
+
     if (UCC_IS_INPLACE(TASK_ARGS(task))) {
-        tl_error(UCC_TASK_LIB(task), "inplace alltoallv is not supported");
+        tl_debug(UCC_TASK_LIB(task), "inplace alltoall is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).src.info.datatype) ||
-        !UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info.datatype))) {
-        tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
+    if (UCC_OK != ucc_rccl_check_dt_supported(dt1, dt2)) {
+        tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
+
     task->super.post     = ucc_tl_rccl_alltoall_start;
     return UCC_OK;
 }
@@ -287,13 +290,15 @@ exit_coll:
 
 ucc_status_t ucc_tl_rccl_alltoallv_init(ucc_tl_rccl_task_t *task)
 {
+    ucc_datatype_t dt1 = TASK_ARGS(task).src.info_v.datatype;
+    ucc_datatype_t dt2 = TASK_ARGS(task).dst.info_v.datatype;
+
     if (UCC_IS_INPLACE(TASK_ARGS(task))) {
-        tl_error(UCC_TASK_LIB(task), "inplace alltoall is not supported");
+        tl_debug(UCC_TASK_LIB(task), "inplace alltoallv is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).src.info_v.datatype) ||
-        !UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info_v.datatype))) {
-        tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
+    if (UCC_OK != ucc_rccl_check_dt_supported(dt1, dt2)) {
+        tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post = ucc_tl_rccl_alltoallv_start;
@@ -386,7 +391,7 @@ ucc_status_t ucc_tl_rccl_allgather_init(ucc_tl_rccl_task_t *task)
     ucc_datatype_t dt2 = TASK_ARGS(task).dst.info.datatype;
 
     if (UCC_OK != ucc_rccl_check_dt_supported(dt1, dt2)) {
-        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
+        tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post = ucc_tl_rccl_allgather_start;
@@ -395,13 +400,15 @@ ucc_status_t ucc_tl_rccl_allgather_init(ucc_tl_rccl_task_t *task)
 
 ucc_status_t ucc_tl_rccl_allgatherv_init(ucc_tl_rccl_task_t *task)
 {
+    ucc_datatype_t dt1 = TASK_ARGS(task).src.info_v.datatype;
+    ucc_datatype_t dt2 = TASK_ARGS(task).dst.info_v.datatype;
+
     if (UCC_IS_INPLACE(TASK_ARGS(task))) {
-        tl_error(UCC_TASK_LIB(task), "inplace allgatherv is not supported");
+        tl_debug(UCC_TASK_LIB(task), "inplace allgatherv is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
-    if ((!UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).src.info_v.datatype) ||
-        !UCC_DT_IS_PREDEFINED((TASK_ARGS(task)).dst.info_v.datatype))) {
-        tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
+    if (UCC_OK != ucc_rccl_check_dt_supported(dt1, dt2)) {
+        tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post = ucc_tl_rccl_allgatherv_p2p_start;
@@ -466,7 +473,7 @@ ucc_status_t ucc_tl_rccl_bcast_init(ucc_tl_rccl_task_t *task)
         ucc_rccl_check_dt_supported(TASK_ARGS(task).src.info.datatype,
                                     TASK_ARGS(task).src.info.datatype)) {
         /* TODO: can we use rcclChar if datatype is not supported? */
-        tl_error(UCC_TASK_LIB(task), "dataype is not supported");
+        tl_debug(UCC_TASK_LIB(task), "dataype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
     task->super.post = ucc_tl_rccl_bcast_start;
@@ -635,19 +642,22 @@ ucc_status_t ucc_tl_rccl_gather_init(ucc_tl_rccl_task_t *task)
 {
     ucc_tl_rccl_team_t *team = TASK_TEAM(task);
     ucc_coll_args_t    *args = &TASK_ARGS(task);
+    ucc_datatype_t      dt;
+
+    dt = (UCC_TL_TEAM_RANK(team) == args->root)
+      ? args->dst.info.datatype
+      : args->src.info.datatype;
 
     if (UCC_TL_TEAM_RANK(team) == args->root) {
-        if (!UCC_DT_IS_PREDEFINED(args->dst.info.datatype)) {
-            tl_error(UCC_TASK_LIB(task),
-                     "user defined datatype is not supported");
+        if (ucc_rccl_check_dt_supported (dt, dt)) {
+            tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
     if ((UCC_TL_TEAM_RANK(team) != args->root) ||
         (!UCC_IS_INPLACE(*args))) {
-        if (!UCC_DT_IS_PREDEFINED(args->src.info.datatype)) {
-            tl_error(UCC_TASK_LIB(task),
-                     "user defined datatype is not supported");
+        if (ucc_rccl_check_dt_supported (dt, dt)) {
+            tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
@@ -722,19 +732,22 @@ ucc_status_t ucc_tl_rccl_gatherv_init(ucc_tl_rccl_task_t *task)
 {
     ucc_tl_rccl_team_t *team = TASK_TEAM(task);
     ucc_coll_args_t    *args = &TASK_ARGS(task);
+    ucc_datatype_t dt;
+
+    dt = (UCC_TL_TEAM_RANK(team) == args->root)
+      ? args->dst.info_v.datatype
+      : args->src.info.datatype;
 
     if (UCC_TL_TEAM_RANK(team) == args->root) {
-        if (!UCC_DT_IS_PREDEFINED(args->dst.info_v.datatype)) {
-            tl_error(UCC_TASK_LIB(task),
-                     "user defined datatype is not supported");
+        if (ucc_rccl_check_dt_supported (dt, dt)) {
+            tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
     if ((UCC_TL_TEAM_RANK(team) != args->root) ||
         (!UCC_IS_INPLACE(*args))) {
-        if (!UCC_DT_IS_PREDEFINED(args->src.info.datatype)) {
-            tl_error(UCC_TASK_LIB(task),
-                     "user defined datatype is not supported");
+        if (ucc_rccl_check_dt_supported (dt, dt)) {
+            tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
@@ -781,19 +794,22 @@ ucc_status_t ucc_tl_rccl_scatter_init(ucc_tl_rccl_task_t *task)
 {
     ucc_tl_rccl_team_t *team = TASK_TEAM(task);
     ucc_coll_args_t    *args = &TASK_ARGS(task);
+    ucc_datatype_t      dt;
+
+    dt = (UCC_TL_TEAM_RANK(team) == args->root)
+      ? args->src.info.datatype
+      : args->dst.info.datatype;
 
     if (UCC_TL_TEAM_RANK(team) == args->root) {
-        if (!UCC_DT_IS_PREDEFINED(args->src.info.datatype)) {
-            tl_error(UCC_TASK_LIB(task),
-                     "user defined datatype is not supported");
+        if (ucc_rccl_check_dt_supported(dt, dt)) {
+            tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
     if ((UCC_TL_TEAM_RANK(team) != args->root) ||
         (!UCC_IS_INPLACE(*args))) {
-        if (!UCC_DT_IS_PREDEFINED(args->dst.info.datatype)) {
-            tl_error(UCC_TASK_LIB(task),
-                     "user defined datatype is not supported");
+        if (ucc_rccl_check_dt_supported (dt, dt)) {
+            tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
@@ -868,19 +884,22 @@ ucc_status_t ucc_tl_rccl_scatterv_init(ucc_tl_rccl_task_t *task)
 {
     ucc_tl_rccl_team_t *team = TASK_TEAM(task);
     ucc_coll_args_t    *args = &TASK_ARGS(task);
+    ucc_datatype_t      dt;
+
+    dt = (UCC_TL_TEAM_RANK(team) == args->root)
+      ? args->src.info_v.datatype
+      : args->dst.info.datatype;
 
     if (UCC_TL_TEAM_RANK(team) == args->root) {
-        if (!UCC_DT_IS_PREDEFINED(args->src.info_v.datatype)) {
-            tl_error(UCC_TASK_LIB(task),
-                     "user defined datatype is not supported");
+        if (ucc_rccl_check_dt_supported(dt, dt)) {
+            tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
             return UCC_ERR_NOT_SUPPORTED;
         }
     }
     if ((UCC_TL_TEAM_RANK(team) != args->root) ||
         (!UCC_IS_INPLACE(*args))) {
-        if (!UCC_DT_IS_PREDEFINED(args->dst.info.datatype)) {
-            tl_error(UCC_TASK_LIB(task),
-                     "user defined datatype is not supported");
+        if (ucc_rccl_check_dt_supported(dt, dt)) {
+            tl_debug(UCC_TASK_LIB(task), "datatype is not supported");
             return UCC_ERR_NOT_SUPPORTED;
         }
     }

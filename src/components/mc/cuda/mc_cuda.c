@@ -277,7 +277,7 @@ static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
                                        ucc_memory_type_t dst_mem,
                                        ucc_memory_type_t src_mem)
 {
-    cudaError_t    st;
+    cudaError_t st;
     ucc_assert(dst_mem == UCC_MEMORY_TYPE_CUDA ||
                src_mem == UCC_MEMORY_TYPE_CUDA);
 
@@ -286,9 +286,35 @@ static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
     if (ucc_unlikely(st != cudaSuccess)) {
         cudaGetLastError();
         mc_error(&ucc_mc_cuda.super,
-                 "failed to launch cudaMemcpyAsync,  dst %p, src %p, len %zd "
+                 "failed to launch cudaMemcpyAsync, dst %p, src %p, len %zd "
                  "cuda error %d(%s)",
                  dst, src, len, st, cudaGetErrorString(st));
+        return UCC_ERR_NO_MESSAGE;
+    }
+    st = cudaStreamSynchronize(ucc_mc_cuda.stream);
+    if (ucc_unlikely(st != cudaSuccess)) {
+        cudaGetLastError();
+        mc_error(&ucc_mc_cuda.super,
+                 "failed to synchronize mc_cuda.stream "
+                 "cuda error %d(%s)",
+                 st, cudaGetErrorString(st));
+        return UCC_ERR_NO_MESSAGE;
+    }
+    return UCC_OK;
+}
+
+static ucc_status_t ucc_mc_cuda_memset(void *ptr, int val, size_t len)
+{
+    cudaError_t st;
+
+    UCC_MC_CUDA_INIT_STREAM();
+    st = cudaMemsetAsync(ptr, val, len, ucc_mc_cuda.stream);
+    if (ucc_unlikely(st != cudaSuccess)) {
+        cudaGetLastError();
+        mc_error(&ucc_mc_cuda.super,
+                 "failed to launch cudaMemsetAsync, dst %p, len %zd "
+                 "cuda error %d(%s)",
+                 ptr, len, st, cudaGetErrorString(st));
         return UCC_ERR_NO_MESSAGE;
     }
     st = cudaStreamSynchronize(ucc_mc_cuda.stream);
@@ -399,6 +425,7 @@ ucc_mc_cuda_t ucc_mc_cuda = {
     .super.ops.mem_alloc          = ucc_mc_cuda_mem_pool_alloc_with_init,
     .super.ops.mem_free           = ucc_mc_cuda_mem_pool_free,
     .super.ops.memcpy             = ucc_mc_cuda_memcpy,
+    .super.ops.memset             = ucc_mc_cuda_memset,
     .super.ops.flush              = ucc_mc_cuda_flush_not_supported,
     .super.config_table =
         {

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -19,7 +19,8 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_linear_init(ucc_base_coll_args_t *coll_a
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_conntected(team->topo))) {
+    if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_conntected(team->topo) ||
+        UCC_TL_TEAM_SIZE(team) - 1 > UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -33,10 +34,8 @@ ucc_status_t ucc_tl_cuda_reduce_scatter_linear_init(ucc_base_coll_args_t *coll_a
     task->reduce_scatterv_linear.get_offset =
         ucc_tl_cuda_reduce_scatter_get_offset;
     task->reduce_scatterv_linear.dt         = coll_args->args.dst.info.datatype;
-    task->reduce_scatterv_linear.rbuf       = coll_args->args.dst.info.buffer;
     task->super.flags          |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post           = ucc_tl_cuda_reduce_scatterv_linear_start;
-    task->super.triggered_post = ucc_triggered_post;
     task->super.progress       = ucc_tl_cuda_reduce_scatterv_linear_progress;
     task->super.finalize       = ucc_tl_cuda_reduce_scatterv_linear_finalize;
     task->bar                  = TASK_BAR(task);

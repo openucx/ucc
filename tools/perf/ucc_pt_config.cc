@@ -25,7 +25,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.n_warmup_large = 20;
     bench.large_thresh   = 64 * 1024;
     bench.full_print     = false;
-    bench.n_bufs         = 2;
+    bench.n_bufs         = UCC_PT_DEFAULT_N_BUFS;
     bench.root           = 0;
     bench.root_shift     = 0;
     comm.mt              = bench.mt;

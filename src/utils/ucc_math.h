@@ -105,4 +105,17 @@ static inline void float32tobfloat16(float float_val, void *bfloat16_ptr)
 #define ucc_align_up_pow2(_n, _alignment)                                      \
     ucc_align_down_pow2((_n) + (_alignment) - 1, _alignment)
 
+/* compute the log2 of n, rounded up */
+static inline int lognum(int n)
+{
+    int count  = 1;
+    int lognum = 0;
+
+    while (count < n) {
+        count = count << 1;
+        lognum++;
+    }
+    return lognum;
+}
+
 #endif

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -14,6 +14,8 @@
 #include <cuda_runtime.h>
 
 #define WARP_SIZE 32
+#define MAX_SUBTASKS 12
+
 typedef enum ucc_ec_cuda_strm_task_mode {
     UCC_EC_CUDA_TASK_KERNEL,
     UCC_EC_CUDA_TASK_MEM_OPS,
@@ -48,6 +50,7 @@ typedef struct ucc_ec_cuda_config {
     unsigned long                  reduce_num_blocks;
     int                            reduce_num_threads;
     int                            use_cooperative_launch;
+    unsigned long                  exec_copy_thresh;
 } ucc_ec_cuda_config_t;
 
 typedef struct ucc_ec_cuda {
@@ -78,9 +81,10 @@ typedef struct ucc_ec_cuda_stream_request {
 typedef struct ucc_ec_cuda_executor_interruptible_task {
     ucc_ee_executor_task_t  super;
     void                   *event;
+    cudaGraph_t             graph;
+    cudaGraphExec_t         graph_exec;
 } ucc_ec_cuda_executor_interruptible_task_t;
 
-#define MAX_SUBTASKS 12
 typedef struct ucc_ec_cuda_executor_persistent_task {
     ucc_ee_executor_task_t       super;
     int                          num_subtasks;
@@ -133,9 +137,9 @@ extern ucc_ec_cuda_t ucc_ec_cuda;
             ucc_ec_cuda.stream_initialized = 1;                                \
         }                                                                      \
         ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);                           \
-        if (ucc_unlikely(cudaSuccess != cuda_st)) {                     \
-            return cuda_error_to_ucc_status(cuda_st);                   \
-        }                                                               \
+        if (ucc_unlikely(cudaSuccess != cuda_st)) {                            \
+            return cuda_error_to_ucc_status(cuda_st);                          \
+        }                                                                      \
     }                                                                          \
 } while(0)
 

@@ -523,7 +523,8 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
         ucc_error("event type %d is not supported", ev->ev_type);
         return UCC_ERR_NOT_IMPLEMENTED;
     }
-    task->ee = ee;
+    task->ee           = ee;
+    task->super.status = UCC_OPERATION_INITIALIZED;
     ev_task = ucc_malloc(sizeof(*ev_task), "ev_task");
     if (!ev_task) {
         ucc_error("failed to allocate %zd bytes for ev_task",

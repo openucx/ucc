@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -14,6 +14,11 @@ extern "C" {
 #include <components/mc/ucc_mc.h>
 }
 
+ucc_status_t ucc_pt_alloc(ucc_mc_buffer_header_t **h_ptr, size_t len,
+                          ucc_memory_type_t mem_type);
+
+ucc_status_t ucc_pt_free(ucc_mc_buffer_header_t *h_ptr);
+
 typedef union {
     ucc_coll_args_t             coll_args;
     ucc_ee_executor_task_args_t executor_args;
@@ -25,6 +30,7 @@ protected:
     bool has_reduction_;
     bool has_range_;
     bool has_bw_;
+    int  root_shift_;
     ucc_pt_comm *comm;
     ucc_coll_args_t coll_args;
     ucc_ee_executor_task_args_t executor_args;
@@ -102,7 +108,7 @@ public:
 
 class ucc_pt_coll_bcast: public ucc_pt_coll {
 public:
-    ucc_pt_coll_bcast(ucc_datatype_t dt, ucc_memory_type mt,
+    ucc_pt_coll_bcast(ucc_datatype_t dt, ucc_memory_type mt, int root_shift,
                       ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;
@@ -112,7 +118,8 @@ public:
 class ucc_pt_coll_gather: public ucc_pt_coll {
 public:
     ucc_pt_coll_gather(ucc_datatype_t dt, ucc_memory_type mt,
-                       bool is_inplace, ucc_pt_comm *communicator);
+                       bool is_inplace, int root_shift,
+                       ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;
     float get_bw(float time_ms, int grsize, ucc_pt_test_args_t args) override;
@@ -121,7 +128,8 @@ public:
 class ucc_pt_coll_gatherv: public ucc_pt_coll {
 public:
     ucc_pt_coll_gatherv(ucc_datatype_t dt, ucc_memory_type mt,
-                        bool is_inplace, ucc_pt_comm *communicator);
+                        bool is_inplace, int root_shift,
+                        ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;
 };
@@ -129,7 +137,7 @@ public:
 class ucc_pt_coll_reduce: public ucc_pt_coll {
 public:
     ucc_pt_coll_reduce(ucc_datatype_t dt, ucc_memory_type mt,
-                       ucc_reduction_op_t op, bool is_inplace,
+                       ucc_reduction_op_t op, bool is_inplace, int root_shift,
                        ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;
@@ -158,7 +166,8 @@ public:
 class ucc_pt_coll_scatter: public ucc_pt_coll {
 public:
     ucc_pt_coll_scatter(ucc_datatype_t dt, ucc_memory_type mt,
-                        bool is_inplace, ucc_pt_comm *communicator);
+                        bool is_inplace, int root_shift,
+                        ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;
     float get_bw(float time_ms, int grsize, ucc_pt_test_args_t args) override;
@@ -167,7 +176,8 @@ public:
 class ucc_pt_coll_scatterv: public ucc_pt_coll {
 public:
     ucc_pt_coll_scatterv(ucc_datatype_t dt, ucc_memory_type mt,
-                         bool is_inplace, ucc_pt_comm *communicator);
+                         bool is_inplace, int root_shift,
+                         ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;
 };
@@ -175,8 +185,9 @@ public:
 class ucc_pt_op_memcpy: public ucc_pt_coll {
     ucc_memory_type_t mem_type;
     ucc_datatype_t    data_type;
+    int               num_bufs;
 public:
-    ucc_pt_op_memcpy(ucc_datatype_t dt, ucc_memory_type mt,
+    ucc_pt_op_memcpy(ucc_datatype_t dt, ucc_memory_type mt, int nbufs,
                      ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;

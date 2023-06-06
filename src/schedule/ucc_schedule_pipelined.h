@@ -1,16 +1,19 @@
 /**
  * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
+
 #ifndef UCC_SCHEDULE_PIPELINED_H_
 #define UCC_SCHEDULE_PIPELINED_H_
+
 #include "components/base/ucc_base_iface.h"
 
 #define UCC_SCHEDULE_FRAG_MAX_TASKS 8
+#define UCC_SCHEDULE_PIPELINED_MAX_FRAGS 4
 
 typedef struct ucc_schedule_pipelined ucc_schedule_pipelined_t;
 
-#define UCC_SCHEDULE_PIPELINED_MAX_FRAGS 4
 
 /* frag_init is the callback provided by the user of pipelined
    framework (e.g., TL that needs to build a pipeline) that is reponsible
