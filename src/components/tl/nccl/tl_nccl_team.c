@@ -263,9 +263,10 @@ free_task:
 ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
                                          ucc_coll_score_t **score_p)
 {
-    ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
-    ucc_base_context_t *ctx  = UCC_TL_TEAM_CTX(team);
-    ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_CUDA;
+    ucc_tl_nccl_team_t *team   = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
+    ucc_base_context_t *ctx    = UCC_TL_TEAM_CTX(team);
+    ucc_memory_type_t   mts[2] = {UCC_MEMORY_TYPE_CUDA,
+                                  UCC_MEMORY_TYPE_CUDA_MANAGED};
     ucc_coll_score_t   *score;
     ucc_status_t        status;
     int                 i;
@@ -274,8 +275,8 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
     team_info.alg_fn              = ucc_tl_nccl_alg_id_to_init;
     team_info.default_score       = UCC_TL_NCCL_DEFAULT_SCORE;
     team_info.init                = ucc_tl_nccl_coll_init;
-    team_info.num_mem_types       = 1;
-    team_info.supported_mem_types = &mt;
+    team_info.num_mem_types       = 2;
+    team_info.supported_mem_types = mts;
     team_info.supported_colls     = UCC_TL_NCCL_SUPPORTED_COLLS;
     team_info.size                = UCC_TL_TEAM_SIZE(team);
     /* There can be a different logic for different coll_type/mem_type.
@@ -283,7 +284,7 @@ ucc_status_t ucc_tl_nccl_team_get_scores(ucc_base_team_t   *tl_team,
     status =
         ucc_coll_score_build_default(tl_team, UCC_TL_NCCL_DEFAULT_SCORE,
                            ucc_tl_nccl_coll_init, UCC_TL_NCCL_SUPPORTED_COLLS,
-                           &mt, 1, &score);
+                           mts, 2, &score);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
