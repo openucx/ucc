@@ -6,7 +6,62 @@
 
 ## Current
 
-## 1.1.0 (TBD)
+## 1.2.0 (June 6th, 2023)
+
+## New Features and Enhancements
+
+## CL/HIER
+
+- Fixed single proc on node issue in alltoall ([#658](https://github.com/openucx/ucc/pull/658))
+- Implemented allreduce rab pipelined ([#608](https://github.com/openucx/ucc/pull/608))
+- Added bcast 2step algorithm ([#620](https://github.com/openucx/ucc/pull/620))
+- Fixed allreduce rab pipeline ([#759](https://github.com/openucx/ucc/pull/759))
+
+##  TL/CUDA
+
+- Support for CUDA 12
+- Fixed cache unmap issue ([#642](https://github.com/openucx/ucc/pull/642))
+- Implemented reduce scatter linear ([#669](https://github.com/openucx/ucc/pull/669))
+- Added algorithm selection based on topology ([#688](https://github.com/openucx/ucc/pull/688))
+- Fixed linear algorithms ([#751](https://github.com/openucx/ucc/pull/751))
+- Fixed pipelining in linear rs ([#770](https://github.com/openucx/ucc/pull/770))
+
+## TL/UCP
+
+- Added special service worker ([#560](https://github.com/openucx/ucc/pull/560))
+- Added scatterv ([#663](https://github.com/openucx/ucc/pull/663))
+- Added gatherv ([#664](https://github.com/openucx/ucc/pull/664))
+- Fixed running with npolls 0 ([#695](https://github.com/openucx/ucc/pull/695))
+- Added knomial allgather ([#729](https://github.com/openucx/ucc/pull/729))
+- Fixed bug for triggered colls ([#757](https://github.com/openucx/ucc/pull/757))
+- Added bruck alltoall ([#756](https://github.com/openucx/ucc/pull/756))
+- Added SLOAV alltoallv ([#687](https://github.com/openucx/ucc/pull/687))
+- Large message broadcast optimizations ([#738](https://github.com/openucx/ucc/pull/738))
+- Ranks reordering in ring allgather for better locality([#69](https://github.com/openucx/ucc/pull/698))
+
+##  TL/SHARP
+
+- Fixed memory type check in allreduce ([#662](https://github.com/openucx/ucc/pull/662))
+- Added support for sharpv3 dt ([#661](https://github.com/openucx/ucc/pull/661))
+- Fixed assert check ([#686](https://github.com/openucx/ucc/pull/686))
+- Implemented SHARP OOB fixes ([#746](https://github.com/openucx/ucc/pull/746))
+- Fixed local rank when NODE SBGP not enabled ([#760](https://github.com/openucx/ucc/pull/760))
+- Prevented sharp team with team max ppn > 1 ([#761](https://github.com/openucx/ucc/pull/761))
+
+
+## CORE
+
+- Fixed memory type score update ([#650](https://github.com/openucx/ucc/pull/650))
+- Fixed ucc parser build ([#666](https://github.com/openucx/ucc/pull/666))
+- Implemented ucc_pipeline_params ([#675](https://github.com/openucx/ucc/pull/675))
+- Changed log level of config_modify ([#667](https://github.com/openucx/ucc/pull/667))
+- Fixed timeout handle for triggered post ([#679](https://github.com/openucx/ucc/pull/679))
+
+## DOCS
+- Added User Guide ([#720](https://github.com/openucx/ucc/pull/720))
+
+
+## 1.1.0 (October 7th, 2022)
 
 ## Features
 
