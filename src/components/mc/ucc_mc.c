@@ -87,6 +87,9 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
 
 ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type)
 {
+    mem_type = (mem_type == UCC_MEMORY_TYPE_CUDA_MANAGED) ?
+                   UCC_MEMORY_TYPE_CUDA : mem_type;
+
     if (NULL == mc_ops[mem_type]) {
         return UCC_ERR_NOT_FOUND;
     }
@@ -122,8 +125,11 @@ UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_alloc, (h_ptr, size, mem_type),
                     ucc_mc_buffer_header_t **h_ptr, size_t size,
                     ucc_memory_type_t mem_type)
 {
-    UCC_CHECK_MC_AVAILABLE(mem_type);
-    return mc_ops[mem_type]->mem_alloc(h_ptr, size);
+    ucc_memory_type_t mt = (mem_type == UCC_MEMORY_TYPE_CUDA_MANAGED) ?
+                               UCC_MEMORY_TYPE_CUDA : mem_type;
+
+    UCC_CHECK_MC_AVAILABLE(mt);
+    return mc_ops[mt]->mem_alloc(h_ptr, size, mem_type);
 }
 
 ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *h_ptr)
@@ -151,6 +157,7 @@ UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_memcpy,
     }
     /* take any non host MC component */
     mt = (dst_mem == UCC_MEMORY_TYPE_HOST) ? src_mem : dst_mem;
+    mt = (mt == UCC_MEMORY_TYPE_CUDA_MANAGED) ? UCC_MEMORY_TYPE_CUDA : mt;
     UCC_CHECK_MC_AVAILABLE(mt);
     return mc_ops[mt]->memcpy(dst, src, len, dst_mem, src_mem);
 }
@@ -158,12 +165,18 @@ UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_memcpy,
 ucc_status_t ucc_mc_memset(void *ptr, int value, size_t size,
                            ucc_memory_type_t mem_type)
 {
+    mem_type = (mem_type == UCC_MEMORY_TYPE_CUDA_MANAGED) ?
+                   UCC_MEMORY_TYPE_CUDA : mem_type;
+
     UCC_CHECK_MC_AVAILABLE(mem_type);
     return mc_ops[mem_type]->memset(ptr, value, size);
 }
 
 ucc_status_t ucc_mc_flush(ucc_memory_type_t mem_type)
 {
+    mem_type = (mem_type == UCC_MEMORY_TYPE_CUDA_MANAGED) ?
+                   UCC_MEMORY_TYPE_CUDA : mem_type;
+
     UCC_CHECK_MC_AVAILABLE(mem_type);
     if (mc_ops[mem_type]->flush) {
         return mc_ops[mem_type]->flush();

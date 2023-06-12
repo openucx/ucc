@@ -46,7 +46,8 @@ static ucc_status_t ucc_mc_cpu_get_attr(ucc_mc_attr_t *mc_attr)
 }
 
 static ucc_status_t ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
-                                         size_t                   size)
+                                         size_t                   size,
+                                         ucc_memory_type_t        mt)
 {
     size_t        size_with_h = size + sizeof(ucc_mc_buffer_header_t);
     ucc_mc_buffer_header_t *h =
@@ -58,14 +59,15 @@ static ucc_status_t ucc_mc_cpu_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
     }
     h->from_pool = 0;
     h->addr      = PTR_OFFSET(h, sizeof(ucc_mc_buffer_header_t));
-    h->mt        = UCC_MEMORY_TYPE_HOST;
+    h->mt        = mt;
     *h_ptr       = h;
     mc_trace(&ucc_mc_cpu.super, "allocated %ld bytes with ucc_malloc", size);
     return UCC_OK;
 }
 
 static ucc_status_t ucc_mc_cpu_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
-                                              size_t                   size)
+                                              size_t                   size,
+                                              ucc_memory_type_t        mt)
 {
     ucc_mc_buffer_header_t *h = NULL;
     if (size <= MC_CPU_CONFIG->mpool_elem_size) {
@@ -73,7 +75,7 @@ static ucc_status_t ucc_mc_cpu_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
     }
     if (!h) {
         // Slow path
-        return ucc_mc_cpu_mem_alloc(h_ptr, size);
+        return ucc_mc_cpu_mem_alloc(h_ptr, size, mt);
     }
     mc_trace(&ucc_mc_cpu.super, "allocated %ld bytes from cpu mpool", size);
     *h_ptr = h;
@@ -127,7 +129,9 @@ static ucc_status_t ucc_mc_cpu_mem_pool_free(ucc_mc_buffer_header_t *h_ptr)
 }
 
 static ucc_status_t
-ucc_mc_cpu_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr, size_t size)
+ucc_mc_cpu_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
+                                    size_t                   size,
+                                    ucc_memory_type_t        mt)
 {
     // lock assures single mpool initiation when multiple threads concurrently
     // execute different collective operations each entering init function.
@@ -137,7 +141,7 @@ ucc_mc_cpu_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr, size_t size)
         ucc_mc_cpu.super.ops.mem_alloc = ucc_mc_cpu_mem_alloc;
         ucc_mc_cpu.super.ops.mem_free  = ucc_mc_cpu_mem_free;
         ucc_spin_unlock(&ucc_mc_cpu.mpool_init_spinlock);
-        return ucc_mc_cpu_mem_alloc(h_ptr, size);
+        return ucc_mc_cpu_mem_alloc(h_ptr, size, mt);
     }
 
     if (!ucc_mc_cpu.mpool_init_flag) {
@@ -154,7 +158,7 @@ ucc_mc_cpu_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr, size_t size)
         ucc_mc_cpu.mpool_init_flag     = 1;
     }
     ucc_spin_unlock(&ucc_mc_cpu.mpool_init_spinlock);
-    return ucc_mc_cpu_mem_pool_alloc(h_ptr, size);
+    return ucc_mc_cpu_mem_pool_alloc(h_ptr, size, mt);
 }
 
 static ucc_status_t ucc_mc_cpu_memcpy(void *dst, const void *src, size_t len,

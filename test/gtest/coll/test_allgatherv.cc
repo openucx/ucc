@@ -214,7 +214,8 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Range(1, UccJob::nStaticTeams), // team_ids
         PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
-        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA), // mem type
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA,
+                          UCC_MEMORY_TYPE_CUDA_MANAGED), // mem type
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
@@ -259,7 +260,8 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Combine(
         PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
-        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA,
+                          UCC_MEMORY_TYPE_CUDA_MANAGED),
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif

@@ -17,7 +17,7 @@ enum {
 };
 
 #define UCC_TL_NCCL_ALLGATHERV_DEFAULT_ALG_SELECT_STR          \
-    "allgatherv:cuda:0-16k:@0#allgatherv:cuda:16k-1M:@1#allgatherv:cuda:1M-inf:@2"
+    "allgatherv:cuda:0-16k:@0#allgatherv:cuda:16k-1M:@1#allgatherv:cuda:1M-inf:@2#allgatherv:cuda_managed:0-inf:@0"
 
 extern ucc_base_coll_alg_info_t
              ucc_tl_nccl_allgatherv_algs[UCC_TL_NCCL_ALLGATHERV_ALG_LAST + 1];

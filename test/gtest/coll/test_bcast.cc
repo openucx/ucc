@@ -182,7 +182,8 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Range(1, UccJob::nStaticTeams), // team_ids
         PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
-        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA,
+                          UCC_MEMORY_TYPE_CUDA_MANAGED),
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
@@ -232,7 +233,8 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Combine(
         PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
-        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
+        ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA,
+                          UCC_MEMORY_TYPE_CUDA_MANAGED),
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
@@ -254,6 +256,9 @@ UCC_TEST_F(test_bcast_alg, 2step) {
 
     if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
         mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);
     }
 
     for (auto count : {8, 65536}) {
