@@ -173,6 +173,7 @@ ucc_status_t ucc_cl_basic_team_get_scores(ucc_base_team_t   *cl_team,
     ucc_cl_basic_team_t *team = ucc_derived_of(cl_team, ucc_cl_basic_team_t);
     ucc_base_context_t  *ctx  = UCC_CL_TEAM_CTX(team);
     ucc_status_t         status;
+    ucc_coll_score_team_info_t team_info;
 
     status = ucc_coll_score_dup(team->score, score);
     if (UCC_OK != status) {
@@ -180,10 +181,16 @@ ucc_status_t ucc_cl_basic_team_get_scores(ucc_base_team_t   *cl_team,
     }
 
     if (strlen(ctx->score_str) > 0) {
-        status = ucc_coll_score_update_from_str(
-            ctx->score_str, *score, UCC_CL_TEAM_SIZE(team), NULL, cl_team,
-            UCC_CL_BASIC_DEFAULT_SCORE, NULL, NULL, 0);
+        team_info.alg_fn              = NULL;
+        team_info.default_score       = UCC_CL_BASIC_DEFAULT_SCORE;
+        team_info.init                = NULL;
+        team_info.num_mem_types       = 0;
+        team_info.supported_mem_types = NULL; /* all memory types supported*/
+        team_info.supported_colls     = UCC_COLL_TYPE_ALL;
+        team_info.size                = UCC_CL_TEAM_SIZE(team);
 
+        status = ucc_coll_score_update_from_str(ctx->score_str, &team_info,
+                                                &team->super.super, *score);
         /* If INVALID_PARAM - User provided incorrect input - try to proceed */
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {
