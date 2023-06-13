@@ -236,31 +236,24 @@ ucc_knomial_calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
 static inline ucc_rank_t ucc_kn_get_opt_radix(ucc_rank_t team_size,
                                               ucc_kn_radix_t max_radix)
 {
-    ucc_rank_t     remainder = 0, n_trees = 0, min_val = 0;
-    ucc_kn_radix_t min_i     = UCC_KN_MIN_RADIX;
+    ucc_rank_t     n_extra = 0, min_val = team_size;
+    ucc_kn_radix_t min_i   = UCC_KN_MIN_RADIX;
+    ucc_kn_radix_t max_r   = ucc_max(max_radix, UCC_KN_MIN_RADIX);
     ucc_kn_radix_t r, fs;
-    ucc_rank_t     min_trees;
 
-    max_radix = ucc_max(max_radix, UCC_KN_MIN_RADIX);
-    min_trees = max_radix;
-
-    for (r = UCC_KN_MIN_RADIX; r <= max_radix; r++) {
+    for (r = UCC_KN_MIN_RADIX; r <= max_r; r++) {
         fs = r;
         while (fs < team_size) {
             fs = fs * r;
         }
-        fs        = (fs == team_size) ? fs : fs / r;
-        n_trees   = team_size / fs;
-        remainder = team_size - (team_size / fs) * fs;
-        if (remainder == 0) {
+        fs      = (fs == team_size) ? fs : fs / r;
+        n_extra = team_size - (team_size / fs) * fs;
+        if (n_extra == 0) {
             return r;
         }
-        if (r == UCC_KN_MIN_RADIX || (r > UCC_KN_MIN_RADIX &&
-            (remainder < min_val ||
-            (remainder == min_val && n_trees < min_trees)))) {
-            min_val   = remainder;
-            min_trees = n_trees;
-            min_i     = r;
+        if (n_extra < min_val) {
+            min_val = n_extra;
+            min_i   = r;
         }
     }
     return min_i;

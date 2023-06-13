@@ -91,7 +91,8 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
 
     cfg_radix = ucc_tl_ucp_get_radix_from_range(tl_team,
                                                 count * ucc_dt_size(dtype),
-                                                mem_type, p);
+                                                mem_type, p,
+                                                tl_team->opt_radix);
     radix     = ucc_knomial_pattern_get_min_radix(cfg_radix,
                                                   UCC_TL_TEAM_SIZE(tl_team),
                                                   count);

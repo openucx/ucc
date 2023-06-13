@@ -134,52 +134,72 @@ static inline int ucc_topo_isoppn(ucc_topo_t *topo)
     return ucc_topo_max_ppn(topo) == ucc_topo_min_ppn(topo);
 }
 
-/* Returns min socket size across the nodes */
+/* Returns min socket size across the nodes.
+ * If not set will return UCC_RANK_MAX,
+ * in case of error will return UCC_RANK_INVALID.
+ */
 static inline ucc_rank_t ucc_topo_min_socket_size(ucc_topo_t *topo)
 {
-    ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+    ucc_sbgp_t *sbgp;
+
+    ucc_assert(topo->topo->sock_bound);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
 
     if (sbgp->status == UCC_SBGP_NOT_INIT) {
-        ucc_assert(topo->topo->sock_bound);
         return UCC_RANK_INVALID;
     }
 
     return topo->min_socket_size;
 }
 
-/* Returns max socket size across the nodes */
+/* Returns max socket size across the nodes.
+ * If not set will return 0,
+ * in case of error will return UCC_RANK_INVALID.
+ */
 static inline ucc_rank_t ucc_topo_max_socket_size(ucc_topo_t *topo)
 {
-     ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+    ucc_sbgp_t *sbgp;
+
+    ucc_assert(topo->topo->sock_bound);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
 
     if (sbgp->status == UCC_SBGP_NOT_INIT) {
-        ucc_assert(topo->topo->sock_bound);
         return UCC_RANK_INVALID;
     }
 
     return topo->max_socket_size;
 }
 
-/* Returns min numa size across the nodes */
+/* Returns min numa size across the nodes.
+ * If not set will return UCC_RANK_MAX,
+ * in case of error will return UCC_RANK_INVALID.
+ */
 static inline ucc_rank_t ucc_topo_min_numa_size(ucc_topo_t *topo)
 {
-    ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+    ucc_sbgp_t *sbgp;
+
+    ucc_assert(topo->topo->numa_bound);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
 
     if (sbgp->status == UCC_SBGP_NOT_INIT) {
-        ucc_assert(topo->topo->numa_bound);
         return UCC_RANK_INVALID;
     }
 
     return topo->min_numa_size;
 }
 
-/* Returns max numa size across the nodes */
+/* Returns max numa size across the nodes.
+ * If not set will return 0,
+ * in case of error will return UCC_RANK_INVALID.
+ */
 static inline ucc_rank_t ucc_topo_max_numa_size(ucc_topo_t *topo)
 {
-    ucc_sbgp_t *sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+    ucc_sbgp_t *sbgp;
+
+    ucc_assert(topo->topo->numa_bound);
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
 
     if (sbgp->status == UCC_SBGP_NOT_INIT) {
-        ucc_assert(topo->topo->numa_bound);
         return UCC_RANK_INVALID;
     }
 
