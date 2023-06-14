@@ -102,9 +102,9 @@ typedef struct ucc_tl_mlx5_dm_chunk_t {
     uintptr_t addr; // 0 based offset from the beginning of
                       // memic_mr (obtained with ibv_reg_dm_mr)
     ucc_tl_mlx5_schedule_t *task;
-    int                     posted_jobs;
+    int                     posted_sends;
     int                     posted_all;
-    int                     completed_jobs;
+    int                     completed_sends;
 } ucc_tl_mlx5_dm_chunk_t;
 
 typedef struct ucc_tl_mlx5_alltoall ucc_tl_mlx5_alltoall_t;
