@@ -64,7 +64,7 @@ UCC_TEST_P(test_tl_mlx5_transpose, transposeWqe)
 
     ibv_wr_start(qp.qp_ex);
     post_transpose(qp.qp, src_mr->lkey, dst_mr->rkey, (uintptr_t)src,
-                   (uintptr_t)dst, elem_size, nrows, ncols, IBV_SEND_SIGNALED);
+                   (uintptr_t)dst, elem_size, ncols, nrows, IBV_SEND_SIGNALED);
     GTEST_ASSERT_EQ(ibv_wr_complete(qp.qp_ex), 0);
 
     while (!completions_num) {
