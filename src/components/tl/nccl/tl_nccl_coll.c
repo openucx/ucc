@@ -258,7 +258,7 @@ ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
     ucc_status_t        status = UCC_OK;
     ptrdiff_t           sbuf   = (ptrdiff_t)args->src.info.buffer;
     ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info.buffer;
-    size_t data_size;
+    size_t     data_size;
     ucc_rank_t peer;
 
     task->super.status = UCC_INPROGRESS;
@@ -279,7 +279,13 @@ ucc_status_t ucc_tl_nccl_alltoall_start(ucc_coll_task_t *coll_task)
                                 ncclChar, peer, team->nccl_comm, stream),
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
     }
+#if NCCL_USE_NON_BLOCKING
+    NCCLCHECK_INPROGRESS_GOTO(ncclGroupEnd(), exit_coll, status,
+                              UCC_TL_TEAM_LIB(team),
+                              task->nccl_progress_st, team->nccl_comm);
+#else
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
     return status;
@@ -292,7 +298,7 @@ ucc_status_t ucc_tl_nccl_alltoall_init(ucc_tl_nccl_task_t *task)
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    task->super.post     = ucc_tl_nccl_alltoall_start;
+    task->super.post = ucc_tl_nccl_alltoall_start;
     return UCC_OK;
 }
 
@@ -306,7 +312,7 @@ ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
     ucc_status_t        status = UCC_OK;
     ptrdiff_t           sbuf   = (ptrdiff_t)args->src.info_v.buffer;
     ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info_v.buffer;
-    size_t sdt_size, rdt_size, count, displ;
+    size_t     sdt_size, rdt_size, count, displ;
     ucc_rank_t peer;
 
     task->super.status = UCC_INPROGRESS;
@@ -334,7 +340,13 @@ ucc_status_t ucc_tl_nccl_alltoallv_start(ucc_coll_task_t *coll_task)
                         exit_coll, status, UCC_TL_TEAM_LIB(team));
         }
     }
+#if NCCL_USE_NON_BLOCKING
+    NCCLCHECK_INPROGRESS_GOTO(ncclGroupEnd(), exit_coll, status,
+                              UCC_TL_TEAM_LIB(team),
+                              task->nccl_progress_st, team->nccl_comm);
+#else
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
     return status;
@@ -347,7 +359,7 @@ ucc_status_t ucc_tl_nccl_alltoallv_init(ucc_tl_nccl_task_t *task)
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    task->super.post     = ucc_tl_nccl_alltoallv_start;
+    task->super.post = ucc_tl_nccl_alltoallv_start;
     return UCC_OK;
 }
 
@@ -397,7 +409,7 @@ ucc_status_t ucc_tl_nccl_allreduce_init(ucc_tl_nccl_task_t *task)
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    task->super.post     = ucc_tl_nccl_allreduce_start;
+    task->super.post = ucc_tl_nccl_allreduce_start;
     return UCC_OK;
 }
 
@@ -493,12 +505,25 @@ ucc_status_t ucc_tl_nccl_bcast_start(ucc_coll_task_t *coll_task)
                                         team->nccl_comm, stream),
                                exit_coll, status, UCC_TL_TEAM_LIB(team));
             }
-            NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status,
-                           UCC_TL_TEAM_LIB(team));
+#if NCCL_USE_NON_BLOCKING
+            NCCLCHECK_INPROGRESS_GOTO(ncclGroupEnd(), exit_coll, status,
+                                      UCC_TL_TEAM_LIB(team),
+                                      task->nccl_progress_st, team->nccl_comm);
+#else
+            NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
         } else {
+#if NCCL_USE_NON_BLOCKING
+            NCCLCHECK_INPROGRESS_GOTO(ncclRecv(src, count, dt, root,
+                                               team->nccl_comm, stream),
+                                      exit_coll, status,
+                                      UCC_TL_TEAM_LIB(team),
+                                      task->nccl_progress_st, team->nccl_comm);
+#else
             NCCLCHECK_GOTO(ncclRecv(src, count, dt, root,
                                     team->nccl_comm, stream),
                            exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
         }
     } else {
         NCCLCHECK_GOTO(ncclBroadcast(src, src, count, dt, root, team->nccl_comm,
@@ -658,7 +683,7 @@ ucc_status_t ucc_tl_nccl_gather_start(ucc_coll_task_t *coll_task)
     void               *dst    = args->dst.info.buffer;
     void               *src    = args->src.info.buffer;
     ucc_status_t        status = UCC_OK;
-    size_t send_size;
+    size_t     send_size;
     ucc_rank_t peer;
 
     if (rank == args->root) {
@@ -687,12 +712,25 @@ ucc_status_t ucc_tl_nccl_gather_start(ucc_coll_task_t *coll_task)
                                     stream),
                            exit_coll, status, UCC_TL_TEAM_LIB(team));
         }
-        NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status,
-                       UCC_TL_TEAM_LIB(team));
+#if NCCL_USE_NON_BLOCKING
+        NCCLCHECK_INPROGRESS_GOTO(ncclGroupEnd(), exit_coll, status,
+                                  UCC_TL_TEAM_LIB(team),
+                                  task->nccl_progress_st, team->nccl_comm);
+#else
+        NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     } else {
+#if NCCL_USE_NON_BLOCKING
+        NCCLCHECK_INPROGRESS_GOTO(ncclSend(src, send_size, ncclChar,
+                                           args->root, team->nccl_comm,
+                                           stream),
+                                  exit_coll, status, UCC_TL_TEAM_LIB(team),
+                                  task->nccl_progress_st, team->nccl_comm);
+#else
         NCCLCHECK_GOTO(ncclSend(src, send_size, ncclChar, args->root,
                                 team->nccl_comm, stream),
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     }
     task->super.status = UCC_INPROGRESS;
     status = ucc_tl_nccl_collective_sync(task, stream);
@@ -702,8 +740,8 @@ exit_coll:
 
 ucc_status_t ucc_tl_nccl_gather_init(ucc_tl_nccl_task_t *task)
 {
-   task->super.post = ucc_tl_nccl_gather_start;
-   return UCC_OK;
+    task->super.post = ucc_tl_nccl_gather_start;
+    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_nccl_gatherv_start(ucc_coll_task_t *coll_task)
@@ -718,7 +756,7 @@ ucc_status_t ucc_tl_nccl_gatherv_start(ucc_coll_task_t *coll_task)
     void               *dst    = args->dst.info_v.buffer;
     void               *src    = args->src.info.buffer;
     ucc_status_t        status = UCC_OK;
-    size_t count, displ, dt_size;
+    size_t     count, displ, dt_size;
     ucc_rank_t peer;
 
     if (rank == args->root) {
@@ -754,13 +792,26 @@ ucc_status_t ucc_tl_nccl_gatherv_start(ucc_coll_task_t *coll_task)
                                     peer,team->nccl_comm, stream),
                            exit_coll, status, UCC_TL_TEAM_LIB(team));
         }
-        NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status,
-                       UCC_TL_TEAM_LIB(team));
+#if NCCL_USE_NON_BLOCKING
+        NCCLCHECK_INPROGRESS_GOTO(ncclGroupEnd(), exit_coll, status,
+                                  UCC_TL_TEAM_LIB(team),
+                                  task->nccl_progress_st, team->nccl_comm);
+#else
+        NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     } else {
+#if NCCL_USE_NON_BLOCKING
+        NCCLCHECK_INPROGRESS_GOTO(ncclSend(src, args->src.info.count * dt_size,
+                                           ncclChar, args->root,
+                                           team->nccl_comm, stream),
+                                  exit_coll, status, UCC_TL_TEAM_LIB(team),
+                                  task->nccl_progress_st, team->nccl_comm);
+#else
         NCCLCHECK_GOTO(ncclSend(src, args->src.info.count * dt_size,
                                 ncclChar, args->root, team->nccl_comm,
                                 stream),
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     }
     task->super.status = UCC_INPROGRESS;
     status = ucc_tl_nccl_collective_sync(task, stream);
@@ -786,8 +837,8 @@ ucc_status_t ucc_tl_nccl_scatter_start(ucc_coll_task_t *coll_task)
     void               *dst    = args->dst.info.buffer;
     void               *src    = args->src.info.buffer;
     ucc_status_t        status = UCC_OK;
-    size_t              send_size;
-    ucc_rank_t          peer;
+    size_t     send_size;
+    ucc_rank_t peer;
 
     if (rank == args->root) {
         send_size = ucc_dt_size(args->src.info.datatype) *
@@ -816,12 +867,25 @@ ucc_status_t ucc_tl_nccl_scatter_start(ucc_coll_task_t *coll_task)
                                     stream),
                            exit_coll, status, UCC_TL_TEAM_LIB(team));
         }
-        NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status,
-                       UCC_TL_TEAM_LIB(team));
+#if NCCL_USE_NON_BLOCKING
+        NCCLCHECK_INPROGRESS_GOTO(ncclGroupEnd(), exit_coll, status,
+                                  UCC_TL_TEAM_LIB(team),
+                                  task->nccl_progress_st, team->nccl_comm);
+#else
+        NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     } else {
+#if NCCL_USE_NON_BLOCKING
+        NCCLCHECK_INPROGRESS_GOTO(ncclRecv(dst, send_size, ncclChar,
+                                           args->root, team->nccl_comm,
+                                           stream),
+                                  exit_coll, status, UCC_TL_TEAM_LIB(team),
+                                  task->nccl_progress_st, team->nccl_comm);
+#else
         NCCLCHECK_GOTO(ncclRecv(dst, send_size, ncclChar, args->root,
                                 team->nccl_comm, stream),
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     }
     task->super.status = UCC_INPROGRESS;
     status = ucc_tl_nccl_collective_sync(task, stream);
@@ -847,7 +911,7 @@ ucc_status_t ucc_tl_nccl_scatterv_start(ucc_coll_task_t *coll_task)
     void               *dst    = args->dst.info.buffer;
     void               *src    = args->src.info_v.buffer;
     ucc_status_t        status = UCC_OK;
-    size_t count, displ, dt_size;
+    size_t     count, displ, dt_size;
     ucc_rank_t peer;
 
     if (rank == args->root) {
@@ -885,12 +949,25 @@ ucc_status_t ucc_tl_nccl_scatterv_start(ucc_coll_task_t *coll_task)
                                     team->nccl_comm, stream),
                            exit_coll, status, UCC_TL_TEAM_LIB(team));
         }
-        NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status,
-                       UCC_TL_TEAM_LIB(team));
+#if NCCL_USE_NON_BLOCKING
+        NCCLCHECK_INPROGRESS_GOTO(ncclGroupEnd(), exit_coll, status,
+                                  UCC_TL_TEAM_LIB(team),
+                                  task->nccl_progress_st, team->nccl_comm);
+#else
+        NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     } else {
+#if NCCL_USE_NON_BLOCKING
+        NCCLCHECK_INPROGRESS_GOTO(ncclRecv(dst, args->dst.info.count * dt_size,
+                                           ncclChar, args->root,
+                                           team->nccl_comm, stream),
+                                  exit_coll, status, UCC_TL_TEAM_LIB(team),
+                                  task->nccl_progress_st, team->nccl_comm);
+#else
         NCCLCHECK_GOTO(ncclRecv(dst, args->dst.info.count * dt_size, ncclChar,
                                 args->root, team->nccl_comm, stream),
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     }
     task->super.status = UCC_INPROGRESS;
     status = ucc_tl_nccl_collective_sync(task, stream);

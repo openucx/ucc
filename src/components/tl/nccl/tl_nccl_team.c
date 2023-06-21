@@ -12,9 +12,6 @@
 #include "coll_score/ucc_coll_score.h"
 #include "utils/arch/cuda_def.h"
 
-#define NCCL_VERSION_COMM_INIT_NB NCCL_VERSION(2,14,3)
-#define NCCL_USE_NON_BLOCKING NCCL_VERSION_CODE >= NCCL_VERSION_COMM_INIT_NB
-
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {

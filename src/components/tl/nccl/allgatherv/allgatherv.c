@@ -89,7 +89,13 @@ ucc_status_t ucc_tl_nccl_allgatherv_p2p_start(ucc_coll_task_t *coll_task)
                         exit_coll, status, UCC_TL_TEAM_LIB(team));
         }
     }
+#if NCCL_USE_NON_BLOCKING
+    NCCLCHECK_INPROGRESS_GOTO(ncclGroupEnd(), exit_coll, status,
+                              UCC_TL_TEAM_LIB(team),
+                              task->nccl_progress_st, team->nccl_comm);
+#else
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
     return status;
@@ -106,8 +112,8 @@ ucc_status_t ucc_tl_nccl_allgatherv_p2p_init(ucc_base_coll_args_t *coll_args,
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
-    task->super.post     = ucc_tl_nccl_allgatherv_p2p_start;
-    *task_h = &task->super;
+    task->super.post = ucc_tl_nccl_allgatherv_p2p_start;
+    *task_h          = &task->super;
 
     return status;
 }
@@ -233,8 +239,8 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcast_start(ucc_coll_task_t *coll_task)
     ucc_status_t        status = UCC_OK;
     void               *sbuf   = args->src.info.buffer;
     ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info_v.buffer;
-    size_t rdt_size, count, displ;
-    ucc_rank_t peer;
+    size_t       rdt_size, count, displ;
+    ucc_rank_t   peer;
 
     task->super.status = UCC_INPROGRESS;
     rdt_size           = ucc_dt_size(args->dst.info_v.datatype);
@@ -253,7 +259,13 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcast_start(ucc_coll_task_t *coll_task)
                                      team->nccl_comm, stream),
                        exit_coll, status, UCC_TL_TEAM_LIB(team));
     }
+#if NCCL_USE_NON_BLOCKING 
+    NCCLCHECK_INPROGRESS_GOTO(ncclGroupEnd(), exit_coll, status,
+                              UCC_TL_TEAM_LIB(team),
+                              task->nccl_progress_st, team->nccl_comm);
+#else
     NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+#endif
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
     return status;
@@ -263,7 +275,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcast_init(ucc_base_coll_args_t *coll_args,
                                                ucc_base_team_t *     team,
                                                ucc_coll_task_t **    task_h)
 {
-    ucc_status_t        status    = UCC_OK;
+    ucc_status_t        status = UCC_OK;
     ucc_tl_nccl_task_t *task;
 
     status = ucc_tl_nccl_init_task(coll_args, team, &task);
@@ -272,6 +284,6 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcast_init(ucc_base_coll_args_t *coll_args,
     }
 
     task->super.post = ucc_tl_nccl_allgatherv_bcast_start;
-    *task_h = &task->super;
+    *task_h          = &task->super;
     return status;
 }

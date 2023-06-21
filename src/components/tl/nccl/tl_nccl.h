@@ -42,7 +42,8 @@
 #define UCC_TL_NCCL_PROFILE_REQUEST_NEW UCC_PROFILE_REQUEST_NEW
 #define UCC_TL_NCCL_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
 #define UCC_TL_NCCL_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
-
+#define NCCL_VERSION_COMM_INIT_NB NCCL_VERSION(2,14,3)
+#define NCCL_USE_NON_BLOCKING NCCL_VERSION_CODE >= NCCL_VERSION_COMM_INIT_NB
 typedef struct ucc_tl_nccl_iface {
     ucc_tl_iface_t super;
 } ucc_tl_nccl_iface_t;
@@ -92,6 +93,7 @@ typedef struct ucc_tl_nccl_team {
 typedef struct ucc_tl_nccl_task {
     ucc_coll_task_t         super;
     ucc_status_t            host_status;
+    ucc_status_t            nccl_progress_st;
     ucc_status_t           *dev_status;
     void                   *completed;
     union {
@@ -128,6 +130,19 @@ UCC_CLASS_DECLARE(ucc_tl_nccl_team_t, ucc_base_context_t *,
         if (ncclSuccess != e) {                                                \
             tl_error(_lib, "NCCL error %d %s", e, ncclGetErrorString(e));      \
             _status = UCC_ERR_NO_MESSAGE;                                      \
+            goto _label;                                                       \
+        }                                                                      \
+    } while (0)
+
+#define NCCLCHECK_INPROGRESS_GOTO(_cmd, _label, _st, _lib, _task_st, _comm)    \
+    do {                                                                       \
+        ncclResult_t e = _cmd;                                                 \
+        ncclCommGetAsyncError(_comm, &e);                                      \
+        if (ncclInProgress == e) {                                             \
+            _task_st = UCC_INPROGRESS;                                         \
+        } else if (ncclSuccess != e) {                                         \
+            tl_error(_lib, "NCCL error %d %s", e, ncclGetErrorString(e));      \
+            _st = UCC_ERR_NO_MESSAGE;                                          \
             goto _label;                                                       \
         }                                                                      \
     } while (0)
