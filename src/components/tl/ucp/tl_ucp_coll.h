@@ -409,15 +409,15 @@ static inline unsigned
 ucc_tl_ucp_get_radix_from_range(ucc_tl_ucp_team_t *team,
                                 size_t             msgsize,
                                 ucc_memory_type_t  mem_type,
-                                ucc_mrange_uint_t *p)
+                                ucc_mrange_uint_t *p,
+                                ucc_rank_t         default_value)
 {
     unsigned radix;
 
     radix = ucc_mrange_uint_get(p, msgsize, mem_type);
 
     if (UCC_UUNITS_AUTO == radix) {
-        /* auto selection based on team configuration */
-        return UCC_UUNITS_AUTO_RADIX;
+        return default_value;
     }
     return radix;
 }
