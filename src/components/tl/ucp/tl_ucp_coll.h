@@ -400,6 +400,32 @@ static inline ucc_status_t ucc_tl_ucp_test_ring(ucc_tl_ucp_task_t *task)
     return UCC_INPROGRESS;
 }
 
+#define UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(_task)                           \
+    (((_task)->onesided.put_posted == (_task)->onesided.put_completed) &&      \
+     ((_task)->onesided.get_posted == (_task)->onesided.get_completed))
+
+#define UCC_TL_UCP_TASK_ONESIDED_SYNC_COMPLETE(_task, _end)                    \
+    (*((long *)(TASK_ARGS(_task).global_work_buffer)) == _end)
+
+static inline ucc_status_t ucc_tl_ucp_test_onesided(ucc_tl_ucp_task_t *task,
+                                                    int                sync_end)
+{
+    int polls = 0;
+
+    if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task) &&
+        UCC_TL_UCP_TASK_ONESIDED_SYNC_COMPLETE(task, sync_end)) {
+        return UCC_OK;
+    }
+    while (polls++ < task->n_polls) {
+        if (UCC_TL_UCP_TASK_ONESIDED_P2P_COMPLETE(task) &&
+            UCC_TL_UCP_TASK_ONESIDED_SYNC_COMPLETE(task, sync_end)) {
+            return UCC_OK;
+        }
+        ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);
+    }
+    return UCC_INPROGRESS;
+}
+
 ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
                                        ucc_coll_type_t          coll_type,
                                        ucc_memory_type_t        mem_type,

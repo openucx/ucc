@@ -25,22 +25,26 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     std::default_random_engine eng;
     size_t                     dt_size, count;
     int                        rank, nprocs, rank_count;
+    bool                       is_onesided;
+    void                      *work_buf;
 
-    dt         = params.dt;
-    dt_size    = ucc_dt_size(dt);
-    count      = msgsize / dt_size;
-    sncounts   = 0;
-    rncounts   = 0;
-    scounts    = NULL;
-    sdispls    = NULL;
-    rcounts    = NULL;
-    rdispls    = NULL;
-    scounts64  = NULL;
-    sdispls64  = NULL;
-    rcounts64  = NULL;
-    rdispls64  = NULL;
-    count_bits = params.count_bits;
-    displ_bits = params.displ_bits;
+    dt          = params.dt;
+    dt_size     = ucc_dt_size(dt);
+    count       = msgsize / dt_size;
+    sncounts    = 0;
+    rncounts    = 0;
+    scounts     = NULL;
+    sdispls     = NULL;
+    rcounts     = NULL;
+    rdispls     = NULL;
+    scounts64   = NULL;
+    sdispls64   = NULL;
+    rcounts64   = NULL;
+    rdispls64   = NULL;
+    count_bits  = params.count_bits;
+    displ_bits  = params.displ_bits;
+    is_onesided = (params.buffers != NULL);
+    work_buf    = NULL;
 
     std::uniform_int_distribution<int> urd(count / 2, count);
     eng.seed(test_rand_seed);
@@ -56,6 +60,10 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
     args.flags |= UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER |
                   UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
+    if (is_onesided) {
+        args.mask  |= UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
+        args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+    }
     if (count_bits == TEST_FLAG_VSIZE_64BIT) {
         args.flags |= UCC_COLL_ARGS_FLAG_COUNT_64BIT;
     }
@@ -92,13 +100,20 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     if (TEST_SKIP_NONE != skip_reduce(test_skip, team.comm)) {
         return;
     }
-
-    UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, sncounts * dt_size, mem_type));
-    UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, rncounts * dt_size, mem_type));
-    sbuf      = sbuf_mc_header->addr;
-    rbuf      = rbuf_mc_header->addr;
     check_buf = ucc_malloc((sncounts + rncounts) * dt_size, "check buf");
     UCC_MALLOC_CHECK(check_buf);
+
+    if (!is_onesided) {
+        UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, sncounts * dt_size, mem_type));
+        UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, rncounts * dt_size, mem_type));
+        sbuf = sbuf_mc_header->addr;
+        rbuf = rbuf_mc_header->addr;
+    } else {
+        sbuf                    = params.buffers[MEM_SEND_SEGMENT];
+        rbuf                    = params.buffers[MEM_RECV_SEGMENT];
+        work_buf                = params.buffers[MEM_WORK_SEGMENT];
+        args.global_work_buffer = work_buf;
+    }
 
     args.src.info_v.buffer = sbuf;
     args.src.info_v.datatype = dt;
@@ -139,6 +154,29 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     } else {
         args.src.info_v.displacements = (ucc_aint_t*)sdispls;
         args.dst.info_v.displacements = (ucc_aint_t*)rdispls;
+    }
+    if (is_onesided) {
+        MPI_Datatype datatype;
+        size_t       disp_size;
+        void        *ldisp;
+        int          alltoall_status;
+
+        if (TEST_FLAG_VSIZE_64BIT == displ_bits) {
+            datatype  = MPI_LONG;
+            disp_size = sizeof(uint64_t);
+        } else {
+            datatype  = MPI_INT;
+            disp_size = sizeof(uint32_t);
+        }
+        ldisp = ucc_calloc(nprocs, disp_size, "displacements");
+        UCC_MALLOC_CHECK(ldisp);
+        alltoall_status = MPI_Alltoall(args.dst.info_v.displacements, 1,
+                                       datatype, ldisp, 1, datatype, team.comm);
+        if (MPI_SUCCESS != alltoall_status) {
+            std::cerr << "*** MPI ALLTOALL FAILED" << std::endl;
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+        args.dst.info_v.displacements = (ucc_aint_t *)ldisp;
     }
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);

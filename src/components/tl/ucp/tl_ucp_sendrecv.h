@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -254,16 +254,18 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     keys        = PTR_OFFSET(base_offset, (section_offset * 3));
 
     for (int i = 0; i < ctx->n_rinfo_segs; i++) {
-        if ((uint64_t)va >= (uint64_t)team->va_base[i] &&
-            (uint64_t)va < (uint64_t)team->va_base[i] + team->base_length[i]) {
+        uint64_t base = (uint64_t)team->va_base[i];
+        uint64_t end = base + team->base_length[i];
+        if ((uint64_t)va >= base &&
+            (uint64_t)va < end) {
             *segment = i;
             break;
         }
         key_offset += key_sizes[i];
     }
-    if (0 > *segment) {
+    if (ucc_unlikely(0 > *segment)) {
         tl_error(UCC_TL_TEAM_LIB(team),
-            "attempt to perform one-sided operation on non-registered memory");
+            "attempt to perform one-sided operation on non-registered memory %p", va);
         return UCC_ERR_NOT_FOUND;
     }
     if (ucc_unlikely(NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment))) {
