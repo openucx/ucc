@@ -166,6 +166,8 @@ static ucc_memory_type_t mtype_str_to_type(std::string mtype)
         return UCC_MEMORY_TYPE_HOST;
     } else if (mtype == "cuda") {
         return UCC_MEMORY_TYPE_CUDA;
+    } else if (mtype == "cudaManaged") {
+        return UCC_MEMORY_TYPE_CUDA_MANAGED;
     } else if (mtype == "rocm") {
         return UCC_MEMORY_TYPE_ROCM;
     }

@@ -584,7 +584,6 @@ ucc_status_t ucc_tl_nccl_reduce_start(ucc_coll_task_t *coll_task)
     ncclRedOp_t         op      = ucc_to_nccl_reduce_op[args->op];
     ucc_status_t        status  = UCC_OK;
     ncclDataType_t      nccl_dt;
-
     UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_reduce_start", 0);
     if (args->root == UCC_TL_TEAM_RANK(team)) {
         ucc_dt = TASK_ARGS(task).dst.info.datatype;

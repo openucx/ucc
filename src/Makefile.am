@@ -11,6 +11,7 @@ ec_dirs = components/ec/cpu
 
 if HAVE_CUDA
 mc_dirs += components/mc/cuda
+mc_dirs += components/mc/cuda_managed
 ec_dirs += components/ec/cuda
 endif
 

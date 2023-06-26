@@ -53,4 +53,30 @@ extern ucc_mc_cuda_t ucc_mc_cuda;
     }                                                                          \
 } while(0)
 
+ucc_status_t ucc_mc_cuda_flush_not_supported();
+
+#if CUDA_VERSION >= 11030
+ucc_status_t ucc_mc_cuda_flush_no_op();
+
+ucc_status_t ucc_mc_cuda_flush_to_owner();
+#endif
+
+ucc_status_t ucc_mc_cuda_chunk_alloc(ucc_mpool_t *mp, //NOLINT
+                                     size_t *size_p,
+                                     void **chunk_p);
+
+void ucc_mc_cuda_chunk_release(ucc_mpool_t *mp, void *chunk); //NOLINT: mp is unused
+
+void ucc_mc_cuda_chunk_cleanup(ucc_mpool_t *mp, void *obj); //NOLINT: mp is unused
+
+ucc_status_t ucc_mc_cuda_mem_free(ucc_mc_buffer_header_t *h_ptr);
+
+ucc_status_t ucc_mc_cuda_mem_pool_free(ucc_mc_buffer_header_t *h_ptr);
+
+ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
+                                ucc_memory_type_t dst_mem,
+                                ucc_memory_type_t src_mem);
+
+ucc_status_t ucc_mc_cuda_memset(void *ptr, int val, size_t len);
+
 #endif

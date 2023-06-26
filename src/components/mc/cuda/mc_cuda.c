@@ -25,19 +25,19 @@ static ucc_config_field_t ucc_mc_cuda_config_table[] = {
 
 };
 
-static ucc_status_t ucc_mc_cuda_flush_not_supported()
+ucc_status_t ucc_mc_cuda_flush_not_supported()
 {
     mc_error(&ucc_mc_cuda.super, "consistency api is not supported");
     return UCC_ERR_NOT_SUPPORTED;
 }
 
 #if CUDA_VERSION >= 11030
-static ucc_status_t ucc_mc_cuda_flush_no_op()
+ucc_status_t ucc_mc_cuda_flush_no_op()
 {
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cuda_flush_to_owner()
+ucc_status_t ucc_mc_cuda_flush_to_owner()
 {
     CUDADRV_FUNC(cuFlushGPUDirectRDMAWrites(CU_FLUSH_GPU_DIRECT_RDMA_WRITES_TARGET_CURRENT_CTX,
                                             CU_FLUSH_GPU_DIRECT_RDMA_WRITES_TO_OWNER));
@@ -162,9 +162,9 @@ static ucc_status_t ucc_mc_cuda_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cuda_chunk_alloc(ucc_mpool_t *mp, //NOLINT
-                                            size_t *size_p,
-                                            void **chunk_p)
+ucc_status_t ucc_mc_cuda_chunk_alloc(ucc_mpool_t *mp, //NOLINT
+                                     size_t *size_p,
+                                     void **chunk_p)
 {
     *chunk_p = ucc_malloc(*size_p, "mc cuda");
     if (!*chunk_p) {
@@ -193,12 +193,12 @@ static void ucc_mc_cuda_chunk_init(ucc_mpool_t *mp, //NOLINT
     h->mt        = UCC_MEMORY_TYPE_CUDA;
 }
 
-static void ucc_mc_cuda_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT: mp is unused
+void ucc_mc_cuda_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT: mp is unused
 {
     ucc_free(chunk);
 }
 
-static void ucc_mc_cuda_chunk_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp is unused
+void ucc_mc_cuda_chunk_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp is unused
 {
     ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t *)obj;
     cudaError_t             st;
@@ -215,9 +215,9 @@ static void ucc_mc_cuda_chunk_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp i
 static ucc_mpool_ops_t ucc_mc_ops = {.chunk_alloc   = ucc_mc_cuda_chunk_alloc,
                                      .chunk_release = ucc_mc_cuda_chunk_release,
                                      .obj_init      = ucc_mc_cuda_chunk_init,
-                                     .obj_cleanup = ucc_mc_cuda_chunk_cleanup};
+                                     .obj_cleanup   = ucc_mc_cuda_chunk_cleanup};
 
-static ucc_status_t ucc_mc_cuda_mem_free(ucc_mc_buffer_header_t *h_ptr)
+ucc_status_t ucc_mc_cuda_mem_free(ucc_mc_buffer_header_t *h_ptr)
 {
     cudaError_t st;
     st = cudaFree(h_ptr->addr);
@@ -233,7 +233,7 @@ static ucc_status_t ucc_mc_cuda_mem_free(ucc_mc_buffer_header_t *h_ptr)
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cuda_mem_pool_free(ucc_mc_buffer_header_t *h_ptr)
+ucc_status_t ucc_mc_cuda_mem_pool_free(ucc_mc_buffer_header_t *h_ptr)
 {
     if (!h_ptr->from_pool) {
         return ucc_mc_cuda_mem_free(h_ptr);
@@ -273,9 +273,9 @@ ucc_mc_cuda_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
     return ucc_mc_cuda_mem_pool_alloc(h_ptr, size);
 }
 
-static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
-                                       ucc_memory_type_t dst_mem,
-                                       ucc_memory_type_t src_mem)
+ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
+                                ucc_memory_type_t dst_mem,
+                                ucc_memory_type_t src_mem)
 {
     cudaError_t st;
     ucc_assert(dst_mem == UCC_MEMORY_TYPE_CUDA ||
@@ -303,7 +303,7 @@ static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cuda_memset(void *ptr, int val, size_t len)
+ucc_status_t ucc_mc_cuda_memset(void *ptr, int val, size_t len)
 {
     cudaError_t st;
 

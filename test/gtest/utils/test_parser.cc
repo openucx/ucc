@@ -52,7 +52,8 @@ UCC_TEST_F(test_parse_mrange, check_invalid) {
 }
 
 UCC_TEST_F(test_parse_mrange, check_range_multiple) {
-    std::string str = "0-4K:host:8,4k-inf:host:10,0-4k:cuda:7,auto";
+    std::string str      =
+        "0-4K:host:8,4k-inf:host:10,0-4k:cuda:7,0-4k:cuda_managed:7,auto";
     size_t      msgsize1 = 1024, msgsize2 = 8192;
 
     EXPECT_EQ(1, ucc_config_sscanf_uint_ranged(str.c_str(), p, NULL));
@@ -61,6 +62,10 @@ UCC_TEST_F(test_parse_mrange, check_range_multiple) {
     EXPECT_EQ(7, ucc_mrange_uint_get(p, msgsize1, UCC_MEMORY_TYPE_CUDA));
     EXPECT_EQ(UCC_UUNITS_AUTO, ucc_mrange_uint_get(p, msgsize2,
                                                    UCC_MEMORY_TYPE_CUDA));
+    EXPECT_EQ(6, ucc_mrange_uint_get(p, msgsize1,
+                                     UCC_MEMORY_TYPE_CUDA_MANAGED));
+    EXPECT_EQ(UCC_UUNITS_AUTO,
+              ucc_mrange_uint_get(p, msgsize2, UCC_MEMORY_TYPE_CUDA_MANAGED));
     ucc_mrange_uint_destroy(p);
 }
 
