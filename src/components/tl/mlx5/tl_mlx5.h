@@ -31,6 +31,7 @@
 #define UCC_TL_MLX5_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
 #define UCC_TL_MLX5_PROFILE_REQUEST_FREE  UCC_PROFILE_REQUEST_FREE
 
+#define ATOMIC_IN_MEMIC 1
 #define DC_KEY 1
 
 typedef struct ucc_tl_mlx5_iface {
@@ -49,6 +50,7 @@ typedef struct ucc_tl_mlx5_ib_qp_conf {
 
 typedef struct ucc_tl_mlx5_lib_config {
     ucc_tl_lib_config_t      super;
+    int                      asr_barrier;
     int                      block_size;
     int                      num_dci_qps;
     int                      dc_threshold;
@@ -74,16 +76,17 @@ UCC_CLASS_DECLARE(ucc_tl_mlx5_lib_t, const ucc_base_lib_params_t *,
 typedef struct ucc_tl_mlx5_context {
     ucc_tl_context_t             super;
     ucc_tl_mlx5_context_config_t cfg;
-    struct ibv_context *         shared_ctx;
-    struct ibv_pd *              shared_pd;
-    ucc_rcache_t *               rcache;
+    struct ibv_context          *shared_ctx;
+    struct ibv_pd               *shared_pd;
+    ucc_rcache_t                *rcache;
     int                          is_imported;
     int                          ib_port;
     ucc_mpool_t                  req_mp;
 } ucc_tl_mlx5_context_t;
-UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t *,
-                  const ucc_base_config_t *);
+UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t*,
+                  const ucc_base_config_t*);
 
+typedef struct ucc_tl_mlx5_task ucc_tl_mlx5_task_t;
 typedef struct ucc_tl_mlx5_schedule ucc_tl_mlx5_schedule_t;
 typedef struct ucc_tl_mlx5_dm_chunk {
     ptrdiff_t               offset; /* 0 based offset from the beginning of
@@ -91,12 +94,14 @@ typedef struct ucc_tl_mlx5_dm_chunk {
     ucc_tl_mlx5_schedule_t *task;
 } ucc_tl_mlx5_dm_chunk_t;
 
-typedef struct ucc_tl_mlx5_a2a ucc_tl_mlx5_a2a_t;
+typedef struct ucc_tl_mlx5_alltoall ucc_tl_mlx5_alltoall_t;
 
 typedef enum
 {
     TL_MLX5_TEAM_STATE_INIT,
     TL_MLX5_TEAM_STATE_POSTED,
+    TL_MLX5_TEAM_STATE_ALLTOALL_INIT,
+    TL_MLX5_TEAM_STATE_ALLTOALL_POSTED
 } ucc_tl_mlx5_team_state_t;
 
 typedef struct ucc_tl_mlx5_team {
@@ -108,7 +113,7 @@ typedef struct ucc_tl_mlx5_team {
     ucc_mpool_t              dm_pool;
     struct ibv_dm           *dm_ptr;
     struct ibv_mr           *dm_mr;
-    ucc_tl_mlx5_a2a_t       *a2a;
+    ucc_tl_mlx5_alltoall_t  *a2a;
     ucc_topo_t              *topo;
     ucc_ep_map_t             ctx_map;
 } ucc_tl_mlx5_team_t;
@@ -144,5 +149,19 @@ typedef struct ucc_tl_mlx5_rcache_region {
 
 #define IS_SERVICE_TEAM(_team)                                                 \
     ((_team)->super.super.params.scope == UCC_CL_LAST + 1)
+
+#define SQUARED(_num) ((_num) * (_num))
+
+ucc_status_t tl_mlx5_create_rcache(ucc_tl_mlx5_context_t *ctx);
+
+ucc_status_t ucc_tl_mlx5_asr_socket_init(ucc_tl_mlx5_context_t *ctx,
+                                         ucc_rank_t group_size, int *socket,
+                                         const char *sock_path);
+
+ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
+                                      struct ibv_pd *pd, int dm_host,
+                                      size_t buf_size, size_t *buf_num_p,
+                                      struct ibv_dm **ptr, struct ibv_mr **mr,
+                                      ucc_base_lib_t *lib);
 
 #endif
