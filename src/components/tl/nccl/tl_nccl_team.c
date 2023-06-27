@@ -67,7 +67,7 @@ ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team)
     ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
 
 #if NCCL_USE_NON_BLOCKING
-    ncclResult_t nccl_status;
+    ncclResult_t nccl_status, st;
 
     if (team->nccl_comm && team->comm_state == UCC_INPROGRESS) {
         goto check_finalize;
@@ -83,16 +83,16 @@ ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team)
 #if NCCL_USE_NON_BLOCKING
             ncclCommFinalize(team->nccl_comm);
 check_finalize:
-            ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
-            if (nccl_status == ncclInProgress) {
-                team->comm_state = UCC_INPROGRESS;
-                return UCC_INPROGRESS;
-            }
-            if (nccl_status != ncclSuccess) {
-                tl_debug(tl_team->context->lib, "NCCL error %d %s", nccl_status,
-                ncclGetErrorString(nccl_status));
+            st = ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
+            if (st != ncclSuccess || (nccl_status != ncclSuccess)) {
+                tl_debug(tl_team->context->lib, "NCCL error %d %s",
+                         st != ncclSuccess ? st : nccl_status,
+                ncclGetErrorString(st != ncclSuccess ? st : nccl_status));
                 ncclCommAbort(team->nccl_comm);
                 return UCC_ERR_NO_MESSAGE;
+            } else if (nccl_status == ncclInProgress) {
+                team->comm_state = UCC_INPROGRESS;
+                return UCC_INPROGRESS;
             } else {
                 ncclCommDestroy(team->nccl_comm);
             }
@@ -117,6 +117,7 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
 
 #if NCCL_USE_NON_BLOCKING
     ncclConfig_t nccl_cfg = NCCL_CONFIG_INITIALIZER;
+    ncclResult_t st;
 
     if (team->comm_state == UCC_INPROGRESS) {
         goto ncclInitStage;
@@ -157,7 +158,10 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
         goto free_stream;
     }
 ncclInitStage:
-    ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
+    st = ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
+    if (st != ncclSuccess) {
+        nccl_status = st;
+    }
     if (nccl_status == ncclInProgress){
         team->comm_state = UCC_INPROGRESS;
         return UCC_INPROGRESS;

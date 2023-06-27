@@ -11,37 +11,38 @@
 #include "core/ucc_ee.h"
 #include "utils/arch/cpu.h"
 
-#if NCCL_USE_NON_BLOCKING
 static ucc_status_t ucc_tl_nccl_nb_progress(ucc_tl_nccl_task_t *task) {
+#if NCCL_USE_NON_BLOCKING
     ucc_tl_nccl_team_t *team = TASK_TEAM(task);
-    ncclResult_t nccl_status;
+    ncclResult_t nccl_status, st;
 
     if (task->nccl_progress_st == UCC_INPROGRESS) {
-        ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
+        st = ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
+        if (st != ncclSuccess ||
+            (nccl_status != ncclSuccess && nccl_status != ncclInProgress)) {
+            tl_error(UCC_TL_TEAM_LIB(team), "NCCL error %d %s",
+                     st != ncclSuccess ? st : nccl_status,
+                     ncclGetErrorString(st != ncclSuccess ? st : nccl_status));
+            return UCC_ERR_NO_MESSAGE;
+        }
         if (nccl_status == ncclInProgress) {
             return UCC_INPROGRESS;
         }
-        if (nccl_status != ncclSuccess) {
-            tl_error(UCC_TL_TEAM_LIB(team), "NCCL error %d %s", nccl_status,
-                     ncclGetErrorString(nccl_status));
-            return UCC_ERR_NO_MESSAGE;
-        }
     }
+#endif
     return UCC_OK;
 }
-#endif
 
 void ucc_tl_nccl_event_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
     ucc_status_t status;
-#if NCCL_USE_NON_BLOCKING
+
     status = ucc_tl_nccl_nb_progress(task);
     if (status != UCC_OK) {
         coll_task->status = status;
         return;
     }
-#endif
 
     ucc_assert(task->completed != NULL);
     status = ucc_ec_event_test(task->completed, UCC_EE_CUDA_STREAM);
@@ -56,7 +57,6 @@ void ucc_tl_nccl_event_collective_progress(ucc_coll_task_t *coll_task)
 void ucc_tl_nccl_driver_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_nccl_task_t *task = ucc_derived_of(coll_task, ucc_tl_nccl_task_t);
-#if NCCL_USE_NON_BLOCKING
     ucc_status_t status;
 
     status = ucc_tl_nccl_nb_progress(task);
@@ -64,7 +64,6 @@ void ucc_tl_nccl_driver_collective_progress(ucc_coll_task_t *coll_task)
         coll_task->status = status;
         return;
     }
-#endif
 
     coll_task->status = task->host_status;
 #ifdef HAVE_PROFILING_TL_NCCL
