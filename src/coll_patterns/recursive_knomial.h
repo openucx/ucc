@@ -8,6 +8,7 @@
 #define RECURSIVE_KNOMIAL_H_
 
 #define UCC_KN_PEER_NULL ((ucc_rank_t)-1)
+#define UCC_KN_MIN_RADIX 2
 typedef uint16_t ucc_kn_radix_t;
 
 enum {
@@ -228,6 +229,34 @@ ucc_knomial_calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
         dist *= radix;
     }
     return dist;
+}
+
+/* Calculates (sub) opt radix for Allreduce SRA and Bcast SAG,
+   by minimizing n_extra ranks */
+static inline ucc_rank_t ucc_kn_get_opt_radix(ucc_rank_t team_size,
+                                              ucc_kn_radix_t max_radix)
+{
+    ucc_rank_t     n_extra = 0, min_val = team_size;
+    ucc_kn_radix_t min_i   = UCC_KN_MIN_RADIX;
+    ucc_kn_radix_t max_r   = ucc_max(max_radix, UCC_KN_MIN_RADIX);
+    ucc_kn_radix_t r, fs;
+
+    for (r = UCC_KN_MIN_RADIX; r <= max_r; r++) {
+        fs = r;
+        while (fs < team_size) {
+            fs = fs * r;
+        }
+        fs      = (fs == team_size) ? fs : fs / r;
+        n_extra = team_size - (team_size / fs) * fs;
+        if (n_extra == 0) {
+            return r;
+        }
+        if (n_extra < min_val) {
+            min_val = n_extra;
+            min_i   = r;
+        }
+    }
+    return min_i;
 }
 
 /* A set of convenience macros used to implement sw based progress

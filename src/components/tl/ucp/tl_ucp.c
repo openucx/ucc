@@ -127,10 +127,10 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"BCAST_SAG_KN_RADIX", "4",
+    {"BCAST_SAG_KN_RADIX", "auto",
      "Radix of the scatter-allgather (SAG) knomial bcast algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_sag_kn_radix),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_UINT_RANGED},
 
     {"REDUCE_KN_RADIX", "4", "Radix of the knomial tree reduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_kn_radix),

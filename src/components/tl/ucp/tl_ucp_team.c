@@ -46,7 +46,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
 {
     ucc_tl_ucp_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_ucp_context_t);
-    ucc_status_t status;
+    ucc_kn_radix_t max_radix;
+    ucc_status_t   status;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
@@ -56,12 +57,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->status          = UCC_INPROGRESS;
     self->tuning_str      = "";
     self->topo            = NULL;
+    self->opt_radix       = UCC_UUNITS_AUTO_RADIX;
 
     status = ucc_config_clone_table(&UCC_TL_UCP_TEAM_LIB(self)->cfg, &self->cfg,
                                     ucc_tl_ucp_lib_config_table);
     if (UCC_OK != status) {
         return status;
     }
+
     if (ctx->topo_required) {
         status = ucc_tl_ucp_get_topo(self);
         if (UCC_OK != status) {
@@ -86,6 +89,15 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                  "topo is not available, disabling ranks reordering");
         self->cfg.use_reordering = 0;
     }
+
+    if (self->topo && !IS_SERVICE_TEAM(self) && self->topo->topo->sock_bound) {
+        max_radix       = ucc_min(UCC_TL_TEAM_SIZE(self),
+                                  ucc_topo_min_socket_size(self->topo));
+
+        self->opt_radix = ucc_kn_get_opt_radix(UCC_TL_TEAM_SIZE(self),
+                                               max_radix);
+    }
+
     tl_debug(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
@@ -103,7 +115,7 @@ ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 {
     ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
 
-    if (UCC_TL_UCP_TEAM_CTX(team)->topo_required) {
+    if (team->topo) {
         ucc_ep_map_destroy_nested(&team->ctx_map);
         ucc_topo_cleanup(team->topo);
     }
@@ -156,6 +168,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
 {
     ucc_tl_ucp_team_t *   team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
+    int                   i;
     ucc_status_t          status;
 
     if (USE_SERVICE_WORKER(team)) {
@@ -167,6 +180,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     if (team->status == UCC_OK) {
         return UCC_OK;
     }
+
     if (UCC_TL_TEAM_SIZE(team) <= ctx->cfg.preconnect) {
         status = ucc_tl_ucp_team_preconnect(team);
         if (UCC_INPROGRESS == status) {
@@ -177,7 +191,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     }
 
     if (ctx->remote_info) {
-        for (int i = 0; i < ctx->n_rinfo_segs; i++) {
+        for (i = 0; i < ctx->n_rinfo_segs; i++) {
             team->va_base[i]     = ctx->remote_info[i].va_base;
             team->base_length[i] = ctx->remote_info[i].len;
         }

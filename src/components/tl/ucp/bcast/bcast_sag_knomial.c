@@ -75,7 +75,10 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
 {
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
     size_t               count    = coll_args->args.src.info.count;
+    ucc_datatype_t       dtype    = coll_args->args.src.info.datatype;
+    ucc_memory_type_t    mem_type = coll_args->args.src.info.mem_type;
     ucc_base_coll_args_t args     = *coll_args;
+    ucc_mrange_uint_t   *p        = &tl_team->cfg.bcast_sag_kn_radix;
     ucc_schedule_t      *schedule;
     ucc_coll_task_t     *task, *rs_task;
     ucc_status_t         status;
@@ -86,11 +89,15 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
         return ucc_tl_ucp_bcast_knomial_init(coll_args, team, task_h);
     }
 
-    cfg_radix = UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.bcast_sag_kn_radix;
-    radix = ucc_knomial_pattern_get_min_radix(cfg_radix,
-                                              UCC_TL_TEAM_SIZE(tl_team), count);
-    status = ucc_tl_ucp_get_schedule(tl_team, coll_args,
-                                     (ucc_tl_ucp_schedule_t **)&schedule);
+    cfg_radix = ucc_tl_ucp_get_radix_from_range(tl_team,
+                                                count * ucc_dt_size(dtype),
+                                                mem_type, p,
+                                                tl_team->opt_radix);
+    radix     = ucc_knomial_pattern_get_min_radix(cfg_radix,
+                                                  UCC_TL_TEAM_SIZE(tl_team),
+                                                  count);
+    status    = ucc_tl_ucp_get_schedule(tl_team, coll_args,
+                                        (ucc_tl_ucp_schedule_t **)&schedule);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
