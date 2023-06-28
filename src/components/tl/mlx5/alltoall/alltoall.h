@@ -138,8 +138,11 @@ typedef struct ucc_tl_mlx5_alltoall {
     ucc_tl_mlx5_a2a_bcast_data_t bcast_data;
 } ucc_tl_mlx5_alltoall_t;
 
-ucc_status_t ucc_tl_mlx5_alltoall_init_start(ucc_tl_mlx5_team_t *team);
-ucc_status_t ucc_tl_mlx5_alltoall_init_progress(ucc_tl_mlx5_team_t *team);
+ucc_status_t ucc_tl_mlx5_team_alltoall_init_start(ucc_tl_mlx5_team_t *team);
+ucc_status_t ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *team);
+ucc_status_t ucc_tl_mlx5_alltoall_init(ucc_base_coll_args_t *coll_args,
+                                       ucc_base_team_t *     team,
+                                       ucc_coll_task_t **    task_h);
 void         ucc_tl_mlx5_alltoall_cleanup(ucc_tl_mlx5_team_t *team);
 
 static inline ucc_tl_mlx5_alltoall_ctrl_t*

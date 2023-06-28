@@ -7,6 +7,7 @@
 #include "tl_mlx5_coll.h"
 #include "tl_mlx5.h"
 #include "tl_mlx5_dm.h"
+#include "tl_mlx5_coll.h"
 #include "coll_score/ucc_coll_score.h"
 #include "alltoall/alltoall.h"
 #include "core/ucc_team.h"
@@ -145,7 +146,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         }
         tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_INIT;
     case TL_MLX5_TEAM_STATE_ALLTOALL_INIT:
-        status = ucc_tl_mlx5_alltoall_init_start(tl_team);
+        status = ucc_tl_mlx5_team_alltoall_init_start(tl_team);
         if (status != UCC_OK) {
             tl_error(UCC_TL_TEAM_LIB(tl_team),
                      "failed to init a2a: %s",
@@ -154,7 +155,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         }
         tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_POSTED;
     case TL_MLX5_TEAM_STATE_ALLTOALL_POSTED:
-        status = ucc_tl_mlx5_alltoall_init_progress(tl_team);
+        status = ucc_tl_mlx5_team_alltoall_init_progress(tl_team);
     }
     if (status < 0) {
         tl_error(team->context->lib, "failed creating tl team: %p", tl_team);
@@ -164,50 +165,46 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     return status;
 }
 
-ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args,
-                                   ucc_base_team_t *     team,
-                                   ucc_coll_task_t **    task_h)
-{
-    ucc_status_t status = UCC_OK;
-
-    switch (coll_args->args.coll_type)
-    {
-    case UCC_COLL_TYPE_BCAST:
-        status = ucc_tl_mlx5_bcast_mcast_init(coll_args, team, task_h);
-        break;
-    default:
-        status = UCC_ERR_NOT_SUPPORTED;
-    }
-
-    return status;
-}
-
 ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
                                          ucc_coll_score_t **score_p)
 {
-    ucc_tl_mlx5_team_t *team = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
-    ucc_base_context_t *ctx  = UCC_TL_TEAM_CTX(team);
-    ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_HOST;
-    ucc_coll_score_t *  score;
-    ucc_status_t        status;
+    ucc_tl_mlx5_team_t *team  = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
+    ucc_base_context_t *ctx   = UCC_TL_TEAM_CTX(team);
+    ucc_base_lib_t     *lib   = UCC_TL_TEAM_LIB(team);
+    ucc_memory_type_t   mt[2] = {UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA};
+    ucc_coll_score_t          *score;
+    ucc_status_t               status;
     ucc_coll_score_team_info_t team_info;
 
     team_info.alg_fn              = NULL;
     team_info.default_score       = UCC_TL_MLX5_DEFAULT_SCORE;
     team_info.init                = NULL;
-    team_info.num_mem_types       = 1;
-    team_info.supported_mem_types = &mt;
+    team_info.num_mem_types       = 2;
+    team_info.supported_mem_types = mt;
     team_info.supported_colls     = UCC_TL_MLX5_SUPPORTED_COLLS;
     team_info.size                = UCC_TL_TEAM_SIZE(team);
 
-    /* There can be a different logic for different coll_type/mem_type.
-       Right now just init everything the same way. */
-    status =
-        ucc_coll_score_build_default(tl_team, UCC_TL_MLX5_DEFAULT_SCORE,
-                                     ucc_tl_mlx5_coll_init,
-                                     UCC_TL_MLX5_SUPPORTED_COLLS,
-                                     NULL, 0, &score);
+    status = ucc_coll_score_alloc(&score);
     if (UCC_OK != status) {
+        tl_error(lib, "failed to alloc score_t");
+        return status;
+    }
+
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_HOST, 0,
+        MAX_MSG_SIZE * UCC_TL_TEAM_SIZE(team), UCC_TL_MLX5_DEFAULT_SCORE,
+        ucc_tl_mlx5_coll_init, tl_team);
+    if (UCC_OK != status) {
+        tl_error(lib, "failed to add range to score_t");
+        return status;
+    }
+
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_CUDA, 0,
+        MAX_MSG_SIZE * UCC_TL_TEAM_SIZE(team), UCC_TL_MLX5_DEFAULT_SCORE,
+        ucc_tl_mlx5_coll_init, tl_team);
+    if (UCC_OK != status) {
+        tl_error(lib, "failed to add range to score_t");
         return status;
     }
 

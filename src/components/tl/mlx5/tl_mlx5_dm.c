@@ -20,16 +20,11 @@ static void ucc_tl_mlx5_dm_chunk_init(ucc_mpool_t *mp,        //NOLINT
                                  UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_buf_size);
 }
 
-static void ucc_tl_mlx5_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
-{
-    ucc_free(chunk);
-}
-
-static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {.chunk_alloc = ucc_mpool_hugetlb_malloc,
-                                      .chunk_release =
-                                          ucc_tl_mlx5_dm_chunk_release,
-                                      .obj_init    = ucc_tl_mlx5_dm_chunk_init,
-                                      .obj_cleanup = NULL};
+static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {
+    .chunk_alloc   = ucc_mpool_hugetlb_malloc,
+    .chunk_release = ucc_mpool_hugetlb_free,
+    .obj_init      = ucc_tl_mlx5_dm_chunk_init,
+    .obj_cleanup   = NULL};
 
 void ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team)
 {
@@ -158,11 +153,10 @@ ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
     }
     team->dm_offset = NULL;
 
-    status = ucc_mpool_init(&team->dm_pool, 0, sizeof(ucc_tl_mlx5_dm_chunk_t),
-                            0, UCC_CACHE_LINE_SIZE, cfg->dm_buf_num,
-                            cfg->dm_buf_num, &ucc_tl_mlx5_dm_ops,
-                            ctx->super.super.ucc_context->thread_mode,
-                            "mlx5 dm pool");
+    status = ucc_mpool_init(
+        &team->dm_pool, 0, sizeof(ucc_tl_mlx5_dm_chunk_t), 0,
+        UCC_CACHE_LINE_SIZE, 1, cfg->dm_buf_num, &ucc_tl_mlx5_dm_ops,
+        ctx->super.super.ucc_context->thread_mode, "mlx5 dm pool");
     if (status != UCC_OK) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to init dm pool");
         ucc_tl_mlx5_dm_cleanup(team);

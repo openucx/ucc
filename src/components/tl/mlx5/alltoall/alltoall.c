@@ -65,7 +65,7 @@ static ucc_status_t build_rank_map(ucc_tl_mlx5_alltoall_t *a2a,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_alltoall_init_start(ucc_tl_mlx5_team_t *team)
+ucc_status_t ucc_tl_mlx5_team_alltoall_init_start(ucc_tl_mlx5_team_t *team)
 {
     ucc_tl_mlx5_context_t  *ctx = UCC_TL_MLX5_TEAM_CTX(team);
     ucc_tl_mlx5_alltoall_t *a2a = NULL;
@@ -270,7 +270,8 @@ static ucc_status_t ucc_tl_mlx5_alltoall_barrier_alloc(ucc_tl_mlx5_team_t *team)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
+ucc_status_t
+ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
 {
     ucc_tl_mlx5_team_t        *team        = ucc_derived_of(tl_team,
                                                            ucc_tl_mlx5_team_t);
