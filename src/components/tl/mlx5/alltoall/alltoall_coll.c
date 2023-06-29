@@ -25,9 +25,6 @@ static ucc_status_t ucc_tl_mlx5_poll_cq(struct ibv_cq *cq, ucc_base_lib_t *lib)
         return UCC_ERR_NO_MESSAGE;
     }
     for (i = 0; i < completions_num; i++) {
-        /* printf("got completion wr_id %zu, opcode %d\n", */
-        /*        team->work_completion[i].wr_id, */
-        /*        team->work_completion[i].opcode); */
         if (wcs[i].status != IBV_WC_SUCCESS) {
             tl_error(lib, "bad work completion status %s, wr_id %zu",
                      ibv_wc_status_str(wcs[i].status), wcs[i].wr_id);
@@ -42,12 +39,10 @@ static ucc_status_t ucc_tl_mlx5_poll_cq(struct ibv_cq *cq, ucc_base_lib_t *lib)
             ucc_tl_mlx5_schedule_t *task =
                 (ucc_tl_mlx5_schedule_t *)(uintptr_t)(wcs[i].wr_id &
                                                       (~(uint64_t)0x1));
-            /* printf("wait on data completion, task %p\n", task); */
             task->alltoall.wait_wc = 1;
         } else {
             ucc_tl_mlx5_dm_chunk_t *dm = (ucc_tl_mlx5_dm_chunk_t *)wcs[i].wr_id;
             dm->task->alltoall.blocks_completed++;
-            /* printf("returning dm %p to pool\n", (void*)team->work_completion[i].wr_id); */
             ucc_mpool_put(dm);
         }
     }
@@ -125,7 +120,7 @@ static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
     }
     task->alltoall.send_rcache_region_p = send_ptr;
 
-    /* NOTE: we does not support alternating block_size for the same msg size - TODO
+    /* NOTE: we don't support alternating block_size for the same msg size - TODO
        Will need to add the possibility of block_size change into consideration
        when initializing the mkey_cache_flag */
 
@@ -183,25 +178,15 @@ void ucc_tl_mlx5_reg_fanin_progress(ucc_coll_task_t *coll_task)
     }
 }
 
-static ucc_status_t ucc_tl_mlx5_node_fanout(ucc_tl_mlx5_team_t *    team,
+static ucc_status_t ucc_tl_mlx5_node_fanout(ucc_tl_mlx5_team_t     *team,
                                             ucc_tl_mlx5_schedule_t *task)
 {
-    ucc_tl_mlx5_alltoall_t *     a2a = team->a2a;
+    ucc_tl_mlx5_alltoall_t      *a2a = team->a2a;
     ucc_tl_mlx5_alltoall_ctrl_t *ctrl_v;
-    /* tl_mlx5_atomic_t   atomic_counter; */
-
     /* First phase of fanout: asr signals it completed local ops
        and other ranks wait for asr */
     if (a2a->node.sbgp->group_rank == a2a->node.asr_rank) {
-#if 0
-        /* ASR waits for atomic replies from other ASRs */
-        atomic_counter = a2a->net.atomic.counters[task->seq_index];
-        ucc_assert(atomic_counter <= a2a->net.net_size);
-
-        if (atomic_counter != a2a->net.net_size) {
-            return UCC_INPROGRESS;
-        }
-#endif /* no need to check counter - we wait on data in device */
+        /* no need to check counter - we wait on data in device */
         ucc_tl_mlx5_get_my_ctrl(a2a, task->alltoall.seq_index)->seq_num =
             task->alltoall.seq_num;
     } else {

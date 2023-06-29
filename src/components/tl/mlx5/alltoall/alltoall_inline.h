@@ -149,7 +149,7 @@ tl_mlx5_barrier_my_remote_addr(ucc_tl_mlx5_schedule_t *task, ucc_rank_t rank)
 
     remote_barrier = team->a2a->net.remote_ctrl[rank].barrier.addr;
     offset         = (task->alltoall.seq_index * (net_size + 1) + net_rank) *
-             sizeof(tl_mlx5_barrier_t);
+                                        sizeof(tl_mlx5_barrier_t);
     return (uintptr_t)PTR_OFFSET(remote_barrier, offset);
 }
 
