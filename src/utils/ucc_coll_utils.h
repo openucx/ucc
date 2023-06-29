@@ -73,6 +73,16 @@
 
 #define UCC_MEM_TYPE_MASK_FULL -1
 
+static inline int ucc_coll_args_is_reduction(ucc_coll_type_t ct)
+{
+    if (ct == UCC_COLL_TYPE_ALLREDUCE || ct == UCC_COLL_TYPE_REDUCE ||
+        ct == UCC_COLL_TYPE_REDUCE_SCATTER ||
+        ct == UCC_COLL_TYPE_REDUCE_SCATTERV) {
+        return 1;
+    }
+    return 0;
+}
+
 static inline size_t
 ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
                         ucc_rank_t idx)

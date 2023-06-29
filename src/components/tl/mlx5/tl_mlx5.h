@@ -14,6 +14,7 @@
 #include <infiniband/verbs.h>
 #include <infiniband/mlx5dv.h>
 #include "utils/arch/cpu.h"
+#include "mcast/tl_mlx5_mcast.h"
 
 #ifndef UCC_TL_MLX5_DEFAULT_SCORE
 #define UCC_TL_MLX5_DEFAULT_SCORE 1
@@ -49,20 +50,22 @@ typedef struct ucc_tl_mlx5_ib_qp_conf {
 } ucc_tl_mlx5_ib_qp_conf_t;
 
 typedef struct ucc_tl_mlx5_lib_config {
-    ucc_tl_lib_config_t      super;
-    int                      asr_barrier;
-    int                      block_size;
-    int                      num_dci_qps;
-    int                      dc_threshold;
-    size_t                   dm_buf_size;
-    unsigned long            dm_buf_num;
-    int                      dm_host;
-    ucc_tl_mlx5_ib_qp_conf_t qp_conf;
+    ucc_tl_lib_config_t         super;
+    int                         asr_barrier;
+    int                         block_size;
+    int                         num_dci_qps;
+    int                         dc_threshold;
+    size_t                      dm_buf_size;
+    unsigned long               dm_buf_num;
+    int                         dm_host;
+    ucc_tl_mlx5_ib_qp_conf_t    qp_conf;
+    mcast_coll_comm_init_spec_t mcast_conf;
 } ucc_tl_mlx5_lib_config_t;
 
 typedef struct ucc_tl_mlx5_context_config {
-    ucc_tl_context_config_t  super;
-    ucs_config_names_array_t devices;
+    ucc_tl_context_config_t         super;
+    ucs_config_names_array_t        devices;
+    ucc_tl_mlx5_mcast_ctx_params_t  mcast_ctx_conf;
 } ucc_tl_mlx5_context_config_t;
 
 typedef struct ucc_tl_mlx5_lib {
@@ -82,6 +85,7 @@ typedef struct ucc_tl_mlx5_context {
     int                          is_imported;
     int                          ib_port;
     ucc_mpool_t                  req_mp;
+    ucc_tl_mlx5_mcast_context_t  mcast;
 } ucc_tl_mlx5_context_t;
 UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t*,
                   const ucc_base_config_t*);
@@ -105,17 +109,18 @@ typedef enum
 } ucc_tl_mlx5_team_state_t;
 
 typedef struct ucc_tl_mlx5_team {
-    ucc_tl_team_t            super;
-    ucc_status_t             status[2];
-    ucc_service_coll_req_t  *scoll_req;
-    ucc_tl_mlx5_team_state_t state;
-    void                    *dm_offset;
-    ucc_mpool_t              dm_pool;
-    struct ibv_dm           *dm_ptr;
-    struct ibv_mr           *dm_mr;
-    ucc_tl_mlx5_alltoall_t  *a2a;
-    ucc_topo_t              *topo;
-    ucc_ep_map_t             ctx_map;
+    ucc_tl_team_t             super;
+    ucc_status_t              status[2];
+    ucc_service_coll_req_t   *scoll_req;
+    ucc_tl_mlx5_team_state_t  state;
+    void                     *dm_offset;
+    ucc_mpool_t               dm_pool;
+    struct ibv_dm            *dm_ptr;
+    struct ibv_mr            *dm_mr;
+    ucc_tl_mlx5_alltoall_t   *a2a;
+    ucc_topo_t               *topo;
+    ucc_ep_map_t              ctx_map;
+    ucc_tl_mlx5_mcast_team_t *mcast;
 } ucc_tl_mlx5_team_t;
 UCC_CLASS_DECLARE(ucc_tl_mlx5_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
@@ -131,7 +136,7 @@ typedef struct ucc_tl_mlx5_rcache_region {
     ucc_tl_mlx5_reg_t   reg;
 } ucc_tl_mlx5_rcache_region_t;
 
-#define UCC_TL_MLX5_SUPPORTED_COLLS (UCC_COLL_TYPE_ALLTOALL)
+#define UCC_TL_MLX5_SUPPORTED_COLLS (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_BCAST)
 
 #define UCC_TL_MLX5_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_mlx5_lib_t))

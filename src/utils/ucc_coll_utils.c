@@ -331,16 +331,6 @@ static inline int ucc_coll_args_is_rooted(ucc_coll_type_t ct)
     return 0;
 }
 
-static inline int ucc_coll_args_is_reduction(ucc_coll_type_t ct)
-{
-    if (ct == UCC_COLL_TYPE_ALLREDUCE || ct == UCC_COLL_TYPE_REDUCE ||
-        ct == UCC_COLL_TYPE_REDUCE_SCATTER ||
-        ct == UCC_COLL_TYPE_REDUCE_SCATTERV) {
-        return 1;
-    }
-    return 0;
-}
-
 #define COLL_ARGS_HEADER_STR_MAX_SIZE 32
 void ucc_coll_args_str(const ucc_coll_args_t *args, ucc_rank_t trank,
                        ucc_rank_t tsize, char *str, size_t len)
