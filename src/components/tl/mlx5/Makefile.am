@@ -4,6 +4,13 @@
 
 if TL_MLX5_ENABLED
 
+mcast =                           \
+	mcast/tl_mlx5_mcast_context.c \
+	mcast/tl_mlx5_mcast.h         \
+	mcast/tl_mlx5_mcast_coll.c    \
+	mcast/tl_mlx5_mcast_coll.h    \
+	mcast/tl_mlx5_mcast_team.c
+
 sources =             \
 	tl_mlx5.h         \
 	tl_mlx5.c         \
@@ -11,6 +18,8 @@ sources =             \
 	tl_mlx5_context.c \
 	tl_mlx5_team.c    \
 	tl_mlx5_coll.h    \
+	tl_mlx5_coll.c    \
+	$(mcast)          \
 	tl_mlx5_ib.h	  \
 	tl_mlx5_ib.c      \
 	tl_mlx5_wqe.h	  \

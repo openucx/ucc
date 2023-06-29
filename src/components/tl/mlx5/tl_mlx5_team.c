@@ -4,11 +4,13 @@
  * See file LICENSE for terms.
  */
 
+#include "tl_mlx5_coll.h"
 #include "tl_mlx5.h"
 #include "tl_mlx5_dm.h"
 #include "coll_score/ucc_coll_score.h"
 #include "core/ucc_team.h"
 #include <sys/shm.h>
+#include "mcast/tl_mlx5_mcast.h"
 
 static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
 {
@@ -66,6 +68,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
         if (UCC_OK != status) {
             tl_error(UCC_TL_TEAM_LIB(self), "failed to init device memory");
         }
+    }
+
+    self->mcast  = NULL;
+    status = ucc_tl_mlx5_mcast_team_init(tl_context, &(self->mcast), &(ctx->mcast), params,
+                                         &(UCC_TL_MLX5_TEAM_LIB(self)->cfg.mcast_conf));
+    if (ucc_unlikely(UCC_OK != status)) {
+        return status;
     }
 
     self->status[0] = status;
@@ -137,12 +146,29 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     return UCC_OK;
 }
 
+ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args,
+                                   ucc_base_team_t *     team,
+                                   ucc_coll_task_t **    task_h)
+{
+    ucc_status_t status = UCC_OK;
+
+    switch (coll_args->args.coll_type)
+    {
+    case UCC_COLL_TYPE_BCAST:
+        status = ucc_tl_mlx5_bcast_mcast_init(coll_args, team, task_h);
+        break;
+    default:
+        status = UCC_ERR_NOT_SUPPORTED;
+    }
+
+    return status;
+}
+
 ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
                                          ucc_coll_score_t **score_p)
 {
     ucc_tl_mlx5_team_t *team = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
     ucc_base_context_t *ctx  = UCC_TL_TEAM_CTX(team);
-    ucc_base_lib_t *    lib  = UCC_TL_TEAM_LIB(team);
     ucc_memory_type_t   mt   = UCC_MEMORY_TYPE_HOST;
     ucc_coll_score_t *  score;
     ucc_status_t        status;
@@ -156,9 +182,14 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
     team_info.supported_colls     = UCC_TL_MLX5_SUPPORTED_COLLS;
     team_info.size                = UCC_TL_TEAM_SIZE(team);
 
-    status = ucc_coll_score_alloc(&score);
+    /* There can be a different logic for different coll_type/mem_type.
+       Right now just init everything the same way. */
+    status =
+        ucc_coll_score_build_default(tl_team, UCC_TL_MLX5_DEFAULT_SCORE,
+                                     ucc_tl_mlx5_coll_init,
+                                     UCC_TL_MLX5_SUPPORTED_COLLS,
+                                     NULL, 0, &score);
     if (UCC_OK != status) {
-        tl_error(lib, "failed to alloc score_t");
         return status;
     }
 
@@ -171,17 +202,12 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
             goto err;
         }
     }
+
     *score_p = score;
     return UCC_OK;
+
 err:
     ucc_coll_score_free(score);
     *score_p = NULL;
     return status;
-}
-
-ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args, /* NOLINT */
-                                   ucc_base_team_t *     team,      /* NOLINT */
-                                   ucc_coll_task_t **    task)      /* NOLINT */
-{
-    return UCC_OK;
 }
