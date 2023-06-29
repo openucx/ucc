@@ -136,7 +136,10 @@ UCC_TEST_F(test_mc_rocm, can_detect_rocm_mem)
     }
     EXPECT_EQ(UCC_OK, ucc_mc_get_mem_attr(test_ptr, &mem_attr));
     EXPECT_EQ(UCC_MEMORY_TYPE_ROCM, mem_attr.mem_type);
-    hipFree(test_ptr);
+    st = hipFree(test_ptr);
+    if (st != hipSuccess) {
+        ADD_FAILURE() << "failed to free device memory";
+    }
     ucc_mc_finalize();
 }
 
@@ -166,7 +169,10 @@ UCC_TEST_F(test_mc_rocm, can_query_rocm_mem)
     EXPECT_EQ(test_ptr, mem_attr.base_address);
     EXPECT_EQ(TEST_ALLOC_SIZE, mem_attr.alloc_length);
 
-    hipFree(test_ptr);
+    st = hipFree(test_ptr);
+    if (st != hipSuccess) {
+        ADD_FAILURE() << "failed to free device memory";
+    }
     ucc_mc_finalize();
 }
 
@@ -182,7 +188,10 @@ UCC_TEST_F(test_mc_rocm, can_detect_managed_mem)
     mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
     EXPECT_EQ(UCC_OK, ucc_mc_get_mem_attr(test_ptr, &mem_attr));
     EXPECT_EQ(UCC_MEMORY_TYPE_ROCM_MANAGED, mem_attr.mem_type);
-    hipFree(test_ptr);
+    st = hipFree(test_ptr);
+    if (st != hipSuccess) {
+        ADD_FAILURE() << "failed to free managed memory";
+    }
 }
 
 UCC_TEST_F(test_mc_rocm, can_detect_host_alloc_mem)
@@ -197,5 +206,8 @@ UCC_TEST_F(test_mc_rocm, can_detect_host_alloc_mem)
     mem_attr.field_mask = UCC_MEM_ATTR_FIELD_MEM_TYPE;
     EXPECT_EQ(UCC_OK, ucc_mc_get_mem_attr(test_ptr, &mem_attr));
     EXPECT_EQ(UCC_MEMORY_TYPE_HOST, mem_attr.mem_type);
-    hipFreeHost(test_ptr);
+    st = hipFreeHost(test_ptr);
+    if (st != hipSuccess) {
+        ADD_FAILURE() << "failed to free host mapped memory";
+    }
 }

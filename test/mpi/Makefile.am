@@ -45,6 +45,7 @@ endif
 
 if HAVE_ROCM
 ucc_test_mpi_CPPFLAGS += $(HIP_CPPFLAGS)
+ucc_test_mpi_CXXFLAGS += $(HIP_CXXFLAGS)
 ucc_test_mpi_LDFLAGS += $(HIP_LDFLAGS)
 ucc_test_mpi_LDADD += $(HIP_LIBS)
 endif
