@@ -138,9 +138,13 @@ void ucc_tl_ucp_alltoall_bruck_progress(ucc_coll_task_t *coll_task)
             } else {
                 data = PTR_OFFSET(scratch, send_buffer_index * seg_size);
             }
-            ucc_mc_memcpy(PTR_OFFSET(mergebuf, seg_size * snd_count),
-                          data, seg_size, UCC_MEMORY_TYPE_HOST,
-                          UCC_MEMORY_TYPE_HOST);
+            st = ucc_mc_memcpy(PTR_OFFSET(mergebuf, seg_size * snd_count),
+                               data, seg_size, UCC_MEMORY_TYPE_HOST,
+                               UCC_MEMORY_TYPE_HOST);
+            if (ucc_unlikely(UCC_OK != st)) {
+                task->super.status = st;
+                return;
+            }
             snd_count++;
         }
         data = PTR_OFFSET(scratch, level * nrecv_segs * seg_size);
