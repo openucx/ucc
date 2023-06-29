@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * Copyright (C) Advanced Micro Devices, Inc. 2022. ALL RIGHTS RESERVED.
+ * Copyright (C) Advanced Micro Devices, Inc. 2022-2023. ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -13,11 +13,18 @@
 #include "core/ucc_ee.h"
 #include "utils/ucc_mpool.h"
 #include "utils/arch/rocm_def.h"
+
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
 #include <hip/hip_complex.h>
-#include <hip_fp16.h>
-#include <hip_bfloat16.h>
+#include <hip/hip_bfloat16.h>
+
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
+#endif
+#include <hip/hip_fp16.h>
+#pragma GCC diagnostic pop
 
 typedef enum ucc_ec_task_status {
     UCC_EC_ROCM_TASK_COMPLETED,
