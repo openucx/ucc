@@ -128,6 +128,7 @@ endif
 
 if HAVE_ROCM
 gtest_SOURCES  += core/test_mc_rocm.cc
+gtest_CXXFLAGS += $(HIP_CXXFLAGS)
 gtest_CPPFLAGS += $(HIP_CPPFLAGS)
 gtest_LDFLAGS  += $(HIP_LDFLAGS)
 gtest_LDADD    += $(HIP_LIBS)
