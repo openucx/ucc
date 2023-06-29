@@ -4,6 +4,12 @@
 
 if TL_MLX5_ENABLED
 
+alltoall =                    \
+	alltoall/alltoall.h       \
+	alltoall/alltoall.c       \
+	alltoall/alltoall_mkeys.h \
+	alltoall/alltoall_mkeys.c
+
 mcast =                           \
 	mcast/tl_mlx5_mcast_context.c \
 	mcast/tl_mlx5_mcast.h         \
@@ -19,7 +25,6 @@ sources =             \
 	tl_mlx5_team.c    \
 	tl_mlx5_coll.h    \
 	tl_mlx5_coll.c    \
-	$(mcast)          \
 	tl_mlx5_ib.h	  \
 	tl_mlx5_ib.c      \
 	tl_mlx5_wqe.h	  \
@@ -28,7 +33,9 @@ sources =             \
 	tl_mlx5_pd.c      \
 	tl_mlx5_rcache.c  \
 	tl_mlx5_dm.c      \
-	tl_mlx5_dm.h
+	tl_mlx5_dm.h      \
+	$(mcast)          \
+	$(alltoall)
 
 module_LTLIBRARIES = libucc_tl_mlx5.la
 libucc_tl_mlx5_la_SOURCES  = $(sources)

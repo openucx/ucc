@@ -8,7 +8,7 @@
 #include "tl_mlx5_mcast.h"
 #include "utils/arch/cpu.h"
 #include <ucs/sys/string.h>
-#include "src/core/ucc_service_coll.h"
+#include "core/ucc_service_coll.h"
 #include "tl_mlx5.h"
 
 ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *context, /* NOLINT */

@@ -8,6 +8,7 @@
 #include "tl_mlx5.h"
 #include "tl_mlx5_dm.h"
 #include "coll_score/ucc_coll_score.h"
+#include "alltoall/alltoall.h"
 #include "core/ucc_team.h"
 #include <sys/shm.h>
 #include "mcast/tl_mlx5_mcast.h"
@@ -16,7 +17,7 @@ static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
 {
     ucc_subset_t subset;
     ucc_status_t status;
-    
+
     status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
                                       &UCC_TL_TEAM_MAP(team), &team->ctx_map);
     if (UCC_OK != status) {
@@ -88,6 +89,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
 {
     tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
 
+    ucc_tl_mlx5_alltoall_cleanup(self);
     ucc_tl_mlx5_dm_cleanup(self);
     ucc_tl_mlx5_topo_cleanup(self);
 }
@@ -141,9 +143,25 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
             ucc_tl_mlx5_team_destroy(team);
             return tl_team->status[1];
         }
+        tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_INIT;
+    case TL_MLX5_TEAM_STATE_ALLTOALL_INIT:
+        status = ucc_tl_mlx5_alltoall_init_start(tl_team);
+        if (status != UCC_OK) {
+            tl_error(UCC_TL_TEAM_LIB(tl_team),
+                     "failed to init a2a: %s",
+                     ucc_status_string(status));
+            return status;
+        }
+        tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_POSTED;
+    case TL_MLX5_TEAM_STATE_ALLTOALL_POSTED:
+        status = ucc_tl_mlx5_alltoall_init_progress(tl_team);
     }
-
-    return UCC_OK;
+    if (status < 0) {
+        tl_error(team->context->lib, "failed creating tl team: %p", tl_team);
+    } else if (status == UCC_OK) {
+        tl_debug(team->context->lib, "initialized tl team: %p", tl_team);
+    }
+    return status;
 }
 
 ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args,
