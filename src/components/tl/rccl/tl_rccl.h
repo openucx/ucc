@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
- * Copyright (C) Advanced Micro Devices, Inc. 2022. ALL RIGHTS RESERVED.
+ * Copyright (C) Advanced Micro Devices, Inc. 2022-2023. ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
  */
@@ -15,7 +15,13 @@
 #include "utils/ucc_mpool.h"
 
 #include <hip/hip_runtime.h>
+
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
+#endif
 #include <hip/hip_fp16.h>
+#pragma GCC diagnostic pop
 
 #ifdef RCCL_OLD_HEADERS
 #include <rccl.h>
