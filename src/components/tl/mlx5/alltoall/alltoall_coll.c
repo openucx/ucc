@@ -160,9 +160,9 @@ static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
         coll_task->status = UCC_OK;
         UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanin_done", 0);
         return ucc_task_complete(coll_task);
-    } else {
-        ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
     }
+
+    ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
     return UCC_OK;
 }
 
@@ -346,18 +346,18 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
     ucc_tl_mlx5_alltoall_t *a2a            = team->a2a;
     int                     node_size      = a2a->node.sbgp->group_size;
     int                     net_size       = a2a->net.sbgp->group_size;
-    int                     op_msgsize     =
-                       node_size * a2a->max_msg_size * UCC_TL_TEAM_SIZE(team)
+    int                     op_msgsize     = node_size * a2a->max_msg_size
+                                                     * UCC_TL_TEAM_SIZE(team)
                                                      * a2a->max_num_of_columns;
-    int                     node_msgsize   =
-                                  SQUARED(node_size) * task->alltoall.msg_size;
+    int                     node_msgsize   = SQUARED(node_size)
+                                                     * task->alltoall.msg_size;
     int                     block_size     = task->alltoall.block_size;
-    int                     col_msgsize    =
-                              task->alltoall.msg_size * block_size * node_size;
-    int                     block_msgsize  =
-                                 SQUARED(block_size) * task->alltoall.msg_size;
-    int                     dm_host        =
-                                       UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_host;
+    int                     col_msgsize    = task->alltoall.msg_size
+                                                      * block_size * node_size;
+    int                     block_msgsize  = SQUARED(block_size)
+                                                     * task->alltoall.msg_size;
+    int                     dm_host        = UCC_TL_MLX5_TEAM_LIB(team)
+                                                                 ->cfg.dm_host;
     ucc_status_t            status         = UCC_OK;
     ucc_base_lib_t         *lib            = UCC_TASK_LIB(task);
     int                     seq_index      = task->alltoall.seq_index;
@@ -721,20 +721,20 @@ static inline int power2(int value)
 
 static inline int block_size_fits(size_t msgsize, int block_size)
 {
-    size_t t1    = power2(ucc_max(msgsize, 8));
-    size_t tsize = block_size * ucc_max(power2(block_size) * t1, MAX_MSG_SIZE);
-
-    return tsize <= MAX_TRANSPOSE_SIZE;
+    return block_size * ucc_max(power2(block_size) * msgsize, MAX_MSG_SIZE) <=
+           MAX_TRANSPOSE_SIZE;
 }
 
 static inline int get_block_size(ucc_tl_mlx5_schedule_t *task)
 {
-    ucc_tl_mlx5_team_t *team = SCHEDULE_TEAM(task);
-    int                 ppn  = team->a2a->node.sbgp->group_size;
+    ucc_tl_mlx5_team_t *team              = SCHEDULE_TEAM(task);
+    int                 ppn               = team->a2a->node.sbgp->group_size;
+    size_t              effective_msgsize = power2(ucc_max(
+                                                task->alltoall.msg_size, 8));
     int                 block_size;
 
     block_size = ppn;
-    while (!block_size_fits(task->alltoall.msg_size, block_size)) {
+    while (!block_size_fits(effective_msgsize, block_size)) {
         block_size--;
     }
     return block_size;
@@ -745,14 +745,17 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
                          ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
                          ucc_coll_task_t **task_h)
 {
-    ucc_tl_mlx5_team_t     *tl_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
-    ucc_tl_mlx5_alltoall_t *a2a     = tl_team->a2a;
-    int             is_asr = (a2a->node.sbgp->group_rank == a2a->node.asr_rank);
-    int             i, n_tasks = is_asr ? 4 : 2, curr_task = 0;
+    ucc_tl_mlx5_team_t     *tl_team   = ucc_derived_of(team,
+                                                           ucc_tl_mlx5_team_t);
+    ucc_tl_mlx5_alltoall_t *a2a       = tl_team->a2a;
+    int                     is_asr    = (a2a->node.sbgp->group_rank
+                                                        == a2a->node.asr_rank);
+    int                     n_tasks   = is_asr ? 4 : 2;
+    int                     curr_task = 0;
     ucc_schedule_t         *schedule;
     ucc_tl_mlx5_schedule_t *task;
     size_t                  msg_size;
-    int                     block_size;
+    int                     block_size, i;
     ucc_coll_task_t        *tasks[4];
     ucc_status_t            status;
 
@@ -764,7 +767,7 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
                ucc_dt_size(coll_args->args.src.info.datatype);
 
     if (msg_size > a2a->max_msg_size) {
-        tl_debug(UCC_TL_TEAM_LIB(tl_team), "msg size too long");
+        tl_trace(UCC_TL_TEAM_LIB(tl_team), "msg size too long");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -785,10 +788,11 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
     task->alltoall.blocks_completed     = 0;
     task->alltoall.seq_num              = a2a->sequence_number;
     task->alltoall.seq_index            = SEQ_INDEX(a2a->sequence_number);
-    task->alltoall.op       = &a2a->node.ops[task->alltoall.seq_index];
-    task->alltoall.msg_size = msg_size;
+    task->alltoall.op                   = &a2a->node.ops[
+                                                     task->alltoall.seq_index];
+    task->alltoall.msg_size             = msg_size;
 
-    tl_debug(UCC_TL_TEAM_LIB(tl_team), "Seq num is %d", task->alltoall.seq_num);
+    tl_trace(UCC_TL_TEAM_LIB(tl_team), "Seq num is %d", task->alltoall.seq_num);
     a2a->sequence_number += 1;
 
     block_size = a2a->requested_block_size ? a2a->requested_block_size
@@ -799,12 +803,6 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
         (a2a->node.sbgp->group_size % block_size)
             ? ucc_div_round_up(a2a->node.sbgp->group_size, block_size)
             : 0;
-    if (((a2a->net.sbgp->group_rank == 0) && is_asr) &&
-        (msg_size != a2a->previous_msg_size[task->alltoall.seq_index])) {
-        tl_info(UCC_TL_TEAM_LIB(tl_team), "Block size is %d msg_size is %zu",
-                block_size, msg_size);
-    }
-
     task->alltoall.block_size = block_size;
 
     // TODO remove for connectX-7 - this is mkey_entry->stride (count+skip) limitation - only 16 bits
@@ -824,9 +822,8 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
         bytes_skip       = (ppn - bs) * msg_size;
         if ((bytes_count + bytes_skip >= limit) ||
             (bytes_count_last + bytes_skip_last >= limit)) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
-                     "Currently can't support this operation in connectX-6");
-            status = UCC_ERR_NO_MESSAGE;
+            tl_debug(UCC_TL_TEAM_LIB(tl_team), "unsupported operation");
+            status = UCC_ERR_NOT_SUPPORTED;
             goto put_schedule;
         }
     }
