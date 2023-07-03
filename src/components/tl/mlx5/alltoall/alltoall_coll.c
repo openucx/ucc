@@ -169,7 +169,7 @@ static ucc_status_t ucc_tl_mlx5_reg_fanin_start(ucc_coll_task_t *coll_task)
 void ucc_tl_mlx5_reg_fanin_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_mlx5_schedule_t *task = TASK_SCHEDULE(coll_task);
-    ucc_tl_mlx5_team_t *    team = SCHEDULE_TEAM(task);
+    ucc_tl_mlx5_team_t     *team = SCHEDULE_TEAM(task);
 
     ucc_assert(team->a2a->node.sbgp->group_rank == team->a2a->node.asr_rank);
     if (UCC_OK == ucc_tl_mlx5_node_fanin(team, task)) {
@@ -202,7 +202,7 @@ static ucc_status_t ucc_tl_mlx5_node_fanout(ucc_tl_mlx5_team_t     *team,
 static ucc_status_t ucc_tl_mlx5_fanout_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_mlx5_schedule_t *task = TASK_SCHEDULE(coll_task);
-    ucc_tl_mlx5_team_t *    team = SCHEDULE_TEAM(task);
+    ucc_tl_mlx5_team_t     *team = SCHEDULE_TEAM(task);
 
     coll_task->status       = UCC_INPROGRESS;
     coll_task->super.status = UCC_INPROGRESS;
@@ -245,9 +245,10 @@ static void ucc_tl_mlx5_fanout_progress(ucc_coll_task_t *coll_task)
 
 static ucc_status_t ucc_tl_mlx5_asr_barrier_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mlx5_schedule_t *task = TASK_SCHEDULE(coll_task);
-    ucc_tl_mlx5_team_t     *team = SCHEDULE_TEAM(task);
-    ucc_tl_mlx5_alltoall_t *a2a  = team->a2a;
+    ucc_tl_mlx5_schedule_t *task  = TASK_SCHEDULE(coll_task);
+    ucc_tl_mlx5_team_t     *team  = SCHEDULE_TEAM(task);
+    ucc_tl_mlx5_alltoall_t *a2a   = team->a2a;
+    tl_mlx5_barrier_t      *local = tl_mlx5_barrier_local_addr(task);
     ucc_status_t            status;
     int                     i;
 
@@ -290,8 +291,7 @@ static ucc_status_t ucc_tl_mlx5_asr_barrier_start(ucc_coll_task_t *coll_task)
         }
         ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
     } else {
-        tl_mlx5_barrier_t *local = tl_mlx5_barrier_local_addr(task);
-        *local                   = task->alltoall.seq_num;
+        *local = task->alltoall.seq_num;
         for (i = 0; i < a2a->net.net_size; i++) {
             task->alltoall.op->blocks_sent[i] = 0;
             if (i == a2a->net.sbgp->group_rank) {
@@ -737,7 +737,8 @@ static inline int get_block_size(ucc_tl_mlx5_schedule_t *task)
     while (!block_size_fits(effective_msgsize, block_size)) {
         block_size--;
     }
-    return block_size;
+
+    return ucc_max(1, block_size);
 }
 
 UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
