@@ -148,7 +148,7 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
     CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
                     cudaStreamNonBlocking), free_unique_id, status);
 #if NCCL_USE_NON_BLOCKING
-    nccl_cfg.blocking = 0;
+    nccl_cfg.blocking = UCC_TL_NCCL_TEAM_CTX(team)->cfg.nccl_cfg_blocking;
     nccl_status = ncclCommInitRankConfig(&team->nccl_comm,
                                          UCC_TL_TEAM_SIZE(team),
                                          team->unique_id[0],

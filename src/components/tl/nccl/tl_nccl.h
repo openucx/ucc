@@ -65,6 +65,7 @@ typedef enum ucc_tl_nccl_completion_sync_type {
 typedef struct ucc_tl_nccl_context_config {
     ucc_tl_context_config_t            super;
     ucc_tl_nccl_completion_sync_type_t sync_type;
+    int                                nccl_cfg_blocking;
 } ucc_tl_nccl_context_config_t;
 
 typedef struct ucc_tl_nccl_lib {
@@ -158,5 +159,8 @@ static inline ucc_status_t ucc_tl_nccl_check_nb(ncclResult_t *nccl_status, // NO
 
 #define UCC_TL_NCCL_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_nccl_lib_t))
+
+#define UCC_TL_NCCL_TEAM_CTX(_team)                                             \
+    (ucc_derived_of((_team)->super.super.context, ucc_tl_nccl_context_t))
 
 #endif
