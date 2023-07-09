@@ -21,13 +21,20 @@ export MASTER_ADDR=${HEAD_NODE}
 
 NNODES=$(wc --lines "$HOSTFILE" | awk '{print $1}')
 DEV=""
+CX7_DEV=""
 
 # Find first available active device
 for d in $(ssh $HEAD_NODE "ibstat -l"); do
     state=$(ssh $HEAD_NODE "ibstat $d" | grep 'State:' | awk '{print $2}')
+    type=$(ssh $HEAD_NODE "ibstat $d" | grep 'CA type:' | awk '{print $2}')
     if [ $state == 'Active' ]; then
-        DEV=$d
-        break
+        if [ "x$DEV" == "x" ]; then
+            DEV=$d
+        fi
+        if [ $state == 'MT4129' ]; then
+            CX7_DEV=$d
+            break
+        fi
     fi
 done
 
@@ -101,6 +108,16 @@ for MT in "" "-T"; do
     mpirun $(mpi_params $PPN 1) $ucx_tls_no_cuda_ipc $tlcuda_args $EXE $MT $TG --mtypes cuda -c $tlcuda_colls
     echo "INFO: UCC MPI unit tests (TL/CUDA) ... DONE"
 
+    echo "INFO: UCC MPI unit tests (TL/MLX5) ..."
+    # shellcheck disable=SC2086
+    if [ "x$CX7_DEV" == "x" ]; then
+        echo "No active CX7 devices found on $HEAD_NODE"
+    else
+        tlmlx5_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp,mlx5 -x UCC_TL_MLXS_NET_DEVICES=$CX7_DEV -x UCC_TL_MLX5_TUNE=inf -x UCX_RC_MLX5_DM_COUNT=0 -x UCX_DC_MLX5_DM_COUNT=0 "
+        tlmlx5_colls="alltoall"
+        mpirun $(mpi_params $PPN) $tlmlx5_args $EXE $MT $TG --mtypes host,cuda -c $tlmlx5_colls -t world -d uint8 -O 0 -m 1:128
+    fi
+    echo "INFO: UCC MPI unit tests (TL/MLX5) ... DONE"
 
     echo "INFO: UCC MPI unit tests (CL/HIER) ..."
     # shellcheck disable=SC2086
