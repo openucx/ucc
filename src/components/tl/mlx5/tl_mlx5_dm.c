@@ -89,7 +89,7 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
                 attr.max_dm_size / buf_size - 1; //keep reserved memory
             min_chunks_to_alloc = 1;
             if (!max_chunks_to_alloc) {
-                tl_error(lib,
+                tl_debug(lib,
                          "requested buffer size (=%ld) is too large, "
                          "should be set to be strictly less than %ld. "
                          "max allocation size is %ld",
@@ -98,7 +98,7 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
             }
         }
         if (attr.max_dm_size < buf_size * min_chunks_to_alloc) {
-            tl_error(lib,
+            tl_debug(lib,
                      "cannot allocate %i buffer(s) of size %ld, "
                      "max allocation size is %ld",
                      min_chunks_to_alloc, buf_size, attr.max_dm_size);
@@ -114,7 +114,7 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
             }
         }
         if (!dm_ptr) {
-            tl_error(lib,
+            tl_debug(lib,
                      "dev mem allocation failed, requested %ld, attr.max %zd, "
                      "errno %d",
                      dm_attr.length, attr.max_dm_size, errno);
@@ -147,7 +147,7 @@ ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
         ctx->shared_ctx, ctx->shared_pd, cfg->dm_host, cfg->dm_buf_size,
         &cfg->dm_buf_num, &team->dm_ptr, &team->dm_mr, UCC_TL_TEAM_LIB(team));
     if (status != UCC_OK) {
-        tl_error(UCC_TL_TEAM_LIB(team),
+        tl_debug(UCC_TL_TEAM_LIB(team),
                  "failed to alloc and register device memory");
         return status;
     }

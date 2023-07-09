@@ -204,7 +204,7 @@ static ucc_status_t ucc_tl_mlx5_alltoall_atomic_alloc(ucc_tl_mlx5_team_t *team)
 #endif
 
     if (!a2a->net.atomic.counters) {
-        tl_error(UCC_TL_TEAM_LIB(team),
+        tl_debug(UCC_TL_TEAM_LIB(team),
                  "failed to allocate %zd bytes for atomic counters array",
                  size);
         return UCC_ERR_NO_MEMORY;

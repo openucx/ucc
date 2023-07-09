@@ -68,7 +68,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     if (ucc_topo_get_sbgp(self->topo, UCC_SBGP_NODE)->group_rank == 0) {
         status = ucc_tl_mlx5_dm_init(self);
         if (UCC_OK != status) {
-            tl_error(UCC_TL_TEAM_LIB(self), "failed to init device memory");
+            tl_debug(UCC_TL_TEAM_LIB(self), "failed to init device memory");
         }
     }
 
@@ -111,7 +111,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     ucc_subset_t        subset    = {.map.type   = UCC_EP_MAP_FULL,
                                      .map.ep_num = core_team->size,
                                      .myrank     = core_team->rank};
-    ucc_status_t        status;
+    ucc_status_t        status    = UCC_OK;
 
     switch (tl_team->state) {
     case TL_MLX5_TEAM_STATE_INIT:
@@ -138,7 +138,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         ucc_assert(status == UCC_OK);
         ucc_service_coll_finalize(tl_team->scoll_req);
         if (tl_team->status[1] != UCC_OK) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
+            tl_debug(UCC_TL_TEAM_LIB(tl_team),
                      "node leader failed during device memory init: %s",
                      ucc_status_string(tl_team->status[1]));
             ucc_tl_mlx5_team_destroy(team);
@@ -148,8 +148,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     case TL_MLX5_TEAM_STATE_ALLTOALL_INIT:
         status = ucc_tl_mlx5_team_alltoall_init_start(tl_team);
         if (status != UCC_OK) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
-                     "failed to init a2a: %s",
+            tl_debug(UCC_TL_TEAM_LIB(tl_team), "failed to init a2a: %s",
                      ucc_status_string(status));
             return status;
         }
@@ -158,7 +157,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         status = ucc_tl_mlx5_team_alltoall_init_progress(tl_team);
     }
     if (status < 0) {
-        tl_error(team->context->lib, "failed creating tl team: %p", tl_team);
+        tl_debug(team->context->lib, "failed creating tl team: %p", tl_team);
     } else if (status == UCC_OK) {
         tl_debug(team->context->lib, "initialized tl team: %p", tl_team);
     }
