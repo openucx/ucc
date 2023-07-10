@@ -143,7 +143,7 @@ static ucc_status_t ucc_mc_cuda_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
     h->mt        = UCC_MEMORY_TYPE_CUDA;
     *h_ptr       = h;
     mc_trace(&ucc_mc_cuda.super, "allocated %ld bytes with %s", size,
-             mt == UCC_MEMORY_TYPE_CUDA ? "cudaMalloc" : "cudaMallocManaged");
+             ucc_memory_type_names[mt]);
     return UCC_OK;
 }
 
