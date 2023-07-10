@@ -766,6 +766,10 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
 
     msg_size = coll_args->args.src.info.count / UCC_TL_TEAM_SIZE(tl_team) *
                ucc_dt_size(coll_args->args.src.info.datatype);
+    if (!msg_size) {
+        tl_trace(UCC_TL_TEAM_LIB(tl_team), "msg size too short, reduces to nullop");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     if (msg_size > a2a->max_msg_size) {
         tl_trace(UCC_TL_TEAM_LIB(tl_team), "msg size too long");
