@@ -257,7 +257,7 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
 }
 
 static void ucc_tl_mlx5_context_barrier(ucc_context_oob_coll_t *oob,
-                                        ucc_base_lib_t* lib)
+                                        ucc_base_lib_t         *lib)
 {
     char        *rbuf;
     char         sbuf;
@@ -270,13 +270,12 @@ static void ucc_tl_mlx5_context_barrier(ucc_context_oob_coll_t *oob,
 
     rbuf = ucc_malloc(sizeof(char) * oob->n_oob_eps, "tmp_barrier");
     if (!rbuf) {
-        tl_error(lib,
-                 "failed to allocate %zd bytes for tmp barrier array",
+        tl_error(lib, "failed to allocate %zd bytes for tmp barrier array",
                  sizeof(char) * oob->n_oob_eps);
         return;
     }
-    if (UCC_OK == oob->allgather(&sbuf, rbuf, sizeof(char), oob->coll_info,
-                                 &req)) {
+    if (UCC_OK ==
+        oob->allgather(&sbuf, rbuf, sizeof(char), oob->coll_info, &req)) {
         ucc_assert(req != NULL);
         while (UCC_OK != (status = oob->req_test(req))) {
             if (status < 0) {
@@ -303,8 +302,7 @@ ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx)
         if (!ctx->is_imported) {
             err = ibv_dealloc_pd(ctx->shared_pd);
             if (err) {
-                tl_error(lib, "failed to dealloc PD, errno %d",
-                         err);
+                tl_debug(lib, "failed to dealloc PD, errno %d", err);
                 status = UCC_ERR_NO_MESSAGE;
             }
         }
