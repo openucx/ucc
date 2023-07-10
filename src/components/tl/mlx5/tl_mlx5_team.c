@@ -65,12 +65,15 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
         return status;
     }
 
-    if (ucc_topo_get_sbgp(self->topo, UCC_SBGP_NODE)->group_rank == 0) {
+    if (ucc_topo_get_sbgp(self->topo, UCC_SBGP_NODE)->group_rank == MLX5_ASR_RANK) {
         status = ucc_tl_mlx5_dm_init(self);
         if (UCC_OK != status) {
             tl_debug(UCC_TL_TEAM_LIB(self), "failed to init device memory");
         }
     }
+
+    self->status[0] = status;
+    self->state     = TL_MLX5_TEAM_STATE_INIT;
 
     self->mcast  = NULL;
     status = ucc_tl_mlx5_mcast_team_init(tl_context, &(self->mcast), &(ctx->mcast), params,
@@ -78,9 +81,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
-
-    self->status[0] = status;
-    self->state     = TL_MLX5_TEAM_STATE_INIT;
 
     tl_debug(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
