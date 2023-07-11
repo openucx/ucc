@@ -359,6 +359,7 @@ ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
         }
 
         for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
+            op              = &a2a->node.ops[i];
             op->blocks_sent = PTR_OFFSET(a2a->net.blocks_sent,
                                             sizeof(*a2a->net.blocks_sent) *
                                                 a2a->net.net_size * i);
