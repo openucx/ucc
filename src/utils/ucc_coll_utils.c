@@ -270,6 +270,7 @@ ucc_ep_map_from_array_generic(void **array, ucc_rank_t size,
     int64_t      stride;
     ucc_rank_t   i;
 
+    memset(&map, 0, sizeof(ucc_ep_map_t));
     map.ep_num = size;
     if (size > 1) {
         /* try to detect strided pattern */
@@ -550,13 +551,15 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
 
         if (task->team->context->lib->log_component.name[0] == 'C') {
             /* it's not CL BASIC task */
-            strncpy(cl_info, task->team->context->lib->log_component.name,
-                    sizeof(cl_info));
+            ucc_strncpy_safe(cl_info,
+                             task->team->context->lib->log_component.name,
+                             sizeof(cl_info));
             ucc_coll_task_components_str(task, tl_info, &tl_info_len);
         } else {
-            strncpy(cl_info, "CL_BASIC", sizeof(cl_info));
-            strncpy(tl_info , task->team->context->lib->log_component.name,
-                    sizeof(tl_info));
+            ucc_strncpy_safe(cl_info, "CL_BASIC", sizeof(cl_info));
+            ucc_strncpy_safe(tl_info,
+                             task->team->context->lib->log_component.name,
+                             sizeof(tl_info));
         }
         ucc_coll_args_str(&task->bargs.args, team->rank, team->size, str, len);
         rc = ucc_snprintf_safe(task_info, sizeof(task_info),

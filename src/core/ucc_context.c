@@ -392,6 +392,7 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
                       tl_lib->iface->super.name);
             continue;
         }
+        // coverity[overrun-buffer-val:FALSE]
         status = tl_lib->iface->context.create(
             &b_params, &ctx_config->tl_cfgs[i]->super.super, &b_ctx);
         if (UCC_OK != status) {
@@ -645,6 +646,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
     ctx->cl_flags = 0;
     for (i = 0; i < num_cls; i++) {
         cl_lib = config->cl_cfgs[i]->cl_lib;
+        // coverity[overrun-buffer-val:FALSE]
         status = cl_lib->iface->context.create(
             &b_params, &config->cl_cfgs[i]->super.super, &b_ctx);
         if (UCC_OK != status) {
@@ -746,6 +748,8 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                 ucc_debug("TL UCP context is not available, "
                           "service team can not be created");
             } else {
+                memset(&t_params.map, 0, sizeof(ucc_ep_map_t));
+                memset(&t_params.params, 0, sizeof(ucc_team_params_t));
                 t_params.params.mask = UCC_TEAM_PARAM_FIELD_EP |
                                        UCC_TEAM_PARAM_FIELD_EP_RANGE |
                                        UCC_TEAM_PARAM_FIELD_OOB;
@@ -1070,6 +1074,7 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
         ucc_base_ctx_attr_t attr;
         ucc_tl_lib_t *      tl_lib;
 
+        memset(&attr.attr, 0, sizeof(ucc_context_attr_t));
         attr.attr.mask = UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE;
         attr.attr.global_work_buffer_size = 0;
         for (i = 0; i < context->n_tl_ctx; i++) {
