@@ -39,8 +39,9 @@ static ucs_config_field_t ucc_tl_nccl_context_config_table[] = {
      UCS_CONFIG_TYPE_ENUM(ucc_tl_nccl_completion_sync_names)
     },
 
-    {"NCCL_CFG_BLOCKING", "1",
-     "If set to 0 will use non-blocking mode, if set to 1 will use blocking",
+    {"BLOCKING", "1",
+     "If set to 0 will use non-blocking mode communicator behavior, "
+     "if set to 1 will use blocking mode",
      ucs_offsetof(ucc_tl_nccl_context_config_t, nccl_cfg_blocking),
      UCS_CONFIG_TYPE_BOOL},
 
