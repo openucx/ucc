@@ -287,7 +287,7 @@ static ucc_status_t ucc_tl_mlx5_asr_barrier_start(ucc_coll_task_t *coll_task)
     coll_task->super.status = UCC_INPROGRESS;
 
     task->alltoall.started = 0;
-    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_barreir_start", 0);
+    UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_barrier_start", 0);
     // despite while statement in poll_umr_cq, non blocking because have independent cq,
     // will be finished in a finite time
     ucc_tl_mlx5_populate_send_recv_mkeys(team, task);

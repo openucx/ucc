@@ -162,7 +162,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     ucc_tl_mlx5_context_create_sbcast_data_t *sbcast_data;
 
     if (!core_ctx->service_team) {
-        tl_debug(context->lib, "need service team");
+        tl_debug(context->lib, "failed to init ctx: need service team");
         return UCC_ERR_NO_MESSAGE;
     }
     ucc_assert(core_ctx->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB);

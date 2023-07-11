@@ -80,9 +80,9 @@ static inline ucc_status_t send_atomic(ucc_tl_mlx5_alltoall_t *a2a,
         mlx5dv_wr_set_dc_addr(qp_dv, a2a->net.ahs[rank],
                               a2a->net.remote_dctns[rank], DC_KEY);
     }
-    ibv_wr_set_sge(qp_ex, a2a->scratch_bf_mr->lkey,
-                   (uint64_t)a2a->scratch_bf_mr->addr,
-                   a2a->scratch_bf_mr->length);
+    ibv_wr_set_sge(qp_ex, a2a->atomic_scratch_bf_mr->lkey,
+                   (uint64_t)a2a->atomic_scratch_bf_mr->addr,
+                   a2a->atomic_scratch_bf_mr->length);
     return UCC_OK;
 }
 

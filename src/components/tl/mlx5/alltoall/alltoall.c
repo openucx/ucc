@@ -599,14 +599,14 @@ ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
             a2a->net.rkeys[i]       = remote_data->recv_mkey_rkey;
         }
 
-        a2a->scratch_bf_mr =
-            ibv_reg_mr(ctx->shared_pd, (void *)&a2a->dummy_atomic_buff,
-                       sizeof(a2a->dummy_atomic_buff),
+        a2a->atomic_scratch_bf_mr =
+            ibv_reg_mr(ctx->shared_pd, (void *)&a2a->atomic_scratch_bf,
+                       sizeof(a2a->atomic_scratch_bf),
                        IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-        if (!a2a->scratch_bf_mr) {
-            tl_error(lib, "failed to register dummy buff (errno=%d)", errno);
+        if (!a2a->atomic_scratch_bf_mr) {
+            tl_error(lib, "failed to register atomic scratch buff (errno=%d)", errno);
             status = UCC_ERR_NO_MESSAGE;
-            goto err_scratch_bf_mr;
+            goto err_atomic_atomic_scratch_bf_mr;
         }
 
         /* allocate buffer for noninline UMR registration, has to be 2KB aligned */
@@ -633,8 +633,8 @@ ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
     return UCC_OK;
 
 err_umr_entries_mr:
-    ibv_dereg_mr(a2a->scratch_bf_mr);
-err_scratch_bf_mr:
+    ibv_dereg_mr(a2a->atomic_scratch_bf_mr);
+err_atomic_atomic_scratch_bf_mr:
     if (a2a->is_dc) {
 err_create_ah:
         for (j = 0; j < i ; j++) {
@@ -745,7 +745,7 @@ void ucc_tl_mlx5_alltoall_cleanup(ucc_tl_mlx5_team_t *team)
             tl_error(lib, "failed to destroy Mkeys");
         }
         ucc_free(a2a->net.rkeys);
-        ibv_dereg_mr(a2a->scratch_bf_mr);
+        ibv_dereg_mr(a2a->atomic_scratch_bf_mr);
         ucc_free(a2a->net.rank_map);
         ibv_dereg_mr(a2a->node.umr_entries_mr);
         ucc_free(a2a->node.umr_entries_buf);

@@ -118,11 +118,9 @@ typedef struct ucc_tl_mlx5_alltoall {
     struct ibv_context          *ctx;
     int                          ib_port;
     int                          state;
-    int                          transpose;
     uint64_t                     max_msg_size;
     ucc_tl_mlx5_alltoall_node_t  node;
     ucc_tl_mlx5_alltoall_net_t   net;
-    void                        *service_bcast_tmp_buf;
     int                          sequence_number;
     int                          op_busy[MAX_OUTSTANDING_OPS];
     int                          num_dci_qps;
@@ -130,10 +128,10 @@ typedef struct ucc_tl_mlx5_alltoall {
     int                          previous_msg_size[MAX_OUTSTANDING_OPS];
     void                        *previous_send_address[MAX_OUTSTANDING_OPS];
     void                        *previous_recv_address[MAX_OUTSTANDING_OPS];
-    uint64_t                     dummy_atomic_buff;
+    uint64_t                     atomic_scratch_bf;
     int                          requested_block_size;
     int                          max_num_of_columns;
-    struct ibv_mr               *scratch_bf_mr;
+    struct ibv_mr               *atomic_scratch_bf_mr;
     ucc_rank_t                   node_size;
     ucc_tl_mlx5_a2a_bcast_data_t bcast_data;
 } ucc_tl_mlx5_alltoall_t;
