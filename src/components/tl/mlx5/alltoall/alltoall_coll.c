@@ -14,7 +14,8 @@
 #include "tl_mlx5_wqe.h"
 #include "tl_mlx5_ib.h"
 
-static ucc_status_t ucc_tl_mlx5_poll_free_op_slot_start(ucc_coll_task_t *coll_task)
+static ucc_status_t
+ucc_tl_mlx5_poll_free_op_slot_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_mlx5_schedule_t *task      = TASK_SCHEDULE(coll_task);
     ucc_tl_mlx5_team_t     *team      = SCHEDULE_TEAM(task);
@@ -22,12 +23,13 @@ static ucc_status_t ucc_tl_mlx5_poll_free_op_slot_start(ucc_coll_task_t *coll_ta
     int                     seq_index = task->alltoall.seq_index;
 
     if (a2a->op_busy[seq_index] && !task->alltoall.started) {
-        tl_debug(UCC_TL_TEAM_LIB(team),
-        "Operation num %d must wait for previous outstanding to complete",
-        task->alltoall.seq_num);
+        tl_debug(
+            UCC_TL_TEAM_LIB(team),
+            "Operation num %d must wait for previous outstanding to complete",
+            task->alltoall.seq_num);
     }
 
-    coll_task->status = UCC_INPROGRESS;
+    coll_task->status       = UCC_INPROGRESS;
     coll_task->super.status = UCC_INPROGRESS;
     ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
     return UCC_OK;
@@ -46,9 +48,9 @@ void ucc_tl_mlx5_poll_free_op_slot_progress(ucc_coll_task_t *coll_task)
     } //wait for slot to be open
     a2a->op_busy[seq_index] = 1;
     task->alltoall.started  = 1;
-    coll_task->status = UCC_OK;
+    coll_task->status       = UCC_OK;
     tl_debug(UCC_TL_TEAM_LIB(team), "Operation num %d started",
-                                                    task->alltoall.seq_num);
+             task->alltoall.seq_num);
 }
 
 static ucc_status_t ucc_tl_mlx5_poll_cq(struct ibv_cq *cq, ucc_base_lib_t *lib)

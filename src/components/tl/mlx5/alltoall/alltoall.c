@@ -604,7 +604,8 @@ ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
                        sizeof(a2a->atomic_scratch_bf),
                        IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
         if (!a2a->atomic_scratch_bf_mr) {
-            tl_error(lib, "failed to register atomic scratch buff (errno=%d)", errno);
+            tl_error(lib, "failed to register atomic scratch buff (errno=%d)",
+                     errno);
             status = UCC_ERR_NO_MESSAGE;
             goto err_atomic_atomic_scratch_bf_mr;
         }
