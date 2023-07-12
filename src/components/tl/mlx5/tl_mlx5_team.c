@@ -110,7 +110,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     ucc_subset_t        subset    = {.map.type   = UCC_EP_MAP_FULL,
                                      .map.ep_num = core_team->size,
                                      .myrank     = core_team->rank};
-    ucc_status_t        status;
+    ucc_status_t        status    = UCC_OK;
 
     switch (tl_team->state) {
     case TL_MLX5_TEAM_STATE_INIT:
