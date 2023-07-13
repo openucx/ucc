@@ -52,7 +52,7 @@ static ucc_status_t ucc_component_load_one(const char *so_path,
 
     handle = dlopen(so_path, RTLD_LAZY);
     if (!handle) {
-        ucc_debug("failed to load UCC component library: %s", so_path);
+        ucc_debug("failed to load UCC component library: %s Error %s", so_path, dlerror());
         goto error;
     }
     iface = (ucc_component_iface_t *)dlsym(handle, iface_struct);

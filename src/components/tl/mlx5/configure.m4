@@ -6,8 +6,11 @@ tl_mlx5_enabled=n
 CHECK_TLS_REQUIRED(["mlx5"])
 AS_IF([test "$CHECKED_TL_REQUIRED" = "y"],
 [
+    CHECK_RDMACM
+    AC_MSG_RESULT([RDMACM support: $rdmacm_happy])
+
     mlx5_happy=no
-    if test "x$mlx5dv_happy" = "xyes" -a "x$have_mlx5dv_wr_raw_wqe" = "xyes"; then
+    if test "x$mlx5dv_happy" = "xyes" -a "x$have_mlx5dv_wr_raw_wqe" = "xyes" -a "x$rdmacm_happy" = "xyes"; then
        mlx5_happy=yes
     fi
     AC_MSG_RESULT([MLX5 support: $mlx5_happy])

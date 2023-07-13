@@ -10,12 +10,21 @@ alltoall =                    \
 	alltoall/alltoall_mkeys.h \
 	alltoall/alltoall_mkeys.c
 
-mcast =                           \
-	mcast/tl_mlx5_mcast_context.c \
-	mcast/tl_mlx5_mcast.h         \
-	mcast/tl_mlx5_mcast_coll.c    \
-	mcast/tl_mlx5_mcast_coll.h    \
-	mcast/tl_mlx5_mcast_team.c
+mcast =                             	\
+	mcast/tl_mlx5_mcast_context.c   	\
+	mcast/tl_mlx5_mcast.h           	\
+	mcast/tl_mlx5_mcast_coll.c      	\
+	mcast/tl_mlx5_mcast_coll.h      	\
+	mcast/tl_mlx5_mcast_team.c			\
+    mcast/tl_mlx5_mcast_helper.c		\
+    mcast/tl_mlx5_mcast_helper.h		\
+    mcast/tl_mlx5_mcast_progress.c  	\
+    mcast/tl_mlx5_mcast_progress.h  	\
+    mcast/tl_mlx5_mcast_rcache.c    	\
+    mcast/tl_mlx5_mcast_rcache.h		\
+	mcast/p2p/ucc_tl_mlx5_mcast_p2p.h	\
+	mcast/p2p/ucc_tl_mlx5_mcast_p2p.c
+
 
 sources =             \
 	tl_mlx5.h         \
@@ -42,7 +51,7 @@ libucc_tl_mlx5_la_SOURCES  = $(sources)
 libucc_tl_mlx5_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS)
 libucc_tl_mlx5_la_CFLAGS   = $(BASE_CFLAGS)
 libucc_tl_mlx5_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed
-libucc_tl_mlx5_la_LIBADD   = $(UCC_TOP_BUILDDIR)/src/libucc.la $(IBVERBS_LIBADD) $(MLX5DV_LIBADD)
+libucc_tl_mlx5_la_LIBADD   = $(UCC_TOP_BUILDDIR)/src/libucc.la $(IBVERBS_LIBADD) $(RDMACM_LIBADD) $(MLX5DV_LIBADD)
 
 include $(top_srcdir)/config/module.am
 

@@ -59,7 +59,7 @@ typedef struct ucc_tl_mlx5_lib_config {
     unsigned long               dm_buf_num;
     int                         dm_host;
     ucc_tl_mlx5_ib_qp_conf_t    qp_conf;
-    mcast_coll_comm_init_spec_t mcast_conf;
+    ucc_tl_mlx5_mcast_coll_comm_init_spec_t mcast_conf;
 } ucc_tl_mlx5_lib_config_t;
 
 typedef struct ucc_tl_mlx5_context_config {
