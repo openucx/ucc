@@ -161,8 +161,8 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
                       (coll_args, request, team), ucc_coll_args_t *coll_args,
                       ucc_coll_req_h *request, ucc_team_h team)
 {
+    ucc_base_coll_args_t      op_args = {0};
     ucc_coll_task_t          *task;
-    ucc_base_coll_args_t      op_args;
     ucc_status_t              status;
     ucc_ee_executor_params_t  params;
     ucc_memory_type_t         coll_mem_type;
@@ -194,7 +194,6 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     }
 
     /* TO discuss: maybe we want to pass around user pointer ? */
-    op_args.mask = 0;
     memcpy(&op_args.args, coll_args, sizeof(ucc_coll_args_t));
     op_args.team = team;
 
