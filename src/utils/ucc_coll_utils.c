@@ -266,11 +266,10 @@ ucc_ep_map_from_array_generic(void **array, ucc_rank_t size,
                               ucc_rank_t full_size, int need_free, int is64)
 {
     int          is_const_stride = 0;
-    ucc_ep_map_t map;
+    ucc_ep_map_t map             = {0};
     int64_t      stride;
     ucc_rank_t   i;
 
-    memset(&map, 0, sizeof(ucc_ep_map_t));
     map.ep_num = size;
     if (size > 1) {
         /* try to detect strided pattern */
