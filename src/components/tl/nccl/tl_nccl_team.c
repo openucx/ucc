@@ -12,9 +12,6 @@
 #include "coll_score/ucc_coll_score.h"
 #include "utils/arch/cuda_def.h"
 
-#define NCCL_VERSION_COMM_INIT_NB NCCL_VERSION(2,14,3)
-#define NCCL_USE_NON_BLOCKING NCCL_VERSION_CODE >= NCCL_VERSION_COMM_INIT_NB
-
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
@@ -70,7 +67,7 @@ ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team)
     ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
 
 #if NCCL_USE_NON_BLOCKING
-    ncclResult_t nccl_status;
+    ncclResult_t nccl_status, st;
 
     if (team->nccl_comm && team->comm_state == UCC_INPROGRESS) {
         goto check_finalize;
@@ -86,16 +83,16 @@ ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team)
 #if NCCL_USE_NON_BLOCKING
             ncclCommFinalize(team->nccl_comm);
 check_finalize:
-            ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
-            if (nccl_status == ncclInProgress) {
-                team->comm_state = UCC_INPROGRESS;
-                return UCC_INPROGRESS;
-            }
-            if (nccl_status != ncclSuccess) {
-                tl_debug(tl_team->context->lib, "NCCL error %d %s", nccl_status,
-                ncclGetErrorString(nccl_status));
+            st = ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
+            if (st != ncclSuccess || (nccl_status != ncclSuccess)) {
+                tl_debug(tl_team->context->lib, "NCCL error %d %s",
+                         st != ncclSuccess ? st : nccl_status,
+                ncclGetErrorString(st != ncclSuccess ? st : nccl_status));
                 ncclCommAbort(team->nccl_comm);
                 return UCC_ERR_NO_MESSAGE;
+            } else if (nccl_status == ncclInProgress) {
+                team->comm_state = UCC_INPROGRESS;
+                return UCC_INPROGRESS;
             } else {
                 ncclCommDestroy(team->nccl_comm);
             }
@@ -120,6 +117,7 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
 
 #if NCCL_USE_NON_BLOCKING
     ncclConfig_t nccl_cfg = NCCL_CONFIG_INITIALIZER;
+    ncclResult_t st;
 
     if (team->comm_state == UCC_INPROGRESS) {
         goto ncclInitStage;
@@ -150,7 +148,7 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
     CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
                     cudaStreamNonBlocking), free_unique_id, status);
 #if NCCL_USE_NON_BLOCKING
-    nccl_cfg.blocking = 0;
+    nccl_cfg.blocking = UCC_TL_NCCL_TEAM_CTX(team)->cfg.nccl_cfg_blocking;
     nccl_status = ncclCommInitRankConfig(&team->nccl_comm,
                                          UCC_TL_TEAM_SIZE(team),
                                          team->unique_id[0],
@@ -160,7 +158,10 @@ ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
         goto free_stream;
     }
 ncclInitStage:
-    ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
+    st = ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
+    if (st != ncclSuccess) {
+        nccl_status = st;
+    }
     if (nccl_status == ncclInProgress){
         team->comm_state = UCC_INPROGRESS;
         return UCC_INPROGRESS;
