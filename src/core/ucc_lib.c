@@ -90,7 +90,7 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
     }
 
     lib->cl_attrs = (ucc_cl_lib_attr_t *)
-        ucc_malloc(sizeof(ucc_cl_lib_attr_t) * n_cls, "cl_attrs");
+        ucc_calloc(n_cls, sizeof(ucc_cl_lib_attr_t), "cl_attrs");
     if (!lib->cl_attrs) {
         ucc_error("failed to allocate %zd bytes for cl_attrs",
                   sizeof(ucc_cl_lib_attr_t) * n_cls);
@@ -103,6 +103,7 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
         params.mask |= UCC_LIB_PARAM_FIELD_THREAD_MODE;
         params.thread_mode = UCC_THREAD_SINGLE;
     }
+    memset(&b_params, 0, sizeof(ucc_base_lib_params_t));
     ucc_copy_lib_params(&b_params.params, &params);
     ucc_assert(config->cls.count >= 1);
     lib->specific_cls_requested = (0 == ucc_cl_requested(config, UCC_CL_ALL));
@@ -122,6 +123,7 @@ static ucc_status_t ucc_cl_lib_init(const ucc_lib_params_t *user_params,
                       cl_iface->super.name);
             goto error_cfg_read;
         }
+        // coverity[overrun-buffer-val:FALSE]
         status = cl_iface->lib.init(&b_params, &cl_config->super.super, &b_lib);
         if (UCC_OK != status) {
             if (lib->specific_cls_requested) {
@@ -271,6 +273,7 @@ static ucc_status_t ucc_tl_lib_init(const ucc_lib_params_t *user_params,
                          tl_iface->super.name);
                 continue;
             }
+            // coverity[overrun-buffer-val:FALSE]
             status = tl_iface->lib.init(&b_params, &tl_config->super.super,
                                         &b_lib);
             ucc_base_config_release(&tl_config->super.super);
