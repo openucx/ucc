@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -57,7 +57,20 @@ typedef struct ucc_tl_mlx5_schedule {
 #define TASK_SCHEDULE(_task)                                                   \
     (ucc_derived_of((_task)->schedule, ucc_tl_mlx5_schedule_t))
 
-static inline ucc_tl_mlx5_task_t *
+#define SCHEDULE_TEAM(_schedule)                                               \
+    (ucc_derived_of((_schedule)->super.super.team, ucc_tl_mlx5_team_t))
+
+#define SCHEDULE_CTX(_schedule)                                                \
+    (ucc_derived_of((_schedule)->super.super.team->context,                    \
+                    ucc_tl_mlx5_context_t))
+
+#define SCHEDULE_LIB(_schedule)                                                \
+    (ucc_derived_of((_schedule)->super.super.team->context->lib,               \
+                    ucc_tl_mlx5_lib_t))
+
+#define SCHEDULE_ARGS(_schedule) (_schedule)->super.super.bargs.args
+
+static inline ucc_tl_mlx5_task_t*
 ucc_tl_mlx5_get_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
 {
     ucc_tl_mlx5_team_t *   tl_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
@@ -80,7 +93,7 @@ ucc_tl_mlx5_get_schedule(ucc_tl_mlx5_team_t      *team,
                          ucc_base_coll_args_t    *coll_args,
                          ucc_tl_mlx5_schedule_t **schedule)
 {
-    ucc_tl_mlx5_context_t * ctx      = UCC_TL_MLX5_TEAM_CTX(team);
+    ucc_tl_mlx5_context_t *ctx = UCC_TL_MLX5_TEAM_CTX(team);
 
     *schedule = ucc_mpool_get(&ctx->req_mp);
 
@@ -100,7 +113,17 @@ static inline void ucc_tl_mlx5_put_schedule(ucc_tl_mlx5_schedule_t *schedule)
 }
 
 ucc_status_t ucc_tl_mlx5_bcast_mcast_init(ucc_base_coll_args_t *coll_args,
-                                          ucc_base_team_t *     team,
-                                          ucc_coll_task_t **    task_h);
+                                          ucc_base_team_t      *team,
+                                          ucc_coll_task_t     **task_h);
+
+ucc_status_t ucc_tl_mlx5_task_finalize(ucc_coll_task_t *coll_task);
+
+ucc_tl_mlx5_task_t* ucc_tl_mlx5_init_task(ucc_base_coll_args_t *coll_args,
+                                          ucc_base_team_t      *team,
+                                          ucc_schedule_t       *schedule);
+
+ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args,
+                                   ucc_base_team_t      *team,
+                                   ucc_coll_task_t     **task_h);
 
 #endif

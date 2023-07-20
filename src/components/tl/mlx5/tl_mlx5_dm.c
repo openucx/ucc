@@ -20,16 +20,11 @@ static void ucc_tl_mlx5_dm_chunk_init(ucc_mpool_t *mp,        //NOLINT
                                  UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_buf_size);
 }
 
-static void ucc_tl_mlx5_dm_chunk_release(ucc_mpool_t *mp, void *chunk) //NOLINT
-{
-    ucc_free(chunk);
-}
-
-static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {.chunk_alloc = ucc_mpool_hugetlb_malloc,
-                                      .chunk_release =
-                                          ucc_tl_mlx5_dm_chunk_release,
-                                      .obj_init    = ucc_tl_mlx5_dm_chunk_init,
-                                      .obj_cleanup = NULL};
+static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {
+    .chunk_alloc   = ucc_mpool_hugetlb_malloc,
+    .chunk_release = ucc_mpool_hugetlb_free,
+    .obj_init      = ucc_tl_mlx5_dm_chunk_init,
+    .obj_cleanup   = NULL};
 
 void ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team)
 {
@@ -94,7 +89,7 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
                 attr.max_dm_size / buf_size - 1; //keep reserved memory
             min_chunks_to_alloc = 1;
             if (!max_chunks_to_alloc) {
-                tl_error(lib,
+                tl_debug(lib,
                          "requested buffer size (=%ld) is too large, "
                          "should be set to be strictly less than %ld. "
                          "max allocation size is %ld",
@@ -103,7 +98,7 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
             }
         }
         if (attr.max_dm_size < buf_size * min_chunks_to_alloc) {
-            tl_error(lib,
+            tl_debug(lib,
                      "cannot allocate %i buffer(s) of size %ld, "
                      "max allocation size is %ld",
                      min_chunks_to_alloc, buf_size, attr.max_dm_size);
@@ -119,7 +114,7 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
             }
         }
         if (!dm_ptr) {
-            tl_error(lib,
+            tl_debug(lib,
                      "dev mem allocation failed, requested %ld, attr.max %zd, "
                      "errno %d",
                      dm_attr.length, attr.max_dm_size, errno);
@@ -152,17 +147,16 @@ ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
         ctx->shared_ctx, ctx->shared_pd, cfg->dm_host, cfg->dm_buf_size,
         &cfg->dm_buf_num, &team->dm_ptr, &team->dm_mr, UCC_TL_TEAM_LIB(team));
     if (status != UCC_OK) {
-        tl_error(UCC_TL_TEAM_LIB(team),
+        tl_debug(UCC_TL_TEAM_LIB(team),
                  "failed to alloc and register device memory");
         return status;
     }
     team->dm_offset = NULL;
 
-    status = ucc_mpool_init(&team->dm_pool, 0, sizeof(ucc_tl_mlx5_dm_chunk_t),
-                            0, UCC_CACHE_LINE_SIZE, cfg->dm_buf_num,
-                            cfg->dm_buf_num, &ucc_tl_mlx5_dm_ops,
-                            ctx->super.super.ucc_context->thread_mode,
-                            "mlx5 dm pool");
+    status = ucc_mpool_init(
+        &team->dm_pool, 0, sizeof(ucc_tl_mlx5_dm_chunk_t), 0,
+        UCC_CACHE_LINE_SIZE, 1, cfg->dm_buf_num, &ucc_tl_mlx5_dm_ops,
+        ctx->super.super.ucc_context->thread_mode, "mlx5 dm pool");
     if (status != UCC_OK) {
         tl_error(UCC_TL_TEAM_LIB(team), "failed to init dm pool");
         ucc_tl_mlx5_dm_cleanup(team);

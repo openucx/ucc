@@ -92,7 +92,7 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
         pos         = strstr(ib_devname, ":");
         end_pos     = ib_devname + strlen(ib_devname);
         if (!pos) {
-            devname_len = strlen(ib_devname);
+            devname_len = sizeof(tmp) - 1;
         } else {
             devname_len = (int)(pos - ib_devname);
             pos++;
@@ -161,6 +161,12 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     ucc_coll_task_t *req;
     ucc_tl_mlx5_context_create_sbcast_data_t *sbcast_data;
 
+    if (!core_ctx->service_team) {
+        tl_debug(context->lib, "failed to init ctx: need service team");
+        return UCC_ERR_NO_MESSAGE;
+    }
+    ucc_assert(core_ctx->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB);
+
     sbcast_data = (ucc_tl_mlx5_context_create_sbcast_data_t *)ucc_malloc(
         sbcast_data_length);
     if (!sbcast_data) {
@@ -168,9 +174,6 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
                  "failed to allocate buffer for sharing ib_ctx info");
         return UCC_ERR_NO_MEMORY;
     }
-
-    ucc_assert(core_ctx->service_team != NULL);
-    ucc_assert(core_ctx->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB);
 
     s.map.type   = UCC_EP_MAP_FULL;
     s.map.ep_num = core_ctx->params.oob.n_oob_eps;

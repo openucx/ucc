@@ -256,31 +256,64 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
     return UCC_OK;
 }
 
+static void ucc_tl_mlx5_context_barrier(ucc_context_oob_coll_t *oob,
+                                        ucc_base_lib_t         *lib)
+{
+    char        *rbuf;
+    char         sbuf;
+    void        *req;
+    ucc_status_t status;
+
+    if (ucc_unlikely(oob->n_oob_eps < 2)) {
+        return;
+    }
+
+    rbuf = ucc_malloc(sizeof(char) * oob->n_oob_eps, "tmp_barrier");
+    if (!rbuf) {
+        tl_error(lib, "failed to allocate %zd bytes for tmp barrier array",
+                 sizeof(char) * oob->n_oob_eps);
+        return;
+    }
+    if (UCC_OK ==
+        oob->allgather(&sbuf, rbuf, sizeof(char), oob->coll_info, &req)) {
+        ucc_assert(req != NULL);
+        while (UCC_OK != (status = oob->req_test(req))) {
+            if (status < 0) {
+                tl_error(lib, "failed to test oob req");
+                break;
+            }
+        }
+        oob->req_free(req);
+    }
+    ucc_free(rbuf);
+}
+
 ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx)
 {
+    ucc_base_lib_t *lib    = ctx->super.super.lib;
+    ucc_status_t    status = UCC_OK;
     int err;
 
     if (ctx->shared_pd) {
         if (ctx->is_imported) {
             ibv_unimport_pd(ctx->shared_pd);
-        } else {
-            do {
-                err = ibv_dealloc_pd(ctx->shared_pd);
-            } while (err == EBUSY);
+        }
+        ucc_tl_mlx5_context_barrier(&UCC_TL_CTX_OOB(ctx), lib);
+        if (!ctx->is_imported) {
+            err = ibv_dealloc_pd(ctx->shared_pd);
             if (err) {
-                tl_error(ctx->super.super.lib, "failed to dealloc PD, errno %d",
-                         err);
-                return UCC_ERR_NO_MESSAGE;
+                tl_debug(lib, "failed to dealloc PD, errno %d", err);
+                status = UCC_ERR_NO_MESSAGE;
             }
         }
     }
 
     if (ctx->shared_ctx) {
         if (ibv_close_device(ctx->shared_ctx)) {
-            tl_error(ctx->super.super.lib, "failed to close ib ctx");
-            return UCC_ERR_NO_MESSAGE;
+            tl_error(lib, "failed to close ib ctx");
+            status |= UCC_ERR_NO_MESSAGE;
         }
     }
 
-    return UCC_OK;
+    return status;
 }

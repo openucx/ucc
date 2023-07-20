@@ -4,11 +4,13 @@
 
 if TL_MLX5_ENABLED
 
-alltoall =                    \
-	alltoall/alltoall.h       \
-	alltoall/alltoall.c       \
-	alltoall/alltoall_mkeys.h \
-	alltoall/alltoall_mkeys.c
+alltoall =                      \
+	alltoall/alltoall.h         \
+	alltoall/alltoall.c         \
+	alltoall/alltoall_mkeys.h   \
+	alltoall/alltoall_mkeys.c   \
+	alltoall/alltoall_inline.h  \
+	alltoall/alltoall_coll.c
 
 mcast =                           \
 	mcast/tl_mlx5_mcast_context.c \
