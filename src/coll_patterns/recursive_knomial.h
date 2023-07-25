@@ -239,7 +239,8 @@ static inline ucc_rank_t ucc_kn_get_opt_radix(ucc_rank_t team_size,
     ucc_rank_t     n_extra = 0, min_val = team_size;
     ucc_kn_radix_t min_i   = UCC_KN_MIN_RADIX;
     ucc_kn_radix_t max_r   = ucc_max(max_radix, UCC_KN_MIN_RADIX);
-    ucc_kn_radix_t r, fs;
+    ucc_kn_radix_t r;
+    ucc_rank_t     fs;
 
     for (r = UCC_KN_MIN_RADIX; r <= max_r; r++) {
         fs = r;
