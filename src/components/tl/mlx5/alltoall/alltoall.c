@@ -523,6 +523,7 @@ ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
             tl_error(UCC_TL_TEAM_LIB(tl_team),
                      "failure during service coll exchange: %s",
                      ucc_status_string(status));
+            ucc_service_coll_finalize(tl_team->scoll_req);
             goto err_service_allgather_progress;
         }
         if (UCC_INPROGRESS == status) {
@@ -652,7 +653,6 @@ err_rkeys:
     ucc_free(a2a->net.rank_map);
 err_rank_map:
 err_service_allgather_progress:
-    ucc_service_coll_finalize(tl_team->scoll_req);
 err_service_allgather_post:
     if (!a2a->is_dc) {
 err_create_rc_qps:

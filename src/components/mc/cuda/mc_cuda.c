@@ -226,7 +226,7 @@ static ucc_status_t ucc_mc_cuda_mem_free(ucc_mc_buffer_header_t *h_ptr)
         mc_error(&ucc_mc_cuda.super,
                  "failed to free mem at %p, "
                  "cuda error %d(%s)",
-                 h_ptr->addr, st, cudaGetErrorString(st));
+                 h_ptr, st, cudaGetErrorString(st));
         return UCC_ERR_NO_MESSAGE;
     }
     ucc_free(h_ptr);

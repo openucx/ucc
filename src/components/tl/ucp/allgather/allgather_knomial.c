@@ -167,19 +167,20 @@ out:
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t     *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t       *args  = &TASK_ARGS(task);
-    ucc_tl_ucp_team_t     *team  = TASK_TEAM(task);
-    ucc_coll_type_t        ct    = args->coll_type;
-    ucc_rank_t             size  = UCC_TL_TEAM_SIZE(team);
-    ucc_kn_radix_t         radix = task->allgather_kn.p.radix;
-    ucc_knomial_pattern_t *p     = &task->allgather_kn.p;
-    ucc_rank_t             rank  = VRANK(UCC_TL_TEAM_RANK(team),
-                                     ct == UCC_COLL_TYPE_BCAST ? args->root : 0,
-                                     size);
+    ucc_tl_ucp_task_t          *task  = ucc_derived_of(coll_task,
+                                                       ucc_tl_ucp_task_t);
+    ucc_coll_args_t            *args  = &TASK_ARGS(task);
+    ucc_tl_ucp_team_t          *team  = TASK_TEAM(task);
+    ucc_coll_type_t             ct    = args->coll_type;
+    ucc_rank_t                  size  = UCC_TL_TEAM_SIZE(team);
+    ucc_kn_radix_t              radix = task->allgather_kn.p.radix;
+    ucc_knomial_pattern_t      *p     = &task->allgather_kn.p;
+    ucc_rank_t                  rank  = VRANK(UCC_TL_TEAM_RANK(team),
+                                              ct == UCC_COLL_TYPE_BCAST ?
+                                              args->root : 0, size);
+    ucc_ee_executor_task_args_t eargs = {0};
     ucc_status_t       status;
     ptrdiff_t          offset;
-    ucc_ee_executor_task_args_t eargs;
     ucc_ee_executor_t *exec;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);

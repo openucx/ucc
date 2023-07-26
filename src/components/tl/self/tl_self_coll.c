@@ -70,10 +70,11 @@ void ucc_tl_self_copy_progress(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_self_copy_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_self_task_t *task = ucc_derived_of(coll_task, ucc_tl_self_task_t);
-    ucc_ee_executor_t  *exec;
-    ucc_ee_executor_task_args_t exec_args;
-    ucc_status_t                status;
+    ucc_tl_self_task_t         *task      = ucc_derived_of(coll_task,
+                                                           ucc_tl_self_task_t);
+    ucc_ee_executor_task_args_t exec_args = {0};
+    ucc_ee_executor_t *exec;
+    ucc_status_t       status;
 
     status = ucc_coll_task_get_executor(&task->super, &exec);
     if (ucc_unlikely(status != UCC_OK)) {

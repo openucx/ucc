@@ -17,33 +17,35 @@
 
 void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t     *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t       *args  = &TASK_ARGS(task);
-    ucc_tl_ucp_team_t     *team  = TASK_TEAM(task);
-    ucc_kn_radix_t         radix = task->reduce_scatter_kn.p.radix;
-    int                    avg_pre_op =
+    ucc_tl_ucp_task_t          *task       = ucc_derived_of(coll_task,
+                                                            ucc_tl_ucp_task_t);
+    ucc_coll_args_t            *args       = &TASK_ARGS(task);
+    ucc_tl_ucp_team_t          *team       = TASK_TEAM(task);
+    ucc_kn_radix_t              radix      = task->reduce_scatter_kn.p.radix;
+    int                         avg_pre_op =
         UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op;
-    uint8_t                node_type  = task->reduce_scatter_kn.p.node_type;
-    ucc_knomial_pattern_t *p          = &task->reduce_scatter_kn.p;
-    void                  *scratch    = task->reduce_scatter_kn.scratch;
-    void                  *rbuf       = args->dst.info.buffer;
-    ucc_memory_type_t      mem_type   = args->dst.info.mem_type;
-    size_t                 count      = args->dst.info.count;
-    ucc_datatype_t         dt         = args->dst.info.datatype;
-    void                  *sbuf       = UCC_IS_INPLACE(*args) ?
+    uint8_t                     node_type  =
+        task->reduce_scatter_kn.p.node_type;
+    ucc_knomial_pattern_t      *p          = &task->reduce_scatter_kn.p;
+    void                       *scratch    = task->reduce_scatter_kn.scratch;
+    void                       *rbuf       = args->dst.info.buffer;
+    ucc_memory_type_t           mem_type   = args->dst.info.mem_type;
+    size_t                      count      = args->dst.info.count;
+    ucc_datatype_t              dt         = args->dst.info.datatype;
+    void                       *sbuf       = UCC_IS_INPLACE(*args) ?
         rbuf : args->src.info.buffer;
-    size_t                 dt_size    = ucc_dt_size(dt);
-    size_t                 data_size  = count * dt_size;
-    ucc_rank_t             rank       = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t             size       = UCC_TL_TEAM_SIZE(team);
-    ptrdiff_t              peer_seg_offset, local_seg_offset, offset;
-    ucc_rank_t             peer, step_radix, peer_seg_index, local_seg_index;
-    ucc_status_t           status;
-    ucc_kn_radix_t         loop_step;
-    size_t                 block_count, peer_seg_count, local_seg_count;
-    void                  *reduce_data, *local_data;
-    int                    is_avg;
-    ucc_ee_executor_task_args_t eargs;
+    size_t                      dt_size    = ucc_dt_size(dt);
+    size_t                      data_size  = count * dt_size;
+    ucc_rank_t                  rank       = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t                  size       = UCC_TL_TEAM_SIZE(team);
+    ucc_ee_executor_task_args_t eargs      = {0};
+    ptrdiff_t      peer_seg_offset, local_seg_offset, offset;
+    ucc_rank_t     peer, step_radix, peer_seg_index, local_seg_index;
+    ucc_status_t   status;
+    ucc_kn_radix_t loop_step;
+    size_t         block_count, peer_seg_count, local_seg_count;
+    void          *reduce_data, *local_data;
+    int            is_avg;
 
     local_seg_count = 0;
     block_count     = ucc_sra_kn_compute_block_count(count, rank, p);
