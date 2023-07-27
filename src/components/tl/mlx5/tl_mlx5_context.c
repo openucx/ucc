@@ -203,7 +203,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
                 goto err;
             }
 
-            strcat(sock_path, sockname);
+            strncat(sock_path, sockname, sizeof(sock_path) - strlen(sock_path) - 1);
             status = ucc_tl_mlx5_socket_init(ctx, sbgp->group_size, &sock,
                                              sock_path);
             if (UCC_OK != status) {
