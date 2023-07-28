@@ -175,6 +175,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
         return UCC_ERR_NO_MEMORY;
     }
 
+    memset(&s.map, 0, sizeof(ucc_ep_map_t));
     s.map.type   = UCC_EP_MAP_FULL;
     s.map.ep_num = core_ctx->params.oob.n_oob_eps;
     s.myrank     = core_ctx->rank;
@@ -266,12 +267,13 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
 
     ucc_free(sbcast_data);
     ucc_topo_cleanup(topo);
-
+    close(sock);
     return UCC_OK;
 
 err:
     ucc_tl_mlx5_remove_shared_ctx_pd(ctx);
     ucc_topo_cleanup(topo);
+    close(sock);
 err_topo:
     ucc_free(sbcast_data);
     return status;

@@ -151,7 +151,7 @@ static ucc_status_t create_and_populate_recv_team_mkey(ucc_tl_mlx5_team_t *team,
     ucc_tl_mlx5_alltoall_t      *a2a       = team->a2a;
     ucc_tl_mlx5_alltoall_node_t *node      = &a2a->node;
     int                          mnc       = a2a->max_num_of_columns;
-    ucc_status_t                 status;
+    ucc_status_t                 status    = UCC_OK;
     int                          i, j, index;
 
     status = create_master_key(MAX_OUTSTANDING_OPS * mnc, a2a->pd,
@@ -161,6 +161,12 @@ static ucc_status_t create_and_populate_recv_team_mkey(ucc_tl_mlx5_team_t *team,
     }
     struct ibv_sge *team_mkey_klm_entries = (struct ibv_sge *)calloc(
         MAX_OUTSTANDING_OPS * mnc, sizeof(struct ibv_sge));
+
+    if (!team_mkey_klm_entries) {
+        tl_error(lib, "failed to allocate team_mkey_klm_entries");
+        status = UCC_ERR_NO_MEMORY;
+        goto err_calloc;
+    }
 
     for (i = 0; i < MAX_OUTSTANDING_OPS; i++) {
         for (j = 0; j < mnc; j++) {
@@ -179,13 +185,18 @@ static ucc_status_t create_and_populate_recv_team_mkey(ucc_tl_mlx5_team_t *team,
         team_mkey_klm_entries, MAX_OUTSTANDING_OPS * mnc, lib);
     if (status != UCC_OK) {
         tl_error(a2a, "failed to populate team mkey");
-        if (mlx5dv_destroy_mkey(node->team_recv_mkey)) {
-            tl_error(lib, "mkey destroy failed(errno=%d)", errno);
-        }
-        return status;
+        goto err_mkey;
     }
     ucc_free(team_mkey_klm_entries);
-    return UCC_OK;
+    return status;
+
+err_mkey:
+    ucc_free(team_mkey_klm_entries);
+err_calloc:
+    if (mlx5dv_destroy_mkey(node->team_recv_mkey)) {
+        tl_error(lib, "mkey destroy failed(errno=%d)", errno);
+    }
+    return status;
 }
 
 /**
@@ -237,7 +248,7 @@ ucc_status_t ucc_tl_mlx5_init_mkeys(ucc_tl_mlx5_team_t *team,
     status = create_and_populate_recv_team_mkey(team, lib);
     if (status != UCC_OK) {
         tl_error(lib, "failed to create recv top masterkey");
-        goto err_create_mkey;
+        goto err_malloc;
     }
 
     return UCC_OK;

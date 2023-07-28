@@ -146,9 +146,10 @@ exit_err:
 
 ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t         *team = TASK_TEAM(task);
-    ucc_rank_t                  rank = UCC_TL_TEAM_RANK(team);
-    ucc_tl_cuda_sync_t         *sync = TASK_SYNC(task, rank);
+    ucc_tl_cuda_team_t         *team      = TASK_TEAM(task);
+    ucc_rank_t                  rank      = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_sync_t         *sync      = TASK_SYNC(task, rank);
+    ucc_ee_executor_task_args_t exec_args = {0};
     ucc_tl_cuda_sync_t         *peer_sync;
     ucc_ee_executor_t          *exec;
     void                       *src, *dst;
@@ -156,7 +157,6 @@ ucc_status_t ucc_tl_cuda_alltoallv_ce_post_copies(ucc_tl_cuda_task_t *task)
     size_t                      data_size, data_displ;
     ucc_rank_t                  i, peer, psrc, pdst;
     ucc_status_t                status;
-    ucc_ee_executor_task_args_t exec_args;
 
     task->alltoallv_ce.num_posted = 0;
     status = ucc_coll_task_get_executor(&task->super, &exec);

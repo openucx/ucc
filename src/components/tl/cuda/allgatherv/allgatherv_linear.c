@@ -131,7 +131,7 @@ static inline ucc_status_t ecopy(void *dst, void *src, size_t size,
                                  ucc_ee_executor_t *      exec,
                                  ucc_ee_executor_task_t **etask)
 {
-    ucc_ee_executor_task_args_t exec_args;
+    ucc_ee_executor_task_args_t exec_args = {0};
 
     exec_args.task_type = UCC_EE_EXECUTOR_TASK_COPY;
     exec_args.copy.dst  = dst;
