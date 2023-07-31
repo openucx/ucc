@@ -75,6 +75,13 @@ ucc_status_t ucc_tl_mlx5_team_alltoall_init_start(ucc_tl_mlx5_team_t *team)
     ucc_topo_t             *topo;
     ucc_status_t            status;
 
+    if (team->dm_status[1] != UCC_OK) {
+        tl_debug(ctx->super.super.lib,
+                 "node leader failed during device memory init: %s",
+                 ucc_status_string(team->dm_status[1]));
+        return team->dm_status[1];
+    }
+
     a2a = ucc_calloc(1, sizeof(*a2a), "mlx5_a2a");
     if (!a2a) {
         return UCC_ERR_NO_MEMORY;
@@ -277,18 +284,24 @@ ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
                                                            ucc_tl_mlx5_team_t);
     ucc_tl_mlx5_context_t     *ctx         = UCC_TL_MLX5_TEAM_CTX(team);
     ucc_tl_mlx5_alltoall_t    *a2a         = team->a2a;
-    ucc_rank_t                 node_size   = a2a->node.sbgp->group_size;
-    ucc_rank_t                 node_rank   = a2a->node.sbgp->group_rank;
     ucc_base_lib_t            *lib         = UCC_TL_TEAM_LIB(team);
-    size_t                     op_seg_size = OP_SEGMENT_SIZE(a2a);
     int                        i           = 0;
     net_exchange_t            *local_data  = NULL;
+    ucc_rank_t                 node_size, node_rank;
     ucc_status_t               status;
     ucc_tl_mlx5_alltoall_op_t *op;
     int                        j, asr_cq_size, net_size, ret;
     struct ibv_port_attr       port_attr;
-    size_t                     local_data_size, umr_buf_size;
+    size_t                     op_seg_size, local_data_size, umr_buf_size;
     net_exchange_t            *global_data, *remote_data;
+
+    if (tl_team->a2a_status < 0) {
+        return tl_team->a2a_status;
+    }
+
+    node_size   = a2a->node.sbgp->group_size;
+    node_rank   = a2a->node.sbgp->group_rank;
+    op_seg_size = OP_SEGMENT_SIZE(a2a);
 
     switch (a2a->state) {
     case TL_MLX5_ALLTOALL_STATE_SHMID:

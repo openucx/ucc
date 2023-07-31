@@ -41,15 +41,26 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
         return status;
     }
 
+    status = tl_mlx5_rcache_create(self);
+    if (UCC_OK != status) {
+        tl_error(self->super.super.lib, "failed to create rcache");
+        goto err_rcache;
+    }
+
     status = ucc_tl_mlx5_mcast_context_init(&(self->mcast), &(self->cfg.mcast_ctx_conf));
     if (UCC_OK != status) {
         tl_error(self->super.super.lib,
                  "failed to initialize mcast context");
-        return status;
+        goto err_mcast_context;
     }
 
-    tl_debug(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
+
+err_mcast_context:
+    ucc_rcache_destroy(self->rcache);
+err_rcache:
+    ucc_mpool_cleanup(&self->req_mp, 1);
+    return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
@@ -60,7 +71,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
     }
 
     if (ucc_tl_mlx5_remove_shared_ctx_pd(self) != UCC_OK) {
-        tl_error(self->super.super.lib, "failed to free ib ctx and pd");
+        tl_debug(self->super.super.lib, "failed to free ib ctx and pd");
     };
 
     ucc_mpool_cleanup(&self->req_mp, 1);
@@ -142,7 +153,7 @@ typedef struct ucc_tl_mlx5_context_create_sbcast_data {
     char sock_path[];
 } ucc_tl_mlx5_context_create_sbcast_data_t;
 
-ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
+ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
 {
     ucc_tl_mlx5_context_t *ctx = ucc_derived_of(context, ucc_tl_mlx5_context_t);
     ucc_context_t *  core_ctx           = context->ucc_context;
@@ -182,37 +193,36 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
 
     status = ucc_topo_init(s, core_ctx->topo, &topo);
     if (UCC_OK != status) {
-        tl_error(context->lib, "failed to init mlx5 ctx topo");
+        tl_debug(context->lib, "failed to init mlx5 ctx topo");
         goto err_topo;
     }
 
     sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
-    if (sbgp->status != UCC_SBGP_ENABLED) {
-        status = UCC_OK;
-        goto err;
-    }
 
     ctx->shared_ctx  = NULL;
     ctx->shared_pd   = NULL;
     ctx->is_imported = sbgp->group_rank != PD_OWNER_RANK;
 
     if (!ctx->is_imported) {
+        status = ucc_tl_mlx5_ib_ctx_pd_init(ctx);
+        if (status != UCC_OK) {
+            tl_debug(context->lib, "failed to init ib_ctx and pd");
+            goto err_ib_ctx_pd_init;
+        }
+        if (sbgp->status == UCC_SBGP_NOT_EXISTS) {
+            goto topo_ppn_1;
+        }
         ucc_strncpy_safe(sock_path, template, sock_dir_len);
         if (mkdtemp(sock_path) != NULL) {
-            status = ucc_tl_mlx5_ib_ctx_pd_init(ctx);
-            if (status != UCC_OK) {
-                goto err;
-            }
-
             strncat(sock_path, sockname, sizeof(sock_path) - strlen(sock_path) - 1);
             status = ucc_tl_mlx5_socket_init(ctx, sbgp->group_size, &sock,
                                              sock_path);
             if (UCC_OK != status) {
                 sock_path[0] = '\0';
-                tl_error(context->lib, "failed to init socket to share ib_ctx");
+                tl_debug(context->lib, "failed to init socket to share ib_ctx");
             }
         } else {
-            tl_error(context->lib, "failed to create tmp file for socket path");
+            tl_debug(context->lib, "failed to create tmp file for socket path");
             sock_path[0] = '\0';
         }
         sbcast_data->ib_port = ctx->ib_port;
@@ -244,6 +254,7 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
     memcpy(sock_path, sbcast_data->sock_path, sizeof(sock_path));
 
     if (strlen(sock_path) == 0) {
+        tl_debug(context->lib, "failed to share ctx and pd");
         status = UCC_ERR_NO_MESSAGE;
         goto err;
     }
@@ -255,26 +266,29 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
         rmdir(sock_path);
     }
     if (status != UCC_OK) {
-        tl_error(context->lib, "failed to share ctx and pd");
+        tl_debug(context->lib, "failed to share ctx and pd");
         goto err;
     }
 
-    status = tl_mlx5_rcache_create(ctx);
-    if (UCC_OK != status) {
-        tl_error(context->lib, "failed to create rcache");
-        goto err;
-    }
-
+    close(sock);
+topo_ppn_1:
     ucc_free(sbcast_data);
     ucc_topo_cleanup(topo);
-    close(sock);
+    tl_debug(ctx->super.super.lib, "initialized tl context: %p", ctx);
     return UCC_OK;
 
 err:
     ucc_tl_mlx5_remove_shared_ctx_pd(ctx);
-    ucc_topo_cleanup(topo);
     close(sock);
+err_ib_ctx_pd_init:
+    ucc_topo_cleanup(topo);
 err_topo:
     ucc_free(sbcast_data);
+    tl_debug(ctx->super.super.lib, "failed initialize tl context: %p", ctx);
     return status;
+}
+
+ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
+{
+    return ucc_tl_mlx5_context_ib_ctx_pd_setup(context);
 }

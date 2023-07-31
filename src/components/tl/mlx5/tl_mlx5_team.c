@@ -73,8 +73,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
         }
     }
 
-    self->status[0] = status;
-    self->state     = TL_MLX5_TEAM_STATE_INIT;
+    self->dm_status[0] = status;
+    self->state        = TL_MLX5_TEAM_STATE_INIT;
 
     self->mcast  = NULL;
     status = ucc_tl_mlx5_mcast_team_init(tl_context, &(self->mcast), &(ctx->mcast), params,
@@ -116,9 +116,9 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
 
     switch (tl_team->state) {
     case TL_MLX5_TEAM_STATE_INIT:
-        status = ucc_service_allreduce(
-                    core_team, &tl_team->status[0], &tl_team->status[1],
-                    UCC_DT_INT32, 1, UCC_OP_MIN, subset, &tl_team->scoll_req);
+        status = ucc_service_allreduce(core_team, &tl_team->dm_status[0],
+                                       &tl_team->dm_status[1], UCC_DT_INT32, 1,
+                                       UCC_OP_MIN, subset, &tl_team->scoll_req);
         if (status < 0) {
             tl_error(UCC_TL_TEAM_LIB(tl_team),
                      "failed to collect global status");
@@ -136,33 +136,24 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         if (UCC_INPROGRESS == status) {
             return status;
         }
-        ucc_assert(status == UCC_OK);
         ucc_service_coll_finalize(tl_team->scoll_req);
-        if (tl_team->status[1] != UCC_OK) {
-            tl_debug(UCC_TL_TEAM_LIB(tl_team),
-                     "node leader failed during device memory init: %s",
-                     ucc_status_string(tl_team->status[1]));
-            ucc_tl_mlx5_team_destroy(team);
-            return tl_team->status[1];
-        }
         tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_INIT;
     case TL_MLX5_TEAM_STATE_ALLTOALL_INIT:
-        status = ucc_tl_mlx5_team_alltoall_init_start(tl_team);
-        if (status != UCC_OK) {
-            tl_debug(UCC_TL_TEAM_LIB(tl_team), "failed to init a2a: %s",
-                     ucc_status_string(status));
-            return status;
-        }
+        tl_team->a2a_status = ucc_tl_mlx5_team_alltoall_init_start(tl_team);
         tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_POSTED;
     case TL_MLX5_TEAM_STATE_ALLTOALL_POSTED:
-        status = ucc_tl_mlx5_team_alltoall_init_progress(tl_team);
+        tl_team->a2a_status = ucc_tl_mlx5_team_alltoall_init_progress(tl_team);
+        if (tl_team->a2a_status == UCC_INPROGRESS) {
+            return UCC_INPROGRESS;
+        }
+        if (tl_team->a2a_status != UCC_OK) {
+            tl_debug(UCC_TL_TEAM_LIB(tl_team), "failed to init a2a: %s",
+                     ucc_status_string(tl_team->a2a_status));
+        }
     }
-    if (status < 0) {
-        tl_debug(team->context->lib, "failed creating tl team: %p", tl_team);
-    } else if (status == UCC_OK) {
-        tl_debug(team->context->lib, "initialized tl team: %p", tl_team);
-    }
-    return status;
+
+    tl_debug(team->context->lib, "initialized tl team: %p", tl_team);
+    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,

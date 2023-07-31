@@ -110,13 +110,14 @@ typedef enum
 
 typedef struct ucc_tl_mlx5_team {
     ucc_tl_team_t             super;
-    ucc_status_t              status[2];
     ucc_service_coll_req_t   *scoll_req;
     ucc_tl_mlx5_team_state_t  state;
+    ucc_status_t              dm_status[2];
     void                     *dm_offset;
     ucc_mpool_t               dm_pool;
     struct ibv_dm            *dm_ptr;
     struct ibv_mr            *dm_mr;
+    ucc_status_t              a2a_status;
     ucc_tl_mlx5_alltoall_t   *a2a;
     ucc_topo_t               *topo;
     ucc_ep_map_t              ctx_map;
