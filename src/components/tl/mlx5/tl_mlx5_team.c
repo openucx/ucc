@@ -22,7 +22,7 @@ static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
     status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
                                       &UCC_TL_TEAM_MAP(team), &team->ctx_map);
     if (UCC_OK != status) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
+        tl_debug(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
         return status;
     }
     subset.map    = team->ctx_map;
@@ -31,7 +31,7 @@ static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
     status = ucc_topo_init(subset, UCC_TL_CORE_CTX(team)->topo, &team->topo);
 
     if (UCC_OK != status) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to init team topo");
+        tl_debug(UCC_TL_TEAM_LIB(team), "failed to init team topo");
         goto err_topo_init;
     }
 
@@ -61,7 +61,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
 
     status = ucc_tl_mlx5_topo_init(self);
     if (status != UCC_OK) {
-        tl_error(ctx->super.super.lib, "failed to init team topo");
+        tl_debug(ctx->super.super.lib, "failed to init team topo");
         return status;
     }
 
@@ -120,7 +120,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
                                        &tl_team->dm_status[1], UCC_DT_INT32, 1,
                                        UCC_OP_MIN, subset, &tl_team->scoll_req);
         if (status < 0) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
+            tl_debug(UCC_TL_TEAM_LIB(tl_team),
                      "failed to collect global status");
             return status;
         }
@@ -128,7 +128,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     case TL_MLX5_TEAM_STATE_POSTED:
         status = ucc_service_coll_test(tl_team->scoll_req);
         if (status < 0) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
+            tl_debug(UCC_TL_TEAM_LIB(tl_team),
                      "failure during service coll exchange: %s",
                      ucc_status_string(status));
             return status;
@@ -177,7 +177,7 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
 
     status = ucc_coll_score_alloc(&score);
     if (UCC_OK != status) {
-        tl_error(lib, "failed to alloc score_t");
+        tl_debug(lib, "failed to alloc score_t");
         return status;
     }
 
@@ -186,7 +186,7 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
         MAX_MSG_SIZE * UCC_TL_TEAM_SIZE(team), UCC_TL_MLX5_DEFAULT_SCORE,
         ucc_tl_mlx5_coll_init, tl_team);
     if (UCC_OK != status) {
-        tl_error(lib, "failed to add range to score_t");
+        tl_debug(lib, "failed to add range to score_t");
         return status;
     }
 
@@ -195,7 +195,7 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
         MAX_MSG_SIZE * UCC_TL_TEAM_SIZE(team), UCC_TL_MLX5_DEFAULT_SCORE,
         ucc_tl_mlx5_coll_init, tl_team);
     if (UCC_OK != status) {
-        tl_error(lib, "failed to add range to score_t");
+        tl_debug(lib, "failed to add range to score_t");
         return status;
     }
 

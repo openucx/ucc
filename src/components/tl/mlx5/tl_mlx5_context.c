@@ -36,20 +36,20 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
         UCC_CACHE_LINE_SIZE, 8, UINT_MAX, &ucc_coll_task_mpool_ops,
         params->thread_mode, "tl_mlx5_req_mp");
     if (UCC_OK != status) {
-        tl_error(self->super.super.lib,
+        tl_debug(self->super.super.lib,
                  "failed to initialize tl_mlx5_req mpool");
         return status;
     }
 
     status = tl_mlx5_rcache_create(self);
     if (UCC_OK != status) {
-        tl_error(self->super.super.lib, "failed to create rcache");
+        tl_debug(self->super.super.lib, "failed to create rcache");
         goto err_rcache;
     }
 
     status = ucc_tl_mlx5_mcast_context_init(&(self->mcast), &(self->cfg.mcast_ctx_conf));
     if (UCC_OK != status) {
-        tl_error(self->super.super.lib,
+        tl_debug(self->super.super.lib,
                  "failed to initialize mcast context");
         goto err_mcast_context;
     }
@@ -109,7 +109,7 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
             pos++;
             port = (int)strtol(pos, &end_pos, 10);
             if (errno != 0 || pos == end_pos) {
-                tl_error(ctx->super.super.lib, "wrong device's port number");
+                tl_debug(ctx->super.super.lib, "wrong device's port number");
                 return UCC_ERR_INVALID_PARAM;
             }
         }
@@ -120,7 +120,7 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
 
     status = ucc_tl_mlx5_create_ibv_ctx(&ib_devname, &ctx->shared_ctx, ctx->super.super.lib);
     if (UCC_OK != status) {
-        tl_error(ctx->super.super.lib, "failed to allocate ibv_context");
+        tl_debug(ctx->super.super.lib, "failed to allocate ibv_context");
         return status;
     }
     if (port == -1) {
@@ -128,7 +128,7 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
     }
     ctx->ib_port = port;
     if (-1 == port || !ucc_tl_mlx5_check_port_active(ctx->shared_ctx, port)) {
-        tl_error(ctx->super.super.lib, "no active ports found on %s",
+        tl_debug(ctx->super.super.lib, "no active ports found on %s",
                  ib_devname);
         goto destroy_context;
     }
@@ -136,7 +136,7 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
 
     ctx->shared_pd = ibv_alloc_pd(ctx->shared_ctx);
     if (!ctx->shared_pd) {
-        tl_error(ctx->super.super.lib, "failed to allocate ib_pd");
+        tl_debug(ctx->super.super.lib, "failed to allocate ib_pd");
         goto destroy_context;
     }
 
@@ -181,7 +181,7 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
     sbcast_data = (ucc_tl_mlx5_context_create_sbcast_data_t *)ucc_malloc(
         sbcast_data_length);
     if (!sbcast_data) {
-        tl_error(context->lib,
+        tl_debug(context->lib,
                  "failed to allocate buffer for sharing ib_ctx info");
         return UCC_ERR_NO_MEMORY;
     }
@@ -236,7 +236,7 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
         &steam->super, sbcast_data, sbcast_data_length, PD_OWNER_RANK, s, &req);
 
     if (UCC_OK != status) {
-        tl_error(context->lib, "failed to start mlx5 ctx bcast");
+        tl_debug(context->lib, "failed to start mlx5 ctx bcast");
         goto err;
     }
 
@@ -246,7 +246,7 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
     ucc_collective_finalize(&req->super);
 
     if (UCC_OK != status) {
-        tl_error(context->lib, "failure during mlx5 ctx bcast");
+        tl_debug(context->lib, "failure during mlx5 ctx bcast");
         goto err;
     }
 

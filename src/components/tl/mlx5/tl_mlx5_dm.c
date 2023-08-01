@@ -61,14 +61,14 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
         dm_attr.length      = max_chunks_to_alloc * buf_size;
         dm_ptr              = ucc_malloc(dm_attr.length, "memic_host");
         if (!dm_ptr) {
-            tl_error(lib, " memic_host allocation failed");
+            tl_debug(lib, " memic_host allocation failed");
             return UCC_ERR_NO_MEMORY;
         }
 
         dm_mr = ibv_reg_mr(pd, dm_ptr, dm_attr.length,
                            IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
         if (!dm_mr) {
-            tl_error(lib, "failed to reg host memory");
+            tl_debug(lib, "failed to reg host memory");
             ucc_free(dm_ptr);
             return UCC_ERR_NO_MESSAGE;
         }
@@ -76,11 +76,11 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
     } else {
         attr.comp_mask = 0;
         if (ibv_query_device_ex(ib_ctx, NULL, &attr)) {
-            tl_error(lib, "failed to query device (errno=%d)", errno);
+            tl_debug(lib, "failed to query device (errno=%d)", errno);
             return UCC_ERR_NO_MESSAGE;
         }
         if (!attr.max_dm_size) {
-            tl_error(lib, "device doesn't support dm allocation");
+            tl_debug(lib, "device doesn't support dm allocation");
             return UCC_ERR_NO_RESOURCE;
         }
         max_chunks_to_alloc = min_chunks_to_alloc = *buf_num_p;
@@ -125,7 +125,7 @@ ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
                               IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
                                   IBV_ACCESS_ZERO_BASED);
         if (!dm_mr) {
-            tl_error(lib, "failed to reg memic");
+            tl_debug(lib, "failed to reg memic");
             ibv_free_dm(dm_ptr);
             return UCC_ERR_NO_MESSAGE;
         }
@@ -158,7 +158,7 @@ ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
         UCC_CACHE_LINE_SIZE, 1, cfg->dm_buf_num, &ucc_tl_mlx5_dm_ops,
         ctx->super.super.ucc_context->thread_mode, "mlx5 dm pool");
     if (status != UCC_OK) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to init dm pool");
+        tl_debug(UCC_TL_TEAM_LIB(team), "failed to init dm pool");
         ucc_tl_mlx5_dm_cleanup(team);
         return status;
     }

@@ -74,7 +74,7 @@ ucc_status_t ucc_tl_mlx5_create_ibv_ctx(char               **ib_devname,
             }
         }
         if (!dev_list[i]) {
-            tl_error(lib, "IB device %s not found", *ib_devname);
+            tl_debug(lib, "IB device %s not found", *ib_devname);
             status = UCC_ERR_NOT_FOUND;
             goto out;
         }
@@ -129,7 +129,7 @@ ucc_status_t ucc_tl_mlx5_qp_connect(struct ibv_qp *qp, uint32_t qp_num,
     if (ibv_modify_qp(qp, &qp_attr,
                       IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT |
                           IBV_QP_ACCESS_FLAGS) != 0) {
-        tl_error(lib, "QP RESET->INIT failed, %m");
+        tl_debug(lib, "QP RESET->INIT failed, %m");
         return UCC_ERR_NO_MESSAGE;
     }
 
@@ -149,7 +149,7 @@ ucc_status_t ucc_tl_mlx5_qp_connect(struct ibv_qp *qp, uint32_t qp_num,
                       IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU |
                           IBV_QP_DEST_QPN | IBV_QP_RQ_PSN |
                           IBV_QP_MAX_DEST_RD_ATOMIC | IBV_QP_MIN_RNR_TIMER)) {
-        tl_error(lib, "QP INIT->RTR failed, %m");
+        tl_debug(lib, "QP INIT->RTR failed, %m");
         return UCC_ERR_NO_MESSAGE;
     }
 
@@ -165,7 +165,7 @@ ucc_status_t ucc_tl_mlx5_qp_connect(struct ibv_qp *qp, uint32_t qp_num,
                       IBV_QP_STATE | IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT |
                           IBV_QP_RNR_RETRY | IBV_QP_SQ_PSN |
                           IBV_QP_MAX_QP_RD_ATOMIC)) {
-        tl_error(lib, "QP RTR->RTS failed, %m");
+        tl_debug(lib, "QP RTR->RTS failed, %m");
         return UCC_ERR_NO_MESSAGE;
     }
     return UCC_OK;
@@ -213,21 +213,21 @@ ucc_status_t ucc_tl_mlx5_init_dct(struct ibv_pd *pd, struct ibv_context *ctx,
 
     qp = mlx5dv_create_qp(ctx, &attr_ex, &attr_dv);
     if (qp == NULL) {
-        tl_error(lib, "couldn't create DCT QP, %m");
+        tl_debug(lib, "couldn't create DCT QP, %m");
         return UCC_ERR_NO_MESSAGE;
     }
 
     if (ibv_modify_qp(qp, &qp_attr_to_init,
                       IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT |
                           IBV_QP_ACCESS_FLAGS) != 0) {
-        tl_error(lib, "failed to modify init qp, %m");
+        tl_debug(lib, "failed to modify init qp, %m");
         goto fail;
     }
 
     if (ibv_modify_qp(qp, &qp_attr_to_rtr,
                       IBV_QP_STATE | IBV_QP_PATH_MTU | IBV_QP_AV |
                           IBV_QP_MIN_RNR_TIMER) != 0) {
-        tl_error(lib, "failed to modify init qp, %m");
+        tl_debug(lib, "failed to modify init qp, %m");
         goto fail;
     }
 
@@ -237,7 +237,7 @@ ucc_status_t ucc_tl_mlx5_init_dct(struct ibv_pd *pd, struct ibv_context *ctx,
 
 fail:
     if (ibv_destroy_qp(qp)) {
-        tl_error(lib, "couldn't destroy QP, %m");
+        tl_debug(lib, "couldn't destroy QP, %m");
     }
     return UCC_ERR_NO_MESSAGE;
 }
@@ -299,30 +299,30 @@ ucc_status_t ucc_tl_mlx5_init_dci(ucc_tl_mlx5_dci_t *dci, struct ibv_pd *pd,
 
     dci->dci_qp = mlx5dv_create_qp(ctx, &attr_ex, &attr_dv);
     if (!dci->dci_qp) {
-        tl_error(lib, "couldn't create DCI QP, %m");
+        tl_debug(lib, "couldn't create DCI QP, %m");
         return UCC_ERR_NO_MESSAGE;
     }
     // Turn DCI ibv_qp to ibv_qpex and ibv_mqpex
     dci->dc_qpex = ibv_qp_to_qp_ex(dci->dci_qp);
     if (!dci->dc_qpex) {
-        tl_error(lib, "failed turn ibv_qp to ibv_qp_ex, %m");
+        tl_debug(lib, "failed turn ibv_qp to ibv_qp_ex, %m");
         goto fail;
     }
     dci->dc_mqpex = mlx5dv_qp_ex_from_ibv_qp_ex(dci->dc_qpex);
     if (!dci->dc_mqpex) {
-        tl_error(lib, "failed turn ibv_qp_ex to mlx5dv_qp_ex, %m");
+        tl_debug(lib, "failed turn ibv_qp_ex to mlx5dv_qp_ex, %m");
         goto fail;
     }
 
     if (ibv_modify_qp(dci->dci_qp, &qp_attr_to_init,
                       IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT) != 0) {
-        tl_error(lib, "failed to modify init qp, %m");
+        tl_debug(lib, "failed to modify init qp, %m");
         goto fail;
     }
 
     if (ibv_modify_qp(dci->dci_qp, &qp_attr_to_rtr,
                       IBV_QP_STATE | IBV_QP_PATH_MTU | IBV_QP_AV) != 0) {
-        tl_error(lib, "failed to modify qp to rtr, %m");
+        tl_debug(lib, "failed to modify qp to rtr, %m");
         goto fail;
     }
 
@@ -330,7 +330,7 @@ ucc_status_t ucc_tl_mlx5_init_dci(ucc_tl_mlx5_dci_t *dci, struct ibv_pd *pd,
                       IBV_QP_STATE | IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT |
                       IBV_QP_RNR_RETRY | IBV_QP_SQ_PSN |
                       IBV_QP_MAX_QP_RD_ATOMIC | IBV_QP_MIN_RNR_TIMER) != 0) {
-        tl_error(lib, "failed to modify qp to rts, %m");
+        tl_debug(lib, "failed to modify qp to rts, %m");
         goto fail;
     }
 
@@ -338,7 +338,7 @@ ucc_status_t ucc_tl_mlx5_init_dci(ucc_tl_mlx5_dci_t *dci, struct ibv_pd *pd,
 
 fail:
     if (ibv_destroy_qp(dci->dci_qp)) {
-        tl_error(lib, "couldn't destroy qp, %m");
+        tl_debug(lib, "couldn't destroy qp, %m");
     }
     return UCC_ERR_NO_MESSAGE;
 }
@@ -371,7 +371,7 @@ ucc_status_t ucc_tl_mlx5_create_rc_qp(struct ibv_context *ctx,
 
     qp->qp = mlx5dv_create_qp(ctx, &attr_ex, &attr_dv);
     if (!qp->qp) {
-        tl_error(lib, "failed to create RC QP, %m");
+        tl_debug(lib, "failed to create RC QP, %m");
         return UCC_ERR_NO_MESSAGE;
     }
     qp->qp_ex = ibv_qp_to_qp_ex(qp->qp);
@@ -395,7 +395,7 @@ ucc_status_t ucc_tl_mlx5_create_ah(struct ibv_pd *pd, uint16_t lid,
 
     *ah_ptr = ibv_create_ah(pd, &ah_attr);
     if (!(*ah_ptr)) {
-        tl_error(lib, "failed to create ah, %m");
+        tl_debug(lib, "failed to create ah, %m");
         return UCC_ERR_NO_MESSAGE;
     }
     return UCC_OK;
@@ -448,18 +448,18 @@ ucc_status_t ucc_tl_mlx5_create_umr_qp(struct ibv_context *ctx,
     } while (*qp == NULL && umr_init_attr_ex.cap.max_inline_data > 0);
 
     if (*qp == NULL) {
-        tl_error(lib, "failed to create UMR QP with inline_data, %m");
+        tl_debug(lib, "failed to create UMR QP with inline_data, %m");
         return UCC_ERR_NO_MESSAGE;
     }
     qp_ex = ibv_qp_to_qp_ex(*qp);
     if (qp_ex == NULL) {
-        tl_error(lib, "failed to create UMR qp_ex, %m");
+        tl_debug(lib, "failed to create UMR qp_ex, %m");
         status = UCC_ERR_NO_MESSAGE;
         goto failure;
     }
     qp_ex->wr_flags = IBV_SEND_INLINE | IBV_SEND_SIGNALED;
     if (ibv_query_port(ctx, ib_port, &port_attr)) {
-        tl_error(lib, "failed to get port info, %m");
+        tl_debug(lib, "failed to get port info, %m");
         status = UCC_ERR_NO_MESSAGE;
         goto failure;
     }
@@ -476,7 +476,7 @@ ucc_status_t ucc_tl_mlx5_create_umr_qp(struct ibv_context *ctx,
 
 failure:
     if (ibv_destroy_qp(*qp)) {
-        tl_error(lib, "failed to destroy UMR QP, %m");
+        tl_debug(lib, "failed to destroy UMR QP, %m");
     }
     return status;
 }
