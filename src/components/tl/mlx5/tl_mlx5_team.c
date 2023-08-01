@@ -73,7 +73,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
         }
     }
 
-    self->dm_status[0] = status;
+    self->dm_status.local = status;
     self->state        = TL_MLX5_TEAM_STATE_INIT;
 
     self->mcast  = NULL;
@@ -116,8 +116,8 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
 
     switch (tl_team->state) {
     case TL_MLX5_TEAM_STATE_INIT:
-        status = ucc_service_allreduce(core_team, &tl_team->dm_status[0],
-                                       &tl_team->dm_status[1], UCC_DT_INT32, 1,
+        status = ucc_service_allreduce(core_team, &tl_team->dm_status.local,
+                                       &tl_team->dm_status.global, UCC_DT_INT32, 1,
                                        UCC_OP_MIN, subset, &tl_team->scoll_req);
         if (status < 0) {
             tl_debug(UCC_TL_TEAM_LIB(tl_team),
@@ -140,13 +140,13 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_INIT;
     case TL_MLX5_TEAM_STATE_ALLTOALL_INIT:
         tl_team->a2a_status = ucc_tl_mlx5_team_alltoall_init_start(tl_team);
-        tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_POSTED;
+        tl_team->state      = TL_MLX5_TEAM_STATE_ALLTOALL_POSTED;
     case TL_MLX5_TEAM_STATE_ALLTOALL_POSTED:
         tl_team->a2a_status = ucc_tl_mlx5_team_alltoall_init_progress(tl_team);
-        if (tl_team->a2a_status == UCC_INPROGRESS) {
+        if (UCC_INPROGRESS == tl_team->a2a_status) {
             return UCC_INPROGRESS;
         }
-        if (tl_team->a2a_status != UCC_OK) {
+        if (UCC_OK != tl_team->a2a_status) {
             tl_debug(UCC_TL_TEAM_LIB(tl_team), "failed to init a2a: %s",
                      ucc_status_string(tl_team->a2a_status));
         }

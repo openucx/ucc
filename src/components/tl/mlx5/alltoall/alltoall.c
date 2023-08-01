@@ -75,11 +75,11 @@ ucc_status_t ucc_tl_mlx5_team_alltoall_init_start(ucc_tl_mlx5_team_t *team)
     ucc_topo_t             *topo;
     ucc_status_t            status;
 
-    if (team->dm_status[1] != UCC_OK) {
+    if (team->dm_status.global != UCC_OK) {
         tl_debug(ctx->super.super.lib,
                  "node leader failed during device memory init: %s",
-                 ucc_status_string(team->dm_status[1]));
-        return team->dm_status[1];
+                 ucc_status_string(team->dm_status.global));
+        return team->dm_status.global;
     }
 
     a2a = ucc_calloc(1, sizeof(*a2a), "mlx5_a2a");

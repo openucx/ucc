@@ -108,11 +108,16 @@ typedef enum
     TL_MLX5_TEAM_STATE_ALLTOALL_POSTED
 } ucc_tl_mlx5_team_state_t;
 
+typedef struct ucc_tl_mlx5_team_status {
+    ucc_status_t local;
+    ucc_status_t global;
+} ucc_tl_mlx5_team_status_t;
+
 typedef struct ucc_tl_mlx5_team {
     ucc_tl_team_t             super;
     ucc_service_coll_req_t   *scoll_req;
     ucc_tl_mlx5_team_state_t  state;
-    ucc_status_t              dm_status[2];
+    ucc_tl_mlx5_team_status_t dm_status;
     void                     *dm_offset;
     ucc_mpool_t               dm_pool;
     struct ibv_dm            *dm_ptr;

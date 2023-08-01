@@ -70,7 +70,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
         ucc_rcache_destroy(self->rcache);
     }
 
-    if (ucc_tl_mlx5_remove_shared_ctx_pd(self) != UCC_OK) {
+    if (UCC_OK != ucc_tl_mlx5_remove_shared_ctx_pd(self)) {
         tl_debug(self->super.super.lib, "failed to free ib ctx and pd");
     };
 
@@ -205,11 +205,10 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
 
     if (!ctx->is_imported) {
         status = ucc_tl_mlx5_ib_ctx_pd_init(ctx);
-        if (status != UCC_OK) {
-            tl_debug(context->lib, "failed to init ib_ctx and pd");
+        if (UCC_OK != status) {
             goto err_ib_ctx_pd_init;
         }
-        if (sbgp->status == UCC_SBGP_NOT_EXISTS) {
+        if (UCC_SBGP_NOT_EXISTS == sbgp->status) {
             goto topo_ppn_1;
         }
         ucc_strncpy_safe(sock_path, template, sock_dir_len);
@@ -265,8 +264,7 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
         sock_path[sock_dir_len - 1] = '\0';
         rmdir(sock_path);
     }
-    if (status != UCC_OK) {
-        tl_debug(context->lib, "failed to share ctx and pd");
+    if (UCC_OK != status) {
         goto err;
     }
 
