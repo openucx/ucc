@@ -74,7 +74,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     }
 
     self->dm_status.local = status;
-    self->state        = TL_MLX5_TEAM_STATE_INIT;
+    self->state           = TL_MLX5_TEAM_STATE_INIT;
 
     self->mcast  = NULL;
     status = ucc_tl_mlx5_mcast_team_init(tl_context, &(self->mcast), &(ctx->mcast), params,
@@ -116,9 +116,9 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
 
     switch (tl_team->state) {
     case TL_MLX5_TEAM_STATE_INIT:
-        status = ucc_service_allreduce(core_team, &tl_team->dm_status.local,
-                                       &tl_team->dm_status.global, UCC_DT_INT32, 1,
-                                       UCC_OP_MIN, subset, &tl_team->scoll_req);
+        status = ucc_service_allreduce(
+            core_team, &tl_team->dm_status.local, &tl_team->dm_status.global,
+            UCC_DT_INT32, 1, UCC_OP_MIN, subset, &tl_team->scoll_req);
         if (status < 0) {
             tl_debug(UCC_TL_TEAM_LIB(tl_team),
                      "failed to collect global status");

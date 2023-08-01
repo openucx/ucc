@@ -49,8 +49,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
 
     status = ucc_tl_mlx5_mcast_context_init(&(self->mcast), &(self->cfg.mcast_ctx_conf));
     if (UCC_OK != status) {
-        tl_debug(self->super.super.lib,
-                 "failed to initialize mcast context");
+        tl_debug(self->super.super.lib, "failed to initialize mcast context");
         goto err_mcast_context;
     }
 
