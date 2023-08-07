@@ -84,6 +84,7 @@ typedef struct ucc_tl_mlx5_context {
     ucc_rcache_t                *rcache;
     int                          is_imported;
     int                          ib_port;
+    int                          sock;
     ucc_mpool_t                  req_mp;
     ucc_tl_mlx5_mcast_context_t  mcast;
 } ucc_tl_mlx5_context_t;

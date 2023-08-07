@@ -309,7 +309,7 @@ ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx)
     if (ctx->shared_ctx) {
         if (ibv_close_device(ctx->shared_ctx)) {
             tl_debug(lib, "failed to close ib ctx");
-            status |= UCC_ERR_NO_MESSAGE;
+            status = UCC_ERR_NO_MESSAGE;
         }
     }
 

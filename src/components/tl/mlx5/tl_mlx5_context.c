@@ -74,6 +74,8 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
     };
 
     ucc_mpool_cleanup(&self->req_mp, 1);
+
+    close(self->sock);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_mlx5_context_t, ucc_tl_context_t);
@@ -161,7 +163,6 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
     const char *     sockname           = "/sock";
     size_t           sock_dir_len       = strlen(template) + 1;
     size_t           sock_path_len      = sock_dir_len + strlen(sockname);
-    int              sock               = 0;
     size_t           sbcast_data_length = sizeof(int) + sock_path_len;
     char             sock_path[sock_path_len];
     ucc_subset_t     s;
@@ -214,7 +215,7 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
         ucc_strncpy_safe(sock_path, template, sock_dir_len);
         if (mkdtemp(sock_path) != NULL) {
             strncat(sock_path, sockname, sizeof(sock_path) - strlen(sock_path) - 1);
-            status = ucc_tl_mlx5_socket_init(ctx, sbgp->group_size, &sock,
+            status = ucc_tl_mlx5_socket_init(ctx, sbgp->group_size, &ctx->sock,
                                              sock_path);
             if (UCC_OK != status) {
                 sock_path[0] = '\0';
@@ -257,18 +258,14 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
         status = UCC_ERR_NO_MESSAGE;
         goto err;
     }
-
     status = ucc_tl_mlx5_share_ctx_pd(ctx, sock_path, sbgp->group_size,
-                                      !ctx->is_imported, sock);
-    if (!ctx->is_imported) {
-        sock_path[sock_dir_len - 1] = '\0';
-        rmdir(sock_path);
-    }
+                                      !ctx->is_imported, ctx->sock);
+
     if (UCC_OK != status) {
         goto err;
     }
 
-    close(sock);
+    rmdir(sock_path);
 topo_ppn_1:
     ucc_free(sbcast_data);
     ucc_topo_cleanup(topo);
@@ -277,7 +274,8 @@ topo_ppn_1:
 
 err:
     ucc_tl_mlx5_remove_shared_ctx_pd(ctx);
-    close(sock);
+    rmdir(sock_path);
+    close(ctx->sock);
 err_ib_ctx_pd_init:
     ucc_topo_cleanup(topo);
 err_topo:
