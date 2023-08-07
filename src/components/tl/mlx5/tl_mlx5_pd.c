@@ -294,17 +294,15 @@ ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx)
     ucc_status_t    status = UCC_OK;
     int err;
 
-    if (ctx->shared_pd) {
-        if (ctx->is_imported) {
-            ibv_unimport_pd(ctx->shared_pd);
-        }
-        ucc_tl_mlx5_context_barrier(&UCC_TL_CTX_OOB(ctx), lib);
-        if (!ctx->is_imported) {
-            err = ibv_dealloc_pd(ctx->shared_pd);
-            if (err) {
-                tl_debug(lib, "failed to dealloc PD, errno %d", err);
-                status = UCC_ERR_NO_MESSAGE;
-            }
+    if (ctx->shared_pd && ctx->is_imported) {
+        ibv_unimport_pd(ctx->shared_pd);
+    }
+    ucc_tl_mlx5_context_barrier(&UCC_TL_CTX_OOB(ctx), lib);
+    if (ctx->shared_pd && !ctx->is_imported) {
+        err = ibv_dealloc_pd(ctx->shared_pd);
+        if (err) {
+            tl_debug(lib, "failed to dealloc PD, errno %d", err);
+            status = UCC_ERR_NO_MESSAGE;
         }
     }
 

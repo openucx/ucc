@@ -71,9 +71,9 @@ ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args,
 
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_ALLTOALL:
-        status = ucc_derived_of(team, ucc_tl_mlx5_team_t)->a2a_status;
+        status = ucc_derived_of(team, ucc_tl_mlx5_team_t)->a2a_status.local;
         if (status != UCC_OK) {
-            return status;
+            return UCC_ERR_NOT_SUPPORTED;
         }
         status = ucc_tl_mlx5_alltoall_init(coll_args, team, task_h);
         break;

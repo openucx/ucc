@@ -65,28 +65,20 @@ static ucc_status_t build_rank_map(ucc_tl_mlx5_alltoall_t *a2a,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_team_alltoall_init_start(ucc_tl_mlx5_team_t *team)
+ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team)
 {
     ucc_tl_mlx5_context_t  *ctx = UCC_TL_MLX5_TEAM_CTX(team);
-    ucc_tl_mlx5_alltoall_t *a2a = NULL;
+    ucc_tl_mlx5_alltoall_t *a2a;
     ucc_sbgp_t             *node, *net;
-    size_t                  storage_size;
     int                     i, j, node_size, ppn, team_size, nnodes;
     ucc_topo_t             *topo;
-    ucc_status_t            status;
 
-    if (team->dm_status.global != UCC_OK) {
-        tl_debug(ctx->super.super.lib,
-                 "node leader failed during device memory init: %s",
-                 ucc_status_string(team->dm_status.global));
-        return team->dm_status.global;
-    }
-
-    a2a = ucc_calloc(1, sizeof(*a2a), "mlx5_a2a");
-    if (!a2a) {
+    team->a2a = ucc_calloc(1, sizeof(*team->a2a), "mlx5_a2a");
+    if (!team->a2a) {
         return UCC_ERR_NO_MEMORY;
     }
 
+    a2a       = team->a2a;
     topo      = team->topo;
     node      = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     net       = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
@@ -94,32 +86,35 @@ ucc_status_t ucc_tl_mlx5_team_alltoall_init_start(ucc_tl_mlx5_team_t *team)
     nnodes    = ucc_topo_nnodes(topo);
     team_size = UCC_TL_TEAM_SIZE(team);
 
+    a2a->net.atomic.counters = NULL;
+    team->dm_ptr             = NULL;
+    team->a2a_status.local   = UCC_OK;
+
     if (!ucc_topo_isoppn(topo)) {
         tl_debug(ctx->super.super.lib,
                  "disabling mlx5 a2a for team with non-uniform ppn, "
                  "min_ppn %d, max_ppn %d",
                  ucc_topo_min_ppn(topo), ucc_topo_max_ppn(topo));
-        status = UCC_ERR_NOT_SUPPORTED;
-        goto err;
+        team->a2a_status.local = UCC_ERR_NOT_SUPPORTED;
+        return UCC_OK;
     }
     ppn = ucc_topo_max_ppn(topo);
 
     if (net->status == UCC_SBGP_NOT_EXISTS) {
         tl_debug(ctx->super.super.lib,
                  "disabling mlx5 a2a for single node team");
-        status = UCC_ERR_NOT_SUPPORTED;
-        goto err;
+        team->a2a_status.local = UCC_ERR_NOT_SUPPORTED;
+        return UCC_OK;
     }
 
     if (nnodes == team_size) {
         tl_debug(ctx->super.super.lib,
                  "disabling mlx5 a2a for ppn=1 case, not supported so far");
-        status = UCC_ERR_NOT_SUPPORTED;
-        goto err;
+        team->a2a_status.local = UCC_ERR_NOT_SUPPORTED;
+        return UCC_OK;
     }
 
     a2a->node_size = node_size;
-    ucc_assert(team_size == ppn * nnodes);
 
     for (i = 0; i < nnodes; i++) {
         for (j = 1; j < ppn; j++) {
@@ -128,8 +123,8 @@ ucc_status_t ucc_tl_mlx5_team_alltoall_init_start(ucc_tl_mlx5_team_t *team)
                 tl_debug(ctx->super.super.lib,
                          "disabling mlx5 a2a for team with non contiguous "
                          "ranks-per-node placement");
-                status = UCC_ERR_NOT_SUPPORTED;
-                goto err;
+                team->a2a_status.local = UCC_ERR_NOT_SUPPORTED;
+                return UCC_OK;
             }
         }
     }
@@ -150,10 +145,37 @@ ucc_status_t ucc_tl_mlx5_team_alltoall_init_start(ucc_tl_mlx5_team_t *team)
         ucc_div_round_up(node->group_size, 2 /* todo: there can be an estimation of
                                                     minimal possible block size */);
 
-    ucc_assert(a2a->net.sbgp->status == UCC_SBGP_ENABLED ||
-               node->group_rank != 0);
-
     if (a2a->node.asr_rank == node->group_rank) {
+        team->a2a_status.local = ucc_tl_mlx5_dm_init(team);
+        if (UCC_OK != team->a2a_status.local) {
+            tl_debug(UCC_TL_TEAM_LIB(team), "failed to init device memory");
+        }
+    }
+
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_mlx5_team_test_alltoall_start(ucc_tl_mlx5_team_t *team)
+{
+    ucc_tl_mlx5_context_t  *ctx = UCC_TL_MLX5_TEAM_CTX(team);
+    ucc_tl_mlx5_alltoall_t *a2a = team->a2a;
+    size_t                  storage_size;
+
+    if (team->a2a_status.global != UCC_OK) {
+        tl_debug(ctx->super.super.lib,
+                 "global status in error state: %s",
+                 ucc_status_string(team->a2a_status.global));
+
+        ucc_tl_mlx5_dm_cleanup(team);
+        if (a2a) {
+            ucc_free(a2a);
+            team->a2a = NULL;
+        }
+        ucc_tl_mlx5_topo_cleanup(team);
+        return team->a2a_status.global;
+    }
+
+    if (a2a->node.asr_rank == a2a->node.sbgp->group_rank) {
         a2a->net.net_size = a2a->net.sbgp->group_size;
         storage_size      = OP_SEGMENT_SIZE(a2a) * MAX_OUTSTANDING_OPS;
         a2a->bcast_data.shmid =
@@ -175,70 +197,8 @@ ucc_status_t ucc_tl_mlx5_team_alltoall_init_start(ucc_tl_mlx5_team_t *team)
     team->a2a = a2a;
     return ucc_service_bcast(UCC_TL_CORE_TEAM(team), &a2a->bcast_data,
                              sizeof(ucc_tl_mlx5_a2a_bcast_data_t),
-                             a2a->node.asr_rank, ucc_sbgp_to_subset(node),
+                             a2a->node.asr_rank, ucc_sbgp_to_subset(a2a->node.sbgp),
                              &team->scoll_req);
-err:
-    if (a2a) {
-        ucc_free(a2a);
-    }
-    return status;
-}
-
-static void ucc_tl_mlx5_alltoall_atomic_free(ucc_tl_mlx5_alltoall_t *a2a)
-{
-    ibv_dereg_mr(a2a->net.atomic.mr);
-#if ATOMIC_IN_MEMIC
-    ibv_free_dm(a2a->net.atomic.counters);
-#else
-    ucc_free(a2a->net.atomic.counters);
-#endif
-}
-
-static ucc_status_t ucc_tl_mlx5_alltoall_atomic_alloc(ucc_tl_mlx5_team_t *team)
-{
-    ucc_tl_mlx5_context_t  *ctx = UCC_TL_MLX5_TEAM_CTX(team);
-    ucc_tl_mlx5_alltoall_t *a2a = team->a2a;
-    size_t                  size;
-
-    size = sizeof(*a2a->net.atomic.counters) * MAX_OUTSTANDING_OPS;
-#if ATOMIC_IN_MEMIC
-    struct ibv_alloc_dm_attr dm_attr;
-    memset(&dm_attr, 0, sizeof(dm_attr));
-    dm_attr.length           = size;
-    a2a->net.atomic.counters = ibv_alloc_dm(ctx->shared_ctx, &dm_attr);
-#else
-    a2a->net.atomic.counters = ucc_malloc(size, "atomic");
-#endif
-
-    if (!a2a->net.atomic.counters) {
-        tl_debug(UCC_TL_TEAM_LIB(team),
-                 "failed to allocate %zd bytes for atomic counters array",
-                 size);
-        return UCC_ERR_NO_MEMORY;
-    }
-#if ATOMIC_IN_MEMIC
-    a2a->net.atomic.mr =
-        ibv_reg_dm_mr(ctx->shared_pd, a2a->net.atomic.counters, 0, size,
-                      IBV_ACCESS_REMOTE_ATOMIC | IBV_ACCESS_LOCAL_WRITE |
-                          IBV_ACCESS_ZERO_BASED);
-
-#else
-    a2a->net.atomic.mr =
-        ibv_reg_mr(ctx->shared_pd, a2a->net.atomic.counters, size,
-                   IBV_ACCESS_REMOTE_ATOMIC | IBV_ACCESS_LOCAL_WRITE);
-#endif
-
-    if (!a2a->net.atomic.mr) {
-        tl_error(UCC_TL_TEAM_LIB(team),
-                 "failed to register atomic couters array");
-#if ATOMIC_IN_MEMIC
-        ibv_free_dm(a2a->net.atomic.counters);
-#else
-        ucc_free(a2a->net.atomic.counters);
-#endif
-        return UCC_ERR_NO_MESSAGE;
-    }
-    return UCC_OK;
 }
 
 static void ucc_tl_mlx5_alltoall_barrier_free(ucc_tl_mlx5_alltoall_t *a2a)
@@ -278,7 +238,7 @@ static ucc_status_t ucc_tl_mlx5_alltoall_barrier_alloc(ucc_tl_mlx5_team_t *team)
 }
 
 ucc_status_t
-ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
+ucc_tl_mlx5_team_test_alltoall_progress(ucc_tl_mlx5_team_t *tl_team)
 {
     ucc_tl_mlx5_team_t        *team        = ucc_derived_of(tl_team,
                                                            ucc_tl_mlx5_team_t);
@@ -295,8 +255,8 @@ ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
     size_t                     op_seg_size, local_data_size, umr_buf_size;
     net_exchange_t            *global_data, *remote_data;
 
-    if (tl_team->a2a_status < 0) {
-        return tl_team->a2a_status;
+    if (tl_team->a2a_status.local < 0) {
+        return tl_team->a2a_status.local;
     }
 
     node_size   = a2a->node.sbgp->group_size;
@@ -346,11 +306,6 @@ ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *tl_team)
         // Non-ASR ranks exit here
         if (a2a->node.asr_rank != node_rank) {
             return UCC_OK;
-        }
-
-        status = ucc_tl_mlx5_alltoall_atomic_alloc(team);
-        if (UCC_OK != status) {
-            goto err_atomic;
         }
 
         status = ucc_tl_mlx5_alltoall_barrier_alloc(team);
@@ -704,8 +659,6 @@ err_umr:
 err_blocks_sent:
     ucc_tl_mlx5_alltoall_barrier_free(a2a);
 err_barrier:
-    ucc_tl_mlx5_alltoall_atomic_free(a2a);
-err_atomic:
     return status;
 }
 
@@ -734,6 +687,7 @@ void ucc_tl_mlx5_alltoall_cleanup(ucc_tl_mlx5_team_t *team)
             for (i = 0; i < a2a->num_dci_qps; i++) {
                 ibv_destroy_qp(a2a->net.dcis[i].dci_qp);
             }
+            ucc_free(a2a->net.dcis);
             ibv_destroy_qp(a2a->net.dct_qp);
             ibv_destroy_srq(a2a->net.srq);
             for (i = 0; i < a2a->net.net_size; i++) {
@@ -766,7 +720,6 @@ void ucc_tl_mlx5_alltoall_cleanup(ucc_tl_mlx5_team_t *team)
 
         ucc_free(a2a->net.blocks_sent);
         ucc_tl_mlx5_alltoall_barrier_free(a2a);
-        ucc_tl_mlx5_alltoall_atomic_free(a2a);
     }
-    ucc_free(a2a->net.dcis);
+    ucc_free(a2a);
 }

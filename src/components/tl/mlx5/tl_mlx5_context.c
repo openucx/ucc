@@ -106,6 +106,7 @@ ucc_status_t ucc_tl_mlx5_ib_ctx_pd_init(ucc_tl_mlx5_context_t *ctx)
         } else {
             devname_len = (int)(pos - ib_devname);
             pos++;
+            errno = 0;
             port = (int)strtol(pos, &end_pos, 10);
             if (errno != 0 || pos == end_pos) {
                 tl_debug(ctx->super.super.lib, "wrong device's port number");

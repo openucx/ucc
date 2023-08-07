@@ -9,6 +9,7 @@
 
 #include "tl_mlx5.h"
 #include "tl_mlx5_ib.h"
+#include "tl_mlx5_dm.h"
 
 #define SEQ_INDEX(_seq_num) ((_seq_num) % MAX_OUTSTANDING_OPS)
 
@@ -136,8 +137,10 @@ typedef struct ucc_tl_mlx5_alltoall {
     ucc_tl_mlx5_a2a_bcast_data_t bcast_data;
 } ucc_tl_mlx5_alltoall_t;
 
-ucc_status_t ucc_tl_mlx5_team_alltoall_init_start(ucc_tl_mlx5_team_t *team);
-ucc_status_t ucc_tl_mlx5_team_alltoall_init_progress(ucc_tl_mlx5_team_t *team);
+void ucc_tl_mlx5_topo_cleanup(ucc_tl_mlx5_team_t *team);
+ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team);
+ucc_status_t ucc_tl_mlx5_team_test_alltoall_start(ucc_tl_mlx5_team_t *team);
+ucc_status_t ucc_tl_mlx5_team_test_alltoall_progress(ucc_tl_mlx5_team_t *team);
 ucc_status_t ucc_tl_mlx5_alltoall_init(ucc_base_coll_args_t *coll_args,
                                        ucc_base_team_t *     team,
                                        ucc_coll_task_t **    task_h);

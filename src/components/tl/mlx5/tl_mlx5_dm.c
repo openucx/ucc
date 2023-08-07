@@ -5,8 +5,71 @@
  */
 
 #include "tl_mlx5_dm.h"
+#include "alltoall/alltoall.h"
 
 #define DM_HOST_AUTO_NUM_CHUNKS 8
+
+static void ucc_tl_mlx5_alltoall_atomic_free(ucc_tl_mlx5_team_t *team)
+{
+    if (!team->a2a || !team->a2a->net.atomic.counters) {
+        return;
+    }
+
+    ibv_dereg_mr(team->a2a->net.atomic.mr);
+#if ATOMIC_IN_MEMIC
+    ibv_free_dm(team->a2a->net.atomic.counters);
+#else
+    ucc_free(team->a2a->net.atomic.counters);
+#endif
+    team->a2a->net.atomic.counters = NULL;
+}
+
+static ucc_status_t ucc_tl_mlx5_alltoall_atomic_alloc(ucc_tl_mlx5_team_t *team)
+{
+    ucc_tl_mlx5_context_t  *ctx = UCC_TL_MLX5_TEAM_CTX(team);
+    ucc_tl_mlx5_alltoall_t *a2a = team->a2a;
+    size_t                  size;
+
+    size = sizeof(*a2a->net.atomic.counters) * MAX_OUTSTANDING_OPS;
+#if ATOMIC_IN_MEMIC
+    struct ibv_alloc_dm_attr dm_attr;
+    memset(&dm_attr, 0, sizeof(dm_attr));
+    dm_attr.length           = size;
+    a2a->net.atomic.counters = ibv_alloc_dm(ctx->shared_ctx, &dm_attr);
+#else
+    a2a->net.atomic.counters = ucc_malloc(size, "atomic");
+#endif
+
+    if (!a2a->net.atomic.counters) {
+        tl_debug(UCC_TL_TEAM_LIB(team),
+                 "failed to allocate %zd bytes for atomic counters array",
+                 size);
+        return UCC_ERR_NO_MEMORY;
+    }
+#if ATOMIC_IN_MEMIC
+    a2a->net.atomic.mr =
+        ibv_reg_dm_mr(ctx->shared_pd, a2a->net.atomic.counters, 0, size,
+                      IBV_ACCESS_REMOTE_ATOMIC | IBV_ACCESS_LOCAL_WRITE |
+                          IBV_ACCESS_ZERO_BASED);
+
+#else
+    a2a->net.atomic.mr =
+        ibv_reg_mr(ctx->shared_pd, a2a->net.atomic.counters, size,
+                   IBV_ACCESS_REMOTE_ATOMIC | IBV_ACCESS_LOCAL_WRITE);
+#endif
+
+    if (!a2a->net.atomic.mr) {
+        tl_error(UCC_TL_TEAM_LIB(team),
+                 "failed to register atomic couters array");
+#if ATOMIC_IN_MEMIC
+        ibv_free_dm(a2a->net.atomic.counters);
+#else
+        ucc_free(a2a->net.atomic.counters);
+#endif
+        return UCC_ERR_NO_MESSAGE;
+    }
+    return UCC_OK;
+}
 
 static void ucc_tl_mlx5_dm_chunk_init(ucc_mpool_t *mp,        //NOLINT
                                       void *obj, void *chunk) //NOLINT
@@ -26,7 +89,7 @@ static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {
     .obj_init      = ucc_tl_mlx5_dm_chunk_init,
     .obj_cleanup   = NULL};
 
-void ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team)
+void ucc_tl_mlx5_dm_pool_cleanup(ucc_tl_mlx5_team_t *team)
 {
     if (!team->dm_ptr) {
         return;
@@ -40,6 +103,13 @@ void ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team)
     } else {
         ibv_free_dm(team->dm_ptr);
     }
+    team->dm_ptr = NULL;
+}
+
+void ucc_tl_mlx5_dm_cleanup(ucc_tl_mlx5_team_t *team)
+{
+    ucc_tl_mlx5_dm_pool_cleanup(team);
+    ucc_tl_mlx5_alltoall_atomic_free(team);
 }
 
 ucc_status_t ucc_tl_mlx5_dm_alloc_reg(struct ibv_context *ib_ctx,
@@ -143,13 +213,16 @@ ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
     ucc_tl_mlx5_lib_config_t *cfg = &UCC_TL_MLX5_TEAM_LIB(team)->cfg;
     ucc_status_t              status;
 
+    status = ucc_tl_mlx5_alltoall_atomic_alloc(team);
+    if (UCC_OK != status) {
+        return status;
+    }
+
     status = ucc_tl_mlx5_dm_alloc_reg(
         ctx->shared_ctx, ctx->shared_pd, cfg->dm_host, cfg->dm_buf_size,
         &cfg->dm_buf_num, &team->dm_ptr, &team->dm_mr, UCC_TL_TEAM_LIB(team));
     if (status != UCC_OK) {
-        tl_debug(UCC_TL_TEAM_LIB(team),
-                 "failed to alloc and register device memory");
-        return status;
+        goto err_dm_alloc;
     }
     team->dm_offset = NULL;
 
@@ -159,8 +232,19 @@ ucc_status_t ucc_tl_mlx5_dm_init(ucc_tl_mlx5_team_t *team)
         ctx->super.super.ucc_context->thread_mode, "mlx5 dm pool");
     if (status != UCC_OK) {
         tl_debug(UCC_TL_TEAM_LIB(team), "failed to init dm pool");
-        ucc_tl_mlx5_dm_cleanup(team);
-        return status;
+        goto err_mpool_init;
     }
     return UCC_OK;
+
+err_mpool_init:
+    ibv_dereg_mr(team->dm_mr);
+    if (UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_host) {
+        ucc_free(team->dm_ptr);
+    } else {
+        ibv_free_dm(team->dm_ptr);
+    }
+    team->dm_ptr = NULL;
+err_dm_alloc:
+    ucc_tl_mlx5_alltoall_atomic_free(team);
+    return status;
 }
