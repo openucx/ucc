@@ -162,8 +162,7 @@ ucc_status_t ucc_tl_mlx5_team_test_alltoall_start(ucc_tl_mlx5_team_t *team)
     size_t                  storage_size;
 
     if (team->a2a_status.global != UCC_OK) {
-        tl_debug(ctx->super.super.lib,
-                 "global status in error state: %s",
+        tl_debug(ctx->super.super.lib, "global status in error state: %s",
                  ucc_status_string(team->a2a_status.global));
 
         ucc_tl_mlx5_dm_cleanup(team);
@@ -195,10 +194,10 @@ ucc_status_t ucc_tl_mlx5_team_test_alltoall_start(ucc_tl_mlx5_team_t *team)
     a2a->state = TL_MLX5_ALLTOALL_STATE_SHMID;
 
     team->a2a = a2a;
-    return ucc_service_bcast(UCC_TL_CORE_TEAM(team), &a2a->bcast_data,
-                             sizeof(ucc_tl_mlx5_a2a_bcast_data_t),
-                             a2a->node.asr_rank, ucc_sbgp_to_subset(a2a->node.sbgp),
-                             &team->scoll_req);
+    return ucc_service_bcast(
+        UCC_TL_CORE_TEAM(team), &a2a->bcast_data,
+        sizeof(ucc_tl_mlx5_a2a_bcast_data_t), a2a->node.asr_rank,
+        ucc_sbgp_to_subset(a2a->node.sbgp), &team->scoll_req);
 }
 
 static void ucc_tl_mlx5_alltoall_barrier_free(ucc_tl_mlx5_alltoall_t *a2a)

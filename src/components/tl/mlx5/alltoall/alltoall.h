@@ -137,7 +137,7 @@ typedef struct ucc_tl_mlx5_alltoall {
     ucc_tl_mlx5_a2a_bcast_data_t bcast_data;
 } ucc_tl_mlx5_alltoall_t;
 
-void ucc_tl_mlx5_topo_cleanup(ucc_tl_mlx5_team_t *team);
+void         ucc_tl_mlx5_topo_cleanup(ucc_tl_mlx5_team_t *team);
 ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team);
 ucc_status_t ucc_tl_mlx5_team_test_alltoall_start(ucc_tl_mlx5_team_t *team);
 ucc_status_t ucc_tl_mlx5_team_test_alltoall_progress(ucc_tl_mlx5_team_t *team);

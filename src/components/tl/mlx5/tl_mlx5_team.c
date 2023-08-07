@@ -42,7 +42,7 @@ err_topo_init:
 
 void ucc_tl_mlx5_topo_cleanup(ucc_tl_mlx5_team_t *team)
 {
-    if (!team->topo){
+    if (!team->topo) {
         return;
     }
     ucc_ep_map_destroy_nested(&team->ctx_map);
@@ -65,8 +65,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
         return status;
     }
 
-    self->a2a    = NULL;
-    status       = ucc_tl_mlx5_team_init_alltoall(self);
+    self->a2a = NULL;
+    status    = ucc_tl_mlx5_team_init_alltoall(self);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
@@ -135,10 +135,12 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         ucc_service_coll_finalize(tl_team->scoll_req);
         tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_INIT;
     case TL_MLX5_TEAM_STATE_ALLTOALL_INIT:
-        tl_team->a2a_status.local = ucc_tl_mlx5_team_test_alltoall_start(tl_team);
+        tl_team->a2a_status.local =
+            ucc_tl_mlx5_team_test_alltoall_start(tl_team);
         tl_team->state      = TL_MLX5_TEAM_STATE_ALLTOALL_POSTED;
     case TL_MLX5_TEAM_STATE_ALLTOALL_POSTED:
-        tl_team->a2a_status.local = ucc_tl_mlx5_team_test_alltoall_progress(tl_team);
+        tl_team->a2a_status.local =
+            ucc_tl_mlx5_team_test_alltoall_progress(tl_team);
         if (UCC_INPROGRESS == tl_team->a2a_status.local) {
             return UCC_INPROGRESS;
         }
