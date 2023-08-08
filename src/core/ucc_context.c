@@ -417,6 +417,21 @@ static ucc_status_t ucc_create_tl_contexts(ucc_context_t *ctx,
         status = UCC_ERR_NOT_FOUND;
         goto err;
     }
+    /* build the list of names of all available tl contexts.
+       This is a convenience data struct for CLs */
+    ctx->all_tls.count = ctx->n_tl_ctx;
+    ctx->all_tls.names = ucc_malloc(sizeof(char*) * ctx->n_tl_ctx, "all_tls");
+    if (!ctx->all_tls.names) {
+        ucc_error("failed to allocate %zd bytes for all_tls names",
+                  sizeof(char*) * ctx->n_tl_ctx);
+        status = UCC_ERR_NO_MEMORY;
+        goto err;
+
+    }
+    for (i = 0; i < ctx->n_tl_ctx; i++) {
+        ctx->all_tls.names[i] = (char*)ucc_derived_of(ctx->tl_ctx[i]->super.lib,
+                                               ucc_tl_lib_t)->iface->super.name;
+    }
     return UCC_OK;
 err:
     for (i = 0; i < ctx->n_tl_ctx; i++) {
@@ -577,7 +592,8 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                                           ucc_context_h              *context,
                                           ucc_proc_info_t            *proc_info)
 {
-    uint32_t                   topo_required = 0;
+    uint32_t                   topo_required       = 0;
+    uint64_t                   created_ctx_counter = 0;
     ucc_base_context_params_t  b_params;
     ucc_base_context_t        *b_ctx;
     ucc_base_ctx_attr_t        c_attr;
@@ -587,7 +603,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
     ucc_tl_lib_t              *tl_lib;
     ucc_context_t             *ctx;
     ucc_status_t               status;
-    uint64_t                   i, j, n_tl_ctx, created_ctx_counter = 0;
+    uint64_t                   i, j, n_tl_ctx;
     int                        num_cls;
 
     num_cls = config->n_cl_cfg;
@@ -790,7 +806,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                 if (ucc_tl_is_required(lib, tl_lib->iface, 1)) {
                     ucc_error("ctx create epilog for %s failed: %s",
                               tl_lib->iface->super.name, ucc_status_string(status));
-                    goto error_ctx_create;
+                    goto error_ctx_create_epilog;
                 } else {
                     ucc_debug("ctx create epilog for %s failed: %s",
                               tl_lib->iface->super.name, ucc_status_string(status));
@@ -808,33 +824,25 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         }
     }
     if (0 == created_ctx_counter) {
-        ucc_error("no CL context created in ucc_context_create");
+        ucc_error("no TL context created");
         status = UCC_ERR_NO_MESSAGE;
-        goto error_ctx_create;
-    }
-
-    ctx->all_tls.count = ctx->n_tl_ctx;
-    ctx->all_tls.names = ucc_malloc(sizeof(char *) * ctx->n_tl_ctx, "all_tls");
-    if (!ctx->all_tls.names) {
-        ucc_error("failed to allocate %zd bytes for all_tls names",
-                  sizeof(char *) * ctx->n_tl_ctx);
-        status = UCC_ERR_NO_MEMORY;
-        goto error_ctx_create;
-    }
-    for (i = 0; i < ctx->n_tl_ctx; i++) {
-        ctx->all_tls.names[i] =
-            (char *)ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t)
-                ->iface->super.name;
+        goto error_ctx_create_epilog;
     }
 
     ucc_debug("created ucc context %p for lib %s", ctx, lib->full_prefix);
     *context = ctx;
     return UCC_OK;
 
-error_ctx_create:
+error_ctx_create_epilog:
     for (j = 0; j < created_ctx_counter; j++) {
-        config->cl_cfgs[j]->cl_lib->iface->context.destroy(
-            &ctx->cl_ctx[j]->super);
+        tl_ctx = ctx->tl_ctx[j];
+        tl_lib = ucc_derived_of(tl_ctx->super.lib, ucc_tl_lib_t);
+        tl_lib->iface->context.destroy(&tl_ctx->super);
+    }
+error_ctx_create:
+    for (i = 0; i < ctx->n_cl_ctx; i++) {
+        config->cl_cfgs[i]->cl_lib->iface->context.destroy(
+            &ctx->cl_ctx[i]->super);
     }
     ucc_free(ctx->cl_ctx);
 error_ctx:
