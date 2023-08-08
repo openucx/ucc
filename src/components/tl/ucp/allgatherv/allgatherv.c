@@ -9,10 +9,6 @@
 #include "allgatherv.h"
 #include "utils/ucc_coll_utils.h"
 
-ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *task);
-
-void ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *task);
-
 ucc_base_coll_alg_info_t
     ucc_tl_ucp_allgatherv_algs[UCC_TL_UCP_ALLGATHERV_ALG_LAST + 1] = {
         [UCC_TL_UCP_ALLGATHERV_ALG_RING] =
@@ -29,8 +25,5 @@ ucc_status_t ucc_tl_ucp_allgatherv_init(ucc_tl_ucp_task_t *task)
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    task->super.post     = ucc_tl_ucp_allgatherv_ring_start;
-    task->super.progress = ucc_tl_ucp_allgatherv_ring_progress;
-
-    return UCC_OK;
+    return ucc_tl_ucp_allgatherv_ring_init_common(task);
 }
