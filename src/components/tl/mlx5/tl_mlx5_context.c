@@ -74,7 +74,6 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
     };
 
     ucc_mpool_cleanup(&self->req_mp, 1);
-
     close(self->sock);
 }
 

@@ -95,23 +95,20 @@ ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team)
                  "disabling mlx5 a2a for team with non-uniform ppn, "
                  "min_ppn %d, max_ppn %d",
                  ucc_topo_min_ppn(topo), ucc_topo_max_ppn(topo));
-        team->a2a_status.local = UCC_ERR_NOT_SUPPORTED;
-        return UCC_OK;
+        goto non_fatal_error;
     }
     ppn = ucc_topo_max_ppn(topo);
 
     if (net->status == UCC_SBGP_NOT_EXISTS) {
         tl_debug(ctx->super.super.lib,
                  "disabling mlx5 a2a for single node team");
-        team->a2a_status.local = UCC_ERR_NOT_SUPPORTED;
-        return UCC_OK;
+        goto non_fatal_error;
     }
 
     if (nnodes == team_size) {
         tl_debug(ctx->super.super.lib,
                  "disabling mlx5 a2a for ppn=1 case, not supported so far");
-        team->a2a_status.local = UCC_ERR_NOT_SUPPORTED;
-        return UCC_OK;
+        goto non_fatal_error;
     }
 
     a2a->node_size = node_size;
@@ -123,8 +120,7 @@ ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team)
                 tl_debug(ctx->super.super.lib,
                          "disabling mlx5 a2a for team with non contiguous "
                          "ranks-per-node placement");
-                team->a2a_status.local = UCC_ERR_NOT_SUPPORTED;
-                return UCC_OK;
+                goto non_fatal_error;
             }
         }
     }
@@ -152,6 +148,10 @@ ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team)
         }
     }
 
+    return UCC_OK;
+
+non_fatal_error:
+    team->a2a_status.local = UCC_ERR_NOT_SUPPORTED;
     return UCC_OK;
 }
 
@@ -236,11 +236,8 @@ static ucc_status_t ucc_tl_mlx5_alltoall_barrier_alloc(ucc_tl_mlx5_team_t *team)
     return UCC_OK;
 }
 
-ucc_status_t
-ucc_tl_mlx5_team_test_alltoall_progress(ucc_tl_mlx5_team_t *tl_team)
+ucc_status_t ucc_tl_mlx5_team_test_alltoall_progress(ucc_tl_mlx5_team_t *team)
 {
-    ucc_tl_mlx5_team_t        *team        = ucc_derived_of(tl_team,
-                                                           ucc_tl_mlx5_team_t);
     ucc_tl_mlx5_context_t     *ctx         = UCC_TL_MLX5_TEAM_CTX(team);
     ucc_tl_mlx5_alltoall_t    *a2a         = team->a2a;
     ucc_base_lib_t            *lib         = UCC_TL_TEAM_LIB(team);
@@ -254,8 +251,8 @@ ucc_tl_mlx5_team_test_alltoall_progress(ucc_tl_mlx5_team_t *tl_team)
     size_t                     op_seg_size, local_data_size, umr_buf_size;
     net_exchange_t            *global_data, *remote_data;
 
-    if (tl_team->a2a_status.local < 0) {
-        return tl_team->a2a_status.local;
+    if (team->a2a_status.local < 0) {
+        return team->a2a_status.local;
     }
 
     node_size   = a2a->node.sbgp->group_size;
@@ -485,12 +482,12 @@ ucc_tl_mlx5_team_test_alltoall_progress(ucc_tl_mlx5_team_t *tl_team)
         a2a->state            = TL_MLX5_ALLTOALL_STATE_EXCHANGE_PROGRESS;
 
     case TL_MLX5_ALLTOALL_STATE_EXCHANGE_PROGRESS:
-        status = ucc_service_coll_test(tl_team->scoll_req);
+        status = ucc_service_coll_test(team->scoll_req);
         if (status < 0) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
+            tl_error(UCC_TL_TEAM_LIB(team),
                      "failure during service coll exchange: %s",
                      ucc_status_string(status));
-            ucc_service_coll_finalize(tl_team->scoll_req);
+            ucc_service_coll_finalize(team->scoll_req);
             goto err_service_allgather_progress;
         }
         if (UCC_INPROGRESS == status) {
@@ -501,7 +498,7 @@ ucc_tl_mlx5_team_test_alltoall_progress(ucc_tl_mlx5_team_t *tl_team)
 
     case TL_MLX5_ALLTOALL_STATE_EXCHANGE_DONE:
         local_data = team->scoll_req->data;
-        ucc_service_coll_finalize(tl_team->scoll_req);
+        ucc_service_coll_finalize(team->scoll_req);
 
         net_size        = a2a->net.net_size;
         local_data_size = sizeof(net_exchange_t);
