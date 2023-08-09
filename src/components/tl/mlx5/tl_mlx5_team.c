@@ -137,8 +137,9 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     case TL_MLX5_TEAM_STATE_ALLTOALL_INIT:
         tl_team->a2a_status.local =
             ucc_tl_mlx5_team_test_alltoall_start(tl_team);
-        tl_team->state      = TL_MLX5_TEAM_STATE_ALLTOALL_POSTED;
+        tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_POSTED;
     case TL_MLX5_TEAM_STATE_ALLTOALL_POSTED:
+        // coverity[deref_arg:FALSE]
         tl_team->a2a_status.local =
             ucc_tl_mlx5_team_test_alltoall_progress(tl_team);
         if (UCC_INPROGRESS == tl_team->a2a_status.local) {

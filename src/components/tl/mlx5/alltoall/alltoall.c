@@ -180,7 +180,7 @@ ucc_status_t ucc_tl_mlx5_team_test_alltoall_start(ucc_tl_mlx5_team_t *team)
         a2a->bcast_data.shmid =
             shmget(IPC_PRIVATE, storage_size, IPC_CREAT | 0600);
         if (a2a->bcast_data.shmid == -1) {
-            tl_error(ctx->super.super.lib,
+            tl_debug(ctx->super.super.lib,
                      "failed to allocate sysv shm segment for %zd bytes",
                      storage_size);
         } else {
