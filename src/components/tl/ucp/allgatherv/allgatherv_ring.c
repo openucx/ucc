@@ -34,9 +34,9 @@ void ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
 
     while (task->tagged.send_posted < tsize) {
         send_idx   =
-            ucc_ep_map_eval(task->subset.map,(trank -
-                                              task->tagged.send_posted + 1 +
-                                              tsize) % tsize);
+            ucc_ep_map_eval(task->subset.map, (trank -
+                                               task->tagged.send_posted + 1 +
+                                               tsize) % tsize);
         data_displ = ucc_coll_args_get_displacement(
                          args, args->dst.info_v.displacements, send_idx) *
                      rdt_size;
@@ -47,8 +47,9 @@ void ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *coll_task)
                                          rmem, sendto, team, task),
                       task, out);
         recv_idx   =
-            ucc_ep_map_eval(task->subset.map,(trank -
-                            task->tagged.recv_posted + tsize) % tsize);
+            ucc_ep_map_eval(task->subset.map, (trank -
+                                               task->tagged.recv_posted +
+                                               tsize) % tsize);
         data_displ = ucc_coll_args_get_displacement(
                          args, args->dst.info_v.displacements, recv_idx) *
                      rdt_size;

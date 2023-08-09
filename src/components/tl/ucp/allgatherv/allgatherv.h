@@ -18,10 +18,6 @@ enum {
 extern ucc_base_coll_alg_info_t
              ucc_tl_ucp_allgatherv_algs[UCC_TL_UCP_ALLGATHERV_ALG_LAST + 1];
 
-ucc_status_t ucc_tl_ucp_allgatherv_ring_start(ucc_coll_task_t *task);
-
-void ucc_tl_ucp_allgatherv_ring_progress(ucc_coll_task_t *task);
-
 ucc_status_t ucc_tl_ucp_allgatherv_ring_init_common(ucc_tl_ucp_task_t *task);
 
 ucc_status_t ucc_tl_ucp_allgatherv_init(ucc_tl_ucp_task_t *task);
