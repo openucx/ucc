@@ -327,6 +327,15 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
     ucc_coll_score_t   *score;
     ucc_status_t        status;
     int                 i;
+    ucc_coll_score_team_info_t team_info;
+
+    team_info.alg_fn              = ucc_tl_cuda_alg_id_to_init;
+    team_info.default_score       = UCC_TL_CUDA_DEFAULT_SCORE;
+    team_info.init                = ucc_tl_cuda_coll_init;
+    team_info.num_mem_types       = 1;
+    team_info.supported_mem_types = &mt;
+    team_info.supported_colls     = UCC_TL_CUDA_SUPPORTED_COLLS;
+    team_info.size                = UCC_TL_TEAM_SIZE(team);
 
     status =
         ucc_coll_score_build_default(tl_team, UCC_TL_CUDA_DEFAULT_SCORE,
@@ -339,9 +348,8 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
 
     for (i = 0; i < UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR; i++) {
         status = ucc_coll_score_update_from_str(
-            ucc_tl_cuda_default_alg_select_str[i], score,
-            UCC_TL_TEAM_SIZE(team), ucc_tl_cuda_coll_init, &team->super.super,
-            UCC_TL_CUDA_DEFAULT_SCORE, ucc_tl_cuda_alg_id_to_init, &mt, 1);
+            ucc_tl_cuda_default_alg_select_str[i], &team_info,
+            &team->super.super, score);
         if (UCC_OK != status) {
             tl_error(tl_team->context->lib,
                      "failed to apply default coll select setting: %s",
@@ -351,10 +359,8 @@ ucc_status_t ucc_tl_cuda_team_get_scores(ucc_base_team_t *tl_team,
     }
 
     if (strlen(ctx->score_str) > 0) {
-        status = ucc_coll_score_update_from_str(
-            ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
-            ucc_tl_cuda_coll_init, &team->super.super,
-            UCC_TL_CUDA_DEFAULT_SCORE, ucc_tl_cuda_alg_id_to_init, &mt, 1);
+        status = ucc_coll_score_update_from_str(ctx->score_str, &team_info,
+                                                &team->super.super, score);
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {
             goto err;

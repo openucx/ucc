@@ -246,11 +246,9 @@ void UccTestMpi::destroy_team(ucc_test_team_t &team)
     ucc_status_t status;
 
     team.free_ee();
-    while (UCC_INPROGRESS == (status = ucc_team_destroy(team.team))) {
-        if (UCC_OK != status) {
-            std::cerr << "ucc_team_destroy failed\n";
-            break;
-        }
+    while (UCC_INPROGRESS == (status = ucc_team_destroy(team.team))) {}
+    if (UCC_OK != status) {
+        std::cerr << "ucc_team_destroy failed\n";
     }
     if (team.comm != MPI_COMM_WORLD) {
         MPI_Comm_free(&team.comm);
@@ -536,7 +534,7 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
     return rst;
 }
 
-void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
+void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
                                  std::vector<ucc_status_t> &rst)
 {
     TestCaseParams params;
@@ -606,9 +604,11 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &          team,
                     for (auto m: test_msgsizes) {
                         for (auto dt: test_dtypes) {
                             for (auto op: test_ops) {
-                                if (!ucc_coll_reduce_supported(op, dt)) {
+                                if (ucc_coll_args_is_reduction(c) &&
+                                    !ucc_coll_reduce_supported(op, dt)) {
                                     continue;
                                 }
+
                                 if (mt != UCC_MEMORY_TYPE_HOST &&
                                     (dt == UCC_DT_FLOAT128 ||
                                      dt == UCC_DT_FLOAT128_COMPLEX)) {

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -18,6 +18,30 @@
 #define UCC_SCORE_INVALID -1
 
 #define UCC_MSG_MAX UINT64_MAX
+
+/* Callback that maps alg_id (int or str) to the "init" function.
+   This callback is provided by the component (CL/TL) that uses
+   ucc_coll_score_alloc_from_str.
+   Return values:
+   UCC_OK - input alg_id can be correctly mapped to the "init" fn
+   UCC_ERR_NOT_SUPPORTED - CL/TL doesn't allow changing algorithms ids for
+   the given coll_type, mem_type
+   UCC_ERR_INVALID_PARAM - incorrect value of alg_id is provided */
+typedef ucc_status_t (*ucc_alg_id_to_init_fn_t)(int alg_id,
+                                                const char *alg_id_str,
+                                                ucc_coll_type_t coll_type,
+                                                ucc_memory_type_t mem_type,
+                                                ucc_base_coll_init_fn_t *init);
+
+typedef struct ucc_coll_score_team_info {
+    ucc_score_t              default_score;
+    ucc_rank_t               size;
+    uint64_t                 supported_colls;
+    ucc_memory_type_t       *supported_mem_types;
+    int                      num_mem_types;
+    ucc_base_coll_init_fn_t  init;
+    ucc_alg_id_to_init_fn_t  alg_fn;
+} ucc_coll_score_team_info_t;
 
 typedef struct ucc_coll_entry {
     ucc_list_link_t          list_elem;
@@ -67,19 +91,6 @@ ucc_status_t  ucc_coll_score_merge(ucc_coll_score_t * score1,
                                    ucc_coll_score_t * score2,
                                    ucc_coll_score_t **rst, int free_inputs);
 
-/* Callback that maps alg_id (int or str) to the "init" function.
-   This callback is provided by the component (CL/TL) that uses
-   ucc_coll_score_alloc_from_str.
-   Return values:
-   UCC_OK - input alg_id can be correctly mapped to the "init" fn
-   UCC_ERR_NOT_SUPPORTED - CL/TL does allow changing algorithms ids for
-   the given coll_type, mem_type
-   UCC_ERR_INVALID_PARAM - incorrect value of alg_id is provided */
-typedef ucc_status_t (*ucc_alg_id_to_init_fn_t)(int               alg_id,
-                                                const char *      alg_id_str,
-                                                ucc_coll_type_t   coll_type,
-                                                ucc_memory_type_t mem_type,
-                                                ucc_base_coll_init_fn_t *init);
 
 /* Parses SCORE string (see ucc_base_iface.c for pattern description)
    and initializes score data structure. team_size is used to filter
@@ -112,15 +123,12 @@ ucc_status_t ucc_coll_score_alloc_from_str(const char *            str,
       "init" is set to NULL. User provided ranges without alg_id will not
       modify any existing "init" functions in that case and only change the
       score of existing ranges*/
-ucc_status_t ucc_coll_score_update_from_str(const char *            str,
-                                            ucc_coll_score_t       *score,
-                                            ucc_rank_t              team_size,
-                                            ucc_base_coll_init_fn_t init,
-                                            ucc_base_team_t        *team,
-                                            ucc_score_t             def_score,
-                                            ucc_alg_id_to_init_fn_t alg_fn,
-                                            ucc_memory_type_t      *mtypes,
-                                            int                     mt_n);
+
+ucc_status_t
+ucc_coll_score_update_from_str(const char *str,
+                               const ucc_coll_score_team_info_t *info,
+                               ucc_base_team_t *team,
+                               ucc_coll_score_t *score);
 
 ucc_status_t ucc_coll_score_merge_in(ucc_coll_score_t **dst,
                                      ucc_coll_score_t *src);
@@ -159,6 +167,7 @@ ucc_status_t ucc_coll_score_update(ucc_coll_score_t  *score,
                                    ucc_coll_score_t  *update,
                                    ucc_score_t        default_score,
                                    ucc_memory_type_t *mtypes,
-                                   int                mt_n);
+                                   int                mt_n,
+                                   uint64_t           colls);
 
 #endif

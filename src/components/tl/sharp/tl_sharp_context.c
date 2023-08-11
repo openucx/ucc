@@ -428,6 +428,7 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
         return UCC_OK;
     }
 
+    memset(&set.map, 0, sizeof(ucc_ep_map_t));
     set.map.type   = UCC_EP_MAP_FULL;
     set.myrank     = UCC_TL_CTX_OOB(sharp_ctx).oob_ep;
     set.map.ep_num = UCC_TL_CTX_OOB(sharp_ctx).n_oob_eps;
@@ -447,6 +448,7 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
     status = ucc_tl_sharp_context_init(sharp_ctx, &sharp_ctx->sharp_context,
                                        &sharp_ctx->oob_ctx, topo);
     if (status != UCC_OK) {
+        ucc_topo_cleanup(topo);
         return status;
     }
 

@@ -155,19 +155,26 @@ ucc_cl_hier_bcast_2step_init_schedule(ucc_base_coll_args_t *coll_args,
         n_tasks++;
     }
 
-    ucc_task_subscribe_dep(&schedule->super, tasks[first_task],
-                           UCC_EVENT_SCHEDULE_STARTED);
-    ucc_schedule_add_task(schedule, tasks[first_task]);
+    UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, tasks[first_task],
+                                          UCC_EVENT_SCHEDULE_STARTED),
+                   out, status);
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, tasks[first_task]),
+                   out, status);
     if (n_tasks > 1) {
         if (root == rank) {
-            ucc_task_subscribe_dep(&schedule->super, tasks[(first_task + 1) % 2],
-                                   UCC_EVENT_SCHEDULE_STARTED);
+            UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super,
+                                                  tasks[(first_task + 1) % 2],
+                                                  UCC_EVENT_SCHEDULE_STARTED),
+                           out, status);
         } else {
-            ucc_task_subscribe_dep(tasks[first_task],
-                                   tasks[(first_task + 1) % 2],
-                                   UCC_EVENT_COMPLETED);
+            UCC_CHECK_GOTO(ucc_task_subscribe_dep(tasks[first_task],
+                                                  tasks[(first_task + 1) % 2],
+                                                  UCC_EVENT_COMPLETED),
+                            out, status);
         }
-        ucc_schedule_add_task(schedule, tasks[(first_task + 1) % 2]);
+        UCC_CHECK_GOTO(ucc_schedule_add_task(schedule,
+                                             tasks[(first_task + 1) % 2]),
+                       out, status);
     }
 
     schedule->super.post           = ucc_cl_hier_bcast_2step_start;

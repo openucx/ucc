@@ -54,9 +54,11 @@ public:
                 work_buf    = (long *)team->procs[i].p->onesided_buf[2];
                 coll->mask  = UCC_COLL_ARGS_FIELD_FLAGS |
                              UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
-                coll->src.info.buffer = sbuf;
-                coll->dst.info.buffer = rbuf;
-                coll->flags           = UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+                coll->flags = UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+                coll->src.info.buffer    = sbuf;
+                coll->src.info.mem_type  = UCC_MEMORY_TYPE_HOST;
+                coll->dst.info.buffer    = rbuf;
+                coll->dst.info.mem_type  = UCC_MEMORY_TYPE_HOST;
                 coll->global_work_buffer = work_buf;
             } else {
                 UCC_CHECK(ucc_mc_alloc(

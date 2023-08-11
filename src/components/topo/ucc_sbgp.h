@@ -34,7 +34,7 @@ typedef enum ucc_sbgp_type_t
                                     but EXISTS for procs with local_socket_rank != 0 */
     UCC_SBGP_NUMA_LEADERS,       /* Same as SOCKET_LEADERS but for NUMA grouping */
     UCC_SBGP_FULL,               /* Group contains ALL the ranks of the team */
-    UCC_SBGP_FULL_HOST_ORDERED,  /* Group contains All the ranks of the ream ordered
+    UCC_SBGP_FULL_HOST_ORDERED,  /* Group contains ALL the ranks of the team ordered
                                     by host, socket, numa */
     UCC_SBGP_LAST
 } ucc_sbgp_type_t;

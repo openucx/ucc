@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -70,12 +70,14 @@ ucc_status_t ucc_tl_nccl_allgatherv_p2p_start(ucc_coll_task_t *coll_task)
 
     task->super.status = UCC_INPROGRESS;
     UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_allgatherv_start", 0);
-    NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+    NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team),
+                   &task->nccl_progress_st, team->nccl_comm, 0);
     if (count != 0) {
         for (peer = 0; peer < size; peer++) {
             NCCLCHECK_GOTO(ncclSend(sbuf, count * sdt_size, ncclChar, peer,
                                     team->nccl_comm, stream),
-                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+                        exit_coll, status, UCC_TL_TEAM_LIB(team),
+                        &task->nccl_progress_st, team->nccl_comm, 0);
         }
     }
     for (peer = 0; peer < size; peer++) {
@@ -86,10 +88,12 @@ ucc_status_t ucc_tl_nccl_allgatherv_p2p_start(ucc_coll_task_t *coll_task)
             NCCLCHECK_GOTO(ncclRecv(PTR_OFFSET(rbuf, displ * rdt_size),
                                     count * rdt_size, ncclChar, peer,
                                     team->nccl_comm, stream),
-                        exit_coll, status, UCC_TL_TEAM_LIB(team));
+                        exit_coll, status, UCC_TL_TEAM_LIB(team),
+                        &task->nccl_progress_st, team->nccl_comm, 0);
         }
     }
-    NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+    NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team),
+                   &task->nccl_progress_st, team->nccl_comm, 1);
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
     return status;
@@ -106,8 +110,8 @@ ucc_status_t ucc_tl_nccl_allgatherv_p2p_init(ucc_base_coll_args_t *coll_args,
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
-    task->super.post     = ucc_tl_nccl_allgatherv_p2p_start;
-    *task_h = &task->super;
+    task->super.post = ucc_tl_nccl_allgatherv_p2p_start;
+    *task_h          = &task->super;
 
     return status;
 }
@@ -144,7 +148,8 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcopy_start(ucc_coll_task_t *coll_task)
     }
     NCCLCHECK_GOTO(ncclAllGather(sbuf, scratch, max_count * rdt_size,
                                  ncclChar, team->nccl_comm, stream),
-                   exit_coll, status, UCC_TL_TEAM_LIB(team));
+                   exit_coll, status, UCC_TL_TEAM_LIB(team),
+                   &task->nccl_progress_st, team->nccl_comm, 0);
     for (peer = 0; peer < size; peer++) {
         rcount = ucc_coll_args_get_count(args,
                                          args->dst.info_v.counts, peer);
@@ -233,13 +238,14 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcast_start(ucc_coll_task_t *coll_task)
     ucc_status_t        status = UCC_OK;
     void               *sbuf   = args->src.info.buffer;
     ptrdiff_t           rbuf   = (ptrdiff_t)args->dst.info_v.buffer;
-    size_t rdt_size, count, displ;
-    ucc_rank_t peer;
+    size_t       rdt_size, count, displ;
+    ucc_rank_t   peer;
 
     task->super.status = UCC_INPROGRESS;
     rdt_size           = ucc_dt_size(args->dst.info_v.datatype);
     UCC_TL_NCCL_PROFILE_REQUEST_EVENT(coll_task, "nccl_allgatherv_start", 0);
-    NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+    NCCLCHECK_GOTO(ncclGroupStart(), exit_coll, status, UCC_TL_TEAM_LIB(team),
+                   &task->nccl_progress_st, team->nccl_comm, 0);
     for (peer = 0; peer < size; peer++) {
         count = ucc_coll_args_get_count(args, args->dst.info_v.counts, peer);
         displ = ucc_coll_args_get_displacement(args,
@@ -251,9 +257,11 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcast_start(ucc_coll_task_t *coll_task)
         NCCLCHECK_GOTO(ncclBroadcast(sbuf, PTR_OFFSET(rbuf, displ * rdt_size),
                                      count * rdt_size, ncclChar, peer,
                                      team->nccl_comm, stream),
-                       exit_coll, status, UCC_TL_TEAM_LIB(team));
+                       exit_coll, status, UCC_TL_TEAM_LIB(team),
+                       &task->nccl_progress_st, team->nccl_comm, 0);
     }
-    NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team));
+    NCCLCHECK_GOTO(ncclGroupEnd(), exit_coll, status, UCC_TL_TEAM_LIB(team),
+                   &task->nccl_progress_st, team->nccl_comm, 1);
     status = ucc_tl_nccl_collective_sync(task, stream);
 exit_coll:
     return status;
@@ -263,7 +271,7 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcast_init(ucc_base_coll_args_t *coll_args,
                                                ucc_base_team_t *     team,
                                                ucc_coll_task_t **    task_h)
 {
-    ucc_status_t        status    = UCC_OK;
+    ucc_status_t        status = UCC_OK;
     ucc_tl_nccl_task_t *task;
 
     status = ucc_tl_nccl_init_task(coll_args, team, &task);
@@ -272,6 +280,6 @@ ucc_status_t ucc_tl_nccl_allgatherv_bcast_init(ucc_base_coll_args_t *coll_args,
     }
 
     task->super.post = ucc_tl_nccl_allgatherv_bcast_start;
-    *task_h = &task->super;
+    *task_h          = &task->super;
     return status;
 }

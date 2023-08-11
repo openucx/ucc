@@ -266,7 +266,7 @@ ucc_ep_map_from_array_generic(void **array, ucc_rank_t size,
                               ucc_rank_t full_size, int need_free, int is64)
 {
     int          is_const_stride = 0;
-    ucc_ep_map_t map;
+    ucc_ep_map_t map             = {0};
     int64_t      stride;
     ucc_rank_t   i;
 
@@ -326,16 +326,6 @@ static inline int ucc_coll_args_is_rooted(ucc_coll_type_t ct)
         ct == UCC_COLL_TYPE_GATHER || ct == UCC_COLL_TYPE_SCATTER ||
         ct == UCC_COLL_TYPE_FANIN || ct == UCC_COLL_TYPE_FANOUT ||
         ct == UCC_COLL_TYPE_GATHERV || ct == UCC_COLL_TYPE_SCATTERV) {
-        return 1;
-    }
-    return 0;
-}
-
-static inline int ucc_coll_args_is_reduction(ucc_coll_type_t ct)
-{
-    if (ct == UCC_COLL_TYPE_ALLREDUCE || ct == UCC_COLL_TYPE_REDUCE ||
-        ct == UCC_COLL_TYPE_REDUCE_SCATTER ||
-        ct == UCC_COLL_TYPE_REDUCE_SCATTERV) {
         return 1;
     }
     return 0;
@@ -560,13 +550,15 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
 
         if (task->team->context->lib->log_component.name[0] == 'C') {
             /* it's not CL BASIC task */
-            strncpy(cl_info, task->team->context->lib->log_component.name,
-                    sizeof(cl_info));
+            ucc_strncpy_safe(cl_info,
+                             task->team->context->lib->log_component.name,
+                             sizeof(cl_info));
             ucc_coll_task_components_str(task, tl_info, &tl_info_len);
         } else {
-            strncpy(cl_info, "CL_BASIC", sizeof(cl_info));
-            strncpy(tl_info , task->team->context->lib->log_component.name,
-                    sizeof(tl_info));
+            ucc_strncpy_safe(cl_info, "CL_BASIC", sizeof(cl_info));
+            ucc_strncpy_safe(tl_info,
+                             task->team->context->lib->log_component.name,
+                             sizeof(tl_info));
         }
         ucc_coll_args_str(&task->bargs.args, team->rank, team->size, str, len);
         rc = ucc_snprintf_safe(task_info, sizeof(task_info),

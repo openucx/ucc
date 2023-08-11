@@ -14,6 +14,7 @@
 #include "schedule/ucc_schedule_pipelined.h"
 #include <ucp/api/ucp.h>
 #include <ucs/memory/memory_type.h>
+#include "core/ucc_service_coll.h"
 
 #ifndef UCC_TL_UCP_DEFAULT_SCORE
 #define UCC_TL_UCP_DEFAULT_SCORE 10
@@ -52,11 +53,12 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t                 reduce_scatter_kn_radix;
     uint32_t                 allgather_kn_radix;
     uint32_t                 bcast_kn_radix;
-    uint32_t                 bcast_sag_kn_radix;
+    ucc_mrange_uint_t        bcast_sag_kn_radix;
     uint32_t                 reduce_kn_radix;
     uint32_t                 gather_kn_radix;
     uint32_t                 gatherv_linear_num_posts;
     uint32_t                 scatter_kn_radix;
+    ucc_on_off_auto_value_t  scatter_kn_enable_recv_zcopy;
     uint32_t                 scatterv_linear_num_posts;
     uint32_t                 alltoall_pairwise_num_posts;
     uint32_t                 alltoallv_pairwise_num_posts;
@@ -140,6 +142,7 @@ typedef struct ucc_tl_ucp_team {
     const char *               tuning_str;
     ucc_topo_t                *topo;
     ucc_ep_map_t               ctx_map;
+    ucc_rank_t                 opt_radix;
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

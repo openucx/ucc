@@ -16,7 +16,7 @@
 #include "tl_ucp_tag.h"
 
 #define UCC_UUNITS_AUTO_RADIX 4
-#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 6
+#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 7
 
 ucc_status_t ucc_tl_ucp_team_default_score_str_alloc(ucc_tl_ucp_team_t *team,
     char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR]);
@@ -152,6 +152,7 @@ typedef struct ucc_tl_ucp_task {
             ucc_knomial_pattern_t   p;
             ucc_rank_t              recv_dist;
             ptrdiff_t               send_offset;
+            ptrdiff_t               recv_offset;
             size_t                  recv_size;
         } scatter_kn;
         struct {
@@ -408,15 +409,15 @@ static inline unsigned
 ucc_tl_ucp_get_radix_from_range(ucc_tl_ucp_team_t *team,
                                 size_t             msgsize,
                                 ucc_memory_type_t  mem_type,
-                                ucc_mrange_uint_t *p)
+                                ucc_mrange_uint_t *p,
+                                ucc_rank_t         default_value)
 {
     unsigned radix;
 
     radix = ucc_mrange_uint_get(p, msgsize, mem_type);
 
     if (UCC_UUNITS_AUTO == radix) {
-        /* auto selection based on team configuration */
-        return UCC_UUNITS_AUTO_RADIX;
+        return default_value;
     }
     return radix;
 }

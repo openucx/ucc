@@ -1,5 +1,5 @@
 #
-# Copyright (C) Advanced Micro Devices, Inc. 2016 - 2022. ALL RIGHTS RESERVED.
+# Copyright (C) Advanced Micro Devices, Inc. 2016 - 2023. ALL RIGHTS RESERVED.
 # Copyright (c) 2001-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # See file LICENSE for terms.
 #
@@ -107,7 +107,7 @@ AS_IF([test "x$with_rocm" != "xno"],
     [AC_LANG_PROGRAM([[#include <${with_rocm}/include/rocm_version.h>
         ]], [[
 #if ROCM_VERSION_MAJOR >= 5
-int main() {return 0;}
+return 0;
 #else
 intr make+compilation_fail()
 #endif

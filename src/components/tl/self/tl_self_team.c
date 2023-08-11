@@ -52,10 +52,19 @@ ucc_status_t ucc_tl_self_team_get_scores(ucc_base_team_t   *tl_team,
     ucc_memory_type_t   mem_types[UCC_MEMORY_TYPE_LAST];
     ucc_coll_score_t   *score;
     ucc_status_t        status;
+    ucc_coll_score_team_info_t team_info;
 
     for (i = 0; i < UCC_MEMORY_TYPE_LAST; i++) {
         mem_types[mt_n++] = (ucc_memory_type_t)i;
     }
+
+    team_info.alg_fn              = NULL;
+    team_info.default_score       = UCC_TL_SELF_DEFAULT_SCORE;
+    team_info.init                = ucc_tl_self_coll_init;
+    team_info.num_mem_types       = mt_n;
+    team_info.supported_mem_types = mem_types; /* all memory types supported*/
+    team_info.supported_colls     = UCC_TL_SELF_SUPPORTED_COLLS;
+    team_info.size                = UCC_TL_TEAM_SIZE(team);
 
     status = ucc_coll_score_build_default(
         tl_team, UCC_TL_SELF_DEFAULT_SCORE, ucc_tl_self_coll_init,
@@ -66,10 +75,8 @@ ucc_status_t ucc_tl_self_team_get_scores(ucc_base_team_t   *tl_team,
     }
 
     if (strlen(ctx->score_str) > 0) {
-        status = ucc_coll_score_update_from_str(
-            ctx->score_str, score, UCC_TL_TEAM_SIZE(team),
-            ucc_tl_self_coll_init, &team->super.super,
-            UCC_TL_SELF_DEFAULT_SCORE, NULL, NULL, 0);
+        status = ucc_coll_score_update_from_str(ctx->score_str, &team_info,
+                                                &team->super.super, score);
         if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
             (status != UCC_ERR_NOT_SUPPORTED)) {
             goto err;

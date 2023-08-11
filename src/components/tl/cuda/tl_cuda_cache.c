@@ -280,6 +280,7 @@ ucc_tl_cuda_map_memhandle(const void *d_ptr, size_t size,
 
 err:
     pthread_rwlock_unlock(&cache->lock);
+    // coverity[leaked_storage:FALSE]
     return status;
 
 

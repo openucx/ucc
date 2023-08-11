@@ -67,7 +67,7 @@ std::shared_ptr<TestCase> TestCase::init_single(ucc_test_team_t &_team,
 void TestCase::run(bool triggered)
 {
     if (triggered) {
-        ucc_ee_h ee;
+        ucc_ee_h ee = nullptr;
         ucc_ev_t comp_ev, *post_ev;
         ucc_ee_type_t ee_type;
 

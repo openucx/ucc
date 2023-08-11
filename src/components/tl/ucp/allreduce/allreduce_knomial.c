@@ -198,8 +198,8 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_start(ucc_coll_task_t *coll_task)
     task->allreduce_kn.phase = UCC_KN_PHASE_INIT;
     ucc_assert(UCC_IS_INPLACE(TASK_ARGS(task)) ||
                (TASK_ARGS(task).src.info.mem_type == mem_type));
-    cfg_radix = ucc_tl_ucp_get_radix_from_range(team, data_size,
-                                                mem_type, p);
+    cfg_radix = ucc_tl_ucp_get_radix_from_range(team, data_size, mem_type, p,
+                                                UCC_UUNITS_AUTO_RADIX);
     ucc_knomial_pattern_init(size, rank, ucc_min(cfg_radix, size),
                              &task->allreduce_kn.p);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
@@ -228,7 +228,7 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
     task->super.progress = ucc_tl_ucp_allreduce_knomial_progress;
     task->super.finalize = ucc_tl_ucp_allreduce_knomial_finalize;
     cfg_radix            = ucc_tl_ucp_get_radix_from_range(team, data_size,
-                                                           mem_type, p);
+                               mem_type, p, UCC_UUNITS_AUTO_RADIX);
     radix                = ucc_min(cfg_radix, size);
     status               = ucc_mc_alloc(&task->allreduce_kn.scratch_mc_header,
                           (radix - 1) * data_size,

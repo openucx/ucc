@@ -33,7 +33,7 @@ ucc_dt_reduce_strided(void *src1, void *src2, void *dst, size_t n_vectors,
 {
     ucc_ee_executor_task_args_t eargs;
 
-    if (count == 0) {
+    if (count == 0 || n_vectors == 0) {
         *task = NULL;
         return UCC_OK;
     }

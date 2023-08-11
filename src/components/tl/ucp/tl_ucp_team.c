@@ -46,7 +46,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
 {
     ucc_tl_ucp_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_ucp_context_t);
-    ucc_status_t status;
+    ucc_kn_radix_t max_radix;
+    ucc_status_t   status;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
     /* TODO: init based on ctx settings and on params: need to check
@@ -56,12 +57,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     self->status          = UCC_INPROGRESS;
     self->tuning_str      = "";
     self->topo            = NULL;
+    self->opt_radix       = UCC_UUNITS_AUTO_RADIX;
 
     status = ucc_config_clone_table(&UCC_TL_UCP_TEAM_LIB(self)->cfg, &self->cfg,
                                     ucc_tl_ucp_lib_config_table);
     if (UCC_OK != status) {
         return status;
     }
+
     if (ctx->topo_required) {
         status = ucc_tl_ucp_get_topo(self);
         if (UCC_OK != status) {
@@ -86,6 +89,15 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
                  "topo is not available, disabling ranks reordering");
         self->cfg.use_reordering = 0;
     }
+
+    if (self->topo && !IS_SERVICE_TEAM(self) && self->topo->topo->sock_bound) {
+        max_radix       = ucc_min(UCC_TL_TEAM_SIZE(self),
+                                  ucc_topo_min_socket_size(self->topo));
+
+        self->opt_radix = ucc_kn_get_opt_radix(UCC_TL_TEAM_SIZE(self),
+                                               max_radix);
+    }
+
     tl_debug(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
@@ -103,7 +115,7 @@ ucc_status_t ucc_tl_ucp_team_destroy(ucc_base_team_t *tl_team)
 {
     ucc_tl_ucp_team_t *team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
 
-    if (UCC_TL_UCP_TEAM_CTX(team)->topo_required) {
+    if (team->topo) {
         ucc_ep_map_destroy_nested(&team->ctx_map);
         ucc_topo_cleanup(team->topo);
     }
@@ -156,6 +168,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
 {
     ucc_tl_ucp_team_t *   team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
+    int                   i;
     ucc_status_t          status;
 
     if (USE_SERVICE_WORKER(team)) {
@@ -167,6 +180,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     if (team->status == UCC_OK) {
         return UCC_OK;
     }
+
     if (UCC_TL_TEAM_SIZE(team) <= ctx->cfg.preconnect) {
         status = ucc_tl_ucp_team_preconnect(team);
         if (UCC_INPROGRESS == status) {
@@ -177,7 +191,7 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
     }
 
     if (ctx->remote_info) {
-        for (int i = 0; i < ctx->n_rinfo_segs; i++) {
+        for (i = 0; i < ctx->n_rinfo_segs; i++) {
             team->va_base[i]     = ctx->remote_info[i].va_base;
             team->base_length[i] = ctx->remote_info[i].len;
         }
@@ -207,6 +221,7 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     unsigned                    i;
     char                       *ucc_tl_ucp_default_alg_select_str
                                           [UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR];
+    ucc_coll_score_team_info_t team_info;
 
     for (i = 0; i < UCC_MEMORY_TYPE_LAST; i++) {
         if (tl_ctx->ucp_memory_types & UCC_BIT(ucc_memtype_to_ucs[i])) {
@@ -216,6 +231,14 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
             mem_types[mt_n++] = (ucc_memory_type_t)i;
         }
     }
+
+    team_info.alg_fn              = ucc_tl_ucp_alg_id_to_init;
+    team_info.default_score       = UCC_TL_UCP_DEFAULT_SCORE;
+    team_info.init                = ucc_tl_ucp_coll_init;
+    team_info.num_mem_types       = mt_n;
+    team_info.supported_mem_types = mem_types; /* all memory types supported*/
+    team_info.supported_colls     = UCC_TL_UCP_SUPPORTED_COLLS;
+    team_info.size                = UCC_TL_TEAM_SIZE(team);
 
     /* There can be a different logic for different coll_type/mem_type.
        Right now just init everything the same way. */
@@ -232,9 +255,8 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     }
     for (i = 0; i < UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR; i++) {
         status = ucc_coll_score_update_from_str(
-            ucc_tl_ucp_default_alg_select_str[i], score, UCC_TL_TEAM_SIZE(team),
-            ucc_tl_ucp_coll_init, &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
-            ucc_tl_ucp_alg_id_to_init, mem_types, mt_n);
+            ucc_tl_ucp_default_alg_select_str[i], &team_info,
+            &team->super.super, score);
         if (UCC_OK != status) {
             tl_error(tl_team->context->lib,
                      "failed to apply default coll select setting: %s",
@@ -244,27 +266,16 @@ ucc_status_t ucc_tl_ucp_team_get_scores(ucc_base_team_t   *tl_team,
     }
 
     if (strlen(ctx->score_str) > 0) {
-        status = ucc_coll_score_update_from_str(
-            ctx->score_str, score, UCC_TL_TEAM_SIZE(team), NULL,
-            &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
-            ucc_tl_ucp_alg_id_to_init, mem_types, mt_n);
-
-        /* If INVALID_PARAM - User provided incorrect input - try to proceed */
-        if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
-            (status != UCC_ERR_NOT_SUPPORTED)) {
-            goto err;
-        }
+        status = ucc_coll_score_update_from_str(ctx->score_str, &team_info,
+                                                &team->super.super, score);
     } else if (strlen(team->tuning_str) > 0) {
-        status = ucc_coll_score_update_from_str(
-            team->tuning_str, score, UCC_TL_TEAM_SIZE(team), NULL,
-            &team->super.super, UCC_TL_UCP_DEFAULT_SCORE,
-            ucc_tl_ucp_alg_id_to_init, mem_types, mt_n);
-
-        /* If INVALID_PARAM - User provided incorrect input - try to proceed */
-        if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
-            (status != UCC_ERR_NOT_SUPPORTED)) {
-            goto err;
-        }
+        status = ucc_coll_score_update_from_str(team->tuning_str, &team_info,
+                                                &team->super.super, score);
+    }
+    /* If INVALID_PARAM - User provided incorrect input - try to proceed */
+    if ((status < 0) && (status != UCC_ERR_INVALID_PARAM) &&
+        (status != UCC_ERR_NOT_SUPPORTED)) {
+        goto err;
     }
 
     for (i = 0; i < plugins->n_components; i++) {
