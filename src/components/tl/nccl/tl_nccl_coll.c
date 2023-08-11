@@ -459,11 +459,6 @@ ucc_status_t ucc_tl_nccl_allgather_init(ucc_tl_nccl_task_t *task)
 
 ucc_status_t ucc_tl_nccl_allgatherv_init(ucc_tl_nccl_task_t *task)
 {
-    if (UCC_IS_INPLACE(TASK_ARGS(task))) {
-        tl_error(UCC_TASK_LIB(task), "inplace allgatherv is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
     task->super.post = ucc_tl_nccl_allgatherv_p2p_start;
     return UCC_OK;
 }
