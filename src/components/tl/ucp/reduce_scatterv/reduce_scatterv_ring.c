@@ -270,9 +270,11 @@ static ucc_status_t ucc_tl_ucp_reduce_scatterv_ring_init_subset(
     void *scratch, size_t max_block_count)
 {
     ucc_tl_ucp_task_t *task;
+    ucc_tl_ucp_team_t *tl_team;
     ucc_status_t       status;
 
     task                 = ucc_tl_ucp_init_task(coll_args, team);
+    tl_team              = TASK_TEAM(task);
     task->super.post     = ucc_tl_ucp_reduce_scatterv_ring_start;
     task->super.progress = ucc_tl_ucp_reduce_scatterv_ring_progress;
     task->super.finalize = ucc_tl_ucp_reduce_scatterv_ring_finalize;
@@ -280,7 +282,8 @@ static ucc_status_t ucc_tl_ucp_reduce_scatterv_ring_init_subset(
 
     if (task->subset.map.type != UCC_EP_MAP_FULL) {
         status = ucc_ep_map_create_inverse(task->subset.map,
-                                           &task->reduce_scatterv_ring.inv_map);
+                                           &task->reduce_scatterv_ring.inv_map,
+                                           frag && tl_team->cfg.use_reordering);
         if (UCC_OK != status) {
             return status;
         }
