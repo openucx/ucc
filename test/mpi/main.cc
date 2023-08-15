@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Advanced Micro Devices, Inc. 2023. ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
@@ -7,8 +7,8 @@
 
 #include <getopt.h>
 #include <sstream>
-#include "test_mpi.h"
 #include <chrono>
+#include "test_mpi.h"
 
 int test_rand_seed = -1;
 static size_t test_max_size = TEST_UCC_RANK_BUF_SIZE_MAX;
@@ -22,32 +22,45 @@ static std::vector<ucc_coll_type_t> colls = {
     UCC_COLL_TYPE_REDUCE_SCATTER, UCC_COLL_TYPE_REDUCE_SCATTERV,
     UCC_COLL_TYPE_GATHER,         UCC_COLL_TYPE_GATHERV,
     UCC_COLL_TYPE_SCATTER,        UCC_COLL_TYPE_SCATTERV};
-static std::vector<ucc_coll_type_t> onesided_colls = {UCC_COLL_TYPE_ALLTOALL};
-static std::vector<ucc_memory_type_t> mtypes = {UCC_MEMORY_TYPE_HOST};
-static std::vector<ucc_datatype_t>    dtypes         = {
+
+static std::vector<ucc_coll_type_t> onesided_colls = {
+    UCC_COLL_TYPE_ALLTOALL};
+
+static std::vector<ucc_memory_type_t> mtypes = {
+    UCC_MEMORY_TYPE_HOST};
+
+static std::vector<ucc_datatype_t> dtypes = {
     UCC_DT_INT16,   UCC_DT_INT32,   UCC_DT_INT64,
     UCC_DT_UINT16,  UCC_DT_UINT32,  UCC_DT_UINT64,
     UCC_DT_FLOAT32, UCC_DT_FLOAT64, UCC_DT_FLOAT64_COMPLEX};
-static std::vector<ucc_reduction_op_t>     ops    = {UCC_OP_SUM, UCC_OP_MAX,
-                                              UCC_OP_AVG};
-static std::vector<ucc_test_mpi_team_t> teams = {TEAM_WORLD, TEAM_REVERSE,
-                                                 TEAM_SPLIT_HALF, TEAM_SPLIT_ODD_EVEN};
-static std::vector<ucc_test_vsize_flag_t> counts_vsize = {TEST_FLAG_VSIZE_32BIT,
-                                                          TEST_FLAG_VSIZE_64BIT};
-static std::vector<ucc_test_vsize_flag_t> displs_vsize = {TEST_FLAG_VSIZE_32BIT,
-                                                          TEST_FLAG_VSIZE_64BIT};
-static size_t msgrange[3] = {8, (1ULL << 21), 8};
-static std::vector<bool> inplace    = {false};
-static std::vector<bool> persistent = {false};
-static std::vector<bool> triggered  = {false};
-static ucc_test_mpi_root_t root_type = ROOT_RANDOM;
-static int root_value = 10;
-static ucc_thread_mode_t                   thread_mode  = UCC_THREAD_SINGLE;
-static int                                 iterations   = 1;
-static int                                 show_help    = 0;
-static int                                 num_tests    = 1;
-static bool                                has_onesided = true;
-static bool                                verbose      = false;
+
+static std::vector<ucc_reduction_op_t> ops = {
+    UCC_OP_SUM, UCC_OP_MAX, UCC_OP_AVG};
+
+static std::vector<ucc_test_mpi_team_t> teams = {
+    TEAM_WORLD, TEAM_REVERSE, TEAM_SPLIT_HALF, TEAM_SPLIT_ODD_EVEN};
+
+static std::vector<ucc_test_vsize_flag_t> counts_vsize = {
+    TEST_FLAG_VSIZE_32BIT, TEST_FLAG_VSIZE_64BIT};
+
+static std::vector<ucc_test_vsize_flag_t> displs_vsize = {
+    TEST_FLAG_VSIZE_32BIT, TEST_FLAG_VSIZE_64BIT};
+
+static size_t msgrange[3] = {
+    8, (1ULL << 21), 8};
+
+static std::vector<bool>   inplace      = {false};
+static std::vector<bool>   persistent   = {false};
+static std::vector<bool>   triggered    = {false};
+static ucc_test_mpi_root_t root_type    = ROOT_RANDOM;
+static int                 root_value   = 10;
+static ucc_thread_mode_t   thread_mode  = UCC_THREAD_SINGLE;
+static int                 iterations   = 1;
+static int                 show_help    = 0;
+static int                 num_tests    = 1;
+static bool                has_onesided = true;
+static bool                verbose      = false;
+
 #if defined(HAVE_CUDA) || defined(HAVE_HIP)
 extern test_set_gpu_device_t test_gpu_set_device;
 #endif
@@ -505,14 +518,15 @@ void ProcessArgs(int argc, char** argv)
 
 int main(int argc, char *argv[])
 {
-    std::chrono::steady_clock::time_point begin =
-        std::chrono::steady_clock::now();
-    int failed = 0;
+    int failed                       = 0;
+    int total_done_skipped_failed[4] = {0};
+    std::chrono::steady_clock::time_point begin;
     int size, required, provided, completed, rank;
     UccTestMpi *test;
     MPI_Request req;
     std::string err;
 
+    begin = std::chrono::steady_clock::now();
     try {
         ProcessArgs(argc, argv);
     } catch (const std::string &s) {
@@ -596,50 +610,51 @@ int main(int argc, char *argv[])
             }
         }
     }
-
     std::cout << std::flush;
-    MPI_Iallreduce(MPI_IN_PLACE, test->results.data(), test->results.size(),
-                   MPI_INT, MPI_MIN, MPI_COMM_WORLD, &req);
+
+    total_done_skipped_failed[0] = test->results.size();
+    for (auto s : test->results) {
+        switch(s) {
+        case UCC_OK:
+            total_done_skipped_failed[1]++;
+            break;
+        case UCC_ERR_NOT_IMPLEMENTED:
+        case UCC_ERR_LAST:
+            total_done_skipped_failed[2]++;
+            break;
+        default:
+            total_done_skipped_failed[3]++;
+        }
+    }
+    MPI_Iallreduce(MPI_IN_PLACE, total_done_skipped_failed,
+                   sizeof(total_done_skipped_failed)/sizeof(int),
+                   MPI_INT, MPI_MAX, MPI_COMM_WORLD, &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         test->progress_ctx();
     } while(!completed);
 
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
     if (0 == rank) {
         std::chrono::steady_clock::time_point end =
             std::chrono::steady_clock::now();
-        int skipped = 0;
-        int done = 0;
-        for (auto s : test->results) {
-            switch(s) {
-            case UCC_OK:
-                done++;
-                break;
-            case UCC_ERR_NOT_IMPLEMENTED:
-            case UCC_ERR_LAST:
-                skipped++;
-                break;
-            default:
-                failed++;
-            }
-        }
         std::cout << "\n===== UCC MPI TEST REPORT =====\n" <<
-            "   total tests : " << test->results.size() << "\n" <<
-            "   passed      : " << done << "\n" <<
-            "   skipped     : " << skipped << "\n" <<
-            "   failed      : " << failed << "\n" <<
+            "   total tests : " << total_done_skipped_failed[0] << "\n" <<
+            "   passed      : " << total_done_skipped_failed[1] << "\n" <<
+            "   skipped     : " << total_done_skipped_failed[2] << "\n" <<
+            "   failed      : " << total_done_skipped_failed[3] << "\n" <<
             "   elapsed     : " <<
             std::chrono::duration_cast<std::chrono::seconds>(end - begin).count()
                   << "s" << std::endl;
 
-	if (skipped == test->results.size()) {
-            std::cout << "\n All tests have been skipped, indicating most likely "
-                         "a problem\n";
-            failed = 1;
-	}
+        /* check if all tests have been skipped */
+        if (total_done_skipped_failed[0] == total_done_skipped_failed[2]) {
+                std::cout <<
+                    "\n All tests have been skipped, indicating most likely "
+                    "a problem\n";
+                failed = 1;
+        }
     }
+
 test_exit:
     delete test;
 mpi_exit:
