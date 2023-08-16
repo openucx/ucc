@@ -180,6 +180,23 @@ typedef struct ucc_tl_ucp_task {
                                          int step);
         } allgather_ring;
         struct {
+            /*
+             * get send/recv block depends on subset type being used.
+             * For service allgather we need to get context endpoints but keep
+             * subset numbering.
+             * For regular allgather with rank reordering both endpoints
+             * and blocks permutation are necessary.
+             */
+            ucc_rank_t (*get_send_block)(ucc_subset_t *subset,
+                                         ucc_rank_t trank,
+                                         ucc_rank_t tsize,
+                                         int step);
+            ucc_rank_t (*get_recv_block)(ucc_subset_t *subset,
+                                         ucc_rank_t trank,
+                                         ucc_rank_t tsize,
+                                         int step);
+        } allgather_neighbor;
+        struct {
             ucc_rank_t              dist;
             uint32_t                radix;
         } bcast_kn;

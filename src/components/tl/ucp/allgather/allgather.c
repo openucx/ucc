@@ -17,6 +17,10 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_RING,
              .name = "ring",
              .desc = "O(N) Ring"},
+        [UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR] =
+            {.id   = UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR,
+             .name = "neighbor",
+             .desc = "O(N) Neighbor Exchange N/2 steps"},
         [UCC_TL_UCP_ALLGATHER_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 

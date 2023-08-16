@@ -9,10 +9,11 @@ SUBDIRS = .
 include makefile.coll_plugins.am
 endif
 
-allgather =                       \
-	allgather/allgather.h         \
-	allgather/allgather.c         \
-	allgather/allgather_ring.c    \
+allgather =                        \
+	allgather/allgather.h          \
+	allgather/allgather.c          \
+	allgather/allgather_ring.c     \
+	allgather/allgather_neighbor.c \
 	allgather/allgather_knomial.c
 
 allgatherv =                     \
