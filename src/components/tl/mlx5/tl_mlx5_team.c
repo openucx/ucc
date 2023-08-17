@@ -67,14 +67,14 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
 
     self->a2a = NULL;
     status    = ucc_tl_mlx5_team_init_alltoall(self);
-    if (ucc_unlikely(UCC_OK != status)) {
+    if (UCC_OK != status) {
         return status;
     }
 
     self->mcast  = NULL;
     status = ucc_tl_mlx5_mcast_team_init(tl_context, &(self->mcast), &(ctx->mcast), params,
                                          &(UCC_TL_MLX5_TEAM_LIB(self)->cfg.mcast_conf));
-    if (ucc_unlikely(UCC_OK != status)) {
+    if (UCC_OK != status) {
         return status;
     }
 
@@ -168,33 +168,17 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
 
     team_info.alg_fn              = NULL;
     team_info.default_score       = UCC_TL_MLX5_DEFAULT_SCORE;
-    team_info.init                = NULL;
+    team_info.init                = ucc_tl_mlx5_coll_init;
     team_info.num_mem_types       = 2;
     team_info.supported_mem_types = mt;
     team_info.supported_colls     = UCC_TL_MLX5_SUPPORTED_COLLS;
     team_info.size                = UCC_TL_TEAM_SIZE(team);
 
-    status = ucc_coll_score_alloc(&score);
+    status = ucc_coll_score_build_default(
+        tl_team, UCC_TL_MLX5_DEFAULT_SCORE, ucc_tl_mlx5_coll_init,
+        UCC_TL_MLX5_SUPPORTED_COLLS, mt, 2, &score);
     if (UCC_OK != status) {
-        tl_debug(lib, "failed to alloc score_t");
-        return status;
-    }
-
-    status = ucc_coll_score_add_range(
-        score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_HOST, 0,
-        MAX_MSG_SIZE * UCC_TL_TEAM_SIZE(team), UCC_TL_MLX5_DEFAULT_SCORE,
-        ucc_tl_mlx5_coll_init, tl_team);
-    if (UCC_OK != status) {
-        tl_debug(lib, "failed to add range to score_t");
-        return status;
-    }
-
-    status = ucc_coll_score_add_range(
-        score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_CUDA, 0,
-        MAX_MSG_SIZE * UCC_TL_TEAM_SIZE(team), UCC_TL_MLX5_DEFAULT_SCORE,
-        ucc_tl_mlx5_coll_init, tl_team);
-    if (UCC_OK != status) {
-        tl_debug(lib, "failed to add range to score_t");
+        tl_debug(lib, "failed to build score map");
         return status;
     }
 

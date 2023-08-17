@@ -73,22 +73,16 @@ ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team)
     int                     i, j, node_size, ppn, team_size, nnodes;
     ucc_topo_t             *topo;
 
-    team->a2a = ucc_calloc(1, sizeof(*team->a2a), "mlx5_a2a");
-    if (!team->a2a) {
-        return UCC_ERR_NO_MEMORY;
-    }
+    team->a2a              = NULL;
+    team->dm_ptr           = NULL;
+    team->a2a_status.local = UCC_OK;
 
-    a2a       = team->a2a;
     topo      = team->topo;
     node      = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
     net       = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
     node_size = node->group_size;
     nnodes    = ucc_topo_nnodes(topo);
     team_size = UCC_TL_TEAM_SIZE(team);
-
-    a2a->net.atomic.counters = NULL;
-    team->dm_ptr             = NULL;
-    team->a2a_status.local   = UCC_OK;
 
     if (!ucc_topo_isoppn(topo)) {
         tl_debug(ctx->super.super.lib,
@@ -111,7 +105,6 @@ ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team)
         goto non_fatal_error;
     }
 
-    a2a->node_size = node_size;
 
     for (i = 0; i < nnodes; i++) {
         for (j = 1; j < ppn; j++) {
@@ -125,19 +118,27 @@ ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team)
         }
     }
 
-    a2a->pd                 = ctx->shared_pd;
-    a2a->ctx                = ctx->shared_ctx;
-    a2a->ib_port            = ctx->ib_port;
-    a2a->node.sbgp          = node;
-    a2a->net.sbgp           = net;
-    a2a->node.asr_rank      = MLX5_ASR_RANK;
-    a2a->num_dci_qps        = UCC_TL_MLX5_TEAM_LIB(team)->cfg.num_dci_qps;
-    a2a->sequence_number    = 1;
-    a2a->net.ctrl_mr        = NULL;
-    a2a->net.remote_ctrl    = NULL;
-    a2a->net.rank_map       = NULL;
-    a2a->max_msg_size       = MAX_MSG_SIZE;
-    a2a->max_num_of_columns =
+    team->a2a = ucc_calloc(1, sizeof(*team->a2a), "mlx5_a2a");
+    if (!team->a2a) {
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    a2a                      = team->a2a;
+    a2a->node_size           = node_size;
+    a2a->pd                  = ctx->shared_pd;
+    a2a->ctx                 = ctx->shared_ctx;
+    a2a->ib_port             = ctx->ib_port;
+    a2a->node.sbgp           = node;
+    a2a->net.sbgp            = net;
+    a2a->node.asr_rank       = MLX5_ASR_RANK;
+    a2a->num_dci_qps         = UCC_TL_MLX5_TEAM_LIB(team)->cfg.num_dci_qps;
+    a2a->sequence_number     = 1;
+    a2a->net.atomic.counters = NULL;
+    a2a->net.ctrl_mr         = NULL;
+    a2a->net.remote_ctrl     = NULL;
+    a2a->net.rank_map        = NULL;
+    a2a->max_msg_size        = MAX_MSG_SIZE;
+    a2a->max_num_of_columns  =
         ucc_div_round_up(node->group_size, 2 /* todo: there can be an estimation of
                                                     minimal possible block size */);
 
