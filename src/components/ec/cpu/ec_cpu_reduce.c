@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -8,9 +8,10 @@
 #include "ec_cpu.h"
 #include <complex.h>
 
-#define DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, OP)                        \
+#define DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, OP)                  \
     do {                                                                       \
         size_t _i, _j;                                                         \
+        type  _tmp;                                                            \
         switch (_n_srcs) {                                                     \
         case 2:                                                                \
             for (_i = 0; _i < _count; _i++) {                                  \
@@ -53,13 +54,12 @@
             break;                                                             \
         default:                                                               \
             for (_i = 0; _i < _count; _i++) {                                  \
-                d[_i] = OP##_8(s[0][_i], s[1][_i], s[2][_i], s[3][_i],         \
-                               s[4][_i], s[5][_i], s[6][_i], s[7][_i]);        \
-            }                                                                  \
-            for (_j = 8; _j < _n_srcs; _j++) {                                 \
-                for (_i = 0; _i < _count; _i++) {                              \
-                    d[_i] = OP##_2(d[_i], s[_j][_i]);                          \
+                _tmp = OP##_8(s[0][_i], s[1][_i], s[2][_i], s[3][_i],          \
+                              s[4][_i], s[5][_i], s[6][_i], s[7][_i]);         \
+                for (_j = 8; _j < _n_srcs; _j++) {                             \
+                    _tmp = OP##_2(_tmp, s[_j][_i]);                            \
                 }                                                              \
+                d[_i] = _tmp;                                                  \
             }                                                                  \
             break;                                                             \
         }                                                                      \
@@ -80,37 +80,37 @@
         switch (_op) {                                                         \
         case UCC_OP_AVG:                                                       \
         case UCC_OP_SUM:                                                       \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_SUM);            \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_SUM);      \
             if (flags & UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA) {                 \
                 VEC_OP(d, _count, task->alpha);                                \
             }                                                                  \
             break;                                                             \
         case UCC_OP_MIN:                                                       \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_MIN);            \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_MIN);      \
             break;                                                             \
         case UCC_OP_MAX:                                                       \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_MAX);            \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_MAX);      \
             break;                                                             \
         case UCC_OP_PROD:                                                      \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_PROD);           \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_PROD);     \
             break;                                                             \
         case UCC_OP_LAND:                                                      \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_LAND);           \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_LAND);     \
             break;                                                             \
         case UCC_OP_BAND:                                                      \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_BAND);           \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_BAND);     \
             break;                                                             \
         case UCC_OP_LOR:                                                       \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_LOR);            \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_LOR);      \
             break;                                                             \
         case UCC_OP_BOR:                                                       \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_BOR);            \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_BOR);      \
             break;                                                             \
         case UCC_OP_LXOR:                                                      \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_LXOR);           \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_LXOR);     \
             break;                                                             \
         case UCC_OP_BXOR:                                                      \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_BXOR);           \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_BXOR);     \
             break;                                                             \
         default:                                                               \
             ec_error(&ucc_ec_cpu.super,                                        \
@@ -176,16 +176,16 @@
         switch (_op) {                                                         \
         case UCC_OP_AVG:                                                       \
         case UCC_OP_SUM:                                                       \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_SUM);            \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_SUM);      \
             break;                                                             \
         case UCC_OP_PROD:                                                      \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_PROD);           \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_PROD);     \
             break;                                                             \
         case UCC_OP_MIN:                                                       \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_MIN);            \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_MIN);      \
             break;                                                             \
         case UCC_OP_MAX:                                                       \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_MAX);            \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_MAX);      \
             break;                                                             \
         default:                                                               \
             ec_error(&ucc_ec_cpu.super,                                        \
@@ -206,10 +206,10 @@
         switch (_op) {                                                         \
         case UCC_OP_AVG:                                                       \
         case UCC_OP_SUM:                                                       \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_SUM);            \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_SUM);      \
             break;                                                             \
         case UCC_OP_PROD:                                                      \
-            DO_DT_REDUCE_WITH_OP(s, d, _count, _n_srcs, DO_OP_PROD);           \
+            DO_DT_REDUCE_WITH_OP(type, s, d, _count, _n_srcs, DO_OP_PROD);     \
             break;                                                             \
         default:                                                               \
             ec_error(&ucc_ec_cpu.super,                                        \
