@@ -648,10 +648,9 @@ int main(int argc, char *argv[])
 
         /* check if all tests have been skipped */
         if (total_done_skipped_failed[0] == total_done_skipped_failed[2]) {
-                std::cout <<
-                    "\n All tests have been skipped, indicating most likely "
-                    "a problem\n";
-                failed = 1;
+            std::cout << "\n All tests have been skipped, indicating most likely "
+                         "a problem\n";
+            failed = 1;
         }
     }
 
