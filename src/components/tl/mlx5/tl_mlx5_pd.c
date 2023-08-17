@@ -159,6 +159,8 @@ static ucc_status_t client_recv_data(int *shared_cmd_fd,
         goto out;
     }
 
+    return status;
+
 out:
     if (close(sock) == -1) {
         tl_debug(lib, "Failed to close client socket errno %d", errno);
@@ -203,6 +205,8 @@ static ucc_status_t server_send_data(int command_fd, uint32_t pd_handle,
         tl_debug(lib, "socket file removal failed");
         status = UCC_ERR_NO_MESSAGE;
     }
+
+    return status;
 
 listen_fail:
     if (close(sock) == -1) {
