@@ -303,7 +303,6 @@ static size_t pack_send_data(ucc_tl_ucp_task_t *task, int step,
     int                n                    = send_count;
     int                logi                 = 1;
     void              *op_metadata          = task->alltoallv_hybrid.scratch_mc_header->addr;
-
     ucc_rank_t index;
     int send_len, snd_offset, i, k;
     unsigned int temp_count;
@@ -365,7 +364,7 @@ static size_t pack_send_data(ucc_tl_ucp_task_t *task, int step,
     /* if there is data for less than half the destinations, send meta data
      * in sparse format.
      */
-    if ((sparse_cnt / 2) < send_count) {
+    if ((sparse_cnt * 2) < send_count) {
         /* sparse format: store nonzero messages and source rank index */
         ((unsigned int *)packed_send_buf)[0] = sparse_cnt;
         /* compute space requirement for sparse data exchange header */
