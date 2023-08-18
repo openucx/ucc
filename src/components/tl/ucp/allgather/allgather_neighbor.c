@@ -66,12 +66,19 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_init(ucc_base_coll_args_t *coll_args,
 
 ucc_status_t ucc_tl_ucp_allgather_neighbor_init_common(ucc_tl_ucp_task_t *task)
 {
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
+    ucc_tl_ucp_team_t *team       = TASK_TEAM(task);
+    ucc_rank_t         tsize      = (ucc_rank_t)task->subset.map.ep_num;
     ucc_sbgp_t *sbgp;
 
     if (!ucc_coll_args_is_predefined_dt(&TASK_ARGS(task), UCC_RANK_INVALID)) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
         return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (tsize % 2)
+    {
+        tl_warn(UCC_TASK_LIB(task), "odd team size is not supported, switching to ring");
+        return ucc_tl_ucp_allgather_ring_init_common(task);
     }
     
     if (!(task->flags & UCC_TL_UCP_TASK_FLAG_SUBSET)) {
