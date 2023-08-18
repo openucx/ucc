@@ -27,8 +27,8 @@
 const ucc_tl_ucp_default_alg_desc_t
     ucc_tl_ucp_default_alg_descs[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
         {
-            .select_str = UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR,
-            .str_get_fn = NULL
+            .select_str = NULL,
+            .str_get_fn = ucc_tl_ucp_allgather_score_str_get
         },
         {
             .select_str = NULL,

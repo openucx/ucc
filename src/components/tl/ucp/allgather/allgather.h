@@ -19,7 +19,9 @@ extern ucc_base_coll_alg_info_t
              ucc_tl_ucp_allgather_algs[UCC_TL_UCP_ALLGATHER_ALG_LAST + 1];
 
 #define UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR                            \
-    "allgather:0-4k:@0#allgather:4k-inf:@1"
+    "allgather:0-4k:@0#allgather:4k-inf:@%d"
+
+char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team);
 
 static inline int ucc_tl_ucp_allgather_alg_from_str(const char *str)
 {
