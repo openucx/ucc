@@ -7,18 +7,6 @@
 #include "utils/ucc_coll_utils.h"
 #include "components/mc/ucc_mc.h"
 
-static ucc_rank_t ucc_tl_ucp_allgather_neighbor_get_send_block(
-    ucc_subset_t *subset, ucc_rank_t trank, ucc_rank_t tsize, int step)
-{
-    return ucc_ep_map_eval(subset->map, (trank - step + tsize) % tsize);
-}
-
-static ucc_rank_t ucc_tl_ucp_allgather_neighbor_get_recv_block(
-    ucc_subset_t *subset, ucc_rank_t trank, ucc_rank_t tsize, int step)
-{
-    return ucc_ep_map_eval(subset->map, (trank - step - 1 + tsize) % tsize);
-}
-
 static ucc_rank_t get_recv_from_rank(ucc_rank_t rank, ucc_rank_t size, int i)
 {
     int neighbor[2], offset_at_step[2], recv_data_from[2];
@@ -86,10 +74,6 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_init_common(ucc_tl_ucp_task_t *task)
         }
     }
 
-    task->allgather_neighbor.get_send_block =
-        ucc_tl_ucp_allgather_neighbor_get_send_block;
-    task->allgather_neighbor.get_recv_block =
-        ucc_tl_ucp_allgather_neighbor_get_recv_block;
     task->super.post     = ucc_tl_ucp_allgather_neighbor_start;
     task->super.progress = ucc_tl_ucp_allgather_neighbor_progress;
 
