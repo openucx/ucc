@@ -14,6 +14,8 @@
     _team->sbgps[UCC_HIER_SBGP_##_sbgp].sbgp_type = UCC_SBGP_##_sbgp;          \
     _team->sbgps[UCC_HIER_SBGP_##_sbgp].state     = UCC_HIER_SBGP_##_enable;
 
+#define N_MT 3
+
 /* The function below must enable/disable those hier sbgps that will be
  * used to construct hierarchical schedules.
  * Currently just enable two sbgps as example and for testing purposes.
@@ -308,10 +310,11 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
 ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
                                          ucc_coll_score_t **score_p)
 {
-    ucc_cl_hier_team_t *team  = ucc_derived_of(cl_team, ucc_cl_hier_team_t);
-    ucc_base_lib_t     *lib   = UCC_CL_TEAM_LIB(team);
-    ucc_base_context_t *ctx   = UCC_CL_TEAM_CTX(team);
-    ucc_memory_type_t   mt[2] = {UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA};
+    ucc_cl_hier_team_t *team     = ucc_derived_of(cl_team, ucc_cl_hier_team_t);
+    ucc_base_lib_t     *lib      = UCC_CL_TEAM_LIB(team);
+    ucc_base_context_t *ctx      = UCC_CL_TEAM_CTX(team);
+    ucc_memory_type_t   mt[N_MT] = {UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA,
+                                    UCC_MEMORY_TYPE_CUDA_MANAGED};
     ucc_coll_score_t   *score;
     ucc_status_t        status;
     int                 i;
@@ -331,7 +334,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
         return status;
     }
 
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < N_MT; i++) {
         status = ucc_coll_score_add_range(
             score, UCC_COLL_TYPE_ALLTOALLV, mt[i], 0, UCC_MSG_MAX,
             /* low priority 1: to be enabled manually */
@@ -362,11 +365,6 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
     }
 
     for (i = 0; i < UCC_CL_HIER_N_DEFAULT_ALG_SELECT_STR; i++) {
-        // status = ucc_coll_score_update_from_str(
-        //     ucc_cl_hier_default_alg_select_str[i], score,
-        //     UCC_TL_TEAM_SIZE(team), ucc_cl_hier_coll_init, &team->super.super,
-        //     UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_alg_id_to_init, NULL, 0,
-        //     UCC_COLL_TYPE_ALL);
         status = ucc_coll_score_update_from_str(
             ucc_cl_hier_default_alg_select_str[i], &team_info,
             &team->super.super, score);
@@ -378,10 +376,6 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
     }
 
     if (strlen(ctx->score_str) > 0) {
-        // status = ucc_coll_score_update_from_str(
-        //     ctx->score_str, score, UCC_CL_TEAM_SIZE(team), NULL, cl_team,
-        //     UCC_CL_HIER_DEFAULT_SCORE, ucc_cl_hier_alg_id_to_init, NULL, 0,
-        //     UCC_COLL_TYPE_ALL);
         status = ucc_coll_score_update_from_str(ctx->score_str, &team_info,
                                                 &team->super.super, score);
         /* if INVALID_PARAM - user provided incorrect input - try to proceed */

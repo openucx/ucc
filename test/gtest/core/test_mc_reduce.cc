@@ -57,6 +57,9 @@ class test_mc_reduce : public testing::Test {
             }
 #endif
             break;
+        case UCC_MEMORY_TYPE_CUDA_MANAGED:
+            coll_ee_type = UCC_EE_CUDA_STREAM;
+            break;
         case UCC_MEMORY_TYPE_HOST:
             coll_ee_type = UCC_EE_CPU_THREAD;
             break;

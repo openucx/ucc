@@ -244,7 +244,8 @@ INSTANTIATE_TEST_CASE_P(
                        PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
                        ::testing::Values(UCC_MEMORY_TYPE_HOST,
-                                         UCC_MEMORY_TYPE_CUDA),
+                                         UCC_MEMORY_TYPE_CUDA,
+                                         UCC_MEMORY_TYPE_CUDA_MANAGED),
 #else
                        ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
@@ -298,7 +299,8 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Combine(PREDEFINED_DTYPES,
 #ifdef HAVE_CUDA
                        ::testing::Values(UCC_MEMORY_TYPE_HOST,
-                                         UCC_MEMORY_TYPE_CUDA),
+                                         UCC_MEMORY_TYPE_CUDA,
+                                         UCC_MEMORY_TYPE_CUDA_MANAGED),
 #else
                        ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif

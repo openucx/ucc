@@ -88,7 +88,7 @@ void PrintHelp()
             "barrier, allreduce, allgather, allgatherv, bcast, alltoall, alltoallv "
             "reduce, reduce_scatter, reduce_scatterv, gather, gatherv, scatter, scatterv\n\n"
        "-t, --teams            <t1,t2,..>\n\tlist of teams: world,half,reverse,odd_even\n\n"
-       "-M, --mtypes           <m1,m2,..>\n\tlist of mtypes: host,cuda,rocm\n\n"
+       "-M, --mtypes           <m1,m2,..>\n\tlist of mtypes: host,cuda,cudaManaged,rocm\n\n"
        "-d, --dtypes           <d1,d2,..>\n\tlist of dtypes: (u)int8(16,32,64),float32(64,128),float32(64,128)_complex\n\n"
        "-o, --ops              <o1,o2,..>\n\tlist of ops:sum,prod,max,min,land,lor,lxor,band,bor,bxor\n\n"
        "-I, --inplace          <value>\n\t0 - no inplace, 1 - inplace, 2 - both\n\n"
@@ -179,6 +179,8 @@ static ucc_memory_type_t mtype_str_to_type(std::string mtype)
         return UCC_MEMORY_TYPE_HOST;
     } else if (mtype == "cuda") {
         return UCC_MEMORY_TYPE_CUDA;
+    } else if (mtype == "cudaManaged") {
+        return UCC_MEMORY_TYPE_CUDA_MANAGED;
     } else if (mtype == "rocm") {
         return UCC_MEMORY_TYPE_ROCM;
     }

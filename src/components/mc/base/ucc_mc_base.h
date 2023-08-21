@@ -100,7 +100,8 @@ extern ucc_config_field_t ucc_mc_config_table[];
 
 typedef struct ucc_mc_ops {
     ucc_status_t (*mem_query)(const void *ptr, ucc_mem_attr_t *mem_attr);
-    ucc_status_t (*mem_alloc)(ucc_mc_buffer_header_t **h_ptr, size_t size);
+    ucc_status_t (*mem_alloc)(ucc_mc_buffer_header_t **h_ptr, size_t size,
+                              ucc_memory_type_t mt);
     ucc_status_t (*mem_free)(ucc_mc_buffer_header_t *h_ptr);
     ucc_status_t (*memcpy)(void *dst, const void *src, size_t len,
                            ucc_memory_type_t dst_mem,

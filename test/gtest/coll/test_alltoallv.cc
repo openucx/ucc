@@ -239,7 +239,8 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Combine(
             ::testing::Range(1, UccJob::nStaticTeams), // team_ids
 #ifdef HAVE_CUDA
-            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
+            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA,
+                              UCC_MEMORY_TYPE_CUDA_MANAGED),
 #else
             ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
@@ -252,7 +253,8 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Combine(
             ::testing::Range(1, UccJob::nStaticTeams), // team_ids
 #ifdef HAVE_CUDA
-            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
+            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA,
+                              UCC_MEMORY_TYPE_CUDA_MANAGED),
 #else
             ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
@@ -365,7 +367,8 @@ INSTANTIATE_TEST_CASE_P(
         64, test_alltoallv_2,
         ::testing::Combine(
 #ifdef HAVE_CUDA
-            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
+            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA,
+                              UCC_MEMORY_TYPE_CUDA_MANAGED),
 #else
             ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
@@ -376,7 +379,8 @@ INSTANTIATE_TEST_CASE_P(
         32, test_alltoallv_3,
         ::testing::Combine(
 #ifdef HAVE_CUDA
-            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA),
+            ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA,
+                              UCC_MEMORY_TYPE_CUDA_MANAGED),
 #else
             ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif

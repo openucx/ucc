@@ -60,7 +60,8 @@ static ucc_status_t ucc_mc_rocm_get_attr(ucc_mc_attr_t *mc_attr)
 }
 
 static ucc_status_t ucc_mc_rocm_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
-                                          size_t                   size)
+                                          size_t                   size,
+                                          ucc_memory_type_t        mt)
 {
     hipError_t st;
 
@@ -80,14 +81,15 @@ static ucc_status_t ucc_mc_rocm_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
         return hip_error_to_ucc_status(st);
     }
     h->from_pool = 0;
-    h->mt        = UCC_MEMORY_TYPE_ROCM;
+    h->mt        = mt;
     *h_ptr       = h;
     mc_trace(&ucc_mc_rocm.super, "allocated %ld bytes with hipMalloc", size);
     return UCC_OK;
 }
 
 static ucc_status_t ucc_mc_rocm_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
-                                               size_t                   size)
+                                               size_t                   size,
+                                               ucc_memory_type_t        mt)
 {
     ucc_mc_buffer_header_t *h = NULL;
 
@@ -96,7 +98,7 @@ static ucc_status_t ucc_mc_rocm_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
     }
     if (!h) {
         // Slow path
-        return ucc_mc_rocm_mem_alloc(h_ptr, size);
+        return ucc_mc_rocm_mem_alloc(h_ptr, size, mt);
     }
     if (ucc_unlikely(!h->addr)){
         return UCC_ERR_NO_MEMORY;
@@ -191,7 +193,8 @@ static ucc_status_t ucc_mc_rocm_mem_pool_free(ucc_mc_buffer_header_t *h_ptr)
 
 static ucc_status_t
 ucc_mc_rocm_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
-                                     size_t                   size)
+                                     size_t                   size,
+                                     ucc_memory_type_t        mt)
 {
     // lock assures single mpool initiation when multiple threads concurrently execute
     // different collective operations thus concurrently entering init function.
@@ -201,7 +204,7 @@ ucc_mc_rocm_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
         ucc_mc_rocm.super.ops.mem_alloc = ucc_mc_rocm_mem_alloc;
         ucc_mc_rocm.super.ops.mem_free  = ucc_mc_rocm_mem_free;
         ucc_spin_unlock(&ucc_mc_rocm.init_spinlock);
-        return ucc_mc_rocm_mem_alloc(h_ptr, size);
+        return ucc_mc_rocm_mem_alloc(h_ptr, size, mt);
     }
 
     if (!ucc_mc_rocm.mpool_init_flag) {
@@ -217,7 +220,7 @@ ucc_mc_rocm_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
         ucc_mc_rocm.mpool_init_flag     = 1;
     }
     ucc_spin_unlock(&ucc_mc_rocm.init_spinlock);
-    return ucc_mc_rocm_mem_pool_alloc(h_ptr, size);
+    return ucc_mc_rocm_mem_pool_alloc(h_ptr, size, mt);
 }
 
 static ucc_status_t ucc_mc_rocm_memcpy(void *dst, const void *src, size_t len,
