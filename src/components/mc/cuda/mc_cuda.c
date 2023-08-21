@@ -116,7 +116,8 @@ static ucc_status_t ucc_mc_cuda_get_attr(ucc_mc_attr_t *mc_attr)
 }
 
 static ucc_status_t ucc_mc_cuda_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
-                                          size_t                   size)
+                                          size_t                   size,
+                                          ucc_memory_type_t        mt)
 {
     cudaError_t             st;
     ucc_mc_buffer_header_t *h =
@@ -126,7 +127,9 @@ static ucc_status_t ucc_mc_cuda_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
                  sizeof(ucc_mc_buffer_header_t));
         return UCC_ERR_NO_MEMORY;
     }
-    st = cudaMalloc(&h->addr, size);
+    st = (mt == UCC_MEMORY_TYPE_CUDA) ? cudaMalloc(&h->addr, size) :
+                                        cudaMallocManaged(&h->addr, size,
+                                                          cudaMemAttachGlobal);
     if (ucc_unlikely(st != cudaSuccess)) {
         cudaGetLastError();
         mc_error(&ucc_mc_cuda.super,
@@ -139,20 +142,23 @@ static ucc_status_t ucc_mc_cuda_mem_alloc(ucc_mc_buffer_header_t **h_ptr,
     h->from_pool = 0;
     h->mt        = UCC_MEMORY_TYPE_CUDA;
     *h_ptr       = h;
-    mc_trace(&ucc_mc_cuda.super, "allocated %ld bytes with cudaMalloc", size);
+    mc_trace(&ucc_mc_cuda.super, "allocated %ld bytes with %s", size,
+             ucc_memory_type_names[mt]);
     return UCC_OK;
 }
 
 static ucc_status_t ucc_mc_cuda_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
-                                               size_t                   size)
+                                               size_t                   size,
+                                               ucc_memory_type_t        mt)
 {
     ucc_mc_buffer_header_t *h = NULL;
-    if (size <= MC_CUDA_CONFIG->mpool_elem_size) {
+    if (size <= MC_CUDA_CONFIG->mpool_elem_size &&
+        mt != UCC_MEMORY_TYPE_CUDA_MANAGED) {
         h = (ucc_mc_buffer_header_t *)ucc_mpool_get(&ucc_mc_cuda.mpool);
     }
     if (!h) {
         // Slow path
-        return ucc_mc_cuda_mem_alloc(h_ptr, size);
+        return ucc_mc_cuda_mem_alloc(h_ptr, size, mt);
     }
     if (ucc_unlikely(!h->addr)){
         return UCC_ERR_NO_MEMORY;
@@ -215,7 +221,7 @@ static void ucc_mc_cuda_chunk_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp i
 static ucc_mpool_ops_t ucc_mc_ops = {.chunk_alloc   = ucc_mc_cuda_chunk_alloc,
                                      .chunk_release = ucc_mc_cuda_chunk_release,
                                      .obj_init      = ucc_mc_cuda_chunk_init,
-                                     .obj_cleanup = ucc_mc_cuda_chunk_cleanup};
+                                     .obj_cleanup   = ucc_mc_cuda_chunk_cleanup};
 
 static ucc_status_t ucc_mc_cuda_mem_free(ucc_mc_buffer_header_t *h_ptr)
 {
@@ -244,7 +250,8 @@ static ucc_status_t ucc_mc_cuda_mem_pool_free(ucc_mc_buffer_header_t *h_ptr)
 
 static ucc_status_t
 ucc_mc_cuda_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
-                                     size_t                   size)
+                                     size_t                   size,
+                                     ucc_memory_type_t        mt)
 {
     // lock assures single mpool initiation when multiple threads concurrently execute
     // different collective operations thus concurrently entering init function.
@@ -254,7 +261,7 @@ ucc_mc_cuda_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
         ucc_mc_cuda.super.ops.mem_alloc = ucc_mc_cuda_mem_alloc;
         ucc_mc_cuda.super.ops.mem_free  = ucc_mc_cuda_mem_free;
         ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);
-        return ucc_mc_cuda_mem_alloc(h_ptr, size);
+        return ucc_mc_cuda_mem_alloc(h_ptr, size, mt);
     }
 
     if (!ucc_mc_cuda.mpool_init_flag) {
@@ -270,7 +277,7 @@ ucc_mc_cuda_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
         ucc_mc_cuda.mpool_init_flag     = 1;
     }
     ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);
-    return ucc_mc_cuda_mem_pool_alloc(h_ptr, size);
+    return ucc_mc_cuda_mem_pool_alloc(h_ptr, size, mt);
 }
 
 static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
@@ -279,7 +286,9 @@ static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
 {
     cudaError_t st;
     ucc_assert(dst_mem == UCC_MEMORY_TYPE_CUDA ||
-               src_mem == UCC_MEMORY_TYPE_CUDA);
+               src_mem == UCC_MEMORY_TYPE_CUDA ||
+               dst_mem == UCC_MEMORY_TYPE_CUDA_MANAGED ||
+               src_mem == UCC_MEMORY_TYPE_CUDA_MANAGED);
 
     UCC_MC_CUDA_INIT_STREAM();
     st = cudaMemcpyAsync(dst, src, len, cudaMemcpyDefault, ucc_mc_cuda.stream);
@@ -303,7 +312,7 @@ static ucc_status_t ucc_mc_cuda_memcpy(void *dst, const void *src, size_t len,
     return UCC_OK;
 }
 
-static ucc_status_t ucc_mc_cuda_memset(void *ptr, int val, size_t len)
+ucc_status_t ucc_mc_cuda_memset(void *ptr, int val, size_t len)
 {
     cudaError_t st;
 

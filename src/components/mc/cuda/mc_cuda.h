@@ -47,10 +47,12 @@ extern ucc_mc_cuda_t ucc_mc_cuda;
             ucc_mc_cuda.stream_initialized = 1;                                \
         }                                                                      \
         ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);                           \
-        if (ucc_unlikely(cudaSuccess != cuda_st)) {                     \
-            return cuda_error_to_ucc_status(cuda_st);                   \
-        }                                                               \
+        if (ucc_unlikely(cudaSuccess != cuda_st)) {                            \
+            return cuda_error_to_ucc_status(cuda_st);                          \
+        }                                                                      \
     }                                                                          \
 } while(0)
+
+ucc_status_t ucc_mc_cuda_memset(void *ptr, int val, size_t len);
 
 #endif

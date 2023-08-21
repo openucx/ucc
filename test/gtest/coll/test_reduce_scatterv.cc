@@ -284,6 +284,25 @@ TYPED_TEST(test_reduce_scatterv_cuda, single_persistent_inplace)
 {
     TEST_DECLARE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE, 3, 1);
 }
+TYPED_TEST(test_reduce_scatterv_cuda, single_managed)
+{
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA_MANAGED, TEST_NO_INPLACE, 1, 0);
+}
+
+TYPED_TEST(test_reduce_scatterv_cuda, single_persistent_managed)
+{
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA_MANAGED, TEST_NO_INPLACE, 3, 1);
+}
+
+TYPED_TEST(test_reduce_scatterv_cuda, single_inplace_managed)
+{
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA_MANAGED, TEST_INPLACE, 1, 0);
+}
+
+TYPED_TEST(test_reduce_scatterv_cuda, single_persistent_inplace_managed)
+{
+    TEST_DECLARE(UCC_MEMORY_TYPE_CUDA_MANAGED, TEST_INPLACE, 3, 1);
+}
 #endif
 
 #define TEST_DECLARE_MULTIPLE(_mem_type, _inplace)                             \
@@ -334,6 +353,15 @@ TYPED_TEST(test_reduce_scatterv_cuda, multiple_inplace)
 {
     TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA, TEST_INPLACE);
 }
+TYPED_TEST(test_reduce_scatterv_cuda, multiple_managed)
+{
+    TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA_MANAGED, TEST_NO_INPLACE);
+}
+
+TYPED_TEST(test_reduce_scatterv_cuda, multiple_inplace_managed)
+{
+    TEST_DECLARE_MULTIPLE(UCC_MEMORY_TYPE_CUDA_MANAGED, TEST_INPLACE);
+}
 #endif
 
 class test_reduce_scatterv_alg
@@ -358,6 +386,9 @@ UCC_TEST_P(test_reduce_scatterv_alg, ring)
 
     if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
         mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);
     }
 
     for (auto count : {65536, 123567}) {

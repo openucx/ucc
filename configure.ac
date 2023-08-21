@@ -160,6 +160,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_MPICXX], [false])
      AM_CONDITIONAL([HAVE_PROFILING],[false])
      AM_CONDITIONAL([HAVE_IBVERBS],[false])
+     AM_CONDITIONAL([HAVE_RDMACM],[false])
      AM_CONDITIONAL([HAVE_MLX5DV],[false])
     ],
     [
@@ -175,6 +176,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/sharp.m4])
      m4_include([config/m4/mpi.m4])
      m4_include([config/m4/ibverbs.m4])
+     m4_include([config/m4/rdmacm.m4])
      m4_include([config/m4/configure.m4])
      m4_include([config/m4/tl_coll_plugins.m4])
      m4_include([config/m4/check_tls.m4])
@@ -208,6 +210,9 @@ AS_IF([test "x$with_docs_only" = xyes],
 
      CHECK_IBVERBS
      AC_MSG_RESULT([IBVERBS support: $ibverbs_happy, MLX5DV support: $mlx5dv_happy])
+
+     CHECK_RDMACM
+     AC_MSG_RESULT([RDMACM support: $rdmacm_happy])
      ]) # Docs only
 
 

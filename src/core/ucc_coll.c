@@ -216,6 +216,7 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
         coll_mem_type = ucc_coll_args_mem_type(coll_args, team->rank);
         switch(coll_mem_type) {
         case UCC_MEMORY_TYPE_CUDA:
+        case UCC_MEMORY_TYPE_CUDA_MANAGED:
             coll_ee_type = UCC_EE_CUDA_STREAM;
             break;
         case UCC_MEMORY_TYPE_ROCM:
