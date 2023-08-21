@@ -154,9 +154,7 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         tsize     = UCC_TL_TEAM_SIZE(team);
     size_t             data_size = (count / tsize) * ucc_dt_size(dt);
     ucc_status_t       status;
-    ucc_rank_t         block;
-    int                even_rank;
-    ucc_rank_t         neighbor[2];
+    ucc_rank_t         neighbor;
     void              *tmprecv, *tmpsend;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_neighbor_start",
@@ -164,32 +162,28 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        block  = trank % tsize;
-        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * block), sbuf,
+        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
                                data_size, rmem, smem);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }
     }
 
-    even_rank = !(trank % 2);
-    if (even_rank) {
-        neighbor[0] = (trank + 1) % tsize;
-        neighbor[1] = (trank - 1 + tsize) % tsize;
+    if (!(trank % 2)) {
+        neighbor = (trank + 1) % tsize;
     } else {
-        neighbor[0] = (trank - 1 + tsize) % tsize;
-        neighbor[1] = (trank + 1) % tsize;
+        neighbor = (trank - 1 + tsize) % tsize;
     }
 
-    tmprecv = PTR_OFFSET(rbuf, neighbor[0] * data_size);
+    tmprecv = PTR_OFFSET(rbuf, neighbor * data_size);
     tmpsend = PTR_OFFSET(rbuf, trank * data_size);
 
     /* Sendreceive */
     UCPCHECK_GOTO(
-        ucc_tl_ucp_send_nb(tmpsend, data_size, rmem, neighbor[0], team, task),
+        ucc_tl_ucp_send_nb(tmpsend, data_size, rmem, neighbor, team, task),
         task, out);
     UCPCHECK_GOTO(
-        ucc_tl_ucp_recv_nb(tmprecv, data_size, rmem, neighbor[0], team, task),
+        ucc_tl_ucp_recv_nb(tmprecv, data_size, rmem, neighbor, team, task),
         task, out);
 out:
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
