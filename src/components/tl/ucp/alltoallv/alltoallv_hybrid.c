@@ -373,7 +373,7 @@ static size_t pack_send_data(ucc_tl_ucp_task_t *task, int step,
         while (k < sparse_cnt) {
             unsigned int cur_len = ((unsigned int *)packed_send_buf)[i + 1];
             if (cur_len != 0 && cur_len != COUNT_DIRECT) {
-                BytesForPacking[2 * k]   = i;
+                BytesForPacking[2 * k]     = i;
                 BytesForPacking[2 * k + 1] = cur_len;
                 ++k;
             }
@@ -416,8 +416,8 @@ ucc_status_t send_data(void *buf, int send_size, ucc_rank_t dst,
     ucc_status_t status;
 
     ucc_assert(meta->bins[meta->cur_bin].len != 0);
-    status = ucc_tl_ucp_send_cb(buf, send_size, UCC_MEMORY_TYPE_HOST, dst, TASK_TEAM(task), task,
-                                send_completion,
+    status = ucc_tl_ucp_send_cb(buf, send_size, UCC_MEMORY_TYPE_HOST, dst,
+                                TASK_TEAM(task), task, send_completion,
                                 (void*)&meta->bins[meta->cur_bin]);
     task->alltoallv_hybrid.phase = UCC_ALLTOALLV_HYBRID_PHASE_SENT;
     return status;
@@ -447,8 +447,8 @@ int receive_buffer_recycler(ucc_rank_t tsize, unsigned int* rcv_start, int* rcv_
     while (cur >= 0) {
         for (i = tsize - 1; i >= 0; --i) {
             if (tmp_buf[i + tsize] && ((i / mstep) % radix == node_edge_id)) {
-                tmp_buf[cur]     = i;
-                tmp_buf[i+tsize] = 0;
+                tmp_buf[cur]       = i;
+                tmp_buf[i + tsize] = 0;
                 --cur;
             }
         }
@@ -473,9 +473,9 @@ int receive_buffer_recycler(ucc_rank_t tsize, unsigned int* rcv_start, int* rcv_
             seg_st[cur] = seg_st[cur] % 4;
         } else {
             if (offset < rcv_start[cur]) {
-                memcpy(PTR_OFFSET(buf, offset * dt_size),
-                       PTR_OFFSET(buf, rcv_start[cur] * dt_size),
-                       rcv_len[cur] * dt_size);
+                memmove(PTR_OFFSET(buf, offset * dt_size),
+                        PTR_OFFSET(buf, rcv_start[cur] * dt_size),
+                        rcv_len[cur] * dt_size);
                 rcv_start[cur] = offset;
                 offset += rcv_len[cur];
             } else {
@@ -501,24 +501,23 @@ ucc_status_t post_recv(ucc_rank_t recvfrom, ucc_rank_t tsize, size_t dt_size,
     void         *user_rbuf = TASK_ARGS(task).dst.info_v.buffer;
     uint32_t      radix     = task->alltoallv_hybrid.radix;
     ucc_status_t  status    = UCC_OK;
-    int recv_size, new_offset;
+    int new_offset;
     void* dst_buf;
 
     if (task->alltoallv_hybrid.phase != UCC_ALLTOALLV_HYBRID_PHASE_SENT) {
         return UCC_OK;
     }
-    recv_size = step_buf_size;
+
     /* check if we have space for maximum recieve. If not, recycle */
-    if (meta->offset*dt_size + recv_size > tmp_buf_size) {
+    if (meta->offset * dt_size + step_buf_size > tmp_buf_size) {
         new_offset = receive_buffer_recycler(tsize, (int *)op_metadata, (int *)op_metadata + tsize,
                                              seg_st, p_tmp_recv_region, dt_size, BytesForPacking,
                                              step, user_rbuf, rdisps, trank, radix, node_edge_id);
         meta->offset = new_offset;
     }
-    ucc_assert(meta->offset * dt_size + recv_size <= tmp_buf_size);
+    ucc_assert(meta->offset * dt_size + step_buf_size <= tmp_buf_size);
     dst_buf = PTR_OFFSET(p_tmp_recv_region, meta->offset * dt_size);
-
-    status = ucc_tl_ucp_recv_nb(dst_buf, recv_size, UCC_MEMORY_TYPE_HOST,
+    status = ucc_tl_ucp_recv_nb(dst_buf, step_buf_size, UCC_MEMORY_TYPE_HOST,
                                 recvfrom, TASK_TEAM(task), task);
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
@@ -580,7 +579,7 @@ static ucc_status_t complete_current_step_receives(ucc_rank_t tsize, int step,
         if (rcv_sparse == DENSE_PACK_FORMAT) {
             recv_count = 0;
             recv_size = calculate_head_size(n, dt_size);
-            temp_offset = PTR_OFFSET(dst_buf, recv_size*dt_size);
+            temp_offset = PTR_OFFSET(dst_buf, recv_size * dt_size);
             /* this is where we parse the recieved bruck-like packet and
              * set the pointers to point on the important data segments.
              */
@@ -669,7 +668,7 @@ static inline void hybrid_reverse_rotation(ucc_tl_ucp_task_t *task)
     void              *user_sbuf      = TASK_ARGS(task).src.info_v.buffer;
     void              *user_rbuf      = TASK_ARGS(task).dst.info_v.buffer;
     int               *rdisps         = (int*)TASK_ARGS(task).dst.info_v.displacements;
-    void              *metainfo = task->alltoallv_hybrid.scratch_mc_header->addr;
+    void              *metainfo       = task->alltoallv_hybrid.scratch_mc_header->addr;
     size_t dt_size;
     int i, idx, cur_buf_index, cur_buf_size;
     char loc;
@@ -852,6 +851,7 @@ static void ucc_tl_ucp_alltoallv_hybrid_progress(ucc_coll_task_t *coll_task)
                                            step_header_size, buf);
                 ucc_assert(step_buf_size >= send_size);
                 meta->bins[meta->cur_bin].len = send_size;
+
                 status = send_data(buf, send_size, sendto, meta, task);
                 if (ucc_unlikely(UCC_OK != status)) {
                     task->super.status = status;
