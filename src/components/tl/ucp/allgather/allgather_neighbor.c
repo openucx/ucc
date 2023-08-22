@@ -9,25 +9,24 @@
 
 static ucc_rank_t get_recv_from_rank(ucc_rank_t rank, ucc_rank_t size, int i)
 {
-    int neighbor[2], offset_at_step[2], recv_data_from[2];
-    int even_rank;
-    even_rank = !(rank % 2);
-    if (even_rank) {
-        neighbor[0]       = (rank + 1) % size;
-        neighbor[1]       = (rank - 1 + size) % size;
-        recv_data_from[0] = rank;
-        recv_data_from[1] = rank;
-        offset_at_step[0] = (+2);
-        offset_at_step[1] = (-2);
-    } else {
+    const int  i_parity = i % 2;
+    ucc_rank_t neighbor[2], offset_at_step[2], recv_data_from[2];
+    if (rank % 2) {
         neighbor[0]       = (rank - 1 + size) % size;
         neighbor[1]       = (rank + 1) % size;
         recv_data_from[0] = neighbor[0];
         recv_data_from[1] = neighbor[0];
         offset_at_step[0] = (-2);
         offset_at_step[1] = (+2);
+    } else {
+        neighbor[0]       = (rank + 1) % size;
+        neighbor[1]       = (rank - 1 + size) % size;
+        recv_data_from[0] = rank;
+        recv_data_from[1] = rank;
+        offset_at_step[0] = (+2);
+        offset_at_step[1] = (-2);
     }
-    const int i_parity = i % 2;
+
     return (recv_data_from[i_parity] +
             offset_at_step[i_parity] * ((i + 1) / 2) + size) %
            size;
@@ -83,17 +82,18 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_init_common(ucc_tl_ucp_task_t *task)
 /* Original implmenetation: https://github.com/open-mpi/ompi/blob/main/ompi/mca/coll/base/coll_base_allgather.c */
 void ucc_tl_ucp_allgather_neighbor_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
-    ucc_rank_t         trank = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t         tsize = UCC_TL_TEAM_SIZE(team);
-    ucc_rank_t         neighbor[2];
+    ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
+    ucc_rank_t         trank     = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t         tsize     = UCC_TL_TEAM_SIZE(team);
     void              *rbuf      = TASK_ARGS(task).dst.info.buffer;
     ucc_memory_type_t  rmem      = TASK_ARGS(task).dst.info.mem_type;
     size_t             count     = TASK_ARGS(task).dst.info.count;
     ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
     size_t             data_size = (count / tsize) * ucc_dt_size(dt);
+    ucc_rank_t         neighbor[2];
     ucc_rank_t         i;
+    int                i_parity;
     int                even_rank;
     void              *tmprecv, *tmpsend;
 
@@ -111,8 +111,8 @@ void ucc_tl_ucp_allgather_neighbor_progress(ucc_coll_task_t *coll_task)
     }
 
     while (task->tagged.send_posted < (tsize / 2)) {
-        i                  = task->tagged.send_posted;
-        const int i_parity = i % 2;
+        i        = task->tagged.send_posted;
+        i_parity = i % 2;
 
         tmprecv =
             PTR_OFFSET(rbuf, get_recv_from_rank(trank, tsize, i) * data_size);
@@ -169,10 +169,10 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_start(ucc_coll_task_t *coll_task)
         }
     }
 
-    if (!(trank % 2)) {
-        neighbor = (trank + 1) % tsize;
-    } else {
+    if (trank % 2) {
         neighbor = (trank - 1 + tsize) % tsize;
+    } else {
+        neighbor = (trank + 1) % tsize;
     }
 
     tmprecv = PTR_OFFSET(rbuf, neighbor * data_size);
