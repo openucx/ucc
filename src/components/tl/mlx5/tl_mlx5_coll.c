@@ -31,7 +31,7 @@ ucc_status_t ucc_tl_mlx5_bcast_mcast_init(ucc_base_coll_args_t *coll_args,
     if (ucc_unlikely(UCC_OK != status)) {
         goto free_task;
     }
-       
+
     *task_h = &(task->super);
 
     tl_debug(UCC_TASK_LIB(task), "init coll task %p", task);

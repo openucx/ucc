@@ -6,7 +6,6 @@
 
 #include "tl_mlx5_coll.h"
 #include "tl_mlx5.h"
-#include "tl_mlx5_dm.h"
 #include "tl_mlx5_coll.h"
 #include "coll_score/ucc_coll_score.h"
 #include "alltoall/alltoall.h"
@@ -22,7 +21,7 @@ static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
     status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(team)->ctx_map,
                                       &UCC_TL_TEAM_MAP(team), &team->ctx_map);
     if (UCC_OK != status) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
+        tl_debug(UCC_TL_TEAM_LIB(team), "failed to create ctx map");
         return status;
     }
     subset.map    = team->ctx_map;
@@ -31,7 +30,7 @@ static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
     status = ucc_topo_init(subset, UCC_TL_CORE_CTX(team)->topo, &team->topo);
 
     if (UCC_OK != status) {
-        tl_error(UCC_TL_TEAM_LIB(team), "failed to init team topo");
+        tl_debug(UCC_TL_TEAM_LIB(team), "failed to init team topo");
         goto err_topo_init;
     }
 
@@ -41,10 +40,14 @@ err_topo_init:
     return status;
 }
 
-static void ucc_tl_mlx5_topo_cleanup(ucc_tl_mlx5_team_t *team)
+void ucc_tl_mlx5_topo_cleanup(ucc_tl_mlx5_team_t *team)
 {
+    if (!team->topo) {
+        return;
+    }
     ucc_ep_map_destroy_nested(&team->ctx_map);
     ucc_topo_cleanup(team->topo);
+    team->topo = NULL;
 }
 
 UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
@@ -56,33 +59,26 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
-    self->a2a    = NULL;
-    self->dm_ptr = NULL;
-
     status = ucc_tl_mlx5_topo_init(self);
     if (status != UCC_OK) {
-        tl_error(ctx->super.super.lib, "failed to init team topo");
+        tl_debug(ctx->super.super.lib, "failed to init team topo");
         return status;
     }
 
-    if (ucc_topo_get_sbgp(self->topo, UCC_SBGP_NODE)->group_rank ==
-        MLX5_ASR_RANK) {
-        status = ucc_tl_mlx5_dm_init(self);
-        if (UCC_OK != status) {
-            tl_debug(UCC_TL_TEAM_LIB(self), "failed to init device memory");
-        }
+    self->a2a = NULL;
+    status    = ucc_tl_mlx5_team_init_alltoall(self);
+    if (UCC_OK != status) {
+        return status;
     }
-
-    self->status[0] = status;
-    self->state     = TL_MLX5_TEAM_STATE_INIT;
 
     self->mcast  = NULL;
     status = ucc_tl_mlx5_mcast_team_init(tl_context, &(self->mcast), &(ctx->mcast), params,
                                          &(UCC_TL_MLX5_TEAM_LIB(self)->cfg.mcast_conf));
-    if (ucc_unlikely(UCC_OK != status)) {
+    if (UCC_OK != status) {
         return status;
     }
 
+    self->state = TL_MLX5_TEAM_STATE_INIT;
     tl_debug(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
 }
@@ -91,8 +87,8 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
 {
     tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
 
-    ucc_tl_mlx5_alltoall_cleanup(self);
     ucc_tl_mlx5_dm_cleanup(self);
+    ucc_tl_mlx5_alltoall_cleanup(self);
     ucc_tl_mlx5_topo_cleanup(self);
 }
 
@@ -117,10 +113,10 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     switch (tl_team->state) {
     case TL_MLX5_TEAM_STATE_INIT:
         status = ucc_service_allreduce(
-                    core_team, &tl_team->status[0], &tl_team->status[1],
-                    UCC_DT_INT32, 1, UCC_OP_MIN, subset, &tl_team->scoll_req);
+            core_team, &tl_team->a2a_status.local, &tl_team->a2a_status.global,
+            UCC_DT_INT32, 1, UCC_OP_MIN, subset, &tl_team->scoll_req);
         if (status < 0) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
+            tl_debug(UCC_TL_TEAM_LIB(tl_team),
                      "failed to collect global status");
             return status;
         }
@@ -128,7 +124,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     case TL_MLX5_TEAM_STATE_POSTED:
         status = ucc_service_coll_test(tl_team->scoll_req);
         if (status < 0) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
+            tl_debug(UCC_TL_TEAM_LIB(tl_team),
                      "failure during service coll exchange: %s",
                      ucc_status_string(status));
             return status;
@@ -136,33 +132,27 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         if (UCC_INPROGRESS == status) {
             return status;
         }
-        ucc_assert(status == UCC_OK);
         ucc_service_coll_finalize(tl_team->scoll_req);
-        if (tl_team->status[1] != UCC_OK) {
-            tl_debug(UCC_TL_TEAM_LIB(tl_team),
-                     "node leader failed during device memory init: %s",
-                     ucc_status_string(tl_team->status[1]));
-            ucc_tl_mlx5_team_destroy(team);
-            return tl_team->status[1];
-        }
         tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_INIT;
     case TL_MLX5_TEAM_STATE_ALLTOALL_INIT:
-        status = ucc_tl_mlx5_team_alltoall_init_start(tl_team);
-        if (status != UCC_OK) {
-            tl_debug(UCC_TL_TEAM_LIB(tl_team), "failed to init a2a: %s",
-                     ucc_status_string(status));
-            return status;
-        }
+        tl_team->a2a_status.local =
+            ucc_tl_mlx5_team_test_alltoall_start(tl_team);
         tl_team->state = TL_MLX5_TEAM_STATE_ALLTOALL_POSTED;
     case TL_MLX5_TEAM_STATE_ALLTOALL_POSTED:
-        status = ucc_tl_mlx5_team_alltoall_init_progress(tl_team);
+        // coverity[deref_arg:FALSE]
+        tl_team->a2a_status.local =
+            ucc_tl_mlx5_team_test_alltoall_progress(tl_team);
+        if (UCC_INPROGRESS == tl_team->a2a_status.local) {
+            return UCC_INPROGRESS;
+        }
+        if (UCC_OK != tl_team->a2a_status.local) {
+            tl_debug(UCC_TL_TEAM_LIB(tl_team), "failed to init a2a: %s",
+                     ucc_status_string(tl_team->a2a_status.local));
+        }
     }
-    if (status < 0) {
-        tl_debug(team->context->lib, "failed creating tl team: %p", tl_team);
-    } else if (status == UCC_OK) {
-        tl_debug(team->context->lib, "initialized tl team: %p", tl_team);
-    }
-    return status;
+
+    tl_debug(team->context->lib, "initialized tl team: %p", tl_team);
+    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
@@ -178,33 +168,19 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
 
     team_info.alg_fn              = NULL;
     team_info.default_score       = UCC_TL_MLX5_DEFAULT_SCORE;
-    team_info.init                = NULL;
+    team_info.init                = ucc_tl_mlx5_coll_init;
     team_info.num_mem_types       = 2;
     team_info.supported_mem_types = mt;
-    team_info.supported_colls     = UCC_TL_MLX5_SUPPORTED_COLLS;
+    team_info.supported_colls =
+        (UCC_COLL_TYPE_ALLTOALL * (team->a2a_status.local == UCC_OK)) |
+        UCC_COLL_TYPE_BCAST;
     team_info.size                = UCC_TL_TEAM_SIZE(team);
 
-    status = ucc_coll_score_alloc(&score);
+    status = ucc_coll_score_build_default(
+        tl_team, UCC_TL_MLX5_DEFAULT_SCORE, ucc_tl_mlx5_coll_init,
+        UCC_TL_MLX5_SUPPORTED_COLLS, mt, 2, &score);
     if (UCC_OK != status) {
-        tl_error(lib, "failed to alloc score_t");
-        return status;
-    }
-
-    status = ucc_coll_score_add_range(
-        score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_HOST, 0,
-        MAX_MSG_SIZE * UCC_TL_TEAM_SIZE(team), UCC_TL_MLX5_DEFAULT_SCORE,
-        ucc_tl_mlx5_coll_init, tl_team);
-    if (UCC_OK != status) {
-        tl_error(lib, "failed to add range to score_t");
-        return status;
-    }
-
-    status = ucc_coll_score_add_range(
-        score, UCC_COLL_TYPE_ALLTOALL, UCC_MEMORY_TYPE_CUDA, 0,
-        MAX_MSG_SIZE * UCC_TL_TEAM_SIZE(team), UCC_TL_MLX5_DEFAULT_SCORE,
-        ucc_tl_mlx5_coll_init, tl_team);
-    if (UCC_OK != status) {
-        tl_error(lib, "failed to add range to score_t");
+        tl_debug(lib, "failed to build score map");
         return status;
     }
 
