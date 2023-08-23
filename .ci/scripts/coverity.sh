@@ -1,5 +1,5 @@
 #!/bin/bash -eE
-# shellcheck disable=SC2086,SC2181
+
 set -o pipefail
 
 handle_error() {
@@ -28,9 +28,8 @@ previous_date=$(date -d "yesterday" +'%Y-%m-%d')
 HPCX_UCX_DIR=/hpc/local/benchmarks/daily/next/$previous_date/hpcx-gcc-redhat7/ucx
 HPCX_SHARP_DIR=/hpc/local/benchmarks/daily/next/$previous_date/hpcx-gcc-redhat7/sharp
 ./autogen.sh
-./configure --with-nccl --with-tls=cuda,nccl,self,sharp,shm,ucp,mlx5 --with-ucx=$HPCX_UCX_DIR --with-sharp=$HPCX_SHARP_DIR
-nproc=$(grep -c processor /proc/cpuinfo)
-make_opt="-j$((nproc / 2 + 1))"
+./configure --with-nccl --with-tls=cuda,nccl,self,sharp,shm,ucp,mlx5 --with-ucx="${HPCX_UCX_DIR}" --with-sharp="${HPCX_SHARP_DIR}"
+make_opt="-j$(($(nproc) / 2 + 1))"
 COV_BUILD_DIR=$(dirname "$0")/cov-build
 mkdir -p "$COV_BUILD_DIR"
 COV_ANALYSE_OPTIONS+=" --all"
@@ -82,13 +81,11 @@ function run_coverity_analysis() {
     echo "Running Coverity analysis..."
 
     # Run cov-analyze
-    cov-analyze --dir $COV_BUILD_DIR "$@" --jobs auto $COV_ANALYSE_OPTIONS
+    # shellcheck disable=SC2086
+    cov-analyze --dir "${COV_BUILD_DIR}" "$@" --jobs auto $COV_ANALYSE_OPTIONS
     err_code=$?
     return $err_code
 }
-
-
-
 
 # Main function
 function main() {
@@ -125,17 +122,16 @@ function main() {
 
     # Run Coverity analysis
     if [ -z "$SKIP_COVERITY" ]; then
+    # shellcheck disable=SC2086
         if ! run_coverity_analysis $COV_ANALYZE_ARGS; then
             echo "Coverity analysis failed"
             return 1
         fi
     fi
 
-    
     echo "Uploading to synopsys main coverity server"
-    /auto/sw_tools/Commercial/Synopsys/Coverity/latest/linux_x86_64/bin/cov-commit-defects --ssl --on-new-cert trust --host coverity.mellanox.com --port 8443 --user ${UCC_USERNAME} --password ${UCC_PASSWORD} --dir $COV_BUILD_DIR --stream ucc_master
-    
-
+    cov-commit-defects --ssl --on-new-cert trust --host coverity.mellanox.com --port 8443 \
+    --user "${UCC_USERNAME}" --password "${UCC_PASSWORD}" --dir "$COV_BUILD_DIR" --stream ucc_master
     return 0
 }
 
