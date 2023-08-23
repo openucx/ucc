@@ -37,36 +37,33 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_init(ucc_base_coll_args_t *coll_args,
                                                 ucc_coll_task_t     **task_h)
 {
     ucc_tl_ucp_task_t *task;
+    ucc_tl_ucp_team_t *ucp_team;
     ucc_status_t       status;
 
-    task   = ucc_tl_ucp_init_task(coll_args, team);
-    status = ucc_tl_ucp_allgather_neighbor_init_common(task);
-    if (status != UCC_OK) {
-        ucc_tl_ucp_put_task(task);
-    }
-    *task_h = &task->super;
-    return UCC_OK;
-}
-
-ucc_status_t ucc_tl_ucp_allgather_neighbor_init_common(ucc_tl_ucp_task_t *task)
-{
-    ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
-    ucc_rank_t         tsize = UCC_TL_TEAM_SIZE(team);
+    task     = ucc_tl_ucp_init_task(coll_args, team);
+    ucp_team = TASK_TEAM(task);
 
     if (!ucc_coll_args_is_predefined_dt(&TASK_ARGS(task), UCC_RANK_INVALID)) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
+        status = UCC_ERR_NOT_SUPPORTED;
+        goto out;
     }
 
-    if (tsize % 2) {
+    if (UCC_TL_TEAM_SIZE(ucp_team) % 2) {
         tl_warn(UCC_TASK_LIB(task),
                 "odd team size is not supported, switching to ring");
-        return ucc_tl_ucp_allgather_ring_init_common(task);
+        status = ucc_tl_ucp_allgather_ring_init_common(task);
+    } else {
+        task->super.post     = ucc_tl_ucp_allgather_neighbor_start;
+        task->super.progress = ucc_tl_ucp_allgather_neighbor_progress;
     }
 
-    task->super.post     = ucc_tl_ucp_allgather_neighbor_start;
-    task->super.progress = ucc_tl_ucp_allgather_neighbor_progress;
+out:
+    if (status != UCC_OK) {
+        ucc_tl_ucp_put_task(task);
+    }
 
+    *task_h = &task->super;
     return UCC_OK;
 }
 
