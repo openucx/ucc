@@ -28,7 +28,7 @@ static ucc_rank_t get_recv_from_rank(ucc_rank_t rank, ucc_rank_t size, int i)
     }
 
     return (recv_data_from[i_parity] +
-            offset_at_step[i_parity] * ((i + 1) / 2) + size) %
+            offset_at_step[i_parity] * ucc_div_round_up(i, 2) + size) %
            size;
 }
 
