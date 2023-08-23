@@ -79,13 +79,11 @@ void ucc_tl_ucp_allgather_neighbor_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t         tsize     = UCC_TL_TEAM_SIZE(team);
     void              *rbuf      = TASK_ARGS(task).dst.info.buffer;
     ucc_memory_type_t  rmem      = TASK_ARGS(task).dst.info.mem_type;
-    size_t             count     = TASK_ARGS(task).dst.info.count;
     ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
+    size_t             count     = TASK_ARGS(task).dst.info.count;
     size_t             data_size = (count / tsize) * ucc_dt_size(dt);
-    ucc_rank_t         neighbor[2];
-    ucc_rank_t         i;
-    int                i_parity;
-    int                even_rank;
+    ucc_rank_t         neighbor[2], i;
+    int                i_parity, even_rank;
     void              *tmprecv, *tmpsend;
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
