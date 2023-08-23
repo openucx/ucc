@@ -52,7 +52,6 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_init_common(ucc_tl_ucp_task_t *task)
 {
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
     ucc_rank_t         tsize = UCC_TL_TEAM_SIZE(team);
-    ucc_sbgp_t        *sbgp;
 
     if (!ucc_coll_args_is_predefined_dt(&TASK_ARGS(task), UCC_RANK_INVALID)) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
@@ -63,14 +62,6 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_init_common(ucc_tl_ucp_task_t *task)
         tl_warn(UCC_TASK_LIB(task),
                 "odd team size is not supported, switching to ring");
         return ucc_tl_ucp_allgather_ring_init_common(task);
-    }
-
-    if (!(task->flags & UCC_TL_UCP_TASK_FLAG_SUBSET)) {
-        if (team->cfg.use_reordering) {
-            sbgp = ucc_topo_get_sbgp(team->topo, UCC_SBGP_FULL_HOST_ORDERED);
-            task->subset.myrank = sbgp->group_rank;
-            task->subset.map    = sbgp->map;
-        }
     }
 
     task->super.post     = ucc_tl_ucp_allgather_neighbor_start;
