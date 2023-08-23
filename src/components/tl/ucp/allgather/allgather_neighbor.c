@@ -36,9 +36,9 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_init(ucc_base_coll_args_t *coll_args,
                                                 ucc_base_team_t      *team,
                                                 ucc_coll_task_t     **task_h)
 {
+    ucc_status_t       status = UCC_OK;
     ucc_tl_ucp_task_t *task;
     ucc_tl_ucp_team_t *ucp_team;
-    ucc_status_t       status;
 
     task     = ucc_tl_ucp_init_task(coll_args, team);
     ucp_team = TASK_TEAM(task);
