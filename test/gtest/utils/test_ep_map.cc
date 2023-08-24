@@ -1,7 +1,8 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
+
 extern "C" {
 #include "utils/ucc_coll_utils.h"
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -137,7 +137,7 @@ static void ucc_tl_ucp_reduce_scatter_ring_progress(ucc_coll_task_t *coll_task)
         prevblock     =
             ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, prevblock);
         if (team->cfg.use_reordering) {
-            prevblock     = ucc_ep_map_eval(task->subset.map, prevblock);
+            prevblock = ucc_ep_map_eval(task->subset.map, prevblock);
         }
         /* reduction */
         ucc_assert(task->tagged.recv_posted == task->tagged.recv_completed);
@@ -233,14 +233,15 @@ ucc_tl_ucp_reduce_scatter_ring_start(ucc_coll_task_t *coll_task)
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
+
+    r_scratch  = task->reduce_scatter_ring.scratch;
     sendto     = ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, sendto);
     recvfrom   = ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, recvfrom);
     recv_block = ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, recv_block);
     send_block = ucc_ep_map_eval(task->reduce_scatter_ring.inv_map, send_block);
-    r_scratch  = task->reduce_scatter_ring.scratch;
     if (team->cfg.use_reordering) {
-        sendto   = ucc_ep_map_eval(task->subset.map, sendto);
-        recvfrom = ucc_ep_map_eval(task->subset.map, recvfrom);
+        sendto     = ucc_ep_map_eval(task->subset.map, sendto);
+        recvfrom   = ucc_ep_map_eval(task->subset.map, recvfrom);
         recv_block = ucc_ep_map_eval(task->subset.map, recv_block);
         send_block = ucc_ep_map_eval(task->subset.map, send_block);
     }
@@ -345,7 +346,6 @@ ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
     ucc_memory_type_t  mem_type = coll_args->args.dst.info.mem_type;
     int                bidir =
         UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.reduce_scatter_ring_bidirectional;
-    // int free_rev_reorder_flag   = 1;
     size_t                 to_alloc_per_set, max_segcount, count_per_set;
     ucc_tl_ucp_schedule_t *tl_schedule;
     ucc_schedule_t        *schedule;
@@ -374,17 +374,11 @@ ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
        to split into 2 sets */
     n_subsets    = (bidir && (count > size)) ? 2 : 1;
 
-    // int flag = 1;
-    // while (flag) {}
     if (tl_team->cfg.use_reordering) {
         sbgp = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_FULL_HOST_ORDERED);
         s[0].myrank     = sbgp->group_rank;
         s[0].map        = sbgp->map;
 
-        // status = ucc_ep_map_create_reverse_from_reorder(s[0].map, &s[1].map);
-        // if (ucc_unlikely(UCC_OK != status)) {
-        //     goto out;
-        // }
         s[1].map    = ucc_ep_map_create_reverse(UCC_TL_TEAM_SIZE(tl_team));
         s[1].myrank = ucc_ep_map_eval(s[1].map, s[0].myrank);
     } else {
@@ -405,21 +399,20 @@ ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
                                 to_alloc_per_set * dt_size * n_subsets,
                                 mem_type),
                    out, status);
-    // free_rev_reorder_flag = 0;
     for (i = 0; i < n_subsets; i++) {
         UCC_CHECK_GOTO(ucc_tl_ucp_reduce_scatter_ring_init_subset(
                            coll_args, team, &ctask, s, n_subsets, i,
                            PTR_OFFSET(tl_schedule->scratch_mc_header->addr,
                                       to_alloc_per_set * i * dt_size),
                            max_segcount),
-                       out_free_scratch, status);
+                       out_free, status);
         ctask->n_deps = 1;
-        UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, ctask), out_free_scratch,
+        UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, ctask), out_free,
                        status);
         UCC_CHECK_GOTO(ucc_event_manager_subscribe(
                            &schedule->super, UCC_EVENT_SCHEDULE_STARTED, ctask,
                            ucc_task_start_handler),
-                       out_free_scratch, status);
+                       out_free, status);
     }
     schedule->super.flags   |= UCC_COLL_TASK_FLAG_EXECUTOR;
     schedule->super.post     = ucc_tl_ucp_reduce_scatter_ring_sched_post;
@@ -427,12 +420,8 @@ ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
     *task_h                  = &schedule->super;
     return UCC_OK;
 
-out_free_scratch:
+out_free:
     ucc_mc_free(tl_schedule->scratch_mc_header);
-// out_free_rev_reord:
-//     if (tl_team->cfg.use_reordering) {
-//         ucc_free(s[1].map.array.map);
-//     }
 out:
     ucc_tl_ucp_put_schedule(schedule);
     return status;

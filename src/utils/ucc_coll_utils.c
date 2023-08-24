@@ -631,39 +631,6 @@ ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size)
     return map;
 }
 
-ucc_status_t ucc_ep_map_create_reverse_from_reorder(ucc_ep_map_t map,
-                                                    ucc_ep_map_t *new_map)
-{
-    ucc_ep_map_t rev_reord;
-    ucc_rank_t   i, r;
-    ucc_rank_t   max_rank;
-
-    rev_reord.type            = UCC_EP_MAP_ARRAY;
-    rev_reord.ep_num          = map.ep_num;
-    rev_reord.array.elem_size = sizeof(ucc_rank_t);
-    max_rank                  = 0;
-    for (i = 0; i < map.ep_num; i++) {
-        r = (ucc_rank_t)ucc_ep_map_eval(map, i);
-        if (r > max_rank) {
-            max_rank = r;
-        }
-    }
-    rev_reord.array.map =
-        ucc_malloc(sizeof(ucc_rank_t) * (max_rank + 1), "rev_reord_map");
-    if (!rev_reord.array.map) {
-        ucc_error("failed to allocate %zd bytes for rev_reord map\n",
-                    sizeof(ucc_rank_t) * map.ep_num);
-        return UCC_ERR_NO_MEMORY;
-    }
-    for (i = 0; i < map.ep_num; i++) {
-        r = (ucc_rank_t)ucc_ep_map_eval(map, i);
-        *((ucc_rank_t *)PTR_OFFSET(rev_reord.array.map, sizeof(ucc_rank_t) * r)) =
-            max_rank - i;
-    }
-    *new_map = rev_reord;
-    return UCC_OK;
-}
-
 static inline int ucc_ep_map_is_reverse(ucc_ep_map_t *map,
                                         int reversed_reordered_flag)
 {
@@ -705,7 +672,6 @@ ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map,
                 i;
         }
     }
-    // *reversed_reordered_flag = 0;
     *inv_map = inv;
     return UCC_OK;
 }
