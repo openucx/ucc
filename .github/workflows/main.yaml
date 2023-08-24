@@ -8,7 +8,7 @@ env:
   OPEN_MPI_LINK: https://github.com/open-mpi/ompi.git
   OPEN_MPI_BRANCH: v5.0.x
   IMB_LINK: https://github.com/intel/mpi-benchmarks.git
-  IMB_COLLS: allgather,allgatherv,allreduce,alltoall,alltoallv,barrier,bcast,reduce
+  IMB_COLLS: allgather,allgatherv,allreduce,alltoall,alltoallv,barrier,bcast,gather,gatherv,reduce,reduce_scatter,reduce_scatter_block,scatter,scatterv
 jobs:
   tests:
     runs-on: ubuntu-latest
