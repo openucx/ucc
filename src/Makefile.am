@@ -50,6 +50,7 @@ noinst_HEADERS =                      \
 	coll_score/ucc_coll_score.h       \
 	utils/arch/aarch64/cpu.h          \
 	utils/arch/ppc64/cpu.h            \
+	utils/arch/riscv64/cpu.h          \
 	utils/arch/x86_64/cpu.h           \
 	utils/arch/cpu.h                  \
 	utils/arch/cuda_def.h             \
