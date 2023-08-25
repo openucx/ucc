@@ -197,10 +197,9 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
             memcpy(&op_args.args, coll_args, sizeof(ucc_coll_args_t));
             op_args.team = team;
             op_args.args.flags = 0;
-            UCC_COPY_PARAM_BY_FIELD(&op_args.args, coll_args, UCC_COLL_ARGS_FIELD_FLAGS,
-                                    flags);
+            UCC_COPY_PARAM_BY_FIELD(&op_args.args, coll_args,
+                                    UCC_COLL_ARGS_FIELD_FLAGS, flags);
             ucc_coll_task_init(task, &op_args, NULL);
-            *request = &task->super;
             goto print_trace;
         }
     }
@@ -278,9 +277,9 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     task->seq_num = team->seq_num++;
 
     ucc_assert(task->super.status == UCC_OPERATION_INITIALIZED);
-    *request = &task->super;
 
 print_trace:
+    *request = &task->super;
     if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DIAG) {
         char coll_str[256];
         ucc_coll_str(task, coll_str, sizeof(coll_str),
@@ -329,6 +328,7 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
     ucc_status_t status;
 
     if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DEBUG) {
+        /* team is NULL if task is a dummy task, e.g. collective of zero size */
         if (task->team) {
             ucc_rank_t rank = task->team->params.team->rank;
             if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {

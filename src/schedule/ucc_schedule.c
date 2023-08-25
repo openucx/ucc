@@ -98,7 +98,7 @@ ucc_status_t ucc_dummy_finalize(ucc_coll_task_t *task)
 void ucc_dummy_progress(ucc_coll_task_t *task)
 {
     /* this function should never be called */
-    ucc_assert(0);
+    ucc_assert_always(0);
 }
 
 ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
