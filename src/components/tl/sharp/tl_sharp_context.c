@@ -442,7 +442,7 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
     status = ucc_topo_init(set, core_ctx->topo, &topo);
     if (UCC_OK != status) {
         tl_error(sharp_ctx->super.super.lib, "failed to init topo");
-        goto err_topo_init;
+        return status;
     }
 
     status = ucc_tl_sharp_context_init(sharp_ctx, &sharp_ctx->sharp_context,
@@ -456,7 +456,6 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
         status = ucc_tl_sharp_rcache_create(sharp_ctx->sharp_context, &sharp_ctx->rcache);
         if (status != UCC_OK) {
             tl_error(sharp_ctx->super.super.lib, "failed to create rcache");
-            status = UCC_ERR_NO_RESOURCE;
             goto err_sharp_ctx_init;
         }
     }
@@ -477,8 +476,6 @@ err_sharp_progress_register:
     }
 err_sharp_ctx_init:
     sharp_coll_finalize(sharp_ctx->sharp_context);
-err_topo_init:
-    ucc_mpool_cleanup(&sharp_ctx->req_mp, 1);
     return status;
 }
 

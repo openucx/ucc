@@ -810,6 +810,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
                 } else {
                     ucc_debug("ctx create epilog for %s failed: %s",
                               tl_lib->iface->super.name, ucc_status_string(status));
+                    tl_lib->iface->context.destroy(&tl_ctx->super);
                     for (j = 0; j < ctx->n_cl_ctx; j++) {
                         remove_tl_ctx_from_array(ctx->cl_ctx[j]->tl_ctxs,
                                                  &ctx->cl_ctx[j]->n_tl_ctxs,
@@ -825,7 +826,7 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
     }
     if (0 == created_ctx_counter) {
         ucc_error("no TL context created");
-        status = UCC_ERR_NO_MESSAGE;
+        status = UCC_ERR_NO_RESOURCE;
         goto error_ctx_create_epilog;
     }
 
