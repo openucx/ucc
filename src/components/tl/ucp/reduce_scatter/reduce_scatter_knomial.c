@@ -15,20 +15,40 @@
         task->reduce_scatter_kn.phase = _phase;                                \
     } while (0)
 
-static inline void get_sbuf_rbuf(ucc_knomial_pattern_t *p, ucc_coll_args_t *args,
-                                 void *scratch, size_t block_count,
+static inline void get_sbuf_rbuf(ucc_tl_ucp_task_t *task, size_t block_count,
                                  void **sbuf, void **rbuf)
 {
-    uint8_t node_type = p->node_type;
-    size_t  dt_size   = ucc_dt_size(args->dst.info.datatype);
+    ucc_coll_args_t       *args      = &TASK_ARGS(task);
+    size_t                 dt_size   = ucc_dt_size(args->dst.info.datatype);
+    void                  *scratch   = task->reduce_scatter_kn.scratch;
+    ucc_knomial_pattern_t *p         = &task->reduce_scatter_kn.p;
+    size_t offset, local_seg_offset, local_seg_count;
 
     if (ucc_knomial_pattern_loop_first_iteration(p)) {
-        *sbuf = (KN_NODE_PROXY == node_type || UCC_IS_INPLACE(*args))
+        *sbuf = ((KN_NODE_PROXY ==  p->node_type) || UCC_IS_INPLACE(*args))
                  ? args->dst.info.buffer: args->src.info.buffer;
         *rbuf = scratch;
     } else {
         *sbuf = scratch;
-        *rbuf = PTR_OFFSET(*sbuf, block_count * dt_size);
+        if (!ucc_knomial_pattern_loop_last_iteration(p) ||
+            (task->reduce_scatter_kn.scratch_mc_header != NULL)) {
+            *rbuf = PTR_OFFSET(*sbuf, block_count * dt_size);
+        } else {
+            ucc_sra_kn_get_offset_and_seglen(args->dst.info.count, dt_size,
+                                             p->rank, p->size,
+                                             p->radix, &local_seg_offset,
+                                             &local_seg_count);
+            local_seg_offset = local_seg_offset / dt_size;
+            if ((local_seg_offset <= block_count) || (local_seg_count == 0)) {
+                *rbuf = PTR_OFFSET(*sbuf, block_count * dt_size);
+            } else {
+                offset = (local_seg_offset - block_count) % local_seg_count;
+                /* check we have enough space to store segments */
+                ucc_assert(args->dst.info.count - (block_count + offset) >=
+                           local_seg_count * (ucc_kn_compute_step_radix(p) - 1));
+                *rbuf = PTR_OFFSET(*sbuf, (block_count + offset) * dt_size);
+            }
+        }
     }
 }
 
@@ -39,11 +59,8 @@ void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_coll_args_t            *args       = &TASK_ARGS(task);
     ucc_tl_ucp_team_t          *team       = TASK_TEAM(task);
     ucc_kn_radix_t              radix      = task->reduce_scatter_kn.p.radix;
-    int                         avg_pre_op =
-    UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op;
-    uint8_t                     node_type  =
-        task->reduce_scatter_kn.p.node_type;
     ucc_knomial_pattern_t      *p          = &task->reduce_scatter_kn.p;
+    uint8_t                     node_type  = p->node_type;
     void                       *scratch    = task->reduce_scatter_kn.scratch;
     void                       *rbuf       = args->dst.info.buffer;
     ucc_memory_type_t           mem_type   = args->dst.info.mem_type;
@@ -56,7 +73,7 @@ void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t                  rank       = UCC_TL_TEAM_RANK(team);
     ucc_rank_t                  size       = UCC_TL_TEAM_SIZE(team);
     ptrdiff_t peer_seg_offset, local_seg_offset, offset;
-    ucc_rank_t peer, step_radix, local_seg_index;
+    ucc_rank_t peer, step_radix;
     ucc_status_t status;
     ucc_kn_radix_t loop_step;
     size_t block_count, peer_seg_count, local_seg_count;
@@ -105,10 +122,9 @@ UCC_KN_PHASE_EXTRA_REDUCE:
     }
     while (!ucc_knomial_pattern_loop_done(p)) {
         block_count = ucc_sra_kn_compute_block_count(count, rank, p);
-        get_sbuf_rbuf(p, args, task->reduce_scatter_kn.scratch, block_count,
-                      &sbuf, &rbuf);
         ucc_kn_rs_pattern_peer_seg(rank, p, &local_seg_count,
                                    &local_seg_offset);
+        get_sbuf_rbuf(task, block_count, &sbuf, &rbuf);
         for (loop_step = radix - 1; loop_step > 0; loop_step--) {
             peer = ucc_knomial_pattern_get_loop_peer(p, rank, loop_step);
             if (peer == UCC_KN_PEER_NULL) {
@@ -136,39 +152,30 @@ UCC_KN_PHASE_LOOP:
             step_radix = ucc_kn_compute_step_radix(p);
             ucc_kn_rs_pattern_peer_seg(rank, p, &local_seg_count,
                                        &local_seg_offset);
-            get_sbuf_rbuf(p, args, task->reduce_scatter_kn.scratch, block_count,
-                          &sbuf, &rbuf);
+            get_sbuf_rbuf(task, block_count, &sbuf, &rbuf);
             local_data  = PTR_OFFSET(sbuf, local_seg_offset * dt_size);
-            reduce_data = task->reduce_scatter_kn.scratch;
-            is_avg      = args->op == UCC_OP_AVG &&
-                     (avg_pre_op ? ucc_knomial_pattern_loop_first_iteration(p)
-                                 : ucc_knomial_pattern_loop_last_iteration(p));
+            is_avg      = (args->op == UCC_OP_AVG) &&
+                          (UCC_TL_UCP_TEAM_LIB(team)->cfg.reduce_avg_pre_op ?
+                                   ucc_knomial_pattern_loop_first_iteration(p) :
+                                   ucc_knomial_pattern_loop_last_iteration(p));
             ucc_assert((step_radix - 1) ==
                        (task->tagged.send_posted - p->iteration * (radix - 1)));
 
-            if (!task->reduce_scatter_kn.scratch_mc_header &&
-                ucc_knomial_pattern_loop_last_iteration(p)) {
-                status = ucc_dt_reduce_strided(
-                    rbuf, PTR_OFFSET(rbuf, local_seg_count * dt_size), rbuf,
-                    step_radix - 2, local_seg_count, local_seg_count * dt_size,
-                    dt, args, 0, 0, task->reduce_scatter_kn.executor,
-                    &task->reduce_scatter_kn.etask);
-
+            if (ucc_knomial_pattern_loop_last_iteration(p)) {
+                ucc_sra_kn_get_offset_and_seglen(count, dt_size, rank, size,
+                                                 radix, &offset,
+                                                 &local_seg_count);
+                reduce_data = PTR_OFFSET(args->dst.info.buffer, offset);
             } else {
-                if (task->reduce_scatter_kn.scratch_mc_header &&
-                    ucc_knomial_pattern_loop_last_iteration(p)) {
-                    ucc_sra_kn_get_offset_and_seglen(count, dt_size, rank, size,
-                                                     radix, &offset,
-                                                     &local_seg_count);
-                    reduce_data = PTR_OFFSET(args->dst.info.buffer, offset);
-                }
-                status = ucc_dt_reduce_strided(
-                    local_data, rbuf, reduce_data, step_radix - 1,
-                    local_seg_count, local_seg_count * dt_size, dt, args,
-                    is_avg ? UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA : 0,
-                    AVG_ALPHA(task), task->reduce_scatter_kn.executor,
-                    &task->reduce_scatter_kn.etask);
+                reduce_data = task->reduce_scatter_kn.scratch;
             }
+
+            status = ucc_dt_reduce_strided(local_data, rbuf, reduce_data,
+                                           step_radix - 1, local_seg_count,
+                                           local_seg_count * dt_size, dt, args,
+                                           is_avg ? UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA : 0,
+                                           AVG_ALPHA(task), task->reduce_scatter_kn.executor,
+                                           &task->reduce_scatter_kn.etask);
             if (ucc_unlikely(UCC_OK != status)) {
                 tl_error(UCC_TASK_LIB(task), "failed to perform dt reduction");
                 task->super.status = status;
@@ -181,42 +188,7 @@ UCC_KN_PHASE_REDUCE:
         }
         ucc_kn_rs_pattern_next_iter(p);
     }
-
-    if (!task->reduce_scatter_kn.scratch_mc_header) {
-        ucc_knomial_pattern_prev_iteration(p);
-        get_sbuf_rbuf(p, args, task->reduce_scatter_kn.scratch, block_count,
-                      &sbuf, &rbuf);
-
-        step_radix = ucc_kn_compute_step_radix(p);
-        local_seg_index = ucc_kn_compute_seg_index(
-            rank, p->radix_pow, p);
-        local_seg_count = ucc_sra_kn_compute_seg_size(
-            block_count, step_radix, local_seg_index);
-        local_seg_offset = ucc_sra_kn_compute_seg_offset(
-            block_count, step_radix, local_seg_index);
-        local_data  = PTR_OFFSET(sbuf, local_seg_offset * dt_size);
-        is_avg      = args->op == UCC_OP_AVG &&
-                            (avg_pre_op ? ucc_knomial_pattern_loop_first_iteration(p)
-                                        : ucc_knomial_pattern_loop_last_iteration(p));
-
-        ucc_sra_kn_get_offset_and_seglen(count, dt_size, rank, size, radix,
-                                         &offset, &local_seg_count);
-        status = ucc_dt_reduce(local_data, rbuf,
-                               PTR_OFFSET(args->dst.info.buffer, offset),
-                               local_seg_count, dt, args,
-                               is_avg ? UCC_EEE_TASK_FLAG_REDUCE_WITH_ALPHA : 0,
-                               AVG_ALPHA(task),
-                               task->reduce_scatter_kn.executor,
-                               &task->reduce_scatter_kn.etask);
-        if (ucc_unlikely(status != UCC_OK)) {
-            tl_error(UCC_TASK_LIB(task), "failed to reduce data to dst buffer");
-            task->super.status = status;
-            return;
-        }
-    UCC_KN_PHASE_COMPLETE:
-        EXEC_TASK_TEST(UCC_KN_PHASE_COMPLETE, "failed to perform reduce",
-                       task->reduce_scatter_kn.etask);
-    }
+UCC_KN_PHASE_COMPLETE:
 UCC_KN_PHASE_PROXY: /* unused label */
 out:
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_reduce_scatter_kn_done",
@@ -263,9 +235,11 @@ ucc_tl_ucp_reduce_scatter_knomial_finalize(ucc_coll_task_t *coll_task)
     return ucc_tl_ucp_coll_finalize(coll_task);
 }
 
-ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
-    ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
-    ucc_coll_task_t **task_h, ucc_kn_radix_t radix)
+ucc_status_t
+ucc_tl_ucp_reduce_scatter_knomial_init_r(ucc_base_coll_args_t *coll_args,
+                                         ucc_base_team_t *team,
+                                         ucc_coll_task_t **task_h,
+                                         ucc_kn_radix_t radix)
 {
     ucc_tl_ucp_team_t *tl_team   = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         rank      = UCC_TL_TEAM_RANK(tl_team);
@@ -318,8 +292,8 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_init_r(
 
 ucc_status_t
 ucc_tl_ucp_reduce_scatter_knomial_init(ucc_base_coll_args_t *coll_args,
-                                       ucc_base_team_t *     team,
-                                       ucc_coll_task_t **    task_h)
+                                       ucc_base_team_t *team,
+                                       ucc_coll_task_t **task_h)
 {
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         size    = UCC_TL_TEAM_SIZE(tl_team);
