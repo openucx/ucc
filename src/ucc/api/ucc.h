@@ -869,32 +869,32 @@ typedef ucc_oob_coll_t ucc_context_oob_coll_t;
 typedef ucc_oob_coll_t ucc_team_oob_coll_t;
 
 typedef enum {
-    UCC_SHARED_MKEY,
-    UCC_SHARED_MEMH,
-    UCC_SHARED_CTX,
-    UCC_SHARED_QP,
-} ucc_shared_resource_type;
+    UCC_ATTR_MKEY,
+    UCC_ATTR_MEMH,
+    UCC_ATTR_CTX,
+    UCC_ATTR_QP,
+} ucc_attribute_type;
 
-typedef struct ucc_shared_resource {
-    ucc_shared_resource_type type;
-    void *resource;
-    size_t len;
-} ucc_shared_resource_t;
+typedef struct ucc_attribute {
+    ucc_attribute_type type;
+    void              *attr;
+    size_t             attr_len;
+} ucc_attribute_t;
 
-typedef struct ucc_resource_set {
-    ucc_shared_resource_t *resources;
-    uint64_t n_resources;
-} ucc_resource_set_t;
+typedef struct ucc_attribute_set {
+    ucc_attribute_t *attribute;
+    uint64_t         n_attributes;
+} ucc_attribute_set_t;
 
 /**
  *
  *  @ingroup UCC_CONTEXT_DT
  */
 typedef struct ucc_mem_map {
-    void              *address; /*!< The address of a buffer to be attached to
+    void                 *address; /*!< The address of a buffer to be attached to
                                     a UCC context */
-    size_t             len;     /*!< The length of the buffer */
-    ucc_resource_set_t resource_set;
+    size_t                len;     /*!< The length of the buffer */
+    ucc_attribute_set_t   attribute_set;
 } ucc_mem_map_t;
 
 /**
