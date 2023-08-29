@@ -218,8 +218,9 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
     size_t             count     = TASK_ARGS(task).dst.info.count;
     ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
     size_t             data_size = count * ucc_dt_size(dt);
-    ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
     ucc_mrange_uint_t *p         = &team->cfg.allreduce_kn_radix;
+    ucc_sbgp_t        *sbgp;
+    ucc_rank_t         size;
     ucc_kn_radix_t     radix, cfg_radix;
     ucc_status_t       status;
 
@@ -227,12 +228,20 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init_common(ucc_tl_ucp_task_t *task)
     task->super.post     = ucc_tl_ucp_allreduce_knomial_start;
     task->super.progress = ucc_tl_ucp_allreduce_knomial_progress;
     task->super.finalize = ucc_tl_ucp_allreduce_knomial_finalize;
-    cfg_radix            = ucc_tl_ucp_get_radix_from_range(team, data_size,
-                               mem_type, p, UCC_UUNITS_AUTO_RADIX);
-    radix                = ucc_min(cfg_radix, size);
-    status               = ucc_mc_alloc(&task->allreduce_kn.scratch_mc_header,
-                          (radix - 1) * data_size,
-                          TASK_ARGS(task).dst.info.mem_type);
+
+    if (!(task->flags & UCC_TL_UCP_TASK_FLAG_SUBSET) && team->cfg.use_reordering) {
+        sbgp = ucc_topo_get_sbgp(team->topo, UCC_SBGP_FULL_HOST_ORDERED);
+        task->subset.myrank = sbgp->group_rank;
+        task->subset.map    = sbgp->map;
+    }
+
+    size      = (ucc_rank_t)task->subset.map.ep_num;
+    cfg_radix = ucc_tl_ucp_get_radix_from_range(team, data_size, mem_type, p,
+                                                UCC_UUNITS_AUTO_RADIX);
+    radix     = ucc_min(cfg_radix, size);
+    status    = ucc_mc_alloc(&task->allreduce_kn.scratch_mc_header,
+                             (radix - 1) * data_size,
+                             TASK_ARGS(task).dst.info.mem_type);
     task->allreduce_kn.scratch = task->allreduce_kn.scratch_mc_header->addr;
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TASK_LIB(task), "failed to allocate scratch buffer");
