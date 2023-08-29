@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * See file LICENSE for terms.
+ */
 #include "config.h"
 #include "tl_ucp.h"
 #include "allgather.h"
