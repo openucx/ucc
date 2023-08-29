@@ -29,6 +29,13 @@
         goto go;                                                               \
     }
 
+#define RESOURCE_CHECK(ctx, msg, go)                                           \
+    if (ctx == NULL) {                                                         \
+        tl_error(ctx->super.super.lib, msg);                                   \
+        ucc_status = UCC_INVALID_PARAM;                                        \
+        goto go;                                                               \
+    }
+
 unsigned ucc_tl_ucp_service_worker_progress(void *progress_arg)
 {
     ucc_tl_ucp_context_t *ctx = (ucc_tl_ucp_context_t *)progress_arg;
@@ -476,30 +483,82 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
     }
 
     for (i = 0; i < nsegs; i++) {
-        mmap_params.field_mask =
-            UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
-        mmap_params.address = map.segments[i].address;
-        mmap_params.length  = map.segments[i].len;
+        mh = NULL;
 
-        status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
-        if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib,
-                     "ucp_mem_map failed with error code: %d", status);
-            ucc_status = ucs_status_to_ucc_status(status);
-            goto fail_mem_map;
-        }
-        ctx->remote_info[i].mem_h = (void *)mh;
-        status                    = ucp_rkey_pack(ctx->worker.ucp_context, mh,
-                               &ctx->remote_info[i].packed_key,
-                               &ctx->remote_info[i].packed_key_len);
-        if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib,
-                     "failed to pack UCP key with error code: %d", status);
-            ucc_status = ucs_status_to_ucc_status(status);
-            goto fail_mem_map;
-        }
         ctx->remote_info[i].va_base = map.segments[i].address;
-        ctx->remote_info[i].len     = map.segments[i].len;
+        ctx->remote_info[i].len = map.segments[i].len;
+        ctx->remote_info[i].ucp_context = NULL;
+        ctx->remote_info[i].ucp_worker = NULL;
+
+        for (int j = 0; j < map.segments[i].resource_set.n_resources; j++) {
+            ucc_shared_resource_t *tmp_resource = &map.segments[i].resource_set.resources[j];
+            if (tmp_resource->type == UCC_SHARED_CTX) {
+                ctx->remote_info[i].ucp_context = (ucp_context_h) tmp_resource->resource;
+            } else if (tmp_resource->type == UCC_SHARED_QP) {
+                ctx->remote_info[i].ucp_worker = (ucp_worker_h) tmp_resource->resource;
+            } else if (tmp_resource->type == UCC_SHARED_MEMH) {
+                mmap_params.field_mask |= UCP_MEM_MAP_FIELD_EXPORTED_MEMH_BUFFER;
+                mmap_params.exported_memh_buffer = tmp_resource->resource;
+
+                RESOURCE_CHECK(ctx->remote_info[i].ucp_context,
+                               "Shared resource context either missing or ordered after resource",
+                               fail_mem_map);
+
+                status = ucp_mem_map(ctx->remote_info[i].ucp_context, &map_params, &mh);
+                if (status == UCS_ERR_UNREACHABLE) {
+                    tl_error(ctx->super.super.lib, "exported memh unsupported");
+                    ucc_status = ucs_status_to_ucc_status(status);
+                    goto fail_mem_map; //FIXME
+                } else if (status < UCS_OK) {
+                    tl_error(ctx->super.super.lib, "error on ucp_mem_map");
+                    goto fail_mem_map;
+                }
+
+                status = ucp_rkey_pack(ctx->remote_info[i].ucp_context, mh,
+                                      &ctx->remote_info[i].packed_key,
+                                      &ctx->remote_info[i].packed_key_len);
+                if (UCS_OK != status) {
+                    tl_error(ctx->super.super.lib,
+                        "failed to pack UCP key with error code: %d", status);
+                    ucc_status = ucs_status_to_ucc_status(status);
+                    goto fail_mem_map;
+                }
+            } else if (tmp_resource->type == UCC_SHARED_MKEY) {
+                ctx->remote_info[i].packed_key = tmp_resource->resource;
+                ctx->remote_info[i].packed_key_len = tmp_resource->len;
+            }
+        }
+
+        if (!ctx->remote_info[i].ucp_context) {
+            ctx->remote_info[i].ucp_context = ctx->worker.ucp_context;
+        }
+        if (!ctx->remote_info[i].ucp_worker) {
+            ctx->remote_info[i].ucp_worker = ctx->worker.ucp_worker;
+        }
+
+        if (ctx->remote_info[i].packed_key == NULL) {
+            mmap_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
+            mmap_params.address    = map.segments[i].address;
+            mmap_params.length     = map.segments[i].len;
+            /* we do everything we used to do */
+            status = ucp_mem_map(ctx->remote_info[i].ucp_context, &mmap_params, &mh);
+            if (UCS_OK != status) {
+                tl_error(ctx->super.super.lib,
+                         "ucp_mem_map failed with error code: %d", status);
+                ucc_status = ucs_status_to_ucc_status(status);
+                goto fail_mem_map;
+            }
+            status = ucp_rkey_pack(ctx->worker.ucp_context, mh,
+                                   &ctx->remote_info[i].packed_key,
+                                   &ctx->remote_info[i].packed_key_len);
+            if (UCS_OK != status) {
+                tl_error(ctx->super.super.lib,
+                         "failed to pack UCP key with error code: %d", status);
+                ucc_status = ucs_status_to_ucc_status(status);
+                goto fail_mem_map;
+            }
+        }
+        ctx->remote_info[i].mem_h = mh;
     }
     ctx->n_rinfo_segs = nsegs;
 

@@ -88,6 +88,9 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
 
 typedef struct ucc_tl_ucp_remote_info {
+    ucp_context_h ucp_context;
+    ucp_worker_h  ucp_worker;
+    ucp_ep_h     *eps;
     void * va_base;
     size_t len;
     void * mem_h;

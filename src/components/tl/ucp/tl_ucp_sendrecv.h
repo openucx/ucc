@@ -237,6 +237,8 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     void                 *keys;
     void                 *offset;
     ptrdiff_t             base_offset;
+    uint64_t *addr_lens;
+    void *addrs;
 
     *segment  = -1;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
@@ -249,7 +251,9 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     base_offset = (ptrdiff_t)(TL_UCP_EP_ADDR_ONESIDED_INFO(offset, ctx));
     rvas        = (uint64_t *)base_offset;
     key_sizes   = PTR_OFFSET(base_offset, (section_offset * 2));
-    keys        = PTR_OFFSET(base_offset, (section_offset * 3));
+    addr_lens   = PTR_OFFSET(base_offset, (section_offset * 3));
+    keys        = PTR_OFFSET(base_offset, (section_offset * 4));
+    addrs       = PTR_OFFSET(base_offset, (section_offset * 5));//FIXME
 
     for (int i = 0; i < ctx->n_rinfo_segs; i++) {
         if ((uint64_t)va >= (uint64_t)team->va_base[i] &&
@@ -264,6 +268,38 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
             "attempt to perform one-sided operation on non-registered memory");
         return UCC_ERR_NOT_FOUND;
     }
+    if (ctx->worker.ucp_context == ctx->remote_info[*segment].ucp_context) {
+        ucc_status_t ucc_status = ucc_tl_ucp_get_ep(team, peer, ep);
+        if (ucc_unlikely(UCC_OK != ucc_status) {
+            return status;
+        }
+    } else {
+        if (!ctx->remote_info[*segment].eps[peer]) {
+            // make it
+            ucs_status_t ucs_status;
+            ucp_ep_params_t ep_params = {
+                .field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS | UCP_EP_PARAM_FIELD_ERR_HANDLING_MODE | UCP_EP_PARAM_FIELD_ERR_HANDLER;
+                .address = (ucp_address_t *) addrs[peer]; //FIXME
+                .err_mode = UCC_ERR_HANDLING_MODE_PEER,
+                .err_handler = {
+                    .cb = ucc_tl_ucp_err_handler,
+                    .arg = NULL,
+                },
+            };
+            ucs_status = ucp_ep_create(ctx->remote_info[*segment].ucp_worker,
+                                       &ep_params,
+                                       ep);
+            if (UCS_OK != ucs_status) {
+                tl_error(ctx->super.super.lib, "ucp returned connect error: %s",
+                    ucs_status_string(status));
+                return ucs_status_to_ucc_status(status);
+            }
+            ctx->remote_info[*segment].eps[peer] = *ep;
+        } else {
+            *ep = ctx->remote_info[*segment].eps[peer];
+        }
+    }
+
     if (ucc_unlikely(NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment))) {
         ucs_status_t ucs_status =
             ucp_ep_rkey_unpack(*ep, PTR_OFFSET(keys, key_offset),
@@ -328,12 +364,12 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
-
+/*
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
-
+*/
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
                                           &rva, &rkey, &segment);
     if (ucc_unlikely(UCC_OK != status)) {
@@ -371,12 +407,12 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
-
+/*
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
-
+*/
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
                                           &rva, &rkey, &segment);
     if (ucc_unlikely(UCC_OK != status)) {
@@ -414,12 +450,12 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
-
+/*
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
-
+*/
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
                                           &rva, &rkey, &segment);
     if (ucc_unlikely(UCC_OK != status)) {
