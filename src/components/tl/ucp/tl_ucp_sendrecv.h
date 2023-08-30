@@ -237,8 +237,8 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     void                 *keys;
     void                 *offset;
     ptrdiff_t             base_offset;
-    uint64_t *addr_lens;
-    void *addrs;
+    void                 *addrs;
+    uint64_t             *addr_lens;
 
     *segment  = -1;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
@@ -270,36 +270,30 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     }
     if (ctx->worker.ucp_context == ctx->remote_info[*segment].ucp_context) {
         ucc_status_t ucc_status = ucc_tl_ucp_get_ep(team, peer, ep);
-        if (ucc_unlikely(UCC_OK != ucc_status) {
-            return status;
+        if (ucc_unlikely(UCC_OK != ucc_status)) {
+            return ucc_status;
         }
     } else {
         if (!ctx->remote_info[*segment].eps[peer]) {
             // make it
-            ucs_status_t ucs_status;
+            ucs_status_t    ucs_status;
             ucp_ep_params_t ep_params = {
-                .field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS | UCP_EP_PARAM_FIELD_ERR_HANDLING_MODE | UCP_EP_PARAM_FIELD_ERR_HANDLER;
-                .address = (ucp_address_t *) addrs[peer]; //FIXME
-                .err_mode = UCC_ERR_HANDLING_MODE_PEER,
-                .err_handler = {
-                    .cb = ucc_tl_ucp_err_handler,
-                    .arg = NULL,
-                },
+                .field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS,
+                .address    = (ucp_address_t *)PTR_OFFSET(
+                       addrs, peer * addr_lens[peer]), //FIXME
             };
             ucs_status = ucp_ep_create(ctx->remote_info[*segment].ucp_worker,
-                                       &ep_params,
-                                       ep);
+                                       &ep_params, ep);
             if (UCS_OK != ucs_status) {
                 tl_error(ctx->super.super.lib, "ucp returned connect error: %s",
-                    ucs_status_string(status));
-                return ucs_status_to_ucc_status(status);
+                         ucs_status_string(ucs_status));
+                return ucs_status_to_ucc_status(ucs_status);
             }
             ctx->remote_info[*segment].eps[peer] = *ep;
         } else {
             *ep = ctx->remote_info[*segment].eps[peer];
         }
     }
-
     if (ucc_unlikely(NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment))) {
         ucs_status_t ucs_status =
             ucp_ep_rkey_unpack(*ep, PTR_OFFSET(keys, key_offset),
