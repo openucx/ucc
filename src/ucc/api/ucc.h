@@ -891,10 +891,10 @@ typedef struct ucc_attribute_set {
  *  @ingroup UCC_CONTEXT_DT
  */
 typedef struct ucc_mem_map {
-    void                 *address; /*!< The address of a buffer to be attached to
+    void               *address; /*!< The address of a buffer to be attached to
                                     a UCC context */
-    size_t                len;     /*!< The length of the buffer */
-    ucc_attribute_set_t   attribute_set;
+    size_t              len;     /*!< The length of the buffer */
+    ucc_attribute_set_t attribute_set;
 } ucc_mem_map_t;
 
 /**
