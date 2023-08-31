@@ -7,6 +7,7 @@
 
 #include <getopt.h>
 #include <sstream>
+#include <algorithm>
 #include <chrono>
 #include "test_mpi.h"
 
@@ -602,7 +603,14 @@ int main(int argc, char *argv[])
     }
 
     if (has_onesided) {
-        test->set_colls(onesided_colls);
+        std::vector<ucc_coll_type_t>           os_colls(onesided_colls.size());
+        std::vector<ucc_coll_type_t>::iterator it_start;
+
+        it_start = std::set_intersection(
+            colls.begin(), colls.end(), onesided_colls.begin(),
+            onesided_colls.end(), os_colls.begin());
+        os_colls.resize(it_start - os_colls.begin());
+        test->set_colls(os_colls);
         for (auto inpl : inplace) {
             for (auto pers : persistent) {
                 test->set_triggered(false);
