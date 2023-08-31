@@ -45,10 +45,10 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     size_t                 count     = args->dst.info.count;
     size_t                 dt_size   = ucc_dt_size(args->dst.info.datatype);
     size_t                 data_size = count * dt_size;
-    ucc_rank_t             size      = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t             size      = task->subset.map.ep_num;
     ucc_rank_t             broot     = args->coll_type == UCC_COLL_TYPE_BCAST ?
                                        args->root : 0;
-    ucc_rank_t             rank      = VRANK(UCC_TL_TEAM_RANK(team), broot, size);
+    ucc_rank_t             rank      = VRANK(task->subset.myrank, broot, size);
     size_t                 local     = GET_LOCAL_COUNT(args, size, rank);
     void                  *sbuf;
     ptrdiff_t              peer_seg_offset, local_seg_offset;
@@ -67,18 +67,21 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
         if (p->type != KN_PATTERN_ALLGATHERX) {
             UCPCHECK_GOTO(ucc_tl_ucp_send_nb(task->allgather_kn.sbuf,
                                              local * dt_size, mem_type,
-                                             INV_VRANK(peer, broot, size), team,
-                                             task),
+                                             ucc_ep_map_eval(task->subset.map,
+                                             INV_VRANK(peer,broot,size)),
+                                             team, task),
                           task, out);
         }
         UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(rbuf, data_size, mem_type,
-                                         INV_VRANK(peer, broot, size), team,
-                                         task),
+                                         ucc_ep_map_eval(task->subset.map,
+                                         INV_VRANK(peer,broot,size)),
+                                         team, task),
                       task, out);
     }
     if ((p->type != KN_PATTERN_ALLGATHERX) && (node_type == KN_NODE_PROXY)) {
         peer = ucc_knomial_pattern_get_extra(p, rank);
         extra_count = GET_LOCAL_COUNT(args, size, peer);
+        peer = ucc_ep_map_eval(task->subset.map, peer);
         UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(task->allgather_kn.sbuf,
                                         local * dt_size), extra_count * dt_size,
                                         mem_type, peer, team, task),
@@ -113,8 +116,9 @@ UCC_KN_PHASE_EXTRA:
             }
             UCPCHECK_GOTO(ucc_tl_ucp_send_nb(sbuf, local_seg_count * dt_size,
                                              mem_type,
-                                             INV_VRANK(peer, broot, size), team,
-                                             task),
+                                             ucc_ep_map_eval(task->subset.map,
+                                             INV_VRANK(peer, broot, size)),
+                                             team, task),
                           task, out);
         }
 
@@ -135,7 +139,9 @@ UCC_KN_PHASE_EXTRA:
             UCPCHECK_GOTO(
                 ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, peer_seg_offset * dt_size),
                                    peer_seg_count * dt_size, mem_type,
-                                   INV_VRANK(peer, broot, size), team, task),
+                                   ucc_ep_map_eval(task->subset.map,
+                                   INV_VRANK(peer, broot, size)),
+                                   team, task),
                 task, out);
         }
     UCC_KN_PHASE_LOOP:
@@ -149,7 +155,9 @@ UCC_KN_PHASE_EXTRA:
     if (KN_NODE_PROXY == node_type) {
         peer = ucc_knomial_pattern_get_extra(p, rank);
         UCPCHECK_GOTO(ucc_tl_ucp_send_nb(args->dst.info.buffer, data_size,
-                                         mem_type, INV_VRANK(peer, broot, size),
+                                         mem_type,
+                                         ucc_ep_map_eval(task->subset.map,
+                                         INV_VRANK(peer, broot, size)),
                                          team, task),
                       task, out);
     }
@@ -172,10 +180,10 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_coll_args_t            *args  = &TASK_ARGS(task);
     ucc_tl_ucp_team_t          *team  = TASK_TEAM(task);
     ucc_coll_type_t             ct    = args->coll_type;
-    ucc_rank_t                  size  = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t                  size  = task->subset.map.ep_num;
     ucc_kn_radix_t              radix = task->allgather_kn.p.radix;
     ucc_knomial_pattern_t      *p     = &task->allgather_kn.p;
-    ucc_rank_t                  rank  = VRANK(UCC_TL_TEAM_RANK(team),
+    ucc_rank_t                  rank  = VRANK(task->subset.myrank,
                                               ct == UCC_COLL_TYPE_BCAST ?
                                               args->root : 0, size);
     ucc_ee_executor_task_args_t eargs = {0};
@@ -230,14 +238,22 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_coll_task_t **task_h, ucc_kn_radix_t radix)
 {
+    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task;
+    ucc_sbgp_t        *sbgp;
 
     task = ucc_tl_ucp_init_task(coll_args, team);
+    if (tl_team->cfg.use_reordering &&
+        coll_args->args.coll_type == UCC_COLL_TYPE_ALLREDUCE) {
+        sbgp = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_FULL_HOST_ORDERED);
+        task->subset.myrank = sbgp->group_rank;
+        task->subset.map    = sbgp->map;
+    }
     task->allgather_kn.p.radix = radix;
-    task->super.flags    |= UCC_COLL_TASK_FLAG_EXECUTOR;
-    task->super.post     = ucc_tl_ucp_allgather_knomial_start;
-    task->super.progress = ucc_tl_ucp_allgather_knomial_progress;
-    *task_h              = &task->super;
+    task->super.flags         |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    task->super.post           = ucc_tl_ucp_allgather_knomial_start;
+    task->super.progress       = ucc_tl_ucp_allgather_knomial_progress;
+    *task_h                    = &task->super;
     return UCC_OK;
 }
 
