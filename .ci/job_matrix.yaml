@@ -73,7 +73,7 @@ steps:
   #============================================================================
   - name: Run Coverity
     credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0"
-    agentSelector: "{nodeLabel: 'swx-clx01'}"
+    agentSelector: "{nodeLabel: 'ml-test-node-gpu'}"
     run: |
       export UCC_PASSWORD=$UCC_PASSWORD
       export UCC_USERNAME=$UCC_USERNAME
