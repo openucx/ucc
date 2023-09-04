@@ -60,6 +60,7 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_init(ucc_base_coll_args_t *coll_args,
 out:
     if (status != UCC_OK) {
         ucc_tl_ucp_put_task(task);
+        return status;
     }
 
     *task_h = &task->super;
