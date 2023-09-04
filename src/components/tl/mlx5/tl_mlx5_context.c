@@ -26,6 +26,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_mlx5_config->super,
                               params->context);
     memcpy(&self->cfg, tl_mlx5_config, sizeof(*tl_mlx5_config));
+    self->sock       = 0;
     self->rcache     = NULL;
     self->shared_pd  = NULL;
     self->shared_ctx = NULL;
@@ -73,8 +74,11 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
         tl_debug(self->super.super.lib, "failed to free ib ctx and pd");
     };
 
+    if (!self->sock) {
+        close(self->sock);
+    }
+
     ucc_mpool_cleanup(&self->req_mp, 1);
-    close(self->sock);
 }
 
 UCC_CLASS_DEFINE(ucc_tl_mlx5_context_t, ucc_tl_context_t);

@@ -127,7 +127,7 @@ out:
 
 static ucc_status_t client_recv_data(int *shared_cmd_fd,
                                      uint32_t *shared_pd_handle,
-                                     const char *sock_path,
+                                     const char *sock_path, int *sock_p,
                                      ucc_tl_mlx5_lib_t *lib)
 {
     struct sockaddr_storage sockaddr = {};
@@ -159,7 +159,8 @@ static ucc_status_t client_recv_data(int *shared_cmd_fd,
         goto out;
     }
 
-    return status;
+    *sock_p = sock;
+    return UCC_OK;
 
 out:
     if (close(sock) == -1) {
@@ -229,7 +230,8 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
     ucc_status_t status;
 
     if (!is_ctx_owner) {
-        status = client_recv_data(&ctx_fd, &pd_handle, sock_path, lib);
+        status =
+            client_recv_data(&ctx_fd, &pd_handle, sock_path, &ctx->sock, lib);
         if (UCC_OK != status) {
             tl_debug(lib, "failed to share ctx & pd from client side");
             return status;
