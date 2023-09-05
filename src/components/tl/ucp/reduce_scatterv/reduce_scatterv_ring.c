@@ -209,21 +209,21 @@ static ucc_status_t
 ucc_tl_ucp_reduce_scatterv_ring_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task     = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_coll_args_t *  args     = &TASK_ARGS(task);
+    ucc_coll_args_t   *args     = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team     = TASK_TEAM(task);
     ucc_rank_t         size     = task->subset.map.ep_num;
     ucc_rank_t         rank     = task->subset.myrank;
     ucc_datatype_t     dt       = args->dst.info_v.datatype;
     size_t             dt_size  = ucc_dt_size(dt);
     ucc_memory_type_t  mem_type = args->dst.info_v.mem_type;
-    void *             sbuf     = args->src.info.buffer;
+    void              *sbuf     = args->src.info.buffer;
     int                step     = 0;
     ucc_rank_t         sendto   = (rank + 1) % size;
     ucc_rank_t         recvfrom = (rank - 1 + size) % size;
     ucc_rank_t         recv_block = (rank - 2 - step + size) % size;
     ucc_rank_t         send_block = (rank - 1 - step + size) % size;
     size_t             block_offset, frag_count, frag_offset;
-    void *             r_scratch;
+    void              *r_scratch;
     ucc_status_t       status;
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
@@ -355,13 +355,13 @@ ucc_tl_ucp_reduce_scatterv_ring_init(ucc_base_coll_args_t *coll_args,
     ucc_datatype_t     dt       = coll_args->args.dst.info_v.datatype;
     size_t             dt_size  = ucc_dt_size(dt);
     ucc_memory_type_t  mem_type = coll_args->args.dst.info_v.mem_type;
-    int                bidir =
+    int                bidir    =
         UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.reduce_scatterv_ring_bidirectional;
     size_t                 to_alloc_per_set, max_segcount, count_per_set, count;
     ucc_tl_ucp_schedule_t *tl_schedule;
-    ucc_schedule_t *       schedule;
-    ucc_coll_task_t *      ctask;
-    ucc_sbgp_t *           sbgp;
+    ucc_schedule_t        *schedule;
+    ucc_coll_task_t       *ctask;
+    ucc_sbgp_t            *sbgp;
     ucc_status_t           status;
     ucc_subset_t           s[2];
     int                    i, n_subsets;
@@ -383,26 +383,22 @@ ucc_tl_ucp_reduce_scatterv_ring_init(ucc_base_coll_args_t *coll_args,
         return status;
     }
 
-    schedule    = &tl_schedule->super.super;
+    schedule  = &tl_schedule->super.super;
     /* if count == size then we have 1 elem per rank, not enough
        to split into 2 sets */
     n_subsets = (bidir && (count > size)) ? 2 : 1;
 
     if (tl_team->cfg.use_reordering) {
         sbgp = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_FULL_HOST_ORDERED);
-        s[0].myrank     = sbgp->group_rank;
-        s[0].map        = sbgp->map;
-
-        s[1].map    = ucc_ep_map_create_reverse(UCC_TL_TEAM_SIZE(tl_team));
-        s[1].myrank = ucc_ep_map_eval(s[1].map, s[0].myrank);
+        s[0].myrank = sbgp->group_rank;
+        s[0].map    = sbgp->map;
     } else {
         s[0].myrank     = UCC_TL_TEAM_RANK(tl_team);
         s[0].map.type   = UCC_EP_MAP_FULL;
         s[0].map.ep_num = UCC_TL_TEAM_SIZE(tl_team);
-
-        s[1].map    = ucc_ep_map_create_reverse(UCC_TL_TEAM_SIZE(tl_team));
-        s[1].myrank = ucc_ep_map_eval(s[1].map, UCC_TL_TEAM_RANK(tl_team));
     }
+    s[1].map    = ucc_ep_map_create_reverse(UCC_TL_TEAM_SIZE(tl_team));
+    s[1].myrank = ucc_ep_map_eval(s[1].map, s[0].myrank);
 
     if (coll_args->mask & UCC_BASE_CARGS_MAX_FRAG_COUNT) {
         max_segcount = coll_args->max_frag_count;

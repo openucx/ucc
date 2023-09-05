@@ -369,29 +369,24 @@ ucc_tl_ucp_reduce_scatter_ring_init(ucc_base_coll_args_t *coll_args,
         return status;
     }
 
-    schedule     = &tl_schedule->super.super;
+    schedule  = &tl_schedule->super.super;
     /* if count == size then we have 1 elem per rank, not enough
        to split into 2 sets */
-    n_subsets    = (bidir && (count > size)) ? 2 : 1;
+    n_subsets = (bidir && (count > size)) ? 2 : 1;
 
     if (tl_team->cfg.use_reordering) {
         sbgp = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_FULL_HOST_ORDERED);
-        s[0].myrank     = sbgp->group_rank;
-        s[0].map        = sbgp->map;
-
-        s[1].map    = ucc_ep_map_create_reverse(UCC_TL_TEAM_SIZE(tl_team));
-        s[1].myrank = ucc_ep_map_eval(s[1].map, s[0].myrank);
+        s[0].myrank = sbgp->group_rank;
+        s[0].map    = sbgp->map;
     } else {
         s[0].myrank     = UCC_TL_TEAM_RANK(tl_team);
         s[0].map.type   = UCC_EP_MAP_FULL;
         s[0].map.ep_num = UCC_TL_TEAM_SIZE(tl_team);
-
-        s[1].map    = ucc_ep_map_create_reverse(UCC_TL_TEAM_SIZE(tl_team));
-        s[1].myrank = ucc_ep_map_eval(s[1].map, UCC_TL_TEAM_RANK(tl_team));
     }
-
-    count_per_set    = (count + n_subsets - 1) / n_subsets;
-    max_segcount     = ucc_buffer_block_count(count_per_set, size, 0);
+    s[1].map      = ucc_ep_map_create_reverse(UCC_TL_TEAM_SIZE(tl_team));
+    s[1].myrank   = ucc_ep_map_eval(s[1].map, s[0].myrank);
+    count_per_set = (count + n_subsets - 1) / n_subsets;
+    max_segcount  = ucc_buffer_block_count(count_per_set, size, 0);
     /* in flight we can have 2 sends from 2 differnt blocks and 1 recv:
        need 3 * max_segcount of scratch per set */
     to_alloc_per_set = max_segcount * 3;
