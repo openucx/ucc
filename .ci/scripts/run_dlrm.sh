@@ -32,7 +32,6 @@ mpirun \
     -np $NP \
     --hostfile ${HOSTFILE} \
     --map-by node \
-    --allow-run-as-root \
     --mca plm_rsh_args '-p 12345' \
     -x PATH \
     -x LD_LIBRARY_PATH \
@@ -43,7 +42,6 @@ mpirun \
     -np $NP \
     --hostfile ${HOSTFILE} \
     --map-by node \
-    --allow-run-as-root \
     --mca plm_rsh_args '-p 12345' \
     -x PATH \
     -x LD_LIBRARY_PATH \
@@ -54,7 +52,6 @@ mpirun \
     -np $NP \
     --hostfile ${HOSTFILE} \
     --map-by node \
-    --allow-run-as-root \
     --mca plm_rsh_args '-p 12345' \
     -x PATH \
     -x LD_LIBRARY_PATH \

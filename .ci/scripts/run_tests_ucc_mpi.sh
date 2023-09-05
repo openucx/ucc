@@ -46,7 +46,7 @@ function mpi_params {
         nnodes=$NNODES
     fi
     echo "-np $((nnodes*ppn)) --oversubscribe --hostfile ${HOSTFILE} \
---map-by ppr:$ppn:node --bind-to socket --allow-run-as-root \
+--map-by ppr:$ppn:node --bind-to socket  \
 -x PATH -x LD_LIBRARY_PATH --mca opal_common_ucx_opal_mem_hooks 1 --mca plm_rsh_args -p12345 \
 --mca coll ^ucc,hcoll \
 -x UCX_NET_DEVICES=$DEV:1"
