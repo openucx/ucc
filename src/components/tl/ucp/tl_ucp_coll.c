@@ -27,8 +27,8 @@
 const ucc_tl_ucp_default_alg_desc_t
     ucc_tl_ucp_default_alg_descs[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR] = {
         {
-            .select_str = UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR,
-            .str_get_fn = NULL
+            .select_str = NULL,
+            .str_get_fn = ucc_tl_ucp_allgather_score_str_get
         },
         {
             .select_str = NULL,
@@ -251,6 +251,9 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
             break;
         case UCC_TL_UCP_ALLGATHER_ALG_RING:
             *init = ucc_tl_ucp_allgather_ring_init;
+            break;
+        case UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR:
+            *init = ucc_tl_ucp_allgather_neighbor_init;
             break;
         default:
             status = UCC_ERR_INVALID_PARAM;
