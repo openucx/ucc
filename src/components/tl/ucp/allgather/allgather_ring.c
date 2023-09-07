@@ -143,6 +143,7 @@ ucc_status_t ucc_tl_ucp_allgather_ring_init(ucc_base_coll_args_t *coll_args,
     status = ucc_tl_ucp_allgather_ring_init_common(task);
     if (status != UCC_OK) {
         ucc_tl_ucp_put_task(task);
+        return status;
     }
     *task_h = &task->super;
     return UCC_OK;
