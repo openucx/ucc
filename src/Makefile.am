@@ -91,6 +91,7 @@ noinst_HEADERS =                      \
 	coll_patterns/recursive_knomial.h \
 	coll_patterns/sra_knomial.h       \
 	coll_patterns/bruck_alltoall.h    \
+	coll_patterns/two_tree.h          \
 	components/topo/ucc_topo.h        \
 	components/topo/ucc_sbgp.h
 
