@@ -280,3 +280,77 @@ UCC_TEST_F(test_bcast_alg, 2step) {
         }
     }
 }
+
+UCC_TEST_F(test_bcast_alg, two_tree_odd_shift) {
+    int           n_procs = 15;
+    ucc_job_env_t env     = {{"UCC_TL_UCP_TUNE", "bcast:@two_tree:0-inf:inf"},
+                             {"UCC_CLS", "basic"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 1;
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);
+    }
+
+    for (auto count : {8, 65536}) {
+        for (int root = 0; root < n_procs; root++) {
+            for (auto m : mt) {
+                this->set_root(root);
+                SET_MEM_TYPE(m);
+                this->data_init(n_procs, UCC_DT_INT8, count, ctxs, false);
+                UccReq req(team, ctxs);
+
+                for (auto i = 0; i < repeat; i++) {
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->reset(ctxs);
+                }
+                this->data_fini(ctxs);
+            }
+        }
+    }
+}
+
+UCC_TEST_F(test_bcast_alg, two_tree_even_mirror) {
+    int           n_procs = 16;
+    ucc_job_env_t env     = {{"UCC_TL_UCP_TUNE", "bcast:@two_tree:0-inf:inf"},
+                             {"UCC_CLS", "basic"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 1;
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);
+    }
+
+    for (auto count : {8, 65536}) {
+        for (int root = 0; root < n_procs; root++) {
+            for (auto m : mt) {
+                this->set_root(root);
+                SET_MEM_TYPE(m);
+                this->data_init(n_procs, UCC_DT_INT8, count, ctxs, false);
+                UccReq req(team, ctxs);
+
+                for (auto i = 0; i < repeat; i++) {
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->reset(ctxs);
+                }
+                this->data_fini(ctxs);
+            }
+        }
+    }
+}

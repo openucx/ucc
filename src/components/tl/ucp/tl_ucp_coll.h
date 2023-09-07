@@ -11,6 +11,7 @@
 #include "tl_ucp.h"
 #include "schedule/ucc_schedule_pipelined.h"
 #include "coll_patterns/recursive_knomial.h"
+#include "coll_patterns/two_tree.h"
 #include "components/mc/base/ucc_mc_base.h"
 #include "components/ec/ucc_ec.h"
 #include "tl_ucp_tag.h"
@@ -184,6 +185,11 @@ typedef struct ucc_tl_ucp_task {
             uint32_t                radix;
         } bcast_kn;
         struct {
+            ucc_dbt_single_tree_t   t1;
+            ucc_dbt_single_tree_t   t2;
+            int                     state;
+        } bcast_two_tree;
+        struct {
             ucc_rank_t              dist;
             ucc_rank_t              max_dist;
             int                     children_per_cycle;
@@ -194,6 +200,11 @@ typedef struct ucc_tl_ucp_task {
             ucc_ee_executor_task_t *etask;
             ucc_ee_executor_t      *executor;
         } reduce_kn;
+        struct {
+            ucc_dbt_single_tree_t   t1;
+            ucc_dbt_single_tree_t   t2;
+            int                     state;
+        } reduce_two_tree;
         struct {
             ucc_rank_t              dist;
             ucc_rank_t              max_dist;
@@ -364,6 +375,9 @@ static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
 #define UCC_TL_UCP_TASK_RECV_COMPLETE(_task)                                   \
     (((_task)->tagged.recv_posted == (_task)->tagged.recv_completed))
 
+#define UCC_TL_UCP_TASK_SEND_COMPLETE(_task)                                   \
+    (((_task)->tagged.send_posted == (_task)->tagged.send_completed))
+
 static inline ucc_status_t ucc_tl_ucp_test_recv(ucc_tl_ucp_task_t *task)
 {
     int polls = 0;
@@ -373,6 +387,22 @@ static inline ucc_status_t ucc_tl_ucp_test_recv(ucc_tl_ucp_task_t *task)
     }
     while (polls++ < task->n_polls) {
         if (UCC_TL_UCP_TASK_RECV_COMPLETE(task)) {
+            return UCC_OK;
+        }
+        ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);
+    }
+    return UCC_INPROGRESS;
+}
+
+static inline ucc_status_t ucc_tl_ucp_test_send(ucc_tl_ucp_task_t *task)
+{
+    int polls = 0;
+
+    if (UCC_TL_UCP_TASK_SEND_COMPLETE(task)) {
+        return UCC_OK;
+    }
+    while (polls++ < task->n_polls) {
+        if (UCC_TL_UCP_TASK_SEND_COMPLETE(task)) {
             return UCC_OK;
         }
         ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);

@@ -37,7 +37,8 @@ allreduce =                           \
 	allreduce/allreduce.h             \
 	allreduce/allreduce.c             \
 	allreduce/allreduce_knomial.c     \
-	allreduce/allreduce_sra_knomial.c
+	allreduce/allreduce_sra_knomial.c \
+	allreduce/allreduce_two_tree.c
 
 barrier =                     \
 	barrier/barrier.h         \
@@ -48,7 +49,8 @@ bcast =                       \
 	bcast/bcast.h             \
 	bcast/bcast.c             \
 	bcast/bcast_knomial.c     \
-	bcast/bcast_sag_knomial.c
+	bcast/bcast_sag_knomial.c \
+	bcast/bcast_two_tree.c
 
 fanin =           \
 	fanin/fanin.h \
@@ -71,7 +73,8 @@ gatherv =                    \
 reduce =                    \
 	reduce/reduce.h         \
 	reduce/reduce.c         \
-	reduce/reduce_knomial.c
+	reduce/reduce_knomial.c \
+	reduce/reduce_two_tree.c
 
 reduce_scatter =                            \
 	reduce_scatter/reduce_scatter.h         \
