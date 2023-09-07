@@ -447,19 +447,16 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
 
     status = ucc_tl_sharp_context_init(sharp_ctx, &sharp_ctx->sharp_context,
                                        &sharp_ctx->oob_ctx, topo);
-    if (status != UCC_OK) {
-        ucc_topo_cleanup(topo);
-        return status;
-    }
-
     ucc_topo_cleanup(topo);
+    if (status != UCC_OK) {
+        goto err_sharp_ctx_init;
+    }
 
     if (sharp_ctx->cfg.use_rcache) {
         status = ucc_tl_sharp_rcache_create(sharp_ctx->sharp_context, &sharp_ctx->rcache);
         if (status != UCC_OK) {
             tl_error(sharp_ctx->super.super.lib, "failed to create rcache");
-            sharp_coll_finalize(sharp_ctx->sharp_context);
-            return UCC_ERR_NO_RESOURCE;
+            goto err_sharp_ctx_init;
         }
     }
 
@@ -468,10 +465,18 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
         sharp_ctx->sharp_context);
     if (status != UCC_OK) {
         tl_error(context->lib, "failed to register progress function");
-        return status;
+        goto err_sharp_progress_register;
     }
 
     return UCC_OK;
+
+err_sharp_progress_register:
+    if (sharp_ctx->rcache != NULL) {
+        ucc_rcache_destroy(sharp_ctx->rcache);
+    }
+err_sharp_ctx_init:
+    sharp_coll_finalize(sharp_ctx->sharp_context);
+    return status;
 }
 
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_sharp_context_t)
