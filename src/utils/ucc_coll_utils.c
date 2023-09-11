@@ -631,20 +631,22 @@ ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size)
     return map;
 }
 
-static inline int ucc_ep_map_is_reverse(ucc_ep_map_t *map)
+static inline int ucc_ep_map_is_reverse(ucc_ep_map_t *map,
+                                        int reversed_reordered_flag)
 {
-    return (map->type == UCC_EP_MAP_STRIDED) &&
+    return (((map->type == UCC_EP_MAP_STRIDED) &&
            (map->strided.start == map->ep_num - 1) &&
-           (map->strided.stride == -1);
+           (map->strided.stride == -1)) || reversed_reordered_flag);
 }
 
-ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map)
+ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map,
+                                       int reversed_reordered_flag)
 {
     ucc_ep_map_t inv;
     ucc_rank_t   i, r;
     ucc_rank_t   max_rank;
 
-    if (ucc_ep_map_is_reverse(&map)) {
+    if (ucc_ep_map_is_reverse(&map, reversed_reordered_flag)) {
         inv = map;
     } else {
         inv.type            = UCC_EP_MAP_ARRAY;

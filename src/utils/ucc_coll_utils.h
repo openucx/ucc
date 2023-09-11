@@ -229,8 +229,16 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
    rank r -> size - 1 - r */
 ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size);
 
-/* Creates an inverse mapping for a given map */
-ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map);
+/* Creates an inverse mapping for a given map,
+   only if given map is not a reverse map
+   or a reordered map within the reverse direction task.
+   @param [in] map                       given map
+   @param [in] inv_map                   output map
+   @param [in] reversed_reordered_flag   1 if is reverse direction task and
+                                         reorder ranks is configured as yes,
+                                         0 otherwise. */
+ucc_status_t ucc_ep_map_create_inverse(ucc_ep_map_t map, ucc_ep_map_t *inv_map,
+                                       int reversed_reordered_flag);
 
 ucc_status_t ucc_ep_map_create_nested(ucc_ep_map_t *base_map,
                                       ucc_ep_map_t *sub_map,

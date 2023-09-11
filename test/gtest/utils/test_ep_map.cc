@@ -1,7 +1,8 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
+
 extern "C" {
 #include "utils/ucc_coll_utils.h"
 }
@@ -131,7 +132,7 @@ class test_ep_map_inv : public test_ep_map {
     void check_inv(EpMap map)
     {
         ucc_ep_map_t inv;
-        EXPECT_EQ(UCC_OK, ucc_ep_map_create_inverse(map.map, &inv));
+        EXPECT_EQ(UCC_OK, ucc_ep_map_create_inverse(map.map, &inv, 0));
         for (int i = 0; i < map.map.ep_num; i++) {
             EXPECT_EQ(i, ucc_ep_map_eval(inv, ucc_ep_map_eval(map.map, i)));
         }
