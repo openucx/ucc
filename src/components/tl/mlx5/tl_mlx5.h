@@ -50,16 +50,16 @@ typedef struct ucc_tl_mlx5_ib_qp_conf {
 } ucc_tl_mlx5_ib_qp_conf_t;
 
 typedef struct ucc_tl_mlx5_lib_config {
-    ucc_tl_lib_config_t         super;
-    int                         asr_barrier;
-    int                         block_size;
-    int                         num_dci_qps;
-    int                         dc_threshold;
-    size_t                      dm_buf_size;
-    unsigned long               dm_buf_num;
-    int                         dm_host;
-    ucc_tl_mlx5_ib_qp_conf_t    qp_conf;
-    mcast_coll_comm_init_spec_t mcast_conf;
+    ucc_tl_lib_config_t                     super;
+    int                                     asr_barrier;
+    int                                     block_size;
+    int                                     num_dci_qps;
+    int                                     dc_threshold;
+    size_t                                  dm_buf_size;
+    unsigned long                           dm_buf_num;
+    int                                     dm_host;
+    ucc_tl_mlx5_ib_qp_conf_t                qp_conf;
+    ucc_tl_mlx5_mcast_coll_comm_init_spec_t mcast_conf;
 } ucc_tl_mlx5_lib_config_t;
 
 typedef struct ucc_tl_mlx5_context_config {

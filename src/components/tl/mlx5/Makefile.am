@@ -21,6 +21,8 @@ mcast =                                 \
 	mcast/tl_mlx5_mcast_rcache.c        \
 	mcast/p2p/ucc_tl_mlx5_mcast_p2p.h   \
 	mcast/p2p/ucc_tl_mlx5_mcast_p2p.c   \
+	mcast/tl_mlx5_mcast_progress.h      \
+	mcast/tl_mlx5_mcast_helper.h        \
 	mcast/tl_mlx5_mcast_team.c
 
 sources =             \

@@ -5,15 +5,15 @@
  */
 
 #include "tl_mlx5_coll.h"
+#include "tl_mlx5_mcast_helper.h"
 
 ucc_status_t ucc_tl_mlx5_mcast_test(ucc_tl_mlx5_mcast_coll_req_t* req /* NOLINT */)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
 
-ucc_status_t mcast_coll_do_bcast(void* buf, int size, int root, void *mr, /* NOLINT */
-                                 mcast_coll_comm_t *comm, /* NOLINT */
-                                 int is_blocking, /* NOLINT */
+ucc_status_t mcast_coll_do_bcast(void* buf, size_t size, ucc_rank_t root, void *mr, /* NOLINT */
+                                 ucc_tl_mlx5_mcast_coll_comm_t *comm, /* NOLINT */
                                  ucc_tl_mlx5_mcast_coll_req_t **task_req_handle /* NOLINT */)
 {
     return UCC_ERR_NOT_SUPPORTED;
@@ -21,22 +21,22 @@ ucc_status_t mcast_coll_do_bcast(void* buf, int size, int root, void *mr, /* NOL
 
 ucc_status_t ucc_tl_mlx5_mcast_bcast_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mlx5_task_t       *task      = ucc_derived_of(coll_task, ucc_tl_mlx5_task_t);
-    ucc_tl_mlx5_team_t       *mlx5_team = TASK_TEAM(task);
-    ucc_tl_mlx5_mcast_team_t *team      = mlx5_team->mcast;
-    ucc_coll_args_t          *args      = &TASK_ARGS_MCAST(task);
-    ucc_datatype_t            dt        = args->src.info.datatype;
-    size_t                    count     = args->src.info.count;
-    ucc_rank_t                root      = args->root;
-    ucc_status_t              status    = UCC_OK;
-    size_t                    data_size = ucc_dt_size(dt) * count;
-    void                     *buf       = args->src.info.buffer;
-    mcast_coll_comm_t        *comm      = team->mcast_comm;
+    ucc_tl_mlx5_task_t            *task      = ucc_derived_of(coll_task, ucc_tl_mlx5_task_t);
+    ucc_tl_mlx5_team_t            *mlx5_team = TASK_TEAM(task);
+    ucc_tl_mlx5_mcast_team_t      *team      = mlx5_team->mcast;
+    ucc_coll_args_t               *args      = &TASK_ARGS(task);
+    ucc_datatype_t                 dt        = args->src.info.datatype;
+    size_t                         count     = args->src.info.count;
+    ucc_rank_t                     root      = args->root;
+    ucc_status_t                   status    = UCC_OK;
+    size_t                         data_size = ucc_dt_size(dt) * count;
+    void                          *buf       = args->src.info.buffer;
+    ucc_tl_mlx5_mcast_coll_comm_t *comm      = team->mcast_comm;
 
     task->bcast_mcast.req_handle = NULL;
 
     status = mcast_coll_do_bcast(buf, data_size, root, NULL, comm,
-                            UCC_TL_MLX5_MCAST_ENABLE_BLOCKING, &task->bcast_mcast.req_handle);
+                                &task->bcast_mcast.req_handle);
     if (status < 0) {
         tl_error(UCC_TASK_LIB(task), "mcast_coll_do_bcast failed:%d", status);
         coll_task->status = status;

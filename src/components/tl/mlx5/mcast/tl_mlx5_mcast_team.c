@@ -13,7 +13,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t           *base_cont
                                          ucc_tl_mlx5_mcast_team_t    **mcast_team, /* NOLINT */
                                          ucc_tl_mlx5_mcast_context_t  *ctx, /* NOLINT */
                                          const ucc_base_team_params_t *params, /* NOLINT */
-                                         mcast_coll_comm_init_spec_t  *mcast_conf /* NOLINT */)
+                                         ucc_tl_mlx5_mcast_coll_comm_init_spec_t  *mcast_conf /* NOLINT */)
 {
     return UCC_OK;
 }
