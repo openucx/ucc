@@ -37,7 +37,7 @@ ucc_status_t ucc_tl_mlx5_mcast_bcast_start(ucc_coll_task_t *coll_task)
 
     status = mcast_coll_do_bcast(buf, data_size, root, NULL, comm,
                             UCC_TL_MLX5_MCAST_ENABLE_BLOCKING, &task->bcast_mcast.req_handle);
-    if (UCC_OK != status && UCC_INPROGRESS != status) {
+    if (status < 0) {
         tl_error(UCC_TASK_LIB(task), "mcast_coll_do_bcast failed:%d", status);
         coll_task->status = status;
         return ucc_task_complete(coll_task);
