@@ -73,13 +73,6 @@ function build_with_coverity() {
     return $err_code
 }
 
-function format-errors() {
-    cov-format-errors --dir "$COV_BUILD_DIR" --strip-path '/lib/terminfo/s/*' --emacs-style | tee log
-    cov-format-errors --dir "$COV_BUILD_DIR" --strip-path '/lib/terminfo/s/*' --html-output report
-    err_code=$?
-    return $err_code
-}
-
 # Run Coverity analysis
 function run_coverity_analysis() {
     echo "Running Coverity analysis..."
@@ -87,6 +80,13 @@ function run_coverity_analysis() {
     # Run cov-analyze
     # shellcheck disable=SC2086
     cov-analyze --dir "${COV_BUILD_DIR}" "$@" --jobs auto $COV_ANALYSE_OPTIONS
+    err_code=$?
+    return $err_code
+}
+
+function format-errors() {
+    cov-format-errors --dir "$COV_BUILD_DIR" --strip-path '/lib/terminfo/s/*' --emacs-style | tee log
+    cov-format-errors --dir "$COV_BUILD_DIR" --strip-path '/lib/terminfo/s/*' --html-output report
     err_code=$?
     return $err_code
 }
