@@ -123,10 +123,6 @@ function main() {
     if [ -z "$SKIP_COVERITY" ] && [ -z "$SKIP_COV_BUILD" ]; then
         build_with_coverity
     fi
-    # Run Coverity format-errors
-    if [ -z "$SKIP_COVERITY" ]; then
-        format-errors
-    fi
 
     # Run Coverity analysis
     if [ -z "$SKIP_COVERITY" ]; then
@@ -135,6 +131,11 @@ function main() {
             echo "Coverity analysis failed"
             return 1
         fi
+    fi
+    
+     # Run Coverity format-errors
+    if [ -z "$SKIP_COVERITY" ]; then
+        format-errors
     fi
 
     echo "Uploading to synopsys main coverity server at https://coverity.mellanox.com"
