@@ -24,9 +24,6 @@ module load hpcx-gcc
 module load dev/cuda12.1.1
 module load dev/nccl_2.18.3-1_cuda12.1.1_"$(uname -i)"
 module load tools/cov-2021.12
-previous_date=$(date -d "yesterday" +'%Y-%m-%d')
-HPCX_UCX_DIR=/hpc/local/benchmarks/daily/next/$previous_date/hpcx-gcc-redhat7/ucx
-HPCX_SHARP_DIR=/hpc/local/benchmarks/daily/next/$previous_date/hpcx-gcc-redhat7/sharp
 ./autogen.sh
 ./configure --with-nccl --with-tls=cuda,nccl,self,sharp,shm,ucp,mlx5 --with-ucx="${HPCX_UCX_DIR}" --with-sharp="${HPCX_SHARP_DIR}"
 make_opt="-j$(($(nproc) / 2 + 1))"
