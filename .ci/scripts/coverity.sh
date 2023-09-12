@@ -76,6 +76,13 @@ function build_with_coverity() {
     return $err_code
 }
 
+function format-errors() {
+    cov-format-errors --dir "$COV_BUILD_DIR" --strip-path '/lib/terminfo/s/*' --emacs-style | tee log
+    cov-format-errors --dir "$COV_BUILD_DIR" --strip-path '/lib/terminfo/s/*' --html-output report
+    err_code=$?
+    return $err_code
+}
+
 # Run Coverity analysis
 function run_coverity_analysis() {
     echo "Running Coverity analysis..."
@@ -119,6 +126,10 @@ function main() {
     if [ -z "$SKIP_COVERITY" ] && [ -z "$SKIP_COV_BUILD" ]; then
         build_with_coverity
     fi
+    # Run Coverity format-errors
+    if [ -z "$SKIP_COVERITY" ]; then
+        format-errors
+    fi
 
     # Run Coverity analysis
     if [ -z "$SKIP_COVERITY" ]; then
@@ -129,7 +140,7 @@ function main() {
         fi
     fi
 
-    echo "Uploading to synopsys main coverity server"
+    echo "Uploading to synopsys main coverity server at https://coverity.mellanox.com"
     cov-commit-defects --ssl --on-new-cert trust --host coverity.mellanox.com --port 8443 \
     --user "${UCC_USERNAME}" --password "${UCC_PASSWORD}" --dir "$COV_BUILD_DIR" --stream ucc_master
     return 0
