@@ -28,7 +28,9 @@ module load tools/cov-2021.12
 ./configure --with-nccl --with-tls=cuda,nccl,self,sharp,shm,ucp,mlx5 --with-ucx="${HPCX_UCX_DIR}" --with-sharp="${HPCX_SHARP_DIR}"
 make_opt="-j$(($(nproc) / 2 + 1))"
 COV_BUILD_DIR=$(dirname "$0")/cov-build
+COV_REPORT=$(dirname "$0")/report
 mkdir -p "$COV_BUILD_DIR"
+mkdir -p "$COV_REPORT"
 COV_ANALYSE_OPTIONS+=" --all"
 COV_ANALYSE_OPTIONS+=" --enable-fnptr"
 COV_ANALYSE_OPTIONS+=" --fnptr-models"
@@ -86,7 +88,7 @@ function run_coverity_analysis() {
 
 function format-errors() {
     cov-format-errors --dir "$COV_BUILD_DIR" --strip-path '/lib/terminfo/s/*' --emacs-style | tee log
-    cov-format-errors --dir "$COV_BUILD_DIR" --strip-path '/lib/terminfo/s/*' --html-output report
+    cov-format-errors --dir "$COV_BUILD_DIR" --strip-path '/lib/terminfo/s/*' --html-output "$COV_REPORT"
     err_code=$?
     return $err_code
 }
