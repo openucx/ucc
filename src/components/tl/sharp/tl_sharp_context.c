@@ -449,7 +449,7 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
                                        &sharp_ctx->oob_ctx, topo);
     ucc_topo_cleanup(topo);
     if (status != UCC_OK) {
-        goto err_sharp_ctx_init;
+        return status;
     }
 
     if (sharp_ctx->cfg.use_rcache) {
