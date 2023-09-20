@@ -606,6 +606,9 @@ int main(int argc, char *argv[])
         std::vector<ucc_coll_type_t>           os_colls(onesided_colls.size());
         std::vector<ucc_coll_type_t>::iterator it_start;
 
+        std::sort(colls.begin(), colls.end());
+        std::sort(onesided_colls.begin(), onesided_colls.end());
+
         it_start = std::set_intersection(
             colls.begin(), colls.end(), onesided_colls.begin(),
             onesided_colls.end(), os_colls.begin());
