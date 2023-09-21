@@ -162,6 +162,7 @@ ucc_status_t ucc_tl_ucp_bcast_two_tree_start(ucc_coll_task_t *coll_task)
 
     task->bcast_two_tree.t1.recv = 0;
     task->bcast_two_tree.t2.recv = 0;
+    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     if (rank == coll_root && coll_root != t1_root) {
         status = ucc_tl_ucp_send_nb(buffer, data_size, mtype, t1_root, team,
@@ -198,8 +199,6 @@ ucc_status_t ucc_tl_ucp_bcast_two_tree_start(ucc_coll_task_t *coll_task)
 
     task->bcast_two_tree.state = RECV;
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_bcast_two_tree_start", 0);
-    ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
