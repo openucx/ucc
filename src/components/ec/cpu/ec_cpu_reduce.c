@@ -114,7 +114,7 @@
             break;                                                             \
         default:                                                               \
             ec_error(&ucc_ec_cpu.super,                                        \
-                     "float dtype does not support "                           \
+                     "int dtype does not support "                             \
                      "requested reduce op: %s",                                \
                      ucc_reduction_op_str(_op));                               \
             return UCC_ERR_NOT_SUPPORTED;                                      \
