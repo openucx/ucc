@@ -6,7 +6,7 @@ env:
   OPEN_UCX_LINK: https://github.com/openucx/ucx
   OPEN_UCX_BRANCH: master
   CLANG_VER: 12
-  ROCM_VER: 5-4
+  ROCM_VER: 5.6.1
   LIBRARY_PATH: /tmp/ucx/install/lib
   LD_LIBRARY_PATH: /tmp/ucx/install/lib
 jobs:
@@ -23,7 +23,7 @@ jobs:
     - name: Install extra dependencies
       run: |
         curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/rocm-keyring.gpg
-        echo 'deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/rocm-keyring.gpg]  https://repo.radeon.com/rocm/apt/debian focal main' | sudo tee /etc/apt/sources.list.d/rocm.list
+        echo 'deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/rocm-keyring.gpg] https://repo.radeon.com/rocm/apt/5.6.1 focal main' | sudo tee /etc/apt/sources.list.d/rocm.list
         sudo apt-get update
         sudo apt-get install -y rocm-hip-sdk
     - name: Get UCX
@@ -31,7 +31,7 @@ jobs:
     - name: Build UCX
       run: |
         cd /tmp/ucx && ./autogen.sh
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install --with-rocm=/opt/rocm
+        CC=gcc CXX=g++ ./contrib/configure-release --without-java --without-go --disable-numa --prefix $PWD/install --with-rocm=/opt/rocm
         make -j install
     - uses: actions/checkout@v1
     - name: Build UCC
