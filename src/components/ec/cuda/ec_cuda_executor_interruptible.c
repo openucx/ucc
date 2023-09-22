@@ -65,7 +65,7 @@ ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
         return status;
     }
 
-    ee_task = ucc_mpool_get(&ucc_ec_cuda.executor_interruptible_tasks);
+    ee_task = ucc_mpool_get(&ucc_ec_cuda.resources.executor_interruptible_tasks);
     if (ucc_unlikely(!ee_task)) {
         return UCC_ERR_NO_MEMORY;
     }

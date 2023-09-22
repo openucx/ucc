@@ -23,7 +23,7 @@ ucc_cuda_executor_persistent_task_post(ucc_ee_executor_t *executor,
         ucc_spin_lock(&eee->tasks_lock);
     }
 
-    ee_task = ucc_mpool_get(&ucc_ec_cuda.executor_persistent_tasks);
+    ee_task = ucc_mpool_get(&ucc_ec_cuda.resources.executor_persistent_tasks);
     if (ucc_unlikely(!ee_task)) {
         return UCC_ERR_NO_MEMORY;
     }
