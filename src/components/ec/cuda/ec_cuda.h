@@ -43,10 +43,7 @@ typedef struct ucc_ec_cuda_config {
 
 typedef struct ucc_ec_cuda {
     ucc_ec_base_t                  super;
-    int                            stream_initialized;
-    cudaStream_t                   stream;
     int                            exec_streams_initialized;
-    cudaStream_t                  *exec_streams;
     ucc_ec_cuda_resources_t        resources;
     ucc_ec_cuda_resources_hash_t  *resources_hash;
     ucc_thread_mode_t              thread_mode;
@@ -67,6 +64,8 @@ ucc_status_t ucc_ec_cuda_event_destroy(void *event);
 ucc_status_t ucc_ec_cuda_event_post(void *ee_context, void *event);
 
 ucc_status_t ucc_ec_cuda_event_test(void *event);
+
+ucc_status_t ucc_ec_cuda_get_resources(ucc_ec_cuda_resources_t **resources);
 
 extern ucc_ec_cuda_t ucc_ec_cuda;
 

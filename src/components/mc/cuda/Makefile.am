@@ -5,8 +5,10 @@
 if HAVE_CUDA
 
 sources =     \
-	mc_cuda.h \
-	mc_cuda.c
+	mc_cuda.h           \
+	mc_cuda.c           \
+	mc_cuda_resources.c \
+	mc_cuda_resources.h
 
 module_LTLIBRARIES         = libucc_mc_cuda.la
 libucc_mc_cuda_la_SOURCES  = $(sources)

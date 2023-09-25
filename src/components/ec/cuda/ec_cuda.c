@@ -105,8 +105,6 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     struct cudaDeviceProp prop;
     ucc_status_t          status;
 
-    ucc_ec_cuda.stream                   = NULL;
-    ucc_ec_cuda.stream_initialized       = 0;
     ucc_ec_cuda.exec_streams_initialized = 0;
     ucc_strncpy_safe(ucc_ec_cuda.super.config->log_component.name,
                      ucc_ec_cuda.super.super.name,
@@ -139,14 +137,6 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
         ec_warn(&ucc_ec_cuda.super,
                 "number of streams is too small, min supported 1");
         cfg->exec_num_streams = 1;
-    }
-
-    ucc_ec_cuda.exec_streams = ucc_calloc(cfg->exec_num_streams,
-                                          sizeof(cudaStream_t),
-                                          "ec cuda streams");
-    if (!ucc_ec_cuda.exec_streams) {
-        ec_error(&ucc_ec_cuda.super, "failed to allocate streams array");
-        return UCC_ERR_NO_MEMORY;
     }
 
     if (cfg->strm_task_mode == UCC_EC_CUDA_TASK_KERNEL) {
@@ -197,6 +187,7 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
 
     ucc_ec_cuda.resources_hash = kh_init(ucc_ec_cuda_resources_hash);
     status = ucc_ec_cuda_resources_init(&ucc_ec_cuda.super,
+                                        EC_CUDA_CONFIG->exec_num_streams,
                                         &ucc_ec_cuda.resources);
     if (status != UCC_OK) {
         ec_warn(&ucc_ec_cuda.super, "failed to initilize CUDA resources");
@@ -211,54 +202,6 @@ static ucc_status_t ucc_ec_cuda_get_attr(ucc_ec_attr_t *ec_attr)
 {
     if (ec_attr->field_mask & UCC_EC_ATTR_FIELD_THREAD_MODE) {
         ec_attr->thread_mode = ucc_ec_cuda.thread_mode;
-    }
-    return UCC_OK;
-}
-
-static ucc_status_t ucc_ec_cuda_get_resources(ucc_ec_cuda_resources_t **resources)
-{
-    CUcontext cu_ctx;
-    unsigned long long int cu_ctx_id;
-    ucc_status_t status;
-
-    status = CUDADRV_FUNC(cuCtxGetCurrent(&cu_ctx));
-    if (ucc_unlikely(status != UCC_OK)) {
-        ec_error(&ucc_ec_cuda.super, "failed to get current CUDA context");
-        return status;
-    }
-
-    status = CUDADRV_FUNC(cuCtxGetId(cu_ctx, &cu_ctx_id));
-    if (ucc_unlikely(status != UCC_OK)) {
-        ec_error(&ucc_ec_cuda.super, "failed to get currect CUDA context ID");
-    }
-
-    *resources = ec_cuda_resources_hash_get(ucc_ec_cuda.resources_hash,
-                                            cu_ctx_id);
-    if (ucc_unlikely(*resources == NULL)) {
-        ucc_spin_lock(&ucc_ec_cuda.init_spinlock);
-        *resources = ec_cuda_resources_hash_get(ucc_ec_cuda.resources_hash,
-                                                cu_ctx_id);
-        if (*resources == NULL) {
-            *resources = ucc_malloc(sizeof(ucc_ec_cuda_resources_t),
-                                    "ec cuda resources");
-            if (*resources == NULL) {
-                ec_error(&ucc_ec_cuda.super,
-                         "failed to allocate %zd bytes for resources",
-                         sizeof(ucc_ec_cuda_resources_t));
-                ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
-                return UCC_ERR_NO_MEMORY;
-            }
-            status = ucc_ec_cuda_resources_init(&ucc_ec_cuda.super,
-                                                *resources);
-            if (status != UCC_OK) {
-                ucc_free(*resources);
-                ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
-                return status;
-            }
-            ec_cuda_resources_hash_put(ucc_ec_cuda.resources_hash, cu_ctx_id,
-                                       *resources);
-        }
-        ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
     }
     return UCC_OK;
 }
@@ -316,22 +259,57 @@ ucc_status_t ucc_ec_cuda_event_test(void *event)
 
 static ucc_status_t ucc_ec_cuda_finalize()
 {
-    int i;
-
-    if (ucc_ec_cuda.stream_initialized) {
-        CUDA_FUNC(cudaStreamDestroy(ucc_ec_cuda.stream));
-        ucc_ec_cuda.stream_initialized = 0;
-    }
-
-    if (ucc_ec_cuda.exec_streams_initialized) {
-        for (i = 0; i < EC_CUDA_CONFIG->exec_num_streams; i++) {
-            CUDA_FUNC(cudaStreamDestroy(ucc_ec_cuda.exec_streams[i]));
-        }
-        ucc_ec_cuda.exec_streams_initialized = 0;
-    }
     ucc_ec_cuda_resources_cleanup(&ucc_ec_cuda.resources);
-    ucc_free(ucc_ec_cuda.exec_streams);
 
+    return UCC_OK;
+}
+
+ucc_status_t ucc_ec_cuda_get_resources(ucc_ec_cuda_resources_t **resources)
+{
+    CUcontext cu_ctx;
+    unsigned long long int cu_ctx_id;
+    ucc_status_t status;
+
+    status = CUDADRV_FUNC(cuCtxGetCurrent(&cu_ctx));
+    if (ucc_unlikely(status != UCC_OK)) {
+        ec_error(&ucc_ec_cuda.super, "failed to get current CUDA context");
+        return status;
+    }
+
+    status = CUDADRV_FUNC(cuCtxGetId(cu_ctx, &cu_ctx_id));
+    if (ucc_unlikely(status != UCC_OK)) {
+        ec_error(&ucc_ec_cuda.super, "failed to get currect CUDA context ID");
+    }
+
+    *resources = ec_cuda_resources_hash_get(ucc_ec_cuda.resources_hash,
+                                            cu_ctx_id);
+    if (ucc_unlikely(*resources == NULL)) {
+        ucc_spin_lock(&ucc_ec_cuda.init_spinlock);
+        *resources = ec_cuda_resources_hash_get(ucc_ec_cuda.resources_hash,
+                                                cu_ctx_id);
+        if (*resources == NULL) {
+            *resources = ucc_malloc(sizeof(ucc_ec_cuda_resources_t),
+                                    "ec cuda resources");
+            if (*resources == NULL) {
+                ec_error(&ucc_ec_cuda.super,
+                         "failed to allocate %zd bytes for resources",
+                         sizeof(ucc_ec_cuda_resources_t));
+                ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
+                return UCC_ERR_NO_MEMORY;
+            }
+            status = ucc_ec_cuda_resources_init(&ucc_ec_cuda.super,
+                                                EC_CUDA_CONFIG->exec_num_streams,
+                                                *resources);
+            if (status != UCC_OK) {
+                ucc_free(*resources);
+                ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
+                return status;
+            }
+            ec_cuda_resources_hash_put(ucc_ec_cuda.resources_hash, cu_ctx_id,
+                                       *resources);
+        }
+        ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
+    }
     return UCC_OK;
 }
 

@@ -9,37 +9,43 @@
 
 ucc_status_t ucc_cuda_executor_interruptible_get_stream(cudaStream_t *stream)
 {
-    static uint32_t last_used   = 0;
-    int             num_streams = EC_CUDA_CONFIG->exec_num_streams;
-    ucc_status_t    st;
-    int             i, j;
-    uint32_t        id;
+    static uint32_t          last_used   = 0;
+    int                      num_streams = EC_CUDA_CONFIG->exec_num_streams;
+    ucc_ec_cuda_resources_t *resources;
+    ucc_status_t             st;
+    int                      i, j;
+    uint32_t                 id;
 
     ucc_assert(num_streams > 0);
-    if (ucc_unlikely(!ucc_ec_cuda.exec_streams_initialized)) {
+    st = ucc_ec_cuda_get_resources(&resources);
+    if (ucc_unlikely(st != UCC_OK)) {
+        return st;
+    }
+
+    if (ucc_unlikely(!resources->streams_initialized)) {
         ucc_spin_lock(&ucc_ec_cuda.init_spinlock);
-        if (ucc_ec_cuda.exec_streams_initialized) {
+        if (resources->streams_initialized) {
             goto unlock;
         }
 
         for(i = 0; i < num_streams; i++) {
-            st = CUDA_FUNC(cudaStreamCreateWithFlags(&ucc_ec_cuda.exec_streams[i],
+            st = CUDA_FUNC(cudaStreamCreateWithFlags(&(resources->exec_streams[i]),
                                                      cudaStreamNonBlocking));
             if (st != UCC_OK) {
                 for (j = 0; j < i; j++) {
-                    CUDA_FUNC(cudaStreamDestroy(ucc_ec_cuda.exec_streams[j]));
+                    CUDA_FUNC(cudaStreamDestroy(resources->exec_streams[j]));
                 }
                 ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
                 return st;
             }
         }
-        ucc_ec_cuda.exec_streams_initialized = 1;
+        resources->streams_initialized = 1;
 unlock:
         ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);
     }
 
     id = ucc_atomic_fadd32(&last_used, 1);
-    *stream = ucc_ec_cuda.exec_streams[id % num_streams];
+    *stream = resources->exec_streams[id % num_streams];
     return UCC_OK;
 }
 
@@ -52,13 +58,12 @@ ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
                                          const ucc_ee_executor_task_args_t *task_args,
                                          ucc_ee_executor_task_t **task)
 {
-    cudaStream_t stream = NULL;
+    cudaStream_t stream    = NULL;
+    size_t       num_nodes = UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS;
     ucc_ec_cuda_executor_interruptible_task_t *ee_task;
     ucc_status_t status;
     cudaGraphNode_t nodes[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
-    size_t num_nodes = UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS;
     int i;
-
 
     status = ucc_cuda_executor_interruptible_get_stream(&stream);
     if (ucc_unlikely(status != UCC_OK)) {

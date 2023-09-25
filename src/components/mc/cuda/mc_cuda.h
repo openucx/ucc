@@ -24,8 +24,6 @@ typedef struct ucc_mc_cuda {
     ucc_mc_base_t                  super;
     int                            stream_initialized;
     cudaStream_t                   stream;
-    ucc_mpool_t                    events;
-    ucc_mpool_t                    strm_reqs;
     ucc_mpool_t                    mpool;
     ucc_mpool_t                    mpool_managed;
     int                            mpool_init_flag;

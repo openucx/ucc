@@ -67,13 +67,17 @@ typedef struct ucc_ec_cuda_executor_persistent_task {
 } ucc_ec_cuda_executor_persistent_task_t;
 
 typedef struct ucc_ec_cuda_resources {
-    ucc_mpool_t events;
-    ucc_mpool_t executors;
-    ucc_mpool_t executor_interruptible_tasks;
-    ucc_mpool_t executor_persistent_tasks;
+    ucc_mpool_t   events;
+    ucc_mpool_t   executors;
+    ucc_mpool_t   executor_interruptible_tasks;
+    ucc_mpool_t   executor_persistent_tasks;
+    int           streams_initialized;
+    int           num_streams;
+    cudaStream_t *exec_streams;
 } ucc_ec_cuda_resources_t;
 
 ucc_status_t ucc_ec_cuda_resources_init(ucc_ec_base_t *ec,
+                                        int num_streams,
                                         ucc_ec_cuda_resources_t *resources);
 
 void ucc_ec_cuda_resources_cleanup(ucc_ec_cuda_resources_t *resources);

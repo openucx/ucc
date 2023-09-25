@@ -1,5 +1,6 @@
 #include "ec_cuda_resources.h"
 #include "components/ec/ucc_ec_log.h"
+#include "utils/ucc_malloc.h"
 
 #define EXEC_MAX_TASKS 128
 
@@ -111,6 +112,7 @@ static ucc_mpool_ops_t ucc_ec_cuda_interruptible_task_mpool_ops = {
 };
 
 ucc_status_t ucc_ec_cuda_resources_init(ucc_ec_base_t *ec,
+                                        int num_streams,
                                         ucc_ec_cuda_resources_t *resources)
 {
     ucc_status_t status;
@@ -153,8 +155,20 @@ ucc_status_t ucc_ec_cuda_resources_init(ucc_ec_base_t *ec,
         goto free_interruptible_tasks_mpool;
     }
 
+    resources->num_streams = num_streams;
+    resources->exec_streams = ucc_calloc(num_streams, sizeof(cudaStream_t),
+                                         "ec cuda streams");
+    if (!resources->exec_streams) {
+        ec_error(ec, "failed to allocate %zd bytes for executor streams",
+                 sizeof(cudaStream_t) * num_streams);
+        status = UCC_ERR_NO_MEMORY;
+        goto free_persistent_tasks_mpool;
+    }
+
     return UCC_OK;
 
+free_persistent_tasks_mpool:
+    ucc_mpool_cleanup(&resources->executor_persistent_tasks, 0);
 free_interruptible_tasks_mpool:
     ucc_mpool_cleanup(&resources->executor_persistent_tasks, 0);
 free_executors_mpool:
@@ -167,8 +181,17 @@ exit_err:
 
 void ucc_ec_cuda_resources_cleanup(ucc_ec_cuda_resources_t *resources)
 {
+    int i;
+
+    for (i = 0; i < resources->num_streams; i++) {
+        if (resources->exec_streams[i] != NULL) {
+            CUDA_FUNC(cudaStreamDestroy(resources->exec_streams[i]));
+        }
+    }
     ucc_mpool_cleanup(&resources->events, 1);
     ucc_mpool_cleanup(&resources->executors, 1);
     ucc_mpool_cleanup(&resources->executor_interruptible_tasks, 1);
     ucc_mpool_cleanup(&resources->executor_persistent_tasks, 1);
+
+    ucc_free(resources->exec_streams);
 }
