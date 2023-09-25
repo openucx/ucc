@@ -11,7 +11,8 @@
  * We copy-pasted and modify cuda_fp16.hpp because half operators are only available
  * for SM>=5.3 but we need to support earlier architectures. On earlier architectures,
  * we emulate the operators by converting half to float, do the operation, then convert
- * the result back to half
+ * the result back to half.
+ * Since CUDA 12.2 similar functionality was added to cuda_fp16.hpp
  */
 
 #pragma once
@@ -23,7 +24,7 @@
 
 /* Arithmetic FP16 operations in cuda_fp16.hpp only supported on arch >= 5.3,
  * however, we support early architectures*/
-#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 530)
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 530) && (CUDA_VERSION < 12020)
 #if !defined(__CUDA_NO_HALF_OPERATORS__)
 
 /* Some basic arithmetic operations expected of a builtin */
