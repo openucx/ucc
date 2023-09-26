@@ -4,8 +4,8 @@
  * See file LICENSE for terms.
  */
 
-#ifndef TWO_TREE_H_
-#define TWO_TREE_H_
+#ifndef DOUBLE_BINARY_TREE_H_
+#define DOUBLE_BINARY_TREE_H_
 
 enum {
     LEFT_CHILD,
@@ -103,8 +103,8 @@ static inline int get_parent(int vsize, int vrank, int height, int troot)
     }
 }
 
-static inline void ucc_two_tree_build_t2_mirror(ucc_dbt_single_tree_t t1,
-                                 ucc_dbt_single_tree_t *t2)
+static inline void ucc_dbt_build_t2_mirror(ucc_dbt_single_tree_t t1,
+                                           ucc_dbt_single_tree_t *t2)
 {
     ucc_rank_t            size = t1.size;
     ucc_dbt_single_tree_t t;
@@ -123,8 +123,8 @@ static inline void ucc_two_tree_build_t2_mirror(ucc_dbt_single_tree_t t1,
     *t2 = t;
 }
 
-static inline void ucc_two_tree_build_t2_shift(ucc_dbt_single_tree_t t1,
-                                               ucc_dbt_single_tree_t *t2)
+static inline void ucc_dbt_build_t2_shift(ucc_dbt_single_tree_t t1,
+                                          ucc_dbt_single_tree_t *t2)
 {
     ucc_rank_t            size = t1.size;
     ucc_dbt_single_tree_t t;
@@ -143,12 +143,12 @@ static inline void ucc_two_tree_build_t2_shift(ucc_dbt_single_tree_t t1,
     *t2 = t;
 }
 
-static inline void ucc_two_tree_build_t1(ucc_rank_t rank, ucc_rank_t size,
-                                         ucc_dbt_single_tree_t *t1)
+static inline void ucc_dbt_build_t1(ucc_rank_t rank, ucc_rank_t size,
+                                    ucc_dbt_single_tree_t *t1)
 {
-    int         height   = get_height(rank);
-    ucc_rank_t  root     = get_root(size);
-    ucc_rank_t  parent   = get_parent(size, rank, height, root);
+    int         height = get_height(rank);
+    ucc_rank_t  root   = get_root(size);
+    ucc_rank_t  parent = get_parent(size, rank, height, root);
 
     get_children(size, rank, height, root, &t1->children[LEFT_CHILD],
                  &t1->children[RIGHT_CHILD]);
@@ -160,8 +160,8 @@ static inline void ucc_two_tree_build_t1(ucc_rank_t rank, ucc_rank_t size,
     t1->recv   = 0;
 }
 
-static inline ucc_rank_t ucc_two_tree_convert_rank_for_shift(ucc_rank_t rank,
-                                                             ucc_rank_t size)
+static inline ucc_rank_t ucc_dbt_convert_rank_for_shift(ucc_rank_t rank,
+                                                        ucc_rank_t size)
 {
     ucc_rank_t i;
     for (i = 0; i < size; i++) {
@@ -172,8 +172,8 @@ static inline ucc_rank_t ucc_two_tree_convert_rank_for_shift(ucc_rank_t rank,
     return i;
 }
 
-static inline ucc_rank_t ucc_two_tree_convert_rank_for_mirror(ucc_rank_t rank,
-                                                              ucc_rank_t size)
+static inline ucc_rank_t ucc_dbt_convert_rank_for_mirror(ucc_rank_t rank,
+                                                         ucc_rank_t size)
 {
     ucc_rank_t i;
     for (i = 0; i < size; i++) {
@@ -184,27 +184,27 @@ static inline ucc_rank_t ucc_two_tree_convert_rank_for_mirror(ucc_rank_t rank,
     return i;
 }
 
-static inline void ucc_two_tree_build_t2(ucc_rank_t rank, ucc_rank_t size,
-                                         ucc_dbt_single_tree_t *t2) {
+static inline void ucc_dbt_build_t2(ucc_rank_t rank, ucc_rank_t size,
+                                    ucc_dbt_single_tree_t *t2) {
     ucc_rank_t temp_rank = (size % 2) ?
-        ucc_two_tree_convert_rank_for_shift(rank, size) :
-        ucc_two_tree_convert_rank_for_mirror(rank, size);
+        ucc_dbt_convert_rank_for_shift(rank, size) :
+        ucc_dbt_convert_rank_for_mirror(rank, size);
     ucc_dbt_single_tree_t t1_temp;
 
-    ucc_two_tree_build_t1(temp_rank, size, &t1_temp);
+    ucc_dbt_build_t1(temp_rank, size, &t1_temp);
     if (size % 2) {
-        ucc_two_tree_build_t2_shift(t1_temp, t2);
+        ucc_dbt_build_t2_shift(t1_temp, t2);
     } else {
-        ucc_two_tree_build_t2_mirror(t1_temp, t2);
+        ucc_dbt_build_t2_mirror(t1_temp, t2);
     }
 }
 
-static inline void ucc_two_tree_build_trees(ucc_rank_t rank, ucc_rank_t size,
-                                            ucc_dbt_single_tree_t *t1,
-                                            ucc_dbt_single_tree_t *t2)
+static inline void ucc_dbt_build_trees(ucc_rank_t rank, ucc_rank_t size,
+                                       ucc_dbt_single_tree_t *t1,
+                                       ucc_dbt_single_tree_t *t2)
 {
-    ucc_two_tree_build_t1(rank, size, t1);
-    ucc_two_tree_build_t2(rank, size, t2);
+    ucc_dbt_build_t1(rank, size, t1);
+    ucc_dbt_build_t2(rank, size, t2);
 }
 
 #endif

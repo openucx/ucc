@@ -19,9 +19,9 @@ ucc_base_coll_alg_info_t
              .name = "sag_knomial",
              .desc = "recursive knomial scatter followed by knomial "
                      "allgather (optimized for BW)"},
-        [UCC_TL_UCP_BCAST_ALG_TWO_TREE] =
-            {.id   = UCC_TL_UCP_BCAST_ALG_TWO_TREE,
-             .name = "two_tree",
+        [UCC_TL_UCP_BCAST_ALG_DBT] =
+            {.id   = UCC_TL_UCP_BCAST_ALG_DBT,
+             .name = "dbt",
              .desc = "bcast over double binary tree where a leaf in one tree "
                      "will be intermediate in other (optimized for latency)"},
         [UCC_TL_UCP_BCAST_ALG_LAST] = {

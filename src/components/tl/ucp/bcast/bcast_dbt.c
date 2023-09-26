@@ -17,16 +17,16 @@ enum {
     TEST,
 };
 
-#define UCC_BCAST_TWO_TREE_CHECK_STATE(_p)                                    \
+#define UCC_BCAST_DBT_CHECK_STATE(_p)                                         \
     case _p:                                                                  \
         goto _p;
 
-#define UCC_BCAST_TWO_TREE_GOTO_STATE(_state)                                 \
+#define UCC_BCAST_DBT_GOTO_STATE(_state)                                      \
     do {                                                                      \
         switch (_state) {                                                     \
-            UCC_BCAST_TWO_TREE_CHECK_STATE(SEND_T1);                          \
-            UCC_BCAST_TWO_TREE_CHECK_STATE(SEND_T2);                          \
-            UCC_BCAST_TWO_TREE_CHECK_STATE(TEST);                             \
+            UCC_BCAST_DBT_CHECK_STATE(SEND_T1);                               \
+            UCC_BCAST_DBT_CHECK_STATE(SEND_T2);                               \
+            UCC_BCAST_DBT_CHECK_STATE(TEST);                                  \
         };                                                                    \
     } while (0)
 
@@ -52,7 +52,7 @@ static void recv_completion_1(void *request, ucs_status_t status,
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
 
-    task->bcast_two_tree.t1.recv++;
+    task->bcast_dbt.t1.recv++;
     recv_completion_common(request, status, info, user_data);
 }
 
@@ -62,19 +62,19 @@ static void recv_completion_2(void *request, ucs_status_t status,
 {
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *)user_data;
 
-    task->bcast_two_tree.t2.recv++;
+    task->bcast_dbt.t2.recv++;
     recv_completion_common(request, status, info, user_data);
 
 }
 
-void ucc_tl_ucp_bcast_two_tree_progress(ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_bcast_dbt_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t          *task      = ucc_derived_of(coll_task,
                                                            ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t          *team      = TASK_TEAM(task);
     ucc_rank_t                  rank      = UCC_TL_TEAM_RANK(team);
-    ucc_dbt_single_tree_t       t1        = task->bcast_two_tree.t1;
-    ucc_dbt_single_tree_t       t2        = task->bcast_two_tree.t2;
+    ucc_dbt_single_tree_t       t1        = task->bcast_dbt.t1;
+    ucc_dbt_single_tree_t       t2        = task->bcast_dbt.t2;
     void                       *buffer    = TASK_ARGS(task).src.info.buffer;
     ucc_memory_type_t           mtype     = TASK_ARGS(task).src.info.mem_type;
     ucc_datatype_t              dt        = TASK_ARGS(task).src.info.datatype;
@@ -85,7 +85,7 @@ void ucc_tl_ucp_bcast_two_tree_progress(ucc_coll_task_t *coll_task)
                                              recv_completion_2};
     uint32_t                    i;
 
-    UCC_BCAST_TWO_TREE_GOTO_STATE(task->bcast_two_tree.state);
+    UCC_BCAST_DBT_GOTO_STATE(task->bcast_dbt.state);
 
     if (rank != t1.root && rank != coll_root) {
         UCPCHECK_GOTO(ucc_tl_ucp_recv_cb(buffer, data_size, mtype, t1.parent,
@@ -99,10 +99,10 @@ void ucc_tl_ucp_bcast_two_tree_progress(ucc_coll_task_t *coll_task)
                                          task, cb[1], (void *)task),
                       task, out);
     }
-    task->bcast_two_tree.state = SEND_T1;
+    task->bcast_dbt.state = SEND_T1;
 
 SEND_T1:
-    if ((coll_root == rank) || (task->bcast_two_tree.t1.recv > 0)) {
+    if ((coll_root == rank) || (task->bcast_dbt.t1.recv > 0)) {
         for (i = 0; i < 2; i++) {
             if (t1.children[i] != -1 && t1.children[i] != coll_root) {
                 UCPCHECK_GOTO(ucc_tl_ucp_send_nb(buffer, data_size, mtype,
@@ -113,10 +113,10 @@ SEND_T1:
     } else {
         goto out;
     }
-    task->bcast_two_tree.state = SEND_T2;
+    task->bcast_dbt.state = SEND_T2;
 
 SEND_T2:
-    if ((coll_root == rank) || (task->bcast_two_tree.t2.recv > 0)) {
+    if ((coll_root == rank) || (task->bcast_dbt.t2.recv > 0)) {
         for (i = 0; i < 2; i++) {
             if (t2.children[i] != -1 && t2.children[i] != coll_root) {
                 UCPCHECK_GOTO(ucc_tl_ucp_send_nb(PTR_OFFSET(buffer, data_size),
@@ -131,18 +131,18 @@ SEND_T2:
 
 TEST:
     if (UCC_INPROGRESS == ucc_tl_ucp_test_send(task)) {
-        task->bcast_two_tree.state = TEST;
+        task->bcast_dbt.state = TEST;
         return;
     }
 
     task->super.status = UCC_OK;
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_bcast_tow_tree_done", 0);
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_bcast_dbt_done", 0);
 
 out:
     return;
 }
 
-ucc_status_t ucc_tl_ucp_bcast_two_tree_start(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_ucp_bcast_dbt_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t          *task      = ucc_derived_of(coll_task,
                                                            ucc_tl_ucp_task_t);
@@ -155,13 +155,13 @@ ucc_status_t ucc_tl_ucp_bcast_two_tree_start(ucc_coll_task_t *coll_task)
     size_t                      count     = TASK_ARGS(task).src.info.count;
     size_t                      data_size = count * ucc_dt_size(dt) / 2;
     ucc_rank_t                  coll_root = (ucc_rank_t)TASK_ARGS(task).root;
-    ucc_rank_t                  t1_root   = task->bcast_two_tree.t1.root;
-    ucc_rank_t                  t2_root   = task->bcast_two_tree.t2.root;
+    ucc_rank_t                  t1_root   = task->bcast_dbt.t1.root;
+    ucc_rank_t                  t2_root   = task->bcast_dbt.t2.root;
     ucp_tag_recv_nbx_callback_t cb[2]     = {recv_completion_1,
                                              recv_completion_2};
 
-    task->bcast_two_tree.t1.recv = 0;
-    task->bcast_two_tree.t2.recv = 0;
+    task->bcast_dbt.t1.recv = 0;
+    task->bcast_dbt.t2.recv = 0;
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     if (rank == coll_root && coll_root != t1_root) {
@@ -197,33 +197,33 @@ ucc_status_t ucc_tl_ucp_bcast_two_tree_start(ucc_coll_task_t *coll_task)
         }
     }
 
-    task->bcast_two_tree.state = RECV;
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_bcast_two_tree_start", 0);
+    task->bcast_dbt.state = RECV;
+    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_bcast_dbt_start", 0);
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
-ucc_status_t ucc_tl_ucp_bcast_two_tree_finalize(ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_ucp_bcast_dbt_finalize(ucc_coll_task_t *coll_task)
 {
     return ucc_tl_ucp_coll_finalize(coll_task);
 }
 
-ucc_status_t ucc_tl_ucp_bcast_two_tree_init(
+ucc_status_t ucc_tl_ucp_bcast_dbt_init(
     ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
     ucc_coll_task_t **task_h)
 {
     ucc_tl_ucp_team_t *tl_team;
     ucc_tl_ucp_task_t *task;
-    ucc_rank_t rank, size;
+    ucc_rank_t         rank, size;
 
-    task                           = ucc_tl_ucp_init_task(coll_args, team);
-    task->super.post               = ucc_tl_ucp_bcast_two_tree_start;
-    task->super.progress           = ucc_tl_ucp_bcast_two_tree_progress;
-    task->super.finalize           = ucc_tl_ucp_bcast_two_tree_finalize;
-    tl_team                        = TASK_TEAM(task);
-    rank                           = UCC_TL_TEAM_RANK(tl_team);
-    size                           = UCC_TL_TEAM_SIZE(tl_team);
-    ucc_two_tree_build_trees(rank, size, &task->bcast_two_tree.t1,
-                             &task->bcast_two_tree.t2);
+    task                 = ucc_tl_ucp_init_task(coll_args, team);
+    task->super.post     = ucc_tl_ucp_bcast_dbt_start;
+    task->super.progress = ucc_tl_ucp_bcast_dbt_progress;
+    task->super.finalize = ucc_tl_ucp_bcast_dbt_finalize;
+    tl_team              = TASK_TEAM(task);
+    rank                 = UCC_TL_TEAM_RANK(tl_team);
+    size                 = UCC_TL_TEAM_SIZE(tl_team);
+    ucc_dbt_build_trees(rank, size, &task->bcast_dbt.t1,
+                             &task->bcast_dbt.t2);
 
     *task_h = &task->super;
     return UCC_OK;

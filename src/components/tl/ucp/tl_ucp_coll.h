@@ -11,7 +11,7 @@
 #include "tl_ucp.h"
 #include "schedule/ucc_schedule_pipelined.h"
 #include "coll_patterns/recursive_knomial.h"
-#include "coll_patterns/two_tree.h"
+#include "coll_patterns/double_binary_tree.h"
 #include "components/mc/base/ucc_mc_base.h"
 #include "components/ec/ucc_ec.h"
 #include "tl_ucp_tag.h"
@@ -189,7 +189,7 @@ typedef struct ucc_tl_ucp_task {
             ucc_dbt_single_tree_t   t1;
             ucc_dbt_single_tree_t   t2;
             int                     state;
-        } bcast_two_tree;
+        } bcast_dbt;
         struct {
             ucc_rank_t              dist;
             ucc_rank_t              max_dist;
@@ -201,11 +201,6 @@ typedef struct ucc_tl_ucp_task {
             ucc_ee_executor_task_t *etask;
             ucc_ee_executor_t      *executor;
         } reduce_kn;
-        struct {
-            ucc_dbt_single_tree_t   t1;
-            ucc_dbt_single_tree_t   t2;
-            int                     state;
-        } reduce_two_tree;
         struct {
             ucc_rank_t              dist;
             ucc_rank_t              max_dist;

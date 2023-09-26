@@ -51,7 +51,7 @@ bcast =                       \
 	bcast/bcast.c             \
 	bcast/bcast_knomial.c     \
 	bcast/bcast_sag_knomial.c \
-	bcast/bcast_two_tree.c
+	bcast/bcast_dbt.c
 
 fanin =           \
 	fanin/fanin.h \
