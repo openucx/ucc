@@ -127,20 +127,4 @@ extern ucc_ec_cuda_t ucc_ec_cuda;
 #define EC_CUDA_CONFIG                                                         \
     (ucc_derived_of(ucc_ec_cuda.super.config, ucc_ec_cuda_config_t))
 
-#define UCC_EC_CUDA_INIT_STREAM() do {                                         \
-    if (!ucc_ec_cuda.stream_initialized) {                                     \
-        cudaError_t cuda_st = cudaSuccess;                                     \
-        ucc_spin_lock(&ucc_ec_cuda.init_spinlock);                             \
-        if (!ucc_ec_cuda.stream_initialized) {                                 \
-            cuda_st = cudaStreamCreateWithFlags(&ucc_ec_cuda.stream,           \
-                                                cudaStreamNonBlocking);        \
-            ucc_ec_cuda.stream_initialized = 1;                                \
-        }                                                                      \
-        ucc_spin_unlock(&ucc_ec_cuda.init_spinlock);                           \
-        if (ucc_unlikely(cudaSuccess != cuda_st)) {                            \
-            return cuda_error_to_ucc_status(cuda_st);                          \
-        }                                                                      \
-    }                                                                          \
-} while(0)
-
 #endif
