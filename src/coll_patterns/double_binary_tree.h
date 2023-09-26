@@ -18,6 +18,7 @@ typedef struct ucc_dbt_single_tree {
     ucc_rank_t root;
     ucc_rank_t parent;
     ucc_rank_t children[2];
+    int        n_children;
     int        height;
     int        recv;
 } ucc_dbt_single_tree_t;
@@ -86,6 +87,19 @@ static inline void get_children(ucc_rank_t size, ucc_rank_t rank, int height,
     *r_c = get_right_child(size, rank, height, root);
 }
 
+static inline int get_n_children(ucc_rank_t l_c, ucc_rank_t r_c)
+{
+    int n_children = 0;
+
+    if (l_c != -1) {
+        n_children++;
+    }
+    if (r_c != -1) {
+        n_children++;
+    }
+    return n_children;
+}
+
 static inline int get_parent(int vsize, int vrank, int height, int troot)
 {
     if (vrank == troot) {
@@ -118,6 +132,8 @@ static inline void ucc_dbt_build_t2_mirror(ucc_dbt_single_tree_t t1,
                                size - 1 - t1.children[RIGHT_CHILD];
     t.children[RIGHT_CHILD] = (t1.children[LEFT_CHILD] == -1) ? -1 :
                                size - 1 - t1.children[LEFT_CHILD];
+    t.n_children            = get_n_children(t.children[LEFT_CHILD],
+                                             t.children[RIGHT_CHILD]);
     t.recv                  = 0;
 
     *t2 = t;
@@ -138,6 +154,8 @@ static inline void ucc_dbt_build_t2_shift(ucc_dbt_single_tree_t t1,
                               (t1.children[LEFT_CHILD] + 1) % size;
     t.children[RIGHT_CHILD] = (t1.children[RIGHT_CHILD] == -1) ? -1 :
                               (t1.children[RIGHT_CHILD] + 1) % size;
+    t.n_children            = get_n_children(t.children[LEFT_CHILD],
+                                             t.children[RIGHT_CHILD]);
     t.recv                  = 0;
 
     *t2 = t;
@@ -152,12 +170,14 @@ static inline void ucc_dbt_build_t1(ucc_rank_t rank, ucc_rank_t size,
 
     get_children(size, rank, height, root, &t1->children[LEFT_CHILD],
                  &t1->children[RIGHT_CHILD]);
-    t1->height = height;
-    t1->parent = parent;
-    t1->size   = size;
-    t1->rank   = rank;
-    t1->root   = root;
-    t1->recv   = 0;
+    t1->n_children = get_n_children(t1->children[LEFT_CHILD],
+                                    t1->children[RIGHT_CHILD]);
+    t1->height     = height;
+    t1->parent     = parent;
+    t1->size       = size;
+    t1->rank       = rank;
+    t1->root       = root;
+    t1->recv       = 0;
 }
 
 static inline ucc_rank_t ucc_dbt_convert_rank_for_shift(ucc_rank_t rank,
