@@ -36,8 +36,8 @@ AS_IF([test "x$rccl_checked" != "xyes"],[
 
         AS_IF([test "x$rocm_happy" = "xyes"],
         [
-            CPPFLAGS="$HIP_CPPFLAGS $CPPFLAGS"
-            LDFLAGS="$ROCM_LDFLAGS $LDFLAGS"
+            CPPFLAGS="$CPPFLAGS $HIP_CPPFLAGS"
+            LDFLAGS="$LDFLAGS $ROCM_LDFLAGS"
             AC_CHECK_HEADER([rccl/rccl.h],
             [
                 AC_CHECK_LIB([rccl], [ncclCommInitRank],
