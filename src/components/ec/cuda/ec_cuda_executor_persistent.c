@@ -18,12 +18,19 @@ ucc_cuda_executor_persistent_task_post(ucc_ee_executor_t *executor,
     ucc_ee_executor_task_args_t            *subtask_args;
     ucc_ec_cuda_executor_persistent_task_t *ee_task;
     int                                     i;
+    ucc_ec_cuda_resources_t                *resources;
+    ucc_status_t                            status;
+
+    status = ucc_ec_cuda_get_resources(&resources);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
 
     if (ucc_ec_cuda.thread_mode == UCC_THREAD_MULTIPLE) {
         ucc_spin_lock(&eee->tasks_lock);
     }
 
-    ee_task = ucc_mpool_get(&ucc_ec_cuda.resources.executor_persistent_tasks);
+    ee_task = ucc_mpool_get(&resources->executor_persistent_tasks);
     if (ucc_unlikely(!ee_task)) {
         return UCC_ERR_NO_MEMORY;
     }

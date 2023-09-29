@@ -4,6 +4,7 @@
  * See file LICENSE for terms.
  */
 
+#include <pthread.h>
 #include "config.h"
 #include "base/ucc_ec_base.h"
 #include "ucc_ec.h"
@@ -13,6 +14,7 @@
 
 static const ucc_ec_ops_t          *ec_ops[UCC_EE_LAST];
 static const ucc_ee_executor_ops_t *executor_ops[UCC_EE_LAST];
+static pthread_mutex_t ucc_ec_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define UCC_CHECK_EC_AVAILABLE(ee)                                             \
     do {                                                                       \
@@ -28,6 +30,7 @@ ucc_status_t ucc_ec_init(const ucc_ec_params_t *ec_params)
     ucc_status_t   status;
     ucc_ec_attr_t  attr;
 
+    pthread_mutex_lock(&ucc_ec_mutex);
     memset(ec_ops, 0, UCC_EE_LAST * sizeof(ucc_ec_ops_t *));
     n_ecs = ucc_global_config.ec_framework.n_components;
     for (i = 0; i < n_ecs; i++) {
@@ -62,6 +65,7 @@ ucc_status_t ucc_ec_init(const ucc_ec_params_t *ec_params)
             attr.field_mask = UCC_EC_ATTR_FIELD_THREAD_MODE;
             status = ec->get_attr(&attr);
             if (status != UCC_OK) {
+                pthread_mutex_unlock(&ucc_ec_mutex);
                 return status;
             }
             if (attr.thread_mode < ec_params->thread_mode) {
@@ -75,6 +79,7 @@ ucc_status_t ucc_ec_init(const ucc_ec_params_t *ec_params)
         ec_ops[ec->type] = &ec->ops;
         executor_ops[ec->type] = &ec->executor_ops;
     }
+    pthread_mutex_unlock(&ucc_ec_mutex);
 
     return UCC_OK;
 }
@@ -102,6 +107,7 @@ ucc_status_t ucc_ec_finalize()
     ucc_ee_type_t  et;
     ucc_ec_base_t *ec;
 
+    pthread_mutex_lock(&ucc_ec_mutex);
     for (et = UCC_EE_FIRST; et < UCC_EE_LAST; et++) {
         if (NULL != ec_ops[et]) {
             ec = ucc_container_of(ec_ops[et], ucc_ec_base_t, ops);
@@ -115,6 +121,7 @@ ucc_status_t ucc_ec_finalize()
             }
         }
     }
+    pthread_mutex_unlock(&ucc_ec_mutex);
 
     return UCC_OK;
 }

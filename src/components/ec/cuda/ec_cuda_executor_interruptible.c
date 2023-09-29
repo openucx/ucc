@@ -29,7 +29,7 @@ ucc_status_t ucc_cuda_executor_interruptible_get_stream(cudaStream_t *stream)
         }
 
         for(i = 0; i < num_streams; i++) {
-            st = CUDA_FUNC(cudaStreamCreateWithFlags(&(resources->exec_streams[i]),
+            st = CUDA_FUNC(cudaStreamCreateWithFlags(&resources->exec_streams[i],
                                                      cudaStreamNonBlocking));
             if (st != UCC_OK) {
                 for (j = 0; j < i; j++) {
@@ -63,14 +63,20 @@ ucc_cuda_executor_interruptible_task_post(ucc_ee_executor_t *executor,
     ucc_ec_cuda_executor_interruptible_task_t *ee_task;
     ucc_status_t status;
     cudaGraphNode_t nodes[UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS];
+    ucc_ec_cuda_resources_t *resources;
     int i;
+
+    status = ucc_ec_cuda_get_resources(&resources);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
 
     status = ucc_cuda_executor_interruptible_get_stream(&stream);
     if (ucc_unlikely(status != UCC_OK)) {
         return status;
     }
 
-    ee_task = ucc_mpool_get(&ucc_ec_cuda.resources.executor_interruptible_tasks);
+    ee_task = ucc_mpool_get(&resources->executor_interruptible_tasks);
     if (ucc_unlikely(!ee_task)) {
         return UCC_ERR_NO_MEMORY;
     }

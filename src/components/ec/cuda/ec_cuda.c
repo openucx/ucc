@@ -103,8 +103,9 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     int                   device, num_devices;
     cudaError_t           cuda_st;
     struct cudaDeviceProp prop;
-    ucc_status_t          status;
 
+    ucc_ec_cuda_config = ucc_derived_of(ucc_ec_cuda.super.config,
+                                        ucc_ec_cuda_config_t);
     ucc_ec_cuda.exec_streams_initialized = 0;
     ucc_strncpy_safe(ucc_ec_cuda.super.config->log_component.name,
                      ucc_ec_cuda.super.super.name,
@@ -186,14 +187,6 @@ static ucc_status_t ucc_ec_cuda_init(const ucc_ec_params_t *ec_params)
     }
 
     ucc_ec_cuda.resources_hash = kh_init(ucc_ec_cuda_resources_hash);
-    status = ucc_ec_cuda_resources_init(&ucc_ec_cuda.super,
-                                        EC_CUDA_CONFIG->exec_num_streams,
-                                        &ucc_ec_cuda.resources);
-    if (status != UCC_OK) {
-        ec_warn(&ucc_ec_cuda.super, "failed to initilize CUDA resources");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-
     ucc_spinlock_init(&ucc_ec_cuda.init_spinlock, 0);
     return UCC_OK;
 }
@@ -259,7 +252,15 @@ ucc_status_t ucc_ec_cuda_event_test(void *event)
 
 static ucc_status_t ucc_ec_cuda_finalize()
 {
-    ucc_ec_cuda_resources_cleanup(&ucc_ec_cuda.resources);
+    ucc_ec_cuda_resources_t *resources;
+
+    resources = ec_cuda_resources_hash_pop(ucc_ec_cuda.resources_hash);
+    while (resources) {
+        ucc_ec_cuda_resources_cleanup(resources);
+        resources = ec_cuda_resources_hash_pop(ucc_ec_cuda.resources_hash);
+    }
+
+    ucc_spinlock_destroy(&ucc_ec_cuda.init_spinlock);
 
     return UCC_OK;
 }
@@ -276,10 +277,14 @@ ucc_status_t ucc_ec_cuda_get_resources(ucc_ec_cuda_resources_t **resources)
         return status;
     }
 
+#if CUDA_VERSION < 12000
+    cu_ctx_id = 1;
+#else
     status = CUDADRV_FUNC(cuCtxGetId(cu_ctx, &cu_ctx_id));
     if (ucc_unlikely(status != UCC_OK)) {
         ec_error(&ucc_ec_cuda.super, "failed to get currect CUDA context ID");
     }
+#endif
 
     *resources = ec_cuda_resources_hash_get(ucc_ec_cuda.resources_hash,
                                             cu_ctx_id);
@@ -298,7 +303,6 @@ ucc_status_t ucc_ec_cuda_get_resources(ucc_ec_cuda_resources_t **resources)
                 return UCC_ERR_NO_MEMORY;
             }
             status = ucc_ec_cuda_resources_init(&ucc_ec_cuda.super,
-                                                EC_CUDA_CONFIG->exec_num_streams,
                                                 *resources);
             if (status != UCC_OK) {
                 ucc_free(*resources);
@@ -340,6 +344,8 @@ ucc_ec_cuda_t ucc_ec_cuda = {
     .super.executor_ops.task_finalize = ucc_cuda_executor_task_finalize,
     .super.executor_ops.finalize      = ucc_cuda_executor_finalize,
 };
+
+ucc_ec_cuda_config_t *ucc_ec_cuda_config;
 
 UCC_CONFIG_REGISTER_TABLE_ENTRY(&ucc_ec_cuda.super.config_table,
                                 &ucc_config_global_list);

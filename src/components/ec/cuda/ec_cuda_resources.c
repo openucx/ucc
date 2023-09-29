@@ -2,8 +2,6 @@
 #include "components/ec/ucc_ec_log.h"
 #include "utils/ucc_malloc.h"
 
-#define EXEC_MAX_TASKS 128
-
 static void ucc_ec_cuda_event_init(ucc_mpool_t *mp, void *obj, void *chunk) //NOLINT: mp is unused
 {
     ucc_ec_cuda_event_t *base = (ucc_ec_cuda_event_t *) obj;
@@ -43,9 +41,7 @@ static void ucc_ec_cuda_executor_chunk_init(ucc_mpool_t *mp, void *obj, //NOLINT
                                             void *chunk) //NOLINT: chunk is unused
 {
     ucc_ec_cuda_executor_t *eee       = (ucc_ec_cuda_executor_t*) obj;
-    // int                     max_tasks = EC_CUDA_CONFIG->exec_max_tasks;
-    //TODO: add config
-    int max_tasks = EXEC_MAX_TASKS;
+    int                     max_tasks = ucc_ec_cuda_config->exec_max_tasks;
 
     CUDA_FUNC(cudaHostGetDevicePointer(
                   (void**)(&eee->dev_state), (void *)&eee->state, 0));
@@ -112,11 +108,12 @@ static ucc_mpool_ops_t ucc_ec_cuda_interruptible_task_mpool_ops = {
 };
 
 ucc_status_t ucc_ec_cuda_resources_init(ucc_ec_base_t *ec,
-                                        int num_streams,
                                         ucc_ec_cuda_resources_t *resources)
 {
     ucc_status_t status;
+    int num_streams;
 
+    CUDADRV_CHECK(cuCtxGetCurrent(&resources->cu_ctx));
     status = ucc_mpool_init(&resources->events, 0, sizeof(ucc_ec_cuda_event_t),
                             0, UCC_CACHE_LINE_SIZE, 16, UINT_MAX,
                             &ucc_ec_cuda_event_mpool_ops, UCC_THREAD_MULTIPLE,
@@ -155,7 +152,7 @@ ucc_status_t ucc_ec_cuda_resources_init(ucc_ec_base_t *ec,
         goto free_interruptible_tasks_mpool;
     }
 
-    resources->num_streams = num_streams;
+    num_streams = ucc_ec_cuda_config->exec_num_streams;
     resources->exec_streams = ucc_calloc(num_streams, sizeof(cudaStream_t),
                                          "ec cuda streams");
     if (!resources->exec_streams) {
@@ -182,8 +179,10 @@ exit_err:
 void ucc_ec_cuda_resources_cleanup(ucc_ec_cuda_resources_t *resources)
 {
     int i;
+    CUcontext tmp_context;
 
-    for (i = 0; i < resources->num_streams; i++) {
+    cuCtxPushCurrent(resources->cu_ctx);
+    for (i = 0; i < ucc_ec_cuda_config->exec_num_streams; i++) {
         if (resources->exec_streams[i] != NULL) {
             CUDA_FUNC(cudaStreamDestroy(resources->exec_streams[i]));
         }
@@ -194,4 +193,5 @@ void ucc_ec_cuda_resources_cleanup(ucc_ec_cuda_resources_t *resources)
     ucc_mpool_cleanup(&resources->executor_persistent_tasks, 1);
 
     ucc_free(resources->exec_streams);
+    cuCtxPopCurrent(&tmp_context);
 }

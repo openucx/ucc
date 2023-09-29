@@ -67,6 +67,7 @@ typedef struct ucc_ec_cuda_executor_persistent_task {
 } ucc_ec_cuda_executor_persistent_task_t;
 
 typedef struct ucc_ec_cuda_resources {
+    CUcontext     cu_ctx;
     ucc_mpool_t   events;
     ucc_mpool_t   executors;
     ucc_mpool_t   executor_interruptible_tasks;
@@ -76,8 +77,29 @@ typedef struct ucc_ec_cuda_resources {
     cudaStream_t *exec_streams;
 } ucc_ec_cuda_resources_t;
 
+typedef enum ucc_ec_cuda_strm_task_mode {
+    UCC_EC_CUDA_TASK_KERNEL,
+    UCC_EC_CUDA_TASK_MEM_OPS,
+    UCC_EC_CUDA_TASK_AUTO,
+    UCC_EC_CUDA_TASK_LAST,
+} ucc_ec_cuda_strm_task_mode_t;
+
+typedef struct ucc_ec_cuda_config {
+    ucc_ec_config_t                super;
+    ucc_ec_cuda_strm_task_mode_t   strm_task_mode;
+    unsigned long                  exec_num_workers;
+    unsigned long                  exec_num_threads;
+    unsigned long                  exec_max_tasks;
+    unsigned long                  exec_num_streams;
+    unsigned long                  reduce_num_blocks;
+    int                            reduce_num_threads;
+    int                            use_cooperative_launch;
+    unsigned long                  exec_copy_thresh;
+} ucc_ec_cuda_config_t;
+
+extern ucc_ec_cuda_config_t *ucc_ec_cuda_config;
+
 ucc_status_t ucc_ec_cuda_resources_init(ucc_ec_base_t *ec,
-                                        int num_streams,
                                         ucc_ec_cuda_resources_t *resources);
 
 void ucc_ec_cuda_resources_cleanup(ucc_ec_cuda_resources_t *resources);
@@ -112,5 +134,25 @@ void ec_cuda_resources_hash_put(ucc_ec_cuda_resources_hash_t *h,
     kh_value(h, k) = value;
 }
 
+static inline
+void* ec_cuda_resources_hash_pop(ucc_ec_cuda_resources_hash_t *h)
+{
+    void    *resources = NULL;
+    khiter_t k;
+
+    k = kh_begin(h);
+    while (k != kh_end(h)) {
+        if (kh_exist(h, k)) {
+            resources = kh_value(h, k);
+            break;
+        }
+        k++;
+    }
+
+    if (resources) {
+        kh_del(ucc_ec_cuda_resources_hash, h, k);
+    }
+    return resources;
+}
 
 #endif

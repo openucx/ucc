@@ -74,6 +74,15 @@ static inline ucc_status_t cuda_error_to_ucc_status(cudaError_t cuda_status)
         }                                                                      \
     } while(0)
 
+#define CUDADRV_CHECK(_cmd)                                                    \
+    /* coverity[dead_error_line] */                                            \
+    do {                                                                       \
+        ucc_status_t _cuda_status = CUDADRV_FUNC(_cmd);                        \
+        if (ucc_unlikely(_cuda_status != UCC_OK)) {                            \
+            return _cuda_status;                                               \
+        }                                                                      \
+    } while(0)
+
 #define CUDA_CHECK_GOTO(_cmd, _label, _cuda_status)                            \
     do {                                                                       \
         _cuda_status = CUDA_FUNC(_cmd);                                        \
