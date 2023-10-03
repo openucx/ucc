@@ -13,13 +13,13 @@ enum {
 };
 
 typedef struct ucc_dbt_single_tree {
-   ucc_rank_t rank;
-   ucc_rank_t size;
-   ucc_rank_t root;
-   ucc_rank_t parent;
-   ucc_rank_t children[2];
-   int        height;
-   int        recv;
+    ucc_rank_t rank;
+    ucc_rank_t size;
+    ucc_rank_t root;
+    ucc_rank_t parent;
+    ucc_rank_t children[2];
+    int        height;
+    int        recv;
 } ucc_dbt_single_tree_t;
 
 static inline ucc_rank_t get_root(ucc_rank_t size)

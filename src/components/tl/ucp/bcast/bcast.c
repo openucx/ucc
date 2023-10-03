@@ -23,7 +23,7 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_BCAST_ALG_DBT,
              .name = "dbt",
              .desc = "bcast over double binary tree where a leaf in one tree "
-                     "will be intermediate in other (optimized for latency)"},
+                     "will be intermediate in other (optimized for BW)"},
         [UCC_TL_UCP_BCAST_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
