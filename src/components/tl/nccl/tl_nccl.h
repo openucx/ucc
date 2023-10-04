@@ -45,6 +45,15 @@
 #define NCCL_VERSION_COMM_INIT_NB NCCL_VERSION(2,14,3)
 #define NCCL_USE_NON_BLOCKING NCCL_VERSION_CODE >= NCCL_VERSION_COMM_INIT_NB
 
+enum {
+    TL_NCCL_COMM_STATE_ERROR,
+    TL_NCCL_COMM_STATE_OOB,
+    TL_NCCL_COMM_STATE_INIT_TEAM,
+    TL_NCCL_COMM_STATE_INIT_COMM,
+    TL_NCCL_COMM_STATE_DESTROY_COMM,
+    TL_NCCL_COMM_STATE_READY,
+};
+
 typedef struct ucc_tl_nccl_iface {
     ucc_tl_iface_t super;
 } ucc_tl_nccl_iface_t;
@@ -66,6 +75,7 @@ typedef struct ucc_tl_nccl_context_config {
     ucc_tl_context_config_t            super;
     ucc_tl_nccl_completion_sync_type_t sync_type;
     int                                nccl_cfg_blocking;
+    int                                nccl_lazy_init;
 } ucc_tl_nccl_context_config_t;
 
 typedef struct ucc_tl_nccl_lib {
@@ -85,7 +95,7 @@ UCC_CLASS_DECLARE(ucc_tl_nccl_context_t, const ucc_base_context_params_t *,
 
 typedef struct ucc_tl_nccl_team {
     ucc_tl_team_t        super;
-    ucc_status_t         comm_state;
+    int                  comm_state;
     ncclUniqueId        *unique_id;
     void                *oob_req;
     ncclComm_t           nccl_comm;
@@ -145,6 +155,8 @@ static inline ucc_status_t ucc_tl_nccl_check_nb(ncclResult_t *nccl_status, // NO
 #endif
     return UCC_OK;
 }
+
+ucc_status_t ucc_tl_nccl_comm_init(ucc_tl_nccl_team_t *team);
 
 #define NCCLCHECK_GOTO(_cmd, _label, _st, _lib, _task_st, _comm, _check_nb)    \
     do {                                                                       \
