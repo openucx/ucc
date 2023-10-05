@@ -548,7 +548,12 @@ void ucc_coll_str(const ucc_coll_task_t *task, char *str, size_t len,
         size_t tl_info_len = 0;
         char task_info[64], cl_info[16], tl_info[32];
 
-        if (task->team->context->lib->log_component.name[0] == 'C') {
+        if (!task->team) {
+            /* zero size collective, no CL or TL */
+            strncpy(cl_info, "NoOp", sizeof(cl_info));
+            strncpy(tl_info, "NoOp", sizeof(tl_info));
+        }
+        else if (task->team->context->lib->log_component.name[0] == 'C') {
             /* it's not CL BASIC task */
             ucc_strncpy_safe(cl_info,
                              task->team->context->lib->log_component.name,

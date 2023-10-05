@@ -157,6 +157,15 @@ static ucc_status_t ucc_coll_args_check_mem_type(ucc_coll_args_t *coll_args,
     };
 }
 
+#define UCC_COLL_TYPE_SKIP_ZERO_SIZE \
+    (UCC_COLL_TYPE_ALLREDUCE |       \
+     UCC_COLL_TYPE_ALLGATHER |       \
+     UCC_COLL_TYPE_ALLTOALL |        \
+     UCC_COLL_TYPE_BCAST |           \
+     UCC_COLL_TYPE_GATHER |          \
+     UCC_COLL_TYPE_REDUCE |          \
+     UCC_COLL_TYPE_SCATTER)
+
 UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
                       (coll_args, request, team), ucc_coll_args_t *coll_args,
                       ucc_coll_req_h *request, ucc_team_h team)
@@ -167,6 +176,7 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     ucc_ee_executor_params_t  params;
     ucc_memory_type_t         coll_mem_type;
     ucc_ee_type_t             coll_ee_type;
+    size_t                    coll_size;
 
     if (ucc_unlikely(team->state != UCC_TEAM_ACTIVE)) {
         ucc_error("team %p is used before team create is completed", team);
@@ -174,6 +184,26 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     }
     /* Global check to reduce the amount of checks throughout
        all TLs */
+
+    if (UCC_COLL_TYPE_SKIP_ZERO_SIZE & coll_args->coll_type) {
+        coll_size = ucc_coll_args_msgsize(coll_args, team->rank, team->size);
+        if (coll_size == 0) {
+            task = ucc_mpool_get(&team->contexts[0]->lib->stub_tasks_mp);
+            if (ucc_unlikely(!task)) {
+                ucc_error("failed to allocate dummy task");
+                return UCC_ERR_NO_MEMORY;
+            }
+            op_args.mask = 0;
+            memcpy(&op_args.args, coll_args, sizeof(ucc_coll_args_t));
+            op_args.team = team;
+            op_args.args.flags = 0;
+            UCC_COPY_PARAM_BY_FIELD(&op_args.args, coll_args,
+                                    UCC_COLL_ARGS_FIELD_FLAGS, flags);
+            ucc_coll_task_init(task, &op_args, NULL);
+            goto print_trace;
+        }
+    }
+
     if (UCC_COLL_ARGS_ACTIVE_SET(coll_args) &&
         ((UCC_COLL_TYPE_BCAST != coll_args->coll_type) ||
          coll_args->active_set.size != 2)) {
@@ -246,6 +276,10 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     }
     task->seq_num = team->seq_num++;
 
+    ucc_assert(task->super.status == UCC_OPERATION_INITIALIZED);
+
+print_trace:
+    *request = &task->super;
     if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DIAG) {
         char coll_str[256];
         ucc_coll_str(task, coll_str, sizeof(coll_str),
@@ -262,9 +296,6 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
                 coll_str);
         }
     }
-
-    ucc_assert(task->super.status == UCC_OPERATION_INITIALIZED);
-    *request = &task->super;
 
     return UCC_OK;
 
@@ -297,18 +328,21 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
     ucc_status_t status;
 
     if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DEBUG) {
-        ucc_rank_t rank = task->team->params.team->rank;
-        if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {
-            if (rank == 0) {
+        /* team is NULL if task is a dummy task, e.g. collective of zero size */
+        if (task->team) {
+            ucc_rank_t rank = task->team->params.team->rank;
+            if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {
+                if (rank == 0) {
+                    ucc_log_component_collective_trace(
+                        ucc_global_config.coll_trace.log_level,
+                        "coll post: req %p, seq_num %u", task, task->seq_num);
+                }
+            } else {
                 ucc_log_component_collective_trace(
                     ucc_global_config.coll_trace.log_level,
-                    "coll post: req %p, seq_num %u", task, task->seq_num);
+                    "coll post: rank %d req %p, seq_num %u", rank, task,
+                    task->seq_num);
             }
-        } else {
-            ucc_log_component_collective_trace(
-                ucc_global_config.coll_trace.log_level,
-                "coll post: rank %d req %p, seq_num %u", rank, task,
-                task->seq_num);
         }
     }
 
@@ -388,18 +422,20 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_finalize, (request),
     ucc_coll_task_t *task = ucc_derived_of(request, ucc_coll_task_t);
 
     if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DEBUG) {
-        ucc_rank_t rank = task->team->params.team->rank;
-        if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {
-            if (rank == 0) {
+        if (task->team) {
+            ucc_rank_t rank = task->team->params.team->rank;
+            if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {
+                if (rank == 0) {
+                    ucc_log_component_collective_trace(
+                        ucc_global_config.coll_trace.log_level,
+                        "coll finalize: req %p, seq_num %u", task, task->seq_num);
+                }
+            } else {
                 ucc_log_component_collective_trace(
                     ucc_global_config.coll_trace.log_level,
-                    "coll finalize: req %p, seq_num %u", task, task->seq_num);
+                    "coll finalize: rank %d req %p, seq_num %u", rank, task,
+                    task->seq_num);
             }
-        } else {
-            ucc_log_component_collective_trace(
-                ucc_global_config.coll_trace.log_level,
-                "coll finalize: rank %d req %p, seq_num %u", rank, task,
-                task->seq_num);
         }
     }
     return ucc_collective_finalize_internal(task);

@@ -1,9 +1,5 @@
 /**
-<<<<<<< HEAD
  * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-=======
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
->>>>>>> REVIEW: fix review comments
  *
  * See file LICENSE for terms.
  */
@@ -115,6 +111,10 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
         }
         print_time(cnt, args, time);
         coll->free_args(args);
+        if (max_count == 0) {
+            /* exit from loop when min_count == max_count == 0 */
+            break;
+        }
     }
 
     return UCC_OK;

@@ -135,6 +135,7 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
                                                       ucc_tl_nccl_context_t);
     ucc_tl_nccl_task_t    *task;
     ucc_status_t           status;
+    ucc_coll_progress_fn_t progress_fn;
 
     if (!ucc_coll_args_is_predefined_dt(&coll_args->args, team->params.rank)) {
         tl_error(team->context->lib,
@@ -147,11 +148,13 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
         tl_error(team->context->lib, "failed to get task from mpool");
         return UCC_ERR_NO_MEMORY;
     }
+    progress_fn = task->super.progress;
 
     ucc_coll_task_init(&task->super, coll_args, team);
     UCC_TL_NCCL_PROFILE_REQUEST_NEW(task, "tl_nccl_task", 0);
     task->super.finalize           = ucc_tl_nccl_coll_finalize;
     task->super.triggered_post     = ucc_tl_nccl_triggered_post;
+    task->super.progress           = progress_fn;
     task->completed                = NULL;
     if (nccl_ctx->cfg.sync_type == UCC_TL_NCCL_COMPLETION_SYNC_TYPE_EVENT) {
         status = ucc_ec_create_event(&task->completed, UCC_EE_CUDA_STREAM);
