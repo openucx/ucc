@@ -72,12 +72,12 @@ ucc_status_t TestAllgather::set_input(int iter_persistent)
 ucc_status_t TestAllgather::check()
 {
     size_t dt_size, single_rank_count;
-    int size;
+    int    size, i;
 
     MPI_Comm_size(team.comm, &size);
     single_rank_count = args.dst.info.count / size;
     dt_size = ucc_dt_size(dt);
-    for (int i = 0; i < size; i++) {
+    for (i = 0; i < size; i++) {
         init_buffer(PTR_OFFSET(check_buf, i * single_rank_count * dt_size),
                     single_rank_count, dt, mem_type, i * (iter_persistent + 1));
     }
