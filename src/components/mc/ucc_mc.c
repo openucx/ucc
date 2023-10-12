@@ -145,8 +145,11 @@ UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_alloc, (h_ptr, size, mem_type),
 
 ucc_status_t ucc_mc_free(ucc_mc_buffer_header_t *h_ptr)
 {
-    UCC_CHECK_MC_AVAILABLE(h_ptr->mt);
-    return mc_ops[h_ptr->mt]->mem_free(h_ptr);
+    ucc_memory_type_t mt = (h_ptr->mt == UCC_MEMORY_TYPE_CUDA_MANAGED) ?
+                               UCC_MEMORY_TYPE_CUDA : h_ptr->mt;
+
+    UCC_CHECK_MC_AVAILABLE(mt);
+    return mc_ops[mt]->mem_free(h_ptr);
 }
 
 UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_memcpy,

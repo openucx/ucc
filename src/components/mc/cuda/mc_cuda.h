@@ -27,6 +27,7 @@ typedef struct ucc_mc_cuda {
     ucc_mpool_t                    events;
     ucc_mpool_t                    strm_reqs;
     ucc_mpool_t                    mpool;
+    ucc_mpool_t                    mpool_managed;
     int                            mpool_init_flag;
     ucc_spinlock_t                 init_spinlock;
     ucc_thread_mode_t              thread_mode;

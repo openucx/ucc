@@ -159,10 +159,15 @@ static ucc_status_t ucc_mc_cuda_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
                                                ucc_memory_type_t        mt)
 {
     ucc_mc_buffer_header_t *h = NULL;
-    if (size <= MC_CUDA_CONFIG->mpool_elem_size &&
-        mt != UCC_MEMORY_TYPE_CUDA_MANAGED) {
-        h = (ucc_mc_buffer_header_t *)ucc_mpool_get(&ucc_mc_cuda.mpool);
+
+    if (size <= MC_CUDA_CONFIG->mpool_elem_size) {
+        if (mt == UCC_MEMORY_TYPE_CUDA) {
+            h = (ucc_mc_buffer_header_t *)ucc_mpool_get(&ucc_mc_cuda.mpool);
+        } else {
+            h = (ucc_mc_buffer_header_t *)ucc_mpool_get(&ucc_mc_cuda.mpool_managed);
+        }
     }
+
     if (!h) {
         // Slow path
         return ucc_mc_cuda_mem_alloc(h_ptr, size, mt);
@@ -225,10 +230,36 @@ static void ucc_mc_cuda_chunk_cleanup(ucc_mpool_t *mp, void *obj) //NOLINT: mp i
     }
 }
 
+static void ucc_mc_cuda_chunk_init_managed(ucc_mpool_t *mp, //NOLINT
+                                           void *obj, void *chunk) //NOLINT
+{
+    ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t *)obj;
+    cudaError_t             st;
+
+    st = cudaMallocManaged(&h->addr, MC_CUDA_CONFIG->mpool_elem_size, cudaMemAttachGlobal);
+    if (st != cudaSuccess) {
+        // h->addr will be 0 so ucc_mc_cuda_mem_alloc_pool function will
+        // return UCC_ERR_NO_MEMORY. As such mc_error message is suffice.
+        cudaGetLastError();
+        mc_error(&ucc_mc_cuda.super,
+                 "failed to allocate %zd bytes, "
+                 "cuda error %d(%s)",
+                 MC_CUDA_CONFIG->mpool_elem_size, st, cudaGetErrorString(st));
+    }
+    h->from_pool = 1;
+    h->mt        = UCC_MEMORY_TYPE_CUDA_MANAGED;
+}
+
+
 static ucc_mpool_ops_t ucc_mc_ops = {.chunk_alloc   = ucc_mc_cuda_chunk_alloc,
                                      .chunk_release = ucc_mc_cuda_chunk_release,
                                      .obj_init      = ucc_mc_cuda_chunk_init,
                                      .obj_cleanup   = ucc_mc_cuda_chunk_cleanup};
+
+static ucc_mpool_ops_t ucc_mc_managed_ops = {.chunk_alloc   = ucc_mc_cuda_chunk_alloc,
+                                             .chunk_release = ucc_mc_cuda_chunk_release,
+                                             .obj_init      = ucc_mc_cuda_chunk_init_managed,
+                                             .obj_cleanup   = ucc_mc_cuda_chunk_cleanup};
 
 static ucc_status_t ucc_mc_cuda_mem_free(ucc_mc_buffer_header_t *h_ptr)
 {
@@ -260,6 +291,8 @@ ucc_mc_cuda_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
                                      size_t                   size,
                                      ucc_memory_type_t        mt)
 {
+    ucc_status_t status;
+
     // lock assures single mpool initiation when multiple threads concurrently execute
     // different collective operations thus concurrently entering init function.
     ucc_spin_lock(&ucc_mc_cuda.init_spinlock);
@@ -272,7 +305,7 @@ ucc_mc_cuda_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
     }
 
     if (!ucc_mc_cuda.mpool_init_flag) {
-        ucc_status_t status = ucc_mpool_init(
+        status = ucc_mpool_init(
             &ucc_mc_cuda.mpool, 0, sizeof(ucc_mc_buffer_header_t), 0,
             UCC_CACHE_LINE_SIZE, 1, MC_CUDA_CONFIG->mpool_max_elems,
             &ucc_mc_ops, ucc_mc_cuda.thread_mode, "mc cuda mpool buffers");
@@ -280,6 +313,17 @@ ucc_mc_cuda_mem_pool_alloc_with_init(ucc_mc_buffer_header_t **h_ptr,
             ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);
             return status;
         }
+
+        status = ucc_mpool_init(
+            &ucc_mc_cuda.mpool_managed, 0, sizeof(ucc_mc_buffer_header_t), 0,
+            UCC_CACHE_LINE_SIZE, 1, MC_CUDA_CONFIG->mpool_max_elems,
+            &ucc_mc_managed_ops, ucc_mc_cuda.thread_mode, "mc cuda mpool buffers");
+        if (status != UCC_OK) {
+            ucc_spin_unlock(&ucc_mc_cuda.init_spinlock);
+            return status;
+        }
+
+
         ucc_mc_cuda.super.ops.mem_alloc = ucc_mc_cuda_mem_pool_alloc;
         ucc_mc_cuda.mpool_init_flag     = 1;
     }
@@ -422,6 +466,7 @@ static ucc_status_t ucc_mc_cuda_finalize()
     }
     if (ucc_mc_cuda.mpool_init_flag) {
         ucc_mpool_cleanup(&ucc_mc_cuda.mpool, 1);
+        ucc_mpool_cleanup(&ucc_mc_cuda.mpool_managed, 1);
         ucc_mc_cuda.mpool_init_flag     = 0;
         ucc_mc_cuda.super.ops.mem_alloc = ucc_mc_cuda_mem_pool_alloc_with_init;
     }
