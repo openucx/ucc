@@ -9,6 +9,7 @@
 #include "utils/ucc_malloc.h"
 #include "utils/arch/cpu.h"
 #include <hip/hip_runtime.h>
+#include <hip/hip_version.h>
 #include <hsa/hsa.h>
 #include <hsa/hsa_ext_amd.h>
 
@@ -301,13 +302,23 @@ static ucc_status_t ucc_mc_rocm_mem_query(const void *ptr,
             hipGetLastError();
             return UCC_ERR_NOT_SUPPORTED;
         }
+
+#if HIP_VERSION >= 50500000
+        switch (attr.type) {
+#else
         switch (attr.memoryType) {
+#endif
         case hipMemoryTypeHost:
             mem_type = (attr.isManaged ? UCC_MEMORY_TYPE_ROCM_MANAGED : UCC_MEMORY_TYPE_HOST);
             break;
         case hipMemoryTypeDevice:
             mem_type = UCC_MEMORY_TYPE_ROCM;
             break;
+#if HIP_VERSION >= 50300000
+        case hipMemoryTypeManaged:
+            mem_type = UCC_MEMORY_TYPE_ROCM_MANAGED;
+            break;
+#endif
         default:
             return UCC_ERR_NOT_SUPPORTED;
         }
