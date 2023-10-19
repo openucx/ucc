@@ -88,16 +88,20 @@ ucc_tl_rccl_task_t * ucc_tl_rccl_init_task(ucc_base_coll_args_t *coll_args,
                                                       ucc_tl_rccl_context_t);
     ucc_tl_rccl_task_t    *task;
     ucc_status_t           status;
+    ucc_coll_progress_fn_t progress_fn;
 
     task = ucc_mpool_get(&rccl_ctx->req_mp);
     if (ucc_unlikely(!task)) {
 	tl_error(team->context->lib,"Failed to allocate task");
 	return NULL;
     }
+    progress_fn = task->super.progress;
+
     ucc_coll_task_init(&task->super, coll_args, team);
     UCC_TL_RCCL_PROFILE_REQUEST_NEW(task, "tl_rccl_task", 0);
     task->super.finalize           = ucc_tl_rccl_coll_finalize;
     task->super.triggered_post     = ucc_tl_rccl_triggered_post;
+    task->super.progress           = progress_fn;
     task->completed                = NULL;
     if (rccl_ctx->cfg.sync_type == UCC_TL_RCCL_COMPLETION_SYNC_TYPE_EVENT) {
         status = ucc_ec_create_event(&task->completed, UCC_EE_ROCM_STREAM);
