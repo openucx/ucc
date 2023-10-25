@@ -352,7 +352,10 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable(ucc_tl_mlx5_mcast_coll_com
     return UCC_INPROGRESS;
 }
 
-ucc_status_t ucc_tl_setup_mcast(ucc_tl_mlx5_mcast_coll_comm_t *comm);
+ucc_status_t ucc_tl_mlx5_probe_ip_over_ib(char* ib_dev_list,
+                                          struct sockaddr_storage *addr);
+
+ucc_status_t ucc_tl_mlx5_setup_mcast(ucc_tl_mlx5_mcast_coll_comm_t *comm);
 
 ucc_status_t ucc_tl_mlx5_mcast_init_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
                                         ucc_tl_mlx5_mcast_coll_comm_t *comm);
@@ -360,6 +363,6 @@ ucc_status_t ucc_tl_mlx5_mcast_init_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
 ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
                                          ucc_tl_mlx5_mcast_coll_comm_t *comm);
 
-ucc_status_t ucc_tl_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm);
+ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm);
 
 #endif /* TL_MLX5_MCAST_HELPER_H_ */
