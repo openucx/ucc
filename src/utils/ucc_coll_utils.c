@@ -361,6 +361,12 @@ void ucc_coll_args_str(const ucc_coll_args_t *args, ucc_rank_t trank,
         strncat(hdr, tmp, left);
     }
 
+    if (UCC_IS_PERSISTENT(*args)) {
+        ucc_snprintf_safe(tmp, sizeof(tmp), " persistent");
+        left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr);
+        strncat(hdr, tmp, left);
+    }
+
     if (ucc_coll_args_is_rooted(ct)) {
         ucc_snprintf_safe(tmp, sizeof(tmp), " root %u", root);
         left = COLL_ARGS_HEADER_STR_MAX_SIZE - strlen(hdr);

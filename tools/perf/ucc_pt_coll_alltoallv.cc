@@ -12,6 +12,7 @@
 
 ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
                          ucc_memory_type mt, bool is_inplace,
+                         bool is_persistent,
                          ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
 {
     has_inplace_   = true;
@@ -31,6 +32,11 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
     if (is_inplace) {
         coll_args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
+
+    if (is_persistent) {
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+    }
+
 }
 
 ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count,

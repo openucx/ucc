@@ -18,6 +18,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.mt             = UCC_MEMORY_TYPE_HOST;
     bench.op             = UCC_OP_SUM;
     bench.inplace        = false;
+    bench.persistent     = false;
     bench.triggered      = false;
     bench.n_iter_small   = 1000;
     bench.n_warmup_small = 100;
@@ -89,7 +90,7 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
     int c;
     ucc_status_t st;
 
-    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:r:S:ihFT")) != -1) {
+    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:r:S:iphFT")) != -1) {
         switch (c) {
             case 'c':
                 if (ucc_pt_op_map.count(optarg) == 0) {
@@ -158,6 +159,9 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
             case 'i':
                 bench.inplace = true;
                 break;
+            case 'p':
+                bench.persistent = true;
+                break;
             case 'T':
                 bench.triggered = true;
                 break;
@@ -180,6 +184,7 @@ void ucc_pt_config::print_help()
     std::cout << "  -b <count>: Min number of elements"<<std::endl;
     std::cout << "  -e <count>: Max number of elements"<<std::endl;
     std::cout << "  -i: inplace collective"<<std::endl;
+    std::cout << "  -p: persistent collective"<<std::endl;
     std::cout << "  -d <dt name>: datatype"<<std::endl;
     std::cout << "  -o <op name>: reduction operation type"<<std::endl;
     std::cout << "  -r <number>: root for rooted collectives"<<std::endl;
