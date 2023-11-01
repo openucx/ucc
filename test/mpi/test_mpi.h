@@ -278,7 +278,7 @@ protected:
     uint8_t     progress_buf[1];
     size_t test_max_size;
     ucc_datatype_t dt;
-
+    int iter_persistent;
 public:
     void mpi_progress(void);
     test_skip_cause_t test_skip;
@@ -523,7 +523,7 @@ public:
 };
 
 void init_buffer(void *buf, size_t count, ucc_datatype_t dt,
-                 ucc_memory_type_t mt, int value);
+                 ucc_memory_type_t mt, int value, int offset = 0);
 
 ucc_status_t compare_buffers(void *rst, void *expected, size_t count,
                              ucc_datatype_t dt, ucc_memory_type_t mt);

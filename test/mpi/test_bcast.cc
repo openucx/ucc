@@ -45,6 +45,7 @@ ucc_status_t TestBcast::set_input(int iter_persistent)
     size_t count   = msgsize / dt_size;
     int    rank;
 
+    this->iter_persistent = iter_persistent;
     MPI_Comm_rank(team.comm, &rank);
     if (rank == root) {
         init_buffer(sbuf, count, dt, mem_type, rank * (iter_persistent + 1));
@@ -56,18 +57,12 @@ ucc_status_t TestBcast::set_input(int iter_persistent)
 
 ucc_status_t TestBcast::check()
 {
-    size_t       count = args.src.info.count;
-    MPI_Datatype mpi_dt = ucc_dt_to_mpi(dt);
-    int          rank, completed;
-    MPI_Request  req;
+    size_t count = args.src.info.count;
+    int rank;
 
     MPI_Comm_rank(team.comm, &rank);
-    MPI_Ibcast(check_buf, count, mpi_dt, root, team.comm, &req);
-    do {
-        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
-        ucc_context_progress(team.ctx);
-    } while(!completed);
-
+    init_buffer(check_buf, count, dt, UCC_MEMORY_TYPE_HOST,
+                root * (iter_persistent + 1));
     return (rank == root)
                ? UCC_OK
                : compare_buffers(sbuf, check_buf, count, dt, mem_type);
