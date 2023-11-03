@@ -180,6 +180,7 @@ typedef struct ucc_tl_ucp_task {
                                          ucc_rank_t trank,
                                          ucc_rank_t tsize,
                                          int step);
+            ucc_ee_executor_task_t *etask;
         } allgather_ring;
         struct {
             ucc_rank_t              dist;
