@@ -1,0 +1,25 @@
+name: HPC_SDK
+
+on: [push, pull_request]
+
+env:
+  HPCXDIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2023/comm_libs/12.2/hpcx/latest/
+  NCCLDIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2023/comm_libs/12.2/nccl/
+  CUDADIR: /opt/nvidia/hpc_sdk/Linux_x86_64/2023/cuda/12.2/
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    container:
+      image: nvcr.io/nvidia/nvhpc:23.9-devel-cuda12.2-ubuntu22.04
+    steps:
+    - name: Install dependencies
+      run: |
+        apt-get update
+        apt-get install -y --no-install-recommends libiberty-dev
+    - uses: actions/checkout@v1
+    - name: Build UCC
+      run: |
+        ./autogen.sh
+        CC=nvc CXX=nvc++ ./configure --with-tls=ucp,mlx5,cuda,self,nccl,sharp --with-mpi=${HPCXDIR}/ompi --with-sharp=${HPCXDIR}/sharp --with-ucx=${HPCXDIR}/ucx --with-cuda=${CUDADIR} --with-nccl=${NCCLDIR} --with-nvcc-gencode="-gencode=arch=compute_80,code=sm_80"
+        make -j`nproc` install

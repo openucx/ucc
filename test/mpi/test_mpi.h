@@ -145,7 +145,6 @@ static inline const char* skip_str(test_skip_cause_t s) {
     default:
         return "unknown";
     }
-    return NULL;
 }
 
 static inline const char* team_str(ucc_test_mpi_team_t t) {

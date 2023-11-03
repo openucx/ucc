@@ -159,7 +159,7 @@ ucc_kn_seg_desc_compute(ucc_knomial_pattern_t *p, ucc_kn_seg_desc_t *seg,
 
 static inline void
 ucc_knx_block(ucc_rank_t rank, ucc_rank_t size, ucc_kn_radix_t radix,
-              size_t count, int iter, size_t *b_count, size_t *b_offset)
+              size_t count, int iter, size_t *b_count, ptrdiff_t *b_offset)
 {
     ucc_rank_t            offset = 0;
     ucc_rank_t            block_count;
@@ -213,7 +213,7 @@ ucc_kn_agx_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
 
 static inline void
 ucc_kn_ag_pattern_peer_seg(ucc_rank_t peer, ucc_knomial_pattern_t *p,
-                           size_t *seg_count, size_t *seg_offset)
+                           size_t *seg_count, ptrdiff_t *seg_offset)
 {
     ucc_rank_t step_radix, seg_index;
     ucc_kn_seg_desc_t s;
@@ -278,7 +278,7 @@ static inline void ucc_kn_rsx_pattern_init(ucc_rank_t size, ucc_rank_t rank,
 
 static inline void
 ucc_kn_rs_pattern_peer_seg(ucc_rank_t peer, ucc_knomial_pattern_t *p,
-                           size_t *peer_seg_count, size_t *peer_seg_offset)
+                           size_t *peer_seg_count, ptrdiff_t *peer_seg_offset)
 {
     ucc_rank_t step_radix, seg_index;
 
@@ -305,7 +305,8 @@ ucc_kn_rs_pattern_peer_seg(ucc_rank_t peer, ucc_knomial_pattern_t *p,
 
 static inline void ucc_kn_rs_pattern_next_iter(ucc_knomial_pattern_t *p)
 {
-    size_t offset, bs;
+    size_t bs;
+    ptrdiff_t offset;
 
     ucc_kn_rs_pattern_peer_seg(p->rank, p, &bs, &offset);
     p->block_size_counts = bs;

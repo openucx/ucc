@@ -1337,7 +1337,7 @@ struct ucc_ep_map_cb {
  *  @ingroup UCC_TEAM_DT
  */
 typedef enum {
-    UCC_EP_MAP_FULL     = 1, /*!< The ep range of the team  spans all eps from a context*/
+    UCC_EP_MAP_FULL     = 1, /*!< The ep range of the team  spans all eps from a context. */
     UCC_EP_MAP_STRIDED  = 2, /*!< The ep range of the team can be described by the 2 values: start, stride.*/
     UCC_EP_MAP_ARRAY    = 3, /*!< The ep range is given as an array of intergers that map the ep in the team to
                                        the team_context rank. */

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (C) Advanced Micro Devices, Inc. 2022. ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
@@ -16,7 +16,7 @@ ucc_pt_rocm_iface_t ucc_pt_rocm_iface = {
 
 #define LOAD_ROCM_SYM(_sym, _pt_sym) ({                                    \
             void *h = dlsym(handle, _sym);                                 \
-            if ((error = dlerror()) != NULL)  {                            \
+            if (dlerror() != NULL)  {                                      \
                 return;                                                    \
             }                                                              \
             ucc_pt_rocm_iface. _pt_sym =                                   \
@@ -25,7 +25,6 @@ ucc_pt_rocm_iface_t ucc_pt_rocm_iface = {
 
 void ucc_pt_rocm_init(void)
 {
-    char *error;
     void *handle;
 
     handle = dlopen ("libamdhip64.so", RTLD_LAZY);

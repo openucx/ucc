@@ -220,7 +220,8 @@ static ucc_status_t ucc_tl_cuda_topo_graph_create(ucc_tl_cuda_topo_t *topo)
     ucc_tl_cuda_topo_dev_type_t dev_type;
     ucc_tl_cuda_device_pci_id_t pci_id;
     ucc_tl_cuda_topo_node_t *node, *peer_node;
-    int num_gpus, num_nvlinks, link, i;
+    int num_nvlinks, link, i;
+    unsigned int num_gpus;
     nvmlReturn_t nvml_st;
 
     nvml_st = nvmlInit_v2();
