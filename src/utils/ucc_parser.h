@@ -280,7 +280,7 @@ void         ucc_config_release_uint_ranged(void *ptr, const void *arg);
             ucc_config_clone_pipeline_params,                                  \
             ucc_config_release_pipeline_params, ucs_config_help_generic,       \
             "thresh=<memunit>:fragsize=<memunit>:nfrags="                      \
-            "<uint>:pdepth=<uint>:<ordered/parallel/serial>"                   \
+            "<uint>:pdepth=<uint>:<ordered/parallel/sequential>"                   \
     }
 
 #endif
