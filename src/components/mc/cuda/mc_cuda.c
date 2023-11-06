@@ -163,8 +163,10 @@ static ucc_status_t ucc_mc_cuda_mem_pool_alloc(ucc_mc_buffer_header_t **h_ptr,
     if (size <= MC_CUDA_CONFIG->mpool_elem_size) {
         if (mt == UCC_MEMORY_TYPE_CUDA) {
             h = (ucc_mc_buffer_header_t *)ucc_mpool_get(&ucc_mc_cuda.mpool);
-        } else {
+        } else if (mt == UCC_MEMORY_TYPE_CUDA_MANAGED) {
             h = (ucc_mc_buffer_header_t *)ucc_mpool_get(&ucc_mc_cuda.mpool_managed);
+        } else {
+            return UCC_ERR_INVALID_PARAM;
         }
     }
 
@@ -201,6 +203,7 @@ static void ucc_mc_cuda_chunk_init(ucc_mpool_t *mp, //NOLINT
     if (st != cudaSuccess) {
         // h->addr will be 0 so ucc_mc_cuda_mem_alloc_pool function will
         // return UCC_ERR_NO_MEMORY. As such mc_error message is suffice.
+        h->addr = NULL;
         cudaGetLastError();
         mc_error(&ucc_mc_cuda.super,
                  "failed to allocate %zd bytes, "
@@ -236,10 +239,12 @@ static void ucc_mc_cuda_chunk_init_managed(ucc_mpool_t *mp, //NOLINT
     ucc_mc_buffer_header_t *h = (ucc_mc_buffer_header_t *)obj;
     cudaError_t             st;
 
-    st = cudaMallocManaged(&h->addr, MC_CUDA_CONFIG->mpool_elem_size, cudaMemAttachGlobal);
+    st = cudaMallocManaged(&h->addr, MC_CUDA_CONFIG->mpool_elem_size,
+                           cudaMemAttachGlobal);
     if (st != cudaSuccess) {
         // h->addr will be 0 so ucc_mc_cuda_mem_alloc_pool function will
         // return UCC_ERR_NO_MEMORY. As such mc_error message is suffice.
+        h->addr = NULL;
         cudaGetLastError();
         mc_error(&ucc_mc_cuda.super,
                  "failed to allocate %zd bytes, "
