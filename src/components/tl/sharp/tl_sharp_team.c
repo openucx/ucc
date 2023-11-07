@@ -117,7 +117,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
 
         if (sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_BFLOAT16)) {
             tl_debug(ctx->super.super.lib, "enabling support for UCC_DT_BFLOAT16");
-            ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = UCC_DT_BFLOAT16;
+            ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = SHARP_DTYPE_BFLOAT16;
         } else {
             tl_debug(ctx->super.super.lib, "disabling support for UCC_DT_BFLOAT16");
             ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = SHARP_DTYPE_NULL;

@@ -86,25 +86,28 @@ static inline int ucc_check_range(char *range_str, ucc_rank_t *begin,
     char   **range = ucc_str_split(range_str, "-");
     char    *str_end;
     unsigned n_range;
+    long pbegin, pend;
 
     if (!range) {
         goto split_err;
     }
 
     n_range = ucc_str_split_count(range);
-    *begin  = (size_t) strtol(range[0], &str_end, 10);
-    *end    = *begin;
+    pbegin  = strtol(range[0], &str_end, 10);
+    pend    = pbegin;
 
-    if (n_range > 2 || *str_end != '\0' || *begin < 0) {
+    if (n_range > 2 || *str_end != '\0' || pbegin < 0) {
         goto val_err;
     }
 
     if (n_range == 2) {
-        *end = (size_t) strtol(range[1], &str_end, 10);
-        if (*str_end != '\0' || *end < 0) {
+        pend = strtol(range[1], &str_end, 10);
+        if (*str_end != '\0' || pend < 0) {
             goto val_err;
         }
     }
+    *begin = (ucc_rank_t)pbegin;
+    *end = (ucc_rank_t)pend;
     ucc_str_split_free(range);
     return 1;
 
@@ -852,7 +855,7 @@ int ucc_config_sscanf_uint_ranged(const char *buf, void *dest,
             if (!r) {
                 goto err_tokens;
             }
-            r->mtypes = -1; //mask all types
+            r->mtypes = UCC_MEM_TYPE_MASK_FULL;
             r->start  = 0;
             r->end    = SIZE_MAX;
 
@@ -905,7 +908,7 @@ int ucc_config_sprintf_uint_ranged(char *buf, size_t max, const void *src,
     ucc_list_for_each(r, &s->ranges, list_elem) {
         ucs_memunits_to_str(r->start, tmp_start, tmp_max);
         ucs_memunits_to_str(r->end, tmp_end, tmp_max);
-        if (r->mtypes == -1) {
+        if (r->mtypes == UCC_MEM_TYPE_MASK_FULL) {
             ucc_snprintf_safe(buf, max, "%s-%s:%u", tmp_start, tmp_end,
                               r->value);
         } else {

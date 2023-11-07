@@ -217,7 +217,6 @@ ucc_status_t ucc_tl_mlx5_init_mkeys(ucc_tl_mlx5_team_t *team,
         if (!node->ops[i].send_mkeys) {
             tl_error(lib, "failed to malloc");
             goto err_malloc;
-            return UCC_ERR_NO_MEMORY;
         }
         node->ops[i].recv_mkeys = (struct mlx5dv_mkey **)ucc_malloc(
             sizeof(struct mlx5dv_mkey *) * a2a->max_num_of_columns);
@@ -230,7 +229,7 @@ ucc_status_t ucc_tl_mlx5_init_mkeys(ucc_tl_mlx5_team_t *team,
             status = create_master_key(node->sbgp->group_size + 1, a2a->pd,
                                        &node->ops[i].send_mkeys[j], lib);
             if (status != UCC_OK) {
-                tl_error(lib, " failed to create send masterkey [%d,%d]", i, j);
+                tl_error(lib, "failed to create send masterkey [%d,%d]", i, j);
                 goto err_create_mkey;
             }
             status = create_master_key(node->sbgp->group_size + 1, a2a->pd,

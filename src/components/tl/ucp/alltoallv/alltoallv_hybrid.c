@@ -510,9 +510,11 @@ ucc_status_t post_recv(ucc_rank_t recvfrom, ucc_rank_t tsize, size_t dt_size,
 
     /* check if we have space for maximum recieve. If not, recycle */
     if (meta->offset * dt_size + step_buf_size > tmp_buf_size) {
-        new_offset = receive_buffer_recycler(tsize, (int *)op_metadata, (int *)op_metadata + tsize,
-                                             seg_st, p_tmp_recv_region, dt_size, BytesForPacking,
-                                             step, user_rbuf, rdisps, trank, radix, node_edge_id);
+        new_offset = receive_buffer_recycler(tsize, (unsigned int *)op_metadata,
+                                             (int *)op_metadata + tsize,
+                                             seg_st, p_tmp_recv_region, dt_size,
+                                             BytesForPacking, step, user_rbuf,
+                                             rdisps, trank, radix, node_edge_id);
         meta->offset = new_offset;
     }
     ucc_assert(meta->offset * dt_size + step_buf_size <= tmp_buf_size);
@@ -595,8 +597,8 @@ static ucc_status_t complete_current_step_receives(ucc_rank_t tsize, int step,
                     temp_offset = PTR_OFFSET(temp_offset, cur_buf_length * dt_size);
                 } else {
                     /* data will be sent pairwise */
-                    ((int *)op_metadata)[i]         = COUNT_DIRECT;
-                    ((int *)op_metadata)[i + tsize] = COUNT_DIRECT;
+                    ((int *)op_metadata)[i]         = (int)COUNT_DIRECT;
+                    ((int *)op_metadata)[i + tsize] = (int)COUNT_DIRECT;
                     if (i < (step * radix)) {
                         int pairwise_src = (trank - i + tsize) % tsize;
                         if (rcounts[pairwise_src] > 0) {
@@ -636,8 +638,8 @@ static ucc_status_t complete_current_step_receives(ucc_rank_t tsize, int step,
                         next_p = tsize;
                     }
                 } else {
-                    ((int *)op_metadata)[i]         = COUNT_DIRECT;
-                    ((int *)op_metadata)[i + tsize] = COUNT_DIRECT;
+                    ((int *)op_metadata)[i]         = (int)COUNT_DIRECT;
+                    ((int *)op_metadata)[i + tsize] = (int)COUNT_DIRECT;
                     if (i < (step * radix)) {
                         int pairwise_src = (trank - i + tsize) % tsize;
                         if (rcounts[pairwise_src] > 0) {
@@ -709,7 +711,7 @@ ucc_status_t pairwise_manager(ucc_rank_t trank, ucc_rank_t tsize,
     int               *r_disps          = (int*)TASK_ARGS(task).dst.info_v.displacements;
     int               *scounts          = (int*)TASK_ARGS(task).src.info_v.counts;
     int               *rcounts          = (int*)TASK_ARGS(task).dst.info_v.counts;
-    int*               cur              = &task->alltoallv_hybrid.cur_out;
+    ucc_rank_t        *cur              = &task->alltoallv_hybrid.cur_out;
     int                chunk_num_limit  = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoallv_hybrid_pairwise_num_posts;
     int                chunk_byte_limit = UCC_TL_UCP_TEAM_LIB(team)->cfg.alltoallv_hybrid_chunk_byte_limit;
     ucc_status_t status;

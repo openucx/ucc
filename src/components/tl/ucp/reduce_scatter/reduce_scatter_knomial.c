@@ -22,7 +22,8 @@ static inline void get_sbuf_rbuf(ucc_tl_ucp_task_t *task, size_t block_count,
     size_t                 dt_size   = ucc_dt_size(args->dst.info.datatype);
     void                  *scratch   = task->reduce_scatter_kn.scratch;
     ucc_knomial_pattern_t *p         = &task->reduce_scatter_kn.p;
-    size_t offset, local_seg_offset, local_seg_count;
+    size_t offset, local_seg_count;
+    ptrdiff_t local_seg_offset;
 
     if (ucc_knomial_pattern_loop_first_iteration(p)) {
         *sbuf = ((KN_NODE_PROXY ==  p->node_type) || UCC_IS_INPLACE(*args))

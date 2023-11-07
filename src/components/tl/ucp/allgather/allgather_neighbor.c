@@ -15,7 +15,9 @@
 static ucc_rank_t get_recv_from_rank(ucc_rank_t rank, ucc_rank_t size, int i)
 {
     const int  i_parity = i % 2;
-    ucc_rank_t offset_at_step[2], recv_data_from;
+    int offset_at_step[2];
+    ucc_rank_t recv_data_from;
+
     if (rank % 2) {
         recv_data_from    = (rank - 1 + size) % size;
         offset_at_step[0] = (-2);

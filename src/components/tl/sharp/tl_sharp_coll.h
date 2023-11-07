@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -10,7 +10,7 @@
 #include "tl_sharp.h"
 
 /* need to query for datatype support at runtime */
-#define SHARP_DTYPE_UNKNOWN -1
+#define SHARP_DTYPE_UNKNOWN 0xFFFF
 
 extern enum sharp_datatype ucc_to_sharp_dtype[];
 
