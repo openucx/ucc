@@ -96,7 +96,7 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
     ucc_context_config_release(ctx_config);
     if (with_onesided) {
         prev_env = getenv("UCC_TL_UCP_TUNE");
-        setenv("UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided", 1);
+        setenv("UCC_TL_UCP_TUNE", "alltoall:0-inf:@onesided#alltoallv:0-inf:@onesided", 1);
         UCC_CHECK(ucc_lib_config_read(NULL, NULL, &lib_config));
         UCC_CHECK(ucc_init(&lib_params, lib_config, &onesided_lib));
         ucc_lib_config_release(lib_config);
@@ -590,7 +590,9 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
                         continue;
                     }
 
-                    if (c == UCC_COLL_TYPE_ALLTOALL && team.ctx != ctx) {
+                    if ((c == UCC_COLL_TYPE_ALLTOALL ||
+                         c == UCC_COLL_TYPE_ALLTOALLV) &&
+                        team.ctx != ctx) {
                         /* onesided alltoall */
                         if (mt != UCC_MEMORY_TYPE_HOST) {
                             continue;

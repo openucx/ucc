@@ -19,6 +19,10 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLTOALLV_ALG_HYBRID,
              .name = "hybrid",
              .desc = "hybrid a2av alg "},
+        [UCC_TL_UCP_ALLTOALLV_ALG_ONESIDED] =
+            {.id   = UCC_TL_UCP_ALLTOALLV_ALG_ONESIDED,
+             .name = "onesided",
+             .desc = "O(N) onesided alltoallv"},
         [UCC_TL_UCP_ALLTOALLV_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
