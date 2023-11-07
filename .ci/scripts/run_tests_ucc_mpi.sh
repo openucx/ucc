@@ -112,6 +112,8 @@ for MT in "" "-T"; do
     # shellcheck disable=SC2086
     if [ "x$CX7_DEV" == "x" ]; then
         echo "No active CX7 devices found on $HEAD_NODE"
+    elif [ $NNODES -lt 2 ]; then
+        echo "At least two nodes are required, but only $NNODES are available"
     else
         tlmlx5_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp,mlx5 -x UCC_TL_MLXS_NET_DEVICES=$CX7_DEV -x UCC_TL_MLX5_TUNE=inf -x UCX_RC_MLX5_DM_COUNT=0 -x UCX_DC_MLX5_DM_COUNT=0 "
         tlmlx5_colls="alltoall"
