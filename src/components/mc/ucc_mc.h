@@ -24,6 +24,8 @@ ucc_status_t ucc_mc_available(ucc_memory_type_t mem_type);
  */
 ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr);
 
+ucc_status_t ucc_mc_get_attr(ucc_mc_attr_t *attr, ucc_memory_type_t mem_type);
+
 ucc_status_t ucc_mc_alloc(ucc_mc_buffer_header_t **h_ptr, size_t len,
                           ucc_memory_type_t mem_type);
 

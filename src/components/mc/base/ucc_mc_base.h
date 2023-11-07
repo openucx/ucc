@@ -71,7 +71,9 @@ typedef struct ucc_mem_attr {
  * UCC memory component attributes field mask
  */
 typedef enum ucc_mc_attr_field {
-    UCC_MC_ATTR_FIELD_THREAD_MODE = UCC_BIT(0)
+    UCC_MC_ATTR_FIELD_THREAD_MODE      = UCC_BIT(0),
+ /* size of memory pool chunk element */
+    UCC_MC_ATTR_FIELD_FAST_ALLOC_SIZE  = UCC_BIT(1),
 }  ucc_mc_attr_field_t;
 
 typedef struct ucc_mc_attr {
@@ -81,6 +83,7 @@ typedef struct ucc_mc_attr {
      */
     uint64_t          field_mask;
     ucc_thread_mode_t thread_mode;
+    size_t            fast_alloc_size;
 } ucc_mc_attr_t;
 
 /**

@@ -112,6 +112,13 @@ static ucc_status_t ucc_mc_cuda_get_attr(ucc_mc_attr_t *mc_attr)
     if (mc_attr->field_mask & UCC_MC_ATTR_FIELD_THREAD_MODE) {
         mc_attr->thread_mode = ucc_mc_cuda.thread_mode;
     }
+    if (mc_attr->field_mask & UCC_MC_ATTR_FIELD_FAST_ALLOC_SIZE) {
+        if (MC_CUDA_CONFIG->mpool_max_elems > 0) {
+            mc_attr->fast_alloc_size = MC_CUDA_CONFIG->mpool_elem_size;
+        } else {
+            mc_attr->fast_alloc_size = 0;
+        }
+    }
     return UCC_OK;
 }
 
