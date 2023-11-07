@@ -31,6 +31,9 @@ typedef struct ucc_pt_cuda_iface {
     int (*streamCreateWithFlags)(cudaStream_t *stream, unsigned int flags);
     int (*streamDestroy)(cudaStream_t stream);
     char* (*getErrorString)(int err);
+    int (*cudaMalloc)(void **devptr, size_t size);
+    int (*cudaFree)(void *devptr);
+    int (*cudaMemset)(void *devptr, int value, size_t count);
 } ucc_pt_cuda_iface_t;
 
 extern ucc_pt_cuda_iface_t ucc_pt_cuda_iface;
@@ -71,6 +74,33 @@ static inline int ucc_pt_cudaStreamDestroy(cudaStream_t stream)
         return 1;
     }
     CUDA_CHECK(ucc_pt_cuda_iface.streamDestroy(stream));
+    return 0;
+}
+
+static inline int ucc_pt_cudaMalloc(void **devptr, size_t size)
+{
+    if (!ucc_pt_cuda_iface.available) {
+        return 1;
+    }
+    CUDA_CHECK(ucc_pt_cuda_iface.cudaMalloc(devptr, size));
+    return 0;
+}
+
+static inline int ucc_pt_cudaFree(void *devptr)
+{
+    if (!ucc_pt_cuda_iface.available) {
+        return 1;
+    }
+    CUDA_CHECK(ucc_pt_cuda_iface.cudaFree(devptr));
+    return 0;
+}
+
+static inline int ucc_pt_cudaMemset(void *devptr, int value, size_t count)
+{
+    if (!ucc_pt_cuda_iface.available) {
+        return 1;
+    }
+    CUDA_CHECK(ucc_pt_cuda_iface.cudaMemset(devptr, value, count));
     return 0;
 }
 
