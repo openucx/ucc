@@ -26,12 +26,12 @@ CX7_DEV=""
 # Find first available active device
 for d in $(ssh $HEAD_NODE "ibstat -l"); do
     state=$(ssh $HEAD_NODE "ibstat $d" | grep 'State:' | awk '{print $2}')
-    type=$(ssh $HEAD_NODE "ibstat $d" | grep 'CA type:' | awk '{print $2}')
+    type=$(ssh $HEAD_NODE "ibstat $d" | grep 'CA type:' | awk '{print $3}')
     if [ $state == 'Active' ]; then
         if [ "x$DEV" == "x" ]; then
             DEV=$d
         fi
-        if [ $state == 'MT4129' ]; then
+        if [ $type == 'MT4129' ]; then
             CX7_DEV=$d
             break
         fi
