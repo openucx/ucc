@@ -144,6 +144,11 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_alltoallv_init,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
+    if (coll_args->args.mask & UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER) {
+        cl_debug(team->context->lib, "onesided alltoallv is not supported");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     if (!SBGP_ENABLED(cl_team, FULL)) {
         cl_debug(team->context->lib, "alltoallv requires FULL sbgp");
         return UCC_ERR_NOT_SUPPORTED;
