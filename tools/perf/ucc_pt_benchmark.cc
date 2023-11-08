@@ -18,54 +18,61 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
 {
     switch (cfg.op_type) {
     case UCC_PT_OP_TYPE_ALLGATHER:
-        coll = new ucc_pt_coll_allgather(cfg.dt, cfg.mt, cfg.inplace, comm);
+        coll = new ucc_pt_coll_allgather(cfg.dt, cfg.mt, cfg.inplace,
+                                         cfg.persistent, comm);
         break;
     case UCC_PT_OP_TYPE_ALLGATHERV:
-        coll = new ucc_pt_coll_allgatherv(cfg.dt, cfg.mt, cfg.inplace, comm);
+        coll = new ucc_pt_coll_allgatherv(cfg.dt, cfg.mt, cfg.inplace,
+                                          cfg.persistent, comm);
         break;
     case UCC_PT_OP_TYPE_ALLREDUCE:
         coll = new ucc_pt_coll_allreduce(cfg.dt, cfg.mt, cfg.op, cfg.inplace,
-                                         comm);
+                                         cfg.persistent, comm);
         break;
     case UCC_PT_OP_TYPE_ALLTOALL:
-        coll = new ucc_pt_coll_alltoall(cfg.dt, cfg.mt, cfg.inplace, comm);
+        coll = new ucc_pt_coll_alltoall(cfg.dt, cfg.mt, cfg.inplace,
+                                        cfg.persistent, comm);
         break;
     case UCC_PT_OP_TYPE_ALLTOALLV:
-        coll = new ucc_pt_coll_alltoallv(cfg.dt, cfg.mt, cfg.inplace, comm);
+        coll = new ucc_pt_coll_alltoallv(cfg.dt, cfg.mt, cfg.inplace,
+                                         cfg.persistent, comm);
         break;
     case UCC_PT_OP_TYPE_BARRIER:
         coll = new ucc_pt_coll_barrier(comm);
         break;
     case UCC_PT_OP_TYPE_BCAST:
-        coll = new ucc_pt_coll_bcast(cfg.dt, cfg.mt, cfg.root_shift, comm);
+        coll = new ucc_pt_coll_bcast(cfg.dt, cfg.mt, cfg.root_shift,
+                                     cfg.persistent, comm);
         break;
     case UCC_PT_OP_TYPE_GATHER:
         coll = new ucc_pt_coll_gather(cfg.dt, cfg.mt, cfg.inplace,
-                                      cfg.root_shift, comm);
+                                      cfg.persistent, cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_GATHERV:
         coll = new ucc_pt_coll_gatherv(cfg.dt, cfg.mt, cfg.inplace,
-                                       cfg.root_shift, comm);
+                                       cfg.persistent, cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_REDUCE:
         coll = new ucc_pt_coll_reduce(cfg.dt, cfg.mt, cfg.op, cfg.inplace,
-                                      cfg.root_shift, comm);
+                                      cfg.persistent, cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_REDUCE_SCATTER:
         coll = new ucc_pt_coll_reduce_scatter(cfg.dt, cfg.mt, cfg.op,
-                                              cfg.inplace, comm);
+                                              cfg.inplace,
+                                              cfg.persistent, comm);
         break;
     case UCC_PT_OP_TYPE_REDUCE_SCATTERV:
         coll = new ucc_pt_coll_reduce_scatterv(cfg.dt, cfg.mt, cfg.op,
-                                               cfg.inplace, comm);
+                                               cfg.inplace, cfg.persistent,
+                                               comm);
         break;
     case UCC_PT_OP_TYPE_SCATTER:
         coll = new ucc_pt_coll_scatter(cfg.dt, cfg.mt, cfg.inplace,
-                                       cfg.root_shift, comm);
+                                       cfg.persistent, cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_SCATTERV:
         coll = new ucc_pt_coll_scatterv(cfg.dt, cfg.mt, cfg.inplace,
-                                        cfg.root_shift, comm);
+                                        cfg.persistent, cfg.root_shift, comm);
         break;
     case UCC_PT_OP_TYPE_MEMCPY:
         coll = new ucc_pt_op_memcpy(cfg.dt, cfg.mt, cfg.n_bufs, comm);
@@ -137,10 +144,11 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
                                                     double &time)
                                                     noexcept
 {
-    const bool    triggered = config.triggered;
-    ucc_team_h    team      = comm->get_team();
-    ucc_context_h ctx       = comm->get_context();
-    ucc_status_t  st        = UCC_OK;
+    const bool    triggered  = config.triggered;
+    const bool    persistent = config.persistent;
+    ucc_team_h    team       = comm->get_team();
+    ucc_context_h ctx        = comm->get_context();
+    ucc_status_t  st         = UCC_OK;
     ucc_coll_req_h req;
     ucc_ee_h ee;
     ucc_ev_t comp_ev, *post_ev;
@@ -161,10 +169,18 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
         comp_ev.ev_context_size = 0;
     }
 
+    if (persistent) {
+        UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
+    }
+
     args.root = config.root % comm->get_size();
     for (int i = 0; i < nwarmup + niter; i++) {
         double s = get_time_us();
-        UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
+
+        if (!persistent) {
+            UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
+        }
+
         if (triggered) {
             comp_ev.req = req;
             UCCCHECK_GOTO(ucc_collective_triggered_post(ee, &comp_ev),
@@ -175,12 +191,16 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
         } else {
             UCCCHECK_GOTO(ucc_collective_post(req), free_req, st);
         }
+
         st = ucc_collective_test(req);
         while (st > 0) {
             UCCCHECK_GOTO(ucc_context_progress(ctx), free_req, st);
             st = ucc_collective_test(req);
         }
-        ucc_collective_finalize(req);
+
+        if (!persistent) {
+            ucc_collective_finalize(req);
+        }
         double f = get_time_us();
         if (st != UCC_OK) {
             goto exit_err;
@@ -191,6 +211,11 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
         args.root = (args.root + config.root_shift) % comm->get_size();
         UCCCHECK_GOTO(comm->barrier(), exit_err, st);
     }
+
+    if (persistent) {
+        ucc_collective_finalize(req);
+    }
+
     if (niter != 0) {
         time /= niter;
     }

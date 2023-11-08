@@ -12,6 +12,7 @@
 
 ucc_pt_coll_allgatherv::ucc_pt_coll_allgatherv(ucc_datatype_t dt,
                          ucc_memory_type mt, bool is_inplace,
+                         bool is_persistent,
                          ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
 {
     has_inplace_   = true;
@@ -20,15 +21,22 @@ ucc_pt_coll_allgatherv::ucc_pt_coll_allgatherv(ucc_datatype_t dt,
     has_bw_        = false;
     root_shift_    = 0;
 
-    coll_args.mask = 0;
-    coll_args.coll_type = UCC_COLL_TYPE_ALLGATHERV;
-    coll_args.src.info.datatype = dt;
-    coll_args.src.info.mem_type = mt;
+    coll_args.mask                = 0;
+    coll_args.flags               = 0;
+    coll_args.coll_type           = UCC_COLL_TYPE_ALLGATHERV;
+    coll_args.src.info.datatype   = dt;
+    coll_args.src.info.mem_type   = mt;
     coll_args.dst.info_v.datatype = dt;
     coll_args.dst.info_v.mem_type = mt;
+
     if (is_inplace) {
-        coll_args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+    }
+
+    if (is_persistent) {
+        coll_args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
 }
 

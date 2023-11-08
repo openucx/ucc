@@ -11,7 +11,8 @@
 #include <utils/ucc_coll_utils.h>
 
 ucc_pt_coll_scatter::ucc_pt_coll_scatter(ucc_datatype_t dt,
-                         ucc_memory_type mt, bool is_inplace, int root_shift,
+                         ucc_memory_type mt, bool is_inplace,
+                         bool is_persistent, int root_shift,
                          ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
 {
     has_inplace_   = true;
@@ -21,14 +22,21 @@ ucc_pt_coll_scatter::ucc_pt_coll_scatter(ucc_datatype_t dt,
     root_shift_    = root_shift;
 
     coll_args.mask              = 0;
+    coll_args.flags             = 0;
     coll_args.coll_type         = UCC_COLL_TYPE_SCATTER;
     coll_args.src.info.datatype = dt;
     coll_args.src.info.mem_type = mt;
     coll_args.dst.info.datatype = dt;
     coll_args.dst.info.mem_type = mt;
+
     if (is_inplace) {
         coll_args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+    }
+
+    if (is_persistent) {
+        coll_args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
 }
 

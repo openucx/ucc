@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -79,6 +79,7 @@ struct ucc_pt_benchmark_config {
     ucc_memory_type_t  mt;
     ucc_reduction_op_t op;
     bool               inplace;
+    bool               persistent;
     bool               triggered;
     size_t             large_thresh;
     int                n_iter_small;

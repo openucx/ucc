@@ -11,7 +11,8 @@
 #include <utils/ucc_coll_utils.h>
 
 ucc_pt_coll_reduce::ucc_pt_coll_reduce(ucc_datatype_t dt, ucc_memory_type mt,
-                        ucc_reduction_op_t op, bool is_inplace, int root_shift,
+                        ucc_reduction_op_t op, bool is_inplace,
+                        bool is_persistent, int root_shift,
                         ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
 {
     has_inplace_   = true;
@@ -20,18 +21,24 @@ ucc_pt_coll_reduce::ucc_pt_coll_reduce(ucc_datatype_t dt, ucc_memory_type mt,
     has_bw_        = true;
     root_shift_    = root_shift;
 
-    coll_args.coll_type = UCC_COLL_TYPE_REDUCE;
-    coll_args.mask = 0;
+    coll_args.mask              = 0;
+    coll_args.flags             = 0;
+    coll_args.coll_type         = UCC_COLL_TYPE_REDUCE;
+    coll_args.op                = op;
+    coll_args.src.info.datatype = dt;
+    coll_args.src.info.mem_type = mt;
+    coll_args.dst.info.datatype = dt;
+    coll_args.dst.info.mem_type = mt;
+
     if (is_inplace) {
         coll_args.mask = UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 
-    coll_args.op   = op;
-    coll_args.src.info.datatype = dt;
-    coll_args.src.info.mem_type = mt;
-    coll_args.dst.info.datatype = dt;
-    coll_args.dst.info.mem_type = mt;
+    if (is_persistent) {
+        coll_args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
+    }
 }
 
 ucc_status_t ucc_pt_coll_reduce::init_args(size_t count,
