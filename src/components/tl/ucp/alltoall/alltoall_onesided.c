@@ -55,9 +55,7 @@ void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
     ucc_rank_t         gsize = UCC_TL_TEAM_SIZE(team);
     long *             pSync = TASK_ARGS(task).global_work_buffer;
 
-    if ((*pSync < gsize) ||
-        (task->onesided.put_completed < task->onesided.put_posted)) {
-        ucp_worker_progress(UCC_TL_UCP_TEAM_CTX(team)->worker.ucp_worker);
+    if (ucc_tl_ucp_test_onesided(task, gsize) == UCC_INPROGRESS) {
         return;
     }
 
