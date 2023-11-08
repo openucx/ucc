@@ -82,7 +82,7 @@ static std::vector<std::string> str_split(const char *value, const char *delimit
     return rst;
 }
 
-void PrintHelp()
+void print_help()
 {
     std::cout <<
        "-c, --colls            <c1,c2,..>\n\tlist of collectives: "
@@ -168,10 +168,8 @@ static ucc_coll_type_t coll_str_to_type(std::string coll)
     } else if (coll == "scatterv") {
         return UCC_COLL_TYPE_SCATTERV;
     } else {
-        std::cerr << "incorrect coll type: " << coll << std::endl;
-        PrintHelp();
+        throw std::string("incorrect coll type: ") + coll;
     }
-    throw std::string("incorrect coll type: ") + coll;
 }
 
 static ucc_memory_type_t mtype_str_to_type(std::string mtype)
@@ -394,7 +392,7 @@ int init_rand_seed(int user_seed)
     return seed;
 }
 
-void PrintInfo()
+void print_info()
 {
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
@@ -548,7 +546,7 @@ int main(int argc, char *argv[])
     if (!err.empty() || show_help) {
         if (rank == 0) {
             std::cerr << "ParseArgs error:" << err << "\n\n";
-            PrintHelp();
+            print_help();
         }
         goto mpi_exit;
     }
@@ -589,7 +587,7 @@ int main(int argc, char *argv[])
     test->set_max_size(test_max_size);
     test_rand_seed = init_rand_seed(test_rand_seed);
 
-    PrintInfo();
+    print_info();
 
     for (auto inpl : inplace) {
         for (auto pers : persistent) {
