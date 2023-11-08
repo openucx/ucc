@@ -378,6 +378,9 @@ public:
                       bool                              is_onesided = false);
     void progress_ctx() {
         ucc_context_progress(ctx);
+        if (onesided_ctx) {
+            ucc_context_progress(onesided_ctx);
+        }
     }
 };
 
