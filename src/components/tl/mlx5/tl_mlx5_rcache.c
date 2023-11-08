@@ -63,8 +63,6 @@ ucc_status_t tl_mlx5_rcache_create(ucc_tl_mlx5_context_t *ctx)
     ucc_rcache_params_t     rcache_params;
 
     rcache_params.region_struct_size = sizeof(ucc_tl_mlx5_rcache_region_t);
-    rcache_params.alignment          = UCS_PGT_ADDR_ALIGN;
-    rcache_params.max_alignment      = ucc_get_page_size();
     rcache_params.ucm_event_priority = 1000;
     rcache_params.context            = (void *)ctx;
     rcache_params.ops                = &ucc_rcache_ops;
