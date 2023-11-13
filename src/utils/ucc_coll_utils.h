@@ -248,6 +248,8 @@ ucc_status_t ucc_ep_map_create_nested(ucc_ep_map_t *base_map,
                                       ucc_ep_map_t *sub_map,
                                       ucc_ep_map_t *out);
 
+ucc_status_t ucc_ep_map_is_identity(const ucc_ep_map_t *map);
+
 void ucc_ep_map_destroy_nested(ucc_ep_map_t *out);
 
 void ucc_ep_map_destroy(ucc_ep_map_t *map);
