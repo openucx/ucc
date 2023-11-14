@@ -19,7 +19,7 @@ static ucs_status_t ucc_tl_mlx5_mcast_coll_reg_mr(ucc_tl_mlx5_mcast_coll_context
         tl_error(ctx->lib, "failed to register MR");
         return UCS_ERR_NO_MEMORY;
     }
-    
+
     return UCS_OK;
 }
 
@@ -33,7 +33,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_coll_dereg_mr(ucc_tl_mlx5_mcast_coll_conte
     }
 
     tl_debug(ctx->lib, "external memory deregister: mr %p", mr);
-    
+
     if (ibv_dereg_mr(mr)) {
         tl_error(ctx->lib, "couldn't destroy mr %p", mr);
         return UCC_ERR_NO_RESOURCE;
@@ -140,12 +140,10 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_rcache(ucc_tl_mlx5_mcast_coll_context_t *ct
 {
     ucc_rcache_params_t rcache_params;
 
-    rcache_params.alignment          = 64;
     rcache_params.ucm_event_priority = 1000;
     rcache_params.max_regions        = ULONG_MAX;
     rcache_params.max_size           = SIZE_MAX;
     rcache_params.region_struct_size = sizeof(ucc_tl_mlx5_mcast_rcache_region_t);
-    rcache_params.max_alignment      = ucc_get_page_size();
     rcache_params.ucm_events         = UCM_EVENT_VM_UNMAPPED |
                                        UCM_EVENT_MEM_TYPE_FREE;
     rcache_params.context            = ctx;

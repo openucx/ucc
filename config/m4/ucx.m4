@@ -113,6 +113,11 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
                 [AC_DEFINE([UCS_HAVE_CONFIG_GLOBAL_LIST_ENTRY_FLAGS], [1], [flags for config table])],
                 [],
                 [#include <ucs/config/parser.h>])
+
+            AC_CHECK_MEMBER(ucs_rcache_region_t.alignment,
+                [AC_DEFINE([UCS_HAVE_RCACHE_REGION_ALIGNMENT], [1], [flags for ucs_rcache_get])],
+                [],
+                [#include <ucs/memory/rcache.h>])
         ],
         [
             AS_IF([test "x$with_ucx" != "xguess"],
