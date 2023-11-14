@@ -67,6 +67,27 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, qp_conf.qp_max_atomic),
      UCC_CONFIG_TYPE_UINT},
 
+    {"MCAST_SX_DEPTH", "512", "Send context depth of the Mcast comm",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.sx_depth),
+     UCC_CONFIG_TYPE_INT},
+
+    {"MCAST_SX_INLINE", "128", "Minimal size for inline data send in Mcast",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.sx_inline),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"MCAST_RX_DEPTH", "4096", "Recv context depth of the Mcast comm",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.rx_depth),
+     UCC_CONFIG_TYPE_INT},
+
+    {"MCAST_POST_RECV_THRESH", "64",
+        "Threshold for posting recv into rx ctx of the Mcast comm",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.post_recv_thresh),
+     UCC_CONFIG_TYPE_INT},
+
+    {"MCAST_WINDOW_SIZE", "64", "Reliability Mcast window size",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.wsize),
+     UCC_CONFIG_TYPE_INT},
+
     {NULL}};
 
 static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
@@ -76,6 +97,14 @@ static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
     {"NET_DEVICES", "", "Specifies which network device(s) to use",
      ucc_offsetof(ucc_tl_mlx5_context_config_t, devices),
      UCC_CONFIG_TYPE_STRING_ARRAY},
+
+    {"MCAST_TIMEOUT", "10000", "Timeout [usec] for the reliability NACK in Mcast",
+     ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.timeout),
+     UCC_CONFIG_TYPE_INT},
+
+    {"MCAST_NET_DEVICE", "", "Specifies which network device to use for Mcast",
+     ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.ib_dev_name),
+     UCC_CONFIG_TYPE_STRING},
 
     {NULL}};
 

@@ -26,6 +26,7 @@
 #define ucc_snprintf_safe snprintf
 #define ucc_likely        ucs_likely
 #define ucc_unlikely      ucs_unlikely
+#define ucc_string_split  ucs_string_split
 
 /**
  * Prevent compiler from reordering instructions
