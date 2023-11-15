@@ -47,6 +47,7 @@ void ucc_tl_ucp_team_default_score_str_free(
             return;                                                            \
         }                                                                      \
         ucc_ee_executor_task_finalize(_etask);                                 \
+        _etask = NULL;                                                         \
         if (ucc_unlikely(status < 0)) {                                        \
             tl_error(UCC_TASK_LIB(task), _errmsg);                             \
             task->super.status = status;                                       \
