@@ -47,6 +47,7 @@ void ucc_tl_ucp_team_default_score_str_free(
             return;                                                            \
         }                                                                      \
         ucc_ee_executor_task_finalize(_etask);                                 \
+        _etask = NULL;                                                         \
         if (ucc_unlikely(status < 0)) {                                        \
             tl_error(UCC_TASK_LIB(task), _errmsg);                             \
             task->super.status = status;                                       \
@@ -219,6 +220,9 @@ typedef struct ucc_tl_ucp_task {
         } alltoallv_hybrid;
         struct {
             ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
+            void                   *src;
+            void                   *dst;
             ucc_rank_t              iteration;
             int                     phase;
         } alltoall_bruck;
