@@ -100,7 +100,7 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
     if (TEST_SKIP_NONE != skip_reduce(test_skip, team.comm)) {
         return;
     }
-    check_buf = ucc_malloc((sncounts + rncounts) * dt_size, "check buf");
+    check_buf = ucc_malloc(rncounts * dt_size, "check buf");
     UCC_MALLOC_CHECK(check_buf);
 
     if (!is_onesided) {
@@ -184,13 +184,11 @@ TestAlltoallv::TestAlltoallv(ucc_test_team_t &_team, TestCaseParams &params) :
 
 ucc_status_t TestAlltoallv::set_input(int iter_persistent)
 {
-    size_t dt_size = ucc_dt_size(dt);
-    int    rank;
+    int rank;
 
+    this->iter_persistent = iter_persistent;
     MPI_Comm_rank(team.comm, &rank);
     init_buffer(sbuf, sncounts, dt, mem_type, rank * (iter_persistent + 1));
-    UCC_CHECK(ucc_mc_memcpy(check_buf, sbuf, sncounts * dt_size,
-                            UCC_MEMORY_TYPE_HOST, mem_type));
 
     return UCC_OK;
 }
@@ -209,20 +207,25 @@ TestAlltoallv::~TestAlltoallv()
 
 ucc_status_t TestAlltoallv::check()
 {
-    size_t      dt_size = ucc_dt_size(dt);
     MPI_Request req;
-    int         completed;
-    void       *check;
+    int         i, size, rank, completed;
 
-    check = PTR_OFFSET(check_buf, sncounts * dt_size);
-    MPI_Ialltoallv(check_buf, scounts, sdispls, ucc_dt_to_mpi(dt), check,
-                   rcounts, rdispls, ucc_dt_to_mpi(dt), team.comm, &req);
+    MPI_Comm_size(team.comm, &size);
+    MPI_Comm_rank(team.comm, &rank);
+
+    MPI_Ialltoall(sdispls, 1, MPI_INT, scounts, 1, MPI_INT, team.comm, &req);
     do {
         MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
         ucc_context_progress(team.ctx);
     } while(!completed);
 
-    return compare_buffers(rbuf, check, rncounts, dt, mem_type);
+    for (i = 0; i < size; i++) {
+        init_buffer(PTR_OFFSET(check_buf, rdispls[i] * ucc_dt_size(dt)),
+                    rcounts[i], dt, UCC_MEMORY_TYPE_HOST,
+                    i * (iter_persistent + 1), scounts[i]);
+    }
+
+    return compare_buffers(rbuf, check_buf, rncounts, dt, mem_type);
 }
 
 std::string TestAlltoallv::str()

@@ -107,10 +107,10 @@ ucc_status_t TestAlltoall::check()
     MPI_Comm_size(team.comm, &size);
     single_rank_count = args.src.info.count / size;
 
-    for (   i = 0; i < size; i++) {
+    for (i = 0; i < size; i++) {
         init_buffer(PTR_OFFSET(check_buf, i * single_rank_count * ucc_dt_size(dt)),
-                    single_rank_count, dt, mem_type, i * (iter_persistent + 1),
-                    single_rank_count * rank);
+                    single_rank_count, dt, UCC_MEMORY_TYPE_HOST,
+                    i * (iter_persistent + 1), single_rank_count * rank);
     }
 
     return compare_buffers(rbuf, check_buf, single_rank_count * size, dt,

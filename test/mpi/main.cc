@@ -663,6 +663,10 @@ int main(int argc, char *argv[])
                          "a problem\n";
             failed = 1;
         }
+
+        if (total_done_skipped_failed[3] != 0) {
+            failed = 1;
+        }
     }
 
 test_exit:

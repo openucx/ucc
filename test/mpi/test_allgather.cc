@@ -79,8 +79,10 @@ ucc_status_t TestAllgather::check()
     dt_size = ucc_dt_size(dt);
     for (i = 0; i < size; i++) {
         init_buffer(PTR_OFFSET(check_buf, i * single_rank_count * dt_size),
-                    single_rank_count, dt, mem_type, i * (iter_persistent + 1));
+                    single_rank_count, dt, UCC_MEMORY_TYPE_HOST,
+                    i * (iter_persistent + 1));
     }
+
 
     return compare_buffers(rbuf, check_buf, single_rank_count * size, dt,
                            mem_type);
