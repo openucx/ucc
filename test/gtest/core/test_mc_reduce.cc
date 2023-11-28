@@ -101,6 +101,7 @@ class test_mc_reduce : public testing::Test {
                 std::cerr << "failed to destory cuda stream" << std::endl;
                 return UCC_ERR_NO_MESSAGE;
             }
+            ee_context = NULL;
         }
 #endif
         return status;
@@ -110,11 +111,11 @@ class test_mc_reduce : public testing::Test {
     {
         ucc_status_t status;
 
-        status = alloc_executor(mtype);
+        status = alloc_bufs(mtype, n);
         if (UCC_OK != status) {
             return status;
         }
-        return alloc_bufs(mtype, n);
+        return alloc_executor(mtype);
     }
 
     ucc_status_t alloc_bufs(ucc_memory_type_t mtype, size_t n)
@@ -192,9 +193,6 @@ class test_mc_reduce : public testing::Test {
     virtual void TearDown() override
     {
         free_bufs(mem_type);
-        if (executor) {
-            free_executor();
-        }
         ucc_mc_finalize();
     }
 
@@ -246,6 +244,9 @@ class test_mc_reduce : public testing::Test {
             GTEST_SKIP();
         }
         ASSERT_EQ(status, UCC_OK);
+        if (executor) {
+            free_executor();
+        }
 
         if (mt != UCC_MEMORY_TYPE_HOST) {
             ucc_mc_memcpy(this->res_h, this->res_d, this->COUNT * sizeof(*this->res_d),
@@ -272,6 +273,9 @@ class test_mc_reduce : public testing::Test {
             GTEST_SKIP();
         }
         ASSERT_EQ(status, UCC_OK);
+        if (executor) {
+            free_executor();
+        }
 
         if (mt != UCC_MEMORY_TYPE_HOST) {
             ucc_mc_memcpy(this->res_h, this->res_d, this->COUNT * sizeof(*this->res_d),
@@ -305,6 +309,9 @@ class test_mc_reduce : public testing::Test {
             GTEST_SKIP();
         }
         ASSERT_EQ(status, UCC_OK);
+        if (executor) {
+            free_executor();
+        }
 
         if (mt != UCC_MEMORY_TYPE_HOST) {
             ucc_mc_memcpy(this->res_h, this->res_d, this->COUNT * sizeof(*this->res_d),
