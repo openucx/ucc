@@ -52,7 +52,7 @@ static inline ucc_rank_t get_left_child(ucc_rank_t rank, int height)
     ucc_rank_t sub_height;
 
     if (height == 0) {
-        return -1;
+        return UCC_RANK_INVALID;
     }
 
     sub_height = 1 << (height - 1);
@@ -65,7 +65,7 @@ static inline ucc_rank_t get_right_child(ucc_rank_t size, ucc_rank_t rank,
     ucc_rank_t sub_right_root, sub_height;
 
     if (rank == size - 1 || height == 0) {
-        return -1;
+        return UCC_RANK_INVALID;
     }
 
     sub_right_root = get_root(size - rank - 1) + 1;
@@ -86,10 +86,10 @@ static inline void get_children(ucc_rank_t size, ucc_rank_t rank, int height,
     *r_c = get_right_child(size, rank, height, root);
 }
 
-static inline int get_parent(int vsize, int vrank, int height, int troot)
+static inline ucc_rank_t get_parent(int vsize, int vrank, int height, int troot)
 {
     if (vrank == troot) {
-        return -1;
+        return UCC_RANK_INVALID;
     } else if (height == 0) {
         return ((((vrank/2) % 2 == 0) && (vrank + 1 != vsize))) ? vrank + 1
                                                                 : vrank - 1;
@@ -113,10 +113,13 @@ static inline void ucc_dbt_build_t2_mirror(ucc_dbt_single_tree_t t1,
     t.height                = t1.height;
     t.rank                  = size - 1 - t1.rank;
     t.root                  = size - 1 - t1.root;
-    t.parent                = (t1.parent == -1) ? -1 : size - 1 - t1.parent;
-    t.children[LEFT_CHILD]  = (t1.children[RIGHT_CHILD] == -1) ? -1 :
+    t.parent                = (t1.parent == UCC_RANK_INVALID) ?
+                              UCC_RANK_INVALID : size - 1 - t1.parent;
+    t.children[LEFT_CHILD]  = (t1.children[RIGHT_CHILD] == UCC_RANK_INVALID) ?
+                               UCC_RANK_INVALID :
                                size - 1 - t1.children[RIGHT_CHILD];
-    t.children[RIGHT_CHILD] = (t1.children[LEFT_CHILD] == -1) ? -1 :
+    t.children[RIGHT_CHILD] = (t1.children[LEFT_CHILD] == UCC_RANK_INVALID) ?
+                               UCC_RANK_INVALID :
                                size - 1 - t1.children[LEFT_CHILD];
     t.recv                  = 0;
 
@@ -133,10 +136,13 @@ static inline void ucc_dbt_build_t2_shift(ucc_dbt_single_tree_t t1,
     t.height                = t1.height;
     t.rank                  = (t1.rank + 1) % size;
     t.root                  = (t1.root + 1) % size;
-    t.parent                = (t1.parent == -1) ? -1 : (t1.parent + 1) % size;
-    t.children[LEFT_CHILD]  = (t1.children[LEFT_CHILD] == -1) ? -1 :
+    t.parent                = (t1.parent == UCC_RANK_INVALID) ?
+                              UCC_RANK_INVALID : (t1.parent + 1) % size;
+    t.children[LEFT_CHILD]  = (t1.children[LEFT_CHILD] == UCC_RANK_INVALID) ?
+                              UCC_RANK_INVALID :
                               (t1.children[LEFT_CHILD] + 1) % size;
-    t.children[RIGHT_CHILD] = (t1.children[RIGHT_CHILD] == -1) ? -1 :
+    t.children[RIGHT_CHILD] = (t1.children[RIGHT_CHILD] == UCC_RANK_INVALID) ?
+                              UCC_RANK_INVALID :
                               (t1.children[RIGHT_CHILD] + 1) % size;
     t.recv                  = 0;
 
