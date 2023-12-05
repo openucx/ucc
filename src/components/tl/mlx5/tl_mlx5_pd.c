@@ -263,7 +263,8 @@ ucc_status_t ucc_tl_mlx5_share_ctx_pd(ucc_tl_mlx5_context_t *ctx,
 }
 
 static void ucc_tl_mlx5_context_barrier(ucc_context_oob_coll_t *oob,
-                                        ucc_base_lib_t         *lib)
+                                        ucc_context_t *core_ctx,
+                                        ucc_base_lib_t *lib)
 {
     char        *rbuf;
     char         sbuf;
@@ -284,6 +285,7 @@ static void ucc_tl_mlx5_context_barrier(ucc_context_oob_coll_t *oob,
         oob->allgather(&sbuf, rbuf, sizeof(char), oob->coll_info, &req)) {
         ucc_assert(req != NULL);
         while (UCC_OK != (status = oob->req_test(req))) {
+            ucc_context_progress(core_ctx);
             if (status < 0) {
                 tl_debug(lib, "failed to test oob req");
                 break;
@@ -303,7 +305,8 @@ ucc_status_t ucc_tl_mlx5_remove_shared_ctx_pd(ucc_tl_mlx5_context_t *ctx)
     if (ctx->shared_pd && ctx->is_imported) {
         ibv_unimport_pd(ctx->shared_pd);
     }
-    ucc_tl_mlx5_context_barrier(&UCC_TL_CTX_OOB(ctx), lib);
+    ucc_tl_mlx5_context_barrier(&UCC_TL_CTX_OOB(ctx),
+                                ctx->super.super.ucc_context, lib);
     if (ctx->shared_pd && !ctx->is_imported) {
         err = ibv_dealloc_pd(ctx->shared_pd);
         if (err) {

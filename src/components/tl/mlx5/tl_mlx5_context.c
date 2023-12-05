@@ -14,6 +14,7 @@
 #include "tl_mlx5_ib.h"
 
 #define PD_OWNER_RANK 0
+#define TL_MLX5_IB_PORT_INVALID -1
 
 UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
                     const ucc_base_context_params_t *params,
@@ -210,7 +211,8 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
     if (!ctx->is_imported) {
         status = ucc_tl_mlx5_ib_ctx_pd_init(ctx);
         if (UCC_OK != status) {
-            goto err_ib_ctx_pd_init;
+            ctx->ib_port = TL_MLX5_IB_PORT_INVALID;
+            goto start_bcast;
         }
         if (UCC_SBGP_NOT_EXISTS == sbgp->status) {
             goto topo_ppn_1;
@@ -228,21 +230,20 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
             tl_debug(context->lib, "failed to create tmp file for socket path");
             sock_path[0] = '\0';
         }
-        sbcast_data->ib_port = ctx->ib_port;
         memcpy(sbcast_data->sock_path, sock_path, sizeof(sock_path));
     }
+start_bcast:
+    sbcast_data->ib_port = ctx->ib_port;
     steam = core_ctx->service_team;
-
     s.map    = sbgp->map;
     s.myrank = sbgp->group_rank;
-    status   = UCC_TL_TEAM_IFACE(steam)->scoll.bcast(
+    status = UCC_TL_TEAM_IFACE(steam)->scoll.bcast(
         &steam->super, sbcast_data, sbcast_data_length, PD_OWNER_RANK, s, &req);
 
     if (UCC_OK != status) {
         tl_debug(context->lib, "failed to start mlx5 ctx bcast");
         goto err;
     }
-
     while (UCC_INPROGRESS == (status = ucc_collective_test(&req->super))) {
         ucc_context_progress(core_ctx);
     }
@@ -256,9 +257,15 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
     ctx->ib_port = sbcast_data->ib_port;
     memcpy(sock_path, sbcast_data->sock_path, sizeof(sock_path));
 
+    if (ctx->ib_port == TL_MLX5_IB_PORT_INVALID) {
+        tl_debug(context->lib, "invalid ib port received");
+        status = UCC_ERR_NO_RESOURCE;
+        goto err_ib_ctx_pd_init;
+    }
+
     if (strlen(sock_path) == 0) {
         tl_debug(context->lib, "failed to share ctx and pd");
-        status = UCC_ERR_NO_MESSAGE;
+        status = UCC_ERR_NO_RESOURCE;
         goto err;
     }
     status = ucc_tl_mlx5_share_ctx_pd(ctx, sock_path, sbgp->group_size,
