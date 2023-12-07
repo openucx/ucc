@@ -33,7 +33,7 @@ jobs:
         wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb
         sudo dpkg -i cuda-keyring_1.0-1_all.deb
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends  cuda-cudart-dev-${CUDA_VER} cuda-nvcc-${CUDA_VER} cuda-nvml-dev-${CUDA_VER}
+        sudo apt-get install -y --no-install-recommends cuda-cudart-dev-${CUDA_VER} cuda-nvcc-${CUDA_VER} cuda-nvml-dev-${CUDA_VER}
     - name: Get UCX
       run: git clone ${OPEN_UCX_LINK} -b ${OPEN_UCX_BRANCH} /tmp/ucx
     - name: Build UCX

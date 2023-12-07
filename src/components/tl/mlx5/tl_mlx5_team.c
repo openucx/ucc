@@ -66,7 +66,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     }
 
     self->a2a = NULL;
-    status    = ucc_tl_mlx5_team_init_alltoall(self);
+    status = ucc_tl_mlx5_team_init_alltoall(self);
     if (UCC_OK != status) {
         return status;
     }
