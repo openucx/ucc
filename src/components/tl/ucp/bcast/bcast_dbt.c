@@ -109,7 +109,8 @@ void ucc_tl_ucp_bcast_dbt_progress(ucc_coll_task_t *coll_task)
 SEND_T1:
     if ((coll_root == rank) || (task->bcast_dbt.t1.recv > 0)) {
         for (i = 0; i < 2; i++) {
-            if (t1.children[i] != -1 && t1.children[i] != coll_root) {
+            if ((t1.children[i] != UCC_RANK_INVALID) &&
+                (t1.children[i] != coll_root)) {
                 UCPCHECK_GOTO(ucc_tl_ucp_send_nb(buffer, data_size_t1, mtype,
                                                  t1.children[i], team, task),
                               task, out);
@@ -123,7 +124,8 @@ SEND_T1:
 SEND_T2:
     if ((coll_root == rank) || (task->bcast_dbt.t2.recv > 0)) {
         for (i = 0; i < 2; i++) {
-            if (t2.children[i] != -1 && t2.children[i] != coll_root) {
+            if ((t2.children[i] != UCC_RANK_INVALID) &&
+                (t2.children[i] != coll_root)) {
                 UCPCHECK_GOTO(ucc_tl_ucp_send_nb(PTR_OFFSET(buffer,
                                                             data_size_t1),
                                                  data_size_t2, mtype,
