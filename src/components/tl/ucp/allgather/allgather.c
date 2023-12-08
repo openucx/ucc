@@ -38,7 +38,14 @@ char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
                          ? UCC_TL_UCP_ALLGATHER_ALG_RING
                          : UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR;
     char *str      = ucc_malloc(max_size * sizeof(char));
+    ucc_sbgp_t *sbgp;
 
+    if (team->cfg.use_reordering) {
+        sbgp = ucc_topo_get_sbgp(team->topo, UCC_SBGP_FULL_HOST_ORDERED);
+        if (!ucc_ep_map_is_identity(&sbgp->map)) {
+            algo_num = UCC_TL_UCP_ALLGATHER_ALG_RING;
+        }
+    }
     ucc_snprintf_safe(str, max_size,
                       UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR, algo_num);
     return str;

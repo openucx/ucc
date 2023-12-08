@@ -434,7 +434,7 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
     if (lib->cfg.use_internal_oob) {
         sharp_ctx->oob_ctx.subset = set;
     } else {
-        sharp_ctx->oob_ctx.oob      = &UCC_TL_CTX_OOB(sharp_ctx);
+        sharp_ctx->oob_ctx.oob = &UCC_TL_CTX_OOB(sharp_ctx);
     }
 
     status = ucc_topo_init(set, core_ctx->topo, &topo);

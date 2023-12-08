@@ -108,7 +108,7 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_ucp_allgather_ring_init_common(ucc_tl_ucp_task_t *task)
 {
-    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
+    ucc_tl_ucp_team_t *team = TASK_TEAM(task);
     ucc_sbgp_t *sbgp;
 
     if (!ucc_coll_args_is_predefined_dt(&TASK_ARGS(task), UCC_RANK_INVALID)) {

@@ -644,6 +644,18 @@ ucc_ep_map_t ucc_ep_map_create_reverse(ucc_rank_t size)
     return map;
 }
 
+int ucc_ep_map_is_identity(const ucc_ep_map_t *map)
+{
+    if ((map->type == UCC_EP_MAP_FULL) ||
+        ((map->type == UCC_EP_MAP_STRIDED) &&
+        (map->strided.start == 0) &&
+        (map->strided.stride == 1))) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 static inline int ucc_ep_map_is_reverse(ucc_ep_map_t *map,
                                         int reversed_reordered_flag)
 {
