@@ -11,6 +11,7 @@
 #include "coll_patterns/sra_knomial.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
+#include "components/mc/ucc_mc.h"
 #include "../reduce_scatter/reduce_scatter.h"
 #include "../allgather/allgather.h"
 
@@ -53,41 +54,40 @@ ucc_tl_ucp_allreduce_sra_knomial_frag_finalize(ucc_coll_task_t *task)
     return status;
 }
 
-static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_setup(
-    ucc_schedule_pipelined_t *schedule_p, ucc_schedule_t *frag, int frag_num)
+static ucc_status_t
+ucc_tl_ucp_allreduce_sra_knomial_frag_setup(ucc_schedule_pipelined_t *schedule_p,
+                                            ucc_schedule_t *frag, int frag_num)
 {
-    ucc_coll_args_t *args    = &schedule_p->super.super.bargs.args;
-    ucc_datatype_t   dt      = args->dst.info.datatype;
-    size_t           dt_size = ucc_dt_size(dt);
-    ucc_coll_args_t *targs;
+    ucc_coll_args_t *args       = &schedule_p->super.super.bargs.args;
+    ucc_datatype_t   dt         = args->dst.info.datatype;
+    size_t           dt_size    = ucc_dt_size(dt);
     int              n_frags    = schedule_p->super.n_tasks;
     size_t           frag_count = ucc_buffer_block_count(args->dst.info.count,
                                                          n_frags, frag_num);
     size_t           offset     = ucc_buffer_block_offset(args->dst.info.count,
                                                           n_frags, frag_num);
+    ucc_coll_args_t *targs;
 
-    targs = &frag->tasks[0]->bargs.args; //REDUCE_SCATTER
-    targs->src.info.buffer =
-        PTR_OFFSET(args->src.info.buffer, offset * dt_size);
-    targs->dst.info.buffer =
-        PTR_OFFSET(args->dst.info.buffer, offset * dt_size);
-    targs->src.info.count = frag_count;
-    targs->dst.info.count = frag_count;
+    targs = &frag->tasks[0]->bargs.args; /* REDUCE_SCATTER */
+    targs->src.info.buffer = PTR_OFFSET(args->src.info.buffer, offset * dt_size);
+    targs->src.info.count  = frag_count;
+    targs->dst.info.buffer = PTR_OFFSET(args->dst.info.buffer, offset * dt_size);
+    targs->dst.info.count  = frag_count;
 
-    targs                  = &frag->tasks[1]->bargs.args; //ALLGATHER
+    targs = &frag->tasks[1]->bargs.args; /* ALLGATHER */
     targs->src.info.buffer = NULL;
-    targs->dst.info.buffer =
-        PTR_OFFSET(args->dst.info.buffer, offset * dt_size);
-    targs->src.info.count = 0;
-    targs->dst.info.count = frag_count;
+    targs->src.info.count  = 0;
+    targs->dst.info.buffer = PTR_OFFSET(args->dst.info.buffer, offset * dt_size);
+    targs->dst.info.count  = frag_count;
 
     return UCC_OK;
 }
 
-static ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_frag_init(
-    ucc_base_coll_args_t     *coll_args,
-    ucc_schedule_pipelined_t *sp, //NOLINT
-    ucc_base_team_t *team, ucc_schedule_t **frag_p)
+static ucc_status_t
+ucc_tl_ucp_allreduce_sra_knomial_frag_init(ucc_base_coll_args_t *coll_args,
+                                           ucc_schedule_pipelined_t *sp, //NOLINT
+                                           ucc_base_team_t *team,
+                                           ucc_schedule_t **frag_p)
 {
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_datatype_t       dtype    = coll_args->args.dst.info.datatype;
@@ -166,55 +166,84 @@ ucc_status_t ucc_tl_ucp_allreduce_sra_knomial_start(ucc_coll_task_t *task)
     return ucc_schedule_pipelined_post(task);
 }
 
+static void
+ucc_tl_ucp_allreduce_sra_knomial_get_pipeline_params(ucc_tl_ucp_team_t *team,
+                                                     ucc_coll_args_t *args,
+                                                     ucc_pipeline_params_t *pp)
+{
+    ucc_tl_ucp_lib_config_t *cfg = &team->cfg;
+
+    if (!ucc_pipeline_params_is_auto(&cfg->allreduce_sra_kn_pipeline)) {
+        *pp = cfg->allreduce_sra_kn_pipeline;
+        return;
+    }
+
+    if ((args->src.info.mem_type == UCC_MEMORY_TYPE_CUDA) &&
+        (UCC_IS_INPLACE(*args))) {
+        ucc_mc_attr_t mc_attr;
+        mc_attr.field_mask = UCC_MC_ATTR_FIELD_FAST_ALLOC_SIZE;
+        ucc_mc_get_attr(&mc_attr, UCC_MEMORY_TYPE_CUDA);
+        pp->threshold = mc_attr.fast_alloc_size;
+        pp->n_frags   = 2;
+        pp->frag_size = mc_attr.fast_alloc_size;
+        pp->order     = UCC_PIPELINE_PARALLEL;
+        pp->pdepth    = 2;
+    } else {
+        pp->threshold = SIZE_MAX;
+        pp->n_frags   = 0;
+        pp->frag_size = 0;
+        pp->pdepth    = 1;
+        pp->order     = UCC_PIPELINE_PARALLEL;
+
+    }
+}
+
 ucc_status_t
 ucc_tl_ucp_allreduce_sra_knomial_init(ucc_base_coll_args_t *coll_args,
-                                      ucc_base_team_t      *team,
-                                      ucc_coll_task_t     **task_h)
+                                      ucc_base_team_t *team,
+                                      ucc_coll_task_t **task_h)
 {
     ucc_tl_ucp_team_t        *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_lib_config_t  *cfg     = &tl_team->cfg;
+    ucc_coll_args_t          *args    = &coll_args->args;
+    size_t                    dt_size = ucc_dt_size(args->dst.info.datatype);
     int                       n_frags, pipeline_depth;
     ucc_schedule_pipelined_t *schedule_p;
-    ucc_status_t         status;
-    ucc_base_coll_args_t bargs;
-    size_t               max_frag_count, dt_size;
+    ucc_status_t              st;
+    ucc_base_coll_args_t      bargs;
+    size_t                    max_frag_count;
+    ucc_pipeline_params_t     pipeline_params;
 
-    dt_size = ucc_dt_size(coll_args->args.dst.info.datatype);
-    status  = ucc_tl_ucp_get_schedule(tl_team, coll_args,
-                                      (ucc_tl_ucp_schedule_t **)&schedule_p);
-    if (ucc_unlikely(UCC_OK != status)) {
-        return status;
+    st  = ucc_tl_ucp_get_schedule(tl_team, coll_args,
+                                  (ucc_tl_ucp_schedule_t **)&schedule_p);
+    if (ucc_unlikely(UCC_OK != st)) {
+        return st;
     }
+
     bargs = *coll_args;
-
-    if (bargs.mask & UCC_BASE_CARGS_MAX_FRAG_COUNT) {
-        max_frag_count = bargs.max_frag_count;
-    } else {
-        max_frag_count = coll_args->args.dst.info.count;
-    }
-
-    ucc_pipeline_nfrags_pdepth(&cfg->allreduce_sra_kn_pipeline,
-                               max_frag_count * dt_size, &n_frags,
-                               &pipeline_depth);
-
+    max_frag_count = (bargs.mask & UCC_BASE_CARGS_MAX_FRAG_COUNT) ?
+                     bargs.max_frag_count: args->dst.info.count;
+    ucc_tl_ucp_allreduce_sra_knomial_get_pipeline_params(tl_team, args,
+                                                         &pipeline_params);
+    ucc_pipeline_nfrags_pdepth(&pipeline_params, max_frag_count * dt_size,
+                               &n_frags, &pipeline_depth);
     if (n_frags > 1) {
-        bargs.mask         |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
-        bargs.max_frag_count =
-            ucc_buffer_block_count(max_frag_count, n_frags, 0);
+        bargs.mask           |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
+        bargs.max_frag_count = ucc_buffer_block_count(max_frag_count, n_frags, 0);
     }
 
-    status = ucc_schedule_pipelined_init(
-        &bargs, team, ucc_tl_ucp_allreduce_sra_knomial_frag_init,
-        ucc_tl_ucp_allreduce_sra_knomial_frag_setup, pipeline_depth, n_frags,
-        cfg->allreduce_sra_kn_pipeline.order, schedule_p);
-    if (UCC_OK != status) {
+    st = ucc_schedule_pipelined_init(&bargs, team,
+                                     ucc_tl_ucp_allreduce_sra_knomial_frag_init,
+                                     ucc_tl_ucp_allreduce_sra_knomial_frag_setup,
+                                     pipeline_depth, n_frags,
+                                     pipeline_params.order, schedule_p);
+    if (ucc_unlikely(UCC_OK != st)) {
         tl_error(team->context->lib, "failed to init pipelined schedule");
         ucc_tl_ucp_put_schedule(&schedule_p->super);
-        return status;
+        return st;
     }
-    schedule_p->super.super.finalize =
-        ucc_tl_ucp_allreduce_sra_knomial_finalize;
-    schedule_p->super.super.post = ucc_tl_ucp_allreduce_sra_knomial_start;
-    *task_h                                = &schedule_p->super.super;
+
+    schedule_p->super.super.finalize = ucc_tl_ucp_allreduce_sra_knomial_finalize;
+    schedule_p->super.super.post     = ucc_tl_ucp_allreduce_sra_knomial_start;
+    *task_h = &schedule_p->super.super;
     return UCC_OK;
 }

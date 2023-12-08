@@ -121,6 +121,17 @@ ucc_status_t ucc_mc_get_mem_attr(const void *ptr, ucc_mem_attr_t *mem_attr)
     return UCC_OK;
 }
 
+ucc_status_t ucc_mc_get_attr(ucc_mc_attr_t *attr, ucc_memory_type_t mem_type)
+{
+    ucc_memory_type_t mt = (mem_type == UCC_MEMORY_TYPE_CUDA_MANAGED) ?
+                               UCC_MEMORY_TYPE_CUDA : mem_type;
+    ucc_mc_base_t *mc;
+
+    UCC_CHECK_MC_AVAILABLE(mt);
+    mc = ucc_container_of(mc_ops[mt], ucc_mc_base_t, ops);
+    return mc->get_attr(attr);
+}
+
 UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_alloc, (h_ptr, size, mem_type),
                     ucc_mc_buffer_header_t **h_ptr, size_t size,
                     ucc_memory_type_t mem_type)
