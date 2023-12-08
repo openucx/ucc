@@ -82,18 +82,17 @@ ucc_status_t TestAllgatherv::set_input(int iter_persistent)
 {
     size_t dt_size = ucc_dt_size(dt);
     int    rank;
-    void  *buf, *check;
+    void  *buf;
 
+    this->iter_persistent = iter_persistent;
     MPI_Comm_rank(team.comm, &rank);
     if (inplace) {
         buf = PTR_OFFSET(rbuf, displacements[rank] * dt_size);
     } else {
         buf = sbuf;
     }
-    check = PTR_OFFSET(check_buf, displacements[rank] * dt_size);
     init_buffer(buf, counts[rank], dt, mem_type, rank * (iter_persistent + 1));
-    UCC_CHECK(ucc_mc_memcpy(check, buf, counts[rank] * dt_size,
-                            UCC_MEMORY_TYPE_HOST, mem_type));
+
     return UCC_OK;
 }
 
@@ -108,23 +107,19 @@ TestAllgatherv::~TestAllgatherv() {
 
 ucc_status_t TestAllgatherv::check()
 {
-    MPI_Datatype mpi_dt      = ucc_dt_to_mpi(dt);
-    int          total_count = 0;
-    int          size, rank, completed, i;
-    MPI_Request  req;
+    int total_count = 0;
+    int size, i;
 
     MPI_Comm_size(team.comm, &size);
-    MPI_Comm_rank(team.comm, &rank);
     for (i = 0 ; i < size; i++) {
         total_count += counts[i];
     }
-    MPI_Iallgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, check_buf,
-                    (int *)counts, (int *)displacements, mpi_dt, team.comm,
-                    &req);
-    do {
-        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
-        ucc_context_progress(team.ctx);
-    } while(!completed);
+
+    for (i = 0; i < size; i++) {
+        init_buffer(PTR_OFFSET(check_buf, displacements[i] * ucc_dt_size(dt)),
+                    counts[i], dt, UCC_MEMORY_TYPE_HOST,
+                    i * (iter_persistent + 1));
+    }
 
     return compare_buffers(rbuf, check_buf, total_count, dt, mem_type);
 }
