@@ -149,7 +149,14 @@ test_skip_cause_t TestCase::skip_reduce(int skip_cond, test_skip_cause_t cause,
 {
     test_skip_cause_t test_skip;
     test_skip_cause_t skip = skip_cond ? cause : TestCase::test_skip;
-    MPI_Allreduce((void*)&skip, (void*)&test_skip, 1, MPI_INT, MPI_MAX, comm);
+    MPI_Request req;
+    int completed;
+
+    MPI_Iallreduce((void*)&skip, (void*)&test_skip, 1, MPI_INT, MPI_MAX, comm, &req);
+    do {
+        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
+        tc_progress_ctx();
+    } while(!completed);
     TestCase::test_skip = test_skip;
     return test_skip;
 }
