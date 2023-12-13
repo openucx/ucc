@@ -123,29 +123,6 @@ ucc_coll_args_get_displacement(const ucc_coll_args_t *args,
     return ((uint32_t *)displacements)[idx];
 }
 
-static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
-{
-    switch((int)ct) {
-    case UCC_MEMORY_TYPE_HOST:
-        return "Host";
-    case UCC_MEMORY_TYPE_CUDA:
-        return "Cuda";
-    case UCC_MEMORY_TYPE_CUDA_MANAGED:
-        return "CudaManaged";
-    case UCC_MEMORY_TYPE_ROCM:
-        return "Rocm";
-    case UCC_MEMORY_TYPE_ROCM_MANAGED:
-        return "RocmManaged";
-    case UCC_MEMORY_TYPE_ASYMMETRIC:
-        return "asymmetric";
-    case UCC_MEMORY_TYPE_NOT_APPLY:
-        return "n/a";
-    default:
-        break;
-    }
-    return "invalid";
-}
-
 static inline size_t
 ucc_coll_args_get_total_count(const ucc_coll_args_t *args,
                               const ucc_count_t *counts, ucc_rank_t size)
@@ -248,7 +225,7 @@ ucc_status_t ucc_ep_map_create_nested(ucc_ep_map_t *base_map,
                                       ucc_ep_map_t *sub_map,
                                       ucc_ep_map_t *out);
 
-ucc_status_t ucc_ep_map_is_identity(const ucc_ep_map_t *map);
+int ucc_ep_map_is_identity(const ucc_ep_map_t *map);
 
 void ucc_ep_map_destroy_nested(ucc_ep_map_t *out);
 

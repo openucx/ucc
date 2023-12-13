@@ -267,7 +267,6 @@ protected:
     size_t msgsize;
     bool inplace;
     bool persistent;
-    ucc_coll_args_t args;
     ucc_coll_req_h req;
     ucc_mc_buffer_header_t *sbuf_mc_header, *rbuf_mc_header;
     void *sbuf;
@@ -279,6 +278,7 @@ protected:
     ucc_datatype_t dt;
     int iter_persistent;
 public:
+    ucc_coll_args_t args;
     void mpi_progress(void);
     test_skip_cause_t test_skip;
     static std::shared_ptr<TestCase> init_single(
@@ -304,6 +304,7 @@ public:
                                   MPI_Comm comm);
 };
 
+typedef std::tuple<ucc_coll_type_t, ucc_status_t> ucc_test_mpi_result_t;
 class UccTestMpi {
     ucc_thread_mode_t         tm;
     ucc_context_h             ctx;
@@ -331,14 +332,15 @@ class UccTestMpi {
     std::vector<int> gen_roots(ucc_test_team_t &team);
     std::vector<ucc_test_vsize_flag_t> counts_vsize;
     std::vector<ucc_test_vsize_flag_t> displs_vsize;
-    std::vector<ucc_status_t> exec_tests(
+    std::vector<ucc_test_mpi_result_t> exec_tests(
             std::vector<std::shared_ptr<TestCase>> tcs,
             bool triggered, bool persistent);
 public:
     std::vector<ucc_test_team_t> teams;
     std::vector<ucc_test_team_t> onesided_teams;
-    void run_all_at_team(ucc_test_team_t &team, std::vector<ucc_status_t> &rst);
-    std::vector<ucc_status_t> results;
+    void run_all_at_team(ucc_test_team_t &team,
+                         std::vector<ucc_test_mpi_result_t> &rst);
+    std::vector<ucc_test_mpi_result_t> results;
     UccTestMpi(int argc, char *argv[], ucc_thread_mode_t tm, int is_local,
                bool with_onesided);
     ~UccTestMpi();

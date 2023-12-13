@@ -474,7 +474,7 @@ void set_gpu_device(test_set_gpu_device_t set_device)
 
 #endif
 
-std::vector<ucc_status_t> UccTestMpi::exec_tests(
+std::vector<ucc_test_mpi_result_t> UccTestMpi::exec_tests(
         std::vector<std::shared_ptr<TestCase>> tcs, bool triggered,
                                                     bool persistent)
 {
@@ -483,7 +483,7 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
     ucc_status_t status;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-    std::vector<ucc_status_t> rst;
+    std::vector<ucc_test_mpi_result_t> rst;
 
     for (i = 0; i < n_persistent; i++) {
         for (auto tc: tcs) {
@@ -501,7 +501,7 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
                     std::cout << "SKIPPED: " << skip_str(tc->test_skip) << ": "
                               << tc->str() << " " << std::endl;
                 }
-                rst.push_back(UCC_ERR_LAST);
+                rst.push_back(std::make_tuple(tc->args.coll_type, UCC_ERR_LAST));
                 return rst;
             }
         }
@@ -528,14 +528,14 @@ std::vector<ucc_status_t> UccTestMpi::exec_tests(
             if (UCC_OK != status) {
                 std::cerr << "FAILURE in: " << tc->str() << std::endl;
             }
-            rst.push_back(status);
+            rst.push_back(std::make_tuple(tc->args.coll_type, status));
        }
     }
     return rst;
 }
 
 void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
-                                 std::vector<ucc_status_t> &rst)
+                                 std::vector<ucc_test_mpi_result_t> &rst)
 {
     TestCaseParams params;
 
@@ -586,7 +586,7 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
             for (auto r : roots) {
                 for (auto mt: test_memtypes) {
                     if (triggered && !ucc_coll_triggered_supported(mt)) {
-                        rst.push_back(UCC_ERR_NOT_IMPLEMENTED);
+                        rst.push_back(std::make_tuple(c, UCC_ERR_NOT_IMPLEMENTED));
                         continue;
                     }
 
@@ -642,10 +642,10 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
 }
 
 typedef struct ucc_test_thread {
-    pthread_t                 thread;
-    int                       id;
-    UccTestMpi *              test;
-    std::vector<ucc_status_t> rst;
+    pthread_t                          thread;
+    int                                id;
+    UccTestMpi *                       test;
+    std::vector<ucc_test_mpi_result_t> rst;
 } ucc_test_thread_t;
 
 static void *thread_start(void *arg)

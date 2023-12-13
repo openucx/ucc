@@ -187,4 +187,27 @@ static inline const char* ucc_reduction_op_str(ucc_reduction_op_t op)
     }
 }
 
+static inline const char* ucc_mem_type_str(ucc_memory_type_t ct)
+{
+    switch((int)ct) {
+    case UCC_MEMORY_TYPE_HOST:
+        return "Host";
+    case UCC_MEMORY_TYPE_CUDA:
+        return "Cuda";
+    case UCC_MEMORY_TYPE_CUDA_MANAGED:
+        return "CudaManaged";
+    case UCC_MEMORY_TYPE_ROCM:
+        return "Rocm";
+    case UCC_MEMORY_TYPE_ROCM_MANAGED:
+        return "RocmManaged";
+    case UCC_MEMORY_TYPE_ASYMMETRIC:
+        return "asymmetric";
+    case UCC_MEMORY_TYPE_NOT_APPLY:
+        return "n/a";
+    default:
+        break;
+    }
+    return "invalid";
+}
+
 #endif
