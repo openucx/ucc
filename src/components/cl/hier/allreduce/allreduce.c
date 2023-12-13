@@ -13,7 +13,7 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_CL_HIER_ALLREDUCE_ALG_RAB,
              .name = "rab",
              .desc = "intra-node reduce, followed by inter-node allreduce,"
-                     " followed by innode broadcast"},
+                     " followed by intra-node broadcast"},
         [UCC_CL_HIER_ALLREDUCE_ALG_SPLIT_RAIL] =
             {.id   = UCC_CL_HIER_ALLREDUCE_ALG_SPLIT_RAIL,
              .name = "split_rail",
