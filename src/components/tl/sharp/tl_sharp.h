@@ -109,6 +109,10 @@ typedef struct ucc_tl_sharp_task {
             ucc_tl_sharp_reg_t *r_mem_h;
         } allreduce;
         struct {
+            ucc_tl_sharp_reg_t *s_mem_h;
+            ucc_tl_sharp_reg_t *r_mem_h;
+        } reduce_scatter;
+        struct {
             ucc_tl_sharp_reg_t *mem_h;
         } bcast;
     };
@@ -131,8 +135,15 @@ ucc_status_t sharp_status_to_ucc_status(int status);
     (ucc_derived_of((_task)->super.team->context->lib, ucc_tl_sharp_lib_t))
 #define TASK_ARGS(_task) (_task)->super.bargs.args
 
-#define UCC_TL_SHARP_SUPPORTED_COLLS                                           \
+#define UCC_TL_BASIC_SHARP_SUPPORTED_COLLS                                     \
     (UCC_COLL_TYPE_ALLREDUCE | UCC_COLL_TYPE_BARRIER | UCC_COLL_TYPE_BCAST)
+
+#if HAVE_DECL_SHARP_COLL_DO_REDUCE_SCATTER
+#define UCC_TL_SHARP_SUPPORTED_COLLS                                           \
+    (UCC_TL_BASIC_SHARP_SUPPORTED_COLLS | UCC_COLL_TYPE_REDUCE_SCATTER)
+#else
+#define UCC_TL_SHARP_SUPPORTED_COLLS (UCC_TL_BASIC_SHARP_SUPPORTED_COLLS)
+#endif
 
 UCC_CLASS_DECLARE(ucc_tl_sharp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
