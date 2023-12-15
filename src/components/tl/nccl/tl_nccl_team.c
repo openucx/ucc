@@ -121,6 +121,10 @@ ucc_status_t ucc_tl_nccl_comm_init(ucc_tl_nccl_team_t *team)
     ucc_rank_t   trank    = UCC_TL_TEAM_RANK(team);
     ucc_status_t status;
     ncclResult_t nccl_status;
+#if NCCL_USE_NON_BLOCKING
+    ncclConfig_t nccl_cfg = NCCL_CONFIG_INITIALIZER;
+    ncclResult_t async_status;
+#endif
 
     if (team->comm_state == TL_NCCL_COMM_STATE_READY) {
         return UCC_OK;
@@ -138,9 +142,6 @@ ucc_status_t ucc_tl_nccl_comm_init(ucc_tl_nccl_team_t *team)
                                               cudaStreamNonBlocking),
                     exit_err, status);
 #if NCCL_USE_NON_BLOCKING
-    ncclConfig_t nccl_cfg = NCCL_CONFIG_INITIALIZER;
-    ncclResult_t async_status;
-
     /*
     * if NCCL comm initialized during first call to collective init a.k.a lazy init
     * we need to use blocking init to correctly fallback to other TL in case of error

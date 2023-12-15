@@ -40,8 +40,8 @@ static ucs_config_field_t ucc_tl_nccl_context_config_table[] = {
     },
 
     {"BLOCKING", "yes",
-     "If set to yes will use non-blocking mode communicator behavior, "
-     "if set to no will use blocking mode",
+     "If set to no will use non-blocking mode communicator behavior, "
+     "if set to yes will use blocking mode",
      ucs_offsetof(ucc_tl_nccl_context_config_t, nccl_cfg_blocking),
      UCS_CONFIG_TYPE_BOOL},
 
