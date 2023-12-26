@@ -9,6 +9,7 @@
 #include <sstream>
 #include <algorithm>
 #include <chrono>
+#include <iomanip>
 #include "test_mpi.h"
 
 int test_rand_seed = -1;
@@ -133,6 +134,23 @@ static ucc_test_mpi_team_t team_str_to_type(std::string team)
         return TEAM_REVERSE;
     }
     throw std::string("incorrect team type: ") + team;
+}
+
+static std::string team_type_to_str(ucc_test_mpi_team_t team)
+{
+    switch (team) {
+    case TEAM_WORLD:
+        return "world";
+    case TEAM_SPLIT_HALF:
+        return "half";
+    case TEAM_SPLIT_ODD_EVEN:
+        return "odd_even";
+    case TEAM_REVERSE:
+        return "reverse";
+    default:
+        break;
+    }
+    throw std::string("incorrect team type: ");
 }
 
 static ucc_coll_type_t coll_str_to_type(std::string coll)
@@ -395,15 +413,52 @@ int init_rand_seed(int user_seed)
 void print_info()
 {
     int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     if (world_rank) {
         return;
     }
-    std::cout << "\n===== UCC MPI TEST INFO =======\n"
-              << "   seed        : " << std::to_string(test_rand_seed) << "\n"
-              <<   "===============================\n"
-              << std::endl;
+
+    std::cout << "===== UCC MPI TEST INFO =======" << std::endl;
+    std::cout <<"seed:         " << std::to_string(test_rand_seed) << std::endl;
+    std::cout <<"collectives:  ";
+    for (const auto &c : colls) {
+        std::cout << ucc_coll_type_str(c);
+        if (c != colls.back()) {
+            std::cout << ", ";
+        } else {
+            std::cout << std::endl;
+        }
+    }
+    std::cout <<"data types:   ";
+    for (const auto &d : dtypes) {
+        std::cout << ucc_datatype_str(d);
+        if (d != dtypes.back()) {
+            std::cout << ", ";
+        } else {
+            std::cout << std::endl;
+        }
+    }
+
+    std::cout <<"memory types: ";
+    for (const auto &m : mtypes) {
+        std::cout << ucc_mem_type_str(m);
+        if (m != mtypes.back()) {
+            std::cout << ", ";
+        } else {
+            std::cout << std::endl;
+        }
+    }
+
+    std::cout <<"teams:        ";
+    for (const auto &t : teams) {
+        std::cout << team_type_to_str(t);
+        if (t != teams.back()) {
+            std::cout << ", ";
+        } else {
+            std::cout << std::endl;
+        }
+    }
 }
 
 void ProcessArgs(int argc, char** argv)
@@ -519,8 +574,8 @@ void ProcessArgs(int argc, char** argv)
 
 int main(int argc, char *argv[])
 {
-    int failed                       = 0;
-    int total_done_skipped_failed[4] = {0};
+    int failed                                                          = 0;
+    int total_done_skipped_failed[ucc_ilog2(UCC_COLL_TYPE_LAST) + 1][4] = {0};
     std::chrono::steady_clock::time_point begin;
     int size, required, provided, completed, rank;
     UccTestMpi *test;
@@ -623,19 +678,20 @@ int main(int argc, char *argv[])
     }
     std::cout << std::flush;
 
-    total_done_skipped_failed[0] = test->results.size();
     for (auto s : test->results) {
-        switch(s) {
+        int coll_num = ucc_ilog2(std::get<0>(s));
+        switch(std::get<1>(s)) {
         case UCC_OK:
-            total_done_skipped_failed[1]++;
+            total_done_skipped_failed[coll_num][1]++;
             break;
         case UCC_ERR_NOT_IMPLEMENTED:
         case UCC_ERR_LAST:
-            total_done_skipped_failed[2]++;
+            total_done_skipped_failed[coll_num][2]++;
             break;
         default:
-            total_done_skipped_failed[3]++;
+            total_done_skipped_failed[coll_num][3]++;
         }
+        total_done_skipped_failed[coll_num][0]++;
     }
     MPI_Iallreduce(MPI_IN_PLACE, total_done_skipped_failed,
                    sizeof(total_done_skipped_failed)/sizeof(int),
@@ -648,23 +704,58 @@ int main(int argc, char *argv[])
     if (0 == rank) {
         std::chrono::steady_clock::time_point end =
             std::chrono::steady_clock::now();
+        ucc_coll_type_t coll_type;
+        int num_all = 0, num_skipped = 0, num_done =0, num_failed = 0;
+        std::ios iostate(nullptr);
+
+        iostate.copyfmt(std::cout);
         std::cout << "\n===== UCC MPI TEST REPORT =====\n" <<
-            "   total tests : " << total_done_skipped_failed[0] << "\n" <<
-            "   passed      : " << total_done_skipped_failed[1] << "\n" <<
-            "   skipped     : " << total_done_skipped_failed[2] << "\n" <<
-            "   failed      : " << total_done_skipped_failed[3] << "\n" <<
-            "   elapsed     : " <<
+            std::setw(22) << std::left << "collective" <<
+            std::setw(10) << std::right << "tests" <<
+            std::setw(10) << std::right << "passed" <<
+            std::setw(10) << std::right << "failed" <<
+            std::setw(10) << std::right << "skipped" << std::endl;
+
+        for (coll_type =  (ucc_coll_type_t)1;
+             coll_type < UCC_COLL_TYPE_LAST;
+             coll_type = (ucc_coll_type_t)(coll_type << 1))
+        {
+            int coll_num = ucc_ilog2(coll_type);
+            if (total_done_skipped_failed[coll_num][0] == 0) {
+                continue;
+            }
+            num_all += total_done_skipped_failed[coll_num][0];
+            num_done += total_done_skipped_failed[coll_num][1];
+            num_skipped += total_done_skipped_failed[coll_num][2];
+            num_failed += total_done_skipped_failed[coll_num][3];
+            std::cout <<
+                std::setw(22) << std::left << ucc_coll_type_str(coll_type) <<
+                std::setw(10) << std::right << total_done_skipped_failed[coll_num][0] <<
+                std::setw(10) << std::right << total_done_skipped_failed[coll_num][1] <<
+                std::setw(10) << std::right << total_done_skipped_failed[coll_num][3] <<
+                std::setw(10) << std::right << total_done_skipped_failed[coll_num][2] <<
+                std::endl;
+
+        }
+        std::cout <<
+            " \n===== UCC MPI TEST SUMMARY =====\n" <<
+            "total tests:  " << num_all << "\n" <<
+            "passed:       " << num_done << "\n" <<
+            "skipped:      " << num_skipped << "\n" <<
+            "failed:       " << num_failed << "\n" <<
+            "elapsed:      " <<
             std::chrono::duration_cast<std::chrono::seconds>(end - begin).count()
                   << "s" << std::endl;
+        std::cout.copyfmt(iostate);
 
         /* check if all tests have been skipped */
-        if (total_done_skipped_failed[0] == total_done_skipped_failed[2]) {
+        if (num_all == num_skipped) {
             std::cout << "\n All tests have been skipped, indicating most likely "
                          "a problem\n";
             failed = 1;
         }
 
-        if (total_done_skipped_failed[3] != 0) {
+        if (num_failed != 0) {
             failed = 1;
         }
     }
