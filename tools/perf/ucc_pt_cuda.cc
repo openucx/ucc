@@ -36,6 +36,10 @@ void ucc_pt_cuda_init(void)
     LOAD_CUDA_SYM("cudaGetErrorString", getErrorString);
     LOAD_CUDA_SYM("cudaStreamCreateWithFlags", streamCreateWithFlags);
     LOAD_CUDA_SYM("cudaStreamDestroy", streamDestroy);
+    LOAD_CUDA_SYM("cudaMalloc", cudaMalloc);
+    LOAD_CUDA_SYM("cudaFree", cudaFree);
+    LOAD_CUDA_SYM("cudaMemset", cudaMemset);
+    LOAD_CUDA_SYM("cudaMallocManaged", cudaMallocManaged);
 
     ucc_pt_cuda_iface.available = 1;
 }
