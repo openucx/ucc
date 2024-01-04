@@ -20,7 +20,7 @@ volumes:
     }
 
 env:
-  CUDA_VER: '11.4.2'
+  CUDA_VER: '12.1.1'
   UCC_URI_SUFFIX: "ucc/${UCC_VERSION}/x86_64/centos8/cuda${CUDA_VER}"
   UCC_DOCKER_IMAGE_NAME: "${registry_host}${registry_path}/${UCC_URI_SUFFIX}"
   NVIDIA_ROOT_DIR: "/opt/nvidia"
@@ -42,8 +42,8 @@ credentials:
 
 runs_on_dockers:
   - {
-      file: ".ci/Dockerfile.centos8",
-      name: "centos8",
+      file: ".ci/Dockerfile.ngc_pytorch",
+      name: "ngc_pytorch",
       tag: "${BUILD_NUMBER}",
       arch: "x86_64",
       uri: "${UCC_URI_SUFFIX}",
@@ -69,7 +69,6 @@ steps:
       docker pull ${DOCKER_IMAGE_NAME}
       docker create -ti --rm $DOCKER_OPT ${DOCKER_IMAGE_NAME} /bin/bash > ${WORKSPACE}/ucc_docker.id
       docker start $(cat ${WORKSPACE}/ucc_docker.id)
-
   #============================================================================
   - name: Run Coverity
     credentialsId: "bc9a18d3-1153-449c-b924-7fc9249c9cc0"
@@ -80,7 +79,6 @@ steps:
       echo "Running coverity"
       ${WORKSPACE}/.ci/scripts/coverity.sh
     archiveArtifacts: .ci/scripts/cov-build/*
-
   #============================================================================
   - name: Run UCC / Torch-UCC tests
     agentSelector: "{nodeLabel: 'swx-clx01'}"
@@ -88,9 +86,6 @@ steps:
       echo "INFO: Run UCC tests"
       hostname
       docker exec $(cat ${WORKSPACE}/ucc_docker.id) bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_ucc.sh"
-
-      echo "INFO: Run Torch-UCC tests (UCC)"
-      docker exec $(cat ${WORKSPACE}/ucc_docker.id) bash -c "\${SRC_DIR}/ucc/.ci/scripts/run_tests_torch_ucc.sh"
     always: |
       docker rm --force $(cat ${WORKSPACE}/ucc_docker.id)
   #============================================================================

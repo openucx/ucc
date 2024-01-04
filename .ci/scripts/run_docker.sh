@@ -45,7 +45,7 @@ DOCKER_RUN_ARGS="\
 -d \
 --rm \
 --name=${DOCKER_CONTAINER_NAME} \
--v /labhome:/labhome \
+-v /labhome/swx-jenkins:/labhome/swx-jenkins \
 "
 
 # shellcheck disable=SC2013

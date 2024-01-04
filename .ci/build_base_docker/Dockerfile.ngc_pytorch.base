@@ -1,0 +1,69 @@
+ARG CUDA_VER='12.1.1'
+FROM nvcr.io/nvidia/pytorch:23.11-py3
+#==============================================================================
+ARG NVIDIA_ROOT_DIR=/opt/nvidia
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+ENV SRC_DIR=${NVIDIA_ROOT_DIR}/src
+ENV PKG_DIR=${NVIDIA_ROOT_DIR}/pkg
+ENV BIN_DIR=${NVIDIA_ROOT_DIR}/bin
+ENV WORKLOADS_DIR=${NVIDIA_ROOT_DIR}/workloads
+ENV CUDA_HOME=/usr/local/cuda
+ENV UCX_GITHUB_URL=https://github.com/openucx/ucx.git
+ENV UCX_BRANCH=master
+ENV UCX_BUILD_TYPE=release-mt
+ENV UCX_INSTALL_DIR=${BIN_DIR}/ucx/build-${UCX_BUILD_TYPE}
+ENV UCC_INSTALL_DIR=${BIN_DIR}/ucc/build
+ENV OFED_PKG='lsof kmod udev swig libelf1 libfuse2 pciutils tk gfortran libpci3 libusb-1.0-0 libltdl-dev libmnl0 bison tcl flex chrpath debhelper ethtool graphviz'
+ENV PACKAGES='numactl  openssh-server protobuf-compiler rdma-core vim libevent-dev build-essential git make autoconf libtool'
+ENV OS_VERSION=ubuntu22.04
+ENV PLATFORM=x86_64
+ENV MOFED_VERSION=23.10-0.5.5.0
+ENV MOFED_URL="https://content.mellanox.com/ofed/MLNX_OFED-${MOFED_VERSION}/MLNX_OFED_LINUX-${MOFED_VERSION}-${OS_VERSION}-${PLATFORM}.tgz"
+ENV OMPI_PATH="/opt/hpcx/ompi"
+#==============================================================================
+RUN apt update && apt install -y ${OFED_PKG} && \
+    mkdir -p /tmp/ofed && wget --quiet -O /tmp/ofed/ofed.tgz ${MOFED_URL} && \
+    tar -xvf /tmp/ofed/ofed.tgz --strip-components=2 -C /tmp/ofed && \
+    /tmp/ofed/mlnxofedinstall --user-space-only --without-fw-update -q  --distro ${OS_VERSION} --basic && \
+    rm -rf /tmp/ofed
+
+RUN     apt install -y ${PACKAGES}
+
+# Remove old UCX
+RUN rm -rf /opt/hpcx/uc?
+ENV PATH=${OMPI_PATH}/bin:$PATH
+RUN echo "export PATH=\"\$OMPI_PATH:\$PATH\"" >> /etc/bashrc && \
+    export LD_LIBRARY_PATH=\"\$OMPI_PATH/lib64:\${LD_LIBRARY_PATH}\" >> /etc/bashrc
+#==============================================================================
+# Configure SSH
+RUN mkdir -p /var/run/sshd && \
+    cat /etc/ssh/ssh_config | grep -v StrictHostKeyChecking > /etc/ssh/ssh_config.new && \
+    echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config.new && \
+    mv /etc/ssh/ssh_config.new /etc/ssh/ssh_config && \
+    ssh-keygen -A &&  \
+    rm -f /run/nologin
+#==============================================================================
+
+#==============================================================================
+RUN mkdir -p ${SRC_DIR} ${PKG_DIR} ${BIN_DIR} ${WORKLOADS_DIR} && \
+    cd ${SRC_DIR} && \
+    mkdir -p ${SRC_DIR}/ucx && \
+    git clone --recursive ${UCX_GITHUB_URL} ${SRC_DIR}/ucx && \
+    cd ${SRC_DIR}/ucx && \
+    git checkout ${UCX_BRANCH}
+
+COPY . ${SRC_DIR}/ucc
+#==============================================================================
+# Build UCX
+RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucx.sh
+ENV PATH=${UCX_INSTALL_DIR}/bin:${PATH}
+#==============================================================================
+# Install workloads
+WORKDIR ${WORKLOADS_DIR}
+RUN git clone https://github.com/facebookresearch/dlrm.git && \
+    cd ${WORKLOADS_DIR}/dlrm && \
+    pip3 install -r ${WORKLOADS_DIR}/dlrm/requirements.txt && \
+    pip3 install tensorboard
+RUN git clone https://github.com/facebookresearch/param.git && \
+    pip3 install -r ${WORKLOADS_DIR}/param/requirements.txt

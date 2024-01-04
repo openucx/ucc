@@ -15,9 +15,6 @@ if [ -z "$HOSTFILE" ]; then
     exit 1
 fi
 
-export PATH="/usr/lib64/openmpi/bin:$PATH"
-export LD_LIBRARY_PATH="/usr/lib64/openmpi/lib:${LD_LIBRARY_PATH}"
-
 HEAD_NODE=$(head -1 "$HOSTFILE")
 export HEAD_NODE
 export MASTER_ADDR=${HEAD_NODE}
