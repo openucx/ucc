@@ -15,14 +15,17 @@
 UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
                     const ucc_base_team_params_t *params)
 {
-    ucc_tl_nccl_context_t *ctx    =
-        ucc_derived_of(tl_context, ucc_tl_nccl_context_t);
+    ucc_tl_nccl_context_t *ctx = ucc_derived_of(tl_context,
+                                                ucc_tl_nccl_context_t);
+    ucc_team_oob_coll_t *oob;
     ucc_status_t status;
     ucc_rank_t size;
-    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
 
+    UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
+    oob = &(UCC_TL_TEAM_OOB(self));
     size = UCC_TL_TEAM_SIZE(self);
-    self->comm_state = UCC_OK;
+    self->stream     = NULL;
+    self->nccl_comm  = NULL;
     self->unique_id  = ucc_malloc(sizeof(ncclUniqueId) * (size + 1),
                                   "tl_nccl_unique_id");
     if (!self->unique_id) {
@@ -31,6 +34,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
                  sizeof(ncclUniqueId) * (size + 1));
         return UCC_ERR_NO_MEMORY;
     }
+
     if (UCC_TL_TEAM_RANK(self) == 0) {
         ncclResult_t st;
         st = ncclGetUniqueId(&self->unique_id[size]);
@@ -39,14 +43,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_nccl_team_t, ucc_base_context_t *tl_context,
             memset(&self->unique_id[size], 0, sizeof(ncclUniqueId));
         }
     }
-    status = UCC_TL_TEAM_OOB(self).allgather(
-        &self->unique_id[size], self->unique_id,
-        sizeof(ncclUniqueId), UCC_TL_TEAM_OOB(self).coll_info,
-        &self->oob_req);
+
+    status = oob->allgather(&self->unique_id[size],
+                            self->unique_id, sizeof(ncclUniqueId),
+                            oob->coll_info, &self->oob_req);
     if (status != UCC_OK) {
         tl_error(ctx->super.super.lib, "failed to start oob allgather");
         goto free_unique_id;
     }
+    self->comm_state = TL_NCCL_COMM_STATE_OOB;
+
     return UCC_OK;
 
 free_unique_id:
@@ -69,15 +75,17 @@ ucc_status_t ucc_tl_nccl_team_destroy(ucc_base_team_t *tl_team)
 #if NCCL_USE_NON_BLOCKING
     ncclResult_t nccl_status, st;
 
-    if (team->nccl_comm && team->comm_state == UCC_INPROGRESS) {
+    if (team->comm_state == TL_NCCL_COMM_STATE_DESTROY_COMM) {
         goto check_finalize;
     }
 #endif
 
+    if (team->stream) {
+        cudaStreamDestroy(team->stream);
+        team->stream = NULL;
+    }
     if (team->nccl_comm) {
-        if (team->comm_state != UCC_OK && team->comm_state != UCC_INPROGRESS) {
-            /* if communication error was detected ncclCommAbort should be used
-               since ncclCommDestroy could block */
+        if (team->comm_state == TL_NCCL_COMM_STATE_ERROR) {
             ncclCommAbort(team->nccl_comm);
         } else {
 #if NCCL_USE_NON_BLOCKING
@@ -91,7 +99,7 @@ check_finalize:
                 ncclCommAbort(team->nccl_comm);
                 return UCC_ERR_NO_MESSAGE;
             } else if (nccl_status == ncclInProgress) {
-                team->comm_state = UCC_INPROGRESS;
+                team->comm_state = TL_NCCL_COMM_STATE_DESTROY_COMM;
                 return UCC_INPROGRESS;
             } else {
                 ncclCommDestroy(team->nccl_comm);
@@ -101,93 +109,123 @@ check_finalize:
             ncclCommDestroy(team->nccl_comm);
 #endif
         }
-        cudaStreamDestroy(team->stream);
     }
 
     UCC_CLASS_DELETE_FUNC_NAME(ucc_tl_nccl_team_t)(tl_team);
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
+ucc_status_t ucc_tl_nccl_comm_init(ucc_tl_nccl_team_t *team)
 {
-    ucc_tl_nccl_team_t *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
+    ucc_rank_t   tsize    = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t   trank    = UCC_TL_TEAM_RANK(team);
     ucc_status_t status;
     ncclResult_t nccl_status;
-    ncclUniqueId errorid;
-
 #if NCCL_USE_NON_BLOCKING
     ncclConfig_t nccl_cfg = NCCL_CONFIG_INITIALIZER;
-    ncclResult_t st;
-
-    if (team->comm_state == UCC_INPROGRESS) {
-        goto ncclInitStage;
-    }
+    ncclResult_t async_status;
 #endif
 
-    status = UCC_TL_TEAM_OOB(team).req_test(team->oob_req);
-    if (status == UCC_INPROGRESS) {
-        return UCC_INPROGRESS;
-    }
-    if (status != UCC_OK) {
-        UCC_TL_TEAM_OOB(team).req_free(team->oob_req);
-        tl_error(tl_team->context->lib, "oob req test failed");
-        goto free_unique_id;
-    }
-    status = UCC_TL_TEAM_OOB(team).req_free(team->oob_req);
-    if (status != UCC_OK) {
-        tl_error(tl_team->context->lib, "oob req free failed");
-        goto free_unique_id;
-    }
-    /* check unique id is valid */
-    memset(&errorid, 0, sizeof(errorid));
-    if (!memcmp(&errorid, team->unique_id, sizeof(errorid))) {
-        tl_error(tl_team->context->lib, "incorrect unique id");
-        goto free_unique_id;
+    if (team->comm_state == TL_NCCL_COMM_STATE_READY) {
+        return UCC_OK;
+    } else if (team->comm_state == TL_NCCL_COMM_STATE_ERROR) {
+        return UCC_ERR_NOT_SUPPORTED;
+    } else if (team->comm_state == TL_NCCL_COMM_STATE_INIT_COMM) {
+#if NCCL_USE_NON_BLOCKING
+        goto nccl_async_init;
+#else
+        ucc_assert_always(0);
+#endif
     }
 
     CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
-                    cudaStreamNonBlocking), free_unique_id, status);
+                                              cudaStreamNonBlocking),
+                    exit_err, status);
 #if NCCL_USE_NON_BLOCKING
-    nccl_cfg.blocking = UCC_TL_NCCL_TEAM_CTX(team)->cfg.nccl_cfg_blocking;
-    nccl_status = ncclCommInitRankConfig(&team->nccl_comm,
-                                         UCC_TL_TEAM_SIZE(team),
-                                         team->unique_id[0],
-                                         UCC_TL_TEAM_RANK(team),
-                                         &nccl_cfg);
-    if (nccl_status != ncclInProgress && nccl_status != ncclSuccess) {
-        goto free_stream;
+    /*
+    * if NCCL comm initialized during first call to collective init a.k.a lazy init
+    * we need to use blocking init to correctly fallback to other TL in case of error
+    */
+    nccl_cfg.blocking = (UCC_TL_NCCL_TEAM_CTX(team)->cfg.nccl_cfg_blocking ||
+                         UCC_TL_NCCL_TEAM_CTX(team)->cfg.nccl_lazy_init) ? 1: 0;
+
+    nccl_status = ncclCommInitRankConfig(&team->nccl_comm, tsize,
+                                         team->unique_id[0], trank, &nccl_cfg);
+    if ((nccl_status != ncclInProgress) && (nccl_status != ncclSuccess)) {
+        goto nccl_comm_init_err;
     }
-ncclInitStage:
-    st = ncclCommGetAsyncError(team->nccl_comm, &nccl_status);
-    if (st != ncclSuccess) {
-        nccl_status = st;
+nccl_async_init:
+    nccl_status = ncclCommGetAsyncError(team->nccl_comm, &async_status);
+    if (nccl_status != ncclSuccess) {
+        goto nccl_comm_init_err;
     }
-    if (nccl_status == ncclInProgress){
-        team->comm_state = UCC_INPROGRESS;
-        return UCC_INPROGRESS;
+    if (async_status == ncclInProgress) {
+        team->comm_state = TL_NCCL_COMM_STATE_INIT_COMM;
     }
 #else
-    nccl_status = ncclCommInitRank(&team->nccl_comm, UCC_TL_TEAM_SIZE(team),
-                                   team->unique_id[0], UCC_TL_TEAM_RANK(team));
-#endif
+    nccl_status = ncclCommInitRank(&team->nccl_comm, tsize, team->unique_id[0],
+                                   trank);
     if (nccl_status != ncclSuccess) {
-        goto free_stream;
+        goto nccl_comm_init_err;
     }
-    ucc_free(team->unique_id);
-    tl_debug(tl_team->context->lib, "initialized tl team: %p", team);
+#endif
+
+    team->comm_state = TL_NCCL_COMM_STATE_READY;
     return UCC_OK;
 
-free_stream:
-    tl_debug(tl_team->context->lib, "NCCL error %d %s", nccl_status,
-             ncclGetErrorString(nccl_status));
-    status = UCC_ERR_NO_MESSAGE;
-#if NCCL_USE_NON_BLOCKING
-    ncclCommAbort(team->nccl_comm);
-#endif
-    cudaStreamDestroy(team->stream);
-free_unique_id:
-    ucc_free(team->unique_id);
+nccl_comm_init_err:
+    tl_debug(team->super.super.context->lib, "NCCL error %d %s",
+             nccl_status, ncclGetErrorString(nccl_status));
+    if (nccl_status == ncclInvalidUsage) {
+        /*
+        * handles the case when trying to inititize multiple ranks
+        * on the same GPU. Return "not supported" and fallback to other TL
+        */
+        status = UCC_ERR_NOT_SUPPORTED;
+    } else {
+        status = UCC_ERR_NO_RESOURCE;
+    }
+    team->comm_state = TL_NCCL_COMM_STATE_ERROR;
+
+exit_err:
     return status;
+}
+
+ucc_status_t ucc_tl_nccl_team_create_test(ucc_base_team_t *tl_team)
+{
+    ucc_tl_nccl_team_t  *team = ucc_derived_of(tl_team, ucc_tl_nccl_team_t);
+    ucc_team_oob_coll_t *oob  = &(UCC_TL_TEAM_OOB(team));
+    ncclUniqueId errorid;
+    ucc_status_t status;
+
+
+    if (team->comm_state == TL_NCCL_COMM_STATE_OOB) {
+        status = oob->req_test(team->oob_req);
+        if (status == UCC_INPROGRESS) {
+            return UCC_INPROGRESS;
+        }
+
+        oob->req_free(team->oob_req);
+        if (status != UCC_OK) {
+            tl_error(tl_team->context->lib, "oob req test failed");
+            return status;
+        }
+
+        /* check unique id is valid */
+        memset(&errorid, 0, sizeof(errorid));
+        if (!memcmp(&errorid, team->unique_id, sizeof(errorid))) {
+            tl_error(tl_team->context->lib, "incorrect unique id");
+            return status;
+        }
+
+        team->comm_state = TL_NCCL_COMM_STATE_INIT_TEAM;
+    }
+
+    if (UCC_TL_NCCL_TEAM_CTX(team)->cfg.nccl_lazy_init) {
+        return UCC_OK;
+    }
+
+    return ucc_tl_nccl_comm_init(team);
 }
 
 ucc_status_t ucc_tl_nccl_coll_init(ucc_base_coll_args_t *coll_args,
