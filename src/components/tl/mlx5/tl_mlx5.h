@@ -106,8 +106,21 @@ typedef enum
     TL_MLX5_TEAM_STATE_INIT,
     TL_MLX5_TEAM_STATE_POSTED,
     TL_MLX5_TEAM_STATE_ALLTOALL_INIT,
-    TL_MLX5_TEAM_STATE_ALLTOALL_POSTED
+    TL_MLX5_TEAM_STATE_ALLTOALL_POSTED,
+    TL_MLX5_TEAM_STATE_ALLTOALL_READY,
+    TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE
 } ucc_tl_mlx5_team_state_t;
+
+typedef enum
+{
+    TL_MLX5_TEAM_STATE_MCAST_INIT,
+    TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST,
+    TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY,
+    TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED,
+    TL_MLX5_TEAM_STATE_MCAST_GRP_BCAST_POST,
+    TL_MLX5_TEAM_STATE_MCAST_READY,
+    TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE
+} ucc_tl_mlx5_team_mcast_state_t;
 
 typedef struct ucc_tl_mlx5_team_status {
     ucc_status_t local;
@@ -115,18 +128,19 @@ typedef struct ucc_tl_mlx5_team_status {
 } ucc_tl_mlx5_team_status_t;
 
 typedef struct ucc_tl_mlx5_team {
-    ucc_tl_team_t             super;
-    ucc_service_coll_req_t   *scoll_req;
-    ucc_tl_mlx5_team_state_t  state;
-    void                     *dm_offset;
-    ucc_mpool_t               dm_pool;
-    struct ibv_dm            *dm_ptr;
-    struct ibv_mr            *dm_mr;
-    ucc_tl_mlx5_team_status_t a2a_status;
-    ucc_tl_mlx5_alltoall_t   *a2a;
-    ucc_topo_t               *topo;
-    ucc_ep_map_t              ctx_map;
-    ucc_tl_mlx5_mcast_team_t *mcast;
+    ucc_tl_team_t                   super;
+    ucc_service_coll_req_t         *scoll_req;
+    ucc_tl_mlx5_team_state_t        a2a_state;
+    ucc_tl_mlx5_team_mcast_state_t  mcast_state;
+    void                           *dm_offset;
+    ucc_mpool_t                     dm_pool;
+    struct ibv_dm                  *dm_ptr;
+    struct ibv_mr                  *dm_mr;
+    ucc_tl_mlx5_team_status_t       a2a_status;
+    ucc_tl_mlx5_alltoall_t         *a2a;
+    ucc_topo_t                     *topo;
+    ucc_ep_map_t                    ctx_map;
+    ucc_tl_mlx5_mcast_team_t       *mcast;
 } ucc_tl_mlx5_team_t;
 UCC_CLASS_DECLARE(ucc_tl_mlx5_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

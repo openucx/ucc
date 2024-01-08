@@ -529,33 +529,3 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_clean_mcast_ctx(ucc_tl_mlx5_mcast_coll_context_t *ctx)
-{
-    tl_debug(ctx->lib, "cleaning mcast ctx: %p", ctx);
-
-    if (ctx->rcache) {
-        ucc_rcache_destroy(ctx->rcache);
-    }
-
-    if (ctx->pd) {
-        if (ibv_dealloc_pd(ctx->pd)) {
-            tl_error(ctx->lib, "ibv_dealloc_pd failed errno %d", errno);
-            return UCC_ERR_NO_RESOURCE;
-        }
-    }
-
-    if (rdma_destroy_id(ctx->id)) {
-        tl_error(ctx->lib, "rdma_destroy_id failed errno %d", errno);
-        return UCC_ERR_NO_RESOURCE;
-    }
-
-    rdma_destroy_event_channel(ctx->channel);
-
-    if (!strcmp(ctx->params.ib_dev_name, "")) {
-        ucc_free(ctx->devname);
-    }
-
-    ucc_free(ctx);
-
-    return UCC_OK;
-}

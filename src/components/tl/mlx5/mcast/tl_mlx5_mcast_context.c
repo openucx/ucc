@@ -51,12 +51,20 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
     int                     ib_valid;
     const char             *dst;
 
+    mlx5_ctx = ucc_container_of(context, ucc_tl_mlx5_context_t, mcast);
+    lib      = mlx5_ctx->super.super.lib;
+
+    context->mcast_enabled = mcast_ctx_conf->mcast_enabled;
+
+    if (!mcast_ctx_conf->mcast_enabled) {
+        tl_debug(lib, "Mcast is disabled by the user");
+        return UCC_ERR_NO_RESOURCE;
+    }
+
     ctx = &(context->mcast_context);
     memset(ctx, 0, sizeof(ucc_tl_mlx5_mcast_coll_context_t));
     memcpy(&ctx->params, mcast_ctx_conf, sizeof(ucc_tl_mlx5_mcast_ctx_params_t));
 
-    mlx5_ctx = ucc_container_of(context, ucc_tl_mlx5_context_t, mcast);
-    lib      = mlx5_ctx->super.super.lib;
     ctx->lib = lib;
 
     /* TODO unify all the contexts under TL mlx5 */
@@ -239,13 +247,55 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
 error:
     if (ctx->pd) {
         ibv_dealloc_pd(ctx->pd);
+        ctx->pd = NULL;
     }
     if (ctx->id) {
         rdma_destroy_id(ctx->id);
+        ctx->id = NULL;
     }
     if (ctx->channel) {
         rdma_destroy_event_channel(ctx->channel);
+        ctx->channel = NULL;
     }
 
     return status;
+}
+
+ucc_status_t ucc_tl_mlx5_mcast_clean_ctx(ucc_tl_mlx5_mcast_coll_context_t *ctx)
+{
+    tl_debug(ctx->lib, "cleaning mcast ctx: %p", ctx);
+
+    if (ctx == NULL) return UCC_OK;
+
+    if (ctx->rcache) {
+        ucc_rcache_destroy(ctx->rcache);
+        ctx->rcache = NULL;
+    }
+
+    if (ctx->pd) {
+        if (ibv_dealloc_pd(ctx->pd)) {
+            tl_error(ctx->lib, "ibv_dealloc_pd failed errno %d", errno);
+            return UCC_ERR_NO_RESOURCE;
+        }
+        ctx->pd = NULL;
+    }
+
+    if (ctx->id && rdma_destroy_id(ctx->id)) {
+        tl_error(ctx->lib, "rdma_destroy_id failed errno %d", errno);
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    ctx->id = NULL;
+
+    if (ctx->channel) {
+        rdma_destroy_event_channel(ctx->channel);
+        ctx->channel = NULL;
+    }
+
+   if (ctx->devname && !strcmp(ctx->params.ib_dev_name, "")) {
+        ucc_free(ctx->devname);
+        ctx->devname = NULL;
+    }
+
+    return UCC_OK;
 }

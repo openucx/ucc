@@ -365,4 +365,12 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
 
 ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm);
 
+ucc_status_t ucc_tl_mlx5_mcast_join_mcast_post(ucc_tl_mlx5_mcast_coll_context_t *ctx,
+                                               struct sockaddr_in6 *net_addr,
+                                               int is_root);
+
+ucc_status_t ucc_tl_mlx5_mcast_join_mcast_test(ucc_tl_mlx5_mcast_coll_context_t *ctx,
+                                               struct rdma_cm_event **event,
+                                               int is_root);
+
 #endif /* TL_MLX5_MCAST_HELPER_H_ */
