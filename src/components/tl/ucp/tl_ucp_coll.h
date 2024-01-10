@@ -202,13 +202,10 @@ typedef struct ucc_tl_ucp_task {
             ucc_ee_executor_t      *executor;
         } reduce_kn;
         struct {
-            ucc_dbt_single_tree_t   t1;
-            ucc_dbt_single_tree_t   t2;
             int                     state;
-            int                     t1_reduction_comp;
-            int                     t2_reduction_comp;
-            int                     t1_send_comp;
-            int                     t2_send_comp;
+            ucc_dbt_single_tree_t   trees[2];
+            int                     reduction_comp[2];
+            int                     send_comp[2];
             void                   *scratch;
             ucc_mc_buffer_header_t *scratch_mc_header;
             ucc_ee_executor_task_t *etask;
