@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2001-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # See file LICENSE for terms.
 #
 
@@ -118,6 +118,16 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
                 [AC_DEFINE([UCS_HAVE_RCACHE_REGION_ALIGNMENT], [1], [flags for ucs_rcache_get])],
                 [],
                 [#include <ucs/memory/rcache.h>])
+
+
+            AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <ucs/config/parser.h>
+					            int main(int argc, char** argv) {
+				        	    	ucs_config_parser_set_value(NULL, NULL, NULL, NULL, NULL);
+					        	    return 0;
+					            } ]])],
+                  [AC_DEFINE([UCS_HAVE_PARSER_SET_VALUE_TABLE_PREFIX], [1], [flags for ucs_rcache_get])],
+                  [])
+
         ],
         [
             AS_IF([test "x$with_ucx" != "xguess"],
