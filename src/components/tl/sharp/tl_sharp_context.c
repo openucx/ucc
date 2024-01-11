@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -269,15 +269,12 @@ ucc_status_t ucc_tl_sharp_rcache_create(struct sharp_coll_context *context,
 {
     ucc_rcache_params_t rcache_params;
 
-    rcache_params.ucm_event_priority = 1000;
-    rcache_params.max_regions        = ULONG_MAX;
-    rcache_params.max_size           = SIZE_MAX;
+    ucc_rcache_set_default_params(&rcache_params);
     rcache_params.region_struct_size = sizeof(ucc_tl_sharp_rcache_region_t);
-    rcache_params.ucm_events         = UCM_EVENT_VM_UNMAPPED |
-        UCM_EVENT_MEM_TYPE_FREE;
     rcache_params.context            = context;
     rcache_params.ops                = &ucc_tl_sharp_rcache_ops;
-    rcache_params.flags              = 0;
+    rcache_params.ucm_events         = UCM_EVENT_VM_UNMAPPED |
+                                       UCM_EVENT_MEM_TYPE_FREE;
 
     return ucc_rcache_create(&rcache_params, "SHARP", rcache);
 }
