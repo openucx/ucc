@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -168,8 +168,13 @@ static inline ucc_status_t
 ucc_config_parser_set_value(void *opts, ucc_config_field_t *fields,
                             const char *name, const char *value)
 {
-    ucs_status_t status =
-        ucs_config_parser_set_value(opts, fields, name, value);
+    ucs_status_t status;
+
+#if UCS_HAVE_PARSER_SET_VALUE_TABLE_PREFIX
+    status = ucs_config_parser_set_value(opts, fields, NULL, name, value);
+#else
+    status = ucs_config_parser_set_value(opts, fields, name, value);
+#endif
     return ucs_status_to_ucc_status(status);
 }
 
