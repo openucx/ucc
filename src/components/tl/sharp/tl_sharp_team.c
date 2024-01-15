@@ -234,6 +234,11 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
     case UCC_COLL_TYPE_BCAST:
         status = ucc_tl_sharp_bcast_init(task);
         break;
+#if HAVE_DECL_SHARP_COLL_DO_REDUCE_SCATTER
+    case UCC_COLL_TYPE_REDUCE_SCATTER:
+        status = ucc_tl_sharp_reduce_scatter_init(task);
+        break;
+#endif
     default:
         tl_debug(UCC_TASK_LIB(task),
                  "collective %d is not supported by sharp tl",

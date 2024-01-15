@@ -20,4 +20,7 @@ ucc_status_t ucc_tl_sharp_barrier_init(ucc_tl_sharp_task_t *task);
 
 ucc_status_t ucc_tl_sharp_bcast_init(ucc_tl_sharp_task_t *task);
 
+#if HAVE_DECL_SHARP_COLL_DO_REDUCE_SCATTER
+ucc_status_t ucc_tl_sharp_reduce_scatter_init(ucc_tl_sharp_task_t *task);
+#endif
 #endif
