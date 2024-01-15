@@ -172,19 +172,26 @@ ucc_status_t ucc_tl_mlx5_probe_ip_over_ib(char* ib_dev, struct
 {
     char                   *ib_name = NULL;
     char                   *port    = NULL;
+    char                   *ib      = NULL;
     ucc_status_t            status;
     struct sockaddr_storage rdma_src_addr;
 
-    if (NULL == ib_dev) {
-        status = UCC_ERR_NO_RESOURCE;
-    } else {
-        ucc_string_split(ib_dev, ":", 2, &ib_name, &port);
-        status = dev2if(ib_name, port, &rdma_src_addr);
+    if (ib_dev == NULL) {
+        return UCC_ERR_NO_RESOURCE;
     }
+
+    ib = strdup(ib_dev);
+    if (!ib) {
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    ucc_string_split(ib, ":", 2, &ib_name, &port);
+    status = dev2if(ib_name, port, &rdma_src_addr);
 
     if (UCC_OK == status) {
         *addr = rdma_src_addr;
     }
+    ucc_free(ib);
 
     return status;
 }
@@ -203,7 +210,7 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_post(ucc_tl_mlx5_mcast_coll_context_t 
     }
 
     tl_debug(ctx->lib, "joining addr: %s is_root %d", buf, is_root);
-    
+
     if (rdma_join_multicast(ctx->id, (struct sockaddr*)net_addr, NULL)) {
         tl_error(ctx->lib, "rdma_join_multicast failed errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
@@ -552,4 +559,3 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_ctx(ucc_tl_mlx5_mcast_coll_context_t *ctx)
 
     return UCC_OK;
 }
-
