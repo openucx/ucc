@@ -173,8 +173,8 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
 
     ib = strdup(ctx->devname);
     ucc_string_split(ib, ":", 2, &ib_name, &port);
-    ucc_free(ib);
     ctx->ib_port = atoi(port);
+    ucc_free(ib);
 
     /* Determine MTU */
     if (ibv_query_port(ctx->ctx, ctx->ib_port, &port_attr)) {
