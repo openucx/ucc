@@ -166,6 +166,7 @@ typedef enum ucc_memory_type {
     UCC_MEMORY_TYPE_CUDA_MANAGED, /*!< NVIDIA CUDA managed memory */
     UCC_MEMORY_TYPE_ROCM,         /*!< AMD ROCM memory */
     UCC_MEMORY_TYPE_ROCM_MANAGED, /*!< AMD ROCM managed system memory */
+    UCC_MEMORY_TYPE_DPU,          /*!< DPU memory */
     UCC_MEMORY_TYPE_LAST,
     UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
 } ucc_memory_type_t;
@@ -895,8 +896,13 @@ typedef ucc_oob_coll_t ucc_team_oob_coll_t;
  *  @ingroup UCC_CONTEXT_DT
  */
 typedef struct ucc_mem_map {
-    void *   address; /*!< the address of a buffer to be attached to a UCC context */
-    size_t   len;     /*!< the length of the buffer */
+    void *            address;  /*!< the address of a buffer to be attached to
+                                     a UCC context */
+    size_t            len;      /*!< the length of the buffer */
+    ucc_memory_type_t mem_type; /*!< the memory type */
+    void *            resource; /*!< resource associated with the address.
+                                     examples of resources include memory
+                                     keys. */
 } ucc_mem_map_t;
 
 /**
@@ -1703,12 +1709,17 @@ typedef enum {
                                                             Note, the status is not guaranteed
                                                             to be global on all the processes
                                                             participating in the collective.*/
-    UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7)  /*!< If set, both src
+    UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7), /*!< If set, both src
                                                             and dst buffers
                                                             reside in a memory
                                                             mapped region.
                                                             Useful for one-sided
                                                             collectives. */
+    UCC_COLL_ARGS_FLAG_MEM_MAP              = UCC_BIT(8)  /*!< If set, map both
+                                                            src and dst buffers.
+                                                            Useful for one-sided
+                                                            collectives in message
+                                                            passing programming models */
 } ucc_coll_args_flags_t;
 
 /**
@@ -1798,7 +1809,8 @@ enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(1),
     UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(2),
     UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER              = UCC_BIT(3),
-    UCC_COLL_ARGS_FIELD_ACTIVE_SET                      = UCC_BIT(4)
+    UCC_COLL_ARGS_FIELD_ACTIVE_SET                      = UCC_BIT(4),
+    UCC_COLL_ARGS_FIELD_MEM_MAP                         = UCC_BIT(5)
 };
 
 /**
@@ -1868,6 +1880,11 @@ typedef struct ucc_coll_args {
                                                              to 0. */
     ucc_coll_callback_t             cb;
     double                          timeout; /*!< Timeout in seconds */
+    ucc_mem_map_params_t            mem_map; /*!< Memory regions to be used
+                                                  in during the collective
+                                                  operation for one-sided
+                                                  collectives. Not necessary
+                                                  for two-sided collectives */
     struct {
         uint64_t start;
         int64_t  stride;
