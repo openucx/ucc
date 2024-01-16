@@ -113,13 +113,13 @@ ucc_status_t ucc_constructor(void)
         &ucc_global_config, UCC_CONFIG_GET_TABLE(ucc_global_config_table),
         "UCC_", 1);
     if (UCC_OK != status) {
-        goto exit_unlock_mutex;
         ucc_error("failed to parse global options");
+        goto exit_unlock_mutex;
     }
 
     if (UCC_OK != (status = init_lib_paths())) {
-        goto exit_unlock_mutex;
         ucc_error("failed to init ucc components path");
+        goto exit_unlock_mutex;
     }
 
     status = ucc_check_config_file();
