@@ -23,11 +23,16 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR,
              .name = "neighbor",
              .desc = "O(N) Neighbor Exchange N/2 steps"},
+        [UCC_TL_UCP_ALLGATHER_ALG_BRUCK] = 
+            {.id   = UCC_TL_UCP_ALLGATHER_ALG_BRUCK,
+             .name = "bruck",
+             .desc = "O(log(N)) Variation of Bruck algorithm"},
         [UCC_TL_UCP_ALLGATHER_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task)
 {
+    printf ("HELLO\n");
     return ucc_tl_ucp_allgather_ring_init_common(task);
 }
 
@@ -36,7 +41,7 @@ char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
     int   max_size = ALLGATHER_MAX_PATTERN_SIZE;
     int   algo_num = UCC_TL_TEAM_SIZE(team) % 2
                          ? UCC_TL_UCP_ALLGATHER_ALG_RING
-                         : UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR;
+                         : UCC_TL_UCP_ALLGATHER_ALG_BRUCK;
     char *str      = ucc_malloc(max_size * sizeof(char));
     ucc_sbgp_t *sbgp;
 
@@ -46,6 +51,7 @@ char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
             algo_num = UCC_TL_UCP_ALLGATHER_ALG_RING;
         }
     }
+    fprintf(stderr, "Algo num: %d\n", algo_num);
     ucc_snprintf_safe(str, max_size,
                       UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR, algo_num);
     return str;
