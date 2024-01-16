@@ -34,7 +34,26 @@ typedef struct ucc_tl_ucp_dpu_offload_buf_info
 enum ucc_tl_ucp_task_flags {
     /*indicates whether subset field of tl_ucp_task is set*/
     UCC_TL_UCP_TASK_FLAG_SUBSET = UCC_BIT(0),
+    /* indicates usage of dynamic segments */
+    UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG = UCC_BIT(1),
 };
+
+/* Structure to hold dynamic segment exchange parameters and buffers */
+typedef struct {
+    ucc_tl_ucp_task_t  *task;
+    void               *src_pack_buffer;
+    void               *dst_pack_buffer;
+    size_t              src_pack_size;
+    size_t              dst_pack_size;
+    size_t              max_individual_pack_size;
+    size_t              exchange_size;
+    ucc_mem_map_memh_t *src_memh_pack;
+    ucc_mem_map_memh_t *dst_memh_pack;
+    void               *exchange_buffer;
+    void               *global_buffer;
+    ucc_mem_map_memh_t *src_memh_local;
+    ucc_mem_map_memh_t *dst_memh_local;
+} ucc_tl_ucp_dynamic_segment_args_t;
 
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
@@ -223,6 +242,14 @@ typedef struct ucc_tl_ucp_task {
     };
     uint32_t flush_posted;
     uint32_t flush_completed;
+    struct {
+        ucc_mem_map_memh_t     *src_local;
+        ucc_mem_map_memh_t     *dst_local;
+        ucc_mem_map_memh_t    **src_global;
+        ucc_mem_map_memh_t    **dst_global;
+        ucc_mem_map_memh_t     *gwb_local;
+        ucc_mem_map_memh_t     *gwb_global;
+    } dynamic_segments;
 } ucc_tl_ucp_task_t;
 
 static inline void ucc_tl_ucp_task_reset(ucc_tl_ucp_task_t *task,
