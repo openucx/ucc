@@ -902,8 +902,8 @@ typedef ucc_oob_coll_t ucc_team_oob_coll_t;
  *  @ingroup UCC_CONTEXT_DT
  */
 typedef struct ucc_mem_map {
-    void *   address; /*!< the address of a buffer to be attached to a UCC context */
-    size_t   len;     /*!< the length of the buffer */
+    void  *address;  /*!< the address of a buffer to be attached to a UCC context */
+    size_t len;      /*!< the length of the buffer */
 } ucc_mem_map_t;
 
 /**
@@ -1710,7 +1710,7 @@ typedef enum {
                                                             Note, the status is not guaranteed
                                                             to be global on all the processes
                                                             participating in the collective.*/
-    UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7), /*!< If set, both src
+    UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7),  /*!< If set, both src
                                                             and dst buffers
                                                             reside in a memory
                                                             mapped region.
@@ -1720,7 +1720,7 @@ typedef enum {
                                                             the src_memh memory
                                                             handle is an array of
                                                             global handles. */
-    UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL      = UCC_BIT(9), /*!< If set, indicates
+    UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL      = UCC_BIT(9)  /*!< If set, indicates
                                                             the dst_memh memory
                                                             handle is an array of
                                                             global handles. */
