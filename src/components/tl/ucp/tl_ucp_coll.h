@@ -79,6 +79,251 @@ typedef struct ucc_tl_ucp_default_alg_desc {
     ucc_tl_ucp_score_str_get_fn_t  str_get_fn;
 } ucc_tl_ucp_default_alg_desc_t;
 
+<<<<<<< HEAD
+=======
+enum ucc_tl_ucp_task_flags {
+    /*indicates whether subset field of tl_ucp_task is set*/
+    UCC_TL_UCP_TASK_FLAG_SUBSET      = UCC_BIT(0),
+    /* indicates usage of dynamic segments */
+    UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG = UCC_BIT(1),
+    /* indicates onesided operations have been started */
+    UCC_TL_UCP_TASK_FLAG_OPS_STARTED = UCC_BIT(2),
+};
+
+typedef struct ucc_tl_ucp_allreduce_sw_pipeline
+    ucc_tl_ucp_allreduce_sw_pipeline;
+typedef struct ucc_tl_ucp_allreduce_sw_host_allgather
+    ucc_tl_ucp_allreduce_sw_host_allgather;
+typedef struct ucc_tl_ucp_dpu_offload_buf_info
+    ucc_tl_ucp_dpu_offload_buf_info_t;
+
+/* Structure to hold dynamic segment exchange parameters and buffers */
+typedef struct {
+    ucc_tl_ucp_task_t  *task;
+    void               *src_pack_buffer;
+    void               *dst_pack_buffer;
+    size_t              src_pack_size;
+    size_t              dst_pack_size;
+    size_t              max_individual_pack_size;
+    size_t              exchange_size;
+    ucc_mem_map_memh_t *src_memh_pack;
+    ucc_mem_map_memh_t *dst_memh_pack;
+    void               *exchange_buffer;
+    ucc_mem_map_memh_t *src_memh_local;
+    ucc_mem_map_memh_t *dst_memh_local;
+    size_t             *global_sizes;
+} ucc_tl_ucp_dyn_seg_args_t;
+
+typedef struct ucc_tl_ucp_task {
+    ucc_coll_task_t super;
+    uint32_t        flags;
+    union {
+        struct {
+            uint32_t        send_posted;
+            uint32_t        send_completed;
+            uint32_t        recv_posted;
+            uint32_t        recv_completed;
+            uint32_t        tag;
+        } tagged;
+        struct {
+            uint32_t        put_posted;
+            uint32_t        put_completed;
+            uint32_t        get_posted;
+            uint32_t        get_completed;
+        } onesided;
+    };
+    uint32_t        n_polls;
+    ucc_subset_t    subset;
+    union {
+        struct {
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+        } barrier;
+        struct {
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+            void                   *scratch;
+            void                   *reduce_bufs[UCC_EE_EXECUTOR_NUM_BUFS];
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
+        } allreduce_kn;
+        struct {
+            ucc_tl_ucp_allreduce_sw_pipeline          *pipe;
+            ucs_status_ptr_t                          *put_requests;
+            ucc_tl_ucp_allreduce_sw_host_allgather    *allgather_data;
+            ucc_coll_task_t                           *allgather_task;
+            ucc_ee_executor_task_t                    *reduce_task;
+            ucc_tl_ucp_dpu_offload_buf_info_t         *bufs;
+        } allreduce_sliding_window;
+        struct {
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+            void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
+            size_t                  max_seg;
+        } reduce_scatter_kn;
+        struct {
+            void                   *scratch;
+            size_t                  max_block_count;
+            ucc_ep_map_t            inv_map;
+            int                     n_frags;
+            int                     frag;
+            char                    s_scratch_busy[2];
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
+        } reduce_scatter_ring;
+        struct {
+            void                   *scratch;
+            size_t                  max_block_count;
+            ucc_ep_map_t            inv_map;
+            int                     n_frags;
+            int                     frag;
+            char                    s_scratch_busy[2];
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
+        } reduce_scatterv_ring;
+        struct {
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+            ucc_rank_t              recv_dist;
+            ptrdiff_t               send_offset;
+            ptrdiff_t               recv_offset;
+            size_t                  recv_size;
+        } scatter_kn;
+        struct {
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+            void                   *sbuf;
+            ucc_tl_ucp_copy_task_t *copy_task;
+            ucc_rank_t              recv_dist;
+        } allgather_kn;
+        struct {
+            /*
+             * get send/recv block depends on subset type being used.
+             * For service allgather we need to get context endpoints but keep
+             * subset numbering.
+             * For regular allgather with rank reordering both endpoints
+             * and blocks permutation are necessary.
+             */
+            ucc_rank_t (*get_send_block)(ucc_subset_t *subset,
+                                         ucc_rank_t trank,
+                                         ucc_rank_t tsize,
+                                         int step);
+            ucc_rank_t (*get_recv_block)(ucc_subset_t *subset,
+                                         ucc_rank_t trank,
+                                         ucc_rank_t tsize,
+                                         int step);
+        } allgather_ring;
+        struct {
+            int                     nreqs; // number of send/recv requests in progress
+            ucc_tl_ucp_copy_task_t *copy_task;
+        } allgather_linear;
+        struct {
+            ucc_mc_buffer_header_t *scratch_header;
+            size_t                  scratch_size;
+        } allgather_bruck;
+        struct {
+            uint32_t                i;
+            int                     data_expected;
+        } allgather_sparbit;
+        struct {
+            ucc_rank_t              dist;
+            uint32_t                radix;
+        } bcast_kn;
+        struct {
+            ucc_dbt_single_tree_t   t1;
+            ucc_dbt_single_tree_t   t2;
+            int                     state;
+        } bcast_dbt;
+        struct {
+            ucc_rank_t              dist;
+            ucc_rank_t              max_dist;
+            int                     children_per_cycle;
+            uint32_t                radix;
+            int                     phase;
+            void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
+        } reduce_kn;
+        struct {
+            int                     state;
+            ucc_dbt_single_tree_t   trees[2];
+            int                     reduction_comp[2];
+            int                     send_comp[2];
+            void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
+        } reduce_dbt;
+        struct {
+            int                     phase;
+            ucc_knomial_pattern_t   p;
+            ucc_rank_t              dist;
+            ucc_rank_t              max_dist;
+            uint32_t                radix;
+            void *                  scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+        } gather_kn;
+        struct {
+            size_t                  merge_buf_size;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            size_t                  byte_send_limit;
+            int                     phase;
+            uint32_t                radix;
+            uint32_t                cur_radix;
+            uint32_t                iteration;
+            ucc_rank_t              cur_out;
+            size_t                  traffic_in;
+            size_t                  traffic_out;
+            ucc_rank_t              num_in;
+            ucc_rank_t              num2send;
+            ucc_rank_t              num2recv;
+        } alltoallv_hybrid;
+        struct {
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
+            void                   *src;
+            void                   *dst;
+            ucc_rank_t              iteration;
+            int                     phase;
+        } alltoall_bruck;
+        char                        plugin_data[UCC_TL_UCP_TASK_PLUGIN_MAX_DATA];
+    };
+    struct {
+        ucc_mem_map_memh_t        *src_local;
+        ucc_mem_map_memh_t        *dst_local;
+        ucc_mem_map_memh_t       **src_global;
+        ucc_mem_map_memh_t       **dst_global;
+        ucc_tl_ucp_dyn_seg_args_t *exchange_args;
+        void                      *global_buffer;
+        ucc_service_coll_req_t    *scoll_req_sizes; /* For sizes allgather */
+        ucc_service_coll_req_t    *scoll_req_data; /* For data ex allgather */
+        int                        exchange_step;
+        ucc_status_t               exchange_status;
+    } dynamic_segments;
+} ucc_tl_ucp_task_t;
+
+typedef struct ucc_tl_ucp_schedule {
+    ucc_schedule_pipelined_t super;
+    ucc_mc_buffer_header_t  *scratch_mc_header;
+    union {
+        ptrdiff_t frag_offset;
+    } reduce_srg_kn;
+} ucc_tl_ucp_schedule_t;
+
+#define TASK_TEAM(_task)                                                       \
+    (ucc_derived_of((_task)->super.team, ucc_tl_ucp_team_t))
+#define TASK_CTX(_task)                                                        \
+    (ucc_derived_of((_task)->super.team->context, ucc_tl_ucp_context_t))
+#define TASK_LIB(_task)                                                        \
+    (ucc_derived_of((_task)->super.team->context->lib, ucc_tl_ucp_lib_t))
+#define TASK_ARGS(_task) (_task)->super.bargs.args
+
+>>>>>>> fc580dc2 (TL/UCP: enable nonblocking dynamic segments)
 #define AVG_ALPHA(_task) (1.0 / (double)UCC_TL_TEAM_SIZE(TASK_TEAM(_task)))
 
 ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
@@ -274,6 +519,27 @@ static inline unsigned ucc_tl_ucp_get_knomial_radix(ucc_tl_ucp_team_t *team,
 
     }
     return radix;
+}
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t *coll_args,
+                                                  ucc_tl_ucp_task_t   *task);
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange(ucc_tl_ucp_task_t *task);
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange_nb(ucc_tl_ucp_task_t *task);
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task);
+
+static inline ucc_status_t ucc_tl_ucp_test_dynamic_segment(ucc_tl_ucp_task_t *task)
+{
+    if (!(task->flags & UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG)) {
+        return UCC_OK;
+    }
+
+    if (task->dynamic_segments.exchange_step < 5) {
+        return ucc_tl_ucp_coll_dynamic_segment_exchange_nb(task);
+    }
+
+    return UCC_OK;
 }
 
 #endif
