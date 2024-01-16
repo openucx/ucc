@@ -86,7 +86,9 @@ typedef struct ucc_tl_ucp_default_alg_desc {
 
 enum ucc_tl_ucp_task_flags {
     /*indicates whether subset field of tl_ucp_task is set*/
-    UCC_TL_UCP_TASK_FLAG_SUBSET = UCC_BIT(0),
+    UCC_TL_UCP_TASK_FLAG_SUBSET      = UCC_BIT(0),
+    /* indicates usage of dynamic segments */
+    UCC_TL_UCP_TASK_FLAG_USE_DYN_SEG = UCC_BIT(1),
 };
 
 typedef struct ucc_tl_ucp_allreduce_sw_pipeline
@@ -275,6 +277,14 @@ typedef struct ucc_tl_ucp_task {
         } alltoall_bruck;
         char                        plugin_data[UCC_TL_UCP_TASK_PLUGIN_MAX_DATA];
     };
+    struct {
+        ucc_mem_map_memh_t     *src_local;
+        ucc_mem_map_memh_t     *dst_local;
+        ucc_mem_map_memh_t    **src_global;
+        ucc_mem_map_memh_t    **dst_global;
+        ucc_mem_map_memh_t     *gwb_local;
+        ucc_mem_map_memh_t     *gwb_global;
+    } dynamic_segments;
 } ucc_tl_ucp_task_t;
 
 typedef struct ucc_tl_ucp_schedule {
@@ -544,5 +554,12 @@ static inline unsigned ucc_tl_ucp_get_knomial_radix(ucc_tl_ucp_team_t *team,
     }
     return radix;
 }
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t *coll_args,
+                                                  ucc_tl_ucp_task_t   *task);
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange(ucc_tl_ucp_task_t *task);
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task);
 
 #endif
