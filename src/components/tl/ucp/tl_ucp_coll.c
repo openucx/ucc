@@ -186,6 +186,398 @@ ucc_status_t ucc_tl_ucp_coll_finalize(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
+/*
+ * This function is called when a onesided algorithm is used without mapped
+ * memory by the user. A new memory handle should be created and returned. */
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t     *coll_args,
+                                                  ucc_mem_map_memh_t **src_memh,
+                                                  ucc_mem_map_memh_t **dst_memh,
+                                                  ucc_tl_ucp_task_t   *task)
+{
+    ucc_tl_ucp_team_t    *tl_team        = UCC_TL_UCP_TASK_TEAM(task);
+    ucc_tl_ucp_context_t *ctx            = UCC_TL_UCP_TEAM_CTX(tl_team);
+    ucc_status_t          status         = UCC_OK;
+    ucc_mem_map_memh_t   *src_memh_local = NULL;
+    ucc_mem_map_memh_t   *dst_memh_local = NULL;
+
+    /* if src_memh is NULL, create a new memory handle */
+    if (*src_memh == NULL) {
+        src_memh_local = ucc_calloc(1, sizeof(ucc_mem_map_memh_t), "src_memh");
+        if (src_memh_local == NULL) {
+            tl_error(UCC_TASK_LIB(task), "failed to allocate src_memh");
+            return UCC_ERR_NO_MEMORY;
+        }
+        src_memh_local->address = coll_args->src.info.buffer;
+        src_memh_local->len =
+            coll_args->src.info.count * sizeof(coll_args->src.info.datatype);
+        src_memh_local->tl_h =
+            ucc_calloc(1, sizeof(ucc_mem_map_tl_t), "src_tl_h");
+        if (src_memh_local->tl_h == NULL) {
+            tl_error(UCC_TASK_LIB(task), "failed to allocate src_tl_h");
+            return UCC_ERR_NO_MEMORY;
+        }
+        strncpy(src_memh_local->tl_h->tl_name, "ucp",
+                UCC_MEM_MAP_TL_NAME_LEN - 1);
+
+        status = ucc_tl_ucp_mem_map(&ctx->super.super, UCC_MEM_MAP_MODE_EXPORT,
+                                    src_memh_local, src_memh_local->tl_h);
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task), "failed to map memory");
+            return status;
+        }
+        *src_memh = src_memh_local;
+    }
+    /* if dst_memh is NULL, create a new memory handle */
+    if (*dst_memh == NULL) {
+        dst_memh_local = ucc_calloc(1, sizeof(ucc_mem_map_memh_t), "dst_memh");
+        if (dst_memh_local == NULL) {
+            tl_error(UCC_TASK_LIB(task), "failed to allocate dst_memh");
+            return UCC_ERR_NO_MEMORY;
+        }
+        dst_memh_local->address = coll_args->dst.info.buffer;
+        dst_memh_local->len =
+            coll_args->dst.info.count * sizeof(coll_args->dst.info.datatype);
+        dst_memh_local->tl_h =
+            ucc_calloc(1, sizeof(ucc_mem_map_tl_t), "dst_tl_h");
+        if (dst_memh_local->tl_h == NULL) {
+            tl_error(UCC_TASK_LIB(task), "failed to allocate dst_tl_h");
+            return UCC_ERR_NO_MEMORY;
+        }
+        strncpy(dst_memh_local->tl_h->tl_name, "ucp",
+                UCC_MEM_MAP_TL_NAME_LEN - 1);
+
+        status = ucc_tl_ucp_mem_map(&ctx->super.super, UCC_MEM_MAP_MODE_EXPORT,
+                                    dst_memh_local, dst_memh_local->tl_h);
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task), "failed to map memory");
+            return status;
+        }
+        *dst_memh = dst_memh_local;
+    }
+    /* update coll_args with new src and destination memory handles if the
+     * src and dst memory handles are NULL */
+    if (coll_args->src_memh.local_memh == NULL) {
+        coll_args->src_memh.local_memh = *src_memh;
+    }
+    if (coll_args->dst_memh.local_memh == NULL) {
+        coll_args->dst_memh.local_memh = *dst_memh;
+    }
+    return status;
+}
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange(
+    ucc_tl_ucp_task_t *task, ucc_mem_map_memh_t *src_memh,
+    ucc_mem_map_memh_t *dst_memh, ucc_mem_map_memh_t **global_src_memh,
+    ucc_mem_map_memh_t **global_dst_memh)
+{
+    ucc_tl_ucp_team_t    *tl_team   = UCC_TL_UCP_TASK_TEAM(task);
+    ucc_tl_ucp_context_t *ctx       = UCC_TL_UCP_TEAM_CTX(tl_team);
+    ucc_team_t           *core_team = UCC_TL_CORE_TEAM(tl_team);
+    ucc_subset_t subset = {.map = tl_team->ctx_map, .myrank = core_team->rank};
+    ucc_service_coll_req_t *scoll_req;
+    ucc_status_t            status          = UCC_OK;
+    ucc_mem_map_memh_t     *src_memh_local  = NULL;
+    ucc_mem_map_memh_t     *dst_memh_local  = NULL;
+    void                   *src_pack_buffer = NULL;
+    void                   *dst_pack_buffer = NULL;
+    size_t                  src_pack_size   = 0;
+    size_t                  dst_pack_size   = 0;
+    size_t                  max_pack_size   = 0;
+    void                   *exchange_buffer = NULL;
+    void                   *global_buffer   = NULL;
+    int                     i;
+
+    if (src_memh && dst_memh) {
+        return UCC_OK;
+    }
+
+    /* Pack src_memh if it exists */
+    if (src_memh) {
+        status =
+            ucc_tl_ucp_memh_pack(&ctx->super.super, UCC_MEM_MAP_MODE_EXPORT,
+                                 src_memh->tl_h, &src_pack_buffer);
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task), "failed to pack src memory handle");
+            goto cleanup;
+        }
+        src_pack_size = src_memh->tl_h->packed_size;
+    }
+
+    /* Pack dst_memh if it exists */
+    if (dst_memh) {
+        status =
+            ucc_tl_ucp_memh_pack(&ctx->super.super, UCC_MEM_MAP_MODE_EXPORT,
+                                 dst_memh->tl_h, &dst_pack_buffer);
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task), "failed to pack dst memory handle");
+            goto cleanup;
+        }
+        dst_pack_size = dst_memh->tl_h->packed_size;
+    }
+
+    /* Calculate total pack size for this rank */
+    size_t local_pack_size = sizeof(size_t) * 2 + src_pack_size + dst_pack_size;
+
+    /* Allgather to find the maximum pack size across all ranks */
+    size_t *global_sizes =
+        ucc_calloc(core_team->size, sizeof(size_t), "global sizes");
+    if (!global_sizes) {
+        tl_error(UCC_TASK_LIB(task), "failed to allocate global sizes buffer");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup_sizes;
+    }
+
+    status = ucc_service_allgather(core_team, &local_pack_size, global_sizes,
+                                   sizeof(size_t), subset, &scoll_req);
+    if (status != UCC_OK) {
+        tl_error(UCC_TASK_LIB(task),
+                 "failed to start service allgather for sizes");
+        goto cleanup_sizes;
+    }
+
+    /* Wait for the allgather to complete */
+    while (UCC_INPROGRESS == (status = ucc_service_coll_test(scoll_req))) {
+        /* Progress the service worker if available */
+        if (ctx->cfg.service_worker) {
+            ucp_worker_progress(ctx->service_worker.ucp_worker);
+        }
+    }
+    if (status != UCC_OK) {
+        tl_error(UCC_TASK_LIB(task),
+                 "failed during service allgather for sizes");
+        ucc_service_coll_finalize(scoll_req);
+        goto cleanup_sizes;
+    }
+    ucc_service_coll_finalize(scoll_req);
+
+    /* Find the maximum pack size */
+    for (i = 0; i < core_team->size; i++) {
+        if (global_sizes[i] > max_pack_size) {
+            max_pack_size = global_sizes[i];
+        }
+    }
+    src_memh_local = ucc_calloc(
+        1, sizeof(ucc_mem_map_memh_t) + max_pack_size + sizeof(size_t) * 2,
+        "src_memh_local");
+    if (!src_memh_local) {
+        tl_error(UCC_TASK_LIB(task), "failed to allocate src_memh_local");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup_sizes;
+    }
+    dst_memh_local = ucc_calloc(
+        1, sizeof(ucc_mem_map_memh_t) + max_pack_size + sizeof(size_t) * 2,
+        "dst_memh_local");
+    if (!dst_memh_local) {
+        tl_error(UCC_TASK_LIB(task), "failed to allocate dst_memh_local");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup_sizes;
+    }
+    src_memh_local->tl_h = ucc_calloc(1, sizeof(ucc_mem_map_tl_t), "src_tl_h");
+    if (!src_memh_local->tl_h) {
+        tl_error(UCC_TASK_LIB(task), "failed to allocate src_tl_h");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup_sizes;
+    }
+    dst_memh_local->tl_h = ucc_calloc(1, sizeof(ucc_mem_map_tl_t), "dst_tl_h");
+    if (!dst_memh_local->tl_h) {
+        tl_error(UCC_TASK_LIB(task), "failed to allocate dst_tl_h");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup_sizes;
+    }
+    /* Allocate exchange buffer */
+    exchange_buffer = ucc_malloc(
+        2 * (sizeof(ucc_mem_map_memh_t) + max_pack_size + sizeof(size_t) * 2),
+        "exchange buffer");
+    if (!exchange_buffer) {
+        tl_error(UCC_TASK_LIB(task), "failed to allocate exchange buffer");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup_sizes;
+    }
+
+    /* Pack local data into exchange buffer */
+    strncpy(src_memh_local->pack_buffer, "ucp", UCC_MEM_MAP_TL_NAME_LEN - 1);
+    memcpy(PTR_OFFSET(src_memh_local, UCC_MEM_MAP_TL_NAME_LEN), &src_pack_size,
+           sizeof(size_t));
+    memcpy(PTR_OFFSET(src_memh_local, UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t)),
+           src_pack_buffer, src_pack_size);
+    ucc_free(src_pack_buffer);
+    memcpy(PTR_OFFSET(src_memh_local,
+                      UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t) + src_pack_size),
+           src_memh->tl_h, sizeof(ucc_mem_map_tl_t));
+
+    strncpy(dst_memh_local->pack_buffer, "ucp", UCC_MEM_MAP_TL_NAME_LEN - 1);
+    memcpy(PTR_OFFSET(dst_memh_local, UCC_MEM_MAP_TL_NAME_LEN), &dst_pack_size,
+           sizeof(size_t));
+    memcpy(PTR_OFFSET(dst_memh_local, UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t)),
+           dst_pack_buffer, dst_pack_size);
+    ucc_free(dst_pack_buffer);
+    memcpy(PTR_OFFSET(dst_memh_local,
+                      UCC_MEM_MAP_TL_NAME_LEN + sizeof(size_t) + dst_pack_size),
+           dst_memh->tl_h, sizeof(ucc_mem_map_tl_t));
+
+    src_memh_local->mode    = UCC_MEM_MAP_MODE_EXPORT;
+    dst_memh_local->mode    = UCC_MEM_MAP_MODE_EXPORT;
+    src_memh_local->context = (ucc_context_h)&ctx->super.super;
+    dst_memh_local->context = (ucc_context_h)&ctx->super.super;
+    src_memh_local->address = src_memh->address;
+    dst_memh_local->address = dst_memh->address;
+    src_memh_local->len     = src_memh->len;
+    dst_memh_local->len     = dst_memh->len;
+    src_memh_local->num_tls = 1;
+    dst_memh_local->num_tls = 1;
+
+    if (src_pack_size > 0) {
+        memcpy(exchange_buffer, src_memh_local, src_pack_size);
+    }
+
+    if (dst_pack_size > 0) {
+        memcpy(PTR_OFFSET(exchange_buffer, max_pack_size), dst_memh_local,
+               dst_pack_size);
+    }
+
+    /* Allocate global buffer for allgather */
+    global_buffer =
+        ucc_malloc((2 * max_pack_size) * core_team->size, "global buffer");
+    if (!global_buffer) {
+        tl_error(UCC_TASK_LIB(task), "failed to allocate global buffer");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup_exchange;
+    }
+
+    /* Allgather the packed memory handles */
+    status = ucc_service_allgather(core_team, exchange_buffer, global_buffer,
+                                   2 * max_pack_size, subset, &scoll_req);
+    if (status != UCC_OK) {
+        tl_error(UCC_TASK_LIB(task),
+                 "failed to start service allgather for memory handles");
+        goto cleanup_global;
+    }
+
+    /* Wait for the allgather to complete */
+    while (UCC_INPROGRESS == (status = ucc_service_coll_test(scoll_req))) {
+        /* Progress the service worker if available */
+        if (ctx->cfg.service_worker) {
+            ucp_worker_progress(ctx->service_worker.ucp_worker);
+        }
+    }
+    if (status != UCC_OK) {
+        tl_error(UCC_TASK_LIB(task),
+                 "failed during service allgather for memory handles");
+        ucc_service_coll_finalize(scoll_req);
+        goto cleanup_global;
+    }
+    ucc_service_coll_finalize(scoll_req);
+
+    global_src_memh = ucc_calloc(core_team->size, sizeof(ucc_mem_map_memh_t),
+                                 "global_src_memh");
+    if (!global_src_memh) {
+        tl_error(UCC_TASK_LIB(task),
+                 "failed to allocate global src memory handles");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup_global;
+    }
+    global_dst_memh = ucc_calloc(core_team->size, sizeof(ucc_mem_map_memh_t),
+                                 "global_dst_memh");
+    if (!global_dst_memh) {
+        tl_error(UCC_TASK_LIB(task),
+                 "failed to allocate global memory handles");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup_global;
+    }
+    /* Import memory handles for each rank using ucc_tl_ucp_mem_map */
+    for (i = 0; i < core_team->size; i++) {
+        //ucc_mem_map_memh_t *s_ptr = (ucc_mem_map_memh_t *)PTR_OFFSET(global_buffer, i * 2 * max_pack_size);
+        //ucc_mem_map_memh_t *d_ptr = (ucc_mem_map_memh_t *)PTR_OFFSET(global_buffer, i * 2 * max_pack_size + max_pack_size);
+
+        status =
+            ucc_tl_ucp_mem_map(&ctx->super.super, UCC_MEM_MAP_MODE_IMPORT,
+                               global_src_memh[i], global_src_memh[i]->tl_h);
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task),
+                     "failed to import src memory handle for rank %d", i);
+            goto cleanup_global;
+        }
+
+        status =
+            ucc_tl_ucp_mem_map(&ctx->super.super, UCC_MEM_MAP_MODE_IMPORT,
+                               global_dst_memh[i], global_dst_memh[i]->tl_h);
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task),
+                     "failed to import dst memory handle for rank %d", i);
+            goto cleanup_global;
+        }
+    }
+    TASK_ARGS(task).src_memh.global_memh = (ucc_mem_map_mem_h *)global_src_memh;
+    TASK_ARGS(task).dst_memh.global_memh = (ucc_mem_map_mem_h *)global_dst_memh;
+
+cleanup_global:
+    if (global_buffer) {
+        ucc_free(global_buffer);
+    }
+cleanup_exchange:
+    if (exchange_buffer) {
+        ucc_free(exchange_buffer);
+    }
+cleanup_sizes:
+    if (global_sizes) {
+        ucc_free(global_sizes);
+    }
+cleanup:
+    if (src_pack_buffer) {
+        ucc_free(src_pack_buffer);
+    }
+    if (dst_pack_buffer) {
+        ucc_free(dst_pack_buffer);
+    }
+    return status;
+}
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(
+    ucc_tl_ucp_task_t *task, ucc_mem_map_memh_t **global_src_memh,
+    ucc_mem_map_memh_t **global_dst_memh, int team_size)
+{
+    ucc_tl_ucp_team_t    *team   = UCC_TL_UCP_TASK_TEAM(task);
+    ucc_tl_ucp_context_t *ctx    = UCC_TL_UCP_TEAM_CTX(team);
+    ucc_status_t          status = UCC_OK;
+    int                   i;
+
+    /* Unmap global_src_memh array if it exists */
+    if (global_src_memh) {
+        for (i = 0; i < team_size; i++) {
+            if (global_src_memh[i]) {
+                status = ucc_tl_ucp_mem_unmap(&ctx->super.super,
+                                              UCC_MEM_MAP_MODE_IMPORT,
+                                              global_src_memh[i]->tl_h);
+                if (status != UCC_OK) {
+                    tl_error(
+                        UCC_TASK_LIB(task),
+                        "failed to unmap global src memory handle for rank %d",
+                        i);
+                }
+                global_src_memh[i] = NULL;
+            }
+        }
+    }
+    /* Unmap global_dst_memh array if it exists */
+    if (global_dst_memh) {
+        for (i = 0; i < team_size; i++) {
+            if (global_dst_memh[i]) {
+                status = ucc_tl_ucp_mem_unmap(&ctx->super.super,
+                                              UCC_MEM_MAP_MODE_IMPORT,
+                                              global_dst_memh[i]->tl_h);
+                if (status != UCC_OK) {
+                    tl_error(
+                        UCC_TASK_LIB(task),
+                        "failed to unmap global dst memory handle for rank %d",
+                        i);
+                }
+                global_dst_memh[i] = NULL;
+            }
+        }
+    }
+    return status;
+}
+
 ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
                                   ucc_base_team_t *team,
                                   ucc_coll_task_t **task_h)

@@ -26,10 +26,26 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_start(ucc_coll_task_t *ctask)
     size_t             rdt_size = ucc_dt_size(TASK_ARGS(task).dst.info_v.datatype);
     ucc_mem_map_mem_h  src_memh = TASK_ARGS(task).src_memh.local_memh;
     ucc_mem_map_mem_h *dst_memh = TASK_ARGS(task).dst_memh.global_memh;
+    ucc_mem_map_memh_t *global_src_memh = NULL;
+    ucc_mem_map_memh_t *global_dst_memh = NULL;
     ucc_rank_t         peer;
+    ucc_status_t       status;
     size_t             sd_disp, dd_disp, data_size;
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
+    status = ucc_tl_ucp_coll_dynamic_segment_exchange(task, src_memh, *dst_memh, &global_src_memh, &global_dst_memh);
+    if (UCC_OK != status) {
+        task->super.status = status;
+        goto out;
+    }
+
+    if (TASK_ARGS(task).flags & UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL) {
+        if (global_src_memh) {
+            src_memh = (ucc_mem_map_mem_h)&global_src_memh[grank];
+        } else {
+            src_memh = TASK_ARGS(task).src_memh.global_memh[grank];
+        }
+    }
 
     /* perform a put to each member peer using the peer's index in the
      * destination displacement. */
@@ -73,6 +89,7 @@ void ucc_tl_ucp_alltoallv_onesided_progress(ucc_coll_task_t *ctask)
 
     pSync[0]           = 0;
     task->super.status = UCC_OK;
+    ucc_tl_ucp_coll_dynamic_segment_finalize(task, (ucc_mem_map_memh_t **)&TASK_ARGS(task).src_memh.global_memh, (ucc_mem_map_memh_t **)&TASK_ARGS(task).dst_memh.global_memh, gsize);
 }
 
 ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
@@ -82,6 +99,8 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task;
     ucc_status_t       status;
+    ucc_mem_map_memh_t *src_memh = NULL;
+    ucc_mem_map_memh_t *dst_memh = NULL;
 
     ALLTOALLV_TASK_CHECK(coll_args->args, tl_team);
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER)) {
@@ -89,14 +108,6 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
                  "global work buffer not provided nor associated with team");
         status = UCC_ERR_NOT_SUPPORTED;
         goto out;
-    }
-    if (coll_args->args.mask & UCC_COLL_ARGS_FIELD_FLAGS) {
-        if (!(coll_args->args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS)) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team),
-                     "non memory mapped buffers are not supported");
-            status = UCC_ERR_NOT_SUPPORTED;
-            goto out;
-        }
     }
     if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH)) {
         coll_args->args.src_memh.global_memh = NULL;
@@ -109,7 +120,20 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_init(ucc_base_coll_args_t *coll_args,
     *task_h              = &task->super;
     task->super.post     = ucc_tl_ucp_alltoallv_onesided_start;
     task->super.progress = ucc_tl_ucp_alltoallv_onesided_progress;
-    status               = UCC_OK;
+
+    if (!(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH) ||
+        !(coll_args->args.mask & UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH)) {
+        status = ucc_tl_ucp_coll_dynamic_segment_init(&coll_args->args, &src_memh, &dst_memh, task);
+        if (UCC_OK != status) {
+            tl_error(UCC_TL_TEAM_LIB(tl_team),
+                    "failed to initialize dynamic segments");
+            goto out;
+        }
+        coll_args->args.src_memh.local_memh = src_memh;
+        coll_args->args.dst_memh.local_memh = dst_memh;
+        coll_args->args.mask |= UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH | UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH;
+        coll_args->args.flags |= UCC_COLL_ARGS_FLAG_DST_MEMH_GLOBAL | UCC_COLL_ARGS_FLAG_SRC_MEMH_GLOBAL;
+    }
 out:
     return status;
 }
