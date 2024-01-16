@@ -39,7 +39,8 @@ allreduce =                           \
 	allreduce/allreduce.h             \
 	allreduce/allreduce.c             \
 	allreduce/allreduce_knomial.c     \
-	allreduce/allreduce_sra_knomial.c
+	allreduce/allreduce_sra_knomial.c \
+	allreduce/allreduce_dbt.c
 
 barrier =                     \
 	barrier/barrier.h         \
@@ -74,7 +75,8 @@ gatherv =                    \
 reduce =                    \
 	reduce/reduce.h         \
 	reduce/reduce.c         \
-	reduce/reduce_knomial.c
+	reduce/reduce_knomial.c \
+	reduce/reduce_dbt.c
 
 reduce_scatter =                            \
 	reduce_scatter/reduce_scatter.h         \

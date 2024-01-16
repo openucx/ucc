@@ -17,7 +17,7 @@
 #include "tl_ucp_tag.h"
 
 #define UCC_UUNITS_AUTO_RADIX 4
-#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 7
+#define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 8
 
 ucc_status_t ucc_tl_ucp_team_default_score_str_alloc(ucc_tl_ucp_team_t *team,
     char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR]);
@@ -201,6 +201,16 @@ typedef struct ucc_tl_ucp_task {
             ucc_ee_executor_task_t *etask;
             ucc_ee_executor_t      *executor;
         } reduce_kn;
+        struct {
+            int                     state;
+            ucc_dbt_single_tree_t   trees[2];
+            int                     reduction_comp[2];
+            int                     send_comp[2];
+            void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
+        } reduce_dbt;
         struct {
             ucc_rank_t              dist;
             ucc_rank_t              max_dist;

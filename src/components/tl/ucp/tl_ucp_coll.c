@@ -43,6 +43,10 @@ const ucc_tl_ucp_default_alg_desc_t
             .str_get_fn = NULL
         },
         {
+            .select_str = UCC_TL_UCP_REDUCE_DEFAULT_ALG_SELECT_STR,
+            .str_get_fn = NULL
+        },
+        {
             .select_str = UCC_TL_UCP_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR,
             .str_get_fn = NULL
         },
@@ -223,6 +227,8 @@ static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
         return ucc_tl_ucp_alltoallv_alg_from_str(str);
     case UCC_COLL_TYPE_BCAST:
         return ucc_tl_ucp_bcast_alg_from_str(str);
+    case UCC_COLL_TYPE_REDUCE:
+        return ucc_tl_ucp_reduce_alg_from_str(str);
     case UCC_COLL_TYPE_REDUCE_SCATTER:
         return ucc_tl_ucp_reduce_scatter_alg_from_str(str);
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
@@ -239,6 +245,7 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
                                        ucc_base_coll_init_fn_t *init)
 {
     ucc_status_t status = UCC_OK;
+
     if (alg_id_str) {
         alg_id = alg_id_from_str(coll_type, alg_id_str);
     }
@@ -267,6 +274,9 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
             break;
         case UCC_TL_UCP_ALLREDUCE_ALG_SRA_KNOMIAL:
             *init = ucc_tl_ucp_allreduce_sra_knomial_init;
+            break;
+        case UCC_TL_UCP_ALLREDUCE_ALG_DBT:
+            *init = ucc_tl_ucp_allreduce_dbt_init;
             break;
         default:
             status = UCC_ERR_INVALID_PARAM;
@@ -319,6 +329,19 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
         default:
             status = UCC_ERR_INVALID_PARAM;
             break;
+        };
+        break;
+    case UCC_COLL_TYPE_REDUCE:
+        switch (alg_id) {
+        case UCC_TL_UCP_REDUCE_ALG_KNOMIAL:
+            *init = ucc_tl_ucp_reduce_knomial_init;
+            break;
+        case UCC_TL_UCP_REDUCE_ALG_DBT:
+            *init = ucc_tl_ucp_reduce_dbt_init;
+            break;
+        default:
+           status = UCC_ERR_INVALID_PARAM;
+           break;
         };
         break;
     case UCC_COLL_TYPE_REDUCE_SCATTER:
