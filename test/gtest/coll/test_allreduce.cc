@@ -327,6 +327,43 @@ TYPED_TEST(test_allreduce_alg, sra_knomial_pipelined) {
     }
 }
 
+TYPED_TEST(test_allreduce_alg, dbt) {
+    int           n_procs = 15;
+    ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
+                             {"UCC_TL_UCP_TUNE", "allreduce:@dbt:inf"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 3;
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+    if (UCC_OK == ucc_mc_available( UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+        mt.push_back( UCC_MEMORY_TYPE_CUDA_MANAGED);
+    }
+
+    for (auto count : {65536, 123567}) {
+        for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+            for (auto m : mt) {
+                SET_MEM_TYPE(m);
+                this->set_inplace(inplace);
+                this->data_init(n_procs, TypeParam::dt, count, ctxs, true);
+                UccReq req(team, ctxs);
+
+                for (auto i = 0; i < repeat; i++) {
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->reset(ctxs);
+                }
+                this->data_fini(ctxs);
+            }
+        }
+    }
+}
+
 TYPED_TEST(test_allreduce_alg, rab) {
     int           n_procs = 15;
     ucc_job_env_t env     = {{"UCC_CL_HIER_TUNE", "allreduce:@rab:0-inf:inf"},

@@ -70,8 +70,8 @@ ucc_tl_ucp_bcast_sag_knomial_finalize(ucc_coll_task_t *coll_task)
 
 ucc_status_t
 ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
-                                      ucc_base_team_t      *team,
-                                      ucc_coll_task_t     **task_h)
+                                  ucc_base_team_t *team,
+                                  ucc_coll_task_t **task_h)
 {
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
     size_t               count    = coll_args->args.src.info.count;

@@ -245,6 +245,7 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
                                        ucc_base_coll_init_fn_t *init)
 {
     ucc_status_t status = UCC_OK;
+
     if (alg_id_str) {
         alg_id = alg_id_from_str(coll_type, alg_id_str);
     }
@@ -273,6 +274,9 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
             break;
         case UCC_TL_UCP_ALLREDUCE_ALG_SRA_KNOMIAL:
             *init = ucc_tl_ucp_allreduce_sra_knomial_init;
+            break;
+        case UCC_TL_UCP_ALLREDUCE_ALG_DBT:
+            *init = ucc_tl_ucp_allreduce_dbt_init;
             break;
         default:
             status = UCC_ERR_INVALID_PARAM;

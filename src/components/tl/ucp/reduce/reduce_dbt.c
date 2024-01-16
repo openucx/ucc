@@ -226,7 +226,7 @@ TEST_ROOT:
     for (i = 0; i < 2; i++) {
         if (is_root && rank == trees[i].root) {
             UCPCHECK_GOTO(ucc_mc_memcpy(PTR_OFFSET(args->dst.info.buffer,
-                                        i * counts[i] * ucc_dt_size(dt)),
+                                        i * counts[i - 1] * ucc_dt_size(dt)),
                                         rbuf[i], counts[i] * ucc_dt_size(dt),
                                         mtype, mtype), task, out);
         }
