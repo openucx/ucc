@@ -1,0 +1,20 @@
+ARG CUDA_VER='12.1.1'
+FROM harbor.mellanox.com/torch-ucc/ucc/1.0.0/x86_64/centos8/cuda${CUDA_VER}:base
+RUN rm -rf  ${SRC_DIR}/ucc
+COPY . ${SRC_DIR}/ucc
+
+RUN apt update && apt install -y sudo && \
+    echo "swx-jenkins ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN pip install 'protobuf<=3.19.0'
+#==============================================================================
+# Build UCC
+RUN ${SRC_DIR}/ucc/.ci/scripts/build_ucc.sh
+#==============================================================================
+# Install torch_ucc (UCC version) python module and build a wheel package
+RUN chown -R 6213:11429 /opt/nvidia
+#==============================================================================
+RUN groupadd -g 11429 swx-jenkins
+RUN adduser --no-create-home --uid 6213 --gid 11429 --home /labhome/swx-jenkins swx-jenkins
+#==============================================================================
+USER swx-jenkins
+
