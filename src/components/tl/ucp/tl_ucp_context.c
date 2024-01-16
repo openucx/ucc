@@ -206,7 +206,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         ucp_params.features |= UCP_FEATURE_EXPORTED_MEMH;
     }
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
-    ucp_params.name = "UCC_UCP_CONTEXT";
+    ucp_params.name            = "UCC_UCP_CONTEXT";
 
     if (params->estimated_num_ppn > 0) {
         ucp_params.field_mask |= UCP_PARAM_FIELD_ESTIMATED_NUM_PPN;
@@ -307,9 +307,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
           "failed to register progress function", err_thread_mode,
           UCC_ERR_NO_MESSAGE, self);
 
-    self->remote_info  = NULL;
-    self->n_rinfo_segs = 0;
-    self->rkeys        = NULL;
+    self->remote_info         = NULL;
+    self->n_rinfo_segs        = 0;
+    self->rkeys               = NULL;
     if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS &&
         params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         ucc_status = ucc_tl_ucp_ctx_remote_populate(
@@ -532,6 +532,8 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
                                             ucc_mem_map_params_t   map,
                                             ucc_context_oob_coll_t oob)
 {
+    ucc_tl_ucp_lib_t *lib =
+        ucc_derived_of(ctx->super.super.lib, ucc_tl_ucp_lib_t);
     uint32_t             size  = oob.n_oob_eps;
     uint64_t             nsegs = map.n_segments;
     ucp_mem_map_params_t mmap_params;
@@ -542,52 +544,50 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
 
     if (size < 2) {
         tl_error(
-            ctx->super.super.lib,
+            lib,
             "oob.n_oob_eps set to incorrect value for remote exchange (%d)",
             size);
         return UCC_ERR_INVALID_PARAM;
     }
     if (nsegs > MAX_NR_SEGMENTS) {
-        tl_error(ctx->super.super.lib, "cannot map more than %d segments",
-                 MAX_NR_SEGMENTS);
+        tl_error(lib, "cannot map more than %d segments", MAX_NR_SEGMENTS);
         return UCC_ERR_INVALID_PARAM;
     }
-    ctx->rkeys =
-        (ucp_rkey_h *)ucc_calloc(sizeof(ucp_rkey_h), nsegs * size, "ucp_ctx_rkeys");
+    ctx->rkeys = (ucp_rkey_h *)ucc_calloc(sizeof(ucp_rkey_h), nsegs * size,
+                                          "ucp_ctx_rkeys");
     if (NULL == ctx->rkeys) {
-        tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
+        tl_error(lib, "failed to allocated %zu bytes",
                  sizeof(ucp_rkey_h) * nsegs * size);
         return UCC_ERR_NO_MEMORY;
     }
     ctx->remote_info = (ucc_tl_ucp_remote_info_t *)ucc_calloc(
         nsegs, sizeof(ucc_tl_ucp_remote_info_t), "ucp_remote_info");
     if (NULL == ctx->remote_info) {
-        tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
+        tl_error(lib, "failed to allocated %zu bytes",
                  sizeof(ucc_tl_ucp_remote_info_t) * nsegs);
         ucc_status = UCC_ERR_NO_MEMORY;
         goto fail_alloc_remote_segs;
     }
 
     for (i = 0; i < nsegs; i++) {
-        mmap_params.field_mask =
-            UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
+        mmap_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+                                 UCP_MEM_MAP_PARAM_FIELD_LENGTH;
         mmap_params.address = map.segments[i].address;
         mmap_params.length  = map.segments[i].len;
 
         status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
         if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib,
-                     "ucp_mem_map failed with error code: %d", status);
+            tl_error(lib, "ucp_mem_map failed with error code: %d", status);
             ucc_status = ucs_status_to_ucc_status(status);
             goto fail_mem_map;
         }
+
         ctx->remote_info[i].mem_h = (void *)mh;
         status                    = ucp_rkey_pack(ctx->worker.ucp_context, mh,
-                               &ctx->remote_info[i].packed_key,
-                               &ctx->remote_info[i].packed_key_len);
+                                                  &ctx->remote_info[i].packed_key,
+                                                  &ctx->remote_info[i].packed_key_len);
         if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib,
-                     "failed to pack UCP key with error code: %d", status);
+            tl_error(lib, "failed to pack UCP key with error code: %d", status);
             ucc_status = ucs_status_to_ucc_status(status);
             goto fail_mem_map;
         }
@@ -753,7 +753,6 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_m
     // copy name information for look ups later
     strncpy(tl_h->tl_name, "ucp", UCC_MEM_MAP_TL_NAME_LEN - 1);
 
-    /* nothing to do for UCC_MEM_MAP_MODE_EXPORT_OFFLOAD and UCC_MEM_MAP_MODE_IMPORT */
     if (mode == UCC_MEM_MAP_MODE_EXPORT) {
         ucc_status = ucc_tl_ucp_mem_map_export(ctx, memh->address, memh->len, mode, m_data);
         if (UCC_OK != ucc_status) {
@@ -801,17 +800,25 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
             ucp_rkey_buffer_release(data->rinfo.packed_key);
             data->rinfo.packed_key = NULL;
         }
+        // Free the data structure itself for export mode too
+        ucc_free(data);
+        memh->tl_data = NULL;
     } else if (mode == UCC_MEM_MAP_MODE_IMPORT || mode == UCC_MEM_MAP_MODE_IMPORT_OFFLOAD) {
         // need to free rkeys (data->rkey) , packed memh (data->packed_memh)
         if (data->packed_memh) {
             ucp_memh_buffer_release(data->packed_memh, NULL);
+            data->packed_memh = NULL;
         }
         if (data->rinfo.packed_key) {
             ucp_rkey_buffer_release(data->rinfo.packed_key);
+            data->rinfo.packed_key = NULL;
         }
         if (data->rkey) {
             ucp_rkey_destroy(data->rkey);
         }
+        // Free the data structure itself
+        ucc_free(data);
+        memh->tl_data = NULL;
     } else {
         ucc_error("Unknown mem map mode entered: %d", mode);
         return UCC_ERR_INVALID_PARAM;
