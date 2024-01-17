@@ -23,8 +23,16 @@ ucc_status_t ucc_cuda_executor_persistent_wait_stop(ucc_ee_executor_t *executor)
 ucc_status_t ucc_cuda_executor_init(const ucc_ee_executor_params_t *params,
                                     ucc_ee_executor_t **executor)
 {
-    ucc_ec_cuda_executor_t *eee = ucc_mpool_get(&ucc_ec_cuda.executors);
+    ucc_ec_cuda_executor_t  *eee;
+    ucc_ec_cuda_resources_t *resources;
+    ucc_status_t             status;
 
+    status = ucc_ec_cuda_get_resources(&resources);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+
+    eee = ucc_mpool_get(&resources->executors);
     if (ucc_unlikely(!eee)) {
         ec_error(&ucc_ec_cuda.super, "failed to allocate executor");
         return UCC_ERR_NO_MEMORY;

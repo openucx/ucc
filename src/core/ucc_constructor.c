@@ -15,6 +15,7 @@
 #include "utils/profile/ucc_profile.h"
 #include "ucc/api/ucc_version.h"
 #include <dlfcn.h>
+#include <pthread.h>
 
 static ucc_status_t ucc_check_config_file(void)
 {
@@ -93,100 +94,106 @@ out:
 UCC_CONFIG_REGISTER_TABLE(ucc_global_config_table, "UCC global", NULL,
                           ucc_global_config, &ucc_config_global_list)
 
+static pthread_mutex_t ucc_constructor_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 ucc_status_t ucc_constructor(void)
 {
-    ucc_global_config_t *cfg = &ucc_global_config;
-    ucc_status_t         status;
+    ucc_global_config_t *cfg    = &ucc_global_config;
+    ucc_status_t         status = UCC_OK;
     Dl_info              dl_info;
     int                  ret;
 
-    if (!cfg->initialized) {
-        cfg->initialized = 1;
-        status = ucc_config_parser_fill_opts(
-            &ucc_global_config, UCC_CONFIG_GET_TABLE(ucc_global_config_table),
-            "UCC_", 1);
-        if (UCC_OK != status) {
-            ucc_error("failed to parse global options");
-            return status;
-        }
+    pthread_mutex_lock(&ucc_constructor_mutex);
+    if (cfg->initialized) {
+        goto exit_unlock_mutex;
+    }
 
-        if (UCC_OK != (status = init_lib_paths())) {
-            ucc_error("failed to init ucc components path");
-            return status;
-        }
+    cfg->initialized = 1;
+    status = ucc_config_parser_fill_opts(
+        &ucc_global_config, UCC_CONFIG_GET_TABLE(ucc_global_config_table),
+        "UCC_", 1);
+    if (UCC_OK != status) {
+        ucc_error("failed to parse global options");
+        goto exit_unlock_mutex;
+    }
 
-        status = ucc_check_config_file();
-        if (UCC_OK != status && UCC_ERR_NOT_FOUND != status) {
-            /* bail only in case of real error */
-            return status;
-        }
+    if (UCC_OK != (status = init_lib_paths())) {
+        ucc_error("failed to init ucc components path");
+        goto exit_unlock_mutex;
+    }
 
-        status = ucc_components_load("cl", &cfg->cl_framework);
-        if (UCC_OK != status) {
-            ucc_error("no CL components were found in the "
-                      "ucc modules dir: %s",
+    status = ucc_check_config_file();
+    if (UCC_OK != status && UCC_ERR_NOT_FOUND != status) {
+        /* bail only in case of real error */
+        goto exit_unlock_mutex;
+    }
+
+    status = ucc_components_load("cl", &cfg->cl_framework);
+    if (UCC_OK != status) {
+        ucc_error("no CL components were found in the "
+                  "ucc modules dir: %s", cfg->component_path);
+        goto exit_unlock_mutex;
+    }
+    status = ucc_component_check_scores_uniq(&cfg->cl_framework);
+    if (UCC_OK != status) {
+        ucc_error("CLs must have distinct uniq default scores");
+        goto exit_unlock_mutex;
+    }
+    status = ucc_components_load("tl", &cfg->tl_framework);
+    if (UCC_OK != status) {
+        /* not critical - some CLs may operate w/o use of TL */
+        ucc_debug("no TL components were found in the "
+                  "ucc modules dir: %s", cfg->component_path);
+    }
+    status = ucc_component_check_scores_uniq(&cfg->tl_framework);
+    if (UCC_OK != status) {
+        ucc_error("TLs must have distinct uniq default scores");
+        goto exit_unlock_mutex;
+    }
+    status = ucc_components_load("mc", &cfg->mc_framework);
+    if (UCC_OK != status) {
+        ucc_error("no memory components were found in the "
+                  "ucc modules dir: %s", cfg->component_path);
+        goto exit_unlock_mutex;
+    }
+    status = ucc_components_load("ec", &cfg->ec_framework);
+    if (status != UCC_OK) {
+        if (status == UCC_ERR_NOT_FOUND) {
+            ucc_info("no execution components were found in the "
+                     "ucc modules dir: %s. "
+                     "Triggered operations might not work",
                       cfg->component_path);
-            return status;
-        }
-        status = ucc_component_check_scores_uniq(&cfg->cl_framework);
-        if (UCC_OK != status) {
-            ucc_error("CLs must have distinct uniq default scores");
-            return status;
-        }
-        status = ucc_components_load("tl", &cfg->tl_framework);
-        if (UCC_OK != status) {
-            /* not critical - some CLs may operate w/o use of TL */
-            ucc_debug("no TL components were found in the "
-                      "ucc modules dir: %s",
-                      cfg->component_path);
-        }
-        status = ucc_component_check_scores_uniq(&cfg->tl_framework);
-        if (UCC_OK != status) {
-            ucc_error("TLs must have distinct uniq default scores");
-            return status;
-        }
-        status = ucc_components_load("mc", &cfg->mc_framework);
-        if (UCC_OK != status) {
-            ucc_error("no memory components were found in the "
-                      "ucc modules dir: %s",
-                      cfg->component_path);
-            return status;
-        }
-        status = ucc_components_load("ec", &cfg->ec_framework);
-        if (status != UCC_OK) {
-            if (status == UCC_ERR_NOT_FOUND) {
-                ucc_info("no execution components were found in the "
-                         "ucc modules dir: %s. "
-                         "Triggered operations might not work",
-                         cfg->component_path);
-            } else {
-                ucc_error("failed to load execution components %d (%s)",
-                           status, ucc_status_string(status));
-                return status;
-            }
-        }
-
-        if (UCC_OK != ucc_local_proc_info_init()) {
-            ucc_error("failed to initialize local proc info");
-            return status;
-        }
-#ifdef HAVE_PROFILING
-        ucc_profile_init(cfg->profile_mode, cfg->profile_file,
-                         cfg->profile_log_size);
-#endif
-        if (ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_INFO) {
-            ret = dladdr(ucc_init_version, &dl_info);
-            if (ret == 0) {
-                ucc_error("failed to get ucc_init_version handler");
-                return UCC_ERR_NO_MESSAGE;
-            }
-            ucc_info("version: %s, loaded from: %s, cfg file: %s",
-                     ucc_get_version_string(), dl_info.dli_fname,
-                     ucc_global_config.file_cfg ?
-                     ucc_global_config.file_cfg->filename: "n/a");
+        } else {
+            ucc_error("failed to load execution components %d (%s)",
+                      status, ucc_status_string(status));
+            goto exit_unlock_mutex;
         }
     }
-    return UCC_OK;
+
+    if (UCC_OK != ucc_local_proc_info_init()) {
+        ucc_error("failed to initialize local proc info");
+        goto exit_unlock_mutex;
+    }
+#ifdef HAVE_PROFILING
+    ucc_profile_init(cfg->profile_mode, cfg->profile_file,
+                     cfg->profile_log_size);
+#endif
+    if (ucc_global_config.log_component.log_level >= UCC_LOG_LEVEL_INFO) {
+        ret = dladdr(ucc_init_version, &dl_info);
+        if (ret == 0) {
+            ucc_error("failed to get ucc_init_version handler");
+            status = UCC_ERR_NO_RESOURCE;
+            goto exit_unlock_mutex;
+        }
+        ucc_info("version: %s, loaded from: %s, cfg file: %s",
+                 ucc_get_version_string(), dl_info.dli_fname,
+                 ucc_global_config.file_cfg ?
+                 ucc_global_config.file_cfg->filename: "n/a");
+    }
+
+exit_unlock_mutex:
+    pthread_mutex_unlock(&ucc_constructor_mutex);
+    return status;
 }
 
 __attribute__((destructor)) static void ucc_destructor(void)

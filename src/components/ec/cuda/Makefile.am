@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 if HAVE_CUDA
@@ -12,7 +12,9 @@ sources =    \
 	ec_cuda_executor.c                 \
 	ec_cuda_executor_interruptible.c   \
 	ec_cuda_executor_persistent.c      \
-	ec_cuda_executor_persistent_wait.c
+	ec_cuda_executor_persistent_wait.c \
+	ec_cuda_resources.c                \
+	ec_cuda_resources.h
 
 module_LTLIBRARIES         = libucc_ec_cuda.la
 libucc_ec_cuda_la_SOURCES  = $(sources)

@@ -35,8 +35,8 @@ typedef struct ucc_global_config {
 
     /* Limit for profiling log size */
     size_t                     profile_log_size;
-    char *                     cfg_filename;
-    ucc_file_config_t *        file_cfg;
+    char                      *cfg_filename;
+    ucc_file_config_t         *file_cfg;
 } ucc_global_config_t;
 
 extern ucc_global_config_t ucc_global_config;
