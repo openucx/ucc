@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 #include "config.h"
@@ -52,7 +52,9 @@ static ucc_status_t ucc_component_load_one(const char *so_path,
 
     handle = dlopen(so_path, RTLD_LAZY);
     if (!handle) {
-        ucc_debug("failed to load UCC component library: %s", so_path);
+        error = dlerror();
+        ucc_debug("failed to load UCC component library: %s (%s)",
+                  so_path, error);
         goto error;
     }
     iface = (ucc_component_iface_t *)dlsym(handle, iface_struct);

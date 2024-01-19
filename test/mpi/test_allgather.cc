@@ -51,7 +51,7 @@ ucc_status_t TestAllgather::set_input(int iter_persistent)
     size_t single_rank_count = msgsize / dt_size;
     size_t single_rank_size  = single_rank_count * dt_size;
     int    rank;
-    void  *buf, *check;
+    void  *buf;
 
     this->iter_persistent = iter_persistent;
     MPI_Comm_rank(team.comm, &rank);
@@ -60,12 +60,9 @@ ucc_status_t TestAllgather::set_input(int iter_persistent)
     } else {
         buf   = sbuf;
     }
-    check = PTR_OFFSET(check_buf, rank * single_rank_size);
 
     init_buffer(buf, single_rank_count, dt, mem_type,
                 rank * (iter_persistent + 1));
-    UCC_CHECK(ucc_mc_memcpy(check, buf, single_rank_size,
-                            UCC_MEMORY_TYPE_HOST, mem_type));
     return UCC_OK;
 }
 
@@ -82,7 +79,6 @@ ucc_status_t TestAllgather::check()
                     single_rank_count, dt, UCC_MEMORY_TYPE_HOST,
                     i * (iter_persistent + 1));
     }
-
 
     return compare_buffers(rbuf, check_buf, single_rank_count * size, dt,
                            mem_type);

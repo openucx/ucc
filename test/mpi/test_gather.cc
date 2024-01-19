@@ -75,8 +75,9 @@ ucc_status_t TestGather::set_input(int iter_persistent)
     size_t single_rank_count = msgsize / dt_size;
     size_t single_rank_size  = single_rank_count * dt_size;
     int    rank;
-    void  *buf, *check;
+    void  *buf;
 
+    this->iter_persistent = iter_persistent;
     MPI_Comm_rank(team.comm, &rank);
     if (rank == root) {
         if (inplace) {
@@ -87,34 +88,30 @@ ucc_status_t TestGather::set_input(int iter_persistent)
     } else {
         buf = sbuf;
     }
-    check = PTR_OFFSET(check_buf, rank * single_rank_size);
-
     init_buffer(buf, single_rank_count, dt, mem_type,
                 rank * (iter_persistent + 1));
-    UCC_CHECK(ucc_mc_memcpy(check, buf, single_rank_size,
-                            UCC_MEMORY_TYPE_HOST, mem_type));
     return UCC_OK;
 }
 
 ucc_status_t TestGather::check()
 {
-    size_t       single_rank_count = msgsize / ucc_dt_size(dt);
-    MPI_Datatype mpi_dt            = ucc_dt_to_mpi(dt);
-    MPI_Request req;
-    int size, rank, completed;
+    int size, rank, i;
+    size_t dt_size, single_rank_count;
 
     MPI_Comm_size(team.comm, &size);
     MPI_Comm_rank(team.comm, &rank);
+    if (rank != root) {
+        return UCC_OK;
+    }
 
-    MPI_Iallgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, check_buf,
-                   single_rank_count, mpi_dt, team.comm, &req);
-    do {
-        MPI_Test(&req, &completed, MPI_STATUS_IGNORE);
-        ucc_context_progress(team.ctx);
-    } while(!completed);
+    dt_size = ucc_dt_size(dt);
+    single_rank_count = msgsize / dt_size;
+    for (i = 0; i < size; i++) {
+        init_buffer(PTR_OFFSET(check_buf, i * single_rank_count * dt_size),
+                    single_rank_count, dt, UCC_MEMORY_TYPE_HOST,
+                    i * (iter_persistent + 1));
+    }
 
-    return (rank != root)
-               ? UCC_OK
-               : compare_buffers(rbuf, check_buf, single_rank_count * size, dt,
-                                 mem_type);
+    return compare_buffers(rbuf, check_buf, single_rank_count * size, dt,
+                           mem_type);
 }
