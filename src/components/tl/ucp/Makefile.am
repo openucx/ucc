@@ -34,10 +34,12 @@ alltoallv =                        \
 	alltoallv/alltoallv_pairwise.c \
 	alltoallv/alltoallv_hybrid.c
 
-allreduce =                           \
-	allreduce/allreduce.h             \
-	allreduce/allreduce.c             \
-	allreduce/allreduce_knomial.c     \
+allreduce =                                    \
+	allreduce/allreduce.h                      \
+	allreduce/allreduce.c                      \
+	allreduce/allreduce_knomial.c              \
+	allreduce/allreduce_sliding_window.c       \
+	allreduce/allreduce_sliding_window_setup.c \
 	allreduce/allreduce_sra_knomial.c
 
 barrier =                     \

@@ -48,6 +48,9 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t                 fanin_kn_radix;
     uint32_t                 fanout_kn_radix;
     uint32_t                 barrier_kn_radix;
+    size_t                   allreduce_sliding_window_buf_size;
+    uint32_t                 allreduce_sliding_window_put_window_size;
+    uint32_t                 allreduce_sliding_window_num_get_bufs;
     ucc_mrange_uint_t        allreduce_kn_radix;
     ucc_mrange_uint_t        allreduce_sra_kn_radix;
     uint32_t                 reduce_scatter_kn_radix;

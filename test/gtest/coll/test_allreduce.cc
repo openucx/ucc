@@ -7,6 +7,9 @@
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
+// For sliding window allreduce
+#include "test_allreduce_sliding_window.h"
+
 #include <array>
 
 template<typename T>
@@ -23,8 +26,9 @@ class test_allreduce : public UccCollArgs, public testing::Test {
             ctxs[r] = (gtest_ucc_coll_ctx_t*)calloc(1, sizeof(gtest_ucc_coll_ctx_t));
             ctxs[r]->args = coll;
 
-            coll->coll_type = UCC_COLL_TYPE_ALLREDUCE;
-            coll->op        = T::redop;
+            coll->coll_type          = UCC_COLL_TYPE_ALLREDUCE;
+            coll->op                 = T::redop;
+            coll->global_work_buffer = NULL;
 
             ctxs[r]->init_buf = ucc_malloc(ucc_dt_size(dt) * count, "init buf");
             EXPECT_NE(ctxs[r]->init_buf, nullptr);
@@ -390,6 +394,50 @@ TYPED_TEST(test_allreduce_alg, rab_pipelined) {
                     EXPECT_EQ(true, this->data_validate(ctxs));
                     this->reset(ctxs);
                 }
+                this->data_fini(ctxs);
+            }
+        }
+    }
+}
+
+TYPED_TEST(test_allreduce_alg, sliding_window)
+{
+    int           n_procs = 8;
+    ucc_job_env_t env     = {{"UCC_TL_UCP_TUNE", "allreduce:@2"},
+                         {"UCC_CLS", "all"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 3;
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt        = {UCC_MEMORY_TYPE_HOST};
+    ucp_info_t *                   ucp_infos = NULL;
+
+    if (UCC_OK == ucc_mc_available(
+                      UCC_MEMORY_TYPE_CUDA)) { //add cuda_managed for cl hier?
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+
+    for (auto count : {65536, 123567}) {
+        for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+            for (auto m : mt) {
+                SET_MEM_TYPE(m);
+                this->set_inplace(inplace);
+                this->data_init(n_procs, TypeParam::dt, count, ctxs, true);
+
+                // set args->global_work_buffer on each ctx
+                setup_gwbi(n_procs, ctxs, &ucp_infos, inplace == TEST_INPLACE);
+
+                UccReq req(team, ctxs);
+
+                for (auto i = 0; i < repeat; i++) {
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, this->data_validate(ctxs));
+                    this->reset(ctxs);
+                }
+
+                free_gwbi(n_procs, ctxs, ucp_infos, inplace == TEST_INPLACE);
+                ucp_infos = NULL;
                 this->data_fini(ctxs);
             }
         }

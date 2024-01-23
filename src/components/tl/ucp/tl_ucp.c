@@ -104,6 +104,23 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_kn_radix),
      UCC_CONFIG_TYPE_UINT_RANGED},
 
+    {"ALLREDUCE_SLIDING_WIN_BUF_SIZE", "65536",
+     "Buffer size of the sliding window allreduce algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sliding_window_buf_size),
+     UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"ALLREDUCE_SLIDING_WIN_PUT_WINDOW_SIZE", "0",
+     "Buffer size for sliding window allreduce. <= 0 means set to team size",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t,
+                  allreduce_sliding_window_put_window_size),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLREDUCE_SLIDING_WIN_NUM_GET_BUFS", "0",
+     "Buffer size for sliding window allreduce. <= 0 means set to team size",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t,
+                  allreduce_sliding_window_num_get_bufs),
+     UCC_CONFIG_TYPE_UINT},
+
     {"ALLREDUCE_SRA_KN_RADIX", "auto",
      "Radix of the scatter-reduce-allgather (SRA) knomial allreduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allreduce_sra_kn_radix),
