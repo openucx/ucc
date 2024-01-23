@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -36,17 +36,17 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
 
-    {"ALLTOALL_PAIRWISE_NUM_POSTS", "1",
+    {"ALLTOALL_PAIRWISE_NUM_POSTS", "auto",
      "Maximum number of outstanding send and receive messages in alltoall "
      "pairwise algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_pairwise_num_posts),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_ULUNITS},
 
-    {"ALLTOALLV_PAIRWISE_NUM_POSTS", "1",
+    {"ALLTOALLV_PAIRWISE_NUM_POSTS", "auto",
      "Maximum number of outstanding send and receive messages in alltoallv "
      "pairwise algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_pairwise_num_posts),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_ULUNITS},
 
 /* TODO: add radix to config once it's fully supported by the algorithm
     {"ALLTOALLV_HYBRID_RADIX", "2",
