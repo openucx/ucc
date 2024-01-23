@@ -56,5 +56,34 @@ ucc_tl_ucp_allreduce_sliding_window_init(ucc_base_coll_args_t *coll_args,
                                          ucc_base_team_t *     team,
                                          ucc_coll_task_t **    task_h)
 {
-    return UCC_OK;
+    ucc_status_t             status  = UCC_OK;
+    ucc_tl_ucp_team_t *      tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_tl_ucp_task_t *      task;
+    ucc_ee_executor_params_t params;
+
+    ALLREDUCE_TASK_CHECK(coll_args->args, tl_team);
+
+    task = ucc_tl_ucp_init_task(coll_args, team);
+    if (ucc_unlikely(!task)) {
+        ucc_error("couldnt allocate task");
+        return UCC_ERR_NO_MEMORY;
+    }
+    *task_h              = &task->super;
+    task->super.post     = ucc_tl_ucp_allreduce_sliding_window_start;
+    task->super.progress = ucc_tl_ucp_allreduce_sliding_window_progress;
+    task->super.finalize = ucc_tl_ucp_allreduce_sliding_window_finalize;
+
+    ucc_tl_ucp_allreduce_sliding_window_task_init(coll_args, team, task);
+
+    params.mask    = UCC_EE_EXECUTOR_PARAM_FIELD_TYPE;
+    params.ee_type = UCC_EE_CPU_THREAD;
+    status =
+        ucc_ee_executor_init(&params, &task->allreduce_sliding_window.executor);
+
+    if (UCC_OK != status) {
+        ucc_error("failed to init executor: %s", ucc_status_string(status));
+    }
+
+out:
+    return status;
 }
