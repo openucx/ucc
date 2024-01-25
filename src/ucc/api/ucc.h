@@ -166,7 +166,6 @@ typedef enum ucc_memory_type {
     UCC_MEMORY_TYPE_CUDA_MANAGED, /*!< NVIDIA CUDA managed memory */
     UCC_MEMORY_TYPE_ROCM,         /*!< AMD ROCM memory */
     UCC_MEMORY_TYPE_ROCM_MANAGED, /*!< AMD ROCM managed system memory */
-    UCC_MEMORY_TYPE_DPU,          /*!< DPU memory */
     UCC_MEMORY_TYPE_LAST,
     UCC_MEMORY_TYPE_UNKNOWN = UCC_MEMORY_TYPE_LAST
 } ucc_memory_type_t;
@@ -899,7 +898,6 @@ typedef struct ucc_mem_map {
     void *            address;  /*!< the address of a buffer to be attached to
                                      a UCC context */
     size_t            len;      /*!< the length of the buffer */
-    ucc_memory_type_t mem_type; /*!< the memory type */
     void *            resource; /*!< resource associated with the address.
                                      examples of resources include memory
                                      keys. */
@@ -1709,17 +1707,12 @@ typedef enum {
                                                             Note, the status is not guaranteed
                                                             to be global on all the processes
                                                             participating in the collective.*/
-    UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7), /*!< If set, both src
+    UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS   = UCC_BIT(7)  /*!< If set, both src
                                                             and dst buffers
                                                             reside in a memory
                                                             mapped region.
                                                             Useful for one-sided
                                                             collectives. */
-    UCC_COLL_ARGS_FLAG_MEM_MAP              = UCC_BIT(8)  /*!< If set, map both
-                                                            src and dst buffers.
-                                                            Useful for one-sided
-                                                            collectives in message
-                                                            passing programming models */
 } ucc_coll_args_flags_t;
 
 /**
@@ -1881,10 +1874,17 @@ typedef struct ucc_coll_args {
     ucc_coll_callback_t             cb;
     double                          timeout; /*!< Timeout in seconds */
     ucc_mem_map_params_t            mem_map; /*!< Memory regions to be used
-                                                  in during the collective
-                                                  operation for one-sided
-                                                  collectives. Not necessary
-                                                  for two-sided collectives */
+                                                  for the current and/or
+                                                  future one-sided collectives.
+                                                  If set, the designated regions
+                                                  will be mapped and information
+                                                  exchanged with the team
+                                                  associated with the collective
+                                                  via an allgather operation.
+                                                  It is recommended to use this
+                                                  option sparingly due to the
+                                                  increased overhead. Not necessary
+                                                  for two-sided collectives. */
     struct {
         uint64_t start;
         int64_t  stride;

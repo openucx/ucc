@@ -163,10 +163,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK | UCP_PARAM_FIELD_NAME;
-    ucp_params.features = UCP_FEATURE_TAG | UCP_FEATURE_AM;
-    if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS) {
-        ucp_params.features |= UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
-    }
+    ucp_params.features = UCP_FEATURE_TAG | UCP_FEATURE_AM | UCP_FEATURE_RMA |
+                          UCP_FEATURE_AMO64 | UCP_FEATURE_EXPORTED_MEMH;
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
     ucp_params.name = "UCC_UCP_CONTEXT";
 
@@ -247,9 +245,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
           "failed to register progress function", err_thread_mode,
           UCC_ERR_NO_MESSAGE, self);
 
-    self->remote_info  = NULL;
-    self->n_rinfo_segs = 0;
-    self->rkeys        = NULL;
+    self->remote_info         = NULL;
+    self->dynamic_remote_info = NULL;
+    self->n_rinfo_segs        = 0;
+    self->n_dynrinfo_segs     = 0;
+    self->rkeys               = NULL;
+    memset(&self->dyn_seg, 0, sizeof(self->dyn_seg));
     if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS &&
         params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         ucc_status = ucc_tl_ucp_ctx_remote_populate(
@@ -338,6 +339,12 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
                 ucp_rkey_destroy(UCC_TL_UCP_REMOTE_RKEY(ctx, i, j));
             }
         }
+        for (j = 0; j < ctx->n_dynrinfo_segs; j++) {
+            if (UCC_TL_UCP_REMOTE_RKEY(ctx, i, ctx->n_rinfo_segs + j)) {
+                ucp_rkey_destroy(
+                    UCC_TL_UCP_REMOTE_RKEY(ctx, i, ctx->n_rinfo_segs + j));
+            }
+        }
     }
     for (i = 0; i < ctx->n_rinfo_segs; i++) {
         if (ctx->remote_info[i].mem_h) {
@@ -347,10 +354,23 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
             ucp_rkey_buffer_release(ctx->remote_info[i].packed_key);
         }
     }
+    if (ctx->dynamic_remote_info) {
+        for (i = 0; i < ctx->n_dynrinfo_segs; i++) {
+            if (ctx->dynamic_remote_info[i].mem_h) {
+                ucp_mem_unmap(ctx->worker.ucp_context,
+                              ctx->dynamic_remote_info[i].mem_h);
+            }
+            if (ctx->dynamic_remote_info[i].packed_key) {
+                ucp_rkey_buffer_release(ctx->dynamic_remote_info[i].packed_key);
+            }
+        }
+        ucc_free(ctx->dynamic_remote_info);
+    }
     ucc_free(ctx->remote_info);
     ucc_free(ctx->rkeys);
-    ctx->remote_info = NULL;
-    ctx->rkeys       = NULL;
+    ctx->remote_info         = NULL;
+    ctx->rkeys               = NULL;
+    ctx->dynamic_remote_info = NULL;
 
     return UCC_OK;
 }
@@ -477,22 +497,42 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
     }
 
     for (i = 0; i < nsegs; i++) {
-        mmap_params.field_mask =
-            UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
-        mmap_params.address = map.segments[i].address;
-        mmap_params.length  = map.segments[i].len;
+        if (map.segments[i].resource == NULL) {
+            mmap_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+                                     UCP_MEM_MAP_PARAM_FIELD_LENGTH;
+            mmap_params.address = map.segments[i].address;
+            mmap_params.length  = map.segments[i].len;
 
-        status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
-        if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib,
-                     "ucp_mem_map failed with error code: %d", status);
-            ucc_status = ucs_status_to_ucc_status(status);
-            goto fail_mem_map;
+            status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
+            if (UCS_OK != status) {
+                tl_error(ctx->super.super.lib,
+                         "ucp_mem_map failed with error code: %d", status);
+                ucc_status = ucs_status_to_ucc_status(status);
+                goto fail_mem_map;
+            }
+            ctx->remote_info[i].packed_memh = NULL;
+        } else {
+            mmap_params.field_mask =
+                UCP_MEM_MAP_PARAM_FIELD_EXPORTED_MEMH_BUFFER;
+            mmap_params.exported_memh_buffer = map.segments[i].resource;
+
+            status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
+            if (status == UCS_ERR_UNREACHABLE) {
+                tl_error(ctx->super.super.lib, "exported memh is unsupported");
+                ucc_status = ucs_status_to_ucc_status(status);
+                goto fail_mem_map;
+            } else if (status < UCS_OK) {
+                tl_error(ctx->super.super.lib,
+                         "ucp_mem_map failed with error code: %d", status);
+                ucc_status = ucs_status_to_ucc_status(status);
+                goto fail_mem_map;
+            }
+            ctx->remote_info[i].packed_memh = map.segments[i].resource;
         }
         ctx->remote_info[i].mem_h = (void *)mh;
         status                    = ucp_rkey_pack(ctx->worker.ucp_context, mh,
-                               &ctx->remote_info[i].packed_key,
-                               &ctx->remote_info[i].packed_key_len);
+                                                  &ctx->remote_info[i].packed_key,
+                                                  &ctx->remote_info[i].packed_key_len);
         if (UCS_OK != status) {
             tl_error(ctx->super.super.lib,
                      "failed to pack UCP key with error code: %d", status);
