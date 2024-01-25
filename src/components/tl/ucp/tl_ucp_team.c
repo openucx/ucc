@@ -171,7 +171,6 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
 {
     ucc_tl_ucp_team_t *   team = ucc_derived_of(tl_team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_context_t *ctx  = UCC_TL_UCP_TEAM_CTX(team);
-    int                   i;
     ucc_status_t          status;
 
     if (USE_SERVICE_WORKER(team)) {
@@ -190,13 +189,6 @@ ucc_status_t ucc_tl_ucp_team_create_test(ucc_base_team_t *tl_team)
             return UCC_INPROGRESS;
         } else if (UCC_OK != status) {
             goto err_preconnect;
-        }
-    }
-
-    if (ctx->remote_info) {
-        for (i = 0; i < ctx->n_rinfo_segs; i++) {
-            team->va_base[i]     = ctx->remote_info[i].va_base;
-            team->base_length[i] = ctx->remote_info[i].len;
         }
     }
 

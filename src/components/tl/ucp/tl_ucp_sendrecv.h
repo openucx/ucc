@@ -226,9 +226,9 @@ static inline ucc_status_t ucc_tl_ucp_send_nz(void *buffer, size_t msglen,
 }
 
 static inline ucc_status_t
-ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
-                             ucc_rank_t peer, uint64_t *rva, ucp_rkey_h *rkey,
-                             int *segment)
+ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, size_t msglen,
+                             ucp_ep_h *ep, ucc_rank_t peer, uint64_t *rva,
+                             ucp_rkey_h *rkey, void **packed_memh, int *segment)
 {
     ucc_tl_ucp_context_t *ctx            = UCC_TL_UCP_TEAM_CTX(team);
     ptrdiff_t             key_offset     = 0;
@@ -239,6 +239,7 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     void                 *keys;
     void                 *offset;
     ptrdiff_t             base_offset;
+    int                   i;
 
     *segment  = -1;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
@@ -252,33 +253,76 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
     rvas        = (uint64_t *)base_offset;
     key_sizes   = PTR_OFFSET(base_offset, (section_offset * 2));
     keys        = PTR_OFFSET(base_offset, (section_offset * 3));
-
-    for (int i = 0; i < ctx->n_rinfo_segs; i++) {
-        uint64_t base = (uint64_t)team->va_base[i];
-        uint64_t end = base + team->base_length[i];
-        if ((uint64_t)va >= base &&
-            (uint64_t)va < end) {
+    for (i = 0; i < ctx->n_rinfo_segs; i++) {
+        uint64_t base = (uint64_t)ctx->remote_info[i].va_base;
+        uint64_t end  = base + ctx->remote_info[i].len;
+        if ((uint64_t)va >= base && (uint64_t)va < end) {
             *segment = i;
-            break;
+            *rva     = rvas[i] + ((uint64_t)va - (uint64_t)base);
+            if (ucc_unlikely(NULL ==
+                             UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment))) {
+                ucs_status_t ucs_status = ucp_ep_rkey_unpack(
+                    *ep, PTR_OFFSET(keys, key_offset),
+                    &UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment));
+                if (UCS_OK != ucs_status) {
+                    return ucs_status_to_ucc_status(ucs_status);
+                }
+            }
+            *rkey        = UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment);
+            *packed_memh = (ctx->remote_info[i].packed_memh)
+                               ? ctx->remote_info[i].mem_h
+                               : NULL;
+            return UCC_OK;
         }
         key_offset += key_sizes[i];
     }
-    if (ucc_unlikely(0 > *segment)) {
-        tl_error(UCC_TL_TEAM_LIB(team),
-            "attempt to perform one-sided operation on non-registered memory %p", va);
-        return UCC_ERR_NOT_FOUND;
-    }
-    if (ucc_unlikely(NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment))) {
-        ucs_status_t ucs_status =
-            ucp_ep_rkey_unpack(*ep, PTR_OFFSET(keys, key_offset),
-                               &UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment));
-        if (UCS_OK != ucs_status) {
-            return ucs_status_to_ucc_status(ucs_status);
+    if (0 > *segment) {
+        key_offset = 0;
+        for (i = 0; i < ctx->n_dynrinfo_segs; i++) {
+            uint64_t base       = (uint64_t)ctx->dynamic_remote_info[i].va_base;
+            uint64_t end        = base + ctx->dynamic_remote_info[i].len;
+            uint64_t check_base = (uint64_t)va;
+            uint64_t check_end  = check_base + msglen;
+            size_t   num_keys   = 0;
+            void    *packed_key = NULL;
+            size_t   team_size  = UCC_TL_TEAM_SIZE(team);
+            if (check_base >= base && check_base < end && check_end <= end) {
+                *segment = i;
+                *rva     = UCC_TL_UCP_REMOTE_DYN_RVA(ctx, peer, i);
+                num_keys = *segment - ctx->dyn_seg.starting_seg[*segment];
+                for (int j = 0; j < num_keys; j++) {
+                    key_offset += UCC_TL_UCP_REMOTE_DYN_KEY_SIZE(
+                        ctx, peer, ctx->dyn_seg.starting_seg[*segment] + j);
+                }
+                packed_key =
+                    UCC_TL_UCP_REMOTE_DYN_KEY(ctx, peer, key_offset, *segment);
+                /* dynamic segment keys should be placed AFTER
+                 * the ctx's keys (i.e., num_static_segs + segment_number) */
+                if (ucc_unlikely(NULL == UCC_TL_UCP_DYN_REMOTE_RKEY(
+                                             ctx, peer, team_size, *segment))) {
+                    ucs_status_t ucs_status =
+                        ucp_ep_rkey_unpack(*ep, packed_key,
+                                           &UCC_TL_UCP_DYN_REMOTE_RKEY(
+                                               ctx, peer, team_size, *segment));
+                    if (UCS_OK != ucs_status) {
+                        return ucs_status_to_ucc_status(ucs_status);
+                    }
+                }
+                *rkey =
+                    UCC_TL_UCP_DYN_REMOTE_RKEY(ctx, peer, team_size, *segment);
+                *packed_memh = (ctx->dynamic_remote_info[i].packed_memh)
+                                   ? ctx->dynamic_remote_info[i].mem_h
+                                   : NULL;
+                return UCC_OK;
+            }
         }
     }
-    *rkey = UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment);
-    *rva  = rvas[*segment] + ((uint64_t)va - (uint64_t)team->va_base[*segment]);
-    return UCC_OK;
+
+    tl_error(
+        UCC_TL_TEAM_LIB(team),
+        "attempt to perform one-sided operation on non-registered memory %p",
+        va);
+    return UCC_ERR_NOT_FOUND;
 }
 
 static inline ucc_status_t ucc_tl_ucp_flush(ucc_tl_ucp_team_t *team)
@@ -322,13 +366,15 @@ static inline ucc_status_t ucc_tl_ucp_ep_flush(ucc_rank_t dest_group_rank,
 static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
                                              size_t             msglen,
                                              ucc_rank_t         dest_group_rank,
+                                             ucc_memory_type_t  mtype,
                                              ucc_tl_ucp_team_t *team,
                                              ucc_tl_ucp_task_t *task)
 {
-    ucp_request_param_t req_param = {0};
-    int                 segment   = 0;
-    ucp_rkey_h          rkey      = NULL;
-    uint64_t            rva       = 0;
+    ucp_request_param_t req_param   = {0};
+    int                 segment     = 0;
+    ucp_rkey_h          rkey        = NULL;
+    uint64_t            rva         = 0;
+    void               *packed_memh = NULL;
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
@@ -338,19 +384,25 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
         return status;
     }
 
-    status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
-                                          &rva, &rkey, &segment);
+    status =
+        ucc_tl_ucp_resolve_p2p_by_va(team, target, msglen, &ep, dest_group_rank,
+                                     &rva, &rkey, &packed_memh, &segment);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
 
-    req_param.op_attr_mask =
-        UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA;
-    req_param.cb.send   = ucc_tl_ucp_put_completion_cb;
-    req_param.user_data = (void *)task;
+    req_param.op_attr_mask = UCP_OP_ATTR_FIELD_CALLBACK |
+                             UCP_OP_ATTR_FIELD_USER_DATA |
+                             UCP_OP_ATTR_FIELD_MEMORY_TYPE;
+    req_param.cb.send     = ucc_tl_ucp_put_completion_cb;
+    req_param.user_data   = (void *)task;
+    req_param.memory_type = ucc_memtype_to_ucs[mtype];
+    if (packed_memh) {
+        req_param.op_attr_mask |= UCP_OP_ATTR_FIELD_MEMH;
+        req_param.memh = packed_memh;
+    }
 
     ucp_status = ucp_put_nbx(ep, buffer, msglen, rva, rkey, &req_param);
-
     task->onesided.put_posted++;
     if (UCS_OK != ucp_status) {
         if (UCS_PTR_IS_ERR(ucp_status)) {
@@ -365,13 +417,15 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
 static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
                                              size_t             msglen,
                                              ucc_rank_t         dest_group_rank,
+                                             ucc_memory_type_t  mtype,
                                              ucc_tl_ucp_team_t *team,
                                              ucc_tl_ucp_task_t *task)
 {
-    ucp_request_param_t req_param = {0};
-    int                 segment   = 0;
-    ucp_rkey_h          rkey      = NULL;
-    uint64_t            rva       = 0;
+    ucp_request_param_t req_param   = {0};
+    int                 segment     = 0;
+    ucp_rkey_h          rkey        = NULL;
+    uint64_t            rva         = 0;
+    void               *packed_memh = NULL;
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
@@ -381,19 +435,25 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
         return status;
     }
 
-    status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
-                                          &rva, &rkey, &segment);
+    status =
+        ucc_tl_ucp_resolve_p2p_by_va(team, target, msglen, &ep, dest_group_rank,
+                                     &rva, &rkey, &packed_memh, &segment);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
 
-    req_param.op_attr_mask =
-        UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA;
-    req_param.cb.send   = ucc_tl_ucp_get_completion_cb;
-    req_param.user_data = (void *)task;
+    req_param.op_attr_mask = UCP_OP_ATTR_FIELD_CALLBACK |
+                             UCP_OP_ATTR_FIELD_USER_DATA |
+                             UCP_OP_ATTR_FIELD_MEMORY_TYPE;
+    req_param.cb.send     = ucc_tl_ucp_get_completion_cb;
+    req_param.user_data   = (void *)task;
+    req_param.memory_type = ucc_memtype_to_ucs[mtype];
+    if (packed_memh) {
+        req_param.op_attr_mask |= UCP_OP_ATTR_FIELD_MEMH;
+        req_param.memh = packed_memh;
+    }
 
     ucp_status = ucp_get_nbx(ep, buffer, msglen, rva, rkey, &req_param);
-
     task->onesided.get_posted++;
     if (UCS_OK != ucp_status) {
         if (UCS_PTR_IS_ERR(ucp_status)) {
@@ -410,11 +470,12 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
                                                  ucc_rank_t dest_group_rank,
                                                  ucc_tl_ucp_team_t *team)
 {
-    ucp_request_param_t req_param = {0};
-    int                 segment   = 0;
-    uint64_t            one       = 1;
-    ucp_rkey_h          rkey      = NULL;
-    uint64_t            rva       = 0;
+    ucp_request_param_t req_param   = {0};
+    int                 segment     = 0;
+    uint64_t            one         = 1;
+    ucp_rkey_h          rkey        = NULL;
+    uint64_t            rva         = 0;
+    void               *packed_memh = NULL;
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
@@ -424,8 +485,9 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
         return status;
     }
 
-    status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
-                                          &rva, &rkey, &segment);
+    status = ucc_tl_ucp_resolve_p2p_by_va(team, target, sizeof(uint64_t), &ep,
+                                          dest_group_rank, &rva, &rkey,
+                                          &packed_memh, &segment);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }

@@ -508,4 +508,8 @@ ucc_tl_ucp_get_radix_from_range(ucc_tl_ucp_team_t *team,
     }
     return radix;
 }
+
+ucc_status_t ucc_tl_ucp_coll_dynamic_segments(ucc_coll_args_t   *coll_args,
+                                              ucc_tl_ucp_task_t *task);
+
 #endif
