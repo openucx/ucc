@@ -51,7 +51,7 @@ libucc_tl_mlx5_la_SOURCES  = $(sources)
 libucc_tl_mlx5_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS)
 libucc_tl_mlx5_la_CFLAGS   = $(BASE_CFLAGS)
 libucc_tl_mlx5_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed
-libucc_tl_mlx5_la_LIBADD   = $(UCC_TOP_BUILDDIR)/src/libucc.la $(IBVERBS_LIBADD) $(MLX5DV_LIBADD)
+libucc_tl_mlx5_la_LIBADD   = $(UCC_TOP_BUILDDIR)/src/libucc.la $(IBVERBS_LIBADD) $(MLX5DV_LIBADD) $(RDMACM_LIBADD)
 
 include $(top_srcdir)/config/module.am
 
