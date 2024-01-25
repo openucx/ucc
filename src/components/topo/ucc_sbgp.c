@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -439,40 +439,88 @@ static int ucc_compare_proc_info_id(const void *a, const void *b)
     } else if (d1->numa_id != d2->numa_id) {
         return d1->numa_id - d2->numa_id;
     } else {
-        return d1->pid - d2->pid;
+        return 0;
     }
 }
 
 static ucc_status_t sbgp_create_full_ordered(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
 {
-    ucc_rank_t      gsize = ucc_subset_size(&topo->set);
-    proc_info_id_t *sorted;
-    ucc_rank_t      i;
+    ucc_rank_t       gsize = ucc_subset_size(&topo->set);
+    ucc_proc_info_t *pinfo = topo->topo->procs;
+    ucc_host_id_t   *visited;
+    proc_info_id_t  *sorted;
+    ucc_rank_t       i, j, num_visited;
+    int              is_sorted, d;
 
     ucc_assert(gsize > 0);
     sbgp->status     = UCC_SBGP_ENABLED;
     sbgp->group_size = gsize;
     sbgp->group_rank = topo->set.myrank;
+    sbgp->rank_map   = ucc_malloc(sizeof(ucc_rank_t) * gsize, "rank_map");
+    if (ucc_unlikely(!sbgp->rank_map)) {
+        ucc_error("failed to allocate %zd bytes for rank_map",
+                  gsize * sizeof(ucc_rank_t));
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    visited = (ucc_host_id_t *)ucc_malloc(gsize * sizeof(ucc_host_id_t),
+                                          "visited host");
+    if (ucc_unlikely(!visited)) {
+        ucc_error("failed to allocate %zd bytes for list of visited nodes",
+                  gsize * sizeof(ucc_host_id_t));
+        ucc_free(sbgp->rank_map);
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    is_sorted   = 1;
+    num_visited = 1;
+    visited[0] = pinfo[0].host_hash;
+    for (i = 1; i < gsize; i++) {
+        if (pinfo[i].host_hash != pinfo[i-1].host_hash) {
+            /* check if we saw that host_has before*/
+            for (j = 0; j < num_visited; j++) {
+                if (visited[j] == pinfo[i].host_hash) {
+                    break;
+                }
+            }
+            if (j < num_visited) {
+                /* this host was present already, ranks are not ordered */
+                is_sorted = 0;
+                break;
+            }
+            /* add new host to the list of visited */
+            visited[num_visited++] = pinfo[i].host_hash;
+        } else {
+            d = ucc_compare_proc_info_id(&pinfo[i - 1].host_hash,
+                                         &pinfo[i].host_hash);
+
+            if (d > 0) {
+                is_sorted = 0;
+                break;
+            }
+        }
+    }
+    ucc_free(visited);
+
+    if (is_sorted) {
+        for (i = 0; i < gsize; i++) {
+            sbgp->rank_map[i] = i;
+        }
+        return UCC_OK;
+    }
 
     sorted = (proc_info_id_t *)ucc_malloc(gsize * sizeof(proc_info_id_t),
                                           "proc_sorted");
     if (ucc_unlikely(!sorted)) {
         ucc_error("failed to allocate %zd bytes for sorted proc info",
                   gsize * sizeof(proc_info_id_t));
+        ucc_free(sbgp->rank_map);
         return UCC_ERR_NO_MEMORY;
     }
 
     for (i = 0; i < gsize; i++) {
         sorted[i].info = topo->topo->procs[i];
         sorted[i].id   = i;
-    }
-
-    sbgp->rank_map = ucc_malloc(sizeof(ucc_rank_t) * gsize, "rank_map");
-    if (ucc_unlikely(!sbgp->rank_map)) {
-        ucc_error("failed to allocate %zd bytes for rank_map",
-                  gsize * sizeof(ucc_rank_t));
-        ucc_free(sorted);
-        return UCC_ERR_NO_MEMORY;
     }
 
     qsort(sorted, gsize, sizeof(proc_info_id_t), ucc_compare_proc_info_id);
