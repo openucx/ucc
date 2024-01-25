@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -130,7 +130,7 @@ ucc_tl_mlx5_mcast_mem_deregister(ucc_tl_mlx5_mcast_coll_context_t *ctx,
     return UCC_OK;
 }
 
-static ucc_rcache_ops_t ucc_rcache_ops = {
+static ucc_rcache_ops_t ucc_tl_mlx5_rcache_ops = {
     .mem_reg     = ucc_tl_mlx5_mcast_rcache_mem_reg_cb,
     .mem_dereg   = ucc_tl_mlx5_mcast_rcache_mem_dereg_cb,
     .dump_region = ucc_tl_mlx5_mcast_rcache_dump_region_cb
@@ -140,15 +140,12 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_rcache(ucc_tl_mlx5_mcast_coll_context_t *ct
 {
     ucc_rcache_params_t rcache_params;
 
-    rcache_params.ucm_event_priority = 1000;
-    rcache_params.max_regions        = ULONG_MAX;
-    rcache_params.max_size           = SIZE_MAX;
+    ucc_rcache_set_default_params(&rcache_params);
     rcache_params.region_struct_size = sizeof(ucc_tl_mlx5_mcast_rcache_region_t);
+    rcache_params.context            = ctx;
+    rcache_params.ops                = &ucc_tl_mlx5_rcache_ops;
     rcache_params.ucm_events         = UCM_EVENT_VM_UNMAPPED |
                                        UCM_EVENT_MEM_TYPE_FREE;
-    rcache_params.context            = ctx;
-    rcache_params.ops                = &ucc_rcache_ops;
-    rcache_params.flags              = 0;
 
-    return ucc_rcache_create(&rcache_params, "MCAST", &ctx->rcache);
+    return ucc_rcache_create(&rcache_params, "MLX5_MCAST", &ctx->rcache);
 }

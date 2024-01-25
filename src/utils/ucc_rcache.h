@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -16,10 +17,23 @@
 #define ucc_rcache_params_t          ucs_rcache_params_t
 #define ucc_rcache_region_t          ucs_rcache_region_t
 
-#define ucc_rcache_destroy           ucs_rcache_destroy
-#define ucc_rcache_region_hold       ucs_rcache_region_hold
-#define ucc_rcache_region_put        ucs_rcache_region_put
-#define ucc_rcache_region_invalidate ucs_rcache_region_invalidate
+static inline void ucc_rcache_set_default_params(ucs_rcache_params_t *rcache_params)
+{
+    rcache_params->region_struct_size = sizeof(ucs_rcache_region_t);
+    rcache_params->ucm_events         = 0;
+    rcache_params->ucm_event_priority = 1000;
+    rcache_params->ops                = NULL;
+    rcache_params->context            = NULL;
+    rcache_params->flags              = 0;
+    rcache_params->max_regions        = UCS_MEMUNITS_INF;
+    rcache_params->max_size           = UCS_MEMUNITS_INF;
+    rcache_params->max_unreleased     = UCS_MEMUNITS_INF;
+}
+
+#define ucc_rcache_destroy            ucs_rcache_destroy
+#define ucc_rcache_region_hold        ucs_rcache_region_hold
+#define ucc_rcache_region_put         ucs_rcache_region_put
+#define ucc_rcache_region_invalidate  ucs_rcache_region_invalidate
 
 /* Wrapper functions for status conversion */
 static inline ucc_status_t
@@ -46,16 +60,17 @@ static inline ucc_status_t
 ucc_rcache_get(ucc_rcache_t *rcache, void *address, size_t length,
                void *arg, ucc_rcache_region_t **region_p)
 {
+    ucs_status_t status;
+
 #ifdef UCS_HAVE_RCACHE_REGION_ALIGNMENT
-    return ucs_status_to_ucc_status(ucs_rcache_get(
-                                       rcache, address, length,
-                                       ucc_get_page_size(),
-                                       PROT_READ | PROT_WRITE, arg, region_p));
+    status = ucs_rcache_get(rcache, address, length, ucc_get_page_size(),
+                            PROT_READ | PROT_WRITE, arg, region_p);
 #else
-    return ucs_status_to_ucc_status(ucs_rcache_get(
-                                       rcache, address, length,
-                                       PROT_READ | PROT_WRITE, arg, region_p));
+    status = ucs_rcache_get(rcache, address, length,
+                            PROT_READ | PROT_WRITE, arg, region_p);
 #endif
+
+    return ucs_status_to_ucc_status(status);
 }
 
 #endif
