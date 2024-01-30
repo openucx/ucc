@@ -219,6 +219,11 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     }
     team->oob.req_free(team->oob_req);
     team->oob_req = (void*)0x1;
+
+    for (i = 0; i < UCC_TL_TEAM_SIZE(team); i++) {
+           team->scratch.rem[i] = NULL;
+    }
+
     status = ucc_tl_cuda_team_topo_create(&team->super, &team->topo);
     if (status != UCC_OK) {
         goto exit_err;
