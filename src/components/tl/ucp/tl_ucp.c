@@ -86,7 +86,7 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      "other KN_RADIX values",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, kn_radix), UCC_CONFIG_TYPE_UINT},
 
-    {"BARRIER_KN_RADIX", "4",
+    {"BARRIER_KN_RADIX", "8",
      "Radix of the recursive-knomial barrier algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, barrier_kn_radix),
      UCC_CONFIG_TYPE_UINT},
