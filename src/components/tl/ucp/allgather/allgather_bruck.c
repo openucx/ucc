@@ -139,6 +139,7 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
 
     /* post processing step */
     if (trank != 0) {
+        // copy blocks [0 .. (size - rank - 1)] from rbuf to shift buffer
         status = ucc_mc_memcpy(scratch_header->addr, rbuf, scratch_size,
                                UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_HOST);
         if (ucc_unlikely(status != UCC_OK)) {
@@ -147,17 +148,17 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
             ucc_tl_ucp_coll_finalize(&task->super);
             return;
         }
-
+        // move blocks [(size - rank) .. size] from rbuf to beginning of rbuf
         status = ucc_mc_memcpy(rbuf, PTR_OFFSET(rbuf, scratch_size),
-                               count * ucc_dt_size(dt) - scratch_size,
-                               UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_HOST);
+                               trank * data_size, UCC_MEMORY_TYPE_HOST,
+                               UCC_MEMORY_TYPE_HOST);
         if (ucc_unlikely(status != UCC_OK)) {
             tl_error(UCC_TASK_LIB(task),
                      "failed to move data inside rbuff buffer");
             ucc_tl_ucp_coll_finalize(&task->super);
             return;
         }
-
+        // copy blocks from shift buffer starting at block [rank] in rbuf.
         status = ucc_mc_memcpy(PTR_OFFSET(rbuf, trank * data_size),
                                scratch_header->addr, scratch_size,
                                UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_HOST);
