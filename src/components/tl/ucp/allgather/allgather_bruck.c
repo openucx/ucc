@@ -71,7 +71,7 @@ ucc_status_t ucc_tl_ucp_allgather_bruck_finalize(ucc_coll_task_t *coll_task)
         tl_error(UCC_TASK_LIB(task), "failed to free scratch buffer memory");
     }
     task->allgather_bruck.scratch_size = 0;
-    
+
     status = ucc_tl_ucp_coll_finalize(&task->super);
     if (ucc_unlikely(status != UCC_OK)) {
         tl_error(UCC_TASK_LIB(task),
@@ -149,8 +149,8 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
         }
 
         status = ucc_mc_memcpy(rbuf, PTR_OFFSET(rbuf, scratch_size),
-                               trank * data_size, UCC_MEMORY_TYPE_HOST,
-                               UCC_MEMORY_TYPE_HOST);
+                               count * ucc_dt_size(dt) - scratch_size,
+                               UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_HOST);
         if (ucc_unlikely(status != UCC_OK)) {
             tl_error(UCC_TASK_LIB(task),
                      "failed to move data inside rbuff buffer");
