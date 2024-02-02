@@ -66,6 +66,8 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_ucp_allgather_bruck_start(ucc_coll_task_t *task);
 
+ucc_status_t ucc_tl_ucp_allgather_bruck_finalize(ucc_coll_task_t *coll_task);
+
 /* Uses allgather_kn_radix from config */
 ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
                                                ucc_base_team_t      *team,
