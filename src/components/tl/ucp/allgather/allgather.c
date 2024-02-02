@@ -32,7 +32,6 @@ ucc_base_coll_alg_info_t
 
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task)
 {
-    printf ("HELLO\n");
     return ucc_tl_ucp_allgather_ring_init_common(task);
 }
 
@@ -51,7 +50,6 @@ char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
             algo_num = UCC_TL_UCP_ALLGATHER_ALG_RING;
         }
     }
-    fprintf(stderr, "Algo num: %d\n", algo_num);
     ucc_snprintf_safe(str, max_size,
                       UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR, algo_num);
     return str;
