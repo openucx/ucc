@@ -149,15 +149,8 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
             return;
         }
         // move blocks [(size - rank) .. size] from rbuf to beginning of rbuf
-        status = ucc_mc_memcpy(rbuf, PTR_OFFSET(rbuf, scratch_size),
-                               trank * data_size, UCC_MEMORY_TYPE_HOST,
-                               UCC_MEMORY_TYPE_HOST);
-        if (ucc_unlikely(status != UCC_OK)) {
-            tl_error(UCC_TASK_LIB(task),
-                     "failed to move data inside rbuff buffer");
-            ucc_tl_ucp_coll_finalize(&task->super);
-            return;
-        }
+        // TODO: rewrite to cycle to get rid of overlap
+        memmove(rbuf, PTR_OFFSET(rbuf, scratch_size), trank * data_size);
         // copy blocks from shift buffer starting at block [rank] in rbuf.
         status = ucc_mc_memcpy(PTR_OFFSET(rbuf, trank * data_size),
                                scratch_header->addr, scratch_size,
