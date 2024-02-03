@@ -40,7 +40,7 @@ char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
     int   max_size = ALLGATHER_MAX_PATTERN_SIZE;
     int   algo_num = UCC_TL_TEAM_SIZE(team) % 2
                          ? UCC_TL_UCP_ALLGATHER_ALG_RING
-                         : UCC_TL_UCP_ALLGATHER_ALG_BRUCK;
+                         : UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR;
     char *str      = ucc_malloc(max_size * sizeof(char));
     ucc_sbgp_t *sbgp;
 
