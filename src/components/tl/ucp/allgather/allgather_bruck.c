@@ -38,16 +38,20 @@ ucc_status_t ucc_tl_ucp_allgather_bruck_init(ucc_base_coll_args_t *coll_args,
     task->super.progress = ucc_tl_ucp_allgather_bruck_progress;
     task->super.finalize = ucc_tl_ucp_allgather_bruck_finalize;
 
-    /* allocate scratch buffer */
-    status = ucc_mc_alloc(&task->allgather_bruck.scratch_header, scratch_size,
-                          UCC_MEMORY_TYPE_HOST);
-    if (ucc_unlikely(status != UCC_OK)) {
-        tl_error(UCC_TASK_LIB(task), "failed to allocate scratch buffer");
-        ucc_tl_ucp_coll_finalize(&task->super);
-        goto out;
+    if (trank != 0) {
+        /* allocate scratch buffer only on non root rank */
+        status = ucc_mc_alloc(&task->allgather_bruck.scratch_header,
+                              scratch_size, UCC_MEMORY_TYPE_HOST);
+        if (ucc_unlikely(status != UCC_OK)) {
+            tl_error(UCC_TASK_LIB(task), "failed to allocate scratch buffer");
+            ucc_tl_ucp_coll_finalize(&task->super);
+            goto out;
+        }
+        task->allgather_bruck.scratch_size = scratch_size;
+    } else {
+        task->allgather_bruck.scratch_header = NULL;
+        task->allgather_bruck.scratch_size   = 0;
     }
-    task->allgather_bruck.scratch_size = scratch_size;
-
 out:
     if (status != UCC_OK) {
         ucc_tl_ucp_put_task(task);
@@ -61,16 +65,20 @@ out:
 ucc_status_t ucc_tl_ucp_allgather_bruck_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_status_t       status, global_status;
+    ucc_status_t       global_status = UCC_OK;
+    ucc_status_t       status;
 
     tl_trace(UCC_TASK_LIB(task), "ucc_tl_ucp_allgather_bruck_finalize");
 
-    /* deallocate scratch buffer */
-    global_status = ucc_mc_free(task->allgather_bruck.scratch_header);
-    if (ucc_unlikely(global_status != UCC_OK)) {
-        tl_error(UCC_TASK_LIB(task), "failed to free scratch buffer memory");
+    if (task->allgather_bruck.scratch_header != NULL) {
+        /* deallocate scratch buffer */
+        global_status = ucc_mc_free(task->allgather_bruck.scratch_header);
+        if (ucc_unlikely(global_status != UCC_OK)) {
+            tl_error(UCC_TASK_LIB(task),
+                     "failed to free scratch buffer memory");
+        }
+        task->allgather_bruck.scratch_size = 0;
     }
-    task->allgather_bruck.scratch_size = 0;
 
     status = ucc_tl_ucp_coll_finalize(&task->super);
     if (ucc_unlikely(status != UCC_OK)) {
