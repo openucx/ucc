@@ -12,48 +12,49 @@
     do {                                                                       \
         size_t _i, _j;                                                         \
         type  _tmp;                                                            \
+        size_t __count = _count;                                               \
         switch (_n_srcs) {                                                     \
         case 2:                                                                \
-            for (_i = 0; _i < _count; _i++) {                                  \
+            for (_i = 0; _i < __count; _i++) {                                 \
                 d[_i] = OP##_2(s[0][_i], s[1][_i]);                            \
             }                                                                  \
             break;                                                             \
         case 3:                                                                \
-            for (_i = 0; _i < _count; _i++) {                                  \
+            for (_i = 0; _i < __count; _i++) {                                 \
                 d[_i] = OP##_3(s[0][_i], s[1][_i], s[2][_i]);                  \
             }                                                                  \
             break;                                                             \
         case 4:                                                                \
-            for (_i = 0; _i < _count; _i++) {                                  \
+            for (_i = 0; _i < __count; _i++) {                                 \
                 d[_i] = OP##_4(s[0][_i], s[1][_i], s[2][_i], s[3][_i]);        \
             }                                                                  \
             break;                                                             \
         case 5:                                                                \
-            for (_i = 0; _i < _count; _i++) {                                  \
+            for (_i = 0; _i < __count; _i++) {                                 \
                 d[_i] =                                                        \
                     OP##_5(s[0][_i], s[1][_i], s[2][_i], s[3][_i], s[4][_i]);  \
             }                                                                  \
             break;                                                             \
         case 6:                                                                \
-            for (_i = 0; _i < _count; _i++) {                                  \
+            for (_i = 0; _i < __count; _i++) {                                 \
                 d[_i] = OP##_6(s[0][_i], s[1][_i], s[2][_i], s[3][_i],         \
                                s[4][_i], s[5][_i]);                            \
             }                                                                  \
             break;                                                             \
         case 7:                                                                \
-            for (_i = 0; _i < _count; _i++) {                                  \
+            for (_i = 0; _i < __count; _i++) {                                 \
                 d[_i] = OP##_7(s[0][_i], s[1][_i], s[2][_i], s[3][_i],         \
                                s[4][_i], s[5][_i], s[6][_i]);                  \
             }                                                                  \
             break;                                                             \
         case 8:                                                                \
-            for (_i = 0; _i < _count; _i++) {                                  \
+            for (_i = 0; _i < __count; _i++) {                                 \
                 d[_i] = OP##_8(s[0][_i], s[1][_i], s[2][_i], s[3][_i],         \
                                s[4][_i], s[5][_i], s[6][_i], s[7][_i]);        \
             }                                                                  \
             break;                                                             \
         default:                                                               \
-            for (_i = 0; _i < _count; _i++) {                                  \
+            for (_i = 0; _i < __count; _i++) {                                 \
                 _tmp = OP##_8(s[0][_i], s[1][_i], s[2][_i], s[3][_i],          \
                               s[4][_i], s[5][_i], s[6][_i], s[7][_i]);         \
                 for (_j = 8; _j < _n_srcs; _j++) {                             \
@@ -223,11 +224,9 @@
         }                                                                      \
     } while (0)
 
-ucc_status_t ucc_ec_cpu_reduce(ucc_eee_task_reduce_t *task, uint16_t flags)
+ucc_status_t ucc_ec_cpu_reduce(ucc_eee_task_reduce_t *task,
+                               void * const * restrict srcs, uint16_t flags)
 {
-    void **srcs = (flags & UCC_EEE_TASK_FLAG_REDUCE_SRCS_EXT) ? task->srcs_ext
-                                                              : task->srcs;
-
     switch (task->dt) {
     case UCC_DT_INT8:
         DO_DT_REDUCE_INT(int8_t, srcs, task->dst, task->op, task->count,
