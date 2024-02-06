@@ -1,7 +1,7 @@
 /**
  * @file ucc.h
  * @date 2020
- * @copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * @copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * @copyright Copyright (C) Huawei Technologies Co., Ltd. 2020.  ALL RIGHTS RESERVED.
  * @copyright Copyright (C) UChicago Argonne, LLC. 2022.  ALL RIGHTS RESERVED.
  *
@@ -716,15 +716,6 @@ ucc_status_t ucc_lib_config_modify(ucc_lib_config_h config, const char *name,
  */
 void ucc_get_version(unsigned *major_version, unsigned *minor_version,
                      unsigned *release_number);
-
-/**
- * @ingroup UCC_LIB
- * @brief Get UCC library version as a string.
- *
- * This routine returns the UCC library version as a string which consists of:
- * "major.minor.release".
- */
-const char *ucc_get_version_string(void);
 
 /**
  * @ingroup UCC_LIB
