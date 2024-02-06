@@ -11,7 +11,6 @@
 #include "alltoall/alltoall.h"
 #include "core/ucc_team.h"
 #include <sys/shm.h>
-#include "mcast/tl_mlx5_mcast.h"
 
 static ucc_status_t ucc_tl_mlx5_topo_init(ucc_tl_mlx5_team_t *team)
 {
@@ -67,13 +66,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
 
     self->a2a = NULL;
     status = ucc_tl_mlx5_team_init_alltoall(self);
-    if (UCC_OK != status) {
-        return status;
-    }
-
-    self->mcast  = NULL;
-    status = ucc_tl_mlx5_mcast_team_init(tl_context, &(self->mcast), &(ctx->mcast), params,
-                                         &(UCC_TL_MLX5_TEAM_LIB(self)->cfg.mcast_conf));
     if (UCC_OK != status) {
         return status;
     }
