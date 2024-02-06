@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Advanced Micro Devices, Inc. 2023. ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
@@ -574,8 +574,8 @@ void ProcessArgs(int argc, char** argv)
 
 int main(int argc, char *argv[])
 {
-    int failed                                                          = 0;
-    int total_done_skipped_failed[ucc_ilog2(UCC_COLL_TYPE_LAST) + 1][4] = {0};
+    int failed = 0;
+    int total_done_skipped_failed[ucc_ilog2(UCC_COLL_TYPE_LAST) + 1][4];
     std::chrono::steady_clock::time_point begin;
     int size, required, provided, completed, rank;
     UccTestMpi *test;
@@ -583,6 +583,8 @@ int main(int argc, char *argv[])
     std::string err;
 
     begin = std::chrono::steady_clock::now();
+    memset(total_done_skipped_failed, 0,
+           sizeof(total_done_skipped_failed));
     try {
         ProcessArgs(argc, argv);
     } catch (const std::string &s) {
