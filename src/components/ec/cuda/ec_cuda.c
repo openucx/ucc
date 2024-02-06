@@ -282,7 +282,9 @@ ucc_status_t ucc_ec_cuda_get_resources(ucc_ec_cuda_resources_t **resources)
 #else
     status = CUDADRV_FUNC(cuCtxGetId(cu_ctx, &cu_ctx_id));
     if (ucc_unlikely(status != UCC_OK)) {
-        ec_error(&ucc_ec_cuda.super, "failed to get currect CUDA context ID");
+        /* worakround for pytorch, progress thread doesn't have cuda context for GPU 0*/
+        cu_ctx_id = 0x12345;
+        ec_debug(&ucc_ec_cuda.super, "failed to get currect CUDA context ID");
     }
 #endif
 
