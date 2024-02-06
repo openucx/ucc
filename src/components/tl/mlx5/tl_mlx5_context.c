@@ -49,17 +49,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
         goto err_rcache;
     }
 
-    status = ucc_tl_mlx5_mcast_context_init(&(self->mcast), &(self->cfg.mcast_ctx_conf));
-    if (UCC_OK != status) {
-        tl_debug(self->super.super.lib, "failed to initialize mcast context");
-        goto err_mcast_context;
-    }
-
     return UCC_OK;
 
-err_mcast_context:
-    ucc_rcache_destroy(self->rcache);
 err_rcache:
+    ucc_rcache_destroy(self->rcache);
     ucc_mpool_cleanup(&self->req_mp, 1);
     return status;
 }
