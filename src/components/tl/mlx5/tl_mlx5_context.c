@@ -52,7 +52,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
     return UCC_OK;
 
 err_rcache:
-    ucc_rcache_destroy(self->rcache);
     ucc_mpool_cleanup(&self->req_mp, 1);
     return status;
 }
