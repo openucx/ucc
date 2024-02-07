@@ -114,7 +114,11 @@ ucc_status_t ucc_cpu_executor_task_post(ucc_ee_executor_t *executor,
     switch (task_args->task_type) {
     case UCC_EE_EXECUTOR_TASK_REDUCE:
         status = ucc_ec_cpu_reduce((ucc_eee_task_reduce_t *)&task_args->reduce,
-                                   task_args->flags);
+                                   (task_args->flags &
+                                        UCC_EEE_TASK_FLAG_REDUCE_SRCS_EXT) ?
+                                        task_args->reduce.srcs_ext :
+                                        task_args->reduce.srcs,
+                                    task_args->flags);
         if (ucc_unlikely(UCC_OK != status)) {
             goto free_task;
         }
@@ -147,7 +151,7 @@ ucc_status_t ucc_cpu_executor_task_post(ucc_ee_executor_t *executor,
         tr.dst    = trs->dst;
         tr.alpha  = trs->alpha;
 
-        status = ucc_ec_cpu_reduce(&tr, flags);
+        status = ucc_ec_cpu_reduce(&tr, srcs, flags);
         if (ucc_unlikely(UCC_OK != status)) {
             goto free_task;
         }
