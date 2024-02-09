@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -63,6 +63,8 @@ typedef struct ucc_coll_score {
 
 typedef struct ucc_score_map ucc_score_map_t;
 
+char *ucc_score_to_str(ucc_score_t score, char *buf, size_t max);
+
 /* Allocates empty score data structure */
 ucc_status_t  ucc_coll_score_alloc(ucc_coll_score_t **score);
 
@@ -77,7 +79,7 @@ ucc_status_t  ucc_coll_score_add_range(ucc_coll_score_t *score,
 
 /* Releases the score data structure and all the score ranges stored
    there */
-void          ucc_coll_score_free(ucc_coll_score_t *score);
+void ucc_coll_score_free(ucc_coll_score_t *score);
 
 /* Merges 2 scores score1 and score2 into the new score "rst" selecting
    larger score. Ie.: rst will contain a range from score1 if either
@@ -87,9 +89,9 @@ void          ucc_coll_score_free(ucc_coll_score_t *score);
     This fn is used by CL to merge scores from multiple TLs and produce
     a score map. As a result the produced score map will select TL with
     higher score.*/
-ucc_status_t  ucc_coll_score_merge(ucc_coll_score_t * score1,
-                                   ucc_coll_score_t * score2,
-                                   ucc_coll_score_t **rst, int free_inputs);
+ucc_status_t ucc_coll_score_merge(ucc_coll_score_t * score1,
+                                  ucc_coll_score_t * score2,
+                                  ucc_coll_score_t **rst, int free_inputs);
 
 
 /* Parses SCORE string (see ucc_base_iface.c for pattern description)
@@ -147,7 +149,7 @@ ucc_status_t ucc_coll_score_build_default(ucc_base_team_t        *team,
 ucc_status_t ucc_coll_score_build_map(ucc_coll_score_t *score,
                                       ucc_score_map_t **map);
 
-void         ucc_coll_score_free_map(ucc_score_map_t *map);
+void ucc_coll_score_free_map(ucc_score_map_t *map);
 
 /* Initializes task based on args selection and score map.
    Checks fallbacks if necessary. */
