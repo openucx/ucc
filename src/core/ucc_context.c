@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -44,6 +44,11 @@ static ucc_config_field_t ucc_context_config_table[] = {
      "Use internal OOB transport for team creation. Available for ucc_context "
      "is configured with OOB (global mode). 0 - disable, 1 - try, 2 - force.",
      ucc_offsetof(ucc_context_config_t, internal_oob), UCC_CONFIG_TYPE_UINT},
+
+    {"THROTTLE_PROGRESS", "1000",
+     "Throttle UCC progress to every <n>th invocation",
+     ucc_offsetof(ucc_context_config_t, throttle_progress),
+     UCC_CONFIG_TYPE_UINT},
 
     {NULL}};
 UCC_CONFIG_REGISTER_TABLE(ucc_context_config_table, "UCC context", NULL,
@@ -614,9 +619,10 @@ ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
-    ctx->rank          = UCC_RANK_MAX;
-    ctx->lib           = lib;
-    ctx->ids.pool_size = config->team_ids_pool_size;
+    ctx->throttle_progress = config->throttle_progress;
+    ctx->rank              = UCC_RANK_MAX;
+    ctx->lib               = lib;
+    ctx->ids.pool_size     = config->team_ids_pool_size;
     ucc_list_head_init(&ctx->progress_list);
     ucc_copy_context_params(&ctx->params, params);
     ucc_copy_context_params(&b_params.params, params);
@@ -957,12 +963,25 @@ ucc_status_t ucc_context_progress_deregister(ucc_context_t *ctx,
 
 ucc_status_t ucc_context_progress(ucc_context_h context)
 {
+    static int                    call_num = 0;
     ucc_status_t                  status;
     ucc_context_progress_entry_t *entry;
-    /* progress registered progress fns */
-    ucc_list_for_each(entry, &context->progress_list, list_elem) {
-        entry->fn(entry->arg);
+    int                           is_empty;
+
+    is_empty = ucc_progress_queue_is_empty(context->pq);
+    if (ucc_likely(is_empty)) {
+        call_num--;
+        if (ucc_likely(call_num >= 0)) {
+            return UCC_OK;
+        }
+        /* progress registered progress fns */
+        ucc_list_for_each(entry, &context->progress_list, list_elem) {
+            entry->fn(entry->arg);
+        }
+        call_num = context->throttle_progress;
+        return UCC_OK;
     }
+
     /* the fn below returns int - number of completed tasks.
        TODO : do we need to handle it ? Maybe return to user
        as int as well? */

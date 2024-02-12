@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -25,7 +26,7 @@ typedef struct ucc_pq_mt_locked {
 } ucc_pq_mt_locked_t;
 
 static void ucc_pq_locked_mt_enqueue(ucc_progress_queue_t *pq,
-                                     ucc_coll_task_t *     task)
+                                     ucc_coll_task_t *task)
 {
     ucc_pq_mt_locked_t *pq_mt = ucc_derived_of(pq, ucc_pq_mt_locked_t);
 
@@ -42,7 +43,7 @@ static void ucc_pq_mt_enqueue(ucc_progress_queue_t *pq, ucc_coll_task_t *task)
 }
 
 static void ucc_pq_locked_mt_dequeue(ucc_progress_queue_t *pq,
-                                     ucc_coll_task_t **    popped_task)
+                                     ucc_coll_task_t **popped_task)
 {
     ucc_pq_mt_locked_t *pq_mt = ucc_derived_of(pq, ucc_pq_mt_locked_t);
     *popped_task              = NULL;
@@ -56,7 +57,7 @@ static void ucc_pq_locked_mt_dequeue(ucc_progress_queue_t *pq,
 }
 
 static void ucc_pq_mt_dequeue(ucc_progress_queue_t *pq,
-                              ucc_coll_task_t **    popped_task)
+                              ucc_coll_task_t **popped_task)
 {
     ucc_pq_mt_t *pq_mt  = ucc_derived_of(pq, ucc_pq_mt_t);
     ucc_lf_queue_elem_t *elem   = ucc_lf_queue_dequeue(&pq_mt->lf_queue, 1);
@@ -100,6 +101,20 @@ static int ucc_pq_mt_progress(ucc_progress_queue_t *pq)
     return n_progressed;
 }
 
+static int ucc_pq_locked_mt_is_empty(ucc_progress_queue_t *pq)
+{
+    ucc_pq_mt_locked_t *pq_mt = ucc_derived_of(pq, ucc_pq_mt_locked_t);
+
+/* this function should not be very accurate for the purpose of progress throttling */
+    return ucc_list_is_empty(&pq_mt->queue);
+}
+
+static int ucc_pq_mt_is_empty(ucc_progress_queue_t *pq) //NOLINT: pq is unused
+{
+/* lock free progress queue never use throttling */
+    return 0;
+}
+
 static void ucc_pq_locked_mt_finalize(ucc_progress_queue_t *pq)
 {
     ucc_pq_mt_locked_t *pq_mt = ucc_derived_of(pq, ucc_pq_mt_locked_t);
@@ -128,6 +143,7 @@ ucc_status_t ucc_pq_mt_init(ucc_progress_queue_t **pq,
         pq_mt->super.dequeue    = ucc_pq_mt_dequeue;
         pq_mt->super.progress   = ucc_pq_mt_progress;
         pq_mt->super.finalize   = ucc_pq_mt_finalize;
+        pq_mt->super.is_empty   = ucc_pq_mt_is_empty;
         *pq                     = &pq_mt->super;
     } else {
         ucc_pq_mt_locked_t *pq_mt = ucc_malloc(sizeof(*pq_mt), "pq_mt");
@@ -141,6 +157,7 @@ ucc_status_t ucc_pq_mt_init(ucc_progress_queue_t **pq,
         pq_mt->super.dequeue  = ucc_pq_locked_mt_dequeue;
         pq_mt->super.progress = ucc_pq_mt_progress;
         pq_mt->super.finalize = ucc_pq_locked_mt_finalize;
+        pq_mt->super.is_empty = ucc_pq_locked_mt_is_empty;
         *pq                   = &pq_mt->super;
     }
     return UCC_OK;

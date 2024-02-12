@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -67,6 +68,13 @@ static void ucc_pq_st_finalize(ucc_progress_queue_t *pq)
     ucc_free(pq_st);
 }
 
+static int ucc_pq_st_is_empty(ucc_progress_queue_t *pq)
+{
+    ucc_pq_st_t *pq_st = ucc_derived_of(pq, ucc_pq_st_t);
+
+    return ucc_list_is_empty(&pq_st->list);
+}
+
 ucc_status_t ucc_pq_st_init(ucc_progress_queue_t **pq)
 {
     ucc_pq_st_t *pq_st = ucc_malloc(sizeof(*pq_st), "pq_st");
@@ -79,6 +87,8 @@ ucc_status_t ucc_pq_st_init(ucc_progress_queue_t **pq)
     pq_st->super.dequeue  = NULL;
     pq_st->super.progress = ucc_pq_st_progress;
     pq_st->super.finalize = ucc_pq_st_finalize;
+    pq_st->super.is_empty = ucc_pq_st_is_empty;
+
     *pq                   = &pq_st->super;
     return UCC_OK;
 }
