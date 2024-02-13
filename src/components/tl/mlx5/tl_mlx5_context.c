@@ -242,6 +242,7 @@ start_bcast:
     steam = core_ctx->service_team;
     s.map    = sbgp->map;
     s.myrank = sbgp->group_rank;
+
     status = UCC_TL_TEAM_IFACE(steam)->scoll.bcast(
         &steam->super, sbcast_data, sbcast_data_length, PD_OWNER_RANK, s, &req);
 

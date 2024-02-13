@@ -205,9 +205,8 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
     }
 
     if (UCC_COLL_ARGS_ACTIVE_SET(coll_args) &&
-        ((UCC_COLL_TYPE_BCAST != coll_args->coll_type) ||
-         coll_args->active_set.size != 2)) {
-        ucc_warn("Active Sets are only supported for bcast and set size = 2");
+        (UCC_COLL_TYPE_BCAST != coll_args->coll_type)) {
+        ucc_warn("Active Sets are only supported for bcast");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
