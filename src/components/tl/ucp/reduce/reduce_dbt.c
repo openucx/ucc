@@ -155,6 +155,8 @@ void ucc_tl_ucp_reduce_dbt_progress(ucc_coll_task_t *coll_task)
     task->reduce_dbt.state = REDUCE;
 
 REDUCE:
+/* test_recv is needed to progress ucp_worker */
+    ucc_tl_ucp_test_recv(task);
     for (i = 0; i < 2; i++) {
         if (trees[i].recv == trees[i].n_children &&
             !task->reduce_dbt.reduction_comp[i]) {
@@ -216,6 +218,8 @@ TEST:
     }
 
 TEST_ROOT:
+/* test_recv is needed to progress ucp_worker */
+    ucc_tl_ucp_test_recv(task);
     if (UCC_INPROGRESS == ucc_tl_ucp_test_send(task) ||
         task->reduce_dbt.reduction_comp[0] != trees[0].recv ||
         task->reduce_dbt.reduction_comp[1] != trees[1].recv) {

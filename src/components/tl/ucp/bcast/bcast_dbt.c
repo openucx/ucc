@@ -107,6 +107,8 @@ void ucc_tl_ucp_bcast_dbt_progress(ucc_coll_task_t *coll_task)
     task->bcast_dbt.state = SEND_T1;
 
 SEND_T1:
+/* test_recv is needed to progress ucp_worker */
+    ucc_tl_ucp_test_recv(task);
     if ((coll_root == rank) || (task->bcast_dbt.t1.recv > 0)) {
         for (i = 0; i < 2; i++) {
             if ((t1.children[i] != UCC_RANK_INVALID) &&
@@ -122,6 +124,8 @@ SEND_T1:
     task->bcast_dbt.state = SEND_T2;
 
 SEND_T2:
+/* test_recv is needed to progress ucp_worker */
+    ucc_tl_ucp_test_recv(task);
     if ((coll_root == rank) || (task->bcast_dbt.t2.recv > 0)) {
         for (i = 0; i < 2; i++) {
             if ((t2.children[i] != UCC_RANK_INVALID) &&
@@ -231,6 +235,7 @@ ucc_status_t ucc_tl_ucp_bcast_dbt_init(
     task->super.post     = ucc_tl_ucp_bcast_dbt_start;
     task->super.progress = ucc_tl_ucp_bcast_dbt_progress;
     task->super.finalize = ucc_tl_ucp_bcast_dbt_finalize;
+    task->n_polls        = ucc_max(1, task->n_polls);
     tl_team              = TASK_TEAM(task);
     rank                 = UCC_TL_TEAM_RANK(tl_team);
     size                 = UCC_TL_TEAM_SIZE(tl_team);
