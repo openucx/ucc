@@ -430,7 +430,7 @@ exit_err:
 void proc_context_create_mem_params(UccProcess_h proc, int id,
                                     ThreadAllgather *ta)
 {
-    ucc_mem_map_t        map[UCC_TEST_N_MEM_SEGMENTS] = {0};
+    ucc_mem_map_t        map[UCC_TEST_N_MEM_SEGMENTS] = {};
     ucc_status_t         status;
     ucc_context_config_h ctx_config;
     std::stringstream    err_msg;
