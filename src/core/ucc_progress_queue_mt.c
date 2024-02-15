@@ -105,13 +105,13 @@ static int ucc_pq_locked_mt_is_empty(ucc_progress_queue_t *pq)
 {
     ucc_pq_mt_locked_t *pq_mt = ucc_derived_of(pq, ucc_pq_mt_locked_t);
 
-/* this function should not be very accurate for the purpose of progress throttling */
+    /* this function should not be very accurate for the purpose of progress throttling */
     return ucc_list_is_empty(&pq_mt->queue);
 }
 
 static int ucc_pq_mt_is_empty(ucc_progress_queue_t *pq) //NOLINT: pq is unused
 {
-/* lock free progress queue never use throttling */
+    /* lock free progress queue never use throttling */
     return 0;
 }
 

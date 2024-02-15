@@ -77,7 +77,6 @@ typedef struct ucc_context {
     ucc_context_topo_t      *topo;
     uint64_t                 cl_flags;
     ucc_tl_team_t           *service_team;
-
     int32_t                  throttle_progress;
 } ucc_context_t;
 
