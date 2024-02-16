@@ -16,6 +16,7 @@
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
 #include "utils/ucc_rcache.h"
+#include "core/ucc_service_coll.h"
 
 #define POLL_PACKED       16
 #define REL_DONE          ((void*)-1)
@@ -119,6 +120,7 @@ typedef struct ucc_tl_mlx5_mcast_rcache_region {
 } ucc_tl_mlx5_mcast_rcache_region_t;
 
 typedef struct ucc_tl_mlx5_mcast_ctx_params {
+    int      mcast_enabled;
     char    *ib_dev_name;
     int      print_nack_stats;
     int      timeout;
@@ -142,11 +144,19 @@ typedef struct ucc_tl_mlx5_mcast_coll_context {
     ucc_base_lib_t                *lib;
 } ucc_tl_mlx5_mcast_coll_context_t;
 
+typedef struct ucc_tl_mlx5_mcast_join_info_t {
+    ucc_status_t  status;
+    uint16_t      dlid;
+    union ibv_gid dgid;
+} ucc_tl_mlx5_mcast_join_info_t;
+
 typedef struct ucc_tl_mlx5_mcast_context {
     ucc_thread_mode_t                  tm;
     ucc_tl_mlx5_mcast_coll_context_t   mcast_context;
     ucc_tl_mlx5_mcast_context_config_t cfg;
     ucc_mpool_t                        req_mp;
+    int                                mcast_enabled;
+    int                                mcast_ready;
     ucc_tl_mlx5_mcast_oob_ctx_t        oob_ctx;
 } ucc_tl_mlx5_mcast_context_t;
 
@@ -225,6 +235,11 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                     n_prep_reliable;
     int                                     n_mcast_reliable;
     int                                     wsize;
+    ucc_tl_mlx5_mcast_join_info_t          *group_setup_info;
+    ucc_service_coll_req_t                 *group_setup_info_req;
+    ucc_status_t                           (*bcast_post) (void*, void*, size_t, ucc_rank_t, ucc_service_coll_req_t**);
+    ucc_status_t                           (*bcast_test) (ucc_service_coll_req_t*);
+    struct rdma_cm_event                   *event;
     struct pp_packet                       *r_window[1]; // do not add any new variable after here
 } ucc_tl_mlx5_mcast_coll_comm_t;
 
@@ -352,6 +367,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *tl_context,
                                          const ucc_base_team_params_t *params,
                                          ucc_tl_mlx5_mcast_coll_comm_init_spec_t *mcast_conf);
 
+ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team);
+
 ucc_status_t ucc_tl_mlx5_mcast_coll_init(ucc_base_coll_args_t *coll_args,
                                          ucc_base_team_t *team,
                                          ucc_coll_task_t **task_h);
@@ -359,4 +376,6 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_init(ucc_base_coll_args_t *coll_args,
 ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t *mcast_ctx,
                                             ucc_tl_mlx5_mcast_ctx_params_t *mcast_ctx_conf);
 
+
+ucc_status_t ucc_tl_mlx5_mcast_clean_ctx(ucc_tl_mlx5_mcast_coll_context_t *ctx);
 #endif

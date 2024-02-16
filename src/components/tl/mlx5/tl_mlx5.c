@@ -102,6 +102,10 @@ static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.timeout),
      UCC_CONFIG_TYPE_INT},
 
+    {"MCAST_ENABLE", "0", "Enable Mcast",
+     ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.mcast_enabled),
+     UCC_CONFIG_TYPE_INT},
+
     {"MCAST_NET_DEVICE", "", "Specifies which network device to use for Mcast",
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.ib_dev_name),
      UCC_CONFIG_TYPE_STRING},
