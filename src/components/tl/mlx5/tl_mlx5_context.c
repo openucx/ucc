@@ -74,7 +74,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
         tl_debug(self->super.super.lib, "failed to free ib ctx and pd");
     };
 
-    if (!self->sock) {
+    if (self->sock) {
         close(self->sock);
     }
 
