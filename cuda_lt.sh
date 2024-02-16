@@ -28,7 +28,7 @@ mkdir -p $pic_dir
 
 tmpcmd="${@:3}"
 if [[ "$tmpcmd" == *"amdclang"* ]]; then
-  cmd="${@:3:2} -x hip -target x86_64-unknown-linux-gnu --offload-arch=gfx908:xnack- --offload-arch=gfx90a:xnack- --offload-arch=gfx90a:xnack+ --offload-arch=gfx940 --offload-arch=gfx941 --offload-arch=gfx942 --offload-arch=gfx1030 --offload-arch=gfx1100 --offload-arch=gfx1101 --offload-arch=gfx1102 --offload-arch=native ${@:5} -fPIC -o ${pic_filepath}"
+  cmd="${@:3:2} -x hip -target x86_64-unknown-linux-gnu --offload-arch=gfx908 --offload-arch=gfx90a --offload-arch=gfx940 --offload-arch=gfx941 --offload-arch=gfx942 --offload-arch=gfx1030 --offload-arch=gfx1100 --offload-arch=gfx1101 --offload-arch=gfx1102 --offload-arch=native ${@:5} -fPIC -O3 -o ${pic_filepath}"
 elif [[ "$tmpcmd" == *"hipcc"* ]]; then
   cmd="${@:3} -fPIC -o ${pic_filepath}"
 else
@@ -38,7 +38,7 @@ echo $cmd
 $cmd
 
 if [[ "$tmpcmd" == *"amdclang"* ]]; then
-  cmd="${@:3:2} -x hip -target x86_64-unknown-linux-gnu --offload-arch=gfx908:xnack- --offload-arch=gfx90a:xnack- --offload-arch=gfx90a:xnack+ --offload-arch=gfx940 --offload-arch=gfx941 --offload-arch=gfx942 --offload-arch=gfx1030 --offload-arch=gfx1100 --offload-arch=gfx1101 --offload-arch=gfx1102 --offload-arch=native ${@:5} -o ${npic_filepath}"
+  cmd="${@:3:2} -x hip -target x86_64-unknown-linux-gnu --offload-arch=gfx908 --offload-arch=gfx90a --offload-arch=gfx940 --offload-arch=gfx941 --offload-arch=gfx942 --offload-arch=gfx1030 --offload-arch=gfx1100 --offload-arch=gfx1101 --offload-arch=gfx1102 --offload-arch=native ${@:5} -O3 -o ${npic_filepath}"
 else
   cmd="${@:3} -o ${npic_filepath}"
 fi
