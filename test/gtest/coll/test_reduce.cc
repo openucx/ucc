@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -283,55 +283,66 @@ template <typename T> class test_reduce_avg_order : public test_reduce<T> {
 template <typename T> class test_reduce_dbt : public test_reduce<T> {
 };
 
-#define TEST_DECLARE_WITH_ENV(_env, _n_procs)                                    \
-    {                                                                            \
-        UccJob        job(_n_procs, UccJob::UCC_JOB_CTX_GLOBAL, _env);           \
-        UccTeam_h     team   = job.create_team(_n_procs);                        \
-        int           repeat = 3;                                                \
-        UccCollCtxVec ctxs;                                                      \
-        std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};              \
-        if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {                  \
-            mt.push_back(UCC_MEMORY_TYPE_CUDA);                                  \
-        }                                                                        \
-        if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {          \
-            mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);                          \
-        }                                                                        \
-        for (auto count : {5, 256, 65536}) {                                     \
-            for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {               \
-                for (auto m : mt) {                                              \
-                    CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, m);      \
-                    SET_MEM_TYPE(m);                                             \
-                    this->set_inplace(inplace);                                  \
-                    this->data_init(_n_procs, TypeParam::dt, count, ctxs, true); \
-                    UccReq req(team, ctxs);                                      \
-                    CHECK_REQ_NOT_SUPPORTED_SKIP(req, this->data_fini(ctxs));    \
-                    for (auto i = 0; i < repeat; i++) {                          \
-                        req.start();                                             \
-                        req.wait();                                              \
-                        EXPECT_EQ(true, this->data_validate(ctxs));              \
-                        this->reset(ctxs);                                       \
-                    }                                                            \
-                    this->data_fini(ctxs);                                       \
-                }                                                                \
-            }                                                                    \
-        }                                                                        \
+template <typename T> class test_reduce_2step : public test_reduce<T> {
+};
+
+#define TEST_DECLARE_WITH_ENV(_env, _n_procs, _persistent)                     \
+    {                                                                          \
+        UccJob        job(_n_procs, UccJob::UCC_JOB_CTX_GLOBAL, _env);         \
+        UccTeam_h     team   = job.create_team(_n_procs);                      \
+        int           repeat = _persistent ? 3 : 1;                            \
+        UccCollCtxVec ctxs;                                                    \
+        std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};            \
+        if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {                \
+            mt.push_back(UCC_MEMORY_TYPE_CUDA);                                \
+        }                                                                      \
+        if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {        \
+            mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);                        \
+        }                                                                      \
+        for (auto count : {5, 256, 65536}) {                                   \
+            for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {             \
+                for (auto m : mt) {                                            \
+                    CHECK_TYPE_OP_SKIP(TypeParam::dt, TypeParam::redop, m);    \
+                    SET_MEM_TYPE(m);                                           \
+                    this->set_inplace(inplace);                                \
+                    this->data_init(_n_procs, TypeParam::dt, count, ctxs,      \
+                                    _persistent);                              \
+                    UccReq req(team, ctxs);                                    \
+                    CHECK_REQ_NOT_SUPPORTED_SKIP(req, this->data_fini(ctxs));  \
+                    for (auto i = 0; i < repeat; i++) {                        \
+                        req.start();                                           \
+                        req.wait();                                            \
+                        EXPECT_EQ(true, this->data_validate(ctxs));            \
+                        this->reset(ctxs);                                     \
+                    }                                                          \
+                    this->data_fini(ctxs);                                     \
+                }                                                              \
+            }                                                                  \
+        }                                                                      \
     }
 
 TYPED_TEST_CASE(test_reduce_avg_order, CollReduceTypeOpsAvg);
 TYPED_TEST_CASE(test_reduce_dbt, CollReduceTypeOpsHost);
+TYPED_TEST_CASE(test_reduce_2step, CollReduceTypeOpsHost);
 
-ucc_job_env_t post_op_env    = {{"UCC_TL_UCP_REDUCE_AVG_PRE_OP", "0"}};
-ucc_job_env_t reduce_dbt_env = {{"UCC_TL_UCP_TUNE", "reduce:@dbt:0-inf:inf"},
-                                {"UCC_CLS", "basic"}};
+ucc_job_env_t post_op_env      = {{"UCC_TL_UCP_REDUCE_AVG_PRE_OP", "0"}};
+ucc_job_env_t reduce_dbt_env   = {{"UCC_TL_UCP_TUNE", "reduce:@dbt:0-inf:inf"},
+                                  {"UCC_CLS", "basic"}};
+ucc_job_env_t reduce_2step_env = {{"UCC_CL_HIER_TUNE", "reduce:@2step:0-inf:inf"},
+                                  {"UCC_CLS", "all"}};
 
 TYPED_TEST(test_reduce_avg_order, avg_post_op) {
-    TEST_DECLARE_WITH_ENV(post_op_env, 15);
+    TEST_DECLARE_WITH_ENV(post_op_env, 15, true);
 }
 
 TYPED_TEST(test_reduce_dbt, reduce_dbt_shift) {
-    TEST_DECLARE_WITH_ENV(reduce_dbt_env, 15);
+    TEST_DECLARE_WITH_ENV(reduce_dbt_env, 15, true);
 }
 
 TYPED_TEST(test_reduce_dbt, reduce_dbt_mirror) {
-    TEST_DECLARE_WITH_ENV(reduce_dbt_env, 16);
+    TEST_DECLARE_WITH_ENV(reduce_dbt_env, 16, true);
+}
+
+TYPED_TEST(test_reduce_2step, 2step) {
+    TEST_DECLARE_WITH_ENV(reduce_2step_env, 16, false);
 }

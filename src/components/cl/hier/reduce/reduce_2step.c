@@ -117,7 +117,9 @@ ucc_cl_hier_reduce_2step_init_schedule(ucc_base_coll_args_t *coll_args,
             ? find_root_node_rank(root, cl_team) : 0;
 
         if ((root != rank) && SBGP_ENABLED(cl_team, NODE_LEADERS)) {
-            status = ucc_mc_alloc(&cl_schedule->scratch, args.max_frag_count,
+            status = ucc_mc_alloc(&cl_schedule->scratch,
+                                  args.max_frag_count *
+                                  ucc_dt_size(args.args.src.info.datatype),
                                   args.args.src.info.mem_type);
             if (ucc_unlikely(UCC_OK != status)) {
                 goto out;
@@ -273,7 +275,8 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_reduce_2step_init,
     int                       n_frags, pipeline_depth;
     ucc_status_t              status;
 
-    if (coll_args->args.op == UCC_OP_AVG) {
+    if (UCC_IS_PERSISTENT(coll_args->args) ||
+        (coll_args->args.op == UCC_OP_AVG)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
