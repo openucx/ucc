@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -64,14 +64,14 @@ typedef struct ucc_tl_mlx5_mcast_p2p_completion_obj {
 
 typedef int (*ucc_tl_mlx5_mcast_p2p_wait_cb_fn_t)(void *wait_arg);
 
-typedef int (*ucc_tl_mlx5_mcast_p2p_send_nb_fn_t)(void* src, size_t size,
-                                                  ucc_rank_t rank, void *context,
-                                                  ucc_tl_mlx5_mcast_p2p_completion_obj_t *compl_obj);
+typedef ucc_status_t (*ucc_tl_mlx5_mcast_p2p_send_nb_fn_t)(void* src, size_t size,
+                                                           ucc_rank_t rank, void *context,
+                                                           ucc_tl_mlx5_mcast_p2p_completion_obj_t *compl_obj);
 
 
-typedef int (*ucc_tl_mlx5_mcast_p2p_recv_nb_fn_t)(void* src, size_t size,
-                                                  ucc_rank_t rank, void *context,
-                                                  ucc_tl_mlx5_mcast_p2p_completion_obj_t *compl_obj);
+typedef ucc_status_t (*ucc_tl_mlx5_mcast_p2p_recv_nb_fn_t)(void* src, size_t size,
+                                                           ucc_rank_t rank, void *context,
+                                                           ucc_tl_mlx5_mcast_p2p_completion_obj_t *compl_obj);
 
 typedef struct ucc_tl_mlx5_mcast_p2p_interface {
     ucc_tl_mlx5_mcast_p2p_send_nb_fn_t  send_nb;
@@ -228,8 +228,8 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     void                                   *p2p_ctx;
     ucc_base_lib_t                         *lib;
     struct sockaddr_in6                     mcast_addr;
-    int                                     parents[MAX_COMM_POW2];
-    int                                     children[MAX_COMM_POW2];
+    ucc_rank_t                              parents[MAX_COMM_POW2];
+    ucc_rank_t                              children[MAX_COMM_POW2];
     int                                     nack_requests;
     int                                     nacks_counter;
     int                                     n_prep_reliable;

@@ -45,7 +45,14 @@ free_task:
 
 ucc_status_t ucc_tl_mlx5_task_finalize(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_mlx5_task_t *task = ucc_derived_of(coll_task, ucc_tl_mlx5_task_t);
+    ucc_tl_mlx5_task_t           *task = ucc_derived_of(coll_task, ucc_tl_mlx5_task_t);
+    ucc_tl_mlx5_mcast_coll_req_t *req = task->bcast_mcast.req_handle;
+
+    if (req != NULL) {
+        ucc_assert(coll_task->status != UCC_INPROGRESS);
+        ucc_free(req);
+        task->bcast_mcast.req_handle = NULL;
+    }
 
     tl_trace(UCC_TASK_LIB(task), "finalizing task %p", task);
     ucc_tl_mlx5_put_task(task);

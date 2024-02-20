@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -329,7 +329,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 
             case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST:
             {
-                /* rank 0 has already called rdma_join_multicast() 
+                /* rank 0 has already called rdma_join_multicast()
                  * it is time to wait for the rdma event to confirm the join */
                 status = ucc_tl_mlx5_mcast_join_mcast_test(comm->ctx, &comm->event, 1);
                 if (UCC_OK != status) {
@@ -437,7 +437,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                 status = ucc_tl_mlx5_mcast_coll_setup_comm_resources(comm);
                 if (UCC_OK != status) {
                     return status;
-                } 
+                }
 
                 tl_debug(comm->lib, "initialized tl mcast team: %p", tl_team);
                 tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_READY;
@@ -525,7 +525,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 
             case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST:
             {
-                /* none-root rank has already called rdma_join_multicast() 
+                /* none-root rank has already called rdma_join_multicast()
                  * it is time to wait for the rdma event to confirm the join */
                 status = ucc_tl_mlx5_mcast_join_mcast_test(comm->ctx, &comm->event, 0);
                 if (UCC_OK != status) {
@@ -568,7 +568,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                 status = ucc_tl_mlx5_mcast_coll_setup_comm_resources(comm);
                 if (UCC_OK != status) {
                     return status;
-                } 
+                }
 
                 tl_debug(comm->lib, "initialized tl mcast team: %p", tl_team);
                 tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_READY;
@@ -586,7 +586,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
             {
                 tl_error(comm->lib, "unknown state during mcast team: %p create", tl_team);
                 return UCC_ERR_NO_RESOURCE;
-            } 
+            }
         }
     }
 }

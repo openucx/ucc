@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -417,15 +417,21 @@ ucc_status_t ucc_tl_mlx5_fini_mcast_group(ucc_tl_mlx5_mcast_coll_context_t *ctx,
 
 ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
 {
-    int          ret;
-    ucc_status_t status;
+    ucc_tl_mlx5_mcast_context_t *mcast_ctx = ucc_container_of(comm->ctx, ucc_tl_mlx5_mcast_context_t, mcast_context);
+    ucc_tl_mlx5_context_t       *mlx5_ctx  = ucc_container_of(mcast_ctx, ucc_tl_mlx5_context_t, mcast);
+    ucc_context_h                context   = mlx5_ctx->super.super.ucc_context;
+    int                          ret;
+    ucc_status_t                 status;
 
     tl_debug(comm->lib, "cleaning  mcast comm: %p, id %d, mlid %x",
              comm, comm->comm_id, comm->mcast_lid);
 
-    if (UCC_OK != (status = ucc_tl_mlx5_mcast_reliable(comm))) {
-        // TODO handle (UCC_INPROGRESS == ret)
-        tl_error(comm->lib, "couldn't clean mcast team: relibality progress status %d",
+    while (UCC_INPROGRESS == (status = ucc_tl_mlx5_mcast_reliable(comm))) {
+        ucc_context_progress(context);
+    }
+
+    if (UCC_OK != status) {
+        tl_error(comm->lib, "failed to clean mcast team: relibality progress status %d",
                  status);
         return status;
     }
