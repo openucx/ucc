@@ -1881,6 +1881,8 @@ typedef struct ucc_coll_args {
                                                   exchanged with the team
                                                   associated with the collective
                                                   via an allgather operation.
+                                                  Memory is unmapped during
+                                                  context destruction.
                                                   It is recommended to use this
                                                   option sparingly due to the
                                                   increased overhead. Not necessary
