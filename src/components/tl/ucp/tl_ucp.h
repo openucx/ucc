@@ -217,10 +217,36 @@ extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 #define UCC_TL_UCP_DYN_REMOTE_RKEY(_ctx, _rank, _size, _seg)                   \
     ((_ctx)->rkeys[_size * _ctx->n_rinfo_segs + _rank * _ctx->n_dynrinfo_segs + _seg])
 
-/*
 #define UCC_TL_UCP_REMOTE_DYN_RVA(_ctx, _rank, _seg)                           \
-    (PTR_OFFSET((_ctx)->dyn_seg.dyn_buff, (_ctx)->dyn_seg.seg_group_start[_seg] + (_ctx)->dyn_seg.seg_groups[_seg] * _rank))
-*/
+    *(uint64_t *)(PTR_OFFSET(_ctx->dyn_seg.dyn_buff,                           \
+        _ctx->dyn_seg.seg_group_start[_seg]                                    \
+      + _ctx->dyn_seg.seg_group_size[_ctx->dyn_seg.seg_groups[_seg]] * _rank   \
+      + (_seg - _ctx->dyn_seg.starting_seg[_seg]) * sizeof(uint64_t)))
+
+#define UCC_TL_UCP_REMOTE_DYN_LEN(_ctx, _rank, _seg)                           \
+    *(uint64_t *)(PTR_OFFSET(_ctx->dyn_seg.dyn_buff,                           \
+      sizeof(uint64_t)                                                         \
+      * _ctx->dyn_seg.num_seg_per_group[_ctx->dyn_seg.seg_groups[_seg]]        \
+      + _ctx->dyn_seg.seg_group_start[_seg]                                    \
+      + _ctx->dyn_seg.seg_group_size[_ctx->dyn_seg.seg_groups[_seg]] * _rank   \
+      + (_seg - _ctx->dyn_seg.starting_seg[_seg]) * sizeof(uint64_t)))
+
+#define UCC_TL_UCP_REMOTE_DYN_KEY_SIZE(_ctx, _rank, _seg)                      \
+    *(uint64_t *)(PTR_OFFSET(_ctx->dyn_seg.dyn_buff,                           \
+      2 * sizeof(uint64_t)                                                     \
+      * _ctx->dyn_seg.num_seg_per_group[_ctx->dyn_seg.seg_groups[_seg]]        \
+      + _ctx->dyn_seg.seg_group_start[_seg]                                    \
+      + _ctx->dyn_seg.seg_group_size[_ctx->dyn_seg.seg_groups[_seg]] * _rank   \
+      + (_seg - _ctx->dyn_seg.starting_seg[_seg]) * sizeof(uint64_t)))
+
+#define UCC_TL_UCP_REMOTE_DYN_KEY(_ctx, _rank, _offset, _seg)                  \
+    (PTR_OFFSET(_ctx->dyn_seg.dyn_buff,                                        \
+      3 * sizeof(uint64_t)                                                     \
+      * _ctx->dyn_seg.num_seg_per_group[_ctx->dyn_seg.seg_groups[_seg]]        \
+      + _ctx->dyn_seg.seg_group_start[_seg]                                    \
+      + _ctx->dyn_seg.seg_group_size[_ctx->dyn_seg.seg_groups[_seg]] * _rank   \
+      + _offset))
+
 extern ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1];
 
 void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
@@ -229,45 +255,4 @@ void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,
 ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t *ctx,
                                             ucc_mem_map_params_t  map,
                                             ucc_team_oob_coll_t   oob);
-
-// FIXME convert to macro
-static inline uint64_t UCC_TL_UCP_REMOTE_DYN_RVA(ucc_tl_ucp_context_t *ctx,
-                                        ucc_rank_t rank,
-                                        uint64_t seg)
-{
-    int seg_group_id = ctx->dyn_seg.seg_groups[seg];
-    uint64_t *prva = PTR_OFFSET(ctx->dyn_seg.dyn_buff, ctx->dyn_seg.seg_group_start[seg] + ctx->dyn_seg.seg_group_size[seg_group_id] * rank + (seg - ctx->dyn_seg.starting_seg[seg]) * sizeof(uint64_t));
-    return *prva;//[seg - ctx->dyn_seg.starting_seg[seg]];
-}
-
-// FIXME convert to macro
-static inline uint64_t UCC_TL_UCP_REMOTE_DYN_LEN(ucc_tl_ucp_context_t *ctx,
-                                        ucc_rank_t rank,
-                                        uint64_t seg)
-{
-    int seg_group_id = ctx->dyn_seg.seg_groups[seg];
-    uint64_t *plen = PTR_OFFSET(ctx->dyn_seg.dyn_buff, sizeof(uint64_t) * ctx->dyn_seg.num_seg_per_group[ctx->dyn_seg.seg_groups[seg]] + ctx->dyn_seg.seg_group_start[seg] + ctx->dyn_seg.seg_group_size[seg_group_id] * rank + (seg - ctx->dyn_seg.starting_seg[seg]) * sizeof(uint64_t));
-    return *plen;//[seg - ctx->dyn_seg.starting_seg[seg]];
-}
-
-// FIXME convert to macro
-static inline uint64_t UCC_TL_UCP_REMOTE_DYN_KEY_SIZE(ucc_tl_ucp_context_t *ctx,
-                                        ucc_rank_t rank,
-                                        uint64_t seg)
-{
-    int seg_group_id = ctx->dyn_seg.seg_groups[seg];
-    uint64_t *pkey_size = PTR_OFFSET(ctx->dyn_seg.dyn_buff, 2 * sizeof(uint64_t) * ctx->dyn_seg.num_seg_per_group[ctx->dyn_seg.seg_groups[seg]] + ctx->dyn_seg.seg_group_start[seg] + ctx->dyn_seg.seg_group_size[seg_group_id] * rank + (seg - ctx->dyn_seg.starting_seg[seg]) * sizeof(uint64_t));
-    return *pkey_size;//[seg - ctx->dyn_seg.starting_seg[seg]];
-}
-
-// FIXME convert to macro
-static inline void * UCC_TL_UCP_REMOTE_DYN_KEY(ucc_tl_ucp_context_t *ctx,
-                                        ucc_rank_t rank,
-                                        size_t offset,
-                                        uint64_t seg)
-{
-    int seg_group_id = ctx->dyn_seg.seg_groups[seg];
-    void *pkey = PTR_OFFSET(ctx->dyn_seg.dyn_buff, 3 * sizeof(uint64_t) * ctx->dyn_seg.num_seg_per_group[ctx->dyn_seg.seg_groups[seg]] + ctx->dyn_seg.seg_group_start[seg] + ctx->dyn_seg.seg_group_size[seg_group_id] * rank + offset);
-    return pkey;
-}
 #endif
