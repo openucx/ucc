@@ -261,11 +261,12 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segments(ucc_coll_args_t   *coll_args,
                                               ucc_tl_ucp_task_t *task)
 {
     ucc_tl_ucp_team_t    *tl_team        = UCC_TL_UCP_TASK_TEAM(task);
+    ucc_tl_ucp_lib_t     *tl_lib         = UCC_TL_UCP_TEAM_LIB(tl_team);
     ucc_tl_ucp_context_t *ctx            = UCC_TL_UCP_TEAM_CTX(tl_team);
     int                   i              = 0;
     ucc_status_t          status;
 
-    if (coll_args->mem_map.n_segments > 0) {
+    if (tl_lib->cfg.use_dynamic_segments && coll_args->mem_map.n_segments > 0) {
         int                   starting_index = ctx->n_dynrinfo_segs;
         size_t                seg_pack_size  = 0;
         size_t               *global_size    = NULL;

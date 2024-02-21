@@ -166,8 +166,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK | UCP_PARAM_FIELD_NAME;
-    ucp_params.features = UCP_FEATURE_TAG | UCP_FEATURE_AM | UCP_FEATURE_RMA |
-                          UCP_FEATURE_AMO64 | UCP_FEATURE_EXPORTED_MEMH;
+    ucp_params.features = UCP_FEATURE_TAG | UCP_FEATURE_AM;
+    if ((params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS) ||
+         lib->cfg.use_dynamic_segments) {
+        ucp_params.features |= UCP_FEATURE_RMA | UCP_FEATURE_AMO64 |
+                               UCP_FEATURE_EXPORTED_MEMH;
+    }
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
     ucp_params.name = "UCC_UCP_CONTEXT";
 
