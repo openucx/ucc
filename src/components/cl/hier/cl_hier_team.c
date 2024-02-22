@@ -363,7 +363,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
     team_info.init                = ucc_cl_hier_coll_init;
     team_info.num_mem_types       = 0;
     team_info.supported_mem_types = NULL; /* all memory types supported*/
-    team_info.supported_colls     = UCC_COLL_TYPE_ALL;
+    team_info.supported_colls     = UCC_CL_HIER_SUPPORTED_COLLS;
     team_info.size                = UCC_CL_TEAM_SIZE(team);
 
     status = ucc_coll_score_alloc(&score);

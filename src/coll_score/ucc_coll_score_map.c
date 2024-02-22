@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -160,11 +160,12 @@ ucc_status_t ucc_coll_init(ucc_score_map_t      *map,
 
 void ucc_coll_score_map_print_info(const ucc_score_map_t *map)
 {
-    size_t            left;
-    ucc_msg_range_t  *range;
-    int               i, j, all_empty;
-    char              range_str[128];
-    char              coll_str[1024];
+    size_t           left;
+    ucc_msg_range_t *range;
+    int              i, j, all_empty;
+    char             score_str[32];
+    char             range_str[128];
+    char             coll_str[1024];
 
     for (i = 0; i < UCC_COLL_TYPE_NUM; i++) {
         all_empty = 1;
@@ -191,10 +192,12 @@ void ucc_coll_score_map_print_info(const ucc_score_map_t *map)
                               super.list_elem) {
                 ucc_memunits_range_str(range->start, range->end, range_str,
                                        sizeof(range_str));
-                STR_APPEND(coll_str, left, 256, "{%s}:%s:%u ",
+                ucc_score_to_str(range->super.score, score_str,
+                                 sizeof(score_str));
+                STR_APPEND(coll_str, left, 256, "{%s}:%s:%s ",
                            range_str,
                            range->super.team->context->lib->log_component.name,
-                           range->super.score);
+                           score_str);
             }
             STR_APPEND(coll_str, left, 4, "\n");
         }

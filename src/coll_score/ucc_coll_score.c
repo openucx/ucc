@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -8,6 +8,16 @@
 #include "utils/ucc_string.h"
 #include "utils/ucc_log.h"
 #include "utils/ucc_coll_utils.h"
+
+char *ucc_score_to_str(ucc_score_t score, char *buf, size_t max) {
+    if (score == UCC_SCORE_MAX) {
+        ucc_strncpy_safe(buf, "inf", max);
+    } else {
+        ucc_snprintf_safe(buf, max, "%d", score);
+    }
+
+    return buf;
+}
 
 ucc_status_t ucc_coll_score_alloc(ucc_coll_score_t **score)
 {

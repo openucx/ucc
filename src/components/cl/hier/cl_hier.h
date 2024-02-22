@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -109,8 +109,12 @@ typedef struct ucc_cl_hier_team {
 UCC_CLASS_DECLARE(ucc_cl_hier_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
-#define UCC_CL_HIER_SUPPORTED_COLLS \
-    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV)
+#define UCC_CL_HIER_SUPPORTED_COLLS                                            \
+    (UCC_COLL_TYPE_ALLTOALL |                                                  \
+     UCC_COLL_TYPE_ALLTOALLV |                                                 \
+     UCC_COLL_TYPE_ALLREDUCE |                                                 \
+     UCC_COLL_TYPE_BARRIER |                                                   \
+     UCC_COLL_TYPE_BCAST)
 
 ucc_status_t ucc_cl_hier_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t      *team,
