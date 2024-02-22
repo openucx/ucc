@@ -78,6 +78,7 @@ typedef struct ucc_tl_ucp_lib_config {
     ucc_ternary_auto_value_t use_topo;
     int                      use_reordering;
     int                      use_dynamic_segments;
+    int                      use_xgvmi;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {
