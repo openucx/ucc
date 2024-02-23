@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -77,6 +77,7 @@ typedef struct ucc_context {
     ucc_context_topo_t      *topo;
     uint64_t                 cl_flags;
     ucc_tl_team_t           *service_team;
+    int32_t                  throttle_progress;
 } ucc_context_t;
 
 typedef struct ucc_context_config {
@@ -90,6 +91,7 @@ typedef struct ucc_context_config {
     uint32_t                  estimated_num_ppn;
     uint32_t                  lock_free_progress_q;
     uint32_t                  internal_oob;
+    uint32_t                  throttle_progress;
 } ucc_context_config_t;
 
 /* Internal function for context creation that takes explicit

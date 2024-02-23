@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -14,6 +15,7 @@ struct ucc_progress_queue {
     void (*enqueue)(ucc_progress_queue_t *pq, ucc_coll_task_t *task);
     void (*dequeue)(ucc_progress_queue_t *pq, ucc_coll_task_t **task);
     int  (*progress)(ucc_progress_queue_t *pq);
+    int  (*is_empty)(ucc_progress_queue_t *pq);
     void (*finalize)(ucc_progress_queue_t *pq);
 };
 
@@ -44,6 +46,11 @@ static inline ucc_status_t ucc_progress_queue_enqueue(ucc_progress_queue_t *pq,
 static inline int ucc_progress_queue(ucc_progress_queue_t *pq)
 {
     return pq->progress(pq);
+}
+
+static inline int ucc_progress_queue_is_empty(ucc_progress_queue_t *pq)
+{
+    return pq->is_empty(pq);
 }
 
 void ucc_progress_queue_finalize(ucc_progress_queue_t *pq);
