@@ -118,7 +118,7 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
     }
 
     /* On each step doubles distance */
-    distance = 1 << task->tagged.send_posted;
+    distance = 1 << task->tagged.recv_posted;
     tmpsend  = rbuf;
     while (distance < tsize) {
 
@@ -142,11 +142,15 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
                                          recvfrom, team, task),
                       task, out);
 
-        if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        if (UCC_INPROGRESS == ucc_tl_ucp_test_recv(task)) {
             return;
         }
 
-        distance = 1 << task->tagged.send_posted;
+        distance = 1 << task->tagged.recv_posted;
+    }
+
+    if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        return;
     }
 
     /* post processing step */
