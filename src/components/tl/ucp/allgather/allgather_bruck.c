@@ -130,7 +130,7 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
         if (distance <= tsize >> 1) {
             blockcount = distance;
         } else {
-            /* send-recv all reminder*/
+            /* send-recv all reminder */
             blockcount = tsize - distance;
         }
 
@@ -158,7 +158,6 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
             if (ucc_unlikely(status != UCC_OK)) {
                 tl_error(UCC_TASK_LIB(task),
                          "failed to copy data to scratch buffer");
-                ucc_tl_ucp_coll_finalize(&task->super);
                 task->super.status = status;
                 return;
             }
@@ -172,7 +171,6 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
             if (ucc_unlikely(status != UCC_OK)) {
                 tl_error(UCC_TASK_LIB(task),
                          "failed to copy data from scratch to rbuff buffer");
-                ucc_tl_ucp_coll_finalize(&task->super);
                 task->super.status = status;
                 return;
             }
@@ -185,7 +183,6 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
             if (ucc_unlikely(status != UCC_OK)) {
                 tl_error(UCC_TASK_LIB(task),
                          "failed to copy first data part to scratch buffer");
-                ucc_tl_ucp_coll_finalize(&task->super);
                 task->super.status = status;
                 return;
             }
@@ -196,7 +193,6 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
             if (ucc_unlikely(status != UCC_OK)) {
                 tl_error(UCC_TASK_LIB(task),
                          "failed to copy second data part to scratch buffer");
-                ucc_tl_ucp_coll_finalize(&task->super);
                 task->super.status = status;
                 return;
             }
@@ -206,7 +202,6 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
             if (ucc_unlikely(status != UCC_OK)) {
                 tl_error(UCC_TASK_LIB(task),
                          "failed to copy from scratch buffer to dst");
-                ucc_tl_ucp_coll_finalize(&task->super);
                 task->super.status = status;
                 return;
             }
