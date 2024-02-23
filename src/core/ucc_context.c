@@ -909,7 +909,7 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
         tl_ctx = context->tl_ctx[i];
         tl_lib = ucc_derived_of(tl_ctx->super.lib, ucc_tl_lib_t);
         if (tl_ctx->ref_count != 0 ) {
-            ucc_warn("tl ctx %s is still in use", tl_lib->iface->super.name);
+            ucc_info("tl ctx %s is still in use", tl_lib->iface->super.name);
         }
         tl_lib->iface->context.destroy(&tl_ctx->super);
     }
