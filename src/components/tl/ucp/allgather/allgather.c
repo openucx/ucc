@@ -23,6 +23,10 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR,
              .name = "neighbor",
              .desc = "O(N) Neighbor Exchange N/2 steps"},
+        [UCC_TL_UCP_ALLGATHER_ALG_BRUCK] = 
+            {.id   = UCC_TL_UCP_ALLGATHER_ALG_BRUCK,
+             .name = "bruck",
+             .desc = "O(log(N)) Variation of Bruck algorithm"},
         [UCC_TL_UCP_ALLGATHER_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 

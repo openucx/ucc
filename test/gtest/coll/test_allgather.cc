@@ -296,7 +296,7 @@ INSTANTIATE_TEST_CASE_P(
 #endif
         ::testing::Values(1,3,8192), // count
         ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE),
-        ::testing::Values("knomial", "ring", "neighbor")),
+        ::testing::Values("knomial", "ring", "neighbor", "bruck")),
         [](const testing::TestParamInfo<test_allgather_alg::ParamType>& info) {
             std::string name;
             name += ucc_datatype_str(std::get<0>(info.param));

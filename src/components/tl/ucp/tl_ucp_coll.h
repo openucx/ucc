@@ -182,6 +182,10 @@ typedef struct ucc_tl_ucp_task {
                                          int step);
         } allgather_ring;
         struct {
+            ucc_mc_buffer_header_t *scratch_header;
+            size_t                  scratch_size;
+        } allgather_bruck;
+        struct {
             ucc_rank_t              dist;
             uint32_t                radix;
         } bcast_kn;

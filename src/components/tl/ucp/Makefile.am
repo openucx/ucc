@@ -14,6 +14,7 @@ allgather =                        \
 	allgather/allgather.c          \
 	allgather/allgather_ring.c     \
 	allgather/allgather_neighbor.c \
+	allgather/allgather_bruck.c    \
 	allgather/allgather_knomial.c
 
 allgatherv =                     \
