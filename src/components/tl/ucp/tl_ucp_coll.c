@@ -102,7 +102,7 @@ void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
                  ucs_status_string(status));
         task->super.status = ucs_status_to_ucc_status(status);
     }
-    task->tagged.send_completed++;
+    ucc_atomic_add32(&task->tagged.send_completed, 1);
     ucp_request_free(request);
 }
 
@@ -142,7 +142,7 @@ void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
                  ucs_status_string(status));
         task->super.status = ucs_status_to_ucc_status(status);
     }
-    task->tagged.recv_completed++;
+    ucc_atomic_add32(&task->tagged.recv_completed, 1);
     ucp_request_free(request);
 }
 
