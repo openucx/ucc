@@ -128,6 +128,10 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
                   [AC_DEFINE([UCS_HAVE_PARSER_SET_VALUE_TABLE_PREFIX], [1], [flags for ucs_rcache_get])],
                   [])
 
+            AC_CHECK_MEMBER(ucs_config_parser_t.doc,
+                [AC_DEFINE([UCS_HAVE_PARSER_CONFIG_DOC], [1], [flags for ucs_rcache_get])],
+                [],
+                [#include <ucs/memory/rcache.h>])
         ],
         [
             AS_IF([test "x$with_ucx" != "xguess"],
