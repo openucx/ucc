@@ -280,20 +280,19 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
 
 print_trace:
     *request = &task->super;
-    if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DIAG) {
+    if (ucc_unlikely(ucc_global_config.coll_trace.log_level >=
+                     UCC_LOG_LEVEL_DIAG)) {
         char coll_str[256];
         ucc_coll_str(task, coll_str, sizeof(coll_str),
                      ucc_global_config.coll_trace.log_level);
-        if (ucc_global_config.coll_trace.log_level <= UCC_LOG_LEVEL_DEBUG) {
+        if (ucc_global_config.coll_trace.log_level <= UCC_LOG_LEVEL_INFO) {
             if (team->rank == 0) {
                 ucc_log_component_collective_trace(
                     ucc_global_config.coll_trace.log_level, "coll_init: %s",
                     coll_str);
             }
         } else {
-            ucc_log_component_collective_trace(
-                ucc_global_config.coll_trace.log_level, "coll_init: %s",
-                coll_str);
+            ucc_coll_trace_debug("coll_init: %s", coll_str);
         }
     }
 
