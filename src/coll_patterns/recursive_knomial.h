@@ -8,7 +8,6 @@
 #define RECURSIVE_KNOMIAL_H_
 
 #define UCC_KN_PEER_NULL ((ucc_rank_t)-1)
-#define UCC_KN_MIN_RADIX 2
 typedef uint16_t ucc_kn_radix_t;
 
 enum {
@@ -240,15 +239,16 @@ ucc_knomial_calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
 /* Calculates (sub) opt radix for Allreduce SRA and Bcast SAG,
    by minimizing n_extra ranks */
 static inline ucc_rank_t ucc_kn_get_opt_radix(ucc_rank_t team_size,
+                                              ucc_kn_radix_t min_radix,
                                               ucc_kn_radix_t max_radix)
 {
     ucc_rank_t     n_extra = 0, min_val = team_size;
-    ucc_kn_radix_t min_i   = UCC_KN_MIN_RADIX;
-    ucc_kn_radix_t max_r   = ucc_max(max_radix, UCC_KN_MIN_RADIX);
+    ucc_kn_radix_t min_i   = min_radix;
+    ucc_kn_radix_t max_r   = ucc_max(max_radix, min_radix);
     ucc_kn_radix_t r;
     ucc_rank_t     fs;
 
-    for (r = UCC_KN_MIN_RADIX; r <= max_r; r++) {
+    for (r = min_radix; r <= max_r; r++) {
         fs = r;
         while (fs < team_size) {
             fs = fs * r;
