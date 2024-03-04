@@ -25,6 +25,11 @@ bcast =                       \
 	bcast/bcast.c             \
 	bcast/bcast_2step.c
 
+reduce =                      \
+	reduce/reduce.h           \
+	reduce/reduce.c           \
+	reduce/reduce_2step.c
+
 sources =             \
 	cl_hier.h         \
 	cl_hier.c         \
@@ -37,7 +42,8 @@ sources =             \
 	$(alltoallv)      \
 	$(alltoall)       \
 	$(barrier)        \
-	$(bcast)
+	$(bcast)          \
+	$(reduce)
 
 module_LTLIBRARIES         = libucc_cl_hier.la
 libucc_cl_hier_la_SOURCES  = $(sources)
