@@ -25,7 +25,6 @@ TestScatter::TestScatter(ucc_test_team_t &_team, TestCaseParams &params) :
                                       TEST_SKIP_MEM_LIMIT, team.comm)) {
         return;
     }
-
     if (rank == root) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, msgsize * size, mem_type));
         sbuf = sbuf_mc_header->addr;

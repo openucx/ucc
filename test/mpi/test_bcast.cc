@@ -49,8 +49,6 @@ ucc_status_t TestBcast::set_input(int iter_persistent)
     MPI_Comm_rank(team.comm, &rank);
     if (rank == root) {
         init_buffer(sbuf, count, dt, mem_type, rank * (iter_persistent + 1));
-        UCC_CHECK(ucc_mc_memcpy(check_buf, sbuf, count * dt_size,
-                  UCC_MEMORY_TYPE_HOST, mem_type));
     }
     return UCC_OK;
 }
@@ -61,9 +59,11 @@ ucc_status_t TestBcast::check()
     int rank;
 
     MPI_Comm_rank(team.comm, &rank);
+    if (rank == root) {
+        return UCC_OK;
+    }
+
     init_buffer(check_buf, count, dt, UCC_MEMORY_TYPE_HOST,
                 root * (iter_persistent + 1));
-    return (rank == root)
-               ? UCC_OK
-               : compare_buffers(sbuf, check_buf, count, dt, mem_type);
+    return compare_buffers(sbuf, check_buf, count, dt, mem_type);
 }
