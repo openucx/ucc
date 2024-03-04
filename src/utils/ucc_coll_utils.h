@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -332,6 +332,6 @@ static inline size_t ucc_buffer_block_offset_aligned(size_t total_count,
    @param [in] args        pointer to the collective args.
    @param [in] rank        rank to check, used only for rooted collective
                            operations. */
-int ucc_coll_args_is_predefined_dt(ucc_coll_args_t *args, ucc_rank_t rank);
+int ucc_coll_args_is_predefined_dt(const ucc_coll_args_t *args, ucc_rank_t rank);
 
 #endif

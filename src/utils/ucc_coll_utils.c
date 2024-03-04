@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -56,7 +56,8 @@ static inline int
 ucc_coll_args_is_mem_symmetric(const ucc_coll_args_t *args,
                                ucc_rank_t rank)
 {
-    ucc_rank_t             root = args->root;
+    ucc_rank_t root = args->root;
+
     if (UCC_IS_INPLACE(*args)) {
         return 1;
     }
@@ -93,7 +94,7 @@ ucc_coll_args_is_mem_symmetric(const ucc_coll_args_t *args,
     return 0;
 }
 
-int ucc_coll_args_is_predefined_dt(ucc_coll_args_t *args, ucc_rank_t rank)
+int ucc_coll_args_is_predefined_dt(const ucc_coll_args_t *args, ucc_rank_t rank)
 {
     switch (args->coll_type) {
     case UCC_COLL_TYPE_BARRIER:
@@ -160,7 +161,7 @@ int ucc_coll_args_is_predefined_dt(ucc_coll_args_t *args, ucc_rank_t rank)
 ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
                                          ucc_rank_t rank)
 {
-    ucc_rank_t             root = args->root;
+    ucc_rank_t root = args->root;
 
     if (!ucc_coll_args_is_mem_symmetric(args, rank)) {
         return UCC_MEMORY_TYPE_ASYMMETRIC;
