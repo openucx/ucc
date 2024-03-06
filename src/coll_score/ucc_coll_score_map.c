@@ -74,10 +74,9 @@ void ucc_coll_score_free_map(ucc_score_map_t *map)
     ucc_free(map);
 }
 
-static
-ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t      *map,
-                                       ucc_base_coll_args_t *bargs,
-                                       ucc_msg_range_t     **range)
+static ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t *map,
+                                              ucc_base_coll_args_t *bargs,
+                                              ucc_msg_range_t **range)
 {
     ucc_memory_type_t mt      = ucc_coll_args_mem_type(&bargs->args,
                                                        map->team_rank);
@@ -85,11 +84,12 @@ ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t      *map,
     size_t            msgsize = ucc_coll_args_msgsize(&bargs->args,
                                                       map->team_rank,
                                                       map->team_size);
-    ucc_list_link_t  *list;
-    ucc_msg_range_t  *r;
+    ucc_list_link_t *list;
+    ucc_msg_range_t *r;
 
     if (mt == UCC_MEMORY_TYPE_ASYMMETRIC) {
         /* TODO */
+        ucc_debug("asymmetric memory type is not supported");
         return UCC_ERR_NOT_SUPPORTED;
     } else if (mt == UCC_MEMORY_TYPE_NOT_APPLY) {
         /* Temporary solution: for Barrier, Fanin, Fanout - use
@@ -122,7 +122,9 @@ ucc_status_t ucc_coll_init(ucc_score_map_t      *map,
     ucc_status_t      status;
 
     status = ucc_coll_score_map_lookup(map, bargs, &r);
-    if (UCC_OK != status) {
+    if (ucc_unlikely(UCC_OK != status)) {
+        ucc_debug("coll_score_map lookup failed %d (%s)",
+                   status, ucc_status_string(status));
         return status;
     }
 
