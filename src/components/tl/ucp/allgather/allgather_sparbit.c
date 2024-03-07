@@ -17,16 +17,8 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_init(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t      *team,
                                              ucc_coll_task_t     **task_h)
 {
-    ucc_tl_ucp_team_t *tl_team      = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task         = ucc_tl_ucp_init_task(coll_args, team);
     ucc_status_t       status       = UCC_OK;
-    ucc_rank_t         trank        = UCC_TL_TEAM_RANK(tl_team);
-    ucc_rank_t         tsize        = UCC_TL_TEAM_SIZE(tl_team);
-    ucc_memory_type_t  rmem         = TASK_ARGS(task).dst.info.mem_type;
-    ucc_datatype_t     dt           = TASK_ARGS(task).dst.info.datatype;
-    size_t             count        = TASK_ARGS(task).dst.info.count;
-    size_t             data_size    = (count / tsize) * ucc_dt_size(dt);
-    size_t             scratch_size = (tsize - trank) * data_size;
 
     if (!ucc_coll_args_is_predefined_dt(&TASK_ARGS(task), UCC_RANK_INVALID)) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
@@ -59,13 +51,13 @@ void ucc_tl_ucp_allgather_sparbit_progress(ucc_coll_task_t *coll_task)
     ucc_memory_type_t       rmem  = TASK_ARGS(task).dst.info.mem_type;
     ucc_datatype_t          dt    = TASK_ARGS(task).dst.info.datatype;
     size_t                  count = TASK_ARGS(task).dst.info.count;
-    ucc_mc_buffer_header_t *scratch_header =
-        task->allgather_sparbit.scratch_header;
-    size_t       scratch_size = task->allgather_sparbit.scratch_size;
     size_t       data_size    = (count / tsize) * ucc_dt_size(dt);
     ucc_rank_t   recvfrom, sendto;
-    ucc_status_t status;
-    size_t       blockcount, distance;
+    // ucc_status_t status;
+    size_t       distance;
+    uint32_t last_ignore;
+    uint32_t ignore_steps;
+    int tsize_log, exclusion, data_expected, transfer_count, i;
     void        *tmprecv, *tmpsend;
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
@@ -89,16 +81,17 @@ void ucc_tl_ucp_allgather_sparbit_progress(ucc_coll_task_t *coll_task)
 
         for (transfer_count = 0; transfer_count < data_expected - exclusion; transfer_count++) {
             tmprecv = PTR_OFFSET(rbuf, (trank - (2 * transfer_count + 1) * distance + tsize) % tsize * data_size);
-            tmpsend = PTR_OFFSET(rbuf, (trank - 2 * transfer_count * distance + tsize) % tsize * data_size)
+            tmpsend = PTR_OFFSET(rbuf, (trank - 2 * transfer_count * distance + tsize) % tsize * data_size);
         /* Sendreceive */
-        UCPCHECK_GOTO(ucc_tl_ucp_send_nb(tmpsend, blockcount * data_size, rmem,
+        UCPCHECK_GOTO(ucc_tl_ucp_send_nb(tmpsend, data_size, rmem,
                                          sendto, team, task),
                       task, out);
-        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(tmprecv, blockcount * data_size, rmem,
+        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(tmprecv, data_size, rmem,
                                          recvfrom, team, task),
                       task, out);
         }
 
+        // wait for completion of all tasks
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             return;
         }
