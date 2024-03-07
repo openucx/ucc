@@ -1,5 +1,5 @@
 /**
-* Copyright (c) NVIDIA CORPORATION & AFFILIATES, 2001-2023. ALL RIGHTS RESERVED.
+* Copyright (c) NVIDIA CORPORATION & AFFILIATES, 2001-2024. ALL RIGHTS RESERVED.
 * Copyright (C) ARM Ltd. 2016.  ALL RIGHTS RESERVED.
 * Copyright (C) Shanghai Zhaoxin Semiconductor Co., Ltd. 2020. ALL RIGHTS RESERVED.
 * Copyright (C) Rivos Inc. 2023
@@ -35,6 +35,7 @@ typedef enum ucc_cpu_model {
     UCC_CPU_MODEL_ZHAOXIN_ZHANGJIANG,
     UCC_CPU_MODEL_ZHAOXIN_WUDAOKOU,
     UCC_CPU_MODEL_ZHAOXIN_LUJIAZUI,
+    UCC_CPU_MODEL_NVIDIA_GRACE,
     UCC_CPU_MODEL_LAST
 } ucc_cpu_model_t;
 
@@ -48,6 +49,7 @@ typedef enum ucc_cpu_vendor {
     UCC_CPU_VENDOR_GENERIC_RISCV,
     UCC_CPU_VENDOR_FUJITSU_ARM,
     UCC_CPU_VENDOR_ZHAOXIN,
+    UCC_CPU_VENDOR_NVIDIA,
     UCC_CPU_VENDOR_LAST
 } ucc_cpu_vendor_t;
 
@@ -67,6 +69,8 @@ static inline ucc_cpu_vendor_t ucc_get_vendor_from_str(const char *v_name)
         return UCC_CPU_VENDOR_FUJITSU_ARM;
     if (strcasecmp(v_name, "zhaoxin") == 0)
         return UCC_CPU_VENDOR_ZHAOXIN;
+    if (strcasecmp(v_name, "nvidia") == 0)
+        return UCC_CPU_VENDOR_NVIDIA;
     return UCC_CPU_VENDOR_UNKNOWN;
 }
 
@@ -102,6 +106,8 @@ static inline ucc_cpu_model_t ucc_get_model_from_str(const char *m_name)
         return UCC_CPU_MODEL_ZHAOXIN_WUDAOKOU;
     if (strcasecmp(m_name, "lujiazui") == 0)
         return UCC_CPU_MODEL_ZHAOXIN_LUJIAZUI;
+    if (strcasecmp(m_name, "grace") == 0)
+        return UCC_CPU_MODEL_NVIDIA_GRACE;
     return UCC_CPU_MODEL_UNKNOWN;
 }
 

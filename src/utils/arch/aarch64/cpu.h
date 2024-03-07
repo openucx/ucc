@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2001-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+* Copyright (c) 2001-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 * Copyright (C) ARM Ltd. 2016-2020.  ALL RIGHTS RESERVED.
 * Copyright (C) Stony Brook University. 2016-2020.  ALL RIGHTS RESERVED.
 *
@@ -47,11 +47,6 @@ typedef struct ucc_aarch64_cpuid {
  */
 void ucc_aarch64_cpuid(ucc_aarch64_cpuid_t *cpuid);
 
-static inline ucc_cpu_model_t ucc_arch_get_cpu_model()
-{
-    return UCC_CPU_MODEL_ARM_AARCH64;
-}
-
 static inline ucc_cpu_vendor_t ucc_arch_get_cpu_vendor()
 {
     ucc_aarch64_cpuid_t cpuid;
@@ -61,7 +56,25 @@ static inline ucc_cpu_vendor_t ucc_arch_get_cpu_vendor()
         return UCC_CPU_VENDOR_FUJITSU_ARM;
     }
 
+    if ((cpuid.implementer == 0x41) && (cpuid.architecture == 8)) {
+        return UCC_CPU_VENDOR_NVIDIA;
+    }
+
     return UCC_CPU_VENDOR_GENERIC_ARM;
 }
+
+static inline ucc_cpu_model_t ucc_arch_get_cpu_model()
+{
+    ucc_aarch64_cpuid_t cpuid;
+    ucc_aarch64_cpuid(&cpuid);
+
+    if ((ucc_arch_get_cpu_vendor() == UCC_CPU_VENDOR_NVIDIA) &&
+        (cpuid.part == 0xd4f)) {
+        return UCC_CPU_MODEL_NVIDIA_GRACE;
+    }
+
+    return UCC_CPU_MODEL_ARM_AARCH64;
+}
+
 
 #endif
