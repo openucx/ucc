@@ -27,9 +27,12 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_init(ucc_base_coll_args_t *coll_args,
     }
     tl_trace(UCC_TASK_LIB(task), "ucc_tl_ucp_allgather_sparbit_init");
 
+    tl_info(UCC_TASK_LIB(task), "SPARBIT");
+
     task->super.post     = ucc_tl_ucp_allgather_sparbit_start;
     task->super.progress = ucc_tl_ucp_allgather_sparbit_progress;
-
+    task->allgather_sparbit.i = 0; // setup iteration
+    task->allgather_sparbit.data_expected = 1;
 out:
     if (status != UCC_OK) {
         ucc_tl_ucp_put_task(task);
@@ -53,27 +56,28 @@ void ucc_tl_ucp_allgather_sparbit_progress(ucc_coll_task_t *coll_task)
     size_t                  count = TASK_ARGS(task).dst.info.count;
     size_t       data_size    = (count / tsize) * ucc_dt_size(dt);
     ucc_rank_t   recvfrom, sendto;
-    // ucc_status_t status;
     size_t       distance;
     uint32_t last_ignore;
     uint32_t ignore_steps;
-    int tsize_log, exclusion, data_expected, transfer_count, i;
+    uint32_t i = task->allgather_sparbit.i; // restore iteration number
+    int tsize_log, exclusion, data_expected, transfer_count;
     void        *tmprecv, *tmpsend;
 
+    // here we can't made any progress while transfers from previous step are running, emulation of wait all in asyn manier 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return;
     }
 
     tsize_log = ceil(log(tsize)/log(2));
-    distance = 1 << (tsize_log - 1);
-
     last_ignore = __builtin_ctz(tsize);
     ignore_steps = (~((uint32_t) tsize >> last_ignore) | 1) << last_ignore;
 
-    data_expected = 1;
-
     tmpsend  = rbuf;
     while (i < tsize_log) {
+        data_expected = task->allgather_sparbit.data_expected;
+
+        distance = 1 << (tsize_log - 1);
+        distance >>= i; 
 
         recvfrom = (trank + tsize - distance) % tsize;
         sendto   = (trank + distance) % tsize;
@@ -91,14 +95,13 @@ void ucc_tl_ucp_allgather_sparbit_progress(ucc_coll_task_t *coll_task)
                       task, out);
         }
 
-        // wait for completion of all tasks
+        task->allgather_sparbit.data_expected = (data_expected << 1) - exclusion;
+        task->allgather_sparbit.i++;
+        // wait for completion of all tasks to check if we could make one more step right now or we should yeld task
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             return;
         }
-
-        distance >>= 1;
-        data_expected = (data_expected << 1) - exclusion;
-        exclusion = 0;
+        i = task->allgather_sparbit.i;
     }
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
