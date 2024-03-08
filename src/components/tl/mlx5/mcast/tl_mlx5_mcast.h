@@ -131,6 +131,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_context {
     struct ibv_pd                 *pd;
     char                          *devname;
     int                            max_qp_wr;
+    int                            user_provided_ib;
     int                            ib_port;
     int                            pkey_index;
     int                            mtu;
