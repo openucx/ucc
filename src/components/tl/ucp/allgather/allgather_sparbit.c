@@ -41,13 +41,13 @@ out:
     return status;
 }
 
-static inline uint32_t highest_power2(uint32_t n)
+// return nearest greater log pow2
+static inline uint32_t highest_log2(uint32_t n)
 {
-    // if n is a power of two simply return it
+    int x = __builtin_clz(n); // leading zeros
     if (!(n & (n - 1)))
-        return n;
-    // else set only the most significant bit
-    return 0x80000000 >> (__builtin_clz(n)); // number of leading zeros
+        return 31 - x; // pow2 case
+    return 31 - x + 1;
 }
 
 /* Inspired by implementation: https://github.com/open-mpi/ompi/blob/main/ompi/mca/coll/base/coll_base_allgather.c */
@@ -74,7 +74,7 @@ void ucc_tl_ucp_allgather_sparbit_progress(ucc_coll_task_t *coll_task)
         return;
     }
 
-    tsize_log = highest_power2(tsize);
+    tsize_log = highest_log2(tsize);
     last_ignore  = __builtin_ctz(tsize); //  count trailing zeros
     ignore_steps = (~((uint32_t)tsize >> last_ignore) | 1) << last_ignore;
 
