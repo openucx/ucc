@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -319,7 +319,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable(ucc_tl_mlx5_mcast_coll_com
             }
         }
         
-        status = ucc_tl_mlx5_mcast_check_nack_requests_all(comm);
+        status = ucc_tl_mlx5_mcast_check_nack_requests(comm, UINT32_MAX);
         if (UCC_OK != status) {
             return status;
         }
