@@ -83,7 +83,7 @@ ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team)
     node_size = node->group_size;
     nnodes    = ucc_topo_nnodes(topo);
     team_size = UCC_TL_TEAM_SIZE(team);
-
+    // while(1) {;};
     if (!ucc_topo_isoppn(topo)) {
         tl_debug(ctx->super.super.lib,
                  "disabling mlx5 a2a for team with non-uniform ppn, "
@@ -93,7 +93,7 @@ ucc_status_t ucc_tl_mlx5_team_init_alltoall(ucc_tl_mlx5_team_t *team)
     }
     ppn = ucc_topo_max_ppn(topo);
 
-    if (net->status == UCC_SBGP_NOT_EXISTS) {
+    if (nnodes == 1) {
         tl_debug(ctx->super.super.lib,
                  "disabling mlx5 a2a for single node team");
         goto non_fatal_error;

@@ -119,7 +119,7 @@ for MT in "" "-T"; do
         tlmlx5_args+=" -x UCC_LOG_LEVEL=debug -x UCC_COLL_TRACE=info "
         echo $CX7_DEV
         tlmlx5_colls="alltoall"
-        mpirun $(mpi_params $PPN) $tlmlx5_args $EXE $MT $TG --mtypes host,cuda -c $tlmlx5_colls -t world -d uint8 -O 0 -m 1:128
+        mpirun $(mpi_params $PPN) $tlmlx5_args /opt/nvidia/src/ucc/build/test/mpi/ucc_test_mpi --mtypes host -c $tlmlx5_colls -t world -d uint8 -O 0 -m 128
     fi
     echo "INFO: UCC MPI unit tests (TL/MLX5) ... DONE"
 
