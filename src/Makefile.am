@@ -14,6 +14,10 @@ mc_dirs += components/mc/cuda
 ec_dirs += components/ec/cuda
 endif
 
+if HAVE_DOCA_UROM
+cl_dirs += components/cl/doca_urom
+endif
+
 if HAVE_ROCM
 mc_dirs += components/mc/rocm
 ec_dirs += components/ec/rocm

@@ -162,6 +162,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      AM_CONDITIONAL([HAVE_IBVERBS],[false])
      AM_CONDITIONAL([HAVE_RDMACM],[false])
      AM_CONDITIONAL([HAVE_MLX5DV],[false])
+     AM_CONDITIONAL([HAVE_DOCA_UROM], [false])
     ],
     [
      AM_CONDITIONAL([DOCS_ONLY], [false])
@@ -172,6 +173,7 @@ AS_IF([test "x$with_docs_only" = xyes],
      m4_include([config/m4/cuda.m4])
      m4_include([config/m4/nccl.m4])
      m4_include([config/m4/rocm.m4])
+     m4_include([config/m4/doca_urom.m4])
      m4_include([config/m4/rccl.m4])
      m4_include([config/m4/sharp.m4])
      m4_include([config/m4/mpi.m4])
@@ -205,6 +207,9 @@ AS_IF([test "x$with_docs_only" = xyes],
          mc_modules="${mc_modules}:rocm"
      fi
 
+     CHECK_DOCA_UROM
+     AC_MSG_RESULT([DOCA_UROM support: $doca_urom_happy])
+
      CHECK_GTEST
      AC_MSG_RESULT([GTEST support: $gtest_happy])
 
@@ -224,11 +229,13 @@ LDFLAGS="$LDFLAGS $UCS_LDFLAGS $UCS_LIBADD"
 CHECK_TL_COLL_PLUGINS
 AC_CONFIG_FILES([
                  Makefile
+                 contrib/Makefile
                  src/Makefile
                  src/ucc/api/ucc_version.h
                  src/core/ucc_version.c
                  src/components/cl/basic/Makefile
                  src/components/cl/hier/Makefile
+                 src/components/cl/doca_urom/Makefile
                  src/components/mc/cpu/Makefile
                  src/components/mc/cuda/Makefile
                  src/components/ec/cpu/Makefile
@@ -265,6 +272,7 @@ AC_MSG_NOTICE([      C++ compiler:   ${CXX} ${CXXFLAGS} ${BASE_CXXFLAGS}])
 AS_IF([test "x$cuda_happy" = "xyes"],[
 AC_MSG_NOTICE([     NVCC gencodes:   ${NVCC_ARCH}])
 ])
+AC_MSG_NOTICE([ DOCA UROM enabled:   ${doca_urom_happy}])
 AC_MSG_NOTICE([          Perftest:   ${mpi_enable}])
 AC_MSG_NOTICE([             Gtest:   ${gtest_enable}])
 AC_MSG_NOTICE([        MC modules:   <$(echo ${mc_modules}|tr ':' ' ') >])

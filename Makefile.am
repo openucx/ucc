@@ -7,6 +7,7 @@
 if !DOCS_ONLY
 SUBDIRS =      \
 	src        \
+	contrib    \
 	tools/info \
 	cmake
 

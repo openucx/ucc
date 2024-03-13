@@ -11,6 +11,7 @@
 typedef enum {
     UCC_CL_BASIC,
     UCC_CL_HIER,
+    UCC_CL_DOCA_UROM,
     UCC_CL_ALL,
     UCC_CL_LAST
 } ucc_cl_type_t;

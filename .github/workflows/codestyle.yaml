@@ -37,7 +37,7 @@ jobs:
             fi
           fi
           H1="CODESTYLE|REVIEW|CORE|UTIL|TEST|API|DOCS|TOOLS|BUILD|MC|EC|SCHEDULE|TOPO"
-          H2="CI|CL/|TL/|MC/|EC/|UCP|SHM|NCCL|SHARP|BASIC|HIER|CUDA|CPU|EE|RCCL|ROCM|SELF|MLX5"
+          H2="CI|CL/|TL/|MC/|EC/|UCP|SHM|NCCL|SHARP|BASIC|HIER|DOCA_UROM|CUDA|CPU|EE|RCCL|ROCM|SELF|MLX5"
           if ! echo $msg | grep -qP '^Merge |^'"(($H1)|($H2))"'+: \w'
           then
             echo "Wrong header"
