@@ -206,6 +206,14 @@ void ucc_topo_cleanup(ucc_topo_t *topo)
             }
             ucc_free(topo->all_sockets);
         }
+        if (topo->all_numas) {
+            for (i = 0; i < topo->n_numas; i++) {
+                if (topo->all_numas[i].status == UCC_SBGP_ENABLED) {
+                    ucc_sbgp_cleanup(&topo->all_numas[i]);
+                }
+            }
+            ucc_free(topo->all_numas);
+        }
         ucc_free(topo);
     }
 }
