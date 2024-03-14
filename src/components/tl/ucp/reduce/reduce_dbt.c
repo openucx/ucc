@@ -41,7 +41,7 @@ static void recv_completion_common(void *request, ucs_status_t status,
                  ucs_status_string(status));
         task->super.status = ucs_status_to_ucc_status(status);
     }
-    task->tagged.recv_completed++;
+    ucc_atomic_add32(&task->tagged.recv_completed, 1);
     if (request) {
         ucp_request_free(request);
     }

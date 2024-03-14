@@ -107,7 +107,7 @@ ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
     } else {
-        task->tagged.send_completed++;
+        ucc_atomic_add32(&task->tagged.send_completed, 1);
     }
     return UCC_OK;
 }
@@ -170,7 +170,7 @@ ucc_tl_ucp_recv_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
     } else {
-        task->tagged.recv_completed++;
+        ucc_atomic_add32(&task->tagged.recv_completed, 1);
     }
     return UCC_OK;
 
@@ -202,7 +202,7 @@ static inline ucc_status_t ucc_tl_ucp_recv_nz(void *buffer, size_t msglen,
 {
     if (msglen == 0) {
         task->tagged.recv_posted++;
-        task->tagged.recv_completed++;
+        ucc_atomic_add32(&task->tagged.recv_completed, 1);
         return UCC_OK;
     }
     return ucc_tl_ucp_recv_nb(buffer, msglen, mtype,
@@ -218,7 +218,7 @@ static inline ucc_status_t ucc_tl_ucp_send_nz(void *buffer, size_t msglen,
 {
     if (msglen == 0) {
         task->tagged.send_posted++;
-        task->tagged.send_completed++;
+        ucc_atomic_add32(&task->tagged.send_completed, 1);
         return UCC_OK;
     }
     return ucc_tl_ucp_send_nb(buffer, msglen, mtype,

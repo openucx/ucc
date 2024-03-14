@@ -24,7 +24,7 @@ static inline void send_completion_common(void *request, ucs_status_t status,
                  ucs_status_string(status));
         task->super.status = ucs_status_to_ucc_status(status);
     }
-    task->tagged.send_completed++;
+    ucc_atomic_add32(&task->tagged.send_completed, 1);
     if (request) {
         ucp_request_free(request);
     }

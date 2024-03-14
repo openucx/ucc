@@ -13,6 +13,7 @@
 #include "tl_ucp_sendrecv.h"
 #include "components/mc/ucc_mc.h"
 #include "coll_patterns/bruck_alltoall.h"
+#include "utils/ucc_atomic.h"
 
 /*
 scratch structure
@@ -122,7 +123,7 @@ static void send_completion(void *request, ucs_status_t status,
         ucp_request_free(request);
     }
 
-    bin->task->tagged.send_completed++;
+    ucc_atomic_add32(&bin->task->tagged.send_completed, 1);
     bin->len = 0;
 }
 
