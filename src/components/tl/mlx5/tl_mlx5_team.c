@@ -223,7 +223,7 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
     team_info.supported_mem_types = mt;
     team_info.supported_colls =
         (UCC_COLL_TYPE_ALLTOALL * 0) |
-        UCC_COLL_TYPE_BCAST * 0;
+        UCC_COLL_TYPE_BCAST;
     team_info.size                = UCC_TL_TEAM_SIZE(team);
 
     status = ucc_coll_score_build_default(
