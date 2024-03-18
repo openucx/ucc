@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -16,6 +16,7 @@ ucc_status_t ucc_tl_mlx5_bcast_mcast_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_mlx5_task_t *task   = NULL;
 
     if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args)) {
+        tl_trace(team->context->lib, "mcast bcast not supported for active sets");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -51,6 +52,7 @@ ucc_status_t ucc_tl_mlx5_task_finalize(ucc_coll_task_t *coll_task)
     if (req != NULL) {
         ucc_assert(coll_task->status != UCC_INPROGRESS);
         ucc_free(req);
+        tl_trace(UCC_TASK_LIB(task), "finalizing an mcast task %p", task);
         task->bcast_mcast.req_handle = NULL;
     }
 
