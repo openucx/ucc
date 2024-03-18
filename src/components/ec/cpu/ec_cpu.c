@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -70,7 +70,7 @@ ucc_status_t ucc_cpu_executor_init(const ucc_ee_executor_params_t *params,
 {
     ucc_ee_executor_t *eee = ucc_mpool_get(&ucc_ec_cpu.executors);
 
-    ec_debug(&ucc_ec_cpu.super, "executor init, eee: %p", eee);
+    ec_trace(&ucc_ec_cpu.super, "executor init, eee: %p", eee);
     if (ucc_unlikely(!eee)) {
         ec_error(&ucc_ec_cpu.super, "failed to allocate executor");
         return UCC_ERR_NO_MEMORY;
@@ -187,7 +187,7 @@ ucc_status_t ucc_cpu_executor_task_finalize(ucc_ee_executor_task_t *task)
 
 ucc_status_t ucc_cpu_executor_finalize(ucc_ee_executor_t *executor)
 {
-    ec_debug(&ucc_ec_cpu.super, "executor finalize, eee: %p", executor);
+    ec_trace(&ucc_ec_cpu.super, "executor finalize, eee: %p", executor);
     ucc_mpool_put(executor);
 
     return UCC_OK;
