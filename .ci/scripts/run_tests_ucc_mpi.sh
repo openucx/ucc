@@ -117,7 +117,7 @@ for MT in "" "-T"; do
         echo "WARNING: At least two nodes are required, but only $NNODES are available"
         echo "INFO: UCC MPI unit tests (TL/MLX5) ... SKIPPED"
     else
-        tlmlx5_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp,mlx5 -x UCC_TL_MLX5_NET_DEVICES=$CX7_DEV:1 -x UCC_TL_MLX5_TUNE=inf -x UCX_RC_MLX5_DM_COUNT=0 -x UCX_DC_MLX5_DM_COUNT=0 "
+        tlmlx5_args=" -x UCC_CLS=basic -x UCC_CL_BASIC_TLS=ucp,mlx5 -x UCC_TL_MLX5_NET_DEVICES=$CX7_DEV:1 -x UCC_TL_MLX5_TUNE=inf "
         tlmlx5_colls="alltoall"
         mpirun $(mpi_params $PPN) $tlmlx5_args $EXE $MT $TG --mtypes host,cuda -c $tlmlx5_colls -t world -d uint8 -O 0 -m 1:128
         echo "INFO: UCC MPI unit tests (TL/MLX5) ... DONE"
