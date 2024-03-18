@@ -31,7 +31,7 @@
 #define ucc_memory_bus_load_fence()   ucc_aarch64_dmb(oshld)
 
 #define ucc_memory_cpu_fence()        ucc_aarch64_dmb(ish)
-#define ucc_memory_cpu_store_fence()  ucc_aarch64_dmb(ishst)
+#define ucc_memory_cpu_store_fence()  ucc_aarch64_dsb(ishst)
 #define ucc_memory_cpu_load_fence()   ucc_aarch64_dmb(ishld)
 
 typedef struct ucc_aarch64_cpuid {

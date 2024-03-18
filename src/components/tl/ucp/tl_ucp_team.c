@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -46,7 +46,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
 {
     ucc_tl_ucp_context_t *ctx =
         ucc_derived_of(tl_context, ucc_tl_ucp_context_t);
-    ucc_kn_radix_t max_radix;
+    ucc_kn_radix_t max_radix, min_radix;
+    ucc_rank_t     tsize;
     ucc_status_t   status;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_team_t, &ctx->super, params);
@@ -91,11 +92,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
     }
 
     if (self->topo && !IS_SERVICE_TEAM(self) && self->topo->topo->sock_bound) {
-        max_radix       = ucc_min(UCC_TL_TEAM_SIZE(self),
-                                  ucc_topo_min_socket_size(self->topo));
-
-        self->opt_radix = ucc_kn_get_opt_radix(UCC_TL_TEAM_SIZE(self),
-                                               max_radix);
+        tsize = UCC_TL_TEAM_SIZE(self);
+        max_radix = (ucc_topo_max_ppn(self->topo) == 1) ? tsize :
+                    ucc_min(tsize, ucc_topo_min_socket_size(self->topo));
+        min_radix = ucc_min(tsize, ucc_topo_max_ppn(self->topo) == 1 ? 3: 2);
+        self->opt_radix = ucc_kn_get_opt_radix(tsize, min_radix, max_radix);
+        tl_debug(tl_context->lib, "opt knomial radix: %d", self->opt_radix);
     }
 
     tl_debug(tl_context->lib, "posted tl team: %p", self);
