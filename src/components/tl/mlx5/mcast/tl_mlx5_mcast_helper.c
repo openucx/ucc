@@ -203,7 +203,7 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_post(ucc_tl_mlx5_mcast_coll_context_t 
     char        buf[40];
     const char *dst;
 
-    dst = inet_ntop(AF_INET6, net_addr, buf, 40);
+    dst = inet_ntop(AF_INET6, &net_addr->sin6_addr, buf, 40);
     if (NULL == dst) {
         tl_error(ctx->lib, "inet_ntop failed");
         return UCC_ERR_NO_RESOURCE;
@@ -399,7 +399,7 @@ ucc_status_t ucc_tl_mlx5_fini_mcast_group(ucc_tl_mlx5_mcast_coll_context_t *ctx,
     char        buf[40];
     const char *dst;
 
-    dst = inet_ntop(AF_INET6, &comm->mcast_addr, buf, 40);
+    dst = inet_ntop(AF_INET6, &comm->mcast_addr.sin6_addr, buf, 40);
     if (NULL == dst) {
         tl_error(comm->lib, "inet_ntop failed");
         return UCC_ERR_NO_RESOURCE;
