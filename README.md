@@ -85,9 +85,8 @@ $ ./autogen.sh; ./configure --prefix=<ucc-install-path> --with-ucx=<ucx-install-
 #### Compile Open MPI 
 
 ```sh
-$ git clone https://github.com/open-mpi/ompi
+$ git clone --recurse-submodules https://github.com/open-mpi/ompi
 $ cd ompi
-$ git submodule update --init --recursive .
 $ ./autogen.pl; ./configure --prefix=<ompi-install-path> --with-ucx=<ucx-install-path> --with-ucc=<ucc-install-path>; make -j install
 ```
 
