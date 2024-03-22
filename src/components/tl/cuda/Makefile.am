@@ -59,6 +59,7 @@ sources =               \
 	$(allgatherv)       \
 	$(alltoall)         \
 	$(alltoallv)        \
+	$(bcast)            \
 	$(reduce_scatter)   \
 	$(reduce_scatterv)
 
