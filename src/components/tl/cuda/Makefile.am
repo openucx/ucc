@@ -27,6 +27,11 @@ alltoallv =                  \
 	alltoallv/alltoallv.c    \
 	alltoallv/alltoallv_ce.c
 
+bcast =                  \
+	bcast/bcast.h        \
+	bcast/bcast.c        \
+	bcast/bcast_linear.c
+
 reduce_scatter =                           \
 	reduce_scatter/reduce_scatter.h        \
 	reduce_scatter/reduce_scatter.c        \
