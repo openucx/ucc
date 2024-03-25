@@ -98,7 +98,7 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
     double             time;
 
     print_header();
-    for (size_t cnt = min_count; cnt <= max_count; cnt *= 2) {
+    for (size_t cnt = min_count; cnt <= max_count; cnt *= config.mult_factor) {
         size_t coll_size = cnt * ucc_dt_size(config.dt);
         int iter = config.n_iter_small;
         int warmup = config.n_warmup_small;
