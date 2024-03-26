@@ -6,6 +6,72 @@
 
 ## Current
 
+## New Features and Enhancements
+
+### CL/HIER
+- Disable onesided alltoallv {PR #875}
+
+### TL/CUDA
+- Initialize remote CUDA scratch to NULL {PR #911}
+
+
+### TL/UCP
+- Enable hybrid alltoallv {PR #781}
+- Avoid copy in knomial scatter {PR #771}
+- Enable reorder ranks to reduce_scatter, Knomial Allreduce, Ring Allgather/v {PR #819}
+- Remove memcpy in last SRA step {PR #743}
+- Fix sparse pack in hybrid a2av {PR #825}
+- Fix recycle in hybrid a2av {PR #827}
+- Reorder ranks for SRA {PR #834}
+- Use ring allgather when reordering needed {PR #879}
+- Use pipelining in SRA allreduce for CUDA {PR #873}
+- Poll for onesided alltoall completion {PR #876}
+- Add support for non-host buffers in bruck alltoall {PR #852}
+- Added Neighbor Exchange Allgather{PR #822}
+
+### TL/SHARP
+- Enable bcast for any predefined dt {PR #774}
+- Don't print team create error {PR #777}
+- Check datasize supported {PR #776}
+- Fix sharp context cleanup {PR #843}
+
+### API
+- Remove duplicate get_version_string {PR #933}
+
+### TL/NCCL
+- Make team init non-blocking {PR #772}
+- Add CUDA managed to score {PR #793}
+- Make ncclGroupEnd nb {PR #798}
+- Lazy init nccl comm {PR #851}
+
+### TL/MLX5
+- Share ib_ctx and pd {PR #749}
+- Rcache {PR #753}
+- Device memory and topo init {PR #780}
+- Adding mcast interface {PR #784}
+- A2A part 1 -- coll init {PR #790}
+- A2A part 2 -- full collective {PR #802}
+- Revisit team and ctx init {PR #815}
+- Fix context create hang {PR #887}
+- Add librdmacm linkage {PR #910}
+
+### CORE
+- Fix score update when only score given {PR #779}
+- Coverity fixes {PR #809}
+- Additional coverty fixes {PR #813}
+- Fix error handling for ctx create epilog {PR #818}
+- Skip zero size collectives {PR #787}
+
+### DOCS
+- Updating NEWS for v1.2 {PR #791}
+
+### TEST
+- Check op and dt compatibility {PR #773}
+- Fix barrier test {PR #799}
+- Propagate HIP_CXXFLAGS to gtest and mpi {PR #803}
+
+
+
 ## 1.2.0 (June 6th, 2023)
 
 ## New Features and Enhancements
