@@ -895,8 +895,12 @@ typedef ucc_oob_coll_t ucc_team_oob_coll_t;
  *  @ingroup UCC_CONTEXT_DT
  */
 typedef struct ucc_mem_map {
-    void *   address; /*!< the address of a buffer to be attached to a UCC context */
-    size_t   len;     /*!< the length of the buffer */
+    void *            address;  /*!< the address of a buffer to be attached to
+                                     a UCC context */
+    size_t            len;      /*!< the length of the buffer */
+    void *            resource; /*!< resource associated with the address.
+                                     examples of resources include memory
+                                     keys. */
 } ucc_mem_map_t;
 
 /**
@@ -1798,7 +1802,8 @@ enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(1),
     UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(2),
     UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER              = UCC_BIT(3),
-    UCC_COLL_ARGS_FIELD_ACTIVE_SET                      = UCC_BIT(4)
+    UCC_COLL_ARGS_FIELD_ACTIVE_SET                      = UCC_BIT(4),
+    UCC_COLL_ARGS_FIELD_MEM_MAP                         = UCC_BIT(5)
 };
 
 /**
@@ -1868,6 +1873,20 @@ typedef struct ucc_coll_args {
                                                              to 0. */
     ucc_coll_callback_t             cb;
     double                          timeout; /*!< Timeout in seconds */
+    ucc_mem_map_params_t            mem_map; /*!< Memory regions to be used
+                                                  for the current and/or
+                                                  future one-sided collectives.
+                                                  If set, the designated regions
+                                                  will be mapped and information
+                                                  exchanged with the team
+                                                  associated with the collective
+                                                  via an allgather operation.
+                                                  Memory is unmapped during
+                                                  context destruction.
+                                                  It is recommended to use this
+                                                  option sparingly due to the
+                                                  increased overhead. Not necessary
+                                                  for two-sided collectives. */
     struct {
         uint64_t start;
         int64_t  stride;
