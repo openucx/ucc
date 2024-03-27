@@ -66,6 +66,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
         return status;
     }
 
+    self->global_sync_in_progress = 0;
+
     self->a2a = NULL;
     status    = ucc_tl_mlx5_team_init_alltoall(self);
     if (UCC_OK != status) {
@@ -73,15 +75,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     }
 
     self->mcast = NULL;
-    status      = ucc_tl_mlx5_mcast_team_init(tl_context, &(self->mcast), &(ctx->mcast), params,
-                                              &(UCC_TL_MLX5_TEAM_LIB(self)->cfg.mcast_conf));
+    status      = ucc_tl_mlx5_mcast_team_init(tl_context, &self->local_mcast_ctx_ready,
+                                              &(self->mcast), &(ctx->mcast),
+                                              params, &(UCC_TL_MLX5_TEAM_LIB(self)->cfg.mcast_conf));
     if (UCC_OK != status) {
-        self->mcast_state = TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE;
-    } else {
-        self->mcast_state = TL_MLX5_TEAM_STATE_MCAST_INIT;
+        tl_warn(tl_context->lib, "mcast team init failed");
+        self->local_mcast_ctx_ready = 0;
     }
 
-    self->a2a_state = TL_MLX5_TEAM_STATE_INIT;
+    self->mcast_state = TL_MLX5_TEAM_STATE_MCAST_CTX_CHECK;
+    self->a2a_state   = TL_MLX5_TEAM_STATE_ALLTOALL_CTX_CHECK;
 
     tl_debug(tl_context->lib, "posted tl team: %p", self);
     return UCC_OK;
@@ -92,7 +95,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_team_t)
     tl_debug(self->super.super.context->lib, "finalizing tl team: %p", self);
 
     ucc_tl_mlx5_dm_cleanup(self);
-    ucc_tl_mlx5_alltoall_cleanup(self);
+    if (self->a2a_state != TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE) {
+        ucc_tl_mlx5_alltoall_cleanup(self);
+    }
     ucc_tl_mlx5_topo_cleanup(self);
     if (self->mcast_state != TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE) {
         ucc_tl_mlx5_clean_mcast_comm(self->mcast->mcast_comm);
@@ -111,36 +116,8 @@ ucc_status_t ucc_tl_mlx5_team_destroy(ucc_base_team_t *tl_team)
 static inline ucc_status_t ucc_tl_mlx5_a2a_team_test(ucc_base_team_t *team)
 {
     ucc_tl_mlx5_team_t *tl_team   = ucc_derived_of(team, ucc_tl_mlx5_team_t);
-    ucc_team_t         *core_team = UCC_TL_CORE_TEAM(tl_team);
-    ucc_subset_t        subset    = {.map    = UCC_TL_TEAM_MAP(tl_team),
-                                     .myrank = UCC_TL_TEAM_RANK(tl_team)};
-
-    ucc_status_t        status    = UCC_OK;
 
     switch (tl_team->a2a_state) {
-    case TL_MLX5_TEAM_STATE_INIT:
-        status = ucc_service_allreduce(
-            core_team, &tl_team->a2a_status.local, &tl_team->a2a_status.global,
-            UCC_DT_INT32, 1, UCC_OP_MIN, subset, &tl_team->scoll_req);
-        if (status < 0) {
-            tl_debug(UCC_TL_TEAM_LIB(tl_team),
-                     "failed to collect global status");
-            return status;
-        }
-        tl_team->a2a_state = TL_MLX5_TEAM_STATE_POSTED;
-    case TL_MLX5_TEAM_STATE_POSTED:
-        status = ucc_service_coll_test(tl_team->scoll_req);
-        if (status < 0) {
-            tl_debug(UCC_TL_TEAM_LIB(tl_team),
-                     "failure during service coll exchange: %s",
-                     ucc_status_string(status));
-            return status;
-        }
-        if (UCC_INPROGRESS == status) {
-            return status;
-        }
-        ucc_service_coll_finalize(tl_team->scoll_req);
-        tl_team->a2a_state = TL_MLX5_TEAM_STATE_ALLTOALL_INIT;
     case TL_MLX5_TEAM_STATE_ALLTOALL_INIT:
         tl_team->a2a_status.local =
             ucc_tl_mlx5_team_test_alltoall_start(tl_team);
@@ -169,40 +146,153 @@ static inline ucc_status_t ucc_tl_mlx5_a2a_team_test(ucc_base_team_t *team)
 
 ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
 {
-    ucc_tl_mlx5_team_t *tl_team      = ucc_derived_of(team, ucc_tl_mlx5_team_t);
-    ucc_status_t        a2a_status   = UCC_OK;
-    ucc_status_t        mcast_status = UCC_OK;
+    ucc_tl_mlx5_team_t            *tl_team      = ucc_derived_of(team, ucc_tl_mlx5_team_t);
+    ucc_team_t                    *core_team    = UCC_TL_CORE_TEAM(tl_team);
+    ucc_subset_t                   subset       = {.map = UCC_TL_TEAM_MAP(tl_team),
+                                                .myrank = UCC_TL_TEAM_RANK(tl_team)};
+    ucc_status_t                   a2a_status   = UCC_OK;
+    ucc_status_t                   mcast_status = UCC_OK;
+    ucc_tl_mlx5_mcast_coll_comm_t *comm         = NULL;
+    ucc_status_t                   status;
+
+
+    if (tl_team->global_sync_in_progress) {
+        status = ucc_service_coll_test(tl_team->scoll_req);
+        if (status < 0) {
+            tl_debug(UCC_TL_TEAM_LIB(tl_team),
+                     "failure during service coll exchange: %s",
+                     ucc_status_string(status));
+            return status;
+        }
+        if (UCC_INPROGRESS == status) {
+            return status;
+        }
+
+        ucc_service_coll_finalize(tl_team->scoll_req);
+
+        tl_team->global_sync_in_progress = 0;
+
+        if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_CTX_CHECK &&
+            tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_CTX_CHECK ) {
+            tl_team->a2a_status.global = tl_team->global_status_array[UCC_TL_MLX5_A2A_STATUS_INDEX];
+            tl_team->a2a_state         = TL_MLX5_TEAM_STATE_ALLTOALL_INIT;
+
+            if (tl_team->global_status_array[UCC_TL_MLX5_MCAST_STATUS_INDEX] != UCC_OK) {
+                /* mcast context is not available for some of the team members so we cannot create
+                 * mcast team */
+                tl_debug(UCC_TL_TEAM_LIB(tl_team),
+                         "failure during mcast ctx create, no mcast team support");
+
+                if (tl_team->local_mcast_ctx_ready) {
+                    comm = tl_team->mcast->mcast_comm;
+                    /* release the resources */
+                    if (ibv_dereg_mr(comm->grh_mr)) {
+                        tl_warn(UCC_TL_TEAM_LIB(tl_team),
+                                "ibv_dereg_mr failed");
+                    }
+                    if (ibv_destroy_cq(comm->rcq)) {
+                        tl_warn(UCC_TL_TEAM_LIB(tl_team),
+                                "ibv_destroy_cq failed");
+                    }
+                    ucc_free(comm->params.oob);
+                    ucc_free(comm);
+                    ucc_free(tl_team->mcast);
+                }
+                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE;
+            } else {
+                tl_debug(UCC_TL_TEAM_LIB(tl_team),
+                         "all team members have mcast ctx ready");
+                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_INIT;
+            }
+
+            return UCC_INPROGRESS;
+        } else {
+            if (tl_team->global_status_array[UCC_TL_MLX5_A2A_STATUS_INDEX] != UCC_OK) {
+                //a2a team not avail for some of nodes so disable it
+                if (tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_READY) {
+                    // free the resources
+                    ucc_tl_mlx5_alltoall_cleanup(tl_team);
+                }
+                tl_team->a2a_state = TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE;
+            }
+
+            if (tl_team->global_status_array[UCC_TL_MLX5_MCAST_STATUS_INDEX] != UCC_OK) {
+                //mcast team not avail for some of nodes so disable it
+                if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_READY) {
+                    // free the resources
+                    ucc_tl_mlx5_clean_mcast_comm(tl_team->mcast->mcast_comm);
+                }
+                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE;
+            }
+
+            tl_debug(team->context->lib, "attempted to initialize tl team: %p: MCAST component is %s ALLTOALL component is %s",
+                    team, (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_READY)?"ENABLED":"DISABLED",
+                    (tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_READY)?"ENABLED":"DISABLED");
+        }
+
+        if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE &&
+            tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE) {
+            tl_warn(team->context->lib, "unable to initialize tl team as both a2a and mcast are not available: %p", team);
+            return UCC_ERR_NO_RESOURCE;
+        }
+
+        return UCC_OK;
+    }
+
+    ucc_assert(!tl_team->global_sync_in_progress);
+    
+    if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_CTX_CHECK &&
+            tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_CTX_CHECK ) {
+        // check if ctx is ready for a2a and mcast
+        tl_team->local_status_array[UCC_TL_MLX5_A2A_STATUS_INDEX] =
+            tl_team->a2a_status.local;
+        tl_team->local_status_array[UCC_TL_MLX5_MCAST_STATUS_INDEX] =
+            (tl_team->local_mcast_ctx_ready) ? UCC_OK : UCC_ERR_NO_RESOURCE;
+        goto initial_sync_post;
+    }
 
     a2a_status = ucc_tl_mlx5_a2a_team_test(team);
     if (a2a_status < 0) {
-        tl_error(team->context->lib, "ALLTOALL tl team: %p creation failed %d",
-                 team, a2a_status);
+        tl_warn(team->context->lib, "ALLTOALL tl team: %p creation failed %d",
+                team, a2a_status);
         tl_team->a2a_state = TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE;
     }
 
     if (tl_team->mcast_state != TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE) {
         mcast_status = ucc_tl_mlx5_mcast_team_test(team);
         if (mcast_status < 0) {
-            tl_error(team->context->lib, "MCAST tl team: %p creation failed %d",
-                     team, mcast_status);
+            tl_warn(team->context->lib, "MCAST tl team: %p creation failed %d",
+                    team, mcast_status);
             tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE;
         }
-    }
-
-    if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE &&
-        tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE) {
-        tl_error(team->context->lib, "unable to initialize tl team: %p", team);
-        return UCC_ERR_NO_RESOURCE;
     }
 
     if (UCC_OK != a2a_status || UCC_OK != mcast_status) {
         return UCC_INPROGRESS;
     }
 
-    tl_debug(team->context->lib, "initialized tl team: %p: MCAST component is %s ALLTOALL component is %s",
-            team, (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_READY)?"ENABLED":"DISABLED",
-            (tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_READY)?"ENABLED":"DISABLED");
-    return UCC_OK;
+    tl_team->local_status_array[UCC_TL_MLX5_A2A_STATUS_INDEX] =
+        (tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_READY) ? UCC_OK : UCC_ERR_NO_RESOURCE;
+    tl_team->local_status_array[UCC_TL_MLX5_MCAST_STATUS_INDEX] =
+        (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_READY) ? UCC_OK : UCC_ERR_NO_RESOURCE;
+
+    tl_debug(UCC_TL_TEAM_LIB(tl_team),
+             "posting global status, local status: a2a %d mcast %d",
+             (tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_READY),
+             (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_READY));
+
+initial_sync_post:
+    status = ucc_service_allreduce(
+        core_team, tl_team->local_status_array, tl_team->global_status_array,
+        UCC_DT_INT32, UCC_TL_MLX5_FEATURES_COUNT, UCC_OP_MIN, subset, &tl_team->scoll_req);
+    if (status < 0) {
+        tl_debug(UCC_TL_TEAM_LIB(tl_team),
+                 "failed to collect global status");
+        return status;
+    }
+    tl_team->global_sync_in_progress = 1;
+
+    return UCC_INPROGRESS;
 }
 
 ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,

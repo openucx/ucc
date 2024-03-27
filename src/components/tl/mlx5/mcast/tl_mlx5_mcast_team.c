@@ -46,29 +46,33 @@ static ucc_status_t ucc_tl_mlx5_mcast_service_bcast_test(ucc_service_coll_req_t 
 }
 
 ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
+                                         int *local_mcast_ctx_ready,
                                          ucc_tl_mlx5_mcast_team_t **mcast_team,
                                          ucc_tl_mlx5_mcast_context_t *ctx,
                                          const ucc_base_team_params_t *team_params,
                                          ucc_tl_mlx5_mcast_coll_comm_init_spec_t *mcast_conf)
 {
-    ucc_status_t                             status;
-    ucc_subset_t                             set;
     ucc_tl_mlx5_mcast_coll_comm_init_spec_t  comm_spec     = *mcast_conf;
     ucc_tl_mlx5_mcast_coll_context_t        *mcast_context = &(ctx->mcast_context);
     ucc_tl_mlx5_mcast_coll_comm_init_spec_t *conf_params   = &comm_spec;
     ucc_context_t                           *context       =  base_context->ucc_context;
+    ucc_status_t                             status;
+    ucc_subset_t                             set;
     ucc_tl_mlx5_mcast_team_t                *new_mcast_team;
     ucc_tl_mlx5_mcast_oob_p2p_context_t     *oob_p2p_ctx;
     ucc_tl_mlx5_mcast_coll_comm_t           *comm;
     int                                      i;
 
-    if (!ctx->mcast_enabled || NULL == mcast_context) {
+    if (!ctx->mcast_enabled || !ctx->mcast_ready || NULL == mcast_context) {
         tl_debug(base_context->lib,
                 "mcast context not available, base_context = %p",
                  base_context );
+        *local_mcast_ctx_ready = 0;
         return UCC_ERR_NO_RESOURCE;
     }
 
+    *local_mcast_ctx_ready = 1;
+    
     new_mcast_team = ucc_calloc(1, sizeof(ucc_tl_mlx5_mcast_team_t), "new_mcast_team");
 
     if (!new_mcast_team) {
@@ -302,11 +306,11 @@ error:
 ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 {
     ucc_tl_mlx5_team_t            *tl_team  = ucc_derived_of(team, ucc_tl_mlx5_team_t);
-    ucc_tl_mlx5_mcast_coll_comm_t *comm     = tl_team->mcast->mcast_comm;
     ucc_status_t                   status   = UCC_OK;
     struct sockaddr_in6            net_addr = {0,};
     ucc_tl_mlx5_mcast_join_info_t *data     = NULL;
-    
+    ucc_tl_mlx5_mcast_coll_comm_t *comm     = tl_team->mcast->mcast_comm;
+
     if (comm->rank == 0) {
         switch(tl_team->mcast_state) {
             case TL_MLX5_TEAM_STATE_MCAST_INIT:

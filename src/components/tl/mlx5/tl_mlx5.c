@@ -88,6 +88,10 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.wsize),
      UCC_CONFIG_TYPE_INT},
 
+    {"MCAST_MAX_EAGER", "65536", "Max msg size to be used for Mcast with eager protocol",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.max_eager),
+     UCC_CONFIG_TYPE_INT},
+
     {NULL}};
 
 static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {

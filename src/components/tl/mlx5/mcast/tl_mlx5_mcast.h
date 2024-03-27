@@ -363,6 +363,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_recv_buffers(ucc_tl_mlx5_mcast
 }
 
 ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *tl_context,
+                                         int *local_mcast_ctx_ready,
                                          ucc_tl_mlx5_mcast_team_t **mcast_team,
                                          ucc_tl_mlx5_mcast_context_t *ctx,
                                          const ucc_base_team_params_t *params,

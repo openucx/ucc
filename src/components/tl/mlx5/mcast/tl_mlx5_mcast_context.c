@@ -144,7 +144,7 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
     dst = inet_ntop((is_ipv4) ? AF_INET : AF_INET6,
                     &in_src_addr->sin_addr, addrstr, sizeof(addrstr) - 1);
     if (NULL == dst) {
-        tl_error(lib, "inet_ntop failed");
+        tl_warn(lib, "inet_ntop failed");
         status = UCC_ERR_NO_RESOURCE;
         goto error;
     }
@@ -174,20 +174,20 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
     }
 
     if (rdma_get_cm_event(ctx->channel, &revent) < 0) {
-        tl_error(lib, "failed to get cm event, errno %d", errno);
+        tl_warn(lib, "failed to get cm event, errno %d", errno);
         status = UCC_ERR_NO_RESOURCE;
         goto error;
     } else if (revent->event != RDMA_CM_EVENT_ADDR_RESOLVED) {
-        tl_error(lib, "cm event is not resolved");
+        tl_warn(lib, "cm event is not resolved");
         if (rdma_ack_cm_event(revent) < 0) {
-            tl_error(lib, "rdma_ack_cm_event failed");
+            tl_warn(lib, "rdma_ack_cm_event failed");
         }
         status = UCC_ERR_NO_RESOURCE;
         goto error;
     }
 
     if (rdma_ack_cm_event(revent) < 0) {
-        tl_error(lib, "rdma_ack_cm_event failed");
+        tl_warn(lib, "rdma_ack_cm_event failed");
         status = UCC_ERR_NO_RESOURCE;
         goto error;
     }
@@ -195,14 +195,14 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
     ctx->ctx = ctx->id->verbs;
     ctx->pd  = ibv_alloc_pd(ctx->ctx);
     if (!ctx->pd) {
-        tl_error(lib, "failed to allocate pd");
+        tl_warn(lib, "failed to allocate pd");
         status = UCC_ERR_NO_RESOURCE;
         goto error;
     }
 
     /* Determine MTU */
     if (ibv_query_port(ctx->ctx, ctx->ib_port, &port_attr)) {
-        tl_error(lib, "couldn't query port in ctx create, errno %d", errno);
+        tl_warn(lib, "couldn't query port in ctx create, errno %d", errno);
         status = UCC_ERR_NO_RESOURCE;
         goto error;
     }
@@ -227,7 +227,7 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
     }
 
     if (ibv_query_device(ctx->ctx, &device_attr)) {
-        tl_error(lib, "failed to query device in ctx create, errno %d", errno);
+        tl_warn(lib, "failed to query device in ctx create, errno %d", errno);
         status = UCC_ERR_NO_RESOURCE;
         goto error;
     }
@@ -243,7 +243,7 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
                             UCC_THREAD_SINGLE,
                             "ucc_tl_mlx5_mcast_p2p_completion_obj_t");
     if (ucc_unlikely(UCC_OK != status)) {
-        tl_error(lib, "failed to initialize compl_objects_mp mpool");
+        tl_warn(lib, "failed to initialize compl_objects_mp mpool");
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
@@ -251,7 +251,7 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
     ctx->rcache = NULL;
     status = ucc_tl_mlx5_mcast_setup_rcache(ctx);
     if (UCC_OK != status) {
-        tl_error(lib, "failed to setup rcache");
+        tl_warn(lib, "failed to setup rcache");
         goto error;
     }
 
@@ -296,7 +296,7 @@ ucc_status_t ucc_tl_mlx5_mcast_clean_ctx(ucc_tl_mlx5_mcast_coll_context_t *ctx)
     }
 
     if (ctx->id && rdma_destroy_id(ctx->id)) {
-        tl_error(ctx->lib, "rdma_destroy_id failed errno %d", errno);
+        tl_warn(ctx->lib, "rdma_destroy_id failed errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
