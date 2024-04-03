@@ -16,7 +16,7 @@ ucc_base_coll_alg_info_t
         [UCC_TL_UCP_REDUCE_ALG_DBT] =
             {.id   = UCC_TL_UCP_REDUCE_ALG_DBT,
              .name = "dbt",
-             .desc = "bcast over double binary tree where a leaf in one tree "
+             .desc = "reduce over double binary tree where a leaf in one tree "
                      "will be intermediate in other (optimized for BW)"},
         [UCC_TL_UCP_REDUCE_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
