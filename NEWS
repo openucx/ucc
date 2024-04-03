@@ -64,8 +64,10 @@
 
 ### DOCS
 - Updating NEWS for v1.2 {PR #791}
+- Updating NEWS for v1.3 {PR #937}
 
-### TEST
+### BUILD and TEST
+- Updated build system to enable UCC with ROCm 6.x {PR #906 and #917}
 - Check op and dt compatibility {PR #773}
 - Fix barrier test {PR #799}
 - Propagate HIP_CXXFLAGS to gtest and mpi {PR #803}
