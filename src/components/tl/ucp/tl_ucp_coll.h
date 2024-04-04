@@ -133,11 +133,11 @@ typedef struct ucc_tl_ucp_task {
             void                                     **sbufs;
             void                                     **rbufs;
             ucc_tl_ucp_allreduce_sw_pipeline          *pipe;
-            ucc_ee_executor_task_t                    *etask;
-            ucc_ee_executor_t                         *executor;
+            ucc_ee_executor_task_t                    *reduce_task;
             ucs_status_ptr_t                          *put_requests;
+            ucc_coll_task_t                           *allgather_task;
             ucc_tl_ucp_allreduce_sw_host_allgather    *allgather_data;
-            ucc_schedule_t                            *sw_sched;
+            ucc_coll_task_t                           *barrier_task;
             struct ucc_tl_ucp_allreduce_sw_export_buf *src_ebuf;
             struct ucc_tl_ucp_allreduce_sw_export_buf *dst_ebuf;
         } allreduce_sliding_window;
