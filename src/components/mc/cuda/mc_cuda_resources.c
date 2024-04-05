@@ -84,6 +84,16 @@ free_scratch_mpool:
 void ucc_mc_cuda_resources_cleanup(ucc_mc_cuda_resources_t *resources)
 {
     CUcontext tmp_context;
+#if CUDA_VERSION >= 12000
+    CUresult status;
+    unsigned long long int cu_ctx_id;
+
+    status = cuCtxGetId(resources->cu_ctx, &cu_ctx_id);
+    if (ucc_unlikely(status != CUDA_SUCCESS)) {
+        // ctx is not available, can be due to cudaDeviceReset
+        return;
+    }
+#endif
 
     cuCtxPushCurrent(resources->cu_ctx);
     ucc_mpool_cleanup(&resources->scratch_mpool, 1);
