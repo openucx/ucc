@@ -205,14 +205,14 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_post(ucc_tl_mlx5_mcast_coll_context_t 
 
     dst = inet_ntop(AF_INET6, net_addr, buf, 40);
     if (NULL == dst) {
-        tl_error(ctx->lib, "inet_ntop failed");
+        tl_warn(ctx->lib, "inet_ntop failed");
         return UCC_ERR_NO_RESOURCE;
     }
 
     tl_debug(ctx->lib, "joining addr: %s is_root %d", buf, is_root);
 
     if (rdma_join_multicast(ctx->id, (struct sockaddr*)net_addr, NULL)) {
-        tl_error(ctx->lib, "rdma_join_multicast failed errno %d", errno);
+        tl_warn(ctx->lib, "rdma_join_multicast failed errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
@@ -228,8 +228,8 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_test(ucc_tl_mlx5_mcast_coll_context_t 
 
     if (rdma_get_cm_event(ctx->channel, event) < 0) {
         if (EINTR != errno) {
-            tl_error(ctx->lib, "rdma_get_cm_event failed, errno %d %s",
-                     errno, strerror(errno));
+            tl_warn(ctx->lib, "rdma_get_cm_event failed, errno %d %s",
+                    errno, strerror(errno));
             return UCC_ERR_NO_RESOURCE;
         } else {
             return UCC_INPROGRESS;
@@ -237,19 +237,19 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_test(ucc_tl_mlx5_mcast_coll_context_t 
     }
 
     if (RDMA_CM_EVENT_MULTICAST_JOIN != (*event)->event) {
-        tl_error(ctx->lib, "failed to join multicast, is_root %d. unexpected event was"
-                 " received: event=%d, str=%s, status=%d",
+        tl_warn(ctx->lib, "failed to join multicast, is_root %d. unexpected event was"
+                " received: event=%d, str=%s, status=%d",
                  is_root, (*event)->event, rdma_event_str((*event)->event),
                  (*event)->status);
         if (rdma_ack_cm_event(*event) < 0) {
-            tl_error(ctx->lib, "rdma_ack_cm_event failed");
+            tl_warn(ctx->lib, "rdma_ack_cm_event failed");
         }
         return UCC_ERR_NO_RESOURCE;
     }
 
     dst = inet_ntop(AF_INET6, (*event)->param.ud.ah_attr.grh.dgid.raw, buf, 40);
     if (NULL == dst) {
-        tl_error(ctx->lib, "inet_ntop failed");
+        tl_warn(ctx->lib, "inet_ntop failed");
         return UCC_ERR_NO_RESOURCE;
     }
 
@@ -271,7 +271,7 @@ ucc_status_t ucc_tl_mlx5_setup_mcast_group_join_post(ucc_tl_mlx5_mcast_coll_comm
 
         status = ucc_tl_mlx5_mcast_join_mcast_post(comm->ctx, &net_addr, 1);
         if (status < 0) {
-            tl_error(comm->lib, "rank 0 is unable to join mcast group");
+            tl_warn(comm->lib, "rank 0 is unable to join mcast group");
             return status;
         }
     }
@@ -296,7 +296,7 @@ ucc_status_t ucc_tl_mlx5_mcast_init_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
 
     comm->mcast.qp = ibv_create_qp(ctx->pd, &qp_init_attr);
     if (!comm->mcast.qp) {
-        tl_error(ctx->lib, "failed to create mcast qp, errno %d", errno);
+        tl_warn(ctx->lib, "failed to create mcast qp, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
@@ -320,7 +320,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_create_ah(ucc_tl_mlx5_mcast_coll_comm_t *c
 
     comm->mcast.ah = ibv_create_ah(comm->ctx->pd, &ah_attr);
     if (!comm->mcast.ah) {
-        tl_error(comm->lib, "failed to create AH");
+        tl_warn(comm->lib, "failed to create AH");
         return UCC_ERR_NO_RESOURCE;
     }
     return UCC_OK;
@@ -346,7 +346,7 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
         ctx->pkey_index = 0;
         ibv_query_pkey(ctx->ctx, ctx->ib_port, ctx->pkey_index, &pkey);
         if (!pkey) {
-            tl_error(ctx->lib, "cannot find valid PKEY");
+            tl_warn(ctx->lib, "cannot find valid PKEY");
             return UCC_ERR_NO_RESOURCE;
         }
 
@@ -361,32 +361,32 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
 
     if (ibv_modify_qp(comm->mcast.qp, &attr,
                       IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_QKEY)) {
-        tl_error(ctx->lib, "failed to move mcast qp to INIT, errno %d", errno);
+        tl_warn(ctx->lib, "failed to move mcast qp to INIT, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
     if (ibv_attach_mcast(comm->mcast.qp, &comm->mgid, comm->mcast_lid)) {
-        tl_error(ctx->lib, "failed to attach QP to the mcast group, errno %d", errno);
+        tl_warn(ctx->lib, "failed to attach QP to the mcast group, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
     /* Ok, now cycle to RTR on everyone */
     attr.qp_state = IBV_QPS_RTR;
     if (ibv_modify_qp(comm->mcast.qp, &attr, IBV_QP_STATE)) {
-        tl_error(ctx->lib, "failed to modify QP to RTR, errno %d", errno);
+        tl_warn(ctx->lib, "failed to modify QP to RTR, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
     attr.qp_state = IBV_QPS_RTS;
     attr.sq_psn   = DEF_PSN;
     if (ibv_modify_qp(comm->mcast.qp, &attr, IBV_QP_STATE | IBV_QP_SQ_PSN)) {
-        tl_error(ctx->lib, "failed to modify QP to RTS, errno %d", errno);
+        tl_warn(ctx->lib, "failed to modify QP to RTS, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
 
     /* Create the address handle */
     if (UCC_OK != ucc_tl_mlx5_mcast_create_ah(comm)) {
-        tl_error(ctx->lib, "failed to create adress handle");
+        tl_warn(ctx->lib, "failed to create adress handle");
         return UCC_ERR_NO_RESOURCE;
     }
 
