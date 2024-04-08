@@ -30,7 +30,7 @@
 #define DEF_SL            0
 #define DEF_SRC_PATH_BITS 0
 #define GRH_LENGTH        40
-#define DROP_THRESHOLD    1000000
+#define DROP_THRESHOLD    1000
 #define MAX_COMM_POW2     32
 
 enum {
@@ -41,7 +41,8 @@ enum {
 enum {
     MCAST_P2P_NACK,
     MCAST_P2P_ACK,
-    MCAST_P2P_NEED_NACK_SEND
+    MCAST_P2P_NEED_NACK_SEND,
+    MCAST_P2P_NACK_SEND_PENDING
 };
 
 enum {
@@ -138,7 +139,6 @@ typedef struct ucc_tl_mlx5_mcast_coll_context {
     struct rdma_cm_id             *id;
     struct rdma_event_channel     *channel;
     ucc_mpool_t                    compl_objects_mp;
-    ucc_mpool_t                    nack_reqs_mp;
     ucc_list_link_t                pending_nacks_list;
     ucc_rcache_t                  *rcache;
     ucc_tl_mlx5_mcast_ctx_params_t params;
@@ -308,10 +308,11 @@ typedef struct ucc_tl_mlx5_mcast_coll_req {
 } ucc_tl_mlx5_mcast_coll_req_t;
 
 typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {
-    ucc_context_h base_ctx;
-    ucc_team_h    base_team;
-    ucc_rank_t    my_team_rank;
-    ucc_subset_t  subset;
+    ucc_context_h   base_ctx;
+    ucc_team_h      base_team;
+    ucc_rank_t      my_team_rank;
+    ucc_subset_t    subset;
+    ucc_base_lib_t *lib;
 } ucc_tl_mlx5_mcast_oob_p2p_context_t;
 
 static inline struct pp_packet* ucc_tl_mlx5_mcast_buf_get_free(ucc_tl_mlx5_mcast_coll_comm_t* comm)
@@ -333,7 +334,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_recv_buffers(ucc_tl_mlx5_mcast
     struct pp_packet   *pp     = NULL;
     int                 count  = comm->params.rx_depth - comm->pending_recv;
     int                 i;
-    
+
     if (count <= comm->params.post_recv_thresh) {
         return UCC_OK;
     }
