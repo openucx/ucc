@@ -11,19 +11,17 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 #include "components/mc/ucc_mc.h"
-#include <stdio.h>
 
 ucc_status_t ucc_tl_ucp_allgather_sparbit_init(ucc_base_coll_args_t *coll_args,
                                                ucc_base_team_t      *team,
                                                ucc_coll_task_t     **task_h)
 {
     ucc_tl_ucp_task_t *task   = ucc_tl_ucp_init_task(coll_args, team);
-    ucc_status_t       status = UCC_OK;
 
     if (!ucc_coll_args_is_predefined_dt(&TASK_ARGS(task), UCC_RANK_INVALID)) {
         tl_error(UCC_TASK_LIB(task), "user defined datatype is not supported");
-        status = UCC_ERR_NOT_SUPPORTED;
-        goto out;
+        ucc_tl_ucp_put_task(task);
+        return UCC_ERR_NOT_SUPPORTED;
     }
     tl_trace(UCC_TASK_LIB(task), "ucc_tl_ucp_allgather_sparbit_init");
 
@@ -31,22 +29,19 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_init(ucc_base_coll_args_t *coll_args,
     task->super.progress      = ucc_tl_ucp_allgather_sparbit_progress;
     task->allgather_sparbit.i = 0; // setup iteration
     task->allgather_sparbit.data_expected = 1;
-out:
-    if (status != UCC_OK) {
-        ucc_tl_ucp_put_task(task);
-        return status;
-    }
 
     *task_h = &task->super;
-    return status;
+
+    return UCC_OK;
 }
 
-// return nearest greater log pow2
+// return log2 of nearest greater or equal power of 2
 static inline uint32_t highest_log2(uint32_t n)
 {
     int x = __builtin_clz(n); // leading zeros
-    if (!(n & (n - 1)))
+    if (!(n & (n - 1))) {
         return 31 - x; // pow2 case
+    }
     return 31 - x + 1;
 }
 
@@ -69,7 +64,7 @@ void ucc_tl_ucp_allgather_sparbit_progress(ucc_coll_task_t *coll_task)
     uint32_t   tsize_log, exclusion;
     void      *tmprecv, *tmpsend;
 
-    // here we can't made any progress while transfers from previous step are running, emulation of wait all in async manier
+    // here we can't make any progress while transfers from previous step are running, emulation of wait all in async manner
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return;
     }
@@ -142,9 +137,7 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_start(ucc_coll_task_t *coll_task)
                                      0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
-    /* initial step: copy data on non root ranks to the beginning of buffer */
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        // not inplace
         status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
                                data_size, rmem, smem);
         if (ucc_unlikely(UCC_OK != status)) {
