@@ -72,7 +72,7 @@ ucc_status_t ucc_mc_init(const ucc_mc_params_t *mc_params)
                 return status;
             }
             if (attr.thread_mode < mc_params->thread_mode) {
-                ucc_warn("mc %s was allready initilized with "
+                ucc_info("mc %s was allready initilized with "
                          "different thread mode: current tm %d, provided tm %d",
                          mc->super.name, attr.thread_mode,
                          mc_params->thread_mode);
