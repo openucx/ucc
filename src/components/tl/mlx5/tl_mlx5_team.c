@@ -133,14 +133,18 @@ static inline ucc_status_t ucc_tl_mlx5_a2a_team_test(ucc_base_team_t *team)
         if (UCC_OK != tl_team->a2a_status.local) {
             tl_debug(UCC_TL_TEAM_LIB(tl_team), "failed to init a2a: %s",
                      ucc_status_string(tl_team->a2a_status.local));
+            tl_team->a2a_state = TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE;
+        } else {
+            tl_team->a2a_state = TL_MLX5_TEAM_STATE_ALLTOALL_READY;
+            tl_debug(UCC_TL_TEAM_LIB(tl_team), "initialized tl a2a team: %p",
+                     tl_team);
         }
-        tl_team->a2a_state = TL_MLX5_TEAM_STATE_ALLTOALL_READY;
-        tl_debug(team->context->lib, "initialized tl a2a team: %p", tl_team);
     case TL_MLX5_TEAM_STATE_ALLTOALL_READY:
     case TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE:
         return UCC_OK;
     default:
-        tl_error(team->context->lib, "unknown state during a2a team: %p create", tl_team);
+        tl_error(UCC_TL_TEAM_LIB(tl_team),
+                 "unknown state during a2a team: %p create", tl_team);
         return UCC_ERR_NO_RESOURCE;
     }
 }
