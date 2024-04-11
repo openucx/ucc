@@ -180,7 +180,16 @@ void ucc_ec_cuda_resources_cleanup(ucc_ec_cuda_resources_t *resources)
 {
     int i;
     CUcontext tmp_context;
+#if CUDA_VERSION >= 12000
+    CUresult status;
+    unsigned long long int cu_ctx_id;
 
+    status = cuCtxGetId(resources->cu_ctx, &cu_ctx_id);
+    if (ucc_unlikely(status != CUDA_SUCCESS)) {
+        // ctx is not available, can be due to cudaDeviceReset
+        return;
+    }
+#endif
     cuCtxPushCurrent(resources->cu_ctx);
     for (i = 0; i < ucc_ec_cuda_config->exec_num_streams; i++) {
         if (resources->exec_streams[i] != NULL) {
