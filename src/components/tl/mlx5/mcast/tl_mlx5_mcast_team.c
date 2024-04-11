@@ -91,6 +91,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     oob_p2p_ctx->base_ctx       = context;
     oob_p2p_ctx->base_team      = team_params->team;
     oob_p2p_ctx->my_team_rank   = team_params->rank;
+    oob_p2p_ctx->lib            = mcast_context->lib;
     set.myrank                  = team_params->rank;
     set.map                     = team_params->map;
     oob_p2p_ctx->subset         = set;
