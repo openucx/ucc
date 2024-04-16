@@ -327,21 +327,18 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_post, (request),
     ucc_status_t status;
 
     if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DEBUG) {
-        /* team is NULL if task is a dummy task, e.g. collective of zero size */
-        if (task->team) {
-            ucc_rank_t rank = task->team->params.team->rank;
-            if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {
-                if (rank == 0) {
-                    ucc_log_component_collective_trace(
-                        ucc_global_config.coll_trace.log_level,
-                        "coll post: req %p, seq_num %u", task, task->seq_num);
-                }
-            } else {
+        ucc_rank_t rank = task->bargs.team->rank;
+        if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {
+            if (rank == 0) {
                 ucc_log_component_collective_trace(
                     ucc_global_config.coll_trace.log_level,
-                    "coll post: rank %d req %p, seq_num %u", rank, task,
-                    task->seq_num);
+                    "coll post: req %p, seq_num %u", task, task->seq_num);
             }
+        } else {
+            ucc_log_component_collective_trace(
+                ucc_global_config.coll_trace.log_level,
+                "coll post: rank %d req %p, seq_num %u", rank, task,
+                task->seq_num);
         }
     }
 
@@ -365,7 +362,7 @@ ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ev)
     ucc_coll_task_t *task = ucc_derived_of(ev->req, ucc_coll_task_t);
 
     if (ucc_global_config.coll_trace.log_level >= UCC_LOG_LEVEL_DEBUG) {
-        ucc_rank_t rank = task->team->params.team->rank;
+        ucc_rank_t rank = task->bargs.team->rank;
         if (ucc_global_config.coll_trace.log_level == UCC_LOG_LEVEL_DEBUG) {
             if (rank == 0) {
                 ucc_log_component_collective_trace(
@@ -588,5 +585,5 @@ ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
         return status;
     }
 
-    return ucc_progress_queue_enqueue(UCC_TASK_CORE_CTX(ev_task)->pq, ev_task);
+    return ucc_progress_queue_enqueue(task->bargs.team->contexts[0]->pq, ev_task);
 }
