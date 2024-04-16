@@ -9,6 +9,10 @@
 #include <ucc/api/ucc.h>
 #include <utils/ucc_math.h>
 #include <utils/ucc_coll_utils.h>
+#include <string>
+#include <ifstream>
+#include <vector>
+
 
 ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
                          ucc_memory_type mt, bool is_inplace,
@@ -39,14 +43,77 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
 
 }
 
+double parse_transfer_matrix_token(string token)
+{
+    size_t size;
+    double val;
+    std::stod(token, &size);
+    if (size < token.size())
+    {
+        switch(s[size])
+        {
+            case 'M':
+                val *= 1e6;
+                break;
+            case 'G':
+                val *= 1e9;
+                break;
+            default:
+                throw std::runtime_error("Unknown suffix from transfer matrix: " + s[size]);
+        }
+    }
+}
+
+std::vector<std::vector<double>> ucc_pt_coll_alltoallv::fill_transfer_matrix(std::vector<std::vector<double>>& transfer_matrix)
+{
+    ifstream f;
+    string line, token;
+    double val;
+    int row = col = 0;
+    int N = transfer_matrix.size();
+    
+    f.open(std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE"));
+    if (!f.is_open())
+        throw std::runtime_error(std::format("Couldn't open transfer matrix file: {}", std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE")));
+
+    while (getline(f, line)){
+        if (row >= N)
+            throw std::runtime_error(std::format("Transfer matrix rows number exceed expected number of {}", N));
+
+        col = 0;
+        while (line >> token){
+            if (col >= N)
+                throw std::runtime_error(std::format("Transfer matrix columns of row {} exceed expected number of {}", row, N));
+            transfer_matrix[row][col++] = parse_transfer_matrix_token(token);
+        }
+
+        if (col != N-1)
+            throw std::runtime_error(std::format("Transfer matrix row {} doesn't contain {} elements as expected.", row+1, N));
+
+        row++;
+    }
+
+    if (row != N-1)
+        throw std::runtime_error(std::format("Transfer matrix is expected to have {} rows but only have {}.", N, row+1));
+
+    return transfer_matrix;
+}
+
+
 ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count,
                                               ucc_pt_test_args_t &test_args)
 {
-    ucc_coll_args_t &args      = test_args.coll_args;
-    int              comm_size = comm->get_size();
-    size_t           dt_size   = ucc_dt_size(coll_args.src.info_v.datatype);
-    size_t           size      = comm_size * count * dt_size;
-    ucc_status_t     st        = UCC_OK;
+    ucc_coll_args_t                     &args      = test_args.coll_args;
+    int                                 comm_size = comm->get_size();
+    int                                 comm_rank = comm->get_rank();
+    size_t                              dt_size   = ucc_dt_size(coll_args.src.info_v.datatype);
+    size_t                              size      = comm_size * count * dt_size;
+    ucc_status_t                        st        = UCC_OK;
+    int                                 src_displacement = dst_displacement = 0;
+    std::vector<std::vector<double>>    transfer_matrix(comm_size, std::vector<double>(comm_size, 0));
+
+    if (std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE"))
+        fill_transfer_matrix(transfer_matrix);
 
     args = coll_args;
     args.src.info_v.counts = (ucc_count_t *) ucc_malloc(comm_size * sizeof(uint32_t), "counts buf");
@@ -65,11 +132,15 @@ ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count,
                       free_dst, st);
         args.src.info_v.buffer = src_header->addr;
     }
+
     for (int i = 0; i < comm_size; i++) {
-        ((uint32_t*)args.src.info_v.counts)[i] = count;
-        ((uint32_t*)args.src.info_v.displacements)[i] = count * i;
-        ((uint32_t*)args.dst.info_v.counts)[i] = count;
-        ((uint32_t*)args.dst.info_v.displacements)[i] = count * i;
+        ((uint32_t*)args.src.info_v.counts)[i] = transfer_matrix[comm_rank][i];
+        ((uint32_t*)args.src.info_v.displacements)[i] = src_displacement;
+        ((uint32_t*)args.dst.info_v.counts)[i] = transfer_matrix[i][comm_rank];
+        ((uint32_t*)args.dst.info_v.displacements)[i] = dst_displacement;
+
+        src_displacement += transfer_matrix[comm_rank][i];
+        dst_displacement += transfer_matrix[i][comm_rank];
     }
     return UCC_OK;
 free_dst:
