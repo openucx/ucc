@@ -49,6 +49,8 @@ runs_on_dockers:
       uri: "${UCC_URI_SUFFIX}",
       build_args: "--rm --no-cache --build-arg CUDA_VER=${CUDA_VER} --build-arg NVIDIA_ROOT_DIR=${NVIDIA_ROOT_DIR}",
       cloud: "swx-k8s",
+      limits: '{memory: 16Gi, cpu: 8000m, ephemeral-storage: 10Gi}',
+      requests: '{memory: 16Gi, cpu: 8000m, ephemeral-storage: 5Gi}'
     }
 
 # bare metal
