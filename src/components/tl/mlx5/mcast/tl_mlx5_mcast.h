@@ -157,7 +157,7 @@ typedef struct ucc_tl_mlx5_mcast_context {
     ucc_tl_mlx5_mcast_context_config_t cfg;
     ucc_mpool_t                        req_mp;
     int                                mcast_enabled;
-    int                                mcast_ready;
+    int                                mcast_ctx_ready;
     ucc_tl_mlx5_mcast_oob_ctx_t        oob_ctx;
 } ucc_tl_mlx5_mcast_context_t;
 
