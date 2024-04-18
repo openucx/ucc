@@ -10,7 +10,8 @@
 #include <utils/ucc_math.h>
 #include <utils/ucc_coll_utils.h>
 #include <string>
-#include <ifstream>
+#include <fstream>
+#include <iostream>
 #include <vector>
 
 
@@ -43,14 +44,14 @@ ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
 
 }
 
-double parse_transfer_matrix_token(string token)
+double parse_transfer_matrix_token(std::string token)
 {
     size_t size;
     double val;
-    std::stod(token, &size);
+    val = std::stod(token, &size);
     if (size < token.size())
     {
-        switch(s[size])
+        switch(token[size])
         {
             case 'M':
                 val *= 1e6;
@@ -59,42 +60,46 @@ double parse_transfer_matrix_token(string token)
                 val *= 1e9;
                 break;
             default:
-                throw std::runtime_error("Unknown suffix from transfer matrix: " + s[size]);
+                throw std::runtime_error("Unknown suffix from transfer matrix: " + token[size]);
         }
     }
+		return val;
 }
 
-std::vector<std::vector<double>> ucc_pt_coll_alltoallv::fill_transfer_matrix(std::vector<std::vector<double>>& transfer_matrix)
+std::vector<std::vector<double>> fill_transfer_matrix(std::vector<std::vector<double>>& transfer_matrix)
 {
-    ifstream f;
-    string line, token;
-    double val;
-    int row = col = 0;
+		std::ifstream f;
+		std::string line, token;
+		std::istringstream linestream;
+    int row = 0;
+		int col = 0;
     int N = transfer_matrix.size();
-    
+
     f.open(std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE"));
     if (!f.is_open())
-        throw std::runtime_error(std::format("Couldn't open transfer matrix file: {}", std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE")));
+        throw std::runtime_error("Couldn't open transfer matrix file: " + (std::string) std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE"));
 
     while (getline(f, line)){
         if (row >= N)
-            throw std::runtime_error(std::format("Transfer matrix rows number exceed expected number of {}", N));
+            throw std::runtime_error("Transfer matrix rows number exceed expected number of {}" + std::to_string(N));
 
+				linestream.str(line);
+				linestream.clear();
         col = 0;
-        while (line >> token){
+        while (linestream >> token){
             if (col >= N)
-                throw std::runtime_error(std::format("Transfer matrix columns of row {} exceed expected number of {}", row, N));
+                throw std::runtime_error("Transfer matrix columns of row " + std::to_string(row) + " exceed expected number of " + std::to_string(N));
             transfer_matrix[row][col++] = parse_transfer_matrix_token(token);
         }
 
         if (col != N-1)
-            throw std::runtime_error(std::format("Transfer matrix row {} doesn't contain {} elements as expected.", row+1, N));
+            throw std::runtime_error("Transfer matrix row " + std::to_string(row+1) + " doesn't contain " + std::to_string(N) + " elements as expected.");
 
         row++;
     }
 
     if (row != N-1)
-        throw std::runtime_error(std::format("Transfer matrix is expected to have {} rows but only have {}.", N, row+1));
+        throw std::runtime_error("Transfer matrix is expected to have " + std::to_string(N) + " rows but only have " + std::to_string(row+1));
 
     return transfer_matrix;
 }
@@ -109,8 +114,12 @@ ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count,
     size_t                              dt_size   = ucc_dt_size(coll_args.src.info_v.datatype);
     size_t                              size      = comm_size * count * dt_size;
     ucc_status_t                        st        = UCC_OK;
-    int                                 src_displacement = dst_displacement = 0;
+    int                                 src_displacement = 0;
+    int                                 dst_displacement = 0;
     std::vector<std::vector<double>>    transfer_matrix(comm_size, std::vector<double>(comm_size, 0));
+
+		std::cout << std::to_string(comm_rank) << " -- " << "Comm size: " << std::to_string(comm_size) << std::endl;
+		std::cout << std::to_string(comm_rank) << " -- " << "Matrix size: " << std::to_string(transfer_matrix.size()) << std::endl;
 
     if (std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE"))
         fill_transfer_matrix(transfer_matrix);
