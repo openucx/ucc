@@ -77,7 +77,6 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t                 alltoallv_hybrid_pairwise_num_posts;
     ucc_ternary_auto_value_t use_topo;
     int                      use_reordering;
-    int                      use_dynamic_segments;
     int                      use_xgvmi;
 } ucc_tl_ucp_lib_config_t;
 
@@ -100,28 +99,6 @@ typedef struct ucc_tl_ucp_lib {
 } ucc_tl_ucp_lib_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *,
                   const ucc_base_config_t *);
-
-/* dynamic segments stored in a flat buffer. An example with 4 segments on
- * two PEs, with segments stored two at a time (collective with src/dst pair):
-
-rva/key => (rva, len, key size, key) tuple
-
-+-----------------------------+-----------------------------+
-| seg group 0 (seg 0 + seg 1) | seg group 1 (seg 2 + seg 3) |
-+--------------+--------------+--------------+--------------+
-| rva/key pe 0 | rva/key pe 1 | rva/key pe 0 | rva/key pe 1 |
-+--------------+--------------+--------------+--------------+
-*/
-typedef struct ucc_tl_ucp_dynamic_seg {
-    void   *dyn_buff; /* flat buffer with rva, keys, etc. */
-    size_t  buff_size;
-    size_t *seg_groups;      /* segment to segment group mapping */
-    size_t *seg_group_start; /* offset of dyn_buff to start of seg group */
-    size_t *seg_group_size;  /* storage size of a seg group */
-    size_t *starting_seg;    /* starting seg for a seg group */
-    size_t *num_seg_per_group;
-    size_t  num_groups;
-} ucc_tl_ucp_dynamic_seg_t;
 
 typedef struct ucc_tl_ucp_remote_info {
     void * va_base;
@@ -149,13 +126,14 @@ typedef struct ucc_tl_ucp_context {
     uint32_t                    service_worker_throttling_count;
     ucc_mpool_t                 req_mp;
     ucc_tl_ucp_remote_info_t   *remote_info;
-    ucc_tl_ucp_remote_info_t   *dynamic_remote_info;
-    ucc_tl_ucp_dynamic_seg_t    dyn_seg;
     ucp_rkey_h *                rkeys;
     uint64_t                    n_rinfo_segs;
-    uint64_t                    n_dynrinfo_segs;
     uint64_t                    ucp_memory_types;
     int                         topo_required;
+    ucc_tl_ucp_remote_info_t   *dynamic_remote_info;
+    void                       *dyn_seg_buf;
+    ucp_rkey_h                 *dyn_rkeys;
+    size_t                      n_dynrinfo_segs;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -216,38 +194,8 @@ extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 #define UCC_TL_UCP_REMOTE_RKEY(_ctx, _rank, _seg)                              \
     ((_ctx)->rkeys[_rank * _ctx->n_rinfo_segs + _seg])
 
-#define UCC_TL_UCP_DYN_REMOTE_RKEY(_ctx, _rank, _size, _seg)                   \
-    ((_ctx)->rkeys[_size * _ctx->n_rinfo_segs + _rank * _ctx->n_dynrinfo_segs + _seg])
-
-#define UCC_TL_UCP_REMOTE_DYN_RVA(_ctx, _rank, _seg)                           \
-    *(uint64_t *)(PTR_OFFSET(_ctx->dyn_seg.dyn_buff,                           \
-        _ctx->dyn_seg.seg_group_start[_seg]                                    \
-      + _ctx->dyn_seg.seg_group_size[_ctx->dyn_seg.seg_groups[_seg]] * _rank   \
-      + (_seg - _ctx->dyn_seg.starting_seg[_seg]) * sizeof(uint64_t)))
-
-#define UCC_TL_UCP_REMOTE_DYN_LEN(_ctx, _rank, _seg)                           \
-    *(uint64_t *)(PTR_OFFSET(_ctx->dyn_seg.dyn_buff,                           \
-      sizeof(uint64_t)                                                         \
-      * _ctx->dyn_seg.num_seg_per_group[_ctx->dyn_seg.seg_groups[_seg]]        \
-      + _ctx->dyn_seg.seg_group_start[_seg]                                    \
-      + _ctx->dyn_seg.seg_group_size[_ctx->dyn_seg.seg_groups[_seg]] * _rank   \
-      + (_seg - _ctx->dyn_seg.starting_seg[_seg]) * sizeof(uint64_t)))
-
-#define UCC_TL_UCP_REMOTE_DYN_KEY_SIZE(_ctx, _rank, _seg)                      \
-    *(uint64_t *)(PTR_OFFSET(_ctx->dyn_seg.dyn_buff,                           \
-      2 * sizeof(uint64_t)                                                     \
-      * _ctx->dyn_seg.num_seg_per_group[_ctx->dyn_seg.seg_groups[_seg]]        \
-      + _ctx->dyn_seg.seg_group_start[_seg]                                    \
-      + _ctx->dyn_seg.seg_group_size[_ctx->dyn_seg.seg_groups[_seg]] * _rank   \
-      + (_seg - _ctx->dyn_seg.starting_seg[_seg]) * sizeof(uint64_t)))
-
-#define UCC_TL_UCP_REMOTE_DYN_KEY(_ctx, _rank, _offset, _seg)                  \
-    (PTR_OFFSET(_ctx->dyn_seg.dyn_buff,                                        \
-      3 * sizeof(uint64_t)                                                     \
-      * _ctx->dyn_seg.num_seg_per_group[_ctx->dyn_seg.seg_groups[_seg]]        \
-      + _ctx->dyn_seg.seg_group_start[_seg]                                    \
-      + _ctx->dyn_seg.seg_group_size[_ctx->dyn_seg.seg_groups[_seg]] * _rank   \
-      + _offset))
+#define UCC_TL_UCP_DYN_REMOTE_RKEY(_ctx, _rank, _seg)                   \
+    ((_ctx)->dyn_rkeys[_rank * _ctx->n_dynrinfo_segs + _seg])
 
 extern ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1];
 

@@ -164,18 +164,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     UCP_CHECK(ucp_config_read(prefix, NULL, &ucp_config),
               "failed to read ucp configuration", err_cfg_read, self);
 
-    ucp_params.field_mask =
-        UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK | UCP_PARAM_FIELD_NAME;
-    ucp_params.features = UCP_FEATURE_TAG | UCP_FEATURE_AM;
-    if (((params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS) ||
-         lib->cfg.use_dynamic_segments)) {
-        ucp_params.features |= UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
-    }
+    ucp_params.field_mask = UCP_PARAM_FIELD_FEATURES |
+                            UCP_PARAM_FIELD_TAG_SENDER_MASK |
+                            UCP_PARAM_FIELD_NAME;
+    ucp_params.features =
+        UCP_FEATURE_TAG | UCP_FEATURE_AM | UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
     if (lib->cfg.use_xgvmi) {
         ucp_params.features |= UCP_FEATURE_EXPORTED_MEMH;
     }
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
-    ucp_params.name = "UCC_UCP_CONTEXT";
+    ucp_params.name            = "UCC_UCP_CONTEXT";
 
     if (params->estimated_num_ppn > 0) {
         ucp_params.field_mask |= UCP_PARAM_FIELD_ESTIMATED_NUM_PPN;
@@ -257,10 +255,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     self->remote_info         = NULL;
     self->dynamic_remote_info = NULL;
+    self->dyn_seg_buf         = NULL;
     self->n_rinfo_segs        = 0;
     self->n_dynrinfo_segs     = 0;
     self->rkeys               = NULL;
-    memset(&self->dyn_seg, 0, sizeof(self->dyn_seg));
+    self->dyn_rkeys           = NULL;
     if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS &&
         params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         ucc_status = ucc_tl_ucp_ctx_remote_populate(
@@ -351,12 +350,6 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
                 ucp_rkey_destroy(UCC_TL_UCP_REMOTE_RKEY(ctx, i, j));
             }
         }
-        for (j = 0; j < ctx->n_dynrinfo_segs; j++) {
-            if (UCC_TL_UCP_REMOTE_RKEY(ctx, i, ctx->n_rinfo_segs + j)) {
-                ucp_rkey_destroy(
-                    UCC_TL_UCP_REMOTE_RKEY(ctx, i, ctx->n_rinfo_segs + j));
-            }
-        }
     }
     for (i = 0; i < ctx->n_rinfo_segs; i++) {
         if (ctx->remote_info[i].mem_h) {
@@ -372,9 +365,6 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
                 ucp_mem_unmap(ctx->worker.ucp_context,
                               ctx->dynamic_remote_info[i].mem_h);
             }
-            if (ctx->dynamic_remote_info[i].packed_key) {
-                ucp_rkey_buffer_release(ctx->dynamic_remote_info[i].packed_key);
-            }
         }
         ucc_free(ctx->dynamic_remote_info);
     }
@@ -382,7 +372,6 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
     ucc_free(ctx->rkeys);
     ctx->remote_info         = NULL;
     ctx->rkeys               = NULL;
-    ctx->dynamic_remote_info = NULL;
 
     return UCC_OK;
 }

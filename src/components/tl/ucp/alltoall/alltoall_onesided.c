@@ -27,9 +27,14 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
     long              *pSync  = TASK_ARGS(task).global_work_buffer;
     ucc_memory_type_t  mtype  = TASK_ARGS(task).src.info.mem_type;
     ucc_rank_t         peer;
+    ucc_status_t       status;
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-    ucc_tl_ucp_coll_dynamic_segments(&TASK_ARGS(task), task);
+    status = ucc_tl_ucp_coll_dynamic_segment_exchange(task);
+    if (UCC_OK != status) {
+        task->super.status = status;
+        goto out;
+    }
 
     /* TODO: change when support for library-based work buffers is complete */
     nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
@@ -66,4 +71,5 @@ void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
 
     pSync[0]           = 0;
     task->super.status = UCC_OK;
+    ucc_tl_ucp_coll_dynamic_segment_finalize(task);
 }
