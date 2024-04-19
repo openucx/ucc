@@ -225,6 +225,25 @@ static inline ucc_status_t ucc_tl_ucp_send_nz(void *buffer, size_t msglen,
                               dest_group_rank, team, task);
 }
 
+static inline int resolve_segment(const void *va, size_t *key_sizes,
+                                  ptrdiff_t *key_offset, size_t nr_segments,
+                                  ucc_tl_ucp_remote_info_t *rinfo)
+{
+    int      i;
+    uint64_t base;
+    uint64_t end;
+
+    for (i = 0; i < nr_segments; i++) {
+        base = (uint64_t)rinfo[i].va_base;
+        end  = base + rinfo[i].len;
+        if ((uint64_t)va >= base && (uint64_t)va < end) {
+            return i;
+        }
+        *key_offset += key_sizes[i];
+    }
+    return -1;
+}
+
 static inline ucc_status_t
 ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, size_t msglen,
                              ucp_ep_h *ep, ucc_rank_t peer, uint64_t *rva,
@@ -232,14 +251,13 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, size_t msglen,
 {
     ucc_tl_ucp_context_t *ctx            = UCC_TL_UCP_TEAM_CTX(team);
     ptrdiff_t             key_offset     = 0;
-    const size_t          section_offset = sizeof(uint64_t) * ctx->n_rinfo_segs;
+    size_t                section_offset = sizeof(uint64_t) * ctx->n_rinfo_segs;
     ucc_rank_t            core_rank;
     uint64_t             *rvas;
     uint64_t             *key_sizes;
     void                 *keys;
     void                 *offset;
     ptrdiff_t             base_offset;
-    int                   i;
 
     *segment  = -1;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
@@ -253,69 +271,51 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, size_t msglen,
     rvas        = (uint64_t *)base_offset;
     key_sizes   = PTR_OFFSET(base_offset, (section_offset * 2));
     keys        = PTR_OFFSET(base_offset, (section_offset * 3));
-    for (i = 0; i < ctx->n_rinfo_segs; i++) {
-        uint64_t base = (uint64_t)ctx->remote_info[i].va_base;
-        uint64_t end  = base + ctx->remote_info[i].len;
-        if ((uint64_t)va >= base && (uint64_t)va < end) {
-            *segment = i;
-            *rva     = rvas[i] + ((uint64_t)va - (uint64_t)base);
-            if (ucc_unlikely(NULL ==
-                             UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment))) {
-                ucs_status_t ucs_status = ucp_ep_rkey_unpack(
-                    *ep, PTR_OFFSET(keys, key_offset),
-                    &UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment));
-                if (UCS_OK != ucs_status) {
-                    return ucs_status_to_ucc_status(ucs_status);
-                }
+    *segment    = resolve_segment(va, key_sizes, &key_offset, ctx->n_rinfo_segs,
+                                  ctx->remote_info);
+    if (*segment >= 0) {
+        *rva = rvas[*segment] +
+               ((uint64_t)va - (uint64_t)ctx->remote_info[*segment].va_base);
+        *packed_memh = (ctx->remote_info[*segment].packed_memh)
+                           ? ctx->remote_info[*segment].mem_h
+                           : NULL;
+        if (ucc_unlikely(NULL == UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment))) {
+            ucs_status_t ucs_status = ucp_ep_rkey_unpack(
+                *ep, PTR_OFFSET(keys, key_offset),
+                &UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment));
+            if (UCS_OK != ucs_status) {
+                return ucs_status_to_ucc_status(ucs_status);
             }
-            *rkey        = UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment);
-            *packed_memh = (ctx->remote_info[i].packed_memh)
-                               ? ctx->remote_info[i].mem_h
-                               : NULL;
-            return UCC_OK;
         }
-        key_offset += key_sizes[i];
+        *rkey = UCC_TL_UCP_REMOTE_RKEY(ctx, peer, *segment);
+        return UCC_OK;
     }
-    if (0 > *segment) {
-        key_offset = 0;
-        for (i = 0; i < ctx->n_dynrinfo_segs; i++) {
-            uint64_t base       = (uint64_t)ctx->dynamic_remote_info[i].va_base;
-            uint64_t end        = base + ctx->dynamic_remote_info[i].len;
-            uint64_t check_base = (uint64_t)va;
-            uint64_t check_end  = check_base + msglen;
-            size_t   num_keys   = 0;
-            void    *packed_key = NULL;
-            size_t   team_size  = UCC_TL_TEAM_SIZE(team);
-            if (check_base >= base && check_base < end && check_end <= end) {
-                *segment = i;
-                *rva     = UCC_TL_UCP_REMOTE_DYN_RVA(ctx, peer, i);
-                num_keys = *segment - ctx->dyn_seg.starting_seg[*segment];
-                for (int j = 0; j < num_keys; j++) {
-                    key_offset += UCC_TL_UCP_REMOTE_DYN_KEY_SIZE(
-                        ctx, peer, ctx->dyn_seg.starting_seg[*segment] + j);
-                }
-                packed_key =
-                    UCC_TL_UCP_REMOTE_DYN_KEY(ctx, peer, key_offset, *segment);
-                /* dynamic segment keys should be placed AFTER
-                 * the ctx's keys (i.e., num_static_segs + segment_number) */
-                if (ucc_unlikely(NULL == UCC_TL_UCP_DYN_REMOTE_RKEY(
-                                             ctx, peer, team_size, *segment))) {
-                    ucs_status_t ucs_status =
-                        ucp_ep_rkey_unpack(*ep, packed_key,
-                                           &UCC_TL_UCP_DYN_REMOTE_RKEY(
-                                               ctx, peer, team_size, *segment));
-                    if (UCS_OK != ucs_status) {
-                        return ucs_status_to_ucc_status(ucs_status);
-                    }
-                }
-                *rkey =
-                    UCC_TL_UCP_DYN_REMOTE_RKEY(ctx, peer, team_size, *segment);
-                *packed_memh = (ctx->dynamic_remote_info[i].packed_memh)
-                                   ? ctx->dynamic_remote_info[i].mem_h
-                                   : NULL;
-                return UCC_OK;
+
+    section_offset = sizeof(uint64_t) * ctx->n_dynrinfo_segs;
+    base_offset    = (ptrdiff_t)(ctx->dyn_seg_buf);
+    rvas           = (uint64_t *)base_offset;
+    key_sizes      = PTR_OFFSET(base_offset, (section_offset * 2));
+    keys           = PTR_OFFSET(base_offset, (section_offset * 3));
+    *segment = resolve_segment(va, key_sizes, &key_offset, ctx->n_dynrinfo_segs,
+                               ctx->dynamic_remote_info);
+    if (*segment >= 0) {
+        *rva = rvas[*segment] +
+               ((uint64_t)va -
+                (uint64_t)ctx->dynamic_remote_info[*segment].va_base);
+        *packed_memh = (ctx->dynamic_remote_info[*segment].packed_memh)
+                           ? ctx->dynamic_remote_info[*segment].mem_h
+                           : NULL;
+        if (ucc_unlikely(NULL ==
+                         UCC_TL_UCP_DYN_REMOTE_RKEY(ctx, peer, *segment))) {
+            ucs_status_t ucs_status = ucp_ep_rkey_unpack(
+                *ep, PTR_OFFSET(keys, key_offset),
+                &UCC_TL_UCP_DYN_REMOTE_RKEY(ctx, peer, *segment));
+            if (UCS_OK != ucs_status) {
+                return ucs_status_to_ucc_status(ucs_status);
             }
         }
+        *rkey = UCC_TL_UCP_DYN_REMOTE_RKEY(ctx, peer, *segment);
+        return UCC_OK;
     }
 
     tl_error(
