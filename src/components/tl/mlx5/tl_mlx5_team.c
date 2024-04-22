@@ -75,13 +75,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     }
 
     self->mcast = NULL;
-    status      = ucc_tl_mlx5_mcast_team_init(tl_context, &(self->mcast), &(ctx->mcast),
-                                              params, &(UCC_TL_MLX5_TEAM_LIB(self)->cfg.mcast_conf));
-    if (UCC_OK != status) {
-        tl_warn(tl_context->lib, "mcast team init failed");
-        self->local_mcast_ctx_ready = 0;
-    } else {
-        self->local_mcast_ctx_ready = 1;
+
+    self->local_mcast_team_ready = 0;
+    if (ctx->mcast.mcast_ctx_ready) {
+        status = ucc_tl_mlx5_mcast_team_init(tl_context, &(self->mcast), &(ctx->mcast),
+                                             params, &(UCC_TL_MLX5_TEAM_LIB(self)->cfg.mcast_conf));
+        if (UCC_OK != status) {
+            tl_warn(tl_context->lib, "mcast team init failed");
+        } else {
+            self->local_mcast_team_ready = 1;
+        }
     }
 
     self->mcast_state = TL_MLX5_TEAM_STATE_MCAST_CTX_CHECK;
@@ -186,9 +189,9 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
                 /* mcast context is not available for some of the team members so we cannot create
                  * mcast team */
                 tl_debug(UCC_TL_TEAM_LIB(tl_team),
-                         "failure during mcast ctx create, no mcast team support");
+                         "some of the ranks do not have mcast context available so no mcast team is created");
 
-                if (tl_team->local_mcast_ctx_ready) {
+                if (tl_team->local_mcast_team_ready) {
                     comm = tl_team->mcast->mcast_comm;
                     /* release the resources */
                     if (ibv_dereg_mr(comm->grh_mr)) {
@@ -230,15 +233,9 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
                 tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE;
             }
 
-            tl_debug(team->context->lib, "attempted to initialize tl team: %p: MCAST component is %s ALLTOALL component is %s",
+            tl_debug(team->context->lib, "team %p: MCAST component is %s ALLTOALL component is %s",
                     team, (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_READY)?"ENABLED":"DISABLED",
                     (tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_READY)?"ENABLED":"DISABLED");
-        }
-
-        if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE &&
-            tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE) {
-            tl_warn(team->context->lib, "unable to initialize tl team as both ALLTOALL and MCAST are not available: %p", team);
-            return UCC_ERR_NO_RESOURCE;
         }
 
         return UCC_OK;
@@ -252,7 +249,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         tl_team->local_status_array[UCC_TL_MLX5_A2A_STATUS_INDEX] =
             tl_team->a2a_status.local;
         tl_team->local_status_array[UCC_TL_MLX5_MCAST_STATUS_INDEX] =
-            (tl_team->local_mcast_ctx_ready) ? UCC_OK : UCC_ERR_NO_RESOURCE;
+            (tl_team->local_mcast_team_ready) ? UCC_OK : UCC_ERR_NO_RESOURCE;
         goto initial_sync_post;
     }
 

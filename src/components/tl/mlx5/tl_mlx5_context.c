@@ -49,13 +49,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
         goto err_rcache;
     }
 
-    self->mcast.mcast_ready = 0;
+    self->mcast.mcast_ctx_ready = 0;
     if (params->thread_mode == UCC_THREAD_SINGLE) {
         status = ucc_tl_mlx5_mcast_context_init(&(self->mcast), &(self->cfg.mcast_ctx_conf));
         if (UCC_OK != status) {
             tl_debug(self->super.super.lib, "failed to initialize mcast context");
         } else {
-            self->mcast.mcast_ready = 1;
+            self->mcast.mcast_ctx_ready = 1;
         }
     }
     return UCC_OK;
@@ -82,7 +82,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_mlx5_context_t)
 
     ucc_mpool_cleanup(&self->req_mp, 1);
 
-    if (self->mcast.mcast_ready) {
+    if (self->mcast.mcast_ctx_ready) {
         ucc_tl_mlx5_mcast_clean_ctx(&self->mcast.mcast_context);
     }
 }

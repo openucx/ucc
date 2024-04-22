@@ -145,7 +145,7 @@ typedef struct ucc_tl_mlx5_team {
     ucc_tl_mlx5_alltoall_t         *a2a;
     ucc_topo_t                     *topo;
     ucc_ep_map_t                    ctx_map;
-    int                             local_mcast_ctx_ready;
+    int                             local_mcast_team_ready;
     ucc_tl_mlx5_mcast_team_t       *mcast;
     ucc_status_t                    local_status_array[UCC_TL_MLX5_FEATURES_COUNT];
     ucc_status_t                    global_status_array[UCC_TL_MLX5_FEATURES_COUNT];

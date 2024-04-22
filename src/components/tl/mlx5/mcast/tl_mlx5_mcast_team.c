@@ -62,7 +62,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     ucc_tl_mlx5_mcast_coll_comm_t           *comm;
     int                                      i;
 
-    if (!ctx->mcast_enabled || !ctx->mcast_ready || NULL == mcast_context) {
+    if (!ctx->mcast_ctx_ready) {
         tl_debug(base_context->lib,
                 "mcast context not available, base_context = %p",
                  base_context );
