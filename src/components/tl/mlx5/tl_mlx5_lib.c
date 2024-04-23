@@ -48,7 +48,7 @@ ucc_status_t ucc_tl_mlx5_get_lib_attr(const ucc_base_lib_t *lib, /* NOLINT */
 
 ucc_status_t ucc_tl_mlx5_get_lib_properties(ucc_base_lib_properties_t *prop)
 {
-    prop->default_team_size = 2;
+    prop->default_team_size = UCC_RANK_MAX;
     prop->min_team_size     = 2;
     prop->max_team_size     = UCC_RANK_MAX;
     return UCC_OK;
