@@ -161,8 +161,8 @@ ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count,
     }
 
     for (int i = 0; i < comm_size; i++) {
-        send_count = std::ceil(transfer_matrix[comm_rank][i] / dt_size);
-        recv_count = std::ceil(transfer_matrix[i][comm_rank] / dt_size);
+        send_count = std::floor(transfer_matrix[comm_rank][i] / dt_size);
+        recv_count = std::floor(transfer_matrix[i][comm_rank] / dt_size);
 
         ((uint32_t*)args.src.info_v.counts)[i] = send_count;
         ((uint32_t*)args.src.info_v.displacements)[i] = src_displacement;
@@ -193,9 +193,9 @@ void ucc_pt_coll_alltoallv::free_args(ucc_pt_test_args_t &test_args)
     ucc_coll_args_t &args = test_args.coll_args;
 
     if (!UCC_IS_INPLACE(args)) {
-        ucc_pt_free(src_header);
+        //ucc_pt_free(src_header);
     }
-    ucc_pt_free(dst_header);
+    //ucc_pt_free(dst_header);
     ucc_free(args.dst.info_v.counts);
     ucc_free(args.dst.info_v.displacements);
     ucc_free(args.src.info_v.counts);
