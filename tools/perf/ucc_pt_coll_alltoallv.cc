@@ -193,9 +193,9 @@ void ucc_pt_coll_alltoallv::free_args(ucc_pt_test_args_t &test_args)
     ucc_coll_args_t &args = test_args.coll_args;
 
     if (!UCC_IS_INPLACE(args)) {
-        //ucc_pt_free(src_header);
+        ucc_pt_free(src_header);
     }
-    //ucc_pt_free(dst_header);
+    ucc_pt_free(dst_header);
     ucc_free(args.dst.info_v.counts);
     ucc_free(args.dst.info_v.displacements);
     ucc_free(args.src.info_v.counts);
