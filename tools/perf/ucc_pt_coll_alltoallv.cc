@@ -73,21 +73,39 @@ double parse_transfer_matrix_token(std::string token)
 }
 
 
-std::vector<std::vector<double>> fill_transfer_matrix(std::vector<std::vector<double>>& transfer_matrix)
+/**
+* Fill a matrix using the file provided in the env var UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE
+* The file should contain square matrices of size comm_size.
+* The rows of the matrix should be lines and the elements should be separated by a single space.
+* The element (i,j) represents the number of bytes rank i will send to rank j. \
+* The notation support convenient unit notation for gigabytes and megabytes, e.g 3G or 10M.
+* Multiple matrices is supported using the <offset> parameter, they should be separated by a single empty line.
+*
+* @param offset - The offset of the matrix to read, in case the file contains more than one matrix,
+*       the function will read the matrix at offset <offset>, the first matrix has offset 0.
+*/
+void fill_transfer_matrix(std::vector<std::vector<double>>& transfer_matrix, int offset=0)
 {
 	std::ifstream f;
 	std::string line, token;
 	std::istringstream linestream;
-    int row = 0;
 	int col = 0;
     int N = transfer_matrix.size();
+    int lines_offset = offset*(N+1);
 
 	char* transfer_matrix_fn = std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE");
     f.open(transfer_matrix_fn);
     if (!f.is_open())
         throw std::invalid_argument("Couldn't open transfer matrix file: " + (transfer_matrix_fn ? std::string(transfer_matrix_fn) : ""));
 
-    while (getline(f, line)){
+    for (int i=0; i<lines_offset; i++)
+        if (!getline(f, line))
+            throw std::invalid_argument("Offset is " + std::to_string(offset) + " but the file contains less matrices than that");
+
+    for (int row=0; row < N; row++){
+        if (!getline(f, line))
+            throw std::invalid_argument("Transfer matrix is expected to have " + std::to_string(N) + " rows but only have " + std::to_string(row+1));
+
         if (row >= N)
             throw std::invalid_argument("Transfer matrix rows number exceed expected number of " + std::to_string(N));
 
@@ -104,14 +122,7 @@ std::vector<std::vector<double>> fill_transfer_matrix(std::vector<std::vector<do
 
         if (col != N)
             throw std::invalid_argument("Transfer matrix row " + std::to_string(row+1) + " doesn't contain " + std::to_string(N) + " elements as expected.");
-
-        row++;
     }
-
-    if (row != N)
-        throw std::invalid_argument("Transfer matrix is expected to have " + std::to_string(N) + " rows but only have " + std::to_string(row+1));
-
-    return transfer_matrix;
 }
 
 
@@ -130,7 +141,7 @@ ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count,
 	int 								send_count, recv_count;
 
     if (std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE")){
-        fill_transfer_matrix(transfer_matrix);
+        fill_transfer_matrix(transfer_matrix, test_args.iter);
 	}
 
 	src_header_size = dst_header_size = 0;
