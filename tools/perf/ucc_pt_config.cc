@@ -91,7 +91,7 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
     int c;
     ucc_status_t st;
 
-    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:r:S:iphFT")) != -1) {
+    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:r:S:f:iphFT")) != -1) {
         switch (c) {
             case 'c':
                 if (ucc_pt_op_map.count(optarg) == 0) {
