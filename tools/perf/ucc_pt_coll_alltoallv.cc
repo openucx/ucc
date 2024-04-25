@@ -80,6 +80,7 @@ double parse_transfer_matrix_token(std::string token)
 * The element (i,j) represents the number of bytes rank i will send to rank j. \
 * The notation support convenient unit notation for gigabytes and megabytes, e.g 3G or 10M.
 * Multiple matrices is supported using the <offset> parameter, they should be separated by a single empty line.
+* Be careful when using multiple matrices, if you have N matrices, set -b 1 and -e 2**N
 *
 * @param offset - The offset of the matrix to read, in case the file contains more than one matrix,
 *       the function will read the matrix at offset <offset>, the first matrix has offset 0.
