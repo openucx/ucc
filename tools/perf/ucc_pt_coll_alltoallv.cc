@@ -48,12 +48,12 @@ double parse_transfer_matrix_token(std::string token)
 {
     size_t size;
     double val;
-	try { 
-		val = std::stod(token, &size);
-	}
-	catch (...) {
-		throw std::invalid_argument("Invalid element in transfer matrix: " + token);
-	}
+    try { 
+        val = std::stod(token, &size);
+    }
+    catch (...) {
+        throw std::invalid_argument("Invalid element in transfer matrix: " + token);
+    }
 
     if (size < token.size())
     {
@@ -69,20 +69,20 @@ double parse_transfer_matrix_token(std::string token)
                 throw std::invalid_argument("Unknown suffix from transfer matrix: " + token[size]);
         }
     }
-		return val;
+    return val;
 }
 
 
 std::vector<std::vector<double>> fill_transfer_matrix(std::vector<std::vector<double>>& transfer_matrix)
 {
-	std::ifstream f;
-	std::string line, token;
-	std::istringstream linestream;
+    std::ifstream f;
+    std::string line, token;
+    std::istringstream linestream;
     int row = 0;
-	int col = 0;
+    int col = 0;
     int N = transfer_matrix.size();
 
-	char* transfer_matrix_fn = std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE");
+    char* transfer_matrix_fn = std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE");
     f.open(transfer_matrix_fn);
     if (!f.is_open())
         throw std::invalid_argument("Couldn't open transfer matrix file: " + (transfer_matrix_fn ? std::string(transfer_matrix_fn) : ""));
@@ -91,15 +91,15 @@ std::vector<std::vector<double>> fill_transfer_matrix(std::vector<std::vector<do
         if (row >= N)
             throw std::invalid_argument("Transfer matrix rows number exceed expected number of " + std::to_string(N));
 
-		linestream.str(line);
-		linestream.clear();
+	linestream.str(line);
+	linestream.clear();
         col = 0;
         while (linestream >> token){
             if (col >= N)
                 throw std::invalid_argument("Transfer matrix columns of row " + std::to_string(row+1) + " exceed expected number of " + std::to_string(N));
 
             transfer_matrix[row][col] = parse_transfer_matrix_token(token);
-			col++;
+	    col++;
         }
 
         if (col != N)
@@ -127,19 +127,19 @@ ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count,
     ucc_status_t                        st        = UCC_OK;
     int                                 src_displacement = 0;
     int                                 dst_displacement = 0;
-	int 								send_count, recv_count;
+    int 				send_count, recv_count;
 
     if (std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE")){
         fill_transfer_matrix(transfer_matrix);
-	}
-
-	src_header_size = dst_header_size = 0;
-	for (size_t i=0; i < transfer_matrix.size(); i++){
-		src_header_size += transfer_matrix[comm_rank][i];
     }
 
-	for (size_t i=0; i < transfer_matrix.size(); i++){
-		dst_header_size += transfer_matrix[i][comm_rank];
+    src_header_size = dst_header_size = 0;
+    for (size_t i=0; i < transfer_matrix.size(); i++){
+	src_header_size += transfer_matrix[comm_rank][i];
+    }
+
+    for (size_t i=0; i < transfer_matrix.size(); i++){
+	dst_header_size += transfer_matrix[i][comm_rank];
     }
 
     args = coll_args;
