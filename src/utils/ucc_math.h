@@ -32,6 +32,18 @@
 #define PTR_OFFSET(_ptr, _offset)                                              \
     ((void *)((ptrdiff_t)(_ptr) + (size_t)(_offset)))
 
+/* Returns the number of trailing 0-bits in x, starting at the least
+ * significant bit position.  If x is 0, the result is undefined.
+ */
+#define ucc_count_trailing_zero_bits(_n) \
+    ((sizeof(_n) <= 4) ? __builtin_ctz((uint32_t)(_n)) : __builtin_ctzl(_n))
+
+/* Returns the number of leading 0-bits in _n.
+ * If _n is 0, the result is undefined
+ */
+#define ucc_count_leading_zero_bits(_n) \
+    ((sizeof(_n) <= 4) ? __builtin_clz((uint32_t)(_n)) : __builtin_clzl(_n))
+
 /* http://www.cse.yorku.ca/~oz/hash.html - Dan Bernstein string
    hash function */
 static inline unsigned long ucc_str_hash_djb2(const char *str)
@@ -116,6 +128,16 @@ static inline int lognum(int n)
         lognum++;
     }
     return lognum;
+}
+
+/* return log2 of nearest greater or equal power of 2 */
+static inline uint32_t ucc_ilog2_ceil(uint32_t n)
+{
+    int x = ucc_count_leading_zero_bits(n); // leading zeros
+    if (!(n & (n - 1))) {
+        return 31 - x; // pow2 case
+    }
+    return 31 - x + 1;
 }
 
 #endif
