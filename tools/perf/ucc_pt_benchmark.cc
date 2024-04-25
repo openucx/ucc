@@ -99,6 +99,7 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
 
     print_header();
     for (size_t cnt = min_count; cnt <= max_count; cnt *= config.mult_factor) {
+        std::cout << "Iteration " << std::to_string(cnt) << std::endl;
         size_t coll_size = cnt * ucc_dt_size(config.dt);
         int iter = config.n_iter_small;
         int warmup = config.n_warmup_small;
@@ -122,6 +123,8 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
             /* exit from loop when min_count == max_count == 0 */
             break;
         }
+        if (cnt == 0)
+            cnt++;
     }
 
     return UCC_OK;

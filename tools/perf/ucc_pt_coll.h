@@ -22,6 +22,7 @@ ucc_status_t ucc_pt_free(ucc_mc_buffer_header_t *h_ptr);
 typedef union {
     ucc_coll_args_t             coll_args;
     ucc_ee_executor_task_args_t executor_args;
+    int iter;
 } ucc_pt_test_args_t;
 
 class ucc_pt_coll {
