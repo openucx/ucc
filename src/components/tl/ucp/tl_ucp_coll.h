@@ -206,6 +206,10 @@ typedef struct ucc_tl_ucp_task {
             size_t                  scratch_size;
         } allgather_bruck;
         struct {
+            uint32_t                i;
+            int                     data_expected;
+        } allgather_sparbit;
+        struct {
             ucc_rank_t              dist;
             uint32_t                radix;
         } bcast_kn;

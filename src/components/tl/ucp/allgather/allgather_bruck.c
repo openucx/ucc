@@ -11,7 +11,6 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 #include "components/mc/ucc_mc.h"
-#include <stdio.h>
 
 ucc_status_t ucc_tl_ucp_allgather_bruck_init(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t      *team,

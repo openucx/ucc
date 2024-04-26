@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -27,6 +27,10 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_BRUCK,
              .name = "bruck",
              .desc = "O(log(N)) Variation of Bruck algorithm"},
+        [UCC_TL_UCP_ALLGATHER_ALG_SPARBIT] = 
+            {.id   = UCC_TL_UCP_ALLGATHER_ALG_SPARBIT,
+             .name = "sparbit",
+             .desc = "O(log(N)) SPARBIT algorithm"},
         [UCC_TL_UCP_ALLGATHER_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
