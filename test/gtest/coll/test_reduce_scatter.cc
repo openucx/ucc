@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
  * See file LICENSE for terms.
  */
 
@@ -361,5 +362,46 @@ UCC_TEST_P(test_reduce_scatter_alg, ring)
         }
     }
 }
+
+UCC_TEST_P(test_reduce_scatter_alg, knomial)
+{
+    test_reduce_scatter<TypeOpPair<UCC_DT_INT32, sum>> rs_test;
+    int                                                n_procs = 15;
+    std::string                                        bidir   = GetParam();
+    ucc_job_env_t                  env = {{"UCC_CL_BASIC_TUNE", "inf"},
+                         {"UCC_TL_UCP_TUNE", "reduce_scatter:@knomial:inf"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 3;
+    UccCollCtxVec ctxs;
+    std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
+
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA);
+    }
+    if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA_MANAGED)) {
+        mt.push_back(UCC_MEMORY_TYPE_CUDA_MANAGED);
+    }
+
+    for (auto count : {65536, 123567}) {
+        for (auto inplace : {TEST_NO_INPLACE, TEST_INPLACE}) {
+            for (auto m : mt) {
+                rs_test.set_mem_type(m);
+                rs_test.set_inplace(inplace);
+                rs_test.data_init(n_procs, UCC_DT_INT32, count, ctxs, true);
+                UccReq req(team, ctxs);
+
+                for (auto i = 0; i < repeat; i++) {
+                    req.start();
+                    req.wait();
+                    EXPECT_EQ(true, rs_test.data_validate(ctxs));
+                    rs_test.reset(ctxs);
+                }
+                rs_test.data_fini(ctxs);
+            }
+        }
+    }
+}
+
 INSTANTIATE_TEST_CASE_P(, test_reduce_scatter_alg,
                         ::testing::Values("bidirectional", "unidirectional"));

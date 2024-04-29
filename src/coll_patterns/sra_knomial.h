@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -265,6 +265,18 @@ static inline void ucc_kn_ag_pattern_next_iter(ucc_knomial_pattern_t *p)
     }
 }
 
+static inline void ucc_kn_rs_pattern_init(ucc_rank_t size, ucc_rank_t rank,
+                                          ucc_kn_radix_t radix, size_t count,
+                                          ucc_knomial_pattern_t *p)
+{
+    ucc_knomial_pattern_init_backward(size, rank, radix, p);
+    p->type              = KN_PATTERN_REDUCE_SCATTER;
+    p->count             = count;
+    p->block_size_counts = count;
+    p->block_size        = size - p->n_extra;
+    p->block_offset      = 0;
+}
+
 static inline void ucc_kn_rsx_pattern_init(ucc_rank_t size, ucc_rank_t rank,
                                            ucc_kn_radix_t radix, size_t count,
                                            ucc_knomial_pattern_t *p)
@@ -281,6 +293,14 @@ ucc_kn_rs_pattern_peer_seg(ucc_rank_t peer, ucc_knomial_pattern_t *p,
                            size_t *peer_seg_count, ptrdiff_t *peer_seg_offset)
 {
     ucc_rank_t step_radix, seg_index;
+    ucc_kn_seg_desc_t s;
+    ucc_rank_t block_offset_inv;
+    /* offset of the segment in counts of datatypes from the
+       start of the buffer */
+    size_t peer_seg_offset_base;
+    /* offset of the current block in counts of datatypes from the
+       start of the buffer */
+    size_t block_offset_counts;
 
     *peer_seg_count  = 0;
     *peer_seg_offset = 0;
@@ -295,6 +315,17 @@ ucc_kn_rs_pattern_peer_seg(ucc_rank_t peer, ucc_knomial_pattern_t *p,
                                                   step_radix, seg_index);
         return;
     case KN_PATTERN_REDUCE_SCATTER:
+        ucc_kn_seg_desc_compute(p, &s, peer);
+        block_offset_inv = ucc_knomial_pattern_loop_rank_inv(p, p->block_offset);
+        peer_seg_offset_base = ucc_buffer_block_offset(p->count, p->size,
+                                                       s.seg_start);
+        *peer_seg_count      = ucc_buffer_block_offset(p->count, p->size,
+                                                       s.seg_end) -
+                               peer_seg_offset_base;
+        block_offset_counts = ucc_buffer_block_offset(p->count, p->size,
+                                                      block_offset_inv);
+        *peer_seg_offset = peer_seg_offset_base - block_offset_counts;
+        return;
     case KN_PATTERN_REDUCE_SCATTERV:
         /* not implemented */
         ucc_assert(0);
@@ -307,6 +338,7 @@ static inline void ucc_kn_rs_pattern_next_iter(ucc_knomial_pattern_t *p)
 {
     size_t bs;
     ptrdiff_t offset;
+    ucc_kn_seg_desc_t s;
 
     ucc_kn_rs_pattern_peer_seg(p->rank, p, &bs, &offset);
     p->block_size_counts = bs;
@@ -317,9 +349,29 @@ static inline void ucc_kn_rs_pattern_next_iter(ucc_knomial_pattern_t *p)
         ucc_knomial_pattern_next_iteration(p);
         return;
     case KN_PATTERN_REDUCE_SCATTER:
+        ucc_kn_seg_desc_compute(p, &s, p->rank);
+        p->block_size    = s.seg_size;
+        p->block_offset += s.seg_offset;
+        ucc_knomial_pattern_next_iteration_backward(p);
+        return;
     case KN_PATTERN_REDUCE_SCATTERV:
         /* not implemented */
         ucc_assert(0);
+    default:
+        ucc_assert(0);
+    }
+}
+
+static inline void ucc_kn_rs_pattern_extra_seg(ucc_knomial_pattern_t *p,
+                                               size_t *seg_count,
+                                               ptrdiff_t *seg_offset)
+{
+    switch (p->type) {
+    case KN_PATTERN_REDUCE_SCATTER:
+        *seg_offset = ucc_buffer_block_count(p->count, p->size, p->rank);
+        *seg_count  = ucc_buffer_block_count(
+            p->count, p->size, ucc_knomial_pattern_get_extra(p, p->rank));
+        return;
     default:
         ucc_assert(0);
     }
