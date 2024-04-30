@@ -139,7 +139,7 @@ ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count,
     ucc_status_t                        st        = UCC_OK;
     int                                 src_displacement = 0;
     int                                 dst_displacement = 0;
-    int 								send_count, recv_count;
+    int                                 send_count, recv_count;
 
     if (std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRIX_FILE")){
         fill_transfer_matrix(transfer_matrix, test_args.iter);
@@ -205,9 +205,9 @@ void ucc_pt_coll_alltoallv::free_args(ucc_pt_test_args_t &test_args)
     ucc_coll_args_t &args = test_args.coll_args;
 
     if (!UCC_IS_INPLACE(args)) {
-        //ucc_pt_free(src_header);
+        ucc_pt_free(src_header);
     }
-    //ucc_pt_free(dst_header);
+    ucc_pt_free(dst_header);
     ucc_free(args.dst.info_v.counts);
     ucc_free(args.dst.info_v.displacements);
     ucc_free(args.src.info_v.counts);
