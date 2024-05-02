@@ -12,6 +12,8 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <dirent.h>
+
 
 
 ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
@@ -114,11 +116,10 @@ void fill_transfer_matrix(std::vector<std::vector<double>>& transfer_matrix, std
     }
 }
 
-void fill_transfer_matrices(std::vector<std::vector<std::vector<double>>>& transfer_matrices, double default_value=0)
+void fill_transfer_matrices(std::vector<std::vector<std::vector<double>>>& transfer_matrices, double default_value=0, std::string transfer_matrices_dir)
 {
     std::string fn;
     std::exception_ptr exc;
-    std::string transfer_matrices_dir = std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR");
 
     if (transfer_matrices_dir.back() != '/')
         transfer_matrices_dir.push_back('/');
@@ -134,6 +135,22 @@ void fill_transfer_matrices(std::vector<std::vector<std::vector<double>>>& trans
             throw;
         }
     }
+}
+
+int count_files_in_dir(std::string path){    
+    int count = 0;
+    DIR* dir = opendir(path.c_str());
+    if (!dir)
+        throw std::invalid_argument("Can't read directory: " + path);
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        if (entry->d_type == DT_REG) {
+            count += 1;
+        }
+    }
+    closedir(dir);
+    return count;
 }
 
 void ucc_pt_coll_alltoallv::pre_run(ucc_coll_args_t &args, int iter, int inner_iter) {
@@ -162,7 +179,6 @@ void ucc_pt_coll_alltoallv::pre_run(ucc_coll_args_t &args, int iter, int inner_i
     }
 }
 
-
 ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count, ucc_pt_test_args_t &test_args)
 {
     ucc_coll_args_t                     &args      = test_args.coll_args;
@@ -171,14 +187,24 @@ ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count, ucc_pt_test_args_t &
     size_t                              dst_header_size, src_header_size, max_dst_header_size, max_src_header_size;
     ucc_status_t                        st        = UCC_OK;
     int                                 n_matrices = 1;
+    string                              transfer_matrices_dir;
+
+    // Temporary: Forbid usage without transfer matrices
+    if (!std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR") || !std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT"))
+        throw std::invalid_argument("One of those required environment variables were not provided: UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR, UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT");
+    // End of temporary snippet 
 
     if (std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT")){
         if (!std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR"))
             throw std::invalid_argument("Environment variable UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT is set but UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR was not.");
 
+        transfer_matrices_dir = std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR");
         n_matrices = atoi(std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT"));
         if (n_matrices == 0)
             throw std::invalid_argument("Invalid value for environment variable UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT");
+        
+        if (n_matrices != count_files_in_dir(transfer_matrices_dir))
+            throw std::invalid_argument("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT doesn't match the count of files in UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR");
     }
 
     transfer_matrices.resize(n_matrices, std::vector<std::vector<double>>(comm_size, std::vector<double>(comm_size, count)));

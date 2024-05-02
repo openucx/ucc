@@ -188,15 +188,16 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
     if (std::getenv("UCC_PT_COLL_INNER_LOG_FILE")){
         inner_log_file.open(std::getenv("UCC_PT_COLL_INNER_LOG_FILE"));
         if (!inner_log_file.is_open())
-            std::cerr << "Couldn't open inner log file." << std::endl;
+            throw std::invalid_argument("Couldn't open inner log file.");
     }
 
     for (int i = 0; i < nwarmup + niter; i++) {
 
         for (int inner_iter = 0; inner_iter < n_inner_iter; inner_iter++) {
-            double s = get_time_us();
 
             coll->pre_run(args, i, inner_iter);
+
+            double s = get_time_us();
 
             if (!persistent) {
                 UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
@@ -252,7 +253,6 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
 
     if (niter != 0) {
         time /= niter;
-        time /= (n_inner_iter ? n_inner_iter : 1);
     }
     return UCC_OK;
 free_req:
