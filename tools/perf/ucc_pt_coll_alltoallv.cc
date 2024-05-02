@@ -211,20 +211,6 @@ ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count, ucc_pt_test_args_t &
 
     if (std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR"))
         fill_transfer_matrices(transfer_matrices);
-
-    //DEBUG
-    if (comm_rank == 1){
-        for (int x=0; x < transfer_matrices.size(); x++){
-            for (int y=0; y < transfer_matrices[0].size(); y++){
-                for (int z=0; z < transfer_matrices[0][0].size(); z++){
-                    std::cout << std::to_string(transfer_matrices[x][y][z]) << " "; 
-                }
-                std::cout << "\n";
-            }
-            std::cout << std::endl;
-        }
-    }
-    //---
     
     max_src_header_size = max_dst_header_size = 0;
     for (int mat_ix=0; mat_ix < transfer_matrices.size(); mat_ix++){
