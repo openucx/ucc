@@ -14,8 +14,6 @@
 #include <iostream>
 #include <dirent.h>
 
-
-
 ucc_pt_coll_alltoallv::ucc_pt_coll_alltoallv(ucc_datatype_t dt,
                          ucc_memory_type mt, bool is_inplace,
                          bool is_persistent,
@@ -72,7 +70,6 @@ double parse_transfer_matrix_token(std::string token)
     }
         return val;
 }
-
 
 /**
 * Fill a matrix based on the passed file

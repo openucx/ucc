@@ -162,7 +162,6 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
     double inner_time, max_inner_time;
     std::ofstream inner_log_file;
 
-
     UCCCHECK_GOTO(comm->barrier(), exit_err, st);
     time = 0;
 
