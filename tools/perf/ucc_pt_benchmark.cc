@@ -5,11 +5,16 @@
  */
 
 #include <iomanip>
+#include <vector>
+#include <iostream>
+#include <fstream>
 #include "ucc_pt_benchmark.h"
 #include "components/mc/ucc_mc.h"
 #include "ucc_perftest.h"
 #include "utils/ucc_coll_utils.h"
 #include "core/ucc_ee.h"
+
+
 
 ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
                                    ucc_pt_comm *communicator):
@@ -97,13 +102,12 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
     ucc_pt_test_args_t args;
     double             time;
 
-    args.iter = 0;
-
     print_header();
     for (size_t cnt = min_count; cnt <= max_count; cnt *= config.mult_factor) {
         size_t coll_size = cnt * ucc_dt_size(config.dt);
         int iter = config.n_iter_small;
         int warmup = config.n_warmup_small;
+        int inner_iter = config.n_inner_iter;
         if (coll_size >= config.large_thresh) {
             iter = config.n_iter_large;
             warmup = config.n_warmup_large;
@@ -111,7 +115,7 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
         args.coll_args.root = config.root;
         UCCCHECK_GOTO(coll->init_args(cnt, args), exit_err, st);
         if ((uint64_t)config.op_type < (uint64_t)UCC_COLL_TYPE_LAST) {
-            UCCCHECK_GOTO(run_single_coll_test(args.coll_args, warmup, iter, time),
+            UCCCHECK_GOTO(run_single_coll_test(args.coll_args, warmup, iter, inner_iter, time),
                           free_coll, st);
         } else {
             UCCCHECK_GOTO(run_single_executor_test(args.executor_args,
@@ -124,7 +128,6 @@ ucc_status_t ucc_pt_benchmark::run_bench() noexcept
             /* exit from loop when min_count == max_count == 0 */
             break;
         }
-        args.iter++;
     }
 
     return UCC_OK;
@@ -144,6 +147,7 @@ static inline double get_time_us(void)
 
 ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
                                                     int nwarmup, int niter,
+                                                    int n_inner_iter,
                                                     double &time)
                                                     noexcept
 {
@@ -155,6 +159,9 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
     ucc_coll_req_h req;
     ucc_ee_h ee;
     ucc_ev_t comp_ev, *post_ev;
+    double inner_time, max_inner_time;
+    std::ofstream inner_log_file;
+
 
     UCCCHECK_GOTO(comm->barrier(), exit_err, st);
     time = 0;
@@ -177,43 +184,67 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
     }
 
     args.root = config.root % comm->get_size();
+
+    if (std::getenv("UCC_PT_COLL_INNER_LOG_FILE")){
+        inner_log_file.open(std::getenv("UCC_PT_COLL_INNER_LOG_FILE"));
+        if (!inner_log_file.is_open())
+            std::cerr << "Couldn't open inner log file." << std::endl;
+    }
+
     for (int i = 0; i < nwarmup + niter; i++) {
-        double s = get_time_us();
 
-        if (!persistent) {
-            UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
-        }
+        for (int inner_iter = 0; inner_iter < n_inner_iter; inner_iter++) {
+            double s = get_time_us();
 
-        if (triggered) {
-            comp_ev.req = req;
-            UCCCHECK_GOTO(ucc_collective_triggered_post(ee, &comp_ev),
-                          free_req, st);
-            UCCCHECK_GOTO(ucc_ee_get_event(ee, &post_ev), free_req, st);
-            ucc_assert(post_ev->ev_type == UCC_EVENT_COLLECTIVE_POST);
-            UCCCHECK_GOTO(ucc_ee_ack_event(ee, post_ev), free_req, st);
-        } else {
-            UCCCHECK_GOTO(ucc_collective_post(req), free_req, st);
-        }
+            coll->pre_run(args, i, inner_iter);
 
-        st = ucc_collective_test(req);
-        while (st > 0) {
-            UCCCHECK_GOTO(ucc_context_progress(ctx), free_req, st);
+            if (!persistent) {
+                UCCCHECK_GOTO(ucc_collective_init(&args, &req, team), exit_err, st);
+            }
+
+            if (triggered) {
+                comp_ev.req = req;
+                UCCCHECK_GOTO(ucc_collective_triggered_post(ee, &comp_ev),
+                            free_req, st);
+                UCCCHECK_GOTO(ucc_ee_get_event(ee, &post_ev), free_req, st);
+                ucc_assert(post_ev->ev_type == UCC_EVENT_COLLECTIVE_POST);
+                UCCCHECK_GOTO(ucc_ee_ack_event(ee, post_ev), free_req, st);
+            } else {
+                UCCCHECK_GOTO(ucc_collective_post(req), free_req, st);
+            }
+
             st = ucc_collective_test(req);
+            while (st > 0) {
+                UCCCHECK_GOTO(ucc_context_progress(ctx), free_req, st);
+                st = ucc_collective_test(req);
+            }
+
+            if (!persistent) {
+                ucc_collective_finalize(req);
+            }
+            double f = get_time_us();
+            inner_time = f - s;
+
+            if (i >= nwarmup) {
+                time += inner_time;
+                if (inner_log_file.is_open()){
+                    comm->allreduce(&inner_time, &max_inner_time, 1, UCC_OP_MAX);
+                    inner_log_file << std::to_string(max_inner_time) << " ";
+                }
+            }
         }
 
-        if (!persistent) {
-            ucc_collective_finalize(req);
+        if (i >= nwarmup && inner_log_file.is_open()) {
+            inner_log_file << "\n";
         }
-        double f = get_time_us();
+
         if (st != UCC_OK) {
             goto exit_err;
-        }
-        if (i >= nwarmup) {
-            time += f - s;
         }
         args.root = (args.root + config.root_shift) % comm->get_size();
         UCCCHECK_GOTO(comm->barrier(), exit_err, st);
     }
+    inner_log_file.close();
 
     if (persistent) {
         ucc_collective_finalize(req);
@@ -221,6 +252,7 @@ ucc_status_t ucc_pt_benchmark::run_single_coll_test(ucc_coll_args_t args,
 
     if (niter != 0) {
         time /= niter;
+        time /= (n_inner_iter ? n_inner_iter : 1);
     }
     return UCC_OK;
 free_req:
@@ -323,6 +355,10 @@ void ucc_pt_benchmark::print_header()
                   << "  small" << config.n_iter_small << std::endl
                   << std::left << std::setw(24)
                   << "  large" << config.n_iter_large << std::endl;
+        std::cout << std::left << std::setw(24)
+                  << "Inner iterations: "
+                  << config.n_inner_iter
+                  << std::endl;
         std::cout.copyfmt(iostate);
         std::cout << std::endl;
         std::cout << std::setw(12) << "Count"

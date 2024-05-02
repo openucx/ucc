@@ -24,6 +24,7 @@ public:
     ucc_status_t run_bench() noexcept;
     ucc_status_t run_single_coll_test(ucc_coll_args_t args,
                                       int nwarmup, int niter,
+                                      int n_inner_iter,
                                       double &time) noexcept;
     ucc_status_t run_single_executor_test(ucc_ee_executor_task_args_t args,
                                           int nwarmup, int niter,

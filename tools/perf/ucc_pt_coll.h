@@ -13,6 +13,7 @@ extern "C" {
 #include <components/ec/ucc_ec.h>
 #include <components/mc/ucc_mc.h>
 }
+#include <vector>
 
 ucc_status_t ucc_pt_alloc(ucc_mc_buffer_header_t **h_ptr, size_t len,
                           ucc_memory_type_t mem_type);
@@ -22,7 +23,6 @@ ucc_status_t ucc_pt_free(ucc_mc_buffer_header_t *h_ptr);
 typedef union {
     ucc_coll_args_t             coll_args;
     ucc_ee_executor_task_args_t executor_args;
-    int iter;
 } ucc_pt_test_args_t;
 
 class ucc_pt_coll {
@@ -49,6 +49,7 @@ public:
     {
         return 0.0;
     }
+    virtual void pre_run(ucc_coll_args_t &args, int iter, int inner_iter) {}
     bool has_reduction();
     bool has_inplace();
     bool has_range();
@@ -102,6 +103,10 @@ public:
                           ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;
+    void pre_run(ucc_coll_args_t &args, int iter, int inner_iter) override;
+
+protected:
+    std::vector<std::vector<std::vector<double>>> transfer_matrices;
 };
 
 class ucc_pt_coll_barrier: public ucc_pt_coll {

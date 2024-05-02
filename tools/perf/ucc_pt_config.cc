@@ -24,6 +24,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.n_warmup_small = 100;
     bench.n_iter_large   = 200;
     bench.n_warmup_large = 20;
+    bench.n_inner_iter   = 1;
     bench.large_thresh   = 64 * 1024;
     bench.full_print     = false;
     bench.n_bufs         = UCC_PT_DEFAULT_N_BUFS;
@@ -91,7 +92,7 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
     int c;
     ucc_status_t st;
 
-    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:r:S:f:iphFT")) != -1) {
+    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:r:S:f:j:iphFT")) != -1) {
         switch (c) {
             case 'c':
                 if (ucc_pt_op_map.count(optarg) == 0) {
@@ -154,6 +155,9 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
                 std::stringstream(optarg) >> bench.n_warmup_small;
                 bench.n_warmup_large = bench.n_warmup_small;
                 break;
+            case 'j':
+                std::stringstream(optarg) >> bench.n_inner_iter;
+                break;
             case 'f':
                 std::stringstream(optarg) >> bench.mult_factor;
                 break;
@@ -195,6 +199,7 @@ void ucc_pt_config::print_help()
     std::cout << "  -m <mtype name>: memory type"<<std::endl;
     std::cout << "  -n <number>: number of iterations"<<std::endl;
     std::cout << "  -w <number>: number of warmup iterations"<<std::endl;
+    std::cout << "  -j <number>: number of inner iterations"<<std::endl;
     std::cout << "  -f <number>: multiplication factor between sizes. Default : 2."<<std::endl;
     std::cout << "  -N <number>: number of buffers"<<std::endl;
     std::cout << "  -T: triggered collective"<<std::endl;
