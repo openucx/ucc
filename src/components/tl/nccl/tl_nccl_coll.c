@@ -145,6 +145,10 @@ ucc_status_t ucc_tl_nccl_init_task(ucc_base_coll_args_t *coll_args,
     }
 
     if (ucc_unlikely(nccl_team->comm_state != TL_NCCL_COMM_STATE_READY)) {
+        if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args)) {
+            /* active set is not supported with lazy comm init*/
+            return UCC_ERR_NOT_SUPPORTED;
+        }
         status = ucc_tl_nccl_comm_init(nccl_team);
         if (ucc_unlikely(status != UCC_OK)) {
             return status;
