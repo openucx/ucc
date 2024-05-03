@@ -82,7 +82,7 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
 
     {"KN_RADIX", "0",
      "Radix of all algorithms based on knomial pattern. When set to a "
-     "positive value it is used as a convinience parameter to set all "
+     "positive value it is used as a convenience parameter to set all "
      "other KN_RADIX values",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, kn_radix), UCC_CONFIG_TYPE_UINT},
 
@@ -191,7 +191,7 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      UCC_CONFIG_TYPE_BOOL},
 
     {"REDUCE_SCATTERV_RING_BIDIRECTIONAL", "y",
-     "Launch 2 inverted rings concurrently during ReduceScatterV Ring "
+     "Launch 2 inverted rings concurrently during ReduceScatterv Ring "
      "algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatterv_ring_bidirectional),
      UCC_CONFIG_TYPE_BOOL},
@@ -214,7 +214,7 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
 
     {"PRECONNECT", "0",
      "Threshold that defines the number of ranks in the UCC team/context "
-     "below which the team/context enpoints will be preconnected during "
+     "below which the team/context endpoints will be preconnected during "
      "corresponding team/context create call",
      ucc_offsetof(ucc_tl_ucp_context_config_t, preconnect),
      UCC_CONFIG_TYPE_UINT},

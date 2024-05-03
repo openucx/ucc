@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -22,7 +22,7 @@ ucc_config_field_t ucc_base_lib_config_table[] = {
      ucc_offsetof(ucc_base_lib_config_t, use_tuning), UCC_CONFIG_TYPE_BOOL},
 
     {"MIN_TEAM_SIZE", "auto",
-     "mininaml team size for which component can be used",
+     "minimal team size for which component can be used",
      ucc_offsetof(ucc_base_lib_config_t, min_team_size),
      UCC_CONFIG_TYPE_ULUNITS},
 
