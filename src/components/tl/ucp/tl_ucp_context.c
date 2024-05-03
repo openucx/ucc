@@ -71,8 +71,8 @@ ucc_tl_ucp_context_service_init(const char *prefix, ucp_params_t ucp_params,
                                 const ucc_base_context_params_t *params,
                                 ucc_tl_ucp_context_t *           ctx)
 {
+    ucp_config_t *ucp_config = NULL;
     ucc_status_t  ucc_status;
-    ucp_config_t *ucp_config;
     ucp_context_h ucp_context_service;
     ucp_worker_h  ucp_worker_service;
     ucs_status_t  status;
@@ -91,6 +91,7 @@ ucc_tl_ucp_context_service_init(const char *prefix, ucp_params_t ucp_params,
     UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context_service),
               "failed to init ucp context for service worker", err_cfg, ctx);
     ucp_config_release(ucp_config);
+    ucp_config = NULL;
 
     UCP_CHECK(ucp_worker_create(ucp_context_service, &worker_params,
                                 &ucp_worker_service),
@@ -122,7 +123,9 @@ err_thread_mode:
 err_worker_create:
     ucp_cleanup(ucp_context_service);
 err_cfg:
-    ucp_config_release(ucp_config);
+    if (ucp_config) {
+        ucp_config_release(ucp_config);
+    }
 err_cfg_read:
     if (service_prefix) {
         ucc_free(service_prefix);
@@ -136,13 +139,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 {
     ucc_tl_ucp_context_config_t *tl_ucp_config =
         ucc_derived_of(config, ucc_tl_ucp_context_config_t);
+    ucp_config_t       *ucp_config             = NULL;
     ucc_tl_ucp_lib_t   *lib;
     ucc_status_t        ucc_status = UCC_OK;
     ucp_context_attr_t  context_attr;
     ucp_worker_params_t worker_params;
     ucp_worker_attr_t   worker_attr;
     ucp_params_t        ucp_params;
-    ucp_config_t       *ucp_config;
     ucp_context_h       ucp_context;
     ucp_worker_h        ucp_worker;
     ucs_status_t        status;
@@ -183,6 +186,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     UCP_CHECK(ucp_init(&ucp_params, ucp_config, &ucp_context),
               "failed to init ucp context", err_cfg, self);
     ucp_config_release(ucp_config);
+    ucp_config = NULL;
 
     context_attr.field_mask = UCP_ATTR_FIELD_MEMORY_TYPES;
     UCP_CHECK(ucp_context_query(ucp_context, &context_attr),
@@ -282,7 +286,9 @@ err_thread_mode:
 err_worker_create:
     ucp_cleanup(ucp_context);
 err_cfg:
-    ucp_config_release(ucp_config);
+    if (ucp_config) {
+        ucp_config_release(ucp_config);
+    }
 err_cfg_read:
     if (prefix) {
         ucc_free(prefix);

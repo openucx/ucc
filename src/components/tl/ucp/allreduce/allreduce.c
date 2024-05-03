@@ -25,6 +25,10 @@ ucc_base_coll_alg_info_t
              .name = "dbt",
              .desc = "alreduce over double binary tree where a leaf in one tree "
                      "will be intermediate in other (optimized for BW)"},
+        [UCC_TL_UCP_ALLREDUCE_ALG_SLIDING_WINDOW] =
+            {.id   = UCC_TL_UCP_ALLREDUCE_ALG_SLIDING_WINDOW,
+             .name = "sliding_window",
+             .desc = "sliding window allreduce (optimized for running on DPU)"},
         [UCC_TL_UCP_ALLREDUCE_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
@@ -50,4 +54,14 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init(ucc_base_coll_args_t *coll_args,
     status = ucc_tl_ucp_allreduce_knomial_init_common(task);
 out:
     return status;
+}
+
+ucc_status_t
+ucc_tl_ucp_allreduce_sliding_window_init(ucc_base_coll_args_t __attribute__((unused)) *coll_args, //NOLINT
+                                         ucc_base_team_t __attribute__((unused)) *team, //NOLINT
+                                         ucc_coll_task_t __attribute__((unused)) **task_h) //NOLINT
+{
+    ucc_coll_task_t *coll_task = NULL;
+    ucc_tl_ucp_allreduce_sliding_window_progress(coll_task);
+    return UCC_OK;
 }

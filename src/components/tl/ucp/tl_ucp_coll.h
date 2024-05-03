@@ -88,6 +88,11 @@ enum ucc_tl_ucp_task_flags {
     UCC_TL_UCP_TASK_FLAG_SUBSET = UCC_BIT(0),
 };
 
+typedef struct ucc_tl_ucp_allreduce_sw_pipeline
+    ucc_tl_ucp_allreduce_sw_pipeline;
+typedef struct ucc_tl_ucp_allreduce_sw_host_allgather
+    ucc_tl_ucp_allreduce_sw_host_allgather;
+
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
     uint32_t        flags;
@@ -121,6 +126,21 @@ typedef struct ucc_tl_ucp_task {
             ucc_ee_executor_task_t *etask;
             ucc_ee_executor_t      *executor;
         } allreduce_kn;
+        struct {
+            int                                        reduce_in_progress;
+            ucp_rkey_h                                *src_rkeys; //unpacked
+            ucp_rkey_h                                *dst_rkeys; //unpacked
+            void                                     **sbufs;
+            void                                     **rbufs;
+            ucc_tl_ucp_allreduce_sw_pipeline          *pipe;
+            ucc_ee_executor_task_t                    *etask;
+            ucc_ee_executor_t                         *executor;
+            ucs_status_ptr_t                          *put_requests;
+            ucc_tl_ucp_allreduce_sw_host_allgather    *allgather_data;
+            ucc_schedule_t                            *sw_sched;
+            struct ucc_tl_ucp_allreduce_sw_export_buf *src_ebuf;
+            struct ucc_tl_ucp_allreduce_sw_export_buf *dst_ebuf;
+        } allreduce_sliding_window;
         struct {
             int                     phase;
             ucc_knomial_pattern_t   p;
@@ -185,6 +205,10 @@ typedef struct ucc_tl_ucp_task {
             ucc_mc_buffer_header_t *scratch_header;
             size_t                  scratch_size;
         } allgather_bruck;
+        struct {
+            uint32_t                i;
+            int                     data_expected;
+        } allgather_sparbit;
         struct {
             ucc_rank_t              dist;
             uint32_t                radix;

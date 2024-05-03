@@ -15,6 +15,7 @@ allgather =                        \
 	allgather/allgather_ring.c     \
 	allgather/allgather_neighbor.c \
 	allgather/allgather_bruck.c    \
+	allgather/allgather_sparbit.c  \
 	allgather/allgather_knomial.c
 
 allgatherv =                     \
@@ -37,10 +38,13 @@ alltoallv =                        \
 	alltoallv/alltoallv_onesided.c
 
 allreduce =                           \
-	allreduce/allreduce.h             \
-	allreduce/allreduce.c             \
-	allreduce/allreduce_knomial.c     \
-	allreduce/allreduce_sra_knomial.c \
+	allreduce/allreduce.h                      \
+	allreduce/allreduce.c                      \
+	allreduce/allreduce_knomial.c              \
+	allreduce/allreduce_sra_knomial.c          \
+	allreduce/allreduce_sliding_window.h       \
+	allreduce/allreduce_sliding_window.c       \
+	allreduce/allreduce_sliding_window_setup.c \
 	allreduce/allreduce_dbt.c
 
 barrier =                     \
