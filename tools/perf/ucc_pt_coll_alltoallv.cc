@@ -113,7 +113,7 @@ void fill_transfer_matrix(std::vector<std::vector<double>>& transfer_matrix, std
     }
 }
 
-void fill_transfer_matrices(std::vector<std::vector<std::vector<double>>>& transfer_matrices, double default_value=0, std::string transfer_matrices_dir)
+void fill_transfer_matrices(std::vector<std::vector<std::vector<double>>>& transfer_matrices, std::string transfer_matrices_dir)
 {
     std::string fn;
     std::exception_ptr exc;
@@ -184,11 +184,13 @@ ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count, ucc_pt_test_args_t &
     size_t                              dst_header_size, src_header_size, max_dst_header_size, max_src_header_size;
     ucc_status_t                        st        = UCC_OK;
     int                                 n_matrices = 1;
-    string                              transfer_matrices_dir;
+    std::string                              transfer_matrices_dir;
 
     // Temporary: Forbid usage without transfer matrices
-    if (!std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR") || !std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT"))
-        throw std::invalid_argument("One of those required environment variables were not provided: UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR, UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT");
+    if (!std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR") || !std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT")){
+        std::cerr << "One of those required environment variables were not provided: UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR, UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT" << std::endl;
+        std::terminate();
+    }
     // End of temporary snippet 
 
     if (std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_COUNT")){
@@ -207,7 +209,7 @@ ucc_status_t ucc_pt_coll_alltoallv::init_args(size_t count, ucc_pt_test_args_t &
     transfer_matrices.resize(n_matrices, std::vector<std::vector<double>>(comm_size, std::vector<double>(comm_size, count)));
 
     if (std::getenv("UCC_PT_COLL_ALLTOALLV_TRANSFER_MATRICES_DIR"))
-        fill_transfer_matrices(transfer_matrices);
+        fill_transfer_matrices(transfer_matrices, transfer_matrices_dir);
     
     max_src_header_size = max_dst_header_size = 0;
     for (int mat_ix=0; mat_ix < transfer_matrices.size(); mat_ix++){
