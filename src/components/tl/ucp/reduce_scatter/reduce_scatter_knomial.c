@@ -184,7 +184,8 @@ static inline void get_rs_work_buf(ucc_tl_ucp_task_t *task,
                                    size_t block_count,
                                    ucc_tl_ucp_rs_work_buf_t *wb)
 {
-    ucc_coll_args_t *args     = &TASK_ARGS(task);
+    ucc_coll_args_t *args = &TASK_ARGS(task);
+
     switch (args->coll_type) {
     case UCC_COLL_TYPE_ALLREDUCE:
         return get_sbuf_rbuf_ar(task, block_count, wb);
@@ -427,11 +428,10 @@ static size_t compute_scratch_size(ucc_tl_ucp_task_t *task)
             if (coll_args->mask & UCC_BASE_CARGS_MAX_FRAG_COUNT) {
                 count = coll_args->max_frag_count;
             }
-            data_size = count * dt_size;
-            step_radix = ucc_kn_compute_step_radix(&task->reduce_scatter_kn.p);
+            data_size     = count * dt_size;
+            step_radix    = ucc_kn_compute_step_radix(&task->reduce_scatter_kn.p);
             max_recv_size = ucc_sra_kn_compute_seg_size(count, step_radix, 0) *
-                step_radix * dt_size;
-
+                            step_radix * dt_size;
             if (UCC_IS_INPLACE(coll_args->args) ||
                 (KN_NODE_PROXY == task->reduce_scatter_kn.p.node_type) ||
                 max_recv_size > data_size) {
