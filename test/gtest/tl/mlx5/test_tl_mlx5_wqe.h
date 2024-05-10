@@ -153,7 +153,7 @@ class test_tl_mlx5_rdma_write
 
 class test_tl_mlx5_dm : public test_tl_mlx5_rdma_write {
   public:
-    struct ibv_dm *          dm_ptr;
+    struct ibv_dm *          dm_ptr = nullptr;
     struct ibv_alloc_dm_attr dm_attr;
     struct ibv_mr *          dm_mr;
 
@@ -177,8 +177,10 @@ class test_tl_mlx5_dm : public test_tl_mlx5_rdma_write {
         memset(&dm_attr, 0, sizeof(dm_attr));
         dm_attr.length = bufsize;
         dm_ptr         = ibv_alloc_dm(ctx, &dm_attr);
-        GTEST_ASSERT_NE(dm_ptr, nullptr);
-        GTEST_ASSERT_NE(errno, 0);
+        if (!dm_ptr) {
+            GTEST_SKIP() << "device cannot allocate a buffer of size "
+                         << bufsize;
+        }
 
         dm_mr = ibv_reg_dm_mr(pd, dm_ptr, 0, dm_attr.length,
                               IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |

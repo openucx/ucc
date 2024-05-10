@@ -143,6 +143,9 @@ UCC_TEST_P(test_tl_mlx5_dm, MemcpyToDeviceMemory)
 {
     bufsize = GetParam();
     buffers_init();
+    if (!dm_ptr) {
+        return;
+    }
 
     if (bufsize % 4 != 0) {
         GTEST_SKIP() << "for memcpy involving device memory, buffer size "
@@ -162,6 +165,9 @@ UCC_TEST_P(test_tl_mlx5_dm, RdmaToDeviceMemory)
 
     bufsize = GetParam();
     buffers_init();
+    if (!dm_ptr) {
+        return;
+    }
 
     // RDMA write from host source to device memory
     memset(&sg, 0, sizeof(sg));
@@ -208,6 +214,9 @@ UCC_TEST_P(test_tl_mlx5_dm, CustomRdmaToDeviceMemory)
 {
     bufsize = GetParam();
     buffers_init();
+    if (!dm_ptr) {
+        return;
+    }
 
     // RDMA write from host source to device memory
     ibv_wr_start(qp.qp_ex);
