@@ -473,7 +473,7 @@ typedef enum {
  *
  *  @ref ucc_thread_mode_t is used to initialize the UCC library’s thread mode.
  *  The UCC library can be configured in three thread modes UCC_THREAD_SINGLE,
- *  UCC_THREAD_FUNNELED, and UCC_LIB_THREAD_MULTIPLE. In the UCC_THREAD_SINGLE
+ *  UCC_THREAD_FUNNELED, and UCC_THREAD_MULTIPLE. In the UCC_THREAD_SINGLE
  *  mode, the user program must not be multithreaded. In the UCC_THREAD_FUNNELED
  *  mode, the user program may be multithreaded. However, all UCC interfaces
  *  should be invoked from the same thread. In the UCC_THREAD_MULTIPLE mode, the
