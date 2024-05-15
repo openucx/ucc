@@ -33,6 +33,14 @@
 #define DROP_THRESHOLD    1000
 #define MAX_COMM_POW2     32
 
+/* Allgather RDMA-based reliability designs */
+#define ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE 1024
+#define ONE_SIDED_NO_RELIABILITY            0
+#define ONE_SIDED_SYNCHRONOUS_PROTO         1
+#define ONE_SIDED_ASYNCHRONOUS_PROTO        2
+#define ONE_SIDED_SLOTS_COUNT               2                /* number of memory slots during async design */
+#define ONE_SIDED_SLOTS_INFO_SIZE           sizeof(uint32_t) /* size of metadata prepended to each slots in bytes */
+
 enum {
     MCAST_PROTO_EAGER,     /* Internal staging buffers */
     MCAST_PROTO_ZCOPY
@@ -136,6 +144,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_context {
     int                            ib_port;
     int                            pkey_index;
     int                            mtu;
+    uint16_t                       port_lid;
     struct rdma_cm_id             *id;
     struct rdma_event_channel     *channel;
     ucc_mpool_t                    compl_objects_mp;
@@ -174,6 +183,10 @@ struct mcast_ctx {
     struct ibv_ah     *ah;
     struct ibv_send_wr swr;
     struct ibv_sge     ssg;
+    // RC connection info for supporing one-sided based relibality
+    struct ibv_qp     **rc_qp;
+    uint16_t           *rc_lid;
+    union ibv_gid      *rc_gid;
 };
 
 struct packet {
@@ -183,65 +196,109 @@ struct packet {
     int        comm_id;
 };
 
+typedef struct ucc_tl_mlx5_mcast_slot_mem_info {
+    uint64_t remote_addr;
+    uint32_t rkey;
+} ucc_tl_mlx5_mcast_slot_mem_info_t;
+
+typedef struct ucc_tl_mlx5_one_sided_reliable_team_info {
+    ucc_tl_mlx5_mcast_slot_mem_info_t slot_mem;
+    uint16_t                          port_lid;
+    uint32_t                          rc_qp_num[ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE];
+} ucc_tl_mlx5_one_sided_reliable_team_info_t;
+
+typedef struct ucc_tl_mlx5_mcast_one_sided_reliability_comm {
+    /* all the info required for establishing a reliable connection as
+     * well as temp slots memkeys that all processes in the team need
+     * to be aware of*/
+    ucc_tl_mlx5_one_sided_reliable_team_info_t *info;
+    /* holds all the remote-addr/rkey of sendbuf from processes in the team
+     * used in sync design. it needs to be set during each mcast-allgather call
+     * after sendbuf registration */
+    ucc_tl_mlx5_mcast_slot_mem_info_t          *sendbuf_memkey_list;
+    /* counter for each target recv packet */
+    uint32_t                                   *recvd_pkts_tracker;
+    /* holds the remote targets' collective call counter. it is used to check
+     * if remote temp slot is ready for RDMA READ in async design */
+    uint32_t                                   *remote_slot_info;
+    struct ibv_mr                              *remote_slot_info_mr;
+    int                                         reliability_scheme_msg_threshold;
+    /* mem address and mem keys of the temp slots in async design */
+    char                                       *slots_buffer;
+    struct ibv_mr                              *slots_mr;
+    /* size of a temp slot in async design */
+    int                                         slot_size;
+    /* coll req that is used during the oob service calls */
+    ucc_service_coll_req_t                     *reliability_req;
+} ucc_tl_mlx5_mcast_one_sided_reliability_comm_t;
+
+typedef struct ucc_tl_mlx5_mcast_service_coll {
+    ucc_status_t (*bcast_post) (void*, void*, size_t, ucc_rank_t, ucc_service_coll_req_t**);
+    ucc_status_t (*allgather_post) (void*, void*, void*, size_t, ucc_service_coll_req_t**);
+    ucc_status_t (*barrier_post) (void*, ucc_service_coll_req_t**);
+    ucc_status_t (*coll_test) (ucc_service_coll_req_t*);
+} ucc_tl_mlx5_mcast_service_coll_t;
+
 typedef struct ucc_tl_mlx5_mcast_coll_comm {
-    struct pp_packet                        dummy_packet;
-    ucc_tl_mlx5_mcast_coll_context_t       *ctx;
-    ucc_tl_mlx5_mcast_coll_comm_init_spec_t params;
-    ucc_tl_mlx5_mcast_p2p_interface_t       p2p;
-    int                                     tx;
-    struct ibv_cq                          *scq;
-    struct ibv_cq                          *rcq;
-    ucc_rank_t                              rank;
-    ucc_rank_t                              commsize;
-    char                                   *grh_buf;
-    struct ibv_mr                          *grh_mr;
-    uint16_t                                mcast_lid;
-    union ibv_gid                           mgid;
-    unsigned                                max_inline;
-    size_t                                  max_eager;
-    int                                     max_per_packet;
-    int                                     pending_send;
-    int                                     pending_recv;
-    struct ibv_mr                          *pp_mr;
-    char                                   *pp_buf;
-    struct pp_packet                       *pp;
-    uint32_t                                psn;
-    uint32_t                                last_psn;
-    uint32_t                                racks_n;
-    uint32_t                                sacks_n;
-    uint32_t                                last_acked;
-    uint32_t                                naks_n;
-    uint32_t                                child_n;
-    uint32_t                                parent_n;
-    int                                     buf_n;
-    struct packet                           p2p_pkt[MAX_COMM_POW2];
-    struct packet                           p2p_spkt[MAX_COMM_POW2];
-    ucc_list_link_t                         bpool;
-    ucc_list_link_t                         pending_q;
-    struct mcast_ctx                        mcast;
-    int                                     reliable_in_progress;
-    int                                     recv_drop_packet_in_progress;
-    struct ibv_recv_wr                     *call_rwr;
-    struct ibv_sge                         *call_rsgs;
-    uint64_t                                timer;
-    int                                     stalled;
-    int                                     comm_id;
-    void                                   *p2p_ctx;
-    ucc_base_lib_t                         *lib;
-    struct sockaddr_in6                     mcast_addr;
-    ucc_rank_t                              parents[MAX_COMM_POW2];
-    ucc_rank_t                              children[MAX_COMM_POW2];
-    int                                     nack_requests;
-    int                                     nacks_counter;
-    int                                     n_prep_reliable;
-    int                                     n_mcast_reliable;
-    int                                     wsize;
-    ucc_tl_mlx5_mcast_join_info_t          *group_setup_info;
-    ucc_service_coll_req_t                 *group_setup_info_req;
-    ucc_status_t                           (*bcast_post) (void*, void*, size_t, ucc_rank_t, ucc_service_coll_req_t**);
-    ucc_status_t                           (*bcast_test) (ucc_service_coll_req_t*);
-    struct rdma_cm_event                   *event;
-    struct pp_packet                       *r_window[1]; // do not add any new variable after here
+    struct pp_packet                                dummy_packet;
+    ucc_tl_mlx5_mcast_coll_context_t               *ctx;
+    ucc_tl_mlx5_mcast_coll_comm_init_spec_t         params;
+    ucc_tl_mlx5_mcast_p2p_interface_t               p2p;
+    int                                             tx;
+    struct ibv_cq                                  *scq;
+    struct ibv_cq                                  *rcq;
+    struct ibv_srq                                 *srq;
+    ucc_rank_t                                      rank;
+    ucc_rank_t                                      commsize;
+    char                                           *grh_buf;
+    struct ibv_mr                                  *grh_mr;
+    uint16_t                                        mcast_lid;
+    union ibv_gid                                   mgid;
+    unsigned                                        max_inline;
+    size_t                                          max_eager;
+    int                                             max_per_packet;
+    int                                             pending_send;
+    int                                             pending_recv;
+    struct ibv_mr                                  *pp_mr;
+    char                                           *pp_buf;
+    struct pp_packet                               *pp;
+    uint32_t                                        psn;
+    uint32_t                                        last_psn;
+    uint32_t                                        racks_n;
+    uint32_t                                        sacks_n;
+    uint32_t                                        last_acked;
+    uint32_t                                        naks_n;
+    uint32_t                                        child_n;
+    uint32_t                                        parent_n;
+    int                                             buf_n;
+    struct packet                                   p2p_pkt[MAX_COMM_POW2];
+    struct packet                                   p2p_spkt[MAX_COMM_POW2];
+    ucc_list_link_t                                 bpool;
+    ucc_list_link_t                                 pending_q;
+    struct mcast_ctx                                mcast;
+    int                                             reliable_in_progress;
+    int                                             recv_drop_packet_in_progress;
+    struct ibv_recv_wr                             *call_rwr;
+    struct ibv_sge                                 *call_rsgs;
+    uint64_t                                        timer;
+    int                                             stalled;
+    int                                             comm_id;
+    void                                           *p2p_ctx;
+    ucc_base_lib_t                                 *lib;
+    struct sockaddr_in6                             mcast_addr;
+    ucc_rank_t                                      parents[MAX_COMM_POW2];
+    ucc_rank_t                                      children[MAX_COMM_POW2];
+    int                                             nack_requests;
+    int                                             nacks_counter;
+    int                                             n_prep_reliable;
+    int                                             n_mcast_reliable;
+    int                                             wsize;
+    ucc_tl_mlx5_mcast_join_info_t                  *group_setup_info;
+    ucc_service_coll_req_t                         *group_setup_info_req;
+    ucc_tl_mlx5_mcast_service_coll_t                service_coll;
+    struct rdma_cm_event                           *event;
+    ucc_tl_mlx5_mcast_one_sided_reliability_comm_t  one_sided;
+    struct pp_packet                               *r_window[1]; // note: do not add any new variable after here
 } ucc_tl_mlx5_mcast_coll_comm_t;
 
 typedef struct ucc_tl_mlx5_mcast_team {
@@ -313,6 +370,7 @@ typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {
     ucc_rank_t      my_team_rank;
     ucc_subset_t    subset;
     ucc_base_lib_t *lib;
+    int             tmp_buf;
 } ucc_tl_mlx5_mcast_oob_p2p_context_t;
 
 static inline struct pp_packet* ucc_tl_mlx5_mcast_buf_get_free(ucc_tl_mlx5_mcast_coll_comm_t* comm)

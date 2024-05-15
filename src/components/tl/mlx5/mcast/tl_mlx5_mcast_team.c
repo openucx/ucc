@@ -11,40 +11,8 @@
 #include "tl_mlx5_mcast_helper.h"
 #include "p2p/ucc_tl_mlx5_mcast_p2p.h"
 #include "mcast/tl_mlx5_mcast_helper.h"
+#include "mcast/tl_mlx5_mcast_service_coll.h"
  
-static ucc_status_t ucc_tl_mlx5_mcast_service_bcast_post(void *arg, void *buf, size_t size, ucc_rank_t root,
-                                                         ucc_service_coll_req_t **bcast_req)
-{
-    ucc_tl_mlx5_mcast_oob_p2p_context_t *ctx    = (ucc_tl_mlx5_mcast_oob_p2p_context_t *)arg;
-    ucc_status_t                         status = UCC_OK;
-    ucc_team_t                          *team   = ctx->base_team;
-    ucc_subset_t                         subset = ctx->subset;
-    ucc_service_coll_req_t              *req    = NULL;
-
-    status = ucc_service_bcast(team, buf, size, root, subset, &req);
-    if (ucc_unlikely(UCC_OK != status)) {
-        tl_error(ctx->base_ctx->lib, "tl service mcast  bcast failed");
-        return status;
-    }
-
-    *bcast_req = req;
-
-    return status;
-}
-
-static ucc_status_t ucc_tl_mlx5_mcast_service_bcast_test(ucc_service_coll_req_t *req)
-{
-    ucc_status_t status = UCC_OK;
-
-    status = ucc_service_coll_test(req);
-
-    if (UCC_INPROGRESS != status) {
-        ucc_service_coll_finalize(req);
-    }
-
-    return status;
-}
-
 ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
                                          ucc_tl_mlx5_mcast_team_t **mcast_team,
                                          ucc_tl_mlx5_mcast_context_t *ctx,
@@ -113,8 +81,10 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     ucc_list_head_init(&comm->bpool);
     ucc_list_head_init(&comm->pending_q);
 
-    comm->bcast_post = ucc_tl_mlx5_mcast_service_bcast_post;
-    comm->bcast_test = ucc_tl_mlx5_mcast_service_bcast_test;
+    comm->service_coll.bcast_post     = ucc_tl_mlx5_mcast_service_bcast_post;
+    comm->service_coll.allgather_post = ucc_tl_mlx5_mcast_service_allgather_post;
+    comm->service_coll.barrier_post   = ucc_tl_mlx5_mcast_service_barrier_post;
+    comm->service_coll.coll_test      = ucc_tl_mlx5_mcast_service_coll_test;
 
     memcpy(&comm->params, conf_params, sizeof(*conf_params));
 
@@ -380,8 +350,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     data->status = UCC_ERR_NO_RESOURCE;
                 }
 
-                status = comm->bcast_post(comm->p2p_ctx, data, sizeof(ucc_tl_mlx5_mcast_join_info_t),
-                                          0, &comm->group_setup_info_req);
+                status = comm->service_coll.bcast_post(comm->p2p_ctx, data, sizeof(ucc_tl_mlx5_mcast_join_info_t),
+                                                       0, &comm->group_setup_info_req);
                 if (UCC_OK != status) {
                     tl_error(comm->lib, "unable to post bcast for group setup info");
                     ucc_free(comm->group_setup_info);
@@ -403,7 +373,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
             case TL_MLX5_TEAM_STATE_MCAST_GRP_BCAST_POST:
             {
                 /* rank 0 polls bcast request and wait for its completion */
-                status = comm->bcast_test(comm->group_setup_info_req);
+                status = comm->service_coll.coll_test(comm->group_setup_info_req);
                 if (UCC_OK != status) {
                     /* bcast is not completed yet */
                     if (status < 0) {
@@ -472,8 +442,9 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     return UCC_ERR_NO_MEMORY;
                 }
 
-                status = comm->bcast_post(comm->p2p_ctx, data, sizeof(ucc_tl_mlx5_mcast_join_info_t),
-                                          0, &comm->group_setup_info_req);
+                status = comm->service_coll.bcast_post(comm->p2p_ctx, data,
+                                                       sizeof(ucc_tl_mlx5_mcast_join_info_t), 0,
+                                                       &comm->group_setup_info_req);
                 if (UCC_OK != status) {
                     tl_error(comm->lib, "unable to post bcast for group setup info");
                     ucc_free(data);
@@ -489,7 +460,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
             case TL_MLX5_TEAM_STATE_MCAST_GRP_BCAST_POST:
             {
                 /* none rank 0 processes poll bcast request and wait for its completion */
-                status = comm->bcast_test(comm->group_setup_info_req);
+                status = comm->service_coll.coll_test(comm->group_setup_info_req);
                 if (UCC_OK != status) {
                     /* bcast is not completed yet */
                     if (status < 0) {
