@@ -13,20 +13,28 @@
 
 void ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
 {
+    uint32_t           i;
+
+    ucc_rank_t         vrank;
     ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
     ucc_rank_t         rank      = task->subset.myrank;
     ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
-    ucc_rank_t         root      = (uint32_t)TASK_ARGS(task).root;
+
     uint32_t           radix     = task->bcast_kn.radix;
-    ucc_rank_t         vrank     = (rank - root + size) % size;
+    ucc_rank_t         root = (uint32_t)TASK_ARGS(task).root;
     ucc_rank_t         dist      = task->bcast_kn.dist;
     void              *buffer    = TASK_ARGS(task).src.info.buffer;
     ucc_memory_type_t  mtype     = TASK_ARGS(task).src.info.mem_type;
     size_t             data_size = TASK_ARGS(task).src.info.count *
                        ucc_dt_size(TASK_ARGS(task).src.info.datatype);
     ucc_rank_t vpeer, peer, vroot_at_level, root_at_level, pos;
-    uint32_t i;
+
+    if (UCC_COLL_ARGS_ACTIVE_SET(&(TASK_ARGS(task)))) {
+        root = ucc_ep_map_local_rank(task->subset.map, root);
+    }
+
+    vrank = (rank - root + size) % size;
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return;

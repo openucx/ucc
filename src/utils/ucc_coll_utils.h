@@ -155,7 +155,7 @@ size_t            ucc_coll_args_msgsize(const ucc_coll_args_t *args,
 ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
                                          ucc_rank_t rank);
 
-
+/* Convert rank from subset space to rank space (UCC team space) */
 static inline ucc_rank_t ucc_ep_map_eval(ucc_ep_map_t map, ucc_rank_t rank)
 {
     ucc_rank_t r;
@@ -261,8 +261,9 @@ static inline size_t ucc_buffer_block_offset(size_t     total_count,
 
 /* Given the rank space A (e.g. core ucc team), a subset B (e.g. active set
    within the core team), the ep_map that maps ranks from the subset B to A,
-   and the rank of a process within A.
-   The function below computes the local rank of the process within subset B. */
+   and the rank of a process within A. The function below computes the local
+   rank of the process within subset B.
+   i.e., convert from rank space (UCC team) to subset space */
 static inline ucc_rank_t ucc_ep_map_local_rank(ucc_ep_map_t map,
                                                ucc_rank_t   rank)
 {
