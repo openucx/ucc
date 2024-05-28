@@ -113,6 +113,8 @@ sources =                 \
 	tl_ucp_ep.c           \
 	tl_ucp_coll.c         \
 	tl_ucp_service_coll.c \
+	tl_ucp_dpu_offload.h  \
+	tl_ucp_dpu_offload.c  \
 	$(allgather)          \
 	$(allgatherv)         \
 	$(alltoall)           \

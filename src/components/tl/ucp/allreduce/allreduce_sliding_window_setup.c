@@ -14,32 +14,35 @@ ucc_status_t
 ucc_tl_ucp_allreduce_sliding_window_alloc_pipe(ucc_base_team_t   *team,
                                                ucc_tl_ucp_task_t *task)
 {
-    int                      i;
-    ucc_tl_ucp_team_t       *tl_team   = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_rank_t               team_size = (ucc_rank_t)team->params.size;
-    ucc_tl_ucp_lib_config_t *cfg       = &UCC_TL_UCP_TEAM_LIB(tl_team)->cfg;
+    ucc_tl_ucp_team_t                *tl_team         =
+        ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_rank_t                        team_size       =
+        UCC_TL_TEAM_SIZE(tl_team);
+    ucc_tl_ucp_lib_config_t          *cfg             =
+        &UCC_TL_UCP_TEAM_LIB(tl_team)->cfg;
+    const size_t                      buf_size        =
+        cfg->allreduce_sliding_window_buf_size;
+    uint32_t                          put_window_size =
+        cfg->allreduce_sliding_window_put_window_size;
+    uint32_t                          num_get_bufs    =
+        cfg->allreduce_sliding_window_num_get_bufs;
+    int                               i, j;
+    ucc_tl_ucp_allreduce_sw_pipeline *pipe;
 
-    const size_t buf_size = cfg->allreduce_sliding_window_buf_size;
-    int   put_window_size = cfg->allreduce_sliding_window_put_window_size;
-    int      num_get_bufs = cfg->allreduce_sliding_window_num_get_bufs;
-
-    ucc_tl_ucp_allreduce_sw_pipeline *pipe =
-        (ucc_tl_ucp_allreduce_sw_pipeline *)ucc_malloc(
-            sizeof(ucc_tl_ucp_allreduce_sw_pipeline));
+    pipe = ucc_malloc(sizeof(ucc_tl_ucp_allreduce_sw_pipeline));
     if (pipe == NULL) {
         goto err;
     }
 
-    if (put_window_size <= 0) {
+    ucc_assert(team_size > 0); // Bypass clang linter
+
+    if (put_window_size == 0 || put_window_size > team_size) {
         put_window_size = team_size;
     }
 
-    if (num_get_bufs <= 0) {
+    if (num_get_bufs == 0) {
         num_get_bufs = team_size;
     }
-
-    ucc_assert(num_get_bufs > 0);
-    ucc_assert(put_window_size > 0);
 
     pipe->accbuf.buf = ucc_malloc(buf_size);
     if (pipe->accbuf.buf == NULL) {
@@ -49,9 +52,6 @@ ucc_tl_ucp_allreduce_sliding_window_alloc_pipe(ucc_base_team_t   *team,
         num_get_bufs * sizeof(ucc_tl_ucp_allreduce_sw_buf_t));
     if (pipe->getbuf == NULL) {
         goto free_acc;
-    }
-    for (i = 0; i < num_get_bufs; i++) {
-        pipe->getbuf[i].buf = NULL;
     }
     for (i = 0; i < num_get_bufs; i++) {
         pipe->getbuf[i].buf = ucc_malloc(buf_size);
@@ -69,14 +69,14 @@ ucc_tl_ucp_allreduce_sliding_window_alloc_pipe(ucc_base_team_t   *team,
     }
 
     task->allreduce_sliding_window.pipe = pipe;
+    task->allreduce_sliding_window.put_requests =
+        task->allreduce_sliding_window.pipe->put_requests;
 
     return UCC_OK;
 
 free_getbuf:
-    for (i = 0; i < num_get_bufs; i++) {
-        if (pipe->getbuf[i].buf == NULL)
-            break;
-        ucc_free(pipe->getbuf[i].buf);
+    for (j = 0; j < i; j++) {
+        ucc_free(pipe->getbuf[j].buf);
     }
     ucc_free(pipe->getbuf);
 free_acc:
@@ -84,7 +84,7 @@ free_acc:
 free_pipe:
     ucc_free(pipe);
 err:
-    tl_error(UCC_TL_TEAM_LIB(tl_team), "error allocating sliding window pipe\n");
+    tl_error(UCC_TL_TEAM_LIB(tl_team), "error allocating sliding window pipe");
     return UCC_ERR_NO_RESOURCE;
 }
 
@@ -93,51 +93,69 @@ ucc_tl_ucp_allreduce_sliding_window_task_init(ucc_base_coll_args_t *coll_args,
                                               ucc_base_team_t      *team,
                                               ucc_tl_ucp_task_t    *task)
 {
-    ucc_tl_ucp_allreduce_sw_host_allgather_t *allgather_data;
-    void                 *src_buf   = coll_args->args.src.info.buffer;
-    void                 *dst_buf   = coll_args->args.dst.info.buffer;
-    ucc_tl_ucp_team_t    *tl_team   = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_rank_t            team_size = UCC_TL_TEAM_SIZE(tl_team);
-    int                   inplace   = UCC_IS_INPLACE(coll_args->args);
-    ucc_tl_ucp_allreduce_sw_global_work_buf_info_t *gwbi_p = NULL;
-    size_t allgather_size = sizeof(ucc_tl_ucp_allreduce_sw_host_allgather_t);
+    void                   *src_buf        = coll_args->args.src.info.buffer;
+    void                   *dst_buf        = coll_args->args.dst.info.buffer;
+    ucc_tl_ucp_team_t      *tl_team        = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_rank_t              team_size      = UCC_TL_TEAM_SIZE(tl_team);
+    int                     inplace        = UCC_IS_INPLACE(coll_args->args);
+    ucc_tl_ucp_allreduce_sw_global_work_buf_info_t
+                           *gwbi_p         = NULL;
+    size_t                  allgather_size =
+        sizeof(ucc_tl_ucp_allreduce_sw_host_allgather_t);
+    ucc_tl_ucp_allreduce_sw_host_allgather_t
+                           *allgather_data;
+    ucc_rank_t              i;
+    void                   *buffer;
+    void                   *ptr;
+    size_t                  bufs_sz, allgather_data_sz, rbufs_sz, dst_rkeys_sz,
+                            dst_ebuf_sz, sbufs_sz, src_rkeys_sz, src_ebuf_sz;
 
     ucc_assert(team_size > 0);
 
-    if (ucc_tl_ucp_allreduce_sliding_window_alloc_pipe(team, task) != UCC_OK) {
-        goto err;
+    bufs_sz           = sizeof(ucc_tl_ucp_dpu_offload_buf_info_t);
+    allgather_data_sz = allgather_size * (team_size + 1);
+    rbufs_sz          = sizeof(void *) * team_size;
+    dst_rkeys_sz      = sizeof(ucp_rkey_h) * team_size;
+    dst_ebuf_sz       = sizeof(struct ucc_tl_ucp_allreduce_sw_export_buf);
+
+    if (!inplace) {
+        sbufs_sz      = sizeof(void *) * team_size;
+        src_rkeys_sz  = sizeof(ucp_rkey_h) * team_size;
+        src_ebuf_sz   = sizeof(struct ucc_tl_ucp_allreduce_sw_export_buf);
+    } else {
+        sbufs_sz      = 0;
+        src_rkeys_sz  = 0;
+        src_ebuf_sz   = 0;
     }
 
-    allgather_data = ucc_malloc(allgather_size * (team_size + 1));
-    if (allgather_data == NULL) {
-        goto free_pipe;
+    buffer = ucc_malloc(bufs_sz + allgather_data_sz + rbufs_sz +
+                        dst_rkeys_sz + dst_ebuf_sz + sbufs_sz +
+                        src_rkeys_sz + src_ebuf_sz);
+    if (buffer == NULL) {
+        tl_error(UCC_TL_TEAM_LIB(tl_team), "error while allocating task");
+        return UCC_ERR_NO_RESOURCE;
     }
+
+    ptr = buffer;
+
+    task->allreduce_sliding_window.bufs = ptr;
+
+    ptr = allgather_data = PTR_OFFSET(ptr, bufs_sz);
+    task->allreduce_sliding_window.allgather_data = allgather_data;
 
     gwbi_p = coll_args->args.global_work_buffer;
     task->super.bargs.args.global_work_buffer = gwbi_p;
 
-    task->allreduce_sliding_window.barrier_task = NULL;
     task->allreduce_sliding_window.reduce_task = NULL;
 
-    task->allreduce_sliding_window.rbufs =
-        ucc_malloc(sizeof(void *) * team_size);
-    if (task->allreduce_sliding_window.rbufs == NULL) {
-        goto free_allgather_data;
-    }
-    task->allreduce_sliding_window.dst_rkeys =
-        ucc_malloc(sizeof(ucp_rkey_h) * team_size);
-    if (task->allreduce_sliding_window.dst_rkeys == NULL) {
-        goto free_rbufs;
+    ptr = task->allreduce_sliding_window.bufs->rbufs = PTR_OFFSET(ptr, allgather_data_sz);
+    ptr = task->allreduce_sliding_window.bufs->dst_rkeys = PTR_OFFSET(ptr, rbufs_sz);
+    for (i = 0; i < team_size; i++) {
+        task->allreduce_sliding_window.bufs->dst_rkeys[i] = NULL;
     }
 
-    task->allreduce_sliding_window.put_requests =
-        task->allreduce_sliding_window.pipe->put_requests;
-
-    task->allreduce_sliding_window.dst_ebuf =
-        ucc_malloc(sizeof(struct ucc_tl_ucp_allreduce_sw_export_buf));
-    if (task->allreduce_sliding_window.dst_ebuf == NULL) {
-        goto free_dst_rkeys;
-    }
+    ptr = task->allreduce_sliding_window.bufs->dst_ebuf = PTR_OFFSET(ptr, dst_rkeys_sz);
+    task->allreduce_sliding_window.bufs->dst_ebuf->memh = NULL;
 
     allgather_data->dst_buf = dst_buf;
 
@@ -147,62 +165,36 @@ ucc_tl_ucp_allreduce_sliding_window_task_init(ucc_base_coll_args_t *coll_args,
     if (!inplace) {
         allgather_data->src_buf = src_buf;
 
-        task->allreduce_sliding_window.sbufs =
-            ucc_malloc(sizeof(void *) * team_size);
-        if (task->allreduce_sliding_window.sbufs == NULL) {
-            goto free_dst_ebuf;
-        }
-        task->allreduce_sliding_window.src_rkeys =
-            ucc_malloc(sizeof(ucp_rkey_h) * team_size);
-        if (task->allreduce_sliding_window.src_rkeys == NULL) {
-            goto free_sbufs;
+        ptr = task->allreduce_sliding_window.bufs->sbufs = PTR_OFFSET(ptr, dst_ebuf_sz);
+        ptr = task->allreduce_sliding_window.bufs->src_rkeys = PTR_OFFSET(ptr, sbufs_sz);
+        for (i = 0; i < team_size; i++) {
+            task->allreduce_sliding_window.bufs->src_rkeys[i] = NULL;
         }
 
-        task->allreduce_sliding_window.src_ebuf =
-            ucc_malloc(sizeof(struct ucc_tl_ucp_allreduce_sw_export_buf));
-        if (task->allreduce_sliding_window.src_ebuf == NULL) {
-            goto free_src_rkeys;
-        }
+        task->allreduce_sliding_window.bufs->src_ebuf = PTR_OFFSET(ptr, src_rkeys_sz);
+        task->allreduce_sliding_window.bufs->src_ebuf->memh = NULL;
     } else {
-        task->allreduce_sliding_window.src_ebuf = NULL;
+        task->allreduce_sliding_window.bufs->src_ebuf = NULL;
     }
 
     return UCC_OK;
-
-free_src_rkeys:
-    ucc_free(task->allreduce_sliding_window.src_rkeys);
-free_sbufs:
-    ucc_free(task->allreduce_sliding_window.sbufs);
-free_dst_ebuf:
-    ucc_free(task->allreduce_sliding_window.dst_ebuf);
-free_dst_rkeys:
-    ucc_free(task->allreduce_sliding_window.dst_rkeys);
-free_rbufs:
-    ucc_free(task->allreduce_sliding_window.rbufs);
-free_allgather_data:
-    ucc_free(allgather_data);
-free_pipe:
-    ucc_tl_ucp_allreduce_sliding_window_free_pipe(&task->super);
-err:
-    tl_error(UCC_TL_TEAM_LIB(tl_team), "error while allocating task");
-    return UCC_ERR_NO_RESOURCE;
 }
 
 ucc_status_t ucc_tl_ucp_allreduce_sliding_window_allgather_info_finalize(
                 ucc_tl_ucp_task_t *sw_task)
 {
-    ucc_rank_t         i;
-    ucp_ep_h           ep;
-    ucp_rkey_h         src_unpacked, dst_unpacked;
     ucs_status_t       ucs_status = UCS_OK;
     ucc_base_team_t   *base_team  = sw_task->super.team;
     ucc_tl_ucp_team_t *tl_team    = ucc_derived_of(base_team, ucc_tl_ucp_team_t);
-    ucc_rank_t         team_size  = base_team->params.size;
+    ucc_rank_t         team_size  = UCC_TL_TEAM_SIZE(tl_team);
     void              *recvbuf    = sw_task->allreduce_sliding_window.
                                     allgather_task->bargs.args.dst.info.buffer;
     ucc_tl_ucp_allreduce_sw_host_allgather_t *all_host_allgather = recvbuf;
     ucc_status_t       status     = UCC_OK;
-    int                inplace    = UCC_IS_INPLACE(sw_task->super.bargs.args);
+    int                inplace    = UCC_IS_INPLACE(TASK_ARGS(sw_task));
+    ucc_rank_t         i;
+    ucp_ep_h           ep;
+    ucp_rkey_h         src_unpacked, dst_unpacked;
 
     ucc_assert(team_size > 0);
 
@@ -215,30 +207,30 @@ ucc_status_t ucc_tl_ucp_allreduce_sliding_window_allgather_info_finalize(
         ucs_status = ucp_ep_rkey_unpack(
             ep, all_host_allgather[i].packed_dst_key, &dst_unpacked);
         if (UCS_OK != ucs_status) {
-            tl_error(UCC_TL_TEAM_LIB(tl_team), "dst rkey unpack failed\n");
-            return UCC_ERR_NO_RESOURCE;
+            tl_error(UCC_TL_TEAM_LIB(tl_team), "dst rkey unpack failed");
+            return ucs_status_to_ucc_status(ucs_status);
         }
 
-        sw_task->allreduce_sliding_window.rbufs[i] =
+        sw_task->allreduce_sliding_window.bufs->rbufs[i] =
             all_host_allgather[i].dst_buf;
-        sw_task->allreduce_sliding_window.dst_rkeys[i] = dst_unpacked;
+        sw_task->allreduce_sliding_window.bufs->dst_rkeys[i] = dst_unpacked;
 
         if (!inplace) {
             ucs_status = ucp_ep_rkey_unpack(
                 ep, all_host_allgather[i].packed_src_key, &src_unpacked);
             if (UCS_OK != ucs_status) {
-                tl_error(UCC_TL_TEAM_LIB(tl_team), "src rkey unpack failed\n");
-                return UCC_ERR_NO_RESOURCE;
+                tl_error(UCC_TL_TEAM_LIB(tl_team), "src rkey unpack failed");
+                return ucs_status_to_ucc_status(ucs_status);
             }
 
-            sw_task->allreduce_sliding_window.sbufs[i] =
+            sw_task->allreduce_sliding_window.bufs->sbufs[i] =
                 all_host_allgather[i].src_buf;
-            sw_task->allreduce_sliding_window.src_rkeys[i] = src_unpacked;
+            sw_task->allreduce_sliding_window.bufs->src_rkeys[i] = src_unpacked;
         } else {
-            sw_task->allreduce_sliding_window.sbufs =
-                sw_task->allreduce_sliding_window.rbufs;
-            sw_task->allreduce_sliding_window.src_rkeys =
-                sw_task->allreduce_sliding_window.dst_rkeys;
+            sw_task->allreduce_sliding_window.bufs->sbufs =
+                sw_task->allreduce_sliding_window.bufs->rbufs;
+            sw_task->allreduce_sliding_window.bufs->src_rkeys =
+                sw_task->allreduce_sliding_window.bufs->dst_rkeys;
         }
     }
 
@@ -254,43 +246,49 @@ ucc_tl_ucp_allreduce_sliding_window_free_task(ucc_coll_task_t *coll_task)
     int                   inplace = UCC_IS_INPLACE(coll_task->bargs.args);
     ucc_tl_ucp_context_t *tl_ctx  = UCC_TL_UCP_TEAM_CTX(tl_team);
 
-    if (!inplace) {
-        ucc_free(task->allreduce_sliding_window.sbufs);
+    if (task->allreduce_sliding_window.bufs) {
+        if (!inplace) {
+            if (task->allreduce_sliding_window.bufs->src_ebuf->memh != NULL) {
+                ucp_mem_unmap(tl_ctx->worker.ucp_context,
+                              task->allreduce_sliding_window.bufs->src_ebuf->memh);
+                task->allreduce_sliding_window.bufs->src_ebuf->memh = NULL;
+            }
+        }
+
+        if (task->allreduce_sliding_window.bufs->dst_ebuf->memh != NULL) {
+            ucp_mem_unmap(tl_ctx->worker.ucp_context,
+                          task->allreduce_sliding_window.bufs->dst_ebuf->memh);
+        }
+        ucc_free(task->allreduce_sliding_window.bufs);
     }
-
-    ucc_free(task->allreduce_sliding_window.rbufs);
-    ucc_free(task->allreduce_sliding_window.allgather_data);
-
-    if (!inplace) {
-        ucp_mem_unmap(tl_ctx->worker.ucp_context,
-                      task->allreduce_sliding_window.src_ebuf->memh);
-        ucc_free(task->allreduce_sliding_window.src_ebuf);
-        ucc_free(task->allreduce_sliding_window.src_rkeys);
-    }
-
-    ucp_mem_unmap(tl_ctx->worker.ucp_context,
-                  task->allreduce_sliding_window.dst_ebuf->memh);
-    ucc_free(task->allreduce_sliding_window.dst_ebuf);
-    ucc_free(task->allreduce_sliding_window.dst_rkeys);
 }
 
 void
 ucc_tl_ucp_allreduce_sliding_window_free_pipe(ucc_coll_task_t *coll_task)
 {
-    int                   i;
-    ucc_base_team_t      *team    = coll_task->team;
-    ucc_tl_ucp_team_t    *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_tl_ucp_task_t    *task    = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_allreduce_sw_pipeline *pipe =
+    ucc_base_team_t                  *team         = coll_task->team;
+    ucc_tl_ucp_team_t                *tl_team      =
+        ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_rank_t                        team_size    = UCC_TL_TEAM_SIZE(tl_team);
+    ucc_tl_ucp_task_t                *task         =
+        ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_allreduce_sw_pipeline *pipe         =
         task->allreduce_sliding_window.pipe;
-    int num_get_bufs =
+    int                               num_get_bufs =
         UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allreduce_sliding_window_num_get_bufs;
+    int                               i;
 
-    ucc_free(pipe->accbuf.buf);
-    for (i = 0; i < num_get_bufs; i++) {
-        ucc_free(pipe->getbuf[i].buf);
+    if (num_get_bufs == 0) {
+        num_get_bufs = team_size;
     }
-    ucc_free(pipe->getbuf);
-    ucc_free(pipe->put_requests);
-    ucc_free(pipe);
+
+    if (pipe) {
+        ucc_free(pipe->accbuf.buf);
+        for (i = 0; i < num_get_bufs; i++) {
+            ucc_free(pipe->getbuf[i].buf);
+        }
+        ucc_free(pipe->getbuf);
+        ucc_free(pipe->put_requests);
+        ucc_free(pipe);
+    }
 }

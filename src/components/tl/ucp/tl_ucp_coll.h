@@ -92,6 +92,8 @@ typedef struct ucc_tl_ucp_allreduce_sw_pipeline
     ucc_tl_ucp_allreduce_sw_pipeline;
 typedef struct ucc_tl_ucp_allreduce_sw_host_allgather
     ucc_tl_ucp_allreduce_sw_host_allgather;
+typedef struct ucc_tl_ucp_dpu_offload_buf_info
+    ucc_tl_ucp_dpu_offload_buf_info_t;
 
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
@@ -127,19 +129,12 @@ typedef struct ucc_tl_ucp_task {
             ucc_ee_executor_t      *executor;
         } allreduce_kn;
         struct {
-            int                                        reduce_in_progress;
-            ucp_rkey_h                                *src_rkeys; //unpacked
-            ucp_rkey_h                                *dst_rkeys; //unpacked
-            void                                     **sbufs;
-            void                                     **rbufs;
             ucc_tl_ucp_allreduce_sw_pipeline          *pipe;
-            ucc_ee_executor_task_t                    *reduce_task;
             ucs_status_ptr_t                          *put_requests;
-            ucc_coll_task_t                           *allgather_task;
             ucc_tl_ucp_allreduce_sw_host_allgather    *allgather_data;
-            ucc_coll_task_t                           *barrier_task;
-            struct ucc_tl_ucp_allreduce_sw_export_buf *src_ebuf;
-            struct ucc_tl_ucp_allreduce_sw_export_buf *dst_ebuf;
+            ucc_coll_task_t                           *allgather_task;
+            ucc_ee_executor_task_t                    *reduce_task;
+            ucc_tl_ucp_dpu_offload_buf_info_t         *bufs;
         } allreduce_sliding_window;
         struct {
             int                     phase;
