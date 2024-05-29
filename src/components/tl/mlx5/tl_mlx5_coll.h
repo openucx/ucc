@@ -16,7 +16,7 @@ typedef struct ucc_tl_mlx5_task {
     union {
         struct {
             ucc_tl_mlx5_mcast_coll_req_t *req_handle;
-        } bcast_mcast;
+        } coll_mcast;
     };
 } ucc_tl_mlx5_task_t;
 
@@ -79,7 +79,7 @@ ucc_tl_mlx5_get_task(ucc_base_coll_args_t *coll_args, ucc_base_team_t *team)
 
     UCC_TL_MLX5_PROFILE_REQUEST_NEW(task, "tl_mlx5_task", 0);
     ucc_coll_task_init(&task->super, coll_args, team);
-    task->bcast_mcast.req_handle = NULL;
+    task->coll_mcast.req_handle = NULL;
     return task;
 }
 

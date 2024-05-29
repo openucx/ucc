@@ -341,12 +341,6 @@ ucc_status_t ucc_tl_mlx5_mcast_prepare_reliable(ucc_tl_mlx5_mcast_coll_comm_t *c
     return UCC_OK;
 }
 
-static inline uint64_t ucc_tl_mlx5_mcast_get_timer(void)
-{
-    double t_second = ucc_get_time();
-    return (uint64_t) (t_second * 1000000);
-}
-
 ucc_status_t ucc_tl_mlx5_mcast_bcast_check_drop(ucc_tl_mlx5_mcast_coll_comm_t *comm,
                                                 ucc_tl_mlx5_mcast_coll_req_t *req)
 {

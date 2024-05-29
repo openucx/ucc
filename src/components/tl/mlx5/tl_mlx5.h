@@ -164,6 +164,7 @@ typedef struct ucc_tl_mlx5_rcache_region {
     ucc_tl_mlx5_reg_t   reg;
 } ucc_tl_mlx5_rcache_region_t;
 
+//TODO: add UCC_COLL_TYPE_ALLGATHER once mcast design is completed
 #define UCC_TL_MLX5_SUPPORTED_COLLS (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_BCAST)
 
 #define UCC_TL_MLX5_TEAM_LIB(_team)                                            \

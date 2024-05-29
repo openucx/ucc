@@ -88,9 +88,26 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.wsize),
      UCC_CONFIG_TYPE_INT},
 
+    {"MCAST_MAX_PUSH_SEND", "16", "Max number of concurrent send wq for mcast based allgather",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.max_push_send),
+     UCC_CONFIG_TYPE_INT},
+
     {"MCAST_MAX_EAGER", "65536", "Max msg size to be used for Mcast with the eager protocol",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.max_eager),
      UCC_CONFIG_TYPE_MEMUNITS},
+
+    {"MCAST_ONE_SIDED_RELIABILITY_ENABLE", "1", "Enable one sided reliability for mcast",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.one_sided_reliability_enable),
+     UCC_CONFIG_TYPE_INT},
+
+    {"MCAST_ZERO_COPY_ALLGATHER_ENABLE", "1", "Enable truly zero copy allgather design for mcast",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.truly_zero_copy_allgather_enabled),
+     UCC_CONFIG_TYPE_INT},
+
+    {"MCAST_ZERO_COPY_PREPOST_BUCKET_SIZE", "16", "Number of posted recvs during each stage of the pipeline"
+     " in truly zero copy mcast allgather design",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.mcast_prepost_bucket_size),
+     UCC_CONFIG_TYPE_INT},
 
     {NULL}};
 

@@ -258,10 +258,10 @@ ucc_status_t ucc_tl_mlx5_mcast_bcast_start(ucc_coll_task_t *coll_task)
     void                          *buf       = args->src.info.buffer;
     ucc_tl_mlx5_mcast_coll_comm_t *comm      = team->mcast_comm;
 
-    task->bcast_mcast.req_handle = NULL;
+    task->coll_mcast.req_handle = NULL;
 
     status = ucc_tl_mlx5_mcast_coll_do_bcast(buf, data_size, root, comm,
-                                             &task->bcast_mcast.req_handle);
+                                             &task->coll_mcast.req_handle);
     if (status < 0) {
         tl_error(UCC_TASK_LIB(task), "mcast_coll_do_bcast failed:%d", status);
         coll_task->status = status;
@@ -276,7 +276,7 @@ ucc_status_t ucc_tl_mlx5_mcast_bcast_start(ucc_coll_task_t *coll_task)
 void ucc_tl_mlx5_mcast_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_mlx5_task_t           *task   = ucc_derived_of(coll_task, ucc_tl_mlx5_task_t);
-    ucc_tl_mlx5_mcast_coll_req_t *req    = task->bcast_mcast.req_handle;
+    ucc_tl_mlx5_mcast_coll_req_t *req    = task->coll_mcast.req_handle;
 
     if (req != NULL) {
         coll_task->status = ucc_tl_mlx5_mcast_test(req);
