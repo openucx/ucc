@@ -663,7 +663,7 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
         tl_debug(comm->lib, "comm_id %d, comm_size %d, comm->psn %d, rank %d, "
                  "nacks counter %d, n_mcast_rel %d",
                  comm->comm_id, comm->commsize, comm->psn, comm->rank,
-                 comm->nacks_counter, comm->n_mcast_reliable);
+                 comm->bcast_comm.nacks_counter, comm->bcast_comm.n_mcast_reliable);
     }
 
     if (comm->p2p_ctx != NULL) {

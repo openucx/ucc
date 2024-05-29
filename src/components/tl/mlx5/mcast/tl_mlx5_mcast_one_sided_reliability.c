@@ -169,6 +169,13 @@ ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_init(ucc_base_team_t *team)
     ucc_tl_mlx5_mcast_coll_comm_t *comm     = tl_team->mcast->mcast_comm;
     ucc_status_t                   status   = UCC_OK;
 
+    if (comm->commsize > ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE) {
+        tl_warn(comm->lib,
+                "team size is %d but max supported team size of mcast one-sided reliability is %d",
+                comm->commsize, ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     status = ucc_tl_mlx5_mcast_one_sided_setup_reliability_buffers(team);
     if (status != UCC_OK) {
         tl_error(comm->lib, "setup reliablity resources failed");

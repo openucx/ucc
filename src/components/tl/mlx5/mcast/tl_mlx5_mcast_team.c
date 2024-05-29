@@ -99,11 +99,14 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     memcpy(&comm->params, conf_params, sizeof(*conf_params));
 
-    comm->wsize              = conf_params->wsize;
-    comm->max_eager          = conf_params->max_eager;
-    comm->cuda_mem_enabled   = conf_params->cuda_mem_enabled;
-    comm->comm_id            = team_params->id;
-    comm->ctx                = mcast_context;
+    comm->one_sided.reliability_enabled = conf_params->one_sided_reliability_enable;
+    comm->bcast_comm.wsize              = conf_params->wsize;
+    comm->allgather_comm.max_push_send  = conf_params->max_push_send;
+    comm->max_eager                     = conf_params->max_eager;
+    comm->cuda_mem_enabled              = conf_params->cuda_mem_enabled;
+    comm->comm_id                       = team_params->id;
+    comm->ctx                           = mcast_context;
+    comm->mcast_group_count             = 1; /* TODO: add support for more number of mcast groups */
 
     if (comm->cuda_mem_enabled && (UCC_OK != ucc_tl_mlx5_check_gpudirect_driver())) {
         tl_warn(mcast_context->lib, "cuda-aware mcast not available as gpu direct is not ready");
@@ -130,20 +133,20 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
         goto cleanup;
     }
 
-    comm->rank           = team_params->rank;
-    comm->commsize       = team_params->size;
-    comm->max_per_packet = mcast_context->mtu - GRH_LENGTH;
-    comm->last_acked     = comm->last_psn = 0;
-    comm->racks_n        = comm->sacks_n  = 0;
-    comm->child_n        = comm->parent_n = 0;
-    comm->p2p_ctx        = conf_params->oob;
+    comm->rank                  = team_params->rank;
+    comm->commsize              = team_params->size;
+    comm->max_per_packet        = mcast_context->mtu - GRH_LENGTH;
+    comm->bcast_comm.last_acked = comm->bcast_comm.last_psn = 0;
+    comm->bcast_comm.racks_n    = comm->bcast_comm.sacks_n  = 0;
+    comm->bcast_comm.child_n    = comm->bcast_comm.parent_n = 0;
+    comm->p2p_ctx               = conf_params->oob;
 
     memcpy(&comm->p2p, &conf_params->p2p_iface,
             sizeof(ucc_tl_mlx5_mcast_p2p_interface_t));
 
     comm->dummy_packet.psn = UINT32_MAX;
 
-    for (i=0; i< comm->wsize; i++) {
+    for (i=0; i< comm->bcast_comm.wsize; i++) {
         comm->r_window[i] = &comm->dummy_packet;
     }
 
@@ -284,15 +287,14 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
         goto error;
     }
 
-    memset(comm->parents,  0, sizeof(comm->parents));
-    memset(comm->children, 0, sizeof(comm->children));
+    memset(comm->bcast_comm.parents,  0, sizeof(comm->bcast_comm.parents));
+    memset(comm->bcast_comm.children, 0, sizeof(comm->bcast_comm.children));
 
-    comm->nacks_counter                = 0;
-    comm->tx                           = 0;
-    comm->n_prep_reliable              = 0;
-    comm->n_mcast_reliable             = 0;
-    comm->reliable_in_progress         = 0;
-    comm->recv_drop_packet_in_progress = 0;
+    comm->bcast_comm.nacks_counter                = 0;
+    comm->bcast_comm.n_mcast_reliable             = 0;
+    comm->bcast_comm.reliable_in_progress         = 0;
+    comm->bcast_comm.recv_drop_packet_in_progress = 0;
+    comm->tx                                      = 0;
 
     return status;
 

@@ -33,14 +33,27 @@
 #define GRH_LENGTH        40
 #define DROP_THRESHOLD    10000
 #define MAX_COMM_POW2     32
+#define MAX_GROUP_COUNT   64
 
 /* Allgather RDMA-based reliability designs */
-#define ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE 1024
-#define ONE_SIDED_NO_RELIABILITY            0
-#define ONE_SIDED_SYNCHRONOUS_PROTO         1
-#define ONE_SIDED_ASYNCHRONOUS_PROTO        2
+#define ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE 1024u
 #define ONE_SIDED_SLOTS_COUNT               2                /* number of memory slots during async design */
 #define ONE_SIDED_SLOTS_INFO_SIZE           sizeof(uint32_t) /* size of metadata prepended to each slots in bytes */
+#define ONE_SIDED_MAX_ALLGATHER_COUNTER     32u
+#define ONE_SIDED_MAX_CONCURRENT_LEVEL      64
+
+enum ucc_tl_mlx5_mcast_one_sided_slot_states {
+    ONE_SIDED_INVALID = -4,
+    ONE_SIDED_VALID,
+    ONE_SIDED_PENDING_INFO,
+    ONE_SIDED_PENDING_DATA,
+};
+
+enum ucc_tl_mlx5_mcast_one_sided_reliability_scheme {
+    ONE_SIDED_NO_RELIABILITY = 0,
+    ONE_SIDED_SYNCHRONOUS_PROTO,
+    ONE_SIDED_ASYNCHRONOUS_PROTO
+};
 
 #define CUDA_MEM_MCAST_BCAST_MAX_MSG 4000
 
@@ -90,7 +103,7 @@ typedef struct ucc_tl_mlx5_mcast_p2p_interface {
     ucc_tl_mlx5_mcast_p2p_recv_nb_fn_t  recv_nb;
 } ucc_tl_mlx5_mcast_p2p_interface_t;
 
-typedef struct mcast_coll_comm_init_spec {
+typedef struct ucc_tl_mlx5_mcast_coll_comm_init_spec {
     ucc_tl_mlx5_mcast_p2p_interface_t p2p_iface;
     int                               sx_depth;
     int                               rx_depth;
@@ -100,8 +113,10 @@ typedef struct mcast_coll_comm_init_spec {
     int                               post_recv_thresh;
     int                               scq_moderation;
     int                               wsize;
+    int                               max_push_send;
     int                               max_eager;
     int                               cuda_mem_enabled;
+    int                               one_sided_reliability_enable;
     void                             *oob;
 } ucc_tl_mlx5_mcast_coll_comm_init_spec_t;
 
@@ -152,6 +167,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_context {
     struct rdma_cm_id             *id;
     struct rdma_event_channel     *channel;
     ucc_mpool_t                    compl_objects_mp;
+    ucc_mpool_t                    mcast_req_mp;
     ucc_list_link_t                pending_nacks_list;
     ucc_rcache_t                  *rcache;
     ucc_tl_mlx5_mcast_ctx_params_t params;
@@ -168,7 +184,6 @@ typedef struct ucc_tl_mlx5_mcast_context {
     ucc_thread_mode_t                  tm;
     ucc_tl_mlx5_mcast_coll_context_t   mcast_context;
     ucc_tl_mlx5_mcast_context_config_t cfg;
-    ucc_mpool_t                        req_mp;
     int                                mcast_enabled;
     int                                mcast_ctx_ready;
     ucc_tl_mlx5_mcast_oob_ctx_t        oob_ctx;
@@ -178,19 +193,28 @@ struct pp_packet {
     ucc_list_link_t super;
     uint32_t        psn;
     int             length;
+    int             packet_counter;
     uintptr_t       context;
-    uintptr_t       buf;
+    int             qp_id;
+    uintptr_t       buf; // buffer address, initialized once
 };
 
 struct mcast_ctx {
-    struct ibv_qp     *qp;
-    struct ibv_ah     *ah;
-    struct ibv_send_wr swr;
-    struct ibv_sge     ssg;
+    struct ibv_qp      *qp;
+    struct ibv_ah      *ah;
+    struct ibv_send_wr  swr;
+    struct ibv_sge      ssg;
+
     // RC connection info for supporing one-sided based relibality
     struct ibv_qp     **rc_qp;
     uint16_t           *rc_lid;
     union ibv_gid      *rc_gid;
+
+    // multiple mcast group
+    struct ibv_qp      **qp_list;
+    struct ibv_ah      **ah_list;
+    struct ibv_send_wr  *swr_list;
+    struct ibv_sge      *ssg_list;
 };
 
 struct packet {
@@ -219,21 +243,25 @@ typedef struct ucc_tl_mlx5_mcast_one_sided_reliability_comm {
     /* holds all the remote-addr/rkey of sendbuf from processes in the team
      * used in sync design. it needs to be set during each mcast-allgather call
      * after sendbuf registration */
-    ucc_tl_mlx5_mcast_slot_mem_info_t          *sendbuf_memkey_list;
+    ucc_tl_mlx5_mcast_slot_mem_info_t           *sendbuf_memkey_list;
     /* counter for each target recv packet */
-    uint32_t                                   *recvd_pkts_tracker;
+    uint32_t                                    *recvd_pkts_tracker;
     /* holds the remote targets' collective call counter. it is used to check
      * if remote temp slot is ready for RDMA READ in async design */
-    uint32_t                                   *remote_slot_info;
-    struct ibv_mr                              *remote_slot_info_mr;
-    int                                         reliability_scheme_msg_threshold;
+    uint32_t                                    *remote_slot_info;
+    struct ibv_mr                               *remote_slot_info_mr;
+    int                                          reliability_scheme_msg_threshold;
     /* mem address and mem keys of the temp slots in async design */
-    char                                       *slots_buffer;
-    struct ibv_mr                              *slots_mr;
+    char                                        *slots_buffer;
+    struct ibv_mr                               *slots_mr;
     /* size of a temp slot in async design */
-    int                                         slot_size;
+    int                                          slot_size;
     /* coll req that is used during the oob service calls */
-    ucc_service_coll_req_t                     *reliability_req;
+    ucc_service_coll_req_t                      *reliability_req;
+    int                                          reliability_enabled;
+    int                                          reliability_ready;
+    int                                          rdma_read_in_progress;
+    enum ucc_tl_mlx5_mcast_one_sided_slot_states slots_state;
 } ucc_tl_mlx5_mcast_one_sided_reliability_comm_t;
 
 typedef struct ucc_tl_mlx5_mcast_service_coll {
@@ -242,6 +270,32 @@ typedef struct ucc_tl_mlx5_mcast_service_coll {
     ucc_status_t (*barrier_post) (void*, ucc_service_coll_req_t**);
     ucc_status_t (*coll_test) (ucc_service_coll_req_t*);
 } ucc_tl_mlx5_mcast_service_coll_t;
+
+typedef struct ucc_tl_mlx5_mcast_allgather_comm {
+    uint32_t under_progress_counter;
+    uint32_t coll_counter;
+    uint32_t max_num_packets;
+    uint32_t max_push_send;
+} ucc_tl_mlx5_mcast_allgather_comm_t;
+
+typedef struct ucc_tl_mlx5_mcast_bcast_comm {
+    uint32_t      last_psn;
+    uint32_t      racks_n;
+    uint32_t      sacks_n;
+    uint32_t      last_acked;
+    uint32_t      child_n;
+    uint32_t      parent_n;
+    struct packet p2p_pkt[MAX_COMM_POW2];
+    struct packet p2p_spkt[MAX_COMM_POW2];
+    int           reliable_in_progress;
+    int           recv_drop_packet_in_progress;
+    ucc_rank_t    parents[MAX_COMM_POW2];
+    ucc_rank_t    children[MAX_COMM_POW2];
+    int           nack_requests;
+    int           nacks_counter;
+    int           n_mcast_reliable;
+    int           wsize;
+} ucc_tl_mlx5_mcast_bcast_comm_t;
 
 typedef struct ucc_tl_mlx5_mcast_coll_comm {
     struct pp_packet                                dummy_packet;
@@ -268,21 +322,11 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     ucc_mc_buffer_header_t                         *pp_buf_header;
     struct pp_packet                               *pp;
     uint32_t                                        psn;
-    uint32_t                                        last_psn;
-    uint32_t                                        racks_n;
-    uint32_t                                        sacks_n;
-    uint32_t                                        last_acked;
-    uint32_t                                        naks_n;
-    uint32_t                                        child_n;
-    uint32_t                                        parent_n;
     int                                             buf_n;
-    struct packet                                   p2p_pkt[MAX_COMM_POW2];
-    struct packet                                   p2p_spkt[MAX_COMM_POW2];
     ucc_list_link_t                                 bpool;
     ucc_list_link_t                                 pending_q;
+    ucc_list_link_t                                 posted_q;
     struct mcast_ctx                                mcast;
-    int                                             reliable_in_progress;
-    int                                             recv_drop_packet_in_progress;
     struct ibv_recv_wr                             *call_rwr;
     struct ibv_sge                                 *call_rsgs;
     uint64_t                                        timer;
@@ -291,19 +335,16 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     void                                           *p2p_ctx;
     ucc_base_lib_t                                 *lib;
     struct sockaddr_in6                             mcast_addr;
-    ucc_rank_t                                      parents[MAX_COMM_POW2];
-    ucc_rank_t                                      children[MAX_COMM_POW2];
-    int                                             nack_requests;
-    int                                             nacks_counter;
-    int                                             n_prep_reliable;
-    int                                             n_mcast_reliable;
-    int                                             wsize;
     int                                             cuda_mem_enabled;
     ucc_tl_mlx5_mcast_join_info_t                  *group_setup_info;
     ucc_service_coll_req_t                         *group_setup_info_req;
     ucc_tl_mlx5_mcast_service_coll_t                service_coll;
     struct rdma_cm_event                           *event;
     ucc_tl_mlx5_mcast_one_sided_reliability_comm_t  one_sided;
+    int                                             mcast_group_count;
+    int                                             pending_recv_per_qp[MAX_GROUP_COUNT];
+    ucc_tl_mlx5_mcast_allgather_comm_t              allgather_comm;
+    ucc_tl_mlx5_mcast_bcast_comm_t                  bcast_comm;
     struct pp_packet                               *r_window[1]; // note: do not add any new variable after here
 } ucc_tl_mlx5_mcast_coll_comm_t;
 
@@ -320,54 +361,86 @@ typedef struct ucc_tl_mlx5_mcast_nack_req {
     ucc_tl_mlx5_mcast_coll_comm_t *comm;
 } ucc_tl_mlx5_mcast_nack_req_t;
 
-#define PSN_IS_IN_RANGE(_psn, _call, _comm)                                         \
-                             (                                                      \
-                                ((_psn >= _call->start_psn) &&                      \
-                                (_psn < _call->start_psn + _call->num_packets) &&   \
-                                (_psn >= _comm->last_acked) &&                      \
-                                (_psn < _comm->last_acked + _comm->wsize))          \
+#define PSN_IS_IN_RANGE(_psn, _call, _comm)                                                       \
+                             (                                                                    \
+                                ((_psn >= _call->start_psn) &&                                    \
+                                (_psn < _call->start_psn + _call->num_packets) &&                 \
+                                (_psn >= _comm->bcast_comm.last_acked) &&                         \
+                                (_psn < _comm->bcast_comm.last_acked + _comm->bcast_comm.wsize))  \
                              )
 
-#define PSN_TO_RECV_OFFSET(_psn, _call, _comm)                                      \
-                             (                                                      \
-                                ((ptrdiff_t)((_psn - _call->start_psn)              \
-                                 * (_comm->max_per_packet)))                        \
+#define PSN_TO_RECV_OFFSET(_psn, _call, _comm)                                                    \
+                             (                                                                    \
+                                ((ptrdiff_t)((_psn - _call->start_psn)                            \
+                                 * (_comm->max_per_packet)))                                      \
                              )
 
-#define PSN_TO_RECV_LEN(_psn, _call, _comm)                                         \
-                             (                                                      \
-                                ((_psn - _call->start_psn + 1) %                    \
-                                 _call->num_packets == 0 ? _call->last_pkt_len :    \
-                                 _comm->max_per_packet)                             \
+#define PSN_TO_RECV_LEN(_psn, _call, _comm)                                                       \
+                             (                                                                    \
+                                ((_psn - _call->start_psn + 1) %                                  \
+                                 _call->num_packets == 0 ? _call->last_pkt_len :                  \
+                                 _comm->max_per_packet)                                           \
                              )
 
-#define PSN_RECEIVED(_psn, _comm)                                                   \
-                             (                                                      \
-                                (_comm->r_window[(_psn) %                           \
-                                 _comm->wsize]->psn == (_psn))                      \
+#define PSN_RECEIVED(_psn, _comm)                                                                 \
+                             (                                                                    \
+                                (_comm->r_window[(_psn) %                                         \
+                                 _comm->bcast_comm.wsize]->psn == (_psn))                         \
                              )
+
+typedef struct ucc_tl_mlx5_mcast_tensor {
+    int    group_id;
+    size_t offset;
+    size_t offset_left;
+    int    root;
+    int    count;
+    int    to_recv;
+    int    to_send_left;
+} ucc_tl_mlx5_mcast_tensor_t;
+
+typedef struct ucc_tl_mlx5_mcast_pipelined_ag_schedule {
+   ucc_tl_mlx5_mcast_tensor_t multicast_op[ONE_SIDED_MAX_CONCURRENT_LEVEL];
+   ucc_tl_mlx5_mcast_tensor_t prepost_buf_op[ONE_SIDED_MAX_CONCURRENT_LEVEL];
+   int                        prepost_buf_op_done;
+   int                        multicast_op_done;
+   int                        total_steps;
+   int                        num_recvd;
+   int                        to_recv;
+   int                        to_send;
+} ucc_tl_mlx5_mcast_pipelined_ag_schedule_t;
 
 typedef struct ucc_tl_mlx5_mcast_coll_req {
-    ucc_tl_mlx5_mcast_coll_comm_t  *comm;
-    size_t                          length; /* bcast buffer size */
-    int                             proto;
-    struct ibv_mr                  *mr;
-    struct ibv_recv_wr             *rwr;
-    struct ibv_sge                 *rsgs;
-    void                           *rreg;
-    char                           *ptr;
-    int                             am_root;
-    ucc_rank_t                      root;
-    void                          **rbufs;
-    int                             first_send_psn;
-    int                             to_send;
-    int                             to_recv;
-    ucc_rank_t                      parent;
-    uint32_t                        start_psn;
-    int                             num_packets;
-    int                             last_pkt_len;
-    int                             offset;
-    ucc_memory_type_t               buf_mem_type;
+    ucc_tl_mlx5_mcast_coll_comm_t                      *comm;
+    size_t                                              length;
+    int                                                 proto;
+    struct ibv_mr                                      *mr;
+    struct ibv_mr                                      *recv_mr;
+    struct ibv_recv_wr                                 *rwr;
+    struct ibv_sge                                     *rsgs;
+    void                                               *rreg;
+    char                                               *ptr;
+    char                                               *rptr;
+    int                                                 am_root;
+    ucc_rank_t                                          root;
+    void                                              **rbufs;
+    int                                                 first_send_psn;
+    int                                                 to_send;
+    int                                                 to_recv;
+    ucc_rank_t                                          parent;
+    uint32_t                                            start_psn;
+    int                                                 num_packets;
+    int                                                 last_pkt_len;
+    int                                                 offset;
+    ucc_memory_type_t                                   buf_mem_type;
+    enum ucc_tl_mlx5_mcast_one_sided_reliability_scheme one_sided_reliability_scheme;
+    uint32_t                                            ag_counter;
+    int                                                 state;
+    ucc_tl_mlx5_mcast_pipelined_ag_schedule_t          *ag_schedule;
+    int                                                 total_steps;
+    int                                                 step;
+    ucc_service_coll_req_t                             *allgather_rkeys_req;
+    ucc_service_coll_req_t                             *barrier_req;
+    void                                               *recv_rreg;
 } ucc_tl_mlx5_mcast_coll_req_t;
 
 typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {
@@ -422,6 +495,61 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_recv_buffers(ucc_tl_mlx5_mcast
             return UCC_ERR_NO_RESOURCE;
         }
         comm->pending_recv += i;
+    }
+
+    return UCC_OK;
+}
+
+static inline uint64_t ucc_tl_mlx5_mcast_get_timer(void)
+{
+    double t_second = ucc_get_time();
+    return (uint64_t) (t_second * 1000000);
+}
+
+static inline ucc_status_t ucc_tl_mlx5_mcast_post_user_recv_buffers(ucc_tl_mlx5_mcast_coll_comm_t *comm,
+                                                                    ucc_tl_mlx5_mcast_coll_req_t  *req,
+                                                                    int group_id, ucc_rank_t root,
+                                                                    int coll_type,
+                                                                    int count,
+                                                                    size_t offset)
+{
+    struct ibv_recv_wr *bad_wr = NULL;
+    struct ibv_recv_wr *rwr    = comm->call_rwr;
+    struct ibv_sge     *sge    = comm->call_rsgs;
+    struct pp_packet   *pp     = NULL;
+    uint32_t            i;
+
+    for (i = 0; i < count; i++) {
+        if (NULL == (pp = ucc_tl_mlx5_mcast_buf_get_free(comm))) {
+            tl_error(comm->lib, "not enought free pp packets to cover the entire message");
+            return UCC_ERR_NO_RESOURCE;
+        }
+
+        assert(offset % comm->max_per_packet == 0);
+        pp->packet_counter = offset / comm->max_per_packet;
+        pp->qp_id          = group_id;
+        rwr[i].wr_id       = ((uint64_t) pp);
+        sge[2*i + 1].addr  = (uint64_t)req->rptr + root * req->length + offset;
+        sge[2*i + 1].lkey  = req->recv_mr->lkey;
+        offset            += comm->max_per_packet;
+
+        if (i == count - 1) {
+            sge[2*i + 1].length = req->last_pkt_len;
+        } else {
+            sge[2*i + 1].length = comm->max_per_packet;
+            rwr[i].next         = &rwr[i+1];
+        }
+    }
+
+    if (i > 0) {
+        rwr[i-1].next = NULL;
+        if (ibv_post_recv(comm->mcast.qp_list[group_id], &rwr[0], &bad_wr)) {
+            tl_error(comm->lib, "Failed to prepost recvs: errno %d buffer count %d",
+                    errno, i);
+            return UCC_ERR_NO_RESOURCE;
+        }
+        comm->pending_recv                  += i;
+        comm->pending_recv_per_qp[group_id] += i;
     }
 
     return UCC_OK;
