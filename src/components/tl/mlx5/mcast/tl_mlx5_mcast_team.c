@@ -88,11 +88,15 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     memcpy(&comm->params, conf_params, sizeof(*conf_params));
 
-    comm->wsize     = conf_params->wsize;
-    comm->max_eager = conf_params->max_eager;
-    comm->comm_id   = team_params->id;
-    comm->ctx       = mcast_context;
-    comm->grh_buf   = (char *)ucc_malloc(GRH_LENGTH * sizeof(char), "grh_buf");
+    comm->one_sided.reliability_enabled     = conf_params->one_sided_reliability_enable;
+    comm->wsize                             = conf_params->wsize;
+    comm->max_push_send                     = conf_params->max_push_send;
+    comm->max_eager                         = conf_params->max_eager;
+    comm->comm_id                           = team_params->id;
+    comm->ctx                               = mcast_context;
+    comm->mcast_group_count                 = 1; /* TODO: add support for more number of mcast groups */
+
+    comm->grh_buf = (char *)ucc_malloc(GRH_LENGTH * sizeof(char), "grh_buf");
     if (!comm->grh_buf) {
         status = UCC_ERR_NO_MEMORY;
         goto cleanup;
