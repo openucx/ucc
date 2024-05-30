@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -148,6 +148,7 @@ typedef struct ucc_tl_ucp_task {
             ucc_mc_buffer_header_t *scratch_mc_header;
             ucc_ee_executor_task_t *etask;
             ucc_ee_executor_t      *executor;
+            size_t                  max_seg;
         } reduce_scatter_kn;
         struct {
             void                   *scratch;

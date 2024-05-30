@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -357,6 +357,9 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
         switch (alg_id) {
         case UCC_TL_UCP_REDUCE_SCATTER_ALG_RING:
             *init = ucc_tl_ucp_reduce_scatter_ring_init;
+            break;
+        case UCC_TL_UCP_REDUCE_SCATTER_ALG_KNOMIAL:
+            *init = ucc_tl_ucp_reduce_scatter_knomial_init;
             break;
         default:
             status = UCC_ERR_INVALID_PARAM;

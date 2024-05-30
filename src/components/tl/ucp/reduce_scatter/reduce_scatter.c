@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -14,5 +14,9 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_REDUCE_SCATTER_ALG_RING,
              .name = "ring",
              .desc = "O(N) ring"},
+        [UCC_TL_UCP_REDUCE_SCATTER_ALG_KNOMIAL] =
+            {.id   = UCC_TL_UCP_REDUCE_SCATTER_ALG_KNOMIAL,
+             .name = "knomial",
+             .desc = "recursive k-ing with arbitrary radix"},
         [UCC_TL_UCP_REDUCE_SCATTER_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};

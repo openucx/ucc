@@ -1,8 +1,9 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
+
 #ifndef REDUCE_SCATTER_H_
 #define REDUCE_SCATTER_H_
 #include "tl_ucp_coll.h"
@@ -10,6 +11,7 @@
 enum
 {
     UCC_TL_UCP_REDUCE_SCATTER_ALG_RING,
+    UCC_TL_UCP_REDUCE_SCATTER_ALG_KNOMIAL,
     UCC_TL_UCP_REDUCE_SCATTER_ALG_LAST
 };
 
