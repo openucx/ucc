@@ -200,21 +200,22 @@ static inline void get_rs_work_buf(ucc_tl_ucp_task_t *task,
 
 void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t     *task            = ucc_derived_of(coll_task,
-                                                            ucc_tl_ucp_task_t);
-    ucc_coll_args_t       *args            = &TASK_ARGS(task);
-    ucc_tl_ucp_team_t     *team            = TASK_TEAM(task);
-    ucc_knomial_pattern_t *p               = &task->reduce_scatter_kn.p;
-    ucc_kn_radix_t         radix           = p->radix;
-    uint8_t                node_type       = p->node_type;
-    ucc_memory_type_t      mem_type        = args->dst.info.mem_type;
-    size_t                 count           = GET_COUNT(args);
-    ucc_datatype_t         dt              = GET_DT(args);
-    size_t                 dt_size         = ucc_dt_size(dt);
-    size_t                 data_size       = count * dt_size;
-    ucc_rank_t             rank            = task->subset.myrank;
-    ucc_rank_t             size            = task->subset.map.ep_num;
-    size_t                 local_seg_count = 0;
+    ucc_tl_ucp_task_t        *task            = ucc_derived_of(coll_task,
+                                                               ucc_tl_ucp_task_t);
+    ucc_coll_args_t          *args            = &TASK_ARGS(task);
+    ucc_tl_ucp_team_t        *team            = TASK_TEAM(task);
+    ucc_knomial_pattern_t    *p               = &task->reduce_scatter_kn.p;
+    ucc_kn_radix_t            radix           = p->radix;
+    uint8_t                   node_type       = p->node_type;
+    ucc_memory_type_t         mem_type        = args->dst.info.mem_type;
+    size_t                    count           = GET_COUNT(args);
+    ucc_datatype_t            dt              = GET_DT(args);
+    size_t                    dt_size         = ucc_dt_size(dt);
+    size_t                    data_size       = count * dt_size;
+    ucc_rank_t                rank            = task->subset.myrank;
+    ucc_rank_t                size            = task->subset.map.ep_num;
+    size_t                    local_seg_count = 0;
+    ucc_tl_ucp_rs_work_buf_t  wb              = (ucc_tl_ucp_rs_work_buf_t){0};
     ptrdiff_t                peer_seg_offset, local_seg_offset;
     ucc_rank_t               peer;
     ucc_status_t             status;
@@ -222,7 +223,6 @@ void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     size_t                   block_count, peer_seg_count;
     void                    *local_data;
     int                      is_avg;
-    ucc_tl_ucp_rs_work_buf_t wb;
 
     UCC_KN_REDUCE_GOTO_PHASE(task->reduce_scatter_kn.phase);
     block_count = ucc_sra_kn_compute_block_count(count, rank, p);
