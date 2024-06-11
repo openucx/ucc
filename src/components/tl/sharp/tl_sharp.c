@@ -19,10 +19,10 @@ static ucc_config_field_t ucc_tl_sharp_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_sharp_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
 
-    {"USE_INTERNAL_OOB", "n",
+    {"USE_INTERNAL_OOB", "try",
      "Use service team to create sharp context",
      ucc_offsetof(ucc_tl_sharp_lib_config_t, use_internal_oob),
-     UCC_CONFIG_TYPE_BOOL},
+     UCC_CONFIG_TYPE_TERNARY},
 
     {NULL}};
 

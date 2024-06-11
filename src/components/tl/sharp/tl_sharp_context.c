@@ -92,7 +92,7 @@ static int ucc_tl_sharp_oob_bcast(void *arg, void *buf, int size, int root)
     ucc_status_t            status;
     void                   *req, *tmp_rbuf;
 
-    tmp_rbuf = ucc_malloc(msg_size * oob_coll->n_oob_eps, "tmp_barrier");
+    tmp_rbuf = ucc_malloc(msg_size * oob_coll->n_oob_eps, "tmp_bcast");
     if (!tmp_rbuf) {
         tl_error(ctx->super.super.lib,
                  "failed to allocate %zd bytes for tmp barrier array",
@@ -322,7 +322,7 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
     init_spec.enable_thread_support          =
                     (sharp_ctx->tm == UCC_THREAD_MULTIPLE) ? 1 : 0;
 
-    if (lib->cfg.use_internal_oob) {
+    if (lib->cfg.use_internal_oob != UCC_NO && sharp_ctx->super.super.ucc_context->service_team) {
         tl_debug(sharp_ctx->super.super.lib,
                  "using internal oob.  rank:%u size:%lu",
                  oob_ctx->subset.myrank, oob_ctx->subset.map.ep_num);
@@ -428,7 +428,7 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
     set.myrank     = UCC_TL_CTX_OOB(sharp_ctx).oob_ep;
     set.map.ep_num = UCC_TL_CTX_OOB(sharp_ctx).n_oob_eps;
 
-    if (lib->cfg.use_internal_oob) {
+    if (lib->cfg.use_internal_oob != UCC_NO && core_ctx->service_team) {
         sharp_ctx->oob_ctx.subset = set;
     } else {
         sharp_ctx->oob_ctx.oob = &UCC_TL_CTX_OOB(sharp_ctx);
