@@ -55,13 +55,3 @@ ucc_status_t ucc_tl_ucp_allreduce_knomial_init(ucc_base_coll_args_t *coll_args,
 out:
     return status;
 }
-
-ucc_status_t
-ucc_tl_ucp_allreduce_sliding_window_init(ucc_base_coll_args_t __attribute__((unused)) *coll_args, //NOLINT
-                                         ucc_base_team_t __attribute__((unused)) *team, //NOLINT
-                                         ucc_coll_task_t __attribute__((unused)) **task_h) //NOLINT
-{
-    ucc_coll_task_t *coll_task = NULL;
-    ucc_tl_ucp_allreduce_sliding_window_progress(coll_task);
-    return UCC_OK;
-}
