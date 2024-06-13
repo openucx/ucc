@@ -13,6 +13,17 @@
 #include "mcast/tl_mlx5_mcast_helper.h"
 #include "mcast/tl_mlx5_mcast_service_coll.h"
  
+static ucc_status_t ucc_tl_mlx5_check_gpudirect_driver()
+{
+    const char  *file   = "/sys/kernel/mm/memory_peers/nv_mem/version";
+
+    if (!access(file, F_OK)) {
+        return UCC_OK;
+    }
+
+    return UCC_ERR_NO_RESOURCE;
+}
+
 ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
                                          ucc_tl_mlx5_mcast_team_t **mcast_team,
                                          ucc_tl_mlx5_mcast_context_t *ctx,
@@ -88,23 +99,14 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     memcpy(&comm->params, conf_params, sizeof(*conf_params));
 
-    comm->wsize     = conf_params->wsize;
-    comm->max_eager = conf_params->max_eager;
-    comm->comm_id   = team_params->id;
-    comm->ctx       = mcast_context;
-    comm->grh_buf   = (char *)ucc_malloc(GRH_LENGTH * sizeof(char), "grh_buf");
-    if (!comm->grh_buf) {
-        status = UCC_ERR_NO_MEMORY;
-        goto cleanup;
-    }
+    comm->wsize              = conf_params->wsize;
+    comm->max_eager          = conf_params->max_eager;
+    comm->cuda_mem_enabled   = conf_params->cuda_mem_enabled;
+    comm->comm_id            = team_params->id;
+    comm->ctx                = mcast_context;
 
-    memset(comm->grh_buf, 0, GRH_LENGTH);
-    
-    comm->grh_mr = ibv_reg_mr(mcast_context->pd, comm->grh_buf, GRH_LENGTH,
-                              IBV_ACCESS_REMOTE_WRITE |
-                              IBV_ACCESS_LOCAL_WRITE);
-    if (!comm->grh_mr) {
-        tl_error(mcast_context->lib, "could not register memory for GRH, errno %d", errno);
+    if (comm->cuda_mem_enabled && (UCC_OK != ucc_tl_mlx5_check_gpudirect_driver())) {
+        tl_warn(mcast_context->lib, "cuda-aware mcast not available as gpu direct is not ready");
         status = UCC_ERR_NO_RESOURCE;
         goto cleanup;
     }
@@ -162,9 +164,10 @@ cleanup:
 
 ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_comm_t *comm)
 {
-    ucc_status_t status;
-    size_t       page_size;
-    int          buf_size, i, ret;
+    ucc_status_t      status;
+    size_t            page_size;
+    int               buf_size, i, ret;
+    ucc_memory_type_t supported_mem_type;
 
     status = ucc_tl_mlx5_mcast_init_qps(comm->ctx, comm);
     if (UCC_OK != status) {
@@ -197,19 +200,47 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
     comm->pending_recv = 0;
     comm->buf_n        = comm->params.rx_depth * 2;
 
-    ret = posix_memalign((void**) &comm->pp_buf, page_size, buf_size * comm->buf_n);
-    if (ret) {
-        tl_error(comm->ctx->lib, "posix_memalign failed");
-        return UCC_ERR_NO_MEMORY;
+    supported_mem_type = comm->cuda_mem_enabled ? UCC_MEMORY_TYPE_CUDA
+                                                : UCC_MEMORY_TYPE_HOST;
+
+    comm->grh_buf = ucc_malloc(GRH_LENGTH * sizeof(char), "grh");
+    if (ucc_unlikely(!comm->grh_buf)) {
+        tl_error(comm->ctx->lib, "failed to allocate grh memory");
+        return status;
     }
 
-    memset(comm->pp_buf, 0, buf_size * comm->buf_n);
-    
+    status = ucc_mc_memset(comm->grh_buf, 0, GRH_LENGTH, UCC_MEMORY_TYPE_HOST);
+    if (status != UCC_OK) {
+        tl_error(comm->ctx->lib, "could not cuda memset");
+        goto error;
+    }
+
+    comm->grh_mr = ibv_reg_mr(comm->ctx->pd, comm->grh_buf, GRH_LENGTH,
+                              IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
+    if (!comm->grh_mr) {
+        tl_error(comm->ctx->lib, "could not register device memory for GRH, errno %d", errno);
+        status = UCC_ERR_NO_RESOURCE;
+        goto error;
+    }
+
+    status = ucc_mc_alloc(&comm->pp_buf_header, buf_size * comm->buf_n, supported_mem_type);
+    comm->pp_buf = comm->pp_buf_header->addr;
+    if (ucc_unlikely(status != UCC_OK)) {
+        tl_error(comm->ctx->lib, "failed to allocate cuda memory");
+        goto error;
+    }
+
+    status = ucc_mc_memset(comm->pp_buf, 0, buf_size * comm->buf_n, supported_mem_type);
+    if (status != UCC_OK) {
+        tl_error(comm->ctx->lib, "could not memset");
+        goto error;
+    }
+
     comm->pp_mr = ibv_reg_mr(comm->ctx->pd, comm->pp_buf, buf_size * comm->buf_n,
                              IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
     if (!comm->pp_mr) {
-        tl_error(comm->ctx->lib, "could not register pp_buf mr, errno %d", errno);
-        status = UCC_ERR_NO_MEMORY;
+        tl_error(comm->ctx->lib, "could not register pp_buf device mr, errno %d", errno);
+        status = UCC_ERR_NO_RESOURCE;
         goto error;
     }
 

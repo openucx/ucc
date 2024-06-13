@@ -132,6 +132,7 @@ ucc_status_t ucc_mc_get_attr(ucc_mc_attr_t *attr, ucc_memory_type_t mem_type)
     return mc->get_attr(attr);
 }
 
+/* TODO: add the flexbility to bypass the mpool if the user asks for it */
 UCC_MC_PROFILE_FUNC(ucc_status_t, ucc_mc_alloc, (h_ptr, size, mem_type),
                     ucc_mc_buffer_header_t **h_ptr, size_t size,
                     ucc_memory_type_t mem_type)

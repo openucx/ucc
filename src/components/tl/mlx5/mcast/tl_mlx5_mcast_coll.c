@@ -283,6 +283,23 @@ void ucc_tl_mlx5_mcast_collective_progress(ucc_coll_task_t *coll_task)
     }
 }
 
+ucc_status_t ucc_tl_mlx5_mcast_check_memory_type_cap(ucc_base_coll_args_t *coll_args,
+                                                     ucc_base_team_t *team)
+{
+    ucc_tl_mlx5_team_t            *mlx5_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
+    ucc_tl_mlx5_mcast_coll_comm_t *comm      = mlx5_team->mcast->mcast_comm;
+    ucc_coll_args_t               *args      = &coll_args->args;
+
+    if ((comm->cuda_mem_enabled &&
+            args->src.info.mem_type == UCC_MEMORY_TYPE_CUDA) ||
+        (!comm->cuda_mem_enabled &&
+                args->src.info.mem_type == UCC_MEMORY_TYPE_HOST)) {
+        return UCC_OK;
+    }
+        
+    return UCC_ERR_NO_RESOURCE;
+}
+
 ucc_status_t ucc_tl_mlx5_mcast_bcast_init(ucc_tl_mlx5_task_t *task)
 {
     task->super.post     = ucc_tl_mlx5_mcast_bcast_start;
