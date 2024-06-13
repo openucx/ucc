@@ -14,6 +14,7 @@ enum {
     UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR,
     UCC_TL_UCP_ALLGATHER_ALG_BRUCK,
     UCC_TL_UCP_ALLGATHER_ALG_SPARBIT,
+    UCC_TL_UCP_ALLGATHER_ALG_XGVMI,
     UCC_TL_UCP_ALLGATHER_ALG_LAST
 };
 
@@ -71,6 +72,11 @@ ucc_status_t ucc_tl_ucp_allgather_bruck_finalize(ucc_coll_task_t *coll_task);
 
 /* Sparbit */
 ucc_status_t ucc_tl_ucp_allgather_sparbit_init(ucc_base_coll_args_t *coll_args,
+                                                ucc_base_team_t      *team,
+                                                ucc_coll_task_t     **task_h);
+
+/* XGVMI */
+ucc_status_t ucc_tl_ucp_allgather_xgvmi_init(ucc_base_coll_args_t *coll_args,
                                                 ucc_base_team_t      *team,
                                                 ucc_coll_task_t     **task_h);
 
