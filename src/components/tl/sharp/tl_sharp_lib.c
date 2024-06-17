@@ -36,7 +36,7 @@ ucc_status_t ucc_tl_sharp_get_lib_attr(const ucc_base_lib_t *lib,
 
     attr->super.flags = 0;
     if (lib != NULL) {
-        if (sharp_lib->cfg.use_internal_oob) {
+        if (sharp_lib->cfg.use_internal_oob == UCC_YES) {
             attr->super.flags |= UCC_BASE_LIB_FLAG_CTX_SERVICE_TEAM_REQUIRED;
         }
     }
