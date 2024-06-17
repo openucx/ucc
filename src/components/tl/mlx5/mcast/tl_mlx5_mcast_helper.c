@@ -300,7 +300,7 @@ ucc_status_t ucc_tl_mlx5_mcast_init_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
         return UCC_ERR_NO_RESOURCE;
     }
 
-    if (comm->device_mem_enabled) {
+    if (comm->cuda_mem_enabled) {
         /* max inline send otherwise it segfault during ibv send */
         comm->max_inline = 0;
     } else {
@@ -482,7 +482,7 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
     }
 
     if (comm->grh_buf) {
-        if (comm->device_mem_enabled) {
+        if (comm->cuda_mem_enabled) {
             cudaFree(comm->grh_buf);
         } else {
             ucc_free(comm->grh_buf);
@@ -502,7 +502,7 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
     }
 
     if (comm->pp_buf) {
-        if (comm->device_mem_enabled) {
+        if (comm->cuda_mem_enabled) {
             cudaFree(comm->pp_buf);
         } else {
             ucc_free(comm->pp_buf);

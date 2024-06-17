@@ -75,7 +75,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
         if (zcopy) {
             pp->context = (uintptr_t) PTR_OFFSET(req->ptr, offset);
         } else {
-            if (comm->device_mem_enabled) {
+            if (comm->cuda_mem_enabled) {
                 CUDA_FUNC(cudaMemcpy((void*) pp->buf, PTR_OFFSET(req->ptr, offset),
                                      length, cudaMemcpyDeviceToDevice));
             } else {

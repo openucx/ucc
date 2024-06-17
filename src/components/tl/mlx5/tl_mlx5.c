@@ -92,8 +92,8 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.max_eager),
      UCC_CONFIG_TYPE_MEMUNITS},
 
-    {"MCAST_DEVICE_MEM_ENABLE", "0", "Enable GPU memory support for Mcast",
-     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.device_mem_enabled),
+    {"MCAST_CUDA_MEM_ENABLE", "0", "Enable GPU CUDA memory support for Mcast. GPUDirect RDMA must be enabled",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.cuda_mem_enabled),
      UCC_CONFIG_TYPE_INT},
 
     {NULL}};

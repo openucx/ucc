@@ -120,7 +120,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     comm->wsize              = conf_params->wsize;
     comm->max_eager          = conf_params->max_eager;
-    comm->device_mem_enabled = conf_params->device_mem_enabled;
+    comm->cuda_mem_enabled   = conf_params->cuda_mem_enabled;
     comm->comm_id            = team_params->id;
     comm->ctx                = mcast_context;
 
@@ -212,7 +212,7 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
     comm->pending_recv = 0;
     comm->buf_n        = comm->params.rx_depth * 2;
 
-    if (comm->device_mem_enabled) {
+    if (comm->cuda_mem_enabled) {
         /* TODO add check to make sure GPUDirect is enabled
          * lsmod | grep nv_peer */
         CUDA_FUNC(cudaMalloc((void **)&comm->grh_buf, GRH_LENGTH * sizeof(char)));
@@ -232,7 +232,6 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
             goto error;
         }
 
-        // assuming the device page size is same as host page size
         CUDA_FUNC(cudaMalloc((void**) &comm->pp_buf, buf_size * comm->buf_n));
         if (!comm->pp_buf) {
             tl_error(comm->ctx->lib, "cuda memcpy failed");

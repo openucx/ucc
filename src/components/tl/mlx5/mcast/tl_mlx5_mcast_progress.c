@@ -379,7 +379,7 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet(ucc_tl_mlx5_mcast_coll_comm_t *com
 
     if (pp->length > 0 ) {
         dest = req->ptr + PSN_TO_RECV_OFFSET(pp->psn, req, comm);
-        if (comm->device_mem_enabled) {
+        if (comm->cuda_mem_enabled) {
             cudaMemcpy(dest, (void*) pp->buf, pp->length, cudaMemcpyDeviceToDevice);
         } else {
             memcpy(dest, (void*) pp->buf, pp->length);
