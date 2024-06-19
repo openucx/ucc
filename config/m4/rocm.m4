@@ -4,6 +4,17 @@
 # See file LICENSE for terms.
 #
 
+ROCM_ARCH_NATIVE="--offload-arch=native"
+ROCM_ARCH908="--offload-arch=gfx908"
+ROCM_ARCH90A="--offload-arch=gfx90a"
+ROCM_ARCH94="--offload-arch=gfx940 \
+--offload-arch=gfx941 \
+--offload-arch=gfx942"
+ROCM_ARCH10="--offload-arch=gfx1030"
+ROCM_ARCH11="--offload-arch=gfx1100 \
+--offload-arch=gfx1101 \
+--offload-arch=gfx1102"
+
 # ROCM_PARSE_FLAGS(ARG, VAR_LIBS, VAR_LDFLAGS, VAR_CPPFLAGS)
 # ----------------------------------------------------------
 # Parse whitespace-separated ARG into appropriate LIBS, LDFLAGS, and
@@ -73,7 +84,12 @@ AC_ARG_WITH([rocm],
         [Enable the use of ROCm (default is autodetect).])],
     [],
     [with_rocm=guess])
-
+AC_ARG_WITH([rocm-arch],
+    [AS_HELP_STRING([--with-rocm-arch=arch-code],
+        [Defines target GPU architecture,
+            see rocm documentation for valid --offload-arch options for details
+            'all-arch-no-native' for all default architectures but not native])],
+        [], [with_rocm_arch=all])
 rocm_happy=no
 hip_happy=no
 AS_IF([test "x$with_rocm" != "xno"],
@@ -115,15 +131,26 @@ AS_IF([test "x$with_rocm" != "xno"],
            AC_SUBST([ROCM_ROOT])],
           [AC_MSG_WARN([ROCm not found])])
 
+
+    # Check whether we run on ROCm 6.0 or higher
+    CHECK_ROCM_VERSION(6, ROCM_VERSION_60_OR_GREATER)
+    AC_MSG_CHECKING([if ROCm version is 6.0 or above])
+
+    AS_IF([test "x$rocm_happy" = "xyes"],
+        [AS_IF([test "x$with_rocm_arch" = "xall"],
+          [ROCM_ARCH="${ROCM_ARCH908} ${ROCM_ARCH90A} ${ROCM_ARCH94} ${ROCM_ARCH10} ${ROCM_ARCH11} ${ROCM_ARCH_NATIVE}"],
+        [AS_IF([test "x$with_rocm_arch" = "xall-arch-no-native"],
+          [ROCM_ARCH="${ROCM_ARCH908} ${ROCM_ARCH90A} ${ROCM_ARCH94} ${ROCM_ARCH10} ${ROCM_ARCH11}"],
+        [ROCM_ARCH="$with_rocm_arch"])])
+        AS_IF([test "$ROCM_VERSION_60_OR_GREATER" = "1"],
+          AC_SUBST([ROCM_ARCH], ["$ROCM_ARCH"]),
+          AC_SUBST([ROCM_ARCH], [""]))])
     CPPFLAGS="$SAVE_CPPFLAGS"
     LDFLAGS="$SAVE_LDFLAGS"
     LIBS="$SAVE_LIBS"
 
     HIP_BUILD_FLAGS([$with_rocm], [HIP_LIBS], [HIP_LDFLAGS], [HIP_CPPFLAGS])
 
-    # Check whether we run on ROCm 6.0 or higher
-    CHECK_ROCM_VERSION(6, ROCM_VERSION_60_OR_GREATER)
-    AC_MSG_CHECKING([if ROCm version is 6.0 or above])
     if test "$ROCM_VERSION_60_OR_GREATER" = "1" ; then
         AC_MSG_RESULT([yes])
     else

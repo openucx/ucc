@@ -17,10 +17,10 @@ HIPCCFLAGS =                                     \
 LINK = $(LIBTOOL) --mode=link $(CC) -o $@
 
 .cu.o:
-	$(HIPCC) -c $< -o $@  $(HIPCCFLAGS)
+	$(HIPCC) -c $< -o $@  $(ROCM_ARCH) $(HIPCCFLAGS)
 
 .cu.lo:
-	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(HIPCC) -c  $< $(HIPCCFLAGS)
+	/bin/bash $(top_srcdir)/cuda_lt.sh "$(LIBTOOL)" $@ $(HIPCC) -c  $< $(ROCM_ARCH) $(HIPCCFLAGS)
 
 comp_noinst = libucc_ec_rocm_kernels.la
 

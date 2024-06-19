@@ -265,6 +265,9 @@ AC_MSG_NOTICE([      C++ compiler:   ${CXX} ${CXXFLAGS} ${BASE_CXXFLAGS}])
 AS_IF([test "x$cuda_happy" = "xyes"],[
 AC_MSG_NOTICE([     NVCC gencodes:   ${NVCC_ARCH}])
 ])
+AS_IF([test "x$rocm_happy" = xyes],[
+AC_MSG_NOTICE([ROCM architectures:   ${ROCM_ARCH}])
+])
 AC_MSG_NOTICE([          Perftest:   ${mpi_enable}])
 AC_MSG_NOTICE([             Gtest:   ${gtest_enable}])
 AC_MSG_NOTICE([        MC modules:   <$(echo ${mc_modules}|tr ':' ' ') >])
