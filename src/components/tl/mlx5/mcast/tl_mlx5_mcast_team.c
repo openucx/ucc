@@ -118,26 +118,11 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     memcpy(&comm->params, conf_params, sizeof(*conf_params));
 
-    comm->wsize     = conf_params->wsize;
-    comm->max_eager = conf_params->max_eager;
-    comm->comm_id   = team_params->id;
-    comm->ctx       = mcast_context;
-    comm->grh_buf   = (char *)ucc_malloc(GRH_LENGTH * sizeof(char), "grh_buf");
-    if (!comm->grh_buf) {
-        status = UCC_ERR_NO_MEMORY;
-        goto cleanup;
-    }
-
-    memset(comm->grh_buf, 0, GRH_LENGTH);
-    
-    comm->grh_mr = ibv_reg_mr(mcast_context->pd, comm->grh_buf, GRH_LENGTH,
-                              IBV_ACCESS_REMOTE_WRITE |
-                              IBV_ACCESS_LOCAL_WRITE);
-    if (!comm->grh_mr) {
-        tl_error(mcast_context->lib, "could not register memory for GRH, errno %d", errno);
-        status = UCC_ERR_NO_RESOURCE;
-        goto cleanup;
-    }
+    comm->wsize              = conf_params->wsize;
+    comm->max_eager          = conf_params->max_eager;
+    comm->cuda_mem_enabled   = conf_params->cuda_mem_enabled;
+    comm->comm_id            = team_params->id;
+    comm->ctx                = mcast_context;
 
     comm->rcq = ibv_create_cq(mcast_context->ctx, comm->params.rx_depth, NULL, NULL, 0);
     if (!comm->rcq) {
@@ -227,20 +212,76 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
     comm->pending_recv = 0;
     comm->buf_n        = comm->params.rx_depth * 2;
 
-    ret = posix_memalign((void**) &comm->pp_buf, page_size, buf_size * comm->buf_n);
-    if (ret) {
-        tl_error(comm->ctx->lib, "posix_memalign failed");
-        return UCC_ERR_NO_MEMORY;
-    }
+    if (comm->cuda_mem_enabled) {
+        /* TODO add check to make sure GPUDirect is enabled
+         * lsmod | grep nv_peer */
+        CUDA_FUNC(cudaMalloc((void **)&comm->grh_buf, GRH_LENGTH * sizeof(char)));
+        if (!comm->grh_buf) {
+            tl_error(comm->ctx->lib, "cuda memcpy failed");
+            status = UCC_ERR_NO_MEMORY;
+            goto error;
+        }
 
-    memset(comm->pp_buf, 0, buf_size * comm->buf_n);
-    
-    comm->pp_mr = ibv_reg_mr(comm->ctx->pd, comm->pp_buf, buf_size * comm->buf_n,
-                             IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
-    if (!comm->pp_mr) {
-        tl_error(comm->ctx->lib, "could not register pp_buf mr, errno %d", errno);
-        status = UCC_ERR_NO_MEMORY;
-        goto error;
+        CUDA_FUNC(cudaMemset(comm->grh_buf, 0, GRH_LENGTH));
+
+        comm->grh_mr = ibv_reg_mr(comm->ctx->pd, comm->grh_buf, GRH_LENGTH,
+                                  IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
+        if (!comm->grh_mr) {
+            tl_error(comm->ctx->lib, "Could not register device memory for GRH, errno %d", errno);
+            status = UCC_ERR_NO_RESOURCE;
+            goto error;
+        }
+
+        CUDA_FUNC(cudaMalloc((void**) &comm->pp_buf, buf_size * comm->buf_n));
+        if (!comm->pp_buf) {
+            tl_error(comm->ctx->lib, "cuda memcpy failed");
+            status = UCC_ERR_NO_MEMORY;
+            goto error;
+        }
+
+        CUDA_FUNC(cudaMemset(comm->pp_buf, 0, buf_size * comm->buf_n));
+
+        comm->pp_mr = ibv_reg_mr(comm->ctx->pd, comm->pp_buf, buf_size * comm->buf_n,
+                                 IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE |
+                                 IBV_ACCESS_REMOTE_READ);
+        if (!comm->pp_mr) {
+            tl_error(comm->ctx->lib, "Could not register pp_buf device mr, errno %d", errno);
+            status = UCC_ERR_NO_RESOURCE;
+            goto error;
+        }
+    } else {
+        comm->grh_buf = (char *)ucc_malloc(GRH_LENGTH * sizeof(char), "grh_buf");
+        if (!comm->grh_buf) {
+            status = UCC_ERR_NO_MEMORY;
+            goto error;
+        }
+        memset(comm->grh_buf, 0, GRH_LENGTH);
+
+        comm->grh_mr = ibv_reg_mr(comm->ctx->pd, comm->grh_buf, GRH_LENGTH,
+                                  IBV_ACCESS_REMOTE_WRITE |
+                                  IBV_ACCESS_LOCAL_WRITE);
+        if (!comm->grh_mr) {
+            tl_error(comm->ctx->lib, "could not register memory for GRH, errno %d", errno);
+            status = UCC_ERR_NO_RESOURCE;
+            goto error;
+        }
+
+        ret = posix_memalign((void**) &comm->pp_buf, page_size, buf_size * comm->buf_n);
+        if (ret) {
+            tl_error(comm->ctx->lib, "posix_memalign failed");
+            status = UCC_ERR_NO_MEMORY;
+            goto error;
+        }
+
+        memset(comm->pp_buf, 0, buf_size * comm->buf_n);
+        
+        comm->pp_mr = ibv_reg_mr(comm->ctx->pd, comm->pp_buf, buf_size * comm->buf_n,
+                                 IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
+        if (!comm->pp_mr) {
+            tl_error(comm->ctx->lib, "could not register pp_buf mr, errno %d", errno);
+            status = UCC_ERR_NO_MEMORY;
+            goto error;
+        }
     }
 
     ret = posix_memalign((void**) &comm->pp, page_size, sizeof(struct

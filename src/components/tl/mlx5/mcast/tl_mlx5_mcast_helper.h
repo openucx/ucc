@@ -75,7 +75,12 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
         if (zcopy) {
             pp->context = (uintptr_t) PTR_OFFSET(req->ptr, offset);
         } else {
-            memcpy((void*) pp->buf, PTR_OFFSET(req->ptr, offset), length);
+            if (comm->cuda_mem_enabled) {
+                CUDA_FUNC(cudaMemcpy((void*) pp->buf, PTR_OFFSET(req->ptr, offset),
+                                     length, cudaMemcpyDeviceToDevice));
+            } else {
+                memcpy((void*) pp->buf, PTR_OFFSET(req->ptr, offset), length);
+            }
             ssg[0].addr = (uint64_t) pp->buf;
         }
 
