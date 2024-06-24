@@ -377,6 +377,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_context_t,
         goto err;
     }
 
+    if (params->params.oob.n_oob_eps < 2) {
+        status = UCC_ERR_NOT_SUPPORTED;
+        goto err;
+    }
+
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_sharp_config->super,
                               params->context);
     memcpy(&self->cfg, tl_sharp_config, sizeof(*tl_sharp_config));
@@ -434,6 +439,7 @@ ucc_status_t ucc_tl_sharp_context_create_epilog(ucc_base_context_t *context)
         sharp_ctx->oob_ctx.oob = &UCC_TL_CTX_OOB(sharp_ctx);
     }
 
+    ucc_assert(core_ctx->topo != NULL);
     status = ucc_topo_init(set, core_ctx->topo, &topo);
     if (UCC_OK != status) {
         tl_error(sharp_ctx->super.super.lib, "failed to init topo");
