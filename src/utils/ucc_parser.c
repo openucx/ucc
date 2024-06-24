@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -698,7 +698,15 @@ static ucc_pipeline_params_t ucc_pipeline_params_default = {
 
 int ucc_pipeline_params_is_auto(const ucc_pipeline_params_t *p)
 {
-    return 0 == memcmp(p, &ucc_pipeline_params_auto, sizeof(*p));
+    if ((p->threshold == ucc_pipeline_params_auto.threshold) &&
+        (p->n_frags == ucc_pipeline_params_auto.n_frags) &&
+        (p->frag_size == ucc_pipeline_params_auto.frag_size) &&
+        (p->pdepth == ucc_pipeline_params_auto.pdepth) &&
+        (p->order == ucc_pipeline_params_auto.order)) {
+        return 1;
+    }
+
+    return 0;
 }
 
 int ucc_config_sscanf_pipeline_params(const char *buf, void *dest,
