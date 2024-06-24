@@ -393,6 +393,140 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
     return UCC_OK;
 }
 
+ucc_status_t ucc_tl_mlx5_mcast_create_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
+                                             ucc_tl_mlx5_mcast_coll_comm_t *comm)
+{
+    int                      i = 0, j = 0;
+    struct ibv_srq_init_attr srq_init_attr;
+    struct ibv_qp_init_attr  qp_init_attr;
+
+    /* create srq for this RC connection */
+    memset(&srq_init_attr, 0, sizeof(srq_init_attr));
+    srq_init_attr.attr.max_wr  = comm->params.rx_depth;
+    srq_init_attr.attr.max_sge = 2;
+
+    comm->srq = ibv_create_srq(ctx->pd, &srq_init_attr);
+    if (!comm->srq) {
+        tl_error(ctx->lib, "ibv_create_srq() failed");
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    comm->mcast.rc_qp = ucc_calloc(1, comm->commsize * sizeof(struct ibv_qp *), "ibv_qp* list");
+    if (!comm->mcast.rc_qp) {
+        tl_error(ctx->lib, "failed to allocate memory for ibv_qp*");
+        goto failed;
+    }
+
+    /* create RC qp */
+    for (i = 0; i < comm->commsize; i++) {
+        memset(&qp_init_attr, 0, sizeof(qp_init_attr));
+
+        qp_init_attr.srq                 = comm->srq;
+        qp_init_attr.qp_type             = IBV_QPT_RC;
+        qp_init_attr.send_cq             = comm->scq;
+        qp_init_attr.recv_cq             = comm->rcq;
+        qp_init_attr.sq_sig_all          = 0;
+        qp_init_attr.cap.max_send_wr     = comm->params.sx_depth;
+        qp_init_attr.cap.max_recv_wr     = 0; // has srq
+        qp_init_attr.cap.max_inline_data = 0;
+        qp_init_attr.cap.max_send_sge    = comm->params.sx_sge;
+        qp_init_attr.cap.max_recv_sge    = comm->params.rx_sge;
+
+        comm->mcast.rc_qp[i] = ibv_create_qp(ctx->pd, &qp_init_attr);
+        if (!comm->mcast.rc_qp[i]) {
+            tl_error(ctx->lib, "Failed to create mcast RC qp index %d, errno %d", i, errno);
+            goto failed;
+        }
+    }
+
+    return UCC_OK;
+
+failed:
+    for (j=0; j<i; j++) {
+        if (ibv_destroy_qp(comm->mcast.rc_qp[j])) {
+            tl_error(comm->lib, "ibv_destroy_qp failed");
+            return UCC_ERR_NO_RESOURCE;
+        }
+    }
+    
+    if (ibv_destroy_srq(comm->srq)) {
+        tl_error(comm->lib, "ibv_destroy_srq failed");
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    ucc_free(comm->mcast.rc_qp);
+    
+    return UCC_ERR_NO_RESOURCE;
+}
+
+ucc_status_t ucc_tl_mlx5_mcast_modify_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
+                                             ucc_tl_mlx5_mcast_coll_comm_t *comm)
+{
+    ucc_rank_t         my_rank = comm->rank;
+    struct ibv_qp_attr attr;
+    int                i;
+
+    for (i = 0; i < comm->commsize; i++) {
+        memset(&attr, 0, sizeof(attr));
+         
+        attr.qp_state        = IBV_QPS_INIT;
+        attr.pkey_index      = 0;
+        attr.port_num        = ctx->ib_port;
+        attr.qp_access_flags = IBV_ACCESS_REMOTE_WRITE |
+                               IBV_ACCESS_REMOTE_READ  |
+                               IBV_ACCESS_REMOTE_ATOMIC;
+
+        if (ibv_modify_qp(comm->mcast.rc_qp[i], &attr,
+                          IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT |
+                          IBV_QP_ACCESS_FLAGS)) {
+            tl_error(ctx->lib, "Failed to move rc qp to INIT, errno %d", errno);
+            return UCC_ERR_NO_RESOURCE;
+        }
+
+        memset(&attr, 0, sizeof(attr));
+
+        attr.qp_state              = IBV_QPS_RTR;
+        attr.path_mtu              = IBV_MTU_4096;
+        attr.dest_qp_num           = comm->one_sided.info[i].rc_qp_num[my_rank];
+        attr.rq_psn                = DEF_PSN;
+        attr.max_dest_rd_atomic	   = 16;
+        attr.min_rnr_timer         = 12;
+        attr.ah_attr.is_global     = 0;
+        attr.ah_attr.dlid          = comm->mcast.rc_lid[i];
+        attr.ah_attr.dlid          = comm->one_sided.info[i].port_lid;
+        attr.ah_attr.sl            = DEF_SL;
+        attr.ah_attr.src_path_bits = 0;
+        attr.ah_attr.port_num      = ctx->ib_port;
+
+        tl_debug(comm->lib, "Connecting to rc qp to rank %d with lid %d qp_num %d port_num %d",
+                i, attr.ah_attr.dlid, attr.dest_qp_num, attr.ah_attr.port_num);
+
+        if (ibv_modify_qp(comm->mcast.rc_qp[i], &attr,
+                          IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN
+                          | IBV_QP_RQ_PSN | IBV_QP_MAX_DEST_RD_ATOMIC | IBV_QP_MIN_RNR_TIMER)) {
+            tl_error(ctx->lib, "Failed to modify rc QP index %d to RTR, errno %d", i, errno);
+            return UCC_ERR_NO_RESOURCE;
+        }
+
+        memset(&attr, 0, sizeof(attr));
+
+        attr.qp_state      = IBV_QPS_RTS;
+        attr.sq_psn        = DEF_PSN;
+        attr.timeout       = 14;
+        attr.retry_cnt     = 7;
+        attr.rnr_retry     = 7; /* infinite */
+        attr.max_rd_atomic = 1;
+        if (ibv_modify_qp(comm->mcast.rc_qp[i], &attr,
+                          IBV_QP_STATE | IBV_QP_SQ_PSN | IBV_QP_TIMEOUT |
+                          IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY | IBV_QP_MAX_QP_RD_ATOMIC)) {
+            tl_error(ctx->lib, "Failed to modify rc QP index %i to RTS, errno %d", i, errno);
+            return UCC_ERR_NO_RESOURCE;
+        }
+    }
+
+    return UCC_OK;
+}
+
 ucc_status_t ucc_tl_mlx5_fini_mcast_group(ucc_tl_mlx5_mcast_coll_context_t *ctx,
                                           ucc_tl_mlx5_mcast_coll_comm_t    *comm)
 {

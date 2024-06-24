@@ -139,3 +139,81 @@ ucc_status_t ucc_tl_mlx5_mcast_p2p_recv_nb(void *dst, size_t size, ucc_rank_t
 
     return status;
 }
+
+ucc_status_t ucc_tl_mlx5_one_sided_p2p_put(void* src, void* remote_addr, size_t length,
+                                           uint32_t lkey, uint32_t rkey, ucc_rank_t target_rank,
+                                           uint64_t wr_id, ucc_tl_mlx5_mcast_coll_comm_t *comm)
+{
+    struct ibv_send_wr  swr = {0};
+    struct ibv_sge      ssg = {0};
+    struct ibv_send_wr *bad_wr;
+    int                 rc;
+
+    if (UINT32_MAX < length) {
+        tl_error(comm->lib, "msg too large for p2p put");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    ssg.addr                = (uint64_t)src;
+    ssg.length              = (uint32_t)length;
+    ssg.lkey                = lkey;
+    swr.sg_list             = &ssg;
+    swr.num_sge             = 1;
+
+    swr.opcode              = IBV_WR_RDMA_WRITE;
+    swr.wr_id               = wr_id;
+    swr.send_flags          = IBV_SEND_SIGNALED;
+    swr.wr.rdma.remote_addr = (uint64_t)remote_addr;
+    swr.wr.rdma.rkey        = rkey;
+    swr.next                = NULL;
+
+    tl_trace(comm->lib, "RDMA WRITE to rank %d size length %ld remote address %p rkey %d lkey %d src %p",
+             target_rank, length, remote_addr, rkey, lkey, src);
+
+    if (0 != (rc = ibv_post_send(comm->mcast.rc_qp[target_rank], &swr, &bad_wr))) {
+        tl_error(comm->lib, "RDMA Write failed rc %d rank %d remote addresss %p rkey %d",
+                 rc, target_rank, remote_addr, rkey);
+        return UCC_ERR_NO_MESSAGE;
+    }
+
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_mlx5_one_sided_p2p_get(void* src, void* remote_addr, size_t length,
+                                           uint32_t lkey, uint32_t rkey, ucc_rank_t target_rank,
+                                           uint64_t wr_id, ucc_tl_mlx5_mcast_coll_comm_t *comm)
+{
+    struct ibv_send_wr  swr = {0};
+    struct ibv_sge      ssg = {0};
+    struct ibv_send_wr *bad_wr;
+    int                 rc;
+
+    if (UINT32_MAX < length) {
+        tl_error(comm->lib, "msg too large for p2p get");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    ssg.addr                = (uint64_t)src;
+    ssg.length              = (uint32_t)length;
+    ssg.lkey                = lkey;
+    swr.sg_list             = &ssg;
+    swr.num_sge             = 1;
+
+    swr.opcode              = IBV_WR_RDMA_READ;
+    swr.wr_id               = wr_id;
+    swr.send_flags          = IBV_SEND_SIGNALED;
+    swr.wr.rdma.remote_addr = (uint64_t)remote_addr;
+    swr.wr.rdma.rkey        = rkey;
+    swr.next                = NULL;
+
+    tl_trace(comm->lib, "RDMA READ to rank %d size length %ld remote address %p rkey %d lkey %d src %p",
+             target_rank, length, remote_addr, rkey, lkey, src);
+
+    if (0 != (rc = ibv_post_send(comm->mcast.rc_qp[target_rank], &swr, &bad_wr))) {
+        tl_error(comm->lib, "RDMA Read failed rc %d rank %d remote addresss %p rkey %d",
+                 rc, target_rank, remote_addr, rkey);
+        return UCC_ERR_NO_MESSAGE;
+    }
+
+    return UCC_OK;
+}

@@ -216,7 +216,8 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
         }
     }
 
-    ctx->mtu = active_mtu;
+    ctx->mtu      = active_mtu;
+    ctx->port_lid = port_attr.lid;
 
     tl_debug(ctx->lib, "port active MTU is %d and port max MTU is %d",
              active_mtu, max_mtu);

@@ -273,6 +273,9 @@ AS_IF([test "x$cuda_happy" = "xyes"],[
 AC_MSG_NOTICE([     NVCC gencodes:   ${NVCC_ARCH}])
 ])
 AC_MSG_NOTICE([ DOCA UROM enabled:   ${doca_urom_happy}])
+AS_IF([test "x$rocm_happy" = xyes],[
+AC_MSG_NOTICE([ROCM architectures:   ${ROCM_ARCH}])
+])
 AC_MSG_NOTICE([          Perftest:   ${mpi_enable}])
 AC_MSG_NOTICE([             Gtest:   ${gtest_enable}])
 AC_MSG_NOTICE([        MC modules:   <$(echo ${mc_modules}|tr ':' ' ') >])
