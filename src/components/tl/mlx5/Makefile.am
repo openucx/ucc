@@ -12,19 +12,23 @@ alltoall =                      \
 	alltoall/alltoall_inline.h  \
 	alltoall/alltoall_coll.c
 
-mcast =                                 \
-	mcast/tl_mlx5_mcast_context.c       \
-	mcast/tl_mlx5_mcast.h               \
-	mcast/tl_mlx5_mcast_coll.c          \
-	mcast/tl_mlx5_mcast_coll.h          \
-	mcast/tl_mlx5_mcast_rcache.h        \
-	mcast/tl_mlx5_mcast_rcache.c        \
-	mcast/p2p/ucc_tl_mlx5_mcast_p2p.h   \
-	mcast/p2p/ucc_tl_mlx5_mcast_p2p.c   \
-	mcast/tl_mlx5_mcast_progress.h      \
-	mcast/tl_mlx5_mcast_progress.c      \
-	mcast/tl_mlx5_mcast_helper.h        \
-	mcast/tl_mlx5_mcast_helper.c        \
+mcast =                                         \
+	mcast/tl_mlx5_mcast_context.c               \
+	mcast/tl_mlx5_mcast.h                       \
+	mcast/tl_mlx5_mcast_coll.c                  \
+	mcast/tl_mlx5_mcast_coll.h                  \
+	mcast/tl_mlx5_mcast_rcache.h                \
+	mcast/tl_mlx5_mcast_rcache.c                \
+	mcast/p2p/ucc_tl_mlx5_mcast_p2p.h           \
+	mcast/p2p/ucc_tl_mlx5_mcast_p2p.c           \
+	mcast/tl_mlx5_mcast_progress.h              \
+	mcast/tl_mlx5_mcast_progress.c              \
+	mcast/tl_mlx5_mcast_helper.h                \
+	mcast/tl_mlx5_mcast_helper.c                \
+	mcast/tl_mlx5_mcast_service_coll.h          \
+	mcast/tl_mlx5_mcast_service_coll.c          \
+	mcast/tl_mlx5_mcast_one_sided_reliability.h \
+	mcast/tl_mlx5_mcast_one_sided_reliability.c \
 	mcast/tl_mlx5_mcast_team.c
 
 sources =             \
