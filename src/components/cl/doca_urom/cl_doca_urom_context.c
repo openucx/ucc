@@ -47,6 +47,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
     int ucp_index                             = -1;
     int num_envs                              = 0;
     char **envs                               = NULL;
+    size_t plugins_count                      = 0;
+    struct doca_log_backend *sdk_log          = NULL;
     const ucc_cl_doca_urom_context_config_t *cl_config     =
             ucc_derived_of(config, ucc_cl_doca_urom_context_config_t);
     ucc_cl_doca_urom_lib_t                  *doca_urom_lib =
@@ -57,21 +59,19 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
         .mask        = UCC_LIB_PARAM_FIELD_THREAD_MODE,
         .thread_mode = UCC_THREAD_SINGLE,
     };
-    ucc_tl_ucp_context_t   *tl_ctx;
-    enum doca_ctx_states    state;
-    struct export_buf       ebuf;
-    ucc_status_t            status;
-    ucs_status_t            ucs_status;
-    ucc_rank_t              rank;
-    uint64_t                rank_u64;
-    void                   *buffer;
-    int                     ret;
-    char                   *plugin_name;
-    char                   *device;
     const struct doca_urom_service_plugin_info *plugins;
-    size_t plugins_count                           = 0;
-    size_t i;
-    struct doca_log_backend *sdk_log               = NULL;
+    ucc_tl_ucp_context_t                       *tl_ctx;
+    enum doca_ctx_states                        state;
+    struct export_buf                           ebuf;
+    ucc_status_t                                status;
+    ucs_status_t                                ucs_status;
+    ucc_rank_t                                  rank;
+    uint64_t                                    rank_u64;
+    size_t                                      i;
+    void                                       *buffer;
+    int                                         ret;
+    char                                       *plugin_name;
+    char                                       *device;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_context_t, &cl_config->super,
                               params->context);
@@ -435,11 +435,11 @@ dev_close:
 
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_doca_urom_context_t)
 {
-    struct ucc_cl_doca_urom_result res  = {0};
-    union doca_data cookie = {0};
-    doca_error_t result    = DOCA_SUCCESS;
-    int        i, ret;
-    ucc_rank_t rank;
+    struct ucc_cl_doca_urom_result res    = {0};
+    union doca_data                cookie = {0};
+    doca_error_t                   result = DOCA_SUCCESS;
+    ucc_rank_t                     rank;
+    int                            i, ret;
 
     rank = self->urom_ctx.ctx_rank;
     cookie.ptr = &res;
@@ -502,7 +502,7 @@ UCC_CLASS_DEFINE(ucc_cl_doca_urom_context_t, ucc_cl_context_t);
 
 ucc_status_t
 ucc_cl_doca_urom_get_context_attr(const ucc_base_context_t *context,
-                              ucc_base_ctx_attr_t      *attr)
+                                  ucc_base_ctx_attr_t      *attr)
 {
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
         attr->attr.ctx_addr_len = 0;
