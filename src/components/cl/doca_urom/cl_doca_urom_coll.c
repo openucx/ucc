@@ -66,32 +66,8 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
         dst_ebuf);
 
     switch (coll_args->coll_type) {
-        case UCC_COLL_TYPE_ALLTOALL:
-        {
-            if (!in_place) {
-                keys.src_len = src_ebuf->packed_key_len;
-                memcpy(keys.rkeys, src_ebuf->packed_key, keys.src_len);
-            } else {
-                keys.src_len = 0;
-            }
-            keys.dst_len = dst_ebuf->packed_key_len;
-            memcpy(keys.rkeys + keys.src_len,
-                   dst_ebuf->packed_key, keys.dst_len);
-            use_xgvmi = 0;
-        } break;
         case UCC_COLL_TYPE_ALLREDUCE:
-        {
-            if (!in_place) {
-                keys.src_len = src_ebuf->packed_memh_len;
-                memcpy(keys.rkeys, src_ebuf->packed_memh, keys.src_len);
-            } else {
-                keys.src_len = 0;
-            }
-            keys.dst_len = dst_ebuf->packed_memh_len;
-            memcpy(keys.rkeys + keys.src_len,
-                   dst_ebuf->packed_memh, keys.dst_len);
-            use_xgvmi = 1;
-        } break;
+        case UCC_COLL_TYPE_ALLTOALL:
         case UCC_COLL_TYPE_ALLGATHER:
         {
             if (!in_place) {
