@@ -76,9 +76,7 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_init(ucc_base_coll_args_t *coll_args,
                                                 ucc_coll_task_t     **task_h);
 
 /* XGVMI */
-ucc_status_t ucc_tl_ucp_allgather_xgvmi_init(ucc_base_coll_args_t *coll_args,
-                                                ucc_base_team_t      *team,
-                                                ucc_coll_task_t     **task_h);
+void ucc_tl_ucp_dpu_xgvmi_rdma_progress_allgather(ucc_coll_task_t *coll_task);
 
 /* Uses allgather_kn_radix from config */
 ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
