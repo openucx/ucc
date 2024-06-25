@@ -113,7 +113,6 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
 
     tl_ctx = ucc_derived_of(self->super.tl_ctxs[ucp_index],
                             ucc_tl_ucp_context_t);
-    self->ucp_context = tl_ctx->worker.ucp_context;
 
     memset(&self->urom_ctx, 0, sizeof(ucc_cl_doca_urom_ctx_t));
 
@@ -244,7 +243,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
     }
 
     result = (doca_error_t) ucc_cl_doca_urom_buffer_export_ucc(
-                                self->ucp_context, buffer, length, &ebuf);
+                                tl_ctx->worker.ucp_context, buffer, length, &ebuf);
     if (result != DOCA_SUCCESS) {
         cl_error(cl_config->super.cl_lib, "Failed to export buffer");
         goto worker_cleanup;
@@ -395,7 +394,7 @@ domain_stop:
     }
 
 worker_unmap:
-    ucs_status = ucp_mem_unmap(self->ucp_context, ebuf.memh);
+    ucs_status = ucp_mem_unmap(tl_ctx->worker.ucp_context, ebuf.memh);
     if (ucs_status != UCS_OK) {
         cl_error(cl_config->super.cl_lib, "Failed to unmap memh");
     }

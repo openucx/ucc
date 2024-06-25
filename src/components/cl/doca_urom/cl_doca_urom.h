@@ -76,7 +76,6 @@ typedef struct ucc_cl_doca_urom_context {
     ucc_cl_context_t                  super;
     void                             *urom_ucc_ctx_h;
     ucc_mpool_t                       sched_mp;
-    ucp_context_h                     ucp_context;
     ucc_cl_doca_urom_ctx_t            urom_ctx;
     ucc_cl_doca_urom_context_config_t cfg;
 } ucc_cl_doca_urom_context_t;
