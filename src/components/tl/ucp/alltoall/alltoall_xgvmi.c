@@ -8,7 +8,7 @@
 #include "tl_ucp_coll.h"
 #include "tl_ucp_dpu_offload.h"
 
-void ucc_tl_ucp_dpu_xgvmi_rdma_progress_allgather(ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_dpu_xgvmi_rdma_progress_alltoall(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t    *task           = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_rank_t            size           = (ucc_rank_t)task->subset.map.ep_num;
@@ -23,7 +23,7 @@ void ucc_tl_ucp_dpu_xgvmi_rdma_progress_allgather(ucc_coll_task_t *coll_task)
     ucp_request_param_t   req_param      = {0};
     int                   i              = 0;
     ucc_rank_t            rank           = UCC_TL_TEAM_RANK(tl_team);
-    size_t                data_size      = (count * dt_size);
+    size_t                data_size      = (count * dt_size) / host_team_size;
     ucs_status_ptr_t     *requests       = task->dpu_xgvmi.requests;
     int                  *posted         = &task->dpu_xgvmi.gets_posted;
     int                  *completed      = &task->dpu_xgvmi.gets_completed;
@@ -43,7 +43,7 @@ void ucc_tl_ucp_dpu_xgvmi_rdma_progress_allgather(ucc_coll_task_t *coll_task)
     for (i = *posted; i < host_team_size; i++) {
         offset = (i + rank) % host_team_size;
         req_param.memh = task->dpu_xgvmi.bufs->dst_ebuf->memh;
-        src_addr = task->dpu_xgvmi.bufs->sbufs[offset];
+        src_addr = PTR_OFFSET(task->dpu_xgvmi.bufs->sbufs[offset], rank * data_size);
         dst_addr = PTR_OFFSET(task->dpu_xgvmi.bufs->rbufs[rank], offset * data_size);
         rkey = task->dpu_xgvmi.bufs->src_rkeys[offset];
         ucc_tl_ucp_get_ep(tl_team, offset, &ep);

@@ -137,14 +137,13 @@ typedef struct ucc_tl_ucp_task {
             ucc_tl_ucp_dpu_offload_buf_info_t         *bufs;
         } allreduce_sliding_window;
         struct {
-            ucs_status_ptr_t                          *put_requests;
             ucc_tl_ucp_allreduce_sw_host_allgather    *allgather_data;
             ucc_coll_task_t                           *allgather_task;
             ucc_tl_ucp_dpu_offload_buf_info_t         *bufs;
             ucs_status_ptr_t                          *requests;
             int gets_posted;
             int gets_completed;
-        } allgather_xgvmi;
+        } dpu_xgvmi;
         struct {
             int                     phase;
             ucc_knomial_pattern_t   p;
