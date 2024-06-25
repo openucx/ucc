@@ -74,7 +74,6 @@ UCC_CLASS_DECLARE(ucc_cl_doca_urom_lib_t, const ucc_base_lib_params_t *,
 
 typedef struct ucc_cl_doca_urom_context {
     ucc_cl_context_t                  super;
-    void                             *urom_ucc_ctx_h;
     ucc_mpool_t                       sched_mp;
     ucc_cl_doca_urom_ctx_t            urom_ctx;
     ucc_cl_doca_urom_context_config_t cfg;
