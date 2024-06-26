@@ -184,8 +184,9 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
         goto service_stop;
     }
 
+    /* Each command requires a plugin id--save it in the worker */
     result = ucc_cl_doca_urom_save_plugin_id(self->urom_ctx.ucc_info->id,
-                           self->urom_ctx.ucc_info->version);
+                                             self->urom_ctx.ucc_info->version);
     if (result != DOCA_SUCCESS) {
         cl_error(cl_config->super.cl_lib, "Failed to init UCC worker plugin");
         goto service_stop;
@@ -255,6 +256,9 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
         goto worker_cleanup;
     }
 
+    /* The buffers in the domain are used for gets/puts from the host without
+       XGVMI. Also, the domain is used for the OOB exchange given to the DPU-
+       side UCC instance */
     buf_attrs.buffer   = buffer;
     buf_attrs.buf_len  = length;
     buf_attrs.memh     = ebuf.packed_memh;

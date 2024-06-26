@@ -35,6 +35,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_team_t, ucc_base_context_t *cl_context,
 
     cookie.ptr = &self->res;
 
+    /* Send the command to create a team on the DPU */
     result = ucc_cl_doca_urom_task_team_create(
                 ctx->urom_ctx.urom_worker,
                 cookie,

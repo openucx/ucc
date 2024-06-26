@@ -201,6 +201,9 @@ doca_error_t ucc_cl_doca_urom_start_urom_domain(
 	if (result != DOCA_SUCCESS)
 		goto domain_destroy;
 
+    /* The buffers in the domain are used for gets/puts from the host without
+       XGVMI. Also, the domain is used for the OOB exchange given to the DPU-
+       side UCC instance */
 	if (nb_workers != 0 && buffers != NULL) {
 		result = doca_urom_domain_set_buffers_count(inst, nb_buffers);
 		if (result != DOCA_SUCCESS)

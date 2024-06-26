@@ -49,6 +49,7 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
         in_place = 1;
     }
 
+    // Register the src buf to get the exported memh
     if (!in_place) {
         ucc_cl_doca_urom_buffer_export_ucc(
             tl_ctx->worker.ucp_context,
@@ -58,6 +59,7 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
             src_ebuf);
     }
 
+    // Register the dst buf to get the exported memh
     ucc_cl_doca_urom_buffer_export_ucc(
         tl_ctx->worker.ucp_context,
         coll_args->dst.info.buffer,
@@ -89,6 +91,7 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
 
     coll_args->mask |= UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
 
+    // Submit the offload coll cmd to the DPU plugin
     result = ucc_cl_doca_urom_task_collective(ctx->urom_ctx.urom_worker,
                             cookie,
                             rank,
@@ -126,6 +129,7 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_finalize(ucc_coll_task_t *task)
     struct export_buf           *dst_ebuf  = &schedule->dst_ebuf;
     ucc_status_t                 status;
 
+    // Deregister buffers and free the schedule
     if (src_ebuf->memh) {
         ucp_mem_unmap(tl_ctx->worker.ucp_context, src_ebuf->memh);
     }
@@ -162,6 +166,7 @@ static void ucc_cl_doca_urom_coll_full_progress(ucc_coll_task_t *ctask)
 
     ucp_worker_progress(tl_ctx->worker.ucp_worker);
 
+    // Poll the DOCA PE for completions
     ret = doca_pe_progress(ctx->urom_ctx.urom_pe);
     if (ret == 0 && res->result == DOCA_SUCCESS) {
         ctask->status = UCC_INPROGRESS;
@@ -190,6 +195,7 @@ ucc_status_t ucc_cl_doca_urom_coll_full_init(ucc_base_coll_args_t *coll_args,
     ucc_base_coll_args_t         args;
     ucc_schedule_t              *schedule;
 
+    // Allocate and initialize schedule
     cl_schedule = ucc_cl_doca_urom_get_schedule(cl_team);
     if (ucc_unlikely(!cl_schedule)) {
         return UCC_ERR_NO_MEMORY;
