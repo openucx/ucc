@@ -1210,9 +1210,10 @@ static void *urom_worker_ucc_ctx_progress_thread(void *arg)
         }
 
         /* Set to sliding window */
-        if (UCC_OK != ucc_context_config_modify(ctx_config,
-                                                "tl/ucp", "TUNE",
-                                                "allreduce:0-inf:@2")) {
+        if (UCC_OK != ucc_context_config_modify(
+                        ctx_config,
+                        "tl/ucp", "TUNE",
+                        "allreduce:0-inf:@sliding_window")) {
             DOCA_LOG_ERR("Failed to modify TL_UCP_TUNE UCC lib config");
             status = DOCA_ERROR_DRIVER;
             goto cfg_release;
