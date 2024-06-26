@@ -269,7 +269,7 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
         case UCC_TL_UCP_ALLGATHER_ALG_SPARBIT:
             *init = ucc_tl_ucp_allgather_sparbit_init;
             break;
-        case UCC_TL_UCP_ALLGATHER_ALG_XGVMI:
+        case UCC_TL_UCP_ALLGATHER_ALG_LINEAR_XGVMI:
             *init = ucc_tl_ucp_dpu_xgvmi_init;
             break;
         default:
@@ -323,7 +323,7 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
         case UCC_TL_UCP_ALLTOALL_ALG_ONESIDED:
             *init = ucc_tl_ucp_alltoall_onesided_init;
             break;
-        case UCC_TL_UCP_ALLTOALL_ALG_XGVMI:
+        case UCC_TL_UCP_ALLTOALL_ALG_LINEAR_XGVMI:
             *init = ucc_tl_ucp_dpu_xgvmi_init;
             break;
         default:
