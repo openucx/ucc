@@ -43,10 +43,10 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLTOALL_ALG_ONESIDED,
              .name = "onesided",
              .desc = "naive, linear one-sided implementation"},
-        [UCC_TL_UCP_ALLTOALL_ALG_XGVMI] =
-            {.id   = UCC_TL_UCP_ALLTOALL_ALG_XGVMI,
-             .name = "xgvmi",
-             .desc = "xgvmi-based implementation"},
+        [UCC_TL_UCP_ALLTOALL_ALG_LINEAR_XGVMI] =
+            {.id   = UCC_TL_UCP_ALLTOALL_ALG_LINEAR_XGVMI,
+             .name = "linear",
+             .desc = "linear xgvmi-based implementation"},
         [UCC_TL_UCP_ALLTOALL_ALG_LAST] = {.id = 0, .name = NULL, .desc = NULL}};
 
 ucc_status_t ucc_tl_ucp_alltoall_init(ucc_tl_ucp_task_t *task)

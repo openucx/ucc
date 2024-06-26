@@ -14,8 +14,8 @@ void ucc_tl_ucp_dpu_xgvmi_rdma_progress_alltoall(ucc_coll_task_t *coll_task)
     ucc_rank_t            size           = (ucc_rank_t)task->subset.map.ep_num;
     ucc_datatype_t        dtype          = TASK_ARGS(task).src.info.datatype;
     size_t                dt_size        = ucc_dt_size(dtype);
-    uint32_t              count          = coll_task->bargs.args.src.info.count;
-    uint32_t              host_team_size = size;
+    ucc_count_t           count          = coll_task->bargs.args.src.info.count;
+    ucc_rank_t            host_team_size = size;
     ucc_base_team_t      *base_team      = coll_task->team;
     ucc_tl_ucp_team_t    *tl_team        = ucc_derived_of(base_team, ucc_tl_ucp_team_t);
     ucc_coll_task_t      *allgather_task = task->dpu_xgvmi.allgather_task;
