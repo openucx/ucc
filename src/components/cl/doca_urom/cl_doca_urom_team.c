@@ -9,13 +9,13 @@
 #include "core/ucc_team.h"
 
 UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_team_t, ucc_base_context_t *cl_context,
-                    const ucc_base_team_params_t *params)
+                    const ucc_base_team_params_t                *params)
 {
-    union doca_data cookie = {0};
-    doca_error_t result    = DOCA_SUCCESS;
-    ucc_cl_doca_urom_context_t       *ctx =
+    union doca_data             cookie = {0};
+    doca_error_t                result = DOCA_SUCCESS;
+    ucc_cl_doca_urom_context_t *ctx    =
         ucc_derived_of(cl_context, ucc_cl_doca_urom_context_t);
-    ucc_status_t status;
+    ucc_status_t                status;
 
     UCC_CLASS_CALL_SUPER_INIT(ucc_cl_team_t, &ctx->super, params);
 
@@ -35,14 +35,15 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_team_t, ucc_base_context_t *cl_context,
 
     cookie.ptr = &self->res;
 
-    result = ucc_cl_doca_urom_task_team_create(ctx->urom_ctx.urom_worker,
-                        cookie,
-                        ctx->urom_ctx.ctx_rank,
-                        0 /* start */,
-                        1 /* stride */,
-                        params->params.oob.n_oob_eps /* size */,
-                        ctx->urom_ctx.urom_ucc_context,
-                        ucc_cl_doca_urom_team_create_finished);
+    result = ucc_cl_doca_urom_task_team_create(
+                ctx->urom_ctx.urom_worker,
+                cookie,
+                ctx->urom_ctx.ctx_rank,
+                0 /* start */,
+                1 /* stride */,
+                params->params.oob.n_oob_eps /* size */,
+                ctx->urom_ctx.urom_ucc_context,
+                ucc_cl_doca_urom_team_create_finished);
 
     if (result != DOCA_SUCCESS) {
         cl_error(cl_context->lib, "Failed to create UCC team task");
@@ -70,8 +71,6 @@ ucc_status_t ucc_cl_doca_urom_team_destroy(ucc_base_team_t *cl_team)
 
 ucc_status_t ucc_cl_doca_urom_team_create_test(ucc_base_team_t *cl_team)
 {
-    ucc_status_t ucc_status;
-    int ret;
     ucc_cl_doca_urom_team_t    *team          =
         ucc_derived_of(cl_team, ucc_cl_doca_urom_team_t);
     ucc_cl_doca_urom_context_t *ctx           =
@@ -82,6 +81,8 @@ ucc_status_t ucc_cl_doca_urom_team_create_test(ucc_base_team_t *cl_team)
     struct ucc_cl_doca_urom_result           res           = {0};
     ucc_coll_score_t           *score         = NULL;
     int                         mt_n          = 2;
+    ucc_status_t ucc_status;
+    int ret;
 
     ret = doca_pe_progress(ctx->urom_ctx.urom_pe);
     if (ret == 0 && res.result == DOCA_SUCCESS) {

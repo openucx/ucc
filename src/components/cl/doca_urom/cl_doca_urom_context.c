@@ -129,7 +129,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
 
     result = doca_log_backend_create_with_file_sdk(stderr, &sdk_log);
     if (result != DOCA_SUCCESS) {
-        cl_error(cl_config->super.cl_lib, "Failed to create DOCA log backend\n");
+        cl_error(cl_config->super.cl_lib,
+                 "Failed to create DOCA log backend\n");
         return UCC_ERR_NO_RESOURCE;
     }
     result = doca_log_backend_set_sdk_level(sdk_log, cl_config->doca_log_level);
@@ -138,8 +139,9 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
         return UCC_ERR_NO_RESOURCE;
     }
 
-    result = ucc_cl_doca_urom_open_doca_device_with_ibdev_name((uint8_t *)device, strlen(device),
-                                              NULL, &self->urom_ctx.dev);
+    result = ucc_cl_doca_urom_open_doca_device_with_ibdev_name(
+                (uint8_t *)device, strlen(device),
+                NULL, &self->urom_ctx.dev);
     if (result != DOCA_SUCCESS) {
         cl_error(cl_config->super.cl_lib, "failed to open device %s\n", device);
         return UCC_ERR_NO_RESOURCE;
@@ -151,10 +153,12 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
         goto dev_close;
     }
 
-    result = ucc_cl_doca_urom_start_urom_service(self->urom_ctx.urom_pe, self->urom_ctx.dev, 2,
-                                &self->urom_ctx.urom_service);
+    result = ucc_cl_doca_urom_start_urom_service(
+                self->urom_ctx.urom_pe, self->urom_ctx.dev, 2,
+                &self->urom_ctx.urom_service);
     if (result != DOCA_SUCCESS) {
-        cl_error(cl_config->super.cl_lib, "Failed to create UROM service context");
+        cl_error(cl_config->super.cl_lib,
+                 "Failed to create UROM service context");
         goto pe_destroy;
     }
 
@@ -187,7 +191,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
         goto service_stop;
     }
 
-    self->urom_ctx.urom_worker_addr = ucc_calloc(1, UCC_CL_DOCA_UROM_ADDR_MAX_LEN,
+    self->urom_ctx.urom_worker_addr = ucc_calloc(1,
+                                                 UCC_CL_DOCA_UROM_ADDR_MAX_LEN,
                                                  "doca_urom worker addr");
     if (!self->urom_ctx.urom_worker_addr) {
         cl_error(cl_config->super.cl_lib, "failed to allocate %d bytes",
@@ -197,10 +202,10 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
 
     /* Create and start worker context */
     result = ucc_cl_doca_urom_start_urom_worker(self->urom_ctx.urom_pe,
-                               self->urom_ctx.urom_service, rank, NULL,
-                               16, NULL, envs, num_envs,
-                               self->urom_ctx.ucc_info->id,
-                               &self->urom_ctx.urom_worker);
+                self->urom_ctx.urom_service, rank, NULL,
+                16, NULL, envs, num_envs,
+                self->urom_ctx.ucc_info->id,
+                &self->urom_ctx.urom_worker);
     if (result != DOCA_SUCCESS)
         cl_error(cl_config->super.cl_lib, "Failed to start urom worker");
 
@@ -235,15 +240,16 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
     oob_coll.oob_index = rank;
 
     ucs_status = ucp_worker_get_address(tl_ctx->worker.ucp_worker,
-            &tl_ctx->worker.worker_address,
-            &tl_ctx->worker.ucp_addrlen);
+                                        &tl_ctx->worker.worker_address,
+                                        &tl_ctx->worker.ucp_addrlen);
     if (ucs_status != UCS_OK) {
         cl_error(cl_config->super.cl_lib, "Failed to get ucp worker address");
         goto worker_cleanup;
     }
 
     result = (doca_error_t) ucc_cl_doca_urom_buffer_export_ucc(
-                                tl_ctx->worker.ucp_context, buffer, length, &ebuf);
+                                tl_ctx->worker.ucp_context, buffer,
+                                length, &ebuf);
     if (result != DOCA_SUCCESS) {
         cl_error(cl_config->super.cl_lib, "Failed to export buffer");
         goto worker_cleanup;
@@ -258,10 +264,12 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
 
     /* Create domain context */
     rank_u64 = (uint64_t)rank;
-    result = ucc_cl_doca_urom_start_urom_domain(self->urom_ctx.urom_pe, &oob_coll,
-                               &rank_u64, &self->urom_ctx.urom_worker,
-                               1, &buf_attrs, 1,
-                               &self->urom_ctx.urom_domain);
+    result = ucc_cl_doca_urom_start_urom_domain(
+                self->urom_ctx.urom_pe,
+                &oob_coll,
+                &rank_u64, &self->urom_ctx.urom_worker,
+                1, &buf_attrs, 1,
+                &self->urom_ctx.urom_domain);
     if (result != DOCA_SUCCESS) {
         cl_error(cl_config->super.cl_lib, "Failed to start domain");
         goto worker_unmap;
@@ -284,9 +292,10 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
 
     /* Create lib */
     cookie.ptr = &res;
-    result = ucc_cl_doca_urom_task_lib_create(self->urom_ctx.urom_worker,
-                                           cookie, rank, &lib_params,
-                                           ucc_cl_doca_urom_lib_create_finished);
+    result = ucc_cl_doca_urom_task_lib_create(
+                self->urom_ctx.urom_worker,
+                cookie, rank, &lib_params,
+                ucc_cl_doca_urom_lib_create_finished);
     if (result != DOCA_SUCCESS) {
         cl_error(cl_config->super.cl_lib, "Failed to create lib creation task");
         goto domain_stop;
@@ -304,11 +313,11 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
 
     cl_debug(cl_config->super.cl_lib, "Creating pd channel");
     result = ucc_cl_doca_urom_task_pd_channel(self->urom_ctx.urom_worker,
-                           cookie,
-                           rank,
-                           tl_ctx->worker.worker_address,
-                           tl_ctx->worker.ucp_addrlen,
-                           ucc_cl_doca_urom_pss_dc_finished);
+                cookie,
+                rank,
+                tl_ctx->worker.worker_address,
+                tl_ctx->worker.ucp_addrlen,
+                ucc_cl_doca_urom_pss_dc_finished);
     if (result != DOCA_SUCCESS) {
         cl_error(cl_config->super.cl_lib, "Failed to create data channel task");
         goto lib_destroy;
@@ -327,10 +336,10 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
 
     cl_debug(cl_config->super.cl_lib, "Creating task ctx");
     result = ucc_cl_doca_urom_task_ctx_create(self->urom_ctx.urom_worker,
-                                           cookie, rank, 0, NULL, 1,
-                                           params->params.oob.n_oob_eps, 0x0,
-                                           length,
-                                           ucc_cl_doca_urom_ctx_create_finished);
+                cookie, rank, 0, NULL, 1,
+                params->params.oob.n_oob_eps, 0x0,
+                length,
+                ucc_cl_doca_urom_ctx_create_finished);
     if (result != DOCA_SUCCESS) {
         cl_error(cl_config->super.cl_lib, "Failed to create UCC context task");
         goto lib_destroy;
@@ -366,7 +375,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_context_t,
 
 lib_destroy:
     result = ucc_cl_doca_urom_task_lib_destroy(self->urom_ctx.urom_worker,
-                                            cookie, rank, ucc_cl_doca_urom_lib_destroy_finished);
+                cookie, rank, ucc_cl_doca_urom_lib_destroy_finished);
     if (result != DOCA_SUCCESS) {
         cl_error(self->super.super.lib,
                  "Failed to create UCC lib destroy task");
@@ -444,7 +453,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_doca_urom_context_t)
     cookie.ptr = &res;
 
     result = ucc_cl_doca_urom_task_lib_destroy(self->urom_ctx.urom_worker,
-                                            cookie, rank, ucc_cl_doca_urom_lib_destroy_finished);
+                cookie, rank, ucc_cl_doca_urom_lib_destroy_finished);
     if (result != DOCA_SUCCESS) {
         cl_error(self->super.super.lib,
                  "Failed to create UCC lib destroy task");

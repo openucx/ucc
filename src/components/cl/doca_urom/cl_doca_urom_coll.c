@@ -176,9 +176,9 @@ static void ucc_cl_doca_urom_coll_full_progress(ucc_coll_task_t *ctask)
     cl_debug(&cl_lib->super, "completed the collective from urom");
 }  
 
-ucc_status_t ucc_cl_doca_urom_coll_full_init(
-                         ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
-                         ucc_coll_task_t **task)
+ucc_status_t ucc_cl_doca_urom_coll_full_init(ucc_base_coll_args_t *coll_args,
+                                             ucc_base_team_t      *team,
+                                             ucc_coll_task_t     **task)
 {
     ucc_cl_doca_urom_team_t     *cl_team = ucc_derived_of(team,
                                             ucc_cl_doca_urom_team_t);

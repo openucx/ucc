@@ -30,11 +30,11 @@ typedef doca_error_t (*ucc_cl_doca_urom_tasks_check)(struct doca_devinfo *);
  * Struct contains domain shared buffer details
  */
 struct ucc_cl_doca_urom_domain_buffer_attrs {
-	void *buffer;	 /* Buffer address */
+	void  *buffer;	 /* Buffer address */
 	size_t buf_len;	 /* Buffer length */
-	void *memh;	 /* Buffer packed memory handle */
+	void  *memh;	 /* Buffer packed memory handle */
 	size_t memh_len; /* Buffer packed memory handle length */
-	void *mkey;	 /* Buffer packed memory key */
+	void  *mkey;	 /* Buffer packed memory key */
 	size_t mkey_len; /* Buffer packed memory key length*/
 };
 
