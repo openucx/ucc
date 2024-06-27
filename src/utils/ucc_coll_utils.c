@@ -52,7 +52,7 @@ ucc_memory_type_t ucc_mem_type_from_str(const char *str)
     return UCC_MEMORY_TYPE_LAST;
 }
 
-static inline int
+int
 ucc_coll_args_is_mem_symmetric(const ucc_coll_args_t *args,
                                ucc_rank_t rank)
 {
@@ -92,6 +92,68 @@ ucc_coll_args_is_mem_symmetric(const ucc_coll_args_t *args,
         break;
     }
     return 0;
+}
+
+
+/* If this is the root and the src/dst buffers are asymmetric, the dst needs
+   to have a new allocation to make the mem types match. On task completion,
+   copy the result back into the old dst */
+ucc_status_t
+ucc_coll_args_init_asymmetric_buffer(ucc_coll_args_t *args,
+                                     ucc_team_h team,
+                                     ucc_buffer_info_asymmetric_memtype_t *save_info)
+{
+    ucc_status_t status = UCC_OK;
+
+    if (UCC_IS_INPLACE(*args)) {
+        return UCC_ERR_INVALID_PARAM;
+    }
+    switch (args->coll_type) {
+    case UCC_COLL_TYPE_REDUCE:
+    case UCC_COLL_TYPE_GATHER:
+    case UCC_COLL_TYPE_SCATTER:
+    case UCC_COLL_TYPE_SCATTERV:
+    {
+        ucc_memory_type_t mem_type = args->src.info.mem_type;
+        if (args->coll_type == UCC_COLL_TYPE_SCATTERV) {
+            mem_type = args->src.info_v.mem_type;
+        }
+        memcpy(&save_info->old_asymmetric_buffer.info,
+               &args->dst.info, sizeof(ucc_coll_buffer_info_t));
+        status = ucc_mc_alloc(&save_info->scratch,
+                              ucc_dt_size(args->dst.info.datatype) *
+                                args->dst.info.count,
+                                mem_type);
+        if (ucc_unlikely(UCC_OK != status)) {
+            ucc_error("failed to allocate replacement "
+                      "memory for asymmetric buffer");
+            return status;
+        }
+        args->dst.info.buffer = save_info->scratch->addr;
+        args->dst.info.mem_type = mem_type;
+        return UCC_OK;
+    }
+    case UCC_COLL_TYPE_GATHERV:
+    {
+        memcpy(&save_info->old_asymmetric_buffer.info_v,
+               &args->dst.info_v, sizeof(ucc_coll_buffer_info_v_t));
+        status = ucc_mc_alloc(&save_info->scratch,
+                              ucc_coll_args_get_total_count(args,
+                                args->dst.info_v.counts, team->size),
+                              args->src.info.mem_type);
+        if (ucc_unlikely(UCC_OK != status)) {
+            ucc_error("failed to allocate replacement "
+                      "memory for asymmetric buffer");
+            return status;
+        }
+        args->dst.info_v.buffer = save_info->scratch->addr;
+        args->dst.info_v.mem_type = args->src.info.mem_type;
+        return UCC_OK;
+    }
+    default:
+        break;
+    }
+    return UCC_ERR_INVALID_PARAM;
 }
 
 int ucc_coll_args_is_predefined_dt(const ucc_coll_args_t *args, ucc_rank_t rank)
@@ -163,9 +225,6 @@ ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
 {
     ucc_rank_t root = args->root;
 
-    if (!ucc_coll_args_is_mem_symmetric(args, rank)) {
-        return UCC_MEMORY_TYPE_ASYMMETRIC;
-    }
     switch (args->coll_type) {
     case UCC_COLL_TYPE_BARRIER:
     case UCC_COLL_TYPE_FANIN:
@@ -180,7 +239,6 @@ ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
         return args->dst.info.mem_type;
     case UCC_COLL_TYPE_ALLGATHERV:
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
-        return args->dst.info_v.mem_type;
     case UCC_COLL_TYPE_ALLTOALLV:
         return args->dst.info_v.mem_type;
     case UCC_COLL_TYPE_REDUCE:
@@ -323,7 +381,7 @@ ucc_ep_map_t ucc_ep_map_from_array_64(uint64_t **array, ucc_rank_t size,
                                          need_free, 1);
 }
 
-static inline int ucc_coll_args_is_rooted(ucc_coll_type_t ct)
+int ucc_coll_args_is_rooted(ucc_coll_type_t ct)
 {
     if (ct == UCC_COLL_TYPE_REDUCE || ct == UCC_COLL_TYPE_BCAST ||
         ct == UCC_COLL_TYPE_GATHER || ct == UCC_COLL_TYPE_SCATTER ||

@@ -14,6 +14,7 @@
 #include "utils/ucc_coll_utils.h"
 #include "components/base/ucc_base_iface.h"
 #include "components/ec/ucc_ec.h"
+#include "components/mc/ucc_mc.h"
 
 #define MAX_LISTENERS 4
 
@@ -165,6 +166,36 @@ ucc_status_t ucc_dependency_handler(ucc_coll_task_t *parent,
 ucc_status_t ucc_triggered_post(ucc_ee_h ee, ucc_ev_t *ev,
                                 ucc_coll_task_t *task);
 
+static inline
+ucc_status_t ucc_copy_asymmetric_buffer_out(ucc_coll_task_t *task)
+{
+    ucc_status_t                          status    = UCC_OK;
+    ucc_coll_args_t                      *coll_args = &task->bargs.args;
+    ucc_buffer_info_asymmetric_memtype_t *save      = &task->bargs.asymmetric_save_info;
+    ucc_rank_t                            size      = task->team->params.size;
+
+    if(task->bargs.args.coll_type == UCC_COLL_TYPE_GATHERV) {
+        status = ucc_mc_memcpy(save->old_asymmetric_buffer.info_v.buffer,
+                        save->scratch->addr,
+                        ucc_coll_args_get_total_count(coll_args,
+                            coll_args->dst.info_v.counts, size),
+                        save->old_asymmetric_buffer.info_v.mem_type,
+                        save->scratch->mt);
+    } else {
+        status = ucc_mc_memcpy(save->old_asymmetric_buffer.info.buffer,
+                        save->scratch->addr,
+                        ucc_dt_size(save->old_asymmetric_buffer.info.datatype) *
+                            save->old_asymmetric_buffer.info.count,
+                        save->old_asymmetric_buffer.info.mem_type,
+                        save->scratch->mt);
+    }
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_error("error copying back to old asymmetric buffer: %s",
+                    ucc_status_string(status));
+    }
+    return status;
+}
+
 static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
 {
     ucc_status_t        status    = task->status;
@@ -185,6 +216,20 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
        with schedules are not released during a callback (if set). */
 
     if (ucc_likely(status == UCC_OK)) {
+        ucc_buffer_info_asymmetric_memtype_t *save = &task->bargs.asymmetric_save_info;
+        if (save->scratch != NULL) {
+            status = ucc_copy_asymmetric_buffer_out(task);
+            if (status != UCC_OK) {
+                ucc_error("failure copying out asymmetric buffer: %s",
+                          ucc_status_string(status));
+            }
+            status = ucc_mc_free(save->scratch);
+            if (ucc_unlikely(status != UCC_OK)) {
+                ucc_error("error freeing scratch asymmetric buffer: %s",
+                            ucc_status_string(status));
+            }
+            save->scratch = NULL;
+        }
         status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
     } else {
         /* error in task status */
