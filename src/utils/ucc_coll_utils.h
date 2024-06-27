@@ -143,6 +143,28 @@ ucc_coll_args_get_total_count(const ucc_coll_args_t *args,
 
     return count;
 }
+
+static inline size_t
+ucc_coll_args_get_v_buffer_size(const ucc_coll_args_t *args,
+                                const ucc_count_t *counts,
+                                const ucc_aint_t *displacements,
+                                ucc_rank_t size)
+{
+    ucc_rank_t i;
+    size_t max_disp, idx_count;
+
+    max_disp = ucc_coll_args_get_displacement(args, displacements, 0);
+    idx_count = ucc_coll_args_get_count(args, counts, 0);
+    for (i = 1; i < size; i++) {
+        size_t disp_i = ucc_coll_args_get_displacement(args, displacements, i);
+        if (disp_i > max_disp) {
+            max_disp = disp_i;
+            idx_count = ucc_coll_args_get_count(args, counts, i);
+        }
+    }
+
+    return max_disp + idx_count;
+}
 typedef struct ucc_base_coll_args ucc_base_coll_args_t;
 
 ucc_coll_type_t   ucc_coll_type_from_str(const char *str);
@@ -334,5 +356,22 @@ static inline size_t ucc_buffer_block_offset_aligned(size_t total_count,
    @param [in] rank        rank to check, used only for rooted collective
                            operations. */
 int ucc_coll_args_is_predefined_dt(const ucc_coll_args_t *args, ucc_rank_t rank);
+
+int ucc_coll_args_is_mem_symmetric(const ucc_coll_args_t *args, ucc_rank_t rank);
+
+int ucc_coll_args_is_rooted(ucc_coll_type_t ct);
+
+typedef struct ucc_buffer_info_asymmetric_memtype ucc_buffer_info_asymmetric_memtype_t;
+typedef struct ucc_mc_buffer_header ucc_mc_buffer_header_t;
+
+ucc_status_t
+ucc_coll_args_init_asymmetric_buffer(ucc_coll_args_t *args,
+                                       ucc_team_h team,
+                                       ucc_buffer_info_asymmetric_memtype_t *save_info);
+
+ucc_status_t
+ucc_coll_args_free_asymmetric_buffer(ucc_coll_task_t *task);
+
+ucc_status_t ucc_copy_asymmetric_buffer(ucc_coll_task_t *task);
 
 #endif

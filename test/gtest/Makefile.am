@@ -106,7 +106,8 @@ gtest_SOURCES =                           \
 	coll_score/test_score.cc              \
 	coll_score/test_score_str.cc          \
 	coll_score/test_score_update.cc       \
-	active_set/test_active_set.cc
+	active_set/test_active_set.cc         \
+	asym_mem/test_asymmetric_memory.cc
 
 if TL_MLX5_ENABLED
     gtest_SOURCES  += tl/mlx5/test_tl_mlx5.cc \
