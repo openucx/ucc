@@ -41,7 +41,6 @@ struct ucc_cl_doca_urom_context_create_result {
 /* UCC team create result */
 struct ucc_cl_doca_urom_team_create_result {
     void *team; /* Pointer to UCC team */
-    ucc_status_t status;
 };
 
 /* UCC collective result */

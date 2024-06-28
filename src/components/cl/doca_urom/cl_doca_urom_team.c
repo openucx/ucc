@@ -51,7 +51,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_team_t, ucc_base_context_t *cl_context,
         return UCC_ERR_NO_RESOURCE;
     }
 
-    self->res.team_create.status = UCC_INPROGRESS;
+    self->res.result = DOCA_ERROR_IN_PROGRESS;
 
     cl_debug(cl_context->lib, "posted cl team: %p", self);
     return UCC_OK;
@@ -87,7 +87,8 @@ ucc_status_t ucc_cl_doca_urom_team_create_test(ucc_base_team_t *cl_team)
     int                                         ret;
 
     ret = doca_pe_progress(ctx->urom_ctx.urom_pe);
-    if (ret == 0 && res->result == DOCA_SUCCESS) {
+
+    if (ret == 0 && res->result == DOCA_ERROR_IN_PROGRESS) {
         return UCC_INPROGRESS;
     }
 
@@ -97,33 +98,25 @@ ucc_status_t ucc_cl_doca_urom_team_create_test(ucc_base_team_t *cl_team)
         return UCC_ERR_NO_MESSAGE;
     }
 
-    if (team_create->status == UCC_OK) {
-        team->teams[team->n_teams] = team_create->team;
-        ++team->n_teams;
-        ucc_status = ucc_coll_score_build_default(
-                        cl_team, UCC_CL_DOCA_UROM_DEFAULT_SCORE,
-                        ucc_cl_doca_urom_coll_init,
-                        UCC_COLL_TYPE_ALLREDUCE,
-                        mem_types, mt_n, &score);
-        if (UCC_OK != ucc_status) {
-            return ucc_status;
-        }
-
-        ucc_status = ucc_coll_score_build_map(score, &team->score_map);
-        if (UCC_OK != ucc_status) {
-            cl_error(ctx->super.super.lib, "failed to build score map");
-        }
-        team->score = score;
-        ucc_coll_score_set(team->score, UCC_CL_DOCA_UROM_DEFAULT_SCORE);
-
-        return UCC_OK;
-    } else if (team_create->status < 0) {
-        cl_error(ctx->super.super.lib, "failed to create team: %s",
-                ucc_status_string(team_create->status));
-        return team_create->status;
+    team->teams[team->n_teams] = team_create->team;
+    ++team->n_teams;
+    ucc_status = ucc_coll_score_build_default(
+                    cl_team, UCC_CL_DOCA_UROM_DEFAULT_SCORE,
+                    ucc_cl_doca_urom_coll_init,
+                    UCC_COLL_TYPE_ALLREDUCE,
+                    mem_types, mt_n, &score);
+    if (UCC_OK != ucc_status) {
+        return ucc_status;
     }
 
-    return UCC_INPROGRESS;
+    ucc_status = ucc_coll_score_build_map(score, &team->score_map);
+    if (UCC_OK != ucc_status) {
+        cl_error(ctx->super.super.lib, "failed to build score map");
+    }
+    team->score = score;
+    ucc_coll_score_set(team->score, UCC_CL_DOCA_UROM_DEFAULT_SCORE);
+
+    return UCC_OK;
 }
 
 ucc_status_t ucc_cl_doca_urom_team_get_scores(ucc_base_team_t   *cl_team,
