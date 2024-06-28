@@ -965,7 +965,9 @@ void ucc_cl_doca_urom_team_create_finished(
     res->dpu_worker_id      = dpu_worker_id;
     res->result             = result;
     res->team_create.team   = team;
-    res->team_create.status = 2; // set done
+    res->team_create.status = (result == DOCA_SUCCESS) ? UCC_OK : 
+                              (result == DOCA_ERROR_IN_PROGRESS) ? UCC_INPROGRESS :
+                              UCC_ERR_NO_MESSAGE;
 }
 
 ucc_status_t ucc_cl_doca_urom_buffer_export_ucc(

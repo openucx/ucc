@@ -51,7 +51,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_team_t, ucc_base_context_t *cl_context,
         return UCC_ERR_NO_RESOURCE;
     }
 
-    self->res.team_create.status = 1; // set in progress
+    self->res.team_create.status = UCC_INPROGRESS;
 
     cl_debug(cl_context->lib, "posted cl team: %p", self);
     return UCC_OK;
@@ -72,39 +72,38 @@ ucc_status_t ucc_cl_doca_urom_team_destroy(ucc_base_team_t *cl_team)
 
 ucc_status_t ucc_cl_doca_urom_team_create_test(ucc_base_team_t *cl_team)
 {
-    ucc_cl_doca_urom_team_t    *team          =
+    ucc_cl_doca_urom_team_t                    *team         =
         ucc_derived_of(cl_team, ucc_cl_doca_urom_team_t);
-    ucc_cl_doca_urom_context_t *ctx           =
+    ucc_cl_doca_urom_context_t                 *ctx          =
         UCC_CL_DOCA_UROM_TEAM_CTX(team);
-    ucc_memory_type_t           mem_types[2]  = {UCC_MEMORY_TYPE_HOST,
-                                                 UCC_MEMORY_TYPE_CUDA};
-    struct ucc_cl_doca_urom_team_create_result  *team_create   = &team->res.team_create;
-    struct ucc_cl_doca_urom_result           res           = {0};
-    ucc_coll_score_t           *score         = NULL;
-    int                         mt_n          = 2;
-    ucc_status_t ucc_status;
-    int ret;
+    ucc_memory_type_t                           mem_types[2] =
+        {UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA};
+    struct ucc_cl_doca_urom_result             *res          = &team->res;
+    struct ucc_cl_doca_urom_team_create_result *team_create  =
+        &res->team_create;
+    ucc_coll_score_t                           *score        = NULL;
+    int                                         mt_n         = 2;
+    ucc_status_t                                ucc_status;
+    int                                         ret;
 
     ret = doca_pe_progress(ctx->urom_ctx.urom_pe);
-    if (ret == 0 && res.result == DOCA_SUCCESS) {
+    if (ret == 0 && res->result == DOCA_SUCCESS) {
         return UCC_INPROGRESS;
     }
 
-    if (res.result != DOCA_SUCCESS) {
+    if (res->result != DOCA_SUCCESS) {
         cl_error(ctx->super.super.lib,
-                 "UCC team create task failed: DOCA status %d", res.result);
+                 "UCC team create task failed: DOCA status %d", res->result);
         return UCC_ERR_NO_MESSAGE;
     }
 
-    if (team_create->status == 2) { // 2=done
+    if (team_create->status == UCC_OK) {
         team->teams[team->n_teams] = team_create->team;
         ++team->n_teams;
         ucc_status = ucc_coll_score_build_default(
                         cl_team, UCC_CL_DOCA_UROM_DEFAULT_SCORE,
                         ucc_cl_doca_urom_coll_init,
-                        UCC_COLL_TYPE_ALLREDUCE |
-                            UCC_COLL_TYPE_ALLGATHER |
-                            UCC_COLL_TYPE_ALLTOALL,
+                        UCC_COLL_TYPE_ALLREDUCE,
                         mem_types, mt_n, &score);
         if (UCC_OK != ucc_status) {
             return ucc_status;
@@ -118,9 +117,13 @@ ucc_status_t ucc_cl_doca_urom_team_create_test(ucc_base_team_t *cl_team)
         ucc_coll_score_set(team->score, UCC_CL_DOCA_UROM_DEFAULT_SCORE);
 
         return UCC_OK;
+    } else if (team_create->status < 0) {
+        cl_error(ctx->super.super.lib, "failed to create team: %s",
+                ucc_status_string(team_create->status));
+        return team_create->status;
     }
 
-    return UCC_INPROGRESS; // 1=in progress
+    return UCC_INPROGRESS;
 }
 
 ucc_status_t ucc_cl_doca_urom_team_get_scores(ucc_base_team_t   *cl_team,
@@ -143,7 +146,7 @@ ucc_status_t ucc_cl_doca_urom_team_get_scores(ucc_base_team_t   *cl_team,
         team_info.init                = NULL;
         team_info.num_mem_types       = 0;
         team_info.supported_mem_types = NULL; /* all memory types supported*/
-        team_info.supported_colls     = UCC_COLL_TYPE_ALL;
+        team_info.supported_colls     = UCC_COLL_TYPE_ALLREDUCE;
         team_info.size                = UCC_CL_TEAM_SIZE(team);
 
         status = ucc_coll_score_update_from_str(ctx->score_str, &team_info,

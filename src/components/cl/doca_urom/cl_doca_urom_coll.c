@@ -24,10 +24,6 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
     ucc_cl_doca_urom_lib_t      *cl_lib    = ucc_derived_of(ctx->super.super.lib,
                                                 ucc_cl_doca_urom_lib_t);
     ucc_coll_args_t             *coll_args = &task->bargs.args;
-    int                          ucp_index = cl_lib->tl_ucp_index;
-    ucc_tl_ucp_context_t        *tl_ctx    = ucc_derived_of(
-                                                ctx->super.tl_ctxs[ucp_index],
-                                                ucc_tl_ucp_context_t);
     union doca_data              cookie    = {0};
     int                          use_xgvmi = 0;
     int                          in_place  = UCC_IS_INPLACE(*coll_args);
@@ -39,33 +35,10 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
     doca_error_t                 result;
     ucc_worker_key_buf           keys;
 
-    src_ebuf->memh = NULL;
-    dst_ebuf->memh = NULL;
-
     cookie.ptr = &schedule->res;
-
-    // Register the src buf to get the exported memh
-    if (!in_place) {
-        ucc_cl_doca_urom_buffer_export_ucc(
-            tl_ctx->worker.ucp_context,
-            coll_args->src.info.buffer,
-            coll_args->src.info.count *
-                ucc_dt_size(coll_args->src.info.datatype),
-            src_ebuf);
-    }
-
-    // Register the dst buf to get the exported memh
-    ucc_cl_doca_urom_buffer_export_ucc(
-        tl_ctx->worker.ucp_context,
-        coll_args->dst.info.buffer,
-        coll_args->dst.info.count *
-            ucc_dt_size(coll_args->dst.info.datatype),
-        dst_ebuf);
 
     switch (coll_args->coll_type) {
         case UCC_COLL_TYPE_ALLREDUCE:
-        case UCC_COLL_TYPE_ALLTOALL:
-        case UCC_COLL_TYPE_ALLGATHER:
         {
             if (!in_place) {
                 keys.src_len = src_ebuf->packed_memh_len;
@@ -183,11 +156,18 @@ ucc_status_t ucc_cl_doca_urom_coll_full_init(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t      *team,
                                              ucc_coll_task_t     **task)
 {
-    ucc_cl_doca_urom_team_t     *cl_team = ucc_derived_of(team,
+    ucc_cl_doca_urom_team_t     *cl_team  = ucc_derived_of(team,
                                             ucc_cl_doca_urom_team_t);
-    ucc_cl_doca_urom_context_t  *ctx     = UCC_CL_DOCA_UROM_TEAM_CTX(cl_team);
-    ucc_cl_doca_urom_lib_t      *cl_lib  = ucc_derived_of(ctx->super.super.lib,
+    ucc_cl_doca_urom_context_t  *ctx      = UCC_CL_DOCA_UROM_TEAM_CTX(cl_team);
+    ucc_cl_doca_urom_lib_t      *cl_lib   = ucc_derived_of(ctx->super.super.lib,
                                             ucc_cl_doca_urom_lib_t);
+    int                          ucp_idx  = cl_lib->tl_ucp_index;
+    ucc_tl_ucp_context_t        *tl_ctx   = ucc_derived_of(
+                                                ctx->super.tl_ctxs[ucp_idx],
+                                                ucc_tl_ucp_context_t);
+    int                          in_place = UCC_IS_INPLACE(coll_args->args);
+    struct export_buf           *src_ebuf;
+    struct export_buf           *dst_ebuf;
     ucc_status_t                 status;
     ucc_cl_doca_urom_schedule_t *cl_schedule;
     ucc_schedule_t              *schedule;
@@ -211,6 +191,31 @@ ucc_status_t ucc_cl_doca_urom_coll_full_init(ucc_base_coll_args_t *coll_args,
     schedule->super.triggered_post_setup = ucc_cl_doca_urom_triggered_post_setup;
 
     *task = &schedule->super;
+
+    src_ebuf = &cl_schedule->src_ebuf;
+    dst_ebuf = &cl_schedule->dst_ebuf;
+
+    src_ebuf->memh = NULL;
+    dst_ebuf->memh = NULL;
+
+    // Register the src buf to get the exported memh
+    if (!in_place) {
+        ucc_cl_doca_urom_buffer_export_ucc(
+            tl_ctx->worker.ucp_context,
+            coll_args->args.src.info.buffer,
+            coll_args->args.src.info.count *
+                ucc_dt_size(coll_args->args.src.info.datatype),
+            src_ebuf);
+    }
+
+    // Register the dst buf to get the exported memh
+    ucc_cl_doca_urom_buffer_export_ucc(
+        tl_ctx->worker.ucp_context,
+        coll_args->args.dst.info.buffer,
+        coll_args->args.dst.info.count *
+            ucc_dt_size(coll_args->args.dst.info.datatype),
+        dst_ebuf);
+
     cl_debug(cl_lib, "cl doca urom coll initialized");
     return UCC_OK;
 }

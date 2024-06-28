@@ -41,7 +41,7 @@ struct ucc_cl_doca_urom_context_create_result {
 /* UCC team create result */
 struct ucc_cl_doca_urom_team_create_result {
     void *team; /* Pointer to UCC team */
-    int status; /* 0=nothing, 1=team create in progress, 2=team create done */
+    ucc_status_t status;
 };
 
 /* UCC collective result */
@@ -288,7 +288,7 @@ doca_error_t ucc_cl_doca_urom_task_ctx_destroy(
  */
 doca_error_t ucc_cl_doca_urom_task_team_create(
 		struct doca_urom_worker *worker_ctx, union doca_data cookie,
-		uint64_t dpu_worker_id, int64_t start, int64_t stride, int64_t size, 
+		uint64_t dpu_worker_id, int64_t start, int64_t stride, int64_t size,
 		void *context, ucc_cl_doca_urom_team_create_finished_cb cb);
 
 /*
