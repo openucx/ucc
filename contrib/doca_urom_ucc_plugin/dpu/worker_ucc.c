@@ -489,6 +489,10 @@ static doca_error_t urom_worker_ucc_cmd_unpack(void  *packed_cmd,
         ucc_cmd->pass_dc_create_cmd.ucp_addr = ptr;
         extended_mem += ucc_cmd->pass_dc_create_cmd.addr_len;
         break;
+
+    default:
+        DOCA_LOG_ERR("Invalid UCC cmd: %u", ucc_cmd->cmd_type);
+        break;
     }
 
     if ((*cmd)->len != extended_mem + sizeof(struct urom_worker_ucc_cmd)) {
@@ -2243,7 +2247,7 @@ urom_worker_ucc_worker_cmd(struct urom_worker_ctx *ctx,
             status = urom_worker_ucc_pass_dc_create(ucc_worker, cmd_desc);
             break;
         default:
-            DOCA_LOG_INFO("Invalid UCC command type: %lu", ucc_cmd->cmd_type);
+            DOCA_LOG_INFO("Invalid UCC command type: %u", ucc_cmd->cmd_type);
             status = DOCA_ERROR_INVALID_VALUE;
             break;
         }

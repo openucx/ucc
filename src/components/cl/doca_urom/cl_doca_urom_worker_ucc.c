@@ -149,7 +149,7 @@ error_exit:
                     ucc_notify->pass_dc_nqe.status);
         break;
     default:
-        DOCA_LOG_ERR("Invalid UCC notification type %lu",
+        DOCA_LOG_ERR("Invalid UCC notification type %u",
                      ucc_notify->notify_type);
         break;
     }
@@ -253,6 +253,10 @@ static doca_error_t cmd_pack(struct urom_worker_ucc_cmd *ucc_cmd,
         pack_head = urom_ucc_serialize_next_raw(&pack_tail, void, pack_len);
         memcpy(pack_head, ucc_cmd->pass_dc_create_cmd.ucp_addr, pack_len);
         *packed_cmd_len += pack_len;
+        break;
+    default:
+        DOCA_LOG_ERR("Invalid UCC cmd type %u",
+                      ucc_cmd->cmd_type);
         break;
     }
     return DOCA_SUCCESS;

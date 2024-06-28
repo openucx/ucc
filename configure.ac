@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2001-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2001-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # This software product is a proprietary product of Mellanox Technologies Ltd.
 # (the "Company") and all right, title, and interest and to the software product,
 # including all associated intellectual property rights, are and shall

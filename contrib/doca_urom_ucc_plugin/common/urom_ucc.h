@@ -21,147 +21,148 @@
 extern "C" {
 #endif
 
-/* UCC serializing next raw, iter points to the offset place and returns the buffer start */
+/* UCC serializing next raw, iter points to the offset place and returns the
+   buffer start */
 #define urom_ucc_serialize_next_raw(_iter, _type, _offset) \
-	({ \
-		_type *_result = (_type *)(*(_iter)); \
-		*(_iter) = UCS_PTR_BYTE_OFFSET(*(_iter), _offset); \
-		_result; \
-	})
+    ({                                                     \
+        _type *_result = (_type *)(*(_iter));              \
+        *(_iter) = UCS_PTR_BYTE_OFFSET(*(_iter), _offset); \
+        _result;                                           \
+    })
 
 /* UCC command types */
 enum urom_worker_ucc_cmd_type {
-	UROM_WORKER_CMD_UCC_LIB_CREATE,			 /* UCC library create command */
-	UROM_WORKER_CMD_UCC_LIB_DESTROY,		 /* UCC library destroy command */
-	UROM_WORKER_CMD_UCC_CONTEXT_CREATE,		 /* UCC context create command */
-	UROM_WORKER_CMD_UCC_CONTEXT_DESTROY,		 /* UCC context destroy command */
-	UROM_WORKER_CMD_UCC_TEAM_CREATE,		 /* UCC team create command */
-	UROM_WORKER_CMD_UCC_COLL,			 /* UCC collective create command */
-	UROM_WORKER_CMD_UCC_CREATE_PASSIVE_DATA_CHANNEL, /* UCC passive data channel command */
+    UROM_WORKER_CMD_UCC_LIB_CREATE,                  /* UCC library create command */
+    UROM_WORKER_CMD_UCC_LIB_DESTROY,                 /* UCC library destroy command */
+    UROM_WORKER_CMD_UCC_CONTEXT_CREATE,              /* UCC context create command */
+    UROM_WORKER_CMD_UCC_CONTEXT_DESTROY,             /* UCC context destroy command */
+    UROM_WORKER_CMD_UCC_TEAM_CREATE,                 /* UCC team create command */
+    UROM_WORKER_CMD_UCC_COLL,                        /* UCC collective create command */
+    UROM_WORKER_CMD_UCC_CREATE_PASSIVE_DATA_CHANNEL, /* UCC passive data channel command */
 };
 
 /*
  * UCC library create command structure
  *
- * Input parameters for creating the library handle. The semantics of the parameters are defined by ucc.h
- * On successful completion of urom_worker_cmd_ucc_lib_create,
- * The UROM worker will generate a notification on the notification queue. This
- * notification has reference to local library handle on the worker. The
- * implementation can choose to create shadow handles or safely pack the
- * library handle on the BlueCC worker to the AEU.
+ * Input parameters for creating the library handle. The semantics of the
+ * parameters are defined by ucc.h On successful completion of
+ * urom_worker_cmd_ucc_lib_create, The UROM worker will generate a notification
+ * on the notification queue. This notification has reference to local library
+ * handle on the worker. The implementation can choose to create shadow handles
+ * or safely pack the library handle on the BlueCC worker to the AEU.
  */
 struct urom_worker_cmd_ucc_lib_create {
-	void *params; /* UCC library parameters */
+    void *params; /* UCC library parameters */
 };
 
 /* UCC context create command structure */
 struct urom_worker_cmd_ucc_context_create {
-	union {
-		int64_t start;	/* The started index */
-		int64_t *array; /* Set stride to <= 0 if array is used */
-	};
-	int64_t stride; /* Set number of strides */
-	int64_t size;	/* Set stride size */
-	void *base_va;	/* Shared buffer address */
-	uint64_t len;	/* Buffer length */
+    union {
+        int64_t  start; /* The started index */
+        int64_t *array; /* Set stride to <= 0 if array is used */
+    };
+    int64_t  stride;  /* Set number of strides */
+    int64_t  size;    /* Set stride size */
+    void    *base_va; /* Shared buffer address */
+    uint64_t len;     /* Buffer length */
 };
 
 /* UCC passive data channel command structure */
 struct urom_worker_cmd_ucc_pass_dc {
-	void *ucp_addr;	 /* UCP worker address on host */
-	size_t addr_len; /* UCP worker address length */
+    void  *ucp_addr; /* UCP worker address on host */
+    size_t addr_len; /* UCP worker address length */
 };
 
 /* UCC context destroy command structure */
 struct urom_worker_cmd_ucc_context_destroy {
-	void *context_h; /* UCC context pointer */
+    void *context_h; /* UCC context pointer */
 };
 
 /* UCC team create command structure */
 struct urom_worker_cmd_ucc_team_create {
-	int64_t start;	 /* Team start index */
-	int64_t stride;	 /* Number of strides */
-	int64_t size;	 /* Stride size */
-	void *context_h; /* UCC context */
+    int64_t start;     /* Team start index */
+    int64_t stride;    /* Number of strides */
+    int64_t size;      /* Stride size */
+    void   *context_h; /* UCC context */
 };
 
 /* UCC team destroy command structure */
 struct urom_worker_cmd_ucc_team_destroy {
-	void *team; /* UCC team to destroy */
+    void *team; /* UCC team to destroy */
 };
 
 /* UCC collective command structure */
 struct urom_worker_cmd_ucc_coll {
-	void *coll_args;	 /* Collective arguments */
-	void *team;		 /* UCC team */
-	int use_xgvmi;		 /* If operation uses XGVMI */
-	void *work_buffer;	 /* Work buffer */
-	size_t work_buffer_size; /* Buffer size */
-	size_t team_size;	 /* Team size */
+    void  *coll_args;        /* Collective arguments */
+    void  *team;             /* UCC team */
+    int    use_xgvmi;        /* If operation uses XGVMI */
+    void  *work_buffer;      /* Work buffer */
+    size_t work_buffer_size; /* Buffer size */
+    size_t team_size;        /* Team size */
 };
 
 /* UROM UCC worker command structure */
 struct urom_worker_ucc_cmd {
-	uint64_t cmd_type;	/* Type of command as defined by urom_worker_ucc_cmd_type */
-	uint64_t dpu_worker_id; /* DPU worker id as part of the team */
-	union {
-		struct urom_worker_cmd_ucc_lib_create lib_create_cmd;		/* Lib create command */
-		struct urom_worker_cmd_ucc_context_create context_create_cmd;	/* Context create command */
-		struct urom_worker_cmd_ucc_context_destroy context_destroy_cmd; /* Context destroy command */
-		struct urom_worker_cmd_ucc_team_create team_create_cmd;		/* Team create command */
-		struct urom_worker_cmd_ucc_team_destroy team_destroy_cmd;	/* Team destroy command */
-		struct urom_worker_cmd_ucc_coll coll_cmd;			/* UCC collective command */
-		struct urom_worker_cmd_ucc_pass_dc pass_dc_create_cmd;		/* Passive data channel command */
-	};
+    enum urom_worker_ucc_cmd_type cmd_type;
+    uint64_t dpu_worker_id; /* DPU worker id as part of the team */
+    union {
+        struct urom_worker_cmd_ucc_lib_create      lib_create_cmd;      /* Lib create command */
+        struct urom_worker_cmd_ucc_context_create  context_create_cmd;  /* Context create command */
+        struct urom_worker_cmd_ucc_context_destroy context_destroy_cmd; /* Context destroy command */
+        struct urom_worker_cmd_ucc_team_create     team_create_cmd;     /* Team create command */
+        struct urom_worker_cmd_ucc_team_destroy    team_destroy_cmd;    /* Team destroy command */
+        struct urom_worker_cmd_ucc_coll            coll_cmd;            /* UCC collective command */
+        struct urom_worker_cmd_ucc_pass_dc         pass_dc_create_cmd;  /* Passive data channel command */
+    };
 };
 
 /* UCC notification types */
 enum urom_worker_ucc_notify_type {
-	UROM_WORKER_NOTIFY_UCC_LIB_CREATE_COMPLETE,	      /* Create UCC library on DPU notification */
-	UROM_WORKER_NOTIFY_UCC_LIB_DESTROY_COMPLETE,	      /* Destroy UCC library on DPU notification */
-	UROM_WORKER_NOTIFY_UCC_CONTEXT_CREATE_COMPLETE,	      /* Create UCC context on DPU notification */
-	UROM_WORKER_NOTIFY_UCC_CONTEXT_DESTROY_COMPLETE,      /* Destroy UCC context on DPU notification */
-	UROM_WORKER_NOTIFY_UCC_TEAM_CREATE_COMPLETE,	      /* Create UCC team on DPU notification */
-	UROM_WORKER_NOTIFY_UCC_COLLECTIVE_COMPLETE,	      /* UCC collective completion notification */
-	UROM_WORKER_NOTIFY_UCC_PASSIVE_DATA_CHANNEL_COMPLETE, /* UCC data channel completion notification */
+    UROM_WORKER_NOTIFY_UCC_LIB_CREATE_COMPLETE,           /* Create UCC library on DPU notification */
+    UROM_WORKER_NOTIFY_UCC_LIB_DESTROY_COMPLETE,          /* Destroy UCC library on DPU notification */
+    UROM_WORKER_NOTIFY_UCC_CONTEXT_CREATE_COMPLETE,       /* Create UCC context on DPU notification */
+    UROM_WORKER_NOTIFY_UCC_CONTEXT_DESTROY_COMPLETE,      /* Destroy UCC context on DPU notification */
+    UROM_WORKER_NOTIFY_UCC_TEAM_CREATE_COMPLETE,          /* Create UCC team on DPU notification */
+    UROM_WORKER_NOTIFY_UCC_COLLECTIVE_COMPLETE,           /* UCC collective completion notification */
+    UROM_WORKER_NOTIFY_UCC_PASSIVE_DATA_CHANNEL_COMPLETE, /* UCC data channel completion notification */
 };
 
 /* UCC context create notification structure */
 struct urom_worker_ucc_notify_context_create {
-	void *context; /* Pointer to UCC context */
+    void *context; /* Pointer to UCC context */
 };
 
 /* UCC team create notification structure */
 struct urom_worker_ucc_notify_team_create {
-	void *team; /* Pointer to UCC team */
+    void *team; /* Pointer to UCC team */
 };
 
 /* UCC collective notification structure */
 struct urom_worker_ucc_notify_collective {
-	ucc_status_t status; /* UCC collective status */
+    ucc_status_t status; /* UCC collective status */
 };
 
 /* UCC passive data channel notification structure */
 struct urom_worker_ucc_notify_pass_dc {
-	ucc_status_t status; /* UCC  data channel status */
+    ucc_status_t status; /* UCC  data channel status */
 };
 
 /* UROM UCC worker notification structure */
 struct urom_worker_notify_ucc {
-	uint64_t notify_type;	/* Notify type as defined by urom_worker_ucc_notify_type */
-	uint64_t dpu_worker_id; /* DPU worker id */
-	union {
-		struct urom_worker_ucc_notify_context_create context_create_nqe; /* Context create notification */
-		struct urom_worker_ucc_notify_team_create team_create_nqe;	 /* Team create notification */
-		struct urom_worker_ucc_notify_collective coll_nqe;		 /* Collective notification */
-		struct urom_worker_ucc_notify_pass_dc pass_dc_nqe;		 /* Passive data channel notification */
-	};
+    enum urom_worker_ucc_notify_type notify_type;
+    uint64_t dpu_worker_id; /* DPU worker id */
+    union {
+        struct urom_worker_ucc_notify_context_create context_create_nqe; /* Context create notification */
+        struct urom_worker_ucc_notify_team_create    team_create_nqe;    /* Team create notification */
+        struct urom_worker_ucc_notify_collective     coll_nqe;           /* Collective notification */
+        struct urom_worker_ucc_notify_pass_dc        pass_dc_nqe;        /* Passive data channel notification */
+    };
 };
 
 typedef struct ucc_worker_key_buf {
-	size_t src_len;
-	size_t dst_len;
-	char rkeys[1024];
+    size_t src_len;
+    size_t dst_len;
+    char   rkeys[1024];
 } ucc_worker_key_buf;
 
 #ifdef __cplusplus
