@@ -588,6 +588,7 @@ int main(int argc, char *argv[])
     try {
         ProcessArgs(argc, argv);
     } catch (const std::string &s) {
+        failed = 1;
         err = s;
     }
     required = (thread_mode == UCC_THREAD_SINGLE) ? MPI_THREAD_SINGLE
