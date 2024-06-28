@@ -30,7 +30,7 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
                                                 ucc_tl_ucp_context_t);
     union doca_data              cookie    = {0};
     int                          use_xgvmi = 0;
-    int                          in_place  = 0;
+    int                          in_place  = UCC_IS_INPLACE(*coll_args);
     ucc_rank_t                   rank      = UCC_CL_TEAM_RANK(cl_team);
     ucc_cl_doca_urom_schedule_t *schedule  = ucc_derived_of(task,
                                                 ucc_cl_doca_urom_schedule_t);
@@ -43,11 +43,6 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
     dst_ebuf->memh = NULL;
 
     cookie.ptr = &schedule->res;
-
-    if ( (coll_args->mask & UCC_COLL_ARGS_FIELD_FLAGS  ) &&
-         (coll_args->flags & UCC_COLL_ARGS_FLAG_IN_PLACE) ) {
-        in_place = 1;
-    }
 
     // Register the src buf to get the exported memh
     if (!in_place) {
@@ -85,8 +80,11 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
             use_xgvmi = 1;
         } break;
         default:
+        {
             cl_error(&cl_lib->super, "coll_type %s is not supported",
                      ucc_coll_type_str(coll_args->coll_type));
+            return UCC_ERR_NOT_IMPLEMENTED;
+        }
     }
 
     coll_args->mask |= UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
@@ -192,7 +190,6 @@ ucc_status_t ucc_cl_doca_urom_coll_full_init(ucc_base_coll_args_t *coll_args,
                                             ucc_cl_doca_urom_lib_t);
     ucc_status_t                 status;
     ucc_cl_doca_urom_schedule_t *cl_schedule;
-    ucc_base_coll_args_t         args;
     ucc_schedule_t              *schedule;
 
     // Allocate and initialize schedule
@@ -201,8 +198,7 @@ ucc_status_t ucc_cl_doca_urom_coll_full_init(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NO_MEMORY;
     }
     schedule = &cl_schedule->super.super;
-    memcpy(&args, coll_args, sizeof(args));
-    status = ucc_schedule_init(schedule, &args, team);
+    status = ucc_schedule_init(schedule, coll_args, team);
     if (UCC_OK != status) {
         ucc_cl_doca_urom_put_schedule(schedule);
         return status;
