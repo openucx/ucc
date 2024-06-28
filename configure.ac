@@ -230,6 +230,7 @@ CHECK_TL_COLL_PLUGINS
 AC_CONFIG_FILES([
                  Makefile
                  contrib/Makefile
+                 contrib/doca_urom_ucc_plugin/Makefile
                  src/Makefile
                  src/ucc/api/ucc_version.h
                  src/core/ucc_version.c

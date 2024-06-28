@@ -67,7 +67,7 @@ UCC_CLASS_DEFINE(ucc_cl_doca_urom_team_t, ucc_cl_team_t);
 
 ucc_status_t ucc_cl_doca_urom_team_destroy(ucc_base_team_t *cl_team)
 {
-    return UCC_OK;    
+    return UCC_OK;
 }
 
 ucc_status_t ucc_cl_doca_urom_team_create_test(ucc_base_team_t *cl_team)

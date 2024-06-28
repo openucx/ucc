@@ -34,7 +34,6 @@ AS_IF([test "x$doca_urom_checked" != "xyes"],[
                 doca_urom_happy="yes"
             ],
             [
-                echo "CPPFLAGS: $CPPFLAGS"
                 doca_urom_happy="no"
             ], [-ldoca_common -ldoca_argp -ldoca_urom])
         ],
@@ -46,7 +45,7 @@ AS_IF([test "x$doca_urom_checked" != "xyes"],[
             AS_IF([test "x$check_doca_urom_dir" != "x"],
             [
                 AC_MSG_RESULT([DOCA_UROM dir: $check_doca_urom_dir])
-                AC_SUBST(DOCA_UROM_CPPFLAGS, "-I$check_doca_urom_dir/include/ $doca_urom_old_headers")
+                AC_SUBST(DOCA_UROM_CPPFLAGS, "-I$check_doca_urom_dir/include/")
             ])
             AS_IF([test "x$check_doca_urom_libdir" != "x"],
             [
