@@ -62,10 +62,7 @@ ucc_status_t ucc_cl_doca_urom_get_lib_attr(const ucc_base_lib_t *lib,
 {
     ucc_cl_doca_urom_lib_t  *cl_lib = ucc_derived_of(lib, ucc_cl_doca_urom_lib_t);
     ucc_cl_lib_attr_t       *attr   = ucc_derived_of(base_attr, ucc_cl_lib_attr_t);
-    ucc_config_names_list_t *tls    = &cl_lib->super.tls;
-    ucc_tl_iface_t          *tl_iface;
     ucc_status_t             status;
-    int                      i;
 
     attr->tls = &cl_lib->super.tls.array;
 
@@ -79,28 +76,10 @@ ucc_status_t ucc_cl_doca_urom_get_lib_attr(const ucc_base_lib_t *lib,
 
     attr->tls_forced             = &cl_lib->super.tls_forced;
     attr->super.attr.thread_mode = UCC_THREAD_MULTIPLE;
-    attr->super.attr.coll_types  = 0;
+    attr->super.attr.coll_types  = UCC_COLL_TYPE_ALLREDUCE;
     attr->super.flags            = 0;
 
     ucc_assert(tls->array.count >= 1);
-
-    for (i = 0; i < tls->array.count; i++) {
-        /* Check TLs provided in CL_DOCA_UROM_TLS. Not all of them could be
-           available, check for NULL. */
-        tl_iface =
-            ucc_derived_of(ucc_get_component(&ucc_global_config.tl_framework,
-                                             tls->array.names[i]),
-                           ucc_tl_iface_t);
-
-        if (!tl_iface) {
-            cl_warn(lib, "tl %s is not available", tls->array.names[i]);
-            continue;
-        }
-
-        if (UCC_OK != (status = check_tl_lib_attr(lib, tl_iface, attr))) {
-            return status;
-        }
-    }
 
     return UCC_OK;
 }

@@ -75,30 +75,25 @@ struct urom_worker_cmd_ucc_pass_dc {
 
 /* UCC context destroy command structure */
 struct urom_worker_cmd_ucc_context_destroy {
-    void *context_h; /* UCC context pointer */
+    ucc_context_h context_h; /* UCC context pointer */
 };
 
 /* UCC team create command structure */
 struct urom_worker_cmd_ucc_team_create {
-    int64_t start;     /* Team start index */
-    int64_t stride;    /* Number of strides */
-    int64_t size;      /* Stride size */
-    void   *context_h; /* UCC context */
-};
-
-/* UCC team destroy command structure */
-struct urom_worker_cmd_ucc_team_destroy {
-    void *team; /* UCC team to destroy */
+    int64_t       start;     /* Team start index */
+    int64_t       stride;    /* Number of strides */
+    int64_t       size;      /* Stride size */
+    ucc_context_h context_h; /* UCC context */
 };
 
 /* UCC collective command structure */
 struct urom_worker_cmd_ucc_coll {
-    void  *coll_args;        /* Collective arguments */
-    void  *team;             /* UCC team */
-    int    use_xgvmi;        /* If operation uses XGVMI */
-    void  *work_buffer;      /* Work buffer */
-    size_t work_buffer_size; /* Buffer size */
-    size_t team_size;        /* Team size */
+    ucc_coll_args_t *coll_args;        /* Collective arguments */
+    ucc_team_h       team;             /* UCC team */
+    int              use_xgvmi;        /* If operation uses XGVMI */
+    void            *work_buffer;      /* Work buffer */
+    size_t           work_buffer_size; /* Buffer size */
+    size_t           team_size;        /* Team size */
 };
 
 /* UROM UCC worker command structure */
@@ -110,7 +105,6 @@ struct urom_worker_ucc_cmd {
         struct urom_worker_cmd_ucc_context_create  context_create_cmd;  /* Context create command */
         struct urom_worker_cmd_ucc_context_destroy context_destroy_cmd; /* Context destroy command */
         struct urom_worker_cmd_ucc_team_create     team_create_cmd;     /* Team create command */
-        struct urom_worker_cmd_ucc_team_destroy    team_destroy_cmd;    /* Team destroy command */
         struct urom_worker_cmd_ucc_coll            coll_cmd;            /* UCC collective command */
         struct urom_worker_cmd_ucc_pass_dc         pass_dc_create_cmd;  /* Passive data channel command */
     };
@@ -129,12 +123,12 @@ enum urom_worker_ucc_notify_type {
 
 /* UCC context create notification structure */
 struct urom_worker_ucc_notify_context_create {
-    void *context; /* Pointer to UCC context */
+    ucc_context_h context; /* Pointer to UCC context */
 };
 
 /* UCC team create notification structure */
 struct urom_worker_ucc_notify_team_create {
-    void *team; /* Pointer to UCC team */
+    ucc_team_h team; /* Pointer to UCC team */
 };
 
 /* UCC collective notification structure */

@@ -16,9 +16,9 @@ sources =                           \
 
 module_LTLIBRARIES         = libucc_cl_doca_urom.la
 libucc_cl_doca_urom_la_SOURCES  = $(sources)
-libucc_cl_doca_urom_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS) $(DOCA_UROM_CPPFLAGS) $(DOCA_UROM_UCC_CPPFLAGS) -I$(top_srcdir)/contrib/doca_urom_ucc_plugin/common
+libucc_cl_doca_urom_la_CPPFLAGS = $(AM_CPPFLAGS) $(BASE_CPPFLAGS) $(DOCA_UROM_CPPFLAGS) -I$(top_srcdir)/contrib/doca_urom_ucc_plugin/common
 libucc_cl_doca_urom_la_CFLAGS   = $(BASE_CFLAGS)
-libucc_cl_doca_urom_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(DOCA_UROM_UCC_LDFLAGS) $(DOCA_UROM_LDFLAGS)
-libucc_cl_doca_urom_la_LIBADD   = $(DOCA_UROM_UCC_LIBADD) $(DOCA_UROM_LIBADD) $(UCC_TOP_BUILDDIR)/src/libucc.la
+libucc_cl_doca_urom_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(DOCA_UROM_LDFLAGS)
+libucc_cl_doca_urom_la_LIBADD   = $(DOCA_UROM_LIBADD) $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 include $(top_srcdir)/config/module.am
