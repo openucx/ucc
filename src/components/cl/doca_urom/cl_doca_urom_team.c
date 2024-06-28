@@ -47,7 +47,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_doca_urom_team_t, ucc_base_context_t *cl_context,
                 ucc_cl_doca_urom_team_create_finished);
 
     if (result != DOCA_SUCCESS) {
-        cl_error(cl_context->lib, "Failed to create UCC team task");
+        cl_error(cl_context->lib, "failed to create UCC team task");
         return UCC_ERR_NO_RESOURCE;
     }
 
@@ -92,7 +92,7 @@ ucc_status_t ucc_cl_doca_urom_team_create_test(ucc_base_team_t *cl_team)
 
     if (res.result != DOCA_SUCCESS) {
         cl_error(ctx->super.super.lib,
-                 "UCC team create task failed: DOCA status %d\n", res.result);
+                 "UCC team create task failed: DOCA status %d", res.result);
         return UCC_ERR_NO_MESSAGE;
     }
 

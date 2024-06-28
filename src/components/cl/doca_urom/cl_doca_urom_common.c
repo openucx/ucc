@@ -69,14 +69,14 @@ doca_error_t ucc_cl_doca_urom_start_urom_service(
 service_stop:
 	tmp_result = doca_ctx_stop(doca_urom_service_as_ctx(inst));
 	if (tmp_result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to stop UROM service");
+		DOCA_LOG_ERR("failed to stop UROM service");
 		DOCA_ERROR_PROPAGATE(result, tmp_result);
 	}
 
 service_cleanup:
 	tmp_result = doca_urom_service_destroy(inst);
 	if (tmp_result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to destroy UROM service");
+		DOCA_LOG_ERR("failed to destroy UROM service");
 		DOCA_ERROR_PROPAGATE(result, tmp_result);
 	}
 	return result;
@@ -153,7 +153,7 @@ doca_error_t ucc_cl_doca_urom_start_urom_worker(
 worker_stop:
 	tmp_result = doca_ctx_stop(doca_urom_worker_as_ctx(inst));
 	if (tmp_result != DOCA_SUCCESS && tmp_result != DOCA_ERROR_IN_PROGRESS) {
-		DOCA_LOG_ERR("Failed to request stop UROM worker");
+		DOCA_LOG_ERR("failed to request stop UROM worker");
 		DOCA_ERROR_PROPAGATE(result, tmp_result);
 	}
 
@@ -165,7 +165,7 @@ worker_stop:
 worker_cleanup:
 	tmp_result = doca_urom_worker_destroy(inst);
 	if (tmp_result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to destroy UROM worker");
+		DOCA_LOG_ERR("failed to destroy UROM worker");
 		DOCA_ERROR_PROPAGATE(result, tmp_result);
 	}
 
@@ -185,7 +185,7 @@ doca_error_t ucc_cl_doca_urom_start_urom_domain(
 
 	result = doca_urom_domain_create(&inst);
 	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to create domain");
+		DOCA_LOG_ERR("failed to create domain");
 		return result;
 	}
 
@@ -241,14 +241,14 @@ doca_error_t ucc_cl_doca_urom_start_urom_domain(
 domain_stop:
 	tmp_result = doca_ctx_stop(doca_urom_domain_as_ctx(inst));
 	if (tmp_result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to stop UROM domain");
+		DOCA_LOG_ERR("failed to stop UROM domain");
 		DOCA_ERROR_PROPAGATE(result, tmp_result);
 	}
 
 domain_destroy:
 	tmp_result = doca_urom_domain_destroy(inst);
 	if (tmp_result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to destroy UROM domain");
+		DOCA_LOG_ERR("failed to destroy UROM domain");
 		DOCA_ERROR_PROPAGATE(result, tmp_result);
 	}
 	return result;
@@ -271,14 +271,14 @@ doca_error_t ucc_cl_doca_urom_open_doca_device_with_ibdev_name(
 
 	/* Setup */
 	if (val_size > DOCA_DEVINFO_IBDEV_NAME_SIZE) {
-		DOCA_LOG_ERR("Value size too large. Failed to locate device");
+		DOCA_LOG_ERR("Value size too large. failed to locate device");
 		return DOCA_ERROR_INVALID_VALUE;
 	}
 	memcpy(val_copy, value, val_size);
 
 	res = doca_devinfo_create_list(&dev_list, &nb_devs);
 	if (res != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to load doca devices list: %s", doca_error_get_descr(res));
+		DOCA_LOG_ERR("failed to load doca devices list: %s", doca_error_get_descr(res));
 		return res;
 	}
 

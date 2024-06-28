@@ -103,7 +103,7 @@ static ucc_status_t ucc_cl_doca_urom_coll_full_start(ucc_coll_task_t *task)
                             0,
                             ucc_cl_doca_urom_collective_finished);
     if (result != DOCA_SUCCESS) {
-        cl_error(&cl_lib->super, "Failed to create UCC collective task");
+        cl_error(&cl_lib->super, "failed to create UCC collective task");
     }
 
     task->status = UCC_INPROGRESS;
@@ -159,7 +159,7 @@ static void ucc_cl_doca_urom_coll_full_progress(ucc_coll_task_t *ctask)
     int                             ret;
 
     if (res == NULL) {
-        cl_error(cl_lib, "Error in UROM");
+        cl_error(cl_lib, "error in UROM");
         ctask->status = UCC_ERR_NO_MESSAGE;
         return;
     }
@@ -174,7 +174,7 @@ static void ucc_cl_doca_urom_coll_full_progress(ucc_coll_task_t *ctask)
     }
 
     if (res->result != DOCA_SUCCESS) {
-        cl_error(&cl_lib->super, "Error in DOCA_UROM, UCC collective task failed");
+        cl_error(&cl_lib->super, "error in DOCA_UROM, UCC collective task failed");
     }
 
     ctask->status = res->collective.status;
