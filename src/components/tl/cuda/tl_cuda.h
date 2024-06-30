@@ -228,6 +228,11 @@ struct ucc_tl_cuda_task {
         
         struct {
             int stage;
+            int step;
+            void *                  sbuf;
+            void *                  rbuf;
+            size_t size;
+            ucc_ee_executor_task_t *exec_task;
         } bcast_linear;
         struct {
             int                     stage;
