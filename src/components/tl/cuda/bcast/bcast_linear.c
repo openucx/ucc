@@ -8,12 +8,23 @@
 
 enum
 {
-    STAGE_SYNC,    /*< Wait for free SYNC segment */
-    STAGE_SETUP,   /*< Wait for memhandle setup to finish */
-    STAGE_COPIES,  /*< Linear algorithm is running */
-    STAGE_BARRIER, /*< Linear algorithm is done, waiting for
-                    *  other ranks to finish */
+    STAGE_COPY, // post copy task: copy block from src to scratch buffer
+    STAGE_WAIT_COPY, // wait for copy finishes
+    STAGE_WAIT_ALL, // wait for all others rank be on same step
 };
+
+static inline ucc_status_t ecopy(void *dst, void *src, size_t size,
+                                 ucc_ee_executor_t *      exec,
+                                 ucc_ee_executor_task_t **etask)
+{
+    ucc_ee_executor_task_args_t exec_args = {0};
+
+    exec_args.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+    exec_args.copy.dst  = dst;
+    exec_args.copy.src  = src;
+    exec_args.copy.len  = size;
+    return ucc_ee_executor_task_post(exec, &exec_args, etask);
+}
 
 ucc_status_t ucc_tl_cuda_bcast_linear_finalize(ucc_coll_task_t *coll_task)
 {
@@ -26,12 +37,50 @@ ucc_status_t ucc_tl_cuda_bcast_linear_finalize(ucc_coll_task_t *coll_task)
 
 void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_tl_cuda_task_t *task  = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
+    ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
     ucc_status_t        st;
-    (void) team;
-    (void) st;
+    (void)team;
+    (void)st;
+    ucc_ee_executor_task_t *etask;
+    ucc_ee_executor_t      *exec;
+    ucc_status_t            status;
+    void *                  sbuf, *dbuf, *scratch_buf;
     task->super.status = UCC_INPROGRESS;
+
+    // fall-through between cases is intentional
+    switch (task->bcast_linear.stage)
+    {
+    case STAGE_COPY:
+        // copy from src buffer to scratch
+        scratch_buf = TASK_SCRATCH(task, trank);
+        block_size = 
+        status = ecopy(dbuf, sbuf, block_size);
+        break;
+    
+    default:
+        break;
+    }
+
+    status = ucc_coll_task_get_executor(&task->super, &exec);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return;
+    }
+    
+    etask = &task->bcast_linear.exec_task;
+
+    ucc_ee_executor_task_args_t exec_args = {0};
+
+    exec_args.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+    exec_args.copy.dst  = task->bcast_linear.dbuf;
+    exec_args.copy.src  = task->bcast_linear.sbuf;
+    exec_args.copy.len  = task->bcast_linear.size;
+    status = ucc_ee_executor_task_post(exec, &exec_args, etask);
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_error("ucc_ee_executor_task_post failed");
+        return;
+    }
 }
 
 ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
@@ -46,7 +95,10 @@ ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
     (void) args;
     (void) dt;
     task->bcast_linear.stage         = STAGE_SYNC;
-    // task->bcast_linear.sbuf          = args->src.info.buffer;
+    ucc_info("bcast start");
+
+    task->bcast_linear.sbuf = args->src.info.buffer;
+    task->bcast_linear.rbuf = args->dst.info.buffer;
 
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -59,6 +111,8 @@ ucc_status_t ucc_tl_cuda_bcast_linear_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     ucc_tl_cuda_task_t *task;
     ucc_status_t        status;
+
+    ucc_info("bcast init");
 
     if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_conntected(team->topo) ||
         UCC_TL_TEAM_SIZE(team) - 1 > UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS)) {
@@ -81,6 +135,8 @@ ucc_status_t ucc_tl_cuda_bcast_linear_init(ucc_base_coll_args_t *coll_args,
     task->super.progress       = ucc_tl_cuda_bcast_linear_progress;
     task->super.finalize       = ucc_tl_cuda_bcast_linear_finalize;
     task->bar                  = TASK_BAR(task);
+
+    ucc_info("bcast init success");
 
     *task_p = &task->super;
     return UCC_OK;
