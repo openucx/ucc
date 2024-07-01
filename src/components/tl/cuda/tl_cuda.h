@@ -230,7 +230,6 @@ struct ucc_tl_cuda_task {
             int stage;
             int step;
             void *                  sbuf;
-            void *                  rbuf;
             ucc_datatype_t          dt;
             size_t size;
             ucc_ee_executor_task_t *exec_task;
