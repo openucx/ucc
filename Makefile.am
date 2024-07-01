@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # Copyright (C) Huawei Technologies Co., Ltd. 2020.  All rights reserved.
 # $HEADER$
 #
@@ -7,6 +7,7 @@
 if !DOCS_ONLY
 SUBDIRS =      \
 	src        \
+	contrib    \
 	tools/info \
 	cmake
 

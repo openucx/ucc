@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # See file LICENSE for terms.
 
@@ -12,6 +12,10 @@ ec_dirs = components/ec/cpu
 if HAVE_CUDA
 mc_dirs += components/mc/cuda
 ec_dirs += components/ec/cuda
+endif
+
+if HAVE_DOCA_UROM
+cl_dirs += components/cl/doca_urom
 endif
 
 if HAVE_ROCM

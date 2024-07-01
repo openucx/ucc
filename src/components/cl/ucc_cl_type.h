@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -11,6 +11,7 @@
 typedef enum {
     UCC_CL_BASIC,
     UCC_CL_HIER,
+    UCC_CL_DOCA_UROM,
     UCC_CL_ALL,
     UCC_CL_LAST
 } ucc_cl_type_t;
