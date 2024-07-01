@@ -43,43 +43,27 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     ucc_status_t        st;
     (void)team;
     (void)st;
-    ucc_ee_executor_task_t *etask;
     ucc_ee_executor_t      *exec;
     ucc_status_t            status;
-    void *                  sbuf, *dbuf, *scratch_buf;
+    void *                  sbuf, *dbuf;
     task->super.status = UCC_INPROGRESS;
-
-    // fall-through between cases is intentional
-    switch (task->bcast_linear.stage)
-    {
-    case STAGE_COPY:
-        // copy from src buffer to scratch
-        scratch_buf = TASK_SCRATCH(task, trank);
-        block_size = 
-        status = ecopy(dbuf, sbuf, block_size);
-        break;
-    
-    default:
-        break;
-    }
 
     status = ucc_coll_task_get_executor(&task->super, &exec);
     if (ucc_unlikely(status != UCC_OK)) {
         return;
     }
     
-    etask = &task->bcast_linear.exec_task;
-
-    ucc_ee_executor_task_args_t exec_args = {0};
-
-    exec_args.task_type = UCC_EE_EXECUTOR_TASK_COPY;
-    exec_args.copy.dst  = task->bcast_linear.dbuf;
-    exec_args.copy.src  = task->bcast_linear.sbuf;
-    exec_args.copy.len  = task->bcast_linear.size;
-    status = ucc_ee_executor_task_post(exec, &exec_args, etask);
-    if (ucc_unlikely(status != UCC_OK)) {
-        ucc_error("ucc_ee_executor_task_post failed");
-        return;
+    // fall-through between cases is intentional
+    switch (task->bcast_linear.stage)
+    {
+    case STAGE_COPY:
+        // copy from src buffer to scratch
+        dbuf = TASK_SCRATCH(task, trank);
+        sbuf = task->bcast_linear.sbuf;
+        status = ecopy(dbuf, sbuf, task->bcast_linear.size, exec, &task->bcast_linear.exec_task);
+        break;
+    default:
+        break;
     }
 }
 
@@ -89,13 +73,13 @@ ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
     ucc_coll_args_t *   args  = &TASK_ARGS(task);
     ucc_rank_t          tsize = UCC_TL_TEAM_SIZE(team);
-    ucc_datatype_t      dt    = task->allgatherv_linear.dt;
+    ucc_datatype_t      dt    = task->bcast_linear.dt;
 
     (void) tsize;
     (void) args;
     (void) dt;
-    task->bcast_linear.stage         = STAGE_SYNC;
-    ucc_info("bcast start");
+    task->bcast_linear.stage         = STAGE_COPY;
+    ucc_info("bcast start with dt: %ld", dt);
 
     task->bcast_linear.sbuf = args->src.info.buffer;
     task->bcast_linear.rbuf = args->dst.info.buffer;
@@ -126,9 +110,13 @@ ucc_status_t ucc_tl_cuda_bcast_linear_init(ucc_base_coll_args_t *coll_args,
 
     // task->allgatherv_linear.get_count  = ucc_tl_cuda_allgather_get_count;
     // task->allgatherv_linear.get_offset = ucc_tl_cuda_allgather_get_offset;
-    // task->allgatherv_linear.dt         = coll_args->args.dst.info.datatype;
+    task->bcast_linear.dt         = coll_args->args.src.info.datatype;
+
+    ucc_info("bcast start with dt: %ld", task->bcast_linear.dt);
+
     // task->allgatherv_linear.sbuf       = coll_args->args.src.info.buffer;
     // task->allgatherv_linear.rbuf       = coll_args->args.dst.info.buffer;
+
 
     task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post           = ucc_tl_cuda_bcast_linear_start;
