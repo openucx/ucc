@@ -113,9 +113,9 @@ static inline void ucc_tl_mlx5_put_schedule(ucc_tl_mlx5_schedule_t *schedule)
     ucc_mpool_put(schedule);
 }
 
-ucc_status_t ucc_tl_mlx5_bcast_mcast_init(ucc_base_coll_args_t *coll_args,
-                                          ucc_base_team_t      *team,
-                                          ucc_coll_task_t     **task_h);
+ucc_status_t ucc_tl_mlx5_coll_mcast_init(ucc_base_coll_args_t *coll_args,
+                                         ucc_base_team_t      *team,
+                                         ucc_coll_task_t     **task_h);
 
 ucc_status_t ucc_tl_mlx5_task_finalize(ucc_coll_task_t *coll_task);
 

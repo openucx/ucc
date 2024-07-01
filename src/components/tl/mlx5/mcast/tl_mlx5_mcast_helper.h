@@ -86,7 +86,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
         swr[0].imm_data   = htonl(pp->psn);
         swr[0].send_flags = (length <= comm->max_inline) ? IBV_SEND_INLINE : 0;
 
-        comm->r_window[pp->psn & (comm->wsize-1)] = pp;
+        comm->r_window[pp->psn & (comm->bcast_comm.wsize-1)] = pp;
         comm->psn++;
         req->to_send--;
         offset += length;
@@ -102,7 +102,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
                  pp->psn, pp->length, zcopy, swr[0].send_flags & IBV_SEND_SIGNALED);
 
         if (0 != (rc = ibv_post_send(comm->mcast.qp, &swr[0], &bad_wr))) {
-            tl_error(comm->lib, "Post send failed: ret %d, start_psn %d, to_send %d, "
+            tl_error(comm->lib, "post send failed: ret %d, start_psn %d, to_send %d, "
                     "to_recv %d, length %d, psn %d, inline %d",
                      rc, req->start_psn, req->to_send, req->to_recv,
                      length, pp->psn, length <= comm->max_inline);
@@ -127,7 +127,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_process_pp(ucc_tl_mlx5_mcast_coll_c
 {
     ucc_status_t status = UCC_OK;
 
-    if (PSN_RECEIVED(pp->psn, comm) || pp->psn < comm->last_acked) {
+    if (PSN_RECEIVED(pp->psn, comm) || pp->psn < comm->bcast_comm.last_acked) {
         /* This psn was already received */
         ucc_assert(pp->context == 0);
         if (in_pending_queue) {
@@ -336,7 +336,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send_collective(ucc_tl_mlx5_mcast_c
                  mcast_group_index);
 
         if (0 != (rc = ibv_post_send(comm->mcast.qp_list[mcast_group_index], &swr[0], &bad_wr))) {
-            tl_error(comm->lib, "Post send failed: ret %d, start_psn %d, to_send %d, "
+            tl_error(comm->lib, "post send failed: ret %d, start_psn %d, to_send %d, "
                       "to_recv %d, length %d, psn %d, inline %d",
                       rc, req->start_psn, req->to_send, req->to_recv,
                       length, pp->psn, length <= comm->max_inline);
@@ -426,6 +426,7 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
             if (UCC_OK != status) {
                 tl_error(comm->lib, "process allgather packet failed, status %d",
                          status);
+                ucc_free(wc);
                 return -1;
             }
 
@@ -499,8 +500,9 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable(ucc_tl_mlx5_mcast_coll_com
 {
     ucc_status_t status = UCC_OK;
 
-    if (comm->racks_n != comm->child_n || comm->sacks_n != comm->parent_n ||
-           comm->nack_requests) { 
+    if (comm->bcast_comm.racks_n != comm->bcast_comm.child_n ||
+            comm->bcast_comm.sacks_n != comm->bcast_comm.parent_n ||
+            comm->bcast_comm.nack_requests) {
         if (comm->pending_send) {
             status = ucc_tl_mlx5_mcast_poll_send(comm);
             if (UCC_OK != status) {
@@ -508,7 +510,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable(ucc_tl_mlx5_mcast_coll_com
             }
         }
         
-        if (comm->parent_n) {
+        if (comm->bcast_comm.parent_n) {
             status = ucc_tl_mlx5_mcast_poll_recv(comm);
             if (UCC_OK != status) {
                 return status;
@@ -521,26 +523,27 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable(ucc_tl_mlx5_mcast_coll_com
         }
     }
 
-    if (comm->parent_n && !comm->reliable_in_progress) {
+    if (comm->bcast_comm.parent_n && !comm->bcast_comm.reliable_in_progress) {
         status = ucc_tl_mlx5_mcast_reliable_send(comm);
         if (UCC_OK != status) {
             return status;
         }
     }
 
-    if (!comm->reliable_in_progress) {
-        comm->reliable_in_progress = 1;
+    if (!comm->bcast_comm.reliable_in_progress) {
+        comm->bcast_comm.reliable_in_progress = 1;
     }
 
-    if (comm->racks_n == comm->child_n && comm->sacks_n == comm->parent_n &&
-           0 == comm->nack_requests) {
+    if (comm->bcast_comm.racks_n == comm->bcast_comm.child_n &&
+            comm->bcast_comm.sacks_n == comm->bcast_comm.parent_n && 0 ==
+            comm->bcast_comm.nack_requests) {
         // Reset for next round.
-        memset(comm->parents,  0, sizeof(comm->parents));
-        memset(comm->children, 0, sizeof(comm->children));
+        memset(comm->bcast_comm.parents,  0, sizeof(comm->bcast_comm.parents));
+        memset(comm->bcast_comm.children, 0, sizeof(comm->bcast_comm.children));
 
-        comm->racks_n = comm->child_n  = 0;
-        comm->sacks_n = comm->parent_n = 0;
-        comm->reliable_in_progress     = 0;
+        comm->bcast_comm.racks_n              = comm->bcast_comm.child_n  = 0;
+        comm->bcast_comm.sacks_n              = comm->bcast_comm.parent_n = 0;
+        comm->bcast_comm.reliable_in_progress = 0;
 
         return UCC_OK;
     }

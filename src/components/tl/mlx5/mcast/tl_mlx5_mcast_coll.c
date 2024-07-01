@@ -12,12 +12,12 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_r_window_recycle(ucc_tl_mlx5_mcast_
                                                               ucc_tl_mlx5_mcast_coll_req_t  *req)
 {
     ucc_status_t     status        = UCC_OK;
-    int              wsize         = comm->wsize;
-    int              num_free_win  = wsize - (comm->psn - comm->last_acked);
+    int              wsize         = comm->bcast_comm.wsize;
+    int              num_free_win  = wsize - (comm->psn - comm->bcast_comm.last_acked);
     int              req_completed = (req->to_send == 0 && req->to_recv == 0);
     struct pp_packet *pp           = NULL;
 
-    ucc_assert(comm->recv_drop_packet_in_progress == false);
+    ucc_assert(comm->bcast_comm.recv_drop_packet_in_progress == false);
     ucc_assert(req->to_send >= 0);
 
     /* When do we need to perform reliability protocol:
@@ -33,12 +33,12 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_r_window_recycle(ucc_tl_mlx5_mcast_
             return status;
         }
 
-        comm->n_mcast_reliable++;
+        comm->bcast_comm.n_mcast_reliable++;
 
-        for (;comm->last_acked < comm->psn; comm->last_acked++) {
-            pp = comm->r_window[comm->last_acked & (wsize-1)];
+        for (;comm->bcast_comm.last_acked < comm->psn; comm->bcast_comm.last_acked++) {
+            pp = comm->r_window[comm->bcast_comm.last_acked & (wsize-1)];
             ucc_assert(pp != &comm->dummy_packet);
-            comm->r_window[comm->last_acked & (wsize-1)] = &comm->dummy_packet;
+            comm->r_window[comm->bcast_comm.last_acked & (wsize-1)] = &comm->dummy_packet;
 
             pp->context = 0;
             ucc_list_add_tail(&comm->bpool, &pp->super);
@@ -60,7 +60,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_bcast(ucc_tl_mlx5_mcast_coll_req
     ucc_status_t                   status = UCC_OK;
     ucc_tl_mlx5_mcast_coll_comm_t *comm   = req->comm;
     int                            zcopy  = req->proto != MCAST_PROTO_EAGER;
-    int                            wsize  = comm->wsize;
+    int                            wsize  = comm->bcast_comm.wsize;
     int                            num_free_win;
     int                            num_sent;
     int                            to_send;
@@ -74,29 +74,29 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_bcast(ucc_tl_mlx5_mcast_coll_req
         return status;
     }
 
-    if (ucc_unlikely(comm->recv_drop_packet_in_progress)) {
+    if (ucc_unlikely(comm->bcast_comm.recv_drop_packet_in_progress)) {
         /* wait till parent resend the dropped packet */
         return UCC_INPROGRESS;
     }
 
 
     if (req->to_send || req->to_recv) {
-        num_free_win = wsize - (comm->psn - comm->last_acked);
+        num_free_win = wsize - (comm->psn - comm->bcast_comm.last_acked);
 
         /* Send data if i'm root and there is a space in the window */
         if (num_free_win && req->am_root) {
             num_sent = req->num_packets - req->to_send;
 			ucc_assert(req->to_send > 0);
-			ucc_assert(req->first_send_psn + num_sent < comm->last_acked + wsize);
-            if (req->first_send_psn + num_sent < comm->last_acked + wsize &&
+			ucc_assert(req->first_send_psn + num_sent < comm->bcast_comm.last_acked + wsize);
+            if (req->first_send_psn + num_sent < comm->bcast_comm.last_acked + wsize &&
                 req->to_send) {
                 /* How many to send: either all that are left (if they fit into window) or
                    up to the window limit */
                 to_send = ucc_min(req->to_send,
-                                  comm->last_acked + wsize - (req->first_send_psn + num_sent));
+                                  comm->bcast_comm.last_acked + wsize - (req->first_send_psn + num_sent));
                 ucc_tl_mlx5_mcast_send(comm, req, to_send, zcopy);
 
-                num_free_win = wsize - (comm->psn - comm->last_acked);
+                num_free_win = wsize - (comm->psn - comm->bcast_comm.last_acked);
             }
         }
         
@@ -119,8 +119,8 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_bcast(ucc_tl_mlx5_mcast_coll_req
                     tl_trace(comm->lib, "Did not receive the packet with psn in"
                             " current window range, so get ready for drop"
                             " event. pending_q_size %d current comm psn %d"
-                            " last_acked psn %d stall threshold %d ",
-                            pending_q_size, comm->psn, comm->last_acked,
+                            " bcast_comm.last_acked psn %d stall threshold %d ",
+                            pending_q_size, comm->psn, comm->bcast_comm.last_acked,
                             DROP_THRESHOLD);
 
                     status = ucc_tl_mlx5_mcast_bcast_check_drop(comm, req);
@@ -144,7 +144,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_bcast(ucc_tl_mlx5_mcast_coll_req
         return status;
     }
 
-    if (req->to_send || req->to_recv || (zcopy && comm->psn != comm->last_acked)) {
+    if (req->to_send || req->to_recv || (zcopy && comm->psn != comm->bcast_comm.last_acked)) {
         return UCC_INPROGRESS;
     } else {
         return status;
@@ -201,16 +201,16 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_prepare_bcast(void* buf, size_t siz
     }
 
     req->offset       = 0;
-    req->start_psn    = comm->last_psn;
+    req->start_psn    = comm->bcast_comm.last_psn;
     req->num_packets  = ucc_max(ucc_div_round_up(req->length, comm->max_per_packet), 1);
     req->last_pkt_len = req->length - (req->num_packets - 1)*comm->max_per_packet;
 
     ucc_assert(req->last_pkt_len > 0 && req->last_pkt_len <= comm->max_per_packet);
 
-    comm->last_psn     += req->num_packets;
-    req->first_send_psn = req->start_psn;
-    req->to_send        = req->am_root ? req->num_packets : 0;
-    req->to_recv        = req->am_root ? 0 : req->num_packets;
+    comm->bcast_comm.last_psn += req->num_packets;
+    req->first_send_psn        = req->start_psn;
+    req->to_send               = req->am_root ? req->num_packets : 0;
+    req->to_recv               = req->am_root ? 0 : req->num_packets;
 
     return UCC_OK;
 }
