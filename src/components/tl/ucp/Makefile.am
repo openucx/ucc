@@ -16,7 +16,8 @@ allgather =                        \
 	allgather/allgather_neighbor.c \
 	allgather/allgather_bruck.c    \
 	allgather/allgather_sparbit.c  \
-	allgather/allgather_knomial.c
+	allgather/allgather_knomial.c  \
+	allgather/allgather_xgvmi.c
 
 allgatherv =                     \
 	allgatherv/allgatherv.h      \
@@ -28,6 +29,7 @@ alltoall =                       \
 	alltoall/alltoall.c          \
 	alltoall/alltoall_onesided.c \
 	alltoall/alltoall_pairwise.c \
+	alltoall/alltoall_xgvmi.c    \
 	alltoall/alltoall_bruck.c
 
 alltoallv =                        \
