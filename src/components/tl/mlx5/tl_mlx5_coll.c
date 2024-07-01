@@ -6,17 +6,18 @@
 
 #include "tl_mlx5_coll.h"
 #include "mcast/tl_mlx5_mcast_coll.h"
+#include "mcast/tl_mlx5_mcast_allgather.h"
 #include "alltoall/alltoall.h"
 
-ucc_status_t ucc_tl_mlx5_bcast_mcast_init(ucc_base_coll_args_t *coll_args,
-                                          ucc_base_team_t      *team,
-                                          ucc_coll_task_t     **task_h)
+ucc_status_t ucc_tl_mlx5_coll_mcast_init(ucc_base_coll_args_t *coll_args,
+                                         ucc_base_team_t      *team,
+                                         ucc_coll_task_t     **task_h)
 {
     ucc_status_t        status = UCC_OK;
     ucc_tl_mlx5_task_t *task   = NULL;
 
     if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args)) {
-        tl_trace(team->context->lib, "mcast bcast not supported for active sets");
+        tl_trace(team->context->lib, "mcast collective not supported for active sets");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -28,14 +29,26 @@ ucc_status_t ucc_tl_mlx5_bcast_mcast_init(ucc_base_coll_args_t *coll_args,
 
     task->super.finalize = ucc_tl_mlx5_task_finalize;
 
-    status = ucc_tl_mlx5_mcast_bcast_init(task);
-    if (ucc_unlikely(UCC_OK != status)) {
-        goto free_task;
+    switch (coll_args->args.coll_type) {
+    case UCC_COLL_TYPE_BCAST:
+        status = ucc_tl_mlx5_mcast_bcast_init(task);
+        if (ucc_unlikely(UCC_OK != status)) {
+            goto free_task;
+        }
+        break;
+    case UCC_COLL_TYPE_ALLGATHER:
+        status = ucc_tl_mlx5_mcast_allgather_init(task);
+        if (ucc_unlikely(UCC_OK != status)) {
+            goto free_task;
+        }
+        break;
+    default:
+        status = UCC_ERR_NOT_SUPPORTED;
     }
 
     *task_h = &(task->super);
 
-    tl_debug(UCC_TASK_LIB(task), "init coll task %p", task);
+    tl_debug(UCC_TASK_LIB(task), "initialized mcast collective task %p", task);
 
     return UCC_OK;
 
@@ -47,13 +60,13 @@ free_task:
 ucc_status_t ucc_tl_mlx5_task_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_mlx5_task_t           *task = ucc_derived_of(coll_task, ucc_tl_mlx5_task_t);
-    ucc_tl_mlx5_mcast_coll_req_t *req = task->bcast_mcast.req_handle;
+    ucc_tl_mlx5_mcast_coll_req_t *req = task->coll_mcast.req_handle;
 
     if (req != NULL) {
         ucc_assert(coll_task->status != UCC_INPROGRESS);
         ucc_free(req);
         tl_trace(UCC_TASK_LIB(task), "finalizing an mcast task %p", task);
-        task->bcast_mcast.req_handle = NULL;
+        task->coll_mcast.req_handle = NULL;
     }
 
     tl_trace(UCC_TASK_LIB(task), "finalizing task %p", task);
@@ -83,7 +96,8 @@ ucc_status_t ucc_tl_mlx5_coll_init(ucc_base_coll_args_t *coll_args,
         status = ucc_tl_mlx5_alltoall_init(coll_args, team, task_h);
         break;
     case UCC_COLL_TYPE_BCAST:
-        status = ucc_tl_mlx5_bcast_mcast_init(coll_args, team, task_h);
+    case UCC_COLL_TYPE_ALLGATHER:
+        status = ucc_tl_mlx5_coll_mcast_init(coll_args, team, task_h);
         break;
     default:
         status = UCC_ERR_NOT_SUPPORTED;
