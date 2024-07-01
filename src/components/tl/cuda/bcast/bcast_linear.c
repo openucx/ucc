@@ -61,6 +61,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
         dbuf = TASK_SCRATCH(task, trank);
         sbuf = task->bcast_linear.sbuf;
         status = ecopy(dbuf, sbuf, task->bcast_linear.size, exec, &task->bcast_linear.exec_task);
+        task->bcast_linear.stage = STAGE_WAIT_COPY;
         break;
     default:
         break;
@@ -111,8 +112,10 @@ ucc_status_t ucc_tl_cuda_bcast_linear_init(ucc_base_coll_args_t *coll_args,
     // task->allgatherv_linear.get_count  = ucc_tl_cuda_allgather_get_count;
     // task->allgatherv_linear.get_offset = ucc_tl_cuda_allgather_get_offset;
     task->bcast_linear.dt         = coll_args->args.src.info.datatype;
-
     ucc_info("bcast start with dt: %ld", task->bcast_linear.dt);
+
+    task->bcast_linear.size = coll_args->args.src.info.count * ucc_dt_size(task->bcast_linear.dt);
+    ucc_info("bcast start with data size: %ld", task->bcast_linear.size);
 
     // task->allgatherv_linear.sbuf       = coll_args->args.src.info.buffer;
     // task->allgatherv_linear.rbuf       = coll_args->args.dst.info.buffer;
