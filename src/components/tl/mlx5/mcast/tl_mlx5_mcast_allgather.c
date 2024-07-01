@@ -11,6 +11,24 @@
 #include "tl_mlx5_mcast_allgather.h"
 #include <inttypes.h>
 
+/* 32 here is the bit count of ib mcast packet's immediate data */
+#define TL_MLX5_MCAST_IB_IMMEDIATE_PACKET_BIT_COUNT 32
+
+#define ONE_SIDED_MAX_PACKET_COUNT(_max_count)                               \
+        do {                                                                 \
+            int pow2;                                                        \
+            int tmp;                                                         \
+            pow2       = log(ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE) / log(2);  \
+            tmp        = TL_MLX5_MCAST_IB_IMMEDIATE_PACKET_BIT_COUNT - pow2; \
+            pow2       = log(ONE_SIDED_MAX_ALLGATHER_COUNTER) / log(2);      \
+            tmp        = tmp - pow2;                                         \
+            _max_count = pow(2, tmp);                                        \
+        } while(0);
+
+#define MCAST_ALLGATHER_IN_PROGRESS(_req, _comm)                                     \
+        (_req->to_send || _req->to_recv || _comm->pending_send ||                    \
+         _comm->one_sided.rdma_read_in_progress || (NULL != _req->allgather_rkeys_req))      \
+
 static inline ucc_status_t ucc_tl_mlx5_mcast_check_collective(ucc_tl_mlx5_mcast_coll_comm_t *comm,
                                                               ucc_tl_mlx5_mcast_coll_req_t  *req)
 {
@@ -80,7 +98,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reset_reliablity(ucc_tl_mlx5_mcast_
     ucc_tl_mlx5_mcast_reg_t       *reg  = NULL;
     ucc_status_t                   status;
 
-    ucc_assert(req->ag_counter == comm->ag_under_progress_counter);
+    ucc_assert(req->ag_counter == comm->allgather_comm.under_progress_counter);
 
     if (comm->one_sided.reliability_enabled && !comm->one_sided.reliability_ready) {
         /* initialize the structures needed by reliablity protocol */ 
@@ -129,7 +147,7 @@ static inline void ucc_tl_mlx5_mcast_init_async_reliability_slots(ucc_tl_mlx5_mc
     ucc_tl_mlx5_mcast_coll_comm_t *comm = req->comm;
     void                          *dest;
 
-    ucc_assert(req->ag_counter == comm->ag_under_progress_counter);
+    ucc_assert(req->ag_counter == comm->allgather_comm.under_progress_counter);
 
     if (ONE_SIDED_ASYNCHRONOUS_PROTO == req->one_sided_reliability_scheme &&
                    ONE_SIDED_INVALID == comm->one_sided.slots_state) {
@@ -162,10 +180,10 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_allgather(ucc_tl_mlx5_mcast_coll
     }
 
     if (req->to_send || req->to_recv) {
-        ucc_assert(comm->max_push_send >= comm->pending_send);
+        ucc_assert(comm->allgather_comm.max_push_send >= comm->pending_send);
         if (req->to_send &&
-            (comm->max_push_send - comm->pending_send) > 0) {
-            ucc_tl_mlx5_mcast_send_collective(comm, req, ucc_min(comm->max_push_send -
+            (comm->allgather_comm.max_push_send - comm->pending_send) > 0) {
+            ucc_tl_mlx5_mcast_send_collective(comm, req, ucc_min(comm->allgather_comm.max_push_send -
                                               comm->pending_send, req->to_send),
                                               zcopy, UCC_COLL_TYPE_ALLGATHER, -1, SIZE_MAX);
         }
@@ -223,7 +241,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_allgather(ucc_tl_mlx5_mcast_coll
     }
 }
 
-ucc_status_t ucc_tl_mlx5_mcast_test_allgather(ucc_tl_mlx5_mcast_coll_req_t* req)
+static inline ucc_status_t ucc_tl_mlx5_mcast_test_allgather(ucc_tl_mlx5_mcast_coll_req_t* req)
 {
     ucc_status_t status;
     
@@ -281,12 +299,12 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_prepare_allgather(void* sbuf, void 
         req->num_packets = 1;
     }
 
-    ONE_SIDED_MAX_PACKET_COUNT(comm->ag_max_num_packets);
+    ONE_SIDED_MAX_PACKET_COUNT(comm->allgather_comm.max_num_packets);
 
-    if (comm->ag_max_num_packets < req->num_packets) {
+    if (comm->allgather_comm.max_num_packets < req->num_packets) {
         tl_warn(comm->lib,
                 "msg size is %ld but max supported msg size of mcast allgather is %d",
-                req->length, comm->ag_max_num_packets * comm->max_per_packet);
+                req->length, comm->allgather_comm.max_num_packets * comm->max_per_packet);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -312,11 +330,11 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_prepare_allgather(void* sbuf, void 
         req->one_sided_reliability_scheme = ONE_SIDED_NO_RELIABILITY;
     }
 
-    req->ag_counter = comm->ag_counter;
+    req->ag_counter = comm->allgather_comm.coll_counter;
     req->to_send    = req->num_packets;
     req->to_recv    = comm->commsize * req->num_packets;
 
-    comm->ag_counter++;
+    comm->allgather_comm.coll_counter++;
     return UCC_OK;
 }
 
@@ -329,7 +347,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_coll_do_allgather(void* sbuf, void 
 
     tl_trace(comm->lib, "MCAST allgather start, sbuf %p, rbuf %p, size %d, comm %d, "
              "comm_size %d, counter %d",
-             sbuf, rbuf, size, comm->comm_id, comm->commsize, comm->ag_counter);
+             sbuf, rbuf, size, comm->comm_id, comm->commsize, comm->allgather_comm.coll_counter);
 
     req = ucc_calloc(1, sizeof(ucc_tl_mlx5_mcast_coll_req_t), "mcast_req");
     if (!req) {
@@ -387,9 +405,9 @@ void ucc_tl_mlx5_mcast_allgather_progress(ucc_coll_task_t *coll_task)
 
     if (task->coll_mcast.req_handle != NULL) {
         req = task->coll_mcast.req_handle;
-        if (req->ag_counter != req->comm->ag_under_progress_counter) {
+        if (req->ag_counter != req->comm->allgather_comm.under_progress_counter) {
             /* it is not this task's turn for progress */
-            ucc_assert(req->comm->ag_under_progress_counter < req->ag_counter);
+            ucc_assert(req->comm->allgather_comm.under_progress_counter < req->ag_counter);
             return;
         }
 
@@ -398,7 +416,7 @@ void ucc_tl_mlx5_mcast_allgather_progress(ucc_coll_task_t *coll_task)
             return;
         } else if (UCC_OK == status) {
             coll_task->status = UCC_OK;
-            req->comm->ag_under_progress_counter++;
+            req->comm->allgather_comm.under_progress_counter++;
             ucc_free(req);
             task->coll_mcast.req_handle = NULL;
         } else {

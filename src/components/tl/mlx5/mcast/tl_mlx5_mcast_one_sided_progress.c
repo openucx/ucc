@@ -242,11 +242,11 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
 
             if (comm->one_sided.recvd_pkts_tracker[source_rank] > req->num_packets) {
                 tl_error(comm->lib, "reliablity failed: comm->one_sided.recvd_pkts_tracker[%d] %d"
-                        " req->num_packets %d offset %d PACKET_TO_DROP %d"
-                        " comm->ag_under_progress_counter %d req->ag_counter"
+                        " req->num_packets %d offset %d"
+                        " comm->allgather_comm.under_progress_counter %d req->ag_counter"
                         " %d \n", source_rank, comm->one_sided.recvd_pkts_tracker[source_rank],
-                        req->num_packets, offset, PACKET_TO_DROP,
-                        comm->ag_under_progress_counter, req->ag_counter);
+                        req->num_packets, offset,
+                        comm->allgather_comm.under_progress_counter, req->ag_counter);
                 return UCC_ERR_NO_MESSAGE;
             }
         }
