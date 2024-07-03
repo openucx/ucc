@@ -163,6 +163,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_context {
     struct rdma_cm_id             *id;
     struct rdma_event_channel     *channel;
     ucc_mpool_t                    compl_objects_mp;
+    ucc_mpool_t                    mcast_req_mp;
     ucc_list_link_t                pending_nacks_list;
     ucc_rcache_t                  *rcache;
     ucc_tl_mlx5_mcast_ctx_params_t params;
@@ -179,7 +180,6 @@ typedef struct ucc_tl_mlx5_mcast_context {
     ucc_thread_mode_t                  tm;
     ucc_tl_mlx5_mcast_coll_context_t   mcast_context;
     ucc_tl_mlx5_mcast_context_config_t cfg;
-    ucc_mpool_t                        req_mp;
     int                                mcast_enabled;
     int                                mcast_ctx_ready;
     ucc_tl_mlx5_mcast_oob_ctx_t        oob_ctx;

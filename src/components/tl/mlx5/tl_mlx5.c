@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -98,7 +98,7 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
 
     {"MCAST_ONE_SIDED_RELIABILITY_ENABLE", "1", "Enable one sided reliability for mcast",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.one_sided_reliability_enable),
-     UCC_CONFIG_TYPE_INT},
+     UCC_CONFIG_TYPE_BOOL},
 
     {NULL}};
 

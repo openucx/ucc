@@ -227,14 +227,16 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_do_bcast(void* buf, size_t size, ucc_rank_t 
              buf, size, root, comm->comm_id, comm->commsize, comm->rank ==
              root, comm->psn );
 
-    req = ucc_calloc(1, sizeof(ucc_tl_mlx5_mcast_coll_req_t), "mcast_req");
+    req = ucc_mpool_get(&comm->ctx->mcast_req_mp);
     if (!req) {
+        tl_error(comm->lib, "failed to get mcast req");
         return UCC_ERR_NO_MEMORY;
     }
+    memset(req, 0, sizeof(ucc_tl_mlx5_mcast_coll_req_t));
 
     status = ucc_tl_mlx5_mcast_prepare_bcast(buf, size, root, comm, req);
     if (UCC_OK != status) {
-        ucc_free(req);
+        ucc_mpool_put(req);
         return status;
     }
 
