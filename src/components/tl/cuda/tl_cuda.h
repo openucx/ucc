@@ -231,6 +231,7 @@ struct ucc_tl_cuda_task {
             int step;
             void *                  sbuf;
             ucc_datatype_t          dt;
+            ucc_rank_t              root;
             size_t size;
             ucc_ee_executor_task_t *exec_task;
         } bcast_linear;
