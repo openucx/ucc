@@ -63,7 +63,7 @@ ucc_rcache_get(ucc_rcache_t *rcache, void *address, size_t length,
     ucs_status_t status;
 
 #ifdef UCS_HAVE_RCACHE_REGION_ALIGNMENT
-    status = ucs_rcache_get(rcache, address, length, ucc_get_page_size(),
+    status = ucs_rcache_get(rcache, address, length, UCS_PGT_ADDR_ALIGN,
                             PROT_READ | PROT_WRITE, arg, region_p);
 #else
     status = ucs_rcache_get(rcache, address, length,
