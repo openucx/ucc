@@ -195,7 +195,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             }
             task->bcast_linear.stage = STAGE_COPY;
             // ucc_info("all others ready for next step");
-            if (task->bcast_linear.stage < task->bcast_linear.num_steps) {
+            if (task->bcast_linear.step < task->bcast_linear.num_steps) {
                 task->bcast_linear.stage = STAGE_COPY;
             } else {
                 task->bcast_linear.stage = STAGE_DONE;
@@ -241,9 +241,9 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                     set_rank_step(task, trank, task->bcast_linear.step, 0);
                     // task->bcast_linear.stage =
                     //     STAGE_DONE; // TODO: just for debug
-                    if (task->bcast_linear.stage <
+                    if (task->bcast_linear.step <
                         task->bcast_linear.num_steps) {
-                        task->bcast_linear.stage = STAGE_COPY;
+                        task->bcast_linear.stage = STAGE_WAIT_ROOT;
                     } else {
                         task->bcast_linear.stage = STAGE_DONE;
                     }
