@@ -96,17 +96,15 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
     ucc_rank_t          tsize = UCC_TL_TEAM_SIZE(team);
     // ucc_datatype_t      dt    = task->bcast_linear.dt;
-    ucc_status_t st;
-    (void)team;
-    (void)st;
+
     ucc_ee_executor_t      *exec;
     ucc_ee_executor_task_t *etask;
-    ucc_status_t            status;
+    ucc_status_t            st;
     void                   *sbuf, *dbuf;
     task->super.status = UCC_INPROGRESS;
 
-    status = ucc_coll_task_get_executor(&task->super, &exec);
-    if (ucc_unlikely(status != UCC_OK)) {
+    st = ucc_coll_task_get_executor(&task->super, &exec);
+    if (ucc_unlikely(st != UCC_OK)) {
         return;
     }
 
@@ -152,21 +150,28 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     // ucc_info("chunk_size: %ld", chunk_size);
 
     if (trank == task->bcast_linear.root) {
+        // Root scenario
         // fall-through between cases is intentional
         switch (task->bcast_linear.stage) {
         case STAGE_COPY:
             // copy from src buffer to scratch
-            dbuf   = TASK_SCRATCH(task, trank);
-            sbuf   = PTR_OFFSET(task->bcast_linear.sbuf, offset_buff);
-            status = ecopy(dbuf, sbuf, chunk_size, exec,
-                           &task->bcast_linear.exec_task);
+            dbuf = TASK_SCRATCH(task, trank);
+            sbuf = PTR_OFFSET(task->bcast_linear.sbuf, offset_buff);
+            st   = ecopy(dbuf, sbuf, chunk_size, exec,
+                         &task->bcast_linear.exec_task);
+            if (st != UCC_OK)
+            {
+                ucc_error("failed to post ecopy task");
+                task->super.status = st;
+                return;
+            }
             task->bcast_linear.stage = STAGE_WAIT_COPY;
-            break;
+            // break;
         case STAGE_WAIT_COPY:
             etask = task->bcast_linear.exec_task;
             if (etask) {
-                status = ucc_ee_executor_task_test(etask);
-                if (status == UCC_OK) {
+                st = ucc_ee_executor_task_test(etask);
+                if (st == UCC_OK) {
                     ucc_ee_executor_task_finalize(etask);
                     task->bcast_linear.exec_task = NULL;
                     // signal others
@@ -175,33 +180,42 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                                   task->bcast_linear.step, 0);
                     task->bcast_linear.stage = STAGE_WAIT_ALL;
                 }
+                else
+                {
+                    // ucc_info("not ready");
+                    return;
+                }
             }
-            break;
+            else
+            {
+                ucc_info("etask is nullptr");
+                return;
+            }
+            // break;
         case STAGE_WAIT_ALL:
             for (int i = 0; i < tsize; ++i) {
-                int other_rank_step = get_rank_step(task, i, 0);
-                // ucc_info("rank %d, step: %d, my step: %d", i, other_rank_step,
-                //          task->bcast_linear.step);
-                if (other_rank_step < task->bcast_linear.step) {
-                    // ucc_info("rank %d is not ready", i);
+                if (get_rank_step(task, i, 0) < task->bcast_linear.step) {
+                    // rank is not ready, lets wait
                     return;
                 }
             }
             task->bcast_linear.stage = STAGE_COPY;
             // ucc_info("all others ready for next step");
             if (task->bcast_linear.step < task->bcast_linear.num_steps) {
+                // go to next iteration
                 task->bcast_linear.stage = STAGE_COPY;
+                return;
             } else {
+                // finish
                 task->bcast_linear.stage = STAGE_DONE;
             }
-            break;
+            // break;
         case STAGE_DONE:
             task->super.status = UCC_OK;
             break;
         default:
             break;
         }
-        // Root scenario
     } else {
         // others
         switch (task->bcast_linear.stage) {
@@ -213,22 +227,26 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 task->bcast_linear.stage = STAGE_CLIENT_COPY;
                 break;
             }
-            break;
+            else
+            {
+                return;
+            }
+            // break;
         case STAGE_CLIENT_COPY:
             dbuf = PTR_OFFSET(task->bcast_linear.sbuf, offset_buff);
             sbuf = TASK_SCRATCH(
                 task,
                 task->bcast_linear
                     .root); // need to copy from root's scratch buffer
-            status                   = ecopy(dbuf, sbuf, chunk_size, exec,
+            st                   = ecopy(dbuf, sbuf, chunk_size, exec,
                                              &task->bcast_linear.exec_task);
             task->bcast_linear.stage = STAGE_CLIENT_COPY_WAIT;
-            break;
+            // break;
         case STAGE_CLIENT_COPY_WAIT:
             etask = task->bcast_linear.exec_task;
             if (etask) {
-                status = ucc_ee_executor_task_test(etask);
-                if (status == UCC_OK) {
+                st = ucc_ee_executor_task_test(etask);
+                if (st == UCC_OK) {
                     ucc_ee_executor_task_finalize(etask);
                     task->bcast_linear.exec_task = NULL;
                     ++task->bcast_linear.step;
@@ -236,12 +254,21 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                     if (task->bcast_linear.step <
                         task->bcast_linear.num_steps) {
                         task->bcast_linear.stage = STAGE_WAIT_ROOT;
+                        return;
                     } else {
                         task->bcast_linear.stage = STAGE_DONE;
                     }
                 }
+                else
+                {
+                    return;
+                }
             }
-            break;
+            else
+            {
+                return;
+            }
+            // break;
         case STAGE_DONE:
             task->super.status = UCC_OK;
             break;
@@ -253,14 +280,11 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
 
 ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task  = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
-    ucc_coll_args_t    *args  = &TASK_ARGS(task);
-    ucc_rank_t          tsize = UCC_TL_TEAM_SIZE(team);
-    ucc_datatype_t      dt    = task->bcast_linear.dt;
-
-    (void)tsize;
-    (void)dt;
+    ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
+    // ucc_rank_t          tsize = UCC_TL_TEAM_SIZE(team);
+    ucc_datatype_t dt = task->bcast_linear.dt;
 
     task->bcast_linear.stage = STAGE_SYNC;
 
