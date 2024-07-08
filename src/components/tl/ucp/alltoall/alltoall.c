@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -45,7 +45,7 @@ ucc_base_coll_alg_info_t
              .desc = "naive, linear one-sided implementation"},
         [UCC_TL_UCP_ALLTOALL_ALG_LINEAR_XGVMI] =
             {.id   = UCC_TL_UCP_ALLTOALL_ALG_LINEAR_XGVMI,
-             .name = "linear",
+             .name = "linear_xgvmi",
              .desc = "linear xgvmi-based implementation"},
         [UCC_TL_UCP_ALLTOALL_ALG_LAST] = {.id = 0, .name = NULL, .desc = NULL}};
 

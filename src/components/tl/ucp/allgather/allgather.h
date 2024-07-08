@@ -1,8 +1,9 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
+
 #ifndef ALLGATHER_H_
 #define ALLGATHER_H_
 #include "../tl_ucp.h"
@@ -76,7 +77,7 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_init(ucc_base_coll_args_t *coll_args,
                                                 ucc_coll_task_t     **task_h);
 
 /* XGVMI */
-void ucc_tl_ucp_dpu_xgvmi_rdma_progress_allgather(ucc_coll_task_t *coll_task);
+void ucc_tl_ucp_dpu_allgather_linear_xgvmi_rdma_progress(ucc_coll_task_t *coll_task);
 
 /* Uses allgather_kn_radix from config */
 ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,

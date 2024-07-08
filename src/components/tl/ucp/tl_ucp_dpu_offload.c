@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -46,10 +46,9 @@ ucc_status_t ucc_tl_ucp_allreduce_sliding_window_register(
     return UCC_OK;
 }
 
-ucc_status_t
-ucc_tl_ucp_dpu_xgvmi_task_init(ucc_base_coll_args_t *coll_args,
-                                              ucc_base_team_t      *team,
-                                              ucc_tl_ucp_task_t    *task)
+ucc_status_t ucc_tl_ucp_dpu_xgvmi_task_init(ucc_base_coll_args_t *coll_args,
+                                            ucc_base_team_t      *team,
+                                            ucc_tl_ucp_task_t    *task)
 {
     void                   *src_buf        = coll_args->args.src.info.buffer;
     void                   *dst_buf        = coll_args->args.dst.info.buffer;
@@ -136,8 +135,8 @@ ucc_tl_ucp_dpu_xgvmi_task_init(ucc_base_coll_args_t *coll_args,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_dpu_xgvmi_allgather_info_finalize(
-                ucc_tl_ucp_task_t *sw_task)
+ucc_status_t
+ucc_tl_ucp_dpu_xgvmi_allgather_info_finalize(ucc_tl_ucp_task_t *sw_task)
 {
     ucs_status_t       ucs_status = UCS_OK;
     ucc_base_team_t   *base_team  = sw_task->super.team;
@@ -305,9 +304,7 @@ ucc_tl_ucp_dpu_xgvmi_finalize(ucc_coll_task_t *coll_task)
     return status;
 }
 
-ucc_status_t
-ucc_tl_ucp_dpu_xgvmi_rdma_task_post(
-    ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_ucp_dpu_xgvmi_rdma_task_post(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task,
                                                        ucc_tl_ucp_task_t);
@@ -318,8 +315,7 @@ ucc_tl_ucp_dpu_xgvmi_rdma_task_post(
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
-void ucc_tl_ucp_dpu_xgvmi_free_rkeys(
-    ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_dpu_xgvmi_free_rkeys(ucc_coll_task_t *coll_task)
 {
     ucc_base_team_t   *team      = coll_task->team;
     ucc_rank_t         team_size = (ucc_rank_t)team->params.size;
@@ -337,9 +333,7 @@ void ucc_tl_ucp_dpu_xgvmi_free_rkeys(
     }
 }
 
-ucc_status_t
-ucc_tl_ucp_dpu_xgvmi_rdma_task_finalize(
-    ucc_coll_task_t *coll_task)
+ucc_status_t ucc_tl_ucp_dpu_xgvmi_rdma_task_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_status_t       st   = UCC_OK;
@@ -356,9 +350,8 @@ ucc_tl_ucp_dpu_xgvmi_rdma_task_finalize(
     return st;
 }
 
-ucc_status_t
-ucc_tl_ucp_dpu_xgvmi_req_test(ucs_status_ptr_t   request,
-                                             ucc_tl_ucp_task_t *task)
+ucc_status_t ucc_tl_ucp_dpu_xgvmi_req_test(ucs_status_ptr_t   request,
+                                           ucc_tl_ucp_task_t *task)
 {
     if (request == NULL) {
         return UCC_OK;
@@ -371,8 +364,7 @@ ucc_tl_ucp_dpu_xgvmi_req_test(ucs_status_ptr_t   request,
     }
 }
 
-void ucc_tl_ucp_dpu_xgvmi_key_exchange_progress(
-    ucc_coll_task_t *coll_task)
+void ucc_tl_ucp_dpu_xgvmi_key_exchange_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_task_t   *allgather_task =
@@ -405,10 +397,9 @@ err:
     goto out;
 }
 
-ucc_status_t
-ucc_tl_ucp_dpu_xgvmi_init(ucc_base_coll_args_t *coll_args,
-                                ucc_base_team_t      *team,
-                                ucc_coll_task_t     **task_h)
+ucc_status_t ucc_tl_ucp_dpu_xgvmi_init(ucc_base_coll_args_t *coll_args,
+                                       ucc_base_team_t      *team,
+                                       ucc_coll_task_t     **task_h)
 {
     ucc_schedule_t          *schedule       = NULL;
     ucc_status_t             status         = UCC_OK;
@@ -476,10 +467,10 @@ ucc_tl_ucp_dpu_xgvmi_init(ucc_base_coll_args_t *coll_args,
 
     switch (coll_args->args.coll_type) {
     case UCC_COLL_TYPE_ALLTOALL:
-        rdma_task->super.progress = ucc_tl_ucp_dpu_xgvmi_rdma_progress_alltoall;
+        rdma_task->super.progress = ucc_tl_ucp_dpu_alltoall_linear_xgvmi_rdma_progress;
         break;
     case UCC_COLL_TYPE_ALLGATHER:
-        rdma_task->super.progress = ucc_tl_ucp_dpu_xgvmi_rdma_progress_allgather;
+        rdma_task->super.progress = ucc_tl_ucp_dpu_allgather_linear_xgvmi_rdma_progress;
         break;
     default:
         tl_error(UCC_TL_TEAM_LIB(tl_team), "coll_type %s is not supported",
