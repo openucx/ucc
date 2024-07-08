@@ -201,6 +201,8 @@ ucc_tl_ucp_dpu_xgvmi_free_task(ucc_coll_task_t *coll_task)
     int                   inplace = UCC_IS_INPLACE(coll_task->bargs.args);
     ucc_tl_ucp_context_t *tl_ctx  = UCC_TL_UCP_TEAM_CTX(tl_team);
 
+    ucc_free(task->dpu_xgvmi.requests);
+
     if (task->dpu_xgvmi.bufs) {
         if (!inplace) {
             if (task->dpu_xgvmi.bufs->src_ebuf->memh != NULL) {
@@ -451,7 +453,7 @@ ucc_status_t ucc_tl_ucp_dpu_xgvmi_init(ucc_base_coll_args_t *coll_args,
     }
 
     status = ucc_tl_ucp_dpu_xgvmi_task_init(coll_args, team,
-                                                           rdma_task);
+                                            rdma_task);
     if (status != UCC_OK) {
         tl_error(UCC_TL_TEAM_LIB(tl_team), "failed to init task: %s",
                  ucc_status_string(status));
@@ -479,10 +481,14 @@ ucc_status_t ucc_tl_ucp_dpu_xgvmi_init(ucc_base_coll_args_t *coll_args,
     }
 
     rdma_task->dpu_xgvmi.requests = ucc_malloc(sizeof(ucs_status_ptr_t) * size);
+    if (rdma_task->dpu_xgvmi.requests == NULL) {
+        tl_error(UCC_TL_TEAM_LIB(tl_team), "failed to alloc requests");
+        goto free_rdma_task;
+    }
 
     UCC_CHECK_GOTO(ucc_tl_ucp_allgather_ring_init(&bargs, team,
                     &rdma_task->dpu_xgvmi.allgather_task),
-        free_rdma_task, status);
+        free_requests, status);
 
     status = ucc_tl_ucp_coll_init(&barrier_coll_args, team,
                                   &barrier_task);
@@ -513,6 +519,9 @@ free_barrier_task:
     ucc_tl_ucp_coll_finalize(barrier_task);
 free_allgather_task:
     ucc_tl_ucp_coll_finalize(rdma_task->dpu_xgvmi.allgather_task);
+free_requests:
+    ucc_free(rdma_task->dpu_xgvmi.requests);
+    rdma_task->dpu_xgvmi.requests = NULL;
 free_rdma_task:
     ucc_tl_ucp_dpu_xgvmi_free_task(&rdma_task->super);
 out:
