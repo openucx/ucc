@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -44,7 +44,7 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
                                                ucc_coll_task_t **task_h);
 
 /* XGVMI */
-void ucc_tl_ucp_dpu_xgvmi_rdma_progress_alltoall(ucc_coll_task_t *coll_task);
+void ucc_tl_ucp_dpu_alltoall_linear_xgvmi_rdma_progress(ucc_coll_task_t *coll_task);
 
 #define ALLTOALL_CHECK_INPLACE(_args, _team)                                   \
     do {                                                                       \
