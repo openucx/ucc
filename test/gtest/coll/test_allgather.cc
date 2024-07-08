@@ -7,6 +7,9 @@
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
+// For linear xgvmi allgather
+#include "test_allreduce_sliding_window.h"
+
 using Param_0 = std::tuple<int, ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
 using Param_1 = std::tuple<ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
 using Param_2 = std::tuple<ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t, std::string>;
@@ -265,22 +268,57 @@ UCC_TEST_P(test_allgather_alg, alg)
     const gtest_ucc_inplace_t inplace  = std::get<3>(GetParam());
     int                       n_procs  = 5;
     char                      tune[32];
-
     sprintf(tune, "allgather:@%s:inf", std::get<4>(GetParam()).c_str());
-    ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
-                             {"UCC_TL_UCP_TUNE", tune}};
-    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
-    UccTeam_h     team    = job.create_team(n_procs);
-    UccCollCtxVec ctxs;
+    ucc_job_env_t             env     = {{"UCC_CL_BASIC_TUNE", "inf"},
+                                        {"UCC_TL_UCP_TUNE", tune}};
+#ifdef HAVE_UCX
+    ucs_status_t              ucs_st   = UCS_OK;
+    test_ucp_info_t          *ucp_info = NULL;
+    // ONESIDED in order to ucp_init inside of ucc with the RMA feature enabled
+    UccJob                    job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
+#else
+    UccJob                    job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+#endif
+    UccTeam_h                 team     = job.create_team(n_procs);
+    UccCollCtxVec             ctxs;
 
     set_inplace(inplace);
     SET_MEM_TYPE(mem_type);
-
     data_init(n_procs, dtype, count, ctxs, false);
+
+    if (!std::get<4>(GetParam()).compare("linear_xgvmi")) {
+        if (inplace == TEST_INPLACE || mem_type != UCC_MEMORY_TYPE_HOST) {
+            data_fini(ctxs);
+            GTEST_SKIP() << "linear xgvmi must be mt host and not in place";
+        }
+#ifdef HAVE_UCX
+        // Algorithm is linear_xgvmi, set up gwbi
+        ucs_st = setup_gwbi(n_procs, ctxs, &ucp_info, inplace == TEST_INPLACE);
+        if (ucs_st != UCS_OK) {
+            free_gwbi(n_procs, ctxs, ucp_info, inplace == TEST_INPLACE);
+            data_fini(ctxs);
+            if (ucs_st == UCS_ERR_UNSUPPORTED) {
+                GTEST_SKIP() << "Exported memory key not supported";
+            } else {
+                GTEST_FAIL() << ucs_status_string(ucs_st);
+            }
+        }
+#else
+        GTEST_SKIP() << "linear xgvmi not supported";
+#endif
+    }
+
     UccReq    req(team, ctxs);
     req.start();
     req.wait();
     EXPECT_EQ(true, data_validate(ctxs));
+
+#ifdef HAVE_UCX
+    if (!std::get<4>(GetParam()).compare("linear_xgvmi")) {
+        free_gwbi(n_procs, ctxs, ucp_info, inplace == TEST_INPLACE);
+    }
+#endif
+
     data_fini(ctxs);
 }
 
@@ -296,7 +334,7 @@ INSTANTIATE_TEST_CASE_P(
 #endif
         ::testing::Values(1,3,8192), // count
         ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE),
-        ::testing::Values("knomial", "ring", "neighbor", "bruck", "sparbit")),
+        ::testing::Values("knomial", "ring", "neighbor", "bruck", "sparbit", "linear_xgvmi")),
         [](const testing::TestParamInfo<test_allgather_alg::ParamType>& info) {
             std::string name;
             name += ucc_datatype_str(std::get<0>(info.param));
