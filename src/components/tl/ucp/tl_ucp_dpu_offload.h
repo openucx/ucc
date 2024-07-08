@@ -49,13 +49,6 @@ ucc_status_t ucc_tl_ucp_allreduce_sliding_window_register(
     ucp_context_h ucp_context, ucc_tl_ucp_team_t *tl_team,
     struct ucc_tl_ucp_allreduce_sw_export_buf *ebuf, void *packed_memh);
 
-void ucc_tl_ucp_dpu_xgvmi_free_rkeys(
-    ucc_coll_task_t *coll_task);
-
-ucc_status_t
-ucc_tl_ucp_dpu_xgvmi_rdma_task_finalize(
-    ucc_coll_task_t *coll_task);
-
 ucc_status_t
 ucc_tl_ucp_dpu_xgvmi_req_test(ucs_status_ptr_t   request,
                               ucc_tl_ucp_task_t *task);
