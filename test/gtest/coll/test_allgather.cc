@@ -304,6 +304,7 @@ UCC_TEST_P(test_allgather_alg, alg)
             }
         }
 #else
+        data_fini(ctxs);
         GTEST_SKIP() << "linear xgvmi not supported";
 #endif
     }
