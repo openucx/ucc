@@ -13,14 +13,13 @@ ucc_tl_ucp_dpu_alltoall_linear_xgvmi_rdma_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t    *task           = ucc_derived_of(coll_task,
                                                           ucc_tl_ucp_task_t);
-    ucc_rank_t            size           = (ucc_rank_t)task->subset.map.ep_num;
     ucc_datatype_t        dtype          = TASK_ARGS(task).src.info.datatype;
     size_t                dt_size        = ucc_dt_size(dtype);
     ucc_count_t           count          = coll_task->bargs.args.src.info.count;
-    ucc_rank_t            host_team_size = size;
     ucc_base_team_t      *base_team      = coll_task->team;
     ucc_tl_ucp_team_t    *tl_team        = ucc_derived_of(base_team,
                                                           ucc_tl_ucp_team_t);
+    ucc_rank_t            host_team_size = UCC_TL_TEAM_SIZE(tl_team);
     ucc_coll_task_t      *allgather_task = task->dpu_xgvmi.allgather_task;
     ucc_tl_ucp_context_t *tl_ctx         = UCC_TL_UCP_TEAM_CTX(tl_team);
     ucp_request_param_t   req_param      = {0};
