@@ -402,6 +402,16 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
 
     }
 
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_ALLGATHERV, UCC_MEMORY_TYPE_HOST,
+        0, UCC_MSG_MAX, UCC_CL_HIER_DEFAULT_SCORE,
+        ucc_cl_hier_allgatherv_init, cl_team);
+    if (UCC_OK != status) {
+        cl_error(lib, "faild to add range to score_t");
+        return status;
+
+    }
+
     for (i = 0; i < UCC_CL_HIER_N_DEFAULT_ALG_SELECT_STR; i++) {
         status = ucc_coll_score_update_from_str(
             ucc_cl_hier_default_alg_select_str[i], &team_info,

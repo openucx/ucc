@@ -2,6 +2,10 @@
 # Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
+allgatherv = 					\
+	allgatherv/allgatherv.h 	\
+	allgatherv/allgatherv.c
+
 allreduce =                          \
 	allreduce/allreduce.h            \
 	allreduce/allreduce.c            \
@@ -38,6 +42,7 @@ sources =             \
 	cl_hier_team.c    \
 	cl_hier_coll.c    \
 	cl_hier_coll.h    \
+	$(allgatherv)     \
 	$(allreduce)      \
 	$(alltoallv)      \
 	$(alltoall)       \

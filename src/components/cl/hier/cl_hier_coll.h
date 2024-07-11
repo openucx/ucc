@@ -15,6 +15,7 @@
 #include "barrier/barrier.h"
 #include "bcast/bcast.h"
 #include "reduce/reduce.h"
+#include "allgatherv/allgatherv.h"
 
 #define UCC_CL_HIER_N_DEFAULT_ALG_SELECT_STR 3
 

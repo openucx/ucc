@@ -113,6 +113,7 @@ UCC_CLASS_DECLARE(ucc_cl_hier_team_t, ucc_base_context_t *,
 #define UCC_CL_HIER_SUPPORTED_COLLS                                            \
     (UCC_COLL_TYPE_ALLTOALL |                                                  \
      UCC_COLL_TYPE_ALLTOALLV |                                                 \
+     UCC_COLL_TYPE_ALLGATHERV |                                                 \
      UCC_COLL_TYPE_ALLREDUCE |                                                 \
      UCC_COLL_TYPE_BARRIER |                                                   \
      UCC_COLL_TYPE_BCAST)
