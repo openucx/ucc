@@ -14,6 +14,7 @@
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
 
+
 #define SAVE_STATE(_phase)                                                     \
     do {                                                                       \
         task->allgather_kn.phase = _phase;                                     \
@@ -30,6 +31,8 @@
  * a new virtual rank number - "vrank".
  * As such allgather must keep to this ranking to be aligned with scatter.
  */
+
+int USE_CUDA = 0;
 
 void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
 {
@@ -58,6 +61,7 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_status_t           status;
     size_t                 extra_count;
 
+    //printf("\nprog\n");
     EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test",
                    task->allgather_kn.etask);
     task->allgather_kn.etask = NULL;
@@ -186,10 +190,10 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_rank_t                  rank  = VRANK(task->subset.myrank,
                                               ct == UCC_COLL_TYPE_BCAST ?
                                               args->root : 0, size);
-    ucc_ee_executor_task_args_t eargs = {0};
+    //ucc_ee_executor_task_args_t eargs = {0};
     ucc_status_t       status;
     ptrdiff_t          offset;
-    ucc_ee_executor_t *exec;
+    //ucc_ee_executor_t *exec; 
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
@@ -200,7 +204,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
                                &task->allgather_kn.p);
         offset = ucc_buffer_block_offset(args->dst.info.count, size, rank) *
                  ucc_dt_size(args->dst.info.datatype);
-        if (!UCC_IS_INPLACE(*args)) {
+        
+        /*if (!UCC_IS_INPLACE(*args) && USE_CUDA) {
             status = ucc_coll_task_get_executor(&task->super, &exec);
             if (ucc_unlikely(status != UCC_OK)) {
                 task->super.status = status;
@@ -217,7 +222,18 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
                 task->super.status = status;
                 return status;
             }
+        }*/
+        if (!UCC_IS_INPLACE(*args) && !USE_CUDA) {
+            //printf("Trying change\n");
+            status = ucc_mc_memcpy(PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer, args->src.info.count * ucc_dt_size(args->src.info.datatype), args->dst.info.mem_type, args->src.info.mem_type);
+            if (ucc_unlikely(UCC_OK != status)) {
+                task->super.status = status;
+                return status;
+            }
+            //printf("worked?\n");
         }
+
+
     } else {
         ucc_kn_agx_pattern_init(size, rank, radix, args->dst.info.count,
                                 &task->allgather_kn.p);
