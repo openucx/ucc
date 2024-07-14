@@ -7,6 +7,7 @@
 #ifndef UCC_SCHEDULE_H_
 #define UCC_SCHEDULE_H_
 
+#include <ucp/api/ucp.h>
 #include "ucc/api/ucc.h"
 #include "utils/ucc_list.h"
 #include "utils/ucc_log.h"
@@ -112,7 +113,8 @@ typedef struct ucc_coll_task {
     /* timestamp of the start time: either post or triggered_post */
     double                             start_time;
     uint32_t                           seq_num;
-    ucp_mem_h                          mh_list[6];
+    ucp_mem_h                         *mh_list;
+    int                                count_mh;
 } ucc_coll_task_t;
 
 extern struct ucc_mpool_ops ucc_coll_task_mpool_ops;

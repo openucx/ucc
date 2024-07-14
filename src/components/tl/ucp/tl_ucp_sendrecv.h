@@ -94,6 +94,7 @@ ucc_tl_ucp_send_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     return ucp_tag_send_nbx(ep, buffer, 1, ucp_tag, &req_param);
 }
 
+static inline ucs_status_ptr_t
 ucc_tl_ucp_send_common_2(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                        ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                        ucc_tl_ucp_task_t *task, ucp_send_nbx_callback_t cb, void *user_data, ucp_mem_h mh)
@@ -118,7 +119,7 @@ ucc_tl_ucp_send_common_2(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     req_param.cb.send     = cb;
     req_param.memory_type = ucc_memtype_to_ucs[mtype];
     req_param.user_data   = user_data;
-    req_params.memh          = mh;
+    req_param.memh       = mh;
     task->tagged.send_posted++;
     return ucp_tag_send_nbx(ep, buffer, 1, ucp_tag, &req_param);
 }
@@ -150,7 +151,7 @@ ucc_tl_ucp_send_nb_2(void *buffer, size_t msglen, ucc_memory_type_t mtype,
 
     ucp_status = ucc_tl_ucp_send_common_2(buffer, msglen, mtype, dest_group_rank,
                                         team, task, ucc_tl_ucp_send_completion_cb,
-                                        (void *)task, ucp_mem_h mh);
+                                        (void *)task, mh);
     if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
     } else {
@@ -204,6 +205,7 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                             ucp_tag_mask, &req_param);
 }
 
+static inline ucs_status_ptr_t
 ucc_tl_ucp_recv_common_2(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                        ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                        ucc_tl_ucp_task_t *task, ucp_tag_recv_nbx_callback_t cb, void *user_data, ucp_mem_h mh)
@@ -226,7 +228,7 @@ ucc_tl_ucp_recv_common_2(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     req_param.cb.recv     = cb;
     req_param.memory_type = ucc_memtype_to_ucs[mtype];
     req_param.user_data   = user_data;
-    req_params.memh = ucp_memh;
+    req_param.memh = mh;
     task->tagged.recv_posted++;
     return ucp_tag_recv_nbx(team->worker->ucp_worker, buffer, 1, ucp_tag,
                             ucp_tag_mask, &req_param);
@@ -260,7 +262,7 @@ ucc_tl_ucp_recv_nb_2(void *buffer, size_t msglen, ucc_memory_type_t mtype,
 
     ucp_status = ucc_tl_ucp_recv_common_2(buffer, msglen, mtype, dest_group_rank,
                                         team, task, ucc_tl_ucp_recv_completion_cb,
-                                        (void *)task, ucp_mem_h mh);
+                                        (void *)task, mh);
     if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
     } else {
