@@ -626,6 +626,7 @@ int main(int argc, char *argv[])
             goto test_exit;
         }
     }
+
     test->create_teams(teams);
     if (has_onesided) {
         test->create_teams(teams, true);
