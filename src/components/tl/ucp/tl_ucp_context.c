@@ -13,6 +13,7 @@
 #include "utils/arch/cpu.h"
 #include "schedule/ucc_schedule_pipelined.h"
 #include <limits.h>
+#include <ucp.h>
 
 #define UCP_CHECK(function, msg, go, ctx)                                      \
     status = function;                                                         \
@@ -194,7 +195,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
               self);
 
     self->ucp_memory_types = context_attr.memory_types;
-    worker_params.field_mask = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
+    worker_params.field_mask = UCP_WORKER_PARAM_FIELD_THREAD_MODE | UCP_WORKER_PARAM_FIELD_CALLBACKS;
     switch (params->thread_mode) {
     case UCC_THREAD_SINGLE:
     case UCC_THREAD_FUNNELED:
@@ -208,6 +209,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         ucc_assert(0);
         break;
     }
+
+    worker_params.callbacks = copy_callback;
 
     UCP_CHECK(ucp_worker_create(ucp_context, &worker_params, &ucp_worker),
               "failed to create ucp worker", err_worker_create, self);
@@ -295,6 +298,72 @@ err_cfg_read:
     }
     return ucc_status;
 }
+
+ucp_worker_mem_callbacks copy_callback{
+
+    void (*memcpy_device)(void *dest, const void *src, size_t size, int to_dev){
+    //     ucc_ee_executor_ops_t *executor_ops;
+    //     ucc_ee_executor_task_args_t *task_args;
+    //     ucc_eee_task_copy_t *copy;
+    //     ucc_ee_executor_task_t **task;
+    //     ucc_ee_executor_t *executor;
+
+    //     copy.src = src;
+    //     copy.dst = dest;
+    //     copy.len = size;
+
+    //     task_args.copy = copy;
+
+    //     executor_ops.task_post(executor, task_args, task);
+    //     while (UCC_OK != &task.status){
+    //         executor_ops.task_test(&task);
+    //     }
+    //     executor_ops.task_finalize(&task);
+    };
+
+    int  (*memcpy_device_start)(void *dest, const void *src, size_t size,
+                                int to_dev, void *completion){
+        // ucc_ee_executor_ops_t *executor_ops;
+        // ucc_ee_executor_task_args_t *task_args;
+        // ucc_eee_task_copy_t *copy;
+        // ucc_ee_executor_task_t **task;
+        // ucc_ee_executor_t *executor;
+
+        // copy.src = src;
+        // copy.dst = dest;
+        // copy.len = size;
+
+        // task_args.copy = copy;
+
+        // executor_ops.task_post(executor, task_args, task);
+
+        ucc_ee_executor_task_args_t eargs;
+        ucc_ee_executor_t *exec;
+
+        // status = ucc_coll_task_get_executor(&task->super, &exec);
+        
+        if (ucc_unlikely(status != UCC_OK)) {
+            task->super.status = status;
+            return;
+        }
+
+        eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+        eargs.copy.src  = src;
+        eargs.copy.dst  = dest;
+        eargs.copy.len  = size;
+        status = ucc_ee_executor_task_post(exec, &eargs,
+                                           &task->alltoall_bruck.etask);
+        if (ucc_unlikely(status != UCC_OK)) {
+            task->super.status = status;
+            return;
+        }
+        EXEC_TASK_TEST(PHASE_BCOPY, "failed to copy data to user buffer",
+                       task->alltoall_bruck.etask);
+    }
+        
+        };
+
+};
 
 static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
                                        ucc_context_oob_coll_t *oob)

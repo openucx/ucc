@@ -50,8 +50,8 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
                                        args->root : 0;
     ucc_rank_t             rank      = VRANK(task->subset.myrank, broot, size);
     size_t                 local     = GET_LOCAL_COUNT(args, size, rank);
-    ucp_mem_h             *mh_list   = task->mh_list;
-    int                    max_count = task->count_mh;
+    ucp_mem_h             *mh_list   = task->super.mh_list;
+    int                    max_count = task->super.count_mh;
     int                    count_mh     = 0;
     void                  *sbuf;
     ptrdiff_t              peer_seg_offset, local_seg_offset;
