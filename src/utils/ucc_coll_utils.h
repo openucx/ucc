@@ -335,4 +335,16 @@ static inline size_t ucc_buffer_block_offset_aligned(size_t total_count,
                            operations. */
 int ucc_coll_args_is_predefined_dt(const ucc_coll_args_t *args, ucc_rank_t rank);
 
+int ucc_coll_args_is_mem_symmetric(const ucc_coll_args_t *args, ucc_rank_t rank);
+
+int ucc_coll_args_is_rooted(ucc_coll_type_t ct);
+
+typedef struct ucc_buffer_info_asymmetric_memtype ucc_buffer_info_asymmetric_memtype_t;
+typedef struct ucc_mc_buffer_header ucc_mc_buffer_header_t;
+
+ucc_status_t
+ucc_coll_args_init_asymmetric_buffer(ucc_coll_args_t *args,
+                                       ucc_team_h team,
+                                       ucc_buffer_info_asymmetric_memtype_t *save_info);
+
 #endif
