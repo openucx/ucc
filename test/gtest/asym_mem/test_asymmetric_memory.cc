@@ -113,7 +113,7 @@ public:
                 dst_mem_type = ctxs[root]->args->dst.info.mem_type;
 
                 rst = (uint8_t*) ucc_malloc(ctxs[root]->rbuf_size, "validation buf");
-                ASSERT_NE(rst, nullptr);
+                EXPECT_NE(rst, nullptr);
 
                 UCC_CHECK(ucc_mc_memcpy(rst, ctxs[root]->args->dst.info.buffer,
                                         ctxs[root]->rbuf_size,
@@ -167,7 +167,7 @@ public:
 
                 ctxs[r]->init_buf =
                     ucc_malloc(ucc_dt_size(UCC_DT_INT8) * my_count, "init buf");
-                ASSERT_NE(ctxs[r]->init_buf, nullptr);
+                EXPECT_NE(ctxs[r]->init_buf, nullptr);
                 for (int i = 0; i < my_count * ucc_dt_size(UCC_DT_INT8); i++) {
                     uint8_t *sbuf = (uint8_t *)ctxs[r]->init_buf;
                     sbuf[i]       = ((i + r) % 256);
@@ -176,9 +176,9 @@ public:
                 if (r == root) {
                     all_counts = 0;
                     counts = (int*)malloc(sizeof(int) * nprocs);
-                    ASSERT_NE(counts, nullptr);
+                    EXPECT_NE(counts, nullptr);
                     displs = (int*)malloc(sizeof(int) * nprocs);
-                    ASSERT_NE(displs, nullptr);
+                    EXPECT_NE(displs, nullptr);
 
                     for (int i = 0; i < nprocs; i++) {
                         counts[i] = (nprocs - i) * count;
@@ -214,9 +214,9 @@ public:
                 if (r == root) {
                     all_counts = 0;
                     counts = (int*)malloc(sizeof(int) * nprocs);
-                    ASSERT_NE(counts, nullptr);
+                    EXPECT_NE(counts, nullptr);
                     displs = (int*)malloc(sizeof(int) * nprocs);
-                    ASSERT_NE(displs, nullptr);
+                    EXPECT_NE(displs, nullptr);
 
                     for (int i = 0; i < nprocs; i++) {
                         counts[i] = (nprocs - i) * count;
@@ -226,7 +226,7 @@ public:
                     
                     ctxs[r]->init_buf =
                         ucc_malloc(ucc_dt_size(UCC_DT_INT8) * all_counts, "init buf");
-                    ASSERT_NE(ctxs[r]->init_buf, nullptr);
+                    EXPECT_NE(ctxs[r]->init_buf, nullptr);
                     uint8_t *sbuf = (uint8_t*)ctxs[r]->init_buf;
                     for (int p = 0; p < nprocs; p++) {
                         for (int i = 0; i < ucc_dt_size(UCC_DT_INT8) * counts[p]; i++) {
