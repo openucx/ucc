@@ -12,7 +12,7 @@
 
 ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
                         ucc_memory_type mt, bool is_inplace,
-                         bool is_persistent,
+                         bool is_persistent,bool is_onesided,
                         ucc_pt_comm *communicator) : ucc_pt_coll(communicator)
 {
     has_inplace_   = true;
@@ -38,6 +38,10 @@ ucc_pt_coll_alltoall::ucc_pt_coll_alltoall(ucc_datatype_t dt,
         coll_args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
         coll_args.flags |= UCC_COLL_ARGS_FLAG_PERSISTENT;
     }
+    if(is_onesided){
+        coll_args.mask  = UCC_COLL_ARGS_FIELD_FLAGS | UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS;
+    }
 }
 
 ucc_status_t ucc_pt_coll_alltoall::init_args(size_t single_rank_count,
@@ -59,6 +63,11 @@ ucc_status_t ucc_pt_coll_alltoall::init_args(size_t single_rank_count,
         UCCCHECK_GOTO(ucc_pt_alloc(&src_header, size, args.src.info.mem_type),
                       free_dst, st);
         args.src.info.buffer = src_header->addr;
+    }
+    if(UCC_IS_ONESIDED(args)){
+        args.src.info.buffer = comm->get_global_buffer(0);
+        args.dst.info.buffer = comm->get_global_buffer(1);
+        args.global_work_buffer = comm->get_global_buffer(2);
     }
     return UCC_OK;
 free_dst:

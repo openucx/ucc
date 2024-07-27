@@ -31,6 +31,7 @@ ucc_pt_config::ucc_pt_config() {
     bench.root_shift     = 0;
     bench.mult_factor    = 2;
     comm.mt              = bench.mt;
+    bench.onesided       = false;
 }
 
 const std::map<std::string, ucc_reduction_op_t> ucc_pt_reduction_op_map = {
@@ -91,7 +92,7 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
     int c;
     ucc_status_t st;
 
-    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:r:S:iphFT")) != -1) {
+    while ((c = getopt(argc, argv, "c:b:e:d:m:n:w:o:N:r:S:iphFTJ")) != -1) {
         switch (c) {
             case 'c':
                 if (ucc_pt_op_map.count(optarg) == 0) {
@@ -172,6 +173,9 @@ ucc_status_t ucc_pt_config::process_args(int argc, char *argv[])
             case 'F':
                 bench.full_print = true;
                 break;
+            case 'J':
+                bench.onesided = true;
+                break;
             case 'h':
             default:
                 print_help();
@@ -201,5 +205,6 @@ void ucc_pt_config::print_help()
     std::cout << "  -F: enable full print"<<std::endl;
     std::cout << "  -S: <number>: root shift for rooted collectives"<<std::endl;
     std::cout << "  -h: show this help message"<<std::endl;
+    std::cout << "  -J: onesided collective"<<std::endl;
     std::cout << std::endl;
 }

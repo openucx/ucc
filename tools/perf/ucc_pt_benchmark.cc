@@ -31,7 +31,7 @@ ucc_pt_benchmark::ucc_pt_benchmark(ucc_pt_benchmark_config cfg,
         break;
     case UCC_PT_OP_TYPE_ALLTOALL:
         coll = new ucc_pt_coll_alltoall(cfg.dt, cfg.mt, cfg.inplace,
-                                        cfg.persistent, comm);
+                                        cfg.persistent, cfg.onesided, comm);
         break;
     case UCC_PT_OP_TYPE_ALLTOALLV:
         coll = new ucc_pt_coll_alltoallv(cfg.dt, cfg.mt, cfg.inplace,

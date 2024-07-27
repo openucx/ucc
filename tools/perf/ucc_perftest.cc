@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     ucc_pt_cuda_init();
     ucc_pt_rocm_init();
     try {
-        comm = new ucc_pt_comm(pt_config.comm);
+        comm = new ucc_pt_comm(pt_config.comm,pt_config.bench);
     } catch(std::exception &e) {
         std::cerr << e.what() << std::endl;
         std::exit(1);

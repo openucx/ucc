@@ -91,6 +91,7 @@ struct ucc_pt_benchmark_config {
     int                root;
     int                root_shift;
     int                mult_factor;
+    bool               onesided;
 };
 
 struct ucc_pt_config {

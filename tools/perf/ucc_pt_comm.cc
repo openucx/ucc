@@ -9,10 +9,16 @@ extern "C" {
 #include "utils/ucc_coll_utils.h"
 #include "components/mc/ucc_mc.h"
 }
+#define UCC_MALLOC_CHECK(_obj)                   \
+    if (!(_obj)) {                               \
+        std::cerr << "*** UCC MALLOC FAIL \n";   \
+        MPI_Abort(MPI_COMM_WORLD.-1);            \
+    }                                            
 
-ucc_pt_comm::ucc_pt_comm(ucc_pt_comm_config config)
+ucc_pt_comm::ucc_pt_comm(ucc_pt_comm_config config,ucc_pt_benchmark_config ben_config)
 {
     cfg = config;
+    bcfg = ben_config;
     bootstrap = new ucc_pt_bootstrap_mpi();
 }
 
@@ -124,6 +130,7 @@ ucc_status_t ucc_pt_comm::init()
     ucc_status_t st;
     std::string cfg_mod;
 
+    ucc_mem_map_t segments[UCC_TEST_N_MEM_SEGMENTS];
     ee       = nullptr;
     executor = nullptr;
     stream   = nullptr;
@@ -157,6 +164,29 @@ ucc_status_t ucc_pt_comm::init()
                       UCC_CONTEXT_PARAM_FIELD_OOB;
     ctx_params.type = UCC_CONTEXT_SHARED;
     ctx_params.oob  = bootstrap->get_context_oob();
+    if (bcfg.onesided)
+    {
+        for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++)
+        {
+            onesided_buffers[i] = ucc_calloc(UCC_TEST_MEM_SEGMENT_SIZE,
+                                            bootstrap->get_size(),"onesided buffers");
+            UCC_MALLOC_CHECK(onesided_buffers[i]);
+            segments[i].address = onesided_buffers[i];
+            segments[i].len     = UCC_TEST_MEM_SEGMENT_SIZE * (bootstrap->get_size());
+        }
+        ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
+        ctx_params.mem_params.segments   = segments;
+        ctx_params.mem_params.n_segments = UCC_TEST_N_MEM_SEGMENTS;   
+    }
+    if(!bcfg.onesided)
+    {
+        for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++)
+        {
+            onesided_buffers[i] = NULL;
+        }
+        
+    }
+    
     UCCCHECK_GOTO(ucc_context_create(lib, &ctx_params, ctx_config, &context),
                   free_ctx_config, st);
     team_params.mask     = UCC_TEAM_PARAM_FIELD_EP |
@@ -165,6 +195,10 @@ ucc_status_t ucc_pt_comm::init()
     team_params.oob      = bootstrap->get_team_oob();
     team_params.ep       = bootstrap->get_rank();
     team_params.ep_range = UCC_COLLECTIVE_EP_RANGE_CONTIG;
+    if(bcfg.onesided){
+        team_params.mask |= UCC_TEAM_PARAM_FIELD_FLAGS;
+        team_params.flags = UCC_TEAM_FLAG_COLL_WORK_BUFFER;
+    }
     UCCCHECK_GOTO(ucc_team_create_post(&context, 1, &team_params, &team),
                   free_ctx, st);
     do {
@@ -219,6 +253,15 @@ ucc_status_t ucc_pt_comm::finalize()
     if (status != UCC_OK) {
         std::cerr << "ucc team destroy error: " << ucc_status_string(status);
     }
+    if (onesided_buffers[0])
+    {
+        for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++)
+        {
+            ucc_free(onesided_buffers[i]);
+        }
+        
+    }
+    
     ucc_context_destroy(context);
     ucc_finalize(lib);
     return UCC_OK;
