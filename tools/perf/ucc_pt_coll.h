@@ -13,6 +13,9 @@ extern "C" {
 #include <components/ec/ucc_ec.h>
 #include <components/mc/ucc_mc.h>
 }
+#define UCC_IS_ONESIDED(_args)                             \
+        (((_args).mask & UCC_COLL_ARGS_FIELD_FLAGS) &&     \
+        ((_args).flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS))
 
 ucc_status_t ucc_pt_alloc(ucc_mc_buffer_header_t **h_ptr, size_t len,
                           ucc_memory_type_t mem_type);
@@ -87,7 +90,7 @@ public:
 class ucc_pt_coll_alltoall: public ucc_pt_coll {
 public:
     ucc_pt_coll_alltoall(ucc_datatype_t dt, ucc_memory_type mt,
-                         bool is_inplace, bool is_persistent,
+                         bool is_inplace, bool is_persistent, bool is_onesided,
                          ucc_pt_comm *communicator);
     ucc_status_t init_args(size_t count, ucc_pt_test_args_t &args) override;
     void free_args(ucc_pt_test_args_t &args) override;

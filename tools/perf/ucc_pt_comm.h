@@ -14,8 +14,11 @@
 extern "C" {
 #include "components/ec/ucc_ec.h"
 }
+#define UCC_TEST_N_MEM_SEGMENTS 3
+#define UCC_TEST_MEM_SEGMENT_SIZE (1 << 21)
 
 class ucc_pt_comm {
+    ucc_pt_benchmark_config bcfg;
     ucc_pt_comm_config cfg;
     ucc_lib_h lib;
     ucc_context_h context;
@@ -24,11 +27,20 @@ class ucc_pt_comm {
     ucc_ee_h ee;
     ucc_ee_executor_t *executor;
     ucc_pt_bootstrap *bootstrap;
+    void             *onesided_buffers[3];
     void set_gpu_device();
 public:
-    ucc_pt_comm(ucc_pt_comm_config config);
+    ucc_pt_comm(ucc_pt_comm_config config,ucc_pt_benchmark_config ben_config);
     int get_rank();
     int get_size();
+    void* get_global_buffer(int index){
+        if (index < 0 || index >=3)
+        {
+            throw std::out_of_range("Index out range");
+        }
+        return onesided_buffers[index];
+        
+    };
     ucc_ee_executor_t* get_executor();
     ucc_ee_h get_ee();
     ucc_team_h get_team();
