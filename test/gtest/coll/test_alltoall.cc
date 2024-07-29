@@ -6,6 +6,9 @@
 #include "common/test_ucc.h"
 #include "utils/ucc_math.h"
 
+// For linear xgvmi alltoall
+#include "test_allreduce_sliding_window.h"
+
 using Param_0 = std::tuple<int, ucc_datatype_t, ucc_memory_type_t, gtest_ucc_inplace_t, int>;
 using Param_1 = std::tuple<ucc_datatype_t, ucc_memory_type_t, gtest_ucc_inplace_t, int>;
 
@@ -332,3 +335,54 @@ INSTANTIATE_TEST_CASE_P(
 #endif
         ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE),
         ::testing::Values(1,3,8192))); // count
+
+
+#ifdef HAVE_UCX
+class test_alltoall_2 : public test_alltoall,
+        public ::testing::WithParamInterface<Param_0> {};
+
+UCC_TEST_P(test_alltoall_2, linear_xgvmi)
+{
+    const int            n_procs        = std::get<0>(GetParam());
+    const ucc_datatype_t dtype          = std::get<1>(GetParam());
+    ucc_memory_type_t    mem_type       = std::get<2>(GetParam());
+    gtest_ucc_inplace_t  inplace        = std::get<3>(GetParam());
+    const int            count          = std::get<4>(GetParam());
+    ucc_job_env_t        env            = {{"UCC_TL_UCP_TUNE", "alltoall:0-inf:@linear_xgvmi"}};
+    UccJob               job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL_ONESIDED, env);
+    UccTeam_h            team           = job.create_team(n_procs);
+    ucs_status_t         ucs_st         = UCS_OK;
+    test_ucp_info_t     *ucp_info       = NULL;
+    std::vector<int>     reference_ranks;
+    UccCollCtxVec        ctxs;
+
+    this->set_inplace(inplace);
+    SET_MEM_TYPE(mem_type);
+    data_init(n_procs, dtype, count, ctxs, NULL, false);
+    ucs_st = setup_gwbi(n_procs, ctxs, &ucp_info, inplace == TEST_INPLACE);
+    if (ucs_st != UCS_OK) {
+        free_gwbi(n_procs, ctxs, ucp_info, inplace == TEST_INPLACE);
+        data_fini(ctxs);
+        if (ucs_st == UCS_ERR_UNSUPPORTED) {
+            GTEST_SKIP() << "Exported memory key not supported";
+        } else {
+            GTEST_FAIL() << ucs_status_string(ucs_st);
+        }
+    }
+    UccReq req(team, ctxs);
+    req.start();
+    req.wait();
+    EXPECT_EQ(true, data_validate(ctxs));
+    data_fini(ctxs);
+}
+
+INSTANTIATE_TEST_CASE_P(
+    , test_alltoall_2,
+    ::testing::Combine(
+        ::testing::Values(2, 4, 6),
+        ::testing::Values(UCC_DT_INT16),
+        ::testing::Values(UCC_MEMORY_TYPE_HOST),
+        ::testing::Values(/*TEST_INPLACE,*/ TEST_NO_INPLACE),
+        ::testing::Values(1,3)));
+
+#endif
