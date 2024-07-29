@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -8,6 +8,7 @@
 #include "components/mc/ucc_mc.h"
 #include "core/ucc_ee.h"
 #include "coll_score/ucc_coll_score.h"
+#include "core/ucc_team.h"
 #include <sharp/api/version.h>
 
 UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
@@ -36,7 +37,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
     set.map    = UCC_TL_TEAM_MAP(self);
 
     if (UCC_TL_SHARP_TEAM_LIB(self)->cfg.use_internal_oob) {
-        self->oob_ctx.subset = set;
+        status = ucc_ep_map_create_nested(&UCC_TL_CORE_TEAM(self)->ctx_map,
+                                 &UCC_TL_TEAM_MAP(self),
+                                 &self->oob_ctx.subset.map);
+        if (status != UCC_OK) {
+            return status;
+        }
+        self->oob_ctx.subset.myrank = UCC_TL_TEAM_RANK(self);
     } else {
         self->oob_ctx.oob = &UCC_TL_TEAM_OOB(self);
     }
@@ -44,6 +51,9 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
     status = ucc_topo_init(set, ctx->super.super.ucc_context->topo, &self->topo);
     if (UCC_OK != status) {
         tl_error(ctx->super.super.lib, "failed to init team topo");
+        if (UCC_TL_SHARP_TEAM_LIB(self)->cfg.use_internal_oob) {
+            ucc_ep_map_destroy_nested(&self->oob_ctx.subset.map);
+        }
         return status;
     }
 
@@ -156,6 +166,9 @@ cleanup:
         }
     }
     ucc_topo_cleanup(self->topo);
+    if (UCC_TL_SHARP_TEAM_LIB(self)->cfg.use_internal_oob) {
+        ucc_ep_map_destroy_nested(&self->oob_ctx.subset.map);
+    }
     return status;
 }
 
@@ -179,6 +192,9 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_sharp_team_t)
                 sharp_coll_finalize(self->sharp_context);
             }
         }
+    }
+    if (UCC_TL_SHARP_TEAM_LIB(self)->cfg.use_internal_oob) {
+        ucc_ep_map_destroy_nested(&self->oob_ctx.subset.map);
     }
 }
 
