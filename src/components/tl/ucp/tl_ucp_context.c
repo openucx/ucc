@@ -339,11 +339,17 @@ ucp_worker_mem_callbacks copy_callback{
 
         ucc_ee_executor_task_args_t eargs;
         ucc_ee_executor_t *exec;
+        int size_of_list = 1;
+        int count_task = 0;
+        ucc_ee_executor_task_t *task_list = (ucc_ee_executor_task_t *)malloc(size_of_list * sizeof(ucc_ee_executor_task_t));
+        ucc_ee_executor_task_t *task;
+        ucc_coll_task_t *task2;
+        ucc_status_t status;
 
-        // status = ucc_coll_task_get_executor(&task->super, &exec);
+        status = ucc_coll_task_get_executor(&task2, &exec);
         
         if (ucc_unlikely(status != UCC_OK)) {
-            task->super.status = status;
+            task2.status = status;
             return;
         }
 
@@ -352,17 +358,19 @@ ucp_worker_mem_callbacks copy_callback{
         eargs.copy.dst  = dest;
         eargs.copy.len  = size;
         status = ucc_ee_executor_task_post(exec, &eargs,
-                                           &task->alltoall_bruck.etask);
+                                           &task);
+        task_list[count_task++] = task;
         if (ucc_unlikely(status != UCC_OK)) {
-            task->super.status = status;
+            task2.status = status;
             return;
         }
-        EXEC_TASK_TEST(PHASE_BCOPY, "failed to copy data to user buffer",
-                       task->alltoall_bruck.etask);
+        for (int i = 0; i < len(task_list); i++) {
+            EXEC_TASK_TEST(PHASE_BCOPY, "failed to copy data to user buffer",
+                        task_list[i]);
+        }
+        
     }
         
-        };
-
 };
 
 static void ucc_tl_ucp_context_barrier(ucc_tl_ucp_context_t *ctx,
