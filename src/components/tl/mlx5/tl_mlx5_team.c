@@ -242,7 +242,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     }
 
     ucc_assert(tl_team->global_sync_req == NULL);
-     
+    
     if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_CTX_CHECK &&
         tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_CTX_CHECK) {
         // check if ctx is ready for a2a and mcast
