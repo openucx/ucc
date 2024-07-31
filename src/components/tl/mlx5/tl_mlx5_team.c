@@ -313,7 +313,7 @@ ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
     team_info.num_mem_types       = 2;
     team_info.supported_mem_types = mt;
     team_info.supported_colls =
-        (UCC_COLL_TYPE_ALLTOALL * (team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_READY) * 0) |
+        (UCC_COLL_TYPE_ALLTOALL * (team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_READY)) |
         UCC_COLL_TYPE_BCAST * (team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_READY);
     team_info.size                = UCC_TL_TEAM_SIZE(team);
 
