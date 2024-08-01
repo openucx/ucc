@@ -282,6 +282,7 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
         int index = 0;
         seg_maps = ucc_calloc(n_segments, sizeof(ucc_mem_map_t));
         if (!seg_maps) {
+            tl_error(UCC_TL_UCP_TEAM_LIB(tl_team), "Out of Memory");
             return UCC_ERR_NO_MEMORY;
         }
 
@@ -307,6 +308,11 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
     if (n_segments > 0) {
         ctx->dynamic_remote_info =
             ucc_calloc(n_segments, sizeof(ucc_tl_ucp_remote_info_t), "dynamic remote info");
+        if (!ctx->dynamic_remote_info) {
+            tl_error(UCC_TL_UCP_TEAM_LIB(tl_team), "Out of Memory");
+            status = UCC_ERR_NO_MEMORY;
+            goto failed_memory_map;
+        }
         /* map memory and fill in local segment information */
         for (i = 0; i < n_segments; i++) {
             status = ucc_tl_ucp_memmap_segment(task, &seg_maps[i], i);
@@ -460,19 +466,24 @@ failed_size_exch:
     return status;
 }
 
-void ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task)
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task)
 {
     ucc_tl_ucp_team_t    *tl_team = UCC_TL_UCP_TASK_TEAM(task);
     ucc_tl_ucp_context_t *ctx     = UCC_TL_UCP_TEAM_CTX(tl_team);
     int                   i       = 0;
     int                   j       = 0;
+    ucs_status_t          status;
     /* free library resources, unmap user resources */
     if (ctx->dyn_seg_buf) {
         /* unmap and release packed buffers */
         for (i = 0; i < ctx->n_dynrinfo_segs; i++) {
             if (ctx->dynamic_remote_info[i].mem_h) {
-                ucp_mem_unmap(ctx->worker.ucp_context,
+                status = ucp_mem_unmap(ctx->worker.ucp_context,
                               ctx->dynamic_remote_info[i].mem_h);
+                if (UCS_OK != status) {
+                    tl_error(UCC_TL_UCP_TEAM_LIB(tl_team), "Failed to unmap memory");
+                    return ucs_status_to_ucc_status(status);
+                }
             }
             if (ctx->dynamic_remote_info[i].packed_key) {
                 ucp_rkey_buffer_release(ctx->dynamic_remote_info[i].packed_key);
@@ -500,6 +511,7 @@ void ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task)
         ctx->dyn_seg_size        = 0;
         ctx->n_dynrinfo_segs     = 0;
     }
+    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,

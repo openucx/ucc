@@ -514,6 +514,6 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
 
 ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange(ucc_tl_ucp_task_t *task);
 
-void ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task);
+ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task);
 
 #endif
