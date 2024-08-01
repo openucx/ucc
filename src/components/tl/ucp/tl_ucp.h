@@ -133,6 +133,7 @@ typedef struct ucc_tl_ucp_context {
     ucc_tl_ucp_remote_info_t   *dynamic_remote_info;
     void                       *dyn_seg_buf;
     ucp_rkey_h                 *dyn_rkeys;
+    size_t                      dyn_seg_size;
     size_t                      n_dynrinfo_segs;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,

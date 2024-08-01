@@ -292,7 +292,7 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, size_t msglen,
     }
 
     section_offset = sizeof(uint64_t) * ctx->n_dynrinfo_segs;
-    base_offset    = (ptrdiff_t)(ctx->dyn_seg_buf);
+    base_offset    = (ptrdiff_t)(ctx->dyn_seg_buf + peer * ctx->dyn_seg_size); //PTR_OFFSET
     rvas           = (uint64_t *)base_offset;
     key_sizes      = PTR_OFFSET(base_offset, (section_offset * 2));
     keys           = PTR_OFFSET(base_offset, (section_offset * 3));

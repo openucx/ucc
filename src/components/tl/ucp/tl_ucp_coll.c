@@ -238,45 +238,95 @@ ucc_status_t ucc_tl_ucp_memmap_segment(ucc_tl_ucp_task_t *task,
 ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
                                                   ucc_tl_ucp_task_t *task)
 {
-    ucc_tl_ucp_team_t    *tl_team = UCC_TL_UCP_TASK_TEAM(task);
-    ucc_tl_ucp_context_t *ctx     = UCC_TL_UCP_TEAM_CTX(tl_team);
-    int                   i       = 0;
-    ucc_status_t          status;
+    ucc_tl_ucp_team_t    *tl_team    = UCC_TL_UCP_TASK_TEAM(task);
+    ucc_tl_ucp_context_t *ctx        = UCC_TL_UCP_TEAM_CTX(tl_team);
+    int                   i          = 0;
+    uint64_t              need_map   = 0x7;
     ucc_mem_map_t        *maps       = coll_args->mem_map.segments;
-    size_t                n_segments = coll_args->mem_map.n_segments;
+    ucc_mem_map_t        *seg_maps   = NULL;
+    size_t                n_segments = 3;
+    ucc_status_t          status;
 
-    if (n_segments == 0) {
-        maps = ucc_calloc(2, sizeof(ucc_mem_map_t));
-        if (!maps) {
+
+    /* check if src, dst, global work in ctx mapped segments */
+    for (i = 0; i < ctx->n_rinfo_segs && n_segments > 0; i++) {
+        uint64_t base = (uint64_t)ctx->remote_info[i].va_base;
+        uint64_t end = (uint64_t)(base + ctx->remote_info[i].len);
+        if ((uint64_t)coll_args->src.info.buffer >= base &&
+            (uint64_t)coll_args->src.info.buffer < end) {
+            // found it
+            need_map ^= 1;
+            --n_segments;
+        }
+        if ((uint64_t)coll_args->dst.info.buffer >= base &&
+            (uint64_t)coll_args->dst.info.buffer < end) {
+            // found it
+            need_map ^= 2;
+            --n_segments;
+        }
+
+        if ((uint64_t)coll_args->global_work_buffer >= base &&
+            (uint64_t)coll_args->global_work_buffer < end) {
+            // found it
+            need_map ^= 4;
+            --n_segments;
+        }
+
+        if (n_segments == 0) {
+            break;
+        }
+    }
+
+    /* add any valid segments */
+    if (n_segments > 0) {
+        int index = 0;
+        seg_maps = ucc_calloc(n_segments, sizeof(ucc_mem_map_t));
+        if (!seg_maps) {
             return UCC_ERR_NO_MEMORY;
         }
 
-        maps[0].address = coll_args->src.info.buffer;
-        maps[0].len = (coll_args->src.info.count / UCC_TL_TEAM_SIZE(tl_team)) *
-                      ucc_dt_size(coll_args->src.info.datatype);
-        maps[0].resource = NULL;
-
-        maps[1].address = coll_args->dst.info.buffer;
-        maps[1].len = (coll_args->dst.info.count / UCC_TL_TEAM_SIZE(tl_team)) *
-                      ucc_dt_size(coll_args->dst.info.datatype);
-        maps[1].resource = NULL;
-
-        n_segments = 2;
-    }
-
-    ctx->dynamic_remote_info =
-        ucc_calloc(n_segments, sizeof(ucc_tl_ucp_remote_info_t), "dynamic remote info");
-    /* map memory and fill in local segment information */
-    for (i = 0; i < n_segments; i++) {
-        status = ucc_tl_ucp_memmap_segment(task, &maps[i], i);
-        if (status != UCC_OK) {
-            tl_error(UCC_TASK_LIB(task), "failed to memory map a segment");
-            goto failed_memory_map;
+        if (need_map & 0x1) {
+            seg_maps[index].address = coll_args->src.info.buffer;
+            seg_maps[index].len = (coll_args->src.info.count) *
+                          ucc_dt_size(coll_args->src.info.datatype);
+            seg_maps[index++].resource = NULL;
         }
-        ++ctx->n_dynrinfo_segs;
+        if (need_map & 0x2) {
+            seg_maps[index].address = coll_args->dst.info.buffer;
+            seg_maps[index].len = (coll_args->dst.info.count) *
+                          ucc_dt_size(coll_args->dst.info.datatype);
+            seg_maps[index++].resource = NULL;
+        }
+        if (need_map & 0x4) {
+            seg_maps[index].address = coll_args->global_work_buffer;
+            seg_maps[index].len = (ONESIDED_SYNC_SIZE + ONESIDED_REDUCE_SIZE) * sizeof(long);
+            seg_maps[index++].resource = NULL;
+        }
     }
-    if (coll_args->mem_map.n_segments == 0) {
-        free(maps);
+
+    if (n_segments > 0) {
+        ctx->dynamic_remote_info =
+            ucc_calloc(n_segments, sizeof(ucc_tl_ucp_remote_info_t), "dynamic remote info");
+        /* map memory and fill in local segment information */
+        for (i = 0; i < n_segments; i++) {
+            status = ucc_tl_ucp_memmap_segment(task, &seg_maps[i], i);
+            if (status != UCC_OK) {
+                tl_error(UCC_TASK_LIB(task), "failed to memory map a segment");
+                goto failed_memory_map;
+            }
+            ++ctx->n_dynrinfo_segs;
+        }
+        for (i = 0; i < coll_args->mem_map.n_segments; i++) {
+            status = ucc_tl_ucp_memmap_segment(task, &maps[i], i + n_segments);
+            if (status != UCC_OK) {
+                tl_error(UCC_TASK_LIB(task), "failed to memory map a segment");
+                goto failed_memory_map;
+            }
+            ++ctx->n_dynrinfo_segs;
+        }
+        if (n_segments) {
+            free(seg_maps);
+        }
     }
     return UCC_OK;
 failed_memory_map:
@@ -293,8 +343,8 @@ failed_memory_map:
         }
     }
     ctx->n_dynrinfo_segs = 0;
-    if (coll_args->mem_map.n_segments == 0) {
-        free(maps);
+    if (n_segments) {
+        ucc_free(seg_maps);
     }
     return status;
 }
@@ -391,6 +441,7 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_exchange(ucc_tl_ucp_task_t *task)
             status = UCC_ERR_NO_MEMORY;
             goto failed_data_exch;
         }
+        ctx->dyn_seg_size = seg_pack_size;
         ucc_free(ex_buffer);
     }
     return UCC_OK;
@@ -439,13 +490,14 @@ void ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task)
                 }
             }
         }
-        free(ctx->dynamic_remote_info);
-        free(ctx->dyn_rkeys);
-        free(ctx->dyn_seg_buf);
+        ucc_free(ctx->dynamic_remote_info);
+        ucc_free(ctx->dyn_rkeys);
+        ucc_free(ctx->dyn_seg_buf);
 
         ctx->dynamic_remote_info = NULL;
         ctx->dyn_rkeys           = NULL;
         ctx->dyn_seg_buf         = NULL;
+        ctx->dyn_seg_size        = 0;
         ctx->n_dynrinfo_segs     = 0;
     }
 }
