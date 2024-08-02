@@ -161,7 +161,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                     return;
                 }
             } else {
-                ucc_info("etask is nullptr");
+                ucc_debug("etask is nullptr");
                 return;
             }
         case STAGE_WAIT_ALL:
@@ -195,7 +195,6 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             /* code */
             if (get_rank_step(task, task->bcast_linear.root, 0) >
                 task->bcast_linear.step) {
-                // ucc_info("something from root is ready!");
                 task->bcast_linear.stage = STAGE_CLIENT_COPY;
                 break;
             } else {
@@ -259,9 +258,9 @@ ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
     task->bcast_linear.num_steps =
         ucc_div_round_up(task->bcast_linear.size, half_scratch_size);
 
-    ucc_info("bcast dt: %s, buffer size: %ld, num_steps: %d",
-             ucc_datatype_str(dt), task->bcast_linear.size,
-             task->bcast_linear.num_steps);
+    ucc_debug("bcast linear dt: %s, buffer size: %ld, num_steps: %d",
+              ucc_datatype_str(dt), task->bcast_linear.size,
+              task->bcast_linear.num_steps);
 
     task->bcast_linear.sbuf = args->src.info.buffer;
     task->bcast_linear.step = 0;
