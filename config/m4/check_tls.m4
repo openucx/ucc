@@ -18,13 +18,13 @@ AC_DEFUN([CHECK_TLS_REQUIRED], [
        CHECKED_TL_REQUIRED=n
        required="y"
        tls_str=${TLS_REQUIRED}
-       AS_IF([ test "${TLS_REQUIRED:0:1}" == "^" ], [
+       AS_IF([ expr "x${TLS_REQUIRED} : 'x\^'" -eq 2 ], [
           CHECKED_TL_REQUIRED=y
           required="n"
-          tls_str=${TLS_REQUIRED:1}])
+          tls_str=${TLS_REQUIRED#^}])
        # AC_MSG_WARN([checking tl : $tl_name, TLS_REQUIRED=${TLS_REQUIRED}, tls_str=${tls_str}, required=${required}])
        for t in $(echo ${tls_str} | tr "," " "); do
-           AS_IF([ test "$t" == "$tl_name" ], [CHECKED_TL_REQUIRED=$required], [])
+           AS_IF([ test "$t" = "$tl_name" ], [CHECKED_TL_REQUIRED=$required], [])
        done
     ])
 ])
