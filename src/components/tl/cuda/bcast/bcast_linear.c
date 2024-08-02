@@ -21,23 +21,6 @@ enum
     STAGE_CLIENT_COPY_WAIT,
 };
 
-// TODO: move out to common with allgather
-static inline int get_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
-                                int step_id)
-{
-    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
-
-    return sync->seq_num[step_id];
-}
-
-static inline void set_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
-                                 int step, int step_id)
-{
-    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
-
-    sync->seq_num[step_id] = step;
-}
-
 ucc_status_t ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
