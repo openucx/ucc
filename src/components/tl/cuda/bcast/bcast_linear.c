@@ -16,9 +16,9 @@ enum
     STAGE_WAIT_COPY, // wait for copy finishes
     STAGE_WAIT_ALL,  // wait for all others rank be on same step
     // non-root
-    STAGE_WAIT_ROOT,
-    STAGE_CLIENT_COPY,
-    STAGE_CLIENT_COPY_WAIT,
+    STAGE_WAIT_ROOT,   // clients wait while root writes to own scratch buffer
+    STAGE_CLIENT_COPY, // clients submit copy task
+    STAGE_CLIENT_COPY_WAIT, // clients wait completion of copy from root's scratch
 };
 
 ucc_status_t ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
@@ -91,6 +91,8 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     ucc_ee_executor_task_t *etask;
     ucc_status_t            st;
     void *                  sbuf, *dbuf;
+    int                     i;
+
     task->super.status = UCC_INPROGRESS;
 
     st = ucc_coll_task_get_executor(&task->super, &exec);
@@ -165,7 +167,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             }
         case STAGE_WAIT_ALL:
-            for (int i = 0; i < tsize; ++i) {
+            for (i = 0; i < tsize; ++i) {
                 // need to wait until all ranks complete step - 1, because of double buffering
                 if (get_rank_step(task, i, 0) < task->bcast_linear.step - 1) {
                     // rank is not ready, lets wait
@@ -192,7 +194,6 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
         // fall-through between cases is intentional
         switch (task->bcast_linear.stage) {
         case STAGE_WAIT_ROOT:
-            /* code */
             if (get_rank_step(task, task->bcast_linear.root, 0) >
                 task->bcast_linear.step) {
                 task->bcast_linear.stage = STAGE_CLIENT_COPY;
@@ -201,8 +202,8 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             }
         case STAGE_CLIENT_COPY:
-            dbuf = PTR_OFFSET(task->bcast_linear.sbuf, offset_buff);
             // need to copy from root's scratch buffer
+            dbuf = PTR_OFFSET(task->bcast_linear.sbuf, offset_buff);
             sbuf = PTR_OFFSET(TASK_SCRATCH(task, task->bcast_linear.root),
                               task->bcast_linear.step % 2 * chunk_size);
             st   = ecopy(dbuf, sbuf, chunk_size, exec,
