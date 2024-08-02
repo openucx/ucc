@@ -10,7 +10,7 @@
 #include "tl_cuda.h"
 #include "components/mc/ucc_mc.h"
 
-#define UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR 4
+#define UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR 5
 extern const char
     *ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR];
 
@@ -155,5 +155,22 @@ ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
                                         ucc_coll_type_t          coll_type,
                                         ucc_memory_type_t        mem_type,
                                         ucc_base_coll_init_fn_t *init);
+
+// common utils function for collectives:
+static inline int get_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
+                                int step_id)
+{
+    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
+
+    return sync->seq_num[step_id];
+}
+
+static inline void set_rank_step(ucc_tl_cuda_task_t *task, ucc_rank_t rank,
+                                 int step, int step_id)
+{
+    ucc_tl_cuda_sync_t *sync = TASK_SYNC(task, rank);
+
+    sync->seq_num[step_id] = step;
+}
 
 #endif
