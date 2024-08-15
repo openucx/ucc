@@ -18,10 +18,11 @@ allgather =                        \
 	allgather/allgather_sparbit.c  \
 	allgather/allgather_knomial.c
 
-allgatherv =                     \
-	allgatherv/allgatherv.h      \
-	allgatherv/allgatherv.c      \
-	allgatherv/allgatherv_ring.c
+allgatherv =                        \
+	allgatherv/allgatherv.h         \
+	allgatherv/allgatherv.c         \
+	allgatherv/allgatherv_ring.c    \
+	allgatherv/allgatherv_knomial.c
 
 alltoall =                       \
 	alltoall/alltoall.h          \

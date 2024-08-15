@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -21,8 +21,8 @@ ucc_pt_coll_allgatherv::ucc_pt_coll_allgatherv(ucc_datatype_t dt,
     has_bw_        = false;
     root_shift_    = 0;
 
-    coll_args.mask                = 0;
-    coll_args.flags               = 0;
+    coll_args.mask               |= UCC_COLL_ARGS_FIELD_FLAGS;
+    coll_args.flags              |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     coll_args.coll_type           = UCC_COLL_TYPE_ALLGATHERV;
     coll_args.src.info.datatype   = dt;
     coll_args.src.info.mem_type   = mt;

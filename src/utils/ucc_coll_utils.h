@@ -281,6 +281,25 @@ static inline size_t ucc_buffer_block_offset(size_t     total_count,
     return (block < left) ? offset - (left - block) : offset;
 }
 
+static inline size_t ucc_buffer_vector_block_offset(ucc_count_t *counts,
+                                                    int is64,
+                                                    ucc_rank_t rank)
+{
+    size_t offset = 0;
+    ucc_rank_t i;
+
+    if (is64) {
+        for (i = 0; i < rank; i++) {
+            offset += ((uint64_t *)counts)[i];
+        }
+    } else {
+        for (i = 0; i < rank; i++) {
+            offset += ((uint32_t *)counts)[i];
+        }
+    }
+    return offset;
+}
+
 /* Given the rank space A (e.g. core ucc team), a subset B (e.g. active set
    within the core team), the ep_map that maps ranks from the subset B to A,
    and the rank of a process within A. The function below computes the local

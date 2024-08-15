@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -61,6 +61,8 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
     UCC_MALLOC_CHECK(check_buf);
     fill_counts_and_displacements(size, count, counts, displacements);
 
+    args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+    args.flags |= UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
     if (!inplace) {
         UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, counts[rank] * dt_size, mem_type));
         sbuf                   = sbuf_mc_header->addr;
@@ -74,6 +76,7 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
     args.dst.info_v.displacements = (ucc_aint_t*)displacements;
     args.dst.info_v.datatype      = dt;
     args.dst.info_v.mem_type      = mem_type;
+
     UCC_CHECK(set_input());
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }

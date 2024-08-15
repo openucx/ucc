@@ -48,8 +48,10 @@ typedef struct ucc_knomial_pattern {
     ucc_rank_t     n_extra;       /* number of "extra" ranks to be served by "proxies" */
     size_t         block_size_counts;
     size_t         count;         /* collective buffer size */
+    ucc_count_t   *counts;
     ucc_rank_t     block_size;
     ptrdiff_t      block_offset;
+    int            is64;
 } ucc_knomial_pattern_t;
 
 /**
