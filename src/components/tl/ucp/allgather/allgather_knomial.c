@@ -107,7 +107,7 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
 
 UCC_KN_PHASE_EXTRA:
     if ((KN_NODE_EXTRA == node_type) || (KN_NODE_PROXY == node_type)) {
-        if (UCC_INPROGRESS == ucc_tl_ucp_test_2(task)) {
+        if (UCC_INPROGRESS == ucc_tl_ucp_test_with_etasks(task)) {
             SAVE_STATE(UCC_KN_PHASE_EXTRA);
             return;
         }
@@ -170,7 +170,7 @@ UCC_KN_PHASE_EXTRA:
             }
         }
     UCC_KN_PHASE_LOOP:
-        if (UCC_INPROGRESS == ucc_tl_ucp_test_recv_2(task)) {
+        if (UCC_INPROGRESS == ucc_tl_ucp_test_recv_with_etasks(task)) {
             SAVE_STATE(UCC_KN_PHASE_LOOP);
             return;
         }
@@ -191,7 +191,7 @@ UCC_KN_PHASE_EXTRA:
         }
     }
 UCC_KN_PHASE_PROXY:
-    if (UCC_INPROGRESS == ucc_tl_ucp_test_2(task)) {
+    if (UCC_INPROGRESS == ucc_tl_ucp_test_with_etasks(task)) {
         SAVE_STATE(UCC_KN_PHASE_PROXY);
         return;
     }

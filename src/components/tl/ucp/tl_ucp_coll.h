@@ -57,22 +57,22 @@ void ucc_tl_ucp_team_default_score_str_free(
     }                                                                          \
 } while(0)
 
-#define EXEC_TASK_TEST_2(_errmsg, _etask) do {                                 \
-    if (_etask != NULL) {                                                      \
-        status = ucc_ee_executor_task_test(_etask);                            \
-        if (status > 0) {                                                      \
-            task->super.status = UCC_INPROGRESS;                               \
-            return;                                                            \
-        }                                                                      \
-        ucc_ee_executor_task_finalize(_etask);                                 \
-        _etask = NULL;                                                         \
-        if (ucc_unlikely(status < 0)) {                                        \
-            tl_error(UCC_TASK_LIB(task), _errmsg);                             \
-            task->super.status = status;                                       \
-            return;                                                            \
-        }                                                                      \
-    }                                                                          \
-} while(0)
+// #define EXEC_TASK_TEST_2(_errmsg, _etask) do {                                 
+//     if (_etask != NULL) {                                                      
+//         status = ucc_ee_executor_task_test(_etask);                            
+//         if (status > 0) {                                                      
+//             task->super.status = UCC_INPROGRESS;                               
+//             return;                                                            
+//         }                                                                      
+//         ucc_ee_executor_task_finalize(_etask);                                 
+//         _etask = NULL;                                                         
+//         if (ucc_unlikely(status < 0)) {                                        
+//             tl_error(UCC_TASK_LIB(task), _errmsg);                             
+//             task->super.status = status;                                       
+//             return;                                                            
+//         }                                                                      
+//     }                                                                          
+// } while(0)
 
 #define EXEC_TASK_WAIT(_etask, ...)                                            \
     do {                                                                       \
@@ -424,11 +424,11 @@ static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
     return UCC_INPROGRESS;
 }
 
-static inline ucc_status_t ucc_tl_ucp_test_2(ucc_tl_ucp_task_t *task)
+static inline ucc_status_t ucc_tl_ucp_test_with_etasks(ucc_tl_ucp_task_t *task)
 {
     int polls = 0;
     ucc_status_t status;
-    int all_positive = 1;
+    int all_tests_positive = 1;
 
     while (polls++ < task->n_polls) {
         node_ucc_ee_executor_task_t *current_node;
@@ -441,18 +441,12 @@ static inline ucc_status_t ucc_tl_ucp_test_2(ucc_tl_ucp_task_t *task)
                     ucp_memcpy_device_complete(current_node->val->completion, status);
                     current_node->val = NULL;                                                              \
                 }                                                                      \
-                                                        
-                // if (ucc_unlikely(status < 0)) {                                        
-                //     tl_error(UCC_TASK_LIB(task), _errmsg);                             
-                //     task->super.status = status;                                       
-                //     return;                                                           
-                // }
                 else {
-                    all_positive = 0;
+                    all_tests_positive = 0;
                 }
             }                                                                      
         }                                                                               
-        if (UCC_TL_UCP_TASK_P2P_COMPLETE(task) && all_positive==1) {
+        if (UCC_TL_UCP_TASK_P2P_COMPLETE(task) && all_tests_positive==1) {
             return UCC_OK;
         }
         ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);
@@ -482,10 +476,10 @@ static inline ucc_status_t ucc_tl_ucp_test_recv(ucc_tl_ucp_task_t *task)
     return UCC_INPROGRESS;
 }
 
-static inline ucc_status_t ucc_tl_ucp_test_recv_2(ucc_tl_ucp_task_t *task) {
+static inline ucc_status_t ucc_tl_ucp_test_recv_with_etasks(ucc_tl_ucp_task_t *task) {
     int polls = 0;
     ucc_status_t status;
-    int all_positive = 1;
+    int all_tests_positive = 1;
 
     while (polls++ < task->n_polls) {
         node_ucc_ee_executor_task_t *current_node;
@@ -496,16 +490,11 @@ static inline ucc_status_t ucc_tl_ucp_test_recv_2(ucc_tl_ucp_task_t *task) {
                 return UCC_INPROGRESS;                                                            \
             }                                                                      \
             ucc_ee_executor_task_finalize(current_node->val);                                 \
-            // ucp_memcpy_device_complete(current_node->val->completion, status);
+            ucp_memcpy_device_complete(current_node->val->completion, status);
             current_node->val = NULL;                                                         \
-            // if (ucc_unlikely(status < 0)) {                                        
-            //     tl_error(UCC_TASK_LIB(task), _errmsg);                             
-            //     task->super.status = status;                                       
-            //     return;                                                            
-            // }
-            all_positive = 0;                                                                      
+            all_tests_positive = 0;                                                                      
         }
-        if (UCC_TL_UCP_TASK_RECV_COMPLETE(task) && all_positive==1) {
+        if (UCC_TL_UCP_TASK_RECV_COMPLETE(task) && all_tests_positive==1) {
             return UCC_OK;
         }
         ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);

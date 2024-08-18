@@ -134,7 +134,7 @@ err_cfg_read:
     return ucc_status;
 }
 
-static int my_memcpy_device_start(void *dest, const void *src, size_t size,
+static int memcpy_device_start(void *dest, const void *src, size_t size,
                                 void *completion, void *user_data) {
 
         ucc_status_t status;
@@ -171,7 +171,7 @@ static int my_memcpy_device_start(void *dest, const void *src, size_t size,
         
     }
 
-static void my_memcpy_device(void *dest, const void *src, size_t size, void *user_data){
+static void memcpy_device(void *dest, const void *src, size_t size, void *user_data){
 
     ucc_status_t status;
     ucc_ee_executor_task_args_t eargs;
@@ -208,28 +208,8 @@ static void my_memcpy_device(void *dest, const void *src, size_t size, void *use
 
 ucp_worker_mem_callbacks_t copy_callback = {
 
-    // void (*memcpy_device)(void *dest, const void *src, size_t size, int to_dev){
-    //     ucc_ee_executor_ops_t *executor_ops;
-    //     ucc_ee_executor_task_args_t *task_args;
-    //     ucc_eee_task_copy_t *copy;
-    //     ucc_ee_executor_task_t **task;
-    //     ucc_ee_executor_t *executor;
-
-    //     copy.src = src;
-    //     copy.dst = dest;
-    //     copy.len = size;
-
-    //     task_args.copy = copy;
-
-    //     executor_ops.task_post(executor, task_args, task);
-    //     while (UCC_OK != &task.status){
-    //         executor_ops.task_test(&task);
-    //     }
-    //     executor_ops.task_finalize(&task);
-    // };
-
-    .memcpy_device_start = my_memcpy_device_start,
-    .memcpy_device = my_memcpy_device
+    .memcpy_device_start = memcpy_device_start,
+    .memcpy_device = memcpy_device
         
 };
 
