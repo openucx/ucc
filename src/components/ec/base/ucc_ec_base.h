@@ -176,7 +176,14 @@ typedef struct ucc_ee_executor_task {
     ucc_ee_executor_t           *eee;
     ucc_ee_executor_task_args_t  args;
     ucc_status_t                 status;
+    void                        *completion;
 } ucc_ee_executor_task_t;
+
+typedef struct node_ucc_ee_executor_task node_ucc_ee_executor_task_t;
+typedef struct node_ucc_ee_executor_task {
+    ucc_ee_executor_task_t      *val;
+    node_ucc_ee_executor_task_t *next;
+} node_ucc_ee_executor_task_t;
 
 typedef struct ucc_ee_executor_ops {
     ucc_status_t (*init)(const ucc_ee_executor_params_t *params,

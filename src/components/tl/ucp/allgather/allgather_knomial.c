@@ -62,8 +62,10 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     size_t                 extra_count;
 
     EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test",
-                   task->allgather_kn.etask);
-    task->allgather_kn.etask = NULL;
+                   task->allgather_kn.etask_linked_list_head->val);
+    // EXEC_TASK_TEST_2("failed to copy data to user buffer",
+    //                    task->allgather_kn.etask);
+    task->allgather_kn.etask_linked_list_head->val = NULL;
     UCC_KN_GOTO_PHASE(task->allgather_kn.phase);
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, rank);
@@ -105,7 +107,7 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
 
 UCC_KN_PHASE_EXTRA:
     if ((KN_NODE_EXTRA == node_type) || (KN_NODE_PROXY == node_type)) {
-        if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        if (UCC_INPROGRESS == ucc_tl_ucp_test_2(task)) {
             SAVE_STATE(UCC_KN_PHASE_EXTRA);
             return;
         }
@@ -168,7 +170,7 @@ UCC_KN_PHASE_EXTRA:
             }
         }
     UCC_KN_PHASE_LOOP:
-        if (UCC_INPROGRESS == ucc_tl_ucp_test_recv(task)) {
+        if (UCC_INPROGRESS == ucc_tl_ucp_test_recv_2(task)) {
             SAVE_STATE(UCC_KN_PHASE_LOOP);
             return;
         }
@@ -189,7 +191,7 @@ UCC_KN_PHASE_EXTRA:
         }
     }
 UCC_KN_PHASE_PROXY:
-    if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+    if (UCC_INPROGRESS == ucc_tl_ucp_test_2(task)) {
         SAVE_STATE(UCC_KN_PHASE_PROXY);
         return;
     }
@@ -220,7 +222,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-    task->allgather_kn.etask = NULL;
+    task->allgather_kn.etask_linked_list_head->val = NULL;
     task->allgather_kn.phase = UCC_KN_PHASE_INIT;
     if (ct == UCC_COLL_TYPE_ALLGATHER) {
         ucc_kn_ag_pattern_init(size, rank, radix, args->dst.info.count,
@@ -239,7 +241,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
             eargs.copy.len  = args->src.info.count *
                               ucc_dt_size(args->src.info.datatype);
             status = ucc_ee_executor_task_post(exec, &eargs,
-                                               &task->allgather_kn.etask);
+                                               &task->allgather_kn.etask_linked_list_head->val);
             if (ucc_unlikely(status != UCC_OK)) {
                 task->super.status = status;
                 return status;
@@ -298,18 +300,18 @@ void register_memory(ucc_coll_task_t *coll_task){
     mmap_params.field_mask  = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
                             UCP_MEM_MAP_PARAM_FIELD_LENGTH  |
                             UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
-    mmap_params.memory_type = mem_type;
+    mmap_params.memory_type = ucc_memtype_to_ucs[mem_type];
 
     EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test",
-                   task->allgather_kn.etask);
-    task->allgather_kn.etask = NULL;
-    UCC_KN_GOTO_PHASE(task->allgather_kn.phase);
+                   task->allgather_kn.etask_linked_list_head->val);
+    task->allgather_kn.etask_linked_list_head->val = NULL;
+    // UCC_KN_GOTO_PHASE(task->allgather_kn.phase);
     if (KN_NODE_EXTRA == node_type) {
         if (p->type != KN_PATTERN_ALLGATHERX) {
 
             mmap_params.address     = task->allgather_kn.sbuf;
             mmap_params.length      = local * dt_size;
-            UCPCHECK_GOTO(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh),
+            UCPCHECK_GOTO(ucs_status_to_ucc_status(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh)),
                           task, out);
             if (count_mh == size_of_list){
                 size_of_list *= 2;
@@ -320,7 +322,7 @@ void register_memory(ucc_coll_task_t *coll_task){
         
         mmap_params.address     = rbuf;
         mmap_params.length      = data_size;
-        UCPCHECK_GOTO(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh),
+        UCPCHECK_GOTO(ucs_status_to_ucc_status(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh)),
                         task, out);
         if (count_mh == size_of_list){
             size_of_list *= 2;
@@ -335,7 +337,7 @@ void register_memory(ucc_coll_task_t *coll_task){
         mmap_params.address     = PTR_OFFSET(task->allgather_kn.sbuf,
                                         local * dt_size);
         mmap_params.length      = extra_count * dt_size;
-        UCPCHECK_GOTO(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh),
+        UCPCHECK_GOTO(ucs_status_to_ucc_status(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh)),
                         task, out);
         if (count_mh == size_of_list){
             size_of_list *= 2;
@@ -344,16 +346,6 @@ void register_memory(ucc_coll_task_t *coll_task){
         mh_list[count_mh++] = mh;
     }
 
-UCC_KN_PHASE_EXTRA:
-    if ((KN_NODE_EXTRA == node_type) || (KN_NODE_PROXY == node_type)) {
-        if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-            SAVE_STATE(UCC_KN_PHASE_EXTRA);
-            return;
-        }
-        if (KN_NODE_EXTRA == node_type) {
-            goto out;
-        }
-    }
     while (!ucc_knomial_pattern_loop_done(p)) {
         ucc_kn_ag_pattern_peer_seg(rank, p, &local_seg_count,
                                    &local_seg_offset);
@@ -372,7 +364,7 @@ UCC_KN_PHASE_EXTRA:
             }
             mmap_params.address     = sbuf;
             mmap_params.length      = local_seg_count * dt_size;
-            UCPCHECK_GOTO(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh),
+            UCPCHECK_GOTO(ucs_status_to_ucc_status(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh)),
                             task, out);
             if (count_mh == size_of_list){
                 size_of_list *= 2;
@@ -397,7 +389,7 @@ UCC_KN_PHASE_EXTRA:
             }
                 mmap_params.address     = PTR_OFFSET(rbuf, peer_seg_offset * dt_size);
                 mmap_params.length      = peer_seg_count * dt_size;
-                UCPCHECK_GOTO(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh),
+                UCPCHECK_GOTO(ucs_status_to_ucc_status(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh)),
                                 task, out);
             if (count_mh == size_of_list){
                 size_of_list *= 2;
@@ -405,30 +397,19 @@ UCC_KN_PHASE_EXTRA:
             }
             mh_list[count_mh++] = mh;
         }
-    UCC_KN_PHASE_LOOP:
-        if (UCC_INPROGRESS == ucc_tl_ucp_test_recv(task)) {
-            SAVE_STATE(UCC_KN_PHASE_LOOP);
-            return;
-        }
         ucc_kn_ag_pattern_next_iter(p);
     }
 
     if (KN_NODE_PROXY == node_type) {
         mmap_params.address     = args->dst.info.buffer;
         mmap_params.length      = data_size;
-        UCPCHECK_GOTO(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh),
+        UCPCHECK_GOTO(ucs_status_to_ucc_status(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh)),
                         task, out);
         if (count_mh == size_of_list){
             size_of_list *= 2;
             mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));
         }
         mh_list[count_mh++] = mh;
-    }
-
-UCC_KN_PHASE_PROXY:
-    if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
-        SAVE_STATE(UCC_KN_PHASE_PROXY);
-        return;
     }
 
 out:
@@ -451,6 +432,10 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     register_memory(*task_h);
 
     task = ucc_tl_ucp_init_task(coll_args, team);
+    ucc_mpool_init(&task->allgather_kn.etask_node_mpool, 0, sizeof(node_ucc_ee_executor_task_t),
+                            0, UCC_CACHE_LINE_SIZE, 16, UINT_MAX, NULL,
+                            tl_team->super.super.context->ucc_context->thread_mode, "etasks_linked_list_nodes");
+    
     if (tl_team->cfg.use_reordering &&
         coll_args->args.coll_type == UCC_COLL_TYPE_ALLREDUCE) {
         sbgp = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_FULL_HOST_ORDERED);
