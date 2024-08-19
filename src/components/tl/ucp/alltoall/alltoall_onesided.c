@@ -70,6 +70,5 @@ void ucc_tl_ucp_alltoall_onesided_progress(ucc_coll_task_t *ctask)
     }
 
     pSync[0]           = 0;
-    task->super.status = UCC_OK;
-    ucc_tl_ucp_coll_dynamic_segment_finalize(task);
+    task->super.status = ucc_tl_ucp_coll_dynamic_segment_finalize(task);
 }
