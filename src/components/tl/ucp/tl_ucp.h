@@ -36,6 +36,12 @@
 #define ONESIDED_SYNC_SIZE 1
 #define ONESIDED_REDUCE_SIZE 4
 
+typedef enum {
+    UCC_TL_UCP_DYN_SEG_UPDATE_SRC    = UCC_BIT(0),
+    UCC_TL_UCP_DYN_SEG_UPDATE_DST    = UCC_BIT(1),
+    UCC_TL_UCP_DYN_SEG_UPDATE_GLOBAL = UCC_BIT(2),
+} ucc_tl_ucp_dynamic_segment_update_mask_t;
+
 typedef struct ucc_tl_ucp_iface {
     ucc_tl_iface_t super;
 } ucc_tl_ucp_iface_t;

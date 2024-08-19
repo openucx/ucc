@@ -241,12 +241,13 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
     ucc_tl_ucp_team_t    *tl_team    = UCC_TL_UCP_TASK_TEAM(task);
     ucc_tl_ucp_context_t *ctx        = UCC_TL_UCP_TEAM_CTX(tl_team);
     int                   i          = 0;
-    uint64_t              need_map   = 0x7;
     ucc_mem_map_t        *maps       = coll_args->mem_map.segments;
     ucc_mem_map_t        *seg_maps   = NULL;
     size_t                n_segments = 3;
+    uint64_t              need_map   = UCC_TL_UCP_DYN_SEG_UPDATE_SRC |
+                                       UCC_TL_UCP_DYN_SEG_UPDATE_DST |
+                                       UCC_TL_UCP_DYN_SEG_UPDATE_GLOBAL;
     ucc_status_t          status;
-
 
     /* check if src, dst, global work in ctx mapped segments */
     for (i = 0; i < ctx->n_rinfo_segs && n_segments > 0; i++) {
@@ -255,23 +256,21 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
         if ((uint64_t)coll_args->src.info.buffer >= base &&
             (uint64_t)coll_args->src.info.buffer < end) {
             // found it
-            need_map ^= 1;
+            need_map ^= UCC_TL_UCP_DYN_SEG_UPDATE_SRC;
             --n_segments;
         }
         if ((uint64_t)coll_args->dst.info.buffer >= base &&
             (uint64_t)coll_args->dst.info.buffer < end) {
             // found it
-            need_map ^= 2;
+            need_map ^= UCC_TL_UCP_DYN_SEG_UPDATE_DST;
             --n_segments;
         }
-
         if ((uint64_t)coll_args->global_work_buffer >= base &&
             (uint64_t)coll_args->global_work_buffer < end) {
             // found it
-            need_map ^= 4;
+            need_map ^= UCC_TL_UCP_DYN_SEG_UPDATE_GLOBAL;
             --n_segments;
         }
-
         if (n_segments == 0) {
             break;
         }
@@ -286,19 +285,19 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
             return UCC_ERR_NO_MEMORY;
         }
 
-        if (need_map & 0x1) {
+        if (need_map & UCC_TL_UCP_DYN_SEG_UPDATE_SRC) {
             seg_maps[index].address = coll_args->src.info.buffer;
             seg_maps[index].len = (coll_args->src.info.count) *
                           ucc_dt_size(coll_args->src.info.datatype);
             seg_maps[index++].resource = NULL;
         }
-        if (need_map & 0x2) {
+        if (need_map & UCC_TL_UCP_DYN_SEG_UPDATE_DST) {
             seg_maps[index].address = coll_args->dst.info.buffer;
             seg_maps[index].len = (coll_args->dst.info.count) *
                           ucc_dt_size(coll_args->dst.info.datatype);
             seg_maps[index++].resource = NULL;
         }
-        if (need_map & 0x4) {
+        if (need_map & UCC_TL_UCP_DYN_SEG_UPDATE_GLOBAL) {
             seg_maps[index].address = coll_args->global_work_buffer;
             seg_maps[index].len = (ONESIDED_SYNC_SIZE + ONESIDED_REDUCE_SIZE) * sizeof(long);
             seg_maps[index++].resource = NULL;
@@ -468,10 +467,11 @@ failed_size_exch:
 
 ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task)
 {
-    ucc_tl_ucp_team_t    *tl_team = UCC_TL_UCP_TASK_TEAM(task);
-    ucc_tl_ucp_context_t *ctx     = UCC_TL_UCP_TEAM_CTX(tl_team);
-    int                   i       = 0;
-    int                   j       = 0;
+    ucc_tl_ucp_team_t    *tl_team    = UCC_TL_UCP_TASK_TEAM(task);
+    ucc_tl_ucp_context_t *ctx        = UCC_TL_UCP_TEAM_CTX(tl_team);
+    int                   i          = 0;
+    int                   j          = 0;
+    ucc_status_t          ret_status = UCC_OK;
     ucs_status_t          status;
     /* free library resources, unmap user resources */
     if (ctx->dyn_seg_buf) {
@@ -479,10 +479,10 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task)
         for (i = 0; i < ctx->n_dynrinfo_segs; i++) {
             if (ctx->dynamic_remote_info[i].mem_h) {
                 status = ucp_mem_unmap(ctx->worker.ucp_context,
-                              ctx->dynamic_remote_info[i].mem_h);
+                                       ctx->dynamic_remote_info[i].mem_h);
                 if (UCS_OK != status) {
                     tl_error(UCC_TL_UCP_TEAM_LIB(tl_team), "Failed to unmap memory");
-                    return ucs_status_to_ucc_status(status);
+                    ret_status = ucs_status_to_ucc_status(status);
                 }
             }
             if (ctx->dynamic_remote_info[i].packed_key) {
@@ -511,7 +511,7 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task)
         ctx->dyn_seg_size        = 0;
         ctx->n_dynrinfo_segs     = 0;
     }
-    return UCC_OK;
+    return ret_status;
 }
 
 ucc_status_t ucc_tl_ucp_coll_init(ucc_base_coll_args_t *coll_args,
