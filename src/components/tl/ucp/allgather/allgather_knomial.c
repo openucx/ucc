@@ -13,6 +13,7 @@
 #include "coll_patterns/sra_knomial.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
+#include <stdio.h>
 
 #define SAVE_STATE(_phase)                                                     \
     do {                                                                       \
@@ -70,7 +71,7 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, rank);
         if (p->type != KN_PATTERN_ALLGATHERX) {
-            UCPCHECK_GOTO(ucc_tl_ucp_send_nb_2(task->allgather_kn.sbuf,
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb_with_mem(task->allgather_kn.sbuf,
                                              local * dt_size, mem_type,
                                              ucc_ep_map_eval(task->subset.map,
                                              INV_VRANK(peer,broot,size)),
@@ -81,7 +82,7 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
                 goto out;
             }
         }
-        UCPCHECK_GOTO(ucc_tl_ucp_send_nb_2(rbuf, data_size, mem_type,
+        UCPCHECK_GOTO(ucc_tl_ucp_send_nb_with_mem(rbuf, data_size, mem_type,
                                          ucc_ep_map_eval(task->subset.map,
                                          INV_VRANK(peer,broot,size)),
                                          team, task, mh_list[count_mh++]),
@@ -95,7 +96,7 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
         peer = ucc_knomial_pattern_get_extra(p, rank);
         extra_count = GET_LOCAL_COUNT(args, size, peer);
         peer = ucc_ep_map_eval(task->subset.map, peer);
-        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb_2(PTR_OFFSET(task->allgather_kn.sbuf,
+        UCPCHECK_GOTO(ucc_tl_ucp_recv_nb_with_mem(PTR_OFFSET(task->allgather_kn.sbuf,
                                         local * dt_size), extra_count * dt_size,
                                         mem_type, peer, team, task, mh_list[count_mh++]),
                       task, out);
@@ -131,7 +132,7 @@ UCC_KN_PHASE_EXTRA:
                     continue;
                 }
             }
-            UCPCHECK_GOTO(ucc_tl_ucp_send_nb_2(sbuf, local_seg_count * dt_size,
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb_with_mem(sbuf, local_seg_count * dt_size,
                                              mem_type,
                                              ucc_ep_map_eval(task->subset.map,
                                              INV_VRANK(peer, broot, size)),
@@ -158,7 +159,7 @@ UCC_KN_PHASE_EXTRA:
                 }
             }
             UCPCHECK_GOTO(
-                ucc_tl_ucp_recv_nb_2(PTR_OFFSET(rbuf, peer_seg_offset * dt_size),
+                ucc_tl_ucp_recv_nb_with_mem(PTR_OFFSET(rbuf, peer_seg_offset * dt_size),
                                    peer_seg_count * dt_size, mem_type,
                                    ucc_ep_map_eval(task->subset.map,
                                    INV_VRANK(peer, broot, size)),
@@ -179,7 +180,7 @@ UCC_KN_PHASE_EXTRA:
 
     if (KN_NODE_PROXY == node_type) {
         peer = ucc_knomial_pattern_get_extra(p, rank);
-        UCPCHECK_GOTO(ucc_tl_ucp_send_nb_2(args->dst.info.buffer, data_size,
+        UCPCHECK_GOTO(ucc_tl_ucp_send_nb_with_mem(args->dst.info.buffer, data_size,
                                          mem_type,
                                          ucc_ep_map_eval(task->subset.map,
                                          INV_VRANK(peer, broot, size)),
@@ -222,6 +223,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
+    task->allgather_kn.etask_linked_list_head = (node_ucc_ee_executor_task_t *)malloc(sizeof(node_ucc_ee_executor_task_t));
     task->allgather_kn.etask_linked_list_head->val = NULL;
     task->allgather_kn.phase = UCC_KN_PHASE_INIT;
     if (ct == UCC_COLL_TYPE_ALLGATHER) {
@@ -287,7 +289,7 @@ void register_memory(ucc_coll_task_t *coll_task){
     ucc_rank_t             peer, peer_dist;
     ucc_kn_radix_t         loop_step;
     size_t                 peer_seg_count, local_seg_count;
-    ucc_status_t           status;
+    // ucc_status_t           status;
     size_t                 extra_count;
 
     ucc_tl_ucp_context_t *ctx = UCC_TL_UCP_TEAM_CTX(team);
@@ -302,9 +304,9 @@ void register_memory(ucc_coll_task_t *coll_task){
                             UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
     mmap_params.memory_type = ucc_memtype_to_ucs[mem_type];
 
-    EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test",
-                   task->allgather_kn.etask_linked_list_head->val);
-    task->allgather_kn.etask_linked_list_head->val = NULL;
+    // EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test",
+    //                task->allgather_kn.etask_linked_list_head->val);
+    // task->allgather_kn.etask_linked_list_head->val = NULL;
     // UCC_KN_GOTO_PHASE(task->allgather_kn.phase);
     if (KN_NODE_EXTRA == node_type) {
         if (p->type != KN_PATTERN_ALLGATHERX) {
@@ -429,7 +431,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     ucc_tl_ucp_task_t *task;
     ucc_sbgp_t        *sbgp;
 
-    register_memory(*task_h);
+    printf("USING NEW KNOMIAL");
 
     task = ucc_tl_ucp_init_task(coll_args, team);
     ucc_mpool_init(&task->allgather_kn.etask_node_mpool, 0, sizeof(node_ucc_ee_executor_task_t),
@@ -444,6 +446,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     }
     task->allgather_kn.p.radix = radix;
     task->super.flags         |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    register_memory(&task->super);
     task->super.post           = ucc_tl_ucp_allgather_knomial_start;
     task->super.progress       = ucc_tl_ucp_allgather_knomial_progress;
     *task_h                    = &task->super;

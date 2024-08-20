@@ -95,7 +95,7 @@ ucc_tl_ucp_send_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
 }
 
 static inline ucs_status_ptr_t
-ucc_tl_ucp_send_common_2(void *buffer, size_t msglen, ucc_memory_type_t mtype,
+ucc_tl_ucp_send_common_with_mem(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                        ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                        ucc_tl_ucp_task_t *task, ucp_send_nbx_callback_t cb, void *user_data, ucp_mem_h mh)
 {
@@ -143,13 +143,13 @@ ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
 }
 
 static inline ucc_status_t
-ucc_tl_ucp_send_nb_2(void *buffer, size_t msglen, ucc_memory_type_t mtype,
+ucc_tl_ucp_send_nb_with_mem(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                    ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                    ucc_tl_ucp_task_t *task, ucp_mem_h mh)
 {
     ucs_status_ptr_t ucp_status;
 
-    ucp_status = ucc_tl_ucp_send_common_2(buffer, msglen, mtype, dest_group_rank,
+    ucp_status = ucc_tl_ucp_send_common_with_mem(buffer, msglen, mtype, dest_group_rank,
                                         team, task, ucc_tl_ucp_send_completion_cb,
                                         (void *)task, mh);
     if (UCS_OK != ucp_status) {
@@ -206,7 +206,7 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
 }
 
 static inline ucs_status_ptr_t
-ucc_tl_ucp_recv_common_2(void *buffer, size_t msglen, ucc_memory_type_t mtype,
+ucc_tl_ucp_recv_common_with_mem(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                        ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                        ucc_tl_ucp_task_t *task, ucp_tag_recv_nbx_callback_t cb, void *user_data, ucp_mem_h mh)
 {
@@ -254,13 +254,13 @@ ucc_tl_ucp_recv_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
 }
 
 static inline ucc_status_t
-ucc_tl_ucp_recv_nb_2(void *buffer, size_t msglen, ucc_memory_type_t mtype,
+ucc_tl_ucp_recv_nb_with_mem(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                    ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                    ucc_tl_ucp_task_t *task, ucp_mem_h mh)
 {
     ucs_status_ptr_t ucp_status;
 
-    ucp_status = ucc_tl_ucp_recv_common_2(buffer, msglen, mtype, dest_group_rank,
+    ucp_status = ucc_tl_ucp_recv_common_with_mem(buffer, msglen, mtype, dest_group_rank,
                                         team, task, ucc_tl_ucp_recv_completion_cb,
                                         (void *)task, mh);
     if (UCS_OK != ucp_status) {

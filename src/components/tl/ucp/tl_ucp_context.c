@@ -134,14 +134,14 @@ err_cfg_read:
     return ucc_status;
 }
 
-static int memcpy_device_start(void *dest, const void *src, size_t size,
+static int memcpy_device_start(void *dest, void *src, size_t size,
                                 void *completion, void *user_data) {
 
         ucc_status_t status;
         ucc_ee_executor_task_args_t eargs;
         ucc_ee_executor_t *exec;
         ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *) user_data;
-        void *non_const_src = (void *) src;
+        // void *non_const_src = (void *) src;
 
         status = ucc_coll_task_get_executor(&task->super, &exec);
         if (ucc_unlikely(status != UCC_OK)) {
@@ -150,7 +150,7 @@ static int memcpy_device_start(void *dest, const void *src, size_t size,
         }
 
         eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
-        eargs.copy.src  = non_const_src;
+        eargs.copy.src  = src;
         eargs.copy.dst  = dest;
         eargs.copy.len  = size;
         node_ucc_ee_executor_task_t *new_node;
@@ -171,14 +171,14 @@ static int memcpy_device_start(void *dest, const void *src, size_t size,
         
     }
 
-static void memcpy_device(void *dest, const void *src, size_t size, void *user_data){
+static void memcpy_device(void *dest, void *src, size_t size, void *user_data){
 
     ucc_status_t status;
     ucc_ee_executor_task_args_t eargs;
     ucc_ee_executor_t *exec;
     ucc_ee_executor_task_t *etask;
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *) user_data;
-    void *non_const_src = (void *) src;
+    // void *non_const_src = (void *) src;
 
     status = ucc_coll_task_get_executor(&task->super, &exec);
     if (ucc_unlikely(status != UCC_OK)) {
@@ -187,7 +187,7 @@ static void memcpy_device(void *dest, const void *src, size_t size, void *user_d
     }
 
     eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
-    eargs.copy.src  = non_const_src;
+    eargs.copy.src  = src;
     eargs.copy.dst  = dest;
     eargs.copy.len  = size;
 
