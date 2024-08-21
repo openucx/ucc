@@ -182,13 +182,6 @@ ucc_status_t compare_buffers(void *_rst, void *expected, size_t count,
     } else {
         status = memcmp(rst, expected, count*ucc_dt_size(dt)) ?
             UCC_ERR_NO_MESSAGE : UCC_OK;
-        // uint8_t* a = (uint8_t*)rst;
-        // uint8_t* b = (uint8_t*)expected;
-        // for (int i=0; i<count*ucc_dt_size(dt); i++ ){
-        //     if (a[i] != b[i]) {
-        //         printf("!?!?!?!?!? FAILUUUUUURE at i=%d, a=%hhn, b=%hhn, range=%ld\n", i, a, b, count*ucc_dt_size(dt));
-        //     }
-        // }
     }
 
     if (UCC_MEMORY_TYPE_HOST != mt && UCC_MEMORY_TYPE_CUDA_MANAGED != mt) {

@@ -299,7 +299,7 @@ ucc_status_t ucc_tl_mlx5_populate_send_recv_mkeys(ucc_tl_mlx5_team_t *    team,
     if (ucc_tl_mlx5_get_my_ctrl(a2a, seq_index)->mkey_cache_flag &
         UCC_MLX5_NEED_SEND_MKEY_UPDATE) {
         repeat_count = nbc ? a2a->net.sbgp->group_size
-                        : UCC_TL_TEAM_SIZE(team) / req->alltoall.block_width;
+                           : UCC_TL_TEAM_SIZE(team) / req->alltoall.block_width;
         for (i = 0; i < n_mkeys; i++) {
             status = populate_strided_mkey(a2a, send_mem_access_flags,
                                            node->ops[seq_index].send_mkeys[i],
@@ -314,8 +314,9 @@ ucc_status_t ucc_tl_mlx5_populate_send_recv_mkeys(ucc_tl_mlx5_team_t *    team,
     }
     if (ucc_tl_mlx5_get_my_ctrl(a2a, seq_index)->mkey_cache_flag &
         UCC_MLX5_NEED_RECV_MKEY_UPDATE) {
-        repeat_count = nbc ? a2a->net.sbgp->group_size
-                        : UCC_TL_TEAM_SIZE(team) / req->alltoall.block_height;
+        repeat_count =
+            nbc ? a2a->net.sbgp->group_size
+                : UCC_TL_TEAM_SIZE(team) / req->alltoall.block_height;
         for (i = 0; i < n_mkeys; i++) {
             status = populate_strided_mkey(a2a, recv_mem_access_flags,
                                            node->ops[seq_index].recv_mkeys[i],
@@ -336,7 +337,7 @@ static void update_mkey_entry(ucc_tl_mlx5_alltoall_t *a2a,
 {
     ucc_tl_mlx5_alltoall_node_t  *node       = &a2a->node;
     int                           block_height = req->alltoall.block_height;
-    int                           block_width = req->alltoall.block_width;
+    int                           block_width  = req->alltoall.block_width;
     size_t                        msg_size   = req->alltoall.msg_size;
     int                           nbc  = req->alltoall.num_of_blocks_columns;
     struct ibv_mr                *buff = direction_send
@@ -349,7 +350,8 @@ static void update_mkey_entry(ucc_tl_mlx5_alltoall_t *a2a,
         mkey_entry = (umr_t *)(direction_send ? MY_SEND_UMR_DATA(req, a2a, 0)
                                               : MY_RECV_UMR_DATA(req, a2a, 0));
         mkey_entry->addr        = (uintptr_t)buff->addr;
-        mkey_entry->bytes_count = (direction_send? block_width : block_height) * msg_size;
+        mkey_entry->bytes_count =
+            (direction_send ? block_width : block_height) * msg_size;
         mkey_entry->bytes_skip  = 0;
         mkey_entry->lkey        = direction_send ? buff->lkey : buff->rkey;
     } else {
