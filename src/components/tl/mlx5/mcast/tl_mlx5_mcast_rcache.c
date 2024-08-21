@@ -130,7 +130,10 @@ void ucc_tl_mlx5_mcast_mem_deregister(ucc_tl_mlx5_mcast_coll_context_t *ctx,
 static ucc_rcache_ops_t ucc_tl_mlx5_rcache_ops = {
     .mem_reg     = ucc_tl_mlx5_mcast_rcache_mem_reg_cb,
     .mem_dereg   = ucc_tl_mlx5_mcast_rcache_mem_dereg_cb,
-    .dump_region = ucc_tl_mlx5_mcast_rcache_dump_region_cb
+    .dump_region = ucc_tl_mlx5_mcast_rcache_dump_region_cb,
+#ifdef UCS_HAVE_RCACHE_MERGE_CB
+    .merge       = ucc_rcache_merge_cb_empty
+#endif
 };
 
 ucc_status_t ucc_tl_mlx5_mcast_setup_rcache(ucc_tl_mlx5_mcast_coll_context_t *ctx)

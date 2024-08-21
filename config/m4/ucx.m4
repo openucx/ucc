@@ -119,6 +119,11 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
                 [],
                 [#include <ucs/memory/rcache.h>])
 
+            AC_CHECK_MEMBER(ucs_rcache_ops_t.merge,
+                [AC_DEFINE([UCS_HAVE_RCACHE_MERGE_CB], [1], [flags for ucs_rcache_ops_t])],
+                [],
+                [#include <ucs/memory/rcache.h>])
+
             AC_DEFINE([HAVE_UCX], 1, [Enable UCX support])
 
             AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <ucs/config/parser.h>

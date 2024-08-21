@@ -35,6 +35,13 @@ static inline void ucc_rcache_set_default_params(ucs_rcache_params_t *rcache_par
 #define ucc_rcache_region_put         ucs_rcache_region_put
 #define ucc_rcache_region_invalidate  ucs_rcache_region_invalidate
 
+static inline void
+ucc_rcache_merge_cb_empty(void *context, ucs_rcache_t *rcache,
+                          void *arg, ucs_rcache_region_t *region)
+{
+    return;
+}
+
 /* Wrapper functions for status conversion */
 static inline ucc_status_t
 ucc_rcache_create(const ucc_rcache_params_t *params,
