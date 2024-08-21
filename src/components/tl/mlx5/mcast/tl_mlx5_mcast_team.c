@@ -68,6 +68,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     conf_params->rx_sge         = 2;
     conf_params->scq_moderation = 64;
 
+    mcast_context->tl_caps = base_context->ucc_context->tl_caps;
+
     comm = (ucc_tl_mlx5_mcast_coll_comm_t*)
             ucc_calloc(1, sizeof(ucc_tl_mlx5_mcast_coll_comm_t) +
                        sizeof(struct pp_packet*)*(conf_params->wsize-1),

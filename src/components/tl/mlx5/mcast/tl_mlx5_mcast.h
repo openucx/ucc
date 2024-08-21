@@ -152,6 +152,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_context {
     ucc_rcache_t                  *rcache;
     ucc_tl_mlx5_mcast_ctx_params_t params;
     ucc_base_lib_t                *lib;
+    enum ucc_tl_capabilities       tl_caps;
 } ucc_tl_mlx5_mcast_coll_context_t;
 
 typedef struct ucc_tl_mlx5_mcast_join_info_t {
