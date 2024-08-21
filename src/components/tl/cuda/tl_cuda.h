@@ -225,7 +225,6 @@ struct ucc_tl_cuda_task {
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  ucc_rank_t                block);
         } allgatherv_linear;
-        
         struct {
             int stage;
             int step;

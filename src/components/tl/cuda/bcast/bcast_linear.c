@@ -6,8 +6,7 @@
 
 #include "bcast/bcast.h"
 
-enum
-{
+enum {
     STAGE_DONE,
     STAGE_SYNC,
     STAGE_SETUP,
@@ -52,7 +51,7 @@ static inline size_t get_raw_scratch_size(ucc_tl_cuda_team_t *team)
 }
 
 static inline ucc_status_t ecopy(void *dst, void *src, size_t size,
-                                 ucc_ee_executor_t *      exec,
+                                 ucc_ee_executor_t       *exec,
                                  ucc_ee_executor_task_t **etask)
 {
     ucc_ee_executor_task_args_t exec_args = {0};
@@ -86,11 +85,10 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                          : task->bcast_linear.size -
                   (task->bcast_linear.step - 1) * half_scratch_size;
     size_t offset_buff = task->bcast_linear.step * half_scratch_size;
-
-    ucc_ee_executor_t *     exec;
+    ucc_ee_executor_t      *exec;
     ucc_ee_executor_task_t *etask;
     ucc_status_t            st;
-    void *                  sbuf, *dbuf;
+    void                   *sbuf, *dbuf;
     int                     i;
 
     task->super.status = UCC_INPROGRESS;
@@ -103,7 +101,6 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     switch (task->bcast_linear.stage) {
     case STAGE_SYNC:
         if (ucc_tl_cuda_get_sync(task) != UCC_OK) {
-            task->super.status = UCC_INPROGRESS;
             return;
         }
         task->bcast_linear.step = 0;
@@ -139,7 +136,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                               task->bcast_linear.step % 2 * half_scratch_size);
             sbuf = PTR_OFFSET(task->bcast_linear.sbuf, offset_buff);
             st   = ecopy(dbuf, sbuf, chunk_size, exec,
-                       &task->bcast_linear.exec_task);
+                         &task->bcast_linear.exec_task);
             if (st != UCC_OK) {
                 ucc_error("failed to post ecopy task");
                 task->super.status = st;
@@ -207,7 +204,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             sbuf = PTR_OFFSET(TASK_SCRATCH(task, task->bcast_linear.root),
                               task->bcast_linear.step % 2 * chunk_size);
             st   = ecopy(dbuf, sbuf, chunk_size, exec,
-                       &task->bcast_linear.exec_task);
+                         &task->bcast_linear.exec_task);
             if (st != UCC_OK) {
                 ucc_error("failed to post ecopy task at client");
                 task->super.status = st;
@@ -249,7 +246,7 @@ ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_coll_args_t *   args = &TASK_ARGS(task);
+    ucc_coll_args_t    *args = &TASK_ARGS(task);
     ucc_datatype_t      dt   = task->bcast_linear.dt;
     size_t              half_scratch_size = get_raw_scratch_size(team) / 2;
 
@@ -270,14 +267,14 @@ ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
 }
 
 ucc_status_t ucc_tl_cuda_bcast_linear_init(ucc_base_coll_args_t *coll_args,
-                                           ucc_base_team_t *     tl_team,
-                                           ucc_coll_task_t **    task_p)
+                                           ucc_base_team_t      *tl_team,
+                                           ucc_coll_task_t     **task_p)
 {
     ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     ucc_tl_cuda_task_t *task;
     ucc_status_t        status;
 
-    if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_conntected(team->topo) ||
+    if (ucc_unlikely(!ucc_tl_cuda_team_topo_is_fully_connected(team->topo) ||
                      UCC_TL_TEAM_SIZE(team) - 1 >
                          UCC_EE_EXECUTOR_MULTI_OP_NUM_BUFS)) {
         return UCC_ERR_NOT_SUPPORTED;
