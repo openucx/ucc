@@ -28,12 +28,15 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, dm_buf_num),
      UCC_CONFIG_TYPE_ULUNITS},
 
-    {"FORCE_REGULAR", "y", "Force the regular case where the block dimensions "
-    "divide ppn. Requires BLOCK_SIZE=0",
-     ucc_offsetof(ucc_tl_mlx5_lib_config_t, force_regular), UCC_CONFIG_TYPE_BOOL},
+    {"FORCE_REGULAR", "y",
+     "Force the regular case where the block dimensions "
+     "divide ppn. Requires BLOCK_SIZE=0",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, force_regular),
+     UCC_CONFIG_TYPE_BOOL},
 
     {"FORCE_LONGER", "y", "Force the blocks to have more height than width",
-     ucc_offsetof(ucc_tl_mlx5_lib_config_t, force_longer), UCC_CONFIG_TYPE_BOOL},
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, force_longer),
+     UCC_CONFIG_TYPE_BOOL},
 
     {"FORCE_WIDER", "n", "Force the blocks to have more width than height",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, force_wider), UCC_CONFIG_TYPE_BOOL},
@@ -118,18 +121,21 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, fanin_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"SEND_BATCH_SIZE", "1", "number of blocks that are transposed "
-    "on the NIC before being sent as a batch to a remote peer",
+    {"SEND_BATCH_SIZE", "1",
+     "number of blocks that are transposed "
+     "on the NIC before being sent as a batch to a remote peer",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, block_batch_size),
      UCC_CONFIG_TYPE_UINT},
 
-    {"NBR_SERIALIZED_BATCHES", "1", "number of block batches "
-    "(within the set of blocks to be sent to a given remote peer) "
+    {"NBR_SERIALIZED_BATCHES", "1",
+     "number of block batches "
+     "(within the set of blocks to be sent to a given remote peer) "
      "serialized on the same device memory chunk",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, nbr_serialized_batches),
      UCC_CONFIG_TYPE_UINT},
 
-    {"NBR_BATCHES_PER_PASSAGE", "32", "",
+    {"NBR_BATCHES_PER_PASSAGE", "32",
+     "number of batches of blocks sent to one remote node before enqueing",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, nbr_batches_per_passage),
      UCC_CONFIG_TYPE_UINT},
 
@@ -155,7 +161,8 @@ static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.ib_dev_name),
      UCC_CONFIG_TYPE_STRING},
     {"FANIN_NPOLLS", "1000",
-     "Number of shared memory polling before returning UCC_INPROGRESS during internode FANIN",
+     "Number of shared memory polling before returning UCC_INPROGRESS during "
+     "internode FANIN",
      ucc_offsetof(ucc_tl_mlx5_context_config_t, npolls), UCC_CONFIG_TYPE_UINT},
 
     {NULL}};

@@ -65,8 +65,8 @@ typedef struct ucc_tl_mlx5_lib_config {
     int                                     nbr_batches_per_passage;
     int                                     block_batch_size;
     int                                     force_regular;
-    int                      force_longer;
-    int                      force_wider;
+    int                                     force_longer;
+    int                                     force_wider;
 } ucc_tl_mlx5_lib_config_t;
 
 typedef struct ucc_tl_mlx5_context_config {
@@ -103,7 +103,7 @@ typedef struct ucc_tl_mlx5_task ucc_tl_mlx5_task_t;
 typedef struct ucc_tl_mlx5_schedule ucc_tl_mlx5_schedule_t;
 typedef struct ucc_tl_mlx5_dm_chunk_t {
     uintptr_t addr; // 0 based offset from the beginning of
-                      // memic_mr (obtained with ibv_reg_dm_mr)
+                    // memic_mr (obtained with ibv_reg_dm_mr)
     ucc_tl_mlx5_schedule_t *task;
     int                     posted_sends;
     int                     posted_all;
