@@ -58,6 +58,9 @@ typedef struct ucc_tl_mlx5_alltoall_node {
     struct mlx5dv_mkey       *team_recv_mkey;
     void                     *umr_entries_buf;
     struct ibv_mr            *umr_entries_mr;
+    int                       fanin_index;
+    int                       fanin_dist;
+    int                       fanin_max_dist;
 } ucc_tl_mlx5_alltoall_node_t;
 
 typedef struct alltoall_net_ctrl {
