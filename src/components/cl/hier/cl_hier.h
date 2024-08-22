@@ -20,10 +20,10 @@
 #include "utils/profile/ucc_profile_off.h"
 #endif
 
-#define UCC_CL_HIER_PROFILE_FUNC UCC_PROFILE_FUNC
-#define UCC_CL_HIER_PROFILE_REQUEST_NEW UCC_PROFILE_REQUEST_NEW
+#define UCC_CL_HIER_PROFILE_FUNC          UCC_PROFILE_FUNC
+#define UCC_CL_HIER_PROFILE_REQUEST_NEW   UCC_PROFILE_REQUEST_NEW
 #define UCC_CL_HIER_PROFILE_REQUEST_EVENT UCC_PROFILE_REQUEST_EVENT
-#define UCC_CL_HIER_PROFILE_REQUEST_FREE UCC_PROFILE_REQUEST_FREE
+#define UCC_CL_HIER_PROFILE_REQUEST_FREE  UCC_PROFILE_REQUEST_FREE
 
 #ifndef UCC_CL_HIER_DEFAULT_SCORE
 #define UCC_CL_HIER_DEFAULT_SCORE 50
@@ -54,6 +54,7 @@ typedef struct ucc_cl_hier_lib_config {
     ucc_pipeline_params_t   allreduce_rab_pipeline;
     ucc_pipeline_params_t   bcast_2step_pipeline;
     ucc_pipeline_params_t   reduce_2step_pipeline;
+    ucc_pipeline_params_t   allgatherv_node_split_pipeline;
 } ucc_cl_hier_lib_config_t;
 
 typedef struct ucc_cl_hier_context_config {
@@ -111,12 +112,9 @@ UCC_CLASS_DECLARE(ucc_cl_hier_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
 #define UCC_CL_HIER_SUPPORTED_COLLS                                            \
-    (UCC_COLL_TYPE_ALLTOALL |                                                  \
-     UCC_COLL_TYPE_ALLTOALLV |                                                 \
-     UCC_COLL_TYPE_ALLGATHERV |                                                 \
-     UCC_COLL_TYPE_ALLREDUCE |                                                 \
-     UCC_COLL_TYPE_BARRIER |                                                   \
-     UCC_COLL_TYPE_BCAST)
+    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
+     UCC_COLL_TYPE_ALLGATHERV | UCC_COLL_TYPE_ALLREDUCE |                      \
+     UCC_COLL_TYPE_BARRIER | UCC_COLL_TYPE_BCAST)
 
 ucc_status_t ucc_cl_hier_coll_init(ucc_base_coll_args_t *coll_args,
                                    ucc_base_team_t      *team,

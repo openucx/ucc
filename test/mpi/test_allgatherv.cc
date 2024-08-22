@@ -30,13 +30,13 @@ static void fill_counts_and_displacements(int size, int count, int *counts,
     }
     displs[size - 1] = displs[size - 2] + counts[size - 2];
 
-    printf("Original counts:\n");
-    for (i = 0; i < size; i++) {
-        printf("counts[%d]=%d\n", i, counts[i]);
-    }
-    for (i = 0; i < size; i++) {
-        printf("displs[%d]=%d\n", i, displs[i]);
-    }
+    //printf("Original counts:\n");
+    //for (i = 0; i < size; i++) {
+    //    printf("counts[%d]=%d\n", i, counts[i]);
+    //}
+    //for (i = 0; i < size; i++) {
+    //    printf("displs[%d]=%d\n", i, displs[i]);
+    //}
 }
 
 TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params)
@@ -86,11 +86,21 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params)
     args.dst.info_v.mem_type      = mem_type;
     UCC_CHECK(set_input());
 
-    //printf("Waiting in allgatherv.c, pid=%d\n", getpid());
-    //int wait = 1;
-    //while (wait) {
-    //    sleep(1);
-    //}
+    // --- DEBUG ---
+    // int wait = 1;
+    // printf("Waiting pid=%d\n", getpid());
+    // while (wait){
+    //     sleep(1);
+    // }
+   
+    // printf("[%d] send buf: [", rank);
+
+    // for (int i=0; i < counts[rank]; i++){
+    //     printf("%u, ", ((uint32_t *)sbuf)[i]);
+    // }
+    // printf("]\n");
+
+    // -----
 
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
@@ -138,6 +148,16 @@ ucc_status_t TestAllgatherv::check()
                     counts[i], dt, UCC_MEMORY_TYPE_HOST,
                     i * (iter_persistent + 1));
     }
+
+    // DEBUG  //
+    int rank;
+    MPI_Comm_rank(team.comm, &rank);
+    printf("[%d] (total count=%d) End --> rbuf: [", rank, total_count);
+    for (i = 0; i < total_count; i++) {
+       printf("%d, ",((uint32_t *)rbuf)[i]);
+    }
+    printf("]\n");
+    // ----- //
 
     return compare_buffers(rbuf, check_buf, total_count, dt, mem_type);
 }

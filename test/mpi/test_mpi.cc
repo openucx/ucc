@@ -488,13 +488,13 @@ UccTestMpi::exec_tests(std::vector<std::shared_ptr<TestCase>> tcs,
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     std::vector<ucc_test_mpi_result_t> rst;
 
-    if (world_rank == 0){
-        printf("Waiting, pid=%d\n", getpid());
-        int wait = 1;
-        while (wait) {
-            sleep(1);
-        }
-    }
+    // if (world_rank == 0){
+    //    printf("Waiting, pid=%d\n", getpid());
+    //    int wait = 1;
+    //    while (wait) {
+    //        sleep(1);
+    //    }
+    // }
 
     for (i = 0; i < n_persistent; i++) {
         for (auto tc : tcs) {
