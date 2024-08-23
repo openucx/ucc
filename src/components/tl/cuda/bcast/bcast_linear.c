@@ -7,7 +7,6 @@
 #include "bcast/bcast.h"
 
 enum {
-    STAGE_DONE,
     STAGE_SYNC,
     STAGE_SETUP,
     // root
@@ -178,11 +177,9 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             } else {
                 // finish
-                task->bcast_linear.stage = STAGE_DONE;
+                task->super.status = UCC_OK;
+                break;
             }
-        case STAGE_DONE:
-            task->super.status = UCC_OK;
-            break;
         default:
             break;
         }
@@ -225,7 +222,9 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                         task->bcast_linear.stage = STAGE_WAIT_ROOT;
                         return;
                     } else {
-                        task->bcast_linear.stage = STAGE_DONE;
+                        // Done
+                        task->super.status = UCC_OK;
+                        break;
                     }
                 } else {
                     return;
@@ -233,9 +232,6 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             } else {
                 return;
             }
-        case STAGE_DONE:
-            task->super.status = UCC_OK;
-            break;
         default:
             break;
         }
