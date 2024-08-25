@@ -181,7 +181,7 @@ typedef struct ucc_ee_executor_task {
 
 typedef struct node_ucc_ee_executor_task node_ucc_ee_executor_task_t;
 typedef struct node_ucc_ee_executor_task {
-    ucc_ee_executor_task_t      *val;
+    ucc_ee_executor_task_t      *etask;
     node_ucc_ee_executor_task_t *next;
 } node_ucc_ee_executor_task_t;
 

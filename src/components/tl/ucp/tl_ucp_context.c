@@ -146,7 +146,7 @@ static int memcpy_device_start(void *dest, void *src, size_t size,
         status = ucc_coll_task_get_executor(&task->super, &exec);
         if (ucc_unlikely(status != UCC_OK)) {
             task->super.status = status;
-            return 0;
+            return -1;
         }
 
         eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
@@ -156,17 +156,16 @@ static int memcpy_device_start(void *dest, void *src, size_t size,
         node_ucc_ee_executor_task_t *new_node;
         new_node = ucc_mpool_get(&task->allgather_kn.etask_node_mpool);
         status = ucc_ee_executor_task_post(exec, &eargs,
-                                           &new_node->val);
+                                           &new_node->etask);
         
+        if (ucc_unlikely(status != UCC_OK)) {
+            task->super.status = status;
+            return -1;
+        }
         new_node->next = task->allgather_kn.etask_linked_list_head;
         task->allgather_kn.etask_linked_list_head = new_node;
 
-        if (ucc_unlikely(status != UCC_OK)) {
-            task->super.status = status;
-            return 0;
-        }
-
-        task->allgather_kn.etask_linked_list_head->val->completion = completion;
+        task->allgather_kn.etask_linked_list_head->etask->completion = completion;
         return 1;
         
     }
@@ -178,7 +177,6 @@ static void memcpy_device(void *dest, void *src, size_t size, void *user_data){
     ucc_ee_executor_t *exec;
     ucc_ee_executor_task_t *etask;
     ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *) user_data;
-    // void *non_const_src = (void *) src;
 
     status = ucc_coll_task_get_executor(&task->super, &exec);
     if (ucc_unlikely(status != UCC_OK)) {
@@ -200,17 +198,15 @@ static void memcpy_device(void *dest, void *src, size_t size, void *user_data){
         //     user_data->super.status = status;                                       
         //     return;                                                            
         // }                                                         
-        continue;  
     }                                                          
     ucc_ee_executor_task_finalize(etask);                                 
     return;
 }
 
-ucp_worker_mem_callbacks_t copy_callback = {
-
+ucp_worker_mem_callbacks_t copy_callback = 
+{
     .memcpy_device_start = memcpy_device_start,
     .memcpy_device = memcpy_device
-        
 };
 
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
