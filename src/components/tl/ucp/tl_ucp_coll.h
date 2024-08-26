@@ -57,18 +57,18 @@ void ucc_tl_ucp_team_default_score_str_free(
     }                                                                          \
 } while(0)
 
-// #define MEM_MAP() do {
-    // status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
-    // if (UCC_OK != status) {
-    //     task->super.status = status;
-    //     return;
-    // }
-//     if (count_mh == size_of_list){
-//         size_of_list *= 2;
-//         mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));
-//     }
-//     mh_list[count_mh++] = mh;
-// } while(0)
+#define MEM_MAP() do {                                                              \
+    status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);               \
+    if (UCC_OK != status) {                                                         \
+        task->super.status = status;                                                \
+        return;                                                                     \
+    }                                                                               \
+    if (count_mh == size_of_list){                                                  \
+        size_of_list *= 2;                                                          \
+        mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));  \
+    }                                                                               \
+    mh_list[count_mh++] = mh;                                                       \
+} while(0)
 
 #define EXEC_TASK_WAIT(_etask, ...)                                            \
     do {                                                                       \
@@ -200,6 +200,7 @@ typedef struct ucc_tl_ucp_task {
             node_ucc_ee_executor_task_t *etask_linked_list_head;
             ucc_rank_t              recv_dist;
             ucc_mpool_t             etask_node_mpool;
+            ucc_ee_executor_task_t *etask;
         } allgather_kn;
         struct {
             /*

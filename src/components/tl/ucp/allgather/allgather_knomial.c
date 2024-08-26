@@ -63,9 +63,9 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     size_t                 extra_count;
 
     EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test",
-                   task->allgather_kn.etask_linked_list_head->etask);
+                   task->allgather_kn.etask);
 
-    // task->allgather_kn.etask_linked_list_head = NULL;
+    task->allgather_kn.etask = NULL;
     UCC_KN_GOTO_PHASE(task->allgather_kn.phase);
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, rank);
@@ -76,20 +76,15 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
                                              INV_VRANK(peer,broot,size)),
                                              team, task, mh_list[count_mh++]),
                           task, out);
-            if (count_mh >= max_count){
-                printf("count_mh is bigger than it should (%d >= %d).", count_mh, max_count);
-                goto out;
-            }
+            ucc_assert(count_mh >= max_count);
+            
         }
         UCPCHECK_GOTO(ucc_tl_ucp_send_nb_with_mem(rbuf, data_size, mem_type,
                                          ucc_ep_map_eval(task->subset.map,
                                          INV_VRANK(peer,broot,size)),
                                          team, task, mh_list[count_mh++]),
                       task, out);
-        if (count_mh >= max_count){
-            printf("count_mh is bigger than it should (%d >= %d).", count_mh, max_count);
-            goto out;
-        }
+        ucc_assert(count_mh >= max_count);
     }
     if ((p->type != KN_PATTERN_ALLGATHERX) && (node_type == KN_NODE_PROXY)) {
         peer = ucc_knomial_pattern_get_extra(p, rank);
@@ -99,10 +94,7 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
                                         local * dt_size), extra_count * dt_size,
                                         mem_type, peer, team, task, mh_list[count_mh++]),
                       task, out);
-        if (count_mh >= max_count){
-            printf("count_mh is bigger than it should (%d >= %d).", count_mh, max_count);
-            goto out;
-        }
+        ucc_assert(count_mh >= max_count);
     }
 
 UCC_KN_PHASE_EXTRA:
@@ -137,10 +129,7 @@ UCC_KN_PHASE_EXTRA:
                                              INV_VRANK(peer, broot, size)),
                                              team, task, mh_list[count_mh++]),
                           task, out);
-            if (count_mh >= max_count){
-                printf("count_mh is bigger than it should (%d >= %d).", count_mh, max_count);
-                goto out;
-            }
+            ucc_assert(count_mh >= max_count);
         }
 
         for (loop_step = 1; loop_step < radix; loop_step++) {
@@ -164,10 +153,7 @@ UCC_KN_PHASE_EXTRA:
                                    INV_VRANK(peer, broot, size)),
                                    team, task, mh_list[count_mh++]),
                 task, out);
-            if (count_mh >= max_count){
-                printf("count_mh is bigger than it should (%d >= %d).", count_mh, max_count);
-                goto out;
-            }
+            ucc_assert(count_mh >= max_count);
         }
     UCC_KN_PHASE_LOOP:
         if (UCC_INPROGRESS == ucc_tl_ucp_test_recv_with_etasks(task)) {
@@ -185,10 +171,7 @@ UCC_KN_PHASE_EXTRA:
                                          INV_VRANK(peer, broot, size)),
                                          team, task, mh_list[count_mh++]),
                       task, out);
-        if (count_mh >= max_count){
-            printf("count_mh is bigger than it should (%d >= %d).", count_mh, max_count);
-            goto out;
-        }
+        ucc_assert(count_mh >= max_count);
     }
 UCC_KN_PHASE_PROXY:
     if (UCC_INPROGRESS == ucc_tl_ucp_test_with_etasks(task)) {
@@ -240,7 +223,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
             eargs.copy.len  = args->src.info.count *
                               ucc_dt_size(args->src.info.datatype);
             status = ucc_ee_executor_task_post(exec, &eargs,
-                                               &task->allgather_kn.etask_linked_list_head->etask);
+                                               &task->allgather_kn.etask);
             if (ucc_unlikely(status != UCC_OK)) {
                 task->super.status = status;
                 return status;
@@ -306,30 +289,12 @@ void register_memory(ucc_coll_task_t *coll_task){
 
             mmap_params.address     = task->allgather_kn.sbuf;
             mmap_params.length      = local * dt_size;
-            status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
-            if (UCC_OK != status) {
-                task->super.status = status;
-                return;
-            }
-            if (count_mh == size_of_list){
-                size_of_list *= 2;
-                mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));
-            }
-            mh_list[count_mh++] = mh;
+            MEM_MAP();
         }
         
         mmap_params.address     = rbuf;
         mmap_params.length      = data_size;
-        status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
-        if (UCC_OK != status) {
-            task->super.status = status;
-            return;
-        }
-        if (count_mh == size_of_list){
-            size_of_list *= 2;
-            mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));
-        }
-        mh_list[count_mh++] = mh;
+        MEM_MAP();
     }
     if ((p->type != KN_PATTERN_ALLGATHERX) && (node_type == KN_NODE_PROXY)) {
         peer = ucc_knomial_pattern_get_extra(p, rank);
@@ -338,22 +303,11 @@ void register_memory(ucc_coll_task_t *coll_task){
         mmap_params.address     = PTR_OFFSET(task->allgather_kn.sbuf,
                                         local * dt_size);
         mmap_params.length      = extra_count * dt_size;
-        status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
-        if (UCC_OK != status) {
-            task->super.status = status;
-            return;
-        }
-        if (count_mh == size_of_list){
-            size_of_list *= 2;
-            mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));
-        }
-        mh_list[count_mh++] = mh;
+        MEM_MAP();
     }
 
-    if ((KN_NODE_EXTRA == node_type) || (KN_NODE_PROXY == node_type)) {
-        if (KN_NODE_EXTRA == node_type) {
-            goto out;
-        }
+    if (KN_NODE_EXTRA == node_type) {
+        goto out;
     }
     while (!ucc_knomial_pattern_loop_done(p)) {
         ucc_kn_ag_pattern_peer_seg(rank, p, &local_seg_count,
@@ -373,16 +327,7 @@ void register_memory(ucc_coll_task_t *coll_task){
             }
             mmap_params.address     = sbuf;
             mmap_params.length      = local_seg_count * dt_size;
-            status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
-            if (UCC_OK != status) {
-                task->super.status = status;
-                return;
-            }
-            if (count_mh == size_of_list){
-                size_of_list *= 2;
-                mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));
-            }
-            mh_list[count_mh++] = mh;
+            MEM_MAP();
         }
 
         for (loop_step = 1; loop_step < radix; loop_step++) {
@@ -401,16 +346,7 @@ void register_memory(ucc_coll_task_t *coll_task){
             }
             mmap_params.address     = PTR_OFFSET(rbuf, peer_seg_offset * dt_size);
             mmap_params.length      = peer_seg_count * dt_size;
-            status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
-            if (UCC_OK != status) {
-                task->super.status = status;
-                return;
-            }
-            if (count_mh == size_of_list){
-                size_of_list *= 2;
-                mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));
-            }
-            mh_list[count_mh++] = mh;
+            MEM_MAP();
         }
         ucc_kn_ag_pattern_next_iter(p);
     }
@@ -418,25 +354,12 @@ void register_memory(ucc_coll_task_t *coll_task){
     if (KN_NODE_PROXY == node_type) {
         mmap_params.address     = args->dst.info.buffer;
         mmap_params.length      = data_size;
-        status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
-        if (UCC_OK != status) {
-            task->super.status = status;
-            return;
-        }
-        if (count_mh == size_of_list){
-            size_of_list *= 2;
-            mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));
-        }
-        mh_list[count_mh++] = mh;
+        MEM_MAP();
     }
 
 out:
-    ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
-    task->super.status = UCC_OK;
     task->mh_list = mh_list;
     task->count_mh = count_mh-1;
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_done", 0);
-
 }
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
@@ -446,8 +369,6 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task;
     ucc_sbgp_t        *sbgp;
-
-    printf("USING NEW KNOMIAL");
 
     task = ucc_tl_ucp_init_task(coll_args, team);
     ucc_mpool_init(&task->allgather_kn.etask_node_mpool, 0, sizeof(node_ucc_ee_executor_task_t),

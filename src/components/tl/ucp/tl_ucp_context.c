@@ -141,12 +141,11 @@ static int memcpy_device_start(void *dest, void *src, size_t size,
         ucc_ee_executor_task_args_t eargs;
         ucc_ee_executor_t *exec;
         ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *) user_data;
-        // void *non_const_src = (void *) src;
 
         status = ucc_coll_task_get_executor(&task->super, &exec);
         if (ucc_unlikely(status != UCC_OK)) {
             task->super.status = status;
-            return -1;
+            return status;
         }
 
         eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
@@ -160,7 +159,7 @@ static int memcpy_device_start(void *dest, void *src, size_t size,
         
         if (ucc_unlikely(status != UCC_OK)) {
             task->super.status = status;
-            return -1;
+            return status;
         }
         new_node->next = task->allgather_kn.etask_linked_list_head;
         task->allgather_kn.etask_linked_list_head = new_node;
@@ -170,7 +169,7 @@ static int memcpy_device_start(void *dest, void *src, size_t size,
         
     }
 
-static void memcpy_device(void *dest, void *src, size_t size, void *user_data){
+static int memcpy_device(void *dest, void *src, size_t size, void *user_data){
 
     ucc_status_t status;
     ucc_ee_executor_task_args_t eargs;
@@ -181,7 +180,7 @@ static void memcpy_device(void *dest, void *src, size_t size, void *user_data){
     status = ucc_coll_task_get_executor(&task->super, &exec);
     if (ucc_unlikely(status != UCC_OK)) {
         task->super.status = status;
-        return;
+        return status;
     }
 
     eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
@@ -190,17 +189,20 @@ static void memcpy_device(void *dest, void *src, size_t size, void *user_data){
     eargs.copy.len  = size;
 
     status = ucc_ee_executor_task_post(exec, &eargs, &etask);
+    if (ucc_unlikely(status < 0)) {                                                                   
+        task->super.status = status;                                       
+        return status;                                                            
+    }        
     status = ucc_ee_executor_task_test(etask);
     while (status>0) {
         status = ucc_ee_executor_task_test(etask);
-        // if (ucc_unlikely(status < 0)) {                                        
-        //     tl_error(UCC_TASK_LIB(user_data), _errmsg);                             
-        //     user_data->super.status = status;                                       
-        //     return;                                                            
-        // }                                                         
+        if (ucc_unlikely(status < 0)) {                                                                   
+            task->super.status = status;                                       
+            return status;                                                            
+        }                                                         
     }                                                          
     ucc_ee_executor_task_finalize(etask);                                 
-    return;
+    return 1;
 }
 
 ucp_worker_mem_callbacks_t copy_callback = 
