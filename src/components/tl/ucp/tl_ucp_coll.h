@@ -60,8 +60,7 @@ void ucc_tl_ucp_team_default_score_str_free(
 #define MEM_MAP() do {                                                              \
     status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);               \
     if (UCC_OK != status) {                                                         \
-        task->super.status = status;                                                \
-        return;                                                                     \
+        return status;                                                                     \
     }                                                                               \
     if (count_mh == size_of_list){                                                  \
         size_of_list *= 2;                                                          \
@@ -109,8 +108,6 @@ typedef struct ucc_tl_ucp_allreduce_sw_host_allgather
 typedef struct ucc_tl_ucp_task {
     ucc_coll_task_t super;
     uint32_t        flags;
-    ucp_mem_h      *mh_list;
-    int             count_mh;
     union {
         struct {
             uint32_t        send_posted;
@@ -197,10 +194,13 @@ typedef struct ucc_tl_ucp_task {
             int                     phase;
             ucc_knomial_pattern_t   p;
             void                   *sbuf;
+            ucc_ee_executor_task_t *etask;
             node_ucc_ee_executor_task_t *etask_linked_list_head;
             ucc_rank_t              recv_dist;
             ucc_mpool_t             etask_node_mpool;
-            ucc_ee_executor_task_t *etask;
+            ucp_mem_h              *mh_list;
+            int                     count_mh;
+            int                     max_mh;
         } allgather_kn;
         struct {
             /*
@@ -427,27 +427,34 @@ static inline ucc_status_t ucc_tl_ucp_test_with_etasks(ucc_tl_ucp_task_t *task)
 {
     int polls = 0;
     ucc_status_t status;
+    ucc_status_t status_2;
+    node_ucc_ee_executor_task_t *current_node;
+    node_ucc_ee_executor_task_t *prev_node;
 
+    if (UCC_TL_UCP_TASK_P2P_COMPLETE(task) && task->allgather_kn.etask_linked_list_head==NULL) {
+        return UCC_OK;
+    }
     while (polls++ < task->n_polls) {
-        node_ucc_ee_executor_task_t *current_node;
-        node_ucc_ee_executor_task_t *prev_node;
         current_node = task->allgather_kn.etask_linked_list_head;
         prev_node = NULL;
         while(current_node != NULL) {
             status = ucc_ee_executor_task_test(current_node->etask);                            
             if (status > 0) {          
-                ucp_memcpy_device_complete(current_node->etask->completion, status);                                            
-                ucc_ee_executor_task_finalize(current_node->etask);                                 
+                ucp_memcpy_device_complete(current_node->etask->completion, ucc_status_to_ucs_status(status));                                            
+                status_2 = ucc_ee_executor_task_finalize(current_node->etask);
+                ucc_mpool_put(current_node);
+                if (ucc_unlikely(status_2 < 0)){
+                    tl_error(UCC_TASK_LIB(task), "task finalize didnt work");                             
+                    return status_2;
+                }                             
                 if (prev_node != NULL){
                     prev_node->next = current_node->next; //to remove from list
                 } 
                 else{ //i'm on first node
                     task->allgather_kn.etask_linked_list_head = current_node->next;
                 }
-            }                                                                      
-            else {
-                prev_node = current_node;
             }
+            prev_node = current_node;
             current_node = current_node->next; //to iterate to next node                                                              
         }                                                                               
         if (UCC_TL_UCP_TASK_P2P_COMPLETE(task) && task->allgather_kn.etask_linked_list_head == NULL) {
@@ -483,17 +490,26 @@ static inline ucc_status_t ucc_tl_ucp_test_recv(ucc_tl_ucp_task_t *task)
 static inline ucc_status_t ucc_tl_ucp_test_recv_with_etasks(ucc_tl_ucp_task_t *task) {
     int polls = 0;
     ucc_status_t status;
+    ucc_status_t status_2;
+    node_ucc_ee_executor_task_t *current_node;
+    node_ucc_ee_executor_task_t *prev_node;
 
+    if (UCC_TL_UCP_TASK_RECV_COMPLETE(task) && task->allgather_kn.etask_linked_list_head==NULL) {
+        return UCC_OK;
+    }
     while (polls++ < task->n_polls) {
-        node_ucc_ee_executor_task_t *current_node;
-        node_ucc_ee_executor_task_t *prev_node;
         current_node = task->allgather_kn.etask_linked_list_head;
         prev_node = NULL;
         while(current_node != NULL) {
-            status = ucc_ee_executor_task_test(current_node->etask);                            \
+            status = ucc_ee_executor_task_test(current_node->etask);                            
             if (status > 0) {          
-                ucp_memcpy_device_complete(current_node->etask->completion, status);                                            \
-                ucc_ee_executor_task_finalize(current_node->etask);                                 \
+                ucp_memcpy_device_complete(current_node->etask->completion, status);                                            
+                status_2 = ucc_ee_executor_task_finalize(current_node->etask);
+                ucc_mpool_put(current_node);
+                if (ucc_unlikely(status_2 < 0)){
+                    tl_error(UCC_TASK_LIB(task), "task finalize didnt work");                             
+                    return status_2;
+                }                                 
                 if (prev_node != NULL){
                     prev_node->next = current_node->next; //to remove from list
                 } 

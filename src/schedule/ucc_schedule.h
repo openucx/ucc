@@ -7,7 +7,6 @@
 #ifndef UCC_SCHEDULE_H_
 #define UCC_SCHEDULE_H_
 
-#include <ucp/api/ucp.h>
 #include "ucc/api/ucc.h"
 #include "utils/ucc_list.h"
 #include "utils/ucc_log.h"

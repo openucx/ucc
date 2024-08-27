@@ -13,7 +13,6 @@
 #include "utils/arch/cpu.h"
 #include "schedule/ucc_schedule_pipelined.h"
 #include <limits.h>
-#include <ucp/api/ucp.h>
 
 #define UCP_CHECK(function, msg, go, ctx)                                      \
     status = function;                                                         \
@@ -144,7 +143,6 @@ static int memcpy_device_start(void *dest, void *src, size_t size,
 
         status = ucc_coll_task_get_executor(&task->super, &exec);
         if (ucc_unlikely(status != UCC_OK)) {
-            task->super.status = status;
             return status;
         }
 
@@ -154,8 +152,12 @@ static int memcpy_device_start(void *dest, void *src, size_t size,
         eargs.copy.len  = size;
         node_ucc_ee_executor_task_t *new_node;
         new_node = ucc_mpool_get(&task->allgather_kn.etask_node_mpool);
+        if (ucc_unlikely(!new_node)) {
+            return UCC_ERR_NO_MEMORY;
+        }
         status = ucc_ee_executor_task_post(exec, &eargs,
                                            &new_node->etask);
+        task->allgather_kn.etask_linked_list_head->etask->completion = completion;
         
         if (ucc_unlikely(status != UCC_OK)) {
             task->super.status = status;
@@ -164,7 +166,6 @@ static int memcpy_device_start(void *dest, void *src, size_t size,
         new_node->next = task->allgather_kn.etask_linked_list_head;
         task->allgather_kn.etask_linked_list_head = new_node;
 
-        task->allgather_kn.etask_linked_list_head->etask->completion = completion;
         return 1;
         
     }
@@ -179,7 +180,6 @@ static int memcpy_device(void *dest, void *src, size_t size, void *user_data){
 
     status = ucc_coll_task_get_executor(&task->super, &exec);
     if (ucc_unlikely(status != UCC_OK)) {
-        task->super.status = status;
         return status;
     }
 
@@ -190,18 +190,19 @@ static int memcpy_device(void *dest, void *src, size_t size, void *user_data){
 
     status = ucc_ee_executor_task_post(exec, &eargs, &etask);
     if (ucc_unlikely(status < 0)) {                                                                   
-        task->super.status = status;                                       
         return status;                                                            
     }        
     status = ucc_ee_executor_task_test(etask);
     while (status>0) {
         status = ucc_ee_executor_task_test(etask);
         if (ucc_unlikely(status < 0)) {                                                                   
-            task->super.status = status;                                       
             return status;                                                            
         }                                                         
     }                                                          
-    ucc_ee_executor_task_finalize(etask);                                 
+    status = ucc_ee_executor_task_finalize(etask);
+    if (ucc_unlikely(status < 0)) {                                                                   
+        return status;                                                            
+    }                                 
     return 1;
 }
 
