@@ -137,11 +137,13 @@ static inline ucc_status_t sbgp_create_node(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
             node_size++;
         }
     }
+
     if (0 == node_size) {
         /* We should always have at least 1 local rank */
         ucc_free(local_ranks);
         return UCC_ERR_NO_MESSAGE;
     }
+    sbgp->is_contig = local_ranks[0] == ctx_nlr
     sbgp->group_size = node_size;
     sbgp->group_rank = node_rank;
     sbgp->rank_map   = local_ranks;

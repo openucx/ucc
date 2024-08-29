@@ -55,6 +55,7 @@ typedef struct ucc_sbgp_t {
     ucc_rank_t        group_rank;
     ucc_rank_t       *rank_map;
     ucc_ep_map_t      map;
+    int               is_contig;    // True if the order of the ranks of the subgroup is the same as in parent group
 } ucc_sbgp_t;
 
 const char* ucc_sbgp_str(ucc_sbgp_type_t type);
