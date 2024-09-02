@@ -39,13 +39,6 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_barrier_init,
     ucc_base_coll_args_t args;
     int                  n_tasks, i;
 
-    if (cl_team->sbgps[UCC_HIER_SBGP_FULL].sbgp->group_rank == 0) {
-        printf("Waiting, pid=%d\n", getpid());
-        int wait = 1;
-        while (wait) {
-            sleep(1);
-        }
-    }
 
     schedule = &ucc_cl_hier_get_schedule(cl_team)->super.super;
     if (ucc_unlikely(!schedule)) {
