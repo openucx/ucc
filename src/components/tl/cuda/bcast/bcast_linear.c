@@ -94,6 +94,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
 
     st = ucc_coll_task_get_executor(&task->super, &exec);
     if (ucc_unlikely(st != UCC_OK)) {
+        task->status = st;
         return;
     }
 
