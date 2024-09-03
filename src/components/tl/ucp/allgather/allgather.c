@@ -14,7 +14,7 @@ ucc_base_coll_alg_info_t
         [UCC_TL_UCP_ALLGATHER_ALG_KNOMIAL] =
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_KNOMIAL,
              .name = "knomial",
-             .desc = "recursive k-ing with arbitrary radix"},
+             .desc = "recursive k-ing with arbitrary radix "},
         [UCC_TL_UCP_ALLGATHER_ALG_RING] =
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_RING,
              .name = "ring",
@@ -23,11 +23,11 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR,
              .name = "neighbor",
              .desc = "O(N) Neighbor Exchange N/2 steps"},
-        [UCC_TL_UCP_ALLGATHER_ALG_BRUCK] =
+        [UCC_TL_UCP_ALLGATHER_ALG_BRUCK] = 
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_BRUCK,
              .name = "bruck",
              .desc = "O(log(N)) Variation of Bruck algorithm"},
-        [UCC_TL_UCP_ALLGATHER_ALG_SPARBIT] =
+        [UCC_TL_UCP_ALLGATHER_ALG_SPARBIT] = 
             {.id   = UCC_TL_UCP_ALLGATHER_ALG_SPARBIT,
              .name = "sparbit",
              .desc = "O(log(N)) SPARBIT algorithm"},

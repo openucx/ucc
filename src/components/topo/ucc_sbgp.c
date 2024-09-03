@@ -28,7 +28,6 @@ const char* ucc_sbgp_str(ucc_sbgp_type_t type)
 static inline int ucc_ranks_on_local_sn(ucc_rank_t rank1, ucc_rank_t rank2,
                                         ucc_topo_t *topo, ucc_sbgp_type_t type)
 {
-    // EYAL 
     ucc_rank_t       ctx_rank1 = ucc_ep_map_eval(topo->set.map, rank1);
     ucc_rank_t       ctx_rank2 = ucc_ep_map_eval(topo->set.map, rank2);
     ucc_proc_info_t *proc1     = &topo->topo->procs[ctx_rank1];
@@ -137,7 +136,6 @@ static inline ucc_status_t sbgp_create_node(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
             node_size++;
         }
     }
-
     if (0 == node_size) {
         /* We should always have at least 1 local rank */
         ucc_free(local_ranks);

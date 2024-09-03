@@ -20,7 +20,8 @@ static ucc_status_t ucc_cl_hier_barrier_finalize(ucc_coll_task_t *task)
     ucc_schedule_t *schedule = ucc_derived_of(task, ucc_schedule_t);
     ucc_status_t    status;
 
-    UCC_CL_HIER_PROFILE_REQUEST_EVENT(task, "cl_hier_barrier_finalize", 0);
+    UCC_CL_HIER_PROFILE_REQUEST_EVENT(task, "cl_hier_barrier_finalize",
+                                      0);
     status = ucc_schedule_finalize(task);
     ucc_cl_hier_put_schedule(schedule);
     return status;
@@ -31,14 +32,12 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_barrier_init,
                          ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
                          ucc_coll_task_t **task)
 {
-
     ucc_cl_hier_team_t  *cl_team = ucc_derived_of(team, ucc_cl_hier_team_t);
     ucc_coll_task_t     *tasks[MAX_BARRIER_TASKS] = {NULL};
     ucc_schedule_t      *schedule;
     ucc_status_t         status;
     ucc_base_coll_args_t args;
     int                  n_tasks, i;
-
 
     schedule = &ucc_cl_hier_get_schedule(cl_team)->super.super;
     if (ucc_unlikely(!schedule)) {
@@ -72,6 +71,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_barrier_init,
         n_tasks++;
     }
 
+
     if (SBGP_ENABLED(cl_team, NODE) &&
         cl_team->top_sbgp != UCC_HIER_SBGP_NODE) {
         args.args.coll_type = UCC_COLL_TYPE_FANOUT;
@@ -97,7 +97,6 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_barrier_init,
     schedule->super.post     = ucc_cl_hier_barrier_start;
     schedule->super.finalize = ucc_cl_hier_barrier_finalize;
     *task                    = &schedule->super;
-
     return UCC_OK;
 
 out:

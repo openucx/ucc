@@ -75,14 +75,6 @@ void ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
         return;
     }
 
-    // DEBUG
-    // int _i;
-    // printf("[%d] end-bcast buffer: [", task->subset.myrank);
-    // for (_i=0; _i < 8; _i++){
-    //     printf("%u, ", ((uint32_t *)TASK_ARGS(task).src.info.buffer)[_i]);
-    // }
-    // printf("]\n");
-    // -----
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.status = UCC_OK;
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_bcast_kn_done", 0);
@@ -100,15 +92,6 @@ ucc_status_t ucc_tl_ucp_bcast_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     CALC_KN_TREE_DIST(size, task->bcast_kn.radix, task->bcast_kn.dist);
-
-    // DEBUG
-    // int _i;
-    // printf("[%d] start-bcast buffer: [", task->subset.myrank);
-    // for (_i=0; _i < 8; _i++){
-    //     printf("%u, ", ((uint32_t *)TASK_ARGS(task).src.info.buffer)[_i]);
-    // }
-    // printf("]\n");
-    // -----
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }

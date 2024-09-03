@@ -1,6 +1,5 @@
 /**
- * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- *
+ * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * See file LICENSE for terms.
  */
 
@@ -316,21 +315,24 @@ TYPED_TEST(test_reduce_scatter_cuda, multiple_inplace_managed)
 }
 #endif
 
-using Param_0 = std::tuple<ucc_job_env_t>;
 class test_reduce_scatter_alg
     : public ucc::test,
-      public ::testing::WithParamInterface<Param_0> {
+      public ::testing::WithParamInterface<std::string> {
 };
 
-UCC_TEST_P(test_reduce_scatter_alg,)
+UCC_TEST_P(test_reduce_scatter_alg, ring)
 {
     test_reduce_scatter<TypeOpPair<UCC_DT_INT32, sum>> rs_test;
     int                                                n_procs = 15;
-    const ucc_job_env_t     env   = std::get<0>(GetParam());
-    UccJob                  job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
-    UccTeam_h               team   = job.create_team(n_procs);
-    int                     repeat = 3;
-    UccCollCtxVec           ctxs;
+    std::string                                        bidir   = GetParam();
+    ucc_job_env_t                  env = {{"UCC_CL_BASIC_TUNE", "inf"},
+                         {"UCC_TL_UCP_TUNE", "reduce_scatter:@ring:inf"},
+                         {"REDUCE_SCATTER_RING_BIDIRECTIONAL",
+                          bidir == "bidirectional" ? "y" : "n"}};
+    UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
+    UccTeam_h     team   = job.create_team(n_procs);
+    int           repeat = 3;
+    UccCollCtxVec ctxs;
     std::vector<ucc_memory_type_t> mt = {UCC_MEMORY_TYPE_HOST};
 
     if (UCC_OK == ucc_mc_available(UCC_MEMORY_TYPE_CUDA)) {
@@ -359,25 +361,5 @@ UCC_TEST_P(test_reduce_scatter_alg,)
         }
     }
 }
-
-ucc_job_env_t ring_unidir_env = {{"name", "ring_unidirectional"},
-                                 {"UCC_CL_BASIC_TUNE", "inf"},
-                                 {"UCC_TL_UCP_TUNE", "reduce_scatter:@ring:inf"},
-                                 {"UCC_TL_UCP_REDUCE_SCATTER_RING_BIDIRECTIONAL", "n"}};
-
-ucc_job_env_t ring_bidir_env = {{"name", "ring_bidirectional"},
-                                {"UCC_CL_BASIC_TUNE", "inf"},
-                                {"UCC_TL_UCP_TUNE", "reduce_scatter:@ring:inf"},
-                                {"UCC_TL_UCP_REDUCE_SCATTER_RING_BIDIRECTIONAL", "y"}};
-
-ucc_job_env_t knomial = {{"name", "knomial"},
-                         {"UCC_CL_BASIC_TUNE", "inf"},
-                         {"UCC_TL_UCP_TUNE", "reduce_scatter:@knomial:inf"}};
-
-INSTANTIATE_TEST_CASE_P(
-    , test_reduce_scatter_alg,
-        ::testing::Combine(
-            ::testing::Values(ring_unidir_env, ring_bidir_env, knomial)),
-    [](const testing::TestParamInfo<Param_0>& info) {
-        const ucc_job_env_t env   = std::get<0>(info.param);
-        return  env[0].second;});
+INSTANTIATE_TEST_CASE_P(, test_reduce_scatter_alg,
+                        ::testing::Values("bidirectional", "unidirectional"));

@@ -7,8 +7,8 @@
 #include "test_mpi.h"
 #include "mpi_util.h"
 
-static void fill_counts_and_displacements(int size, int count, int *counts,
-                                          int *displs)
+static void fill_counts_and_displacements(int size, int count,
+                                          int *counts, int *displs)
 {
     int bias = count / 2;
     int i;
@@ -29,18 +29,10 @@ static void fill_counts_and_displacements(int size, int count, int *counts,
         counts[size - 1] = count;
     }
     displs[size - 1] = displs[size - 2] + counts[size - 2];
-
-    //printf("Original counts:\n");
-    //for (i = 0; i < size; i++) {
-    //    printf("counts[%d]=%d\n", i, counts[i]);
-    //}
-    //for (i = 0; i < size; i++) {
-    //    printf("displs[%d]=%d\n", i, displs[i]);
-    //}
 }
 
-TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params)
-    : TestCase(_team, UCC_COLL_TYPE_ALLGATHERV, params)
+TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params) :
+    TestCase(_team, UCC_COLL_TYPE_ALLGATHERV, params)
 {
     int    rank, size;
     size_t dt_size, count;
@@ -59,10 +51,9 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params)
         return;
     }
 
-    counts = (int *)ucc_malloc(size * sizeof(uint32_t), "counts buf");
+    counts = (int *) ucc_malloc(size * sizeof(uint32_t), "counts buf");
     UCC_MALLOC_CHECK(counts);
-    displacements =
-        (int *)ucc_malloc(size * sizeof(uint32_t), "displacements buf");
+    displacements = (int *) ucc_malloc(size * sizeof(uint32_t), "displacements buf");
     UCC_MALLOC_CHECK(displacements);
     UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize * size, mem_type));
     rbuf      = rbuf_mc_header->addr;
@@ -71,8 +62,7 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params)
     fill_counts_and_displacements(size, count, counts, displacements);
 
     if (!inplace) {
-        UCC_CHECK(
-            ucc_mc_alloc(&sbuf_mc_header, counts[rank] * dt_size, mem_type));
+        UCC_CHECK(ucc_mc_alloc(&sbuf_mc_header, counts[rank] * dt_size, mem_type));
         sbuf                   = sbuf_mc_header->addr;
         args.src.info.buffer   = sbuf;
         args.src.info.datatype = dt;
@@ -80,28 +70,11 @@ TestAllgatherv::TestAllgatherv(ucc_test_team_t &_team, TestCaseParams &params)
         args.src.info.count    = counts[rank];
     }
     args.dst.info_v.buffer        = rbuf;
-    args.dst.info_v.counts        = (ucc_count_t *)counts;
-    args.dst.info_v.displacements = (ucc_aint_t *)displacements;
+    args.dst.info_v.counts        = (ucc_count_t*)counts;
+    args.dst.info_v.displacements = (ucc_aint_t*)displacements;
     args.dst.info_v.datatype      = dt;
     args.dst.info_v.mem_type      = mem_type;
     UCC_CHECK(set_input());
-
-    // --- DEBUG ---
-    // int wait = 1;
-    // printf("Waiting pid=%d\n", getpid());
-    // while (wait){
-    //     sleep(1);
-    // }
-   
-    // printf("[%d] send buf: [", rank);
-
-    // for (int i=0; i < counts[rank]; i++){
-    //     printf("%u, ", ((uint32_t *)sbuf)[i]);
-    // }
-    // printf("]\n");
-
-    // -----
-
     UCC_CHECK_SKIP(ucc_collective_init(&args, &req, team.team), test_skip);
 }
 
@@ -123,8 +96,7 @@ ucc_status_t TestAllgatherv::set_input(int iter_persistent)
     return UCC_OK;
 }
 
-TestAllgatherv::~TestAllgatherv()
-{
+TestAllgatherv::~TestAllgatherv() {
     if (counts) {
         ucc_free(counts);
     }
@@ -139,7 +111,7 @@ ucc_status_t TestAllgatherv::check()
     int size, i;
 
     MPI_Comm_size(team.comm, &size);
-    for (i = 0; i < size; i++) {
+    for (i = 0 ; i < size; i++) {
         total_count += counts[i];
     }
 
@@ -148,16 +120,6 @@ ucc_status_t TestAllgatherv::check()
                     counts[i], dt, UCC_MEMORY_TYPE_HOST,
                     i * (iter_persistent + 1));
     }
-
-    // DEBUG  //
-    int rank;
-    MPI_Comm_rank(team.comm, &rank);
-    printf("[%d] (total count=%d) End --> rbuf: [", rank, total_count);
-    for (i = 0; i < total_count; i++) {
-       printf("%d, ",((uint32_t *)rbuf)[i]);
-    }
-    printf("]\n");
-    // ----- //
 
     return compare_buffers(rbuf, check_buf, total_count, dt, mem_type);
 }
