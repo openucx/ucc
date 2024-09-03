@@ -226,13 +226,13 @@ struct ucc_tl_cuda_task {
                                  ucc_rank_t                block);
         } allgatherv_linear;
         struct {
-            int stage;
-            int step;
-            void *                  sbuf;
+            int                     stage;
+            int                     step;
+            void                   *sbuf;
             ucc_datatype_t          dt;
             ucc_rank_t              root;
-            size_t size;
-            int num_steps;
+            size_t                  size;
+            int                     num_steps;
             ucc_ee_executor_task_t *exec_task;
         } bcast_linear;
         struct {
