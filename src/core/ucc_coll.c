@@ -238,6 +238,8 @@ UCC_CORE_PROFILE_FUNC(ucc_status_t, ucc_collective_init,
             ucc_error("handling asymmetric memory failed");
             return status;
         }
+    } else {
+        op_args.asymmetric_save_info.scratch = NULL;
     }
 
     status = ucc_coll_init(team->score_map, &op_args, &task);
