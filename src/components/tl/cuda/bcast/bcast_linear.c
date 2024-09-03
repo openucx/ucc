@@ -73,17 +73,17 @@ ucc_status_t ucc_tl_cuda_bcast_linear_finalize(ucc_coll_task_t *coll_task)
 
 void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_cuda_task_t *task  = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
-    ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
-    ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t          tsize = UCC_TL_TEAM_SIZE(team);
+    ucc_tl_cuda_task_t *task              = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
+    ucc_tl_cuda_team_t *team              = TASK_TEAM(task);
+    ucc_rank_t          trank             = UCC_TL_TEAM_RANK(team);
+    ucc_rank_t          tsize             = UCC_TL_TEAM_SIZE(team);
     size_t              half_scratch_size = get_raw_scratch_size(team) / 2;
-    size_t              chunk_size =
+    size_t              chunk_size        =
         task->bcast_linear.step < task->bcast_linear.num_steps
                          ? ucc_min(half_scratch_size, task->bcast_linear.size)
                          : task->bcast_linear.size -
                   (task->bcast_linear.step - 1) * half_scratch_size;
-    size_t offset_buff = task->bcast_linear.step * half_scratch_size;
+    size_t offset_buff                    = task->bcast_linear.step * half_scratch_size;
     ucc_ee_executor_t      *exec;
     ucc_ee_executor_task_t *etask;
     ucc_status_t            st;
