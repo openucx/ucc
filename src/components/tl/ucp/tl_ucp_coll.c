@@ -248,6 +248,7 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
                                        UCC_TL_UCP_DYN_SEG_UPDATE_DST |
                                        UCC_TL_UCP_DYN_SEG_UPDATE_GLOBAL;
     ucc_status_t          status;
+    ucs_status_t          ucs_status;
 
     /* check if src, dst, global work in ctx mapped segments */
     for (i = 0; i < ctx->n_rinfo_segs && n_segments > 0; i++) {
@@ -337,8 +338,11 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
 failed_memory_map:
     for (i = 0; i < ctx->n_dynrinfo_segs; i++) {
         if (ctx->dynamic_remote_info[i].mem_h) {
-            ucp_mem_unmap(ctx->worker.ucp_context,
-                          ctx->dynamic_remote_info[i].mem_h);
+            ucs_status = ucp_mem_unmap(ctx->worker.ucp_context,
+                                       ctx->dynamic_remote_info[i].mem_h);
+            if (UCS_OK != ucs_status) {
+                tl_error(UCC_TL_UCP_TEAM_LIB(tl_team), "Failed to unmap memory");
+            }
         }
         if (ctx->dynamic_remote_info[i].packed_key) {
             ucp_rkey_buffer_release(ctx->dynamic_remote_info[i].packed_key);
