@@ -98,7 +98,7 @@ static ucc_status_t ucc_cl_hier_allgatherv_node_split_init_schedule(
 
     if (c64 ^ d64) {
         cl_debug(team->context->lib,
-                 "mixed 64 bit count/displ mode is not supported");
+                 "mixed 64 bit count/displ mode is not supported\n");
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -123,9 +123,10 @@ static ucc_status_t ucc_cl_hier_allgatherv_node_split_init_schedule(
     leaders_size = cl_team->sbgps[UCC_HIER_SBGP_NODE_LEADERS].sbgp->group_size;
     elem_size    = c64 ? 8 : 4;
 
-    if (!cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp->preserves_order){
-        printf("Non contiguous node ranking is not supported")
-    }
+    // if (!cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp->preserves_order){
+    //     printf("Reordering node ranking is not supported");
+    //     return UCC_ERR_NOT_SUPPORTED;
+    // }
 
     // Init buffers for collectives arguments
     size_t scratch_size = elem_size * (node_size * 2 + leaders_size * 2);
@@ -341,10 +342,12 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     }
     n_frags        = 1;
     pipeline_depth = 1;
-    ucc_pipeline_nfrags_pdepth(&cfg->allgatherv_node_split_pipeline,
-                              coll_args->args.src.info.count *
-                              ucc_dt_size(coll_args->args.src.info.datatype),
-                              &n_frags, &pipeline_depth);
+
+    // Question: How to use this ? 
+    // ucc_pipeline_nfrags_pdepth(&cfg->allgatherv_node_split_pipeline,
+    //                           coll_args->args.src.info.count *
+    //                           ucc_dt_size(coll_args->args.src.info.datatype),
+    //                           &n_frags, &pipeline_depth);
 
     if (n_frags == 1) {
         return ucc_cl_hier_allgatherv_node_split_init_schedule(
