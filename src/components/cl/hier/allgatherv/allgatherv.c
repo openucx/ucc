@@ -89,8 +89,6 @@ static ucc_status_t ucc_cl_hier_allgatherv_node_split_init_schedule(
     nrank = cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp->group_rank;
     host_id = ucc_team_rank_host_id(rank, coll_args->team);
 
-    printf("[%d] pid=%d, host_id=%d\n", rank, getpid(), host_id);
-
     int is_root = nrank == node_root;
 
     c64 = UCC_COLL_ARGS_COUNT64(&coll_args->args);
