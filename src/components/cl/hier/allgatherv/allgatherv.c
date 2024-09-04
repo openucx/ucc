@@ -80,14 +80,13 @@ static ucc_status_t ucc_cl_hier_allgatherv_node_split_init_schedule(
     int                     n_tasks                     = 0;
     void                    *gv_rc, *gv_displ;  // Gatherv args buffers
     void                    *agv_rc, *agv_displ;    // Allgatherv args buffers
-    int                     i, c64, d64, rank, nrank, host_id;
+    int                     i, c64, d64, nrank;
     ucc_rank_t              full_size, node_size, leaders_size;
     size_t                  elem_size;
     ucc_rank_t              node_root = 0;
 
-    rank = cl_team->sbgps[UCC_HIER_SBGP_FULL].sbgp->group_rank;
+    //int rank = cl_team->sbgps[UCC_HIER_SBGP_FULL].sbgp->group_rank;
     nrank = cl_team->sbgps[UCC_HIER_SBGP_NODE].sbgp->group_rank;
-    host_id = ucc_team_rank_host_id(rank, coll_args->team);
 
     int is_root = nrank == node_root;
 
