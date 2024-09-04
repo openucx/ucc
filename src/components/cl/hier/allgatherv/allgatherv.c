@@ -279,6 +279,9 @@ static ucc_status_t ucc_cl_hier_allgatherv_node_split_init_schedule(
         n_tasks++;
     }
 
+    schedule->super.post     = ucc_cl_hier_allgatherv_start;
+    schedule->super.finalize = ucc_cl_hier_allgatherv_finalize;
+    //schedule->super.triggered_post_setup = ucc_cl_hier_allgatherv_triggered_post_setup;
     *sched_p = schedule;
 
     return UCC_OK;
