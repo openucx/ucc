@@ -159,11 +159,20 @@ enum {
     UCC_BASE_CARGS_MAX_FRAG_COUNT = UCC_BIT(0)
 };
 
+typedef struct ucc_buffer_info_asymmetric_memtype {
+    union {
+        ucc_coll_buffer_info_t      info;
+        ucc_coll_buffer_info_v_t    info_v;
+    } old_asymmetric_buffer;
+    ucc_mc_buffer_header_t *scratch;
+} ucc_buffer_info_asymmetric_memtype_t;
+
 typedef struct ucc_base_coll_args {
-    uint64_t         mask;
-    ucc_coll_args_t  args;
-    ucc_team_t      *team;
-    size_t           max_frag_count;
+    uint64_t                             mask;
+    ucc_coll_args_t                      args;
+    ucc_team_t                          *team;
+    size_t                               max_frag_count;
+    ucc_buffer_info_asymmetric_memtype_t asymmetric_save_info;
 } ucc_base_coll_args_t;
 
 typedef ucc_status_t (*ucc_base_coll_init_fn_t)(ucc_base_coll_args_t *coll_args,

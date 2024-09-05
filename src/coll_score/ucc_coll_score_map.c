@@ -87,15 +87,12 @@ static ucc_status_t ucc_coll_score_map_lookup(ucc_score_map_t *map,
     ucc_list_link_t *list;
     ucc_msg_range_t *r;
 
-    if (mt == UCC_MEMORY_TYPE_ASYMMETRIC) {
-        /* TODO */
-        ucc_debug("asymmetric memory type is not supported");
-        return UCC_ERR_NOT_SUPPORTED;
-    } else if (mt == UCC_MEMORY_TYPE_NOT_APPLY) {
+    if (mt == UCC_MEMORY_TYPE_NOT_APPLY) {
         /* Temporary solution: for Barrier, Fanin, Fanout - use
            "host" range list */
         mt = UCC_MEMORY_TYPE_HOST;
     }
+    ucc_assert(ucc_coll_args_is_mem_symmetric(&bargs->args, map->team_rank));
     if (msgsize == UCC_MSG_SIZE_INVALID || msgsize == UCC_MSG_SIZE_ASYMMETRIC) {
         /* These algorithms require global communication to get the same msgsize estimation.
            Can't use msg ranges. Use msize 0 (assuming the range list should only contain 1
