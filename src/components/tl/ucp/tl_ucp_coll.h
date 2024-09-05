@@ -58,7 +58,7 @@ void ucc_tl_ucp_team_default_score_str_free(
 } while(0)
 
 #define MEM_MAP() do {                                                              \
-    status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);               \
+    status = ucs_status_to_ucc_status(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh_list[count_mh++]));               \
     if (UCC_OK != status) {                                                         \
         return status;                                                                     \
     }                                                                               \
@@ -66,7 +66,6 @@ void ucc_tl_ucp_team_default_score_str_free(
         size_of_list *= 2;                                                          \
         mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));  \
     }                                                                               \
-    mh_list[count_mh++] = mh;                                                       \
 } while(0)
 
 #define EXEC_TASK_WAIT(_etask, ...)                                            \
@@ -503,7 +502,7 @@ static inline ucc_status_t ucc_tl_ucp_test_recv_with_etasks(ucc_tl_ucp_task_t *t
         while(current_node != NULL) {
             status = ucc_ee_executor_task_test(current_node->etask);                            
             if (status > 0) {          
-                ucp_memcpy_device_complete(current_node->etask->completion, status);                                            
+                ucp_memcpy_device_complete(current_node->etask->completion, ucc_status_to_ucs_status(status));
                 status_2 = ucc_ee_executor_task_finalize(current_node->etask);
                 ucc_mpool_put(current_node);
                 if (ucc_unlikely(status_2 < 0)){
@@ -517,9 +516,7 @@ static inline ucc_status_t ucc_tl_ucp_test_recv_with_etasks(ucc_tl_ucp_task_t *t
                     task->allgather_kn.etask_linked_list_head = current_node->next;
                 }
             }                                                                      
-            else {
-                prev_node = current_node;
-            }
+            prev_node = current_node;
             current_node = current_node->next; //to iterate to next node                                                              
         }
         if (UCC_TL_UCP_TASK_RECV_COMPLETE(task) && task->allgather_kn.etask_linked_list_head==NULL) {
