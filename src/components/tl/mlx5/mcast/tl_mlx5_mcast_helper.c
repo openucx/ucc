@@ -300,7 +300,12 @@ ucc_status_t ucc_tl_mlx5_mcast_init_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
         return UCC_ERR_NO_RESOURCE;
     }
 
-    comm->max_inline = qp_init_attr.cap.max_inline_data;
+    if (comm->cuda_mem_enabled) {
+        /* max inline send otherwise it segfault during ibv send */
+        comm->max_inline = 0;
+    } else {
+        comm->max_inline = qp_init_attr.cap.max_inline_data;
+    }
 
     return UCC_OK;
 }
@@ -609,6 +614,7 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
             return UCC_ERR_NO_RESOURCE;
         }
     }
+
     if (comm->grh_buf) {
         ucc_free(comm->grh_buf);
     }
@@ -626,7 +632,7 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
     }
 
     if (comm->pp_buf) {
-        ucc_free(comm->pp_buf);
+        ucc_mc_free(comm->pp_buf_header);
     }
 
     if (comm->call_rwr) {

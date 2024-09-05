@@ -17,6 +17,7 @@
 #include "components/tl/ucc_tl_log.h"
 #include "utils/ucc_rcache.h"
 #include "core/ucc_service_coll.h"
+#include "components/mc/ucc_mc.h"
 
 #define POLL_PACKED       16
 #define REL_DONE          ((void*)-1)
@@ -98,6 +99,7 @@ typedef struct mcast_coll_comm_init_spec {
     int                               scq_moderation;
     int                               wsize;
     int                               max_eager;
+    int                               cuda_mem_enabled;
     void                             *oob;
 } ucc_tl_mlx5_mcast_coll_comm_init_spec_t;
 
@@ -261,6 +263,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             pending_recv;
     struct ibv_mr                                  *pp_mr;
     char                                           *pp_buf;
+    ucc_mc_buffer_header_t                         *pp_buf_header;
     struct pp_packet                               *pp;
     uint32_t                                        psn;
     uint32_t                                        last_psn;
@@ -293,6 +296,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             n_prep_reliable;
     int                                             n_mcast_reliable;
     int                                             wsize;
+    int                                             cuda_mem_enabled;
     ucc_tl_mlx5_mcast_join_info_t                  *group_setup_info;
     ucc_service_coll_req_t                         *group_setup_info_req;
     ucc_tl_mlx5_mcast_service_coll_t                service_coll;
