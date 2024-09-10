@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Facebook, Inc. and its affiliates. 2021.
  * Copyright (C) Advanced Micro Devices, Inc. 2022. ALL RIGHTS RESERVED.
  *
@@ -117,9 +117,6 @@ ucc_status_t
 ucc_tl_rccl_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
                              ucc_base_ctx_attr_t      *attr)
 {
-    if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
-        attr->attr.ctx_addr_len = 0;
-    }
-    attr->topo_required = 0;
+    ucc_base_ctx_attr_clear(attr);
     return UCC_OK;
 }

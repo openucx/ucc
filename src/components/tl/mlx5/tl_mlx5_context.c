@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -91,11 +91,9 @@ UCC_CLASS_DEFINE(ucc_tl_mlx5_context_t, ucc_tl_context_t);
 
 ucc_status_t
 ucc_tl_mlx5_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                             ucc_base_ctx_attr_t *     attr)
+                             ucc_base_ctx_attr_t      *attr)
 {
-    if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
-        attr->attr.ctx_addr_len = 0;
-    }
+    ucc_base_ctx_attr_clear(attr);
     attr->topo_required = 1;
     return UCC_OK;
 }

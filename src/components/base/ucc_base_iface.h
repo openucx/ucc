@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -107,6 +107,13 @@ typedef struct ucc_base_ctx_attr_t {
     ucc_context_attr_t attr;
     uint32_t           topo_required;
 } ucc_base_ctx_attr_t;
+
+static inline void ucc_base_ctx_attr_clear(ucc_base_ctx_attr_t *attr)
+{
+    uint64_t mask = attr->attr.mask;
+    memset(attr, 0, sizeof(ucc_base_ctx_attr_t));
+    attr->attr.mask = mask;
+}
 
 typedef struct ucc_base_context_iface {
     ucc_status_t (*create)(const ucc_base_context_params_t *params,
