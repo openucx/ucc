@@ -18,6 +18,7 @@
 
 #define UCC_UUNITS_AUTO_RADIX 4
 #define UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR 8
+#define UCC_TL_UCP_TASK_PLUGIN_MAX_DATA 128
 
 ucc_status_t ucc_tl_ucp_team_default_score_str_alloc(ucc_tl_ucp_team_t *team,
     char *default_select_str[UCC_TL_UCP_N_DEFAULT_ALG_SELECT_STR]);
@@ -266,6 +267,7 @@ typedef struct ucc_tl_ucp_task {
             ucc_rank_t              iteration;
             int                     phase;
         } alltoall_bruck;
+        char                        plugin_data[UCC_TL_UCP_TASK_PLUGIN_MAX_DATA];
     };
 } ucc_tl_ucp_task_t;
 
