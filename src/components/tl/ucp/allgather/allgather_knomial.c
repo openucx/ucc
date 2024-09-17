@@ -58,13 +58,11 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t             peer, peer_dist;
     ucc_kn_radix_t         loop_step;
     size_t                 peer_seg_count, local_seg_count;
-    ucc_status_t           status;
+    //ucc_status_t           status;
     size_t                 extra_count;
 
-    //printf("\nprog\n");
-    EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test",
-                   task->allgather_kn.etask);
-    task->allgather_kn.etask = NULL;
+    //EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test", task->allgather_kn.etask);
+    //task->allgather_kn.etask = NULL;
     UCC_KN_GOTO_PHASE(task->allgather_kn.phase);
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, rank);
@@ -179,6 +177,7 @@ out:
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
 {
+    //ucc_debug("****************************knomial*********************");
     ucc_tl_ucp_task_t          *task  = ucc_derived_of(coll_task,
                                                        ucc_tl_ucp_task_t);
     ucc_coll_args_t            *args  = &TASK_ARGS(task);
@@ -197,7 +196,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-    task->allgather_kn.etask = NULL;
+    //task->allgather_kn.etask = NULL;
     task->allgather_kn.phase = UCC_KN_PHASE_INIT;
     if (ct == UCC_COLL_TYPE_ALLGATHER) {
         ucc_kn_ag_pattern_init(size, rank, radix, args->dst.info.count,
@@ -224,14 +223,14 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
             }
         }*/
         if (!UCC_IS_INPLACE(*args) && !USE_CUDA) {
-            //printf("Trying change\n");
             status = ucc_mc_memcpy(PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer, args->src.info.count * ucc_dt_size(args->src.info.datatype), args->dst.info.mem_type, args->src.info.mem_type);
             if (ucc_unlikely(UCC_OK != status)) {
                 task->super.status = status;
                 return status;
             }
-            //printf("worked?\n");
         }
+        
+        
 
 
     } else {
