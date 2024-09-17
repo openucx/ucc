@@ -238,12 +238,22 @@ ucc_status_t ucc_tl_ucp_allgather_bruck_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     /* initial step: copy data on non root ranks to the beginning of buffer */
+
+    uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
         // not inplace: copy chunk from source buff to beginning of receive
+        /*
         status = ucc_mc_memcpy(rbuf, sbuf, data_size, rmem, smem);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }
+        */
+        status = NEW_MEMCPY(USE_CUDA, rbuf, sbuf, data_size, rmem, smem, trank, team, task);
+        if (ucc_unlikely(UCC_OK != status)) {
+            printf("error bruck line 254\n");
+            return status;
+        }
+        
     } else if (trank != 0) {
         // inplace: copy chunk to the begin
         status = ucc_mc_memcpy(rbuf, PTR_OFFSET(rbuf, data_size * trank),

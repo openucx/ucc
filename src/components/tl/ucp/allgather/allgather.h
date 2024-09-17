@@ -23,15 +23,12 @@ ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                    ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                    ucc_tl_ucp_task_t *task)
 
-
-#define NEW_MEMCPY(use_cuda, dst, src, len, dst_mem_type, src_mem_type, rank, team, task) do { \
-    if (use_cuda) { \
-        ucc_mc_memcpy(dst, src, len, dst_mem_type, src_mem_type); \
-    } else { \
-        new_ucp_tl_self_copy_nb(dst, src, len, dst_mem_type, src_mem_type, rank, team, task); \
-    } \
-} while (0)
 */
+#define NEW_MEMCPY(use_cuda, dst, src, len, dst_mem_type, src_mem_type, rank, team, task) \
+    ((use_cuda) ? ucc_mc_memcpy(dst, src, len, dst_mem_type, src_mem_type) : \
+                  new_ucp_tl_self_copy_nb(dst, src, len, dst_mem_type, src_mem_type, rank, team, task))
+
+
 
 
 /*--------------YAELIS FUNCTION---------------------*/
