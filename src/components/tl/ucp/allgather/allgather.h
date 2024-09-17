@@ -7,6 +7,34 @@
 #define ALLGATHER_H_
 #include "../tl_ucp.h"
 #include "../tl_ucp_coll.h"
+/*--------------YAELIS FUNCTION---------------------*/
+ #include "tl_ucp_sendrecv.h"
+
+
+
+/*
+
+ucc_status_t ucc_mc_memcpy(void *dst, const void *src, size_t len,
+                           ucc_memory_type_t dst_mem,
+                           ucc_memory_type_t src_mem);
+
+
+ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
+                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
+                   ucc_tl_ucp_task_t *task)
+
+
+#define NEW_MEMCPY(use_cuda, dst, src, len, dst_mem_type, src_mem_type, rank, team, task) do { \
+    if (use_cuda) { \
+        ucc_mc_memcpy(dst, src, len, dst_mem_type, src_mem_type); \
+    } else { \
+        new_ucp_tl_self_copy_nb(dst, src, len, dst_mem_type, src_mem_type, rank, team, task); \
+    } \
+} while (0)
+*/
+
+
+/*--------------YAELIS FUNCTION---------------------*/
 
 enum {
     UCC_TL_UCP_ALLGATHER_ALG_KNOMIAL,
@@ -35,6 +63,10 @@ static inline int ucc_tl_ucp_allgather_alg_from_str(const char *str)
     }
     return i;
 }
+
+/*--------------YAELIS FUNCTION---------------------*/
+ucc_status_t new_ucp_tl_self_copy_nb(void *dst, void *src, size_t len, ucc_memory_type_t dst_mem,ucc_memory_type_t src_mem, ucc_rank_t rank, ucc_tl_ucp_team_t *team, ucc_tl_ucp_task_t *task);
+/*--------------YAELIS FUNCTION---------------------*/
 
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task);
 
