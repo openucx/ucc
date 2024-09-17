@@ -93,6 +93,7 @@ find_root_node_rank(ucc_rank_t root, ucc_cl_hier_team_t *cl_team)
     return UCC_RANK_INVALID;
 }
 
+
 static ucc_status_t
 ucc_cl_hier_bcast_2step_init_schedule(ucc_base_coll_args_t *coll_args,
                                       ucc_base_team_t      *team,
