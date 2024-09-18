@@ -187,17 +187,17 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_rank_t                  rank  = VRANK(task->subset.myrank,
                                               ct == UCC_COLL_TYPE_BCAST ?
                                               args->root : 0, size);
-    //ucc_ee_executor_task_args_t eargs = {0};
+    ucc_ee_executor_task_args_t eargs = {0};
     ucc_status_t       status;
     ptrdiff_t          offset;
-    //ucc_ee_executor_t *exec; 
+    ucc_ee_executor_t *exec; 
     
 
     uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-    //task->allgather_kn.etask = NULL;
+    task->allgather_kn.etask = NULL;
     task->allgather_kn.phase = UCC_KN_PHASE_INIT;
     if (ct == UCC_COLL_TYPE_ALLGATHER) {
         ucc_kn_ag_pattern_init(size, rank, radix, args->dst.info.count,
@@ -205,7 +205,7 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
         offset = ucc_buffer_block_offset(args->dst.info.count, size, rank) *
                  ucc_dt_size(args->dst.info.datatype);
         
-        /*if (!UCC_IS_INPLACE(*args)) {
+        if (!UCC_IS_INPLACE(*args) && USE_CUDA) {
             status = ucc_coll_task_get_executor(&task->super, &exec);
             if (ucc_unlikely(status != UCC_OK)) {
                 task->super.status = status;
@@ -222,13 +222,13 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
                 task->super.status = status;
                 return status;
             }
-        }*/
-        if (!UCC_IS_INPLACE(*args)){
-            status = NEW_MEMCPY(USE_CUDA, PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer,
+        }
+        if (!UCC_IS_INPLACE(*args) && !USE_CUDA){
+            status = new_ucp_tl_self_copy_nb(PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer,
                             args->src.info.count * ucc_dt_size(args->src.info.datatype), args->dst.info.mem_type, args->src.info.mem_type,
                             rank, team, task);
             if (ucc_unlikely(UCC_OK != status)) {
-                printf("error knomial line 254\n");
+                printf("error knomial line 231\n");
                 return status;
             }
         }
