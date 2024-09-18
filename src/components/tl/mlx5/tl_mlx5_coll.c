@@ -14,19 +14,13 @@ ucc_status_t ucc_tl_mlx5_bcast_mcast_init(ucc_base_coll_args_t *coll_args,
 {
     ucc_status_t        status = UCC_OK;
     ucc_tl_mlx5_task_t *task   = NULL;
-
-    if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args)) {
-        tl_trace(team->context->lib, "mcast bcast not supported for active sets");
-        return UCC_ERR_NOT_SUPPORTED;
-    }
     
-    if (UCC_OK != ucc_tl_mlx5_mcast_check_memory_type_cap(coll_args, team)) {
-        tl_trace(team->context->lib, "mcast bcast not compatible with this memory type");
-        return UCC_ERR_NOT_SUPPORTED;
+    status = ucc_tl_mlx5_mcast_check_support(coll_args, team);
+    if (UCC_OK != status) {
+        return status;
     }
 
     task = ucc_tl_mlx5_get_task(coll_args, team);
-
     if (ucc_unlikely(!task)) {
         return UCC_ERR_NO_MEMORY;
     }

@@ -8,12 +8,12 @@
 #include "components/tl/mlx5/mcast/tl_mlx5_mcast.h"
 
 ucc_status_t ucc_tl_mlx5_mcast_p2p_send_nb(void* src, size_t size, ucc_rank_t
-                                           rank, void *context,
+                                           rank, ucc_memory_type_t mem_type, void *context,
                                            ucc_tl_mlx5_mcast_p2p_completion_obj_t
                                            *obj);
 
 ucc_status_t ucc_tl_mlx5_mcast_p2p_recv_nb(void* dst, size_t size, ucc_rank_t
-                                           rank, void *context,
+                                           rank, ucc_memory_type_t mem_type, void *context,
                                            ucc_tl_mlx5_mcast_p2p_completion_obj_t
                                            *obj);
 
