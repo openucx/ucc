@@ -9,29 +9,6 @@
 
 #define ALLGATHER_MAX_PATTERN_SIZE (sizeof(UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR))
 
-/*--------------YAELIS FUNCTION---------------------*/
-
-
-
-/*
-
-ucc_tl_ucp_recv_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
-                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                   ucc_tl_ucp_task_t *task)
-
-ucc_mc_memcpy(PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer,
-         args->src.info.count * ucc_dt_size(args->src.info.datatype),
-         args->dst.info.mem_type, args->src.info.mem_type);
-
-ucc_status_t ucc_mc_memcpy(void *dst, const void *src, size_t len,
-                           ucc_memory_type_t dst_mem,
-                           ucc_memory_type_t src_mem);
-
-
-ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
-                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                   ucc_tl_ucp_task_t *task)
-*/
 
 ucc_status_t new_ucp_tl_self_copy_nb(void *dst, void *src, size_t len, ucc_memory_type_t dst_mem,ucc_memory_type_t src_mem, ucc_rank_t rank, ucc_tl_ucp_team_t *team, ucc_tl_ucp_task_t *task){
     ucc_status_t status;

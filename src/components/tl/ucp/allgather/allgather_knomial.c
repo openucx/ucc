@@ -176,7 +176,6 @@ out:
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
 {
-    //ucc_debug("****************************knomial*********************");
     ucc_tl_ucp_task_t          *task  = ucc_derived_of(coll_task,
                                                        ucc_tl_ucp_task_t);
     ucc_coll_args_t            *args  = &TASK_ARGS(task);
@@ -224,28 +223,6 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
                 return status;
             }
         }*/
-        /*
-        if (!UCC_IS_INPLACE(*args) && !USE_CUDA) {
-            status = new_ucp_tl_self_copy_nb(PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer,
-                                            args->src.info.count * ucc_dt_size(args->src.info.datatype),
-                                            args->dst.info.mem_type, args->src.info.mem_type,
-                                            rank, team, task);
-            if (ucc_unlikely(UCC_OK != status)) {
-                task->super.status = status;
-                return status;
-            }
-        } 
-        if (!UCC_IS_INPLACE(*args) && USE_CUDA){
-            status = ucc_mc_memcpy(PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer,
-                                        args->src.info.count * ucc_dt_size(args->src.info.datatype),
-                                        args->dst.info.mem_type, args->src.info.mem_type);
-            if (ucc_unlikely(UCC_OK != status)) {
-                task->super.status = status;
-                return status;
-            }
-                                        
-        }
-        */
         if (!UCC_IS_INPLACE(*args)){
             status = NEW_MEMCPY(USE_CUDA, PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer,
                             args->src.info.count * ucc_dt_size(args->src.info.datatype), args->dst.info.mem_type, args->src.info.mem_type,
@@ -309,6 +286,5 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_kn_radix_t     radix;
 
     radix = ucc_min(UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allgather_kn_radix, size);
-    //printf("\n ------- use_cuda allgather_knomial.c:311 = %u ----------\n", UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allgather_use_cuda);
     return ucc_tl_ucp_allgather_knomial_init_r(coll_args, team, task_h, radix);
 }
