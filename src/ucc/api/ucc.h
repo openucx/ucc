@@ -1873,8 +1873,6 @@ typedef struct ucc_coll_args {
         int64_t  stride;
         uint64_t size;
     } active_set;
-    uint32_t                        allgather_use_cuda; /*if set, allgather uses mc_cuda_copy in collectives
-                                                          otherwise, does loopback*/
 
   
 } ucc_coll_args_t;

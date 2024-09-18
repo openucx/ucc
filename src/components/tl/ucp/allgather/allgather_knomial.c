@@ -13,7 +13,7 @@
 #include "coll_patterns/sra_knomial.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
-
+#include "allgather.h"
 
 #define SAVE_STATE(_phase)                                                     \
     do {                                                                       \
@@ -32,26 +32,6 @@
  * As such allgather must keep to this ranking to be aligned with scatter.
  */
 
-
-/*--------------YAELIS FUNCTION---------------------*/
-ucc_status_t new_ucp_tl_self_copy_nb(void *dst, void *src, size_t len, ucc_memory_type_t dst_mem,ucc_memory_type_t src_mem, ucc_rank_t rank, ucc_tl_ucp_team_t *team, ucc_tl_ucp_task_t *task){
-    ucc_status_t status;
-    status = ucc_tl_ucp_send_nb(src, len, src_mem, rank, team, task);
-    // check here all occurances of returns (if this is ok)
-    if (ucc_unlikely(UCC_OK != status)) {
-                printf("\n knomial line 42 \n");
-                task->super.status = status;
-                return status;
-            }
-    status = ucc_tl_ucp_recv_nb(dst, len, dst_mem, rank, team, task);
-    if (ucc_unlikely(UCC_OK != status)) {
-                printf("\n knomial line 48 \n");
-                task->super.status = status;
-                return status;
-            }
-    return UCC_OK;
-}
-/*--------------YAELIS FUNCTION---------------------*/
 
 void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
 {
@@ -213,11 +193,6 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ptrdiff_t          offset;
     //ucc_ee_executor_t *exec; 
     
-    
-    /*
-    ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ^ this was an experiment 
-    */
 
     uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
 
@@ -249,8 +224,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
                 return status;
             }
         }*/
+        /*
         if (!UCC_IS_INPLACE(*args) && !USE_CUDA) {
-            printf("use loopback:) \n");
             status = new_ucp_tl_self_copy_nb(PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer,
                                             args->src.info.count * ucc_dt_size(args->src.info.datatype),
                                             args->dst.info.mem_type, args->src.info.mem_type,
@@ -261,7 +236,6 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
             }
         } 
         if (!UCC_IS_INPLACE(*args) && USE_CUDA){
-            printf("use memcpy:) \n");
             status = ucc_mc_memcpy(PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer,
                                         args->src.info.count * ucc_dt_size(args->src.info.datatype),
                                         args->dst.info.mem_type, args->src.info.mem_type);
@@ -271,6 +245,18 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
             }
                                         
         }
+        */
+        if (!UCC_IS_INPLACE(*args)){
+            status = NEW_MEMCPY(USE_CUDA, PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.buffer,
+                            args->src.info.count * ucc_dt_size(args->src.info.datatype), args->dst.info.mem_type, args->src.info.mem_type,
+                            rank, team, task);
+            if (ucc_unlikely(UCC_OK != status)) {
+                printf("error knomial line 254\n");
+                return status;
+            }
+        }
+        
+
         
         
 

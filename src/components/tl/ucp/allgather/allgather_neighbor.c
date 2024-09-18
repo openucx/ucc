@@ -149,10 +149,19 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_start(ucc_coll_task_t *coll_task)
                                      0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
+    uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
+    
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
+        /*
         status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
                                data_size, rmem, smem);
         if (ucc_unlikely(UCC_OK != status)) {
+            return status;
+        }
+        */
+        status = NEW_MEMCPY(USE_CUDA, PTR_OFFSET(rbuf, data_size * trank), sbuf, data_size, rmem, smem, trank, team, task);
+        if (ucc_unlikely(UCC_OK != status)) {
+            printf("error neighbor line 162\n");
             return status;
         }
     }
