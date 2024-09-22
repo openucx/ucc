@@ -10,13 +10,6 @@
  #include "tl_ucp_sendrecv.h"
 
 
-
-#define NEW_MEMCPY(use_cuda, dst, src, len, dst_mem_type, src_mem_type, rank, team, task) \
-    ((use_cuda) ? ucc_mc_memcpy(dst, src, len, dst_mem_type, src_mem_type) : \
-                  new_ucp_tl_self_copy_nb(dst, src, len, dst_mem_type, src_mem_type, rank, team, task))
-
-
-
 enum {
     UCC_TL_UCP_ALLGATHER_ALG_KNOMIAL,
     UCC_TL_UCP_ALLGATHER_ALG_RING,

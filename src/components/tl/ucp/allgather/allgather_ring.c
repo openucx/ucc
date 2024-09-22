@@ -96,22 +96,20 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
 
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        block = task->allgather_ring.get_send_block(&task->subset, trank, tsize,
-                                                    0);
-        /*
-        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * block),
+        block = task->allgather_ring.get_send_block(&task->subset, trank, tsize, 0);
+        if(USE_CUDA){
+            status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * block),
                                sbuf, data_size, rmem, smem);
-        if (ucc_unlikely(UCC_OK != status)) {
-            return status;
-        }
-        */
-        status = NEW_MEMCPY(USE_CUDA, PTR_OFFSET(rbuf, data_size * block), sbuf, data_size, rmem, smem, trank, team, task);
-        if (ucc_unlikely(UCC_OK != status)) {
-            printf("error ring line 110\n");
-            return status;
+            if (ucc_unlikely(UCC_OK != status)) {
+                return status;
+            }
+        } else {
+            /* Loopback */
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb(sbuf, data_size, smem, trank, team, task),task, enqueue);
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, data_size * block), data_size, rmem, trank, team, task),task, enqueue);
         }
     }
-
+enqueue:
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 

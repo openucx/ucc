@@ -9,26 +9,6 @@
 
 #define ALLGATHER_MAX_PATTERN_SIZE (sizeof(UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR))
 
-
-ucc_status_t new_ucp_tl_self_copy_nb(void *dst, void *src, size_t len, ucc_memory_type_t dst_mem,ucc_memory_type_t src_mem, ucc_rank_t rank, ucc_tl_ucp_team_t *team, ucc_tl_ucp_task_t *task){
-    ucc_status_t status;
-    status = ucc_tl_ucp_send_nb(src, len, src_mem, rank, team, task);
-    // check here all occurances of returns (if this is ok)
-    if (ucc_unlikely(UCC_OK != status)) {
-                printf("\n allgather.c line 41 \n");
-                task->super.status = status;
-                return status;
-            }
-    status = ucc_tl_ucp_recv_nb(dst, len, dst_mem, rank, team, task);
-    if (ucc_unlikely(UCC_OK != status)) {
-                printf("\n allgather.c line 47 \n");
-                task->super.status = status;
-                return status;
-            }
-    return UCC_OK;
-}
-
-/*--------------YAELIS FUNCTION---------------------*/
 ucc_base_coll_alg_info_t
     ucc_tl_ucp_allgather_algs[UCC_TL_UCP_ALLGATHER_ALG_LAST + 1] = {
         [UCC_TL_UCP_ALLGATHER_ALG_KNOMIAL] =
