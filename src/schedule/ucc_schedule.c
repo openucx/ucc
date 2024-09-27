@@ -119,6 +119,10 @@ ucc_status_t ucc_coll_task_init(ucc_coll_task_t *task,
     task->post                 = ucc_dummy_post;
     task->finalize             = ucc_dummy_finalize;
     task->progress             = ucc_dummy_progress;
+
+    // Prevent asymmetric memory copy-out of garbage address at task complete
+    task->bargs.asymmetric_save_info.scratch = NULL;
+
     if (bargs) {
         memcpy(&task->bargs, bargs, sizeof(*bargs));
     }
