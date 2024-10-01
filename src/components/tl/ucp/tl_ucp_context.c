@@ -133,6 +133,85 @@ err_cfg_read:
     return ucc_status;
 }
 
+static int memcpy_device_start(void *dest, void *src, size_t size,
+                                void *completion, void *user_data) {
+
+        ucc_status_t status;
+        ucc_ee_executor_task_args_t eargs;
+        ucc_ee_executor_t *exec;
+        ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *) user_data;
+
+        status = ucc_coll_task_get_executor(&task->super, &exec);
+        if (ucc_unlikely(status != UCC_OK)) {
+            return status;
+        }
+
+        eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+        eargs.copy.src  = src;
+        eargs.copy.dst  = dest;
+        eargs.copy.len  = size;
+        node_ucc_ee_executor_task_t *new_node;
+        new_node = ucc_mpool_get(&task->allgather_kn.etask_node_mpool);
+        if (ucc_unlikely(!new_node)) {
+            return UCC_ERR_NO_MEMORY;
+        }
+        status = ucc_ee_executor_task_post(exec, &eargs,
+                                           &new_node->etask);
+        task->allgather_kn.etask_linked_list_head->etask->completion = completion;
+        
+        if (ucc_unlikely(status != UCC_OK)) {
+            task->super.status = status;
+            return status;
+        }
+        new_node->next = task->allgather_kn.etask_linked_list_head;
+        task->allgather_kn.etask_linked_list_head = new_node;
+
+        return 1;
+        
+    }
+
+static int memcpy_device(void *dest, void *src, size_t size, void *user_data){
+
+    ucc_status_t status;
+    ucc_ee_executor_task_args_t eargs;
+    ucc_ee_executor_t *exec;
+    ucc_ee_executor_task_t *etask;
+    ucc_tl_ucp_task_t *task = (ucc_tl_ucp_task_t *) user_data;
+
+    status = ucc_coll_task_get_executor(&task->super, &exec);
+    if (ucc_unlikely(status != UCC_OK)) {
+        return status;
+    }
+
+    eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+    eargs.copy.src  = src;
+    eargs.copy.dst  = dest;
+    eargs.copy.len  = size;
+
+    status = ucc_ee_executor_task_post(exec, &eargs, &etask);
+    if (ucc_unlikely(status < 0)) {                                                                   
+        return status;                                                            
+    }        
+    status = ucc_ee_executor_task_test(etask);
+    while (status>0) {
+        status = ucc_ee_executor_task_test(etask);
+        if (ucc_unlikely(status < 0)) {                                                                   
+            return status;                                                            
+        }                                                         
+    }                                                          
+    status = ucc_ee_executor_task_finalize(etask);
+    if (ucc_unlikely(status < 0)) {                                                                   
+        return status;                                                            
+    }                                 
+    return 1;
+}
+
+ucp_worker_mem_callbacks_t copy_callback = 
+{
+    .memcpy_device_start = memcpy_device_start,
+    .memcpy_device = memcpy_device
+};
+
 UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                     const ucc_base_context_params_t *params,
                     const ucc_base_config_t *config)
@@ -194,7 +273,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
               self);
 
     self->ucp_memory_types = context_attr.memory_types;
-    worker_params.field_mask = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
+    worker_params.field_mask = UCP_WORKER_PARAM_FIELD_THREAD_MODE | UCP_WORKER_PARAM_FIELD_CALLBACKS;
     switch (params->thread_mode) {
     case UCC_THREAD_SINGLE:
     case UCC_THREAD_FUNNELED:
@@ -208,6 +287,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         ucc_assert(0);
         break;
     }
+
+    worker_params.callbacks = copy_callback;
 
     UCP_CHECK(ucp_worker_create(ucp_context, &worker_params, &ucp_worker),
               "failed to create ucp worker", err_worker_create, self);

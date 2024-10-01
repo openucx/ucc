@@ -58,6 +58,17 @@ void ucc_tl_ucp_team_default_score_str_free(
     }                                                                          \
 } while(0)
 
+#define MEM_MAP() do {                                                              \
+    status = ucs_status_to_ucc_status(ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh_list[count_mh++]));               \
+    if (UCC_OK != status) {                                                         \
+        return status;                                                                     \
+    }                                                                               \
+    if (count_mh == size_of_list){                                                  \
+        size_of_list *= 2;                                                          \
+        mh_list = (ucp_mem_h *)realloc(mh_list, size_of_list * sizeof(ucp_mem_h));  \
+    }                                                                               \
+} while(0)
+
 #define EXEC_TASK_WAIT(_etask, ...)                                            \
     do {                                                                       \
         if (_etask != NULL) {                                                  \
@@ -179,7 +190,12 @@ typedef struct ucc_tl_ucp_task {
             ucc_knomial_pattern_t   p;
             void                   *sbuf;
             ucc_ee_executor_task_t *etask;
+            node_ucc_ee_executor_task_t *etask_linked_list_head;
             ucc_rank_t              recv_dist;
+            ucc_mpool_t             etask_node_mpool;
+            ucp_mem_h              *mh_list;
+            int                     count_mh;
+            int                     max_mh;
         } allgather_kn;
         struct {
             /*
@@ -403,6 +419,48 @@ static inline ucc_status_t ucc_tl_ucp_test(ucc_tl_ucp_task_t *task)
     return UCC_INPROGRESS;
 }
 
+static inline ucc_status_t ucc_tl_ucp_test_with_etasks(ucc_tl_ucp_task_t *task)
+{
+    int polls = 0;
+    ucc_status_t status;
+    ucc_status_t status_2;
+    node_ucc_ee_executor_task_t *current_node;
+    node_ucc_ee_executor_task_t *prev_node;
+
+    if (UCC_TL_UCP_TASK_P2P_COMPLETE(task) && task->allgather_kn.etask_linked_list_head==NULL) {
+        return UCC_OK;
+    }
+    while (polls++ < task->n_polls) {
+        current_node = task->allgather_kn.etask_linked_list_head;
+        prev_node = NULL;
+        while(current_node != NULL) {
+            status = ucc_ee_executor_task_test(current_node->etask);                            
+            if (status > 0) {          
+                ucp_memcpy_device_complete(current_node->etask->completion, ucc_status_to_ucs_status(status));                                            
+                status_2 = ucc_ee_executor_task_finalize(current_node->etask);
+                ucc_mpool_put(current_node);
+                if (ucc_unlikely(status_2 < 0)){
+                    tl_error(UCC_TASK_LIB(task), "task finalize didnt work");                             
+                    return status_2;
+                }                             
+                if (prev_node != NULL){
+                    prev_node->next = current_node->next; //to remove from list
+                } 
+                else{ //i'm on first node
+                    task->allgather_kn.etask_linked_list_head = current_node->next;
+                }
+            }
+            prev_node = current_node;
+            current_node = current_node->next; //to iterate to next node                                                              
+        }                                                                               
+        if (UCC_TL_UCP_TASK_P2P_COMPLETE(task) && task->allgather_kn.etask_linked_list_head == NULL) {
+            return UCC_OK;
+        }
+        ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);
+    }
+    return UCC_INPROGRESS;
+}
+
 #define UCC_TL_UCP_TASK_RECV_COMPLETE(_task)                                   \
     (((_task)->tagged.recv_posted == (_task)->tagged.recv_completed))
 
@@ -418,6 +476,47 @@ static inline ucc_status_t ucc_tl_ucp_test_recv(ucc_tl_ucp_task_t *task)
     }
     while (polls++ < task->n_polls) {
         if (UCC_TL_UCP_TASK_RECV_COMPLETE(task)) {
+            return UCC_OK;
+        }
+        ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);
+    }
+    return UCC_INPROGRESS;
+}
+
+static inline ucc_status_t ucc_tl_ucp_test_recv_with_etasks(ucc_tl_ucp_task_t *task) {
+    int polls = 0;
+    ucc_status_t status;
+    ucc_status_t status_2;
+    node_ucc_ee_executor_task_t *current_node;
+    node_ucc_ee_executor_task_t *prev_node;
+
+    if (UCC_TL_UCP_TASK_RECV_COMPLETE(task) && task->allgather_kn.etask_linked_list_head==NULL) {
+        return UCC_OK;
+    }
+    while (polls++ < task->n_polls) {
+        current_node = task->allgather_kn.etask_linked_list_head;
+        prev_node = NULL;
+        while(current_node != NULL) {
+            status = ucc_ee_executor_task_test(current_node->etask);                            
+            if (status > 0) {          
+                ucp_memcpy_device_complete(current_node->etask->completion, ucc_status_to_ucs_status(status));
+                status_2 = ucc_ee_executor_task_finalize(current_node->etask);
+                ucc_mpool_put(current_node);
+                if (ucc_unlikely(status_2 < 0)){
+                    tl_error(UCC_TASK_LIB(task), "task finalize didnt work");                             
+                    return status_2;
+                }                                 
+                if (prev_node != NULL){
+                    prev_node->next = current_node->next; //to remove from list
+                } 
+                else{ //i'm on first node
+                    task->allgather_kn.etask_linked_list_head = current_node->next;
+                }
+            }                                                                      
+            prev_node = current_node;
+            current_node = current_node->next; //to iterate to next node                                                              
+        }
+        if (UCC_TL_UCP_TASK_RECV_COMPLETE(task) && task->allgather_kn.etask_linked_list_head==NULL) {
             return UCC_OK;
         }
         ucp_worker_progress(UCC_TL_UCP_TASK_TEAM(task)->worker->ucp_worker);
