@@ -10,6 +10,7 @@ UCC is a collective communication operations API and library that is flexible, c
 - [Community](#community)
 - [Contributing](#contributing)
 - [License](#license)
+- [Publication](#publication)
 
 ## Design Goals
 * Highly scalable and performant collectives for HPC, AI/ML and I/O workloads
@@ -110,3 +111,35 @@ $ mpirun -np 2 --mca scoll_ucc_enable 1 --mca scoll_ucc_priority 100 ./my_opensh
 * CUDA
 * NCCL
 * RCCL
+* MLX5
+
+
+### Publication
+
+To cite UCC in a publication, please use the following BibTex entry:
+
+```
+@inproceedings{DBLP:conf/hoti/VenkataPLBALBDS24,
+  author       = {Manjunath Gorentla Venkata and
+                  Valentine Petrov and
+                  Sergey Lebedev and
+                  Devendar Bureddy and
+                  Ferrol Aderholdt and
+                  Joshua Ladd and
+                  Gil Bloch and
+                  Mike Dubman and
+                  Gilad Shainer},
+  title        = {Unified Collective Communication {(UCC):} An Unified Library for CPU,
+                  GPU, and {DPU} Collectives},
+  booktitle    = {{IEEE} Symposium on High-Performance Interconnects, {HOTI} 2024, Albuquerque,
+                  NM, USA, August 21-23, 2024},
+  pages        = {37--46},
+  publisher    = {{IEEE}},
+  year         = {2024},
+  url          = {https://doi.org/10.1109/HOTI63208.2024.00018},
+  doi          = {10.1109/HOTI63208.2024.00018},
+  timestamp    = {Thu, 19 Sep 2024 11:00:54 +0200},
+  biburl       = {https://dblp.org/rec/conf/hoti/VenkataPLBALBDS24.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
+```
