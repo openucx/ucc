@@ -47,7 +47,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_basic_context_t,
         self->super.tl_ctxs = NULL;
         return UCC_ERR_NOT_FOUND;
     }
-    cl_debug(cl_config->cl_lib, "initialized cl context: %p", self);
+    cl_debug(cl_config->cl_lib, "initialized :) cl context: %p", self);
     return UCC_OK;
 }
 

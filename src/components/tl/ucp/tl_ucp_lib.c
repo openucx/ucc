@@ -26,6 +26,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_lib_t, const ucc_base_lib_params_t *params,
     if (UCC_OK != status) {
         return status;
     }
+    //printf("\n ------- use_cuda tl_ucp_lib.c:29 = %u ----------\n", self->cfg.allgather_use_cuda);
 
     if (tl_ucp_config->kn_radix > 0) {
         self->cfg.barrier_kn_radix        = tl_ucp_config->kn_radix;

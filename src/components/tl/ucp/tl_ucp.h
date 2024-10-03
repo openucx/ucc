@@ -45,6 +45,7 @@ extern ucc_tl_ucp_iface_t ucc_tl_ucp;
 typedef struct ucc_tl_ucp_lib_config {
     ucc_tl_lib_config_t      super;
     uint32_t                 kn_radix;
+    uint32_t                 allgather_use_cuda;
     uint32_t                 fanin_kn_radix;
     uint32_t                 fanout_kn_radix;
     uint32_t                 barrier_kn_radix;
