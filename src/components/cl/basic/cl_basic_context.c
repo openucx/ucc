@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -73,14 +73,11 @@ ucc_cl_basic_get_context_attr(const ucc_base_context_t *context,
     ucc_status_t        status;
     int                 i;
 
-    if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
-        attr->attr.ctx_addr_len = 0;
-    }
+    ucc_base_ctx_attr_clear(attr);
 
     /* CL BASIC reports topo_required if any of the TL available
      * TL contexts needs it
      */
-    attr->topo_required = 0;
     for (i = 0; i < ctx->super.n_tl_ctxs; i++) {
         memset(&tl_attr, 0, sizeof(tl_attr));
         status = UCC_TL_CTX_IFACE(ctx->super.tl_ctxs[i])
