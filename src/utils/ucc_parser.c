@@ -594,6 +594,7 @@ ucc_status_t ucc_add_team_sections(void                *team_cfg,
     ucc_rank_t             sock_max  = ucc_topo_max_socket_size(team_topo);
     ucc_rank_t             nnodes    = ucc_topo_nnodes(team_topo);
     ucc_rank_t             team_size = team_topo->set.map.ep_num;
+    int                    found     = 0;
     khash_t(ucc_sec)      *sec_h;
     khiter_t               i, j;
     const char            *sec_name;
@@ -613,10 +614,10 @@ ucc_status_t ucc_add_team_sections(void                *team_cfg,
             }
             status = ucc_apply_file_cfg(team_cfg, tl_fields, env_prefix,
                                         component_prefix, sec_name);
-            return status;
+            found = 1;
         }
     }
-    return UCC_ERR_NOT_FOUND;
+    return found ? status : UCC_ERR_NOT_FOUND;
 }
 
 ucc_status_t ucc_config_parser_fill_opts(void *opts, ucs_config_global_list_entry_t *entry,
