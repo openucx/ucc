@@ -182,7 +182,9 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_prepare_bcast(void* buf, size_t siz
     req->am_root = (root == comm->rank);
     req->mr      = comm->pp_mr;
     req->rreg    = NULL;
-    req->proto   = (req->length < comm->max_eager) ? MCAST_PROTO_EAGER : MCAST_PROTO_ZCOPY;
+    /* cost of copy is too high in cuda buffers */
+    req->proto   = (req->length < comm->max_eager && !comm->cuda_mem_enabled) ?
+                            MCAST_PROTO_EAGER : MCAST_PROTO_ZCOPY;
 
     status = ucc_tl_mlx5_mcast_prepare_reliable(comm, req, req->root);
     if (ucc_unlikely(UCC_OK != status)) {
@@ -283,8 +285,8 @@ void ucc_tl_mlx5_mcast_collective_progress(ucc_coll_task_t *coll_task)
     }
 }
 
-ucc_status_t ucc_tl_mlx5_mcast_check_memory_type_cap(ucc_base_coll_args_t *coll_args,
-                                                     ucc_base_team_t *team)
+static inline ucc_status_t ucc_tl_mlx5_mcast_check_memory_type_cap(ucc_base_coll_args_t *coll_args,
+                                                                   ucc_base_team_t *team)
 {
     ucc_tl_mlx5_team_t            *mlx5_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
     ucc_tl_mlx5_mcast_coll_comm_t *comm      = mlx5_team->mcast->mcast_comm;
@@ -298,6 +300,33 @@ ucc_status_t ucc_tl_mlx5_mcast_check_memory_type_cap(ucc_base_coll_args_t *coll_
     }
         
     return UCC_ERR_NO_RESOURCE;
+}
+
+ucc_status_t ucc_tl_mlx5_mcast_check_support(ucc_base_coll_args_t *coll_args,
+                                             ucc_base_team_t *team)
+{
+    ucc_coll_args_t *args     = &coll_args->args;
+    int              buf_size = ucc_dt_size(args->src.info.datatype) * args->src.info.count;
+
+    if (UCC_COLL_ARGS_ACTIVE_SET(args)) {
+        tl_trace(team->context->lib, "mcast bcast not supported for active sets");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (UCC_OK != ucc_tl_mlx5_mcast_check_memory_type_cap(coll_args, team)) {
+        tl_trace(team->context->lib, "mcast bcast not compatible with this memory type");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (args->src.info.mem_type == UCC_MEMORY_TYPE_CUDA &&
+            buf_size > 4000) {
+        /* for large messages (more than one mtu) we need zero-copy design which
+         * is not implemented yet */
+        tl_trace(team->context->lib, "mcast cuda bcast not supported for large messages");
+        return UCC_ERR_NOT_IMPLEMENTED;
+    }
+
+    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_mlx5_mcast_bcast_init(ucc_tl_mlx5_task_t *task)
