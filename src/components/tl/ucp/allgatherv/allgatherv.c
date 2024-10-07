@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -15,6 +15,10 @@ ucc_base_coll_alg_info_t
             {.id   = UCC_TL_UCP_ALLGATHERV_ALG_RING,
              .name = "ring",
              .desc = "O(N) Ring"},
+        [UCC_TL_UCP_ALLGATHERV_ALG_KNOMIAL] =
+            {.id   = UCC_TL_UCP_ALLGATHERV_ALG_KNOMIAL,
+             .name = "knomial",
+             .desc = "recursive k-ing with arbitrary radix"},
         [UCC_TL_UCP_ALLGATHERV_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 

@@ -212,6 +212,20 @@ ucc_kn_agx_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
 }
 
 static inline void
+ucc_kn_agv_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
+                        ucc_count_t *counts, int is64,
+                        ucc_knomial_pattern_t *p)
+{
+    ucc_knomial_pattern_init(size, rank, radix, p);
+    p->type         = KN_PATTERN_ALLGATHERV;
+    p->counts       = counts;
+    p->is64         = is64;
+    p->block_size   = p->radix_pow * radix;
+    p->block_offset = ucc_knomial_pattern_loop_rank(p, rank) / p->block_size *
+                      p->block_size;
+}
+
+static inline void
 ucc_kn_ag_pattern_peer_seg(ucc_rank_t peer, ucc_knomial_pattern_t *p,
                            size_t *seg_count, ptrdiff_t *seg_offset)
 {
@@ -236,8 +250,12 @@ ucc_kn_ag_pattern_peer_seg(ucc_rank_t peer, ucc_knomial_pattern_t *p,
                      *seg_offset;
         return;
     case KN_PATTERN_ALLGATHERV:
-        /* not implemented */
-        ucc_assert(0);
+        ucc_kn_seg_desc_compute(p, &s, peer);
+        *seg_offset = ucc_buffer_vector_block_offset(p->counts, p->is64,
+                                                     s.seg_start);
+        *seg_count = ucc_buffer_vector_block_offset(p->counts, p->is64,
+                                                    s.seg_end) - *seg_offset;
+        return;
     default:
         ucc_assert(0);
     }
