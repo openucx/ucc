@@ -97,7 +97,8 @@ enum tuning_mask {
     UCC_TUNING_DESC_FIELD_MODEL     = UCC_BIT(1),
     UCC_TUNING_DESC_FIELD_TEAM_SIZE = UCC_BIT(2),
     UCC_TUNING_DESC_FIELD_PPN       = UCC_BIT(3),
-    UCC_TUNING_DESC_FIELD_NNODES    = UCC_BIT(4)
+    UCC_TUNING_DESC_FIELD_NNODES    = UCC_BIT(4),
+    UCC_TUNING_DESC_FIELD_SOCK      = UCC_BIT(5)
 };
 
 typedef struct ucc_section_desc {
@@ -108,6 +109,8 @@ typedef struct ucc_section_desc {
     ucc_rank_t       max_team_size;
     ucc_rank_t       min_ppn;
     ucc_rank_t       max_ppn;
+    ucc_rank_t       min_sock;
+    ucc_rank_t       max_sock;
     ucc_rank_t       min_nnodes;
     ucc_rank_t       max_nnodes;
 } ucc_section_desc_t;
