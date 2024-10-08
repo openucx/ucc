@@ -2,6 +2,8 @@
 # Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
+if HAVE_UCP_MEMH_PACK
+
 sources =                           \
 	cl_doca_urom.h                  \
 	cl_doca_urom.c                  \
@@ -22,3 +24,5 @@ libucc_cl_doca_urom_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(DOCA_
 libucc_cl_doca_urom_la_LIBADD   = $(DOCA_UROM_LIBADD) $(UCC_TOP_BUILDDIR)/src/libucc.la
 
 include $(top_srcdir)/config/module.am
+
+endif
