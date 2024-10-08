@@ -33,6 +33,11 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_r_window_recycle(ucc_tl_mlx5_mcast_
             return status;
         }
 
+        if (comm->cuda_mem_enabled) {
+            while (req->exec_task != NULL) {
+                EXEC_TASK_TEST("failed to complete the nb memcpy", req->exec_task, comm->lib);
+            }
+        }
         comm->bcast_comm.n_mcast_reliable++;
 
         for (; comm->bcast_comm.last_acked < comm->psn; comm->bcast_comm.last_acked++) {
@@ -267,7 +272,10 @@ ucc_status_t ucc_tl_mlx5_mcast_bcast_start(ucc_coll_task_t *coll_task)
         return ucc_task_complete(coll_task);
     }
 
-    coll_task->status = status;
+    ucc_assert(task->coll_mcast.req_handle != NULL);
+
+    coll_task->status                       = status;
+    task->coll_mcast.req_handle->coll_task = coll_task;
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(mlx5_team)->pq, &task->super);
 }
@@ -329,10 +337,34 @@ ucc_status_t ucc_tl_mlx5_mcast_check_support(ucc_base_coll_args_t *coll_args,
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_mcast_bcast_init(ucc_tl_mlx5_task_t *task)
+ucc_status_t ucc_tl_mlx5_mcast_bcast_init(ucc_tl_mlx5_task_t *task,
+                                          ucc_base_coll_args_t *coll_args)
 {
+    ucc_coll_args_t *args = &coll_args->args;
+
     task->super.post     = ucc_tl_mlx5_mcast_bcast_start;
     task->super.progress = ucc_tl_mlx5_mcast_collective_progress;
+    if (args->src.info.mem_type == UCC_MEMORY_TYPE_CUDA) {
+        task->super.flags    = UCC_COLL_TASK_FLAG_EXECUTOR;
+    }
 
     return UCC_OK;
 }
+
+ucc_status_t ucc_tl_mlx5_mcast_schedule_start(ucc_coll_task_t *coll_task)
+{
+    return ucc_schedule_start(coll_task);
+}
+
+ucc_status_t ucc_tl_mlx5_mcast_schedule_finalize(ucc_coll_task_t *coll_task)
+{
+    ucc_status_t            status;
+    ucc_tl_mlx5_schedule_t *schedule =
+                ucc_derived_of(coll_task, ucc_tl_mlx5_schedule_t);
+
+    status = ucc_schedule_finalize(coll_task);
+
+    ucc_tl_mlx5_put_schedule(schedule);
+    return status;
+}
+

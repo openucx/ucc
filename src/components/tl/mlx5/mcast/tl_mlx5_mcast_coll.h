@@ -10,10 +10,15 @@
 #include "tl_mlx5_mcast.h"
 #include "tl_mlx5_coll.h"
 
-ucc_status_t ucc_tl_mlx5_mcast_bcast_init(ucc_tl_mlx5_task_t *task);
+ucc_status_t ucc_tl_mlx5_mcast_bcast_init(ucc_tl_mlx5_task_t *task,
+                                          ucc_base_coll_args_t *coll_args);
 
 ucc_status_t ucc_tl_mlx5_mcast_test(ucc_tl_mlx5_mcast_coll_req_t* _req);
 
 ucc_status_t ucc_tl_mlx5_mcast_check_support(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t *team);
+
+ucc_status_t ucc_tl_mlx5_mcast_schedule_start(ucc_coll_task_t *coll_task);
+
+ucc_status_t ucc_tl_mlx5_mcast_schedule_finalize(ucc_coll_task_t *coll_task);
 #endif
