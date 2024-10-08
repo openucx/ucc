@@ -2,6 +2,7 @@
 # Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
+if HAVE_UCP_MEMH_PACK
 if HAVE_DOCA_UROM
 
 sources =                \
@@ -19,4 +20,5 @@ libucc_doca_urom_plugin_la_CFLAGS   = $(BASE_CFLAGS)
 libucc_doca_urom_plugin_la_LDFLAGS  = -version-info $(SOVERSION) --as-needed $(UCX_LDFLAGS) $(DOCA_UROM_LDFLAGS)
 libucc_doca_urom_plugin_la_LIBADD   = $(UCX_LIBADD) $(DOCA_UROM_LIBADD) $(UCC_TOP_BUILDDIR)/src/libucc.la
 
+endif
 endif

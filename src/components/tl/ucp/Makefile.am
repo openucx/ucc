@@ -43,9 +43,11 @@ allreduce =                           \
 	allreduce/allreduce.c                      \
 	allreduce/allreduce_knomial.c              \
 	allreduce/allreduce_sra_knomial.c          \
+if HAVE_UCP_MEMH_PACK
 	allreduce/allreduce_sliding_window.h       \
 	allreduce/allreduce_sliding_window.c       \
 	allreduce/allreduce_sliding_window_setup.c \
+endif
 	allreduce/allreduce_dbt.c
 
 barrier =                     \
@@ -114,8 +116,10 @@ sources =                 \
 	tl_ucp_ep.c           \
 	tl_ucp_coll.c         \
 	tl_ucp_service_coll.c \
+if HAVE_UCP_MEMH_PACK
 	tl_ucp_dpu_offload.h  \
 	tl_ucp_dpu_offload.c  \
+endif
 	$(allgather)          \
 	$(allgatherv)         \
 	$(alltoall)           \

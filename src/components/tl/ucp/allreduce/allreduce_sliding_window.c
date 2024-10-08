@@ -4,6 +4,8 @@
  * See file LICENSE for terms.
  */
 
+#ifdef HAVE_UCP_MEMH_PACK
+
 #include "allreduce.h"
 #include "allreduce_sliding_window.h"
 #include "../allgather/allgather.h"
@@ -655,3 +657,5 @@ out:
     ucc_tl_ucp_put_schedule(schedule);
     return status;
 }
+
+#endif
