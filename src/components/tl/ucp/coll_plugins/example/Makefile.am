@@ -1,9 +1,13 @@
 #
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 if TLCP_UCP_EXAMPLE_ENABLED
-sources = example.c
+
+sources =           \
+	example_ctx.h   \
+	example_ctx.c   \
+	example_coll.c
 
 module_LTLIBRARIES = libucc_tlcp_ucp_example.la
 libucc_tlcp_ucp_example_la_SOURCES  = $(sources)

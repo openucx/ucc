@@ -69,4 +69,33 @@ static inline ucc_status_t ucc_dt_reduce(void *src1, void *src2, void *dst,
                                  alpha, exec, task);
 }
 
+static inline ucc_status_t
+ucc_dt_reduce_vec(void **srcs, void *dst, size_t n_vectors,
+                  size_t count, ucc_datatype_t dt,
+                  ucc_coll_args_t *args, uint16_t flags, double alpha,
+                  ucc_ee_executor_t *exec, ucc_ee_executor_task_t **task)
+{
+    ucc_ee_executor_task_args_t eargs;
+
+    if (count == 0) {
+        *task = NULL;
+        return UCC_OK;
+    }
+    if (!UCC_DT_IS_PREDEFINED(dt)) {
+        return UCC_ERR_NOT_IMPLEMENTED;
+    } else {
+        eargs.flags           = flags;
+        eargs.task_type       = UCC_EE_EXECUTOR_TASK_REDUCE;
+        eargs.reduce.alpha    = alpha;
+        eargs.reduce.count    = count;
+        eargs.reduce.dst      = dst;
+        eargs.reduce.dt       = dt;
+        eargs.reduce.n_srcs   = n_vectors;
+        eargs.reduce.op       = args->op;
+        eargs.reduce.srcs_ext = srcs;
+
+        return ucc_ee_executor_task_post(exec, &eargs, task);
+    }
+}
+
 #endif
