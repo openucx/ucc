@@ -79,7 +79,7 @@ for HOST in $(cat "$HOSTFILE"); do
     ssh "$HOST" "docker run \
         ${DOCKER_RUN_ARGS} \
         ${DOCKER_IMAGE_NAME} \
-        bash -c 'sudo /usr/sbin/sshd -p ${DOCKER_SSH_PORT}; sleep infinity'"
+        sudo /usr/sbin/sshd -D -p ${DOCKER_SSH_PORT}"
     echo "INFO: start docker container on $HOST ... DONE"
 
     sleep 5
