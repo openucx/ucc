@@ -21,8 +21,8 @@ ucc_pt_coll_allgatherv::ucc_pt_coll_allgatherv(ucc_datatype_t dt,
     has_bw_        = false;
     root_shift_    = 0;
 
-    coll_args.mask               |= UCC_COLL_ARGS_FIELD_FLAGS;
-    coll_args.flags              |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+    coll_args.mask                = UCC_COLL_ARGS_FIELD_FLAGS;
+    coll_args.flags               = UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
     coll_args.coll_type           = UCC_COLL_TYPE_ALLGATHERV;
     coll_args.src.info.datatype   = dt;
     coll_args.src.info.mem_type   = mt;
@@ -30,8 +30,8 @@ ucc_pt_coll_allgatherv::ucc_pt_coll_allgatherv(ucc_datatype_t dt,
     coll_args.dst.info_v.mem_type = mt;
 
     if (is_inplace) {
-        coll_args.mask  = UCC_COLL_ARGS_FIELD_FLAGS;
-        coll_args.flags = UCC_COLL_ARGS_FLAG_IN_PLACE;
+        coll_args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        coll_args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 
     if (is_persistent) {
