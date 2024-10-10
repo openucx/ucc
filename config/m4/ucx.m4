@@ -8,6 +8,7 @@ UCX_MIN_REQUIRED_MAJOR=1
 UCX_MIN_REQUIRED_MINOR=11
 AS_IF([test "x$ucx_checked" != "xyes"],[
     ucx_happy="no"
+    ucp_memh_happy="no"
 
     AC_ARG_WITH([ucx],
             [AS_HELP_STRING([--with-ucx=(DIR)], [Enable the use of UCX (default is guess).])],
@@ -66,6 +67,14 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
             [],[-luct -lucm -lucp])
         ],
         [])
+
+        AC_CHECK_LIB([ucp], [ucp_memh_pack],
+        [
+            ucp_memh_happy="yes"
+        ],
+        [
+            ucp_memh_happy="no"
+        ],[-luct -lucm -lucp])
 
         AS_IF([test "x$ucx_happy" = "xyes"],
         [
@@ -160,5 +169,6 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
 
     ucx_checked=yes
     AM_CONDITIONAL([HAVE_UCX], [test "x$ucx_happy" != xno])
+    AM_CONDITIONAL([HAVE_UCP_MEMH_PACK], [test "x$ucp_memh_happy" != xno])
 ])
 ])
