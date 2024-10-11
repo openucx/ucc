@@ -64,6 +64,12 @@ typedef struct ucc_tl_service_coll {
 typedef struct ucc_tl_coll_plugin_iface {
     ucc_component_iface_t          super;
     ucs_config_global_list_entry_t config;
+    ucc_status_t                   (*context_create)(const ucc_base_context_params_t *params,
+                                                     const ucc_base_config_t *config,
+                                                     ucc_base_context_t *tl_ctx,
+                                                     void **plugin_ctx);
+    ucc_status_t                   (*context_destroy)(ucc_base_context_t *ctx,
+                                                      void *plugin_ctx);
     ucc_get_coll_scores_fn_t       get_scores;
     uint32_t                       id;
 } ucc_tl_coll_plugin_iface_t;
@@ -88,8 +94,9 @@ typedef struct ucc_tl_lib {
 UCC_CLASS_DECLARE(ucc_tl_lib_t, ucc_tl_iface_t *, const ucc_tl_lib_config_t *);
 
 typedef struct ucc_tl_context {
-    ucc_base_context_t super;
-    int                ref_count;
+    ucc_base_context_t  super;
+    int                 ref_count;
+    void               *coll_plugin_context;
 } ucc_tl_context_t;
 UCC_CLASS_DECLARE(ucc_tl_context_t, const ucc_tl_context_config_t *,
                   ucc_context_t *);
