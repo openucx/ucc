@@ -34,6 +34,8 @@ const char *ucc_status_string(ucc_status_t status)
         return "Not found";
     case UCC_ERR_TIMED_OUT:
         return "Timeout expired";
+    case UCC_ERR_MEM_MAP_FAILURE:
+        return "Failed to memory map address";
     default:
         snprintf(error_str, sizeof(error_str) - 1, "Unknown error %d", status);
         return error_str;
