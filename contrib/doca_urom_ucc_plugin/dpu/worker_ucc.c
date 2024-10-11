@@ -1217,7 +1217,7 @@ static void *urom_worker_ucc_ctx_progress_thread(void *arg)
         if (UCC_OK != ucc_context_config_modify(
                         ctx_config,
                         "tl/ucp", "TUNE",
-                        "allreduce:0-inf:@sliding_window")) {
+                        "allreduce:0-inf:@sliding_window#allgather:0-inf:@linear_xgvmi#alltoall:0-inf:@linear_xgvmi")) {
             DOCA_LOG_ERR("Failed to modify TL_UCP_TUNE UCC lib config");
             status = DOCA_ERROR_DRIVER;
             goto cfg_release;
@@ -1956,8 +1956,7 @@ urom_worker_ucc_coll_init(struct urom_worker_ucc *ucc_worker,
         /* Cannot support callbacks to host data.. just won't work */
         coll_args->mask = coll_args->mask & (~UCC_COLL_ARGS_FIELD_CB);
 
-    if (coll_args->coll_type == UCC_COLL_TYPE_ALLTOALL ||
-        coll_args->coll_type == UCC_COLL_TYPE_ALLTOALLV) {
+    if (coll_args->coll_type == UCC_COLL_TYPE_ALLTOALLV) {
         if (!ucc_cmd->coll_cmd.use_xgvmi) {
             size_mod = urom_worker_get_dt_size(coll_args->src.info.datatype);
             size = coll_args->src.info.count * size_mod;
@@ -2013,6 +2012,7 @@ urom_worker_ucc_coll_init(struct urom_worker_ucc *ucc_worker,
             }
         }
     } else if (coll_args->coll_type == UCC_COLL_TYPE_ALLREDUCE ||
+               coll_args->coll_type == UCC_COLL_TYPE_ALLTOALL  ||
                coll_args->coll_type == UCC_COLL_TYPE_ALLGATHER) {
         if (!ucc_cmd->coll_cmd.use_xgvmi) {
             DOCA_LOG_ERR("Failed to initialize UCC collective:"
