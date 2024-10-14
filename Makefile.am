@@ -28,6 +28,9 @@ include $(srcdir)/docs/doxygen/doxygen.am
 
 .PHONY: docs docs-clean
 
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = ucc.pc
+
 DOCLIST = docs/doxygen/doxygen-doc/ucc.tag
 
 FORMAT = pdf
