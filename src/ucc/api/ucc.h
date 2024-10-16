@@ -2220,5 +2220,85 @@ ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
  */
 ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ee_event);
 
+typedef void * ucc_mem_map_mem_h;
+
+/**
+ * @ingroup UCC_DATATYPE
+ */
+enum ucc_mem_map_flags {
+    UCC_MEM_MAP_EXPORT = 0, /*!< Indicate @ref ucc_mem_map() should export
+                                 memory handles from TLs used by context */
+    UCC_MEM_MAP_IMPORT = 1 /*!< Indicate @ref ucc_mem_map() should import
+                                memory handles from user memory handle */
+};
+
+/**
+ * @ingroup UCC_CONTEXT
+ * @brief Routine registers or maps memory for use in future collectives.
+ *
+ * This routine maps memory a user-specified memory segment with a @ref
+ * ucc_context_t. The segment is considered "mapped" with the context until
+ * either the user calls @ref ucc_mem_unmap or @ref ucc_context_destroy(). A
+ * handle to the mapped memory is provided in memh. If the flag
+ * UCC_MEM_MAP_EXPORT is used, the memory will be mapped and memory
+ * handles from TLs will be generated and stored in the memh. If the flag
+ * UCC_MEM_MAP_IMPORT is used, the user must provide a valid memh, otherwise
+ * behavior is undefined.
+ *
+ * @params [in] context     Context mapped memory is associated with
+ * @params [in] flags       flags dictating the behavior of the routine
+ * @params [in] params      parameters indicating the address and length of
+ *                          memory to map
+ * @params [inout] *memh    Handle for the registered memory
+ * 
+ * @return Error code as defined by @ref ucc_status_t.
+ */
+
+ucc_status_t ucc_mem_map(ucc_context_t      context,
+                         ucc_mem_map_flags  flags,
+                         ucc_mem_map_params params,
+                         ucc_mem_map_mem_h *memh);
+
+/**
+ * @ingroup UCC_CONTEXT
+ * @brief Routine exchanges mapped memory with peers to enable future
+ * collectives.
+ *
+ * This routine performs an nonblocking exchange of mapped memory with peers
+ * within the same context on which it is mapped. This is a collective routine
+ * and must be called by all members of the ucc_context on which the memory
+ * is mapped.
+ *
+ * @params [in] *memh       Handle of the registered memory
+ * 
+ * @return Error code as defined by @ref ucc_status_t.
+ */
+ucc_status_t ucc_mem_exchange_post(ucc_mem_map_mem_h *memh);
+
+/**
+ * @ingroup UCC_CONTEXT
+ * @brief Routine tests for the completion of a memory exchange on a context.
+ *
+ * This routine tests for the completion of a memory exchange on a context.
+ *
+ * @params [in] *memh       Handle of the registered memory
+ * 
+ * @return Error code as defined by @ref ucc_status_t.
+ */
+ucc_status_t ucc_mem_exchange_test(ucc_mem_map_mem_h *memh);
+
+/**
+ * @ingroup UCC_CONTEXT
+ * @brief Routine unmaps memory from a context
+ *
+ * This routine unmaps memory and all resources associated with the memory 
+ * from a context. The memh object is freed and cannot be reused.
+ *
+ * @params [in] *memh       Handle of the registered memory
+ * 
+ * @return Error code as defined by @ref ucc_status_t.
+ */
+ucc_status_t ucc_mem_unmap(ucc_mem_map_mem_h *memh);
+
 END_C_DECLS
 #endif
