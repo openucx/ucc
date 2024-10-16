@@ -151,7 +151,7 @@ ucc_tl_ucp_allreduce_sliding_window_rdma_task_post(
     ucc_tl_ucp_task_t          *task  = ucc_derived_of(coll_task,
                                                        ucc_tl_ucp_task_t);
     ucc_tl_ucp_team_t          *team  = TASK_TEAM(task);
-    
+
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -325,9 +325,9 @@ void ucc_tl_ucp_allreduce_sliding_window_rdma_progress(ucc_coll_task_t *coll_tas
     ucc_tl_ucp_allreduce_sw_buf_t      *accbuf          = &pipe->accbuf;
     ucp_request_param_t                 req_param       = {0};
     int                                 i               = 0;
-    ucc_coll_task_t                    *allgather_task  = 
+    ucc_coll_task_t                    *allgather_task  =
         task->allreduce_sliding_window.allgather_task;
-    ucc_ee_executor_task_t            **reduce_task     = 
+    ucc_ee_executor_task_t            **reduce_task     =
         &task->allreduce_sliding_window.reduce_task;
     ucc_rank_t                          put_window_size =
         UCC_TL_UCP_TEAM_LIB(tl_team)->
@@ -490,7 +490,7 @@ void ucc_tl_ucp_allreduce_sliding_window_rdma_progress(ucc_coll_task_t *coll_tas
 
                 ucp_worker_fence(tl_ctx->worker.ucp_worker);
                 ucc_tl_ucp_get_ep(tl_team, dst_rank, &ep);
-                task->allreduce_sliding_window.put_requests[put_idx] = 
+                task->allreduce_sliding_window.put_requests[put_idx] =
                     ucp_put_nbx(
                         ep, src_addr,
                         data_size, (uint64_t)dst_addr,
