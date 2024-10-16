@@ -38,9 +38,6 @@ static inline int ucc_tl_ucp_allgather_alg_from_str(const char *str)
     return i;
 }
 
-/*--------------YAELIS FUNCTION---------------------*/
-ucc_status_t new_ucp_tl_self_copy_nb(void *dst, void *src, size_t len, ucc_memory_type_t dst_mem,ucc_memory_type_t src_mem, ucc_rank_t rank, ucc_tl_ucp_team_t *team, ucc_tl_ucp_task_t *task);
-/*--------------YAELIS FUNCTION---------------------*/
 
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task);
 
