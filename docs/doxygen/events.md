@@ -3,7 +3,7 @@
 The execution engine is an execution context that supports event-driven network
 execution on the CUDA streams, CPU threads, and DPU threads. It is intended to
 interact with execution threads that are asynchronous (offloaded collective
-execution) which can be implemented on GPUs, DPUs, or remote CPUs.  
+execution) which can be implemented on GPUs, DPUs, or remote CPUs.
 
 UCC supports triggering collective operations by library-generated and
 user-generated events. The library events are generated on posting or completion
@@ -69,7 +69,5 @@ are related to the compute event.
 (5) On completion of the collective operation, the library posts
 UCC\_EVENT\_COLLECTIVE\_COMPLETE event to the completion event queue.
 
-\image latex ucc\_events.pdf "UCC Execution Engine and Events"
-\image html ucc\_events.png "UCC Execution Engine and Events"
-
-
+\image latex "ucc_events.pdf" "UCC Execution Engine and Events"
+\image html "ucc_events.png" "UCC Execution Engine and Events"

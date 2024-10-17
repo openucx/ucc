@@ -169,5 +169,5 @@ and it is returned to the user, when the collective is completed.
 
 \b The table below lists the necessary fields that user must initialize
 depending on the collective operation type.
-\image latex ucc\_coll\_args\_table1.pdf width=\textwidth
-\image latex ucc\_coll\_args\_table2.pdf width=\textwidth
+\image latex "ucc_coll_args_table1.pdf" width=\textwidth
+\image latex "ucc_coll_args_table2.pdf" width=\textwidth
