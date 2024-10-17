@@ -253,6 +253,7 @@ AC_CONFIG_FILES([
                  cmake/ucc-config-version.cmake
                  cmake/ucc-config.cmake
                  cmake/ucc-targets.cmake
+                 ucc.pc
                  ])
 AC_OUTPUT
 
