@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -44,7 +44,8 @@ UCC_CLASS_DEFINE(ucc_tl_self_context_t, ucc_tl_context_t);
 
 ucc_status_t
 ucc_tl_self_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                             ucc_base_ctx_attr_t      *attr /* NOLINT */)
+                             ucc_base_ctx_attr_t      *attr)
 {
+    ucc_base_ctx_attr_clear(attr);
     return UCC_OK;
 }

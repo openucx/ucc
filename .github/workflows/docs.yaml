@@ -17,8 +17,8 @@ jobs:
         ./configure --with-docs-only
         make docs
     - name: Upload docs
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: Docs
+        name: docs
         path: ${{ github.workspace }}/docs/doxygen-doc/ucc.pdf
         retention-days: 7

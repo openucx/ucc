@@ -14,6 +14,7 @@
 #include "utils/ucc_coll_utils.h"
 #include "components/base/ucc_base_iface.h"
 #include "components/ec/ucc_ec.h"
+#include "components/mc/ucc_mc.h"
 
 #define MAX_LISTENERS 4
 
@@ -185,6 +186,16 @@ static inline ucc_status_t ucc_task_complete(ucc_coll_task_t *task)
        with schedules are not released during a callback (if set). */
 
     if (ucc_likely(status == UCC_OK)) {
+        ucc_buffer_info_asymmetric_memtype_t *save = &task->bargs.asymmetric_save_info;
+        if (save->scratch &&
+            task->bargs.args.coll_type != UCC_COLL_TYPE_SCATTERV &&
+            task->bargs.args.coll_type != UCC_COLL_TYPE_SCATTER) {
+            status = ucc_copy_asymmetric_buffer(task);
+            if (status != UCC_OK) {
+                ucc_error("failure copying out asymmetric buffer: %s",
+                          ucc_status_string(status));
+            }
+        }
         status = ucc_event_manager_notify(task, UCC_EVENT_COMPLETED);
     } else {
         /* error in task status */

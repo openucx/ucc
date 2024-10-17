@@ -553,9 +553,6 @@ ucc_status_t
 ucc_cl_doca_urom_get_context_attr(const ucc_base_context_t *context,
                                   ucc_base_ctx_attr_t      *attr)
 {
-    if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
-        attr->attr.ctx_addr_len = 0;
-    }
-
+    ucc_base_ctx_attr_clear(attr);
     return UCC_OK;
 }

@@ -371,6 +371,7 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet(ucc_tl_mlx5_mcast_coll_comm_t *com
 {
     ucc_status_t status = UCC_OK;
     void *dest;
+    ucc_memory_type_t mem_type;
     ucc_assert(pp->psn >= req->start_psn &&
            pp->psn < req->start_psn + req->num_packets);
 
@@ -379,7 +380,19 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet(ucc_tl_mlx5_mcast_coll_comm_t *com
 
     if (pp->length > 0 ) {
         dest = req->ptr + PSN_TO_RECV_OFFSET(pp->psn, req, comm);
-        memcpy(dest, (void*) pp->buf, pp->length);
+        
+        if (comm->cuda_mem_enabled) {
+            mem_type = UCC_MEMORY_TYPE_CUDA;
+        } else {
+            mem_type = UCC_MEMORY_TYPE_HOST;
+        }
+
+        status = ucc_mc_memcpy(dest, (void*) pp->buf, pp->length,
+                               mem_type, mem_type);
+        if (ucc_unlikely(status != UCC_OK)) {
+            tl_error(comm->lib, "failed to copy buffer");
+            return status;
+        }
     }
 
     comm->r_window[pp->psn & (comm->wsize-1)] = pp;

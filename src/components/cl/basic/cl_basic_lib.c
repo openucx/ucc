@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -29,8 +29,8 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_lib_t)
 UCC_CLASS_DEFINE(ucc_cl_basic_lib_t, ucc_cl_lib_t);
 
 static inline ucc_status_t check_tl_lib_attr(const ucc_base_lib_t *lib,
-                                             ucc_tl_iface_t *      tl_iface,
-                                             ucc_cl_lib_attr_t *   attr)
+                                             ucc_tl_iface_t       *tl_iface,
+                                             ucc_cl_lib_attr_t    *attr)
 {
     ucc_tl_lib_attr_t tl_attr;
     ucc_status_t      status;
