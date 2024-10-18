@@ -30,6 +30,7 @@ static ucc_status_t ucc_tl_mlx5_mcast_reliability_send_completion(ucc_tl_mlx5_mc
         comm->nack_requests--;
         status = comm->params.p2p_iface.recv_nb(&comm->p2p_pkt[pkt_id],
                                                 sizeof(struct packet), comm->p2p_pkt[pkt_id].from,
+                                                UCC_MEMORY_TYPE_HOST,
                                                 comm->p2p_ctx, GET_COMPL_OBJ(comm,
                                                 ucc_tl_mlx5_mcast_recv_completion, pkt_id, NULL));
         if (status <  0) {
@@ -48,6 +49,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_resend_packet_reliable(ucc_tl_mlx5_
     uint32_t          psn = comm->p2p_pkt[p2p_pkt_id].psn;
     struct pp_packet *pp  = comm->r_window[psn % comm->wsize];
     ucc_status_t      status;
+    ucc_memory_type_t mem_type;
 
     ucc_assert(pp->psn == psn);
     ucc_assert(comm->p2p_pkt[p2p_pkt_id].type == MCAST_P2P_NEED_NACK_SEND);
@@ -58,8 +60,14 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_resend_packet_reliable(ucc_tl_mlx5_
                          comm->comm_id, comm->rank,
                          comm->p2p_pkt[p2p_pkt_id].from, psn, pp->context, comm->nack_requests);
 
+    if (comm->cuda_mem_enabled) {
+        mem_type = UCC_MEMORY_TYPE_CUDA;
+    } else {
+        mem_type = UCC_MEMORY_TYPE_HOST;
+    }
+
     status = comm->params.p2p_iface.send_nb((void*) (pp->context ? pp->context : pp->buf),
-                                            pp->length, comm->p2p_pkt[p2p_pkt_id].from,
+                                            pp->length, comm->p2p_pkt[p2p_pkt_id].from, mem_type,
                                             comm->p2p_ctx, GET_COMPL_OBJ(comm,
                                             ucc_tl_mlx5_mcast_reliability_send_completion, NULL, p2p_pkt_id));
     if (status <  0) {
@@ -138,11 +146,25 @@ static ucc_status_t ucc_tl_mlx5_mcast_recv_data_completion(ucc_tl_mlx5_mcast_p2p
     struct pp_packet               *pp    = (struct pp_packet *)obj->data[1];
     ucc_tl_mlx5_mcast_coll_req_t   *req   = (ucc_tl_mlx5_mcast_coll_req_t *)obj->data[2];
     void                           *dest;
+    ucc_memory_type_t               mem_type;
 
     tl_trace(comm->lib, "[comm %d, rank %d] Recved data psn %d", comm->comm_id, comm->rank, pp->psn);
 
     dest = req->ptr + PSN_TO_RECV_OFFSET(pp->psn, req, comm);
-    memcpy(dest, (void*) pp->buf, pp->length);
+
+    if (comm->cuda_mem_enabled) {
+        mem_type = UCC_MEMORY_TYPE_CUDA;
+    } else {
+        mem_type = UCC_MEMORY_TYPE_HOST;
+    }
+
+    status = ucc_mc_memcpy(dest, (void*) pp->buf, pp->length,
+                           mem_type, mem_type);
+    if (ucc_unlikely(status != UCC_OK)) {
+        tl_error(comm->lib, "failed to copy buffer");
+        return status;
+    }
+
     req->to_recv--;
     comm->r_window[pp->psn % comm->wsize] = pp;
     
@@ -165,6 +187,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable_send_NACK(ucc_tl_mlx5_mcas
     struct pp_packet *pp;
     ucc_rank_t        parent;
     struct packet    *p;
+    ucc_memory_type_t mem_type;
 
     p          = ucc_calloc(1, sizeof(struct packet));
     p->type    = MCAST_P2P_NACK;
@@ -176,7 +199,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable_send_NACK(ucc_tl_mlx5_mcas
 
     comm->nacks_counter++;
 
-    status = comm->params.p2p_iface.send_nb(p, sizeof(struct packet), parent,
+    status = comm->params.p2p_iface.send_nb(p, sizeof(struct packet), parent, UCC_MEMORY_TYPE_HOST,
                                             comm->p2p_ctx, GET_COMPL_OBJ(comm,
                                             ucc_tl_mlx5_mcast_reliability_send_completion, p, UINT_MAX));
     if (status <  0) {
@@ -193,8 +216,14 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reliable_send_NACK(ucc_tl_mlx5_mcas
 
     comm->recv_drop_packet_in_progress = true;
 
+    if (comm->cuda_mem_enabled) {
+        mem_type = UCC_MEMORY_TYPE_CUDA;
+    } else {
+        mem_type = UCC_MEMORY_TYPE_HOST;
+    }
+
     status = comm->params.p2p_iface.recv_nb((void*) pp->buf,
-                                            pp->length, parent,
+                                            pp->length, parent, mem_type,
                                             comm->p2p_ctx, GET_COMPL_OBJ(comm,
                                             ucc_tl_mlx5_mcast_recv_data_completion, pp, req));
     if (status <  0) {
@@ -225,7 +254,7 @@ ucc_status_t ucc_tl_mlx5_mcast_reliable_send(ucc_tl_mlx5_mcast_coll_comm_t *comm
                  comm->rank, parent, comm->parent_n, comm->psn);
 
         status = comm->params.p2p_iface.send_nb(&comm->p2p_spkt[i],
-                                                sizeof(struct packet), parent,
+                                                sizeof(struct packet), parent, UCC_MEMORY_TYPE_HOST,
                                                 comm->p2p_ctx, GET_COMPL_OBJ(comm,
                                                 ucc_tl_mlx5_mcast_send_completion, i, NULL));
         if (status <  0) {
@@ -325,7 +354,7 @@ ucc_status_t ucc_tl_mlx5_mcast_prepare_reliable(ucc_tl_mlx5_mcast_coll_comm_t *c
                              comm->rank, child, comm->child_n, comm->psn);
 
                     status = comm->params.p2p_iface.recv_nb(&comm->p2p_pkt[comm->child_n - 1],
-                                                            sizeof(struct packet), child,
+                                                            sizeof(struct packet), child, UCC_MEMORY_TYPE_HOST,
                                                             comm->p2p_ctx, GET_COMPL_OBJ(comm,
                                                             ucc_tl_mlx5_mcast_recv_completion, comm->child_n - 1, req));
                     if (status <  0) {
@@ -369,8 +398,8 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet(ucc_tl_mlx5_mcast_coll_comm_t *com
                                               ucc_tl_mlx5_mcast_coll_req_t *req,
                                               struct pp_packet* pp)
 {
-    ucc_status_t status = UCC_OK;
-    void *dest;
+    ucc_status_t      status = UCC_OK;
+    void             *dest;
     ucc_memory_type_t mem_type;
     ucc_assert(pp->psn >= req->start_psn &&
            pp->psn < req->start_psn + req->num_packets);
