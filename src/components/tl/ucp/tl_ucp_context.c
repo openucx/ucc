@@ -169,9 +169,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
                             UCP_PARAM_FIELD_NAME;
     ucp_params.features =
         UCP_FEATURE_TAG | UCP_FEATURE_AM | UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
-    if (lib->cfg.use_xgvmi) {
-        ucp_params.features |= UCP_FEATURE_EXPORTED_MEMH;
-    }
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
     ucp_params.name            = "UCC_UCP_CONTEXT";
 
@@ -370,8 +367,8 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
     }
     ucc_free(ctx->remote_info);
     ucc_free(ctx->rkeys);
-    ctx->remote_info         = NULL;
-    ctx->rkeys               = NULL;
+    ctx->remote_info = NULL;
+    ctx->rkeys       = NULL;
 
     return UCC_OK;
 }
@@ -499,27 +496,16 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
     }
 
     for (i = 0; i < nsegs; i++) {
-        if (lib->cfg.use_xgvmi == 0 ||
-            (lib->cfg.use_xgvmi == 1 && map.segments[i].resource == NULL)) {
-            mmap_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
-                                     UCP_MEM_MAP_PARAM_FIELD_LENGTH;
-            mmap_params.address = map.segments[i].address;
-            mmap_params.length  = map.segments[i].len;
-        } else {
-            mmap_params.field_mask =
-                UCP_MEM_MAP_PARAM_FIELD_EXPORTED_MEMH_BUFFER;
-            mmap_params.exported_memh_buffer = map.segments[i].resource;
-        }
+        mmap_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+                                 UCP_MEM_MAP_PARAM_FIELD_LENGTH;
+        mmap_params.address = map.segments[i].address;
+        mmap_params.length  = map.segments[i].len;
+
         status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
         if (UCS_OK != status) {
             tl_error(lib, "ucp_mem_map failed with error code: %d", status);
             ucc_status = ucs_status_to_ucc_status(status);
             goto fail_mem_map;
-        }
-        if (lib->cfg.use_xgvmi && map.segments[i].resource != NULL) {
-            ctx->remote_info[i].packed_memh = map.segments[i].resource;
-        } else {
-            ctx->remote_info[i].packed_memh = NULL;
         }
 
         ctx->remote_info[i].mem_h = (void *)mh;

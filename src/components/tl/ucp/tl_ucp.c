@@ -206,11 +206,6 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, use_reordering),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"USE_XGVMI", "n",
-     "Use XGVMI for onesided collectives",
-     ucc_offsetof(ucc_tl_ucp_lib_config_t, use_xgvmi),
-     UCC_CONFIG_TYPE_BOOL},
-
     {NULL}};
 
 static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {

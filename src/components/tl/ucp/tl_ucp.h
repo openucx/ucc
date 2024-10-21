@@ -83,7 +83,6 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t                 alltoallv_hybrid_pairwise_num_posts;
     ucc_ternary_auto_value_t use_topo;
     int                      use_reordering;
-    int                      use_xgvmi;
 } ucc_tl_ucp_lib_config_t;
 
 typedef struct ucc_tl_ucp_context_config {
@@ -110,7 +109,6 @@ typedef struct ucc_tl_ucp_remote_info {
     void * va_base;
     size_t len;
     void * mem_h;
-    void * packed_memh;
     void * packed_key;
     size_t packed_key_len;
 } ucc_tl_ucp_remote_info_t;

@@ -197,26 +197,16 @@ ucc_status_t ucc_tl_ucp_memmap_segment(ucc_tl_ucp_task_t *task,
     ucp_mem_h             mh;
 
     /* map the memory */
-    if (map->resource != NULL) {
-        mmap_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_EXPORTED_MEMH_BUFFER;
-        mmap_params.exported_memh_buffer               = map->resource;
-        tl_ctx->dynamic_remote_info[segid].packed_memh = map->resource;
-    } else {
-        mmap_params.field_mask =
-            UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
-        mmap_params.address                            = map->address;
-        mmap_params.length                             = map->len;
-        tl_ctx->dynamic_remote_info[segid].packed_memh = NULL;
-    }
-    /* map exported memory handle */
+    mmap_params.field_mask =
+        UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
+    mmap_params.address                            = map->address;
+    mmap_params.length                             = map->len;
+
     ucs_status = ucp_mem_map(tl_ctx->worker.ucp_context, &mmap_params, &mh);
-    if (ucs_status == UCS_ERR_UNREACHABLE) {
-        tl_error(tl_ctx->super.super.lib, "exported memh is unsupported");
-        return UCC_ERR_MEM_MAP_FAILURE;
-    } else if (ucs_status < UCS_OK) {
+    if (ucs_status < UCS_OK) {
         tl_error(tl_ctx->super.super.lib,
                  "ucp_mem_map failed with error code: %d", ucs_status);
-        return UCC_ERR_MEM_MAP_FAILURE;
+        return ucs_status_to_ucc_status(ucs_status);
     }
     /* generate rkeys / packed keys */
     tl_ctx->dynamic_remote_info[segid].va_base = map->address;
@@ -241,7 +231,6 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
     ucc_tl_ucp_team_t    *tl_team    = UCC_TL_UCP_TASK_TEAM(task);
     ucc_tl_ucp_context_t *ctx        = UCC_TL_UCP_TEAM_CTX(tl_team);
     int                   i          = 0;
-    ucc_mem_map_t        *maps       = coll_args->mem_map.segments;
     ucc_mem_map_t        *seg_maps   = NULL;
     size_t                n_segments = 3;
     uint64_t              need_map   = UCC_TL_UCP_DYN_SEG_UPDATE_SRC |
@@ -290,18 +279,17 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
             seg_maps[index].address = coll_args->src.info.buffer;
             seg_maps[index].len = (coll_args->src.info.count) *
                           ucc_dt_size(coll_args->src.info.datatype);
-            seg_maps[index++].resource = NULL;
+            ++index;
         }
         if (need_map & UCC_TL_UCP_DYN_SEG_UPDATE_DST) {
             seg_maps[index].address = coll_args->dst.info.buffer;
             seg_maps[index].len = (coll_args->dst.info.count) *
                           ucc_dt_size(coll_args->dst.info.datatype);
-            seg_maps[index++].resource = NULL;
+            ++index;
         }
         if (need_map & UCC_TL_UCP_DYN_SEG_UPDATE_GLOBAL) {
             seg_maps[index].address = coll_args->global_work_buffer;
             seg_maps[index].len = (ONESIDED_SYNC_SIZE + ONESIDED_REDUCE_SIZE) * sizeof(long);
-            seg_maps[index++].resource = NULL;
         }
     }
 
@@ -316,14 +304,6 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_init(ucc_coll_args_t   *coll_args,
         /* map memory and fill in local segment information */
         for (i = 0; i < n_segments; i++) {
             status = ucc_tl_ucp_memmap_segment(task, &seg_maps[i], i);
-            if (status != UCC_OK) {
-                tl_error(UCC_TASK_LIB(task), "failed to memory map a segment");
-                goto failed_memory_map;
-            }
-            ++ctx->n_dynrinfo_segs;
-        }
-        for (i = 0; i < coll_args->mem_map.n_segments; i++) {
-            status = ucc_tl_ucp_memmap_segment(task, &maps[i], i + n_segments);
             if (status != UCC_OK) {
                 tl_error(UCC_TASK_LIB(task), "failed to memory map a segment");
                 goto failed_memory_map;
@@ -346,9 +326,6 @@ failed_memory_map:
         }
         if (ctx->dynamic_remote_info[i].packed_key) {
             ucp_rkey_buffer_release(ctx->dynamic_remote_info[i].packed_key);
-        }
-        if (ctx->dynamic_remote_info[i].packed_memh) {
-            ucp_rkey_buffer_release(ctx->dynamic_remote_info[i].packed_memh);
         }
     }
     ctx->n_dynrinfo_segs = 0;
@@ -491,10 +468,6 @@ ucc_status_t ucc_tl_ucp_coll_dynamic_segment_finalize(ucc_tl_ucp_task_t *task)
             }
             if (ctx->dynamic_remote_info[i].packed_key) {
                 ucp_rkey_buffer_release(ctx->dynamic_remote_info[i].packed_key);
-            }
-            if (ctx->dynamic_remote_info[i].packed_memh) {
-                ucp_rkey_buffer_release(
-                    ctx->dynamic_remote_info[i].packed_memh);
             }
         }
         /* destroy rkeys */
