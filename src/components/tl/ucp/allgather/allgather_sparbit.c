@@ -131,14 +131,7 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_start(ucc_coll_task_t *coll_task)
     task->allgather_sparbit.data_expected = 1;
 
     uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
-    if(trank == 0){
-        printf("\nin sparbit using: ");
-        if(USE_CUDA){
-            printf("cuda\n");
-        } else {
-            printf("loop\n");
-        }
-    }
+
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
         if(USE_CUDA){
             status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
