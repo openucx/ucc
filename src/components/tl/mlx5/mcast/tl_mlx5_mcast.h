@@ -31,7 +31,7 @@
 #define DEF_SL            0
 #define DEF_SRC_PATH_BITS 0
 #define GRH_LENGTH        40
-#define DROP_THRESHOLD    1000
+#define DROP_THRESHOLD    10000
 #define MAX_COMM_POW2     32
 
 /* Allgather RDMA-based reliability designs */
@@ -41,6 +41,8 @@
 #define ONE_SIDED_ASYNCHRONOUS_PROTO        2
 #define ONE_SIDED_SLOTS_COUNT               2                /* number of memory slots during async design */
 #define ONE_SIDED_SLOTS_INFO_SIZE           sizeof(uint32_t) /* size of metadata prepended to each slots in bytes */
+
+#define CUDA_MEM_MCAST_BCAST_MAX_MSG 4000
 
 enum {
     MCAST_PROTO_EAGER,     /* Internal staging buffers */
@@ -75,12 +77,12 @@ typedef struct ucc_tl_mlx5_mcast_p2p_completion_obj {
 typedef int (*ucc_tl_mlx5_mcast_p2p_wait_cb_fn_t)(void *wait_arg);
 
 typedef ucc_status_t (*ucc_tl_mlx5_mcast_p2p_send_nb_fn_t)(void* src, size_t size,
-                                                           ucc_rank_t rank, void *context,
+                                                           ucc_rank_t rank, ucc_memory_type_t mem_type, void *context,
                                                            ucc_tl_mlx5_mcast_p2p_completion_obj_t *compl_obj);
 
 
 typedef ucc_status_t (*ucc_tl_mlx5_mcast_p2p_recv_nb_fn_t)(void* src, size_t size,
-                                                           ucc_rank_t rank, void *context,
+                                                           ucc_rank_t rank, ucc_memory_type_t mem_type, void *context,
                                                            ucc_tl_mlx5_mcast_p2p_completion_obj_t *compl_obj);
 
 typedef struct ucc_tl_mlx5_mcast_p2p_interface {
