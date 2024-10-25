@@ -4,7 +4,7 @@
  * See file LICENSE for terms.
  */
 
-#include "bcast/bcast.h"
+#include "bcast.h"
 
 enum {
     STAGE_SYNC,
