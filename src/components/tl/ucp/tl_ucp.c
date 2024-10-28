@@ -328,7 +328,7 @@ UCC_TL_UCP_PROFILE_FUNC_VOID(ucc_tl_ucp_pre_register_mem, (team, addr, length,
         return;
     }
 
-    /*mem_attr.field_mask   = UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
+    mem_attr.field_mask   = UCC_MEM_ATTR_FIELD_BASE_ADDRESS |
                             UCC_MEM_ATTR_FIELD_ALLOC_LENGTH;
     mem_attr.alloc_length = length;
     status = ucc_mc_get_mem_attr(addr, &mem_attr);
@@ -338,7 +338,7 @@ UCC_TL_UCP_PROFILE_FUNC_VOID(ucc_tl_ucp_pre_register_mem, (team, addr, length,
     } else {
         tl_warn(UCC_TL_TEAM_LIB(team), "failed to query base addr and len");
     }
-*/
+
     status = ucc_tl_ucp_populate_rcache(base_address, alloc_length,
                                         ucc_memtype_to_ucs[mem_type],
                                         UCC_TL_UCP_TEAM_CTX(team));
