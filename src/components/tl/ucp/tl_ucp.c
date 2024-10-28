@@ -321,7 +321,7 @@ UCC_TL_UCP_PROFILE_FUNC_VOID(ucc_tl_ucp_pre_register_mem, (team, addr, length,
 {
     void *base_address  = addr;
     size_t alloc_length = length;
-    //ucc_mem_attr_t mem_attr;
+    ucc_mem_attr_t mem_attr;
     ucc_status_t status;
 
     if ((addr == NULL) || (length == 0)) {
