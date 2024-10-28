@@ -161,11 +161,10 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_start(ucc_coll_task_t *coll_task)
             }
         } else {
             /* Loopback */
-            UCPCHECK_GOTO(ucc_tl_ucp_send_nb(sbuf, data_size, smem, trank, team, task),task, tmp);
-            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, data_size * trank), data_size, rmem, trank, team, task),task, tmp);
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb(sbuf, data_size, smem, trank, team, task),task, out2);
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, data_size * trank), data_size, rmem, trank, team, task),task, out2);
         }
     }
-tmp:
     if (trank % 2) {
         neighbor = (trank - 1 + tsize) % tsize;
     } else {
@@ -184,4 +183,6 @@ tmp:
         task, out);
 out:
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+out2:
+    return task->super.status; 
 }

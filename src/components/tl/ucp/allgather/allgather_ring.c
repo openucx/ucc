@@ -44,11 +44,20 @@ void ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
     int                step;
     void              *buf;
 
+
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return;
     }
+    printf("after prog\n");
+    
+    /*int k = 1;
+    int a = 1;
+    while(k){
+        a = 1;
+    }*/
     sendto   = ucc_ep_map_eval(task->subset.map, (trank + 1) % tsize);
     recvfrom = ucc_ep_map_eval(task->subset.map, (trank - 1 + tsize) % tsize);
+    printf("in prog,tsize = %d, trank = %d, sndto = %d, recv = %d\n", (int)tsize, (int)trank, (int)sendto, (int)recvfrom);
 
     while (task->tagged.send_posted < tsize - 1) {
         step = task->tagged.send_posted;
@@ -65,6 +74,7 @@ void ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
             ucc_tl_ucp_recv_nb(buf, data_size, rmem, recvfrom, team, task),
             task, out);
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+            printf("in while loop\ntask->tagged.send_posted = %d\n", (int)task->tagged.send_posted);
             return;
         }
     }
@@ -105,12 +115,13 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
             }
         } else {
             /* Loopback */
-            UCPCHECK_GOTO(ucc_tl_ucp_send_nb(sbuf, data_size, smem, trank, team, task),task, enqueue);
-            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, data_size * block), data_size, rmem, trank, team, task),task, enqueue);
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb(sbuf, data_size, smem, trank, team, task),task, out);
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, data_size * block), data_size, rmem, trank, team, task),task, out);
         }
     }
-enqueue:
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+out:
+    return task->super.status;
 }
 
 ucc_status_t ucc_tl_ucp_allgather_ring_init_common(ucc_tl_ucp_task_t *task)

@@ -145,6 +145,7 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_start(ucc_coll_task_t *coll_task)
             UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, data_size * trank), data_size, rmem, trank, team, task),task, out);
         }
     }
-out:
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+out:
+    return task->super.status;
 }

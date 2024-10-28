@@ -237,9 +237,9 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
             } else {
                 /* Loopback */
                 UCPCHECK_GOTO(ucc_tl_ucp_send_nb(args->src.info.buffer, args->src.info.count * ucc_dt_size(args->src.info.datatype),
-                                args->src.info.mem_type, rank, team, task),task, enqueue);
+                                args->src.info.mem_type, rank, team, task),task, out);
                 UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.count * ucc_dt_size(args->src.info.datatype),
-                                args->dst.info.mem_type, rank, team, task),task, enqueue);
+                                args->dst.info.mem_type, rank, team, task),task, out);
             }
         }
       
@@ -254,9 +254,10 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
             ucc_knomial_pattern_loop_rank(p, rank),
             p->radix, 0);
     }
-enqueue:
     task->allgather_kn.sbuf = PTR_OFFSET(args->dst.info.buffer, offset);
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+out:
+    return task->super.status;
 }
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
@@ -266,8 +267,9 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task;
     ucc_sbgp_t        *sbgp;
-
     task = ucc_tl_ucp_init_task(coll_args, team);
+    //ucc_coll_args_t   *args = &coll_args->args;
+
     if (tl_team->cfg.use_reordering &&
         coll_args->args.coll_type == UCC_COLL_TYPE_ALLREDUCE) {
         sbgp = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_FULL_HOST_ORDERED);
@@ -279,6 +281,13 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     task->super.post           = ucc_tl_ucp_allgather_knomial_start;
     task->super.progress       = ucc_tl_ucp_allgather_knomial_progress;
     *task_h                    = &task->super;
+    /*if(!UCC_IS_INPLACE(*args)){
+        printf("registering inplace %p size: %ld\n", args->src.info.buffer, (int)args->src.info.count * ucc_dt_size(args->src.info.datatype));
+        ucc_tl_ucp_pre_register_mem(tl_team, args->src.info.buffer, args->src.info.count * ucc_dt_size(args->src.info.datatype), args->src.info.mem_type);
+    }
+    printf("registering dst %p size: %ld\n", args->dst.info.buffer, (int)args->dst.info.count * ucc_dt_size(args->dst.info.datatype));
+    ucc_tl_ucp_pre_register_mem(tl_team, args->dst.info.buffer, args->dst.info.count * ucc_dt_size(args->dst.info.datatype), args->dst.info.mem_type);
+    */
     return UCC_OK;
 }
 
