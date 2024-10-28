@@ -227,11 +227,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                         task->super.status = UCC_OK;
                         break;
                     }
-                } else {
-                    return;
                 }
-            } else {
-                return;
             }
         default:
             break;
