@@ -178,8 +178,6 @@ static doca_error_t urom_worker_ucc_open(struct urom_worker_ctx *ctx)
     ucp_worker_params_t     worker_params;
     struct urom_worker_ucc *ucc_worker;
 
-    dpu_thread_set_affinity_specific_core(get_ncores() - 1);
-
     if (ctx == NULL) {
         return DOCA_ERROR_INVALID_VALUE;
     }
@@ -994,8 +992,6 @@ static void *urom_worker_ucc_progress_thread(void *arg)
     int                       front;
     int                       size;
     struct ucc_queue_element *qe;
-
-    dpu_thread_set_affinity(thread_id);
 
     while (ucc_component_enabled) {
         size = queue_size[thread_id];
