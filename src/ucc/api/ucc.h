@@ -2258,35 +2258,6 @@ ucc_status_t ucc_mem_map(ucc_context_t      context,
                          ucc_mem_map_flags  flags,
                          ucc_mem_map_params params,
                          ucc_mem_map_mem_h *memh);
-
-/**
- * @ingroup UCC_CONTEXT
- * @brief Routine exchanges mapped memory with peers to enable future
- * collectives.
- *
- * This routine performs an nonblocking exchange of mapped memory with peers
- * within the same context on which it is mapped. This is a collective routine
- * and must be called by all members of the ucc_context on which the memory
- * is mapped.
- *
- * @params [in] *memh       Handle of the registered memory
- * 
- * @return Error code as defined by @ref ucc_status_t.
- */
-ucc_status_t ucc_mem_exchange_post(ucc_mem_map_mem_h *memh);
-
-/**
- * @ingroup UCC_CONTEXT
- * @brief Routine tests for the completion of a memory exchange on a context.
- *
- * This routine tests for the completion of a memory exchange on a context.
- *
- * @params [in] *memh       Handle of the registered memory
- * 
- * @return Error code as defined by @ref ucc_status_t.
- */
-ucc_status_t ucc_mem_exchange_test(ucc_mem_map_mem_h *memh);
-
 /**
  * @ingroup UCC_CONTEXT
  * @brief Routine unmaps memory from a context
