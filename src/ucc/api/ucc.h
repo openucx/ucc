@@ -2251,11 +2251,11 @@ typedef enum {
  * stored in the memh. If the flag UCC_MEM_MAP_IMPORT is used, the user must
  * provide a valid memh, otherwise behavior is undefined.
  *
- * @params [in] context     Context mapped memory is associated with
- * @params [in] flags       flags dictating the behavior of the routine
- * @params [in] params      parameters indicating the address and length of
+ * @param [in] context     Context mapped memory is associated with
+ * @param [in] flags       flags dictating the behavior of the routine
+ * @param [in] params      parameters indicating the address and length of
  *                          memory to map
- * @params [inout] *memh    Handle for the registered memory
+ * @param [inout] *memh    Handle for the registered memory
  * 
  * @return Error code as defined by ucc_status_t.
  */
@@ -2269,7 +2269,7 @@ ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_flags_t flags,
  * This routine unmaps memory and all resources associated with the memory 
  * from a context. The memh object is freed and cannot be reused.
  *
- * @params [in] *memh       Handle of the registered memory
+ * @param [in] *memh       Handle of the registered memory
  * 
  * @return Error code as defined by ucc_status_t.
  */
