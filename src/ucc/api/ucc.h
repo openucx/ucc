@@ -2220,30 +2220,29 @@ ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
  */
 ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ee_event);
 
-typedef void * ucc_mem_map_mem_h;
+typedef void *ucc_mem_map_mem_h;
 
 /**
  * @ingroup UCC_DATATYPE
  */
-enum ucc_mem_map_flags {
+typedef enum {
     UCC_MEM_MAP_EXPORT = 0, /*!< Indicate @ref ucc_mem_map() should export
                                  memory handles from TLs used by context */
-    UCC_MEM_MAP_IMPORT = 1 /*!< Indicate @ref ucc_mem_map() should import
+    UCC_MEM_MAP_IMPORT = 1  /*!< Indicate @ref ucc_mem_map() should import
                                 memory handles from user memory handle */
-};
+} ucc_mem_map_flags_t;
 
 /**
  * @ingroup UCC_CONTEXT
  * @brief Routine registers or maps memory for use in future collectives.
  *
- * This routine maps memory a user-specified memory segment with a @ref
- * ucc_context_t. The segment is considered "mapped" with the context until
- * either the user calls @ref ucc_mem_unmap or @ref ucc_context_destroy(). A
- * handle to the mapped memory is provided in memh. If the flag
- * UCC_MEM_MAP_EXPORT is used, the memory will be mapped and memory
- * handles from TLs will be generated and stored in the memh. If the flag
- * UCC_MEM_MAP_IMPORT is used, the user must provide a valid memh, otherwise
- * behavior is undefined.
+ * This routine maps a user-specified memory segment with a ucc_context_h. The
+ * segment is considered "mapped" with the context until either the user calls
+ * @ref ucc_mem_unmap or @ref ucc_context_destroy(). A handle to the mapped
+ * memory is provided in memh. If the flag UCC_MEM_MAP_EXPORT is used, the
+ * memory will be mapped and memory handles from TLs will be generated and
+ * stored in the memh. If the flag UCC_MEM_MAP_IMPORT is used, the user must
+ * provide a valid memh, otherwise behavior is undefined.
  *
  * @params [in] context     Context mapped memory is associated with
  * @params [in] flags       flags dictating the behavior of the routine
@@ -2254,10 +2253,8 @@ enum ucc_mem_map_flags {
  * @return Error code as defined by @ref ucc_status_t.
  */
 
-ucc_status_t ucc_mem_map(ucc_context_t      context,
-                         ucc_mem_map_flags  flags,
-                         ucc_mem_map_params params,
-                         ucc_mem_map_mem_h *memh);
+ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_flags_t flags,
+                         ucc_mem_map_params_t params, ucc_mem_map_mem_h *memh);
 /**
  * @ingroup UCC_CONTEXT
  * @brief Routine unmaps memory from a context
