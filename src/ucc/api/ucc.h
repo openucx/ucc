@@ -2233,9 +2233,9 @@ typedef void *ucc_mem_map_mem_h;
  * @ingroup UCC_DATATYPE
  */
 typedef enum {
-    UCC_MEM_MAP_EXPORT = 0, /*!< Indicate @ref ucc_mem_map() should export
+    UCC_MEM_MAP_EXPORT = 0, /*!< Indicate ucc_mem_map() should export
                                  memory handles from TLs used by context */
-    UCC_MEM_MAP_IMPORT = 1  /*!< Indicate @ref ucc_mem_map() should import
+    UCC_MEM_MAP_IMPORT = 1  /*!< Indicate ucc_mem_map() should import
                                 memory handles from user memory handle */
 } ucc_mem_map_flags_t;
 
@@ -2245,7 +2245,7 @@ typedef enum {
  *
  * This routine maps a user-specified memory segment with a ucc_context_h. The
  * segment is considered "mapped" with the context until either the user calls
- * @ref ucc_mem_unmap or @ref ucc_context_destroy(). A handle to the mapped
+ * ucc_mem_unmap or ucc_context_destroy(). A handle to the mapped
  * memory is provided in memh. If the flag UCC_MEM_MAP_EXPORT is used, the
  * memory will be mapped and memory handles from TLs will be generated and
  * stored in the memh. If the flag UCC_MEM_MAP_IMPORT is used, the user must
@@ -2257,7 +2257,7 @@ typedef enum {
  *                          memory to map
  * @params [inout] *memh    Handle for the registered memory
  * 
- * @return Error code as defined by @ref ucc_status_t.
+ * @return Error code as defined by ucc_status_t.
  */
 
 ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_flags_t flags,
@@ -2271,7 +2271,7 @@ ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_flags_t flags,
  *
  * @params [in] *memh       Handle of the registered memory
  * 
- * @return Error code as defined by @ref ucc_status_t.
+ * @return Error code as defined by ucc_status_t.
  */
 ucc_status_t ucc_mem_unmap(ucc_mem_map_mem_h *memh);
 
