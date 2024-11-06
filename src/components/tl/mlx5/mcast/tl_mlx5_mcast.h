@@ -17,6 +17,7 @@
 #include "components/tl/ucc_tl_log.h"
 #include "utils/ucc_rcache.h"
 #include "core/ucc_service_coll.h"
+#include "components/mc/ucc_mc.h"
 
 #define POLL_PACKED       16
 #define REL_DONE          ((void*)-1)
@@ -30,7 +31,7 @@
 #define DEF_SL            0
 #define DEF_SRC_PATH_BITS 0
 #define GRH_LENGTH        40
-#define DROP_THRESHOLD    1000
+#define DROP_THRESHOLD    10000
 #define MAX_COMM_POW2     32
 
 /* Allgather RDMA-based reliability designs */
@@ -40,6 +41,8 @@
 #define ONE_SIDED_ASYNCHRONOUS_PROTO        2
 #define ONE_SIDED_SLOTS_COUNT               2                /* number of memory slots during async design */
 #define ONE_SIDED_SLOTS_INFO_SIZE           sizeof(uint32_t) /* size of metadata prepended to each slots in bytes */
+
+#define CUDA_MEM_MCAST_BCAST_MAX_MSG 4000
 
 enum {
     MCAST_PROTO_EAGER,     /* Internal staging buffers */
@@ -74,12 +77,12 @@ typedef struct ucc_tl_mlx5_mcast_p2p_completion_obj {
 typedef int (*ucc_tl_mlx5_mcast_p2p_wait_cb_fn_t)(void *wait_arg);
 
 typedef ucc_status_t (*ucc_tl_mlx5_mcast_p2p_send_nb_fn_t)(void* src, size_t size,
-                                                           ucc_rank_t rank, void *context,
+                                                           ucc_rank_t rank, ucc_memory_type_t mem_type, void *context,
                                                            ucc_tl_mlx5_mcast_p2p_completion_obj_t *compl_obj);
 
 
 typedef ucc_status_t (*ucc_tl_mlx5_mcast_p2p_recv_nb_fn_t)(void* src, size_t size,
-                                                           ucc_rank_t rank, void *context,
+                                                           ucc_rank_t rank, ucc_memory_type_t mem_type, void *context,
                                                            ucc_tl_mlx5_mcast_p2p_completion_obj_t *compl_obj);
 
 typedef struct ucc_tl_mlx5_mcast_p2p_interface {
@@ -98,6 +101,7 @@ typedef struct mcast_coll_comm_init_spec {
     int                               scq_moderation;
     int                               wsize;
     int                               max_eager;
+    int                               cuda_mem_enabled;
     void                             *oob;
 } ucc_tl_mlx5_mcast_coll_comm_init_spec_t;
 
@@ -261,6 +265,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             pending_recv;
     struct ibv_mr                                  *pp_mr;
     char                                           *pp_buf;
+    ucc_mc_buffer_header_t                         *pp_buf_header;
     struct pp_packet                               *pp;
     uint32_t                                        psn;
     uint32_t                                        last_psn;
@@ -293,6 +298,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             n_prep_reliable;
     int                                             n_mcast_reliable;
     int                                             wsize;
+    int                                             cuda_mem_enabled;
     ucc_tl_mlx5_mcast_join_info_t                  *group_setup_info;
     ucc_service_coll_req_t                         *group_setup_info_req;
     ucc_tl_mlx5_mcast_service_coll_t                service_coll;

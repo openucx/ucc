@@ -35,6 +35,13 @@ static inline void ucc_rcache_set_default_params(ucs_rcache_params_t *rcache_par
 #define ucc_rcache_region_put         ucs_rcache_region_put
 #define ucc_rcache_region_invalidate  ucs_rcache_region_invalidate
 
+static inline void
+ucc_rcache_merge_cb_empty(void *context, ucs_rcache_t *rcache,
+                          void *arg, ucs_rcache_region_t *region)
+{
+    return;
+}
+
 /* Wrapper functions for status conversion */
 static inline ucc_status_t
 ucc_rcache_create(const ucc_rcache_params_t *params,
@@ -63,7 +70,7 @@ ucc_rcache_get(ucc_rcache_t *rcache, void *address, size_t length,
     ucs_status_t status;
 
 #ifdef UCS_HAVE_RCACHE_REGION_ALIGNMENT
-    status = ucs_rcache_get(rcache, address, length, ucc_get_page_size(),
+    status = ucs_rcache_get(rcache, address, length, UCS_PGT_ADDR_ALIGN,
                             PROT_READ | PROT_WRITE, arg, region_p);
 #else
     status = ucs_rcache_get(rcache, address, length,

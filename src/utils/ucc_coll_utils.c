@@ -52,7 +52,7 @@ ucc_memory_type_t ucc_mem_type_from_str(const char *str)
     return UCC_MEMORY_TYPE_LAST;
 }
 
-static inline int
+int
 ucc_coll_args_is_mem_symmetric(const ucc_coll_args_t *args,
                                ucc_rank_t rank)
 {
@@ -92,6 +92,180 @@ ucc_coll_args_is_mem_symmetric(const ucc_coll_args_t *args,
         break;
     }
     return 0;
+}
+
+
+/* If this is the root and the src/dst buffers are asymmetric, one buffer needs
+   to have a new allocation to make the mem types match. If that buffer was the
+   dst buffer, copy the result back into the old dst on task completion */
+ucc_status_t
+ucc_coll_args_init_asymmetric_buffer(ucc_coll_args_t *args,
+                                     ucc_team_h team,
+                                     ucc_buffer_info_asymmetric_memtype_t *save_info)
+{
+    ucc_status_t status = UCC_OK;
+
+    if (UCC_IS_INPLACE(*args)) {
+        return UCC_ERR_INVALID_PARAM;
+    }
+    switch (args->coll_type) {
+    case UCC_COLL_TYPE_REDUCE:
+    case UCC_COLL_TYPE_GATHER:
+    {
+        ucc_memory_type_t mem_type = args->src.info.mem_type;
+        if (args->coll_type == UCC_COLL_TYPE_SCATTERV) {
+            mem_type = args->src.info_v.mem_type;
+        }
+        memcpy(&save_info->old_asymmetric_buffer.info,
+               &args->dst.info, sizeof(ucc_coll_buffer_info_t));
+        status = ucc_mc_alloc(&save_info->scratch,
+                              ucc_dt_size(args->dst.info.datatype) *
+                                          args->dst.info.count,
+                                          mem_type);
+        if (ucc_unlikely(UCC_OK != status)) {
+            ucc_error("failed to allocate replacement "
+                      "memory for asymmetric buffer");
+            return status;
+        }
+        args->dst.info.buffer = save_info->scratch->addr;
+        args->dst.info.mem_type = mem_type;
+        return UCC_OK;
+    }
+    case UCC_COLL_TYPE_GATHERV:
+    {
+        memcpy(&save_info->old_asymmetric_buffer.info_v,
+               &args->dst.info_v, sizeof(ucc_coll_buffer_info_v_t));
+        status = ucc_mc_alloc(&save_info->scratch,
+                                ucc_coll_args_get_v_buffer_size(args,
+                                args->dst.info_v.counts,
+                                args->dst.info_v.displacements,
+                                team->size),
+                                args->src.info.mem_type);
+        if (ucc_unlikely(UCC_OK != status)) {
+            ucc_error("failed to allocate replacement "
+                      "memory for asymmetric buffer");
+            return status;
+        }
+        args->dst.info_v.buffer   = save_info->scratch->addr;
+        args->dst.info_v.mem_type = args->src.info.mem_type;
+        return UCC_OK;
+    }
+    case UCC_COLL_TYPE_SCATTER:
+    {
+        ucc_memory_type_t mem_type = args->dst.info.mem_type;
+        memcpy(&save_info->old_asymmetric_buffer.info,
+               &args->src.info, sizeof(ucc_coll_buffer_info_t));
+        status = ucc_mc_alloc(&save_info->scratch,
+                              ucc_dt_size(args->src.info.datatype) * args->src.info.count,
+                              mem_type);
+        if (ucc_unlikely(UCC_OK != status)) {
+            ucc_error("failed to allocate replacement "
+                      "memory for asymmetric buffer");
+            return status;
+        }
+        args->src.info.buffer   = save_info->scratch->addr;
+        args->src.info.mem_type = mem_type;
+        return UCC_OK;
+    }
+    case UCC_COLL_TYPE_SCATTERV:
+    {
+        ucc_memory_type_t mem_type = args->dst.info.mem_type;
+        memcpy(&save_info->old_asymmetric_buffer.info_v,
+               &args->src.info_v, sizeof(ucc_coll_buffer_info_v_t));
+        status = ucc_mc_alloc(&save_info->scratch,
+                              ucc_coll_args_get_v_buffer_size(args,
+                                args->src.info_v.counts,
+                                args->src.info_v.displacements,
+                                team->size),
+                              mem_type);
+        if (ucc_unlikely(UCC_OK != status)) {
+            ucc_error("failed to allocate replacement "
+                      "memory for asymmetric buffer");
+            return status;
+        }
+        args->src.info_v.buffer   = save_info->scratch->addr;
+        args->src.info_v.mem_type = mem_type;
+        return UCC_OK;
+    }
+    default:
+        break;
+    }
+    return UCC_ERR_INVALID_PARAM;
+}
+
+ucc_status_t
+ucc_coll_args_free_asymmetric_buffer(ucc_coll_task_t *task)
+{
+    ucc_status_t status                        = UCC_OK;
+    ucc_buffer_info_asymmetric_memtype_t *save = &task->bargs.asymmetric_save_info;
+
+    if (UCC_IS_INPLACE(task->bargs.args)) {
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    if (save->scratch == NULL) {
+        ucc_error("failure trying to free NULL asymmetric buffer");
+    }
+
+    status = ucc_mc_free(save->scratch);
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_error("error freeing scratch asymmetric buffer: %s",
+                    ucc_status_string(status));
+    }
+    save->scratch = NULL;
+
+    return status;
+}
+
+ucc_status_t ucc_copy_asymmetric_buffer(ucc_coll_task_t *task)
+{
+    ucc_status_t                          status    = UCC_OK;
+    ucc_coll_args_t                      *coll_args = &task->bargs.args;
+    ucc_buffer_info_asymmetric_memtype_t *save      = &task->bargs.asymmetric_save_info;
+    ucc_rank_t                            size      = task->team->params.size;
+
+    if(task->bargs.args.coll_type == UCC_COLL_TYPE_SCATTERV) {
+        // copy in
+        status = ucc_mc_memcpy(save->scratch->addr,
+                        save->old_asymmetric_buffer.info_v.buffer,
+                        ucc_coll_args_get_v_buffer_size(coll_args,
+                            save->old_asymmetric_buffer.info_v.counts,
+                            save->old_asymmetric_buffer.info_v.displacements,
+                            size),
+                        save->scratch->mt,
+                        save->old_asymmetric_buffer.info_v.mem_type);
+    } else if(task->bargs.args.coll_type == UCC_COLL_TYPE_SCATTER) {
+        // copy in
+        status = ucc_mc_memcpy(save->scratch->addr,
+                        save->old_asymmetric_buffer.info.buffer,
+                        ucc_dt_size(save->old_asymmetric_buffer.info.datatype) *
+                            save->old_asymmetric_buffer.info.count,
+                        save->scratch->mt,
+                        save->old_asymmetric_buffer.info.mem_type);
+    } else if(task->bargs.args.coll_type == UCC_COLL_TYPE_GATHERV) {
+        // copy out
+        status = ucc_mc_memcpy(save->old_asymmetric_buffer.info_v.buffer,
+                        save->scratch->addr,
+                        ucc_coll_args_get_v_buffer_size(coll_args,
+                            save->old_asymmetric_buffer.info_v.counts,
+                            save->old_asymmetric_buffer.info_v.displacements,
+                            size),
+                        save->old_asymmetric_buffer.info_v.mem_type,
+                        save->scratch->mt);
+    } else {
+        // copy out
+        status = ucc_mc_memcpy(save->old_asymmetric_buffer.info.buffer,
+                        save->scratch->addr,
+                        ucc_dt_size(save->old_asymmetric_buffer.info.datatype) *
+                            save->old_asymmetric_buffer.info.count,
+                        save->old_asymmetric_buffer.info.mem_type,
+                        save->scratch->mt);
+    }
+    if (ucc_unlikely(status != UCC_OK)) {
+        ucc_error("error copying back to old asymmetric buffer: %s",
+                    ucc_status_string(status));
+    }
+    return status;
 }
 
 int ucc_coll_args_is_predefined_dt(const ucc_coll_args_t *args, ucc_rank_t rank)
@@ -163,9 +337,6 @@ ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
 {
     ucc_rank_t root = args->root;
 
-    if (!ucc_coll_args_is_mem_symmetric(args, rank)) {
-        return UCC_MEMORY_TYPE_ASYMMETRIC;
-    }
     switch (args->coll_type) {
     case UCC_COLL_TYPE_BARRIER:
     case UCC_COLL_TYPE_FANIN:
@@ -180,7 +351,6 @@ ucc_memory_type_t ucc_coll_args_mem_type(const ucc_coll_args_t *args,
         return args->dst.info.mem_type;
     case UCC_COLL_TYPE_ALLGATHERV:
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
-        return args->dst.info_v.mem_type;
     case UCC_COLL_TYPE_ALLTOALLV:
         return args->dst.info_v.mem_type;
     case UCC_COLL_TYPE_REDUCE:
@@ -323,7 +493,7 @@ ucc_ep_map_t ucc_ep_map_from_array_64(uint64_t **array, ucc_rank_t size,
                                          need_free, 1);
 }
 
-static inline int ucc_coll_args_is_rooted(ucc_coll_type_t ct)
+int ucc_coll_args_is_rooted(ucc_coll_type_t ct)
 {
     if (ct == UCC_COLL_TYPE_REDUCE || ct == UCC_COLL_TYPE_BCAST ||
         ct == UCC_COLL_TYPE_GATHER || ct == UCC_COLL_TYPE_SCATTER ||

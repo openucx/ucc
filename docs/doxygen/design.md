@@ -1,4 +1,4 @@
-### Design 
+### Design
 
 * Highly scalable and performant collectives for HPC, AI/ML and I/O workloads
 * Nonblocking collective operations that cover a variety of programming models
@@ -10,5 +10,5 @@
 
 ### Component Diagram
 
-\image latex ucc\_components.pdf "UCC Components and Usage"
-\image html ucc\_components.png "UCC Components and Usage"
+\image latex "ucc_components.pdf" "UCC Components and Usage"
+\image html "ucc_components.png" "UCC Components and Usage"

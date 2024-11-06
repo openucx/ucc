@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -108,6 +108,13 @@ typedef struct ucc_base_ctx_attr_t {
     uint32_t           topo_required;
 } ucc_base_ctx_attr_t;
 
+static inline void ucc_base_ctx_attr_clear(ucc_base_ctx_attr_t *attr)
+{
+    uint64_t mask = attr->attr.mask;
+    memset(attr, 0, sizeof(ucc_base_ctx_attr_t));
+    attr->attr.mask = mask;
+}
+
 typedef struct ucc_base_context_iface {
     ucc_status_t (*create)(const ucc_base_context_params_t *params,
                            const ucc_base_config_t *config,
@@ -159,11 +166,20 @@ enum {
     UCC_BASE_CARGS_MAX_FRAG_COUNT = UCC_BIT(0)
 };
 
+typedef struct ucc_buffer_info_asymmetric_memtype {
+    union {
+        ucc_coll_buffer_info_t      info;
+        ucc_coll_buffer_info_v_t    info_v;
+    } old_asymmetric_buffer;
+    ucc_mc_buffer_header_t *scratch;
+} ucc_buffer_info_asymmetric_memtype_t;
+
 typedef struct ucc_base_coll_args {
-    uint64_t         mask;
-    ucc_coll_args_t  args;
-    ucc_team_t      *team;
-    size_t           max_frag_count;
+    uint64_t                             mask;
+    ucc_coll_args_t                      args;
+    ucc_team_t                          *team;
+    size_t                               max_frag_count;
+    ucc_buffer_info_asymmetric_memtype_t asymmetric_save_info;
 } ucc_base_coll_args_t;
 
 typedef ucc_status_t (*ucc_base_coll_init_fn_t)(ucc_base_coll_args_t *coll_args,

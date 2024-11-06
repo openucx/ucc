@@ -47,6 +47,8 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
     int                 rc;
     int                 length;
     ucc_status_t        status;
+    ucc_memory_type_t   mem_type = comm->cuda_mem_enabled ? UCC_MEMORY_TYPE_CUDA
+                                                          : UCC_MEMORY_TYPE_HOST;
 
     for (i = 0; i < num_packets; i++) {
         if (comm->params.sx_depth <=
@@ -75,7 +77,12 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
         if (zcopy) {
             pp->context = (uintptr_t) PTR_OFFSET(req->ptr, offset);
         } else {
-            memcpy((void*) pp->buf, PTR_OFFSET(req->ptr, offset), length);
+            status = ucc_mc_memcpy((void*) pp->buf, PTR_OFFSET(req->ptr, offset), length,
+                                   mem_type, mem_type);
+            if (ucc_unlikely(status != UCC_OK)) {
+                tl_error(comm->lib, "failed to copy cuda buffer");
+                return status;
+            }
             ssg[0].addr = (uint64_t) pp->buf;
         }
 

@@ -21,9 +21,10 @@ const char* ucc_sbgp_str(ucc_sbgp_type_t type)
     return ucc_sbgp_type_str[type];
 }
 
-#define UCC_TOPO_IS_BOUND(_topo, _sbgp_type)                \
-    (UCC_SBGP_SOCKET == (_sbgp_type)) ?                     \
-    (_topo)->topo->sock_bound : (_topo)->topo->numa_bound
+#define UCC_TOPO_IS_BOUND(_topo, _sbgp_type)                    \
+    (UCC_SBGP_SOCKET         == (_sbgp_type) ||                 \
+     UCC_SBGP_SOCKET_LEADERS == (_sbgp_type)) ?                 \
+        (_topo)->topo->sock_bound : (_topo)->topo->numa_bound
 
 static inline int ucc_ranks_on_local_sn(ucc_rank_t rank1, ucc_rank_t rank2,
                                         ucc_topo_t *topo, ucc_sbgp_type_t type)

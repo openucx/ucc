@@ -261,7 +261,10 @@ ucc_tl_sharp_rcache_dump_region_cb(void *context, ucs_rcache_t *rcache, //NOLINT
 static ucc_rcache_ops_t ucc_tl_sharp_rcache_ops = {
     .mem_reg     = ucc_tl_sharp_rcache_mem_reg_cb,
     .mem_dereg   = ucc_tl_sharp_rcache_mem_dereg_cb,
-    .dump_region = ucc_tl_sharp_rcache_dump_region_cb
+    .dump_region = ucc_tl_sharp_rcache_dump_region_cb,
+#ifdef UCS_HAVE_RCACHE_MERGE_CB
+    .merge       = ucc_rcache_merge_cb_empty
+#endif
 };
 
 ucc_status_t ucc_tl_sharp_rcache_create(struct sharp_coll_context *context,
@@ -503,11 +506,7 @@ UCC_CLASS_DEFINE(ucc_tl_sharp_context_t, ucc_tl_context_t);
 ucc_status_t ucc_tl_sharp_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
                                            ucc_base_ctx_attr_t *attr)
 {
-    if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
-        attr->attr.ctx_addr_len = 0;
-    }
-
+    ucc_base_ctx_attr_clear(attr);
     attr->topo_required = 1;
-
     return UCC_OK;
 }

@@ -151,7 +151,7 @@ typedef size_t ucc_context_addr_len_t;
 
 
 /**
- * @ingroup UCC_EVENTS_DT
+ * @ingroup UCC_EVENT_DT
  * @brief UCC execution engine handle
  *
  * The UCC execution engine handle is an opaque handle created by the library representing
@@ -161,7 +161,7 @@ typedef struct ucc_ee*      ucc_ee_h;
 
 typedef struct ucc_dt_generic ucc_dt_generic_t;
 /**
- * @ingroup UCC_DATATYPES
+ * @ingroup UCC_DATATYPE
  * @brief Helper enum for generic/predefined datatype representation
  *
  */

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -87,9 +87,7 @@ ucc_status_t
 ucc_cl_hier_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
                              ucc_base_ctx_attr_t      *attr)
 {
-    if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN) {
-        attr->attr.ctx_addr_len = 0;
-    }
+    ucc_base_ctx_attr_clear(attr);
     attr->topo_required = 1;
     return UCC_OK;
 }

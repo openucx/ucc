@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -564,6 +564,8 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
     size_t                packed_length;
     int                   i;
 
+    ucc_base_ctx_attr_clear(attr);
+
     if (attr->attr.mask & (UCC_CONTEXT_ATTR_FIELD_CTX_ADDR_LEN |
                            UCC_CONTEXT_ATTR_FIELD_CTX_ADDR)) {
         if (NULL == ctx->worker.worker_address) {
@@ -605,6 +607,7 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
         }
         attr->attr.ctx_addr_len = packed_length;
     }
+
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_CTX_ADDR) {
         *offset = ctx->worker.ucp_addrlen;
         offset  = TL_UCP_EP_ADDR_WORKER(offset);
@@ -621,10 +624,13 @@ ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,
             ucc_tl_ucp_ctx_remote_pack_data(ctx, offset);
         }
     }
+
     if (attr->attr.mask & UCC_CONTEXT_ATTR_FIELD_WORK_BUFFER_SIZE) {
         attr->attr.global_work_buffer_size =
             ONESIDED_SYNC_SIZE + ONESIDED_REDUCE_SIZE;
     }
+
     attr->topo_required = ctx->topo_required;
+
     return UCC_OK;
 }

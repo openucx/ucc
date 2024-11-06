@@ -51,6 +51,13 @@ BEGIN_C_DECLS
   */
 
 /**
+  * @defgroup UCC_LIB_INTERNAL Internal library routines
+  * @{
+  * Internal library routines
+  * @}
+  */
+
+/**
   * @defgroup UCC_CONTEXT_DT Context abstraction data-structures
   * @{
   *  Data-structures associated with context creation and management routines

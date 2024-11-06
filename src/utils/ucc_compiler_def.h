@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -27,6 +27,16 @@
 #define ucc_likely        ucs_likely
 #define ucc_unlikely      ucs_unlikely
 #define ucc_string_split  ucs_string_split
+
+/*
+ * Assertions which are checked in compile-time
+ * In case of failure a compiler msg looks like this:
+ * error: duplicate case value switch(0) {case 0:case (_cond):;}
+ *
+ * Usage: UCC_STATIC_ASSERT(condition)
+ */
+#define UCC_STATIC_ASSERT(_cond)                                               \
+     switch(0) {case 0:case (_cond):;}
 
 /**
  * Prevent compiler from reordering instructions

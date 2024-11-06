@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -126,5 +126,22 @@ ucc_status_t ucc_tl_ucp_allgatherv_ring_init_common(ucc_tl_ucp_task_t *task)
     task->super.post     = ucc_tl_ucp_allgatherv_ring_start;
     task->super.progress = ucc_tl_ucp_allgatherv_ring_progress;
 
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_ucp_allgatherv_ring_init(ucc_base_coll_args_t *coll_args,
+                                             ucc_base_team_t *team,
+                                             ucc_coll_task_t **task_h)
+{
+    ucc_tl_ucp_task_t *task;
+    ucc_status_t status;
+
+    task = ucc_tl_ucp_init_task(coll_args, team);
+    status = ucc_tl_ucp_allgatherv_ring_init_common(task);
+    if (status != UCC_OK) {
+        ucc_tl_ucp_put_task(task);
+        return status;
+    }
+    *task_h = &task->super;
     return UCC_OK;
 }
