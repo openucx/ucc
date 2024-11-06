@@ -27,6 +27,7 @@ ucc_status_t ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
 
     set_rank_step(task, trank, 0, 0);
     ucc_memory_cpu_store_fence();
+    // initiate barrier wait while all ranks set theirs steps to 0
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
     if (ucc_unlikely(status != UCC_OK)) {
         goto exit_err;
@@ -76,7 +77,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_task_t *task              = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team              = TASK_TEAM(task);
     ucc_rank_t          trank             = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t          tsize             = UCC_TL_TEAM_SIZE(team);
+    ucc_rank_t          tsize             = (ucc_rank_t)task->subset.map.ep_num;
     size_t              half_scratch_size = get_raw_scratch_size(team) / 2;
     size_t              chunk_size        =
         task->bcast_linear.step < task->bcast_linear.num_steps
@@ -89,6 +90,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     ucc_status_t            st;
     void                   *sbuf, *dbuf;
     int                     i;
+    ucc_rank_t              peer;
 
     task->super.status = UCC_INPROGRESS;
 
@@ -100,7 +102,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
 
     switch (task->bcast_linear.stage) {
     case STAGE_SYNC:
-        if (ucc_tl_cuda_get_sync(task) != UCC_OK) {
+        if (ucc_tl_cuda_get_sync_root(task, task->bcast_linear.root) != UCC_OK) {
             return;
         }
         task->bcast_linear.step = 0;
@@ -116,7 +118,6 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             task->super.status = st;
             return;
         }
-        ucc_tl_cuda_put_sync(task);
         if (trank == task->bcast_linear.root) {
             task->bcast_linear.stage = STAGE_COPY;
         } else {
@@ -165,8 +166,17 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             }
         case STAGE_WAIT_ALL:
             for (i = 0; i < tsize; ++i) {
+                if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task)))
+                {
+                    // eval phys rank from virt
+                    peer = ucc_ep_map_eval(task->subset.map, i);
+                }
+                else
+                {
+                    peer = i;
+                }
                 // need to wait until all ranks complete step - 1, because of double buffering
-                if (get_rank_step(task, i, 0) < task->bcast_linear.step - 1) {
+                if (get_rank_step(task, peer, 0) < task->bcast_linear.step - 1) {
                     // rank is not ready, lets wait
                     return;
                 }
@@ -178,6 +188,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             } else {
                 // finish
+                ucc_tl_cuda_put_sync_root(task, task->bcast_linear.root);
                 task->super.status = UCC_OK;
                 break;
             }
@@ -286,7 +297,6 @@ ucc_status_t ucc_tl_cuda_bcast_linear_init(ucc_base_coll_args_t *coll_args,
     task->super.post     = ucc_tl_cuda_bcast_linear_start;
     task->super.progress = ucc_tl_cuda_bcast_linear_progress;
     task->super.finalize = ucc_tl_cuda_bcast_linear_finalize;
-    task->bar            = TASK_BAR(task);
 
     *task_p = &task->super;
     return UCC_OK;

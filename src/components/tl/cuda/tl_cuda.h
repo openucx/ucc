@@ -12,6 +12,7 @@
 #include "components/tl/ucc_tl_log.h"
 #include "components/mc/ucc_mc.h"
 #include "utils/ucc_mpool.h"
+#include "utils/ucc_datastruct.h"
 #include "tl_cuda_ep_hash.h"
 #include "tl_cuda_topo.h"
 #include "tl_cuda_team_topo.h"
@@ -108,6 +109,7 @@ typedef uint32_t ucc_tl_cuda_sync_state_t;
 typedef struct ucc_tl_cuda_shm_barrier {
     ucc_rank_t   size;
     ucc_rank_t   count;
+    uint32_t     tag;
     int          sense;
     ucc_status_t state[UCC_TL_CUDA_MAX_PEERS];
     int          local_sense[UCC_TL_CUDA_MAX_PEERS];
@@ -155,11 +157,12 @@ typedef struct ucc_tl_cuda_scratch {
 
 typedef struct ucc_tl_cuda_team {
     ucc_tl_team_t              super;
-    uint32_t                   seq_num;
+    uint32_t                   seq_num; // counter for launched collectives (tasks) for this team
+    uint32_t                   seq_num_active_set; // active set
     ucc_tl_cuda_team_topo_t   *topo;
-    ucc_tl_cuda_sync_t        *sync;
-    ucc_tl_cuda_sync_state_t  *sync_state;
-    ucc_tl_cuda_shm_barrier_t *bar;
+    ucc_tl_cuda_sync_t        *sync; // pointer to shared mem
+    ucc_tl_cuda_sync_state_t  *sync_state; // to track if sync segment of shared memory is used by what task?
+    ucc_tl_cuda_shm_barrier_t *bar;     // pointer to first barrier in array of [0; 2 * max_concurrent) first max_concurrent for normal mode and second for active set
     ucc_tl_cuda_scratch_t      scratch;
     cudaStream_t               stream;
     ucc_tl_cuda_rank_id_t     *ids;
@@ -173,9 +176,10 @@ UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
 typedef struct ucc_tl_cuda_task ucc_tl_cuda_task_t;
 struct ucc_tl_cuda_task {
     ucc_coll_task_t            super;
-    uint32_t                   seq_num;
-    uint32_t                   coll_id;
-    ucc_tl_cuda_shm_barrier_t *bar;
+    uint32_t                   seq_num; // sequential number of collective (started task) in team
+    uint32_t                   coll_id; // index of collective in flight [0; max_concurrent)
+    ucc_tl_cuda_shm_barrier_t *bar;     // pointer to barrier that reserved for with task in cuda team
+    ucc_subset_t               subset;  // information about mapping of active set if it present
     union {
         struct {
             int                    stage;
