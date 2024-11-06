@@ -137,13 +137,18 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
                     status = ucc_tl_cuda_shm_barrier_init_root(task->subset.map.ep_num, task->subset.myrank, coll_args->args.root, task->bar);
                     if (ucc_unlikely(status != UCC_OK)) {
                         ucc_error("failed to init root barrier");
+                        return UCC_ERR_NO_RESOURCE;
                     }
-
                     found = true;
                     break;
                 }
             }
             ucc_assert(found);
+            if (!found)
+            {
+                ucc_error("Unable to find free barrier");
+                return UCC_ERR_NO_RESOURCE;
+            }
         } else {
             /* pool barrier while root mark any of it with tag */
             bool found = false;
@@ -158,8 +163,8 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
                         status = ucc_tl_cuda_shm_barrier_init_root(task->subset.map.ep_num, task->subset.myrank, coll_args->args.root, task->bar);
                         if (ucc_unlikely(status != UCC_OK)) {
                             ucc_error("failed to init peer barrier");
+                            return UCC_ERR_NO_RESOURCE;
                         }
-
                         found = true;
                         break;
                     }
