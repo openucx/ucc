@@ -93,6 +93,19 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
     }
 }
 
+ucc_status_t ucc_tl_cuda_shm_barrier_init_root(ucc_rank_t size, ucc_rank_t rank, ucc_rank_t root,
+                                          ucc_tl_cuda_shm_barrier_t *barrier)
+{
+    if (rank == root) {
+        barrier->size  = size;
+        barrier->count = 0;
+        barrier->sense = 0;
+    }
+    barrier->state[rank]       = UCC_OK;
+    barrier->local_sense[rank] = 1;
+    return UCC_OK;
+}
+
 ucc_status_t ucc_tl_cuda_shm_barrier_init(ucc_rank_t size, ucc_rank_t rank,
                                           ucc_tl_cuda_shm_barrier_t *barrier)
 {

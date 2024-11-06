@@ -45,7 +45,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NO_MEMORY;
     }
 
-    scratch_size = lib->cfg.max_concurrent * lib->cfg.scratch_size;
+    // active set
+    scratch_size = 2 * lib->cfg.max_concurrent * lib->cfg.scratch_size;
     status = CUDA_FUNC(cudaMalloc(&self->scratch.loc, scratch_size));
     if (status != UCC_OK) {
         tl_error(tl_context->lib, "failed to alloc scratch buffer");
@@ -64,6 +65,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                 lib->cfg.max_concurrent +
                 sizeof(ucc_tl_cuda_shm_barrier_t) * lib->cfg.max_concurrent +
                 sizeof(ucc_tl_cuda_sync_state_t) * lib->cfg.max_concurrent;
+    ctrl_size *= 2; // active sets
 
     shm_id = -1;
     self->sync = (void*)-1;
@@ -79,8 +81,10 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         memset(self->sync, 0, ctrl_size);
         self->bar  = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(self, 0,
                                                        lib->cfg.max_concurrent);
-        for (i = 0; i < lib->cfg.max_concurrent; i++) {
+        /* active set */
+        for (i = 0; i < lib->cfg.max_concurrent * 2; i++) {
             bar = UCC_TL_CUDA_TEAM_BARRIER(self, i);
+            bar->tag = 0; // mark as free
             for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
                 status = ucc_tl_cuda_shm_barrier_init(UCC_TL_TEAM_SIZE(self),
                                                       j, bar);
@@ -109,6 +113,7 @@ ids_exchange:
     tl_debug(tl_context->lib, "posted tl team: %p", self);
 
     self->seq_num = 1;
+    self->seq_num_active_set = 1;
     return UCC_OK;
 
 free_devices:
