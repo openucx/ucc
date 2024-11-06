@@ -155,14 +155,15 @@ typedef struct ucc_tl_cuda_scratch {
     ucc_tl_cuda_mem_info_t rem_info[UCC_TL_CUDA_MAX_PEERS];
 } ucc_tl_cuda_scratch_t;
 
+// Team represents a communicator created within the CUDA context, typically using NVLink for inter-GPU communication
 typedef struct ucc_tl_cuda_team {
     ucc_tl_team_t              super;
-    uint32_t                   seq_num; // counter for launched collectives (tasks) for this team
-    uint32_t                   seq_num_active_set; // active set
+    uint32_t                   seq_num;            // Counter for the number of launched collective tasks for this team
+    uint32_t                   seq_num_active_set; // Counter for tasks in the active set (subset of tasks requiring special handling)
     ucc_tl_cuda_team_topo_t   *topo;
-    ucc_tl_cuda_sync_t        *sync; // pointer to shared mem
-    ucc_tl_cuda_sync_state_t  *sync_state; // to track if sync segment of shared memory is used by what task?
-    ucc_tl_cuda_shm_barrier_t *bar;     // pointer to first barrier in array of [0; 2 * max_concurrent) first max_concurrent for normal mode and second for active set
+    ucc_tl_cuda_sync_t        *sync;               // Pointer to shared memory segment for synchronization
+    ucc_tl_cuda_sync_state_t  *sync_state;         // Tracks the task currently using the sync segment of shared memory, if free - 0
+    ucc_tl_cuda_shm_barrier_t *bar;                // Pointer to the first barrier in an array of size [0; 2 * max_concurrent]. First max_concurrent barriers are for normal mode, the second one for active set mode
     ucc_tl_cuda_scratch_t      scratch;
     cudaStream_t               stream;
     ucc_tl_cuda_rank_id_t     *ids;
@@ -173,13 +174,14 @@ typedef struct ucc_tl_cuda_team {
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
+// Task represents a collective operation that runs in the CUDA context, typically using NVLink for inter-GPU communication
 typedef struct ucc_tl_cuda_task ucc_tl_cuda_task_t;
 struct ucc_tl_cuda_task {
     ucc_coll_task_t            super;
-    uint32_t                   seq_num; // sequential number of collective (started task) in team
-    uint32_t                   coll_id; // index of collective in flight [0; max_concurrent)
-    ucc_tl_cuda_shm_barrier_t *bar;     // pointer to barrier that reserved for with task in cuda team
-    ucc_subset_t               subset;  // information about mapping of active set if it present
+    uint32_t                   seq_num; // Sequential identifier for each taks started within the team
+    uint32_t                   coll_id; // Index of the collective task in flight, within the range [0; max_concurrent)
+    ucc_tl_cuda_shm_barrier_t *bar;     // Pointer to the reserved barrier for this task in the CUDA team
+    ucc_subset_t               subset;  // Mapping information for the active set, if it is present
     union {
         struct {
             int                    stage;
