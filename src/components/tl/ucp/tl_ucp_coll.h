@@ -267,6 +267,7 @@ typedef struct ucc_tl_ucp_task {
             int                     phase;
         } alltoall_bruck;
     };
+    int counter;
 } ucc_tl_ucp_task_t;
 
 typedef struct ucc_tl_ucp_schedule {
