@@ -238,6 +238,7 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
              device_attr.max_cq, device_attr.max_cqe);
 
     ctx->max_qp_wr = device_attr.max_qp_wr;
+
     status = ucc_mpool_init(&ctx->compl_objects_mp, 0, sizeof(ucc_tl_mlx5_mcast_p2p_completion_obj_t), 0,
                             UCC_CACHE_LINE_SIZE, 8, UINT_MAX,
                             &ucc_coll_task_mpool_ops,
@@ -245,6 +246,17 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
                             "ucc_tl_mlx5_mcast_p2p_completion_obj_t");
     if (ucc_unlikely(UCC_OK != status)) {
         tl_warn(lib, "failed to initialize compl_objects_mp mpool");
+        status = UCC_ERR_NO_MEMORY;
+        goto error;
+    }
+
+    status = ucc_mpool_init(&ctx->mcast_req_mp, 0, sizeof(ucc_tl_mlx5_mcast_coll_req_t), 0,
+                            UCC_CACHE_LINE_SIZE, 8, UINT_MAX,
+                            &ucc_coll_task_mpool_ops,
+                            UCC_THREAD_SINGLE,
+                            "ucc_tl_mlx5_mcast_coll_req_t");
+    if (ucc_unlikely(UCC_OK != status)) {
+        tl_warn(lib, "failed to initialize mcast_req_mp mpool");
         status = UCC_ERR_NO_MEMORY;
         goto error;
     }
