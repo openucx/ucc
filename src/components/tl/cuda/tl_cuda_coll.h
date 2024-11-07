@@ -86,6 +86,12 @@ static inline ucc_tl_cuda_task_t *ucc_tl_cuda_task_get(ucc_tl_cuda_team_t *team)
 static inline void ucc_tl_cuda_task_put(ucc_tl_cuda_task_t *task)
 {
     UCC_TL_CUDA_PROFILE_REQUEST_FREE(task);
+
+    if (UCC_TL_TEAM_RANK(TASK_TEAM(task)) == task->bcast_linear.root) {
+        ucc_print("free bar!");
+        task->bar->tag = 0;
+    }
+
     ucc_mpool_put(task);
 }
 
@@ -129,7 +135,8 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
             /* search first free barrier in active set pool */
             for (i = 0; i < max_concurrent; ++i) {
                 curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
-                if (curr_bar->tag == 0) {
+                if (ucc_atomic_cswap32(&curr_bar->tag, 0, coll_args->args.tag) == 0) {
+                    ucc_print("found free barrier: %d", i);
                     // free
                     task->bar = curr_bar;
                     // set user specified tag to mark that this barrier is used by this task
@@ -143,10 +150,10 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
                     break;
                 }
             }
-            ucc_assert(found);
             if (!found)
             {
                 ucc_error("Unable to find free barrier");
+                ucc_assert(found);
                 return UCC_ERR_NO_RESOURCE;
             }
         } else {
@@ -243,8 +250,6 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
                                     ucc_coll_task_t **task_h);
 
 ucc_status_t ucc_tl_cuda_coll_finalize(ucc_coll_task_t *coll_task);
-
-
 
 ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
                                         ucc_coll_type_t          coll_type,
