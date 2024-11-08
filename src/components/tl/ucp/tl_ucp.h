@@ -175,11 +175,8 @@ extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 #define UCC_TL_UCP_TEAM_CTX(_team)                                             \
     (ucc_derived_of((_team)->super.super.context, ucc_tl_ucp_context_t))
 
-#define IS_SERVICE_TEAM(_team)                                                 \
-    ((_team)->super.super.params.scope == UCC_CL_LAST + 1)
-
 #define USE_SERVICE_WORKER(_team)                                              \
-    (IS_SERVICE_TEAM(_team) && UCC_TL_UCP_TEAM_CTX(_team)->cfg.service_worker)
+    (UCC_TL_IS_SERVICE_TEAM(_team) && UCC_TL_UCP_TEAM_CTX(_team)->cfg.service_worker)
 
 #define UCC_TL_UCP_TASK_TEAM(_task)                                            \
     (ucc_derived_of((_task)->super.team, ucc_tl_ucp_team_t))

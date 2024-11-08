@@ -73,7 +73,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         }
     }
 
-    if (ucc_global_config.file_cfg && !IS_SERVICE_TEAM(self) &&
+    if (ucc_global_config.file_cfg && !UCC_TL_IS_SERVICE_TEAM(self) &&
         ctx->topo_required && tl_context->lib->use_tuning) {
         status = ucc_add_team_sections(&self->cfg, ucc_tl_ucp_lib_config_table,
                                        self->topo, &self->tuning_str,
@@ -91,7 +91,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_team_t, ucc_base_context_t *tl_context,
         self->cfg.use_reordering = 0;
     }
 
-    if (self->topo && !IS_SERVICE_TEAM(self) && self->topo->topo->sock_bound) {
+    if (self->topo && !UCC_TL_IS_SERVICE_TEAM(self) &&
+        self->topo->topo->sock_bound) {
         tsize = UCC_TL_TEAM_SIZE(self);
         max_radix = (ucc_topo_max_ppn(self->topo) == 1) ? tsize :
                     ucc_min(tsize, ucc_topo_min_socket_size(self->topo));

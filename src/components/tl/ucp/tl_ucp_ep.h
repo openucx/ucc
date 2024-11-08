@@ -64,7 +64,7 @@ static inline ucc_status_t ucc_tl_ucp_get_ep(ucc_tl_ucp_team_t *team,
         ucc_team_t *core_team = UCC_TL_CORE_TEAM(team);
         /* Core super.super.team ptr is NULL for service_team
            which has scope == UCC_CL_LAST + 1*/
-        ucc_assert((NULL != core_team) || IS_SERVICE_TEAM(team));
+        ucc_assert((NULL != core_team) || UCC_TL_IS_SERVICE_TEAM(team));
         ctx_rank = core_team ? ucc_get_ctx_rank(core_team, core_rank)
                        : core_rank;
         *ep      = team->worker->eps[ctx_rank];

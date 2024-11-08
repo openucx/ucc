@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -165,4 +165,8 @@ typedef struct ucc_tl_lib_attr {
 #define UCC_TL_TEAM_MAP(_tl_team) (_tl_team)->super.super.params.map
 
 #define UCC_TL_TEAM_OOB(_tl_team) (_tl_team)->super.super.params.params.oob
+
+#define UCC_TL_IS_SERVICE_TEAM(_tl_team)                                       \
+    ((_tl_team)->super.super.params.scope == UCC_CL_LAST + 1)
+
 #endif

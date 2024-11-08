@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -138,8 +138,6 @@ ucc_status_t ucc_service_coll_test(ucc_service_coll_req_t *req)
     }
     return status;
 }
-
-ucc_status_t ucc_collective_finalize_internal(ucc_coll_task_t *task);
 
 ucc_status_t ucc_service_coll_finalize(ucc_service_coll_req_t *req)
 {
