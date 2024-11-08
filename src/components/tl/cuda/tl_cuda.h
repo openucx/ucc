@@ -106,6 +106,8 @@ UCC_CLASS_DECLARE(ucc_tl_cuda_context_t, const ucc_base_context_params_t *,
 
 typedef uint32_t ucc_tl_cuda_sync_state_t;
 
+#define UCC_TAG_FREE 0xFFFFFFFF
+
 typedef struct ucc_tl_cuda_shm_barrier {
     ucc_rank_t   size;
     ucc_rank_t   count;

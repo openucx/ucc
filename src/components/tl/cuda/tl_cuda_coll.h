@@ -89,7 +89,7 @@ static inline void ucc_tl_cuda_task_put(ucc_tl_cuda_task_t *task)
 
     if (UCC_TL_TEAM_RANK(TASK_TEAM(task)) == task->bcast_linear.root) {
         ucc_print("free bar!");
-        task->bar->tag = 0;
+        task->bar->tag = UCC_TAG_FREE;
     }
 
     ucc_mpool_put(task);
@@ -135,7 +135,7 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
             /* search first free barrier in active set pool */
             for (i = 0; i < max_concurrent; ++i) {
                 curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
-                if (ucc_atomic_cswap32(&curr_bar->tag, 0, coll_args->args.tag) == 0) {
+                if (ucc_atomic_cswap32(&curr_bar->tag, UCC_TAG_FREE, coll_args->args.tag) == UCC_TAG_FREE) {
                     ucc_print("found free barrier: %d", i);
                     // free
                     task->bar = curr_bar;
