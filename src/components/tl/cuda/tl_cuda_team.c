@@ -84,7 +84,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         /* active set */
         for (i = 0; i < lib->cfg.max_concurrent * 2; i++) {
             bar = UCC_TL_CUDA_TEAM_BARRIER(self, i);
-            bar->tag = 0; // mark as free
+            bar->tag = UCC_TAG_FREE; // mark as free
             for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
                 status = ucc_tl_cuda_shm_barrier_init(UCC_TL_TEAM_SIZE(self),
                                                       j, bar);
