@@ -147,6 +147,7 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
                         return UCC_ERR_NO_RESOURCE;
                     }
                     found = true;
+                    task->coll_id = i + max_concurrent;
                     break;
                 }
             }
@@ -173,13 +174,14 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
                             return UCC_ERR_NO_RESOURCE;
                         }
                         found = true;
+                        task->coll_id = i + max_concurrent;
                         break;
                     }
                 }
             }
         }
         task->seq_num = team->seq_num_active_set++;
-        task->coll_id = task->seq_num % max_concurrent + max_concurrent;
+        // task->coll_id = task->seq_num % max_concurrent + max_concurrent;
     } else {
         task->seq_num = team->seq_num++;
         task->coll_id = task->seq_num % max_concurrent;
