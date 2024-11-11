@@ -136,7 +136,7 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
             for (i = 0; i < max_concurrent; ++i) {
                 curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
                 if (ucc_atomic_cswap32(&curr_bar->tag, UCC_TAG_FREE, coll_args->args.tag) == UCC_TAG_FREE) {
-                    ucc_print("found free barrier: %d", i);
+                    ucc_print("found free barrier: %d marked with tag: %d", i, curr_bar->tag);
                     // free
                     task->bar = curr_bar;
                     // set user specified tag to mark that this barrier is used by this task
