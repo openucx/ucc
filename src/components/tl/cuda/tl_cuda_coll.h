@@ -133,12 +133,13 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
         if (task->subset.myrank == coll_args->args.root) {
             bool found = false;
             int peer = ucc_ep_map_eval(task->subset.map, 1);
-            uint64_t key = (coll_args->args.tag << 32 | coll_args->args.root << 16 | peer);
+            uint64_t key   = ((uint64_t)coll_args->args.tag << 32 |
+                            coll_args->args.root << 16 | peer);
             /* search first free barrier in active set pool */
             for (i = 0; i < max_concurrent; ++i) {
                 curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);                
                 if (ucc_atomic_cswap64(&curr_bar->tag, UCC_TAG_FREE, key) == UCC_TAG_FREE) {
-                    ucc_print("found free barrier: %d marked with tag: %d", i, curr_bar->tag);
+                    ucc_print("found free barrier: %d marked with tag: %ld", i, curr_bar->tag);
                     // free
                     task->bar = curr_bar;
                     // set user specified tag to mark that this barrier is used by this task
@@ -162,8 +163,9 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
         } else {
             /* pool barrier while root mark any of it with tag */
             bool found = false;
-            
-            uint64_t key = (coll_args->args.tag << 32 | coll_args->args.root << 16 | task->subset.myrank);
+
+            uint64_t key = ((uint64_t)coll_args->args.tag << 32 |
+                            coll_args->args.root << 16 | task->subset.myrank);
 
             // TODO: get rid of inf loop?
             while (!found)
