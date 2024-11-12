@@ -106,12 +106,12 @@ UCC_CLASS_DECLARE(ucc_tl_cuda_context_t, const ucc_base_context_params_t *,
 
 typedef uint32_t ucc_tl_cuda_sync_state_t;
 
-#define UCC_TAG_FREE 0xFFFFFFFF
+#define UCC_TAG_FREE 0xFFFFFFFFFFFFFFFF
 
 typedef struct ucc_tl_cuda_shm_barrier {
     ucc_rank_t   size;
     ucc_rank_t   count;
-    uint32_t     tag;
+    uint64_t     tag;
     int          sense;
     ucc_status_t state[UCC_TL_CUDA_MAX_PEERS];
     int          local_sense[UCC_TL_CUDA_MAX_PEERS];

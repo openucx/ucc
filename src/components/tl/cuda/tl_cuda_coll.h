@@ -132,15 +132,17 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
         // root
         if (task->subset.myrank == coll_args->args.root) {
             bool found = false;
+            int peer = ucc_ep_map_eval(task->subset.map, 1);
+            uint64_t key = (coll_args->args.tag << 32 | coll_args->args.root << 16 | peer);
             /* search first free barrier in active set pool */
             for (i = 0; i < max_concurrent; ++i) {
-                curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
-                if (ucc_atomic_cswap32(&curr_bar->tag, UCC_TAG_FREE, coll_args->args.tag) == UCC_TAG_FREE) {
+                curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);                
+                if (ucc_atomic_cswap64(&curr_bar->tag, UCC_TAG_FREE, key) == UCC_TAG_FREE) {
                     ucc_print("found free barrier: %d marked with tag: %d", i, curr_bar->tag);
                     // free
                     task->bar = curr_bar;
                     // set user specified tag to mark that this barrier is used by this task
-                    task->bar->tag = coll_args->args.tag;
+                    task->bar->tag = key;
                     status = ucc_tl_cuda_shm_barrier_init_root(task->subset.map.ep_num, task->subset.myrank, coll_args->args.root, task->bar);
                     if (ucc_unlikely(status != UCC_OK)) {
                         ucc_error("failed to init root barrier");
@@ -160,12 +162,15 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
         } else {
             /* pool barrier while root mark any of it with tag */
             bool found = false;
+            
+            uint64_t key = (coll_args->args.tag << 32 | coll_args->args.root << 16 | task->subset.myrank);
+
             // TODO: get rid of inf loop?
             while (!found)
             {
                 for (i = 0; i < max_concurrent; ++i) {
                     curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
-                    if (curr_bar->tag == coll_args->args.tag) {
+                    if (curr_bar->tag == key) {
                         task->bar = curr_bar;
                         // TODO: pass root rank???
                         status = ucc_tl_cuda_shm_barrier_init_root(task->subset.map.ep_num, task->subset.myrank, coll_args->args.root, task->bar);
