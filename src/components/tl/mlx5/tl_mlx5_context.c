@@ -251,7 +251,7 @@ start_bcast:
     while (UCC_INPROGRESS == (status = ucc_collective_test(&req->super))) {
         ucc_context_progress(core_ctx);
     }
-    ucc_collective_finalize(&req->super);
+    ucc_collective_finalize_internal(req);
 
     if (UCC_OK != status) {
         tl_debug(context->lib, "failure during mlx5 ctx bcast");

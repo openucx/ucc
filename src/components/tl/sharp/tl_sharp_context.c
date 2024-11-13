@@ -7,6 +7,7 @@
 #include <inttypes.h>
 #include "tl_sharp.h"
 #include "utils/arch/cpu.h"
+#include "core/ucc_service_coll.h"
 
 static int ucc_tl_sharp_oob_barrier(void *arg)
 {
@@ -141,7 +142,7 @@ static int ucc_tl_sharp_service_barrier(void *arg)
         ucc_context_progress(ctx->super.super.ucc_context);
         status = ucc_collective_test(&req->super);
     } while (status == UCC_INPROGRESS);
-    ucc_collective_finalize(&req->super);
+    ucc_collective_finalize_internal(req);
 
     return status;
 }
@@ -179,7 +180,7 @@ static int ucc_tl_sharp_service_gather(void *arg, int root, void *sbuf,
         ucc_context_progress(ctx->super.super.ucc_context);
         status = ucc_collective_test(&req->super);
     } while (status == UCC_INPROGRESS);
-    ucc_collective_finalize(&req->super);
+    ucc_collective_finalize_internal(req);
 
     if (subset.myrank != root) {
         ucc_free(rbuf);
@@ -208,7 +209,7 @@ static int ucc_tl_sharp_service_bcast(void *arg, void *buf, int size, int root)
         status = ucc_collective_test(&req->super);
     } while (status == UCC_INPROGRESS);
 
-    ucc_collective_finalize(&req->super);
+    ucc_collective_finalize_internal(req);
     return status;
 }
 

@@ -180,9 +180,6 @@ typedef struct ucc_tl_mlx5_rcache_region {
 #define UCC_TL_CTX_LIB(_ctx)                                                   \
     (ucc_derived_of((_ctx)->super.super.lib, ucc_tl_mlx5_lib_t))
 
-#define IS_SERVICE_TEAM(_team)                                                 \
-    ((_team)->super.super.params.scope == UCC_CL_LAST + 1)
-
 #define SQUARED(_num) ((_num) * (_num))
 
 ucc_status_t tl_mlx5_create_rcache(ucc_tl_mlx5_context_t *ctx);
