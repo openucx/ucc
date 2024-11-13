@@ -129,6 +129,7 @@ typedef struct ucc_tl_ucp_task {
             ucc_ee_executor_task_t *etask;
             ucc_ee_executor_t      *executor;
         } allreduce_kn;
+#ifdef HAVE_UCP_MEMH_PACK
         struct {
             ucc_tl_ucp_allreduce_sw_pipeline          *pipe;
             ucs_status_ptr_t                          *put_requests;
@@ -137,6 +138,7 @@ typedef struct ucc_tl_ucp_task {
             ucc_ee_executor_task_t                    *reduce_task;
             ucc_tl_ucp_dpu_offload_buf_info_t         *bufs;
         } allreduce_sliding_window;
+#endif
         struct {
             int                     phase;
             ucc_knomial_pattern_t   p;
