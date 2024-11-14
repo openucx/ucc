@@ -153,6 +153,16 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
+    {"REDUCE_SRG_KN_PIPELINE", "auto",
+     "Pipelining settings for SRG Knomial reduce algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_srg_kn_pipeline),
+     UCC_CONFIG_TYPE_PIPELINE_PARAMS},
+
+    {"REDUCE_SRG_KN_RADIX", "auto",
+     "Radix of the scatter-reduce-gather (SRG) knomial reduce algorithm",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_srg_kn_radix),
+     UCC_CONFIG_TYPE_UINT_RANGED},
+
     {"GATHER_KN_RADIX", "4", "Radix of the knomial tree reduce algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, gather_kn_radix),
      UCC_CONFIG_TYPE_UINT},
