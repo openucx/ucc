@@ -252,8 +252,6 @@ ucc_status_t register_memory(ucc_coll_task_t *coll_task){
     ucc_tl_ucp_team_t     *team      = TASK_TEAM(task);
     ucc_coll_type_t        ct        = args->coll_type;
     ucc_kn_radix_t         radix     = task->allgather_kn.p.radix;
-    uint8_t                node_type = task->allgather_kn.p.node_type;
-    ucc_knomial_pattern_t *p         = &task->allgather_kn.p;
     void                  *rbuf      = args->dst.info.buffer;
     ucc_memory_type_t      mem_type  = args->dst.info.mem_type;
     size_t                 count     = args->dst.info.count;
@@ -274,14 +272,12 @@ ucc_status_t register_memory(ucc_coll_task_t *coll_task){
 
     ucc_tl_ucp_context_t  *ctx = UCC_TL_UCP_TEAM_CTX(team);
     ucp_mem_map_params_t   mmap_params;
-    // ucp_mem_h              mh;
     int                    size_of_list = 1;
     int                    count_mh = 0;
     ucp_mem_h             *mh_list = (ucp_mem_h *)malloc(size_of_list * sizeof(ucp_mem_h));
 
-    UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
-    task->allgather_kn.etask = NULL;
-    task->allgather_kn.phase = UCC_KN_PHASE_INIT;
+    ptrdiff_t          offset;
+
     if (ct == UCC_COLL_TYPE_ALLGATHER) {
         ucc_kn_ag_pattern_init(size, rank, radix, args->dst.info.count,
                                &task->allgather_kn.p);
@@ -289,6 +285,14 @@ ucc_status_t register_memory(ucc_coll_task_t *coll_task){
         ucc_kn_agx_pattern_init(size, rank, radix, args->dst.info.count,
                                 &task->allgather_kn.p);
     }
+
+    offset = ucc_sra_kn_get_offset(count,
+                                dt_size, rank,
+                                size, radix);
+    task->allgather_kn.sbuf = PTR_OFFSET(args->dst.info.buffer, offset);
+
+    ucc_knomial_pattern_t *p         = &task->allgather_kn.p;
+    uint8_t                node_type = task->allgather_kn.p.node_type;
 
     mmap_params.field_mask  = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
                             UCP_MEM_MAP_PARAM_FIELD_LENGTH  |
