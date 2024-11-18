@@ -112,7 +112,6 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     case STAGE_INIT_BAR_ROOT:
         if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task))) {
             found = false;
-            peer = ucc_ep_map_eval(task->subset.map, 1);
             /* search first free barrier in active set pool */
             for (i = 0; i < max_concurrent; ++i) {
                 curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);                
