@@ -103,10 +103,8 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
     ucc_rank_t                 trank          = UCC_TL_TEAM_RANK(team);
     ucc_tl_cuda_lib_t         *lib            = UCC_TL_CUDA_TEAM_LIB(team);
     uint32_t                   max_concurrent = lib->cfg.max_concurrent;
-    ucc_tl_cuda_shm_barrier_t *curr_bar;
     ucc_tl_cuda_task_t        *task;
     ucc_status_t               status;
-    uint32_t                   i;
 
     if (!ucc_coll_args_is_predefined_dt(&coll_args->args, trank)) {
         return UCC_ERR_NOT_SUPPORTED;
@@ -126,73 +124,23 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
     /* active set */
     if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args)) {
         ucc_assert(coll_args->args.coll_type == UCC_COLL_TYPE_BCAST);
-
         task->subset.map    = ucc_active_set_to_ep_map(&coll_args->args);
         task->subset.myrank = UCC_TL_TEAM_RANK(team);
         // root
         if (task->subset.myrank == coll_args->args.root) {
-            bool found = false;
-            int peer = ucc_ep_map_eval(task->subset.map, 1);
-            uint64_t key   = ((uint64_t)coll_args->args.tag << 32 |
-                            coll_args->args.root << 16 | peer);
-            /* search first free barrier in active set pool */
-            for (i = 0; i < max_concurrent; ++i) {
-                curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);                
-                if (ucc_atomic_cswap64(&curr_bar->tag, UCC_TAG_FREE, key) == UCC_TAG_FREE) {
-                    ucc_print("found free barrier: %d marked with tag: %ld", i, curr_bar->tag);
-                    // free
-                    task->bar = curr_bar;
-                    // set user specified tag to mark that this barrier is used by this task
-                    task->bar->tag = key;
-                    status = ucc_tl_cuda_shm_barrier_init_root(task->subset.map.ep_num, task->subset.myrank, coll_args->args.root, task->bar);
-                    if (ucc_unlikely(status != UCC_OK)) {
-                        ucc_error("failed to init root barrier");
-                        return UCC_ERR_NO_RESOURCE;
-                    }
-                    found = true;
-                    task->coll_id = i + max_concurrent;
-                    break;
-                }
-            }
-            if (!found)
-            {
-                ucc_error("Unable to find free barrier");
-                ucc_assert(found);
-                return UCC_ERR_NO_RESOURCE;
-            }
+            int peer               = ucc_ep_map_eval(task->subset.map, 1);
+            task->bcast_linear.key = ((uint64_t)coll_args->args.tag << 32 |
+                                      coll_args->args.root << 16 | peer);
         } else {
-            /* pool barrier while root mark any of it with tag */
-            bool found = false;
-
-            uint64_t key = ((uint64_t)coll_args->args.tag << 32 |
-                            coll_args->args.root << 16 | task->subset.myrank);
-
-            // TODO: get rid of inf loop?
-            while (!found)
-            {
-                for (i = 0; i < max_concurrent; ++i) {
-                    curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
-                    if (curr_bar->tag == key) {
-                        task->bar = curr_bar;
-                        // TODO: pass root rank???
-                        status = ucc_tl_cuda_shm_barrier_init_root(task->subset.map.ep_num, task->subset.myrank, coll_args->args.root, task->bar);
-                        if (ucc_unlikely(status != UCC_OK)) {
-                            ucc_error("failed to init peer barrier");
-                            return UCC_ERR_NO_RESOURCE;
-                        }
-                        found = true;
-                        task->coll_id = i + max_concurrent;
-                        break;
-                    }
-                }
-            }
+            task->bcast_linear.key =
+                ((uint64_t)coll_args->args.tag << 32 |
+                 coll_args->args.root << 16 | task->subset.myrank);
         }
         task->seq_num = team->seq_num_active_set++;
-        // task->coll_id = task->seq_num % max_concurrent + max_concurrent;
     } else {
         task->seq_num = team->seq_num++;
         task->coll_id = task->seq_num % max_concurrent;
-        task->bar = TASK_BAR(task);
+        task->bar     = TASK_BAR(task);
     }
 
     *task_h = task;
