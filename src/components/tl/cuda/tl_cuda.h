@@ -242,6 +242,7 @@ struct ucc_tl_cuda_task {
             size_t                  size;
             int                     num_steps;
             ucc_ee_executor_task_t *exec_task;
+            uint64_t                key; // This is mix of user provided tag, root and peer to be unique for each task, algorithm uses it to mark barrier as used
         } bcast_linear;
         struct {
             int                     stage;

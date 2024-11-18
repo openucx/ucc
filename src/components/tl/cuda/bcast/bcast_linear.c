@@ -7,6 +7,10 @@
 #include "bcast.h"
 
 enum {
+    // Barrier setup
+    STAGE_INIT_BAR_ROOT,
+    STAGE_FIND_BAR_PEER,
+
     STAGE_SYNC,
     STAGE_SETUP,
     // root
@@ -77,20 +81,22 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     ucc_tl_cuda_task_t *task              = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team              = TASK_TEAM(task);
     ucc_rank_t          trank             = UCC_TL_TEAM_RANK(team);
-    ucc_rank_t          tsize             = (ucc_rank_t)task->subset.map.ep_num;
+    uint32_t            max_concurrent    = UCC_TL_CUDA_TEAM_LIB(team)->cfg.max_concurrent;
     size_t              half_scratch_size = get_raw_scratch_size(team) / 2;
+    ucc_rank_t          tsize             = (ucc_rank_t)task->subset.map.ep_num;
     size_t              chunk_size        =
         task->bcast_linear.step < task->bcast_linear.num_steps
                          ? ucc_min(half_scratch_size, task->bcast_linear.size)
                          : task->bcast_linear.size -
                   (task->bcast_linear.step - 1) * half_scratch_size;
-    size_t offset_buff                    = task->bcast_linear.step * half_scratch_size;
-    ucc_ee_executor_t      *exec;
-    ucc_ee_executor_task_t *etask;
-    ucc_status_t            st;
-    void                   *sbuf, *dbuf;
-    int                     i;
-    ucc_rank_t              peer;
+    size_t              offset_buff       = task->bcast_linear.step * half_scratch_size;
+    ucc_ee_executor_t         *exec;
+    ucc_ee_executor_task_t    *etask;
+    ucc_status_t               st;
+    void                      *sbuf, *dbuf;
+    int                        i;
+    ucc_rank_t                 peer;
+    ucc_tl_cuda_shm_barrier_t *curr_bar;
 
     task->super.status = UCC_INPROGRESS;
 
@@ -101,6 +107,64 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     }
 
     switch (task->bcast_linear.stage) {
+    case STAGE_INIT_BAR_ROOT:
+        if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task))) {
+            bool found = false;
+            peer = ucc_ep_map_eval(task->subset.map, 1);
+            /* search first free barrier in active set pool */
+            for (i = 0; i < max_concurrent; ++i) {
+                curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);                
+                if (ucc_atomic_cswap64(&curr_bar->tag, UCC_TAG_FREE, task->bcast_linear.key) == UCC_TAG_FREE) {
+                    ucc_print("found free barrier: %d marked with tag: %ld", i, curr_bar->tag);
+                    // free
+                    task->bar = curr_bar;
+                    // set user specified tag to mark that this barrier is used by this task
+                    task->bar->tag = task->bcast_linear.key;
+                    st = ucc_tl_cuda_shm_barrier_init_root(task->subset.map.ep_num, task->subset.myrank, task->bcast_linear.root, task->bar);
+                    if (ucc_unlikely(st != UCC_OK)) {
+                        ucc_error("failed to init root barrier");
+                        task->super.status = UCC_ERR_NO_RESOURCE;
+                        return;
+                    }
+                    found = true;
+                    task->coll_id = i + max_concurrent;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                // try next time
+                return;
+            }
+            task->bcast_linear.stage = STAGE_SYNC;
+            break; // TODO: move all logic to separate functions
+        }
+    case STAGE_FIND_BAR_PEER:
+        bool found = false;
+        for (i = 0; i < max_concurrent; ++i) {
+            curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
+            if (curr_bar->tag == task->bcast_linear.key) {
+                task->bar = curr_bar;
+                // TODO: pass root rank???
+                st = ucc_tl_cuda_shm_barrier_init_root(
+                    task->subset.map.ep_num, task->subset.myrank,
+                    task->bcast_linear.root, task->bar);
+                if (ucc_unlikely(st != UCC_OK)) {
+                    ucc_error("failed to init peer barrier");
+                    task->super.status = UCC_ERR_NO_RESOURCE;
+                    return;
+                }
+                found         = true;
+                task->coll_id = i + max_concurrent;
+                task->bcast_linear.stage = STAGE_SYNC;
+                break;
+            }
+        }
+        if (!found)
+        {
+            // try next time;
+            return;            
+        }
     case STAGE_SYNC:
         if (ucc_tl_cuda_get_sync_root(task, task->bcast_linear.root) != UCC_OK) {
             return;
@@ -254,7 +318,7 @@ ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
     ucc_datatype_t      dt   = task->bcast_linear.dt;
     size_t              half_scratch_size = get_raw_scratch_size(team) / 2;
 
-    task->bcast_linear.stage = STAGE_SYNC;
+    task->bcast_linear.stage = UCC_TL_TEAM_RANK(team) == task->bcast_linear.root ? STAGE_INIT_BAR_ROOT : STAGE_FIND_BAR_PEER;
 
     task->bcast_linear.size = ucc_dt_size(dt) * args->src.info.count;
     task->bcast_linear.num_steps =
