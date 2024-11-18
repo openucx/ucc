@@ -97,6 +97,8 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     int                        i;
     ucc_rank_t                 peer;
     ucc_tl_cuda_shm_barrier_t *curr_bar;
+    bool                       found;
+
 
     task->super.status = UCC_INPROGRESS;
 
@@ -109,7 +111,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     switch (task->bcast_linear.stage) {
     case STAGE_INIT_BAR_ROOT:
         if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task))) {
-            bool found = false;
+            found = false;
             peer = ucc_ep_map_eval(task->subset.map, 1);
             /* search first free barrier in active set pool */
             for (i = 0; i < max_concurrent; ++i) {
@@ -140,7 +142,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             break; // TODO: move all logic to separate functions
         }
     case STAGE_FIND_BAR_PEER:
-        bool found = false;
+        found = false;
         for (i = 0; i < max_concurrent; ++i) {
             curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
             if (curr_bar->tag == task->bcast_linear.key) {
