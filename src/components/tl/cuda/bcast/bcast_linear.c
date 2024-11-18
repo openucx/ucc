@@ -183,12 +183,11 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
         }
         if (st == UCC_OK) {
             task->bcast_linear.stage = STAGE_SYNC;
-            break;
+            break; // prevent from fall to next case
         } else {
             task->super.status = UCC_ERR_NO_RESOURCE;
             return;
         }
-        break;
     case STAGE_FIND_BAR_PEER:
         st = peer_find_free_barrier(task);
         if (st == UCC_ERR_NOT_FOUND) {
