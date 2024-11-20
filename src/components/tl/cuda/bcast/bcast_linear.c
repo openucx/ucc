@@ -11,8 +11,6 @@ enum {
     STAGE_INIT_BAR_ROOT,
     STAGE_FIND_BAR_PEER,
 
-    STAGE_BAR,
-
     STAGE_SYNC,
     STAGE_SETUP,
     // root
@@ -27,7 +25,22 @@ enum {
 
 ucc_status_t ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
 {
+    ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
+    ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
+    ucc_status_t        status;
+
+    set_rank_step(task, trank, 0, 0);
+    ucc_memory_cpu_store_fence();
+    // initiate barrier wait while all ranks set theirs steps to 0
+    status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
+    if (ucc_unlikely(status != UCC_OK)) {
+        goto exit_err;
+    }
+
     return UCC_OK;
+
+exit_err:
+    return status;
 }
 
 ucc_status_t ucc_tl_cuda_bcast_linear_setup_test(ucc_tl_cuda_task_t *task)
@@ -124,26 +137,6 @@ static inline ucc_status_t peer_find_free_barrier(ucc_tl_cuda_task_t *task)
     return UCC_OK;
 }
 
-static inline ucc_status_t do_start(ucc_tl_cuda_task_t *task)
-{
-    ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
-    ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
-    ucc_status_t        status;
-
-    set_rank_step(task, trank, 0, 0);
-    ucc_memory_cpu_store_fence();
-    // initiate barrier wait while all ranks set theirs steps to 0
-    status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
-    if (ucc_unlikely(status != UCC_OK)) {
-        goto exit_err;
-    }
-
-    return UCC_OK;
-
-exit_err:
-    return status;
-}
-
 ucc_status_t ucc_tl_cuda_bcast_linear_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
@@ -189,7 +182,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             return;
         }
         if (st == UCC_OK) {
-            task->bcast_linear.stage = STAGE_BAR;
+            task->bcast_linear.stage = STAGE_SYNC;
             return;
 
         } else {
@@ -204,15 +197,12 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
         }
         if (st == UCC_OK) {
             // barrier found, continue to next stages
-            task->bcast_linear.stage = STAGE_BAR;
+            task->bcast_linear.stage = STAGE_SYNC;
             return;
         } else {
             task->super.status = UCC_ERR_NO_RESOURCE;
             return;
         }
-    case STAGE_BAR:
-        do_start(task);
-        task->bcast_linear.stage = STAGE_SYNC;
     case STAGE_SYNC:
         if (ucc_tl_cuda_get_sync_root(task, task->bcast_linear.root) != UCC_OK) {
             return;
