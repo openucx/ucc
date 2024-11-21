@@ -53,6 +53,7 @@ typedef struct ucc_tl_sharp_context_config {
     int                      context_per_team;
     int                      enable_lazy_group_alloc;
     int                      team_max_ppn;
+    int                      multi_channel;
 } ucc_tl_sharp_context_config_t;
 
 typedef struct ucc_tl_sharp_lib {
