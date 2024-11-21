@@ -82,7 +82,7 @@ static inline ucc_status_t root_find_free_barrier(ucc_tl_cuda_task_t *task)
         // try to set user specified tag to mark that this barrier is used by this task
         if (ucc_atomic_cswap64(&curr_bar->tag, UCC_TAG_FREE,
                                task->bcast_linear.key) == UCC_TAG_FREE) {
-            ucc_print("found free barrier: %d marked with tag: %ld", i,
+            ucc_print("found free barrier: %p idx: %d marked with tag: %ld", curr_bar, i,
                       curr_bar->tag);
             // free
             task->bar = curr_bar;
@@ -126,7 +126,6 @@ static inline ucc_status_t peer_find_free_barrier(ucc_tl_cuda_task_t *task)
             }
             found                    = true;
             task->coll_id            = i + max_concurrent;
-            // task->bcast_linear.stage = STAGE_SYNC;
             break;
         }
     }
@@ -292,6 +291,9 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 // finish
                 ucc_tl_cuda_put_sync_root(task, task->bcast_linear.root);
                 task->super.status = UCC_OK;
+                // set barrier free to unlock others, this is roots responsibility
+                ucc_print("Free bar: %p with tag: %ld", task->bar, task->bar->tag);
+                task->bar->tag = UCC_TAG_FREE;                
                 break;
             }
         default:
