@@ -72,6 +72,11 @@ static ucc_config_field_t ucc_tl_sharp_context_config_table[] = {
      ucc_offsetof(ucc_tl_sharp_context_config_t, team_max_ppn),
      UCC_CONFIG_TYPE_UINT},
 
+    {"MULTI_CHANNEL", "0",
+     "Use SHARP Multi-channel feature. Options: 0-disable 1-enable",
+     ucc_offsetof(ucc_tl_sharp_context_config_t, multi_channel),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_sharp_lib_t, ucc_base_lib_t,
