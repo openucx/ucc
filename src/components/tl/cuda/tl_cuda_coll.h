@@ -86,11 +86,6 @@ static inline ucc_tl_cuda_task_t *ucc_tl_cuda_task_get(ucc_tl_cuda_team_t *team)
 static inline void ucc_tl_cuda_task_put(ucc_tl_cuda_task_t *task)
 {
     UCC_TL_CUDA_PROFILE_REQUEST_FREE(task);
-
-    if (UCC_TL_TEAM_RANK(TASK_TEAM(task)) == task->bcast_linear.root) {
-        task->bar->tag = UCC_TAG_FREE;
-    }
-
     ucc_mpool_put(task);
 }
 
