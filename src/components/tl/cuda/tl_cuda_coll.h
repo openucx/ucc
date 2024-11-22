@@ -94,11 +94,11 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
                                    ucc_tl_cuda_team_t *team,
                                    ucc_tl_cuda_task_t **task_h)
 {
-    ucc_rank_t                 trank          = UCC_TL_TEAM_RANK(team);
-    ucc_tl_cuda_lib_t         *lib            = UCC_TL_CUDA_TEAM_LIB(team);
-    uint32_t                   max_concurrent = lib->cfg.max_concurrent;
-    ucc_tl_cuda_task_t        *task;
-    ucc_status_t               status;
+    ucc_rank_t          trank          = UCC_TL_TEAM_RANK(team);
+    ucc_tl_cuda_lib_t  *lib            = UCC_TL_CUDA_TEAM_LIB(team);
+    uint32_t            max_concurrent = lib->cfg.max_concurrent;
+    ucc_tl_cuda_task_t *task;
+    ucc_status_t        status;
 
     if (!ucc_coll_args_is_predefined_dt(&coll_args->args, trank)) {
         return UCC_ERR_NOT_SUPPORTED;
