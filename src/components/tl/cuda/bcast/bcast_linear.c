@@ -6,6 +6,8 @@
 
 #include "bcast.h"
 
+#include <stdbool.h>
+
 enum {
     // Barrier setup
     STAGE_INIT_BAR_ROOT,
