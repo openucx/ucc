@@ -83,9 +83,8 @@ static inline ucc_status_t root_find_free_barrier(ucc_tl_cuda_task_t *task)
         // try to set user specified tag to mark that this barrier is used by this task
         if (ucc_atomic_cswap64(&curr_bar->tag, UCC_TAG_FREE,
                                task->bcast_linear.key) == UCC_TAG_FREE) {
-            ucc_print("found free barrier: %p idx: %d marked with tag: %ld", curr_bar, i,
-                      curr_bar->tag);
-            // free
+            ucc_debug("Acquire barrier: %p idx: %d marked with tag: %ld",
+                      curr_bar, i, curr_bar->tag);
             task->bar = curr_bar;
             st        = ucc_tl_cuda_shm_barrier_init_root(
                 task->subset.map.ep_num, task->subset.myrank,
@@ -118,15 +117,15 @@ static inline ucc_status_t peer_find_free_barrier(ucc_tl_cuda_task_t *task)
         curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
         if (curr_bar->tag == task->bcast_linear.key) {
             task->bar = curr_bar;
-            st = ucc_tl_cuda_shm_barrier_init_root(
+            st        = ucc_tl_cuda_shm_barrier_init_root(
                 task->subset.map.ep_num, task->subset.myrank,
                 task->bcast_linear.root, task->bar);
             if (ucc_unlikely(st != UCC_OK)) {
                 ucc_error("failed to init peer barrier");
                 return UCC_ERR_NO_RESOURCE;
             }
-            found                    = true;
-            task->coll_id            = i + max_concurrent;
+            found         = true;
+            task->coll_id = i + max_concurrent;
             break;
         }
     }
@@ -291,8 +290,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             } else {
                 // finish
                 st = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
-                if (ucc_unlikely(st != UCC_OK))
-                {
+                if (ucc_unlikely(st != UCC_OK)) {
                     ucc_error("failed to start barrier from root rank");
                     task->super.status = st;
                     return;
@@ -301,14 +299,14 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             }
         case STAGE_WAIT_COMPLETION:
             st = ucc_tl_cuda_shm_barrier_test(trank, task->bar);
-            if (st != UCC_OK)
-            {
+            if (st != UCC_OK) {
                 // peers still working, lets check next time
                 task->super.status = st;
                 return;
             }
             // set barrier free to unlock others, this is roots responsibility
-            ucc_print("Free bar: %p with tag: %ld", task->bar, task->bar->tag);
+            ucc_debug("Release bar: %p with tag: %ld", task->bar,
+                      task->bar->tag);
             task->bar->tag = UCC_TAG_FREE;
             ucc_tl_cuda_put_sync_root(task, task->bcast_linear.root);
             task->super.status = UCC_OK;
