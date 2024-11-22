@@ -7,8 +7,6 @@
 #ifndef UCC_TL_CUDA_COLL_H_
 #define UCC_TL_CUDA_COLL_H_
 
-#include <stdbool.h>
-
 #include "tl_cuda.h"
 #include "components/mc/ucc_mc.h"
 
