@@ -1,6 +1,12 @@
 #
-# Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
+
+allgatherv =                         \
+	allgatherv/unpack.h              \
+	allgatherv/unpack.c              \
+	allgatherv/allgatherv.h          \
+	allgatherv/allgatherv.c
 
 allreduce =                          \
 	allreduce/allreduce.h            \
@@ -8,41 +14,42 @@ allreduce =                          \
 	allreduce/allreduce_rab.c        \
 	allreduce/allreduce_split_rail.c
 
-alltoallv =                   \
-	alltoallv/alltoallv.h     \
+alltoallv =                          \
+	alltoallv/alltoallv.h            \
 	alltoallv/alltoallv.c
 
-alltoall =                    \
-	alltoall/alltoall.h       \
+alltoall =                           \
+	alltoall/alltoall.h              \
 	alltoall/alltoall.c
 
-barrier =                     \
-	barrier/barrier.h         \
+barrier =                            \
+	barrier/barrier.h                \
 	barrier/barrier.c
 
-bcast =                       \
-	bcast/bcast.h             \
-	bcast/bcast.c             \
+bcast =                              \
+	bcast/bcast.h                    \
+	bcast/bcast.c                    \
 	bcast/bcast_2step.c
 
-reduce =                      \
-	reduce/reduce.h           \
-	reduce/reduce.c           \
+reduce =                             \
+	reduce/reduce.h                  \
+	reduce/reduce.c                  \
 	reduce/reduce_2step.c
 
-sources =             \
-	cl_hier.h         \
-	cl_hier.c         \
-	cl_hier_lib.c     \
-	cl_hier_context.c \
-	cl_hier_team.c    \
-	cl_hier_coll.c    \
-	cl_hier_coll.h    \
-	$(allreduce)      \
-	$(alltoallv)      \
-	$(alltoall)       \
-	$(barrier)        \
-	$(bcast)          \
+sources =                            \
+	cl_hier.h                        \
+	cl_hier.c                        \
+	cl_hier_lib.c                    \
+	cl_hier_context.c                \
+	cl_hier_team.c                   \
+	cl_hier_coll.c                   \
+	cl_hier_coll.h                   \
+	$(allgatherv)                    \
+	$(allreduce)                     \
+	$(alltoallv)                     \
+	$(alltoall)                      \
+	$(barrier)                       \
+	$(bcast)                         \
 	$(reduce)
 
 module_LTLIBRARIES         = libucc_cl_hier.la
