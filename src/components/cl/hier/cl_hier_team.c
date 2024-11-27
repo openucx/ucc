@@ -47,6 +47,8 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     ucc_tl_lib_t              *tl_lib;
     ucc_base_lib_attr_t        attr;
 
+    self->node_leaders = NULL;
+    self->leader_list  = NULL;
 
     if (!params->team->topo) {
         cl_debug(cl_context->lib,
@@ -202,6 +204,13 @@ ucc_status_t ucc_cl_hier_team_destroy(ucc_base_team_t *cl_team)
     int                        i, j;
     ucc_hier_sbgp_t           *hs;
     struct ucc_team_team_desc *d;
+
+    if (team->node_leaders) {
+        ucc_free(team->node_leaders);
+        ucc_free(team->leader_list);
+        team->node_leaders = NULL;
+        team->leader_list  = NULL;
+    }
 
     if (NULL == team->team_create_req) {
         status = ucc_team_multiple_req_alloc(&team->team_create_req,
@@ -396,6 +405,16 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
         score, UCC_COLL_TYPE_BARRIER, UCC_MEMORY_TYPE_HOST,
         0, UCC_MSG_MAX, UCC_CL_HIER_DEFAULT_SCORE,
         ucc_cl_hier_barrier_init, cl_team);
+    if (UCC_OK != status) {
+        cl_error(lib, "faild to add range to score_t");
+        return status;
+
+    }
+
+    status = ucc_coll_score_add_range(
+        score, UCC_COLL_TYPE_ALLGATHERV, UCC_MEMORY_TYPE_HOST,
+        0, UCC_MSG_MAX, UCC_CL_HIER_DEFAULT_SCORE,
+        ucc_cl_hier_allgatherv_init, cl_team);
     if (UCC_OK != status) {
         cl_error(lib, "faild to add range to score_t");
         return status;
