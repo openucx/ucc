@@ -97,6 +97,17 @@ ucc_coll_args_get_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
     return ((uint32_t *)counts)[idx];
 }
 
+static inline void
+ucc_coll_args_set_count(const ucc_coll_args_t *args, const ucc_count_t *counts,
+                        ucc_rank_t idx, size_t val)
+{
+    if (UCC_COLL_ARGS_COUNT64(args)) {
+        ((uint64_t *)counts)[idx] = (uint64_t)val;
+    } else {
+        ((uint32_t *)counts)[idx] = (uint32_t)val;
+    }
+}
+
 static inline size_t ucc_coll_args_get_max_count(const ucc_coll_args_t *args,
                                                  const ucc_count_t *    counts,
                                                  ucc_rank_t             size)
@@ -121,6 +132,18 @@ ucc_coll_args_get_displacement(const ucc_coll_args_t *args,
         return ((uint64_t *)displacements)[idx];
     }
     return ((uint32_t *)displacements)[idx];
+}
+
+static inline void
+ucc_coll_args_set_displacement(const ucc_coll_args_t *args,
+                               const ucc_aint_t *displacements, ucc_rank_t idx,
+                               size_t val)
+{
+    if (UCC_COLL_ARGS_DISPL64(args)) {
+        ((uint64_t *)displacements)[idx] = (uint64_t)val;
+    } else {
+        ((uint32_t *)displacements)[idx] = (uint32_t)val;
+    }
 }
 
 static inline size_t
