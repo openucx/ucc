@@ -256,7 +256,8 @@ ucc_status_t ucc_dependency_handler(ucc_coll_task_t *parent,
     ucc_status_t status;
     uint8_t      n_deps_satisfied;
 
-    n_deps_satisfied = ucc_atomic_fadd8(&task->n_deps_satisfied, 1);
+    n_deps_satisfied = ucc_atomic_fadd32(&task->n_deps_satisfied, 1);
+    ucc_assert(task->n_deps_satisfied > n_deps_satisfied);
 
     ucc_trace_req("task %p, n_deps %d, satisfied %d", task, task->n_deps,
                   n_deps_satisfied);
