@@ -919,25 +919,25 @@ err_ranges:
     return 0;
 }
 
+#define MAX_TMP_BUF_LENGTH 128
 int ucc_config_sprintf_uint_ranged(char *buf, size_t max, const void *src,
                                    const void *arg) // NOLINT
 {
     const ucc_mrange_uint_t *s       = src;
-    const size_t             tmp_max = 128;
     ucc_mrange_t            *r;
-    char                     tmp_start[tmp_max];
-    char                     tmp_end[tmp_max];
-    char                     tmp_mtypes[tmp_max];
+    char                     tmp_start[MAX_TMP_BUF_LENGTH];
+    char                     tmp_end[MAX_TMP_BUF_LENGTH];
+    char                     tmp_mtypes[MAX_TMP_BUF_LENGTH];
     size_t                   last;
 
     ucc_list_for_each(r, &s->ranges, list_elem) {
-        ucs_memunits_to_str(r->start, tmp_start, tmp_max);
-        ucs_memunits_to_str(r->end, tmp_end, tmp_max);
+        ucs_memunits_to_str(r->start, tmp_start, MAX_TMP_BUF_LENGTH);
+        ucs_memunits_to_str(r->end, tmp_end, MAX_TMP_BUF_LENGTH);
         if (r->mtypes == UCC_MEM_TYPE_MASK_FULL) {
             ucc_snprintf_safe(buf, max, "%s-%s:%u", tmp_start, tmp_end,
                               r->value);
         } else {
-            ucc_mtype_map_to_str(r->mtypes, "^", tmp_mtypes, tmp_max);
+            ucc_mtype_map_to_str(r->mtypes, "^", tmp_mtypes, MAX_TMP_BUF_LENGTH);
             ucc_snprintf_safe(buf, max, "%s-%s:%s:%u", tmp_start, tmp_end,
                               tmp_mtypes, r->value);
         }
