@@ -6,24 +6,22 @@
 
 #include "bcast.h"
 
-#include <stdbool.h>
-
 enum {
-    // Barrier setup
-    STAGE_INIT_BAR_ROOT,
-    STAGE_FIND_BAR_PEER,
+    // Barrier setup stages
+    STAGE_INIT_BAR_ROOT,    // Initial stage for the root rank to identify and claim a free barrier
+    STAGE_FIND_BAR_PEER,    // Stage where peer ranks wait while the root rank identifies a free barrier
 
-    STAGE_SYNC,
-    STAGE_SETUP,
-    // root
-    STAGE_COPY,      // post copy task: copy block from src to scratch buffer
-    STAGE_WAIT_COPY, // wait for copy finishes
-    STAGE_WAIT_ALL,  // wait for all others rank be on same step
-    STAGE_WAIT_COMPLETION, // wait for all others rank completes bcast
+    STAGE_SYNC,             // Initialize the barrier and synchronize the segment required for the current task
+    STAGE_SETUP,            // Verify that all ranks are aligned and have reached the barrier
+    // Stages specific to the root rank
+    STAGE_COPY,             // Post copy task: copy data block from src to a scratch buffer
+    STAGE_WAIT_COPY,        // The root waits for the completion of its copy operation
+    STAGE_WAIT_ALL,         // The root rank waits until all other ranks have reached the same operational step
+    STAGE_WAIT_COMPLETION,  // The root rank waits for all other ranks to complete the broadcast operation
     // non-root
-    STAGE_WAIT_ROOT,   // clients wait while root writes to own scratch buffer
-    STAGE_CLIENT_COPY, // clients submit copy task
-    STAGE_CLIENT_COPY_WAIT, // clients wait completion of copy from root's scratch
+    STAGE_WAIT_ROOT,        // Non-root ranks wait while the root rank writes data to its scratch buffer
+    STAGE_CLIENT_COPY,      // Non-root ranks initiate their own copy tasks after the root's operations
+    STAGE_CLIENT_COPY_WAIT, // Non-root ranks wait for the completion of the copy operation from the root's scratch buffer
 };
 
 ucc_status_t ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
@@ -32,7 +30,7 @@ ucc_status_t ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
     ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
     ucc_status_t        status;
 
-    set_rank_step(task, trank, 0, 0);
+    set_rank_step(task, trank, 0, 0); // Initialize rank step tracking
     ucc_memory_cpu_store_fence();
     // initiate barrier wait while all ranks set theirs steps to 0
     status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
@@ -46,17 +44,20 @@ exit_err:
     return status;
 }
 
+// Tests if setup is complete for a linear broadcast task
 ucc_status_t ucc_tl_cuda_bcast_linear_setup_test(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     return ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), task->bar);
 }
 
+// Returns the size of the scratch buffer used for data transfers
 static inline size_t get_raw_scratch_size(ucc_tl_cuda_team_t *team)
 {
     return UCC_TL_CUDA_TEAM_LIB(team)->cfg.scratch_size;
 }
 
+// Posts a copy task to the CUDA executor
 static inline ucc_status_t ecopy(void *dst, void *src, size_t size,
                                  ucc_ee_executor_t       *exec,
                                  ucc_ee_executor_task_t **etask)
@@ -70,16 +71,16 @@ static inline ucc_status_t ecopy(void *dst, void *src, size_t size,
     return ucc_ee_executor_task_post(exec, &exec_args, etask);
 }
 
+// Root rank searches for and claims a free barrier
 static inline ucc_status_t root_find_free_barrier(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     uint32_t max_concurrent  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.max_concurrent;
-    bool     found           = false;
     ucc_tl_cuda_shm_barrier_t *curr_bar;
     int                        i;
     ucc_status_t               st;
 
-    /* search first free barrier in active set pool */
+    // Iterate over available barriers in active set pool to find a free one
     for (i = 0; i < max_concurrent; ++i) {
         curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
         // try to set user specified tag to mark that this barrier is used by this task
@@ -95,28 +96,27 @@ static inline ucc_status_t root_find_free_barrier(ucc_tl_cuda_task_t *task)
                 ucc_error("failed to init root barrier");
                 return UCC_ERR_NO_RESOURCE;
             }
-            found         = true;
+            // Assign a collective ID (index of barrier)
             task->coll_id = i + max_concurrent;
-            break;
+            return UCC_OK;
         }
     }
-    if (!found) {
-        // try next time
-        return UCC_ERR_NOT_FOUND;
-    }
-    return UCC_OK;
+    // try next time
+    return UCC_ERR_NOT_FOUND;
 }
 
+// Peer rank searches for a barrier claimed by the root
 static inline ucc_status_t peer_find_free_barrier(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     uint32_t max_concurrent  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.max_concurrent;
-    bool     found           = false;
     ucc_tl_cuda_shm_barrier_t *curr_bar;
     int                        i;
     ucc_status_t               st;
+
     for (i = 0; i < max_concurrent; ++i) {
         curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
+        // Check if the barrier is claimed by the task's root
         if (curr_bar->tag == task->bcast_linear.key) {
             task->bar = curr_bar;
             st        = ucc_tl_cuda_shm_barrier_init_root(
@@ -126,16 +126,12 @@ static inline ucc_status_t peer_find_free_barrier(ucc_tl_cuda_task_t *task)
                 ucc_error("failed to init peer barrier");
                 return UCC_ERR_NO_RESOURCE;
             }
-            found         = true;
             task->coll_id = i + max_concurrent;
-            break;
+            return UCC_OK;
         }
     }
-    if (!found) {
-        // try next time
-        return UCC_ERR_NOT_FOUND;
-    }
-    return UCC_OK;
+    // try next time
+    return UCC_ERR_NOT_FOUND;
 }
 
 ucc_status_t ucc_tl_cuda_bcast_linear_finalize(ucc_coll_task_t *coll_task)
@@ -269,13 +265,10 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             }
         case STAGE_WAIT_ALL:
             for (i = 0; i < tsize; ++i) {
-                if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task)))
-                {
+                if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task))) {
                     // eval phys rank from virt
                     peer = ucc_ep_map_eval(task->subset.map, i);
-                }
-                else
-                {
+                } else {
                     peer = i;
                 }
                 // need to wait until all ranks complete step - 1, because of double buffering
