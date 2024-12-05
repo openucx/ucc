@@ -312,7 +312,7 @@ ucc_tl_cuda_team_topo_init_proxies(const ucc_tl_cuda_team_t *team,
                 tl_debug(UCC_TL_TEAM_LIB(team), "no proxy found between "
                          "dev %s (%d) and dev %s (%d), "
                          "cuda topology is not supported",
-                        pci_str[0], i, pci_str[j], j);
+                        pci_str[0], i, pci_str[1], j);
                 status = UCC_ERR_NOT_SUPPORTED;
                 goto free_data;
             }
