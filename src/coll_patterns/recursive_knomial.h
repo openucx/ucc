@@ -85,7 +85,7 @@ static inline ucc_rank_t ucc_kn_pattern_radix_pow_init(ucc_knomial_pattern_t *p,
 static inline void
 ucc_knomial_pattern_init_impl(ucc_rank_t size, ucc_rank_t rank,
                               ucc_kn_radix_t radix, ucc_knomial_pattern_t *p,
-                              int backward, int extra)
+                              int backward, int has_extra)
 {
     ucc_rank_t fs = radix;
     ucc_rank_t n_full_subtrees;
@@ -102,7 +102,7 @@ ucc_knomial_pattern_init_impl(ucc_rank_t size, ucc_rank_t rank,
     p->backward      = backward;
     p->iteration     = 0;
     n_full_subtrees  = ucc_kn_pattern_n_full(p);
-    p->n_extra       = extra ? size - n_full_subtrees * p->full_pow_size : 0;
+    p->n_extra       = has_extra ? size - n_full_subtrees * p->full_pow_size : 0;
     p->n_iters       = (p->n_extra && n_full_subtrees == 1) ?
         p->pow_radix_sup - 1 : p->pow_radix_sup;
     p->radix_pow     = ucc_kn_pattern_radix_pow_init(p, backward);
