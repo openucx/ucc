@@ -244,6 +244,7 @@ static ucc_status_t sbgp_create_node_leaders(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
             nl_array_3[sbgp_id + host_id * max_ctx_sbgp_size]++;
         }
 
+        /* Find the first rank that maps to this node, store in nl_array_2 */
         if (nl_array_1[host_id] == 0 || nl_array_1[host_id] == ctx_nlr) {
             nl_array_2[host_id] = i;
         }

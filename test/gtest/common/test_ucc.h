@@ -40,6 +40,7 @@ class UccCollArgs {
 protected:
     ucc_memory_type_t mem_type;
     gtest_ucc_inplace_t inplace;
+    bool is_contig;
     void alltoallx_init_buf(int src_rank, int dst_rank, uint8_t *buf, size_t len)
     {
         for (int i = 0; i < len; i++) {
@@ -74,6 +75,7 @@ public:
     virtual bool data_validate(UccCollCtxVec args) = 0;
     void set_mem_type(ucc_memory_type_t _mt);
     void set_inplace(gtest_ucc_inplace_t _inplace);
+    void set_contig(bool _contig);
 };
 
 #define SET_MEM_TYPE(_mt) do {                  \
