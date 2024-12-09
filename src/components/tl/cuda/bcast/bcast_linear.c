@@ -24,7 +24,7 @@ enum {
     STAGE_CLIENT_COPY_WAIT, // Non-root ranks wait for the completion of the copy operation from the root's scratch buffer
 };
 
-ucc_status_t ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
+static inline ucc_status_t ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
     ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
@@ -45,7 +45,7 @@ exit_err:
 }
 
 // Tests if setup is complete for a linear broadcast task
-ucc_status_t ucc_tl_cuda_bcast_linear_setup_test(ucc_tl_cuda_task_t *task)
+static inline ucc_status_t ucc_tl_cuda_bcast_linear_setup_test(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     return ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), task->bar);
@@ -134,7 +134,7 @@ static inline ucc_status_t peer_find_free_barrier(ucc_tl_cuda_task_t *task)
     return UCC_ERR_NOT_FOUND;
 }
 
-ucc_status_t ucc_tl_cuda_bcast_linear_finalize(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_cuda_bcast_linear_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
 
@@ -143,7 +143,7 @@ ucc_status_t ucc_tl_cuda_bcast_linear_finalize(ucc_coll_task_t *coll_task)
     return UCC_OK;
 }
 
-void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
+static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task              = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team              = TASK_TEAM(task);
@@ -366,7 +366,7 @@ void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     }
 }
 
-ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
+static ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
