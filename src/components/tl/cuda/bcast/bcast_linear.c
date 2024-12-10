@@ -209,7 +209,8 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
         st = ucc_tl_cuda_bcast_linear_setup_test(task);
         if (st != UCC_OK) {
             task->super.status = st;
-            return;the copy operation from the root's scratch buffer
+            return;
+        }
         if (trank == task->bcast_linear.root) {
             task->bcast_linear.stage = STAGE_COPY;
         } else {
@@ -257,7 +258,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             }
         case STAGE_WAIT_ALL:
-            for (i = 0; i < tsize; ++i) {the copy operation from the root's scratch buffer
+            for (i = 0; i < tsize; ++i) {
                 if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task))) {
                     // eval phys rank from virt
                     peer = ucc_ep_map_eval(task->subset.map, i);
