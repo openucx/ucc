@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -107,9 +107,9 @@ typedef struct ucc_coll_task {
         /* used for lf mt progress queue */
         ucc_lf_queue_elem_t            lf_elem;
     };
-    uint8_t                            n_deps;
-    uint8_t                            n_deps_satisfied;
-    uint8_t                            n_deps_base;
+    uint32_t                           n_deps;
+    uint32_t                           n_deps_satisfied;
+    uint32_t                           n_deps_base;
     /* timestamp of the start time: either post or triggered_post */
     double                             start_time;
     uint32_t                           seq_num;
