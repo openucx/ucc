@@ -1880,6 +1880,8 @@ typedef struct ucc_coll_args {
         int64_t  stride;
         uint64_t size;
     } active_set;
+
+  
 } ucc_coll_args_t;
 
 /**

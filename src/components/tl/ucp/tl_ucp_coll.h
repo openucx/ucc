@@ -269,6 +269,7 @@ typedef struct ucc_tl_ucp_task {
         } alltoall_bruck;
         char                        plugin_data[UCC_TL_UCP_TASK_PLUGIN_MAX_DATA];
     };
+    //int count;
 } ucc_tl_ucp_task_t;
 
 typedef struct ucc_tl_ucp_schedule {

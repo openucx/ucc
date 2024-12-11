@@ -7,6 +7,8 @@
 #define ALLGATHER_H_
 #include "../tl_ucp.h"
 #include "../tl_ucp_coll.h"
+ #include "tl_ucp_sendrecv.h"
+
 
 enum {
     UCC_TL_UCP_ALLGATHER_ALG_KNOMIAL,
@@ -35,6 +37,7 @@ static inline int ucc_tl_ucp_allgather_alg_from_str(const char *str)
     }
     return i;
 }
+
 
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task);
 

@@ -130,13 +130,22 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_start(ucc_coll_task_t *coll_task)
     task->allgather_sparbit.i             = 0; // setup iteration
     task->allgather_sparbit.data_expected = 1;
 
+    uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
+
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
+        if(USE_CUDA){
+            status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
                                data_size, rmem, smem);
-        if (ucc_unlikely(UCC_OK != status)) {
-            return status;
+            if (ucc_unlikely(UCC_OK != status)) {
+                return status;
+            }
+        } else {
+            /* Loopback */
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb(sbuf, data_size, smem, trank, team, task),task, out);
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, data_size * trank), data_size, rmem, trank, team, task),task, out);
         }
     }
-
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+out:
+    return task->super.status;
 }

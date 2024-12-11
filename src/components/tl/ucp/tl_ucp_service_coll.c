@@ -31,6 +31,7 @@ static ucc_rank_t ucc_tl_ucp_service_ring_get_recv_block(ucc_subset_t *subset,
 
 static ucc_status_t ucc_tl_ucp_service_coll_start_executor(ucc_coll_task_t *task)
 {
+    ucc_debug("<==================== install/ucc/src/components/tl/ucp/tl_ucp_service_coll.c:34 start executer ====================>");
     ucc_ee_executor_params_t eparams;
     ucc_status_t status;
 
@@ -143,6 +144,7 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
                                           ucc_subset_t      subset,
                                           ucc_coll_task_t **task_p)
 {
+    ucc_debug("<==================== install/ucc/src/components/tl/ucp/tl_ucp_service_coll.c:146 ====================>");
     ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t   *task     = ucc_tl_ucp_get_task(tl_team);
     uint32_t             npolls   =
@@ -167,6 +169,7 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
     ucc_status_t       status;
 
     status               = ucc_coll_task_init(&task->super, &bargs, team);
+    ucc_debug("<==================== install/ucc/src/components/tl/ucp/tl_ucp_service_coll.c:171 ====================>");
     if (status != UCC_OK) {
         goto free_task;
     }

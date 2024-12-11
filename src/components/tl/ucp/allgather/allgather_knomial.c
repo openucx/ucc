@@ -13,6 +13,9 @@
 #include "coll_patterns/sra_knomial.h"
 #include "utils/ucc_math.h"
 #include "utils/ucc_coll_utils.h"
+#include "allgather.h"
+
+
 
 #define SAVE_STATE(_phase)                                                     \
     do {                                                                       \
@@ -52,6 +55,7 @@
  * As such allgather must keep to this ranking to be aligned with scatter.
  */
 
+
 void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t     *task      = ucc_derived_of(coll_task,
@@ -78,9 +82,17 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_status_t           status;
     size_t                 extra_count;
 
-    EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test",
-                   task->allgather_kn.etask);
+    uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
+
+    if(!USE_CUDA){
+        if (UCC_INPROGRESS == ucc_tl_ucp_test(task)){
+            return;
+        }
+    }
+    
+    if(USE_CUDA) EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test", task->allgather_kn.etask);
     task->allgather_kn.etask = NULL;
+    
     UCC_KN_GOTO_PHASE(task->allgather_kn.phase);
     if (KN_NODE_EXTRA == node_type) {
         peer = ucc_knomial_pattern_get_proxy(p, rank);
@@ -197,6 +209,7 @@ out:
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
 {
+    
     ucc_tl_ucp_task_t          *task  = ucc_derived_of(coll_task,
                                                        ucc_tl_ucp_task_t);
     ucc_coll_args_t            *args  = &TASK_ARGS(task);
@@ -214,6 +227,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     ucc_ee_executor_t *exec;
     void              *rbuf;
 
+    uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
+
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_kn_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     task->allgather_kn.etask = NULL;
@@ -225,21 +240,29 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
                  ucc_dt_size(args->dst.info.datatype);
         rbuf   = args->dst.info.buffer;
         if (!UCC_IS_INPLACE(*args)) {
-            status = ucc_coll_task_get_executor(&task->super, &exec);
-            if (ucc_unlikely(status != UCC_OK)) {
-                task->super.status = status;
-                return status;
-            }
-            eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
-            eargs.copy.dst  = PTR_OFFSET(args->dst.info.buffer, offset);
-            eargs.copy.src  = args->src.info.buffer;
-            eargs.copy.len  = args->src.info.count *
-                              ucc_dt_size(args->src.info.datatype);
-            status = ucc_ee_executor_task_post(exec, &eargs,
-                                               &task->allgather_kn.etask);
-            if (ucc_unlikely(status != UCC_OK)) {
-                task->super.status = status;
-                return status;
+            if(USE_CUDA){
+                status = ucc_coll_task_get_executor(&task->super, &exec);
+                if (ucc_unlikely(status != UCC_OK)) {
+                    task->super.status = status;
+                    return status;
+                }
+                eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+                eargs.copy.dst  = PTR_OFFSET(args->dst.info.buffer, offset);
+                eargs.copy.src  = args->src.info.buffer;
+                eargs.copy.len  = args->src.info.count *
+                                ucc_dt_size(args->src.info.datatype);
+                status = ucc_ee_executor_task_post(exec, &eargs,
+                                                &task->allgather_kn.etask);
+                if (ucc_unlikely(status != UCC_OK)) {
+                    task->super.status = status;
+                    return status;
+                }
+            } else {
+                /*Loopback*/
+                UCPCHECK_GOTO(ucc_tl_ucp_send_nb(args->src.info.buffer, args->src.info.count * ucc_dt_size(args->src.info.datatype),
+                                args->src.info.mem_type, rank, team, task),task, out);
+                UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(args->dst.info.buffer, offset), args->src.info.count * ucc_dt_size(args->src.info.datatype),
+                                args->dst.info.mem_type, rank, team, task),task, out);
             }
         }
     } else if (ct == UCC_COLL_TYPE_ALLGATHERV) {
@@ -284,6 +307,8 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_start(ucc_coll_task_t *coll_task)
     task->allgather_kn.sbuf = PTR_OFFSET(rbuf, offset);
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+out:
+    return task->super.status;
 }
 
 ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
@@ -293,8 +318,9 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task;
     ucc_sbgp_t        *sbgp;
-
     task = ucc_tl_ucp_init_task(coll_args, team);
+    //ucc_coll_args_t   *args = &coll_args->args;
+
     if (tl_team->cfg.use_reordering &&
         coll_args->args.coll_type == UCC_COLL_TYPE_ALLREDUCE) {
         sbgp = ucc_topo_get_sbgp(tl_team->topo, UCC_SBGP_FULL_HOST_ORDERED);
@@ -306,6 +332,13 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init_r(
     task->super.post           = ucc_tl_ucp_allgather_knomial_start;
     task->super.progress       = ucc_tl_ucp_allgather_knomial_progress;
     *task_h                    = &task->super;
+    /*if(!UCC_IS_INPLACE(*args)){
+        printf("registering inplace %p size: %ld\n", args->src.info.buffer, (int)args->src.info.count * ucc_dt_size(args->src.info.datatype));
+        ucc_tl_ucp_pre_register_mem(tl_team, args->src.info.buffer, args->src.info.count * ucc_dt_size(args->src.info.datatype), args->src.info.mem_type);
+    }
+    printf("registering dst %p size: %ld\n", args->dst.info.buffer, (int)args->dst.info.count * ucc_dt_size(args->dst.info.datatype));
+    ucc_tl_ucp_pre_register_mem(tl_team, args->dst.info.buffer, args->dst.info.count * ucc_dt_size(args->dst.info.datatype), args->dst.info.mem_type);
+    */
     return UCC_OK;
 }
 
@@ -316,7 +349,6 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_rank_t         size    = UCC_TL_TEAM_SIZE(tl_team);
     ucc_kn_radix_t     radix;
-
     radix = ucc_min(UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allgather_kn_radix, size);
     return ucc_tl_ucp_allgather_knomial_init_r(coll_args, team, task_h, radix);
 }
