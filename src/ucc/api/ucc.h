@@ -2237,8 +2237,9 @@ typedef enum {
  * @brief Routine registers or maps memory for use in future collectives.
  *
  * This routine maps a user-specified memory segment with a ucc_context_h. The
- * segment is considered "mapped" with the context until either the user calls
- * ucc_mem_unmap or ucc_context_destroy(). A handle to the mapped
+ * segment is considered "mapped" with the context until the user calls
+ * ucc_mem_unmap. It is the user's responsibility to unmap all mapped segments
+ * prior to calling ucc_context_destroy(). A handle to the mapped
  * memory is provided in memh. If the flag UCC_MEM_MAP_EXPORT is used, the
  * memory will be mapped and memory handles from TLs will be generated and
  * stored in the memh. If the flag UCC_MEM_MAP_IMPORT is used, the user must
@@ -2255,12 +2256,14 @@ typedef enum {
 
 ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_flags_t flags,
                          ucc_mem_map_params_t params, ucc_mem_map_mem_h *memh);
+
 /**
  * @ingroup UCC_CONTEXT
  * @brief Routine unmaps memory from a context
  *
- * This routine unmaps memory and all resources associated with the memory 
- * from a context. The memh object is freed and cannot be reused.
+ * This is a collective routine that unmaps memory and all resources
+ * associated with the memory from a context. The memh object is freed and
+ * cannot be reused.
  *
  * @param [in] *memh       Handle of the registered memory
  * 
