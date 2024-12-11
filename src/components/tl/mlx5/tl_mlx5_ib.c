@@ -141,7 +141,7 @@ ucc_status_t ucc_tl_mlx5_qp_connect(struct ibv_qp *qp, uint32_t qp_num,
     qp_attr.min_rnr_timer         = qp_conf->qp_rnr_timer;
     qp_attr.max_dest_rd_atomic    = qp_conf->qp_max_atomic;
     qp_attr.ah_attr.dlid          = lid;
-    qp_attr.ah_attr.sl            = 0;
+    qp_attr.ah_attr.sl            = qp_conf->qp_sl;
     qp_attr.ah_attr.src_path_bits = 0;
     qp_attr.ah_attr.port_num      = port;
 
@@ -199,6 +199,7 @@ ucc_status_t ucc_tl_mlx5_init_dct(struct ibv_pd *pd, struct ibv_context *ctx,
     qp_attr_to_rtr.min_rnr_timer     = qp_conf->qp_rnr_timer;
     qp_attr_to_rtr.ah_attr.port_num  = port_num;
     qp_attr_to_rtr.ah_attr.is_global = 0;
+    qp_attr_to_rtr.ah_attr.sl        = qp_conf->qp_sl;
 
     attr_ex.qp_type = IBV_QPT_DRIVER;
     attr_ex.send_cq = cq;
@@ -289,6 +290,7 @@ ucc_status_t ucc_tl_mlx5_init_dci(ucc_tl_mlx5_dci_t *dci, struct ibv_pd *pd,
     qp_attr_to_rtr.min_rnr_timer     = qp_conf->qp_rnr_timer;
     qp_attr_to_rtr.ah_attr.port_num  = port_num;
     qp_attr_to_rtr.ah_attr.is_global = 0;
+    qp_attr_to_rtr.ah_attr.sl        = qp_conf->qp_sl;
 
     qp_attr_to_rts.qp_state      = IBV_QPS_RTS;
     qp_attr_to_rts.timeout       = qp_conf->qp_timeout;
