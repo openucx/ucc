@@ -43,7 +43,6 @@ void ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t         sendto, recvfrom, sblock, rblock;
     int                step;
     void              *buf;
-    
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return;
@@ -104,7 +103,7 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
-
+    
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
         block = task->allgather_ring.get_send_block(&task->subset, trank, tsize, 0);
         if(USE_CUDA){
@@ -115,8 +114,9 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
             }
         } else {
             /* Loopback */
-            UCPCHECK_GOTO(ucc_tl_ucp_send_nb(sbuf, data_size, smem, trank, team, task),task, out);
-            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, data_size * block), data_size, rmem, trank, team, task),task, out);
+            ucc_rank_t rank = ucc_ep_map_eval(task->subset.map, trank);
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb(sbuf, data_size, smem, rank, team, task),task, out);
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, data_size * block), data_size, rmem, rank, team, task),task, out);
         }
     }
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
@@ -137,6 +137,7 @@ ucc_status_t ucc_tl_ucp_allgather_ring_init_common(ucc_tl_ucp_task_t *task)
     if (!(task->flags & UCC_TL_UCP_TASK_FLAG_SUBSET)) {
         if (team->cfg.use_reordering) {
             sbgp = ucc_topo_get_sbgp(team->topo, UCC_SBGP_FULL_HOST_ORDERED);
+            //printf("reordering: rank %d chenged to %d\n", (int)task->subset.myrank, (int)sbgp->group_rank);
             task->subset.myrank = sbgp->group_rank;
             task->subset.map    = sbgp->map;
         }

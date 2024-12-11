@@ -116,6 +116,8 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
         return;
     }
 
+    uint32_t USE_CUDA = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_cuda;
+
     /* On each step doubles distance */
     distance = 1 << task->tagged.recv_posted;
     tmpsend  = rbuf;
@@ -156,57 +158,87 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
     if (trank != 0) {
         if (UCC_MEMORY_TYPE_HOST == rmem) {
             // copy blocks [0 .. (size - rank - 1)] from rbuf to shift buffer
-            status = ucc_mc_memcpy(scratch_header->addr, rbuf, scratch_size,
+            if(USE_CUDA){
+                status = ucc_mc_memcpy(scratch_header->addr, rbuf, scratch_size,
                                    UCC_MEMORY_TYPE_HOST, rmem);
-            if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(UCC_TASK_LIB(task),
-                         "failed to copy data to scratch buffer");
-                task->super.status = status;
-                return;
+                if (ucc_unlikely(status != UCC_OK)) {
+                    tl_error(UCC_TASK_LIB(task),
+                            "failed to copy data to scratch buffer");
+                    task->super.status = status;
+                    return;
+                }
+            } else {
+            /* Loopback */
+            UCPCHECK_GOTO(ucc_tl_ucp_send_nb(rbuf, scratch_size, rmem, trank, team, task),task, out_err);
+            UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(scratch_header->addr, scratch_size, UCC_MEMORY_TYPE_HOST, trank, team, task),task, out_err);
+
             }
             // move blocks [(size - rank) .. size] from rbuf to beginning of rbuf
             // TODO: rewrite to cycle to get rid of overlap
             memmove(rbuf, PTR_OFFSET(rbuf, scratch_size), trank * data_size);
             // copy blocks from shift buffer starting at block [rank] in rbuf.
-            status = ucc_mc_memcpy(PTR_OFFSET(rbuf, trank * data_size),
+            if(USE_CUDA){
+                status = ucc_mc_memcpy(PTR_OFFSET(rbuf, trank * data_size),
                                    scratch_header->addr, scratch_size, rmem,
                                    UCC_MEMORY_TYPE_HOST);
-            if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(UCC_TASK_LIB(task),
-                         "failed to copy data from scratch to rbuff buffer");
-                task->super.status = status;
-                return;
+                if (ucc_unlikely(status != UCC_OK)) {
+                    tl_error(UCC_TASK_LIB(task),
+                            "failed to copy data from scratch to rbuff buffer");
+                    task->super.status = status;
+                    return;
+                }
+            } else {
+                /* Loopback */
+                UCPCHECK_GOTO(ucc_tl_ucp_send_nb(scratch_header->addr, scratch_size, UCC_MEMORY_TYPE_HOST, trank, team, task),task, out_err);
+                UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(rbuf, trank * data_size), scratch_size, rmem, trank, team, task),task, out_err);
             }
         } else {
             /* In case of non host memory we perform two copy to host buffer and then back to device, 3 memcopy in total */
             /* TODO: replace with generic kernel to do bruck post step in sinle launch on device */
-            status = ucc_mc_memcpy(
-                PTR_OFFSET(scratch_header->addr, trank * data_size), rbuf,
-                (tsize - trank) * data_size, UCC_MEMORY_TYPE_HOST, rmem);
-            if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(UCC_TASK_LIB(task),
-                         "failed to copy first data part to scratch buffer");
-                task->super.status = status;
-                return;
+            if(USE_CUDA){
+                status = ucc_mc_memcpy(
+                    PTR_OFFSET(scratch_header->addr, trank * data_size), rbuf,
+                    (tsize - trank) * data_size, UCC_MEMORY_TYPE_HOST, rmem);
+                if (ucc_unlikely(status != UCC_OK)) {
+                    tl_error(UCC_TASK_LIB(task),
+                            "failed to copy first data part to scratch buffer");
+                    task->super.status = status;
+                    return;
+                }
+            } else {
+                /* Loopback */
+                UCPCHECK_GOTO(ucc_tl_ucp_send_nb(rbuf, (tsize - trank) * data_size, rmem, trank, team, task),task, out_err);
+                UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(PTR_OFFSET(scratch_header->addr, trank * data_size), (tsize - trank) * data_size, UCC_MEMORY_TYPE_HOST, trank, team, task),task, out_err);
             }
-            status =
-                ucc_mc_memcpy(scratch_header->addr,
+            if(USE_CUDA){
+                status = ucc_mc_memcpy(scratch_header->addr,
                               PTR_OFFSET(rbuf, (tsize - trank) * data_size),
                               trank * data_size, UCC_MEMORY_TYPE_HOST, rmem);
-            if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(UCC_TASK_LIB(task),
-                         "failed to copy second data part to scratch buffer");
-                task->super.status = status;
-                return;
+                if (ucc_unlikely(status != UCC_OK)) {
+                    tl_error(UCC_TASK_LIB(task),
+                            "failed to copy second data part to scratch buffer");
+                    task->super.status = status;
+                    return;
+                }
+            } else {
+                /* Loopback */
+                UCPCHECK_GOTO(ucc_tl_ucp_send_nb(PTR_OFFSET(rbuf, (tsize - trank) * data_size), trank * data_size, rmem, trank, team, task),task, out_err);
+                UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(scratch_header->addr, trank * data_size, UCC_MEMORY_TYPE_HOST, trank, team, task),task, out_err);
             }
-            status =
-                ucc_mc_memcpy(rbuf, scratch_header->addr, tsize * data_size,
-                              rmem, UCC_MEMORY_TYPE_HOST);
-            if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(UCC_TASK_LIB(task),
-                         "failed to copy from scratch buffer to dst");
-                task->super.status = status;
-                return;
+            if(USE_CUDA){
+                status =
+                    ucc_mc_memcpy(rbuf, scratch_header->addr, tsize * data_size,
+                                rmem, UCC_MEMORY_TYPE_HOST);
+                if (ucc_unlikely(status != UCC_OK)) {
+                    tl_error(UCC_TASK_LIB(task),
+                            "failed to copy from scratch buffer to dst");
+                    task->super.status = status;
+                    return;
+                }
+            } else {
+                /* Loopback */
+                UCPCHECK_GOTO(ucc_tl_ucp_send_nb(scratch_header->addr, tsize * data_size, UCC_MEMORY_TYPE_HOST, trank, team, task),task, out_err);
+                UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(rbuf, tsize * data_size, rmem, trank, team, task),task, out_err);            
             }
         }
     }
@@ -217,6 +249,10 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
 
 out:
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_bruck_done", 0);
+out_err:
+    task->super.status = status;
+    return;
+
 }																//                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             }
 
 ucc_status_t ucc_tl_ucp_allgather_bruck_start(ucc_coll_task_t *coll_task)

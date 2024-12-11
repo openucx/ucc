@@ -89,6 +89,7 @@ void ucc_tl_ucp_allgather_knomial_progress(ucc_coll_task_t *coll_task)
             return;
         }
     }
+    
     if(USE_CUDA) EXEC_TASK_TEST(UCC_KN_PHASE_INIT, "failed during ee task test", task->allgather_kn.etask);
     task->allgather_kn.etask = NULL;
     
