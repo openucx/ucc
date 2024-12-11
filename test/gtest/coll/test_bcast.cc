@@ -276,6 +276,8 @@ ucc_job_env_t two_step_env = {{"UCC_CL_HIER_TUNE", "bcast:@2step:0-inf:inf"},
                               {"UCC_CLS", "all"}};
 ucc_job_env_t dbt_env      = {{"UCC_TL_UCP_TUNE", "bcast:@dbt:0-inf:inf"},
                               {"UCC_CLS", "basic"}};
+ucc_job_env_t cuda_env     = {{"UCC_TL_CUDA_TUNE", "bcast:cuda:@0"},
+                              {"UCC_CLS", "basic"}};
 INSTANTIATE_TEST_CASE_P(
     , test_bcast_alg,
     ::testing::Combine(
@@ -285,6 +287,10 @@ INSTANTIATE_TEST_CASE_P(
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
 #endif
+#ifdef HAVE_CUDA
+        ::testing::Values(two_step_env, dbt_env, cuda_env), //env
+#else
         ::testing::Values(two_step_env, dbt_env), //env
+#endif
         ::testing::Values(8, 65536), // count
-        ::testing::Values(15,16))); // n_procs
+        ::testing::Values(15, 16))); // n_procs
