@@ -239,22 +239,18 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             task->bcast_linear.stage = STAGE_WAIT_COPY;
         case STAGE_WAIT_COPY:
             etask = task->bcast_linear.exec_task;
-            if (etask) {
-                st = ucc_ee_executor_task_test(etask);
-                if (st == UCC_OK) {
-                    ucc_ee_executor_task_finalize(etask);
-                    task->bcast_linear.exec_task = NULL;
-                    // signal others
-                    ++task->bcast_linear.step;
-                    set_rank_step(task, task->bcast_linear.root,
-                                  task->bcast_linear.step, 0);
-                    task->bcast_linear.stage = STAGE_WAIT_ALL;
-                } else {
-                    // not ready
-                    return;
-                }
+            ucc_assert(NULL != etask);
+            st = ucc_ee_executor_task_test(etask);
+            if (st == UCC_OK) {
+                ucc_ee_executor_task_finalize(etask);
+                task->bcast_linear.exec_task = NULL;
+                // signal others
+                ++task->bcast_linear.step;
+                set_rank_step(task, task->bcast_linear.root,
+                              task->bcast_linear.step, 0);
+                task->bcast_linear.stage = STAGE_WAIT_ALL;
             } else {
-                ucc_debug("etask is nullptr");
+                // not ready
                 return;
             }
         case STAGE_WAIT_ALL:
@@ -329,26 +325,24 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             task->bcast_linear.stage = STAGE_CLIENT_COPY_WAIT;
         case STAGE_CLIENT_COPY_WAIT:
             etask = task->bcast_linear.exec_task;
-            if (etask) {
-                st = ucc_ee_executor_task_test(etask);
-                if (st == UCC_OK) {
-                    ucc_ee_executor_task_finalize(etask);
-                    task->bcast_linear.exec_task = NULL;
-                    ++task->bcast_linear.step;
-                    set_rank_step(task, trank, task->bcast_linear.step, 0);
-                    if (task->bcast_linear.step <
-                        task->bcast_linear.num_steps) {
-                        task->bcast_linear.stage = STAGE_WAIT_ROOT;
+            ucc_assert(NULL != etask);
+            st = ucc_ee_executor_task_test(etask);
+            if (st == UCC_OK) {
+                ucc_ee_executor_task_finalize(etask);
+                task->bcast_linear.exec_task = NULL;
+                ++task->bcast_linear.step;
+                set_rank_step(task, trank, task->bcast_linear.step, 0);
+                if (task->bcast_linear.step < task->bcast_linear.num_steps) {
+                    task->bcast_linear.stage = STAGE_WAIT_ROOT;
+                    return;
+                } else {
+                    // start barrier to sync with root
+                    task->bcast_linear.stage = STAGE_CLIENT_WAIT_COMPLETION;
+                    st = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
+                    if (ucc_unlikely(st != UCC_OK)) {
+                        ucc_error("failed to start barrier from peer rank");
+                        task->super.status = st;
                         return;
-                    } else {
-                        // start barrier to sync with root
-                        task->bcast_linear.stage = STAGE_CLIENT_WAIT_COMPLETION;
-                        st = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
-                        if (ucc_unlikely(st != UCC_OK)) {
-                            ucc_error("failed to start barrier from peer rank");
-                            task->super.status = st;
-                            return;
-                        }
                     }
                 }
             }
