@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -45,4 +45,12 @@ void ucc_tl_ucp_gather_knomial_progress(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_ucp_gather_knomial_finalize(ucc_coll_task_t *task);
 
+ucc_status_t ucc_tl_ucp_gather_knomial_init_common(ucc_tl_ucp_task_t *task,
+                                                   ucc_kn_radix_t radix);
+
+/* Internal interface with custom radix */
+ucc_status_t ucc_tl_ucp_gather_knomial_init_r(ucc_base_coll_args_t *coll_args,
+                                              ucc_base_team_t *team,
+                                              ucc_coll_task_t **task_h,
+                                              ucc_kn_radix_t radix);
 #endif

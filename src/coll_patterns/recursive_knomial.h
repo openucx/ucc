@@ -23,6 +23,8 @@ enum {
     KN_PATTERN_ALLGATHER,
     KN_PATTERN_ALLGATHERV,
     KN_PATTERN_ALLGATHERX,
+    KN_PATTERN_GATHER,
+    KN_PATTERN_GATHERX,
 };
 
 typedef struct ucc_knomial_pattern {
@@ -83,7 +85,7 @@ static inline ucc_rank_t ucc_kn_pattern_radix_pow_init(ucc_knomial_pattern_t *p,
 static inline void
 ucc_knomial_pattern_init_impl(ucc_rank_t size, ucc_rank_t rank,
                               ucc_kn_radix_t radix, ucc_knomial_pattern_t *p,
-                              int backward)
+                              int backward, int has_extra)
 {
     ucc_rank_t fs = radix;
     ucc_rank_t n_full_subtrees;
@@ -100,7 +102,7 @@ ucc_knomial_pattern_init_impl(ucc_rank_t size, ucc_rank_t rank,
     p->backward      = backward;
     p->iteration     = 0;
     n_full_subtrees  = ucc_kn_pattern_n_full(p);
-    p->n_extra       = size - n_full_subtrees * p->full_pow_size;
+    p->n_extra       = has_extra ? size - n_full_subtrees * p->full_pow_size : 0;
     p->n_iters       = (p->n_extra && n_full_subtrees == 1) ?
         p->pow_radix_sup - 1 : p->pow_radix_sup;
     p->radix_pow     = ucc_kn_pattern_radix_pow_init(p, backward);
@@ -115,14 +117,22 @@ ucc_knomial_pattern_init_backward(ucc_rank_t size, ucc_rank_t rank,
                                   ucc_kn_radix_t radix,
                                   ucc_knomial_pattern_t *p)
 {
-    ucc_knomial_pattern_init_impl(size, rank, radix, p, 1);
+    ucc_knomial_pattern_init_impl(size, rank, radix, p, 1, 1);
 }
 
 static inline void
 ucc_knomial_pattern_init(ucc_rank_t size, ucc_rank_t rank, ucc_kn_radix_t radix,
                          ucc_knomial_pattern_t *p)
 {
-    ucc_knomial_pattern_init_impl(size, rank, radix, p, 0);
+    ucc_knomial_pattern_init_impl(size, rank, radix, p, 0, 1);
+}
+
+static inline void
+ucc_knomial_pattern_init_no_extra(ucc_rank_t size, ucc_rank_t rank,
+                                  ucc_kn_radix_t radix,
+                                  ucc_knomial_pattern_t *p)
+{
+    ucc_knomial_pattern_init_impl(size, rank, radix, p, 0, 0);
 }
 
 static inline ucc_rank_t
@@ -186,6 +196,23 @@ ucc_knomial_pattern_get_loop_peer(ucc_knomial_pattern_t *p, ucc_rank_t rank,
            ucc_knomial_pattern_loop_rank_inv(p, peer);
 }
 
+static inline ucc_rank_t
+ucc_knomial_pattern_get_base_rank(ucc_knomial_pattern_t *p, ucc_rank_t rank)
+{
+    ucc_rank_t step_size = p->radix_pow * p->radix;
+    ucc_rank_t lrank;
+    ucc_kn_radix_t s;
+
+    lrank = ucc_knomial_pattern_loop_rank(p, rank);
+    s = ucc_div_round_up(step_size - (lrank % step_size), p->radix_pow);
+
+    if (s == p->radix) {
+        return rank;
+    } else {
+        return ucc_knomial_pattern_get_loop_peer(p, rank, s);
+    }
+}
+
 static inline void
 ucc_knomial_pattern_next_iteration(ucc_knomial_pattern_t *p)
 {
@@ -224,11 +251,13 @@ static inline ucc_rank_t
 ucc_knomial_calc_recv_dist(ucc_rank_t team_size, ucc_rank_t rank,
                            ucc_rank_t radix, ucc_rank_t root)
 {
+    ucc_rank_t root_base = 0;
+    ucc_rank_t dist      = 1;
+
     if (rank == root) {
         return 0;
     }
-    ucc_rank_t root_base = 0 ;
-    ucc_rank_t dist = 1;
+
     while (dist <= team_size) {
         if (rank < root_base + radix * dist) {
             break;
