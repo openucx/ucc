@@ -65,42 +65,49 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
     ucc_ee_executor_task_t    **tasks       = PTR_OFFSET(
                                                 cl_schedule->scratch->addr,
                                                 sizeof(ucc_rank_t));
-    size_t                      dt_size     = ucc_dt_size(
+    size_t                      src_dt_size = ucc_dt_size(
+                                                args->src.info_v.datatype);
+    size_t                      dst_dt_size = ucc_dt_size(
                                                 args->dst.info_v.datatype);
     ucc_ee_executor_t          *exec;
     ucc_status_t                status;
     int                         i;
-    size_t                      disp_counter;
-    size_t                      this_rank_count;
+    size_t                      src_rank_count;
+    size_t                      dst_rank_count;
+    size_t                      src_rank_disp;
+    size_t                      dst_rank_disp;
 
     UCC_CHECK_GOTO(
         ucc_coll_task_get_executor(&schedule->super, &exec),
         out, status);
     eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
 
-    disp_counter    = ucc_coll_args_get_total_count(args,
-                                                    args->dst.info_v.counts,
-                                                    team_size);
     *n_tasks        = 0;
+    src_rank_disp   = 0;
 
-    for (i = team_size - 1; i >= 0; i--) {
-        this_rank_count = ucc_coll_args_get_count(args, args->dst.info_v.counts,
-                                                  i);
-        disp_counter   -= this_rank_count;
+    for (i = 0; i < team_size; i++) {
+        src_rank_count = ucc_coll_args_get_count(args, args->src.info_v.counts,
+                                                 i);
+        dst_rank_count = ucc_coll_args_get_count(args, args->dst.info_v.counts,
+                                                 i);
+        dst_rank_disp  = ucc_coll_args_get_displacement(
+                                args, args->dst.info_v.displacements, i);
+        ucc_assert(src_rank_count * src_dt_size ==
+                   dst_rank_count * dst_dt_size);
         eargs.copy.src  = PTR_OFFSET(
-                            args->dst.info_v.buffer, disp_counter * dt_size);
+                            args->src.info_v.buffer,
+                            src_rank_disp * src_dt_size);
         eargs.copy.dst  = PTR_OFFSET(
                             args->dst.info_v.buffer,
-                            ucc_coll_args_get_displacement(
-                                args, args->dst.info_v.displacements, i) *
-                            dt_size);
-        eargs.copy.len  = this_rank_count * dt_size;
+                            dst_rank_disp * dst_dt_size);
+        eargs.copy.len  = dst_rank_count * dst_dt_size;
         if (eargs.copy.src != eargs.copy.dst) {
             UCC_CHECK_GOTO(
                 ucc_ee_executor_task_post(exec, &eargs, &tasks[*n_tasks]),
                 out, status);
             (*n_tasks)++;
         }
+        src_rank_disp += src_rank_count;
     }
 
     schedule->super.status       = UCC_INPROGRESS;
