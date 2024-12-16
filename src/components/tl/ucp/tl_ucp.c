@@ -140,6 +140,10 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
+     {"ALLGATHER_USE_LOOPBACK", "0", "If set to 1 uses mc cuda copy, otherwise performs loopback for self copy",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_use_loopback),
+     UCC_CONFIG_TYPE_BOOL},
+
     {"BCAST_KN_RADIX", "4", "Radix of the recursive-knomial bcast algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),
      UCC_CONFIG_TYPE_UINT},
