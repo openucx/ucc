@@ -61,8 +61,7 @@ char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
 
 ucc_status_t loopback_self_copy(void* rbuf, void* sbuf, size_t data_size,
                                 ucc_memory_type_t rmem, ucc_memory_type_t smem,
-                                ucc_tl_ucp_task_t *task, ucc_tl_ucp_team_t *team, ucc_rank_t rank)
-{
+                                ucc_rank_t rank, ucc_tl_ucp_team_t *team, ucc_tl_ucp_task_t *task) {
     ucc_status_t status;
     status = ucc_tl_ucp_send_nb(sbuf, data_size, smem, rank, team, task);
     if (UCC_OK != status) {
