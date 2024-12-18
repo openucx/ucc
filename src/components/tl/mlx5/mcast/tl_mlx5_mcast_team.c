@@ -99,6 +99,10 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     memcpy(&comm->params, conf_params, sizeof(*conf_params));
 
+    comm->allgather_comm.mcast_prepost_bucket_size
+                                        = conf_params->mcast_prepost_bucket_size;
+    comm->allgather_comm.truly_zero_copy_allgather_enabled
+                                        = conf_params->truly_zero_copy_allgather_enabled;
     comm->one_sided.reliability_enabled = conf_params->one_sided_reliability_enable;
     comm->bcast_comm.wsize              = conf_params->wsize;
     comm->allgather_comm.max_push_send  = conf_params->max_push_send;
