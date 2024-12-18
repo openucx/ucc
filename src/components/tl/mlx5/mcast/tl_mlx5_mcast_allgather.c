@@ -270,6 +270,169 @@ void ucc_tl_mlx5_mcast_allgather_progress(ucc_coll_task_t *coll_task)
     }
 }
 
+static inline ucc_status_t
+ucc_tl_mlx5_mcast_validate_zero_copy_allgather_params(ucc_tl_mlx5_mcast_coll_comm_t *comm,
+                                                      ucc_tl_mlx5_mcast_coll_req_t  *req)
+{
+
+    if (req->concurrency_level % 2 == 0 && req->num_packets % req->mcast_prepost_bucket_size != 0) {
+        tl_warn(comm->lib, "Pipelined mcast allgather not supported: "
+                "num_packets (%d) must be a multiple of mcast_prepost_bucket_size (%d) "
+                "when concurrency_level (%d) is even.",
+                req->num_packets, req->mcast_prepost_bucket_size, req->concurrency_level);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (comm->commsize % req->concurrency_level != 0) {
+        tl_warn(comm->lib, "Pipelined mcast allgather not supported: "
+                "team size (%d) must be a multiple of concurrency_level (%d).",
+                comm->commsize, req->concurrency_level);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (req->length % comm->max_per_packet != 0) {
+        tl_warn(comm->lib, "Pipelined mcast allgather not supported: "
+                "length (%ld) must be a multiple of max_per_packet (%d).",
+                req->length, comm->max_per_packet);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (req->mcast_prepost_bucket_size * req->concurrency_level * 2 > comm->params.rx_depth) {
+        tl_warn(comm->lib, "Pipelined mcast allgather not supported: "
+                "we only support the case prepost_bucket_size * concurrency_level * 2 > rx_depth, "
+                "but got: prepost_bucket_size=%d, concurrency_level=%d, "
+                "rx_depth=%d",
+                 req->mcast_prepost_bucket_size, req->concurrency_level,
+                 comm->params.rx_depth);
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    return UCC_OK;
+}
+
+
+/*
+ * at each stage half of the mcast groups are ready for receiving mcast
+ * packets while the other half are getting prepared by preposting recv
+ * buffers
+ */
+static inline ucc_status_t
+ucc_tl_mlx5_mcast_prepare_zero_copy_allgather(ucc_tl_mlx5_mcast_coll_comm_t *comm,
+                                              ucc_tl_mlx5_mcast_coll_req_t  *req)
+{
+    ucc_tl_mlx5_mcast_reg_t                   *reg    = NULL;
+    ucc_rank_t                                 root   = 0;
+    int                                        offset = 0;
+    ucc_status_t                               status;
+    ucc_rank_t                                 j, i;
+    int                                        total_steps;
+    ucc_tl_mlx5_mcast_pipelined_ag_schedule_t *schedule;
+
+    ucc_assert(comm->allgather_comm.truly_zero_copy_allgather_enabled);
+
+    req->concurrency_level = comm->mcast_group_count / 2;
+    req->concurrency_level = ucc_min(req->concurrency_level, ONE_SIDED_MAX_CONCURRENT_LEVEL);
+    req->concurrency_level = ucc_min(req->concurrency_level, comm->commsize);
+
+    if (req->concurrency_level == 0) {
+        tl_warn(comm->lib, "not enough concurreny level to enable zcopy pipeline allgather");
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    req->mcast_prepost_bucket_size =
+        ucc_min(req->num_packets, comm->allgather_comm.mcast_prepost_bucket_size);
+
+    status = ucc_tl_mlx5_mcast_validate_zero_copy_allgather_params(comm, req);
+    if (status != UCC_OK) {
+        return status;
+    }
+
+    /* calculate the schedule and details of what we should
+     * mcast and prepost to which mcast group at each stage*/
+    total_steps = req->num_packets * (comm->commsize / req->concurrency_level)
+                / req->mcast_prepost_bucket_size + 1;
+
+    schedule = ucc_calloc(1,
+                          sizeof(ucc_tl_mlx5_mcast_pipelined_ag_schedule_t) *
+                          total_steps, "sched");
+    if (!schedule) {
+        tl_warn(comm->lib, "cannot allocate memory for schedule list");
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    /* generate schedule */
+    for (i = 0; i < total_steps; i++) {
+        if (i < total_steps - 1) {
+            for (j = 0; j < req->concurrency_level; j++) {
+                schedule[i].prepost_buf_op[j].group_id =
+                    j + req->concurrency_level * (i % 2);
+                schedule[i].prepost_buf_op[j].offset =
+                    offset * comm->max_per_packet;
+                schedule[i].prepost_buf_op[j].root = root + j;
+                schedule[i].prepost_buf_op[j].count =
+                    req->mcast_prepost_bucket_size;
+            }
+        } else {
+            schedule[i].prepost_buf_op_done = 1;
+        }
+
+        if (i > 0) {
+            for (j = 0; j < req->concurrency_level; j++) {
+                schedule[i].multicast_op[j].group_id =
+                    schedule[i - 1].prepost_buf_op[j].group_id;
+                schedule[i].multicast_op[j].offset =
+                    schedule[i - 1].prepost_buf_op[j].offset;
+                schedule[i].multicast_op[j].offset_left =
+                    schedule[i - 1].prepost_buf_op[j].offset;
+                schedule[i].multicast_op[j].root =
+                    schedule[i - 1].prepost_buf_op[j].root;
+                schedule[i].multicast_op[j].to_send_left =
+                    schedule[i - 1].prepost_buf_op[j].count;
+                schedule[i].multicast_op[j].to_recv =
+                    schedule[i - 1].prepost_buf_op[j].count;
+                schedule[i].to_recv += schedule[i].multicast_op[j].to_recv;
+                if (schedule[i].multicast_op[j].root == comm->rank) {
+                    schedule[i].to_send += schedule[i].multicast_op[j].to_send_left;
+                }
+            }
+        }
+
+        if (!schedule[i].to_send || !schedule[i].to_recv) {
+            schedule[i].multicast_op_done = 1;
+        }
+
+        offset += req->mcast_prepost_bucket_size;
+
+        if (offset == req->num_packets) {
+            offset = 0;
+            root   = (root + req->concurrency_level) % comm->commsize;
+        }
+    }
+
+    tl_trace(comm->lib,
+             "generated the schedule for pipelined zero copy allgather with total_steps %d",
+             total_steps);
+    schedule->total_steps  = total_steps;
+    req->total_steps       = total_steps;
+    req->ag_schedule       = schedule;
+    tl_trace(comm->lib, "registering recv buf of size %ld", req->length * comm->commsize);
+    ucc_assert(req->recv_rreg == NULL);
+
+    status = ucc_tl_mlx5_mcast_mem_register(comm->ctx, req->rptr, req->length *
+                                            comm->commsize, &reg);
+    if (UCC_OK != status) {
+         tl_warn(comm->lib, "unable to register receive buffer %p of size %ld",
+                  req->rptr, req->length * comm->commsize);
+         ucc_free(schedule);
+         return status;
+    }
+
+    req->recv_rreg = reg;
+    req->recv_mr   = reg->mr;
+
+    return UCC_OK;
+}
+
 ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
 {
     ucc_coll_task_t               *coll_task =  &(task->super);
@@ -357,6 +520,13 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
     req->to_send    = req->num_packets;
     req->to_recv    = comm->commsize * req->num_packets;
 
+    if (comm->allgather_comm.truly_zero_copy_allgather_enabled) {
+        status = ucc_tl_mlx5_mcast_prepare_zero_copy_allgather(comm, req);
+        if (UCC_OK != status) {
+            goto failed;
+        }
+    }
+
     comm->allgather_comm.coll_counter++;
 
     task->coll_mcast.req_handle = req;
@@ -368,6 +538,9 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
 failed:
     tl_warn(UCC_TASK_LIB(task), "mcast init allgather failed:%d", status);
     if (req) {
+        if (req->rreg) {
+            ucc_tl_mlx5_mcast_mem_deregister(comm->ctx, req->rreg);
+        }
         ucc_mpool_put(req);
     }
     return status;
