@@ -200,8 +200,6 @@ struct pp_packet {
 };
 
 struct mcast_ctx {
-    struct ibv_qp      *qp;
-    struct ibv_ah      *ah;
     struct ibv_send_wr  swr;
     struct ibv_sge      ssg;
 
@@ -310,8 +308,8 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     ucc_rank_t                                      commsize;
     char                                           *grh_buf;
     struct ibv_mr                                  *grh_mr;
-    uint16_t                                        mcast_lid;
-    union ibv_gid                                   mgid;
+    uint16_t                                       *lid_list;
+    union ibv_gid                                  *mgid_list;
     unsigned                                        max_inline;
     size_t                                          max_eager;
     int                                             max_per_packet;
@@ -334,7 +332,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             comm_id;
     void                                           *p2p_ctx;
     ucc_base_lib_t                                 *lib;
-    struct sockaddr_in6                             mcast_addr;
+    struct sockaddr_in6                            *mcast_addr_list;
     int                                             cuda_mem_enabled;
     ucc_tl_mlx5_mcast_join_info_t                  *group_setup_info;
     ucc_service_coll_req_t                         *group_setup_info_req;
@@ -490,7 +488,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_recv_buffers(ucc_tl_mlx5_mcast
     }
     if (i != 0) {
         rwr[i-1].next = NULL;
-        if (ibv_post_recv(comm->mcast.qp, &rwr[0], &bad_wr)) {
+        if (ibv_post_recv(comm->mcast.qp_list[0], &rwr[0], &bad_wr)) {
             tl_error(comm->lib, "failed to prepost recvs: errno %d", errno);
             return UCC_ERR_NO_RESOURCE;
         }

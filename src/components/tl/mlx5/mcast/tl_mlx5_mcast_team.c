@@ -150,6 +150,30 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
         comm->r_window[i] = &comm->dummy_packet;
     }
 
+    comm->mcast_addr_list = ucc_calloc(comm->mcast_group_count, sizeof(struct sockaddr_in6),
+                                       "mcast_addr_list");
+    if (!comm->mcast_addr_list) {
+        tl_error(mcast_context->lib, "unable to allocate memory for mcast net address");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup;
+    }
+
+    comm->lid_list = ucc_calloc(comm->mcast_group_count, sizeof(uint16_t),
+                                "lid_list");
+    if (!comm->lid_list) {
+        tl_error(mcast_context->lib, "unable to allocate memory for mcast lid");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup;
+    }
+
+    comm->mgid_list = ucc_calloc(comm->mcast_group_count, sizeof(union ibv_gid),
+                                "mgid_list");
+    if (!comm->mgid_list) {
+        tl_error(mcast_context->lib, "unable to allocate memory for mcast mgid");
+        status = UCC_ERR_NO_MEMORY;
+        goto cleanup;
+    }
+
     comm->lib                  = base_context->lib;
     new_mcast_team->mcast_comm = comm;
     *mcast_team                = new_mcast_team;
@@ -159,6 +183,9 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     return UCC_OK;
 
 cleanup:
+    ucc_free(comm->mcast_addr_list);
+    ucc_free(comm->lid_list);
+    ucc_free(comm->mgid_list);
     ucc_free(comm);
     ucc_free(new_mcast_team);
     ucc_free(oob_p2p_ctx);
@@ -263,7 +290,7 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
         ucc_list_add_tail(&comm->bpool, &comm->pp[i].super);
     }
 
-    comm->mcast.swr.wr.ud.ah          = comm->mcast.ah;
+    comm->mcast.swr.wr.ud.ah          = comm->mcast.ah_list[0];
     comm->mcast.swr.num_sge           = 1;
     comm->mcast.swr.sg_list           = &comm->mcast.ssg;
     comm->mcast.swr.opcode            = IBV_WR_SEND_WITH_IMM;
@@ -325,8 +352,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     return UCC_INPROGRESS;
                 }
 
-                comm->mcast_addr     = net_addr;
-                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST;
+                comm->mcast_addr_list[0] = net_addr;
+                tl_team->mcast_state     = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST;
 
                 return UCC_INPROGRESS;
             }
@@ -373,11 +400,11 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 
                 if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY) {
                     /* rank 0 bcast the lid/gid to other processes */
-                    data->status    = UCC_OK;
-                    data->dgid      = comm->event->param.ud.ah_attr.grh.dgid;
-                    data->dlid      = comm->event->param.ud.ah_attr.dlid;
-                    comm->mcast_lid = data->dlid;
-                    comm->mgid      = data->dgid;
+                    data->status       = UCC_OK;
+                    data->dgid         = comm->event->param.ud.ah_attr.grh.dgid;
+                    data->dlid         = comm->event->param.ud.ah_attr.dlid;
+                    comm->lid_list[0]  = data->dlid;
+                    comm->mgid_list[0] = data->dgid;
                 } else {
                     /* rank 0 bcast the failed status to other processes so others do not hang */
                     data->status = UCC_ERR_NO_RESOURCE;
@@ -522,8 +549,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     return status;
                 }
 
-                comm->mcast_addr     = net_addr;
-                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST;
+                comm->mcast_addr_list[0] = net_addr;
+                tl_team->mcast_state     = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST;
 
                 return UCC_INPROGRESS;
             }
@@ -549,8 +576,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 
                 ucc_assert(comm->event != NULL);
 
-                comm->mcast_lid  = comm->group_setup_info->dlid;
-                comm->mgid       = comm->group_setup_info->dgid;
+                comm->lid_list[0]  = comm->group_setup_info->dlid;
+                comm->mgid_list[0] = comm->group_setup_info->dgid;
 
                 ucc_free(comm->group_setup_info);
                 if (comm->event) {
