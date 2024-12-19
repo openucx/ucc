@@ -72,8 +72,8 @@ out:
 }
 
 ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
-                                               ucc_base_team_t *team,
-                                               ucc_coll_task_t **task_h)
+                                               ucc_base_team_t      *team,
+                                               ucc_coll_task_t     **task_h)
 {
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_tl_ucp_task_t *task;
@@ -99,7 +99,12 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
     *task_h              = &task->super;
     task->super.post     = ucc_tl_ucp_alltoall_onesided_start;
     task->super.progress = ucc_tl_ucp_alltoall_onesided_progress;
-    status               = UCC_OK;
+
+    status = ucc_tl_ucp_coll_dynamic_segment_init(&coll_args->args, task);
+    if (UCC_OK != status) {
+        tl_error(UCC_TL_TEAM_LIB(tl_team),
+                 "failed to initialize dynamic segments");
+    }
 out:
     return status;
 }

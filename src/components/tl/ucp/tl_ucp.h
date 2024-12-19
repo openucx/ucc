@@ -36,6 +36,12 @@
 #define ONESIDED_SYNC_SIZE 1
 #define ONESIDED_REDUCE_SIZE 4
 
+typedef enum {
+    UCC_TL_UCP_DYN_SEG_UPDATE_SRC    = UCC_BIT(0),
+    UCC_TL_UCP_DYN_SEG_UPDATE_DST    = UCC_BIT(1),
+    UCC_TL_UCP_DYN_SEG_UPDATE_GLOBAL = UCC_BIT(2),
+} ucc_tl_ucp_dynamic_segment_update_mask_t;
+
 typedef struct ucc_tl_ucp_iface {
     ucc_tl_iface_t super;
 } ucc_tl_ucp_iface_t;
@@ -123,11 +129,16 @@ typedef struct ucc_tl_ucp_context {
     ucc_tl_ucp_worker_t         service_worker;
     uint32_t                    service_worker_throttling_count;
     ucc_mpool_t                 req_mp;
-    ucc_tl_ucp_remote_info_t *  remote_info;
+    ucc_tl_ucp_remote_info_t   *remote_info;
     ucp_rkey_h *                rkeys;
     uint64_t                    n_rinfo_segs;
     uint64_t                    ucp_memory_types;
     int                         topo_required;
+    ucc_tl_ucp_remote_info_t   *dynamic_remote_info;
+    void                       *dyn_seg_buf;
+    ucp_rkey_h                 *dyn_rkeys;
+    size_t                      dyn_seg_size;
+    size_t                      n_dynrinfo_segs;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
@@ -138,8 +149,6 @@ typedef struct ucc_tl_ucp_team {
     ucc_status_t               status;
     uint32_t                   seq_num;
     ucc_tl_ucp_task_t         *preconnect_task;
-    void *                     va_base[MAX_NR_SEGMENTS];
-    size_t                     base_length[MAX_NR_SEGMENTS];
     ucc_tl_ucp_worker_t *      worker;
     ucc_tl_ucp_team_config_t   cfg;
     const char *               tuning_str;
@@ -189,6 +198,9 @@ extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 
 #define UCC_TL_UCP_REMOTE_RKEY(_ctx, _rank, _seg)                              \
     ((_ctx)->rkeys[_rank * _ctx->n_rinfo_segs + _seg])
+
+#define UCC_TL_UCP_DYN_REMOTE_RKEY(_ctx, _rank, _seg)                   \
+    ((_ctx)->dyn_rkeys[_rank * _ctx->n_dynrinfo_segs + _seg])
 
 extern ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1];
 
