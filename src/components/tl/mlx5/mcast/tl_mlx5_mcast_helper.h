@@ -108,7 +108,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
         tl_trace(comm->lib, "post_send, psn %d, length %d, zcopy %d, signaled %d",
                  pp->psn, pp->length, zcopy, swr[0].send_flags & IBV_SEND_SIGNALED);
 
-        if (0 != (rc = ibv_post_send(comm->mcast.qp, &swr[0], &bad_wr))) {
+        if (0 != (rc = ibv_post_send(comm->mcast.qp_list[0], &swr[0], &bad_wr))) {
             tl_error(comm->lib, "post send failed: ret %d, start_psn %d, to_send %d, "
                     "to_recv %d, length %d, psn %d, inline %d",
                      rc, req->start_psn, req->to_send, req->to_recv,
