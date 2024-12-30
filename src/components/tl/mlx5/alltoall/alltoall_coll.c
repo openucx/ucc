@@ -782,6 +782,7 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
     ucc_tl_mlx5_team_t     *tl_team   = ucc_derived_of(team,
                                                            ucc_tl_mlx5_team_t);
     ucc_tl_mlx5_alltoall_t *a2a       = tl_team->a2a;
+    ucc_tl_mlx5_context_t  *ctx       = UCC_TL_MLX5_TEAM_CTX(tl_team);
     int                     is_asr    = (a2a->node.sbgp->group_rank
                                                         == a2a->node.asr_rank);
     int                     n_tasks   = is_asr ? 5 : 3;
@@ -792,6 +793,10 @@ UCC_TL_MLX5_PROFILE_FUNC(ucc_status_t, ucc_tl_mlx5_alltoall_init,
     int                     block_size, i;
     ucc_coll_task_t        *tasks[5];
     ucc_status_t            status;
+
+    if (!ctx->cfg.enable_alltoall) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
 
     if (UCC_IS_INPLACE(coll_args->args)) {
         return UCC_ERR_NOT_SUPPORTED;
