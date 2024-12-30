@@ -1,7 +1,7 @@
 /**
  * @file ucc_def.h
  * @date 2020
- * @copyright (c) 2020, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * @Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * @copyright Copyright (C) Huawei Technologies Co., Ltd. 2020.  ALL RIGHTS RESERVED.
  *
  * See file LICENSE for terms.
