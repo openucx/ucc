@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -8,45 +8,38 @@
 
 enum {
     // Barrier setup stages
-    STAGE_INIT_BAR_ROOT,            // Initial stage for the root rank to identify and claim a free barrier
-    STAGE_FIND_BAR_PEER,            // Stage where peer ranks wait while the root rank identifies a free barrier
+    STAGE_INIT_BAR_ROOT,          // Initial stage for the root rank to identify and claim a free barrier
+    STAGE_FIND_BAR_PEER,          // Stage where peer ranks wait while the root rank identifies a free barrier
 
-    STAGE_SYNC,                     // Initialize the barrier and synchronize the segment required for the current task
-    STAGE_SETUP,                    // Verify that all ranks are aligned and have reached the barrier
+    STAGE_SYNC,                   // Initialize the barrier and synchronize the segment required for the current task
+    STAGE_SETUP,                  // Verify that all ranks are aligned and have reached the barrier
     // Stages specific to the root rank
-    STAGE_COPY,                     // Post copy task: copy data block from src to a scratch buffer
-    STAGE_WAIT_COPY,                // The root waits for the completion of its copy operation
-    STAGE_WAIT_ALL,                 // The root rank waits until all other ranks have reached the same operational step
-    STAGE_WAIT_COMPLETION,          // The root rank waits for all other ranks to complete the broadcast operation
+    STAGE_COPY,                   // Post copy task: copy data block from src to a scratch buffer
+    STAGE_WAIT_COPY,              // The root waits for the completion of its copy operation
+    STAGE_WAIT_ALL,               // The root rank waits until all other ranks have reached the same operational step
+    STAGE_WAIT_COMPLETION,        // The root rank waits for all other ranks to complete the broadcast operation
     // non-root
-    STAGE_WAIT_ROOT,                // Wait while the root rank writes data to its scratch buffer
-    STAGE_CLIENT_COPY,              // Initiate their own copy tasks after the root's operations
-    STAGE_CLIENT_COPY_WAIT,         // Wait for the completion of the copy operation from the root's scratch buffer
-    STAGE_CLIENT_WAIT_COMPLETION,   // Wait for the completion of algorithm on all ranks, global sync with root
+    STAGE_WAIT_ROOT,              // Wait while the root rank writes data to its scratch buffer
+    STAGE_CLIENT_COPY,            // Initiate their own copy tasks after the root's operations
+    STAGE_CLIENT_COPY_WAIT,       // Wait for the completion of the copy operation from the root's scratch buffer
+    STAGE_CLIENT_WAIT_COMPLETION, // Wait for the completion of algorithm on all ranks, global sync with root
 };
 
-static inline ucc_status_t ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
+static inline ucc_status_t
+ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team  = TASK_TEAM(task);
     ucc_rank_t          trank = UCC_TL_TEAM_RANK(team);
-    ucc_status_t        status;
 
     set_rank_step(task, trank, 0, 0); // Initialize rank step tracking
     ucc_memory_cpu_store_fence();
     // initiate barrier wait while all ranks set theirs steps to 0
-    status = ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
-    if (ucc_unlikely(status != UCC_OK)) {
-        goto exit_err;
-    }
-
-    return UCC_OK;
-
-exit_err:
-    return status;
+    return ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
 }
 
 // Tests if setup is complete for a linear broadcast task
-static inline ucc_status_t ucc_tl_cuda_bcast_linear_setup_test(ucc_tl_cuda_task_t *task)
+static inline ucc_status_t
+ucc_tl_cuda_bcast_linear_setup_test(ucc_tl_cuda_task_t *task)
 {
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
     return ucc_tl_cuda_shm_barrier_test(UCC_TL_TEAM_RANK(team), task->bar);
@@ -85,8 +78,8 @@ static inline ucc_status_t root_find_free_barrier(ucc_tl_cuda_task_t *task)
     for (i = 0; i < max_concurrent; ++i) {
         curr_bar = UCC_TL_CUDA_TEAM_BARRIER(team, max_concurrent + i);
         // try to set user specified tag to mark that this barrier is used by this task
-        if (ucc_atomic_cswap64(&curr_bar->tag, UCC_TAG_FREE,
-                               task->bcast_linear.key) == UCC_TAG_FREE) {
+        if (ucc_atomic_cswap64(&curr_bar->tag, UCC_TL_CUDA_TAG_FREE,
+                               task->bcast_linear.key) == UCC_TL_CUDA_TAG_FREE) {
             ucc_debug("Acquire barrier: %p idx: %d marked with tag: %ld",
                       curr_bar, i, curr_bar->tag);
             task->bar = curr_bar;
@@ -135,7 +128,8 @@ static inline ucc_status_t peer_find_free_barrier(ucc_tl_cuda_task_t *task)
     return UCC_ERR_NOT_FOUND;
 }
 
-static ucc_status_t ucc_tl_cuda_bcast_linear_finalize(ucc_coll_task_t *coll_task)
+static ucc_status_t
+ucc_tl_cuda_bcast_linear_finalize(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
 
@@ -230,7 +224,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                               task->bcast_linear.step % 2 * half_scratch_size);
             sbuf = PTR_OFFSET(task->bcast_linear.sbuf, offset_buff);
             st   = ecopy(dbuf, sbuf, chunk_size, exec,
-                         &task->bcast_linear.exec_task);
+                       &task->bcast_linear.exec_task);
             if (st != UCC_OK) {
                 ucc_error("failed to post ecopy task");
                 task->super.status = st;
@@ -241,18 +235,16 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             etask = task->bcast_linear.exec_task;
             ucc_assert(NULL != etask);
             st = ucc_ee_executor_task_test(etask);
-            if (st == UCC_OK) {
-                ucc_ee_executor_task_finalize(etask);
-                task->bcast_linear.exec_task = NULL;
-                // signal others
-                ++task->bcast_linear.step;
-                set_rank_step(task, task->bcast_linear.root,
-                              task->bcast_linear.step, 0);
-                task->bcast_linear.stage = STAGE_WAIT_ALL;
-            } else {
-                // not ready
-                return;
+            if (st != UCC_OK) {
+                return; // not ready
             }
+            ucc_ee_executor_task_finalize(etask);
+            task->bcast_linear.exec_task = NULL;
+            // signal others
+            ++task->bcast_linear.step;
+            set_rank_step(task, task->bcast_linear.root,
+                          task->bcast_linear.step, 0);
+            task->bcast_linear.stage = STAGE_WAIT_ALL;
         case STAGE_WAIT_ALL:
             for (i = 0; i < tsize; ++i) {
                 if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task))) {
@@ -262,7 +254,8 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                     peer = i;
                 }
                 // need to wait until all ranks complete step - 1, because of double buffering
-                if (get_rank_step(task, peer, 0) < task->bcast_linear.step - 1) {
+                if (get_rank_step(task, peer, 0) <
+                    task->bcast_linear.step - 1) {
                     // rank is not ready, lets wait
                     return;
                 }
@@ -272,16 +265,15 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 // go to next iteration
                 task->bcast_linear.stage = STAGE_COPY;
                 return;
-            } else {
-                // finish
-                st = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
-                if (ucc_unlikely(st != UCC_OK)) {
-                    ucc_error("failed to start barrier from root rank");
-                    task->super.status = st;
-                    return;
-                }
-                task->bcast_linear.stage = STAGE_WAIT_COMPLETION;
             }
+            // finish
+            st = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
+            if (ucc_unlikely(st != UCC_OK)) {
+                ucc_error("failed to start barrier from root rank");
+                task->super.status = st;
+                return;
+            }
+            task->bcast_linear.stage = STAGE_WAIT_COMPLETION;
         case STAGE_WAIT_COMPLETION:
             st = ucc_tl_cuda_shm_barrier_test(trank, task->bar);
             if (st != UCC_OK) {
@@ -292,10 +284,12 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             // set barrier free to unlock others, this is roots responsibility
             ucc_debug("Release bar: %p with tag: %ld", task->bar,
                       task->bar->tag);
-            task->bar->tag = UCC_TAG_FREE;
+            task->bar->tag = UCC_TL_CUDA_TAG_FREE;
             ucc_tl_cuda_put_sync_root(task, task->bcast_linear.root);
             task->super.status = UCC_OK;
+            break;
         default:
+            ucc_assert(0);
             break;
         }
     } else {
@@ -316,7 +310,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             sbuf = PTR_OFFSET(TASK_SCRATCH(task, task->bcast_linear.root),
                               task->bcast_linear.step % 2 * chunk_size);
             st   = ecopy(dbuf, sbuf, chunk_size, exec,
-                         &task->bcast_linear.exec_task);
+                       &task->bcast_linear.exec_task);
             if (st != UCC_OK) {
                 ucc_error("failed to post ecopy task at client");
                 task->super.status = st;
@@ -327,24 +321,24 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             etask = task->bcast_linear.exec_task;
             ucc_assert(NULL != etask);
             st = ucc_ee_executor_task_test(etask);
-            if (st == UCC_OK) {
-                ucc_ee_executor_task_finalize(etask);
-                task->bcast_linear.exec_task = NULL;
-                ++task->bcast_linear.step;
-                set_rank_step(task, trank, task->bcast_linear.step, 0);
-                if (task->bcast_linear.step < task->bcast_linear.num_steps) {
-                    task->bcast_linear.stage = STAGE_WAIT_ROOT;
-                    return;
-                } else {
-                    // start barrier to sync with root
-                    task->bcast_linear.stage = STAGE_CLIENT_WAIT_COMPLETION;
-                    st = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
-                    if (ucc_unlikely(st != UCC_OK)) {
-                        ucc_error("failed to start barrier from peer rank");
-                        task->super.status = st;
-                        return;
-                    }
-                }
+            if (st != UCC_OK) {
+                return; // executor task is not ready
+            }
+            ucc_ee_executor_task_finalize(etask);
+            task->bcast_linear.exec_task = NULL;
+            ++task->bcast_linear.step;
+            set_rank_step(task, trank, task->bcast_linear.step, 0);
+            if (task->bcast_linear.step < task->bcast_linear.num_steps) {
+                task->bcast_linear.stage = STAGE_WAIT_ROOT;
+                return;
+            }
+            // start barrier to sync with root
+            task->bcast_linear.stage = STAGE_CLIENT_WAIT_COMPLETION;
+            st = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
+            if (ucc_unlikely(st != UCC_OK)) {
+                ucc_error("failed to start barrier from peer rank");
+                task->super.status = st;
+                return;
             }
             break;
         case STAGE_CLIENT_WAIT_COMPLETION:
@@ -355,7 +349,9 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             }
             task->super.status = UCC_OK;
+            break;
         default:
+            ucc_assert(0);
             break;
         }
     }
@@ -373,9 +369,12 @@ static ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
 
     // in case of active set bcast we need to do additional steps to find free barriers
     if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task))) {
-        task->bcast_linear.stage = UCC_TL_TEAM_RANK(team) == task->bcast_linear.root ? STAGE_INIT_BAR_ROOT : STAGE_FIND_BAR_PEER;
+        task->bcast_linear.stage =
+            UCC_TL_TEAM_RANK(team) == task->bcast_linear.root
+                ? STAGE_INIT_BAR_ROOT
+                : STAGE_FIND_BAR_PEER;
     }
-    
+
     task->bcast_linear.size = ucc_dt_size(dt) * args->src.info.count;
     task->bcast_linear.num_steps =
         ucc_div_round_up(task->bcast_linear.size, half_scratch_size);

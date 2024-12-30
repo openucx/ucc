@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -74,7 +74,7 @@ extern ucc_tl_cuda_iface_t ucc_tl_cuda;
 
 typedef struct ucc_tl_cuda_lib_config {
     ucc_tl_lib_config_t super;
-    uint32_t            max_concurrent;
+    uint32_t            max_concurrent; // Maximum number of tasks that can be progressed simultaneously.
     size_t              scratch_size;
     unsigned long       allgather_ring_max_rings;
     uint32_t            allgather_ring_num_chunks;
@@ -106,7 +106,7 @@ UCC_CLASS_DECLARE(ucc_tl_cuda_context_t, const ucc_base_context_params_t *,
 
 typedef uint32_t ucc_tl_cuda_sync_state_t;
 
-#define UCC_TAG_FREE 0xFFFFFFFFFFFFFFFF
+#define UCC_TL_CUDA_TAG_FREE 0xFFFFFFFFFFFFFFFF
 
 typedef struct ucc_tl_cuda_shm_barrier {
     ucc_rank_t   size;
@@ -180,7 +180,7 @@ UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
 typedef struct ucc_tl_cuda_task ucc_tl_cuda_task_t;
 struct ucc_tl_cuda_task {
     ucc_coll_task_t            super;
-    uint32_t                   seq_num; // Sequential identifier for each taks started within the team
+    uint32_t                   seq_num; // Sequential identifier for each task started within the team
     uint32_t                   coll_id; // Index of the collective task in flight, within the range [0; max_concurrent)
     ucc_tl_cuda_shm_barrier_t *bar;     // Pointer to the reserved barrier for this task in the CUDA team
     ucc_subset_t               subset;  // Mapping information for the active set, if it is present
