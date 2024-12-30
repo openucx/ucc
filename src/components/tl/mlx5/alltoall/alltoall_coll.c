@@ -537,6 +537,7 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
                             return status;
                         }
                     } else {
+                        ucc_assert(dm != NULL);
                         status = ucc_tl_mlx5_post_transpose(
                             tl_mlx5_get_qp(a2a, cyc_rank),
                             a2a->node.ops[seq_index].send_mkeys[0]->lkey,
