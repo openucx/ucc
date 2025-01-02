@@ -28,7 +28,7 @@ typedef struct ucc_global_config {
     char *install_path;
     int   initialized;
     /* Profiling mode */
-    unsigned                   profile_mode;
+    uint64_t                   profile_mode;
 
     /* Profiling output file name */
     char *profile_file;
