@@ -84,9 +84,9 @@ static void ucc_tl_mlx5_dm_chunk_init(ucc_mpool_t *mp,        //NOLINT
     c->posted_sends    = 0;
     c->posted_all      = 0;
     c->completed_sends = 0;
-    team->dm_offset =
-        team->dm_offset + UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_buf_size *
-                              UCC_TL_MLX5_TEAM_LIB(team)->cfg.block_batch_size;
+    team->dm_offset    = PTR_OFFSET(
+        team->dm_offset, UCC_TL_MLX5_TEAM_LIB(team)->cfg.dm_buf_size *
+                             UCC_TL_MLX5_TEAM_LIB(team)->cfg.block_batch_size);
 }
 
 static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {
