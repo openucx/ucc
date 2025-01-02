@@ -104,6 +104,10 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.one_sided_reliability_enable),
      UCC_CONFIG_TYPE_BOOL},
 
+    {"FANIN_KN_RADIX", "4", "Radix of the knomial tree fanin algorithm",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, fanin_kn_radix),
+     UCC_CONFIG_TYPE_UINT},
+
     {NULL}};
 
 static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
@@ -125,6 +129,11 @@ static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
     {"MCAST_NET_DEVICE", "", "Specifies which network device to use for Mcast",
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.ib_dev_name),
      UCC_CONFIG_TYPE_STRING},
+
+    {"FANIN_NPOLLS", "1000",
+     "Number of shared memory polling before returning UCC_INPROGRESS during "
+     "internode FANIN",
+     ucc_offsetof(ucc_tl_mlx5_context_config_t, npolls), UCC_CONFIG_TYPE_UINT},
 
     {NULL}};
 
