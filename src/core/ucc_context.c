@@ -1156,6 +1156,7 @@ ucc_status_t ucc_mem_map_import(ucc_context_h        context,
 {
     ucc_context_t       *ctx    = (ucc_context_t *)context;
     ucc_status_t         status = UCC_OK;
+    ucc_config_names_array_t *tls = &ctx->all_tls;
     int                  i;
     ucc_mem_map_memh_t  *local_memh;
     ucc_tl_lib_t        *tl_lib;
@@ -1164,10 +1165,14 @@ ucc_status_t ucc_mem_map_import(ucc_context_h        context,
         ucc_error("cannot import NULL memory handle");
         return UCC_ERR_INVALID_PARAM;
     }
+    if (!params) {
+        ucc_error("params cannot be NULL");
+        return UCC_ERR_INVALID_PARAM;
+    }
 
     /* FIXME: it's legal for the user to export and immediately import a handle,
      *        is this an issue? */
-    local_memh = (ucc_mem_map_memh_t *)memh;
+    local_memh = *memh;
 
     /* memh should have been used in exchanges or from a remote process, addresses, etc likely garbage. fix it */
     local_memh->tl_h = (ucc_mem_map_tl_t *)ucc_calloc(
@@ -1176,15 +1181,18 @@ ucc_status_t ucc_mem_map_import(ucc_context_h        context,
         tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
         /* FIXME: i don't think this will work properly for more than 1 TL */
         status = tl_lib->iface->context.mem_map(
-            (const ucc_base_context_t *)ctx, UCC_MEM_MAP_TYPE_GLOBAL, params->segments[0].address, params->segments[0].len,
+            (const ucc_base_context_t *)ctx->tl_ctx[i], UCC_MEM_MAP_TYPE_GLOBAL, params->segments[0].address, params->segments[0].len,
             local_memh, &local_memh->tl_h[i]);
-        if (status != UCC_OK) {
-            ucc_error("failed to import mem map memh");
+        if (status < UCC_ERR_NOT_IMPLEMENTED) {
+            ucc_error("failed to import mem map memh %d", status);
             return status;
         }
+        strncpy(local_memh->tl_h[i].tl_name, tls->names[i], 8);
     }
-
     local_memh->type = UCC_MEM_MAP_TYPE_GLOBAL;
+    /* fix context as it will be incorrect on a different system */
+    local_memh->context = ctx;
+
     return status;
 }
 
@@ -1201,6 +1209,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h        context,
     ucc_tl_lib_t        *tl_lib;
     size_t               offset;
     int                  i;
+    ucc_config_names_array_t *tls = &ctx->all_tls;
 
     local_memh = (ucc_mem_map_memh_t *)ucc_calloc(
         1, sizeof(ucc_mem_map_memh_t), "local memh");
@@ -1212,14 +1221,14 @@ ucc_status_t ucc_mem_map_export(ucc_context_h        context,
     local_memh->tl_h = (ucc_mem_map_tl_t *)ucc_calloc(
         ctx->n_tl_ctx, sizeof(ucc_mem_map_tl_t), "tl memh");
     packed_buffers =
-        (void **)ucc_malloc(sizeof(void *) * ctx->n_tl_ctx, "packed buffers");
+        (void **)ucc_calloc(ctx->n_tl_ctx, sizeof(void *), "packed buffers");
 
     /* map all the memory */
     for (i = 0; i < ctx->n_tl_ctx; i++) {
         tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
         /* always treat as a local mem handle */
         status = tl_lib->iface->context.mem_map(
-            (const ucc_base_context_t *)context, UCC_MEM_MAP_TYPE_LOCAL, params->segments[0].address, params->segments[0].len,
+            (const ucc_base_context_t *)ctx->tl_ctx[i], UCC_MEM_MAP_TYPE_LOCAL, params->segments[0].address, params->segments[0].len,
             local_memh, &local_memh->tl_h[i]);
         if (status != UCC_OK) {
             if (status < UCC_ERR_NOT_IMPLEMENTED) {
@@ -1240,7 +1249,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h        context,
             tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
             /* tl should set packed_size, allocate buffer, pack memh */
             status = tl_lib->iface->context.memh_pack(
-                (const ucc_base_context_t *)context, &local_memh->tl_h[i], &packed_buffers[i]);
+                (const ucc_base_context_t *)ctx->tl_ctx[i], &local_memh->tl_h[i], &packed_buffers[i]);
             if (status != UCC_OK) {
                 if (status < UCC_ERR_NOT_IMPLEMENTED) {
                     ucc_error("failed to map memory");
@@ -1251,21 +1260,24 @@ ucc_status_t ucc_mem_map_export(ucc_context_h        context,
         }
     }
 
-    // allocate exported memh, copy items over
+    /* allocate exported memh, copy items over */
     exported_memh = (ucc_mem_map_memh_t *)ucc_calloc(
-        1, sizeof(ucc_mem_map_memh_t) + total_pack_size, "exported memh");
+        1, sizeof(ucc_mem_map_memh_t) + total_pack_size + 2 * sizeof(size_t) * ctx->n_tl_ctx, "exported memh");
     if (!exported_memh) {
         ucc_error("failed to allocate handle for exported buffers");
         return UCC_ERR_NO_MEMORY;
     }
 
-    // copying
+    /* copying */
     exported_memh->tl_h = local_memh->tl_h;
-    offset = 0;
-    for (i = 0; i < ctx->n_tl_ctx; i++) {
+    for (i = 0, offset = 0; i < ctx->n_tl_ctx; i++) {
+        uint64_t tl_index = i;
         if (local_memh->tl_h[i].packed_size == 0) {
             continue;
         }
+        memcpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
+               &tl_index, sizeof(size_t));
+        offset += sizeof(size_t);
         memcpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
                &local_memh->tl_h[i].packed_size, sizeof(size_t));
         offset += sizeof(size_t);
@@ -1273,10 +1285,19 @@ ucc_status_t ucc_mem_map_export(ucc_context_h        context,
                packed_buffers[i], local_memh->tl_h[i].packed_size);
         ucc_free(packed_buffers[i]);
         offset += local_memh->tl_h[i].packed_size;
+
+        // copy name information for look ups later
+        strncpy(exported_memh->tl_h[i].tl_name, tls->names[i], 8);
     }
     ucc_free(local_memh);
-    exported_memh->context = context;
-    *memh = (ucc_mem_map_memh_t *)exported_memh;
+    exported_memh->type = UCC_MEM_MAP_TYPE_LOCAL;
+    exported_memh->context = ctx;
+    exported_memh->address = params->segments[0].address;
+    exported_memh->len = params->segments[0].len;
+    exported_memh->my_ctx_rank = ctx->rank;
+    exported_memh->num_tls = ctx->n_tl_ctx;
+    *memh = exported_memh;
+    *memh_size = total_pack_size;
     return UCC_OK;
 failed_pack:
 failed_mem_map:
@@ -1291,6 +1312,11 @@ ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_flags_t flags,
                          ucc_mem_map_params_t *params, size_t *memh_size,
                          ucc_mem_map_mem_h *memh)
 {
+    if (params->n_segments > 1) {
+        ucc_error("UCC only supports one mapping per call");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
     // check if flags is import / export
     if (flags == UCC_MEM_MAP_IMPORT) {
         // set map type to global
@@ -1314,14 +1340,13 @@ ucc_status_t ucc_mem_unmap(ucc_mem_map_mem_h *memh)
         ucc_warn("unable to free NULL memh");
         return UCC_ERR_INVALID_PARAM;
     }
-
     /* it could be global or local type */
-    lmemh = (ucc_mem_map_memh_t *)memh;
-    ctx = lmemh->context;
+    lmemh = (ucc_mem_map_memh_t *)*memh;
+    ctx = (ucc_context_t *)lmemh->context;
 
     for (i = 0; i < ctx->n_tl_ctx; i++) {
         tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
-        status = tl_lib->iface->context.mem_unmap((const ucc_base_context_t *)ctx, lmemh->type, &lmemh->tl_h[i]);
+        status = tl_lib->iface->context.mem_unmap((const ucc_base_context_t *)ctx->tl_ctx[i], lmemh->type, &lmemh->tl_h[i]);
         if (status < UCC_ERR_NOT_IMPLEMENTED) {
             ucc_error("we had an error");
             return status;

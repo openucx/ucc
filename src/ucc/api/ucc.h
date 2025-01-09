@@ -1806,7 +1806,8 @@ enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(2),
     UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER              = UCC_BIT(3),
     UCC_COLL_ARGS_FIELD_ACTIVE_SET                      = UCC_BIT(4),
-    UCC_COLL_ARGS_FIELD_MEM_MAP_MEMH                    = UCC_BIT(5)
+    UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH                = UCC_BIT(5),
+    UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH                = UCC_BIT(5),
 };
 
 typedef void *ucc_mem_map_mem_h;

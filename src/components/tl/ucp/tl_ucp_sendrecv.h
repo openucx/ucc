@@ -343,10 +343,64 @@ static inline ucc_status_t ucc_tl_ucp_recv_nz(void *buffer, size_t msglen,
         buffer, msglen, mtype, dest_group_rank, team, task);
 }
 
+static inline ucc_status_t find_tl_index(ucc_mem_map_mem_h map_memh, int *tl_index)
+{
+    ucc_mem_map_memh_t *memh = (ucc_mem_map_memh_t *)map_memh;
+    int i = 0;
+
+    for (; i < memh->num_tls; i++) {
+        if (strncmp(memh->tl_h[i].tl_name, "ucp", 3) == 0) {
+            *tl_index = i;
+            return UCC_OK;
+        }
+    }
+    return UCC_ERR_NOT_FOUND;
+}
+
+static inline ucc_status_t ucc_tl_ucp_check_memh(ucp_ep_h *ep, void *va, uint64_t *rva,
+                                                 ucp_rkey_h *rkey, int tl_index, ucc_mem_map_mem_h map_memh)
+{
+    // check if src_memh or dest_memh have segment
+    ucc_mem_map_memh_t *memh = map_memh;
+    ucc_tl_ucp_memh_data_t *tl_data = (ucc_tl_ucp_memh_data_t *)memh->tl_h[tl_index].tl_data;
+    uint64_t base, end;
+    ucs_status_t ucs_status;
+    int i;
+    size_t offset;
+
+    base = (uint64_t)memh->address;
+    end = base + memh->len;
+
+    if ((uint64_t)va >= base && (uint64_t)va < end) {
+        *rva = (uint64_t)PTR_OFFSET(memh->address, ((uint64_t)va - (uint64_t)memh->address));
+        if (NULL == tl_data->rkey) {
+            offset = 0;
+            /* find pack location for tl */
+            for (i = 0; i < tl_index; i++) {
+                size_t *p = PTR_OFFSET(memh->pack_buffer, offset);
+                if (p[0] == tl_index) {
+                    break;
+                }
+                offset += p[1];
+            }
+            ucs_status =
+                ucp_ep_rkey_unpack(*ep, PTR_OFFSET(memh->pack_buffer, offset + sizeof(size_t) * 4),
+                               &tl_data->rkey);
+            if (UCS_OK != ucs_status) {
+                return ucs_status_to_ucc_status(ucs_status);
+            }
+        }
+        *rkey = tl_data->rkey;
+        /* FIXME: packed memh? */
+        return UCC_OK;
+    }
+    return UCC_ERR_NOT_FOUND;
+}
+
 static inline ucc_status_t
 ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
                              ucc_rank_t peer, uint64_t *rva, ucp_rkey_h *rkey,
-                             int *segment)
+                             int *segment, ucc_mem_map_mem_h src_memh, ucc_mem_map_mem_h dest_memh)
 {
     ucc_tl_ucp_context_t *ctx            = UCC_TL_UCP_TEAM_CTX(team);
     ptrdiff_t             key_offset     = 0;
@@ -382,6 +436,41 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
         key_offset += key_sizes[i];
     }
     if (ucc_unlikely(0 > *segment)) {
+        // check if src_memh or dest_memh have segment
+        int tl_index = 0;
+        ucc_status_t status;
+
+        if (src_memh) {
+            //status = UCC_OK;
+            status = find_tl_index(src_memh, &tl_index);
+            if (status == UCC_ERR_NOT_FOUND) {
+                tl_error(UCC_TL_TEAM_LIB(team),
+                    "attempt to perform one-sided operation with malformed mem map handle");
+                return status;
+            }
+
+            status = ucc_tl_ucp_check_memh(ep, va, rva, rkey, tl_index, src_memh);
+            if (status == UCC_OK) {
+                return UCC_OK;
+            }
+        }
+
+        if (dest_memh) {
+            if (tl_index == -1) {
+                status = find_tl_index(dest_memh, &tl_index);
+                if (status == UCC_ERR_NOT_FOUND) {
+                    tl_error(UCC_TL_TEAM_LIB(team),
+                        "attempt to perform one-sided operation with malformed mem map handle");
+                    return status;
+                }
+            }
+
+            status = ucc_tl_ucp_check_memh(ep, va, rva, rkey, tl_index, dest_memh);
+            if (status == UCC_OK) {
+                return UCC_OK;
+            }
+        }
+
         tl_error(UCC_TL_TEAM_LIB(team),
             "attempt to perform one-sided operation on non-registered memory %p", va);
         return UCC_ERR_NOT_FOUND;
@@ -440,6 +529,8 @@ static inline ucc_status_t ucc_tl_ucp_ep_flush(ucc_rank_t dest_group_rank,
 static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
                                              size_t             msglen,
                                              ucc_rank_t         dest_group_rank,
+                                             ucc_mem_map_mem_h  src_memh,
+                                             ucc_mem_map_mem_h  dest_memh,
                                              ucc_tl_ucp_team_t *team,
                                              ucc_tl_ucp_task_t *task)
 {
@@ -457,7 +548,7 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
     }
 
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
-                                          &rva, &rkey, &segment);
+                                          &rva, &rkey, &segment, src_memh, dest_memh);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
@@ -483,6 +574,8 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
 static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
                                              size_t             msglen,
                                              ucc_rank_t         dest_group_rank,
+                                             ucc_mem_map_mem_h  src_memh,
+                                             ucc_mem_map_mem_h  dest_memh,
                                              ucc_tl_ucp_team_t *team,
                                              ucc_tl_ucp_task_t *task)
 {
@@ -500,7 +593,7 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
     }
 
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
-                                          &rva, &rkey, &segment);
+                                          &rva, &rkey, &segment, src_memh, dest_memh);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
@@ -526,6 +619,8 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
 
 static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
                                                  ucc_rank_t dest_group_rank,
+                                                 ucc_mem_map_mem_h  src_memh,
+                                                 ucc_mem_map_mem_h  dest_memh,
                                                  ucc_tl_ucp_team_t *team)
 {
     ucp_request_param_t req_param = {0};
@@ -543,7 +638,7 @@ static inline ucc_status_t ucc_tl_ucp_atomic_inc(void *     target,
     }
 
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
-                                          &rva, &rkey, &segment);
+                                          &rva, &rkey, &segment, src_memh, dest_memh);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }

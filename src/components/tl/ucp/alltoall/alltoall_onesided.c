@@ -24,22 +24,25 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
     ucc_rank_t         gsize  = UCC_TL_TEAM_SIZE(team);
     ucc_rank_t         start  = (grank + 1) % gsize;
     long *             pSync  = TASK_ARGS(task).global_work_buffer;
+    ucc_mem_map_mem_h  *src_memh = TASK_ARGS(task).src_memh.global_memh;
+    ucc_mem_map_mem_h  *dst_memh = TASK_ARGS(task).dst_memh.global_memh;
     ucc_rank_t         peer;
 
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
     /* TODO: change when support for library-based work buffers is complete */
     nelems = (nelems / gsize) * ucc_dt_size(TASK_ARGS(task).src.info.datatype);
     dest   = dest + grank * nelems;
+
     UCPCHECK_GOTO(ucc_tl_ucp_put_nb((void *)(src + start * nelems),
-                                    (void *)dest, nelems, start, team, task),
+                                    (void *)dest, nelems, start, src_memh[start], dst_memh[start], team, task),
                   task, out);
-    UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, start, team), task, out);
+    UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, start, src_memh[start], dst_memh[start], team), task, out);
 
     for (peer = (start + 1) % gsize; peer != start; peer = (peer + 1) % gsize) {
         UCPCHECK_GOTO(ucc_tl_ucp_put_nb((void *)(src + peer * nelems),
-                                        (void *)dest, nelems, peer, team, task),
+                                        (void *)dest, nelems, peer, src_memh[peer], dst_memh[peer], team, task),
                       task, out);
-        UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer, team), task,
+        UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer, src_memh[peer], dst_memh[peer], team), task,
                       out);
     }
 
