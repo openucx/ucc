@@ -123,6 +123,11 @@ typedef struct ucc_base_context_iface {
     void         (*destroy)(ucc_base_context_t *ctx);
     ucc_status_t (*get_attr)(const ucc_base_context_t *context,
                              ucc_base_ctx_attr_t      *attr);
+    ucc_status_t (*mem_map)(const ucc_base_context_t *context, int type,
+                            void *address, size_t len, void *memh, void *tl_h);
+    ucc_status_t (*mem_unmap)(const ucc_base_context_t *context, int type, void *tl_h);
+    ucc_status_t (*memh_pack)(const ucc_base_context_t *context, void *memh,
+                              void **pack_buffer);
 } ucc_base_context_iface_t;
 
 
@@ -236,6 +241,9 @@ typedef struct ucc_base_coll_alg_info {
         .super.context.destroy =                                               \
             UCC_CLASS_DELETE_FUNC_NAME(ucc_##_f##_name##_context_t),           \
         .super.context.get_attr = ucc_##_f##_name##_get_context_attr,          \
+        .super.context.mem_map = ucc_##_f##_name##_mem_map,                    \
+        .super.context.mem_unmap = ucc_##_f##_name##_mem_unmap,                \
+        .super.context.memh_pack = ucc_##_f##_name##_memh_pack,                \
         .super.team.create_post =                                              \
             UCC_CLASS_NEW_FUNC_NAME(ucc_##_f##_name##_team_t),                 \
         .super.team.create_test = ucc_##_f##_name##_team_create_test,          \
