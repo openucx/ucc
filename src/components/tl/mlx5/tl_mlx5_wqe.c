@@ -57,7 +57,7 @@ ucc_status_t ucc_tl_mlx5_post_transpose(struct ibv_qp *qp, uint32_t src_mr_lkey,
     uint32_t                  n_ds     = 4;
     struct ibv_qp_ex *        qp_ex    = ibv_qp_to_qp_ex(qp);
     struct mlx5dv_qp_ex *     mqp      = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
-    int                       fm_ce_se = 0;
+    int                       fm_ce_se = MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE;
     char                      wqe_desc[n_ds * DS_SIZE];
     struct mlx5_wqe_ctrl_seg *ctrl;
     struct mlx5_wqe_data_seg *data;
@@ -153,8 +153,7 @@ ucc_status_t ucc_tl_mlx5_post_umr(struct ibv_qp *     qp,
                        sizeof(struct mlx5_wqe_mkey_context_seg) +
                        sizeof(struct mlx5_wqe_umr_pointer_seg)) /
                        DS_SIZE;
-    uint8_t fm_ce_se =
-        MLX5_WQE_CTRL_INITIATOR_SMALL_FENCE | MLX5_WQE_CTRL_CQ_UPDATE;
+    uint8_t fm_ce_se = MLX5_WQE_CTRL_CQ_UPDATE;
     struct ibv_qp_ex *                qp_ex = ibv_qp_to_qp_ex(qp);
     struct mlx5dv_qp_ex *             mqp = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
     struct mlx5_wqe_ctrl_seg *        ctrl;
@@ -275,7 +274,7 @@ ucc_status_t ucc_tl_mlx5_post_wait_on_data(struct ibv_qp *qp, uint64_t value,
     uint32_t             n_ds   = 3;   //CTRL + Wait on Data of Size 2
     struct ibv_qp_ex *   qp_ex  = ibv_qp_to_qp_ex(qp);
     struct mlx5dv_qp_ex *mqp    = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
-    uint8_t fm_ce_se            = MLX5_WQE_CTRL_FENCE | MLX5_WQE_CTRL_CQ_UPDATE;
+    uint8_t fm_ce_se            = MLX5_WQE_CTRL_CQ_UPDATE;
     char    wqe_desc[n_ds * DS_SIZE];
     struct mlx5_wqe_ctrl_seg *ctrl;
     wait_on_data_seg_t *      wseg;
