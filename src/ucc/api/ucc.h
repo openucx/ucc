@@ -2277,13 +2277,15 @@ typedef enum {
  * @param [in] flags       flags dictating the behavior of the routine
  * @param [in] params      parameters indicating the address and length of
  *                          memory to map
+ * @param [out] memh_size  Size of memory handle when exported
  * @param [inout] *memh    Handle for the registered memory
  * 
  * @return Error code as defined by ucc_status_t.
  */
 
 ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_flags_t flags,
-                         ucc_mem_map_params_t params, ucc_mem_map_mem_h *memh);
+                         ucc_mem_map_params_t *params, size_t *memh_size,
+                         ucc_mem_map_mem_h *memh);
 
 /**
  * @ingroup UCC_CONTEXT
