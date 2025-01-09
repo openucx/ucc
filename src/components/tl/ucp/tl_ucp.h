@@ -120,6 +120,13 @@ typedef struct ucc_tl_ucp_remote_info {
     size_t packed_key_len;
 } ucc_tl_ucp_remote_info_t;
 
+typedef struct ucc_tl_ucp_memh_data {
+    ucc_tl_ucp_remote_info_t rinfo;
+    void *packed_memh;
+    size_t packed_memh_len;
+    ucp_rkey_h  rkey;
+} ucc_tl_ucp_memh_data_t;
+
 typedef struct ucc_tl_ucp_worker {
     ucp_context_h     ucp_context;
     ucp_worker_h      ucp_worker;
