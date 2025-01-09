@@ -76,6 +76,24 @@ free_mpool:
     return status;
 }
 
+ucc_status_t ucc_tl_cuda_mem_map(const ucc_base_context_t *context,
+                                void *address,
+                                size_t len,
+                                void *memh)
+{
+    return UCC_ERR_NOT_IMPLEMENTED;
+}
+
+ucc_status_t ucc_tl_cuda_mem_unmap(const ucc_base_context_t *context, void *memh)
+{
+    return UCC_ERR_NOT_IMPLEMENTED;
+}
+
+ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context, void *memh, void **pack_buffer)
+{
+    return UCC_ERR_NOT_IMPLEMENTED;
+}
+
 UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_context_t)
 {
     tl_debug(self->super.super.lib, "finalizing tl context: %p", self);

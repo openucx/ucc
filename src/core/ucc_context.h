@@ -94,6 +94,28 @@ typedef struct ucc_context_config {
     uint32_t                  throttle_progress;
 } ucc_context_config_t;
 
+typedef enum {
+    UCC_MEM_MAP_TYPE_LOCAL,
+    UCC_MEM_MAP_TYPE_GLOBAL
+} ucc_mem_map_type_t;
+
+typedef struct ucc_mem_map_tl_t {
+    size_t packed_size;
+    void  *tl_data; /* tl specific data */
+} ucc_mem_map_tl_t;
+
+typedef struct ucc_mem_map_memh_t {
+    ucc_mem_map_type_t type;
+    ucc_context_h      context;
+    void              *address;
+    size_t             len;
+    /* rank of exporting process */
+    ucc_rank_t         my_ctx_rank;
+    /* handles for each tl */
+    ucc_mem_map_tl_t  *tl_h;
+    char               pack_buffer[0];
+} ucc_mem_map_memh_t;
+
 /* Internal function for context creation that takes explicit
    pointer for proc_info */
 ucc_status_t ucc_context_create_proc_info(ucc_lib_h                   lib,
