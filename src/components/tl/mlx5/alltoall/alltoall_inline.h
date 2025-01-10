@@ -73,7 +73,7 @@ static inline ucc_status_t send_atomic(ucc_tl_mlx5_alltoall_t *a2a,
     struct mlx5dv_qp_ex *qp_dv;
 
     qp_ex           = tl_mlx5_get_qp_ex(a2a, rank);
-    qp_ex->wr_flags = 0;
+    qp_ex->wr_flags = IBV_SEND_FENCE;
     ibv_wr_atomic_fetch_add(qp_ex, rkey, (uintptr_t)remote_addr, 1ULL);
     if (a2a->is_dc) {
         qp_dv = mlx5dv_qp_ex_from_ibv_qp_ex(qp_ex);
