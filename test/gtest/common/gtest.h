@@ -1,4 +1,7 @@
 // Copyright 2005, Google Inc.
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+// Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
