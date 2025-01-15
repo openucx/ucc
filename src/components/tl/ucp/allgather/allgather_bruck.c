@@ -12,6 +12,44 @@
 #include "utils/ucc_coll_utils.h"
 #include "components/mc/ucc_mc.h"
 
+enum {
+    UCC_BRUCK_PHASE_INIT,
+    UCC_BRUCK_PHASE_SEND_RECV,           /* main loop */
+    UCC_BRUCK_PHASE_HOST_IS_RMEM,
+    UCC_BRUCK_PHASE_HOST_IS_RMEM1,       /* post processing step with host memory - 1st copy */
+    UCC_BRUCK_PHASE_HOST_IS_RMEM2,       /* post processing step with host memory - 2nd copy */
+    UCC_BRUCK_PHASE_NON_HOST,
+    UCC_BRUCK_PHASE_NON_HOST1,           /* post processing step no host memory - 1st copy */
+    UCC_BRUCK_PHASE_NON_HOST2,           /* post processing step no host memory - 1st copy */
+    UCC_BRUCK_PHASE_NON_HOST3,           /* post processing step no host memory - 1st copy */
+    UCC_BRUCK_PHASE_DONE,                /* any work after main loop */
+};
+
+#define SAVE_STATE(_phase)                                                     \
+    do {                                                                       \
+        task->allgather_bruck.phase = _phase;                                  \
+    } while (0)
+
+#define UCC_BRUCK_CHECK_PHASE(_p)                                              \
+    case _p:                                                                   \
+        goto _p;
+
+#define UCC_BRUCK_GOTO_PHASE(_phase)                                           \
+    do {                                                                       \
+        switch (_phase) {                                                      \
+            UCC_BRUCK_CHECK_PHASE(UCC_BRUCK_PHASE_SEND_RECV);                  \
+            UCC_BRUCK_CHECK_PHASE(UCC_BRUCK_PHASE_HOST_IS_RMEM);               \
+            UCC_BRUCK_CHECK_PHASE(UCC_BRUCK_PHASE_HOST_IS_RMEM1);              \
+            UCC_BRUCK_CHECK_PHASE(UCC_BRUCK_PHASE_HOST_IS_RMEM2);              \
+            UCC_BRUCK_CHECK_PHASE(UCC_BRUCK_PHASE_NON_HOST);                   \
+            UCC_BRUCK_CHECK_PHASE(UCC_BRUCK_PHASE_NON_HOST1);                  \
+            UCC_BRUCK_CHECK_PHASE(UCC_BRUCK_PHASE_NON_HOST2);                  \
+            UCC_BRUCK_CHECK_PHASE(UCC_BRUCK_PHASE_NON_HOST3);                  \
+        default:                                                               \
+            break;                                                             \
+        };                                                                     \
+    } while (0)
+
 ucc_status_t ucc_tl_ucp_allgather_bruck_init(ucc_base_coll_args_t *coll_args,
                                              ucc_base_team_t      *team,
                                              ucc_coll_task_t     **task_h)
@@ -108,19 +146,18 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
     size_t       scratch_size = task->allgather_bruck.scratch_size;
     size_t       data_size    = (count / tsize) * ucc_dt_size(dt);
     int          use_loopback = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_loopback;
-    ucc_rank_t   rank         = ucc_ep_map_eval(task->subset.map, trank);
     ucc_rank_t   recvfrom, sendto;
     ucc_status_t status;
     size_t       blockcount, distance;
     void        *tmprecv, *tmpsend;
 
+    UCC_BRUCK_GOTO_PHASE(task->allgather_bruck.phase);
+
+UCC_BRUCK_PHASE_SEND_RECV:
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        SAVE_STATE(UCC_BRUCK_PHASE_SEND_RECV);
         return;
     }
-    /*printf("tagged rcv: %d\n", (int)(task->tagged.recv_posted));
-    use_loopback = 0;*/
-    
-
     /* On each step doubles distance */
     //distance = 1 << task->tagged.recv_posted;
     distance = use_loopback ? 1 << (task->tagged.recv_posted - 1) : 1 << task->tagged.recv_posted;
@@ -148,107 +185,109 @@ void ucc_tl_ucp_allgather_bruck_progress(ucc_coll_task_t *coll_task)
                       task, out);
 
         if (UCC_INPROGRESS == ucc_tl_ucp_test_recv(task)) {
+            SAVE_STATE(UCC_BRUCK_PHASE_SEND_RECV);
             return;
         }
 
-        distance = 1 << task->tagged.recv_posted;
+        distance = use_loopback ? 1 << (task->tagged.recv_posted - 1) : 1 << task->tagged.recv_posted;
     }
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        SAVE_STATE(UCC_BRUCK_PHASE_SEND_RECV);
         return;
     }
 
     /* post processing step */
-    if ((trank != 0) && (task->allgather_bruck.post_processing_step == 1)) {
-        task->allgather_bruck.post_processing_step = 0;
+    if (trank != 0) {
         if (UCC_MEMORY_TYPE_HOST == rmem) {
             // copy blocks [0 .. (size - rank - 1)] from rbuf to shift buffer
-            if (use_loopback){
-                status = loopback_self_copy(scratch_header->addr, rbuf, scratch_size,
-                                UCC_MEMORY_TYPE_HOST, rmem, rank, team, task);
-            } else {
-                status = ucc_mc_memcpy(scratch_header->addr, rbuf, scratch_size,
-                                        UCC_MEMORY_TYPE_HOST, rmem);
-                }
-            if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(UCC_TASK_LIB(task),
-                            "failed to copy data to scratch buffer");
-                task->super.status = status;
-                return;
-            }            
-            // move blocks [(size - rank) .. size] from rbuf to beginning of rbuf
-            // TODO: rewrite to cycle to get rid of overlap
-            memmove(rbuf, PTR_OFFSET(rbuf, scratch_size), trank * data_size);
-            // copy blocks from shift buffer starting at block [rank] in rbuf.
-            if (use_loopback) {
-                status = loopback_self_copy(PTR_OFFSET(rbuf, trank * data_size), scratch_header->addr, scratch_size,
-                                rmem, UCC_MEMORY_TYPE_HOST, rank, team, task);                
-            } else {
-                status = ucc_mc_memcpy(PTR_OFFSET(rbuf, trank * data_size),
-                                   scratch_header->addr, scratch_size, rmem,
-                                   UCC_MEMORY_TYPE_HOST);
-            }
-            if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(UCC_TASK_LIB(task),
-                         "failed to copy data from scratch to rbuff buffer");
-                task->super.status = status;
-                return;
-            }
+            UCC_BRUCK_GOTO_PHASE(UCC_BRUCK_PHASE_HOST_IS_RMEM);
         } else {
             /* In case of non host memory we perform two copy to host buffer and then back to device, 3 memcopy in total */
             /* TODO: replace with generic kernel to do bruck post step in sinle launch on device */
-            if (use_loopback) {
-                status = loopback_self_copy(PTR_OFFSET(scratch_header->addr, trank * data_size), rbuf, (tsize - trank) * data_size,
-                                UCC_MEMORY_TYPE_HOST, rmem, rank, team, task);  
-            } else {
-                status = ucc_mc_memcpy(
-                    PTR_OFFSET(scratch_header->addr, trank * data_size), rbuf,
-                    (tsize - trank) * data_size, UCC_MEMORY_TYPE_HOST, rmem);
-            }
-            if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(UCC_TASK_LIB(task),
-                         "failed to copy first data part to scratch buffer");
-                task->super.status = status;
-                return;
-            }
-            if (use_loopback) {
-                status = loopback_self_copy(scratch_header->addr, PTR_OFFSET(rbuf, (tsize - trank) * data_size), trank * data_size,
-                                UCC_MEMORY_TYPE_HOST, rmem, rank, team, task);  
-            } else {
-                status =
-                    ucc_mc_memcpy(scratch_header->addr,
-                                PTR_OFFSET(rbuf, (tsize - trank) * data_size),
-                                trank * data_size, UCC_MEMORY_TYPE_HOST, rmem);
-            }
-            if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(UCC_TASK_LIB(task),
-                         "failed to copy second data part to scratch buffer");
-                task->super.status = status;
-                return;
-            }
-            if (use_loopback) {
-                status = loopback_self_copy(rbuf, scratch_header->addr, tsize * data_size,
-                                rmem, UCC_MEMORY_TYPE_HOST, rank, team, task);  
-            } else {
-                status =
-                    ucc_mc_memcpy(rbuf, scratch_header->addr, tsize * data_size,
-                                rmem, UCC_MEMORY_TYPE_HOST);
-            }
-            if (ucc_unlikely(status != UCC_OK)) {
-                tl_error(UCC_TASK_LIB(task),
-                         "failed to copy from scratch buffer to dst");
-                task->super.status = status;
-                return;
-            }
+            UCC_BRUCK_GOTO_PHASE(UCC_BRUCK_PHASE_NON_HOST);
         }
+    } else {
+        goto complete;
     }
 
+UCC_BRUCK_PHASE_HOST_IS_RMEM:
+    status = allgather_copy(scratch_header->addr, rbuf, scratch_size,
+                        UCC_MEMORY_TYPE_HOST, rmem, trank, team, task);
+UCC_BRUCK_PHASE_HOST_IS_RMEM1:
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        SAVE_STATE(UCC_BRUCK_PHASE_HOST_IS_RMEM1);
         return;
     }
-    printf("rank %d\n", (int)trank);
-    ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
+    if (ucc_unlikely(status != UCC_OK)) {
+        tl_error(UCC_TASK_LIB(task),
+                    "failed to copy data to scratch buffer");
+        task->super.status = status;
+        return;
+    }            
+    // move blocks [(size - rank) .. size] from rbuf to beginning of rbuf
+    // TODO: rewrite to cycle to get rid of overlap
+    memmove(rbuf, PTR_OFFSET(rbuf, scratch_size), trank * data_size);
+    // copy blocks from shift buffer starting at block [rank] in rbuf.
+    status = allgather_copy(PTR_OFFSET(rbuf, trank * data_size), scratch_header->addr, scratch_size,
+                        rmem, UCC_MEMORY_TYPE_HOST, trank, team, task);
+UCC_BRUCK_PHASE_HOST_IS_RMEM2:
+    if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        SAVE_STATE(UCC_BRUCK_PHASE_HOST_IS_RMEM2);
+        return;
+    }
+    if (ucc_unlikely(status != UCC_OK)) {
+        tl_error(UCC_TASK_LIB(task),
+                    "failed to copy data from scratch to rbuff buffer");
+        task->super.status = status;
+        return;
+    }
+    goto complete;
+    
+UCC_BRUCK_PHASE_NON_HOST:
+    status = allgather_copy(PTR_OFFSET(scratch_header->addr, trank * data_size), rbuf, (tsize - trank) * data_size,
+                        UCC_MEMORY_TYPE_HOST, rmem, trank, team, task);
+UCC_BRUCK_PHASE_NON_HOST1:
+    if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        SAVE_STATE(UCC_BRUCK_PHASE_NON_HOST1);
+        return;
+    }
+    if (ucc_unlikely(status != UCC_OK)) {
+        tl_error(UCC_TASK_LIB(task),
+                "failed to copy first data part to scratch buffer");
+        task->super.status = status;
+        return;
+    }
+    status = allgather_copy(scratch_header->addr, PTR_OFFSET(rbuf, (tsize - trank) * data_size), trank * data_size,
+                        UCC_MEMORY_TYPE_HOST, rmem, trank, team, task);
+UCC_BRUCK_PHASE_NON_HOST2:
+    if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        SAVE_STATE(UCC_BRUCK_PHASE_NON_HOST2);
+        return;
+    }
+    if (ucc_unlikely(status != UCC_OK)) {
+        tl_error(UCC_TASK_LIB(task),
+                "failed to copy second data part to scratch buffer");
+        task->super.status = status;
+        return;
+    }
+    status = allgather_copy(rbuf, scratch_header->addr, tsize * data_size,
+                        rmem, UCC_MEMORY_TYPE_HOST, trank, team, task);
+UCC_BRUCK_PHASE_NON_HOST3:
+    if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+        SAVE_STATE(UCC_BRUCK_PHASE_NON_HOST3);
+        return;
+    }
+    if (ucc_unlikely(status != UCC_OK)) {
+        tl_error(UCC_TASK_LIB(task),
+                "failed to copy from scratch buffer to dst");
+        task->super.status = status;
+        return;
+    }
 
+complete:
+    SAVE_STATE(UCC_BRUCK_PHASE_DONE);
+    ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
     task->super.status = UCC_OK;
 
 out:
@@ -268,33 +307,22 @@ ucc_status_t ucc_tl_ucp_allgather_bruck_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         trank        = UCC_TL_TEAM_RANK(team);
     ucc_rank_t         tsize        = UCC_TL_TEAM_SIZE(team);
     size_t             data_size    = (count / tsize) * ucc_dt_size(dt);
-    int                use_loopback = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_loopback;
-    ucc_rank_t         rank         = ucc_ep_map_eval(task->subset.map, trank);
     ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_bruck_start", 0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
-    task->allgather_bruck.post_processing_step = 1;
+    task->allgather_bruck.phase = UCC_BRUCK_PHASE_INIT;
 
     /* initial step: copy data on non root ranks to the beginning of buffer */
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
         // not inplace: copy chunk from source buff to beginning of receive
-        if (use_loopback) {
-            status = loopback_self_copy(rbuf, sbuf, data_size, rmem, smem, rank, team, task);
-        } else {
-            status = ucc_mc_memcpy(rbuf, sbuf, data_size, rmem, smem);
-        }
+        status = allgather_copy(rbuf, sbuf, data_size, rmem, smem, trank, team, task);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }
     } else if (trank != 0) {
         // inplace: copy chunk to the begin
-        if (use_loopback) {
-            status = loopback_self_copy(rbuf, PTR_OFFSET(rbuf, data_size * trank), data_size, rmem, rmem, rank, team, task);
-        }else {
-            status = ucc_mc_memcpy(rbuf, PTR_OFFSET(rbuf, data_size * trank),
-                               data_size, rmem, rmem);
-        }
+        status = allgather_copy(rbuf, PTR_OFFSET(rbuf, data_size * trank), data_size, rmem, rmem, trank, team, task);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }

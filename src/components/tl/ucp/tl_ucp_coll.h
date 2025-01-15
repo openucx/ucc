@@ -201,6 +201,7 @@ typedef struct ucc_tl_ucp_task {
         struct {
             ucc_mc_buffer_header_t *scratch_header;
             size_t                  scratch_size;
+            int                     phase;
         } allgather_bruck;
         struct {
             uint32_t                i;
