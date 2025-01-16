@@ -122,9 +122,9 @@ typedef struct ucc_tl_ucp_remote_info {
 
 typedef struct ucc_tl_ucp_memh_data {
     ucc_tl_ucp_remote_info_t rinfo;
-    void *packed_memh;
-    size_t packed_memh_len;
-    ucp_rkey_h  rkey;
+    void                    *packed_memh;
+    size_t                   packed_memh_len;
+    ucp_rkey_h               rkey;
 } ucc_tl_ucp_memh_data_t;
 
 typedef struct ucc_tl_ucp_worker {
