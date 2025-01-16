@@ -101,7 +101,7 @@ typedef enum {
 
 typedef struct ucc_mem_map_tl_t {
     size_t packed_size;
-    char tl_name[8]; // typically less than 4 letters
+    char   tl_name[8];
     void  *tl_data; /* tl specific data */
 } ucc_mem_map_tl_t;
 
@@ -110,9 +110,7 @@ typedef struct ucc_mem_map_memh_t {
     ucc_context_h      context;
     void              *address;
     size_t             len;
-    /* rank of exporting process */
     ucc_rank_t         my_ctx_rank;
-    /* handles for each tl */
     ucc_mem_map_tl_t  *tl_h;
     int                num_tls;
     char               pack_buffer[0];

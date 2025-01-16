@@ -391,7 +391,6 @@ static inline ucc_status_t ucc_tl_ucp_check_memh(ucp_ep_h *ep, void *va, uint64_
             }
         }
         *rkey = tl_data->rkey;
-        /* FIXME: packed memh? */
         return UCC_OK;
     }
     return UCC_ERR_NOT_FOUND;
