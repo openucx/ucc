@@ -13,6 +13,8 @@
 #include "utils/ucc_proc_info.h"
 #include "components/topo/ucc_topo.h"
 
+#define UCC_MEM_MAP_TL_NAME_LEN 8
+
 typedef struct ucc_lib_info          ucc_lib_info_t;
 typedef struct ucc_cl_context        ucc_cl_context_t;
 typedef struct ucc_tl_context        ucc_tl_context_t;
@@ -101,7 +103,7 @@ typedef enum {
 
 typedef struct ucc_mem_map_tl_t {
     size_t packed_size;
-    char   tl_name[8];
+    char   tl_name[UCC_MEM_MAP_TL_NAME_LEN];
     void  *tl_data; /* tl specific data */
 } ucc_mem_map_tl_t;
 
