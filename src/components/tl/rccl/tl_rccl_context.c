@@ -122,19 +122,20 @@ ucc_tl_rccl_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
 }
 
 ucc_status_t ucc_tl_rccl_mem_map(const ucc_base_context_t *context, int type,
-                                void *address,
-                                size_t len,
-                                void *memh, void *tl_h)
+                                 void *address, size_t len, void *memh,
+                                 void *tl_h)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
 
-ucc_status_t ucc_tl_rccl_mem_unmap(const ucc_base_context_t *context, int type, void *memh)
+ucc_status_t ucc_tl_rccl_mem_unmap(const ucc_base_context_t *context, int type,
+                                   void *memh)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
 
-ucc_status_t ucc_tl_rccl_memh_pack(const ucc_base_context_t *context, void *memh, void **pack_buffer)
+ucc_status_t ucc_tl_rccl_memh_pack(const ucc_base_context_t *context,
+                                   void *memh, void **pack_buffer)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
