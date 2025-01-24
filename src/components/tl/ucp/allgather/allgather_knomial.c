@@ -314,9 +314,20 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
                                                ucc_coll_task_t     **task_h)
 {
     ucc_tl_ucp_team_t *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_rank_t         size    = UCC_TL_TEAM_SIZE(tl_team);
-    ucc_kn_radix_t     radix;
+    ucc_mrange_uint_t *p       = &tl_team->cfg.allgather_kn_radix;
+    ucc_rank_t         tsize   = UCC_TL_TEAM_SIZE(tl_team);
+    ucc_memory_type_t  mtype   = GET_MT(&coll_args->args);
+    size_t             count   = GET_TOTAL_COUNT(&coll_args->args, tsize);
+    ucc_datatype_t     dtype   = GET_DT(&coll_args->args);
+    ucc_kn_radix_t     radix, cfg_radix, opt_radix;
 
-    radix = ucc_min(UCC_TL_UCP_TEAM_LIB(tl_team)->cfg.allgather_kn_radix, size);
+    opt_radix = (mtype == UCC_MEMORY_TYPE_HOST) ? tl_team->opt_radix_host :
+                                                  tl_team->opt_radix;
+
+    cfg_radix = ucc_tl_ucp_get_radix_from_range(tl_team,
+                                                count * ucc_dt_size(dtype),
+                                                mtype, p, opt_radix);
+    radix = ucc_min(cfg_radix, tsize);
+
     return ucc_tl_ucp_allgather_knomial_init_r(coll_args, team, task_h, radix);
 }
