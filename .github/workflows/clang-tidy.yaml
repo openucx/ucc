@@ -43,6 +43,8 @@ jobs:
         rm -rf /tmp/ucc
     - name: Run gtest ASAN
       run: |
+        export ASAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=1:print_suppressions=0
+        export LSAN_OPTIONS=report_objects=1
         cd ${GITHUB_WORKSPACE}
         ls -la
         echo $PWD
