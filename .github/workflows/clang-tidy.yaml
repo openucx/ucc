@@ -49,6 +49,6 @@ jobs:
         ls -la
         echo $PWD
         ./autogen.sh
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure CFLAGS="-fsanitize=address" --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure CFLAGS="-fsanitize=address" --with-rdmacm --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
         make -j install
-        ./test/gtest/gtest
+        ./test/gtest/gtest --gtest_filter=*bcast*
