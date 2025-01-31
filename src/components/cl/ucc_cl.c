@@ -68,6 +68,7 @@ UCC_CLASS_INIT_FUNC(ucc_cl_lib_t, ucc_cl_iface_t *cl_iface,
 UCC_CLASS_CLEANUP_FUNC(ucc_cl_lib_t)
 {
     ucc_config_names_array_free(&self->tls.array);
+    printf("UCC_CLASS_CLEANUP_FUNC(ucc_cl_lib_t): cleaning self->tls_forced here\n");
     ucc_config_names_array_free(&self->tls_forced);
 }
 
