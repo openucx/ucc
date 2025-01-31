@@ -82,9 +82,6 @@ ucc_status_t ucc_cl_basic_get_lib_attr(const ucc_base_lib_t *lib,
                            ucc_tl_iface_t);
         if (!tl_iface) {
             cl_warn(lib, "tl %s is not available", tls->array.names[i]);
-            if (cl_lib->super.tls.requested) {
-                ucc_config_names_array_free(&cl_lib->super.tls_forced);
-            }
             continue;
         }
         if (UCC_OK != (status = check_tl_lib_attr(lib, tl_iface, attr))) {
