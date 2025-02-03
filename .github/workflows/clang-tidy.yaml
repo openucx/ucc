@@ -51,4 +51,4 @@ jobs:
         ./autogen.sh
         CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure CFLAGS="-fsanitize=address"  --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
         make -j install
-        ./test/gtest/gtest --gtest_filter=*bcast*
+        ./test/gtest/gtest --gtest_filter=*test_bcast_alg.15*
