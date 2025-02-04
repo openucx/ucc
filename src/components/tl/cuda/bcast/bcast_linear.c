@@ -147,11 +147,9 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t          tsize             = UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task))
                                             ? (ucc_rank_t)task->subset.map.ep_num
                                             : UCC_TL_TEAM_SIZE(team);
-    size_t              chunk_size        =
-                            task->bcast_linear.step < task->bcast_linear.num_steps
-                            ? ucc_min(half_scratch_size, task->bcast_linear.size)
-                            : task->bcast_linear.size -
-                                (task->bcast_linear.step - 1) * half_scratch_size;
+    size_t              chunk_size        = ucc_min(
+        half_scratch_size,
+        task->bcast_linear.size - task->bcast_linear.step * half_scratch_size);
     size_t              offset_buff       = task->bcast_linear.step * half_scratch_size;
     ucc_ee_executor_t         *exec;
     ucc_ee_executor_task_t    *etask;
@@ -412,7 +410,7 @@ ucc_status_t ucc_tl_cuda_bcast_linear_init(ucc_base_coll_args_t *coll_args,
     task->bcast_linear.dt   = coll_args->args.src.info.datatype;
     task->bcast_linear.sbuf = coll_args->args.src.info.buffer;
 
-    task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    task->super.flags   |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post     = ucc_tl_cuda_bcast_linear_start;
     task->super.progress = ucc_tl_cuda_bcast_linear_progress;
     task->super.finalize = ucc_tl_cuda_bcast_linear_finalize;
