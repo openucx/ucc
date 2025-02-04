@@ -306,7 +306,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             // need to copy from root's scratch buffer
             dbuf = PTR_OFFSET(task->bcast_linear.sbuf, offset_buff);
             sbuf = PTR_OFFSET(TASK_SCRATCH(task, task->bcast_linear.root),
-                              task->bcast_linear.step % 2 * chunk_size);
+                              task->bcast_linear.step % 2 * half_scratch_size);
             st   = ecopy(dbuf, sbuf, chunk_size, exec,
                        &task->bcast_linear.exec_task);
             if (st != UCC_OK) {
