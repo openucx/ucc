@@ -34,7 +34,7 @@ ucc_tl_cuda_bcast_linear_setup_start(ucc_tl_cuda_task_t *task)
     set_rank_step(task, trank, 0, 0); // Initialize rank step tracking
     ucc_memory_cpu_store_fence();
     // initiate barrier wait while all ranks set theirs steps to 0
-    return ucc_tl_cuda_shm_barrier_start(UCC_TL_TEAM_RANK(team), task->bar);
+    return ucc_tl_cuda_shm_barrier_start(trank, task->bar);
 }
 
 // Tests if setup is complete for a linear broadcast task
@@ -258,7 +258,6 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                     return;
                 }
             }
-            task->bcast_linear.stage = STAGE_COPY;
             if (task->bcast_linear.step < task->bcast_linear.num_steps) {
                 // go to next iteration
                 task->bcast_linear.stage = STAGE_COPY;

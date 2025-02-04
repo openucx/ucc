@@ -87,6 +87,13 @@ static inline void ucc_tl_cuda_task_put(ucc_tl_cuda_task_t *task)
     ucc_mpool_put(task);
 }
 
+static inline uint64_t compute_key(ucc_rank_t root, ucc_rank_t peer, uint16_t tag)
+{
+    assert(peer < (1 << 24));
+    assert(root < (1 << 24));
+    return (uint64_t)tag << 48 | root << 24 | peer;
+}
+
 static inline
 ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
                                    ucc_tl_cuda_team_t *team,
@@ -95,6 +102,7 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
     ucc_rank_t          trank          = UCC_TL_TEAM_RANK(team);
     ucc_tl_cuda_lib_t  *lib            = UCC_TL_CUDA_TEAM_LIB(team);
     uint32_t            max_concurrent = lib->cfg.max_concurrent;
+    ucc_rank_t          peer;
     ucc_tl_cuda_task_t *task;
     ucc_status_t        status;
 
@@ -118,16 +126,10 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
         ucc_assert(coll_args->args.coll_type == UCC_COLL_TYPE_BCAST);
         task->subset.map    = ucc_active_set_to_ep_map(&coll_args->args);
         task->subset.myrank = UCC_TL_TEAM_RANK(team);
-        // root
-        if (task->subset.myrank == coll_args->args.root) {
-            int peer               = ucc_ep_map_eval(task->subset.map, 1);
-            task->bcast_linear.key = ((uint64_t)coll_args->args.tag << 32 |
-                                      coll_args->args.root << 16 | peer);
-        } else {
-            task->bcast_linear.key =
-                ((uint64_t)coll_args->args.tag << 32 |
-                 coll_args->args.root << 16 | task->subset.myrank);
-        }
+        // currently we support only active set bacst with 2 ranks
+        // so root rank should remap phys rank of peer with rank 1
+        peer = (task->subset.myrank == coll_args->args.root) ? ucc_ep_map_eval(task->subset.map, 1) : task->subset.myrank;
+        task->bcast_linear.key = compute_key(coll_args->args.root, peer, coll_args->args.tag);
         task->seq_num = team->seq_num_active_set++;
     } else {
         task->seq_num = team->seq_num++;
@@ -139,7 +141,8 @@ ucc_status_t ucc_tl_cuda_task_init(ucc_base_coll_args_t *coll_args,
     return UCC_OK;
 }
 
-// check if segment for current task is available and barrier is available (completed from prev iteration)
+// check if segment for current task is available and barrier is available (completed from prev iteration) 
+// and possibly mark the segment as occupied by updating the state counter to the current seq_num
 static inline ucc_status_t ucc_tl_cuda_get_sync_root(ucc_tl_cuda_task_t *task, ucc_rank_t root)
 {
     ucc_tl_cuda_team_t                *team  = TASK_TEAM(task);
