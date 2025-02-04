@@ -239,7 +239,7 @@ ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
     int i;
 
     dst->names = ucc_malloc(sizeof(char*) * src->count, "ucc_config_names_array");
-    printf("allocating dst->names %p \n", dst->names);
+    ucc_error("allocating dst->names %p \n", dst->names);
     if (!dst->names) {
         ucc_error("failed to allocate %zd bytes for ucc_config_names_array",
                   sizeof(char *) * src->count);
@@ -264,7 +264,7 @@ err:
 void ucc_config_names_array_free(ucc_config_names_array_t *array)
 {
     int i;
-    printf("freeing dst->names %p \n", array->names);
+    ucc_error("freeing dst->names %p \n", array->names);
     for (i = 0; i < array->count; i++) {
         free(array->names[i]);
     }
