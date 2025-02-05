@@ -60,6 +60,12 @@ typedef struct ucc_tl_mlx5_lib_config {
     int                                     dm_host;
     ucc_tl_mlx5_ib_qp_conf_t                qp_conf;
     ucc_tl_mlx5_mcast_coll_comm_init_spec_t mcast_conf;
+    int                                     nbr_serialized_batches;
+    int                                     nbr_batches_per_passage;
+    int                                     block_batch_size;
+    int                                     force_regular;
+    int                                     force_longer;
+    int                                     force_wider;
 } ucc_tl_mlx5_lib_config_t;
 
 typedef struct ucc_tl_mlx5_context_config {
@@ -93,10 +99,13 @@ UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t*,
 
 typedef struct ucc_tl_mlx5_task ucc_tl_mlx5_task_t;
 typedef struct ucc_tl_mlx5_schedule ucc_tl_mlx5_schedule_t;
-typedef struct ucc_tl_mlx5_dm_chunk {
-    ptrdiff_t               offset; /* 0 based offset from the beginning of
-                                       memic_mr (obtained with ibv_reg_dm_mr) */
+typedef struct ucc_tl_mlx5_dm_chunk_t {
+    uintptr_t addr; // 0 based offset from the beginning of
+                    // memic_mr (obtained with ibv_reg_dm_mr)
     ucc_tl_mlx5_schedule_t *task;
+    int                     posted_sends;
+    int                     posted_all;
+    int                     completed_sends;
 } ucc_tl_mlx5_dm_chunk_t;
 
 typedef struct ucc_tl_mlx5_alltoall ucc_tl_mlx5_alltoall_t;
