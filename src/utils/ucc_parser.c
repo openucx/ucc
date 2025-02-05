@@ -203,6 +203,7 @@ ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
 
     n_new = 0;
     if (dst->count == 0) {
+        ucc_error("calling array_dup in ucc_config_names_array_merge \n");
         return ucc_config_names_array_dup(dst, src);
     } else {
         for (i = 0; i < src->count; i++) {
@@ -298,9 +299,11 @@ ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
     switch (list->mode){
     case UCC_CONFIG_ALLOW_LIST_ALLOW:
         out->requested = 1;
+        ucc_error("calling array_dup in ucc_config_allow_list_process\n");
         status = ucc_config_names_array_dup(&out->array, &list->array);
         break;
     case UCC_CONFIG_ALLOW_LIST_ALLOW_ALL:
+        ucc_error("calling array_dup in ucc_config_allow_list_process 2\n");
         status = ucc_config_names_array_dup(&out->array, all);
         break;
     case UCC_CONFIG_ALLOW_LIST_NEGATE:
