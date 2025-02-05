@@ -902,8 +902,8 @@ typedef ucc_oob_coll_t ucc_team_oob_coll_t;
  *  @ingroup UCC_CONTEXT_DT
  */
 typedef struct ucc_mem_map {
-    void *   address; /*!< the address of a buffer to be attached to a UCC context */
-    size_t   len;     /*!< the length of the buffer */
+    void  *address;  /*!< the address of a buffer to be attached to a UCC context */
+    size_t len;      /*!< the length of the buffer */
 } ucc_mem_map_t;
 
 /**
