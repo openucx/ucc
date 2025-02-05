@@ -330,14 +330,13 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             }
             // start barrier to sync with root
-            task->bcast_linear.stage = STAGE_CLIENT_WAIT_COMPLETION;
             st = ucc_tl_cuda_shm_barrier_start(trank, task->bar);
             if (ucc_unlikely(st != UCC_OK)) {
                 ucc_error("failed to start barrier from peer rank");
                 task->super.status = st;
                 return;
             }
-            break;
+            task->bcast_linear.stage = STAGE_CLIENT_WAIT_COMPLETION;
         case STAGE_CLIENT_WAIT_COMPLETION:
             st = ucc_tl_cuda_shm_barrier_test(trank, task->bar);
             if (st != UCC_OK) {
