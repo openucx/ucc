@@ -198,7 +198,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
                         tl_warn(UCC_TL_TEAM_LIB(tl_team),
                                 "ibv_dereg_mr failed");
                     }
-                    if (ibv_destroy_cq(comm->rcq)) {
+                    if (ibv_destroy_cq(comm->mcast.rcq)) {
                         tl_warn(UCC_TL_TEAM_LIB(tl_team),
                                 "ibv_destroy_cq failed");
                     }

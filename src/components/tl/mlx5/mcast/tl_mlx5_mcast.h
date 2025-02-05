@@ -199,22 +199,25 @@ struct pp_packet {
     uintptr_t       buf; // buffer address, initialized once
 };
 
+struct mcast_group {
+    struct ibv_qp       *qp;
+    struct ibv_ah       *ah;
+    uint16_t             lid;
+    union ibv_gid        mgid;
+    struct sockaddr_in6  mcast_addr;
+};
+
 struct mcast_ctx {
-    struct ibv_qp      *qp;
-    struct ibv_ah      *ah;
     struct ibv_send_wr  swr;
     struct ibv_sge      ssg;
-
+    struct ibv_cq      *scq;
+    struct ibv_cq      *rcq;
+    struct ibv_srq     *srq;
+    struct mcast_group  groups[MAX_GROUP_COUNT];
     // RC connection info for supporing one-sided based relibality
     struct ibv_qp     **rc_qp;
     uint16_t           *rc_lid;
     union ibv_gid      *rc_gid;
-
-    // multiple mcast group
-    struct ibv_qp      **qp_list;
-    struct ibv_ah      **ah_list;
-    struct ibv_send_wr  *swr_list;
-    struct ibv_sge      *ssg_list;
 };
 
 struct packet {
@@ -303,15 +306,10 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     ucc_tl_mlx5_mcast_coll_comm_init_spec_t         params;
     ucc_tl_mlx5_mcast_p2p_interface_t               p2p;
     int                                             tx;
-    struct ibv_cq                                  *scq;
-    struct ibv_cq                                  *rcq;
-    struct ibv_srq                                 *srq;
     ucc_rank_t                                      rank;
     ucc_rank_t                                      commsize;
     char                                           *grh_buf;
     struct ibv_mr                                  *grh_mr;
-    uint16_t                                        mcast_lid;
-    union ibv_gid                                   mgid;
     unsigned                                        max_inline;
     size_t                                          max_eager;
     int                                             max_per_packet;
@@ -334,7 +332,6 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             comm_id;
     void                                           *p2p_ctx;
     ucc_base_lib_t                                 *lib;
-    struct sockaddr_in6                             mcast_addr;
     int                                             cuda_mem_enabled;
     ucc_tl_mlx5_mcast_join_info_t                  *group_setup_info;
     ucc_service_coll_req_t                         *group_setup_info_req;
@@ -492,7 +489,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_recv_buffers(ucc_tl_mlx5_mcast
     }
     if (i != 0) {
         rwr[i-1].next = NULL;
-        if (ibv_post_recv(comm->mcast.qp, &rwr[0], &bad_wr)) {
+        if (ibv_post_recv(comm->mcast.groups[0].qp, &rwr[0], &bad_wr)) {
             tl_error(comm->lib, "failed to prepost recvs: errno %d", errno);
             return UCC_ERR_NO_RESOURCE;
         }
@@ -545,7 +542,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_user_recv_buffers(ucc_tl_mlx5_
 
     if (i > 0) {
         rwr[i-1].next = NULL;
-        if (ibv_post_recv(comm->mcast.qp_list[group_id], &rwr[0], &bad_wr)) {
+        if (ibv_post_recv(comm->mcast.groups[group_id].qp, &rwr[0], &bad_wr)) {
             tl_error(comm->lib, "Failed to prepost recvs: errno %d buffer count %d",
                     errno, i);
             return UCC_ERR_NO_RESOURCE;
