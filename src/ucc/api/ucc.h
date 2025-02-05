@@ -1805,8 +1805,12 @@ enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_TAG                             = UCC_BIT(1),
     UCC_COLL_ARGS_FIELD_CB                              = UCC_BIT(2),
     UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER              = UCC_BIT(3),
-    UCC_COLL_ARGS_FIELD_ACTIVE_SET                      = UCC_BIT(4)
+    UCC_COLL_ARGS_FIELD_ACTIVE_SET                      = UCC_BIT(4),
+    UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH                = UCC_BIT(5),
+    UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH                = UCC_BIT(5),
 };
+
+typedef void *ucc_mem_map_mem_h;
 
 /**
  *  @ingroup UCC_COLLECTIVES
@@ -1880,6 +1884,26 @@ typedef struct ucc_coll_args {
         int64_t  stride;
         uint64_t size;
     } active_set;
+    union {
+        ucc_mem_map_mem_h           local_memh; /*!< Memory handle of locally
+                                                     mapped memory for the src
+                                                     buffer */
+        ucc_mem_map_mem_h          *global_memh; /*!< Array of memory handles
+                                                      for the src buffer
+                                                      corresponding to all
+                                                      participating processes
+                                                      in the collective */
+    } src_memh;
+    union {
+        ucc_mem_map_mem_h           local_memh; /*!< Memory handle of locally
+                                                     mapped memory for the dst
+                                                     buffer */
+        ucc_mem_map_mem_h          *global_memh; /*!< Array of memory handles
+                                                      for the dst buffer
+                                                      corresponding to all
+                                                      participating processes
+                                                      in the collective */
+    } dst_memh;
 } ucc_coll_args_t;
 
 /**
@@ -2226,6 +2250,57 @@ ucc_status_t ucc_ee_wait(ucc_ee_h ee, ucc_ev_t *ev);
  * @return Error code as defined by @ref ucc_status_t
  */
 ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ee_event);
+
+/**
+ * @ingroup UCC_DATATYPE
+ */
+typedef enum {
+    UCC_MEM_MAP_EXPORT = 0, /*!< Indicate ucc_mem_map() should export
+                                 memory handles from TLs used by context */
+    UCC_MEM_MAP_IMPORT = 1  /*!< Indicate ucc_mem_map() should import
+                                memory handles from user memory handle */
+} ucc_mem_map_flags_t;
+
+/**
+ * @ingroup UCC_CONTEXT
+ * @brief Routine registers or maps memory for use in future collectives.
+ *
+ * This local routine maps a user-specified memory segment with a
+ * ucc_context_h. The segment is considered "mapped" with the context until
+ * the user calls ucc_mem_unmap. It is the user's responsibility to unmap all
+ * mapped segments prior to calling ucc_context_destroy(). A handle to the
+ * mapped memory is provided in memh. If the flag UCC_MEM_MAP_EXPORT is used,
+ * the memory will be mapped and memory handles from TLs will be generated and
+ * stored in the memh. If the flag UCC_MEM_MAP_IMPORT is used, the user must
+ * provide a valid memh, otherwise behavior is undefined.
+ *
+ * @param [in] context     Context mapped memory is associated with
+ * @param [in] flags       flags dictating the behavior of the routine
+ * @param [in] params      parameters indicating the address and length of
+ *                          memory to map
+ * @param [out] memh_size  Size of memory handle when exported
+ * @param [inout] *memh    Handle for the registered memory
+ * 
+ * @return Error code as defined by ucc_status_t.
+ */
+
+ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_flags_t flags,
+                         ucc_mem_map_params_t *params, size_t *memh_size,
+                         ucc_mem_map_mem_h *memh);
+
+/**
+ * @ingroup UCC_CONTEXT
+ * @brief Routine unmaps memory from a context
+ *
+ * This is a local routine that unmaps memory and all resources
+ * associated with the memory from a context. The memh object is freed and
+ * cannot be reused.
+ *
+ * @param [in] *memh       Handle of the registered memory
+ * 
+ * @return Error code as defined by ucc_status_t.
+ */
+ucc_status_t ucc_mem_unmap(ucc_mem_map_mem_h *memh);
 
 END_C_DECLS
 #endif
