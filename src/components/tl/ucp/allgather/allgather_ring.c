@@ -92,7 +92,6 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         tsize     = (ucc_rank_t)task->subset.map.ep_num;
     ucc_rank_t         rank      = ucc_ep_map_eval(task->subset.map, trank);
     size_t             data_size = (count / tsize) * ucc_dt_size(dt);
-    int use_loopback = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_loopback;
     ucc_status_t       status;
     ucc_rank_t         block;
 
@@ -102,15 +101,8 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
         block = task->allgather_ring.get_send_block(&task->subset, trank, tsize,
                                                     0);
-        if (use_loopback) {
-            status =
-                loopback_self_copy(PTR_OFFSET(rbuf, data_size * block), sbuf,
+        status = allgather_copy(PTR_OFFSET(rbuf, data_size * block), sbuf,
                                    data_size, rmem, smem, rank, team, task);
-        } else {
-            /* Use cuda copy */
-            status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * block), sbuf,
-                                   data_size, rmem, smem);
-        }
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }

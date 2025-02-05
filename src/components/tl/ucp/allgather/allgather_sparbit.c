@@ -122,7 +122,6 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         trank     = UCC_TL_TEAM_RANK(team);
     ucc_rank_t         tsize     = UCC_TL_TEAM_SIZE(team);
     size_t             data_size = (count / tsize) * ucc_dt_size(dt);
-    int use_loopback = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_loopback;
     ucc_status_t       status;
 
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_sparbit_start",
@@ -132,15 +131,8 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_start(ucc_coll_task_t *coll_task)
     task->allgather_sparbit.data_expected = 1;
 
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        if (use_loopback) {
-            status =
-                loopback_self_copy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
+        status = allgather_copy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
                                    data_size, rmem, smem, trank, team, task);
-        } else {
-            /* Use cuda copy */
-            status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
-                                   data_size, rmem, smem);
-        }
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }

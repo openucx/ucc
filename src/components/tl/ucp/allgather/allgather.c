@@ -64,7 +64,6 @@ ucc_status_t loopback_self_copy(void *rbuf, void *sbuf, size_t data_size,
                                 ucc_rank_t rank, ucc_tl_ucp_team_t *team,
                                 ucc_tl_ucp_task_t *task)
 {
-    printf("check\n");
     ucc_status_t status;
     status = ucc_tl_ucp_send_nb(sbuf, data_size, smem, rank, team, task);
     if (UCC_OK != status) {

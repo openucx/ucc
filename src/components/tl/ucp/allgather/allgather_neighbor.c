@@ -12,6 +12,7 @@
 #include "utils/ucc_coll_utils.h"
 #include "components/mc/ucc_mc.h"
 
+
 static ucc_rank_t get_recv_from_rank(ucc_rank_t rank, ucc_rank_t size, int i)
 {
     const int  i_parity = i % 2;
@@ -81,9 +82,11 @@ void ucc_tl_ucp_allgather_neighbor_progress(ucc_coll_task_t *coll_task)
     ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
     size_t             count     = TASK_ARGS(task).dst.info.count;
     size_t             data_size = (count / tsize) * ucc_dt_size(dt);
+    int use_loopback             = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_loopback;
     ucc_rank_t         neighbors[2], i;
     int                i_parity, even_rank;
     void              *tmprecv, *tmpsend;
+    int                counter;
 
     if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
         return;
@@ -98,8 +101,13 @@ void ucc_tl_ucp_allgather_neighbor_progress(ucc_coll_task_t *coll_task)
         neighbors[1] = (trank + 1) % tsize;
     }
 
-    while (task->tagged.send_posted < (tsize / 2)) {
-        i        = task->tagged.send_posted;
+    if ((!UCC_IS_INPLACE(TASK_ARGS(task))) && use_loopback) {
+        counter = task->tagged.send_posted - 1;
+    } else {
+        counter = task->tagged.send_posted;
+    }
+    while (counter < (tsize / 2)) {
+        i        = counter;
         i_parity = i % 2;
 
         tmprecv =
@@ -114,7 +122,12 @@ void ucc_tl_ucp_allgather_neighbor_progress(ucc_coll_task_t *coll_task)
         UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(tmprecv, 2 * data_size, rmem,
                                          neighbors[i_parity], team, task),
                       task, out);
-
+        
+        if ((!UCC_IS_INPLACE(TASK_ARGS(task))) && use_loopback) {
+            counter = task->tagged.send_posted - 1;
+        } else {
+            counter = task->tagged.send_posted;
+        }
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             return;
         }
@@ -141,25 +154,17 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_start(ucc_coll_task_t *coll_task)
     ucc_rank_t         trank     = UCC_TL_TEAM_RANK(team);
     ucc_rank_t         tsize     = UCC_TL_TEAM_SIZE(team);
     size_t             data_size = (count / tsize) * ucc_dt_size(dt);
-    int use_loopback = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_loopback;
     ucc_status_t       status;
     ucc_rank_t         neighbor;
     void              *tmprecv, *tmpsend;
-
+    
     UCC_TL_UCP_PROFILE_REQUEST_EVENT(coll_task, "ucp_allgather_neighbor_start",
                                      0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        if (use_loopback) {
-            status =
-                loopback_self_copy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
+        status = allgather_copy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
                                    data_size, rmem, smem, trank, team, task);
-        } else {
-            /* Use cuda copy */
-            status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
-                                   data_size, rmem, smem);
-        }
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }
@@ -181,6 +186,8 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_start(ucc_coll_task_t *coll_task)
     UCPCHECK_GOTO(
         ucc_tl_ucp_recv_nb(tmprecv, data_size, rmem, neighbor, team, task),
         task, out);
+        
+
 out:
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }

@@ -208,6 +208,9 @@ typedef struct ucc_tl_ucp_task {
             int                     data_expected;
         } allgather_sparbit;
         struct {
+            int                     phase;
+        } allgather_neighbor;
+        struct {
             ucc_rank_t              dist;
             uint32_t                radix;
         } bcast_kn;
