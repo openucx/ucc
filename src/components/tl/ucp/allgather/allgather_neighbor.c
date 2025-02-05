@@ -169,7 +169,8 @@ ucc_status_t ucc_tl_ucp_allgather_neighbor_start(ucc_coll_task_t *coll_task)
             return status;
         }
     }
-
+    while (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
+	        }
     if (trank % 2) {
         neighbor = (trank - 1 + tsize) % tsize;
     } else {
