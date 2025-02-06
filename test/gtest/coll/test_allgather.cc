@@ -9,7 +9,7 @@
 
 using Param_0 = std::tuple<int, ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
 using Param_1 = std::tuple<ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t>;
-using Param_2 = std::tuple<ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t, std::string>;
+using Param_2 = std::tuple<ucc_datatype_t, ucc_memory_type_t, int, gtest_ucc_inplace_t, std::string, std::string>;
 
 class test_allgather : public UccCollArgs, public ucc::test
 {
@@ -259,16 +259,18 @@ class test_allgather_alg : public test_allgather,
 
 UCC_TEST_P(test_allgather_alg, alg)
 {
-    const ucc_datatype_t      dtype    = std::get<0>(GetParam());
-    const ucc_memory_type_t   mem_type = std::get<1>(GetParam());
-    const int                 count    = std::get<2>(GetParam());
-    const gtest_ucc_inplace_t inplace  = std::get<3>(GetParam());
-    int                       n_procs  = 5;
+    const ucc_datatype_t      dtype        = std::get<0>(GetParam());
+    const ucc_memory_type_t   mem_type     = std::get<1>(GetParam());
+    const int                 count        = std::get<2>(GetParam());
+    const gtest_ucc_inplace_t inplace      = std::get<3>(GetParam());
+    int                       n_procs      = 5;
     char                      tune[32];
+    std::string               use_loopback = std::get<5>(GetParam());
 
     sprintf(tune, "allgather:@%s:inf", std::get<4>(GetParam()).c_str());
     ucc_job_env_t env     = {{"UCC_CL_BASIC_TUNE", "inf"},
-                             {"UCC_TL_UCP_TUNE", tune}};
+                             {"UCC_TL_UCP_TUNE", tune},
+                             {"UCC_TL_UCP_ALLGATHER_USE_LOOPBACK", use_loopback}};
     UccJob        job(n_procs, UccJob::UCC_JOB_CTX_GLOBAL, env);
     UccTeam_h     team    = job.create_team(n_procs);
     UccCollCtxVec ctxs;
@@ -296,7 +298,8 @@ INSTANTIATE_TEST_CASE_P(
 #endif
         ::testing::Values(1,3,8192), // count
         ::testing::Values(TEST_INPLACE, TEST_NO_INPLACE),
-        ::testing::Values("knomial", "ring", "neighbor", "bruck", "sparbit")),
+        ::testing::Values("knomial", "ring", "neighbor", "bruck", "sparbit"),
+        ::testing::Values("1", "0")),
         [](const testing::TestParamInfo<test_allgather_alg::ParamType>& info) {
             std::string name;
             name += ucc_datatype_str(std::get<0>(info.param));
@@ -304,5 +307,6 @@ INSTANTIATE_TEST_CASE_P(
             name += std::string("_count_")+std::to_string(std::get<2>(info.param));
             name += std::string("_inplace_")+std::to_string(std::get<3>(info.param));
             name += std::string("_")+std::get<4>(info.param);
+            name += std::string("_use_loopback_")+std::get<5>(info.param);
             return name;
         });
