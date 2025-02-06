@@ -203,6 +203,7 @@ ucc_status_t ucc_config_names_array_merge(ucc_config_names_array_t *dst,
 
     n_new = 0;
     if (dst->count == 0) {
+        ucc_error("calling array_dup in ucc_config_names_array_merge \n");
         return ucc_config_names_array_dup(dst, src);
     } else {
         for (i = 0; i < src->count; i++) {
@@ -237,8 +238,12 @@ ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
                                         const ucc_config_names_array_t *src)
 {
     int i;
+    if (dst->names != NULL) {
+       ucc_config_names_array_free(dst);
+    }
 
     dst->names = ucc_malloc(sizeof(char*) * src->count, "ucc_config_names_array");
+    ucc_error("allocating dst->names %p \n", dst->names);
     if (!dst->names) {
         ucc_error("failed to allocate %zd bytes for ucc_config_names_array",
                   sizeof(char *) * src->count);
@@ -263,10 +268,12 @@ err:
 void ucc_config_names_array_free(ucc_config_names_array_t *array)
 {
     int i;
+    ucc_error("freeing dst->names %p \n", array->names);
     for (i = 0; i < array->count; i++) {
         free(array->names[i]);
     }
     ucc_free(array->names);
+    array->names = NULL;
 }
 
 int ucc_config_names_search(const ucc_config_names_array_t *config_names,
@@ -296,9 +303,11 @@ ucc_status_t ucc_config_allow_list_process(const ucc_config_allow_list_t * list,
     switch (list->mode){
     case UCC_CONFIG_ALLOW_LIST_ALLOW:
         out->requested = 1;
+        ucc_error("calling array_dup in ucc_config_allow_list_process\n");
         status = ucc_config_names_array_dup(&out->array, &list->array);
         break;
     case UCC_CONFIG_ALLOW_LIST_ALLOW_ALL:
+        ucc_error("calling array_dup in ucc_config_allow_list_process 2\n");
         status = ucc_config_names_array_dup(&out->array, all);
         break;
     case UCC_CONFIG_ALLOW_LIST_NEGATE:

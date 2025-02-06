@@ -67,6 +67,7 @@ ucc_status_t ucc_cl_doca_urom_get_lib_attr(const ucc_base_lib_t *lib,
     attr->tls = &cl_lib->super.tls.array;
 
     if (cl_lib->super.tls.requested) {
+        ucc_error("calling array_dup in ucc_cl_doca_urom_get_lib_attr \n");
         status = ucc_config_names_array_dup(&cl_lib->super.tls_forced,
                                             &cl_lib->super.tls.array);
         if (UCC_OK != status) {

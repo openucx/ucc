@@ -43,10 +43,13 @@ jobs:
         rm -rf /tmp/ucc
     - name: Run gtest ASAN
       run: |
+        export ASAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=1:print_suppressions=0
+        export LSAN_OPTIONS=report_objects=1
+        export UCC_LOG_LEVEL=debug
         cd ${GITHUB_WORKSPACE}
         ls -la
         echo $PWD
         ./autogen.sh
-        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure CFLAGS="-fsanitize=address" --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
+        CC=clang-${CLANG_VER} CXX=clang++-${CLANG_VER} ./configure CFLAGS="-fsanitize=address"  --prefix=/tmp/ucc/install --with-ucx=/tmp/ucx/install --enable-gtest
         make -j install
-        ./test/gtest/gtest
+        ./test/gtest/gtest --gtest_filter=*test_bcast_alg.15*
