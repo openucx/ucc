@@ -238,6 +238,9 @@ ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
 {
     int i;
 
+    if (dst->count != 0) {
+        ucc_config_names_array_free(dst);
+    }
     dst->names = ucc_malloc(sizeof(char*) * src->count, "ucc_config_names_array");
     if (!dst->names) {
         ucc_error("failed to allocate %zd bytes for ucc_config_names_array",
@@ -267,6 +270,7 @@ void ucc_config_names_array_free(ucc_config_names_array_t *array)
         free(array->names[i]);
     }
     ucc_free(array->names);
+    array->count = 0;
 }
 
 int ucc_config_names_search(const ucc_config_names_array_t *config_names,
