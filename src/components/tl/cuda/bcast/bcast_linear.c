@@ -68,8 +68,8 @@ static inline ucc_status_t ecopy(void *dst, void *src, size_t size,
 // Root rank searches for and claims a free barrier
 static inline ucc_status_t root_find_free_barrier(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    uint32_t max_concurrent  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.max_concurrent;
+    ucc_tl_cuda_team_t        *team            = TASK_TEAM(task);
+    uint32_t                   max_concurrent  = UCC_TL_CUDA_TEAM_LIB(team)->cfg.max_concurrent;
     ucc_tl_cuda_shm_barrier_t *curr_bar;
     int                        i;
     ucc_status_t               st;
