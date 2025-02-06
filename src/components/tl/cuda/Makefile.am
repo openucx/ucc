@@ -1,6 +1,8 @@
 #
-# Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
+# SPDX-License-Identifier: BSD-3-Clause
 #
 
 if TL_CUDA_ENABLED

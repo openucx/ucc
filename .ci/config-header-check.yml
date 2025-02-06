@@ -1,0 +1,18 @@
+general:
+  exclude:
+    - "\\.git.*"
+    - "\\.(yml|md|txt)"
+    - "^\\.ci.*"
+    - "NEWS"
+    - "\\.(m4|ac)"
+    - "\\.conf"
+    - "src/components/tl/nvat/*"
+    - "\\.cu"
+    - "AUTHORS"
+    - "LICENSE"
+    - "docs/*"
+
+bsd:
+  validate-spdx-license: true
+  include:
+    - ".*\\.(am|in|hpp|cpp|py|cc|h|c|sh)$"
