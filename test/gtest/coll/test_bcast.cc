@@ -276,7 +276,7 @@ ucc_job_env_t two_step_env = {{"UCC_CL_HIER_TUNE", "bcast:@2step:0-inf:inf"},
                               {"UCC_CLS", "all"}};
 ucc_job_env_t dbt_env      = {{"UCC_TL_UCP_TUNE", "bcast:@dbt:0-inf:inf"},
                               {"UCC_CLS", "basic"}};
-ucc_job_env_t cuda_env     = {{"UCC_TL_CUDA_TUNE", "bcast:cuda:@0"},
+ucc_job_env_t cuda_env     = {{"UCC_TL_CUDA_TUNE", "bcast:cuda:@0:0-inf:inf"},
                               {"UCC_CLS", "basic"}};
 INSTANTIATE_TEST_CASE_P(
     , test_bcast_alg,
