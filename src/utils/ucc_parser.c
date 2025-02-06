@@ -238,15 +238,16 @@ ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
                                         const ucc_config_names_array_t *src)
 {
     int i;
+    if (dst->names != NULL) {
+       ucc_config_names_array_free(dst);
+    }
 
-    if (dst->names == NULL) {
-        dst->names = ucc_malloc(sizeof(char*) * src->count, "ucc_config_names_array");
-        ucc_error("allocating dst->names %p \n", dst->names);
-        if (!dst->names) {
-            ucc_error("failed to allocate %zd bytes for ucc_config_names_array",
-                      sizeof(char *) * src->count);
-            return UCC_ERR_NO_MEMORY;
-        }
+    dst->names = ucc_malloc(sizeof(char*) * src->count, "ucc_config_names_array");
+    ucc_error("allocating dst->names %p \n", dst->names);
+    if (!dst->names) {
+        ucc_error("failed to allocate %zd bytes for ucc_config_names_array",
+                  sizeof(char *) * src->count);
+        return UCC_ERR_NO_MEMORY;
     }
     dst->count = src->count;
     for (i = 0; i < src->count; i++) {
@@ -272,6 +273,7 @@ void ucc_config_names_array_free(ucc_config_names_array_t *array)
         free(array->names[i]);
     }
     ucc_free(array->names);
+    array->names = NULL;
 }
 
 int ucc_config_names_search(const ucc_config_names_array_t *config_names,
