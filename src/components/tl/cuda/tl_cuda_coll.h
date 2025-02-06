@@ -171,27 +171,12 @@ static inline void ucc_tl_cuda_put_sync_root(ucc_tl_cuda_task_t *task, ucc_rank_
 
 static inline ucc_status_t ucc_tl_cuda_get_sync(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t                *team  = TASK_TEAM(task);
-    volatile ucc_tl_cuda_sync_state_t *state = &team->sync_state[task->coll_id];
-
-    if ((UCC_TL_TEAM_RANK(team) == 0) && (*state == 0)) {
-        *state = task->seq_num;
-    }
-    if ((*state != task->seq_num) || (task->bar->state[UCC_TL_TEAM_RANK(team)] != UCC_OK)) {
-        return UCC_INPROGRESS;
-    }
-    return UCC_OK;
+    return ucc_tl_cuda_get_sync_root(task, 0);
 }
 
 static inline void ucc_tl_cuda_put_sync(ucc_tl_cuda_task_t *task)
 {
-    ucc_tl_cuda_team_t       *team  = TASK_TEAM(task);
-    ucc_tl_cuda_sync_state_t *state = &team->sync_state[task->coll_id];
-
-    if (UCC_TL_TEAM_RANK(team) == 0) {
-        ucc_assert(*state == task->seq_num);
-        *state = 0;
-    }
+    ucc_tl_cuda_put_sync_root(task, 0);
 }
 
 ucc_status_t ucc_tl_cuda_mem_info_get(void *ptr, size_t length,
