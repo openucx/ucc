@@ -391,9 +391,10 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet(ucc_tl_mlx5_mcast_coll_comm_t *com
                                               ucc_tl_mlx5_mcast_coll_req_t *req,
                                               struct pp_packet* pp)
 {
-    ucc_status_t      status = UCC_OK;
-    void             *dest;
-    ucc_memory_type_t mem_type;
+    ucc_status_t                status = UCC_OK;
+    void                       *dest;
+    ucc_ee_executor_task_args_t eargs;
+    ucc_ee_executor_t          *exec;
     ucc_assert(pp->psn >= req->start_psn &&
            pp->psn < req->start_psn + req->num_packets);
 
@@ -402,18 +403,29 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet(ucc_tl_mlx5_mcast_coll_comm_t *com
 
     if (pp->length > 0 ) {
         dest = req->ptr + PSN_TO_RECV_OFFSET(pp->psn, req, comm);
-        
-        if (comm->cuda_mem_enabled) {
-            mem_type = UCC_MEMORY_TYPE_CUDA;
-        } else {
-            mem_type = UCC_MEMORY_TYPE_HOST;
+        while (req->exec_task != NULL) {
+            EXEC_TASK_TEST("failed to complete the nb memcpy", req->exec_task, comm->lib);
         }
 
-        status = ucc_mc_memcpy(dest, (void*) pp->buf, pp->length,
-                               mem_type, mem_type);
+        /* for cuda copy, exec is nonblocking but for host copy it is blocking */
+        status = ucc_coll_task_get_executor(req->coll_task, &exec);
         if (ucc_unlikely(status != UCC_OK)) {
-            tl_error(comm->lib, "failed to copy buffer");
             return status;
+        }
+
+        eargs.task_type = UCC_EE_EXECUTOR_TASK_COPY;
+        eargs.copy.src  = (void*) pp->buf;
+        eargs.copy.dst  = dest;
+        eargs.copy.len  = pp->length;
+
+        assert(req->exec_task == NULL);
+        status = ucc_ee_executor_task_post(exec, &eargs, &req->exec_task);
+        if (ucc_unlikely(status != UCC_OK)) {
+            return status;
+        }
+
+        if (req->exec_task != NULL) {
+            EXEC_TASK_TEST("failed to progress the memcpy", req->exec_task, comm->lib);
         }
     }
 
