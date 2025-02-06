@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
 #
 
@@ -26,6 +26,11 @@ alltoallv =                  \
 	alltoallv/alltoallv.h    \
 	alltoallv/alltoallv.c    \
 	alltoallv/alltoallv_ce.c
+
+bcast =                  \
+	bcast/bcast.h        \
+	bcast/bcast.c        \
+	bcast/bcast_linear.c
 
 reduce_scatter =                           \
 	reduce_scatter/reduce_scatter.h        \
@@ -54,6 +59,7 @@ sources =               \
 	$(allgatherv)       \
 	$(alltoall)         \
 	$(alltoallv)        \
+	$(bcast)            \
 	$(reduce_scatter)   \
 	$(reduce_scatterv)
 

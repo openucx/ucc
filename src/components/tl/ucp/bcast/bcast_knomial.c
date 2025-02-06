@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -22,7 +22,7 @@ void ucc_tl_ucp_bcast_knomial_progress(ucc_coll_task_t *coll_task)
     ucc_rank_t         size      = (ucc_rank_t)task->subset.map.ep_num;
 
     uint32_t           radix     = task->bcast_kn.radix;
-    ucc_rank_t         root = (uint32_t)TASK_ARGS(task).root;
+    ucc_rank_t         root      = (ucc_rank_t)TASK_ARGS(task).root;
     ucc_rank_t         dist      = task->bcast_kn.dist;
     void              *buffer    = TASK_ARGS(task).src.info.buffer;
     ucc_memory_type_t  mtype     = TASK_ARGS(task).src.info.mem_type;
