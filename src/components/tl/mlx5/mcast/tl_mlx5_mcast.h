@@ -117,6 +117,8 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm_init_spec {
     int                               max_eager;
     int                               cuda_mem_enabled;
     int                               one_sided_reliability_enable;
+    int                               truly_zero_copy_allgather_enabled;
+    int                               mcast_prepost_bucket_size;
     void                             *oob;
 } ucc_tl_mlx5_mcast_coll_comm_init_spec_t;
 
@@ -279,6 +281,8 @@ typedef struct ucc_tl_mlx5_mcast_allgather_comm {
     uint32_t coll_counter;
     uint32_t max_num_packets;
     uint32_t max_push_send;
+    uint8_t  truly_zero_copy_allgather_enabled;
+    uint32_t mcast_prepost_bucket_size;
 } ucc_tl_mlx5_mcast_allgather_comm_t;
 
 typedef struct ucc_tl_mlx5_mcast_bcast_comm {
@@ -431,6 +435,8 @@ typedef struct ucc_tl_mlx5_mcast_coll_req {
     ucc_memory_type_t                                   buf_mem_type;
     enum ucc_tl_mlx5_mcast_one_sided_reliability_scheme one_sided_reliability_scheme;
     uint32_t                                            ag_counter;
+    int                                                 concurrency_level;
+    int                                                 mcast_prepost_bucket_size;
     int                                                 state;
     ucc_tl_mlx5_mcast_pipelined_ag_schedule_t          *ag_schedule;
     int                                                 total_steps;
