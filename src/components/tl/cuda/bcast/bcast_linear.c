@@ -197,6 +197,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             return;
         }
         task->bcast_linear.stage = STAGE_SETUP;
+        /* fall through */
     case STAGE_SETUP:
         st = ucc_tl_cuda_bcast_linear_setup_test(task);
         if (st != UCC_OK) {
@@ -208,6 +209,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
         } else {
             task->bcast_linear.stage = STAGE_WAIT_ROOT;
         }
+        /* fall through */
     default:
         break;
     }
@@ -229,6 +231,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             }
             task->bcast_linear.stage = STAGE_WAIT_COPY;
+            /* fall through */
         case STAGE_WAIT_COPY:
             etask = task->bcast_linear.exec_task;
             ucc_assert(NULL != etask);
@@ -243,6 +246,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             set_rank_step(task, task->bcast_linear.root,
                           task->bcast_linear.step, 0);
             task->bcast_linear.stage = STAGE_WAIT_ALL;
+            /* fall through */
         case STAGE_WAIT_ALL:
             for (i = 0; i < tsize; ++i) {
                 if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task))) {
@@ -271,6 +275,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             }
             task->bcast_linear.stage = STAGE_WAIT_COMPLETION;
+            /* fall through */
         case STAGE_WAIT_COMPLETION:
             st = ucc_tl_cuda_shm_barrier_test(trank, task->bar);
             if (st != UCC_OK) {
@@ -301,6 +306,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
             } else {
                 return;
             }
+            /* fall through */
         case STAGE_CLIENT_COPY:
             // need to copy from root's scratch buffer
             dbuf = PTR_OFFSET(task->bcast_linear.sbuf, offset_buff);
@@ -314,6 +320,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             }
             task->bcast_linear.stage = STAGE_CLIENT_COPY_WAIT;
+            /* fall through */
         case STAGE_CLIENT_COPY_WAIT:
             etask = task->bcast_linear.exec_task;
             ucc_assert(NULL != etask);
@@ -337,6 +344,7 @@ static void ucc_tl_cuda_bcast_linear_progress(ucc_coll_task_t *coll_task)
                 return;
             }
             task->bcast_linear.stage = STAGE_CLIENT_WAIT_COMPLETION;
+            /* fall through */
         case STAGE_CLIENT_WAIT_COMPLETION:
             st = ucc_tl_cuda_shm_barrier_test(trank, task->bar);
             if (st != UCC_OK) {
