@@ -357,12 +357,9 @@ static ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
 {
     ucc_tl_cuda_task_t *task = ucc_derived_of(coll_task, ucc_tl_cuda_task_t);
     ucc_tl_cuda_team_t *team = TASK_TEAM(task);
-    ucc_coll_args_t    *args = &TASK_ARGS(task);
-    ucc_datatype_t      dt   = task->bcast_linear.dt;
-    size_t              half_scratch_size = get_raw_scratch_size(team) / 2;
 
+    task->bcast_linear.step  = 0;
     task->bcast_linear.stage = STAGE_SYNC;
-
     // in case of active set bcast we need to do additional steps to find free barriers
     if (UCC_COLL_ARGS_ACTIVE_SET(&TASK_ARGS(task))) {
         task->bcast_linear.stage =
@@ -371,16 +368,9 @@ static ucc_status_t ucc_tl_cuda_bcast_linear_start(ucc_coll_task_t *coll_task)
                 : STAGE_FIND_BAR_PEER;
     }
 
-    task->bcast_linear.size = ucc_dt_size(dt) * args->src.info.count;
-    task->bcast_linear.num_steps =
-        ucc_div_round_up(task->bcast_linear.size, half_scratch_size);
-
-    ucc_debug("bcast linear dt: %s, buffer size: %ld, num_steps: %d",
-              ucc_datatype_str(dt), task->bcast_linear.size,
+    ucc_debug("bcast linear start dt: %s, buffer size: %ld, num_steps: %d",
+              ucc_datatype_str(task->bcast_linear.dt), task->bcast_linear.size,
               task->bcast_linear.num_steps);
-
-    task->bcast_linear.sbuf = args->src.info.buffer;
-    task->bcast_linear.step = 0;
 
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
@@ -407,8 +397,12 @@ ucc_status_t ucc_tl_cuda_bcast_linear_init(ucc_base_coll_args_t *coll_args,
     task->bcast_linear.root = coll_args->args.root;
     task->bcast_linear.dt   = coll_args->args.src.info.datatype;
     task->bcast_linear.sbuf = coll_args->args.src.info.buffer;
+    task->bcast_linear.size =
+        ucc_dt_size(task->bcast_linear.dt) * coll_args->args.src.info.count;
+    task->bcast_linear.num_steps = ucc_div_round_up(
+        task->bcast_linear.size, get_raw_scratch_size(team) / 2);
 
-    task->super.flags   |= UCC_COLL_TASK_FLAG_EXECUTOR;
+    task->super.flags |= UCC_COLL_TASK_FLAG_EXECUTOR;
     task->super.post     = ucc_tl_cuda_bcast_linear_start;
     task->super.progress = ucc_tl_cuda_bcast_linear_progress;
     task->super.finalize = ucc_tl_cuda_bcast_linear_finalize;
