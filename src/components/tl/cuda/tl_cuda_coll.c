@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -9,6 +9,7 @@
 #include "alltoallv/alltoallv.h"
 #include "allgather/allgather.h"
 #include "allgatherv/allgatherv.h"
+#include "bcast/bcast.h"
 #include "reduce_scatter/reduce_scatter.h"
 #include "reduce_scatterv/reduce_scatterv.h"
 #include "utils/arch/cpu.h"
@@ -35,6 +36,7 @@ const char *
     ucc_tl_cuda_default_alg_select_str[UCC_TL_CUDA_N_DEFAULT_ALG_SELECT_STR] = {
         UCC_TL_CUDA_ALLGATHER_DEFAULT_ALG_SELECT_STR,
         UCC_TL_CUDA_ALLGATHERV_DEFAULT_ALG_SELECT_STR,
+        UCC_TL_CUDA_BCAST_DEFAULT_ALG_SELECT_STR,
         UCC_TL_CUDA_REDUCE_SCATTER_DEFAULT_ALG_SELECT_STR,
         UCC_TL_CUDA_REDUCE_SCATTERV_DEFAULT_ALG_SELECT_STR};
 
@@ -78,6 +80,8 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
         return ucc_tl_cuda_allgather_init(coll_args, team, task_h);
     case UCC_COLL_TYPE_ALLGATHERV:
         return ucc_tl_cuda_allgatherv_init(coll_args, team, task_h);
+    case UCC_COLL_TYPE_BCAST:
+        return ucc_tl_cuda_bcast_init(coll_args, team, task_h);
     case UCC_COLL_TYPE_REDUCE_SCATTER:
         return ucc_tl_cuda_reduce_scatter_init(coll_args, team, task_h);
     case UCC_COLL_TYPE_REDUCE_SCATTERV:
@@ -87,6 +91,19 @@ ucc_status_t ucc_tl_cuda_coll_init(ucc_base_coll_args_t *coll_args,
     default:
         return UCC_ERR_NOT_SUPPORTED;
     }
+}
+
+ucc_status_t ucc_tl_cuda_shm_barrier_init_root(ucc_rank_t size, ucc_rank_t rank, ucc_rank_t root,
+                                          ucc_tl_cuda_shm_barrier_t *barrier)
+{
+    if (rank == root) {
+        barrier->size  = size;
+        barrier->count = 0;
+        barrier->sense = 0;
+    }
+    barrier->state[rank]       = UCC_OK;
+    barrier->local_sense[rank] = 1;
+    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_cuda_shm_barrier_init(ucc_rank_t size, ucc_rank_t rank,
@@ -134,6 +151,8 @@ static inline int alg_id_from_str(ucc_coll_type_t coll_type, const char *str)
         return ucc_tl_cuda_allgather_alg_from_str(str);
     case UCC_COLL_TYPE_ALLGATHERV:
         return ucc_tl_cuda_allgatherv_alg_from_str(str);
+    case UCC_COLL_TYPE_BCAST:
+        return ucc_tl_cuda_bcast_alg_from_str(str);
     default:
         break;
     }
@@ -181,6 +200,16 @@ ucc_status_t ucc_tl_cuda_alg_id_to_init(int alg_id, const char *alg_id_str,
             break;
         case UCC_TL_CUDA_ALLGATHER_ALG_LINEAR:
             *init = ucc_tl_cuda_allgatherv_linear_init;
+            break;
+        default:
+            status = UCC_ERR_INVALID_PARAM;
+            break;
+        };
+        break;
+    case UCC_COLL_TYPE_BCAST:
+        switch (alg_id) {
+        case UCC_TL_CUDA_BCAST_ALG_LINEAR:
+            *init = ucc_tl_cuda_bcast_linear_init;
             break;
         default:
             status = UCC_ERR_INVALID_PARAM;

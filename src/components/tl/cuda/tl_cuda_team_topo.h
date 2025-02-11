@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -51,7 +51,7 @@ ucc_tl_cuda_team_topo_is_direct(const ucc_tl_team_t *team,
 }
 
 static inline int
-ucc_tl_cuda_team_topo_is_fully_conntected(const ucc_tl_cuda_team_topo_t *topo)
+ucc_tl_cuda_team_topo_is_fully_connected(const ucc_tl_cuda_team_topo_t *topo)
 {
     return topo->is_fully_connected;
 }
