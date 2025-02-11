@@ -42,8 +42,9 @@ static ucc_status_t ucc_cl_hier_allgatherv_finalize(ucc_coll_task_t *task)
 }
 
 /* Return team_rank's node leader in team space */
-static inline ucc_rank_t find_leader_rank(ucc_base_team_t *team,
-                                          ucc_rank_t       team_rank)
+static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
+                                          ucc_rank_t         team_rank,
+                                          ucc_rank_t        *rank_out)
 {
     ucc_cl_hier_team_t *cl_team       = ucc_derived_of(team, ucc_cl_hier_team_t);
     ucc_team_t         *core_team     = team->params.team;
@@ -59,10 +60,12 @@ static inline ucc_rank_t find_leader_rank(ucc_base_team_t *team,
         cl_team->node_leaders = ucc_malloc(sizeof(ucc_rank_t) * team_size);
         if (!cl_team->node_leaders) {
             cl_error(team->context->lib, "Could not allocate node_leaders array");
+            return UCC_ERR_NO_MEMORY;
         }
         cl_team->leader_list  = ucc_malloc(sizeof(ucc_rank_t) * ldr_sbgp_size);
         if (!cl_team->node_leaders) {
             cl_error(team->context->lib, "Could not allocate leader_list array");
+            return UCC_ERR_NO_MEMORY;
         }
         for (i = 0; i < team_size; i++) {
             for (j = 0; j < ldr_sbgp_size; j++) {
@@ -78,7 +81,8 @@ static inline ucc_rank_t find_leader_rank(ucc_base_team_t *team,
     }
 
     //NOLINTNEXTLINE
-    return cl_team->node_leaders[team_rank];
+    *rank_out = cl_team->node_leaders[team_rank];
+    return UCC_OK;
 }
 
 UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
@@ -116,6 +120,8 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     size_t                  total_count;
     void                   *buffer;
     void                   *node_gathered_data;
+    ucc_rank_t              leader_team_rank;
+    ucc_rank_t              team_rank;
 
     schedule = &ucc_cl_hier_get_schedule(cl_team)->super.super;
     if (ucc_unlikely(!schedule)) {
@@ -163,7 +169,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     if(SBGP_ENABLED(cl_team, NODE) && SBGP_ENABLED(cl_team, NODE_LEADERS)) {
         /* Sum up the counts on each node to get the count for each node leader */
         for (i = 0; i < team_size; i++) {
-            ucc_rank_t leader_team_rank = find_leader_rank(team, i);
+            UCC_CHECK_GOTO(
+                find_leader_rank(team, i, &leader_team_rank),
+                free_scratch, status);
             ucc_rank_t leader_sbgp_rank = ucc_ep_map_local_rank(
                                             SBGP_MAP(cl_team, NODE_LEADERS),
                                             leader_team_rank);
@@ -209,7 +217,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
         } else {
             disp_counter = 0;
             for (i = 0; i < node_sbgp_size; i++) {
-                ucc_rank_t team_rank =
+                team_rank =
                     ucc_ep_map_eval(SBGP_MAP(cl_team, NODE), i);
                 ucc_coll_args_set_count(
                     &args.args, node_counts, i,

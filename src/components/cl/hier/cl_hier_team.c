@@ -406,7 +406,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
         0, UCC_MSG_MAX, UCC_CL_HIER_DEFAULT_SCORE,
         ucc_cl_hier_barrier_init, cl_team);
     if (UCC_OK != status) {
-        cl_error(lib, "faild to add range to score_t");
+        cl_error(lib, "failed to add range to score_t");
         return status;
 
     }
@@ -416,7 +416,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
         0, UCC_MSG_MAX, UCC_CL_HIER_DEFAULT_SCORE,
         ucc_cl_hier_allgatherv_init, cl_team);
     if (UCC_OK != status) {
-        cl_error(lib, "faild to add range to score_t");
+        cl_error(lib, "failed to add range to score_t");
         return status;
 
     }
