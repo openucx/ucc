@@ -58,3 +58,37 @@ char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
                       UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR, algo_num);
     return str;
 }
+
+ucc_status_t loopback_self_copy(void *rbuf, void *sbuf, size_t data_size,
+                                ucc_memory_type_t rmem, ucc_memory_type_t smem,
+                                ucc_rank_t rank, ucc_tl_ucp_team_t *team,
+                                ucc_tl_ucp_task_t *task)
+{
+    ucc_status_t status;
+    status = ucc_tl_ucp_send_nb(sbuf, data_size, smem, rank, team, task);
+    if (UCC_OK != status) {
+        task->super.status = status;
+        return task->super.status;
+    }
+    status = ucc_tl_ucp_recv_nb(rbuf, data_size, rmem, rank, team, task);
+    if (UCC_OK != status) {
+        task->super.status = status;
+        return task->super.status;
+    }
+    return UCC_OK;
+}
+ucc_status_t allgather_copy(void *rbuf, void *sbuf, size_t data_size,
+                            ucc_memory_type_t rmem, ucc_memory_type_t smem,
+                            ucc_rank_t rank, ucc_tl_ucp_team_t *team,
+                            ucc_tl_ucp_task_t *task)
+{
+    ucc_status_t status;
+    int use_loopback = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_loopback;
+    if (use_loopback) {
+        status = loopback_self_copy(rbuf, sbuf, data_size, rmem, smem, rank,
+                                    team, task);
+    } else {
+        status = ucc_mc_memcpy(rbuf, sbuf, data_size, rmem, smem);
+    }
+    return status;
+}

@@ -31,15 +31,16 @@ static ucc_rank_t ucc_tl_ucp_allgather_ring_get_recv_block(ucc_subset_t *subset,
 
 void ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
 {
-    ucc_tl_ucp_task_t *task       = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
-    ucc_tl_ucp_team_t *team       = TASK_TEAM(task);
-    ucc_rank_t         trank      = task->subset.myrank;
-    ucc_rank_t         tsize      = (ucc_rank_t)task->subset.map.ep_num;
-    void              *rbuf       = TASK_ARGS(task).dst.info.buffer;
-    ucc_memory_type_t  rmem       = TASK_ARGS(task).dst.info.mem_type;
-    size_t             count      = TASK_ARGS(task).dst.info.count;
-    ucc_datatype_t     dt         = TASK_ARGS(task).dst.info.datatype;
-    size_t             data_size  = (count / tsize) * ucc_dt_size(dt);
+    ucc_tl_ucp_task_t *task      = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
+    ucc_tl_ucp_team_t *team      = TASK_TEAM(task);
+    ucc_rank_t         trank     = task->subset.myrank;
+    ucc_rank_t         tsize     = (ucc_rank_t)task->subset.map.ep_num;
+    void *             rbuf      = TASK_ARGS(task).dst.info.buffer;
+    ucc_memory_type_t  rmem      = TASK_ARGS(task).dst.info.mem_type;
+    size_t             count     = TASK_ARGS(task).dst.info.count;
+    ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
+    size_t             data_size = (count / tsize) * ucc_dt_size(dt);
+    int use_loopback = UCC_TL_UCP_TEAM_LIB(team)->cfg.allgather_use_loopback;
     ucc_rank_t         sendto, recvfrom, sblock, rblock;
     int                step;
     void              *buf;
@@ -49,9 +50,13 @@ void ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
     }
     sendto   = ucc_ep_map_eval(task->subset.map, (trank + 1) % tsize);
     recvfrom = ucc_ep_map_eval(task->subset.map, (trank - 1 + tsize) % tsize);
-
-    while (task->tagged.send_posted < tsize - 1) {
+    if (use_loopback && (!UCC_IS_INPLACE(TASK_ARGS(task)))) {
+        step = task->tagged.send_posted - 1;
+    } else {
         step = task->tagged.send_posted;
+    }
+
+    while (step < tsize - 1) {
         sblock = task->allgather_ring.get_send_block(&task->subset, trank,
                                                      tsize, step);
         rblock = task->allgather_ring.get_recv_block(&task->subset, trank,
@@ -66,6 +71,11 @@ void ucc_tl_ucp_allgather_ring_progress(ucc_coll_task_t *coll_task)
             task, out);
         if (UCC_INPROGRESS == ucc_tl_ucp_test(task)) {
             return;
+        }
+        if (use_loopback && (!UCC_IS_INPLACE(TASK_ARGS(task)))) {
+            step = task->tagged.send_posted - 1;
+        } else {
+            step = task->tagged.send_posted;
         }
     }
     ucc_assert(UCC_TL_UCP_TASK_P2P_COMPLETE(task));
@@ -86,6 +96,7 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     ucc_datatype_t     dt        = TASK_ARGS(task).dst.info.datatype;
     ucc_rank_t         trank     = task->subset.myrank;
     ucc_rank_t         tsize     = (ucc_rank_t)task->subset.map.ep_num;
+    ucc_rank_t         rank      = ucc_ep_map_eval(task->subset.map, trank);
     size_t             data_size = (count / tsize) * ucc_dt_size(dt);
     ucc_status_t       status;
     ucc_rank_t         block;
@@ -96,13 +107,12 @@ ucc_status_t ucc_tl_ucp_allgather_ring_start(ucc_coll_task_t *coll_task)
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
         block = task->allgather_ring.get_send_block(&task->subset, trank, tsize,
                                                     0);
-        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * block),
-                               sbuf, data_size, rmem, smem);
+        status = allgather_copy(PTR_OFFSET(rbuf, data_size * block), sbuf,
+                                data_size, rmem, smem, rank, team, task);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }
     }
-
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 }
 
