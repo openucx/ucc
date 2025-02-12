@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 allgatherv =                         \
