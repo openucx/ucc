@@ -124,6 +124,11 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     ucc_rank_t              leader_team_rank;
     ucc_rank_t              team_rank;
 
+    if (coll_args->args.src.info.mem_type != UCC_MEMORY_TYPE_HOST ||
+        coll_args->args.dst.info_v.mem_type != UCC_MEMORY_TYPE_HOST) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
     schedule = &ucc_cl_hier_get_schedule(cl_team)->super.super;
     if (ucc_unlikely(!schedule)) {
         return UCC_ERR_NO_MEMORY;

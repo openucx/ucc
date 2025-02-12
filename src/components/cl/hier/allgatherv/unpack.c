@@ -8,8 +8,7 @@
 
 ucc_status_t ucc_cl_hier_allgatherv_unpack_finalize(ucc_coll_task_t *task)
 {
-    ucc_schedule_t         *schedule    = ucc_derived_of(task, ucc_schedule_t);
-    ucc_cl_hier_schedule_t *cl_schedule = ucc_derived_of(schedule,
+    ucc_cl_hier_schedule_t *cl_schedule = ucc_derived_of(task,
                                                          ucc_cl_hier_schedule_t);
 
     ucc_mc_free(cl_schedule->scratch);

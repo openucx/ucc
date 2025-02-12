@@ -413,7 +413,7 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
 
     status = ucc_coll_score_add_range(
         score, UCC_COLL_TYPE_ALLGATHERV, UCC_MEMORY_TYPE_HOST,
-        0, UCC_MSG_MAX, UCC_CL_HIER_DEFAULT_SCORE,
+        0, 2048, UCC_CL_HIER_DEFAULT_SCORE,
         ucc_cl_hier_allgatherv_init, cl_team);
     if (UCC_OK != status) {
         cl_error(lib, "failed to add range to score_t");
