@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -28,9 +28,10 @@ void ucc_cl_hier_allgatherv_unpack_progress(ucc_coll_task_t *task)
                                                 sizeof(ucc_rank_t));
     ucc_status_t             st          = UCC_OK;
     ucc_rank_t               i;
+    ucc_ee_executor_task_t  *etask;
 
     for (i = 0; i < *n_tasks; i++) {
-        ucc_ee_executor_task_t *etask = tasks[i];
+        etask = tasks[i];
         if (etask != NULL) {
             st = ucc_ee_executor_task_test(etask);
             if (st == UCC_OK) {
@@ -47,7 +48,6 @@ void ucc_cl_hier_allgatherv_unpack_progress(ucc_coll_task_t *task)
 
 out:
     schedule->super.status       = st;
-    schedule->super.super.status = st;
 }
 
 ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
@@ -71,7 +71,7 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
                                                 args->dst.info_v.datatype);
     ucc_ee_executor_t          *exec;
     ucc_status_t                status;
-    int                         i;
+    ucc_rank_t                  i;
     size_t                      src_rank_count;
     size_t                      dst_rank_count;
     size_t                      src_rank_disp;
@@ -111,7 +111,6 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
     }
 
     schedule->super.status       = UCC_INPROGRESS;
-    schedule->super.super.status = UCC_INPROGRESS;
 
     ucc_progress_queue_enqueue(cl_team->super.super.context->ucc_context->pq,
                                task);

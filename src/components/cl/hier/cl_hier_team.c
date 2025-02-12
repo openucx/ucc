@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -418,7 +418,6 @@ ucc_status_t ucc_cl_hier_team_get_scores(ucc_base_team_t   *cl_team,
     if (UCC_OK != status) {
         cl_error(lib, "failed to add range to score_t");
         return status;
-
     }
 
     for (i = 0; i < UCC_CL_HIER_N_DEFAULT_ALG_SELECT_STR; i++) {

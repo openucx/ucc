@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -98,6 +98,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     ucc_rank_t              node_sbgp_size   = SBGP_SIZE(cl_team, NODE);
     ucc_rank_t              leader_sbgp_size = SBGP_SIZE(cl_team, NODE_LEADERS);
     ucc_rank_t              team_size        = UCC_CL_TEAM_SIZE(cl_team);
+    ucc_topo_t             *topo             = team->params.team->topo;
     ucc_aint_t             *node_disps       = NULL;
     ucc_count_t            *node_counts      = NULL;
     ucc_aint_t             *leader_disps     = NULL;
@@ -246,7 +247,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
             }
 
             args.args.coll_type                = UCC_COLL_TYPE_GATHERV;
-            args.args.root                     = 0;
+            args.args.root                     = topo->node_leader_rank_id;
             args.args.flags                   &= ~UCC_COLL_ARGS_FLAG_IN_PLACE;
             args.args.dst.info_v.displacements = node_disps;
             args.args.dst.info_v.counts        = node_counts;
@@ -279,7 +280,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
         args                        = args_old;
         args.args.coll_type         = UCC_COLL_TYPE_BCAST;
         args.args.flags            |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-        args.args.root              = 0;
+        args.args.root              = topo->node_leader_rank_id;
         args.args.src.info.buffer   = buffer;
         args.args.src.info.count    = total_count;
         args.args.src.info.datatype = args_old.args.dst.info_v.datatype;
