@@ -194,6 +194,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
               self);
 
     self->ucp_memory_types = context_attr.memory_types;
+    if (self->ucp_memory_types & UCC_BIT(ucc_memtype_to_ucs[UCC_MEMORY_TYPE_CUDA])) {
+         /* TL MLX5 needs this information */
+        self->super.super.ucc_context->tl_caps |= UCC_TL_UCP_CUDA_ENABLED;
+    }
+
     worker_params.field_mask = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
     switch (params->thread_mode) {
     case UCC_THREAD_SINGLE:
