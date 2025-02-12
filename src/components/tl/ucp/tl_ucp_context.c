@@ -164,14 +164,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     UCP_CHECK(ucp_config_read(prefix, NULL, &ucp_config),
               "failed to read ucp configuration", err_cfg_read, self);
 
-    ucp_params.field_mask =
-        UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK | UCP_PARAM_FIELD_NAME;
-    ucp_params.features = UCP_FEATURE_TAG | UCP_FEATURE_AM;
-    if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS) {
-        ucp_params.features |= UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
-    }
+    ucp_params.field_mask = UCP_PARAM_FIELD_FEATURES |
+                            UCP_PARAM_FIELD_TAG_SENDER_MASK |
+                            UCP_PARAM_FIELD_NAME;
+    ucp_params.features =
+        UCP_FEATURE_TAG | UCP_FEATURE_AM | UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
-    ucp_params.name = "UCC_UCP_CONTEXT";
+    ucp_params.name            = "UCC_UCP_CONTEXT";
 
     if (params->estimated_num_ppn > 0) {
         ucp_params.field_mask |= UCP_PARAM_FIELD_ESTIMATED_NUM_PPN;
@@ -251,9 +250,13 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
           "failed to register progress function", err_thread_mode,
           UCC_ERR_NO_MESSAGE, self);
 
-    self->remote_info  = NULL;
-    self->n_rinfo_segs = 0;
-    self->rkeys        = NULL;
+    self->remote_info         = NULL;
+    self->dynamic_remote_info = NULL;
+    self->dyn_seg_buf         = NULL;
+    self->n_rinfo_segs        = 0;
+    self->n_dynrinfo_segs     = 0;
+    self->rkeys               = NULL;
+    self->dyn_rkeys           = NULL;
     if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS &&
         params->params.mask & UCC_CONTEXT_PARAM_FIELD_OOB) {
         ucc_status = ucc_tl_ucp_ctx_remote_populate(
@@ -353,6 +356,15 @@ ucc_status_t ucc_tl_ucp_rinfo_destroy(ucc_tl_ucp_context_t *ctx)
             ucp_rkey_buffer_release(ctx->remote_info[i].packed_key);
         }
     }
+    if (ctx->dynamic_remote_info) {
+        for (i = 0; i < ctx->n_dynrinfo_segs; i++) {
+            if (ctx->dynamic_remote_info[i].mem_h) {
+                ucp_mem_unmap(ctx->worker.ucp_context,
+                              ctx->dynamic_remote_info[i].mem_h);
+            }
+        }
+        ucc_free(ctx->dynamic_remote_info);
+    }
     ucc_free(ctx->remote_info);
     ucc_free(ctx->rkeys);
     ctx->remote_info = NULL;
@@ -446,6 +458,8 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
                                             ucc_mem_map_params_t   map,
                                             ucc_context_oob_coll_t oob)
 {
+    ucc_tl_ucp_lib_t *lib =
+        ucc_derived_of(ctx->super.super.lib, ucc_tl_ucp_lib_t);
     uint32_t             size  = oob.n_oob_eps;
     uint64_t             nsegs = map.n_segments;
     ucp_mem_map_params_t mmap_params;
@@ -456,52 +470,50 @@ ucc_status_t ucc_tl_ucp_ctx_remote_populate(ucc_tl_ucp_context_t * ctx,
 
     if (size < 2) {
         tl_error(
-            ctx->super.super.lib,
+            lib,
             "oob.n_oob_eps set to incorrect value for remote exchange (%d)",
             size);
         return UCC_ERR_INVALID_PARAM;
     }
     if (nsegs > MAX_NR_SEGMENTS) {
-        tl_error(ctx->super.super.lib, "cannot map more than %d segments",
-                 MAX_NR_SEGMENTS);
+        tl_error(lib, "cannot map more than %d segments", MAX_NR_SEGMENTS);
         return UCC_ERR_INVALID_PARAM;
     }
-    ctx->rkeys =
-        (ucp_rkey_h *)ucc_calloc(sizeof(ucp_rkey_h), nsegs * size, "ucp_ctx_rkeys");
+    ctx->rkeys = (ucp_rkey_h *)ucc_calloc(sizeof(ucp_rkey_h), nsegs * size,
+                                          "ucp_ctx_rkeys");
     if (NULL == ctx->rkeys) {
-        tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
+        tl_error(lib, "failed to allocated %zu bytes",
                  sizeof(ucp_rkey_h) * nsegs * size);
         return UCC_ERR_NO_MEMORY;
     }
     ctx->remote_info = (ucc_tl_ucp_remote_info_t *)ucc_calloc(
         nsegs, sizeof(ucc_tl_ucp_remote_info_t), "ucp_remote_info");
     if (NULL == ctx->remote_info) {
-        tl_error(ctx->super.super.lib, "failed to allocated %zu bytes",
+        tl_error(lib, "failed to allocated %zu bytes",
                  sizeof(ucc_tl_ucp_remote_info_t) * nsegs);
         ucc_status = UCC_ERR_NO_MEMORY;
         goto fail_alloc_remote_segs;
     }
 
     for (i = 0; i < nsegs; i++) {
-        mmap_params.field_mask =
-            UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
+        mmap_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+                                 UCP_MEM_MAP_PARAM_FIELD_LENGTH;
         mmap_params.address = map.segments[i].address;
         mmap_params.length  = map.segments[i].len;
 
         status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
         if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib,
-                     "ucp_mem_map failed with error code: %d", status);
+            tl_error(lib, "ucp_mem_map failed with error code: %d", status);
             ucc_status = ucs_status_to_ucc_status(status);
             goto fail_mem_map;
         }
+
         ctx->remote_info[i].mem_h = (void *)mh;
         status                    = ucp_rkey_pack(ctx->worker.ucp_context, mh,
-                               &ctx->remote_info[i].packed_key,
-                               &ctx->remote_info[i].packed_key_len);
+                                                  &ctx->remote_info[i].packed_key,
+                                                  &ctx->remote_info[i].packed_key_len);
         if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib,
-                     "failed to pack UCP key with error code: %d", status);
+            tl_error(lib, "failed to pack UCP key with error code: %d", status);
             ucc_status = ucs_status_to_ucc_status(status);
             goto fail_mem_map;
         }
