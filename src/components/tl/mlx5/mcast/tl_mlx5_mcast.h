@@ -113,6 +113,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm_init_spec {
     int                               post_recv_thresh;
     int                               scq_moderation;
     int                               wsize;
+    int                               mcast_group_count;
     int                               max_push_send;
     int                               max_eager;
     int                               cuda_mem_enabled;
@@ -178,8 +179,8 @@ typedef struct ucc_tl_mlx5_mcast_coll_context {
 
 typedef struct ucc_tl_mlx5_mcast_join_info_t {
     ucc_status_t  status;
-    uint16_t      dlid;
-    union ibv_gid dgid;
+    uint16_t      dlid[MAX_GROUP_COUNT];
+    union ibv_gid dgid[MAX_GROUP_COUNT];
 } ucc_tl_mlx5_mcast_join_info_t;
 
 typedef struct ucc_tl_mlx5_mcast_context {
@@ -474,32 +475,38 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_recv_buffers(ucc_tl_mlx5_mcast
     struct ibv_recv_wr *rwr    = comm->call_rwr;
     struct ibv_sge     *sge    = comm->call_rsgs;
     struct pp_packet   *pp     = NULL;
-    int                 count  = comm->params.rx_depth - comm->pending_recv;
     int                 i;
+    int                 j;
+    int                 count;
+    int                 count_per_qp;
 
+    count = comm->params.rx_depth - comm->pending_recv;
     if (count <= comm->params.post_recv_thresh) {
         return UCC_OK;
     }
 
-    for (i = 0; i < count - 1; i++) {
-        if (NULL == (pp = ucc_tl_mlx5_mcast_buf_get_free(comm))) {
-            break;
+    count_per_qp = count / comm->mcast_group_count;
+    for (j = 0; j < comm->mcast_group_count; j++) {
+        for (i = 0; i < count_per_qp; i++) {
+            if (NULL == (pp = ucc_tl_mlx5_mcast_buf_get_free(comm))) {
+                break;
+            }
+            rwr[i].wr_id = ((uint64_t) pp);
+            rwr[i].next = &rwr[i+1];
+            sge[2*i + 1].addr = pp->buf;
+            assert((uint64_t)comm->pp <= rwr[i].wr_id
+                    && ((uint64_t)comm->pp + comm->buf_n * sizeof(struct pp_packet)) > rwr[i].wr_id);
         }
 
-        rwr[i].wr_id      = ((uint64_t) pp);
-        rwr[i].next       = &rwr[i+1];
-        sge[2*i + 1].addr = pp->buf;
-
-        ucc_assert((uint64_t)comm->pp <= rwr[i].wr_id
-                && ((uint64_t)comm->pp + comm->buf_n * sizeof(struct pp_packet)) > rwr[i].wr_id);
-    }
-    if (i != 0) {
-        rwr[i-1].next = NULL;
-        if (ibv_post_recv(comm->mcast.groups[0].qp, &rwr[0], &bad_wr)) {
-            tl_error(comm->lib, "failed to prepost recvs: errno %d", errno);
-            return UCC_ERR_NO_RESOURCE;
+        if (i > 0) {
+            rwr[i-1].next = NULL;
+            if (ibv_post_recv(comm->mcast.groups[j].qp, &rwr[0], &bad_wr)) {
+                tl_error(comm->lib, "Failed to prepost recvs: errno %d qp index %d buffer count %d",
+                        errno, j, i);
+                return UCC_ERR_NO_RESOURCE;
+            }
+            comm->pending_recv += i;
         }
-        comm->pending_recv += i;
     }
 
     return UCC_OK;

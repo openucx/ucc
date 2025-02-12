@@ -48,6 +48,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
     int                 rc;
     int                 length;
     ucc_status_t        status;
+    int                 mcast_group_index;
     ucc_memory_type_t   mem_type = comm->cuda_mem_enabled ? UCC_MEMORY_TYPE_CUDA
                                                           : UCC_MEMORY_TYPE_HOST;
 
@@ -89,6 +90,8 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
 
         ssg[0].length     = length;
         ssg[0].lkey       = req->mr->lkey;
+        mcast_group_index = i % comm->mcast_group_count;
+        swr[0].wr.ud.ah   = comm->mcast.groups[mcast_group_index].ah;
         swr[0].wr_id      = MCAST_BCASTSEND_WR;
         swr[0].imm_data   = htonl(pp->psn);
         swr[0].send_flags = (length <= comm->max_inline) ? IBV_SEND_INLINE : 0;
@@ -108,7 +111,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
         tl_trace(comm->lib, "post_send, psn %d, length %d, zcopy %d, signaled %d",
                  pp->psn, pp->length, zcopy, swr[0].send_flags & IBV_SEND_SIGNALED);
 
-        if (0 != (rc = ibv_post_send(comm->mcast.groups[0].qp, &swr[0], &bad_wr))) {
+        if (0 != (rc = ibv_post_send(comm->mcast.groups[mcast_group_index].qp, &swr[0], &bad_wr))) {
             tl_error(comm->lib, "post send failed: ret %d, start_psn %d, to_send %d, "
                     "to_recv %d, length %d, psn %d, inline %d",
                      rc, req->start_psn, req->to_send, req->to_recv,
@@ -577,10 +580,13 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm);
 
 ucc_status_t ucc_tl_mlx5_mcast_join_mcast_post(ucc_tl_mlx5_mcast_coll_context_t *ctx,
                                                struct sockaddr_in6 *net_addr,
+                                               struct mcast_group *group,
                                                int is_root);
 
-ucc_status_t ucc_tl_mlx5_mcast_join_mcast_test(ucc_tl_mlx5_mcast_coll_context_t *ctx,
-                                               struct rdma_cm_event **event,
-                                               int is_root);
+ucc_status_t ucc_tl_mlx5_mcast_join_mcast_get_event(ucc_tl_mlx5_mcast_coll_context_t *ctx,
+                                                    struct rdma_cm_event **event);
+
+ucc_status_t ucc_tl_mlx5_leave_mcast_groups(ucc_tl_mlx5_mcast_coll_context_t *ctx,
+                                            ucc_tl_mlx5_mcast_coll_comm_t    *comm);
 
 #endif /* TL_MLX5_MCAST_HELPER_H_ */
