@@ -104,6 +104,10 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.one_sided_reliability_enable),
      UCC_CONFIG_TYPE_BOOL},
 
+    {"MCAST_GROUP_COUNT", "1", "Number of multicast groups that can be used to increase parallelism",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.mcast_group_count),
+     UCC_CONFIG_TYPE_INT},
+
     {NULL}};
 
 static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
