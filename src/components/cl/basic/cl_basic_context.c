@@ -61,20 +61,20 @@ UCC_CLASS_CLEANUP_FUNC(ucc_cl_basic_context_t)
     ucc_free(self->super.tl_ctxs);
 }
 
-ucc_status_t ucc_cl_basic_mem_map(const ucc_base_context_t *context, int type,
+ucc_status_t ucc_cl_basic_mem_map(const ucc_base_context_t *context, int type, /* NOLINT */
                                   void *address, size_t len, void *memh,
                                   void *tl_h)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
 
-ucc_status_t ucc_cl_basic_mem_unmap(const ucc_base_context_t *context, int type,
+ucc_status_t ucc_cl_basic_mem_unmap(const ucc_base_context_t *context, int type, /* NOLINT */
                                     void *tl_h)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
 
-ucc_status_t ucc_cl_basic_memh_pack(const ucc_base_context_t *context,
+ucc_status_t ucc_cl_basic_memh_pack(const ucc_base_context_t *context, /* NOLINT */
                                     void *memh, void **packed_buffer)
 {
     return UCC_ERR_NOT_SUPPORTED;

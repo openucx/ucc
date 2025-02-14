@@ -35,18 +35,18 @@ ucc_status_t ucc_tl_ucp_alltoall_onesided_start(ucc_coll_task_t *ctask)
 
     UCPCHECK_GOTO(
         ucc_tl_ucp_put_nb((void *)(src + start * nelems), (void *)dest, nelems,
-                          start, src_memh[start], dst_memh[start], team, task),
+                          start, *src_memh, dst_memh[start], team, task),
                           task, out);
-    UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, start, src_memh[start],
+    UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, start, *src_memh,
                                         dst_memh[start], team),
                                         task, out);
 
     for (peer = (start + 1) % gsize; peer != start; peer = (peer + 1) % gsize) {
         UCPCHECK_GOTO(ucc_tl_ucp_put_nb(
                           (void *)(src + peer * nelems), (void *)dest, nelems,
-                          peer, src_memh[peer], dst_memh[peer], team, task),
+                          peer, *src_memh, dst_memh[peer], team, task),
                           task, out);
-        UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer, src_memh[peer],
+        UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer, *src_memh,
                                             dst_memh[peer], team),
                                             task, out);
     }
