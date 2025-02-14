@@ -357,6 +357,24 @@ static inline ucc_status_t find_tl_index(ucc_mem_map_mem_h map_memh, int *tl_ind
     return UCC_ERR_NOT_FOUND;
 }
 
+static inline ucc_status_t ucc_tl_ucp_get_memh(ucc_tl_ucp_team_t *team, ucc_mem_map_mem_h map_memh, void **ucp_memh)
+{
+    ucc_mem_map_memh_t *memh = map_memh;
+    ucc_tl_ucp_memh_data_t *tl_data;// = (ucc_tl_ucp_memh_data_t *)memh->tl_h[tl_index].tl_data;
+    int tl_index = 0;
+    ucc_status_t status;
+
+    status = find_tl_index(memh, &tl_index);
+    if (status == UCC_ERR_NOT_FOUND) {
+        tl_error(UCC_TL_TEAM_LIB(team),
+            "attempt to perform one-sided operation with malformed mem map handle");
+        return status;
+    }
+    tl_data = (ucc_tl_ucp_memh_data_t *)memh->tl_h[tl_index].tl_data;
+    *ucp_memh = tl_data->rinfo.mem_h;
+    return UCC_OK;
+}
+
 static inline ucc_status_t ucc_tl_ucp_check_memh(ucp_ep_h *ep, void *va, uint64_t *rva,
                                                  ucp_rkey_h *rkey, int tl_index, ucc_mem_map_mem_h map_memh)
 {
@@ -367,6 +385,7 @@ static inline ucc_status_t ucc_tl_ucp_check_memh(ucp_ep_h *ep, void *va, uint64_
     ucs_status_t ucs_status;
     int i;
     size_t offset;
+    uint64_t *key_size;
 
     base = (uint64_t)memh->address;
     end = base + memh->len;
@@ -389,6 +408,9 @@ static inline ucc_status_t ucc_tl_ucp_check_memh(ucp_ep_h *ep, void *va, uint64_
             if (UCS_OK != ucs_status) {
                 return ucs_status_to_ucc_status(ucs_status);
             }
+            /* if they don't have a key, they don't have a memh */
+            key_size = (uint64_t *)PTR_OFFSET(memh->pack_buffer, offset + sizeof(size_t) * 2);
+            tl_data->packed_memh = PTR_OFFSET(memh->pack_buffer, offset + sizeof(size_t) * 4 + *key_size);
         }
         *rkey = tl_data->rkey;
         return UCC_OK;
@@ -440,7 +462,6 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
         ucc_status_t status;
 
         if (src_memh) {
-            //status = UCC_OK;
             status = find_tl_index(src_memh, &tl_index);
             if (status == UCC_ERR_NOT_FOUND) {
                 tl_error(UCC_TL_TEAM_LIB(team),
@@ -450,6 +471,7 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
 
             status = ucc_tl_ucp_check_memh(ep, va, rva, rkey, tl_index, src_memh);
             if (status == UCC_OK) {
+                printf("found %d va %p rva %lx\n", peer, va, *rva);
                 return UCC_OK;
             }
         }
@@ -540,8 +562,14 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
+    void *ucp_memh = NULL;
 
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
+    if (ucc_unlikely(UCC_OK != status)) {
+        return status;
+    }
+
+    status = ucc_tl_ucp_get_memh(team, src_memh, &ucp_memh);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
@@ -552,10 +580,15 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
         return status;
     }
 
+
     req_param.op_attr_mask =
         UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA;
     req_param.cb.send   = ucc_tl_ucp_put_completion_cb;
     req_param.user_data = (void *)task;
+    if (ucp_memh) {
+        req_param.op_attr_mask |= UCP_OP_ATTR_FIELD_MEMH;
+        req_param.memh = ucp_memh;
+    }
 
     ucp_status = ucp_put_nbx(ep, buffer, msglen, rva, rkey, &req_param);
 
@@ -585,6 +618,7 @@ static inline ucc_status_t ucc_tl_ucp_get_nb(void *buffer, void *target,
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
+    //void *packed_memh;
 
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
