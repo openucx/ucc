@@ -184,10 +184,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK | UCP_PARAM_FIELD_NAME;
-    ucp_params.features = UCP_FEATURE_TAG | UCP_FEATURE_AM;
-    if (params->params.mask & UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS) {
-        ucp_params.features |= UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
-    }
+    ucp_params.features = UCP_FEATURE_TAG | UCP_FEATURE_AM | UCP_FEATURE_EXPORTED_MEMH |
+        UCP_FEATURE_RMA | UCP_FEATURE_AMO64;
     ucp_params.tag_sender_mask = UCC_TL_UCP_TAG_SENDER_MASK;
     ucp_params.name = "UCC_UCP_CONTEXT";
 
@@ -616,11 +614,13 @@ ucc_status_t ucc_tl_ucp_mem_map_memhbuf(ucc_tl_ucp_context_t *ctx,
 {
     ucp_mem_map_params_t mmap_params;
     ucs_status_t         status;
+    void                *packed_memh;
 
     *mh = NULL;
     /* unpack here */
-    size_t *key_size  = (size_t *)pack_buffer;
-    void *packed_memh = PTR_OFFSET(pack_buffer, sizeof(size_t) * 2 + *key_size);
+    packed_memh = UCC_TL_UCP_MEMH_TL_PACKED_MEMH(pack_buffer);
+//    size_t *key_size  = (size_t *)PTR_OFFSET(pack_buffer, sizeof(size_t) * 2);
+//   void *packed_memh = PTR_OFFSET(pack_buffer, sizeof(size_t) * 4 + *key_size);
 
     mmap_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_EXPORTED_MEMH_BUFFER;
     mmap_params.exported_memh_buffer = packed_memh;
@@ -633,37 +633,24 @@ ucc_status_t ucc_tl_ucp_mem_map_memhbuf(ucc_tl_ucp_context_t *ctx,
                      ucs_status_string(status));
             return ucs_status_to_ucc_status(status);
         } else {
-            tl_debug(ctx->super.super.lib,
-                     "ucp_mem_map could not map exported memory handle");
+            tl_warn(ctx->super.super.lib,
+                     "ucp_mem_map cannot map exported memory handles");
         }
     }
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, int type,
-                                void *address, size_t len, void *memh,
-                                void *tl_h)
+ucc_status_t ucc_tl_ucp_mem_map_export(ucc_tl_ucp_context_t *ctx, void *address,
+                                       size_t len,
+                                       int type,
+                                       ucc_tl_ucp_memh_data_t *m_data)
 {
-    ucc_tl_ucp_context_t   *ctx = ucc_derived_of(context, ucc_tl_ucp_context_t);
-    ucc_status_t            ucc_status = UCC_OK;
-    ucc_mem_map_tl_t       *p_memh     = (ucc_mem_map_tl_t *)tl_h;
-    ucc_tl_ucp_memh_data_t *m_data = (ucc_tl_ucp_memh_data_t *)p_memh->tl_data;
-    ucp_mem_h               mh     = NULL;
-    ucc_mem_map_memh_t     *l_memh = (ucc_mem_map_memh_t *)memh;
-    size_t                  offset = 0;
-    ucp_mem_map_params_t    mmap_params;
-    ucs_status_t            status;
-    ucp_memh_pack_params_t  pack_params;
+    ucc_status_t           ucc_status = UCC_OK;
+    ucp_mem_h              mh;
+    ucp_mem_map_params_t   mmap_params;
+    ucp_memh_pack_params_t pack_params;
+    ucs_status_t           status;
 
-    if (type == UCC_MEM_MAP_TYPE_GLOBAL || !m_data) {
-        /* either we are importing or m_data is null */
-        m_data = ucc_calloc(1, sizeof(ucc_tl_ucp_memh_data_t), "tl data");
-        if (!m_data) {
-            tl_error(ctx->super.super.lib, "failed to allocate tl data");
-            return UCC_ERR_NO_MEMORY;
-        }
-        p_memh->tl_data = m_data;
-    }
     if (type == UCC_MEM_MAP_TYPE_LOCAL) {
         mmap_params.field_mask =
             UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
@@ -672,35 +659,18 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, int type,
 
         status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, &mh);
         if (UCS_OK != status) {
-            tl_error(ctx->super.super.lib,
-                     "ucp_mem_map failed with error code: %d", status);
+            tl_error(ctx->super.super.lib, "ucp_mem_map failed with error code: %d",
+                     status);
             ucc_status = ucs_status_to_ucc_status(status);
-        }
-    } else {
-        for (int i = 0; i < l_memh->num_tls; i++) {
-            size_t *p = (size_t *)PTR_OFFSET(l_memh->pack_buffer, offset);
-
-            if (tl_h == (void *)&l_memh->tl_h[i]) {
-                break;
-            }
-            /* this is not the index, skip this section of buffer if exists */
-            if (p[0] == i) {
-                offset += p[1];
-            }
-        }
-
-        ucc_status = ucc_tl_ucp_mem_map_memhbuf(
-            ctx, PTR_OFFSET(l_memh->pack_buffer, offset), &mh);
-        if (ucc_status != UCC_OK) {
-            tl_error(ctx->super.super.lib, "ucp_mem_map failed to map memh");
             return ucc_status;
         }
-    }
-    m_data->rinfo.mem_h   = mh;
-    m_data->rinfo.va_base = address;
-    m_data->rinfo.len     = len;
+        m_data->rinfo.mem_h   = mh;
+        m_data->rinfo.va_base = address;
+        m_data->rinfo.len     = len;
 
-    if (type == UCC_MEM_MAP_TYPE_LOCAL) {
+        pack_params.field_mask = UCP_MEMH_PACK_PARAM_FIELD_FLAGS;
+        pack_params.flags      = UCP_MEMH_PACK_FLAG_EXPORT;
+
         status = ucp_memh_pack(mh, &pack_params, &m_data->packed_memh,
                                &m_data->packed_memh_len);
         if (status != UCS_OK) {
@@ -710,17 +680,100 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, int type,
             m_data->packed_memh     = 0;
             m_data->packed_memh_len = 0;
         }
-        // pack rkey
-        status = ucp_rkey_pack(ctx->worker.ucp_context, mh,
-                               &m_data->rinfo.packed_key,
-                               &m_data->rinfo.packed_key_len);
-        if (status != UCS_OK) {
-            tl_error(ctx->super.super.lib, "unable to pack rkey with error %s",
-                     ucs_status_string(status));
-        }
-        p_memh->packed_size =
-            m_data->packed_memh_len + m_data->rinfo.packed_key_len;
     }
+
+    if (!m_data->rinfo.mem_h) {
+        tl_error(ctx->super.super.lib,
+            "attempting to pack keys with invalid memory handle");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    // pack rkey (mem_h should be valid by this point)
+    status =
+        ucp_rkey_pack(ctx->worker.ucp_context, m_data->rinfo.mem_h,
+                      &m_data->rinfo.packed_key, &m_data->rinfo.packed_key_len);
+    if (status != UCS_OK) {
+        tl_error(ctx->super.super.lib, "unable to pack rkey with error %s",
+                 ucs_status_string(status));
+        ucp_mem_unmap(ctx->worker.ucp_context, m_data->rinfo.mem_h);
+        ucc_status = ucs_status_to_ucc_status(status);
+        return ucc_status;
+    }
+
+    return ucc_status;
+}
+
+ucc_status_t ucc_tl_ucp_mem_map_dpu_import(ucc_tl_ucp_context_t *ctx,
+                                           void *address, size_t len,
+                                           ucc_tl_ucp_memh_data_t *m_data,
+                                           ucc_mem_map_memh_t     *l_memh,
+                                           void *tl_h)
+{
+    size_t       offset = 0;
+    ucp_mem_h    mh;
+    ucc_status_t ucc_status;
+
+    for (int i = 0; i < l_memh->num_tls; i++) {
+        size_t *p = (size_t *)PTR_OFFSET(l_memh->pack_buffer, offset);
+
+        if (tl_h == (void *)&l_memh->tl_h[i]) {
+            break;
+        }
+        /* this is not the index, skip this section of buffer if exists */
+        if (p[0] == i) {
+            offset += p[1];
+        }
+    }
+
+    ucc_status = ucc_tl_ucp_mem_map_memhbuf(
+        ctx, PTR_OFFSET(l_memh->pack_buffer, offset), &mh);
+    if (ucc_status != UCC_OK) {
+        tl_error(ctx->super.super.lib, "ucp_mem_map failed to map memh");
+        return ucc_status;
+    }
+    m_data->rinfo.mem_h   = mh; /* used for xgvmi */
+    m_data->rinfo.va_base = address;
+    m_data->rinfo.len     = len;
+
+    return UCC_OK;
+}
+
+ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, int type,
+                                void *address, size_t len, void *memh,
+                                void *tl_h)
+{
+    ucc_tl_ucp_context_t   *ctx = ucc_derived_of(context, ucc_tl_ucp_context_t);
+    ucc_mem_map_tl_t       *p_memh = (ucc_mem_map_tl_t *)tl_h;
+    ucc_tl_ucp_memh_data_t *m_data = (ucc_tl_ucp_memh_data_t *)p_memh->tl_data;
+    ucc_mem_map_memh_t     *l_memh = (ucc_mem_map_memh_t *)memh;
+    ucc_status_t            ucc_status = UCC_OK;
+
+    /* technically, only need to do this on import */
+    if (type == UCC_MEM_MAP_TYPE_GLOBAL ||
+        type == UCC_MEM_MAP_TYPE_DPU_IMPORT || !m_data) {
+        /* either we are importing or m_data is null */
+        m_data = ucc_calloc(1, sizeof(ucc_tl_ucp_memh_data_t), "tl data");
+        if (!m_data) {
+            tl_error(ctx->super.super.lib, "failed to allocate tl data");
+            return UCC_ERR_NO_MEMORY;
+        }
+        p_memh->tl_data = m_data;
+    }
+
+    if (type == UCC_MEM_MAP_TYPE_LOCAL || type == UCC_MEM_MAP_TYPE_DPU_EXPORT) {
+        ucc_status = ucc_tl_ucp_mem_map_export(ctx, address, len, type, m_data);
+        if (UCC_OK != ucc_status) {
+            tl_error(ctx->super.super.lib, "failed to export memory handles");
+        }
+    } else if (type == UCC_MEM_MAP_TYPE_DPU_IMPORT) {
+        ucc_status = ucc_tl_ucp_mem_map_dpu_import(ctx, address, len, m_data, l_memh, tl_h);
+        if (UCC_OK != ucc_status) {
+            tl_error(ctx->super.super.lib, "failed to import memory handle");
+        }
+    }
+
+    p_memh->packed_size =
+        m_data->packed_memh_len + m_data->rinfo.packed_key_len;
 
     return ucc_status;
 }

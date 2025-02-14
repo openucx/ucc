@@ -48,11 +48,10 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_start(ucc_coll_task_t *ctask)
 
         UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, sd_disp),
                                         PTR_OFFSET(dest, dd_disp),
-                                        data_size, peer, src_memh[peer],
+                                        data_size, peer, *src_memh,
                                         dst_memh[peer], team, task),
                       task, out);
-        UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer, src_memh[peer],
-                                            dst_memh[peer], team), task, out);
+        UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer, *src_memh, dst_memh[peer], team), task, out);
     }
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 out:

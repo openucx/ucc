@@ -260,6 +260,24 @@ extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 #define UCC_TL_UCP_REMOTE_RKEY(_ctx, _rank, _seg)                              \
     ((_ctx)->rkeys[_rank * _ctx->n_rinfo_segs + _seg])
 
+#define UCC_TL_UCP_MEMH_TL_HEADERS        2
+
+#define UCC_TL_UCP_MEMH_TL_PACKED_HEADERS 2
+
+#define UCC_TL_UCP_MEMH_TL_HEADER_SIZE                                         \
+    (sizeof(size_t) * UCC_TL_UCP_MEMH_TL_HEADERS)
+
+#define UCC_TL_UCP_MEMH_TL_PACKED_HEADER_SIZE                                  \
+    (sizeof(size_t) *                                                          \
+     (UCC_TL_UCP_MEMH_TL_HEADERS + UCC_TL_UCP_MEMH_TL_PACKED_HEADERS))
+
+#define UCC_TL_UCP_MEMH_TL_KEY_SIZE(buffer)                                    \
+    (*(size_t *)(PTR_OFFSET(buffer, UCC_TL_UCP_MEMH_TL_HEADER_SIZE)))
+
+#define UCC_TL_UCP_MEMH_TL_PACKED_MEMH(buffer)                                 \
+    (PTR_OFFSET(buffer, UCC_TL_UCP_MEMH_TL_PACKED_HEADER_SIZE +                \
+                            UCC_TL_UCP_MEMH_TL_KEY_SIZE(buffer)))
+
 extern ucs_memory_type_t ucc_memtype_to_ucs[UCC_MEMORY_TYPE_LAST+1];
 
 void ucc_tl_ucp_pre_register_mem(ucc_tl_ucp_team_t *team, void *addr,

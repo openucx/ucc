@@ -98,7 +98,9 @@ typedef struct ucc_context_config {
 
 typedef enum {
     UCC_MEM_MAP_TYPE_LOCAL,
-    UCC_MEM_MAP_TYPE_GLOBAL
+    UCC_MEM_MAP_TYPE_GLOBAL,
+    UCC_MEM_MAP_TYPE_DPU_IMPORT,   /* special case */
+    UCC_MEM_MAP_TYPE_DPU_EXPORT
 } ucc_mem_map_type_t;
 
 typedef struct ucc_mem_map_tl_t {
