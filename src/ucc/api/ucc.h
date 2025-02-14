@@ -2257,8 +2257,10 @@ ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ee_event);
 typedef enum {
     UCC_MEM_MAP_EXPORT = 0, /*!< Indicate ucc_mem_map() should export
                                  memory handles from TLs used by context */
-    UCC_MEM_MAP_IMPORT = 1  /*!< Indicate ucc_mem_map() should import
+    UCC_MEM_MAP_IMPORT = 1,  /*!< Indicate ucc_mem_map() should import
                                 memory handles from user memory handle */
+    UCC_MEM_MAP_EXPORT_OFFLOAD = 2,
+    UCC_MEM_MAP_IMPORT_OFFLOAD = 3
 } ucc_mem_map_flags_t;
 
 /**

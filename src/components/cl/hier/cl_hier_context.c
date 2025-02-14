@@ -92,20 +92,20 @@ ucc_cl_hier_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
     return UCC_OK;
 }
 
-ucc_status_t ucc_cl_hier_mem_map(const ucc_base_context_t *context, int type,
+ucc_status_t ucc_cl_hier_mem_map(const ucc_base_context_t *context, int type, /* NOLINT */
                                  void *address, size_t len, void *memh,
                                  void *tl_h)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
 
-ucc_status_t ucc_cl_hier_mem_unmap(const ucc_base_context_t *context, int type,
+ucc_status_t ucc_cl_hier_mem_unmap(const ucc_base_context_t *context, int type, /* NOLINT */
                                    void *tl_h)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
 
-ucc_status_t ucc_cl_hier_memh_pack(const ucc_base_context_t *context,
+ucc_status_t ucc_cl_hier_memh_pack(const ucc_base_context_t *context, /* NOLINT */
                                    void *memh, void **packed_buffer)
 {
     return UCC_ERR_NOT_SUPPORTED;
