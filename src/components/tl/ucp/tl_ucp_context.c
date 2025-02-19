@@ -792,14 +792,14 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, int type,
 
     data = (ucc_tl_ucp_memh_data_t *)p_memh->tl_data;
 
-    if (type == UCC_MEM_MAP_TYPE_LOCAL) {
+    if (type == UCC_MEM_MAP_TYPE_LOCAL || type == UCC_MEM_MAP_TYPE_DPU_EXPORT) {
         status = ucp_mem_unmap(ctx->worker.ucp_context, data->rinfo.mem_h);
         if (status != UCS_OK) {
             tl_error(ctx->super.super.lib,
                      "ucp_mem_unmap failed with error code %d", status);
             return ucs_status_to_ucc_status(status);
         }
-    } else if (type == UCC_MEM_MAP_TYPE_GLOBAL) {
+    } else if (type == UCC_MEM_MAP_TYPE_GLOBAL || type == UCC_MEM_MAP_TYPE_DPU_IMPORT) {
         // need to free rkeys (data->rkey) , packed memh (data->packed_memh)
         if (data->packed_memh) {
             ucc_free(data->packed_memh);
