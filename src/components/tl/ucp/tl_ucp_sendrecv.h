@@ -376,62 +376,62 @@ static inline ucc_status_t ucc_tl_ucp_get_memh(ucc_tl_ucp_team_t *team, ucc_mem_
 }
 
 static inline ucc_status_t ucc_tl_ucp_check_memh(ucp_ep_h *ep, void *va, uint64_t *rva,
-                                                 ucp_rkey_h *rkey, int tl_index, ucc_mem_map_mem_h map_memh)
+                                                 ucp_rkey_h *rkey, int tl_index, ucc_mem_map_mem_h src_map_memh, ucc_mem_map_mem_h dst_map_memh)
 {
     // check if src_memh or dest_memh have segment
-    ucc_mem_map_memh_t *memh = map_memh;
-    ucc_tl_ucp_memh_data_t *tl_data = (ucc_tl_ucp_memh_data_t *)memh->tl_h[tl_index].tl_data;
+    ucc_mem_map_memh_t *src_memh = src_map_memh;
+    ucc_mem_map_memh_t *dst_memh = dst_map_memh;
+    ucc_tl_ucp_memh_data_t *dst_tl_data = (ucc_tl_ucp_memh_data_t *)dst_memh->tl_h[tl_index].tl_data;
     uint64_t base, end;
     ucs_status_t ucs_status;
     int i;
     size_t offset;
-    uint64_t *key_size;
 
-    base = (uint64_t)memh->address;
-    end = base + memh->len;
+    base = (uint64_t)src_memh->address;
+    end = base + src_memh->len;
 
-    if ((uint64_t)va >= base && (uint64_t)va < end) {
-        *rva = (uint64_t)PTR_OFFSET(memh->address, ((uint64_t)va - (uint64_t)memh->address));
-        if (NULL == tl_data->rkey) {
-            offset = 0;
-            /* find pack location for tl */
-            for (i = 0; i < tl_index; i++) {
-                size_t *p = PTR_OFFSET(memh->pack_buffer, offset);
-                if (p[0] == tl_index) {
-                    break;
-                }
-                offset += p[1];
-            }
-            ucs_status =
-                ucp_ep_rkey_unpack(*ep, PTR_OFFSET(memh->pack_buffer, offset + sizeof(size_t) * 4),
-                               &tl_data->rkey);
-            if (UCS_OK != ucs_status) {
-                return ucs_status_to_ucc_status(ucs_status);
-            }
-            /* if they don't have a key, they don't have a memh */
-            key_size = (uint64_t *)PTR_OFFSET(memh->pack_buffer, offset + sizeof(size_t) * 2);
-            tl_data->packed_memh = PTR_OFFSET(memh->pack_buffer, offset + sizeof(size_t) * 4 + *key_size);
-        }
-        *rkey = tl_data->rkey;
-        return UCC_OK;
+    if (!((uint64_t)va >= base && (uint64_t)va < end)) {
+        return UCC_ERR_NOT_FOUND;
     }
-    return UCC_ERR_NOT_FOUND;
+    *rva = (uint64_t)PTR_OFFSET(dst_memh->address, ((uint64_t)va - (uint64_t)src_memh->address));
+    if (NULL == dst_tl_data->rkey) {
+        offset = 0;
+        /* find pack location for tl */
+        for (i = 0; i < tl_index; i++) {
+           size_t *p = PTR_OFFSET(dst_memh->pack_buffer, offset);
+           if (p[0] == tl_index) {
+               break;
+           }
+           offset += p[1];
+        }
+        ucs_status =
+            ucp_ep_rkey_unpack(*ep, PTR_OFFSET(dst_memh->pack_buffer, offset + sizeof(size_t) * 4),
+                           &dst_tl_data->rkey);
+        if (UCS_OK != ucs_status) {
+            return ucs_status_to_ucc_status(ucs_status);
+        }
+    }
+
+    *rkey = dst_tl_data->rkey;
+    return UCC_OK;
 }
 
 static inline ucc_status_t
 ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
                              ucc_rank_t peer, uint64_t *rva, ucp_rkey_h *rkey,
-                             int *segment, ucc_mem_map_mem_h src_memh, ucc_mem_map_mem_h dest_memh)
+                             int *segment, ucc_mem_map_mem_h src_memh, ucc_mem_map_mem_h dst_memh)
 {
     ucc_tl_ucp_context_t *ctx            = UCC_TL_UCP_TEAM_CTX(team);
     ptrdiff_t             key_offset     = 0;
     const size_t          section_offset = sizeof(uint64_t) * ctx->n_rinfo_segs;
+    int                   tl_index       = 0;
     ucc_rank_t            core_rank;
     uint64_t             *rvas;
     uint64_t             *key_sizes;
     void                 *keys;
     void                 *offset;
     ptrdiff_t             base_offset;
+    ucc_status_t          status;
 
     *segment  = -1;
     core_rank = ucc_ep_map_eval(UCC_TL_TEAM_MAP(team), peer);
@@ -457,41 +457,21 @@ ucc_tl_ucp_resolve_p2p_by_va(ucc_tl_ucp_team_t *team, void *va, ucp_ep_h *ep,
         key_offset += key_sizes[i];
     }
     if (ucc_unlikely(0 > *segment)) {
-        // check if src_memh or dest_memh have segment
-        int tl_index = 0;
-        ucc_status_t status;
-
-        if (src_memh) {
+        if (src_memh && dst_memh) {
+            /* check if segment is in src/dst memh */
             status = find_tl_index(src_memh, &tl_index);
             if (status == UCC_ERR_NOT_FOUND) {
-                tl_error(UCC_TL_TEAM_LIB(team),
-                    "attempt to perform one-sided operation with malformed mem map handle");
-                return status;
+               tl_error(UCC_TL_TEAM_LIB(team),
+                 "attempt to perform one-sided operation with malformed mem map handle");
+               return status;
             }
 
-            status = ucc_tl_ucp_check_memh(ep, va, rva, rkey, tl_index, src_memh);
-            if (status == UCC_OK) {
-                printf("found %d va %p rva %lx\n", peer, va, *rva);
-                return UCC_OK;
-            }
-        }
-
-        if (dest_memh) {
-            if (tl_index == -1) {
-                status = find_tl_index(dest_memh, &tl_index);
-                if (status == UCC_ERR_NOT_FOUND) {
-                    tl_error(UCC_TL_TEAM_LIB(team),
-                        "attempt to perform one-sided operation with malformed mem map handle");
-                    return status;
-                }
-            }
-
-            status = ucc_tl_ucp_check_memh(ep, va, rva, rkey, tl_index, dest_memh);
+            status = ucc_tl_ucp_check_memh(ep, va, rva, rkey, tl_index, src_memh, dst_memh);
             if (status == UCC_OK) {
                 return UCC_OK;
             }
         }
-
+        /* general error if nothing was found */
         tl_error(UCC_TL_TEAM_LIB(team),
             "attempt to perform one-sided operation on non-registered memory %p", va);
         return UCC_ERR_NOT_FOUND;
