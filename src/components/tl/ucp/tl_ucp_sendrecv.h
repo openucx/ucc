@@ -539,19 +539,21 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
     int                 segment   = 0;
     ucp_rkey_h          rkey      = NULL;
     uint64_t            rva       = 0;
+    void                *ucp_memh = NULL;
     ucs_status_ptr_t    ucp_status;
     ucc_status_t        status;
     ucp_ep_h            ep;
-    void *ucp_memh = NULL;
 
     status = ucc_tl_ucp_get_ep(team, dest_group_rank, &ep);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
 
-    status = ucc_tl_ucp_get_memh(team, src_memh, &ucp_memh);
-    if (ucc_unlikely(UCC_OK != status)) {
-        return status;
+    if (src_memh) {
+        status = ucc_tl_ucp_get_memh(team, src_memh, &ucp_memh);
+        if (ucc_unlikely(UCC_OK != status)) {
+            return status;
+        }
     }
 
     status = ucc_tl_ucp_resolve_p2p_by_va(team, target, &ep, dest_group_rank,
@@ -559,7 +561,6 @@ static inline ucc_status_t ucc_tl_ucp_put_nb(void *buffer, void *target,
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
-
 
     req_param.op_attr_mask =
         UCP_OP_ATTR_FIELD_CALLBACK | UCP_OP_ATTR_FIELD_USER_DATA;
