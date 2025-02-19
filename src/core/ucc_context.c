@@ -1189,7 +1189,7 @@ ucc_status_t ucc_mem_map_import(ucc_context_h         context,
             ucc_error("failed to import mem map memh %d", status);
             return status;
         }
-        strncpy(local_memh->tl_h[i].tl_name, tls->names[i], 8);
+        strncpy(local_memh->tl_h[i].tl_name, tls->names[i], 7);
     }
     local_memh->type = type;
     /* fix context as it will be incorrect on a different system */
@@ -1214,7 +1214,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     ucc_tl_lib_t             *tl_lib;
     size_t                    offset;
     int                       i;
-    int                       type; 
+    ucc_mem_map_type_t        type;
 
     if (flags == UCC_MEM_MAP_EXPORT) {
         local_memh = (ucc_mem_map_memh_t *)ucc_calloc(1, sizeof(ucc_mem_map_memh_t),
@@ -1306,7 +1306,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         offset += local_memh->tl_h[i].packed_size;
 
         // copy name information for look ups later
-        strncpy(exported_memh->tl_h[i].tl_name, tls->names[i], 8);
+        strncpy(exported_memh->tl_h[i].tl_name, tls->names[i], 7);
     }
     exported_memh->type        = type;
     exported_memh->context     = ctx;
