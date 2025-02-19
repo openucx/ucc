@@ -21,9 +21,9 @@ do {                                                                            
                     ucc_ilog2(_max_counter));                                       \
 } while (0);
 
-#define MCAST_ALLGATHER_IN_PROGRESS(_req, _comm)                                             \
-        (_req->to_send || _req->to_recv || _comm->pending_send ||                            \
-         _comm->one_sided.rdma_read_in_progress || (NULL != _req->allgather_rkeys_req))      \
+#define MCAST_ALLGATHER_IN_PROGRESS(_req, _comm)                                    \
+        (_req->to_send || _req->to_recv || _comm->pending_send ||                   \
+         comm->one_sided.pending_reads || (NULL != _req->allgather_rkeys_req))      \
 
 static inline ucc_status_t ucc_tl_mlx5_mcast_check_collective(ucc_tl_mlx5_mcast_coll_comm_t *comm,
                                                               ucc_tl_mlx5_mcast_coll_req_t  *req)
@@ -32,7 +32,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_check_collective(ucc_tl_mlx5_mcast_
 
     ucc_assert(comm->one_sided.reliability_ready);
 
-    if (comm->one_sided.rdma_read_in_progress) {
+    if (comm->one_sided.pending_reads) {
         return ucc_tl_mlx5_mcast_progress_one_sided_communication(comm, req);
     }
 
@@ -88,21 +88,19 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_check_collective(ucc_tl_mlx5_mcast_
     return UCC_INPROGRESS;
 }
 
-static inline ucc_status_t ucc_tl_mlx5_mcast_reset_reliablity(ucc_tl_mlx5_mcast_coll_req_t *req)
+static inline ucc_status_t ucc_tl_mlx5_mcast_reliability_ready(ucc_tl_mlx5_mcast_coll_req_t *req)
 {
     ucc_tl_mlx5_mcast_coll_comm_t *comm = req->comm;
     ucc_tl_mlx5_mcast_reg_t       *reg  = NULL;
     ucc_status_t                   status;
 
     ucc_assert(req->ag_counter == comm->allgather_comm.under_progress_counter);
-
     if (comm->one_sided.reliability_enabled && !comm->one_sided.reliability_ready) {
-        /* initialize the structures needed by reliablity protocol */ 
+        /* initialize the structures needed by reliability protocol */
         memset(comm->one_sided.recvd_pkts_tracker, 0, comm->commsize * sizeof(uint32_t));
         memset(comm->one_sided.remote_slot_info, ONE_SIDED_INVALID, comm->commsize * sizeof(uint32_t));
         /* local slots state */
         comm->one_sided.slots_state = ONE_SIDED_INVALID;
-
         if (ONE_SIDED_SYNCHRONOUS_PROTO == req->one_sided_reliability_scheme) {
             /* do nonblocking allgather over remote addresses/keys */
             if (!req->rreg) {
@@ -114,14 +112,12 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reset_reliablity(ucc_tl_mlx5_mcast_
                req->rreg = reg;
                req->mr   = reg->mr;
             }
-
             comm->one_sided.sendbuf_memkey_list[comm->rank].rkey        = req->mr->rkey;
             comm->one_sided.sendbuf_memkey_list[comm->rank].remote_addr = (uint64_t)req->ptr;
-
-            tl_trace(comm->lib, "Allgather over sendbuf addresses/rkey: address %p rkey %d",
+            tl_trace(comm->lib, "allgather over sendbuf addresses/rkey: address %p rkey %d",
                      req->ptr, req->mr->rkey);
-
-            status = comm->service_coll.allgather_post(comm->p2p_ctx, NULL /* in-place */,
+            status = comm->service_coll.allgather_post(comm->p2p_ctx,
+                                                       &(comm->one_sided.sendbuf_memkey_list[comm->rank]),
                                                        comm->one_sided.sendbuf_memkey_list,
                                                        sizeof(ucc_tl_mlx5_mcast_slot_mem_info_t),
                                                        &req->allgather_rkeys_req);
@@ -130,11 +126,9 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_reset_reliablity(ucc_tl_mlx5_mcast_
                 return status;
             }
         }
-
         memset(comm->pending_recv_per_qp, 0, sizeof(int) * MAX_GROUP_COUNT);
         comm->one_sided.reliability_ready = 1;
     }
-
     return UCC_OK;
 }
 
@@ -154,7 +148,7 @@ static inline void ucc_tl_mlx5_mcast_init_async_reliability_slots(ucc_tl_mlx5_mc
                           (req->ag_counter % ONE_SIDED_SLOTS_COUNT)
                           * comm->one_sided.slot_size);
     
-        /* both user buffer and reliablity slots are on host */
+        /* both user buffer and reliability slots are on host */
         memcpy(PTR_OFFSET(dest, ONE_SIDED_SLOTS_INFO_SIZE), req->ptr, req->length);
         memcpy(dest, &req->ag_counter, ONE_SIDED_SLOTS_INFO_SIZE);
 
@@ -162,16 +156,18 @@ static inline void ucc_tl_mlx5_mcast_init_async_reliability_slots(ucc_tl_mlx5_mc
     }
 }
 
-static inline ucc_status_t ucc_tl_mlx5_mcast_do_staging_based_allgather(ucc_tl_mlx5_mcast_coll_req_t *req)
+static inline ucc_status_t ucc_tl_mlx5_mcast_do_staging_based_allgather(void *req_handle)
 {
+
     ucc_status_t                   status = UCC_OK;
+    ucc_tl_mlx5_mcast_coll_req_t  *req    = (ucc_tl_mlx5_mcast_coll_req_t *)req_handle;
     ucc_tl_mlx5_mcast_coll_comm_t *comm   = req->comm;
     const int                      zcopy  = req->proto != MCAST_PROTO_EAGER;
     int                            num_recvd;
 
     ucc_assert(req->to_recv >= 0 && req->to_send >= 0);
 
-    status = ucc_tl_mlx5_mcast_reset_reliablity(req);
+    status = ucc_tl_mlx5_mcast_reliability_ready(req);
     if (UCC_OK != status) {
         return status;
     }
@@ -202,14 +198,15 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_staging_based_allgather(ucc_tl_m
     }
 
     if (comm->pending_send) {
-        if (ucc_tl_mlx5_mcast_poll_send(comm) < 0) {
-            return UCC_ERR_NO_MESSAGE;
+        status = ucc_tl_mlx5_mcast_poll_send(comm);
+        if (status != UCC_OK) {
+            return status;
         }
     }
 
     if (comm->one_sided.reliability_enabled) {
         status = ucc_tl_mlx5_mcast_check_collective(comm, req);
-        if (UCC_INPROGRESS != status && UCC_OK != status) {
+        if (status < 0) {
             return status;
         }
     }
@@ -264,8 +261,8 @@ void ucc_tl_mlx5_mcast_allgather_progress(ucc_coll_task_t *coll_task)
         return;
     }
 
-    coll_task->status = ucc_tl_mlx5_mcast_do_staging_based_allgather(req);
-    if (UCC_OK != coll_task->status) {
+    coll_task->status = (req->progress)(req);
+    if (coll_task->status < 0) {
         tl_error(UCC_TASK_LIB(task), "progress mcast allgather failed:%d", coll_task->status);
     }
 }
@@ -309,7 +306,6 @@ ucc_tl_mlx5_mcast_validate_zero_copy_allgather_params(ucc_tl_mlx5_mcast_coll_com
 
     return UCC_OK;
 }
-
 
 /*
  * at each stage half of the mcast groups are ready for receiving mcast
@@ -433,6 +429,195 @@ ucc_tl_mlx5_mcast_prepare_zero_copy_allgather(ucc_tl_mlx5_mcast_coll_comm_t *com
     return UCC_OK;
 }
 
+static inline ucc_status_t
+ucc_tl_mlx5_mcast_check_zcopy_collective(ucc_tl_mlx5_mcast_coll_comm_t *comm,
+                                         ucc_tl_mlx5_mcast_coll_req_t  *req)
+{
+    ucc_tl_mlx5_mcast_pipelined_ag_schedule_t *sched = req->ag_schedule;
+    ucc_status_t                               status;
+
+    if (!sched[req->step].prepost_buf_op_done || !sched[req->step].multicast_op_done) {
+        // it is not yet the time to start the reliability protocol
+        return UCC_INPROGRESS;
+    }
+    if (comm->one_sided.pending_reads) {
+        return ucc_tl_mlx5_mcast_progress_one_sided_communication(comm, req);
+    }
+    if (req->allgather_rkeys_req) {
+        status = comm->service_coll.coll_test(req->allgather_rkeys_req);
+        if (status != UCC_OK) {
+            return status;
+        }
+        req->allgather_rkeys_req = NULL;
+        tl_trace(comm->lib, "allgather for remote_addr/rkey is completed");
+    }
+
+    if (sched[req->step].num_recvd == sched[req->step].to_recv) {
+        /* check for out of order packets, if any root sent a out of order
+         * packet to us in the current step, go ahead and issue RDMA READ
+         * from that root for this specific piece of send buffer */
+        return ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(comm, req, NULL);
+    } else if (!comm->timer) {
+        if (comm->stalled < DROP_THRESHOLD) {
+            comm->stalled++;
+        } else {
+            // kick the timer
+            comm->timer   = ucc_tl_mlx5_mcast_get_timer();
+            comm->stalled = 0;
+        }
+    } else {
+        if (comm->stalled < DROP_THRESHOLD) {
+            comm->stalled++;
+        } else {
+            // calcuate the current time and check if it's time to do RDMA READ
+            if (ucc_tl_mlx5_mcast_get_timer() - comm->timer >=
+                    comm->ctx->params.timeout) {
+                tl_debug(comm->lib, "[REL] time out");
+                return ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(comm, req, NULL);
+            } else {
+                comm->stalled = 0;
+            }
+        }
+    }
+    return UCC_INPROGRESS;
+}
+
+static inline ucc_status_t
+ucc_tl_mlx5_mcast_do_zero_copy_pipelined_allgather(void *req_handle)
+{
+    ucc_tl_mlx5_mcast_coll_req_t              *req   = (ucc_tl_mlx5_mcast_coll_req_t *)req_handle;
+    ucc_tl_mlx5_mcast_coll_comm_t             *comm  = req->comm;
+    const int                                  zcopy = req->proto != MCAST_PROTO_EAGER;
+    ucc_tl_mlx5_mcast_pipelined_ag_schedule_t *sched = req->ag_schedule;
+    int                                        num_recvd, root, to_send_left,
+                                               j, group_id, num_packets, count;
+    size_t                                     offset, offset_left;
+    ucc_status_t                               status;
+
+    status = ucc_tl_mlx5_mcast_reliability_ready(req);
+    if (UCC_OK != status) {
+        return status;
+    }
+
+    ucc_assert(req->to_recv>=0 && req->to_send >=0);
+    if (req->barrier_req) {
+        status = comm->service_coll.coll_test(req->barrier_req);
+        if (status != UCC_OK) {
+            return status;
+        }
+        tl_trace(comm->lib, "barrier at end of req->step %d is completed", req->step);
+        req->barrier_req = NULL;
+        req->step++;
+        if (comm->one_sided.reliability_enabled) {
+            memset(comm->one_sided.recvd_pkts_tracker, 0, sizeof(int) * comm->commsize);
+        }
+        if (req->step == sched->total_steps) {
+            ucc_assert(!req->to_send && !req->to_recv);
+            return UCC_OK;
+        }
+    }
+
+    ucc_assert(req->step < sched->total_steps);
+    if (!sched[req->step].multicast_op_done) {
+        for (j = 0; j < req->concurrency_level; j++) {
+            root = sched[req->step].multicast_op[j].root;
+            if (comm->rank == root) {
+                /* it's my turn to place mcast packets on wire */
+                group_id     = sched[req->step].multicast_op[j].group_id;
+                to_send_left = sched[req->step].multicast_op[j].to_send_left;
+                offset_left  = sched[req->step].multicast_op[j].offset_left;
+                num_packets  = ucc_min(comm->allgather_comm.max_push_send - comm->pending_send, to_send_left);
+                if (to_send_left &&
+                    (comm->allgather_comm.max_push_send - comm->pending_send) > 0) {
+                    status = ucc_tl_mlx5_mcast_send_collective(comm, req, num_packets,
+                                                               zcopy, UCC_COLL_TYPE_ALLGATHER,
+                                                               group_id, offset_left);
+                    if (UCC_OK != status) {
+                        return status;
+                    }
+                    sched[req->step].multicast_op[j].to_send_left -= num_packets;
+                    sched[req->step].multicast_op[j].offset_left  += (num_packets * comm->max_per_packet);
+                }
+                if (comm->pending_send) {
+                    status = ucc_tl_mlx5_mcast_poll_send(comm);
+                    if (status != UCC_OK) {
+                        return status;
+                    }
+                }
+                if (!sched[req->step].multicast_op[j].to_send_left && !comm->pending_send) {
+                    tl_trace(comm->lib, "done with mcast ops step %d group id %d to_send %d",
+                             req->step, group_id, sched[req->step].to_send);
+                    sched[req->step].multicast_op_done = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!sched[req->step].prepost_buf_op_done) {
+        /* prepost the user buffers for a set of processes */
+        for (j = 0; j < req->concurrency_level; j++) {
+            root     = sched[req->step].prepost_buf_op[j].root;
+            group_id = sched[req->step].prepost_buf_op[j].group_id;
+            count    = sched[req->step].prepost_buf_op[j].count;
+            offset   = sched[req->step].prepost_buf_op[j].offset;
+            status   = ucc_tl_mlx5_mcast_post_user_recv_buffers(comm, req, group_id, root,
+                                                                UCC_COLL_TYPE_ALLGATHER, count,
+                                                                offset);
+            if (UCC_OK != status) {
+                return status;
+            }
+            /* progress the recvd packets in between */
+            if (req->to_recv) {
+                num_recvd = ucc_tl_mlx5_mcast_recv_collective(comm, req,
+                                                              req->to_recv,
+                                                              UCC_COLL_TYPE_ALLGATHER);
+                if (num_recvd < 0) {
+                    tl_error(comm->lib, "a failure happend during cq polling");
+                    status = UCC_ERR_NO_MESSAGE;
+                    return status;
+                }
+                sched[req->step].num_recvd += num_recvd;
+            }
+        }
+        tl_trace(comm->lib, "done with prepost bufs step %d group id %d count %d offset %ld root %d",
+                 req->step, group_id, count, offset, root);
+        sched[req->step].prepost_buf_op_done = 1;
+    }
+    if (req->to_recv) {
+        num_recvd = ucc_tl_mlx5_mcast_recv_collective(comm, req,
+                                                      req->to_recv,
+                                                      UCC_COLL_TYPE_ALLGATHER);
+        if (num_recvd < 0) {
+            tl_error(comm->lib, "a failure happend during cq polling");
+            status = UCC_ERR_NO_MESSAGE;
+            return status;
+        }
+        sched[req->step].num_recvd += num_recvd;
+    }
+
+    if (comm->one_sided.reliability_enabled) {
+        status = ucc_tl_mlx5_mcast_check_zcopy_collective(comm, req);
+        if (status != UCC_OK) {
+            return status;
+        }
+    }
+
+    if (sched[req->step].prepost_buf_op_done &&
+        sched[req->step].multicast_op_done &&
+        sched[req->step].num_recvd == sched[req->step].to_recv) {
+        // current step done
+        ucc_assert(sched[req->step].prepost_buf_op_done && sched[req->step].multicast_op_done);
+        ucc_assert(req->barrier_req == NULL);
+        status = comm->service_coll.barrier_post(comm->p2p_ctx, &req->barrier_req);
+        if (status != UCC_OK) {
+            return status;
+        }
+        tl_trace(comm->lib, "init global sync req->step %d", req->step);
+    }
+    return UCC_INPROGRESS;
+}
+
 ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
 {
     ucc_coll_task_t               *coll_task =  &(task->super);
@@ -519,12 +704,14 @@ ucc_status_t ucc_tl_mlx5_mcast_allgather_init(ucc_tl_mlx5_task_t *task)
     req->ag_counter = comm->allgather_comm.coll_counter;
     req->to_send    = req->num_packets;
     req->to_recv    = comm->commsize * req->num_packets;
+    req->progress   = ucc_tl_mlx5_mcast_do_staging_based_allgather;
 
     if (comm->allgather_comm.truly_zero_copy_allgather_enabled) {
         status = ucc_tl_mlx5_mcast_prepare_zero_copy_allgather(comm, req);
         if (UCC_OK != status) {
             goto failed;
         }
+        req->progress = ucc_tl_mlx5_mcast_do_zero_copy_pipelined_allgather;
     }
 
     comm->allgather_comm.coll_counter++;
