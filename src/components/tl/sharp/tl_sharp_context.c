@@ -517,7 +517,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_sharp_context_t)
 UCC_CLASS_DEFINE(ucc_tl_sharp_context_t, ucc_tl_context_t);
 
 ucc_status_t ucc_tl_sharp_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                                           ucc_base_ctx_attr_t *attr)
+                                           ucc_base_ctx_attr_t *attr) /* NOLINT */
 {
     ucc_base_ctx_attr_clear(attr);
     attr->topo_required = 1;
@@ -525,20 +525,20 @@ ucc_status_t ucc_tl_sharp_get_context_attr(const ucc_base_context_t *context, /*
 }
 
 ucc_status_t ucc_tl_sharp_mem_map(const ucc_base_context_t *context, int type, /* NOLINT */
-                                  void *address, size_t len, void *memh,
-                                  void *tl_h)
+                                  void *address, size_t len, void *memh, /* NOLINT */
+                                  void *tl_h) /* NOLINT */
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
 
 ucc_status_t ucc_tl_sharp_mem_unmap(const ucc_base_context_t *context, int type, /* NOLINT */
-                                    void *memh)
+                                    void *memh) /* NOLINT */
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
 
 ucc_status_t ucc_tl_sharp_memh_pack(const ucc_base_context_t *context, /* NOLINT */
-                                    void *memh, void **pack_buffer)
+                                    void *memh, void **pack_buffer) /* NOLINT */
 {
     return UCC_ERR_NOT_SUPPORTED;
 }

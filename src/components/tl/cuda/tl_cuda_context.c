@@ -77,19 +77,19 @@ free_mpool:
 }
 
 ucc_status_t ucc_tl_cuda_mem_map(const ucc_base_context_t *context, /* NOLINT */
-                                 void *address, size_t len, void *memh)
+                                 void *address, size_t len, void *memh) /* NOLINT */
 {
     return UCC_ERR_NOT_IMPLEMENTED;
 }
 
 ucc_status_t ucc_tl_cuda_mem_unmap(const ucc_base_context_t *context, /* NOLINT */
-                                   void                     *memh)
+                                   void                     *memh) /* NOLINT */
 {
     return UCC_ERR_NOT_IMPLEMENTED;
 }
 
 ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context, /* NOLINT */
-                                   void *memh, void **pack_buffer)
+                                   void *memh, void **pack_buffer) /* NOLINT */
 {
     return UCC_ERR_NOT_IMPLEMENTED;
 }

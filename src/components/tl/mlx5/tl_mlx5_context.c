@@ -376,20 +376,20 @@ ucc_status_t ucc_tl_mlx5_context_create_epilog(ucc_base_context_t *context)
 }
 
 ucc_status_t ucc_tl_mlx5_mem_map(const ucc_base_context_t *context, int type, /* NOLINT */
-                                 void *address, size_t len, void *memh,
-                                 void *tl_h)
+                                 void *address, size_t len, void *memh, /* NOLINT */
+                                 void *tl_h) /* NOLINT */
 {
     return UCC_ERR_NOT_IMPLEMENTED;
 }
 
 ucc_status_t ucc_tl_mlx5_mem_unmap(const ucc_base_context_t *context, int type, /* NOLINT */
-                                   void *memh)
+                                   void *memh) /* NOLINT */
 {
     return UCC_ERR_NOT_IMPLEMENTED;
 }
 
 ucc_status_t ucc_tl_mlx5_memh_pack(const ucc_base_context_t *context, /* NOLINT */
-                                   void *memh, void **pack_buffer)
+                                   void *memh, void **pack_buffer) /* NOLINT */
 {
     return UCC_ERR_NOT_IMPLEMENTED;
 }
