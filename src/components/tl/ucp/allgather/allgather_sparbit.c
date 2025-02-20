@@ -131,8 +131,8 @@ ucc_status_t ucc_tl_ucp_allgather_sparbit_start(ucc_coll_task_t *coll_task)
     task->allgather_sparbit.data_expected = 1;
 
     if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-        status = ucc_mc_memcpy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
-                               data_size, rmem, smem);
+        status = allgather_copy(PTR_OFFSET(rbuf, data_size * trank), sbuf,
+                                data_size, rmem, smem, trank, team, task);
         if (ucc_unlikely(UCC_OK != status)) {
             return status;
         }
