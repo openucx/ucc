@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -117,4 +117,6 @@ __attribute__((constructor)) static void cl_hier_iface_init(void)
         ucc_cl_hier_alltoallv_algs;
     ucc_cl_hier.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_BCAST)] =
         ucc_cl_hier_bcast_algs;
+    ucc_cl_hier.super.alg_info[ucc_ilog2(UCC_COLL_TYPE_ALLGATHERV)] =
+        ucc_cl_hier_allgatherv_algs;
 }
