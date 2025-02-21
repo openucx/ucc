@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -79,14 +79,23 @@ typedef struct ucc_tl_ucp_lib_config {
     int                      use_reordering;
 } ucc_tl_ucp_lib_config_t;
 
+typedef enum ucc_tl_ucp_local_copy_type {
+    UCC_TL_UCP_LOCAL_COPY_TYPE_UCP,
+    UCC_TL_UCP_LOCAL_COPY_TYPE_MC,
+    UCC_TL_UCP_LOCAL_COPY_TYPE_EC,
+    UCC_TL_UCP_LOCAL_COPY_TYPE_AUTO,
+    UCC_TL_UCP_LOCAL_COPY_TYPE_LAST
+} ucc_tl_ucp_local_copy_type_t;
+
 typedef struct ucc_tl_ucp_context_config {
-    ucc_tl_context_config_t super;
-    uint32_t                preconnect;
-    uint32_t                n_polls;
-    uint32_t                oob_npolls;
-    uint32_t                pre_reg_mem;
-    uint32_t                service_worker;
-    uint32_t                service_throttling_thresh;
+    ucc_tl_context_config_t      super;
+    uint32_t                     preconnect;
+    uint32_t                     n_polls;
+    uint32_t                     oob_npolls;
+    uint32_t                     pre_reg_mem;
+    uint32_t                     service_worker;
+    uint32_t                     service_throttling_thresh;
+    ucc_tl_ucp_local_copy_type_t local_copy_type;
 } ucc_tl_ucp_context_config_t;
 
 typedef ucc_tl_ucp_lib_config_t ucc_tl_ucp_team_config_t;
@@ -116,6 +125,20 @@ typedef struct ucc_tl_ucp_worker {
     ucp_ep_h *        eps;
 } ucc_tl_ucp_worker_t;
 
+typedef struct ucc_tl_ucp_task ucc_tl_ucp_task_t;
+typedef struct ucc_tl_ucp_context ucc_tl_ucp_context_t;
+
+typedef ucc_status_t (*ucc_tl_ucp_copy_post_fn_t)(void *dst,
+                                                  ucc_memory_type_t dst_mtype,
+                                                  void *src,
+                                                  ucc_memory_type_t src_mtype,
+                                                  size_t size,
+                                                  ucc_tl_ucp_task_t *coll_task,
+                                                  void **copy_task);
+typedef ucc_status_t (*ucc_tl_ucp_copy_test_fn_t)(ucc_tl_ucp_context_t *ctx,
+                                                  void *copy_task);
+typedef ucc_status_t (*ucc_tl_ucp_copy_finalize_fn_t)(void *copy_task);
+
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t            super;
     ucc_tl_ucp_context_config_t cfg;
@@ -128,11 +151,15 @@ typedef struct ucc_tl_ucp_context {
     uint64_t                    n_rinfo_segs;
     uint64_t                    ucp_memory_types;
     int                         topo_required;
+    struct {
+        ucc_tl_ucp_copy_post_fn_t     post;
+        ucc_tl_ucp_copy_test_fn_t     test;
+        ucc_tl_ucp_copy_finalize_fn_t finalize;
+    } copy;
 } ucc_tl_ucp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
 
-typedef struct ucc_tl_ucp_task ucc_tl_ucp_task_t;
 typedef struct ucc_tl_ucp_team {
     ucc_tl_team_t              super;
     ucc_status_t               status;

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 
 if TL_UCP_ENABLED
@@ -116,6 +116,7 @@ sources =                 \
 	tl_ucp_service_coll.c \
 	tl_ucp_dpu_offload.h  \
 	tl_ucp_dpu_offload.c  \
+	tl_ucp_copy.c         \
 	$(allgather)          \
 	$(allgatherv)         \
 	$(alltoall)           \
