@@ -470,7 +470,8 @@ out:
         team->rank == 0) {
         ucc_info("===== COLL_SCORE_MAP (team_id %d, size %u) =====",
                  team->id, team->size);
-        ucc_coll_score_map_print_info(team->score_map);
+        ucc_coll_score_map_print_info(team->score_map,
+                                      ucc_global_config.log_component.log_level);
         ucc_info("================================================");
     }
     /* TODO: add team/coll selection and check if some teams are never
