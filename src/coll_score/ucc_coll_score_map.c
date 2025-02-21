@@ -213,11 +213,10 @@ void ucc_coll_score_map_print_info(const ucc_score_map_t *map)
                                  sizeof(score_str));
 #if ENABLE_DEBUG == 1
                 // If debug, get the name of the init function through dladdr
-                const char *fn_ptr_str = get_fn_name(range->super.init);
                 STR_APPEND(coll_str, left, 256, "{%s}:%s:%s=%s ",
                            range_str,
                            range->super.team->context->lib->log_component.name,
-                           score_str, fn_ptr_str);
+                           score_str, get_fn_name(range->super.init));
 #else
                 STR_APPEND(coll_str, left, 256, "{%s}:%s:%s ",
                            range_str,
