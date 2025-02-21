@@ -9,14 +9,15 @@ SUBDIRS = .
 include makefile.coll_plugins.am
 endif
 
-allgather =                        \
-	allgather/allgather.h          \
-	allgather/allgather.c          \
-	allgather/allgather_ring.c     \
-	allgather/allgather_neighbor.c \
-	allgather/allgather_bruck.c    \
-	allgather/allgather_sparbit.c  \
-	allgather/allgather_knomial.c
+allgather =                            \
+	allgather/allgather.h              \
+	allgather/allgather.c              \
+	allgather/allgather_ring.c         \
+	allgather/allgather_neighbor.c     \
+	allgather/allgather_bruck.c        \
+	allgather/allgather_sparbit.c      \
+	allgather/allgather_knomial.c      \
+	allgather/allgather_linear_xgvmi.c
 
 allgatherv =                        \
 	allgatherv/allgatherv.h         \
@@ -24,11 +25,12 @@ allgatherv =                        \
 	allgatherv/allgatherv_ring.c    \
 	allgatherv/allgatherv_knomial.c
 
-alltoall =                       \
-	alltoall/alltoall.h          \
-	alltoall/alltoall.c          \
-	alltoall/alltoall_onesided.c \
-	alltoall/alltoall_pairwise.c \
+alltoall =                           \
+	alltoall/alltoall.h              \
+	alltoall/alltoall.c              \
+	alltoall/alltoall_onesided.c     \
+	alltoall/alltoall_pairwise.c     \
+	alltoall/alltoall_linear_xgvmi.c \
 	alltoall/alltoall_bruck.c
 
 alltoallv =                        \

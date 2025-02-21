@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -14,6 +14,7 @@ enum {
     UCC_TL_UCP_ALLTOALL_ALG_PAIRWISE,
     UCC_TL_UCP_ALLTOALL_ALG_BRUCK,
     UCC_TL_UCP_ALLTOALL_ALG_ONESIDED,
+    UCC_TL_UCP_ALLTOALL_ALG_LINEAR_XGVMI,
     UCC_TL_UCP_ALLTOALL_ALG_LAST
 };
 
@@ -41,6 +42,9 @@ ucc_status_t ucc_tl_ucp_alltoall_bruck_init(ucc_base_coll_args_t *coll_args,
 ucc_status_t ucc_tl_ucp_alltoall_onesided_init(ucc_base_coll_args_t *coll_args,
                                                ucc_base_team_t *team,
                                                ucc_coll_task_t **task_h);
+
+/* XGVMI */
+void ucc_tl_ucp_dpu_alltoall_linear_xgvmi_rdma_progress(ucc_coll_task_t *coll_task);
 
 #define ALLTOALL_CHECK_INPLACE(_args, _team)                                   \
     do {                                                                       \
