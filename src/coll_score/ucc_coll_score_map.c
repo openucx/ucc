@@ -9,6 +9,10 @@
 #include "utils/ucc_string.h"
 #include "schedule/ucc_schedule.h"
 
+#if ENABLE_DEBUG == 1
+#include <dlfcn.h>
+#endif
+
 typedef struct ucc_score_map {
     ucc_coll_score_t *score;
     /* Size, rank of the process in the base_team associated with that
@@ -157,6 +161,20 @@ ucc_status_t ucc_coll_init(ucc_score_map_t      *map,
     }                                                                \
 }
 
+#if ENABLE_DEBUG == 1
+static const char *get_fn_name(ucc_base_coll_init_fn_t init_fn)
+{
+    int status;
+    Dl_info info;
+    const char *fn_ptr_str = "?";
+    status = dladdr(init_fn, &info);
+    if (status && info.dli_sname != NULL) {
+        fn_ptr_str = info.dli_sname;
+    }
+    return fn_ptr_str;
+}
+#endif
+
 void ucc_coll_score_map_print_info(const ucc_score_map_t *map)
 {
     size_t           left;
@@ -193,10 +211,18 @@ void ucc_coll_score_map_print_info(const ucc_score_map_t *map)
                                        sizeof(range_str));
                 ucc_score_to_str(range->super.score, score_str,
                                  sizeof(score_str));
+#if ENABLE_DEBUG == 1
+                // If debug, get the name of the init function through dladdr
+                STR_APPEND(coll_str, left, 256, "{%s}:%s:%s=%s ",
+                           range_str,
+                           range->super.team->context->lib->log_component.name,
+                           score_str, get_fn_name(range->super.init));
+#else
                 STR_APPEND(coll_str, left, 256, "{%s}:%s:%s ",
                            range_str,
                            range->super.team->context->lib->log_component.name,
                            score_str);
+#endif
             }
             STR_APPEND(coll_str, left, 4, "\n");
         }
