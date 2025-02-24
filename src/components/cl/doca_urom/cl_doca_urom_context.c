@@ -558,8 +558,7 @@ ucc_cl_doca_urom_get_context_attr(const ucc_base_context_t *context,
 }
 
 ucc_status_t ucc_cl_doca_urom_mem_map(const ucc_base_context_t *context,
-                                      int type, void *address, size_t len,
-                                      void *memh, void *tl_h)
+                                      int type, void *memh, void *tl_h)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
@@ -571,7 +570,7 @@ ucc_status_t ucc_cl_doca_urom_mem_unmap(const ucc_base_context_t *context,
 }
 
 ucc_status_t ucc_cl_doca_urom_memh_pack(const ucc_base_context_t *context,
-                                        void *memh, void **packed_buffer)
+                                        int type, void *memh, void **packed_buffer)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }

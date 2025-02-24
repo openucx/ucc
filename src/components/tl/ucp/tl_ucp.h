@@ -260,6 +260,15 @@ extern ucc_config_field_t ucc_tl_ucp_lib_config_table[];
 #define UCC_TL_UCP_REMOTE_RKEY(_ctx, _rank, _seg)                              \
     ((_ctx)->rkeys[_rank * _ctx->n_rinfo_segs + _seg])
 
+/*
+ * For context, the data order of the MEMH Headers / Packed Headers
+ *
+ * MEMH headers for each TL:
+ * TL NAME (8 bytes) | packed size | packed TL
+ *
+ * Packed TL headers:
+ * packed_key_size | packed_memh_size | packed_key | packed_memh
+ */
 #define UCC_TL_UCP_MEMH_TL_HEADERS        2
 
 #define UCC_TL_UCP_MEMH_TL_PACKED_HEADERS 2
