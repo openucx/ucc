@@ -1142,7 +1142,7 @@ ucc_status_t ucc_mem_map_import(ucc_context_h         context,
     ucc_config_names_array_t *tls    = &ctx->all_tls;
     ucc_mem_map_type_t        type   = (flags == UCC_MEM_MAP_IMPORT)
                                            ? UCC_MEM_MAP_TYPE_GLOBAL
-                                           : UCC_MEM_MAP_TYPE_DPU_IMPORT;
+                                           : UCC_MEM_MAP_TYPE_OFFLOAD_IMPORT;
     int                       i;
     ucc_mem_map_memh_t       *local_memh;
     ucc_tl_lib_t             *tl_lib;
@@ -1213,7 +1213,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         type = UCC_MEM_MAP_TYPE_LOCAL;
     } else {
         local_memh = *memh;
-        type = UCC_MEM_MAP_TYPE_DPU_EXPORT;
+        type = UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT;
     }
     packed_buffers =
         (void **)ucc_calloc(ctx->n_tl_ctx, sizeof(void *), "packed buffers");

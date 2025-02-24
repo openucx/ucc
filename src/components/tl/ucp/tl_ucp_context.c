@@ -563,8 +563,6 @@ ucc_status_t ucc_tl_ucp_mem_map_memhbuf(ucc_tl_ucp_context_t *ctx,
     *mh = NULL;
     /* unpack here */
     packed_memh = UCC_TL_UCP_MEMH_TL_PACKED_MEMH(pack_buffer);
-//    size_t *key_size  = (size_t *)PTR_OFFSET(pack_buffer, sizeof(size_t) * 2);
-//   void *packed_memh = PTR_OFFSET(pack_buffer, sizeof(size_t) * 4 + *key_size);
 
     mmap_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_EXPORTED_MEMH_BUFFER;
     mmap_params.exported_memh_buffer = packed_memh;
@@ -647,7 +645,7 @@ ucc_status_t ucc_tl_ucp_mem_map_export(ucc_tl_ucp_context_t *ctx, void *address,
     return ucc_status;
 }
 
-ucc_status_t ucc_tl_ucp_mem_map_dpu_import(ucc_tl_ucp_context_t *ctx,
+ucc_status_t ucc_tl_ucp_mem_map_offload_import(ucc_tl_ucp_context_t *ctx,
                                            void *address, size_t len,
                                            ucc_tl_ucp_memh_data_t *m_data,
                                            ucc_mem_map_memh_t     *l_memh,
@@ -694,7 +692,7 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, int type,
 
     /* technically, only need to do this on import */
     if (type == UCC_MEM_MAP_TYPE_GLOBAL ||
-        type == UCC_MEM_MAP_TYPE_DPU_IMPORT || !m_data) {
+        type == UCC_MEM_MAP_TYPE_OFFLOAD_IMPORT || !m_data) {
         /* either we are importing or m_data is null */
         m_data = ucc_calloc(1, sizeof(ucc_tl_ucp_memh_data_t), "tl data");
         if (!m_data) {
@@ -704,13 +702,14 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, int type,
         p_memh->tl_data = m_data;
     }
 
-    if (type == UCC_MEM_MAP_TYPE_LOCAL || type == UCC_MEM_MAP_TYPE_DPU_EXPORT) {
+    if (type == UCC_MEM_MAP_TYPE_LOCAL || type == UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT) {
         ucc_status = ucc_tl_ucp_mem_map_export(ctx, address, len, type, m_data);
         if (UCC_OK != ucc_status) {
             tl_error(ctx->super.super.lib, "failed to export memory handles");
         }
-    } else if (type == UCC_MEM_MAP_TYPE_DPU_IMPORT) {
-        ucc_status = ucc_tl_ucp_mem_map_dpu_import(ctx, address, len, m_data, l_memh, tl_h);
+    } else if (type == UCC_MEM_MAP_TYPE_OFFLOAD_IMPORT) {
+        ucc_status = ucc_tl_ucp_mem_map_offload_import(ctx, address, len,
+                                                       m_data, l_memh, tl_h);
         if (UCC_OK != ucc_status) {
             tl_error(ctx->super.super.lib, "failed to import memory handle");
         }
@@ -736,14 +735,14 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, int type,
 
     data = (ucc_tl_ucp_memh_data_t *)p_memh->tl_data;
 
-    if (type == UCC_MEM_MAP_TYPE_LOCAL || type == UCC_MEM_MAP_TYPE_DPU_EXPORT) {
+    if (type == UCC_MEM_MAP_TYPE_LOCAL || type == UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT) {
         status = ucp_mem_unmap(ctx->worker.ucp_context, data->rinfo.mem_h);
         if (status != UCS_OK) {
             tl_error(ctx->super.super.lib,
                      "ucp_mem_unmap failed with error code %d", status);
             return ucs_status_to_ucc_status(status);
         }
-    } else if (type == UCC_MEM_MAP_TYPE_GLOBAL || type == UCC_MEM_MAP_TYPE_DPU_IMPORT) {
+    } else if (type == UCC_MEM_MAP_TYPE_GLOBAL || type == UCC_MEM_MAP_TYPE_OFFLOAD_IMPORT) {
         // need to free rkeys (data->rkey) , packed memh (data->packed_memh)
         if (data->packed_memh) {
             ucc_free(data->packed_memh);
