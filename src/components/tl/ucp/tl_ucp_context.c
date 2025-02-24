@@ -164,6 +164,21 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     prefix[strlen(prefix) - 1] = '\0';
     UCP_CHECK(ucp_config_read(prefix, NULL, &ucp_config),
               "failed to read ucp configuration", err_cfg_read, self);
+    if (!tl_ucp_config->memtype_copy_enable) {
+        UCP_CHECK(ucp_config_modify(ucp_config, "MEMTYPE_COPY_ENABLE", "no"),
+                  "failed to set memtype copy enable option for UCX",
+                  err_cfg, self);
+        if (tl_ucp_config->local_copy_type == UCC_TL_UCP_LOCAL_COPY_TYPE_MC) {
+            tl_info(self->super.super.lib, "memtype copy is disabled in UCX, "
+                    "using local copy type MC might lead to deadlocks in CUDA "
+                    "applications");
+        } else if (tl_ucp_config->local_copy_type == UCC_TL_UCP_LOCAL_COPY_TYPE_EC) {
+            tl_info(self->super.super.lib, "memtype copy is disabled in UCX, "
+                    "using local copy type EC might lead to deadlocks in CUDA "
+                    "applications when CUDA kernel depends on collective "
+                    "communication and stream is not provided to the collective");
+        }
+    }
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK | UCP_PARAM_FIELD_NAME;

@@ -254,11 +254,17 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_context_config_t, service_throttling_thresh),
      UCC_CONFIG_TYPE_UINT},
 
-     {"LOCAL_COPY_TYPE", "auto",
-      "Determines what component is responsible for doing local copy "
-      "during collective execution",
-      ucc_offsetof(ucc_tl_ucp_context_config_t, local_copy_type),
-      UCC_CONFIG_TYPE_ENUM(ucc_tl_ucp_local_copy_names)},
+    {"LOCAL_COPY_TYPE", "auto",
+     "Determines what component is responsible for doing local copy "
+     "during collective execution",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, local_copy_type),
+     UCC_CONFIG_TYPE_ENUM(ucc_tl_ucp_local_copy_names)},
+
+    {"MEMTYPE_COPY_ENABLE", "y",
+     "Allows memory type copies. This option influences protocol selection in UCX. "
+     "See https://github.com/openucx/ucx/pull/10490 for more details.",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, memtype_copy_enable),
+     UCC_CONFIG_TYPE_BOOL},
 
     {NULL}};
 
