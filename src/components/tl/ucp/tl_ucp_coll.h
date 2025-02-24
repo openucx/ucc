@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -178,7 +178,7 @@ typedef struct ucc_tl_ucp_task {
             int                     phase;
             ucc_knomial_pattern_t   p;
             void                   *sbuf;
-            ucc_ee_executor_task_t *etask;
+            void                   *copy_task;
             ucc_rank_t              recv_dist;
         } allgather_kn;
         struct {
