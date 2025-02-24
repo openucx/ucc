@@ -1807,7 +1807,7 @@ enum ucc_coll_args_field {
     UCC_COLL_ARGS_FIELD_GLOBAL_WORK_BUFFER              = UCC_BIT(3),
     UCC_COLL_ARGS_FIELD_ACTIVE_SET                      = UCC_BIT(4),
     UCC_COLL_ARGS_FIELD_MEM_MAP_SRC_MEMH                = UCC_BIT(5),
-    UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH                = UCC_BIT(5),
+    UCC_COLL_ARGS_FIELD_MEM_MAP_DST_MEMH                = UCC_BIT(6),
 };
 
 typedef void *ucc_mem_map_mem_h;
@@ -2255,13 +2255,19 @@ ucc_status_t ucc_collective_triggered_post(ucc_ee_h ee, ucc_ev_t *ee_event);
  * @ingroup UCC_DATATYPE
  */
 typedef enum {
-    UCC_MEM_MAP_EXPORT = 0, /*!< Indicate ucc_mem_map() should export
-                                 memory handles from TLs used by context */
-    UCC_MEM_MAP_IMPORT = 1,  /*!< Indicate ucc_mem_map() should import
-                                memory handles from user memory handle */
-    UCC_MEM_MAP_EXPORT_OFFLOAD = 2,
-    UCC_MEM_MAP_IMPORT_OFFLOAD = 3
-} ucc_mem_map_flags_t;
+    UCC_MEM_MAP_EXPORT         = 0, /*!< Indicate ucc_mem_map() should export
+                                         memory handles from TLs used by
+                                         context */
+    UCC_MEM_MAP_IMPORT         = 1,  /*!< Indicate ucc_mem_map() should import
+                                          memory handles from user memory handle */
+    UCC_MEM_MAP_EXPORT_OFFLOAD = 2, /*!< Indicate ucc_mem_map() should
+                                         export memory handles from TLs used
+                                         by a context on an offloaded
+                                         device */
+    UCC_MEM_MAP_IMPORT_OFFLOAD = 3 /*!< Indicate ucc_mem_map() should import
+                                        memory handles from a host's memory
+                                        handle to an offloaded device */
+} ucc_mem_map_mode_t;
 
 /**
  * @ingroup UCC_CONTEXT
@@ -2286,7 +2292,7 @@ typedef enum {
  * @return Error code as defined by ucc_status_t.
  */
 
-ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_flags_t flags,
+ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_mode_t flags,
                          ucc_mem_map_params_t *params, size_t *memh_size,
                          ucc_mem_map_mem_h *memh);
 

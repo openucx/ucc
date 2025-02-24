@@ -64,7 +64,7 @@ ucc_status_t ucc_tl_self_mem_unmap(const ucc_base_context_t *context, int type, 
 }
 
 ucc_status_t ucc_tl_self_memh_pack(const ucc_base_context_t *context, /* NOLINT */
-                                   void *memh, void **pack_buffer) /* NOLINT */
+                                   int type, void *memh, void **pack_buffer) /* NOLINT */
 {
     return UCC_ERR_NOT_SUPPORTED;
 }
