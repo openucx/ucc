@@ -33,25 +33,51 @@ ucc_status_t ucc_tl_ucp_alltoallv_onesided_start(ucc_coll_task_t *ctask)
 
     /* perform a put to each member peer using the peer's index in the
      * destination displacement. */
-    for (peer = (grank + 1) % gsize; task->onesided.put_posted < gsize;
-         peer = (peer + 1) % gsize) {
-        sd_disp =
-            ucc_coll_args_get_displacement(&TASK_ARGS(task), s_disp, peer) *
-            sdt_size;
-        dd_disp =
-            ucc_coll_args_get_displacement(&TASK_ARGS(task), d_disp, peer) *
-            rdt_size;
-        data_size =
-            ucc_coll_args_get_count(&TASK_ARGS(task),
-                                    TASK_ARGS(task).src.info_v.counts, peer) *
-            sdt_size;
+    if (ucc_likely(!(src_memh && dst_memh))) {
+        for (peer = (grank + 1) % gsize; task->onesided.put_posted < gsize;
+             peer = (peer + 1) % gsize) {
+            sd_disp =
+                ucc_coll_args_get_displacement(&TASK_ARGS(task), s_disp, peer) *
+                sdt_size;
+            dd_disp =
+                ucc_coll_args_get_displacement(&TASK_ARGS(task), d_disp, peer) *
+                rdt_size;
+            data_size =
+                ucc_coll_args_get_count(
+                    &TASK_ARGS(task), TASK_ARGS(task).src.info_v.counts, peer) *
+                sdt_size;
 
-        UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, sd_disp),
-                                        PTR_OFFSET(dest, dd_disp),
-                                        data_size, peer, *src_memh,
-                                        dst_memh[peer], team, task),
-                      task, out);
-        UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer, *src_memh, dst_memh[peer], team), task, out);
+            UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, sd_disp),
+                                            PTR_OFFSET(dest, dd_disp),
+                                            data_size, peer, NULL, NULL, team,
+                                            task),
+                          task, out);
+            UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer, NULL, NULL, team),
+                          task, out);
+        }
+    } else {
+        for (peer = (grank + 1) % gsize; task->onesided.put_posted < gsize;
+             peer = (peer + 1) % gsize) {
+            sd_disp =
+                ucc_coll_args_get_displacement(&TASK_ARGS(task), s_disp, peer) *
+                sdt_size;
+            dd_disp =
+                ucc_coll_args_get_displacement(&TASK_ARGS(task), d_disp, peer) *
+                rdt_size;
+            data_size =
+                ucc_coll_args_get_count(
+                    &TASK_ARGS(task), TASK_ARGS(task).src.info_v.counts, peer) *
+                sdt_size;
+
+            UCPCHECK_GOTO(ucc_tl_ucp_put_nb(PTR_OFFSET(src, sd_disp),
+                                            PTR_OFFSET(dest, dd_disp),
+                                            data_size, peer, *src_memh,
+                                            dst_memh[peer], team, task),
+                          task, out);
+            UCPCHECK_GOTO(ucc_tl_ucp_atomic_inc(pSync, peer, *src_memh,
+                                                dst_memh[peer], team),
+                          task, out);
+        }
     }
     return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
 out:
