@@ -517,7 +517,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_sharp_context_t)
 UCC_CLASS_DEFINE(ucc_tl_sharp_context_t, ucc_tl_context_t);
 
 ucc_status_t ucc_tl_sharp_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
-                                           ucc_base_ctx_attr_t *attr) /* NOLINT */
+                                           ucc_base_ctx_attr_t *attr)
 {
     ucc_base_ctx_attr_clear(attr);
     attr->topo_required = 1;
