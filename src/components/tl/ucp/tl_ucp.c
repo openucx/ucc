@@ -136,9 +136,9 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatter_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ALLGATHER_KN_RADIX", "4", "Radix of the knomial allgather algorithm",
+    {"ALLGATHER_KN_RADIX", "auto", "Radix of the knomial allgather algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_kn_radix),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_UINT_RANGED},
 
     {"BCAST_KN_RADIX", "4", "Radix of the recursive-knomial bcast algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),

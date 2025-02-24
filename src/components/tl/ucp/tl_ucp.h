@@ -54,7 +54,7 @@ typedef struct ucc_tl_ucp_lib_config {
     ucc_mrange_uint_t        allreduce_kn_radix;
     ucc_mrange_uint_t        allreduce_sra_kn_radix;
     uint32_t                 reduce_scatter_kn_radix;
-    uint32_t                 allgather_kn_radix;
+    ucc_mrange_uint_t        allgather_kn_radix;
     uint32_t                 bcast_kn_radix;
     ucc_mrange_uint_t        bcast_sag_kn_radix;
     uint32_t                 reduce_kn_radix;
@@ -145,7 +145,8 @@ typedef struct ucc_tl_ucp_team {
     const char *               tuning_str;
     ucc_topo_t                *topo;
     ucc_ep_map_t               ctx_map;
-    ucc_rank_t                 opt_radix;
+    ucc_rank_t                 opt_radix; /* generic opt radix */
+    ucc_rank_t                 opt_radix_host; /* host specific opt radix */
 } ucc_tl_ucp_team_t;
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
