@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -245,6 +245,12 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      "calls to service worker progress function",
      ucc_offsetof(ucc_tl_ucp_context_config_t, service_throttling_thresh),
      UCC_CONFIG_TYPE_UINT},
+
+    {"MEMTYPE_AVOID_COPY", "n",
+     "Avoid memory type copies when activated.",
+     ucc_offsetof(ucc_tl_ucp_context_config_t, avoid_copy_mem_types),
+     UCC_CONFIG_TYPE_BOOL,
+    },
 
     {NULL}};
 
