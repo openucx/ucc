@@ -106,7 +106,7 @@ ucc_status_t ucc_cl_hier_mem_unmap(const ucc_base_context_t *context, int type, 
 }
 
 ucc_status_t ucc_cl_hier_memh_pack(const ucc_base_context_t *context, /* NOLINT */
-                                   void *memh, void **packed_buffer) /* NOLINT */
+                                   int type, void *memh, void **packed_buffer) /* NOLINT */
 {
     return UCC_ERR_NOT_SUPPORTED;
 }

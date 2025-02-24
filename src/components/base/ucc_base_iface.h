@@ -124,9 +124,9 @@ typedef struct ucc_base_context_iface {
     ucc_status_t (*get_attr)(const ucc_base_context_t *context,
                              ucc_base_ctx_attr_t      *attr);
     ucc_status_t (*mem_map)(const ucc_base_context_t *context, int type,
-                            void *address, size_t len, void *memh, void *tl_h);
+                            void *memh, void *tl_h);
     ucc_status_t (*mem_unmap)(const ucc_base_context_t *context, int type, void *tl_h);
-    ucc_status_t (*memh_pack)(const ucc_base_context_t *context, void *memh,
+    ucc_status_t (*memh_pack)(const ucc_base_context_t *context, int type, void *memh,
                               void **pack_buffer);
 } ucc_base_context_iface_t;
 

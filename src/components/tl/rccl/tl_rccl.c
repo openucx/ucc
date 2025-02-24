@@ -18,14 +18,13 @@ ucc_status_t ucc_tl_rccl_get_context_attr(const ucc_base_context_t *context,
                                           ucc_base_ctx_attr_t      *base_attr);
 
 ucc_status_t ucc_tl_rccl_mem_map(const ucc_base_context_t *context, int type,
-                                 void *address, size_t len, void *memh,
-                                 void *tl_h);
+                                 void *memh, void *tl_h);
 
 ucc_status_t ucc_tl_rccl_mem_unmap(const ucc_base_context_t *context, int type,
                                    void *memh);
 
 ucc_status_t ucc_tl_rccl_memh_pack(const ucc_base_context_t *context,
-                                   void *memh, void **pack_buffer);
+                                   int type, void *memh, void **pack_buffer);
 
 static ucc_config_field_t ucc_tl_rccl_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_rccl_lib_config_t, super),

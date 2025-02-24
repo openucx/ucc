@@ -99,8 +99,8 @@ typedef struct ucc_context_config {
 typedef enum {
     UCC_MEM_MAP_TYPE_LOCAL,
     UCC_MEM_MAP_TYPE_GLOBAL,
-    UCC_MEM_MAP_TYPE_DPU_IMPORT,   /* special case */
-    UCC_MEM_MAP_TYPE_DPU_EXPORT
+    UCC_MEM_MAP_TYPE_OFFLOAD_IMPORT,   /* special case */
+    UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT
 } ucc_mem_map_type_t;
 
 typedef struct ucc_mem_map_tl_t {
@@ -114,7 +114,6 @@ typedef struct ucc_mem_map_memh_t {
     ucc_context_h      context;
     void              *address;
     size_t             len;
-    ucc_rank_t         my_ctx_rank;
     ucc_mem_map_tl_t  *tl_h;
     int                num_tls;
     char               pack_buffer[0];
