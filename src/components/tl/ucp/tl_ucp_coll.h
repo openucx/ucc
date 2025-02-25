@@ -269,6 +269,12 @@ typedef struct ucc_tl_ucp_task {
             int                     phase;
         } alltoall_bruck;
         char                        plugin_data[UCC_TL_UCP_TASK_PLUGIN_MAX_DATA];
+        struct {
+            void                   *scratch;
+            ucc_mc_buffer_header_t *scratch_mc_header;
+            ucc_ee_executor_task_t *etask;
+            ucc_ee_executor_t      *executor;
+        } allreduce_ring;
     };
 } ucc_tl_ucp_task_t;
 
