@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -253,6 +253,11 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
 #if HAVE_DECL_SHARP_COLL_DO_REDUCE_SCATTER
     case UCC_COLL_TYPE_REDUCE_SCATTER:
         status = ucc_tl_sharp_reduce_scatter_init(task);
+        break;
+#endif
+#if HAVE_DECL_SHARP_COLL_DO_ALLGATHER
+    case UCC_COLL_TYPE_ALLGATHER:
+        status = ucc_tl_sharp_allgather_init(task);
         break;
 #endif
     default:

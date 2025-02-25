@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -23,4 +23,9 @@ ucc_status_t ucc_tl_sharp_bcast_init(ucc_tl_sharp_task_t *task);
 #if HAVE_DECL_SHARP_COLL_DO_REDUCE_SCATTER
 ucc_status_t ucc_tl_sharp_reduce_scatter_init(ucc_tl_sharp_task_t *task);
 #endif
+
+#if HAVE_DECL_SHARP_COLL_DO_ALLGATHER
+ucc_status_t ucc_tl_sharp_allgather_init(ucc_tl_sharp_task_t *task);
+#endif
+
 #endif
