@@ -1163,6 +1163,7 @@ ucc_status_t ucc_mem_map_import(ucc_context_h         context,
         ctx->n_tl_ctx, sizeof(ucc_mem_map_tl_t), "tl memh");
     for (i = 0; i < ctx->n_tl_ctx; i++) {
         tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
+        strncpy(local_memh->tl_h[i].tl_name, tls->names[i], UCC_MEM_MAP_TL_NAME_LEN - 1);
         status = tl_lib->iface->context.mem_map(
             (const ucc_base_context_t *)ctx->tl_ctx[i], type,
             params->segments[0].address, params->segments[0].len, local_memh,
@@ -1171,7 +1172,6 @@ ucc_status_t ucc_mem_map_import(ucc_context_h         context,
             ucc_error("failed to import mem map memh %d", status);
             return status;
         }
-        strncpy(local_memh->tl_h[i].tl_name, tls->names[i], 7);
     }
     local_memh->type = type;
     /* fix context as it will be incorrect on a different system */
@@ -1272,13 +1272,11 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     /* copying */
     exported_memh->tl_h = local_memh->tl_h;
     for (i = 0, offset = 0; i < ctx->n_tl_ctx; i++) {
-        uint64_t tl_index = i;
         if (local_memh->tl_h[i].packed_size == 0) {
             continue;
         }
-        memcpy(PTR_OFFSET(exported_memh->pack_buffer, offset), &tl_index,
-               sizeof(size_t));
-        offset += sizeof(size_t);
+        strncpy(PTR_OFFSET(exported_memh->pack_buffer, offset), tls->names[i], UCC_MEM_MAP_TL_NAME_LEN - 1);
+        offset += UCC_MEM_MAP_TL_NAME_LEN;
         memcpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
                &local_memh->tl_h[i].packed_size, sizeof(size_t));
         offset += sizeof(size_t);
