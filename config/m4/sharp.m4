@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # See file LICENSE for terms.
 #
 
@@ -45,6 +45,7 @@ AS_IF([test "x$with_sharp" != "xno"],
                 AC_CHECK_DECLS([SHARP_COLL_HIDE_ERRORS], [], [], [[#include <sharp/api/sharp_coll.h>]])
                 AC_CHECK_DECLS([SHARP_COLL_DISABLE_LAZY_GROUP_RESOURCE_ALLOC], [], [], [[#include <sharp/api/sharp_coll.h>]])
                 AC_CHECK_DECLS([sharp_coll_do_reduce_scatter], [], [], [[#include <sharp/api/sharp_coll.h>]])
+                AC_CHECK_DECLS([sharp_coll_do_allgather], [], [], [[#include <sharp/api/sharp_coll.h>]])
             ],
             [
                 AS_IF([test "x$with_sharp" != "xguess"],
