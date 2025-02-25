@@ -651,20 +651,28 @@ ucc_status_t ucc_tl_ucp_mem_map_offload_import(ucc_tl_ucp_context_t *ctx,
                                            ucc_mem_map_memh_t     *l_memh,
                                            void *tl_h)
 {
-    size_t       offset = 0;
-    ucp_mem_h    mh;
-    ucc_status_t ucc_status;
+    int               i      = 0;
+    ucc_mem_map_tl_t *tl     = (ucc_mem_map_tl_t *)tl_h;
+    size_t            offset = 0;
+    ucp_mem_h         mh;
+    ucc_status_t      ucc_status;
+    char             *name;
+    size_t           *packed_size;
 
-    for (int i = 0; i < l_memh->num_tls; i++) {
-        size_t *p = (size_t *)PTR_OFFSET(l_memh->pack_buffer, offset);
+    for (; i < l_memh->num_tls; i++) {
+        name        = (char *)PTR_OFFSET(l_memh->pack_buffer, offset);
+        packed_size = (size_t *)PTR_OFFSET(l_memh->pack_buffer,
+                        offset + UCC_MEM_MAP_TL_NAME_LEN);
 
-        if (tl_h == (void *)&l_memh->tl_h[i]) {
+        if (strncmp(tl->tl_name, name, UCC_MEM_MAP_TL_NAME_LEN - 1) == 0) {
             break;
         }
         /* this is not the index, skip this section of buffer if exists */
-        if (p[0] == i) {
-            offset += p[1];
-        }
+        offset += *packed_size;
+    }
+    if (i == l_memh->num_tls) {
+        tl_error(ctx->super.super.lib, "unable to find TL UCP in memory handle");
+        return UCC_ERR_NOT_FOUND;
     }
 
     ucc_status = ucc_tl_ucp_mem_map_memhbuf(
