@@ -72,7 +72,7 @@ ucc_status_t ucc_tl_cuda_mem_unmap(const ucc_base_context_t *context, int type,
                                    void *memh);
 
 ucc_status_t ucc_tl_cuda_memh_pack(const ucc_base_context_t *context,
-                                   void *memh, void **pack_buffer);
+                                   int type, void *memh, void **pack_buffer);
 
 UCC_CLASS_DEFINE_NEW_FUNC(ucc_tl_cuda_context_t, ucc_base_context_t,
                           const ucc_base_context_params_t *,
