@@ -178,7 +178,7 @@ typedef struct ucc_tl_ucp_task {
             int                     phase;
             ucc_knomial_pattern_t   p;
             void                   *sbuf;
-            void                   *copy_task;
+            ucc_tl_ucp_copy_task_t *copy_task;
             ucc_rank_t              recv_dist;
         } allgather_kn;
         struct {

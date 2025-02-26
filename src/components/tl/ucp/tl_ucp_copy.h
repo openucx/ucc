@@ -25,38 +25,43 @@
     }                                                                          \
 } while(0)
 
+typedef union ucc_tl_ucp_copy_task {
+    ucc_ee_executor_task_t ee_task;
+    ucs_status_ptr_t       ucp_task;
+} ucc_tl_ucp_copy_task_t;
+
 /* copies based on MC */
 ucc_status_t ucc_tl_ucp_mc_copy_post(void *dst, ucc_memory_type_t dst_mtype,
                                      void *src, ucc_memory_type_t src_mtype,
                                      size_t size,
                                      ucc_tl_ucp_task_t *coll_task,
-                                     void **copy_task);
+                                     ucc_tl_ucp_copy_task_t **copy_task);
 
 ucc_status_t ucc_tl_ucp_mc_copy_test(ucc_tl_ucp_context_t *ctx,
-                                     void *copy_task);
+                                     ucc_tl_ucp_copy_task_t *copy_task);
 
-ucc_status_t ucc_tl_ucp_mc_copy_finalize(void *copy_task);
+ucc_status_t ucc_tl_ucp_mc_copy_finalize(ucc_tl_ucp_copy_task_t *copy_task);
 
 /* copies based on EC */
 ucc_status_t ucc_tl_ucp_ec_copy_post(void *dst, ucc_memory_type_t dst_mtype,
                                      void *src, ucc_memory_type_t src_mtype,
                                      size_t size,
                                      ucc_tl_ucp_task_t *coll_task,
-                                     void **copy_task);
+                                     ucc_tl_ucp_copy_task_t **copy_task);
 
 ucc_status_t ucc_tl_ucp_ec_copy_test(ucc_tl_ucp_context_t *ctx,
-                                     void *copy_task);
+                                     ucc_tl_ucp_copy_task_t *copy_task);
 
-ucc_status_t ucc_tl_ucp_ec_copy_finalize(void *copy_task);
+ucc_status_t ucc_tl_ucp_ec_copy_finalize(ucc_tl_ucp_copy_task_t *copy_task);
 
 /* copies based on UCX */
 ucc_status_t ucc_tl_ucp_ucp_copy_post(void *dst, ucc_memory_type_t dst_mtype,
                                      void *src, ucc_memory_type_t src_mtype,
                                      size_t size,
                                      ucc_tl_ucp_task_t *coll_task,
-                                     void **copy_task);
+                                     ucc_tl_ucp_copy_task_t **copy_task);
 
 ucc_status_t ucc_tl_ucp_ucp_copy_test(ucc_tl_ucp_context_t *ctx,
-                                      void *copy_task);
+                                      ucc_tl_ucp_copy_task_t *copy_task);
 
-ucc_status_t ucc_tl_ucp_ucp_copy_finalize(void *copy_task);
+ucc_status_t ucc_tl_ucp_ucp_copy_finalize(ucc_tl_ucp_copy_task_t *copy_task);

@@ -127,6 +127,7 @@ typedef struct ucc_tl_ucp_worker {
 
 typedef struct ucc_tl_ucp_task ucc_tl_ucp_task_t;
 typedef struct ucc_tl_ucp_context ucc_tl_ucp_context_t;
+typedef union ucc_tl_ucp_copy_task ucc_tl_ucp_copy_task_t;
 
 typedef ucc_status_t (*ucc_tl_ucp_copy_post_fn_t)(void *dst,
                                                   ucc_memory_type_t dst_mtype,
@@ -134,10 +135,10 @@ typedef ucc_status_t (*ucc_tl_ucp_copy_post_fn_t)(void *dst,
                                                   ucc_memory_type_t src_mtype,
                                                   size_t size,
                                                   ucc_tl_ucp_task_t *coll_task,
-                                                  void **copy_task);
+                                                  ucc_tl_ucp_copy_task_t **copy_task);
 typedef ucc_status_t (*ucc_tl_ucp_copy_test_fn_t)(ucc_tl_ucp_context_t *ctx,
-                                                  void *copy_task);
-typedef ucc_status_t (*ucc_tl_ucp_copy_finalize_fn_t)(void *copy_task);
+                                                  ucc_tl_ucp_copy_task_t *copy_task);
+typedef ucc_status_t (*ucc_tl_ucp_copy_finalize_fn_t)(ucc_tl_ucp_copy_task_t *copy_task);
 
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t            super;
