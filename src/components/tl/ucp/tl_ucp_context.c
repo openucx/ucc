@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -163,6 +163,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     prefix[strlen(prefix) - 1] = '\0';
     UCP_CHECK(ucp_config_read(prefix, NULL, &ucp_config),
               "failed to read ucp configuration", err_cfg_read, self);
+    if (tl_ucp_config->avoid_copy_mem_types) {
+        UCP_CHECK(ucp_config_modify(ucp_config, "MEMTYPE_AVOID_COPY", "yes"),
+                  "failed to set memtype avoid copy option for UCX",
+                  err_cfg, self);
+    }
 
     ucp_params.field_mask =
         UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_TAG_SENDER_MASK | UCP_PARAM_FIELD_NAME;
