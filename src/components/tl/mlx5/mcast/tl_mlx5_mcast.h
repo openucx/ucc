@@ -117,6 +117,8 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm_init_spec {
     int                               max_eager;
     int                               cuda_mem_enabled;
     int                               one_sided_reliability_enable;
+    int                               truly_zero_copy_allgather_enabled;
+    int                               mcast_prepost_bucket_size;
     void                             *oob;
 } ucc_tl_mlx5_mcast_coll_comm_init_spec_t;
 
@@ -199,22 +201,25 @@ struct pp_packet {
     uintptr_t       buf; // buffer address, initialized once
 };
 
+struct mcast_group {
+    struct ibv_qp       *qp;
+    struct ibv_ah       *ah;
+    uint16_t             lid;
+    union ibv_gid        mgid;
+    struct sockaddr_in6  mcast_addr;
+};
+
 struct mcast_ctx {
-    struct ibv_qp      *qp;
-    struct ibv_ah      *ah;
     struct ibv_send_wr  swr;
     struct ibv_sge      ssg;
-
+    struct ibv_cq      *scq;
+    struct ibv_cq      *rcq;
+    struct ibv_srq     *srq;
+    struct mcast_group  groups[MAX_GROUP_COUNT];
     // RC connection info for supporing one-sided based relibality
     struct ibv_qp     **rc_qp;
     uint16_t           *rc_lid;
     union ibv_gid      *rc_gid;
-
-    // multiple mcast group
-    struct ibv_qp      **qp_list;
-    struct ibv_ah      **ah_list;
-    struct ibv_send_wr  *swr_list;
-    struct ibv_sge      *ssg_list;
 };
 
 struct packet {
@@ -276,6 +281,8 @@ typedef struct ucc_tl_mlx5_mcast_allgather_comm {
     uint32_t coll_counter;
     uint32_t max_num_packets;
     uint32_t max_push_send;
+    uint8_t  truly_zero_copy_allgather_enabled;
+    uint32_t mcast_prepost_bucket_size;
 } ucc_tl_mlx5_mcast_allgather_comm_t;
 
 typedef struct ucc_tl_mlx5_mcast_bcast_comm {
@@ -303,15 +310,10 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     ucc_tl_mlx5_mcast_coll_comm_init_spec_t         params;
     ucc_tl_mlx5_mcast_p2p_interface_t               p2p;
     int                                             tx;
-    struct ibv_cq                                  *scq;
-    struct ibv_cq                                  *rcq;
-    struct ibv_srq                                 *srq;
     ucc_rank_t                                      rank;
     ucc_rank_t                                      commsize;
     char                                           *grh_buf;
     struct ibv_mr                                  *grh_mr;
-    uint16_t                                        mcast_lid;
-    union ibv_gid                                   mgid;
     unsigned                                        max_inline;
     size_t                                          max_eager;
     int                                             max_per_packet;
@@ -334,7 +336,6 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             comm_id;
     void                                           *p2p_ctx;
     ucc_base_lib_t                                 *lib;
-    struct sockaddr_in6                             mcast_addr;
     int                                             cuda_mem_enabled;
     ucc_tl_mlx5_mcast_join_info_t                  *group_setup_info;
     ucc_service_coll_req_t                         *group_setup_info_req;
@@ -434,6 +435,8 @@ typedef struct ucc_tl_mlx5_mcast_coll_req {
     ucc_memory_type_t                                   buf_mem_type;
     enum ucc_tl_mlx5_mcast_one_sided_reliability_scheme one_sided_reliability_scheme;
     uint32_t                                            ag_counter;
+    int                                                 concurrency_level;
+    int                                                 mcast_prepost_bucket_size;
     int                                                 state;
     ucc_tl_mlx5_mcast_pipelined_ag_schedule_t          *ag_schedule;
     int                                                 total_steps;
@@ -441,6 +444,8 @@ typedef struct ucc_tl_mlx5_mcast_coll_req {
     ucc_service_coll_req_t                             *allgather_rkeys_req;
     ucc_service_coll_req_t                             *barrier_req;
     void                                               *recv_rreg;
+    ucc_ee_executor_task_t                             *exec_task;
+    ucc_coll_task_t                                    *coll_task;
 } ucc_tl_mlx5_mcast_coll_req_t;
 
 typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {
@@ -490,7 +495,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_recv_buffers(ucc_tl_mlx5_mcast
     }
     if (i != 0) {
         rwr[i-1].next = NULL;
-        if (ibv_post_recv(comm->mcast.qp, &rwr[0], &bad_wr)) {
+        if (ibv_post_recv(comm->mcast.groups[0].qp, &rwr[0], &bad_wr)) {
             tl_error(comm->lib, "failed to prepost recvs: errno %d", errno);
             return UCC_ERR_NO_RESOURCE;
         }
@@ -543,7 +548,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_user_recv_buffers(ucc_tl_mlx5_
 
     if (i > 0) {
         rwr[i-1].next = NULL;
-        if (ibv_post_recv(comm->mcast.qp_list[group_id], &rwr[0], &bad_wr)) {
+        if (ibv_post_recv(comm->mcast.groups[group_id].qp, &rwr[0], &bad_wr)) {
             tl_error(comm->lib, "Failed to prepost recvs: errno %d buffer count %d",
                     errno, i);
             return UCC_ERR_NO_RESOURCE;
@@ -554,6 +559,21 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_user_recv_buffers(ucc_tl_mlx5_
 
     return UCC_OK;
 }
+
+#define EXEC_TASK_TEST(_errmsg, _etask, _lib) do {                             \
+    if (_etask != NULL) {                                                      \
+        status = ucc_ee_executor_task_test(_etask);                            \
+        if (status > 0) {                                                      \
+            return status;                                                     \
+        }                                                                      \
+        ucc_ee_executor_task_finalize(_etask);                                 \
+        _etask = NULL;                                                         \
+        if (ucc_unlikely(status < 0)) {                                        \
+            tl_error(_lib, _errmsg);                                           \
+            return status;                                                     \
+        }                                                                      \
+    }                                                                          \
+} while(0)
 
 ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *tl_context,
                                          ucc_tl_mlx5_mcast_team_t **mcast_team,
