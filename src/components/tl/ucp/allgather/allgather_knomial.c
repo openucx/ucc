@@ -319,15 +319,9 @@ ucc_status_t ucc_tl_ucp_allgather_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_memory_type_t  mtype   = GET_MT(&coll_args->args);
     size_t             count   = GET_TOTAL_COUNT(&coll_args->args, tsize);
     ucc_datatype_t     dtype   = GET_DT(&coll_args->args);
-    ucc_kn_radix_t     radix, cfg_radix, opt_radix;
+    ucc_kn_radix_t     radix;
 
-    opt_radix = (mtype == UCC_MEMORY_TYPE_HOST) ? tl_team->opt_radix_host :
-                                                  tl_team->opt_radix;
-
-    cfg_radix = ucc_tl_ucp_get_radix_from_range(tl_team,
-                                                count * ucc_dt_size(dtype),
-                                                mtype, p, opt_radix);
-    radix = ucc_min(cfg_radix, tsize);
+    radix = ucc_tl_ucp_get_knomial_radix(tl_team, count, dtype, mtype, p, 0);
 
     return ucc_tl_ucp_allgather_knomial_init_r(coll_args, team, task_h, radix);
 }
