@@ -57,6 +57,7 @@ class test_tl_mlx5_wqe : public test_tl_mlx5_rc_qp {
     void SetUp()
     {
         test_tl_mlx5_rc_qp::SetUp();
+        CHECK_TEST_STATUS();
 
         post_rdma_write = (ucc_tl_mlx5_post_rdma_fn_t)dlsym(
             tl_mlx5_so_handle, "ucc_tl_mlx5_post_rdma");
@@ -75,7 +76,9 @@ class test_tl_mlx5_wqe : public test_tl_mlx5_rc_qp {
         ASSERT_EQ(nullptr, dlerror());
 
         create_qp();
+        CHECK_TEST_STATUS();
         connect_qp_loopback();
+        CHECK_TEST_STATUS();
         create_umr_qp();
     }
 };
@@ -160,6 +163,7 @@ class test_tl_mlx5_dm : public test_tl_mlx5_rdma_write {
     void buffers_init()
     {
         test_tl_mlx5_rdma_write::buffers_init();
+        CHECK_TEST_STATUS();
 
         struct ibv_device_attr_ex attr;
         memset(&attr, 0, sizeof(attr));
@@ -208,6 +212,7 @@ class test_tl_mlx5_dm_alloc_reg
     void SetUp()
     {
         test_tl_mlx5_wqe::SetUp();
+        CHECK_TEST_STATUS();
 
         dm_alloc_reg = (ucc_tl_mlx5_dm_alloc_reg_fn_t)dlsym(
             tl_mlx5_so_handle, "ucc_tl_mlx5_dm_alloc_reg");

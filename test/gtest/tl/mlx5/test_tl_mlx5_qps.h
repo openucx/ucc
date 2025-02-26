@@ -47,6 +47,7 @@ class test_tl_mlx5_rc_qp : public test_tl_mlx5_qp {
     virtual void SetUp()
     {
         test_tl_mlx5_qp::SetUp();
+        CHECK_TEST_STATUS();
 
         create_rc_qp = (ucc_tl_mlx5_create_rc_qp_fn_t)dlsym(
             tl_mlx5_so_handle, "ucc_tl_mlx5_create_rc_qp");
@@ -129,6 +130,7 @@ class test_tl_mlx5_dc : public test_tl_mlx5_qp {
         struct ibv_srq_init_attr srq_attr;
 
         test_tl_mlx5_qp::SetUp();
+        CHECK_TEST_STATUS();
 
         init_dct = (ucc_tl_mlx5_init_dct_fn_t)dlsym(tl_mlx5_so_handle,
                                                     "ucc_tl_mlx5_init_dct");
