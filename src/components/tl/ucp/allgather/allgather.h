@@ -7,6 +7,7 @@
 #define ALLGATHER_H_
 #include "../tl_ucp.h"
 #include "../tl_ucp_coll.h"
+#include "tl_ucp_sendrecv.h"
 
 enum {
     UCC_TL_UCP_ALLGATHER_ALG_KNOMIAL,
@@ -37,6 +38,16 @@ static inline int ucc_tl_ucp_allgather_alg_from_str(const char *str)
 }
 
 ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task);
+
+ucc_status_t loopback_self_copy(void *rbuf, void *sbuf, size_t data_size,
+                                ucc_memory_type_t rmem, ucc_memory_type_t smem,
+                                ucc_rank_t rank, ucc_tl_ucp_team_t *team,
+                                ucc_tl_ucp_task_t *task);
+
+ucc_status_t allgather_copy(void *rbuf, void *sbuf, size_t data_size,
+                            ucc_memory_type_t rmem, ucc_memory_type_t smem,
+                            ucc_rank_t rank, ucc_tl_ucp_team_t *team,
+                            ucc_tl_ucp_task_t *task);
 
 /* Ring */
 ucc_status_t ucc_tl_ucp_allgather_ring_init(ucc_base_coll_args_t *coll_args,
