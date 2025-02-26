@@ -19,7 +19,7 @@ ucc_status_t ucc_tl_mlx5_mem_unmap(const ucc_base_context_t *context, int type,
                                    void *memh);
 
 ucc_status_t ucc_tl_mlx5_memh_pack(const ucc_base_context_t *context,
-                                   void *memh, void **pack_buffer);
+                                   int type, void *memh, void **pack_buffer);
 
 ucc_status_t ucc_tl_mlx5_get_lib_properties(ucc_base_lib_properties_t *prop);
 

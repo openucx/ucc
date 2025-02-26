@@ -36,7 +36,7 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, int type,
                                 void *address, size_t len, void *memh,
                                 void *tl_h);
 
-ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context, void *memh,
+ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context, int type, void *memh,
                                   void **pack_buffer);
 
 ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, int type,

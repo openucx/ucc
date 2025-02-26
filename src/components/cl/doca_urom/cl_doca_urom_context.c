@@ -571,7 +571,7 @@ ucc_status_t ucc_cl_doca_urom_mem_unmap(const ucc_base_context_t *context,
 }
 
 ucc_status_t ucc_cl_doca_urom_memh_pack(const ucc_base_context_t *context,
-                                        void *memh, void **packed_buffer)
+                                        int type, void *memh, void **packed_buffer)
 {
     return UCC_ERR_NOT_SUPPORTED;
 }

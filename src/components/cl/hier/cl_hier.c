@@ -26,7 +26,7 @@ ucc_status_t ucc_cl_hier_mem_unmap(const ucc_base_context_t *context, int type,
                                    void *tl_h);
 
 ucc_status_t ucc_cl_hier_memh_pack(const ucc_base_context_t *context,
-                                   void *memh, void **packed_buffer);
+                                   int type, void *memh, void **packed_buffer);
 
 static ucc_config_field_t ucc_cl_hier_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_cl_hier_lib_config_t, super),

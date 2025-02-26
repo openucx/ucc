@@ -21,7 +21,7 @@ ucc_status_t ucc_cl_doca_urom_mem_unmap(const ucc_base_context_t *context,
                                         int type, void *tl_h);
 
 ucc_status_t ucc_cl_doca_urom_memh_pack(const ucc_base_context_t *context,
-                                        void *memh, void **packed_buffer);
+                                        int type, void *memh, void **packed_buffer);
 
 ucc_status_t ucc_cl_doca_urom_get_lib_properties(ucc_base_lib_properties_t *prop);
 

@@ -1133,7 +1133,7 @@ ucc_status_t ucc_context_get_attr(ucc_context_t      *context,
 }
 
 ucc_status_t ucc_mem_map_import(ucc_context_h         context,
-                                ucc_mem_map_flags_t   flags,
+                                ucc_mem_map_mode_t   flags,
                                 ucc_mem_map_params_t *params, size_t *memh_size,
                                 ucc_mem_map_mem_h *memh)
 {
@@ -1166,7 +1166,7 @@ ucc_status_t ucc_mem_map_import(ucc_context_h         context,
         strncpy(local_memh->tl_h[i].tl_name, tls->names[i], UCC_MEM_MAP_TL_NAME_LEN - 1);
         status = tl_lib->iface->context.mem_map(
             (const ucc_base_context_t *)ctx->tl_ctx[i], type,
-            params->segments[0].address, params->segments[0].len, local_memh,
+            local_memh->address, local_memh->len, local_memh,
             &local_memh->tl_h[i]);
         if (status < UCC_ERR_NOT_IMPLEMENTED) {
             ucc_error("failed to import mem map memh %d", status);
@@ -1182,9 +1182,10 @@ ucc_status_t ucc_mem_map_import(ucc_context_h         context,
 }
 
 ucc_status_t ucc_mem_map_export(ucc_context_h         context,
-                                ucc_mem_map_flags_t   flags,
-                                ucc_mem_map_params_t *params, size_t *memh_size,
-                                ucc_mem_map_mem_h *memh)
+                                ucc_mem_map_mode_t    flags,
+                                ucc_mem_map_params_t *params,
+                                size_t               *memh_size,
+                                ucc_mem_map_mem_h    *memh)
 {
     ucc_context_t            *ctx             = (ucc_context_t *)context;
     ucc_config_names_array_t *tls             = &ctx->all_tls;
@@ -1208,15 +1209,31 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
 
         local_memh->tl_h = (ucc_mem_map_tl_t *)ucc_calloc(
             ctx->n_tl_ctx, sizeof(ucc_mem_map_tl_t), "tl memh");
+        if (!local_memh->tl_h) {
+            ucc_error("failed to allocate a local memory handle");
+            return UCC_ERR_NO_MEMORY;
+        }
         local_memh->address = params->segments[0].address;
-        local_memh->len = params->segments[0].len;
-        type = UCC_MEM_MAP_TYPE_LOCAL;
+        local_memh->len     = params->segments[0].len;
+        type                = UCC_MEM_MAP_TYPE_LOCAL;
     } else {
+        if (!memh) {
+            ucc_error("unable to export map NULL memory handle");
+            return UCC_ERR_INVALID_PARAM;
+        }
         local_memh = *memh;
-        type = UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT;
+        type       = UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT;
     }
     packed_buffers =
         (void **)ucc_calloc(ctx->n_tl_ctx, sizeof(void *), "packed buffers");
+    if (!packed_buffers) {
+        if (flags == UCC_MEM_MAP_EXPORT) {
+            ucc_free(local_memh->tl_h);
+            ucc_free(local_memh);
+        }
+        ucc_error("failed to allocate space for packed buffers");
+        return UCC_ERR_NO_MEMORY;
+    }
 
     /* map all the memory */
     for (i = 0; i < ctx->n_tl_ctx; i++) {
@@ -1224,7 +1241,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         /* always treat as a local mem handle */
         status = tl_lib->iface->context.mem_map(
             (const ucc_base_context_t *)ctx->tl_ctx[i], type,
-            params->segments[0].address, params->segments[0].len, local_memh,
+            local_memh->address, local_memh->len, local_memh,
             &local_memh->tl_h[i]);
         if (status != UCC_OK) {
             if (status < UCC_ERR_NOT_IMPLEMENTED) {
@@ -1238,23 +1255,20 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
             }
         }
     }
-
     /* now pack all the memories */
     for (i = 0; i < ctx->n_tl_ctx; i++) {
-        if (local_memh->tl_h[i].packed_size > 0) {
-            tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
-            /* tl should set packed_size, allocate buffer, pack memh */
-            status = tl_lib->iface->context.memh_pack(
-                (const ucc_base_context_t *)ctx->tl_ctx[i],
-                &local_memh->tl_h[i], &packed_buffers[i]);
-            if (status != UCC_OK) {
-                if (status < UCC_ERR_NOT_IMPLEMENTED) {
-                    ucc_error("failed to pack memory handles");
-                    goto failed_pack;
-                }
+        tl_lib = ucc_derived_of(ctx->tl_ctx[i]->super.lib, ucc_tl_lib_t);
+        /* tl should set packed_size, allocate buffer, pack memh */
+        status = tl_lib->iface->context.memh_pack(
+            (const ucc_base_context_t *)ctx->tl_ctx[i],
+            type, &local_memh->tl_h[i], &packed_buffers[i]);
+        if (status != UCC_OK) {
+            if (status < UCC_ERR_NOT_IMPLEMENTED) {
+                ucc_error("failed to pack memory handles");
+                goto failed_pack;
             }
-            total_pack_size += local_memh->tl_h[i].packed_size;
         }
+        total_pack_size += local_memh->tl_h[i].packed_size;
     }
 
     /* allocate exported memh, copy items over */
@@ -1292,7 +1306,6 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     exported_memh->context     = ctx;
     exported_memh->address     = local_memh->address;
     exported_memh->len         = local_memh->len;
-    exported_memh->my_ctx_rank = ctx->rank;
     exported_memh->num_tls     = ctx->n_tl_ctx;
     *memh                      = exported_memh;
     *memh_size                 = sizeof(ucc_mem_map_memh_t) + offset;
@@ -1318,11 +1331,10 @@ failed_mem_map:
     return status;
 }
 
-ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_flags_t flags,
+ucc_status_t ucc_mem_map(ucc_context_h context, ucc_mem_map_mode_t flags,
                          ucc_mem_map_params_t *params, size_t *memh_size,
                          ucc_mem_map_mem_h *memh)
 {
-    // check if flags is import / export
     if (flags == UCC_MEM_MAP_IMPORT || flags == UCC_MEM_MAP_IMPORT_OFFLOAD) {
         return ucc_mem_map_import(context, flags, params, memh_size, memh);
     } else {
