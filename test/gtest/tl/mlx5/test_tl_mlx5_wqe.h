@@ -101,9 +101,11 @@ class test_tl_mlx5_rdma_write
     : public test_tl_mlx5_wqe,
       public ::testing::WithParamInterface<RdmaWriteParams> {
   public:
+    DT            *src    = nullptr;
+    DT            *dst    = nullptr;
+    struct ibv_mr *src_mr = nullptr;
+    struct ibv_mr *dst_mr = nullptr;
     int            bufsize;
-    DT *           src, *dst;
-    struct ibv_mr *src_mr, *dst_mr;
 
     void buffers_init()
     {
@@ -147,18 +149,26 @@ class test_tl_mlx5_rdma_write
 
     void TearDown()
     {
-        GTEST_ASSERT_EQ(ibv_dereg_mr(src_mr), UCC_OK);
-        GTEST_ASSERT_EQ(ibv_dereg_mr(dst_mr), UCC_OK);
-        free(src);
-        free(dst);
+        if (src_mr != nullptr) {
+            GTEST_ASSERT_EQ(ibv_dereg_mr(src_mr), UCC_OK);
+        }
+        if (dst_mr != nullptr) {
+            GTEST_ASSERT_EQ(ibv_dereg_mr(dst_mr), UCC_OK);
+        }
+        if (src != nullptr) {
+            free(src);
+        }
+        if (dst != nullptr) {
+            free(dst);
+        }
     }
 };
 
 class test_tl_mlx5_dm : public test_tl_mlx5_rdma_write {
   public:
-    struct ibv_dm *          dm_ptr = nullptr;
+    struct ibv_dm *dm_ptr = nullptr;
+    struct ibv_mr *dm_mr  = nullptr;
     struct ibv_alloc_dm_attr dm_attr;
-    struct ibv_mr *          dm_mr;
 
     void buffers_init()
     {

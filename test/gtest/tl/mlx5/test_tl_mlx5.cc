@@ -45,7 +45,7 @@ void test_tl_mlx5::SetUp()
     port = get_active_port(ctx);
     ASSERT_GE(port, 0);
 
-    ibv_query_port(ctx, port, &port_attr);
+    ASSERT_EQ(ibv_query_port(ctx, port, &port_attr), 0);
 
     pd = ibv_alloc_pd(ctx);
     ASSERT_NE(nullptr, pd);
