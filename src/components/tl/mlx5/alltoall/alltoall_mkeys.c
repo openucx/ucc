@@ -335,10 +335,10 @@ ucc_status_t ucc_tl_mlx5_populate_send_recv_mkeys(ucc_tl_mlx5_team_t *    team,
 static void update_mkey_entry(ucc_tl_mlx5_alltoall_t *a2a,
                               ucc_tl_mlx5_schedule_t *req, int direction_send)
 {
-    ucc_tl_mlx5_alltoall_node_t  *node       = &a2a->node;
+    ucc_tl_mlx5_alltoall_node_t  *node         = &a2a->node;
     int                           block_height = req->alltoall.block_height;
     int                           block_width  = req->alltoall.block_width;
-    size_t                        msg_size   = req->alltoall.msg_size;
+    size_t                        msg_size     = req->alltoall.msg_size;
     int                           nbc  = req->alltoall.num_of_blocks_columns;
     struct ibv_mr                *buff = direction_send
                                              ? req->alltoall.send_rcache_region_p->reg.mr

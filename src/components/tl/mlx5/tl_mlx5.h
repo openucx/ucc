@@ -60,8 +60,8 @@ typedef struct ucc_tl_mlx5_lib_config {
     int                                     dm_host;
     ucc_tl_mlx5_ib_qp_conf_t                qp_conf;
     ucc_tl_mlx5_mcast_coll_comm_init_spec_t mcast_conf;
-    int                                     nbr_serialized_batches;
-    int                                     nbr_batches_per_passage;
+    int                                     num_serialized_batches;
+    int                                     num_batches_per_passage;
     int                                     block_batch_size;
     int                                     force_regular;
     int                                     force_longer;
