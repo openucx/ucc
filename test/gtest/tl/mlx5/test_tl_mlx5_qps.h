@@ -12,6 +12,7 @@ class test_tl_mlx5_qp : public test_tl_mlx5 {
     virtual void SetUp()
     {
         test_tl_mlx5::SetUp();
+        CHECK_TEST_STATUS();
 
         qp_conf.qp_rnr_retry  = 7;
         qp_conf.qp_rnr_timer  = 20;
