@@ -34,11 +34,13 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, force_regular),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"ALLTOALL_FORCE_LONGER", "y", "Force the blocks to have more height than width",
+    {"ALLTOALL_FORCE_LONGER", "y",
+     "Force the blocks to have more height than width",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, force_longer),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"ALLTOALL_FORCE_WIDER", "n", "Force the blocks to have more width than height",
+    {"ALLTOALL_FORCE_WIDER", "n",
+     "Force the blocks to have more width than height",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, force_wider), UCC_CONFIG_TYPE_BOOL},
 
     {"ALLTOALL_BLOCK_SIZE", "0",
@@ -94,7 +96,7 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      UCC_CONFIG_TYPE_INT},
 
     {"MCAST_POST_RECV_THRESH", "64",
-        "Threshold for posting recv into rx ctx of the Mcast comm",
+     "Threshold for posting recv into rx ctx of the Mcast comm",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.post_recv_thresh),
      UCC_CONFIG_TYPE_INT},
 
@@ -102,20 +104,25 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.wsize),
      UCC_CONFIG_TYPE_INT},
 
-    {"MCAST_MAX_PUSH_SEND", "16", "Max number of concurrent send wq for mcast based allgather",
+    {"MCAST_MAX_PUSH_SEND", "16",
+     "Max number of concurrent send wq for mcast based allgather",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.max_push_send),
      UCC_CONFIG_TYPE_INT},
 
-    {"MCAST_MAX_EAGER", "65536", "Max msg size to be used for Mcast with the eager protocol",
+    {"MCAST_MAX_EAGER", "65536",
+     "Max msg size to be used for Mcast with the eager protocol",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.max_eager),
      UCC_CONFIG_TYPE_MEMUNITS},
 
-    {"MCAST_CUDA_MEM_ENABLE", "0", "Enable GPU CUDA memory support for Mcast. GPUDirect RDMA must be enabled",
+    {"MCAST_CUDA_MEM_ENABLE", "0",
+     "Enable GPU CUDA memory support for Mcast. GPUDirect RDMA must be enabled",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.cuda_mem_enabled),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"MCAST_ONE_SIDED_RELIABILITY_ENABLE", "1", "Enable one sided reliability for mcast",
-     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.one_sided_reliability_enable),
+    {"MCAST_ONE_SIDED_RELIABILITY_ENABLE", "1",
+     "Enable one sided reliability for mcast",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t,
+                  mcast_conf.one_sided_reliability_enable),
      UCC_CONFIG_TYPE_BOOL},
 
     {"ALLTOALL_SEND_BATCH_SIZE", "2",

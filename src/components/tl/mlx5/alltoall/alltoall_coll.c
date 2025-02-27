@@ -403,7 +403,7 @@ static ucc_status_t ucc_tl_mlx5_send_blocks_start(ucc_coll_task_t *coll_task)
     ucc_rank_t              node_size = a2a->node.sbgp->group_size;
     ucc_rank_t              net_size  = a2a->net.sbgp->group_size;
     size_t op_msgsize = node_size * a2a->max_msg_size * UCC_TL_TEAM_SIZE(team) *
-                     a2a->max_num_of_columns;
+                        a2a->max_num_of_columns;
     size_t       node_msgsize  = SQUARED(node_size) * task->alltoall.msg_size;
     int          block_h       = task->alltoall.block_height;
     int          block_w       = task->alltoall.block_width;
@@ -569,11 +569,12 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
     int                     seq_index = task->alltoall.seq_index;
     size_t                  msg_size  = task->alltoall.msg_size;
     size_t op_msgsize = node_size * a2a->max_msg_size * UCC_TL_TEAM_SIZE(team) *
-                     a2a->max_num_of_columns;
-    size_t mkey_msgsize  = node_size * a2a->max_msg_size * UCC_TL_TEAM_SIZE(team);
-    int    block_size    = task->alltoall.block_height;
-    size_t col_msgsize   = msg_size * block_size * node_size;
-    size_t block_msgsize = SQUARED(block_size) * msg_size;
+                        a2a->max_num_of_columns;
+    size_t mkey_msgsize =
+        node_size * a2a->max_msg_size * UCC_TL_TEAM_SIZE(team);
+    int    block_size                = task->alltoall.block_height;
+    size_t col_msgsize               = msg_size * block_size * node_size;
+    size_t block_msgsize             = SQUARED(block_size) * msg_size;
     int    block_size_leftovers_side = node_size % block_size;
     size_t col_msgsize_leftovers =
         msg_size * block_size_leftovers_side * node_size;
@@ -583,8 +584,8 @@ ucc_tl_mlx5_send_blocks_leftovers_start(ucc_coll_task_t *coll_task)
     ucc_status_t status         = UCC_OK;
     ucc_base_lib_t *lib         = UCC_TASK_LIB(coll_task);
     int             nbc         = task->alltoall.num_of_blocks_columns;
-    int    i, j, k, dest_rank, rank, cyc_rank, bs_x, bs_y;
-    size_t current_block_msgsize;
+    int                     i, j, k, dest_rank, rank, cyc_rank, bs_x, bs_y;
+    size_t                  current_block_msgsize;
     uint64_t                src_addr, remote_addr;
     ucc_tl_mlx5_dm_chunk_t *dm;
     uintptr_t               dm_addr;
@@ -785,13 +786,13 @@ static inline int block_size_fits(size_t msgsize, int height, int width)
 {
     int t;
 
-    if (msgsize > MAX_MSG_SIZE
-        || height > MAX_BLOCK_SIZE
-        || width > MAX_BLOCK_SIZE) {
+    if (msgsize > MAX_MSG_SIZE || height > MAX_BLOCK_SIZE ||
+        width > MAX_BLOCK_SIZE) {
         return false;
     }
     t = power2(ucc_max(msgsize, 8));
-    return height * ucc_max(power2(width) * t, MAX_MSG_SIZE) <= MAX_TRANSPOSE_SIZE;
+    return height * ucc_max(power2(width) * t, MAX_MSG_SIZE) <=
+           MAX_TRANSPOSE_SIZE;
 }
 
 static inline void get_block_dimensions(int ppn, int msgsize, int force_regular,
