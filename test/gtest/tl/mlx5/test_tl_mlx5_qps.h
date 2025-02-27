@@ -118,11 +118,11 @@ typedef ucc_status_t (*ucc_tl_mlx5_create_ah_fn_t)(struct ibv_pd * pd,
 
 class test_tl_mlx5_dc : public test_tl_mlx5_qp {
   public:
-    struct ibv_qp *            dct_qp;
+    struct ibv_qp             *dct_qp = nullptr;
+    struct ibv_ah             *ah     = nullptr;
+    struct ibv_srq            *srq    = nullptr;
+    ucc_tl_mlx5_dci_t          dci    = {};
     uint32_t                   dct_qpn;
-    struct ibv_srq *           srq;
-    ucc_tl_mlx5_dci_t          dci;
-    struct ibv_ah *            ah;
     ucc_tl_mlx5_init_dct_fn_t  init_dct;
     ucc_tl_mlx5_init_dci_fn_t  init_dci;
     ucc_tl_mlx5_create_ah_fn_t create_ah;
@@ -145,11 +145,6 @@ class test_tl_mlx5_dc : public test_tl_mlx5_qp {
         create_ah = (ucc_tl_mlx5_create_ah_fn_t)dlsym(tl_mlx5_so_handle,
                                                       "ucc_tl_mlx5_create_ah");
         ASSERT_EQ(nullptr, dlerror());
-
-        ah         = NULL;
-        dct_qp     = NULL;
-        dci.dci_qp = NULL;
-        srq        = NULL;
 
         memset(&srq_attr, 0, sizeof(struct ibv_srq_init_attr));
         srq_attr.attr.max_wr  = 1;
