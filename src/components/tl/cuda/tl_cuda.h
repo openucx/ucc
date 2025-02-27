@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * Copyright (c) Meta Platforms, Inc. and affiliates. 2022.
  *
  * See file LICENSE for terms.
@@ -12,6 +12,7 @@
 #include "components/tl/ucc_tl_log.h"
 #include "components/mc/ucc_mc.h"
 #include "utils/ucc_mpool.h"
+#include "utils/ucc_datastruct.h"
 #include "tl_cuda_ep_hash.h"
 #include "tl_cuda_topo.h"
 #include "tl_cuda_team_topo.h"
@@ -27,6 +28,7 @@
 #define UCC_TL_CUDA_SUPPORTED_COLLS                                            \
     (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_ALLTOALLV |                        \
      UCC_COLL_TYPE_ALLGATHER | UCC_COLL_TYPE_ALLGATHERV |                      \
+     UCC_COLL_TYPE_BCAST |                                                     \
      UCC_COLL_TYPE_REDUCE_SCATTER | UCC_COLL_TYPE_REDUCE_SCATTERV)
 
 #define UCC_TL_CUDA_TEAM_LIB(_team)                                            \
@@ -72,7 +74,7 @@ extern ucc_tl_cuda_iface_t ucc_tl_cuda;
 
 typedef struct ucc_tl_cuda_lib_config {
     ucc_tl_lib_config_t super;
-    uint32_t            max_concurrent;
+    uint32_t            max_concurrent; // Maximum number of tasks that can be progressed simultaneously.
     size_t              scratch_size;
     unsigned long       allgather_ring_max_rings;
     uint32_t            allgather_ring_num_chunks;
@@ -104,9 +106,12 @@ UCC_CLASS_DECLARE(ucc_tl_cuda_context_t, const ucc_base_context_params_t *,
 
 typedef uint32_t ucc_tl_cuda_sync_state_t;
 
+#define UCC_TL_CUDA_TAG_FREE 0xFFFFFFFFFFFFFFFF
+
 typedef struct ucc_tl_cuda_shm_barrier {
     ucc_rank_t   size;
     ucc_rank_t   count;
+    uint64_t     tag;
     int          sense;
     ucc_status_t state[UCC_TL_CUDA_MAX_PEERS];
     int          local_sense[UCC_TL_CUDA_MAX_PEERS];
@@ -152,13 +157,15 @@ typedef struct ucc_tl_cuda_scratch {
     ucc_tl_cuda_mem_info_t rem_info[UCC_TL_CUDA_MAX_PEERS];
 } ucc_tl_cuda_scratch_t;
 
+// Team represents a communicator created within the CUDA context, typically using NVLink for inter-GPU communication
 typedef struct ucc_tl_cuda_team {
     ucc_tl_team_t              super;
-    uint32_t                   seq_num;
+    uint32_t                   seq_num;            // Counter for the number of launched collective tasks for this team
+    uint32_t                   seq_num_active_set; // Counter for tasks in the active set (subset of tasks requiring special handling)
     ucc_tl_cuda_team_topo_t   *topo;
-    ucc_tl_cuda_sync_t        *sync;
-    ucc_tl_cuda_sync_state_t  *sync_state;
-    ucc_tl_cuda_shm_barrier_t *bar;
+    ucc_tl_cuda_sync_t        *sync;               // Pointer to shared memory segment for synchronization
+    ucc_tl_cuda_sync_state_t  *sync_state;         // Tracks the task currently using the sync segment of shared memory, if free - 0
+    ucc_tl_cuda_shm_barrier_t *bar;                // Pointer to the first barrier in an array of size [0; 2 * max_concurrent]. First max_concurrent barriers are for normal mode, the second one for active set mode
     ucc_tl_cuda_scratch_t      scratch;
     cudaStream_t               stream;
     ucc_tl_cuda_rank_id_t     *ids;
@@ -169,12 +176,14 @@ typedef struct ucc_tl_cuda_team {
 UCC_CLASS_DECLARE(ucc_tl_cuda_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
+// Task represents a collective operation that runs in the CUDA context, typically using NVLink for inter-GPU communication
 typedef struct ucc_tl_cuda_task ucc_tl_cuda_task_t;
 struct ucc_tl_cuda_task {
     ucc_coll_task_t            super;
-    uint32_t                   seq_num;
-    uint32_t                   coll_id;
-    ucc_tl_cuda_shm_barrier_t *bar;
+    uint32_t                   seq_num; // Sequential identifier for each task started within the team
+    uint32_t                   coll_id; // Index of the collective task in flight, within the range [0; max_concurrent)
+    ucc_tl_cuda_shm_barrier_t *bar;     // Pointer to the reserved barrier for this task in the CUDA team
+    ucc_subset_t               subset;  // Mapping information for the active set, if it is present
     union {
         struct {
             int                    stage;
@@ -224,6 +233,17 @@ struct ucc_tl_cuda_task {
             size_t (*get_offset)(const ucc_tl_cuda_task_t *task,
                                  ucc_rank_t                block);
         } allgatherv_linear;
+        struct {
+            int                     stage;
+            int                     step;
+            void                   *sbuf;
+            ucc_datatype_t          dt;
+            ucc_rank_t              root;
+            size_t                  size;
+            int                     num_steps;
+            ucc_ee_executor_task_t *exec_task;
+            uint64_t                key; // This is mix of user provided tag, root and peer to be unique for each task, algorithm uses it to mark barrier as used
+        } bcast_linear;
         struct {
             int                     stage;
             int                     num_frags;

@@ -119,11 +119,11 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_one_sided_cleanup(ucc_tl_mlx5_mcast
         comm->mcast.rc_qp = NULL;
     }
 
-    if (comm->srq != NULL && ibv_destroy_srq(comm->srq)) {
+    if (comm->mcast.srq != NULL && ibv_destroy_srq(comm->mcast.srq)) {
         tl_error(comm->lib, "ibv_destroy_srq failed");
         return UCC_ERR_NO_RESOURCE;
     }
-    comm->srq = NULL;
+    comm->mcast.srq = NULL;
 
     if (comm->one_sided.slots_mr) {
         ibv_dereg_mr(comm->one_sided.slots_mr);

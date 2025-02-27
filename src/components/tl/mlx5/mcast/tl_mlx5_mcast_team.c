@@ -99,6 +99,10 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     memcpy(&comm->params, conf_params, sizeof(*conf_params));
 
+    comm->allgather_comm.mcast_prepost_bucket_size
+                                        = conf_params->mcast_prepost_bucket_size;
+    comm->allgather_comm.truly_zero_copy_allgather_enabled
+                                        = conf_params->truly_zero_copy_allgather_enabled;
     comm->one_sided.reliability_enabled = conf_params->one_sided_reliability_enable;
     comm->bcast_comm.wsize              = conf_params->wsize;
     comm->allgather_comm.max_push_send  = conf_params->max_push_send;
@@ -114,8 +118,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
         goto cleanup;
     }
 
-    comm->rcq = ibv_create_cq(mcast_context->ctx, comm->params.rx_depth, NULL, NULL, 0);
-    if (!comm->rcq) {
+    comm->mcast.rcq = ibv_create_cq(mcast_context->ctx, comm->params.rx_depth, NULL, NULL, 0);
+    if (!comm->mcast.rcq) {
         ibv_dereg_mr(comm->grh_mr);
         tl_error(mcast_context->lib, "could not create recv cq, rx_depth %d, errno %d",
                   comm->params.rx_depth, errno);
@@ -123,10 +127,10 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
         goto cleanup;
     }
 
-    comm->scq = ibv_create_cq(mcast_context->ctx, comm->params.sx_depth, NULL, NULL, 0);
-    if (!comm->scq) {
+    comm->mcast.scq = ibv_create_cq(mcast_context->ctx, comm->params.sx_depth, NULL, NULL, 0);
+    if (!comm->mcast.scq) {
         ibv_dereg_mr(comm->grh_mr);
-        ibv_destroy_cq(comm->rcq);
+        ibv_destroy_cq(comm->mcast.rcq);
         tl_error(mcast_context->lib, "could not create send cq, sx_depth %d, errno %d",
                   comm->params.sx_depth, errno);
         status = UCC_ERR_NO_RESOURCE;
@@ -263,7 +267,7 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
         ucc_list_add_tail(&comm->bpool, &comm->pp[i].super);
     }
 
-    comm->mcast.swr.wr.ud.ah          = comm->mcast.ah;
+    comm->mcast.swr.wr.ud.ah          = comm->mcast.groups[0].ah;
     comm->mcast.swr.num_sge           = 1;
     comm->mcast.swr.sg_list           = &comm->mcast.ssg;
     comm->mcast.swr.opcode            = IBV_WR_SEND_WITH_IMM;
@@ -325,8 +329,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     return UCC_INPROGRESS;
                 }
 
-                comm->mcast_addr     = net_addr;
-                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST;
+                comm->mcast.groups[0].mcast_addr = net_addr;
+                tl_team->mcast_state             = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST;
 
                 return UCC_INPROGRESS;
             }
@@ -373,11 +377,11 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 
                 if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY) {
                     /* rank 0 bcast the lid/gid to other processes */
-                    data->status    = UCC_OK;
-                    data->dgid      = comm->event->param.ud.ah_attr.grh.dgid;
-                    data->dlid      = comm->event->param.ud.ah_attr.dlid;
-                    comm->mcast_lid = data->dlid;
-                    comm->mgid      = data->dgid;
+                    data->status               = UCC_OK;
+                    data->dgid                 = comm->event->param.ud.ah_attr.grh.dgid;
+                    data->dlid                 = comm->event->param.ud.ah_attr.dlid;
+                    comm->mcast.groups[0].lid  = data->dlid;
+                    comm->mcast.groups[0].mgid = data->dgid;
                 } else {
                     /* rank 0 bcast the failed status to other processes so others do not hang */
                     data->status = UCC_ERR_NO_RESOURCE;
@@ -522,8 +526,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     return status;
                 }
 
-                comm->mcast_addr     = net_addr;
-                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST;
+                comm->mcast.groups[0].mcast_addr = net_addr;
+                tl_team->mcast_state             = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST;
 
                 return UCC_INPROGRESS;
             }
@@ -549,8 +553,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 
                 ucc_assert(comm->event != NULL);
 
-                comm->mcast_lid  = comm->group_setup_info->dlid;
-                comm->mgid       = comm->group_setup_info->dgid;
+                comm->mcast.groups[0].lid  = comm->group_setup_info->dlid;
+                comm->mcast.groups[0].mgid = comm->group_setup_info->dgid;
 
                 ucc_free(comm->group_setup_info);
                 if (comm->event) {

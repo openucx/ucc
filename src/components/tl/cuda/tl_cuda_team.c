@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -22,6 +22,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         ucc_derived_of(tl_context, ucc_tl_cuda_context_t);
     ucc_tl_cuda_lib_t     *lib =
         ucc_derived_of(tl_context->lib, ucc_tl_cuda_lib_t);
+    // Number of preallocated resource groups for tasks, including the active set.
+    uint32_t      resource_num = lib->cfg.max_concurrent * 2;
     ucc_tl_cuda_shm_barrier_t *bar;
     ucc_status_t status;
     int shm_id, i, j;
@@ -45,7 +47,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
         return UCC_ERR_NO_MEMORY;
     }
 
-    scratch_size = lib->cfg.max_concurrent * lib->cfg.scratch_size;
+    // active set
+    scratch_size = resource_num * lib->cfg.scratch_size;
     status = CUDA_FUNC(cudaMalloc(&self->scratch.loc, scratch_size));
     if (status != UCC_OK) {
         tl_error(tl_context->lib, "failed to alloc scratch buffer");
@@ -64,6 +67,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
                 lib->cfg.max_concurrent +
                 sizeof(ucc_tl_cuda_shm_barrier_t) * lib->cfg.max_concurrent +
                 sizeof(ucc_tl_cuda_sync_state_t) * lib->cfg.max_concurrent;
+    ctrl_size *= 2; // active sets
 
     shm_id = -1;
     self->sync = (void*)-1;
@@ -77,10 +81,12 @@ UCC_CLASS_INIT_FUNC(ucc_tl_cuda_team_t, ucc_base_context_t *tl_context,
             goto ids_exchange;
         }
         memset(self->sync, 0, ctrl_size);
-        self->bar  = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(self, 0,
-                                                       lib->cfg.max_concurrent);
-        for (i = 0; i < lib->cfg.max_concurrent; i++) {
+        self->bar = (ucc_tl_cuda_shm_barrier_t *)UCC_TL_CUDA_TEAM_SYNC(
+            self, 0, resource_num);
+        /* active set */
+        for (i = 0; i < resource_num; i++) {
             bar = UCC_TL_CUDA_TEAM_BARRIER(self, i);
+            bar->tag = UCC_TL_CUDA_TAG_FREE; // mark as free
             for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
                 status = ucc_tl_cuda_shm_barrier_init(UCC_TL_TEAM_SIZE(self),
                                                       j, bar);
@@ -109,6 +115,7 @@ ids_exchange:
     tl_debug(tl_context->lib, "posted tl team: %p", self);
 
     self->seq_num = 1;
+    self->seq_num_active_set = 1;
     return UCC_OK;
 
 free_devices:
@@ -127,6 +134,8 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
 {
     ucc_tl_cuda_lib_t *lib = ucc_derived_of(self->super.super.context->lib,
                                             ucc_tl_cuda_lib_t);
+    // Number of preallocated resource groups for tasks, including the active set.
+    uint32_t  resource_num = lib->cfg.max_concurrent * 2;
     ucc_tl_cuda_sync_t *sync;
     cudaError_t st;
     int i, j;
@@ -137,7 +146,7 @@ UCC_CLASS_CLEANUP_FUNC(ucc_tl_cuda_team_t)
     }
     if (self->ids) {
         if (self->sync != (void*)-1) {
-            for (i = 0; i < lib->cfg.max_concurrent; i++) {
+            for (i = 0; i < resource_num; i++) {
                 for (j = 0; j < UCC_TL_TEAM_SIZE(self); j++) {
                     if (j == UCC_TL_TEAM_RANK(self)) {
                         continue;
@@ -199,6 +208,8 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
     ucc_tl_cuda_team_t *team = ucc_derived_of(tl_team, ucc_tl_cuda_team_t);
     ucc_tl_cuda_lib_t  *lib  = ucc_derived_of(tl_team->context->lib,
                                               ucc_tl_cuda_lib_t);
+    // Number of preallocated resource groups for tasks, including the active set.
+    uint32_t    resource_num = lib->cfg.max_concurrent * 2;
     ucc_status_t status;
     ucc_tl_cuda_sync_t *sync;
     ucc_tl_cuda_shm_barrier_t *bar;
@@ -268,14 +279,14 @@ ucc_status_t ucc_tl_cuda_team_create_test(ucc_base_team_t *tl_team)
             goto exit_err;
         }
         team->bar = (ucc_tl_cuda_shm_barrier_t*)UCC_TL_CUDA_TEAM_SYNC(team, 0,
-                                                       lib->cfg.max_concurrent);
+                                                       resource_num);
     }
     team->sync_state = (ucc_tl_cuda_sync_state_t*)PTR_OFFSET(team->bar,
                             sizeof(ucc_tl_cuda_shm_barrier_t) *
-                            lib->cfg.max_concurrent);
+                            resource_num);
     CUDA_CHECK_GOTO(cudaStreamCreateWithFlags(&team->stream,
                     cudaStreamNonBlocking), exit_err, status);
-    for (i = 0; i < lib->cfg.max_concurrent; i++) {
+    for (i = 0; i < resource_num; i++) {
         sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
         CUDA_CHECK_GOTO(cudaEventCreateWithFlags(&sync->ipc_event_local,
                                                 cudaEventDisableTiming |
@@ -303,7 +314,7 @@ barrier:
         goto exit_err;
     }
 
-    for (i = 0; i < lib->cfg.max_concurrent; i++) {
+    for (i = 0; i < resource_num; i++) {
         sync = UCC_TL_CUDA_TEAM_SYNC(team, UCC_TL_TEAM_RANK(team), i);
         for (j = 0 ; j < UCC_TL_TEAM_SIZE(team); j++) {
             if (j == UCC_TL_TEAM_RANK(team)) {

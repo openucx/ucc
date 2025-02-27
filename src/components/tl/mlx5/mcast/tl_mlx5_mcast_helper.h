@@ -16,7 +16,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_poll_send(ucc_tl_mlx5_mcast_coll_co
     struct ibv_wc wc;
     int           num_comp;
     
-    num_comp = ibv_poll_cq(comm->scq, 1, &wc);
+    num_comp = ibv_poll_cq(comm->mcast.scq, 1, &wc);
     
     tl_trace(comm->lib, "polled send completions: %d", num_comp);
     
@@ -108,7 +108,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send(ucc_tl_mlx5_mcast_coll_comm_t 
         tl_trace(comm->lib, "post_send, psn %d, length %d, zcopy %d, signaled %d",
                  pp->psn, pp->length, zcopy, swr[0].send_flags & IBV_SEND_SIGNALED);
 
-        if (0 != (rc = ibv_post_send(comm->mcast.qp, &swr[0], &bad_wr))) {
+        if (0 != (rc = ibv_post_send(comm->mcast.groups[0].qp, &swr[0], &bad_wr))) {
             tl_error(comm->lib, "post send failed: ret %d, start_psn %d, to_send %d, "
                     "to_recv %d, length %d, psn %d, inline %d",
                      rc, req->start_psn, req->to_send, req->to_recv,
@@ -202,7 +202,7 @@ static inline int ucc_tl_mlx5_mcast_recv(ucc_tl_mlx5_mcast_coll_comm_t *comm,
     while (num_left > 0)
     {
         memset(wc, 0, sizeof(struct ibv_wc) * POLL_PACKED);
-        num_comp = ibv_poll_cq(comm->rcq, POLL_PACKED, wc);
+        num_comp = ibv_poll_cq(comm->mcast.rcq, POLL_PACKED, wc);
 
         if (num_comp < 0) {
             tl_error(comm->lib, "recv queue poll completion failed %d", num_comp);
@@ -329,19 +329,19 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_send_collective(ucc_tl_mlx5_mcast_c
             mcast_group_index = group_id;
         }
 
-        swr[0].wr.ud.ah = comm->mcast.ah_list[mcast_group_index];
+        swr[0].wr.ud.ah = comm->mcast.groups[mcast_group_index].ah;
 
         tl_trace(comm->lib, "mcast allgather post_send, psn %d, length %d, "
                 "zcopy %d, signaled %d qp->state %d qp->qp_num %d qp->pd %p "
                 "coll_type %d mcast_group_index %d",
                  pp->psn, pp->length, zcopy, swr[0].send_flags &
                  IBV_SEND_SIGNALED,
-                 comm->mcast.qp_list[mcast_group_index]->state,
-                 comm->mcast.qp_list[mcast_group_index]->qp_num,
-                 comm->mcast.qp_list[mcast_group_index]->pd, coll_type,
+                 comm->mcast.groups[mcast_group_index].qp->state,
+                 comm->mcast.groups[mcast_group_index].qp->qp_num,
+                 comm->mcast.groups[mcast_group_index].qp->pd, coll_type,
                  mcast_group_index);
 
-        if (0 != (rc = ibv_post_send(comm->mcast.qp_list[mcast_group_index], &swr[0], &bad_wr))) {
+        if (0 != (rc = ibv_post_send(comm->mcast.groups[mcast_group_index].qp, &swr[0], &bad_wr))) {
             tl_error(comm->lib, "post send failed: ret %d, start_psn %d, to_send %d, "
                       "to_recv %d, length %d, psn %d, inline %d",
                       rc, req->start_psn, req->to_send, req->to_recv,
@@ -398,7 +398,7 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
     while (num_left >  recv_progressed)
     {
         memset(wc, 0, sizeof(sizeof(struct ibv_wc) * POLL_PACKED));
-        num_comp = ibv_poll_cq(comm->rcq, POLL_PACKED, &wc[0]);
+        num_comp = ibv_poll_cq(comm->mcast.rcq, POLL_PACKED, &wc[0]);
 
         if (num_comp < 0) {
             tl_error(comm->lib, "recv queue poll completion failed %d", num_comp);
@@ -460,10 +460,9 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_poll_recv(ucc_tl_mlx5_mcast_coll_co
     uint32_t          psn;
 
     do {
-        num_comp = ibv_poll_cq(comm->rcq, 1, &wc);
+        num_comp = ibv_poll_cq(comm->mcast.rcq, 1, &wc);
 
         if (num_comp > 0) {
-            
             if (IBV_WC_SUCCESS != wc.status) {
                 tl_error(comm->lib, "mcast_poll_recv: %s err %d num_comp",
                         ibv_wc_status_str(wc.status), num_comp);

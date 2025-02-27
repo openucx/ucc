@@ -125,6 +125,15 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
                   mcast_conf.one_sided_reliability_enable),
      UCC_CONFIG_TYPE_BOOL},
 
+    {"MCAST_ZERO_COPY_ALLGATHER_ENABLE", "1", "Enable truly zero copy allgather design for mcast",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.truly_zero_copy_allgather_enabled),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"MCAST_ZERO_COPY_PREPOST_BUCKET_SIZE", "16", "Number of posted recvs during each stage of the pipeline"
+     " in truly zero copy mcast allgather design",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.mcast_prepost_bucket_size),
+     UCC_CONFIG_TYPE_INT},
+
     {"ALLTOALL_SEND_BATCH_SIZE", "2",
      "Number of blocks that are transposed "
      "on the NIC before being sent as a batch to a remote peer",
