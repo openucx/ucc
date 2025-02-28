@@ -14,8 +14,8 @@ ucc_status_t ucc_tl_mlx5_coll_mcast_init(ucc_base_coll_args_t *coll_args,
                                          ucc_base_team_t      *team,
                                          ucc_coll_task_t     **task_h)
 {
-    ucc_status_t        status = UCC_OK;
-    ucc_tl_mlx5_task_t *task   = NULL;
+    ucc_status_t        status  = UCC_OK;
+    ucc_tl_mlx5_task_t *task    = NULL;
     
     status = ucc_tl_mlx5_mcast_check_support(coll_args, team);
     if (UCC_OK != status) {
@@ -35,20 +35,20 @@ ucc_status_t ucc_tl_mlx5_coll_mcast_init(ucc_base_coll_args_t *coll_args,
         if (ucc_unlikely(UCC_OK != status)) {
             goto free_task;
         }
+        *task_h = &(task->super);
         break;
     case UCC_COLL_TYPE_ALLGATHER:
         status = ucc_tl_mlx5_mcast_allgather_init(task);
         if (ucc_unlikely(UCC_OK != status)) {
             goto free_task;
         }
+        *task_h = &(task->super);
         break;
     default:
         status = UCC_ERR_NOT_SUPPORTED;
         tl_trace(team->context->lib, "mcast not supported for this collective type");
         goto free_task;
     }
-
-    *task_h = &(task->super);
 
     tl_debug(UCC_TASK_LIB(task), "initialized mcast collective task %p", task);
 
