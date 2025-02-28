@@ -508,4 +508,33 @@ ucc_tl_ucp_get_radix_from_range(ucc_tl_ucp_team_t *team,
     }
     return radix;
 }
+
+/*
+ * Get the radix for knomial patterns.
+ * If need_scratch is true, the radix is the minimum radix that can be used to fit into scratch buffer.
+ * Otherwise, the radix is the minimum radix that can be used to fit into team size.
+ */
+static inline unsigned ucc_tl_ucp_get_knomial_radix(ucc_tl_ucp_team_t *team,
+                                                    size_t             count,
+                                                    ucc_datatype_t     dtype,
+                                                    ucc_memory_type_t  mem_type,
+                                                    ucc_mrange_uint_t *p,
+                                                    int need_scratch)
+{
+    size_t msgsize = count * ucc_dt_size(dtype);
+    unsigned opt_radix, cfg_radix, radix;
+
+    opt_radix = (mem_type == UCC_MEMORY_TYPE_HOST) ? team->opt_radix_host :
+                                                    team->opt_radix;
+    cfg_radix = ucc_tl_ucp_get_radix_from_range(team, msgsize, mem_type, p,
+                                                opt_radix);
+    if (need_scratch) {
+        radix = ucc_knomial_pattern_get_min_radix(cfg_radix, UCC_TL_TEAM_SIZE(team), count);
+    } else {
+        radix = ucc_min(cfg_radix, UCC_TL_TEAM_SIZE(team));
+
+    }
+    return radix;
+}
+
 #endif

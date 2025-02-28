@@ -82,17 +82,19 @@ ucc_tl_ucp_bcast_sag_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_schedule_t      *schedule;
     ucc_coll_task_t     *task, *rs_task;
     ucc_status_t         status;
-    ucc_kn_radix_t       radix, cfg_radix;
+    ucc_kn_radix_t       radix, cfg_radix, opt_radix;
 
     if (UCC_COLL_ARGS_ACTIVE_SET(&coll_args->args)) {
         /* ActiveSets currently are only supported with KN alg */
         return ucc_tl_ucp_bcast_knomial_init(coll_args, team, task_h);
     }
 
+    opt_radix = (mem_type == UCC_MEMORY_TYPE_HOST) ? tl_team->opt_radix_host :
+                                                     tl_team->opt_radix;
+
     cfg_radix = ucc_tl_ucp_get_radix_from_range(tl_team,
                                                 count * ucc_dt_size(dtype),
-                                                mem_type, p,
-                                                tl_team->opt_radix);
+                                                mem_type, p, opt_radix);
     radix     = ucc_knomial_pattern_get_min_radix(cfg_radix,
                                                   UCC_TL_TEAM_SIZE(tl_team),
                                                   count);
