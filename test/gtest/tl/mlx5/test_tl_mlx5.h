@@ -11,6 +11,11 @@
 #include "components/tl/mlx5/tl_mlx5_dm.h"
 #include "components/tl/mlx5/tl_mlx5_ib.h"
 
+#define CHECK_TEST_STATUS() \
+  if (Test::HasFatalFailure() || Test::IsSkipped()) { \
+    return; \
+  }
+
 typedef ucc_status_t (*ucc_tl_mlx5_create_ibv_ctx_fn_t)(
     char **ib_devname, struct ibv_context **ctx, ucc_base_lib_t *lib);
 

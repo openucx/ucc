@@ -18,6 +18,7 @@ UCC_TEST_F(test_tl_mlx5_rc_qp, create_umr)
 UCC_TEST_F(test_tl_mlx5_rc_qp, connect_loopback)
 {
     create_qp();
+    CHECK_TEST_STATUS();
     connect_qp_loopback();
 }
 
