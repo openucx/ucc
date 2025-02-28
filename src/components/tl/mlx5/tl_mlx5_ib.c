@@ -408,10 +408,10 @@ ucc_status_t ucc_tl_mlx5_create_umr_qp(struct ibv_context *ctx,
                                        ucc_base_lib_t           *lib)
 {
     ucc_status_t               status = UCC_OK;
+    struct ibv_qp_ex *         qp_ex  = NULL;
     struct ibv_qp_init_attr_ex umr_init_attr_ex;
     struct mlx5dv_qp_init_attr umr_mlx5dv_qp_attr;
     struct ibv_port_attr       port_attr;
-    struct ibv_qp_ex *         qp_ex;
 
     memset(&umr_mlx5dv_qp_attr, 0, sizeof(umr_mlx5dv_qp_attr));
     memset(&umr_init_attr_ex, 0, sizeof(umr_init_attr_ex));
@@ -475,8 +475,11 @@ ucc_status_t ucc_tl_mlx5_create_umr_qp(struct ibv_context *ctx,
     return UCC_OK;
 
 failure:
-    if (ibv_destroy_qp(*qp)) {
-        tl_debug(lib, "failed to destroy UMR QP, %m");
+    if (*qp) {
+        if (ibv_destroy_qp(*qp)) {
+            tl_debug(lib, "failed to destroy UMR QP, %m");
+        }
     }
+    *qp = NULL;
     return status;
 }

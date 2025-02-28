@@ -36,9 +36,9 @@ typedef ucc_status_t (*ucc_tl_mlx5_create_rc_qp_fn_t)(
 
 class test_tl_mlx5_rc_qp : public test_tl_mlx5_qp {
   public:
-    ucc_tl_mlx5_qp_t               qp;
+    ucc_tl_mlx5_qp_t               qp     = {};
+    ucc_tl_mlx5_qp_t               umr_qp = {};
     uint32_t                       qpn;
-    ucc_tl_mlx5_qp_t               umr_qp;
     ucc_tl_mlx5_ib_qp_conf_t       umr_qp_conf;
     int                            tx_depth;
     ucc_tl_mlx5_create_rc_qp_fn_t  create_rc_qp;
