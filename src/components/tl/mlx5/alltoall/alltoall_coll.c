@@ -243,6 +243,10 @@ static ucc_status_t ucc_tl_mlx5_fanout_start(ucc_coll_task_t *coll_task)
     tl_debug(UCC_TASK_LIB(task), "fanout start");
     /* start task if completion event received */
     UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_fanout_start", 0);
+    if (team->a2a->node.sbgp->group_rank == team->a2a->node.asr_rank) {
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(
+            task, "mlx5_alltoall_wait-on-data_start", 0);
+    }
     /* Start fanout */
     ucc_progress_enqueue(UCC_TL_CORE_CTX(team)->pq, coll_task);
     return UCC_OK;
@@ -265,6 +269,8 @@ static void ucc_tl_mlx5_fanout_progress(ucc_coll_task_t *coll_task)
             coll_task->status = UCC_INPROGRESS;
             return;
         }
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(
+            task, "mlx5_alltoall_wait-on-data_complete, fanout_start", 0);
     }
 
     if (UCC_OK == ucc_tl_mlx5_node_fanout(team, task)) {
@@ -342,12 +348,14 @@ static ucc_status_t ucc_tl_mlx5_asr_barrier_start(ucc_coll_task_t *coll_task)
                 status = send_done(team, i);
             }
             if (status != UCC_OK) {
-                tl_error(UCC_TASK_LIB(task), "failed  sending barrier notice");
+                tl_error(UCC_TASK_LIB(task), "failed sending barrier notice");
                 return status;
             }
+            UCC_TL_MLX5_PROFILE_REQUEST_EVENT(
+                task, "mlx5_alltoall_barrier_send_posted", 0);
         }
         coll_task->status = UCC_OK;
-        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_barreir_done",
+        UCC_TL_MLX5_PROFILE_REQUEST_EVENT(task, "mlx5_alltoall_barrier_done",
                                           0);
         return ucc_task_complete(coll_task);
     }
