@@ -367,6 +367,14 @@ ucc_status_t ucc_tl_sharp_context_init(ucc_tl_sharp_context_t *sharp_ctx,
         return UCC_ERR_NO_RESOURCE;
     }
 
+    ret = sharp_coll_caps_query(*context, &sharp_ctx->sharp_caps);
+    if (ret < 0) {
+        tl_error(sharp_ctx->super.super.lib, "sharp_coll_caps_query failed: %s(%d)",
+                sharp_coll_strerror(ret), ret);
+        sharp_coll_finalize(*context);
+        return UCC_ERR_NO_RESOURCE;
+    }
+
     return UCC_OK;
 }
 

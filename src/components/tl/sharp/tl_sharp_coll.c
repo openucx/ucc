@@ -408,6 +408,10 @@ ucc_status_t ucc_tl_sharp_reduce_scatter_init(ucc_tl_sharp_task_t *task)
 {
     ucc_coll_args_t *args = &TASK_ARGS(task);
 
+    if (!(TASK_CTX(task)->sharp_caps.support_mask.feature_mask & SHARP_FEATURE_SAT)) {
+       return UCC_ERR_NOT_SUPPORTED;
+    }
+
     if (!ucc_coll_args_is_predefined_dt(args, UCC_RANK_INVALID)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -555,6 +559,10 @@ ucc_status_t ucc_tl_sharp_allgather_start(ucc_coll_task_t *coll_task)
 ucc_status_t ucc_tl_sharp_allgather_init(ucc_tl_sharp_task_t *task)
 {
     ucc_coll_args_t *args = &TASK_ARGS(task);
+
+    if (!(TASK_CTX(task)->sharp_caps.support_mask.feature_mask & SHARP_FEATURE_SAT)) {
+       return UCC_ERR_NOT_SUPPORTED;
+    }
 
     if (!ucc_coll_args_is_predefined_dt(args, UCC_RANK_INVALID)) {
         return UCC_ERR_NOT_SUPPORTED;
