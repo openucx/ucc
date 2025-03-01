@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -12,6 +12,7 @@
 #include "utils/ucc_string.h"
 #include "utils/arch/cpu.h"
 #include "schedule/ucc_schedule_pipelined.h"
+#include "tl_ucp_copy.h"
 #include <limits.h>
 
 #define UCP_CHECK(function, msg, go, ctx)                                      \
@@ -277,6 +278,37 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     }
     ucc_free(prefix);
     prefix = NULL;
+
+
+    switch (self->cfg.local_copy_type) {
+    case UCC_TL_UCP_LOCAL_COPY_TYPE_MC:
+        self->copy.post     = ucc_tl_ucp_mc_copy_post;
+        self->copy.test     = ucc_tl_ucp_mc_copy_test;
+        self->copy.finalize = ucc_tl_ucp_mc_copy_finalize;
+        tl_debug(self->super.super.lib, "using MC for local copy");
+        break;
+    case UCC_TL_UCP_LOCAL_COPY_TYPE_EC:
+    case UCC_TL_UCP_LOCAL_COPY_TYPE_AUTO:
+        self->cfg.local_copy_type = UCC_TL_UCP_LOCAL_COPY_TYPE_EC;
+        self->copy.post     = ucc_tl_ucp_ec_copy_post;
+        self->copy.test     = ucc_tl_ucp_ec_copy_test;
+        self->copy.finalize = ucc_tl_ucp_ec_copy_finalize;
+        tl_debug(self->super.super.lib, "using EC for local copy");
+        break;
+    case UCC_TL_UCP_LOCAL_COPY_TYPE_UCP:
+        self->copy.post     = ucc_tl_ucp_ucp_copy_post;
+        self->copy.test     = ucc_tl_ucp_ucp_copy_test;
+        self->copy.finalize = ucc_tl_ucp_ucp_copy_finalize;
+        tl_debug(self->super.super.lib, "using UCP for local copy");
+        break;
+    default:
+        self->copy.post     = ucc_tl_ucp_ec_copy_post;
+        self->copy.test     = ucc_tl_ucp_ec_copy_test;
+        self->copy.finalize = ucc_tl_ucp_ec_copy_finalize;
+        tl_error(self->super.super.lib,
+                "not valid copy type: %d, using EC copy instead",
+                 self->cfg.local_copy_type);
+    };
 
     tl_debug(self->super.super.lib, "initialized tl context: %p", self);
     return UCC_OK;
