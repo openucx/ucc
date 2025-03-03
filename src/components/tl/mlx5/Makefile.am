@@ -29,6 +29,8 @@ mcast =                                         \
 	mcast/tl_mlx5_mcast_service_coll.c          \
 	mcast/tl_mlx5_mcast_one_sided_reliability.h \
 	mcast/tl_mlx5_mcast_one_sided_reliability.c \
+	mcast/tl_mlx5_mcast_one_sided_progress.h    \
+	mcast/tl_mlx5_mcast_one_sided_progress.c    \
 	mcast/tl_mlx5_mcast_allgather.h             \
 	mcast/tl_mlx5_mcast_allgather.c             \
 	mcast/tl_mlx5_mcast_team.c
