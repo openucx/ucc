@@ -156,43 +156,47 @@ void ucc_tl_sharp_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_sharp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_sharp_task_t);
     int completed;
+    ucc_status_t st1, st2;
 
     if (task->req_handle != NULL) {
         completed = sharp_coll_req_test(task->req_handle);
         if (completed) {
+            st1 = UCC_OK; st2 = UCC_OK;
             switch(TASK_ARGS(task).coll_type){
             case UCC_COLL_TYPE_ALLREDUCE:
                 if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-                    ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
-                                                task->allreduce.s_mem_h);
+                    st1 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                      task->allreduce.s_mem_h);
                 }
-                ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
-                                            task->allreduce.r_mem_h);
+                st2 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                  task->allreduce.r_mem_h);
                 break;
             case UCC_COLL_TYPE_BCAST:
-                ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                st1 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
                                             task->bcast.mem_h);
                 break;
             case UCC_COLL_TYPE_ALLGATHER:
                 if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-                    ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
-                                                task->allgather.s_mem_h);
+                    st1 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                      task->allgather.s_mem_h);
                 }
-                ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
-                                            task->allgather.r_mem_h);
+                st2 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                  task->allgather.r_mem_h);
                 break;
             case UCC_COLL_TYPE_REDUCE_SCATTER:
                 if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-                    ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
-                                                task->reduce_scatter.s_mem_h);
+                    st1 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                      task->reduce_scatter.s_mem_h);
                 }
-                ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
-                                            task->reduce_scatter.r_mem_h);
+                st2 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                  task->reduce_scatter.r_mem_h);
                 break;
             default:
                 break;
             }
-
+            if (ucc_unlikely(st1 != UCC_OK || st2 != UCC_OK)) {
+                tl_warn(UCC_TASK_LIB(task), "ucc_tl_sharp_mem_deregister failed");
+            }
             sharp_coll_req_free(task->req_handle);
             coll_task->status = UCC_OK;
             UCC_TL_SHARP_PROFILE_REQUEST_EVENT(coll_task,
@@ -483,18 +487,31 @@ ucc_status_t ucc_tl_sharp_allgather_start(ucc_coll_task_t *coll_task)
     struct sharp_coll_gather_spec gather_spec;
     size_t                        src_data_size, dst_data_size;
     int                           ret;
+    ucc_status_t                  status;
 
     UCC_TL_SHARP_PROFILE_REQUEST_EVENT(coll_task, "sharp_allgather_start", 0);
 
     src_data_size = ucc_dt_size(dt) * count / UCC_TL_TEAM_SIZE(team);
     dst_data_size = ucc_dt_size(dt) * count;
 
-    if (!UCC_IS_INPLACE(*args)) {
-        ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->src.info.buffer,
-                                  src_data_size, &task->allgather.s_mem_h);
-    }
-    ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->dst.info.buffer,
+    status = ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->dst.info.buffer,
                               dst_data_size, &task->allgather.r_mem_h);
+    if (status != UCC_OK) {
+        tl_error(UCC_TASK_LIB(task), "ucc_tl_sharp_mem_register failed "
+                 "for dst buffer: %s",
+                 ucc_status_string(status));
+        return status;
+    }
+    if (!UCC_IS_INPLACE(*args)) {
+        status = ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->src.info.buffer,
+                                  src_data_size, &task->allgather.s_mem_h);
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task), "ucc_tl_sharp_mem_register failed "
+                     "for src buffer: %s",
+                     ucc_status_string(status));
+            return status;
+        }
+    }
 
     if (!UCC_IS_INPLACE(*args)) {
         gather_spec.sbuf_desc.buffer.ptr = args->src.info.buffer;
@@ -550,7 +567,8 @@ ucc_status_t ucc_tl_sharp_allgather_init(ucc_tl_sharp_task_t *task)
             SHARP_DTYPE_NULL) {
         return UCC_ERR_NOT_SUPPORTED;
     }
-
+    task->allgather.s_mem_h = NULL;
+    task->allgather.r_mem_h = NULL;
     task->super.post     = ucc_tl_sharp_allgather_start;
     task->super.progress = ucc_tl_sharp_collective_progress;
     return UCC_OK;
