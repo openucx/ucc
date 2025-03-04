@@ -91,3 +91,22 @@ ucc_cl_hier_get_context_attr(const ucc_base_context_t *context, /* NOLINT */
     attr->topo_required = 1;
     return UCC_OK;
 }
+
+ucc_status_t ucc_cl_hier_mem_map(const ucc_base_context_t *context, int type, /* NOLINT */
+                                 void *address, size_t len, void *memh, /* NOLINT */
+                                 void *tl_h) /* NOLINT */
+{
+    return UCC_ERR_NOT_SUPPORTED;
+}
+
+ucc_status_t ucc_cl_hier_mem_unmap(const ucc_base_context_t *context, int type, /* NOLINT */
+                                   void *tl_h) /* NOLINT */
+{
+    return UCC_ERR_NOT_SUPPORTED;
+}
+
+ucc_status_t ucc_cl_hier_memh_pack(const ucc_base_context_t *context, /* NOLINT */
+                                   int type, void *memh, void **packed_buffer) /* NOLINT */
+{
+    return UCC_ERR_NOT_SUPPORTED;
+}
