@@ -69,9 +69,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_team_t, ucc_base_context_t *tl_context,
     self->global_sync_req = NULL;
 
     self->a2a = NULL;
-    status    = ucc_tl_mlx5_team_init_alltoall(self);
-    if (UCC_OK != status) {
-        return status;
+    if (ctx->cfg.enable_alltoall) {
+        status = ucc_tl_mlx5_team_init_alltoall(self);
+        if (UCC_OK != status) {
+            return status;
+        }
     }
 
     self->mcast = NULL;
@@ -155,6 +157,7 @@ static inline ucc_status_t ucc_tl_mlx5_alltoall_team_test(ucc_base_team_t *team)
 ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
 {
     ucc_tl_mlx5_team_t            *tl_team      = ucc_derived_of(team, ucc_tl_mlx5_team_t);
+    ucc_tl_mlx5_context_t         *ctx          = UCC_TL_MLX5_TEAM_CTX(tl_team);
     ucc_team_t                    *core_team    = UCC_TL_CORE_TEAM(tl_team);
     ucc_subset_t                   subset       = {.map = UCC_TL_TEAM_MAP(tl_team),
                                                    .myrank = UCC_TL_TEAM_RANK(tl_team)};
@@ -242,7 +245,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
     }
 
     ucc_assert(tl_team->global_sync_req == NULL);
-    
+
     if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_CTX_CHECK &&
         tl_team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_CTX_CHECK) {
         // check if ctx is ready for a2a and mcast
@@ -253,10 +256,15 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         goto initial_sync_post;
     }
 
-    a2a_status = ucc_tl_mlx5_alltoall_team_test(team);
-    if (a2a_status < 0) {
-        tl_warn(team->context->lib, "ALLTOALL tl team: %p creation failed %d",
-                team, a2a_status);
+    if (ctx->cfg.enable_alltoall) {
+        a2a_status = ucc_tl_mlx5_alltoall_team_test(team);
+        if (a2a_status < 0) {
+            tl_warn(team->context->lib,
+                    "ALLTOALL tl team: %p creation failed %d", team,
+                    a2a_status);
+            tl_team->a2a_state = TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE;
+        }
+    } else {
         tl_team->a2a_state = TL_MLX5_TEAM_STATE_ALLTOALL_NOT_AVAILABLE;
     }
 
@@ -269,7 +277,7 @@ ucc_status_t ucc_tl_mlx5_team_create_test(ucc_base_team_t *team)
         }
     }
 
-    if (UCC_OK != a2a_status || UCC_OK != mcast_status) {
+    if (UCC_INPROGRESS == a2a_status || UCC_INPROGRESS == mcast_status) {
         return UCC_INPROGRESS;
     }
 
