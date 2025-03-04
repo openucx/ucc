@@ -40,7 +40,7 @@ static ucc_config_field_t ucc_tl_sharp_context_config_table[] = {
      ucc_offsetof(ucc_tl_sharp_context_config_t, use_rcache),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"REG_THRESH", "256",
+    {"REG_THRESH", "0",
      "Size threshold to register buffers",
      ucc_offsetof(ucc_tl_sharp_context_config_t, reg_threshold),
      UCC_CONFIG_TYPE_MEMUNITS},

@@ -88,6 +88,7 @@ typedef struct ucc_tl_sharp_context {
     ucc_mpool_t                   req_mp;
     ucc_tl_sharp_oob_ctx_t        oob_ctx;
     ucc_rcache_t                 *rcache;
+    struct sharp_coll_caps        sharp_caps;
 } ucc_tl_sharp_context_t;
 UCC_CLASS_DECLARE(ucc_tl_sharp_context_t, const ucc_base_context_params_t *,
                   const ucc_base_config_t *);
