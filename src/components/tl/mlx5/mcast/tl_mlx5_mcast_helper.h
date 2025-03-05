@@ -13,25 +13,52 @@
 
 static inline ucc_status_t ucc_tl_mlx5_mcast_poll_send(ucc_tl_mlx5_mcast_coll_comm_t *comm)
 {
-    struct ibv_wc wc;
-    int           num_comp;
-    
-    num_comp = ibv_poll_cq(comm->mcast.scq, 1, &wc);
-    
-    tl_trace(comm->lib, "polled send completions: %d", num_comp);
-    
+    int               num_comp;
+    struct pp_packet *pp;
+    struct ibv_wc     wc[POLL_PACKED];
+
+    num_comp = ibv_poll_cq(comm->mcast.scq, POLL_PACKED, &wc[0]);
     if (num_comp < 0) {
         tl_error(comm->lib, "send queue poll completion failed %d", num_comp);
         return UCC_ERR_NO_MESSAGE;
     } else if (num_comp > 0) {
-        if (IBV_WC_SUCCESS != wc.status) {
-           tl_error(comm->lib, "mcast_poll_send: %s err %d num_comp",
-                    ibv_wc_status_str(wc.status), num_comp);
-            return UCC_ERR_NO_MESSAGE;
+        tl_trace(comm->lib, "polled send completions: %d", num_comp);
+        for (int i = 0 ; i < num_comp ; i++) {
+            if (IBV_WC_SUCCESS != wc[i].status) {
+                tl_warn(comm->lib, "mcast_poll_send: %s err %d num_comp %d op %ld wr_id\n",
+                        ibv_wc_status_str(wc[i].status), num_comp, wc[i].opcode, wc[i].wr_id);
+                return UCC_ERR_NO_MESSAGE;
+            }
+            switch (wc[i].wr_id) {
+                case MCAST_AG_RDMA_READ_WR:
+                    /* completion of a RDMA Read to remote send buffer during
+                     * reliability protocol */
+                    comm->one_sided.pending_reads--;
+                    tl_trace(comm->lib, "RDMA READ completion, pending reads %d",
+                             comm->one_sided.pending_reads);
+                    break;
+                case MCAST_AG_RDMA_READ_INFO_WR:
+                    tl_trace(comm->lib, "RDMA READ remote slot info completion, pending reads %d",
+                             comm->one_sided.pending_reads);
+                    comm->one_sided.pending_reads--;
+                    break;
+                case MCAST_BCASTSEND_WR:
+                    tl_trace(comm->lib, "completion of mcast send for bcast, opcode %d",
+                             wc[i].opcode);
+                    comm->pending_send--;
+                    break;
+                default:
+                    tl_trace(comm->lib, "completion of mcast send for allgather, opcode %d",
+                             wc[i].opcode);
+                    comm->pending_send--;
+                    pp = (struct pp_packet*)wc[i].wr_id;
+                    assert(pp != 0);
+                    pp->context = 0;
+                    ucc_list_add_tail(&comm->bpool, &pp->super);
+                    break;
+            }
         }
-        comm->pending_send -= num_comp;
     }
-
     return UCC_OK;
 }
 
@@ -409,8 +436,8 @@ static inline int ucc_tl_mlx5_mcast_recv_collective(ucc_tl_mlx5_mcast_coll_comm_
         }
 
         if (IBV_WC_SUCCESS != wc[0].status) {
-            fprintf(stderr, "mcast_recv: %s err pending_recv %d wr_id %ld num_comp %d byte_len %d\n",
-                    ibv_wc_status_str(wc[0].status), comm->pending_recv, wc[0].wr_id, num_comp, wc[0].byte_len);
+            tl_error(comm->lib, "mcast_recv: %s err pending_recv %d wr_id %ld num_comp %d byte_len %d\n",
+                     ibv_wc_status_str(wc[0].status), comm->pending_recv, wc[0].wr_id, num_comp, wc[0].byte_len);
             return -1;
         }
 
