@@ -39,8 +39,9 @@ static inline uint8_t get_umr_mr_flags(uint32_t acc)
 
 typedef struct transpose_seg {
     __be32 element_size; /* 8 bit value */
-    __be16 num_rows;     /* 7 bit value */
+    //From PRM we should have the rows first and then the colls. This is probably a naming error
     __be16 num_cols;     /* 7 bit value */
+    __be16 num_rows;     /* 7 bit value */
     __be64 padding;
 } transpose_seg_t;
 
