@@ -586,7 +586,7 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_post(ucc_tl_mlx5_mcast_coll_context_t 
 ucc_status_t ucc_tl_mlx5_mcast_join_mcast_get_event(ucc_tl_mlx5_mcast_coll_context_t *ctx,
                                                     struct rdma_cm_event **event);
 
-ucc_status_t ucc_tl_mlx5_leave_mcast_group(ucc_tl_mlx5_mcast_coll_context_t *ctx,
-                                           ucc_tl_mlx5_mcast_coll_comm_t    *comm);
+ucc_status_t ucc_tl_mlx5_leave_mcast_groups(ucc_tl_mlx5_mcast_coll_context_t *ctx,
+                                            ucc_tl_mlx5_mcast_coll_comm_t    *comm);
 
 #endif /* TL_MLX5_MCAST_HELPER_H_ */

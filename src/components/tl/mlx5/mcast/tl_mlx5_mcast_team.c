@@ -409,7 +409,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     }
                 } else {
                     /* rank 0 bcast the failed status to other processes so others do not hang */
-                    status = ucc_tl_mlx5_leave_mcast_group(comm->ctx, comm);
+                    status = ucc_tl_mlx5_leave_mcast_groups(comm->ctx, comm);
                     if (status) {
                         tl_error(comm->lib, "couldn't leave mcast group");
                     }
@@ -559,7 +559,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 
             case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED:
             {
-                status = ucc_tl_mlx5_leave_mcast_group(comm->ctx, comm);
+                status = ucc_tl_mlx5_leave_mcast_groups(comm->ctx, comm);
                 if (status) {
                     tl_error(comm->lib, "couldn't leave mcast group");
                 }
