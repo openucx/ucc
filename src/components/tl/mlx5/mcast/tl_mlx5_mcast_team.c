@@ -111,6 +111,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     comm->comm_id                       = team_params->id;
     comm->ctx                           = mcast_context;
     comm->mcast_group_count             = 1; /* TODO: add support for more number of mcast groups */
+    comm->bcast_comm.truly_zero_copy_bcast_enabled
+                                        = conf_params->truly_zero_copy_bcast_enabled;
 
     if (comm->cuda_mem_enabled && (UCC_OK != ucc_tl_mlx5_check_gpudirect_driver())) {
         tl_warn(mcast_context->lib, "cuda-aware mcast not available as gpu direct is not ready");
