@@ -118,6 +118,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm_init_spec {
     int                               cuda_mem_enabled;
     int                               one_sided_reliability_enable;
     int                               truly_zero_copy_allgather_enabled;
+    int                               truly_zero_copy_bcast_enabled;
     int                               mcast_prepost_bucket_size;
     void                             *oob;
 } ucc_tl_mlx5_mcast_coll_comm_init_spec_t;
@@ -302,6 +303,9 @@ typedef struct ucc_tl_mlx5_mcast_bcast_comm {
     int           nacks_counter;
     int           n_mcast_reliable;
     int           wsize;
+    uint32_t      mcast_prepost_bucket_size;
+    uint8_t       truly_zero_copy_bcast_enabled;
+    int           coll_counter;
 } ucc_tl_mlx5_mcast_bcast_comm_t;
 
 typedef struct ucc_tl_mlx5_mcast_coll_comm {
@@ -446,6 +450,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_req {
     void                                               *recv_rreg;
     ucc_ee_executor_task_t                             *exec_task;
     ucc_coll_task_t                                    *coll_task;
+    ucc_status_t (*progress)                           (void *req);
 } ucc_tl_mlx5_mcast_coll_req_t;
 
 typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {
