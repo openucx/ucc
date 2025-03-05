@@ -43,10 +43,16 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
         return status;
     }
 
-    status = tl_mlx5_rcache_create(self);
-    if (UCC_OK != status) {
-        tl_debug(self->super.super.lib, "failed to create rcache");
-        goto err_rcache;
+    if (self->cfg.enable_alltoall) {
+        status = tl_mlx5_rcache_create(self);
+        if (UCC_OK != status) {
+            tl_debug(self->super.super.lib, "failed to create rcache");
+            goto err_rcache;
+        }
+    } else {
+        tl_debug(self->super.super.lib,
+                 "alltoall is disabled by the env variable "
+                 "`UCC_TL_MLX5_ALLTOALL_ENABLE`");
     }
 
     self->mcast.mcast_ctx_ready = 0;
@@ -179,6 +185,10 @@ ucc_status_t ucc_tl_mlx5_context_ib_ctx_pd_setup(ucc_base_context_t *context)
     ucc_tl_team_t *  steam;
     ucc_coll_task_t *req;
     ucc_tl_mlx5_context_create_sbcast_data_t *sbcast_data;
+
+    if (!ctx->cfg.enable_alltoall) {
+        return UCC_OK;
+    }
 
     if (!core_ctx->service_team) {
         tl_debug(context->lib, "failed to init ctx: need service team");
