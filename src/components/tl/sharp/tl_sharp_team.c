@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -99,16 +99,8 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
          SHARP_DTYPE_UNKNOWN) ||
         (ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(SHARP_DTYPE_BFLOAT16)] ==
          SHARP_DTYPE_UNKNOWN)) {
-        struct sharp_coll_caps sharp_caps;
-        ret = sharp_coll_caps_query(sharp_ctx, &sharp_caps);
-        if (ret < 0) {
-            status = sharp_status_to_ucc_status(ret);
-            tl_error(ctx->super.super.lib, "sharp_coll_caps_query failed: %s(%d)",
-                    sharp_coll_strerror(ret), ret);
-            goto cleanup;
-        }
 
-        if (sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_INT8)) {
+        if (ctx->sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_INT8)) {
             tl_debug(ctx->super.super.lib, "enabling support for UCC_DT_INT8");
             ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_INT8)] = SHARP_DTYPE_INT8;
         } else {
@@ -116,7 +108,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
             ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_INT8)] = SHARP_DTYPE_NULL;
         }
 
-        if (sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_UINT8)) {
+        if (ctx->sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_UINT8)) {
             tl_debug(ctx->super.super.lib, "enabling support for UCC_DT_UINT8");
             ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_UINT8)] = SHARP_DTYPE_UINT8;
         } else {
@@ -125,7 +117,7 @@ UCC_CLASS_INIT_FUNC(ucc_tl_sharp_team_t, ucc_base_context_t *tl_context,
         }
 
 
-        if (sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_BFLOAT16)) {
+        if (ctx->sharp_caps.support_mask.dtypes & UCC_BIT(SHARP_DTYPE_BFLOAT16)) {
             tl_debug(ctx->super.super.lib, "enabling support for UCC_DT_BFLOAT16");
             ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(UCC_DT_BFLOAT16)] = SHARP_DTYPE_BFLOAT16;
         } else {
@@ -253,6 +245,11 @@ ucc_status_t ucc_tl_sharp_coll_init(ucc_base_coll_args_t *coll_args,
 #if HAVE_DECL_SHARP_COLL_DO_REDUCE_SCATTER
     case UCC_COLL_TYPE_REDUCE_SCATTER:
         status = ucc_tl_sharp_reduce_scatter_init(task);
+        break;
+#endif
+#if HAVE_DECL_SHARP_COLL_DO_ALLGATHER
+    case UCC_COLL_TYPE_ALLGATHER:
+        status = ucc_tl_sharp_allgather_init(task);
         break;
 #endif
     default:
