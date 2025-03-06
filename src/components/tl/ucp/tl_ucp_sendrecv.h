@@ -228,7 +228,7 @@ static inline ucc_status_t ucc_tl_ucp_send_nz(void *buffer, size_t msglen,
 static inline ucc_status_t find_tl_index(ucc_mem_map_mem_h map_memh, int *tl_index)
 {
     ucc_mem_map_memh_t *memh = (ucc_mem_map_memh_t *)map_memh;
-    int i = 0;
+    int                 i    = 0;
 
     for (; i < memh->num_tls; i++) {
         if (strncmp(memh->tl_h[i].tl_name, "ucp", 3) == 0) {
