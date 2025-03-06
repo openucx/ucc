@@ -601,15 +601,10 @@ ucc_status_t ucc_tl_ucp_mem_map_memhbuf(ucc_tl_ucp_context_t *ctx,
 
     status = ucp_mem_map(ctx->worker.ucp_context, &mmap_params, mh);
     if (UCS_OK != status) {
-        if (status != UCS_ERR_UNREACHABLE) {
-            tl_error(ctx->super.super.lib,
-                     "ucp_mem_map failed with error code: %s",
-                     ucs_status_string(status));
-            return ucs_status_to_ucc_status(status);
-        } else {
-            tl_warn(ctx->super.super.lib,
-                     "ucp_mem_map cannot map exported memory handles");
-        }
+        tl_error(ctx->super.super.lib,
+                 "ucp_mem_map failed with error code: %s",
+                 ucs_status_string(status));
+        return ucs_status_to_ucc_status(status);
     }
     return UCC_OK;
 }
@@ -716,6 +711,8 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_t
                                                        m_data, memh, tl_h);
         if (UCC_OK != ucc_status) {
             tl_error(ctx->super.super.lib, "failed to import memory handle");
+            ucc_free(m_data);
+            return ucc_status;
         }
     }
 
@@ -748,7 +745,7 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
     } else if (type == UCC_MEM_MAP_TYPE_GLOBAL || type == UCC_MEM_MAP_TYPE_OFFLOAD_IMPORT) {
         // need to free rkeys (data->rkey) , packed memh (data->packed_memh)
         if (data->packed_memh) {
-            ucc_free(data->packed_memh);
+            ucp_memh_buffer_release(data->packed_memh, NULL);
         }
         if (data->rinfo.packed_key) {
             ucp_rkey_buffer_release(data->rinfo.packed_key);
@@ -763,11 +760,13 @@ ucc_status_t ucc_tl_ucp_mem_unmap(const ucc_base_context_t *context, ucc_mem_map
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context, ucc_mem_map_type_t type, ucc_mem_map_tl_t *tl_h,
+ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context,
+                                  ucc_mem_map_type_t type, ucc_mem_map_tl_t *tl_h,
                                   void **pack_buffer)
 {
-    ucc_tl_ucp_context_t   *ctx    = ucc_derived_of(context, ucc_tl_ucp_context_t);
-    ucc_tl_ucp_memh_data_t *data   = tl_h->tl_data;
+    ucc_tl_ucp_context_t   *ctx        = ucc_derived_of(context, ucc_tl_ucp_context_t);
+    ucc_tl_ucp_memh_data_t *data       = tl_h->tl_data;
+    ucc_status_t            ucc_status = UCC_OK;
     void                   *packed_buffer;
     size_t                 *key_size;
     size_t                 *memh_size;
@@ -788,7 +787,7 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context, ucc_mem_map
             // we don't support memory pack, or it failed
             tl_debug(ctx->super.super.lib, "ucp_memh_pack() returned error %s",
                      ucs_status_string(status));
-            data->packed_memh     = 0;
+            data->packed_memh     = NULL;
             data->packed_memh_len = 0;
         }
     }
@@ -798,7 +797,8 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context, ucc_mem_map
     if (status != UCS_OK) {
         tl_error(ctx->super.super.lib, "unable to pack rkey with error %s",
                  ucs_status_string(status));
-        return ucs_status_to_ucc_status(status);
+        ucc_status = ucs_status_to_ucc_status(status);
+        goto failed_rkey_pack;
     }
     /*
      * data order
@@ -812,7 +812,8 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context, ucc_mem_map
         tl_error(ctx->super.super.lib,
                  "failed to allocate a packed buffer of size %lu",
                  data->packed_memh_len + data->rinfo.packed_key_len + 2 * sizeof(size_t));
-        return UCC_ERR_NO_MEMORY;
+        ucc_status = UCC_ERR_NO_MEMORY;
+        goto failed_alloc_buffer;
     }
     key_size   = packed_buffer;
     *key_size  = data->rinfo.packed_key_len;
@@ -827,7 +828,15 @@ ucc_status_t ucc_tl_ucp_memh_pack(const ucc_base_context_t *context, ucc_mem_map
     tl_h->packed_size =
         sizeof(size_t) * 2 + data->packed_memh_len + data->rinfo.packed_key_len;
     *pack_buffer = packed_buffer;
-    return UCC_OK;
+    return ucc_status;
+
+failed_alloc_buffer:
+    ucp_rkey_buffer_release(data->rinfo.packed_key);
+failed_rkey_pack:
+    if (data->packed_memh) {
+        ucp_memh_buffer_release(data->packed_memh, NULL);
+    }
+    return ucc_status;
 }
 
 ucc_status_t ucc_tl_ucp_get_context_attr(const ucc_base_context_t *context,

@@ -1211,6 +1211,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
             ctx->n_tl_ctx, sizeof(ucc_mem_map_tl_t), "tl memh");
         if (!local_memh->tl_h) {
             ucc_error("failed to allocate a local memory handle");
+            ucc_free(local_memh);
             return UCC_ERR_NO_MEMORY;
         }
         local_memh->address = params->segments[0].address;
