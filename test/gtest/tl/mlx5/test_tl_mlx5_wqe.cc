@@ -98,6 +98,7 @@ UCC_TEST_P(test_tl_mlx5_rdma_write, RdmaWriteWqe)
 
     bufsize = GetParam();
     buffers_init();
+    CHECK_TEST_STATUS();
 
     memset(&sg, 0, sizeof(sg));
     sg.addr   = (uintptr_t)src;
@@ -117,6 +118,7 @@ UCC_TEST_P(test_tl_mlx5_rdma_write, RdmaWriteWqe)
     // This work request is posted with wr_id = 0
     GTEST_ASSERT_EQ(ibv_post_send(qp.qp, &wr, NULL), 0);
     wait_for_completion();
+    CHECK_TEST_STATUS();
 
     validate_buffers();
 }
@@ -125,6 +127,7 @@ UCC_TEST_P(test_tl_mlx5_rdma_write, CustomRdmaWriteWqe)
 {
     bufsize = GetParam();
     buffers_init();
+    CHECK_TEST_STATUS();
 
     ibv_wr_start(qp.qp_ex);
     post_rdma_write(qp.qp, qpn, nullptr, (uintptr_t)src, bufsize, src_mr->lkey,
@@ -132,6 +135,7 @@ UCC_TEST_P(test_tl_mlx5_rdma_write, CustomRdmaWriteWqe)
                     IBV_SEND_SIGNALED | IBV_SEND_FENCE, 0);
     GTEST_ASSERT_EQ(ibv_wr_complete(qp.qp_ex), 0);
     wait_for_completion();
+    CHECK_TEST_STATUS();
 
     validate_buffers();
 }
@@ -143,6 +147,7 @@ UCC_TEST_P(test_tl_mlx5_dm, MemcpyToDeviceMemory)
 {
     bufsize = GetParam();
     buffers_init();
+    CHECK_TEST_STATUS();
     if (!dm_ptr) {
         return;
     }
@@ -165,6 +170,7 @@ UCC_TEST_P(test_tl_mlx5_dm, RdmaToDeviceMemory)
 
     bufsize = GetParam();
     buffers_init();
+    CHECK_TEST_STATUS();
     if (!dm_ptr) {
         return;
     }
@@ -187,6 +193,7 @@ UCC_TEST_P(test_tl_mlx5_dm, RdmaToDeviceMemory)
 
     GTEST_ASSERT_EQ(ibv_post_send(qp.qp, &wr, NULL), 0);
     wait_for_completion();
+    CHECK_TEST_STATUS();
 
     // RDMA write from device memory to host destination
     memset(&sg, 0, sizeof(sg));
@@ -206,6 +213,7 @@ UCC_TEST_P(test_tl_mlx5_dm, RdmaToDeviceMemory)
 
     GTEST_ASSERT_EQ(ibv_post_send(qp.qp, &wr, NULL), 0);
     wait_for_completion();
+    CHECK_TEST_STATUS();
 
     validate_buffers();
 }
@@ -214,6 +222,7 @@ UCC_TEST_P(test_tl_mlx5_dm, CustomRdmaToDeviceMemory)
 {
     bufsize = GetParam();
     buffers_init();
+    CHECK_TEST_STATUS();
     if (!dm_ptr) {
         return;
     }
@@ -225,6 +234,7 @@ UCC_TEST_P(test_tl_mlx5_dm, CustomRdmaToDeviceMemory)
                     IBV_SEND_SIGNALED | IBV_SEND_FENCE, 0);
     GTEST_ASSERT_EQ(ibv_wr_complete(qp.qp_ex), 0);
     wait_for_completion();
+    CHECK_TEST_STATUS();
 
     // RDMA write from device memory to host destination
     ibv_wr_start(qp.qp_ex);
@@ -233,6 +243,7 @@ UCC_TEST_P(test_tl_mlx5_dm, CustomRdmaToDeviceMemory)
                     IBV_SEND_SIGNALED | IBV_SEND_FENCE, 0);
     GTEST_ASSERT_EQ(ibv_wr_complete(qp.qp_ex), 0);
     wait_for_completion();
+    CHECK_TEST_STATUS();
 
     validate_buffers();
 }

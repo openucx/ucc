@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -136,9 +136,9 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, reduce_scatter_kn_radix),
      UCC_CONFIG_TYPE_UINT},
 
-    {"ALLGATHER_KN_RADIX", "4", "Radix of the knomial allgather algorithm",
+    {"ALLGATHER_KN_RADIX", "auto", "Radix of the knomial allgather algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, allgather_kn_radix),
-     UCC_CONFIG_TYPE_UINT},
+     UCC_CONFIG_TYPE_UINT_RANGED},
 
     {"BCAST_KN_RADIX", "4", "Radix of the recursive-knomial bcast algorithm",
      ucc_offsetof(ucc_tl_ucp_lib_config_t, bcast_kn_radix),
@@ -208,6 +208,14 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
 
     {NULL}};
 
+const char* ucc_tl_ucp_local_copy_names[] = {
+    [UCC_TL_UCP_LOCAL_COPY_TYPE_UCP]  = "ucp",
+    [UCC_TL_UCP_LOCAL_COPY_TYPE_MC]   = "mc",
+    [UCC_TL_UCP_LOCAL_COPY_TYPE_EC]   = "ec",
+    [UCC_TL_UCP_LOCAL_COPY_TYPE_AUTO] = "auto",
+    [UCC_TL_UCP_LOCAL_COPY_TYPE_LAST] = NULL
+};
+
 static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_ucp_context_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_context_config_table)},
@@ -245,6 +253,12 @@ static ucs_config_field_t ucc_tl_ucp_context_config_table[] = {
      "calls to service worker progress function",
      ucc_offsetof(ucc_tl_ucp_context_config_t, service_throttling_thresh),
      UCC_CONFIG_TYPE_UINT},
+
+     {"LOCAL_COPY_TYPE", "auto",
+      "Determines what component is responsible for doing local copy "
+      "during collective execution",
+      ucc_offsetof(ucc_tl_ucp_context_config_t, local_copy_type),
+      UCC_CONFIG_TYPE_ENUM(ucc_tl_ucp_local_copy_names)},
 
     {NULL}};
 

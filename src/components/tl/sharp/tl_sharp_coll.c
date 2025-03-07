@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -156,21 +156,46 @@ void ucc_tl_sharp_collective_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_sharp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_sharp_task_t);
     int completed;
+    ucc_status_t st1, st2;
 
     if (task->req_handle != NULL) {
         completed = sharp_coll_req_test(task->req_handle);
         if (completed) {
-            if (TASK_ARGS(task).coll_type == UCC_COLL_TYPE_ALLREDUCE) {
+            st1 = UCC_OK; st2 = UCC_OK;
+            switch(TASK_ARGS(task).coll_type){
+            case UCC_COLL_TYPE_ALLREDUCE:
                 if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
-                    ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
-                                                task->allreduce.s_mem_h);
+                    st1 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                      task->allreduce.s_mem_h);
                 }
-                ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
-                                            task->allreduce.r_mem_h);
-            }
-            if (TASK_ARGS(task).coll_type == UCC_COLL_TYPE_BCAST) {
-                ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                st2 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                  task->allreduce.r_mem_h);
+                break;
+            case UCC_COLL_TYPE_BCAST:
+                st1 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
                                             task->bcast.mem_h);
+                break;
+            case UCC_COLL_TYPE_ALLGATHER:
+                if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
+                    st1 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                      task->allgather.s_mem_h);
+                }
+                st2 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                  task->allgather.r_mem_h);
+                break;
+            case UCC_COLL_TYPE_REDUCE_SCATTER:
+                if (!UCC_IS_INPLACE(TASK_ARGS(task))) {
+                    st1 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                      task->reduce_scatter.s_mem_h);
+                }
+                st2 = ucc_tl_sharp_mem_deregister(TASK_TEAM(task),
+                                                  task->reduce_scatter.r_mem_h);
+                break;
+            default:
+                break;
+            }
+            if (ucc_unlikely(st1 != UCC_OK || st2 != UCC_OK)) {
+                tl_warn(UCC_TASK_LIB(task), "ucc_tl_sharp_mem_deregister failed");
             }
             sharp_coll_req_free(task->req_handle);
             coll_task->status = UCC_OK;
@@ -383,6 +408,10 @@ ucc_status_t ucc_tl_sharp_reduce_scatter_init(ucc_tl_sharp_task_t *task)
 {
     ucc_coll_args_t *args = &TASK_ARGS(task);
 
+    if (!(TASK_CTX(task)->sharp_caps.support_mask.feature_mask & SHARP_FEATURE_SAT)) {
+       return UCC_ERR_NOT_SUPPORTED;
+    }
+
     if (!ucc_coll_args_is_predefined_dt(args, UCC_RANK_INVALID)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
@@ -450,3 +479,106 @@ ucc_status_t ucc_tl_sharp_barrier_init(ucc_tl_sharp_task_t *task)
     task->super.progress = ucc_tl_sharp_collective_progress;
     return UCC_OK;
 };
+
+#if HAVE_DECL_SHARP_COLL_DO_ALLGATHER
+ucc_status_t ucc_tl_sharp_allgather_start(ucc_coll_task_t *coll_task)
+{
+    ucc_tl_sharp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_sharp_task_t);
+    ucc_tl_sharp_team_t *team  = TASK_TEAM(task);
+    ucc_coll_args_t     *args  = &TASK_ARGS(task);
+    size_t               count = args->dst.info.count;
+    ucc_datatype_t       dt    = args->dst.info.datatype;
+    struct sharp_coll_gather_spec gather_spec;
+    size_t                        src_data_size, dst_data_size;
+    int                           ret;
+    ucc_status_t                  status;
+
+    UCC_TL_SHARP_PROFILE_REQUEST_EVENT(coll_task, "sharp_allgather_start", 0);
+
+    src_data_size = ucc_dt_size(dt) * count / UCC_TL_TEAM_SIZE(team);
+    dst_data_size = ucc_dt_size(dt) * count;
+
+    status = ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->dst.info.buffer,
+                              dst_data_size, &task->allgather.r_mem_h);
+    if (status != UCC_OK) {
+        tl_error(UCC_TASK_LIB(task), "ucc_tl_sharp_mem_register failed "
+                 "for dst buffer: %s",
+                 ucc_status_string(status));
+        return status;
+    }
+    if (!UCC_IS_INPLACE(*args)) {
+        status = ucc_tl_sharp_mem_register(TASK_CTX(task), team, args->src.info.buffer,
+                                  src_data_size, &task->allgather.s_mem_h);
+        if (status != UCC_OK) {
+            tl_error(UCC_TASK_LIB(task), "ucc_tl_sharp_mem_register failed "
+                     "for src buffer: %s",
+                     ucc_status_string(status));
+            return status;
+        }
+    }
+
+    if (!UCC_IS_INPLACE(*args)) {
+        gather_spec.sbuf_desc.buffer.ptr = args->src.info.buffer;
+        gather_spec.sbuf_desc.buffer.mem_handle = task->allgather.s_mem_h->mr;
+        gather_spec.sbuf_desc.mem_type =
+            ucc_to_sharp_memtype[args->src.info.mem_type];
+    } else {
+        gather_spec.sbuf_desc.buffer.ptr = PTR_OFFSET(args->dst.info.buffer,
+                                                      UCC_TL_TEAM_RANK(team) *
+                                                      src_data_size);
+        gather_spec.sbuf_desc.buffer.mem_handle = task->allgather.r_mem_h->mr;
+        gather_spec.sbuf_desc.mem_type =
+            ucc_to_sharp_memtype[args->dst.info.mem_type];
+    }
+    gather_spec.sbuf_desc.buffer.length = src_data_size;
+    gather_spec.sbuf_desc.type = SHARP_DATA_BUFFER;
+
+    gather_spec.rbuf_desc.buffer.ptr        = args->dst.info.buffer;
+    gather_spec.rbuf_desc.buffer.length     = dst_data_size;
+    gather_spec.rbuf_desc.buffer.mem_handle = task->allgather.r_mem_h->mr;
+    gather_spec.rbuf_desc.type              = SHARP_DATA_BUFFER;
+    gather_spec.rbuf_desc.mem_type =
+        ucc_to_sharp_memtype[args->dst.info.mem_type];
+    gather_spec.offset    = 0;
+    gather_spec.dtype = SHARP_DTYPE_INT8;
+
+    ret = sharp_coll_do_allgather_nb(team->sharp_comm, &gather_spec,
+                                     &task->req_handle);
+    if (ret != SHARP_COLL_SUCCESS) {
+        tl_error(UCC_TASK_LIB(task),
+                 "sharp_coll_do_allgather_nb failed:%s",
+                 sharp_coll_strerror(ret));
+        coll_task->status = ucc_tl_sharp_status_to_ucc(ret);
+        return ucc_task_complete(coll_task);
+    }
+    coll_task->status = UCC_INPROGRESS;
+
+    return ucc_progress_queue_enqueue(UCC_TL_CORE_CTX(team)->pq, &task->super);
+}
+
+ucc_status_t ucc_tl_sharp_allgather_init(ucc_tl_sharp_task_t *task)
+{
+    ucc_coll_args_t *args = &TASK_ARGS(task);
+
+    if (!(TASK_CTX(task)->sharp_caps.support_mask.feature_mask & SHARP_FEATURE_SAT)) {
+       return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if (!ucc_coll_args_is_predefined_dt(args, UCC_RANK_INVALID)) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+
+    if ((!UCC_IS_INPLACE(*args) &&
+        ucc_to_sharp_memtype[args->src.info.mem_type] == SHARP_MEM_TYPE_LAST) ||
+        ucc_to_sharp_memtype[args->dst.info.mem_type] == SHARP_MEM_TYPE_LAST ||
+        ucc_to_sharp_dtype[UCC_DT_PREDEFINED_ID(args->dst.info.datatype)] ==
+            SHARP_DTYPE_NULL) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    task->allgather.s_mem_h = NULL;
+    task->allgather.r_mem_h = NULL;
+    task->super.post     = ucc_tl_sharp_allgather_start;
+    task->super.progress = ucc_tl_sharp_collective_progress;
+    return UCC_OK;
+};
+#endif
