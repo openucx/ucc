@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -200,6 +200,14 @@ static inline void get_rs_work_buf(ucc_tl_ucp_task_t *task,
     }
 }
 
+/* return the rank of the peer for the given rank and pattern
+   taken into account the root and map */
+static inline ucc_rank_t get_physical_rank(ucc_tl_ucp_task_t *task, ucc_rank_t rank,
+                                           ucc_rank_t root, ucc_rank_t size)
+{
+    return INV_VRANK(ucc_ep_map_eval(task->subset.map, rank), root, size);
+}
+
 void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
 {
     ucc_tl_ucp_task_t        *task            = ucc_derived_of(coll_task,
@@ -236,9 +244,8 @@ void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     block_count = ucc_sra_kn_compute_block_count(count, rank, p);
     get_rs_work_buf(task, block_count, &wb);
     if (KN_NODE_EXTRA == node_type) {
-        peer = ucc_ep_map_eval(task->subset.map,
-                               ucc_knomial_pattern_get_proxy(p, rank));
-        peer = INV_VRANK(peer, root, size);
+        peer = get_physical_rank(task, ucc_knomial_pattern_get_proxy(p, rank),
+                                 root, size);
         UCPCHECK_GOTO(ucc_tl_ucp_send_nb(wb.src_data, data_size, mem_type,
                                          peer, team, task),
                       task, out);
@@ -250,9 +257,8 @@ void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     }
 
     if (KN_NODE_PROXY == node_type) {
-        peer = ucc_ep_map_eval(task->subset.map,
-                               ucc_knomial_pattern_get_extra(p, rank));
-        peer = INV_VRANK(peer, root, size);
+        peer = get_physical_rank(task, ucc_knomial_pattern_get_extra(p, rank),
+                                 root, size);
         UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(wb.dst_proxy, data_size, mem_type,
                                          peer, team, task),
                       task, out);
@@ -298,8 +304,7 @@ UCC_KN_PHASE_EXTRA_REDUCE:
             }
             ucc_kn_rs_pattern_peer_seg(peer, p, &peer_seg_count,
                                        &peer_seg_offset);
-            peer = INV_VRANK(ucc_ep_map_eval(task->subset.map, peer), root,
-                             size);
+            peer = get_physical_rank(task, peer, root, size);
             UCPCHECK_GOTO(
                 ucc_tl_ucp_send_nb(PTR_OFFSET(wb.src_loop, peer_seg_offset * dt_size),
                                    peer_seg_count * dt_size, mem_type, peer,

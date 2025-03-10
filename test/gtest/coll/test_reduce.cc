@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -286,6 +286,9 @@ template <typename T> class test_reduce_dbt : public test_reduce<T> {
 template <typename T> class test_reduce_2step : public test_reduce<T> {
 };
 
+template <typename T> class test_reduce_srg : public test_reduce<T> {
+};
+
 #define TEST_DECLARE_WITH_ENV(_env, _n_procs, _persistent)                     \
     {                                                                          \
         UccJob        job(_n_procs, UccJob::UCC_JOB_CTX_GLOBAL, _env);         \
@@ -324,13 +327,15 @@ template <typename T> class test_reduce_2step : public test_reduce<T> {
 TYPED_TEST_CASE(test_reduce_avg_order, CollReduceTypeOpsAvg);
 TYPED_TEST_CASE(test_reduce_dbt, CollReduceTypeOpsHost);
 TYPED_TEST_CASE(test_reduce_2step, CollReduceTypeOpsHost);
+TYPED_TEST_CASE(test_reduce_srg, CollReduceTypeOpsHost);
 
 ucc_job_env_t post_op_env      = {{"UCC_TL_UCP_REDUCE_AVG_PRE_OP", "0"}};
 ucc_job_env_t reduce_dbt_env   = {{"UCC_TL_UCP_TUNE", "reduce:@dbt:0-inf:inf"},
                                   {"UCC_CLS", "basic"}};
 ucc_job_env_t reduce_2step_env = {{"UCC_CL_HIER_TUNE", "reduce:@2step:0-inf:inf"},
                                   {"UCC_CLS", "all"}};
-
+ucc_job_env_t reduce_srg_env   = {{"UCC_TL_UCP_TUNE", "reduce:@srg:0-inf:inf"},
+                                  {"UCC_CLS", "basic"}};
 TYPED_TEST(test_reduce_avg_order, avg_post_op) {
     TEST_DECLARE_WITH_ENV(post_op_env, 15, true);
 }
@@ -345,4 +350,8 @@ TYPED_TEST(test_reduce_dbt, reduce_dbt_mirror) {
 
 TYPED_TEST(test_reduce_2step, 2step) {
     TEST_DECLARE_WITH_ENV(reduce_2step_env, 16, false);
+}
+
+TYPED_TEST(test_reduce_srg, srg) {
+    TEST_DECLARE_WITH_ENV(reduce_srg_env, 15, false);
 }
