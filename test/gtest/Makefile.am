@@ -39,7 +39,7 @@ VALGRIND_ARGS = \
 	--suppressions=$(top_srcdir)/contrib/valgrind.supp \
 	$(VALGRIND_EXTRA_ARGS)
 
-noinst_PROGRAMS = gtest
+bin_PROGRAMS = gtest
 
 gtestdir = $(includedir)
 gtest_LDADD = \

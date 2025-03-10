@@ -83,7 +83,7 @@ reduce =                        \
 	reduce/reduce.c             \
 	reduce/reduce_knomial.c     \
 	reduce/reduce_dbt.c         \
-    reduce/reduce_srg_knomial.c
+	reduce/reduce_srg_knomial.c
 
 reduce_scatter =                            \
 	reduce_scatter/reduce_scatter.h         \

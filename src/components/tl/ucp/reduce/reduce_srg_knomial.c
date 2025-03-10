@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -25,7 +25,7 @@
       The extension adds the support for arbitrary radix.
    3. The algorithm targets Large message sizes (ie. optimized for max bandwidth).
    4. If number of ranks in the team can not form a full radix subtree
-      (for radix=2 this means the team size is not power of 2) then there will be
+      (this means the team size is not a power of the radix) then there will be
       "extra" ranks which don't participate in the main exchange loop. They
       will send the data to their "proxy" ranks in the beginning and then wait
       for the response with the final data.
@@ -33,9 +33,59 @@
       However, if they are used together as part of SRG reduce one has to
       provide the same radix for both routines.
    6. After the completion of reduce-scatter phase the local result (at non EXTRA
-      ranks) will be located in dst buffer at offset the can be commputed by the
+      ranks) will be located in the dst buffer at an offset that can be computed by the
       routine from coll_patterns/sra_knomial.h: ucc_sra_kn_get_offset.
  */
+
+#define GET_DT(_args, _trank)                                                  \
+    (UCC_IS_ROOT(*(_args), _trank))                                            \
+        ? (_args)->dst.info.datatype                                           \
+        : (_args)->src.info.datatype
+
+#define GET_MT(_args, _trank)                                                  \
+    (UCC_IS_ROOT(*(_args), _trank))                                            \
+        ? (_args)->dst.info.mem_type                                           \
+        : (_args)->src.info.mem_type
+
+#define GET_COUNT(_args, _trank)                                               \
+    (UCC_IS_ROOT(*(_args), _trank))                                            \
+        ? (_args)->dst.info.count                                              \
+        : (_args)->src.info.count
+
+/**
+ * Get the buffers for the reduce-scatter and gather tasks from reduce args
+ */
+static void get_rs_ag_buffers(ucc_tl_ucp_schedule_t *rsg_schedule,
+                              ucc_coll_args_t *reduce_args,
+                              ucc_rank_t trank,
+                              void **rs_rbuf, void **rs_sbuf,
+                              void **g_rbuf, void **g_sbuf)
+{
+    if (UCC_IS_ROOT(*reduce_args, trank)) {
+        if (UCC_IS_INPLACE(*reduce_args)) {
+            *rs_sbuf = reduce_args->dst.info.buffer;
+            *rs_rbuf = rsg_schedule->scratch_mc_header->addr;
+
+            *g_sbuf = rsg_schedule->scratch_mc_header->addr;
+            *g_rbuf = reduce_args->dst.info.buffer;
+        } else {
+            *rs_sbuf = reduce_args->src.info.buffer;
+            *rs_rbuf = reduce_args->dst.info.buffer;
+
+            // inplace gather case
+            *g_sbuf = reduce_args->dst.info.buffer;
+            *g_rbuf = reduce_args->dst.info.buffer;
+        }
+    } else {
+        *rs_sbuf = reduce_args->src.info.buffer;
+        *rs_rbuf = rsg_schedule->scratch_mc_header->addr;
+
+        *g_sbuf = rsg_schedule->scratch_mc_header->addr;
+        /* non-root gather has no receive buffer but we use rbuf to pass
+         * scratch space needed for gather knomial algorithm */
+        *g_rbuf = rsg_schedule->scratch_mc_header->addr;
+    }
+}
 
 static ucc_status_t
 ucc_tl_ucp_reduce_srg_knomial_frag_start(ucc_coll_task_t *task)
@@ -58,38 +108,39 @@ static ucc_status_t
 ucc_tl_ucp_reduce_srg_knomial_frag_setup(ucc_schedule_pipelined_t *schedule_p,
                                          ucc_schedule_t *frag, int frag_num)
 {
-    int              n_frags = schedule_p->super.n_tasks;
-    ucc_coll_args_t *args    = &schedule_p->super.super.bargs.args;
-    size_t           dt_size;
-    size_t           count;
-    size_t           frag_count;
-    size_t           offset;
-    ucc_coll_args_t *targs;
-    ucc_rank_t rank;
-    ucc_tl_ucp_team_t *team;
+    ucc_tl_ucp_schedule_t *rsg_schedule = ucc_derived_of(schedule_p,
+                                                         ucc_tl_ucp_schedule_t);
+    int                    n_frags      = schedule_p->super.n_tasks;
+    ucc_coll_args_t       *args         = &schedule_p->super.super.bargs.args;
+    ucc_rank_t             trank        = UCC_TL_TEAM_RANK(TASK_TEAM(&schedule_p->super));
+    size_t                 dt_size      = ucc_dt_size(GET_DT(args, trank));
+    size_t                 count        = GET_COUNT(args, trank);
+    size_t                 frag_count;
+    size_t                 offset;
+    ucc_coll_args_t       *targs;
+    void                  *rs_rbuf, *rs_sbuf, *g_rbuf, *g_sbuf;
 
-    team = TASK_TEAM(&schedule_p->super);
-    rank = UCC_TL_TEAM_RANK(team);
-    if (UCC_IS_ROOT(*args, rank)) {
-        count = args->dst.info.count;
-        dt_size = ucc_dt_size(args->dst.info.datatype);
-    } else {
-        count = args->src.info.count;
-        dt_size = ucc_dt_size(args->src.info.datatype);
-    }
     frag_count = ucc_buffer_block_count(count, n_frags, frag_num);
     offset     = ucc_buffer_block_offset(count, n_frags, frag_num);
+    get_rs_ag_buffers(rsg_schedule, args, trank,
+                      &rs_rbuf, &rs_sbuf, &g_rbuf, &g_sbuf);
 
     targs = &frag->tasks[0]->bargs.args; /* REDUCE_SCATTER */
-    targs->src.info.buffer = PTR_OFFSET(targs->src.info.buffer, offset * dt_size);
+    targs->src.info.buffer = PTR_OFFSET(rs_sbuf, offset * dt_size);
+    if (UCC_IS_ROOT(*args, trank) && !UCC_IS_INPLACE(*args)) {
+        targs->dst.info.buffer = PTR_OFFSET(rs_rbuf, offset * dt_size);
+    }
     targs->src.info.count  = frag_count;
-    targs->dst.info.buffer = PTR_OFFSET(targs->dst.info.buffer, offset * dt_size);
     targs->dst.info.count  = frag_count;
 
     targs = &frag->tasks[1]->bargs.args; /* GATHER */
-    targs->src.info.buffer = PTR_OFFSET(targs->src.info.buffer, offset * dt_size);;
-    targs->src.info.count  = 0;
-    targs->dst.info.buffer = PTR_OFFSET(targs->dst.info.buffer, offset * dt_size);
+    if (UCC_IS_ROOT(*args, trank) && !UCC_IS_INPLACE(*args)) {
+        targs->src.info.buffer = PTR_OFFSET(g_sbuf, offset * dt_size);
+    }
+    targs->src.info.count  = frag_count;
+    if (UCC_IS_ROOT(*args, trank)) {
+        targs->dst.info.buffer = PTR_OFFSET(g_rbuf, offset * dt_size);
+    }
     targs->dst.info.count  = frag_count;
 
     return UCC_OK;
@@ -101,99 +152,89 @@ ucc_tl_ucp_reduce_srg_knomial_frag_init(ucc_base_coll_args_t *coll_args,
                                         ucc_base_team_t *team,
                                         ucc_schedule_t **frag_p)
 {
-    ucc_tl_ucp_team_t   *tl_team  = ucc_derived_of(team, ucc_tl_ucp_team_t);
-    ucc_base_coll_args_t args     = *coll_args;
-    ucc_mrange_uint_t   *p        = &tl_team->cfg.reduce_srg_kn_radix;
-    ucc_rank_t           trank    = UCC_TL_TEAM_RANK(tl_team);
-    ucc_schedule_t      *schedule;
-    ucc_coll_task_t     *task, *rs_task;
-    ucc_status_t         status;
-    ucc_kn_radix_t       radix, cfg_radix;
-    size_t               count;
-    ucc_datatype_t       dt;
-    void                 *rs_rbuf, *rs_sbuf;
-    ucc_tl_ucp_schedule_t *rsg_schedule;
-    ucc_memory_type_t mt;
+    ucc_tl_ucp_team_t     *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
+    ucc_rank_t             trank   = UCC_TL_TEAM_RANK(tl_team);
+    ucc_tl_ucp_schedule_t *rsg_schedule = ucc_derived_of(sp, ucc_tl_ucp_schedule_t);
+    ucc_datatype_t         dt      = GET_DT(&coll_args->args, trank);
+    size_t                 dt_size = ucc_dt_size(dt);
+    ucc_memory_type_t      mt      = GET_MT(&coll_args->args, trank);
+    size_t                 count   = GET_COUNT(&coll_args->args, trank);
+    ucc_base_coll_args_t   args    = *coll_args;
+    ucc_mrange_uint_t     *p       = &tl_team->cfg.reduce_srg_kn_radix;
+    int                    n_frags = sp->super.n_tasks;
+    ucc_kn_radix_t         radix, cfg_radix;
+    ucc_schedule_t        *schedule;
+    ucc_coll_task_t       *g_task, *rs_task;
+    ucc_status_t           status;
+    ptrdiff_t              scratch_offset;
+    void                  *rs_rbuf, *rs_sbuf, *g_rbuf, *g_sbuf;
 
-    rsg_schedule = ucc_derived_of(sp, ucc_tl_ucp_schedule_t);
+
+    scratch_offset = ucc_buffer_block_count(count, n_frags, 0);
     status = ucc_tl_ucp_get_schedule(tl_team, coll_args,
                                      (ucc_tl_ucp_schedule_t **)&schedule);
     if (ucc_unlikely(UCC_OK != status)) {
         return status;
     }
 
-    if (UCC_IS_ROOT(coll_args->args, trank)) {
-        dt      = coll_args->args.dst.info.datatype;
-        mt      = coll_args->args.dst.info.mem_type;
-        if (UCC_IS_INPLACE(coll_args->args)) {
-            rs_rbuf = rsg_schedule->scratch_mc_header->addr;
-            rs_sbuf = coll_args->args.dst.info.buffer;
-        } else {
-            rs_rbuf = coll_args->args.dst.info.buffer;
-            rs_sbuf = coll_args->args.src.info.buffer;
-        }
-        count = coll_args->args.dst.info.count;
-    } else {
-        dt      = coll_args->args.src.info.datatype;
-        mt      = coll_args->args.src.info.mem_type;
-        rs_rbuf = rsg_schedule->scratch_mc_header->addr;
-        rs_sbuf = coll_args->args.src.info.buffer;
-        count   = coll_args->args.src.info.count;
-    }
-
-    if (coll_args->mask & UCC_BASE_CARGS_MAX_FRAG_COUNT) {
-        count = coll_args->max_frag_count;
-    }
-
-    args.args.flags             &= ~UCC_COLL_ARGS_FLAG_IN_PLACE;
-    args.args.dst.info.buffer   = rs_rbuf;
-    args.args.dst.info.count    = count;
-    args.args.dst.info.datatype = dt;
-    args.args.dst.info.mem_type = mt;
-    args.args.src.info.buffer   = rs_sbuf;
-    args.args.src.info.count    = count;
-    args.args.src.info.datatype = dt;
-    args.args.src.info.mem_type = mt;
-
-    cfg_radix = ucc_tl_ucp_get_radix_from_range(tl_team,
-                                                count * ucc_dt_size(dt),
+    cfg_radix = ucc_tl_ucp_get_radix_from_range(tl_team, count * dt_size,
                                                 mt, p, 4);
     radix     = ucc_knomial_pattern_get_min_radix(cfg_radix,
                                                   UCC_TL_TEAM_SIZE(tl_team),
                                                   count);
+    get_rs_ag_buffers(rsg_schedule, &coll_args->args, trank,
+                      &rs_rbuf, &rs_sbuf, &g_rbuf, &g_sbuf);
+    /* 1st step of reduce: knomial reduce_scatter.
+    Actual data pointer is set in the setup function */
+    args.args.flags             &= ~UCC_COLL_ARGS_FLAG_IN_PLACE;
+    args.args.src.info.buffer   = rs_sbuf;
+    args.args.src.info.count    = count;
+    args.args.src.info.datatype = dt;
+    args.args.src.info.mem_type = mt;
+    if (!UCC_IS_ROOT(coll_args->args, trank) || UCC_IS_INPLACE(coll_args->args)) {
+        args.args.dst.info.buffer   = PTR_OFFSET(rs_rbuf,
+            rsg_schedule->reduce_srg_kn.frag_offset * dt_size);
+    }
+    args.args.dst.info.count    = count;
+    args.args.dst.info.datatype = dt;
+    args.args.dst.info.mem_type = mt;
 
-    /* 1st step of reduce: knomial reduce_scatter */
-    UCC_CHECK_GOTO(ucc_tl_ucp_reduce_scatter_knomial_init_r(&args, team, &task,
-                                                            radix),
+    UCC_CHECK_GOTO(ucc_tl_ucp_reduce_scatter_knomial_init_r(&args, team,
+                                                            &rs_task, radix),
                    out, status);
-    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task), out, status);
-    UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, task,
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, rs_task), out, status);
+    /* reduce scatter task starts when schedule is started */
+    UCC_CHECK_GOTO(ucc_task_subscribe_dep(&schedule->super, rs_task,
                                           UCC_EVENT_SCHEDULE_STARTED),
                    out, status);
-    rs_task = task;
 
     /* 2nd step of reduce: knomial gather */
-    args.args.src.info.buffer = rs_rbuf;
+    if (!UCC_IS_ROOT(coll_args->args, trank) || UCC_IS_INPLACE(coll_args->args)) {
+    args.args.src.info.buffer   = PTR_OFFSET(g_sbuf,
+            rsg_schedule->reduce_srg_kn.frag_offset * dt_size);
+    }
+    args.args.src.info.count    = count;
+    args.args.src.info.datatype = dt;
+    args.args.src.info.mem_type = mt;
     if (UCC_IS_ROOT(coll_args->args, trank)) {
-        if (UCC_IS_INPLACE (coll_args->args)) {
-            args.args.dst.info.buffer = rs_sbuf;
-            args.args.src.info.buffer = rs_rbuf;
-        } else {
-            args.args.dst.info.buffer = rs_rbuf;
-            args.args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
-            args.args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-
-        }
-    } else {
-        args.args.mask  |= UCC_COLL_ARGS_FIELD_FLAGS;
+        args.args.dst.info.buffer   = PTR_OFFSET(g_rbuf,
+            rsg_schedule->reduce_srg_kn.frag_offset * dt_size);
+    }
+    args.args.dst.info.count    = count;
+    args.args.dst.info.datatype = dt;
+    args.args.dst.info.mem_type = mt;
+    if (UCC_IS_ROOT(coll_args->args, trank) && !UCC_IS_INPLACE(coll_args->args)) {
+        args.args.mask |= UCC_COLL_ARGS_FIELD_FLAGS;
         args.args.flags |= UCC_COLL_ARGS_FLAG_IN_PLACE;
     }
 
-    UCC_CHECK_GOTO(ucc_tl_ucp_gather_knomial_init_r(&args, team, &task, radix),
+    UCC_CHECK_GOTO(ucc_tl_ucp_gather_knomial_init_r(&args, team, &g_task, radix),
                    out, status);
-    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, task), out, status);
-    UCC_CHECK_GOTO(ucc_task_subscribe_dep(rs_task, task, UCC_EVENT_COMPLETED),
+    UCC_CHECK_GOTO(ucc_schedule_add_task(schedule, g_task), out, status);
+    /* gather task starts when reduce scatter task is completed */
+    UCC_CHECK_GOTO(ucc_task_subscribe_dep(rs_task, g_task, UCC_EVENT_COMPLETED),
                    out, status);
+    rsg_schedule->reduce_srg_kn.frag_offset += scratch_offset;
     schedule->super.finalize = ucc_tl_ucp_reduce_srg_knomial_frag_finalize;
     schedule->super.post     = ucc_tl_ucp_reduce_srg_knomial_frag_start;
     *frag_p                  = schedule;
@@ -261,14 +302,15 @@ ucc_status_t ucc_tl_ucp_reduce_srg_knomial_init(ucc_base_coll_args_t *coll_args,
     ucc_tl_ucp_team_t     *tl_team = ucc_derived_of(team, ucc_tl_ucp_team_t);
     ucc_coll_args_t       *args    = &coll_args->args;
     ucc_rank_t             trank   = UCC_TL_TEAM_RANK(tl_team);
+    ucc_memory_type_t      mt      = GET_MT(args, trank);
+    size_t                 count   = GET_COUNT(args, trank);
+    size_t                 dt_size = ucc_dt_size(GET_DT(args, trank));
     int                    n_frags, pipeline_depth;
     ucc_tl_ucp_schedule_t *schedule;
     ucc_status_t           st;
     ucc_base_coll_args_t   bargs;
-    size_t                 max_frag_count, dt_size, count;
+    size_t                 max_frag_count;
     ucc_pipeline_params_t  pipeline_params;
-    ucc_datatype_t         dt;
-    ucc_memory_type_t      mt;
 
     st  = ucc_tl_ucp_get_schedule(tl_team, coll_args, &schedule);
     if (ucc_unlikely(UCC_OK != st)) {
@@ -276,25 +318,7 @@ ucc_status_t ucc_tl_ucp_reduce_srg_knomial_init(ucc_base_coll_args_t *coll_args,
     }
 
     schedule->scratch_mc_header = NULL;
-    if (UCC_IS_ROOT(*args, trank)) {
-        count   = args->dst.info.count;
-        dt      = args->dst.info.datatype;
-        mt      = args->dst.info.mem_type;
-        dt_size = ucc_dt_size(dt);
-    } else  {
-        count   = args->src.info.count;
-        dt      = args->src.info.datatype;
-        mt      = args->src.info.mem_type;
-        dt_size = ucc_dt_size(dt);
-    }
-
-    if (!UCC_IS_ROOT(*args, trank) || UCC_IS_INPLACE(*args)) {
-        st = ucc_mc_alloc(&schedule->scratch_mc_header, count * dt_size, mt);
-        if (ucc_unlikely(UCC_OK != st)) {
-            tl_error(team->context->lib, "failed to alloc scratch memory");
-            goto err_free_schedule;
-        }
-    }
+    schedule->reduce_srg_kn.frag_offset = 0;
 
     bargs = *coll_args;
     max_frag_count = (bargs.mask & UCC_BASE_CARGS_MAX_FRAG_COUNT) ?
@@ -303,9 +327,17 @@ ucc_status_t ucc_tl_ucp_reduce_srg_knomial_init(ucc_base_coll_args_t *coll_args,
                                                       &pipeline_params);
     ucc_pipeline_nfrags_pdepth(&pipeline_params, max_frag_count * dt_size,
                                &n_frags, &pipeline_depth);
+    bargs.max_frag_count = ucc_buffer_block_count(max_frag_count, n_frags, 0);
     if (n_frags > 1) {
         bargs.mask           |= UCC_BASE_CARGS_MAX_FRAG_COUNT;
-        bargs.max_frag_count = ucc_buffer_block_count(max_frag_count, n_frags, 0);
+    }
+
+    if (!UCC_IS_ROOT(*args, trank) || UCC_IS_INPLACE(*args)) {
+        st = ucc_mc_alloc(&schedule->scratch_mc_header, bargs.max_frag_count  * dt_size * pipeline_depth, mt);
+        if (ucc_unlikely(UCC_OK != st)) {
+            tl_error(team->context->lib, "failed to alloc scratch memory");
+            goto err_free_schedule;
+        }
     }
 
     st = ucc_schedule_pipelined_init(&bargs, team,
