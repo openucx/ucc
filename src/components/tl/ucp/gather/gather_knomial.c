@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -155,6 +155,10 @@ UCC_GATHER_KN_PHASE_INIT:
                         PTR_OFFSET(task->gather_kn.scratch, peer_seg_offset * dt_size),
                         PTR_OFFSET(args->src.info.buffer, peer_seg_offset * dt_size), peer_seg_count * dt_size,
                         args->src.info.mem_type, mtype);
+                    if (ucc_unlikely(UCC_OK != status)) {
+                        task->super.status = status;
+                        return;
+                    }
                 }
             }
         } else {
