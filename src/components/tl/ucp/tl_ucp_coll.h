@@ -275,6 +275,9 @@ typedef struct ucc_tl_ucp_task {
 typedef struct ucc_tl_ucp_schedule {
     ucc_schedule_pipelined_t super;
     ucc_mc_buffer_header_t  *scratch_mc_header;
+    union {
+        ptrdiff_t frag_offset;
+    } reduce_srg_kn;
 } ucc_tl_ucp_schedule_t;
 
 #define TASK_TEAM(_task)                                                       \
