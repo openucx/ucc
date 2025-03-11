@@ -211,8 +211,13 @@ static inline void ucc_config_parser_print_opts(FILE *stream, const char *title,
     ucs_config_print_flags_t ucs_flags;
 
     ucs_flags = ucc_print_flags_to_ucs_print_flags(flags);
+#ifdef UCS_HAVE_PARSER_PRINT_FILTER_ARG
+    ucs_config_parser_print_opts(stream, title, opts, fields, table_prefix,
+                                 prefix, ucs_flags, NULL);
+#else
     ucs_config_parser_print_opts(stream, title, opts, fields, table_prefix,
                                  prefix, ucs_flags);
+#endif
 }
 
 void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
