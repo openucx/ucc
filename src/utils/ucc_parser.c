@@ -675,15 +675,8 @@ void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
         }
 
         snprintf(title, sizeof(title), "%s configuration", entry->name);
-#ifdef UCS_HAVE_PARSER_PRINT_FILTER_ARG
-        ucs_config_parser_print_opts(stream, title, opts, entry->table,
-                                     entry->prefix, prefix, ucs_flags,
-                                     NULL);
-#else
-        ucs_config_parser_print_opts(stream, title, opts, entry->table,
+        UCS_CONFIG_PARSER_PRINT_OPTS(stream, title, opts, entry->table,
                                      entry->prefix, prefix, ucs_flags);
-#endif
-
         ucs_config_parser_release_opts(opts, entry->table);
         ucc_free(opts);
     }
