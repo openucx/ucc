@@ -51,6 +51,14 @@ typedef struct ucc_file_config ucc_file_config_t;
     };
 #endif
 
+#ifdef UCS_HAVE_PARSER_PRINT_FILTER_ARG
+#define UCS_CONFIG_PARSER_PRINT_OPTS(_stream, _title, _opts, _fields, _tprefix, _prefix, _flags) \
+    ucs_config_parser_print_opts((_stream), (_title), (_opts), (_fields), (_tprefix), (_prefix), (_flags), NULL)
+#else
+#define UCS_CONFIG_PARSER_PRINT_OPTS(_stream, _title, _opts, _fields, _tprefix, _prefix, _flags) \
+    ucs_config_parser_print_opts((_stream), (_title), (_opts), (_fields), (_tprefix), (_prefix), (_flags))
+#endif
+
 #define UCC_CONFIG_GET_TABLE(_table)    &_table##_config_entry
 #define UCC_CONFIG_TYPE_LOG_COMP        UCS_CONFIG_TYPE_LOG_COMP
 #define UCC_CONFIG_REGISTER_TABLE       UCS_CONFIG_REGISTER_TABLE
@@ -211,7 +219,7 @@ static inline void ucc_config_parser_print_opts(FILE *stream, const char *title,
     ucs_config_print_flags_t ucs_flags;
 
     ucs_flags = ucc_print_flags_to_ucs_print_flags(flags);
-    ucs_config_parser_print_opts(stream, title, opts, fields, table_prefix,
+    UCS_CONFIG_PARSER_PRINT_OPTS(stream, title, opts, fields, table_prefix,
                                  prefix, ucs_flags);
 }
 

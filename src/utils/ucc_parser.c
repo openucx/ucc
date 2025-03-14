@@ -238,6 +238,9 @@ ucc_status_t ucc_config_names_array_dup(ucc_config_names_array_t *dst,
 {
     int i;
 
+    if (dst->count != 0) {
+        ucc_config_names_array_free(dst);
+    }
     dst->names = ucc_malloc(sizeof(char*) * src->count, "ucc_config_names_array");
     if (!dst->names) {
         ucc_error("failed to allocate %zd bytes for ucc_config_names_array",
@@ -263,10 +266,13 @@ err:
 void ucc_config_names_array_free(ucc_config_names_array_t *array)
 {
     int i;
-    for (i = 0; i < array->count; i++) {
-        free(array->names[i]);
+    if (array->names != NULL) {
+        for (i = 0; i < array->count; i++) {
+            free(array->names[i]);
+        }
+        ucc_free(array->names);
     }
-    ucc_free(array->names);
+    array->count = 0;
 }
 
 int ucc_config_names_search(const ucc_config_names_array_t *config_names,
@@ -675,9 +681,8 @@ void ucc_config_parser_print_all_opts(FILE *stream, const char *prefix,
         }
 
         snprintf(title, sizeof(title), "%s configuration", entry->name);
-        ucs_config_parser_print_opts(stream, title, opts, entry->table,
+        UCS_CONFIG_PARSER_PRINT_OPTS(stream, title, opts, entry->table,
                                      entry->prefix, prefix, ucs_flags);
-
         ucs_config_parser_release_opts(opts, entry->table);
         ucc_free(opts);
     }

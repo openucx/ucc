@@ -50,10 +50,11 @@ class test_tl_mlx5_rc_qp : public test_tl_mlx5_qp {
         qp.qp       = NULL;
         umr_qp.qp   = NULL;
         tx_depth    = 4;
-        umr_qp_conf = qp_conf;
 
         test_tl_mlx5_qp::SetUp();
         CHECK_TEST_STATUS();
+
+        umr_qp_conf = qp_conf;
 
         create_rc_qp = (ucc_tl_mlx5_create_rc_qp_fn_t)dlsym(
             tl_mlx5_so_handle, "ucc_tl_mlx5_create_rc_qp");

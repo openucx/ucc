@@ -110,7 +110,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     comm->cuda_mem_enabled              = conf_params->cuda_mem_enabled;
     comm->comm_id                       = team_params->id;
     comm->ctx                           = mcast_context;
-    comm->mcast_group_count             = 1; /* TODO: add support for more number of mcast groups */
+    comm->mcast_group_count             = ucc_min(conf_params->mcast_group_count, MAX_GROUP_COUNT);
 
     if (comm->cuda_mem_enabled && (UCC_OK != ucc_tl_mlx5_check_gpudirect_driver())) {
         tl_warn(mcast_context->lib, "cuda-aware mcast not available as gpu direct is not ready");
@@ -267,7 +267,6 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
         ucc_list_add_tail(&comm->bpool, &comm->pp[i].super);
     }
 
-    comm->mcast.swr.wr.ud.ah          = comm->mcast.groups[0].ah;
     comm->mcast.swr.num_sge           = 1;
     comm->mcast.swr.sg_list           = &comm->mcast.ssg;
     comm->mcast.swr.opcode            = IBV_WR_SEND_WITH_IMM;
@@ -307,6 +306,51 @@ error:
     return status;
 }
 
+static inline ucc_status_t ucc_tl_mlx5_mcast_process_comm_event(ucc_base_team_t *team)
+{
+    ucc_tl_mlx5_team_t            *tl_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
+    ucc_tl_mlx5_mcast_coll_comm_t *comm    = tl_team->mcast->mcast_comm;
+    ucc_status_t                   status  = UCC_OK;
+    struct mcast_group            *group;
+    int                            i;
+
+    for (i = 0; i < comm->mcast_group_count; i++) {
+        if (comm->mcast.groups[i].lid != 0) {
+            continue;
+        }
+
+        status = ucc_tl_mlx5_mcast_join_mcast_get_event(comm->ctx, &comm->event);
+        if (status != UCC_OK) {
+            goto failed;
+        }
+
+        group = (struct mcast_group *)comm->event->param.ud.private_data;
+
+        ucc_assert(group != NULL);
+        tl_debug(comm->lib, "found mcast group %p info in the retreived mcast join event", group);
+
+        group->lid  = comm->event->param.ud.ah_attr.dlid;
+        group->mgid = comm->event->param.ud.ah_attr.grh.dgid;
+
+        if (rdma_ack_cm_event(comm->event) < 0) {
+            tl_error(comm->lib, "rdma_ack_cm_event failed");
+            status               = UCC_ERR_NO_MESSAGE;
+            comm->event          = NULL;
+            goto failed;
+        }
+        comm->event = NULL;
+    }
+
+    tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY;
+    return UCC_OK;
+
+failed:
+    if (status < 0) {
+        tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED;
+    }
+    return status;
+}
+
 ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
 {
     ucc_tl_mlx5_team_t            *tl_team  = ucc_derived_of(team, ucc_tl_mlx5_team_t);
@@ -314,50 +358,35 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
     struct sockaddr_in6            net_addr = {0,};
     ucc_tl_mlx5_mcast_join_info_t *data     = NULL;
     ucc_tl_mlx5_mcast_coll_comm_t *comm     = tl_team->mcast->mcast_comm;
+    int                            i;
 
     if (comm->rank == 0) {
         switch(tl_team->mcast_state) {
             case TL_MLX5_TEAM_STATE_MCAST_INIT:
             {
-                /* now it is time for rank 0 to call rdma_join_multicast() */
-                net_addr.sin6_family   = AF_INET6;
-                net_addr.sin6_flowinfo = comm->comm_id;
-                status = ucc_tl_mlx5_mcast_join_mcast_post(comm->ctx, &net_addr, 1);
-                if (status < 0) {
-                    tl_error(comm->lib, "rank 0 is unable to join mcast group error %d", status);
-                    tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED;
-                    return UCC_INPROGRESS;
+                for (i = 0; i < comm->mcast_group_count; i++) {
+                    net_addr.sin6_family   = AF_INET6;
+                    net_addr.sin6_flowinfo = comm->comm_id + i + 1;
+                    status = ucc_tl_mlx5_mcast_join_mcast_post(comm->ctx, &net_addr, &comm->mcast.groups[i], 1);
+                    if (status < 0) {
+                        tl_error(comm->lib, "rank 0 is unable to join mcast group %d error %d",
+                                 i, status);
+                        tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED;
+                        return UCC_INPROGRESS;
+                    }
+                    comm->mcast.groups[i].mcast_addr = net_addr;
                 }
 
-                comm->mcast.groups[0].mcast_addr = net_addr;
-                tl_team->mcast_state             = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST;
-
+                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_TEST;
                 return UCC_INPROGRESS;
             }
 
-            case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST:
+            case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_TEST:
             {
-                /* rank 0 has already called rdma_join_multicast()
-                 * it is time to wait for the rdma event to confirm the join */
-                status = ucc_tl_mlx5_mcast_join_mcast_test(comm->ctx, &comm->event, 1);
-                if (UCC_OK != status) {
-                    if (status < 0) {
-                        tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED;
-                    }
-                    if (comm->event) {
-                        if (rdma_ack_cm_event(comm->event) < 0) {
-                            tl_error(comm->lib, "rdma_ack_cm_event failed");
-                            return UCC_ERR_NO_RESOURCE;
-                        }
-                        comm->event = NULL;
-                    }
-                    return UCC_INPROGRESS;
+                status = ucc_tl_mlx5_mcast_process_comm_event(team);
+                if (status < UCC_OK) {
+                    tl_error(comm->lib, "mcast_process_comm_event failed");
                 }
-
-                ucc_assert(comm->event != NULL);
-
-                /* at this point, rank 0 has joined mcast group */
-                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY;
 
                 return UCC_INPROGRESS;
             }
@@ -376,14 +405,22 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                 comm->group_setup_info = data;
 
                 if (tl_team->mcast_state == TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY) {
-                    /* rank 0 bcast the lid/gid to other processes */
-                    data->status               = UCC_OK;
-                    data->dgid                 = comm->event->param.ud.ah_attr.grh.dgid;
-                    data->dlid                 = comm->event->param.ud.ah_attr.dlid;
-                    comm->mcast.groups[0].lid  = data->dlid;
-                    comm->mcast.groups[0].mgid = data->dgid;
+                    /* rank 0 bcast the lid/gid of all the groups to other processes */
+                    data->status = UCC_OK;
+                    for (i = 0; i < comm->mcast_group_count; i++) {
+                        data->dgid[i] = comm->mcast.groups[i].mgid;
+                        data->dlid[i] = comm->mcast.groups[i].lid;
+                    }
                 } else {
                     /* rank 0 bcast the failed status to other processes so others do not hang */
+                    status = ucc_tl_mlx5_leave_mcast_groups(comm->ctx, comm);
+                    if (status) {
+                        tl_error(comm->lib, "couldn't leave mcast group");
+                    }
+                    if (comm->group_setup_info) {
+                        ucc_free(comm->group_setup_info);
+                        comm->group_setup_info = NULL;
+                    }
                     data->status = UCC_ERR_NO_RESOURCE;
                 }
 
@@ -392,13 +429,6 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                 if (UCC_OK != status) {
                     tl_error(comm->lib, "unable to post bcast for group setup info");
                     ucc_free(comm->group_setup_info);
-                    if (comm->event) {
-                        if (rdma_ack_cm_event(comm->event) < 0) {
-                            tl_error(comm->lib, "rdma_ack_cm_event failed");
-                            return UCC_ERR_NO_RESOURCE;
-                        }
-                        comm->event = NULL;
-                    }
                     return status;
                 }
 
@@ -414,9 +444,6 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                 if (UCC_OK != status) {
                     /* bcast is not completed yet */
                     if (status < 0) {
-                        if (rdma_ack_cm_event(comm->event) < 0) {
-                            tl_error(comm->lib, "rdma_ack_cm_event failed");
-                        }
                         ucc_free(comm->group_setup_info);
                     }
                     return status;
@@ -425,21 +452,11 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                 if (comm->group_setup_info->status != UCC_OK) {
                     /* rank 0 was not able to join a mcast group so all
                      * the ranks should return */
-                    if (rdma_ack_cm_event(comm->event) < 0) {
-                        tl_error(comm->lib, "rdma_ack_cm_event failed");
-                    }
                     ucc_free(comm->group_setup_info);
                     return UCC_ERR_NO_RESOURCE;
                 }
 
                 ucc_free(comm->group_setup_info);
-                if (comm->event) {
-                    if (rdma_ack_cm_event(comm->event) < 0) {
-                        tl_error(comm->lib, "rdma_ack_cm_event failed");
-                        return UCC_ERR_NO_RESOURCE;
-                    }
-                    comm->event = NULL;
-                }
 
                 /* setup of the rest of the mcast resources */
                 status = ucc_tl_mlx5_mcast_coll_setup_comm_resources(comm);
@@ -515,60 +532,42 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     return status;
                 }
 
-                /* now it is time for none rank 0 to call rdma_join_multicast() */
-                memcpy(&net_addr.sin6_addr, &(data->dgid), sizeof(struct in6_addr));
-                net_addr.sin6_family = AF_INET6;
-
-                status = ucc_tl_mlx5_mcast_join_mcast_post(comm->ctx, &net_addr, 0);
-                if (status < 0) {
-                    tl_error(comm->lib, "none-root rank is unable to join mcast group error %d", status);
-                    ucc_free(data);
-                    return status;
+                /* now it is time for none rank 0 to call rdma_join_multicast()
+                 * for all the mcast groups */
+                for (i = 0; i < comm->mcast_group_count; i++) {
+                    memcpy(&net_addr.sin6_addr, &(data->dgid[i]), sizeof(struct in6_addr));
+                    net_addr.sin6_family = AF_INET6;
+                    status = ucc_tl_mlx5_mcast_join_mcast_post(comm->ctx, &net_addr, &comm->mcast.groups[i], 0);
+                    if (status < 0) {
+                        tl_error(comm->lib, "none-root rank is unable to join mcast group error %d",
+                                 status);
+                        ucc_free(data);
+                        return status;
+                    }
+                    comm->mcast.groups[i].mcast_addr = net_addr;
                 }
 
-                comm->mcast.groups[0].mcast_addr = net_addr;
-                tl_team->mcast_state             = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST;
+                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_TEST;
+                return UCC_INPROGRESS;
+            }
+
+            case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_TEST:
+            {
+                status = ucc_tl_mlx5_mcast_process_comm_event(team);
+                if (status < UCC_OK) {
+                    tl_error(comm->lib, "mcast_process_comm_event failed");
+                }
 
                 return UCC_INPROGRESS;
             }
 
-            case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST:
+            case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED:
             {
-                /* none-root rank has already called rdma_join_multicast()
-                 * it is time to wait for the rdma event to confirm the join */
-                status = ucc_tl_mlx5_mcast_join_mcast_test(comm->ctx, &comm->event, 0);
-                if (UCC_OK != status) {
-                    if (comm->event) {
-                        if (rdma_ack_cm_event(comm->event) < 0) {
-                            tl_error(comm->lib, "rdma_ack_cm_event failed");
-                            return UCC_ERR_NO_RESOURCE;
-                        }
-                        comm->event = NULL;
-                    }
-                    if (status < 0) {
-                        ucc_free(comm->group_setup_info);
-                    }
-                    return status;
+                status = ucc_tl_mlx5_leave_mcast_groups(comm->ctx, comm);
+                if (status) {
+                    tl_error(comm->lib, "couldn't leave mcast group");
                 }
-
-                ucc_assert(comm->event != NULL);
-
-                comm->mcast.groups[0].lid  = comm->group_setup_info->dlid;
-                comm->mcast.groups[0].mgid = comm->group_setup_info->dgid;
-
-                ucc_free(comm->group_setup_info);
-                if (comm->event) {
-                    if (rdma_ack_cm_event(comm->event) < 0) {
-                        tl_error(comm->lib, "rdma_ack_cm_event failed");
-                        return UCC_ERR_NO_RESOURCE;
-                    }
-                    comm->event = NULL;
-                }
-
-                /* at this point, none-root rank has joined mcast group */
-                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY;
-
-                return UCC_INPROGRESS;
+                return UCC_ERR_NO_RESOURCE;
             }
 
             case TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY:

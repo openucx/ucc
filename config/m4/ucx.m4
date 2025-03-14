@@ -138,6 +138,15 @@ AS_IF([test "x$ucx_checked" != "xyes"],[
                 [AC_DEFINE([UCS_HAVE_PARSER_CONFIG_DOC], [1], [flags for ucs_rcache_get])],
                 [],
                 [#include <ucs/memory/rcache.h>])
+
+            AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <ucs/config/parser.h>
+					            int main(int argc, char** argv) {
+				        	    	ucs_config_parser_print_opts(NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL);
+					        	    return 0;
+					            } ]])],
+                  [AC_DEFINE([UCS_HAVE_PARSER_PRINT_FILTER_ARG], [1], [flags for ucs_config_parser_print_opts])],
+                  [])
+
         ],
         [
             AS_IF([test "x$with_ucx" != "xguess"],
