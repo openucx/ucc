@@ -153,7 +153,8 @@ ucc_status_t ucc_tl_ucp_service_allgather(ucc_base_team_t *team, void *sbuf,
     ucc_base_coll_args_t bargs    = {
         .args = {
             .coll_type = UCC_COLL_TYPE_ALLGATHER,
-            .mask      = in_place ? UCC_COLL_ARGS_FLAG_IN_PLACE : 0,
+            .mask      = UCC_COLL_ARGS_FIELD_FLAGS,
+            .flags     = in_place ? UCC_COLL_ARGS_FLAG_IN_PLACE : 0,
             .src.info = {.buffer   = sbuf,
                          .count    = msgsize,
                          .datatype = UCC_DT_UINT8,
