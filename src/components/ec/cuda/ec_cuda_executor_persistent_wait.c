@@ -14,15 +14,26 @@ static ucc_status_t
 ucc_ec_cuda_post_driver_stream_task(ucc_ec_cuda_executor_state_t *state,
                                     cudaStream_t stream)
 {
-    CUdeviceptr state_ptr  = (CUdeviceptr)state;
-
-    CUDADRV_FUNC(cuStreamWriteValue32(stream, state_ptr,
-                                      UCC_EC_CUDA_EXECUTOR_STARTED, 0));
-    CUDADRV_FUNC(cuStreamWaitValue32(stream, state_ptr,
-                                     UCC_EC_CUDA_EXECUTOR_SHUTDOWN,
-                                     CU_STREAM_WAIT_VALUE_EQ));
-    CUDADRV_FUNC(cuStreamWriteValue32(stream, state_ptr,
-                                      UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK, 0));
+    CUdeviceptr              state_ptr       = (CUdeviceptr)state;
+    CUstreamBatchMemOpParams batch_memops[3] = {
+        {
+            .operation = CU_STREAM_MEM_OP_WRITE_VALUE_32,
+            .writeValue.address = state_ptr,
+            .writeValue.value = UCC_EC_CUDA_EXECUTOR_STARTED,
+        },
+        {
+            .operation = CU_STREAM_MEM_OP_WAIT_VALUE_32,
+            .waitValue.address = state_ptr,
+            .waitValue.value = UCC_EC_CUDA_EXECUTOR_SHUTDOWN,
+            .waitValue.flags = CU_STREAM_WAIT_VALUE_EQ,
+        },
+        {
+            .operation = CU_STREAM_MEM_OP_WRITE_VALUE_32,
+            .writeValue.address = state_ptr,
+            .writeValue.value = UCC_EC_CUDA_EXECUTOR_SHUTDOWN_ACK,
+        }
+    };
+    CUDADRV_FUNC(cuStreamBatchMemOp(stream, 3, batch_memops, 0));
     return UCC_OK;
 }
 
