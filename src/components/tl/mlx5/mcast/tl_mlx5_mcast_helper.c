@@ -198,20 +198,21 @@ ucc_status_t ucc_tl_mlx5_probe_ip_over_ib(char* ib_dev, struct
 
 ucc_status_t ucc_tl_mlx5_mcast_join_mcast_post(ucc_tl_mlx5_mcast_coll_context_t *ctx,
                                                struct sockaddr_in6              *net_addr,
+                                               struct mcast_group               *group,
                                                int                               is_root)
 {
-    char        buf[40];
+    char        buf[INET6_ADDRSTRLEN];
     const char *dst;
 
-    dst = inet_ntop(AF_INET6, net_addr, buf, 40);
+    dst = inet_ntop(AF_INET6, net_addr, buf, INET6_ADDRSTRLEN);
     if (NULL == dst) {
         tl_warn(ctx->lib, "inet_ntop failed");
         return UCC_ERR_NO_RESOURCE;
     }
 
-    tl_debug(ctx->lib, "joining addr: %s is_root %d", buf, is_root);
+    tl_debug(ctx->lib, "joining addr: %s is_root %d group %p", buf, is_root, group);
 
-    if (rdma_join_multicast(ctx->id, (struct sockaddr*)net_addr, NULL)) {
+    if (rdma_join_multicast(ctx->id, (struct sockaddr*)net_addr, (void *)group)) {
         tl_warn(ctx->lib, "rdma_join_multicast failed errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
@@ -219,11 +220,10 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_post(ucc_tl_mlx5_mcast_coll_context_t 
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_mcast_join_mcast_test(ucc_tl_mlx5_mcast_coll_context_t *ctx,
-                                               struct rdma_cm_event            **event,
-                                               int                               is_root)
+ucc_status_t ucc_tl_mlx5_mcast_join_mcast_get_event(ucc_tl_mlx5_mcast_coll_context_t *ctx,
+                                                    struct rdma_cm_event            **event)
 {
-    char        buf[40];
+    char        buf[INET6_ADDRSTRLEN];
     const char *dst;
 
     if (rdma_get_cm_event(ctx->channel, event) < 0) {
@@ -232,14 +232,15 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_test(ucc_tl_mlx5_mcast_coll_context_t 
                     errno, strerror(errno));
             return UCC_ERR_NO_RESOURCE;
         } else {
+            /* need to retry again */
             return UCC_INPROGRESS;
         }
     }
 
     if (RDMA_CM_EVENT_MULTICAST_JOIN != (*event)->event) {
-        tl_warn(ctx->lib, "failed to join multicast, is_root %d. unexpected event was"
+        tl_warn(ctx->lib, "failed to join multicast, unexpected event was"
                 " received: event=%d, str=%s, status=%d",
-                 is_root, (*event)->event, rdma_event_str((*event)->event),
+                 (*event)->event, rdma_event_str((*event)->event),
                  (*event)->status);
         if (rdma_ack_cm_event(*event) < 0) {
             tl_warn(ctx->lib, "rdma_ack_cm_event failed");
@@ -247,36 +248,17 @@ ucc_status_t ucc_tl_mlx5_mcast_join_mcast_test(ucc_tl_mlx5_mcast_coll_context_t 
         return UCC_ERR_NO_RESOURCE;
     }
 
-    dst = inet_ntop(AF_INET6, (*event)->param.ud.ah_attr.grh.dgid.raw, buf, 40);
+    dst = inet_ntop(AF_INET6, (*event)->param.ud.ah_attr.grh.dgid.raw, buf, INET6_ADDRSTRLEN);
     if (NULL == dst) {
         tl_warn(ctx->lib, "inet_ntop failed");
         return UCC_ERR_NO_RESOURCE;
     }
 
-    tl_debug(ctx->lib, "is_root %d: joined dgid: %s, mlid 0x%x, sl %d", is_root, buf,
+    tl_debug(ctx->lib, "joined dgid: %s, mlid 0x%x, sl %d", buf,
              (*event)->param.ud.ah_attr.dlid, (*event)->param.ud.ah_attr.sl);
 
     return UCC_OK;
 
-}
-
-ucc_status_t ucc_tl_mlx5_setup_mcast_group_join_post(ucc_tl_mlx5_mcast_coll_comm_t *comm)
-{
-    ucc_status_t          status;
-    struct sockaddr_in6   net_addr = {0,};
-
-    if (comm->rank == 0) {
-        net_addr.sin6_family   = AF_INET6;
-        net_addr.sin6_flowinfo = comm->comm_id;
-
-        status = ucc_tl_mlx5_mcast_join_mcast_post(comm->ctx, &net_addr, 1);
-        if (status < 0) {
-            tl_warn(comm->lib, "rank 0 is unable to join mcast group");
-            return status;
-        }
-    }
-
-    return UCC_OK;
 }
 
 ucc_status_t ucc_tl_mlx5_mcast_init_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
@@ -571,26 +553,33 @@ ucc_status_t ucc_tl_mlx5_mcast_modify_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *c
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_fini_mcast_group(ucc_tl_mlx5_mcast_coll_context_t *ctx,
-                                          ucc_tl_mlx5_mcast_coll_comm_t    *comm)
+ucc_status_t ucc_tl_mlx5_leave_mcast_groups(ucc_tl_mlx5_mcast_coll_context_t *ctx,
+                                            ucc_tl_mlx5_mcast_coll_comm_t    *comm)
 {
-    char        buf[40];
-    const char *dst;
+    ucc_status_t status = UCC_OK;
+    char         buf[INET6_ADDRSTRLEN];
+    const char  *dst;
+    int          i;
 
-    dst = inet_ntop(AF_INET6, &comm->mcast.groups[0].mcast_addr, buf, 40);
-    if (NULL == dst) {
-        tl_error(comm->lib, "inet_ntop failed");
-        return UCC_ERR_NO_RESOURCE;
+    for (i = 0; i < comm->mcast_group_count; i++) {
+        if (comm->mcast.groups[i].mcast_addr.sin6_flowinfo != 0) {
+            dst = inet_ntop(AF_INET6, &comm->mcast.groups[i].mcast_addr, buf, INET6_ADDRSTRLEN);
+            if (NULL == dst) {
+                tl_error(comm->lib, "inet_ntop failed for group %d during mcast leave group", i);
+                status = UCC_ERR_NO_RESOURCE;
+                continue;
+            }
+
+            tl_debug(ctx->lib, "mcast leave: ctx %p, comm %p, dgid: %s group %d", ctx, comm, buf, i);
+
+            if (rdma_leave_multicast(ctx->id, (struct sockaddr*)&comm->mcast.groups[i].mcast_addr)) {
+                tl_error(comm->lib, "mcast rmda_leave_multicast failed for group %d", i);
+                status = UCC_ERR_NO_RESOURCE;
+            }
+        }
     }
 
-    tl_debug(ctx->lib, "mcast leave: ctx %p, comm %p, dgid: %s", ctx, comm, buf);
-
-    if (rdma_leave_multicast(ctx->id, (struct sockaddr*)&comm->mcast.groups[0].mcast_addr)) {
-        tl_error(comm->lib, "mcast rmda_leave_multicast failed");
-        return UCC_ERR_NO_RESOURCE;
-    }
-
-    return UCC_OK;
+    return status;
 }
 
 ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
@@ -639,7 +628,7 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
         }
     }
 
-    status = ucc_tl_mlx5_fini_mcast_group(comm->ctx, comm);
+    status = ucc_tl_mlx5_leave_mcast_groups(comm->ctx, comm);
     if (status) {
         tl_error(comm->lib, "couldn't leave mcast group");
         return status;
