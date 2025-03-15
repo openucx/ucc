@@ -50,7 +50,7 @@ ucc_status_t ucc_tl_mlx5_coll_mcast_init(ucc_base_coll_args_t *coll_args,
         goto free_task;
     }
 
-    tl_debug(UCC_TASK_LIB(task), "initialized mcast collective task %p", task);
+    tl_trace(UCC_TASK_LIB(task), "initialized mcast collective task %p", task);
 
     return UCC_OK;
 
