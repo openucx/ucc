@@ -215,6 +215,11 @@ typedef struct ucc_tl_ucp_task {
             ucc_rank_t              iteration;
             int                     phase;
         } alltoall_bruck;
+        struct {
+            ucc_rank_t              peer;
+            int64_t                 tokens;
+            int64_t                 npolls;
+        } alltoall_onesided;
         char                        plugin_data[UCC_TL_UCP_TASK_PLUGIN_MAX_DATA];
     };
 } ucc_tl_ucp_task_t;
