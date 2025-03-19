@@ -512,3 +512,81 @@ UCC_TEST_F(test_topo, 4sockets_all)
     EXPECT_EQ(true, check_sbgp(&sbgps[0], {0, 1, 3, 4}));
     EXPECT_EQ(true, check_sbgp(&sbgps[1], {2}));
 }
+
+UCC_TEST_F(test_topo, all_nodes)
+{
+    const ucc_rank_t ctx_size = 16;
+    addr_storage     s(ctx_size);
+    ucc_sbgp_t *     sbgps;
+    ucc_subset_t     set;
+    int              n_sbgps;
+
+    /* simulates world proc array: 4 nodes, different number of ranks per node */
+    /* Node 0: ranks 0,1,2,3 */
+    SET_PI(s, 0, 0xaaa, 0, 0);
+    SET_PI(s, 1, 0xaaa, 1, 1);
+    SET_PI(s, 2, 0xaaa, 0, 2);
+    SET_PI(s, 3, 0xaaa, 1, 3);
+    /* Node 1: ranks 4,5,6 */
+    SET_PI(s, 4, 0xbbb, 0, 4);
+    SET_PI(s, 5, 0xbbb, 1, 5);
+    SET_PI(s, 6, 0xbbb, 0, 6);
+    /* Node 2: ranks 7,8,9,10 */
+    SET_PI(s, 7, 0xccc, 0, 7);
+    SET_PI(s, 8, 0xccc, 1, 8);
+    SET_PI(s, 9, 0xccc, 0, 9);
+    SET_PI(s, 10, 0xccc, 1, 10);
+    /* Node 3: ranks 11,12,13,14,15 */
+    SET_PI(s, 11, 0xddd, 0, 11);
+    SET_PI(s, 12, 0xddd, 1, 12);
+    SET_PI(s, 13, 0xddd, 0, 13);
+    SET_PI(s, 14, 0xddd, 1, 14);
+    SET_PI(s, 15, 0xddd, 0, 15);
+
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+
+    /* Test full world */
+    set.map.ep_num = 16;
+    set.map.type   = UCC_EP_MAP_FULL;
+    set.myrank     = 1;
+
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+
+    EXPECT_EQ(UCC_OK, ucc_topo_get_all_nodes(topo, &sbgps, &n_sbgps));
+    EXPECT_EQ(4, n_sbgps);
+    EXPECT_EQ(true, check_sbgp(&sbgps[0], {0, 1, 2, 3}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[1], {4, 5, 6}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[2], {7, 8, 9, 10}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[3], {11, 12, 13, 14, 15}));
+
+    /* Test subset with ranks from different nodes */
+    ucc_topo_cleanup(topo);
+    ucc_rank_t ranks[] = {1, 5, 8, 13};
+    set.map.ep_num = 4;
+    set.map.type = UCC_EP_MAP_ARRAY;
+    set.map.array.map = (void*)ranks;
+    set.map.array.elem_size = sizeof(ucc_rank_t);
+    set.myrank = 0;
+
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_get_all_nodes(topo, &sbgps, &n_sbgps));
+    EXPECT_EQ(4, n_sbgps);
+    EXPECT_EQ(true, check_sbgp(&sbgps[0], {0}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[1], {1}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[2], {2}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[3], {3}));
+
+    /* Test subset with multiple ranks from same node */
+    ucc_topo_cleanup(topo);
+    ucc_rank_t ranks2[] = {11, 12, 13, 14, 15};
+    set.map.ep_num = 5;
+    set.map.type = UCC_EP_MAP_ARRAY;
+    set.map.array.map = (void*)ranks2;
+    set.map.array.elem_size = sizeof(ucc_rank_t);
+    set.myrank = 0;
+
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_get_all_nodes(topo, &sbgps, &n_sbgps));
+    EXPECT_EQ(1, n_sbgps);
+    EXPECT_EQ(true, check_sbgp(&sbgps[0], {0, 1, 2, 3, 4}));
+}
