@@ -615,6 +615,7 @@ ucc_status_t ucc_sbgp_cleanup(ucc_sbgp_t *sbgp)
 {
     if (sbgp->rank_map) {
         ucc_free(sbgp->rank_map);
+        sbgp->rank_map = NULL;
     }
     return UCC_OK;
 }
