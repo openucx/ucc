@@ -628,6 +628,7 @@ UCC_TEST_F(test_topo, node_leaders)
     EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
     EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
     topo->node_leader_rank_id = 0;
+    EXPECT_EQ(2, topo->topo->nnodes);
     EXPECT_EQ(UCC_OK, ucc_topo_get_node_leaders(topo, &node_leaders));
 
     /* Verify node leaders array */

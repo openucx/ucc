@@ -374,7 +374,7 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
     ucc_subset_t *set = &topo->set;
     ucc_rank_t size = ucc_subset_size(set);
     ucc_rank_t nnodes = topo->topo->nnodes;
-    ucc_rank_t i;
+    ucc_rank_t i, j;
     ucc_rank_t *ranks_seen_per_node;
     ucc_rank_t *per_node_leaders;
     ucc_rank_t *node_leaders;
@@ -430,8 +430,8 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
         ucc_rank_t ctx_rank = ucc_ep_map_eval(set->map, i);
         ucc_host_id_t current_host = topo->topo->procs[ctx_rank].host_id;
 
-        for (ucc_rank_t j = 0; j < nnodes; j++) {
-            ucc_rank_t ctx_rank_j = ucc_ep_map_eval(set->map, j);
+        for (j = 0; j < nnodes; j++) {
+            ucc_rank_t ctx_rank_j = ucc_ep_map_eval(set->map, per_node_leaders[j]);
             ucc_host_id_t current_host_j = topo->topo->procs[ctx_rank_j].host_id;
 
             if (current_host_j == current_host) {
@@ -442,6 +442,7 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
     }
 
     topo->node_leaders = node_leaders;
+    *node_leaders_out = node_leaders;
     ucc_free(ranks_seen_per_node);
     ucc_free(per_node_leaders);
     return UCC_OK;
