@@ -601,3 +601,94 @@ UCC_TEST_F(test_topo, all_nodes)
     EXPECT_EQ(UCC_SBGP_ENABLED,    sbgps[3].status);
     EXPECT_EQ(true, check_sbgp(&sbgps[3], {0, 1, 2, 3, 4}));
 }
+
+UCC_TEST_F(test_topo, node_leaders)
+{
+    const ucc_rank_t ctx_size = 8;
+    addr_storage     s(ctx_size);
+    ucc_subset_t     set;
+    ucc_rank_t       i;
+    ucc_rank_t      *node_leaders;
+    /* simulates world proc array: 2 nodes, 4 ranks per node */
+    SET_PI(s, 0, 0xaaa, 0, 0);  // Node 0, rank 0
+    SET_PI(s, 1, 0xaaa, 1, 1);  // Node 0, rank 1
+    SET_PI(s, 2, 0xaaa, 0, 2);  // Node 0, rank 2
+    SET_PI(s, 3, 0xaaa, 1, 3);  // Node 0, rank 3
+    SET_PI(s, 4, 0xbbb, 0, 4);  // Node 1, rank 0
+    SET_PI(s, 5, 0xbbb, 1, 5);  // Node 1, rank 1
+    SET_PI(s, 6, 0xbbb, 0, 6);  // Node 1, rank 2
+    SET_PI(s, 7, 0xbbb, 1, 7);  // Node 1, rank 3
+
+    /* subset from the world */
+    set.map.ep_num = ctx_size;
+    set.map.type   = UCC_EP_MAP_FULL;
+    set.myrank     = 0;
+
+    /* Test with node_leader_rank_id = 0 (default) */
+    EXPECT_EQ(UCC_OK, ucc_context_topo_init(&s.storage, &ctx_topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+    topo->node_leader_rank_id = 0;
+    EXPECT_EQ(UCC_OK, ucc_topo_get_node_leaders(topo, &node_leaders));
+
+    /* Verify node leaders array */
+    // Node 0 ranks should point to rank 0 (first rank on node 0)
+    for (i = 0; i < 4; i++) {
+        EXPECT_EQ(0, node_leaders[i]);
+    }
+    // Node 1 ranks should point to rank 4 (first rank on node 1)
+    for (i = 4; i < 8; i++) {
+        EXPECT_EQ(4, node_leaders[i]);
+    }
+
+    /* Test with node_leader_rank_id = 1 */
+    ucc_topo_cleanup(topo);
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+    topo->node_leader_rank_id = 1;
+    EXPECT_EQ(UCC_OK, ucc_topo_get_node_leaders(topo, &node_leaders));
+
+    /* Verify node leaders array */
+    // Node 0 ranks should point to rank 1 (second rank on node 0)
+    for (i = 0; i < 4; i++) {
+        EXPECT_EQ(1, node_leaders[i]);
+    }
+    // Node 1 ranks should point to rank 5 (second rank on node 1)
+    for (i = 4; i < 8; i++) {
+        EXPECT_EQ(5, node_leaders[i]);
+    }
+
+    /* Test with a subset of ranks */
+    ucc_topo_cleanup(topo);
+    ucc_rank_t ranks[] = {1, 2, 5, 6};  // Mix of ranks from both nodes
+    set.map.ep_num = 4;
+    set.map.type = UCC_EP_MAP_ARRAY;
+    set.map.array.map = (void*)ranks;
+    set.map.array.elem_size = sizeof(ucc_rank_t);
+    set.myrank = 0;
+
+    /* Test subset with node_leader_rank_id = 0 */
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+    topo->node_leader_rank_id = 0;
+    EXPECT_EQ(UCC_OK, ucc_topo_get_node_leaders(topo, &node_leaders));
+
+    /* Verify node leaders array for subset */
+    // Ranks 0,1 (from node 0) should point to rank 0 (first rank on node 0)
+    EXPECT_EQ(0, node_leaders[0]);
+    EXPECT_EQ(0, node_leaders[1]);
+    // Ranks 2,3 (from node 1) should point to rank 2 (first rank on node 1)
+    EXPECT_EQ(2, node_leaders[2]);
+    EXPECT_EQ(2, node_leaders[3]);
+
+    /* Test subset with node_leader_rank_id = 1 */
+    ucc_topo_cleanup(topo);
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+    topo->node_leader_rank_id = 1;
+    EXPECT_EQ(UCC_OK, ucc_topo_get_node_leaders(topo, &node_leaders));
+
+    /* Verify node leaders array for subset */
+    // Ranks 0,1 (from node 0) should point to rank 1 (second rank on node 0)
+    EXPECT_EQ(1, node_leaders[0]);
+    EXPECT_EQ(1, node_leaders[1]);
+    // Ranks 2,3 (from node 1) should point to rank 3 (second rank on node 1)
+    EXPECT_EQ(3, node_leaders[2]);
+    EXPECT_EQ(3, node_leaders[3]);
+}
