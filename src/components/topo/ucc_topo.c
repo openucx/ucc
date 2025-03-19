@@ -184,6 +184,7 @@ ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *ctx_topo,
     topo->max_numa_size       = 0;
     topo->all_sockets         = NULL;
     topo->all_numas           = NULL;
+    topo->all_nodes           = NULL;
 
     *_topo = topo;
     return UCC_OK;
@@ -309,6 +310,7 @@ ucc_status_t ucc_sbgp_create_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
         }
 
         if (node_size == 0) {
+            sbgps[i].status = UCC_SBGP_NOT_EXISTS;
             continue;
         }
 
@@ -331,7 +333,7 @@ ucc_status_t ucc_sbgp_create_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
         sbgps[i].rank_map = node_ranks;
         sbgps[i].status = UCC_SBGP_ENABLED;
         sbgps[i].map = ucc_ep_map_from_array(&node_ranks, node_size,
-                                            ucc_subset_size(&topo->set), 1);
+                                            ucc_subset_size(&topo->set), 0);
     }
 
     *_sbgps = sbgps;

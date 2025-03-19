@@ -517,7 +517,7 @@ UCC_TEST_F(test_topo, all_nodes)
 {
     const ucc_rank_t ctx_size = 16;
     addr_storage     s(ctx_size);
-    ucc_sbgp_t *     sbgps;
+    ucc_sbgp_t      *sbgps, *sbgp;
     ucc_subset_t     set;
     int              n_sbgps;
 
@@ -559,10 +559,17 @@ UCC_TEST_F(test_topo, all_nodes)
     EXPECT_EQ(true, check_sbgp(&sbgps[2], {7, 8, 9, 10}));
     EXPECT_EQ(true, check_sbgp(&sbgps[3], {11, 12, 13, 14, 15}));
 
+    /* Compare with the node sbgp on rank 1. Skip checking group_rank because
+       it isn't set in ucc_topo_get_all_nodes */
+    sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE);
+    EXPECT_EQ(sbgp->status, sbgps[0].status);
+    EXPECT_EQ(sbgp->group_size, sbgps[0].group_size);
+    EXPECT_EQ(sbgp->map.type, sbgps[0].map.type);
+
     /* Test subset with ranks from different nodes */
     ucc_topo_cleanup(topo);
-    ucc_rank_t ranks[] = {1, 5, 8, 13};
-    set.map.ep_num = 4;
+    ucc_rank_t ranks[] = {2, 0, 5, 6, 7, 10, 14, 12};
+    set.map.ep_num = 8;
     set.map.type = UCC_EP_MAP_ARRAY;
     set.map.array.map = (void*)ranks;
     set.map.array.elem_size = sizeof(ucc_rank_t);
@@ -571,10 +578,10 @@ UCC_TEST_F(test_topo, all_nodes)
     EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
     EXPECT_EQ(UCC_OK, ucc_topo_get_all_nodes(topo, &sbgps, &n_sbgps));
     EXPECT_EQ(4, n_sbgps);
-    EXPECT_EQ(true, check_sbgp(&sbgps[0], {0}));
-    EXPECT_EQ(true, check_sbgp(&sbgps[1], {1}));
-    EXPECT_EQ(true, check_sbgp(&sbgps[2], {2}));
-    EXPECT_EQ(true, check_sbgp(&sbgps[3], {3}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[0], {0, 1}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[1], {2, 3}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[2], {4, 5}));
+    EXPECT_EQ(true, check_sbgp(&sbgps[3], {6, 7}));
 
     /* Test subset with multiple ranks from same node */
     ucc_topo_cleanup(topo);
@@ -587,6 +594,10 @@ UCC_TEST_F(test_topo, all_nodes)
 
     EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
     EXPECT_EQ(UCC_OK, ucc_topo_get_all_nodes(topo, &sbgps, &n_sbgps));
-    EXPECT_EQ(1, n_sbgps);
-    EXPECT_EQ(true, check_sbgp(&sbgps[0], {0, 1, 2, 3, 4}));
+    EXPECT_EQ(4, n_sbgps); // All sbgps are allocated, only the last one is ENABLED
+    EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgps[0].status);
+    EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgps[1].status);
+    EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgps[2].status);
+    EXPECT_EQ(UCC_SBGP_ENABLED,    sbgps[3].status);
+    EXPECT_EQ(true, check_sbgp(&sbgps[3], {0, 1, 2, 3, 4}));
 }
