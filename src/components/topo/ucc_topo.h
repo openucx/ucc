@@ -50,6 +50,8 @@ typedef struct ucc_topo {
     int         n_sockets;
     ucc_sbgp_t *all_numas;            /*< array of numa sbgps, init on demand */
     int         n_numas;
+    ucc_sbgp_t *all_nodes;            /*< array of node sbgps, init on demand */
+    int         n_nodes;
     ucc_rank_t  node_leader_rank_id;  /*< defines which rank on a node will be
                                           node leader. Similar to local node rank.
                                           currently set to 0, can be selected differently
@@ -93,6 +95,10 @@ ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
 
 /* Returns the array of ALL existing numa subgroups of given topo */
 ucc_status_t ucc_topo_get_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                    int *n_sbgps);
+
+/* Returns the array of ALL existing node subgroups of given topo */
+ucc_status_t ucc_topo_get_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
                                     int *n_sbgps);
 
 static inline int ucc_rank_on_local_node(ucc_rank_t team_rank, ucc_topo_t *topo)

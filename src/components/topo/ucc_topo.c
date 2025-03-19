@@ -214,6 +214,14 @@ void ucc_topo_cleanup(ucc_topo_t *topo)
             }
             ucc_free(topo->all_numas);
         }
+        if (topo->all_nodes) {
+            for (i = 0; i < topo->n_nodes; i++) {
+                if (topo->all_nodes[i].status == UCC_SBGP_ENABLED) {
+                    ucc_sbgp_cleanup(&topo->all_nodes[i]);
+                }
+            }
+            ucc_free(topo->all_nodes);
+        }
         ucc_free(topo);
     }
 }
@@ -267,6 +275,90 @@ ucc_status_t ucc_topo_get_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
 
     *sbgps   = topo->all_numas;
     *n_sbgps = topo->n_numas;
+
+    return status;
+}
+
+ucc_status_t ucc_sbgp_create_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
+                                      int *n_sbgps)
+{
+    ucc_sbgp_t  *sbgps;
+    ucc_rank_t   nnodes = topo->topo->nnodes;
+    ucc_rank_t  *node_ranks;
+    ucc_rank_t   node_size;
+    ucc_rank_t   i, j;
+    ucc_status_t status;
+
+    ucc_assert(nnodes >= 1);
+
+    sbgps = ucc_calloc(nnodes, sizeof(ucc_sbgp_t), "node_sbgps");
+    if (!sbgps) {
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    for (i = 0; i < nnodes; i++) {
+        sbgps[i].type = UCC_SBGP_NODE;
+        node_size = 0;
+
+        /* First count how many ranks are in this node */
+        for (j = 0; j < ucc_subset_size(&topo->set); j++) {
+            ucc_rank_t ctx_rank = ucc_ep_map_eval(topo->set.map, j);
+            if (topo->topo->procs[ctx_rank].host_id == i) {
+                node_size++;
+            }
+        }
+
+        if (node_size == 0) {
+            continue;
+        }
+
+        /* Allocate and fill the rank map for this node */
+        node_ranks = ucc_malloc(node_size * sizeof(ucc_rank_t), "node_ranks");
+        if (!node_ranks) {
+            status = UCC_ERR_NO_MEMORY;
+            goto error;
+        }
+
+        node_size = 0;
+        for (j = 0; j < ucc_subset_size(&topo->set); j++) {
+            ucc_rank_t ctx_rank = ucc_ep_map_eval(topo->set.map, j);
+            if (topo->topo->procs[ctx_rank].host_id == i) {
+                node_ranks[node_size++] = j;
+            }
+        }
+
+        sbgps[i].group_size = node_size;
+        sbgps[i].rank_map = node_ranks;
+        sbgps[i].status = UCC_SBGP_ENABLED;
+        sbgps[i].map = ucc_ep_map_from_array(&node_ranks, node_size,
+                                            ucc_subset_size(&topo->set), 1);
+    }
+
+    *_sbgps = sbgps;
+    *n_sbgps = nnodes;
+    return UCC_OK;
+
+error:
+    for (i = 0; i < nnodes; i++) {
+        if (sbgps[i].rank_map) {
+            ucc_free(sbgps[i].rank_map);
+        }
+    }
+    ucc_free(sbgps);
+    return status;
+}
+
+ucc_status_t ucc_topo_get_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                    int *n_sbgps)
+{
+    ucc_status_t status = UCC_OK;
+
+    if (!topo->all_nodes) {
+        status = ucc_sbgp_create_all_nodes(topo, &topo->all_nodes, &topo->n_nodes);
+    }
+
+    *sbgps = topo->all_nodes;
+    *n_sbgps = topo->n_nodes;
 
     return status;
 }
