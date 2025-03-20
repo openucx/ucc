@@ -7,7 +7,8 @@
 #include "tl_ucp.h"
 #include "allgather.h"
 
-#define ALLGATHER_MAX_PATTERN_SIZE (sizeof(UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR))
+#define ALLGATHER_MAX_PATTERN_SIZE                                             \
+    (sizeof(UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR_1PPN))
 
 ucc_base_coll_alg_info_t
     ucc_tl_ucp_allgather_algs[UCC_TL_UCP_ALLGATHER_ALG_LAST + 1] = {
@@ -53,6 +54,13 @@ char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
         if (!ucc_ep_map_is_identity(&sbgp->map)) {
             algo_num = UCC_TL_UCP_ALLGATHER_ALG_RING;
         }
+    }
+
+    if (team->topo && ucc_topo_is_single_ppn(team->topo)) {
+        ucc_snprintf_safe(str, max_size,
+                          UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR_1PPN,
+                          algo_num);
+        return str;
     }
     ucc_snprintf_safe(str, max_size,
                       UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR, algo_num);
