@@ -287,17 +287,20 @@ ucc_status_t ucc_topo_get_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
 ucc_status_t ucc_sbgp_create_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
                                       int *n_sbgps)
 {
-    ucc_sbgp_t  *sbgps;
     ucc_rank_t   nnodes = topo->topo->nnodes;
+    ucc_sbgp_t  *sbgps;
     ucc_rank_t  *node_ranks;
     ucc_rank_t   node_size;
     ucc_rank_t   i, j;
     ucc_status_t status;
+    ucc_rank_t   ctx_rank;
 
     ucc_assert(nnodes >= 1);
 
-    sbgps = ucc_calloc(nnodes, sizeof(ucc_sbgp_t), "node_sbgps");
+    sbgps = ucc_calloc(nnodes, sizeof(ucc_sbgp_t), "sbgps");
     if (!sbgps) {
+        ucc_error("failed to allocate %zd bytes for sbgps array",
+                  nnodes * sizeof(ucc_sbgp_t));
         return UCC_ERR_NO_MEMORY;
     }
 
@@ -307,7 +310,7 @@ ucc_status_t ucc_sbgp_create_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
 
         /* First count how many ranks are in this node */
         for (j = 0; j < ucc_subset_size(&topo->set); j++) {
-            ucc_rank_t ctx_rank = ucc_ep_map_eval(topo->set.map, j);
+            ctx_rank = ucc_ep_map_eval(topo->set.map, j);
             if (topo->topo->procs[ctx_rank].host_id == i) {
                 node_size++;
             }
@@ -321,26 +324,29 @@ ucc_status_t ucc_sbgp_create_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
         /* Allocate and fill the rank map for this node */
         node_ranks = ucc_malloc(node_size * sizeof(ucc_rank_t), "node_ranks");
         if (!node_ranks) {
+            ucc_error("failed to allocate %zd bytes for node_ranks array",
+                      node_size * sizeof(ucc_rank_t));
             status = UCC_ERR_NO_MEMORY;
             goto error;
         }
 
         node_size = 0;
         for (j = 0; j < ucc_subset_size(&topo->set); j++) {
-            ucc_rank_t ctx_rank = ucc_ep_map_eval(topo->set.map, j);
+            ctx_rank = ucc_ep_map_eval(topo->set.map, j);
             if (topo->topo->procs[ctx_rank].host_id == i) {
                 node_ranks[node_size++] = j;
             }
         }
 
         sbgps[i].group_size = node_size;
-        sbgps[i].rank_map = node_ranks;
-        sbgps[i].status = UCC_SBGP_ENABLED;
-        sbgps[i].map = ucc_ep_map_from_array(&node_ranks, node_size,
-                                            ucc_subset_size(&topo->set), 0);
+        sbgps[i].rank_map   = node_ranks;
+        sbgps[i].status     = UCC_SBGP_ENABLED;
+        sbgps[i].map        = ucc_ep_map_from_array(&node_ranks, node_size,
+                                                    ucc_subset_size(&topo->set),
+                                                    0);
     }
 
-    *_sbgps = sbgps;
+    *_sbgps  = sbgps;
     *n_sbgps = nnodes;
     return UCC_OK;
 
@@ -371,13 +377,13 @@ ucc_status_t ucc_topo_get_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
 
 ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leaders_out)
 {
-    ucc_subset_t *set = &topo->set;
-    ucc_rank_t size = ucc_subset_size(set);
-    ucc_rank_t nnodes = topo->topo->nnodes;
-    ucc_rank_t i, j;
-    ucc_rank_t *ranks_seen_per_node;
-    ucc_rank_t *per_node_leaders;
-    ucc_rank_t *node_leaders;
+    ucc_subset_t *set    = &topo->set;
+    ucc_rank_t    size   = ucc_subset_size(set);
+    ucc_rank_t    nnodes = topo->topo->nnodes;
+    ucc_rank_t    i;
+    ucc_rank_t   *ranks_seen_per_node;
+    ucc_rank_t   *per_node_leaders;
+    ucc_rank_t   *node_leaders;
 
     if (topo->node_leaders) {
         *node_leaders_out = topo->node_leaders;
@@ -403,7 +409,7 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
     }
 
     per_node_leaders = ucc_calloc(nnodes, sizeof(ucc_rank_t), "per_node_leaders");
-    if (!ranks_seen_per_node) {
+    if (!per_node_leaders) {
         ucc_error("failed to allocate %zd bytes for per_node_leaders array",
                   nnodes * sizeof(ucc_rank_t));
         ucc_free(node_leaders);
@@ -430,15 +436,7 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
         ucc_rank_t ctx_rank = ucc_ep_map_eval(set->map, i);
         ucc_host_id_t current_host = topo->topo->procs[ctx_rank].host_id;
 
-        for (j = 0; j < nnodes; j++) {
-            ucc_rank_t ctx_rank_j = ucc_ep_map_eval(set->map, per_node_leaders[j]);
-            ucc_host_id_t current_host_j = topo->topo->procs[ctx_rank_j].host_id;
-
-            if (current_host_j == current_host) {
-                node_leaders[i] = per_node_leaders[j];
-                break;
-            }
-        }
+        node_leaders[i] = per_node_leaders[current_host];
     }
 
     topo->node_leaders = node_leaders;
