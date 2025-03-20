@@ -568,10 +568,25 @@ UCC_TEST_F(test_topo, all_nodes)
 
     /* Test subset with ranks from different nodes */
     ucc_topo_cleanup(topo);
-    ucc_rank_t ranks[] = {2, 0, 5, 6, 7, 10, 14, 12};
-    set.map.ep_num = 8;
+    ucc_rank_t ranks[] = {9, 12, 13, 14};
+    set.map.ep_num = 4;
     set.map.type = UCC_EP_MAP_ARRAY;
     set.map.array.map = (void*)ranks;
+    set.map.array.elem_size = sizeof(ucc_rank_t);
+    set.myrank = 2;
+
+    EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
+    EXPECT_EQ(UCC_OK, ucc_topo_get_all_nodes(topo, &sbgps, &n_sbgps));
+    EXPECT_EQ(2, n_sbgps);
+    EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgps[0].status); // 1 rank node sbgp doesnt exist
+    EXPECT_EQ(UCC_SBGP_ENABLED,    sbgps[1].status); // 3 rank node sbgp should be enabled
+
+    /* Test subset with ranks from different nodes */
+    ucc_topo_cleanup(topo);
+    ucc_rank_t ranks1[] = {2, 0, 5, 6, 7, 10, 14, 12};
+    set.map.ep_num = 8;
+    set.map.type = UCC_EP_MAP_ARRAY;
+    set.map.array.map = (void*)ranks1;
     set.map.array.elem_size = sizeof(ucc_rank_t);
     set.myrank = 0;
 
@@ -583,7 +598,8 @@ UCC_TEST_F(test_topo, all_nodes)
     EXPECT_EQ(true, check_sbgp(&sbgps[2], {4, 5}));
     EXPECT_EQ(true, check_sbgp(&sbgps[3], {6, 7}));
 
-    /* Test subset with multiple ranks from same node */
+    /* Test subset with multiple ranks from same node--should err because
+       node leader subgroup not exists */
     ucc_topo_cleanup(topo);
     ucc_rank_t ranks2[] = {11, 12, 13, 14, 15};
     set.map.ep_num = 5;
@@ -593,13 +609,7 @@ UCC_TEST_F(test_topo, all_nodes)
     set.myrank = 0;
 
     EXPECT_EQ(UCC_OK, ucc_topo_init(set, ctx_topo, &topo));
-    EXPECT_EQ(UCC_OK, ucc_topo_get_all_nodes(topo, &sbgps, &n_sbgps));
-    EXPECT_EQ(4, n_sbgps); // All sbgps are allocated, only the last one is ENABLED
-    EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgps[0].status);
-    EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgps[1].status);
-    EXPECT_EQ(UCC_SBGP_NOT_EXISTS, sbgps[2].status);
-    EXPECT_EQ(UCC_SBGP_ENABLED,    sbgps[3].status);
-    EXPECT_EQ(true, check_sbgp(&sbgps[3], {0, 1, 2, 3, 4}));
+    EXPECT_EQ(UCC_ERR_INVALID_PARAM, ucc_topo_get_all_nodes(topo, &sbgps, &n_sbgps));
 }
 
 UCC_TEST_F(test_topo, node_leaders)

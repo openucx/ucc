@@ -97,7 +97,7 @@ static inline ucc_status_t sbgp_create_sn(ucc_topo_t *topo, ucc_sbgp_t *sbgp,
     return UCC_OK;
 }
 
-static inline ucc_status_t sbgp_create_node(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
+ucc_status_t ucc_sbgp_create_node(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
 {
     ucc_subset_t *set            = &topo->set;
     ucc_rank_t    group_size     = ucc_subset_size(set);
@@ -300,12 +300,11 @@ skip:
     if (n_node_leaders > 1) {
         sbgp->group_size = n_node_leaders;
         if (i_am_node_leader) {
-            sbgp->rank_map   = nl_array_1;
-            sbgp->status     = UCC_SBGP_ENABLED;
+            sbgp->status = UCC_SBGP_ENABLED;
         } else {
-            ucc_free(nl_array_1);
             sbgp->status = UCC_SBGP_DISABLED;
         }
+        sbgp->rank_map = nl_array_1;
     } else {
         ucc_free(nl_array_1);
         sbgp->status = UCC_SBGP_NOT_EXISTS;
@@ -552,7 +551,7 @@ ucc_status_t ucc_sbgp_create(ucc_topo_t *topo, ucc_sbgp_type_t type)
     sbgp->rank_map = NULL;
     switch (type) {
     case UCC_SBGP_NODE:
-        status = sbgp_create_node(topo, sbgp);
+        status = ucc_sbgp_create_node(topo, sbgp);
         break;
     case UCC_SBGP_FULL:
         status = sbgp_create_full(topo, sbgp);
