@@ -283,15 +283,15 @@ ucc_tl_ucp_reduce_srg_knomial_get_pipeline_params(ucc_tl_ucp_team_t *team,
         ucc_mc_get_attr(&mc_attr, UCC_MEMORY_TYPE_CUDA);
         pp->threshold = mc_attr.fast_alloc_size;
         pp->n_frags   = 2;
-        pp->frag_size = mc_attr.fast_alloc_size;
         pp->order     = UCC_PIPELINE_PARALLEL;
         pp->pdepth    = 2;
+        pp->frag_size = mc_attr.fast_alloc_size / pp->pdepth;
     } else {
         pp->threshold = SIZE_MAX;
         pp->n_frags   = 0;
-        pp->frag_size = 0;
         pp->pdepth    = 1;
         pp->order     = UCC_PIPELINE_PARALLEL;
+        pp->frag_size = 0;
     }
 }
 
