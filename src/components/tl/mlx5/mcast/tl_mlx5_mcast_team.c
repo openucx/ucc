@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -110,6 +110,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     comm->cuda_mem_enabled              = conf_params->cuda_mem_enabled;
     comm->comm_id                       = team_params->id;
     comm->ctx                           = mcast_context;
+    comm->bcast_comm.truly_zero_copy_bcast_enabled
+                                        = conf_params->truly_zero_copy_bcast_enabled;
     comm->mcast_group_count             = ucc_min(conf_params->mcast_group_count, MAX_GROUP_COUNT);
 
     if (comm->cuda_mem_enabled && (UCC_OK != ucc_tl_mlx5_check_gpudirect_driver())) {
