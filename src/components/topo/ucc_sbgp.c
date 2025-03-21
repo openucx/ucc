@@ -140,7 +140,7 @@ ucc_status_t ucc_sbgp_create_node(ucc_topo_t *topo, ucc_sbgp_t *sbgp)
     if (0 == node_size) {
         /* We should always have at least 1 local rank */
         ucc_free(local_ranks);
-        return UCC_ERR_NO_MESSAGE;
+        return UCC_ERR_NOT_FOUND;
     }
     sbgp->group_size = node_size;
     sbgp->group_rank = node_rank;
