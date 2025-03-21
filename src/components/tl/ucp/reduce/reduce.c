@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -18,6 +18,11 @@ ucc_base_coll_alg_info_t
              .name = "dbt",
              .desc = "reduce over double binary tree where a leaf in one tree "
                      "will be intermediate in other (optimized for BW)"},
+        [UCC_TL_UCP_REDUCE_ALG_SRG] =
+            {.id   = UCC_TL_UCP_REDUCE_ALG_SRG,
+             .name = "srg",
+             .desc = "recursive knomial scatter-reduce followed by knomial "
+                     "gather"},
         [UCC_TL_UCP_REDUCE_ALG_LAST] = {
             .id = 0, .name = NULL, .desc = NULL}};
 
