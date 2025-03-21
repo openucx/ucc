@@ -72,11 +72,11 @@ UccTestMpi::UccTestMpi(int argc, char *argv[], ucc_thread_mode_t _tm,
         if (with_onesided) {
             onesided_ctx_params = ctx_params;
             for (auto i = 0; i < UCC_TEST_N_MEM_SEGMENTS; i++) {
-                onesided_buffers[i] = ucc_calloc(UCC_TEST_MEM_SEGMENT_SIZE,
+                onesided_buffers[i] = ucc_calloc(UCC_TEST_MEM_SEGMENT_SIZE * 2,
                                                  size, "onesided buffers");
                 UCC_MALLOC_CHECK(onesided_buffers[i]);
                 segments[i].address = onesided_buffers[i];
-                segments[i].len     = UCC_TEST_MEM_SEGMENT_SIZE * size;
+                segments[i].len     = 2 * UCC_TEST_MEM_SEGMENT_SIZE * size;
             }
             onesided_ctx_params.mask |= UCC_CONTEXT_PARAM_FIELD_MEM_PARAMS;
             onesided_ctx_params.mem_params.segments   = segments;
@@ -523,6 +523,9 @@ std::vector<ucc_test_mpi_result_t> UccTestMpi::exec_tests(
             }
         } while (num_done != tcs.size());
         for (auto tc: tcs) {
+            if (tc->args.flags & UCC_COLL_ARGS_FLAG_MEM_MAPPED_BUFFERS) {
+                MPI_Barrier(MPI_COMM_WORLD);
+            }
             status = tc->check();
             tc->set_input(i + 1);
             if (UCC_OK != status) {
@@ -537,6 +540,7 @@ std::vector<ucc_test_mpi_result_t> UccTestMpi::exec_tests(
 void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
                                  std::vector<ucc_test_mpi_result_t> &rst)
 {
+    uint32_t       id = 0;
     TestCaseParams params;
 
     params.max_size   = test_max_size;
@@ -626,6 +630,7 @@ void UccTestMpi::run_all_at_team(ucc_test_team_t &team,
                                         params.count_bits = count_bits;
                                         params.displ_bits = displ_bits;
                                         params.buffers    = onesided_bufs;
+                                        params.id         = id++;
 
                                         auto tcs = TestCase::init(team, c, nt, params);
                                         auto res = exec_tests(tcs, triggered, persistent);
