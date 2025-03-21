@@ -13,6 +13,7 @@ TestAlltoall::TestAlltoall(ucc_test_team_t &_team, TestCaseParams &params) :
     void*  work_buf = nullptr;
     int    rank, nprocs;
     size_t dt_size, single_rank_count;
+    size_t offset;
 
     dt                = params.dt;
     dt_size           = ucc_dt_size(dt);
@@ -31,9 +32,10 @@ TestAlltoall::TestAlltoall(ucc_test_team_t &_team, TestCaseParams &params) :
         UCC_CHECK(ucc_mc_alloc(&rbuf_mc_header, msgsize * nprocs, mem_type));
         rbuf      = rbuf_mc_header->addr;
     } else {
-        sbuf     = params.buffers[MEM_SEND_SEGMENT];
-        rbuf     = params.buffers[MEM_RECV_SEGMENT];
-        work_buf = params.buffers[MEM_WORK_SEGMENT];
+        offset   = nprocs * UCC_TEST_MEM_SEGMENT_SIZE * (params.id & 1);
+        sbuf     = PTR_OFFSET(params.buffers[MEM_SEND_SEGMENT], offset);
+        rbuf     = PTR_OFFSET(params.buffers[MEM_RECV_SEGMENT], offset);
+        work_buf = PTR_OFFSET(params.buffers[MEM_WORK_SEGMENT], offset);
     }
 
     check_buf = ucc_malloc(msgsize * nprocs, "check buf");
