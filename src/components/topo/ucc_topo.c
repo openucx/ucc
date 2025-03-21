@@ -325,7 +325,7 @@ ucc_status_t ucc_sbgp_create_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
             leader_rank = topo->node_leader_rank;
         } else {
             status = ucc_sbgp_create_node(topo, &sbgps[i]);
-            if (status == UCC_ERR_NO_MESSAGE) {
+            if (status == UCC_ERR_NOT_FOUND) {
                 /* ucc_sbgp_create_node returned because 0 == node_size */
                 sbgps[i].status = UCC_SBGP_NOT_EXISTS;
                 continue;
@@ -355,6 +355,7 @@ ucc_status_t ucc_sbgp_create_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
 
     return UCC_OK;
 error:
+    topo->set.myrank = myrank;
     for (i = 0; i < nnodes; i++) {
         if (sbgps[i].rank_map) {
             ucc_free(sbgps[i].rank_map);
