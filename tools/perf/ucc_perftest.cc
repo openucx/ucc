@@ -35,7 +35,15 @@ int main(int argc, char *argv[])
         delete comm;
         std::exit(1);
     }
-    bench->run_bench();
+    st = bench->run_bench();
+    if (st != UCC_OK) {
+        std::cerr << "Benchmark failed with status " << st << " "
+                  << ucc_status_string(st) << std::endl;
+        delete bench;
+        comm->finalize();
+        delete comm;
+        std::exit(1);
+    }
     delete bench;
     comm->finalize();
     delete comm;
