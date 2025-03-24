@@ -108,6 +108,10 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.truly_zero_copy_allgather_enabled),
      UCC_CONFIG_TYPE_BOOL},
 
+    {"MCAST_ZERO_COPY_BCAST_ENABLE", "0", "Enable truly zero copy bcast design for mcast",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.truly_zero_copy_bcast_enabled),
+     UCC_CONFIG_TYPE_BOOL},
+
     {"MCAST_ZERO_COPY_PREPOST_BUCKET_SIZE", "16", "Number of posted recvs during each stage of the pipeline"
      " in truly zero copy mcast allgather design",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.mcast_prepost_bucket_size),
