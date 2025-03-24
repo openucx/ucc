@@ -14,6 +14,8 @@
 #include "mcast/tl_mlx5_mcast_service_coll.h"
 
 
-ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_init(ucc_base_team_t *team);
+ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_init(ucc_tl_mlx5_mcast_coll_comm_t *comm);
 
-ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_test(ucc_base_team_t *team);
+ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_test(ucc_tl_mlx5_mcast_coll_comm_t *comm);
+
+ucc_status_t ucc_tl_mlx5_mcast_one_sided_cleanup(ucc_tl_mlx5_mcast_coll_comm_t *comm);

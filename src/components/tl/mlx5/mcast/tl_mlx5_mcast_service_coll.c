@@ -70,8 +70,7 @@ ucc_status_t ucc_tl_mlx5_mcast_service_coll_test(ucc_service_coll_req_t *req)
 {
     ucc_status_t status = UCC_OK;
 
-    status = ucc_service_coll_test(req);
-
+    status = ucc_collective_test(&req->task->super);
     if (UCC_INPROGRESS != status) {
         if (status < 0) {
             ucc_error("oob service coll progress failed");
