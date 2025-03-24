@@ -7,7 +7,8 @@
 #include "tl_ucp.h"
 #include "allgather.h"
 
-#define ALLGATHER_MAX_PATTERN_SIZE (sizeof(UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR))
+#define ALLGATHER_MAX_PATTERN_SIZE                                             \
+    (sizeof(UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR_1PPN))
 
 ucc_base_coll_alg_info_t
     ucc_tl_ucp_allgather_algs[UCC_TL_UCP_ALLGATHER_ALG_LAST + 1] = {
@@ -41,17 +42,28 @@ ucc_status_t ucc_tl_ucp_allgather_init(ucc_tl_ucp_task_t *task)
 
 char *ucc_tl_ucp_allgather_score_str_get(ucc_tl_ucp_team_t *team)
 {
-    int   max_size = ALLGATHER_MAX_PATTERN_SIZE;
-    int   algo_num = UCC_TL_TEAM_SIZE(team) % 2
-                         ? UCC_TL_UCP_ALLGATHER_ALG_RING
-                         : UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR;
-    char *str      = ucc_malloc(max_size * sizeof(char));
+    int                   max_size = ALLGATHER_MAX_PATTERN_SIZE;
+    int                   algo_num = UCC_TL_TEAM_SIZE(team) % 2
+                                         ? UCC_TL_UCP_ALLGATHER_ALG_RING
+                                         : UCC_TL_UCP_ALLGATHER_ALG_NEIGHBOR;
+    char *                str      = ucc_malloc(max_size * sizeof(char));
+    ucc_tl_ucp_context_t *ctx      = UCC_TL_UCP_TEAM_CTX(team);
     ucc_sbgp_t *sbgp;
 
     if (team->cfg.use_reordering) {
         sbgp = ucc_topo_get_sbgp(team->topo, UCC_SBGP_FULL_HOST_ORDERED);
         if (!ucc_ep_map_is_identity(&sbgp->map)) {
             algo_num = UCC_TL_UCP_ALLGATHER_ALG_RING;
+        }
+    }
+
+    if (team->topo && ucc_topo_is_single_ppn(team->topo)) {
+        if ((ctx->ucp_memory_types & UCC_BIT(UCC_MEMORY_TYPE_CUDA)) ||
+            (ctx->ucp_memory_types & UCC_BIT(UCC_MEMORY_TYPE_CUDA_MANAGED))) {
+            ucc_snprintf_safe(str, max_size,
+                              UCC_TL_UCP_ALLGATHER_DEFAULT_ALG_SELECT_STR_1PPN,
+                              algo_num);
+            return str;
         }
     }
     ucc_snprintf_safe(str, max_size,
