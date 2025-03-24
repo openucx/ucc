@@ -99,8 +99,9 @@ steps:
   - name: Run UCC MPI tests
     agentSelector: "{nodeLabel: 'swx-clx01'}"
     run: |
+      [ "$UCC_MPI_TESTS" = "false" ] && { echo "MPI tests were skipped !!!";exit 0; }
       echo "INFO: Run UCC MPI tests"
-      [ "$UCC_MPI_TESTS" = "true" ] && ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh || echo "Tests skipped by defaul while will be fixed !!!"
+      ${WORKSPACE}/.ci/scripts/run_tests_ucc_mpi_docker.sh
   #============================================================================
   - name: Run DLRM tests (UCC/GPU)
     agentSelector: "{nodeLabel: 'swx-clx01'}"

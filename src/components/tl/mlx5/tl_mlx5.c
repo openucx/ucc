@@ -143,6 +143,10 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
                   mcast_conf.mcast_prepost_bucket_size),
      UCC_CONFIG_TYPE_INT},
 
+    {"MCAST_GROUP_COUNT", "1", "Number of multicast groups that can be used to increase parallelism",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.mcast_group_count),
+     UCC_CONFIG_TYPE_INT},
+
     {"ALLTOALL_SEND_BATCH_SIZE", "2",
      "Number of blocks that are transposed "
      "on the NIC before being sent as a batch to a remote peer",
@@ -171,7 +175,8 @@ static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_context_config_t, devices),
      UCC_CONFIG_TYPE_STRING_ARRAY},
 
-    {"MCAST_TIMEOUT", "10000", "Timeout [usec] for the reliability NACK in Mcast",
+    {"MCAST_TIMEOUT", "10000",
+     "Timeout [usec] for the reliability NACK in Mcast",
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.timeout),
      UCC_CONFIG_TYPE_INT},
 
@@ -182,6 +187,10 @@ static ucc_config_field_t ucc_tl_mlx5_context_config_table[] = {
     {"MCAST_NET_DEVICE", "", "Specifies which network device to use for Mcast",
      ucc_offsetof(ucc_tl_mlx5_context_config_t, mcast_ctx_conf.ib_dev_name),
      UCC_CONFIG_TYPE_STRING},
+
+    {"ALLTOALL_ENABLE", "1", "Enable Accelerated alltoall",
+     ucc_offsetof(ucc_tl_mlx5_context_config_t, enable_alltoall),
+     UCC_CONFIG_TYPE_BOOL},
 
     {NULL}};
 

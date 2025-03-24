@@ -50,12 +50,16 @@ typedef struct ucc_topo {
     int         n_sockets;
     ucc_sbgp_t *all_numas;            /*< array of numa sbgps, init on demand */
     int         n_numas;
+    ucc_sbgp_t *all_nodes;            /*< array of node sbgps, init on demand */
+    int         n_nodes;
     ucc_rank_t  node_leader_rank_id;  /*< defines which rank on a node will be
                                           node leader. Similar to local node rank.
                                           currently set to 0, can be selected differently
                                           in the future */
     ucc_rank_t   node_leader_rank;    /*< actual rank of the node leader in the original
                                           (ucc_team) ranking */
+    ucc_rank_t  *node_leaders;        /*< array mapping each rank to its node leader in the original
+                                          (ucc_team) ranking, initialized on demand */
     ucc_subset_t set;     /*< subset of procs from the ucc_context_topo.
                          for ucc_team topo it is team->ctx_map */
     ucc_rank_t   min_ppn; /*< min ppn across the nodes for a team */
@@ -93,6 +97,10 @@ ucc_status_t ucc_topo_get_all_sockets(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
 
 /* Returns the array of ALL existing numa subgroups of given topo */
 ucc_status_t ucc_topo_get_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                    int *n_sbgps);
+
+/* Returns the array of ALL existing node subgroups of given topo */
+ucc_status_t ucc_topo_get_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
                                     int *n_sbgps);
 
 static inline int ucc_rank_on_local_node(ucc_rank_t team_rank, ucc_topo_t *topo)
@@ -244,5 +252,10 @@ static inline ucc_rank_t ucc_topo_nnodes(ucc_topo_t *topo)
     }
     return sbgp->group_size;
 }
+
+/* Returns an array mapping each rank to its node leader.
+   The array is cached in topo->node_leaders. */
+ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo,
+                                       ucc_rank_t **node_leaders_out);
 
 #endif

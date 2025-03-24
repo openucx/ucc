@@ -184,6 +184,8 @@ ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *ctx_topo,
     topo->max_numa_size       = 0;
     topo->all_sockets         = NULL;
     topo->all_numas           = NULL;
+    topo->all_nodes           = NULL;
+    topo->node_leaders        = NULL;
 
     *_topo = topo;
     return UCC_OK;
@@ -194,7 +196,8 @@ void ucc_topo_cleanup(ucc_topo_t *topo)
     int i;
     if (topo) {
         for (i = 0; i < UCC_SBGP_LAST; i++) {
-            if (topo->sbgps[i].status == UCC_SBGP_ENABLED) {
+            if (topo->sbgps[i].status == UCC_SBGP_ENABLED ||
+                topo->sbgps[i].status == UCC_SBGP_DISABLED) {
                 ucc_sbgp_cleanup(&topo->sbgps[i]);
             }
         }
@@ -213,6 +216,17 @@ void ucc_topo_cleanup(ucc_topo_t *topo)
                 }
             }
             ucc_free(topo->all_numas);
+        }
+        if (topo->all_nodes) {
+            for (i = 0; i < topo->n_nodes; i++) {
+                if (topo->all_nodes[i].status == UCC_SBGP_ENABLED) {
+                    ucc_sbgp_cleanup(&topo->all_nodes[i]);
+                }
+            }
+            ucc_free(topo->all_nodes);
+        }
+        if (topo->node_leaders) {
+            ucc_free(topo->node_leaders);
         }
         ucc_free(topo);
     }
@@ -269,4 +283,170 @@ ucc_status_t ucc_topo_get_all_numas(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
     *n_sbgps = topo->n_numas;
 
     return status;
+}
+
+/* Returns invalid param if there's only one node in the team (leader sbgp does
+   not exist). Otherwise, creates a node sbgp for every node. One or more sbgps
+   may be UCC_SBGP_NOT_EXISTS if they have only one rank */
+ucc_status_t ucc_sbgp_create_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **_sbgps,
+                                      int *n_sbgps)
+{
+    ucc_rank_t   myrank      = topo->set.myrank;
+    ucc_rank_t   leader_rank = UCC_RANK_INVALID;
+    ucc_sbgp_t  *sbgps, *leader_sbgp;
+    ucc_rank_t   i;
+    ucc_status_t status;
+    ucc_rank_t   nnodes;
+
+    leader_sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+
+    if (leader_sbgp->status == UCC_SBGP_NOT_INIT ||
+        leader_sbgp->status == UCC_SBGP_NOT_EXISTS) {
+        ucc_debug("could not create all_nodes subgroups, leader subgroup "
+                  "does not exist for topo");
+        return UCC_ERR_INVALID_PARAM;
+    }
+
+    nnodes = leader_sbgp->group_size;
+
+    sbgps = ucc_calloc(nnodes, sizeof(ucc_sbgp_t), "sbgps");
+    if (!sbgps) {
+        ucc_error("failed to allocate %zd bytes for sbgps array",
+                  nnodes * sizeof(ucc_sbgp_t));
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    for (i = 0; i < nnodes; i++) {
+        ucc_rank_t ldr_team_rank = ucc_ep_map_eval(leader_sbgp->map, i);
+        topo->set.myrank = ldr_team_rank;
+        if (ucc_rank_on_local_node(myrank, topo)) {
+            /* Skip creating sbgp, we have this node's sbgp already */
+            sbgps[i] = *(ucc_topo_get_sbgp(topo, UCC_SBGP_NODE));
+            leader_rank = topo->node_leader_rank;
+        } else {
+            status = ucc_sbgp_create_node(topo, &sbgps[i]);
+            if (status == UCC_ERR_NOT_FOUND) {
+                /* ucc_sbgp_create_node returned because 0 == node_size */
+                sbgps[i].status = UCC_SBGP_NOT_EXISTS;
+                continue;
+            } else if (status != UCC_OK) {
+                ucc_error("failed to create all_node subgroup %d", i);
+                goto error;
+            }
+            if (sbgps[i].rank_map && sbgps[i].type != UCC_SBGP_FULL) {
+                sbgps[i].map = ucc_ep_map_from_array(
+                                    &sbgps[i].rank_map, sbgps[i].group_size,
+                                    ucc_subset_size(&topo->set), 1);
+            }
+            if (sbgps[i].rank_map && sbgps[i].status == UCC_SBGP_NOT_EXISTS) {
+                ucc_free(sbgps[i].rank_map);
+            }
+        }
+    }
+
+    /* Reset myrank and node_leader_rank because the calls to
+       ucc_sbgp_create_node above will have changed them */
+    topo->set.myrank = myrank;
+    ucc_assert(leader_rank != UCC_RANK_INVALID);
+    topo->node_leader_rank = leader_rank;
+
+    *_sbgps  = sbgps;
+    *n_sbgps = nnodes;
+
+    return UCC_OK;
+error:
+    topo->set.myrank = myrank;
+    for (i = 0; i < nnodes; i++) {
+        if (sbgps[i].rank_map) {
+            ucc_free(sbgps[i].rank_map);
+        }
+    }
+    ucc_free(sbgps);
+    return status;
+}
+
+ucc_status_t ucc_topo_get_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
+                                    int *n_sbgps)
+{
+    ucc_status_t status = UCC_OK;
+
+    if (!topo->all_nodes) {
+        status = ucc_sbgp_create_all_nodes(topo, &topo->all_nodes, &topo->n_nodes);
+    }
+
+    *sbgps = topo->all_nodes;
+    *n_sbgps = topo->n_nodes;
+
+    return status;
+}
+
+ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leaders_out)
+{
+    ucc_subset_t *set    = &topo->set;
+    ucc_rank_t    size   = ucc_subset_size(set);
+    ucc_rank_t    nnodes = topo->topo->nnodes;
+    ucc_rank_t    i;
+    ucc_rank_t   *ranks_seen_per_node;
+    ucc_rank_t   *per_node_leaders;
+    ucc_rank_t   *node_leaders;
+
+    if (topo->node_leaders) {
+        *node_leaders_out = topo->node_leaders;
+        return UCC_OK;
+    }
+
+    ucc_assert(nnodes > 1);
+
+    /* Allocate arrays */
+    node_leaders = ucc_malloc(sizeof(ucc_rank_t) * size, "node_leaders");
+    if (!node_leaders) {
+        ucc_error("failed to allocate %zd bytes for node_leaders array",
+                  size * sizeof(ucc_rank_t));
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    ranks_seen_per_node = ucc_calloc(nnodes, sizeof(ucc_rank_t), "ranks_seen_per_node");
+    if (!ranks_seen_per_node) {
+        ucc_error("failed to allocate %zd bytes for ranks_seen_per_node array",
+                  nnodes * sizeof(ucc_rank_t));
+        ucc_free(node_leaders);
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    per_node_leaders = ucc_calloc(nnodes, sizeof(ucc_rank_t), "per_node_leaders");
+    if (!per_node_leaders) {
+        ucc_error("failed to allocate %zd bytes for per_node_leaders array",
+                  nnodes * sizeof(ucc_rank_t));
+        ucc_free(node_leaders);
+        ucc_free(ranks_seen_per_node);
+        return UCC_ERR_NO_MEMORY;
+    }
+
+    /* First pass: identify node leaders */
+    for (i = 0; i < size; i++) {
+        ucc_rank_t ctx_rank = ucc_ep_map_eval(set->map, i);
+        ucc_host_id_t current_host = topo->topo->procs[ctx_rank].host_id;
+
+        /* Count ranks on this node */
+        ranks_seen_per_node[current_host]++;
+        
+        /* If this is the rank we want as leader for this node, mark it */
+        if (ranks_seen_per_node[current_host] == topo->node_leader_rank_id + 1) {
+            per_node_leaders[current_host] = i;
+        }
+    }
+
+    /* Second pass: propagate node leaders to all ranks */
+    for (i = 0; i < size; i++) {
+        ucc_rank_t ctx_rank = ucc_ep_map_eval(set->map, i);
+        ucc_host_id_t current_host = topo->topo->procs[ctx_rank].host_id;
+
+        node_leaders[i] = per_node_leaders[current_host];
+    }
+
+    topo->node_leaders = node_leaders;
+    *node_leaders_out = node_leaders;
+    ucc_free(ranks_seen_per_node);
+    ucc_free(per_node_leaders);
+    return UCC_OK;
 }

@@ -97,7 +97,7 @@ static ucc_mpool_ops_t ucc_tl_mlx5_dm_ops = {
 
 void ucc_tl_mlx5_dm_pool_cleanup(ucc_tl_mlx5_team_t *team)
 {
-    if (!team->dm_ptr) {
+    if (!team->dm_ptr || !team->a2a) {
         return;
     }
 

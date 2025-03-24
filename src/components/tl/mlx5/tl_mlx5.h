@@ -79,6 +79,7 @@ typedef struct ucc_tl_mlx5_context_config {
     ucc_tl_context_config_t         super;
     ucs_config_names_array_t        devices;
     ucc_tl_mlx5_mcast_ctx_params_t  mcast_ctx_conf;
+    int                             enable_alltoall;
 } ucc_tl_mlx5_context_config_t;
 
 typedef struct ucc_tl_mlx5_lib {
@@ -130,7 +131,7 @@ typedef enum
 {
     TL_MLX5_TEAM_STATE_MCAST_CTX_CHECK,
     TL_MLX5_TEAM_STATE_MCAST_INIT,
-    TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_POST,
+    TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_TEST,
     TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY,
     TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED,
     TL_MLX5_TEAM_STATE_MCAST_GRP_BCAST_POST,

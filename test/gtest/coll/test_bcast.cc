@@ -278,19 +278,47 @@ ucc_job_env_t dbt_env      = {{"UCC_TL_UCP_TUNE", "bcast:@dbt:0-inf:inf"},
                               {"UCC_CLS", "basic"}};
 ucc_job_env_t cuda_env     = {{"UCC_TL_CUDA_TUNE", "bcast:cuda:@0:0-inf:inf"},
                               {"UCC_CLS", "basic"}};
+ucc_job_env_t host_mcast_env = {{"UCC_TLS", "ucp,mlx5"},
+                                {"UCC_TL_MLX5_TUNE", "inf"},
+                                {"UCC_TL_MLX5_MCAST_ENABLE", "1"},
+                                {"UCC_TL_MLX5_MCAST_NET_DEVICE", "mlx5_0"},
+                                {"UCC_TL_MLX5_MCAST_CUDA_MEM_ENABLE", "0"},
+                                {"UCC_TL_MLX5_MIN_TEAM_SIZE", "2"}};
+
+ucc_job_env_t host_mcast_rel_env = {{"UCC_TLS", "ucp,mlx5"},
+                                {"UCC_TL_MLX5_TUNE", "inf"},
+                                {"UCC_TL_MLX5_MCAST_ENABLE", "1"},
+                                {"UCC_TL_MLX5_MCAST_NET_DEVICE", "mlx5_0"},
+                                {"UCC_TL_MLX5_MCAST_CUDA_MEM_ENABLE", "0"},
+                                {"UCC_TL_MLX5_MCAST_TIMEOUT", "0"},
+                                {"UCC_TL_MLX5_MIN_TEAM_SIZE", "2"}};
+
+ucc_job_env_t cuda_mcast_env = {{"UCC_TLS", "ucp,mlx5"},
+                                {"UCC_TL_MLX5_TUNE", "inf"},
+                                {"UCC_TL_MLX5_MCAST_ENABLE", "1"},
+                                {"UCC_TL_MLX5_MCAST_NET_DEVICE", "mlx5_0"},
+                                {"UCC_TL_MLX5_MCAST_CUDA_MEM_ENABLE", "1"},
+                                {"UCC_TL_MLX5_MIN_TEAM_SIZE", "2"}};
+
+ucc_job_env_t cuda_mcast_rel_env = {{"UCC_TLS", "ucp,mlx5"},
+                                {"UCC_TL_MLX5_TUNE", "inf"},
+                                {"UCC_TL_MLX5_MCAST_ENABLE", "1"},
+                                {"UCC_TL_MLX5_MCAST_NET_DEVICE", "mlx5_0"},
+                                {"UCC_TL_MLX5_MCAST_CUDA_MEM_ENABLE", "1"},
+                                {"UCC_TL_MLX5_MCAST_TIMEOUT", "0"},
+                                {"UCC_TL_MLX5_MIN_TEAM_SIZE", "2"}};
+
 INSTANTIATE_TEST_CASE_P(
     , test_bcast_alg,
     ::testing::Combine(
 #ifdef HAVE_CUDA
         ::testing::Values(UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA,
                           UCC_MEMORY_TYPE_CUDA_MANAGED),
+        ::testing::Values(two_step_env, dbt_env, cuda_env, host_mcast_env, host_mcast_rel_env,
+                          cuda_mcast_env, cuda_mcast_rel_env), //env
 #else
         ::testing::Values(UCC_MEMORY_TYPE_HOST),
-#endif
-#ifdef HAVE_CUDA
-        ::testing::Values(two_step_env, dbt_env, cuda_env), //env
-#else
-        ::testing::Values(two_step_env, dbt_env), //env
+        ::testing::Values(two_step_env, dbt_env, host_mcast_env, host_mcast_rel_env), //env
 #endif
         ::testing::Values(8, 65536), // count
         ::testing::Values(15, 16))); // n_procs

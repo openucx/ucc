@@ -707,6 +707,11 @@ void UccCollArgs::set_inplace(gtest_ucc_inplace_t _inplace)
     inplace = _inplace;
 }
 
+void UccCollArgs::set_contig(bool _is_contig)
+{
+    is_contig = _is_contig;
+}
+
 void clear_buffer(void *_buf, size_t size, ucc_memory_type_t mt, uint8_t value)
 {
     void *buf = _buf;

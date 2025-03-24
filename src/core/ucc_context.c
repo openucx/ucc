@@ -884,17 +884,6 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
     int               i;
     ucc_status_t      status;
 
-    if (context->service_team) {
-        while (UCC_INPROGRESS ==
-               (status = UCC_TL_CTX_IFACE(context->service_ctx)
-                             ->team.destroy(&context->service_team->super))) {
-            ucc_context_progress(context);
-        }
-        if (status < 0) {
-            ucc_error("failed to destroy ctx service team");
-        }
-        ucc_tl_context_put(context->service_ctx);
-    }
     if (UCC_OK != ucc_context_free_attr(&context->attr)) {
         ucc_error("failed to free context attributes");
     }
@@ -907,12 +896,37 @@ ucc_status_t ucc_context_destroy(ucc_context_t *context)
 
     for (i = 0; i < context->n_tl_ctx; i++) {
         tl_ctx = context->tl_ctx[i];
+        if ((context->service_team) && (tl_ctx == context->service_ctx)) {
+            /* skip service context cause service team might be
+               in use by other contexts */
+            continue;
+        }
         tl_lib = ucc_derived_of(tl_ctx->super.lib, ucc_tl_lib_t);
         if (tl_ctx->ref_count != 0 ) {
             ucc_info("tl ctx %s is still in use", tl_lib->iface->super.name);
         }
         tl_lib->iface->context.destroy(&tl_ctx->super);
     }
+
+    if (context->service_team) {
+        /* service team can now be safely destroyed since all other contexts
+           have been cleaned up and can no longer use the service team */
+        while (UCC_INPROGRESS ==
+               (status = UCC_TL_CTX_IFACE(context->service_ctx)
+                             ->team.destroy(&context->service_team->super))) {
+            ucc_context_progress(context);
+        }
+        if (status < 0) {
+            ucc_error("failed to destroy ctx service team");
+        }
+        ucc_tl_context_put(context->service_ctx);
+        tl_lib = ucc_derived_of(context->service_ctx->super.lib, ucc_tl_lib_t);
+        if (context->service_ctx->ref_count != 0 ) {
+            ucc_info("tl ctx %s is still in use", tl_lib->iface->super.name);
+        }
+        tl_lib->iface->context.destroy(&context->service_ctx->super);
+    }
+
     ucc_context_topo_cleanup(context->topo);
     ucc_progress_queue_finalize(context->pq);
     ucc_free(context->addr_storage.storage);
