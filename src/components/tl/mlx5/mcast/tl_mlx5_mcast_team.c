@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -12,17 +12,6 @@
 #include "p2p/ucc_tl_mlx5_mcast_p2p.h"
 #include "mcast/tl_mlx5_mcast_helper.h"
 #include "mcast/tl_mlx5_mcast_service_coll.h"
- 
-static ucc_status_t ucc_tl_mlx5_check_gpudirect_driver()
-{
-    const char  *file   = "/sys/kernel/mm/memory_peers/nv_mem/version";
-
-    if (!access(file, F_OK)) {
-        return UCC_OK;
-    }
-
-    return UCC_ERR_NO_RESOURCE;
-}
 
 ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
                                          ucc_tl_mlx5_mcast_team_t **mcast_team,
@@ -34,6 +23,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     ucc_tl_mlx5_mcast_coll_context_t        *mcast_context = &(ctx->mcast_context);
     ucc_tl_mlx5_mcast_coll_comm_init_spec_t *conf_params   = &comm_spec;
     ucc_context_t                           *context       =  base_context->ucc_context;
+    ucc_tl_mlx5_context_t                   *tl_ctx        = ucc_derived_of(base_context,
+                                                                            ucc_tl_mlx5_context_t);
     ucc_status_t                             status;
     ucc_subset_t                             set;
     ucc_tl_mlx5_mcast_team_t                *new_mcast_team;
@@ -47,7 +38,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
                  base_context );
         return UCC_ERR_NO_RESOURCE;
     }
-    
+
     new_mcast_team = ucc_calloc(1, sizeof(ucc_tl_mlx5_mcast_team_t), "new_mcast_team");
 
     if (!new_mcast_team) {
@@ -112,7 +103,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     comm->ctx                           = mcast_context;
     comm->mcast_group_count             = ucc_min(conf_params->mcast_group_count, MAX_GROUP_COUNT);
 
-    if (comm->cuda_mem_enabled && (UCC_OK != ucc_tl_mlx5_check_gpudirect_driver())) {
+    if (comm->cuda_mem_enabled && !(tl_ctx->supported_mem_types & UCC_BIT(UCC_MEMORY_TYPE_CUDA))) {
         tl_warn(mcast_context->lib, "cuda-aware mcast not available as gpu direct is not ready");
         status = UCC_ERR_NO_RESOURCE;
         goto cleanup;
@@ -263,7 +254,7 @@ ucc_status_t ucc_tl_mlx5_mcast_coll_setup_comm_resources(ucc_tl_mlx5_mcast_coll_
 
         comm->pp[i].buf     = (uintptr_t) comm->pp_buf + i * buf_size;
         comm->pp[i].context = 0;
-        
+
         ucc_list_add_tail(&comm->bpool, &comm->pp[i].super);
     }
 

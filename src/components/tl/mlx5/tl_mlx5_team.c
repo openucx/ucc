@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -304,21 +304,23 @@ initial_sync_post:
     return UCC_INPROGRESS;
 }
 
-ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *  tl_team,
+ucc_status_t ucc_tl_mlx5_team_get_scores(ucc_base_team_t *tl_team,
                                          ucc_coll_score_t **score_p)
 {
-    ucc_tl_mlx5_team_t *team  = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
-    ucc_base_context_t *ctx   = UCC_TL_TEAM_CTX(team);
-    ucc_base_lib_t     *lib   = UCC_TL_TEAM_LIB(team);
-    ucc_memory_type_t   mt[2] = {UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA};
+    ucc_tl_mlx5_team_t    *team   = ucc_derived_of(tl_team, ucc_tl_mlx5_team_t);
+    ucc_base_context_t    *ctx    = UCC_TL_TEAM_CTX(team);
+    ucc_tl_mlx5_context_t *tl_ctx = ucc_derived_of(ctx, ucc_tl_mlx5_context_t);
+    ucc_base_lib_t        *lib    = UCC_TL_TEAM_LIB(team);
+    ucc_memory_type_t      mt[2]  = {UCC_MEMORY_TYPE_HOST, UCC_MEMORY_TYPE_CUDA};
     ucc_coll_score_t          *score;
     ucc_status_t               status;
     ucc_coll_score_team_info_t team_info;
 
+
     team_info.alg_fn              = NULL;
     team_info.default_score       = UCC_TL_MLX5_DEFAULT_SCORE;
     team_info.init                = ucc_tl_mlx5_coll_init;
-    team_info.num_mem_types       = 2;
+    team_info.num_mem_types       = tl_ctx->supported_mem_types & UCC_BIT(UCC_MEMORY_TYPE_CUDA) ? 2 : 1;
     team_info.supported_mem_types = mt;
     team_info.supported_colls =
         (UCC_COLL_TYPE_ALLTOALL * (team->a2a_state == TL_MLX5_TEAM_STATE_ALLTOALL_READY)) |
