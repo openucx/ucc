@@ -1,11 +1,12 @@
 /**
- * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
 
 #ifndef UCC_TL_MLX5_H_
 #define UCC_TL_MLX5_H_
+
 #include "components/tl/ucc_tl.h"
 #include "components/tl/ucc_tl_log.h"
 #include "core/ucc_service_coll.h"
@@ -88,6 +89,7 @@ typedef struct ucc_tl_mlx5_context {
     int                          sock;
     ucc_mpool_t                  req_mp;
     ucc_tl_mlx5_mcast_context_t  mcast;
+    uint16_t                     supported_mem_types;
 } ucc_tl_mlx5_context_t;
 UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t*,
                   const ucc_base_config_t*);

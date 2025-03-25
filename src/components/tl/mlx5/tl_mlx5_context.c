@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -16,6 +16,38 @@
 #define PD_OWNER_RANK 0
 #define TL_MLX5_IB_PORT_INVALID -1
 
+static ucc_status_t ucc_tl_mlx5_check_gpudirect_driver(ucc_base_lib_t *lib,
+                                                       const char *file)
+{
+    ucc_status_t status = UCC_ERR_NO_RESOURCE;
+
+    if (!access(file, F_OK)) {
+        status = UCC_OK;
+    }
+
+    tl_debug(lib, "checking gpudirect driver: %s, status: %d %s", file,
+             status, ucc_status_string(status));
+    return status;
+}
+
+static ucc_status_t ucc_tl_mlx5_check_gpudirect_driver_cuda(ucc_base_lib_t *lib)
+{
+    /* Check peer memory driver is loaded, different driver versions use
+     * different paths */
+    if (UCC_OK == ucc_tl_mlx5_check_gpudirect_driver(lib,
+                            "/sys/kernel/mm/memory_peers/nv_mem/version")) {
+        return UCC_OK;
+    } else if (UCC_OK == ucc_tl_mlx5_check_gpudirect_driver(lib,
+                            "/sys/module/nvidia_peermem/version")) {
+        return UCC_OK;
+    } else if (UCC_OK == ucc_tl_mlx5_check_gpudirect_driver(lib,
+                            "/sys/module/nv_peer_mem/version")) {
+        return UCC_OK;
+    }
+    tl_debug(lib, "no gpudirect driver found, cuda memory is not supported");
+    return UCC_ERR_NOT_SUPPORTED;
+}
+
 UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
                     const ucc_base_context_params_t *params,
                     const ucc_base_config_t *        config)
@@ -27,10 +59,15 @@ UCC_CLASS_INIT_FUNC(ucc_tl_mlx5_context_t,
     UCC_CLASS_CALL_SUPER_INIT(ucc_tl_context_t, &tl_mlx5_config->super,
                               params->context);
     memcpy(&self->cfg, tl_mlx5_config, sizeof(*tl_mlx5_config));
-    self->sock       = 0;
-    self->rcache     = NULL;
-    self->shared_pd  = NULL;
-    self->shared_ctx = NULL;
+    self->sock                = 0;
+    self->rcache              = NULL;
+    self->shared_pd           = NULL;
+    self->shared_ctx          = NULL;
+    self->supported_mem_types = UCC_BIT(UCC_MEMORY_TYPE_HOST);
+
+    if (UCC_OK == ucc_tl_mlx5_check_gpudirect_driver_cuda(self->super.super.lib)) {
+        self->supported_mem_types |= UCC_BIT(UCC_MEMORY_TYPE_CUDA);
+    }
 
     status = ucc_mpool_init(
         &self->req_mp, 0,
