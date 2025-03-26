@@ -64,6 +64,48 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
     return UCC_OK;
 }
 
+/* Check if the ranks are block ordered. If they aren't, we'll need to 
+   unpack the data after the allgatherv into the right position, even if the
+   dst buffer is contiguous */
+static inline ucc_status_t is_block_ordered(ucc_cl_hier_team_t *cl_team, int *ordered)
+{
+    ucc_topo_t *topo = cl_team->super.super.params.team->topo;
+    ucc_sbgp_t *all_nodes = NULL;
+    int n_nodes;
+    ucc_status_t status;
+    ucc_rank_t prev_rank, curr_rank;
+    ucc_rank_t i, j;
+
+    *ordered = 0; // Default to not block ordered
+
+    status = ucc_topo_get_all_nodes(topo, &all_nodes, &n_nodes);
+    if (status != UCC_OK) {
+        return status; // Return the error status
+    }
+
+    // For each node, check if its ranks are consecutive in team order
+    for (i = 0; i < n_nodes; i++) {
+        if (all_nodes[i].status == UCC_SBGP_ENABLED && all_nodes[i].group_size > 1) {
+            // Get first rank in this node
+            prev_rank = ucc_ep_map_eval(all_nodes[i].map, 0);
+            
+            // Check if all other ranks are consecutive
+            for (j = 1; j < all_nodes[i].group_size; j++) {
+                curr_rank = ucc_ep_map_eval(all_nodes[i].map, j);
+                
+                // If ranks are not consecutive, not block ordered
+                if (curr_rank != prev_rank + 1) {
+                    return UCC_OK; // Not block ordered, but not an error
+                }
+                prev_rank = curr_rank;
+            }
+        }
+    }
+
+    *ordered = 1; // All nodes have contiguous ranks
+    return UCC_OK;
+}
+
 UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
                          (coll_args, team, task),
                          ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
@@ -105,6 +147,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     ucc_rank_t              team_rank;
     size_t                  leader_old_count;
     size_t                  add_count, new_count;
+    int                     block_ordered;
 
     if (coll_args->args.src.info.mem_type != UCC_MEMORY_TYPE_HOST ||
         coll_args->args.dst.info_v.mem_type != UCC_MEMORY_TYPE_HOST) {
@@ -119,8 +162,10 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
 
     memcpy(&args,     coll_args, sizeof(args));
     memcpy(&args_old, coll_args, sizeof(args));
-    in_place  = UCC_IS_INPLACE(args.args);
-    is_contig = UCC_COLL_IS_DST_CONTIG(&args.args);
+    in_place = UCC_IS_INPLACE(args.args);
+
+    UCC_CHECK_GOTO(is_block_ordered(cl_team, &block_ordered), free_sched, status);
+    is_contig = UCC_COLL_IS_DST_CONTIG(&args.args) && block_ordered;
     n_tasks   = 0;
     UCC_CHECK_GOTO(ucc_schedule_init(schedule, &args, team), free_sched, status);
 
