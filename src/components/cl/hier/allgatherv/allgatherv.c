@@ -178,7 +178,6 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
            a contiguous chunk */
         disp_counter = 0;
         for (i = 0; i < leader_sbgp_size; i++) {
-
             ucc_coll_args_set_displacement(&args.args, leader_disps,
                                             i, disp_counter);
             disp_counter += ucc_coll_args_get_count(&args.args,
