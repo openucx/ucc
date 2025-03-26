@@ -52,7 +52,7 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
     ucc_status_t        status;
 
     ucc_assert(team_rank >= 0 && team_rank < UCC_CL_TEAM_SIZE(cl_team));
-    ucc_assert(SBGP_ENABLED(cl_team, NODE_LEADERS));
+    ucc_assert(SBGP_EXISTS(cl_team, NODE_LEADERS));
 
     status = ucc_topo_get_node_leaders(core_team->topo, &node_leaders, NULL);
     if (UCC_OK != status) {
@@ -151,10 +151,10 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     }
     node_gathered_data = NULL;
 
-    /* If I'm a node leader, calculate leader_counts, leader_disps, and set the
+    /* If node ldr sbgp, calculate leader_counts, leader_disps, and set the
        dst buffer of the gatherv to the right displacements for the in-place
-       node-leader allgatherv */
-    if(SBGP_ENABLED(cl_team, NODE) && SBGP_ENABLED(cl_team, NODE_LEADERS)) {
+       node-leader allgatherv, even on non-node-leader ranks */
+    if(SBGP_ENABLED(cl_team, NODE) && SBGP_EXISTS(cl_team, NODE_LEADERS)) {
         /* Sum up the counts on each node to get the count for each node leader */
         for (i = 0; i < team_size; i++) {
             UCC_CHECK_GOTO(
