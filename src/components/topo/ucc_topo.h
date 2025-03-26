@@ -60,6 +60,7 @@ typedef struct ucc_topo {
                                           (ucc_team) ranking */
     ucc_rank_t  *node_leaders;        /*< array mapping each rank to its node leader in the original
                                           (ucc_team) ranking, initialized on demand */
+    ucc_rank_t  *per_node_leaders;    /*< array of node leaders per node, initialized on demand */
     ucc_subset_t set;     /*< subset of procs from the ucc_context_topo.
                          for ucc_team topo it is team->ctx_map */
     ucc_rank_t   min_ppn; /*< min ppn across the nodes for a team */
@@ -253,9 +254,10 @@ static inline ucc_rank_t ucc_topo_nnodes(ucc_topo_t *topo)
     return sbgp->group_size;
 }
 
-/* Returns an array mapping each rank to its node leader.
-   The array is cached in topo->node_leaders. */
-ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo,
-                                       ucc_rank_t **node_leaders_out);
+/* Returns node leaders array - array that maps each rank to the TEAM RANK that 
+   is the leader of that rank's node. Also returns per-node leaders array - array
+   mapping node_id to the TEAM RANK of that node's leader */
+ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leaders_out,
+                                      ucc_rank_t **per_node_leaders_out);
 
 #endif
