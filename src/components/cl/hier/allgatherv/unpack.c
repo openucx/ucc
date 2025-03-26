@@ -72,17 +72,16 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
     ucc_ee_executor_t          *exec;
     ucc_status_t                status;
     ucc_rank_t                  i;
-    size_t                      src_rank_count;
     size_t                      dst_rank_count;
-    size_t                      src_rank_disp;
     size_t                      dst_rank_disp;
     ucc_rank_t                 *node_leaders = NULL;
     ucc_rank_t                 *per_node_leaders = NULL;
     ucc_sbgp_t                 *all_nodes = NULL;
+    ucc_sbgp_t                 *node_leaders_sbgp = NULL;
     int                         n_nodes;
     ucc_rank_t                  node_id;
-    ucc_rank_t                  node_rank_offset;
-    ucc_rank_t                  team_rank;
+    ucc_rank_t                  node_leader_idx;
+    size_t                      src_rank_disp;
 
     UCC_CHECK_GOTO(
         ucc_coll_task_get_executor(&schedule->super, &exec),
@@ -91,54 +90,57 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
 
     *n_tasks = 0;
 
-    // Get the node leaders and all nodes information
+    // Get the node leaders
     UCC_CHECK_GOTO(
         ucc_topo_get_node_leaders(topo, &node_leaders, &per_node_leaders),
         out, status);
+    
+    // Get the node leaders subgroup for proper rank mapping
+    node_leaders_sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_NODE_LEADERS);
+    if (!SBGP_EXISTS(cl_team, NODE_LEADERS)) {
+        status = UCC_ERR_NOT_SUPPORTED;
+        goto out;
+    }
     
     UCC_CHECK_GOTO(
         ucc_topo_get_all_nodes(topo, &all_nodes, &n_nodes),
         out, status);
 
     for (i = 0; i < team_size; i++) {
-        // Find which node this rank belongs to
-        for (node_id = 0; node_id < n_nodes; node_id++) {
-            if (all_nodes[node_id].status == UCC_SBGP_ENABLED) {
-                for (node_rank_offset = 0; node_rank_offset < all_nodes[node_id].group_size; node_rank_offset++) {
-                    team_rank = ucc_ep_map_eval(all_nodes[node_id].map, node_rank_offset);
-                    if (team_rank == i) {
-                        // Found the node and position for this team rank
-                        goto found_rank;
-                    }
-                }
-            }
-        }
-found_rank:
-        // Get counts and displacements for destination (team order)
+        // Get destination count and displacement (in team rank order)
         dst_rank_count = ucc_coll_args_get_count(args, args->dst.info_v.counts, i);
         dst_rank_disp = ucc_coll_args_get_displacement(args, args->dst.info_v.displacements, i);
+
+        // Find which node leader this rank belongs to
+        ucc_rank_t leader_team_rank = node_leaders[i];
         
-        // Source displacement needs to account for node-based ordering
-        // Calculate offset in source buffer based on node_id and rank's position within node
-        src_rank_disp = 0;
-        // Add up counts for all preceding nodes
-        for (ucc_rank_t prev_node = 0; prev_node < node_id; prev_node++) {
-            if (all_nodes[prev_node].status == UCC_SBGP_ENABLED) {
-                for (ucc_rank_t prev_node_rank = 0; prev_node_rank < all_nodes[prev_node].group_size; prev_node_rank++) {
-                    ucc_rank_t prev_team_rank = ucc_ep_map_eval(all_nodes[prev_node].map, prev_node_rank);
-                    src_rank_disp += ucc_coll_args_get_count(args, args->dst.info_v.counts, prev_team_rank);
-                }
+        // Find the position of this leader in the node_leaders_sbgp
+        for (node_leader_idx = 0; node_leader_idx < node_leaders_sbgp->group_size; node_leader_idx++) {
+            if (ucc_ep_map_eval(node_leaders_sbgp->map, node_leader_idx) == leader_team_rank) {
+                break;
             }
         }
         
-        // Add offset within current node
-        for (ucc_rank_t j = 0; j < node_rank_offset; j++) {
-            ucc_rank_t curr_team_rank = ucc_ep_map_eval(all_nodes[node_id].map, j);
-            src_rank_disp += ucc_coll_args_get_count(args, args->dst.info_v.counts, curr_team_rank);
+        // Get source displacement from leader_displacements (passed in src.info_v)
+        src_rank_disp = ucc_coll_args_get_displacement(
+            args, args->src.info_v.displacements, node_leader_idx);
+            
+        // Find the correct node for this rank
+        for (node_id = 0; node_id < n_nodes; node_id++) {
+            if (all_nodes[node_id].status == UCC_SBGP_ENABLED && 
+                per_node_leaders[node_id] == leader_team_rank) {
+                // Found the node, now find position of rank i within this node
+                for (ucc_rank_t j = 0; j < all_nodes[node_id].group_size; j++) {
+                    ucc_rank_t curr_team_rank = ucc_ep_map_eval(all_nodes[node_id].map, j);
+                    if (curr_team_rank == i) {
+                        break; // We found our position
+                    }
+                    // Add previous ranks' counts from the same node
+                    src_rank_disp += ucc_coll_args_get_count(args, args->dst.info_v.counts, curr_team_rank);
+                }
+                break;
+            }
         }
-        
-        src_rank_count = dst_rank_count;
-        ucc_assert(src_rank_count * src_dt_size == dst_rank_count * dst_dt_size);
         
         eargs.copy.src = PTR_OFFSET(args->src.info_v.buffer, src_rank_disp * src_dt_size);
         eargs.copy.dst = PTR_OFFSET(args->dst.info_v.buffer, dst_rank_disp * dst_dt_size);
