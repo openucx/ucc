@@ -279,8 +279,14 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
 
         if (!is_contig) {
             args                        = args_old;
-            args.args.src.info_v        = args.args.dst.info_v;
+            args.args.src.info_v.datatype = args.args.dst.info_v.datatype;
+            args.args.src.info_v.mem_type = args.args.dst.info_v.mem_type;
             args.args.src.info_v.buffer = buffer;
+            
+            // Pass leader_disps and leader_counts through src.info_v
+            args.args.src.info_v.displacements = leader_disps;
+            args.args.src.info_v.counts = leader_counts;
+            
             UCC_CHECK_GOTO(
                 ucc_cl_hier_allgatherv_unpack_init(&args, team, &tasks[n_tasks]),
                 free_scratch, status);
