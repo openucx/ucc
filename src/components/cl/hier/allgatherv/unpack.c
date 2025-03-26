@@ -115,11 +115,7 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
         ucc_rank_t leader_team_rank = node_leaders[i];
         
         // Find the position of this leader in the node_leaders_sbgp
-        for (node_leader_idx = 0; node_leader_idx < node_leaders_sbgp->group_size; node_leader_idx++) {
-            if (ucc_ep_map_eval(node_leaders_sbgp->map, node_leader_idx) == leader_team_rank) {
-                break;
-            }
-        }
+        node_leader_idx = ucc_ep_map_local_rank(node_leaders_sbgp->map, leader_team_rank);
         
         // Get source displacement from leader_displacements (passed in src.info_v)
         src_rank_disp = ucc_coll_args_get_displacement(
