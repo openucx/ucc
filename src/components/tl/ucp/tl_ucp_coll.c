@@ -367,6 +367,9 @@ ucc_status_t ucc_tl_ucp_alg_id_to_init(int alg_id, const char *alg_id_str,
         case UCC_TL_UCP_REDUCE_ALG_DBT:
             *init = ucc_tl_ucp_reduce_dbt_init;
             break;
+        case UCC_TL_UCP_REDUCE_ALG_SRG:
+            *init = ucc_tl_ucp_reduce_srg_knomial_init;
+            break;
         default:
            status = UCC_ERR_INVALID_PARAM;
            break;
