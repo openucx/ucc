@@ -51,33 +51,34 @@ out:
 
 ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
 {
-    ucc_schedule_t             *schedule    = ucc_derived_of(task,
-                                                             ucc_schedule_t);
-    ucc_cl_hier_team_t         *cl_team     = ucc_derived_of(task->team,
-                                                             ucc_cl_hier_team_t);
-    ucc_rank_t                  team_size   = UCC_CL_TEAM_SIZE(cl_team);
-    ucc_coll_args_t            *args        = &task->bargs.args;
-    ucc_ee_executor_task_args_t eargs       = {0};
-    ucc_cl_hier_schedule_t     *cl_schedule = ucc_derived_of(schedule,
-                                                    ucc_cl_hier_schedule_t);
-    ucc_rank_t                 *n_tasks     = cl_schedule->scratch->addr;
-    ucc_ee_executor_task_t    **tasks       = PTR_OFFSET(
-                                                cl_schedule->scratch->addr,
+    ucc_schedule_t             *schedule          = ucc_derived_of(task,
+                                                        ucc_schedule_t);
+    ucc_cl_hier_team_t         *cl_team           = ucc_derived_of(task->team,
+                                                        ucc_cl_hier_team_t);
+    ucc_rank_t                  team_size         = UCC_CL_TEAM_SIZE(cl_team);
+    ucc_coll_args_t            *args              = &task->bargs.args;
+    ucc_ee_executor_task_args_t eargs             = {0};
+    ucc_cl_hier_schedule_t     *cl_schedule       = ucc_derived_of(schedule,
+                                                        ucc_cl_hier_schedule_t);
+    ucc_rank_t                 *n_tasks           = cl_schedule->scratch->addr;
+    ucc_ee_executor_task_t    **tasks             = PTR_OFFSET(
+                                                    cl_schedule->scratch->addr,
                                                 sizeof(ucc_rank_t));
-    size_t                      src_dt_size = ucc_dt_size(
-                                                args->src.info_v.datatype);
-    size_t                      dst_dt_size = ucc_dt_size(
-                                                args->dst.info_v.datatype);
-    ucc_topo_t                 *topo = task->team->params.team->topo;
+    size_t                      src_dt_size       = ucc_dt_size(
+                                                    args->src.info_v.datatype);
+    size_t                      dst_dt_size       = ucc_dt_size(
+                                                    args->dst.info_v.datatype);
+    ucc_rank_t                 *node_leaders      = NULL;
+    ucc_rank_t                 *per_node_leaders  = NULL;
+    ucc_sbgp_t                 *all_nodes         = NULL;
+    ucc_sbgp_t                 *node_leaders_sbgp = NULL;
+    ucc_topo_t                 *topo              = task->team->params.team->topo;
     ucc_ee_executor_t          *exec;
     ucc_status_t                status;
     ucc_rank_t                  i;
     size_t                      dst_rank_count;
     size_t                      dst_rank_disp;
-    ucc_rank_t                 *node_leaders = NULL;
-    ucc_rank_t                 *per_node_leaders = NULL;
-    ucc_sbgp_t                 *all_nodes = NULL;
-    ucc_sbgp_t                 *node_leaders_sbgp = NULL;
+    ucc_rank_t                  curr_team_rank;
     int                         n_nodes;
     ucc_rank_t                  node_id;
     ucc_rank_t                  node_leader_idx;
@@ -108,14 +109,17 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
 
     for (i = 0; i < team_size; i++) {
         // Get destination count and displacement (in team rank order)
-        dst_rank_count = ucc_coll_args_get_count(args, args->dst.info_v.counts, i);
-        dst_rank_disp = ucc_coll_args_get_displacement(args, args->dst.info_v.displacements, i);
+        dst_rank_count = ucc_coll_args_get_count(
+                            args, args->dst.info_v.counts, i);
+        dst_rank_disp  = ucc_coll_args_get_displacement(
+                            args, args->dst.info_v.displacements, i);
 
         // Find which node leader this rank belongs to
         ucc_rank_t leader_team_rank = node_leaders[i];
         
         // Find the position of this leader in the node_leaders_sbgp
-        node_leader_idx = ucc_ep_map_local_rank(node_leaders_sbgp->map, leader_team_rank);
+        node_leader_idx = ucc_ep_map_local_rank(node_leaders_sbgp->map,
+                                                leader_team_rank);
         
         // Get source displacement from leader_displacements (passed in src.info_v)
         src_rank_disp = ucc_coll_args_get_displacement(
@@ -127,19 +131,23 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
                 per_node_leaders[node_id] == leader_team_rank) {
                 // Found the node, now find position of rank i within this node
                 for (ucc_rank_t j = 0; j < all_nodes[node_id].group_size; j++) {
-                    ucc_rank_t curr_team_rank = ucc_ep_map_eval(all_nodes[node_id].map, j);
+                    curr_team_rank = ucc_ep_map_eval(all_nodes[node_id].map, j);
                     if (curr_team_rank == i) {
                         break; // We found our position
                     }
                     // Add previous ranks' counts from the same node
-                    src_rank_disp += ucc_coll_args_get_count(args, args->dst.info_v.counts, curr_team_rank);
+                    src_rank_disp += ucc_coll_args_get_count(
+                                        args, args->dst.info_v.counts,
+                                        curr_team_rank);
                 }
                 break;
             }
         }
         
-        eargs.copy.src = PTR_OFFSET(args->src.info_v.buffer, src_rank_disp * src_dt_size);
-        eargs.copy.dst = PTR_OFFSET(args->dst.info_v.buffer, dst_rank_disp * dst_dt_size);
+        eargs.copy.src = PTR_OFFSET(args->src.info_v.buffer,
+                                    src_rank_disp * src_dt_size);
+        eargs.copy.dst = PTR_OFFSET(args->dst.info_v.buffer,
+                                    dst_rank_disp * dst_dt_size);
         eargs.copy.len = dst_rank_count * dst_dt_size;
         
         if (eargs.copy.src != eargs.copy.dst) {
