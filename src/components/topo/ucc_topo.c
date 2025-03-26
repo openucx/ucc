@@ -405,8 +405,8 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
 
     // If we just want the per_node_leaders, return them
     if (!node_leaders_out && topo->per_node_leaders) {
-        ucc_assert(topo->per_node_leaders);
-        ucc_assert(per_node_leaders_out);
+        ucc_assert(topo->per_node_leaders != NULL);
+        ucc_assert(per_node_leaders_out != NULL);
         *per_node_leaders_out = topo->per_node_leaders;
         return UCC_OK;
     }
