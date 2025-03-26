@@ -13,6 +13,12 @@ ucc_status_t ucc_tl_mlx5_get_context_attr(const ucc_base_context_t *context,
 
 ucc_status_t ucc_tl_mlx5_get_lib_properties(ucc_base_lib_properties_t *prop);
 
+static const char *alltoall_block_shape_modes[] = {
+    [UCC_TL_MLX5_ALLTOALL_BLOCK_SHAPE_LONG]   = "long",
+    [UCC_TL_MLX5_ALLTOALL_BLOCK_SHAPE_WIDE]   = "wide",
+    [UCC_TL_MLX5_ALLTOALL_BLOCK_SHAPE_SQUARE] = "square",
+    [UCC_TL_MLX5_ALLTOALL_BLOCK_SHAPE_LAST]   = NULL};
+
 static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
     {"", "", NULL, ucc_offsetof(ucc_tl_mlx5_lib_config_t, super),
      UCC_CONFIG_TYPE_TABLE(ucc_tl_lib_config_table)},
@@ -28,8 +34,23 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, dm_buf_num),
      UCC_CONFIG_TYPE_ULUNITS},
 
-    {"BLOCK_SIZE", "0",
-     "Size of the blocks that are sent using blocked AlltoAll Algorithm",
+    {"ALLTOALL_FORCE_REGULAR", "y",
+     "Enforce the regular case where the block dimensions evenly divide ppn. "
+     "This option requires BLOCK_SIZE = 0.",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, force_regular),
+     UCC_CONFIG_TYPE_BOOL},
+
+    {"ALLTOALL_BLOCK_SHAPE", "long",
+     "Shape of the blocks that are sent using blocked AlltoAll Algorithm\n"
+     "long - blocks are more long than wide\n"
+     "wide - blocks are more wide than long\n"
+     "square - blocks are square",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, block_shape_mode),
+     UCC_CONFIG_TYPE_ENUM(alltoall_block_shape_modes)},
+
+    {"ALLTOALL_BLOCK_SIZE", "0",
+     "Size of the blocks that are sent using blocked AlltoAll Algorithm. "
+     "A block size of 0 means it will be calculated automatically",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, block_size), UCC_CONFIG_TYPE_UINT},
 
     {"NUM_DCI_QPS", "16",
@@ -80,7 +101,7 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      UCC_CONFIG_TYPE_INT},
 
     {"MCAST_POST_RECV_THRESH", "64",
-        "Threshold for posting recv into rx ctx of the Mcast comm",
+     "Threshold for posting recv into rx ctx of the Mcast comm",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.post_recv_thresh),
      UCC_CONFIG_TYPE_INT},
 
@@ -88,34 +109,61 @@ static ucc_config_field_t ucc_tl_mlx5_lib_config_table[] = {
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.wsize),
      UCC_CONFIG_TYPE_INT},
 
-    {"MCAST_MAX_PUSH_SEND", "16", "Max number of concurrent send wq for mcast based allgather",
+    {"MCAST_MAX_PUSH_SEND", "16",
+     "Max number of concurrent send wq for mcast based allgather",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.max_push_send),
      UCC_CONFIG_TYPE_INT},
 
-    {"MCAST_MAX_EAGER", "65536", "Max msg size to be used for Mcast with the eager protocol",
+    {"MCAST_MAX_EAGER", "65536",
+     "Max msg size to be used for Mcast with the eager protocol",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.max_eager),
      UCC_CONFIG_TYPE_MEMUNITS},
 
-    {"MCAST_CUDA_MEM_ENABLE", "0", "Enable GPU CUDA memory support for Mcast. GPUDirect RDMA must be enabled",
+    {"MCAST_CUDA_MEM_ENABLE", "0",
+     "Enable GPU CUDA memory support for Mcast. GPUDirect RDMA must be enabled",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.cuda_mem_enabled),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"MCAST_ONE_SIDED_RELIABILITY_ENABLE", "1", "Enable one sided reliability for mcast",
-     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.one_sided_reliability_enable),
+    {"MCAST_ONE_SIDED_RELIABILITY_ENABLE", "1",
+     "Enable one sided reliability for mcast",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t,
+                  mcast_conf.one_sided_reliability_enable),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"MCAST_ZERO_COPY_ALLGATHER_ENABLE", "1", "Enable truly zero copy allgather design for mcast",
-     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.truly_zero_copy_allgather_enabled),
+    {"MCAST_ZERO_COPY_ALLGATHER_ENABLE", "1",
+     "Enable truly zero copy allgather design for mcast",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t,
+                  mcast_conf.truly_zero_copy_allgather_enabled),
      UCC_CONFIG_TYPE_BOOL},
 
-    {"MCAST_ZERO_COPY_PREPOST_BUCKET_SIZE", "16", "Number of posted recvs during each stage of the pipeline"
+    {"MCAST_ZERO_COPY_PREPOST_BUCKET_SIZE", "16",
+     "Number of posted recvs during each stage of the pipeline"
      " in truly zero copy mcast allgather design",
-     ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.mcast_prepost_bucket_size),
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t,
+                  mcast_conf.mcast_prepost_bucket_size),
      UCC_CONFIG_TYPE_INT},
 
     {"MCAST_GROUP_COUNT", "1", "Number of multicast groups that can be used to increase parallelism",
      ucc_offsetof(ucc_tl_mlx5_lib_config_t, mcast_conf.mcast_group_count),
      UCC_CONFIG_TYPE_INT},
+
+    {"ALLTOALL_SEND_BATCH_SIZE", "2",
+     "Number of blocks that are transposed "
+     "on the NIC before being sent as a batch to a remote peer",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, block_batch_size),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALL_NUM_SERIALIZED_BATCHES", "4",
+     "Number of block batches "
+     "(within the set of blocks to be sent to a given remote peer) "
+     "serialized on the same device memory chunk",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, num_serialized_batches),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALL_NUM_BATCHES_PER_PASSAGE", "1",
+     "Number of batches of blocks sent to one remote node before enqueing",
+     ucc_offsetof(ucc_tl_mlx5_lib_config_t, num_batches_per_passage),
+     UCC_CONFIG_TYPE_UINT},
 
     {NULL}};
 

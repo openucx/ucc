@@ -50,17 +50,30 @@ typedef struct ucc_tl_mlx5_ib_qp_conf {
     uint32_t            qp_max_atomic;
 } ucc_tl_mlx5_ib_qp_conf_t;
 
+typedef enum ucc_tl_mlx5_alltoall_block_shape_modes
+{
+    UCC_TL_MLX5_ALLTOALL_BLOCK_SHAPE_LONG,
+    UCC_TL_MLX5_ALLTOALL_BLOCK_SHAPE_WIDE,
+    UCC_TL_MLX5_ALLTOALL_BLOCK_SHAPE_SQUARE,
+    UCC_TL_MLX5_ALLTOALL_BLOCK_SHAPE_LAST,
+} ucc_tl_mlx5_alltoall_block_shape_modes_t;
+
 typedef struct ucc_tl_mlx5_lib_config {
-    ucc_tl_lib_config_t                     super;
-    int                                     asr_barrier;
-    int                                     block_size;
-    int                                     num_dci_qps;
-    int                                     dc_threshold;
-    size_t                                  dm_buf_size;
-    unsigned long                           dm_buf_num;
-    int                                     dm_host;
-    ucc_tl_mlx5_ib_qp_conf_t                qp_conf;
-    ucc_tl_mlx5_mcast_coll_comm_init_spec_t mcast_conf;
+    ucc_tl_lib_config_t                      super;
+    int                                      asr_barrier;
+    int                                      block_size;
+    int                                      num_dci_qps;
+    int                                      dc_threshold;
+    size_t                                   dm_buf_size;
+    unsigned long                            dm_buf_num;
+    int                                      dm_host;
+    ucc_tl_mlx5_ib_qp_conf_t                 qp_conf;
+    ucc_tl_mlx5_mcast_coll_comm_init_spec_t  mcast_conf;
+    int                                      num_serialized_batches;
+    int                                      num_batches_per_passage;
+    int                                      block_batch_size;
+    int                                      force_regular;
+    ucc_tl_mlx5_alltoall_block_shape_modes_t block_shape_mode;
 } ucc_tl_mlx5_lib_config_t;
 
 typedef struct ucc_tl_mlx5_context_config {
@@ -96,10 +109,13 @@ UCC_CLASS_DECLARE(ucc_tl_mlx5_context_t, const ucc_base_context_params_t*,
 
 typedef struct ucc_tl_mlx5_task ucc_tl_mlx5_task_t;
 typedef struct ucc_tl_mlx5_schedule ucc_tl_mlx5_schedule_t;
-typedef struct ucc_tl_mlx5_dm_chunk {
-    ptrdiff_t               offset; /* 0 based offset from the beginning of
-                                       memic_mr (obtained with ibv_reg_dm_mr) */
+typedef struct ucc_tl_mlx5_dm_chunk_t {
+    uintptr_t addr; // 0 based offset from the beginning of
+                    // memic_mr (obtained with ibv_reg_dm_mr)
     ucc_tl_mlx5_schedule_t *task;
+    int                     posted_sends;
+    int                     posted_all;
+    int                     completed_sends;
 } ucc_tl_mlx5_dm_chunk_t;
 
 typedef struct ucc_tl_mlx5_alltoall ucc_tl_mlx5_alltoall_t;
