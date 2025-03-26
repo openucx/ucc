@@ -46,42 +46,21 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
                                             ucc_rank_t       team_rank,
                                             ucc_rank_t      *rank_out)
 {
-    ucc_cl_hier_team_t *cl_team       = ucc_derived_of(team, ucc_cl_hier_team_t);
-    ucc_team_t         *core_team     = team->params.team;
-    ucc_rank_t          team_size     = UCC_CL_TEAM_SIZE(cl_team);
-    ucc_rank_t          ldr_sbgp_size = SBGP_SIZE(cl_team, NODE_LEADERS);
-    ucc_rank_t          i, j;
+    ucc_cl_hier_team_t *cl_team   = ucc_derived_of(team, ucc_cl_hier_team_t);
+    ucc_team_t         *core_team = team->params.team;
+    ucc_rank_t         *node_leaders = NULL;
+    ucc_status_t        status;
 
-    ucc_assert(team_rank >= 0 && team_rank < team_size);
+    ucc_assert(team_rank >= 0 && team_rank < UCC_CL_TEAM_SIZE(cl_team));
     ucc_assert(SBGP_ENABLED(cl_team, NODE_LEADERS));
 
-    /* Allocate and populate node_leaders and leader_list */
-    if (ucc_unlikely(cl_team->node_leaders == NULL)) {
-        cl_team->node_leaders = ucc_malloc(sizeof(ucc_rank_t) * team_size);
-        if (!cl_team->node_leaders) {
-            cl_error(team->context->lib, "Could not allocate node_leaders array");
-            return UCC_ERR_NO_MEMORY;
-        }
-        cl_team->leader_list  = ucc_malloc(sizeof(ucc_rank_t) * ldr_sbgp_size);
-        if (!cl_team->node_leaders) {
-            cl_error(team->context->lib, "Could not allocate leader_list array");
-            return UCC_ERR_NO_MEMORY;
-        }
-        for (i = 0; i < team_size; i++) {
-            for (j = 0; j < ldr_sbgp_size; j++) {
-                ucc_rank_t ldr_team_rank = ucc_ep_map_eval(
-                                            SBGP_MAP(cl_team, NODE_LEADERS), j);
-                if (ucc_team_ranks_on_same_node(i, ldr_team_rank, core_team)) {
-                    cl_team->node_leaders[i] = ldr_team_rank;
-                    cl_team->leader_list[j]  = ldr_team_rank;
-                    break;
-                }
-            }
-        }
+    status = ucc_topo_get_node_leaders(core_team->topo, &node_leaders, NULL);
+    if (UCC_OK != status) {
+        cl_error(team->context->lib, "Could not get node leaders");
+        return status;
     }
 
-    //NOLINTNEXTLINE
-    *rank_out = cl_team->node_leaders[team_rank];
+    *rank_out = node_leaders[team_rank];
     return UCC_OK;
 }
 
@@ -122,6 +101,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     void                   *buffer;
     void                   *node_gathered_data;
     ucc_rank_t              leader_team_rank;
+    ucc_rank_t              leader_sgbp_rank;
     ucc_rank_t              team_rank;
 
     if (coll_args->args.src.info.mem_type != UCC_MEMORY_TYPE_HOST ||
@@ -197,9 +177,11 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
         disp_counter = 0;
         for (i = 0; i < leader_sbgp_size; i++) {
             //NOLINTNEXTLINE
-            ucc_rank_t leader_sgbp_rank = ucc_ep_map_local_rank(
-                                            SBGP_MAP(cl_team, NODE_LEADERS),
-                                            cl_team->leader_list[i]); //NOLINT
+            leader_team_rank = ucc_ep_map_eval(
+                                          SBGP_MAP(cl_team, NODE_LEADERS), i);
+            leader_sgbp_rank = ucc_ep_map_local_rank(
+                                          SBGP_MAP(cl_team, NODE_LEADERS),
+                                          leader_team_rank);
             ucc_coll_args_set_displacement(&args.args, leader_disps,
                                             leader_sgbp_rank, disp_counter);
             disp_counter += ucc_coll_args_get_count(&args.args,
