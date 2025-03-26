@@ -151,9 +151,10 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     }
     node_gathered_data = NULL;
 
-    /* If node ldr sbgp, calculate leader_counts, leader_disps, and set the
-       dst buffer of the gatherv to the right displacements for the in-place
-       node-leader allgatherv, even on non-node-leader ranks */
+    /* If node ldr sbgp exists, calculate leader_counts, leader_disps, and set
+       the dst buffer of the gatherv to the right displacements for the in-place
+       node-leader allgatherv.
+       Calculate this on non-node-leader ranks as well for the unpack phase */
     if(SBGP_ENABLED(cl_team, NODE) && SBGP_EXISTS(cl_team, NODE_LEADERS)) {
         /* Sum up the counts on each node to get the count for each node leader */
         for (i = 0; i < team_size; i++) {
@@ -277,14 +278,14 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
         n_tasks++;
 
         if (!is_contig) {
-            args                        = args_old;
+            args                          = args_old;
             args.args.src.info_v.datatype = args.args.dst.info_v.datatype;
             args.args.src.info_v.mem_type = args.args.dst.info_v.mem_type;
-            args.args.src.info_v.buffer = buffer;
+            args.args.src.info_v.buffer   = buffer;
             
-            // Pass leader_disps and leader_counts through src.info_v
+            // Pass leader_disps and leader_counts through src.info_v for unpack
             args.args.src.info_v.displacements = leader_disps;
-            args.args.src.info_v.counts = leader_counts;
+            args.args.src.info_v.counts        = leader_counts;
             
             UCC_CHECK_GOTO(
                 ucc_cl_hier_allgatherv_unpack_init(&args, team, &tasks[n_tasks]),
