@@ -46,8 +46,8 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
                                             ucc_rank_t       team_rank,
                                             ucc_rank_t      *rank_out)
 {
-    ucc_cl_hier_team_t *cl_team   = ucc_derived_of(team, ucc_cl_hier_team_t);
-    ucc_team_t         *core_team = team->params.team;
+    ucc_cl_hier_team_t *cl_team      = ucc_derived_of(team, ucc_cl_hier_team_t);
+    ucc_team_t         *core_team    = cl_team->super.super.params.team;
     ucc_rank_t         *node_leaders = NULL;
     ucc_status_t        status;
 
@@ -162,11 +162,12 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
 
     memcpy(&args,     coll_args, sizeof(args));
     memcpy(&args_old, coll_args, sizeof(args));
-    in_place = UCC_IS_INPLACE(args.args);
 
+    n_tasks   = 0;
+    in_place  = UCC_IS_INPLACE(args.args);
     UCC_CHECK_GOTO(is_block_ordered(cl_team, &block_ordered), free_sched, status);
     is_contig = UCC_COLL_IS_DST_CONTIG(&args.args) && block_ordered;
-    n_tasks   = 0;
+    
     UCC_CHECK_GOTO(ucc_schedule_init(schedule, &args, team), free_sched, status);
 
     node_counts_size   = node_sbgp_size * sizeof(ucc_count_t);
