@@ -80,7 +80,6 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
     size_t                      dst_rank_disp;
     ucc_rank_t                  curr_team_rank;
     int                         n_nodes;
-    ucc_rank_t                  node_id;
     ucc_rank_t                  node_leader_idx;
     size_t                      src_rank_disp;
 
@@ -125,10 +124,9 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
         src_rank_disp = ucc_coll_args_get_displacement(
             args, args->src.info_v.displacements, node_leader_idx);
 
-        node_id = ucc_ep_map_local_rank(node_leaders_sbgp->map, leader_team_rank);
-        ucc_assert(per_node_leaders[node_id] == leader_team_rank);
-        for (ucc_rank_t j = 0; j < all_nodes[node_id].group_size; j++) {
-            curr_team_rank = ucc_ep_map_eval(all_nodes[node_id].map, j);
+        ucc_assert(per_node_leaders[node_leader_idx] == leader_team_rank);
+        for (ucc_rank_t j = 0; j < all_nodes[node_leader_idx].group_size; j++) {
+            curr_team_rank = ucc_ep_map_eval(all_nodes[node_leader_idx].map, j);
             if (curr_team_rank == i) {
                 break; // We found our position
             }
