@@ -462,8 +462,10 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
 
     topo->node_leaders = node_leaders;
     topo->per_node_leaders = per_node_leaders;
+    //NOLINTNEXTLINE
     *node_leaders_out = node_leaders;
     if (per_node_leaders_out) {
+        //NOLINTNEXTLINE
         *per_node_leaders_out = per_node_leaders;
     }
     ucc_free(ranks_seen_per_node);
