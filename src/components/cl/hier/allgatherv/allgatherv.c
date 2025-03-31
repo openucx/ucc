@@ -70,39 +70,19 @@ static inline ucc_status_t find_leader_rank(ucc_base_team_t *team,
 static inline ucc_status_t is_block_ordered(ucc_cl_hier_team_t *cl_team, int *ordered)
 {
     ucc_topo_t *topo = cl_team->super.super.params.team->topo;
-    ucc_sbgp_t *all_nodes = NULL;
-    int n_nodes;
-    ucc_status_t status;
-    ucc_rank_t prev_rank, curr_rank;
-    ucc_rank_t i, j;
+    ucc_sbgp_t *sbgp;
+    int         is_block_ordered;
 
-    *ordered = 0; // Default to not block ordered
-
-    status = ucc_topo_get_all_nodes(topo, &all_nodes, &n_nodes);
-    if (status != UCC_OK) {
-        return status; // Return the error status
+    if (cl_team->is_block_ordered != -1) {
+        is_block_ordered = cl_team->is_block_ordered;
+    } else {
+        sbgp = ucc_topo_get_sbgp(topo, UCC_SBGP_FULL_HOST_ORDERED);
+        is_block_ordered = ucc_ep_map_is_identity(&sbgp->map) ? 1 : 0;
+        cl_team->is_block_ordered = is_block_ordered;
     }
 
-    // For each node, check if its ranks are consecutive in team order
-    for (i = 0; i < n_nodes; i++) {
-        if (all_nodes[i].status == UCC_SBGP_ENABLED && all_nodes[i].group_size > 1) {
-            // Get first rank in this node
-            prev_rank = ucc_ep_map_eval(all_nodes[i].map, 0);
-            
-            // Check if all other ranks are consecutive
-            for (j = 1; j < all_nodes[i].group_size; j++) {
-                curr_rank = ucc_ep_map_eval(all_nodes[i].map, j);
-                
-                // If ranks are not consecutive, not block ordered
-                if (curr_rank != prev_rank + 1) {
-                    return UCC_OK; // Not block ordered, but not an error
-                }
-                prev_rank = curr_rank;
-            }
-        }
-    }
+    *ordered = is_block_ordered;
 
-    *ordered = 1; // All nodes have contiguous ranks
     return UCC_OK;
 }
 

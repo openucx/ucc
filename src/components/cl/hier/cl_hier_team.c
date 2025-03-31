@@ -262,6 +262,7 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
         return status;
     }
 
+    team->is_block_ordered = -1;
     team->n_tl_teams = 0;
 
     /* TL teams are created: get scores and merge them to produce

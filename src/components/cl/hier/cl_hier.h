@@ -106,6 +106,7 @@ typedef struct ucc_cl_hier_team {
     ucc_coll_score_t        *score;
     ucc_hier_sbgp_t          sbgps[UCC_HIER_SBGP_LAST];
     ucc_hier_sbgp_type_t     top_sbgp;
+    int                      is_block_ordered;
 } ucc_cl_hier_team_t;
 UCC_CLASS_DECLARE(ucc_cl_hier_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
