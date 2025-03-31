@@ -124,24 +124,18 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
         // Get source displacement from leader_displacements (passed in src.info_v)
         src_rank_disp = ucc_coll_args_get_displacement(
             args, args->src.info_v.displacements, node_leader_idx);
-            
-        // Find the correct node for this rank
-        for (node_id = 0; node_id < n_nodes; node_id++) {
-            if (all_nodes[node_id].status == UCC_SBGP_ENABLED && 
-                per_node_leaders[node_id] == leader_team_rank) {
-                // Found the node, now find position of rank i within this node
-                for (ucc_rank_t j = 0; j < all_nodes[node_id].group_size; j++) {
-                    curr_team_rank = ucc_ep_map_eval(all_nodes[node_id].map, j);
-                    if (curr_team_rank == i) {
-                        break; // We found our position
-                    }
-                    // Add previous ranks' counts from the same node
-                    src_rank_disp += ucc_coll_args_get_count(
-                                        args, args->dst.info_v.counts,
-                                        curr_team_rank);
-                }
-                break;
+
+        node_id = ucc_ep_map_local_rank(node_leaders_sbgp->map, leader_team_rank);
+        ucc_assert(per_node_leaders[node_id] == leader_team_rank);
+        for (ucc_rank_t j = 0; j < all_nodes[node_id].group_size; j++) {
+            curr_team_rank = ucc_ep_map_eval(all_nodes[node_id].map, j);
+            if (curr_team_rank == i) {
+                break; // We found our position
             }
+            // Add previous ranks' counts from the same node
+            src_rank_disp += ucc_coll_args_get_count(
+                                args, args->dst.info_v.counts,
+                                curr_team_rank);
         }
         
         eargs.copy.src = PTR_OFFSET(args->src.info_v.buffer,
