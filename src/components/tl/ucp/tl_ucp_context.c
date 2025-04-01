@@ -15,6 +15,8 @@
 #include "tl_ucp_copy.h"
 #include <limits.h>
 
+#include "tl_ucp_sendrecv.h"
+
 #define UCP_CHECK(function, msg, go, ctx)                                      \
     status = function;                                                         \
     if (UCS_OK != status) {                                                    \
@@ -215,9 +217,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     case UCC_THREAD_SINGLE:
     case UCC_THREAD_FUNNELED:
         worker_params.thread_mode = UCS_THREAD_MODE_SINGLE;
+        self->completion_cb = ucc_tl_ucp_send_completion_cb_st;
         break;
     case UCC_THREAD_MULTIPLE:
         worker_params.thread_mode = UCS_THREAD_MODE_MULTI;
+        self->completion_cb = ucc_tl_ucp_send_completion_cb_mt;
         break;
     default:
         /* unreachable */
@@ -293,7 +297,6 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     }
     ucc_free(prefix);
     prefix = NULL;
-
 
     switch (self->cfg.local_copy_type) {
     case UCC_TL_UCP_LOCAL_COPY_TYPE_MC:
