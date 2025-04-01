@@ -122,6 +122,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm_init_spec {
     int                               one_sided_reliability_enable;
     int                               reliability_scheme_msg_threshold;
     int                               truly_zero_copy_allgather_enabled;
+    int                               truly_zero_copy_bcast_enabled;
     int                               mcast_prepost_bucket_size;
     void                             *oob;
 } ucc_tl_mlx5_mcast_coll_comm_init_spec_t;
@@ -304,6 +305,9 @@ typedef struct ucc_tl_mlx5_mcast_bcast_comm {
     int           nacks_counter;
     int           n_mcast_reliable;
     int           wsize;
+    uint32_t      mcast_prepost_bucket_size;
+    uint8_t       truly_zero_copy_bcast_enabled;
+    int           coll_counter;
 } ucc_tl_mlx5_mcast_bcast_comm_t;
 
 typedef struct ucc_tl_mlx5_mcast_coll_comm {
