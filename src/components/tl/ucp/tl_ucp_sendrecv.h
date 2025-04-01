@@ -15,9 +15,12 @@
 #include "utils/ucc_compiler_def.h"
 #include "components/mc/base/ucc_mc_base.h"
 
-void ucc_tl_ucp_send_completion_cb(void *request, ucs_status_t status,
+void ucc_tl_ucp_send_completion_cb_st(void *request, ucs_status_t status,
                                    void *user_data);
+void ucc_tl_ucp_send_completion_cb_mt(void *request, ucs_status_t status,
+                                    void *user_data);
 
+                                    
 void ucc_tl_ucp_put_completion_cb(void *request, ucs_status_t status,
                                    void *user_data);
 
@@ -102,7 +105,7 @@ ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     ucs_status_ptr_t ucp_status;
 
     ucp_status = ucc_tl_ucp_send_common(buffer, msglen, mtype, dest_group_rank,
-                                        team, task, ucc_tl_ucp_send_completion_cb,
+                                        team, task, UCC_TL_UCP_TEAM_CTX(team)->completion_cb,
                                         (void *)task);
     if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
