@@ -8,6 +8,7 @@
 #include <glob.h>
 #include <net/if.h>
 #include <ifaddrs.h>
+#include "tl_mlx5_mcast_one_sided_reliability.h"
 
 #define PREF        "/sys/class/net/"
 #define SUFF        "/device/resource"
@@ -518,7 +519,6 @@ ucc_status_t ucc_tl_mlx5_mcast_modify_rc_qps(ucc_tl_mlx5_mcast_coll_context_t *c
         attr.max_dest_rd_atomic	   = 16;
         attr.min_rnr_timer         = 12;
         attr.ah_attr.is_global     = 0;
-        attr.ah_attr.dlid          = comm->mcast.rc_lid[i];
         attr.ah_attr.dlid          = comm->one_sided.info[i].port_lid;
         attr.ah_attr.sl            = DEF_SL;
         attr.ah_attr.src_path_bits = 0;
@@ -632,6 +632,10 @@ ucc_status_t ucc_tl_mlx5_clean_mcast_comm(ucc_tl_mlx5_mcast_coll_comm_t *comm)
     if (status) {
         tl_error(comm->lib, "couldn't leave mcast group");
         return status;
+    }
+
+    if (comm->one_sided.reliability_enabled) {
+        ucc_tl_mlx5_mcast_one_sided_cleanup(comm);
     }
 
     if (comm->mcast.rcq) {

@@ -37,8 +37,8 @@
 
 /* Allgather RDMA-based reliability designs */
 #define ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE 1024u
-#define ONE_SIDED_SLOTS_COUNT               2                /* number of memory slots during async design */
-#define ONE_SIDED_SLOTS_INFO_SIZE           sizeof(uint32_t) /* size of metadata prepended to each slots in bytes */
+#define ONE_SIDED_SLOTS_COUNT               2           /* number of memory slots during async design */
+#define ONE_SIDED_SLOTS_INFO_SIZE           sizeof(int) /* size of metadata prepended to each slots in bytes */
 #define ONE_SIDED_MAX_ALLGATHER_COUNTER     32u
 #define ONE_SIDED_MAX_CONCURRENT_LEVEL      64
 
@@ -76,6 +76,8 @@ enum {
     MCAST_CALC_WR,
     MCAST_BCASTRECV_WR,
     MCAST_BCASTSEND_WR,
+    MCAST_AG_RDMA_READ_INFO_WR,
+    MCAST_AG_RDMA_READ_WR,
 };
 
 struct ucc_tl_mlx5_mcast_p2p_completion_obj;
@@ -118,6 +120,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm_init_spec {
     int                               max_eager;
     int                               cuda_mem_enabled;
     int                               one_sided_reliability_enable;
+    int                               reliability_scheme_msg_threshold;
     int                               truly_zero_copy_allgather_enabled;
     int                               mcast_prepost_bucket_size;
     void                             *oob;
@@ -219,8 +222,6 @@ struct mcast_ctx {
     struct mcast_group  groups[MAX_GROUP_COUNT];
     // RC connection info for supporing one-sided based relibality
     struct ibv_qp     **rc_qp;
-    uint16_t           *rc_lid;
-    union ibv_gid      *rc_gid;
 };
 
 struct packet {
@@ -254,7 +255,7 @@ typedef struct ucc_tl_mlx5_mcast_one_sided_reliability_comm {
     uint32_t                                    *recvd_pkts_tracker;
     /* holds the remote targets' collective call counter. it is used to check
      * if remote temp slot is ready for RDMA READ in async design */
-    uint32_t                                    *remote_slot_info;
+    int                                         *remote_slot_info;
     struct ibv_mr                               *remote_slot_info_mr;
     int                                          reliability_scheme_msg_threshold;
     /* mem address and mem keys of the temp slots in async design */
@@ -266,7 +267,7 @@ typedef struct ucc_tl_mlx5_mcast_one_sided_reliability_comm {
     ucc_service_coll_req_t                      *reliability_req;
     int                                          reliability_enabled;
     int                                          reliability_ready;
-    int                                          rdma_read_in_progress;
+    int                                          pending_reads;
     enum ucc_tl_mlx5_mcast_one_sided_slot_states slots_state;
 } ucc_tl_mlx5_mcast_one_sided_reliability_comm_t;
 
@@ -447,6 +448,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_req {
     void                                               *recv_rreg;
     ucc_ee_executor_task_t                             *exec_task;
     ucc_coll_task_t                                    *coll_task;
+    ucc_status_t (*progress)                           (void *req);
 } ucc_tl_mlx5_mcast_coll_req_t;
 
 typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {
@@ -481,7 +483,8 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_recv_buffers(ucc_tl_mlx5_mcast
     int                 count_per_qp;
 
     count = comm->params.rx_depth - comm->pending_recv;
-    if (count <= comm->params.post_recv_thresh) {
+    if (comm->allgather_comm.truly_zero_copy_allgather_enabled ||
+        count <= comm->params.post_recv_thresh) {
         return UCC_OK;
     }
 

@@ -137,6 +137,7 @@ typedef enum
     TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_READY,
     TL_MLX5_TEAM_STATE_MCAST_GRP_JOIN_FAILED,
     TL_MLX5_TEAM_STATE_MCAST_GRP_BCAST_POST,
+    TL_MLX5_TEAM_STATE_MCAST_RELIABLITY,
     TL_MLX5_TEAM_STATE_MCAST_READY,
     TL_MLX5_TEAM_STATE_MCAST_NOT_AVAILABLE
 } ucc_tl_mlx5_team_mcast_state_t;
@@ -183,7 +184,8 @@ typedef struct ucc_tl_mlx5_rcache_region {
     ucc_tl_mlx5_reg_t   reg;
 } ucc_tl_mlx5_rcache_region_t;
 
-#define UCC_TL_MLX5_SUPPORTED_COLLS (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_BCAST)
+#define UCC_TL_MLX5_SUPPORTED_COLLS                                            \
+    (UCC_COLL_TYPE_ALLTOALL | UCC_COLL_TYPE_BCAST | UCC_COLL_TYPE_ALLGATHER)
 
 #define UCC_TL_MLX5_TEAM_LIB(_team)                                            \
     (ucc_derived_of((_team)->super.super.context->lib, ucc_tl_mlx5_lib_t))
