@@ -96,6 +96,7 @@ typedef struct ucc_tl_ucp_context_config {
     uint32_t                     service_worker;
     uint32_t                     service_throttling_thresh;
     ucc_tl_ucp_local_copy_type_t local_copy_type;
+    uint32_t                     exported_memory_handle;
 } ucc_tl_ucp_context_config_t;
 
 typedef ucc_tl_ucp_lib_config_t ucc_tl_ucp_team_config_t;
