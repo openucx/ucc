@@ -129,8 +129,9 @@ ucc_tl_mlx5_mcast_progress_one_sided_communication(ucc_tl_mlx5_mcast_coll_comm_t
     if (!req->to_send && !req->to_recv) {
         // need to wait until all the rdma reads are done to avoid data invalidation 
         tl_trace(comm->lib,
-                "all the mcast packets arrived during the reliability protocol- current timeout is %d usec",
-                comm->ctx->params.timeout);
+                 "all the mcast packets arrived during the reliability protocol "
+                 "current timeout is %d usec",
+                 comm->ctx->params.timeout);
     }
 
     if (ucc_tl_mlx5_mcast_poll_send(comm) < 0) {
@@ -146,7 +147,7 @@ ucc_tl_mlx5_mcast_progress_one_sided_communication(ucc_tl_mlx5_mcast_coll_comm_t
             }
 
             if (!comm->one_sided.pending_reads && (completed == comm->commsize)) {
-                tl_debug(comm->lib,
+                tl_trace(comm->lib,
                          "all the pending RDMA READ are comepleted in async reliability protocol");
                 req->to_recv = 0;
                 return UCC_OK;
@@ -155,9 +156,11 @@ ucc_tl_mlx5_mcast_progress_one_sided_communication(ucc_tl_mlx5_mcast_coll_comm_t
 
         case ONE_SIDED_SYNCHRONOUS_PROTO:
             if (!comm->one_sided.pending_reads) {
-                tl_debug(comm->lib,
+                tl_trace(comm->lib,
                          "all the pending RDMA READ are comepleted in sync reliability protocol");
-                req->to_recv = 0;
+                if (!comm->allgather_comm.truly_zero_copy_allgather_enabled) {
+                    req->to_recv = 0;
+                }
                 return UCC_OK;
             } 
             break;
@@ -232,12 +235,16 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
                         comm->allgather_comm.under_progress_counter, req->ag_counter);
                 return UCC_ERR_NO_MESSAGE;
             }
+            if (comm->allgather_comm.truly_zero_copy_allgather_enabled) {
+                /* remove pp from posted_recv_bufs queue */
+                ucc_list_del(&pp->super);
+            }
         }
         req->to_recv--;
         comm->psn++;
         pp->context = 0;
         ucc_list_add_tail(&comm->bpool, &pp->super);
-        comm->pending_recv_per_qp[pp->qp_id]--;
+        comm->one_sided.posted_recv[pp->qp_id].posted_recvs_count--;
     } else if (ag_counter > (req->ag_counter % ONE_SIDED_MAX_ALLGATHER_COUNTER)) {
         /* received out of order allgather packet - add it to queue for future
          * processing */
@@ -254,6 +261,7 @@ ucc_status_t ucc_tl_mlx5_mcast_process_packet_collective(ucc_tl_mlx5_mcast_coll_
     return UCC_OK;
 }
 
+/* IMPORTANT TODO double check if QP is able to recv mcast packets aftre drain */
 static inline ucc_status_t ucc_tl_mlx5_mcast_drain_recv_wr(ucc_tl_mlx5_mcast_coll_comm_t *comm,
                                                            ucc_tl_mlx5_mcast_coll_context_t *ctx,
                                                            int qp_id)
@@ -296,6 +304,15 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_drain_recv_wr(ucc_tl_mlx5_mcast_col
         tl_error(ctx->lib, "failed to modify QP to RTS, errno %d", errno);
         return UCC_ERR_NO_RESOURCE;
     }
+
+    if (ibv_attach_mcast(comm->mcast.groups[qp_id].qp, &comm->mcast.groups[qp_id].mgid,
+                         comm->mcast.groups[qp_id].lid)) {
+        tl_error(ctx->lib, "failed to attach QP %d to the mcast group with mcast_lid %d, errno %d",
+                 qp_id, errno, comm->mcast.groups[qp_id].lid);
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    tl_trace(comm->lib, "drained recv queue of QP %d", qp_id);
     return UCC_OK;
 }
 
@@ -307,8 +324,8 @@ ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(ucc_tl_mlx5_mcast_coll_
 {
     ucc_tl_mlx5_mcast_pipelined_ag_schedule_t *sched = req->ag_schedule;
     ucc_status_t                               status;
-    struct pp_packet                          *pp;
-    struct pp_packet                          *next;
+    //struct pp_packet                          *pp;
+    //struct pp_packet                          *next;
     void                                      *src_addr;
     void                                      *remote_addr;
     uint32_t                                   rkey;
@@ -316,12 +333,17 @@ ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(ucc_tl_mlx5_mcast_coll_
     size_t                                     size;
     uint64_t                                   wr;
     int                                        target_completed = 0;
-    int                                        issued = 0, j, root;
+    int                                        issued = 0, j, root, qp_id;
 
     ucc_assert(!comm->one_sided.pending_reads);
+
+#if 0
     // cancel all the preposted recvs regarding this target before RDMA READ
+
     for (j = 0; j < comm->mcast_group_count; j++) {
         if (comm->pending_recv_per_qp[j] != 0) {
+            tl_trace(comm->lib, "need to cancel %d preposted buffers of QP %d on step %d",
+                     comm->pending_recv_per_qp[j], j, req->step);
             status = ucc_tl_mlx5_mcast_drain_recv_wr(comm, comm->ctx, j);
             if (UCC_OK != status) {
                 tl_error(comm->lib, "unable to drain the posted recv wr on qp %d", j);
@@ -339,7 +361,7 @@ ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(ucc_tl_mlx5_mcast_coll_
         pp->context = 0;
         ucc_list_add_tail(&comm->bpool, &pp->super);
     }
-    ucc_assert(!comm->pending_recv);
+#endif
     for (j = 0; j < req->concurrency_level; j++) {
         root = sched[req->step].multicast_op[j].root;
         /* comm->one_sided.recvd_pkts_tracker[root] will not be incremented if there is out of
@@ -348,6 +370,16 @@ ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(ucc_tl_mlx5_mcast_coll_
             target_completed++;
             continue;
         }
+        qp_id  = sched[req->step].prepost_buf_op[j].group_id;
+        status = ucc_tl_mlx5_mcast_drain_recv_wr(comm, comm->ctx, qp_id);
+        if (UCC_OK != status) {
+            tl_error(comm->lib, "unable to drain the posted recv wr on qp %d", qp_id);
+            return status;
+        }
+        comm->pending_recv -= comm->one_sided.posted_recv[qp_id].posted_recvs_count;
+        req->to_recv       -= comm->one_sided.posted_recv[qp_id].posted_recvs_count;
+        comm->one_sided.posted_recv[qp_id].posted_recvs_count = 0;
+        ucc_assert(comm->pending_recv >= 0 && req->to_recv >= 0);
         /* issue RDMA Read to this root and read a piece of sendbuf
          * from related to this step*/
         src_addr    = PTR_OFFSET(req->rptr, req->length * root +

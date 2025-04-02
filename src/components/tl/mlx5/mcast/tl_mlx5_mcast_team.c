@@ -135,7 +135,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     comm->rank                  = team_params->rank;
     comm->commsize              = team_params->size;
-    comm->max_per_packet        = mcast_context->mtu - GRH_LENGTH;
+    comm->max_per_packet        = mcast_context->mtu;
     comm->bcast_comm.last_acked = comm->bcast_comm.last_psn = 0;
     comm->bcast_comm.racks_n    = comm->bcast_comm.sacks_n  = 0;
     comm->bcast_comm.child_n    = comm->bcast_comm.parent_n = 0;

@@ -243,6 +243,11 @@ typedef struct ucc_tl_mlx5_one_sided_reliable_team_info {
     uint32_t                          rc_qp_num[ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE];
 } ucc_tl_mlx5_one_sided_reliable_team_info_t;
 
+typedef struct ucc_tl_mlx5_mcast_per_qp_posted_recv_info {
+    ucc_list_link_t posted_recv_bufs;
+    int             posted_recvs_count;
+} ucc_tl_mlx5_mcast_per_qp_posted_recv_info_t;
+
 typedef struct ucc_tl_mlx5_mcast_one_sided_reliability_comm {
     /* all the info required for establishing a reliable connection as
      * well as temp slots memkeys that all processes in the team need
@@ -270,6 +275,7 @@ typedef struct ucc_tl_mlx5_mcast_one_sided_reliability_comm {
     int                                          reliability_ready;
     int                                          pending_reads;
     enum ucc_tl_mlx5_mcast_one_sided_slot_states slots_state;
+    ucc_tl_mlx5_mcast_per_qp_posted_recv_info_t  posted_recv[MAX_GROUP_COUNT];
 } ucc_tl_mlx5_mcast_one_sided_reliability_comm_t;
 
 typedef struct ucc_tl_mlx5_mcast_service_coll {
@@ -333,7 +339,6 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             buf_n;
     ucc_list_link_t                                 bpool;
     ucc_list_link_t                                 pending_q;
-    ucc_list_link_t                                 posted_q;
     struct mcast_ctx                                mcast;
     struct ibv_recv_wr                             *call_rwr;
     struct ibv_sge                                 *call_rsgs;
@@ -349,7 +354,6 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     struct rdma_cm_event                           *event;
     ucc_tl_mlx5_mcast_one_sided_reliability_comm_t  one_sided;
     int                                             mcast_group_count;
-    int                                             pending_recv_per_qp[MAX_GROUP_COUNT];
     ucc_tl_mlx5_mcast_allgather_comm_t              allgather_comm;
     ucc_tl_mlx5_mcast_bcast_comm_t                  bcast_comm;
     struct pp_packet                               *r_window[1]; // note: do not add any new variable after here
@@ -461,7 +465,8 @@ typedef struct ucc_tl_mlx5_mcast_oob_p2p_context {
     ucc_rank_t      my_team_rank;
     ucc_subset_t    subset;
     ucc_base_lib_t *lib;
-    int             tmp_buf;
+    int             tmp_sbuf;
+    int             tmp_rbuf;
 } ucc_tl_mlx5_mcast_oob_p2p_context_t;
 
 static inline struct pp_packet* ucc_tl_mlx5_mcast_buf_get_free(ucc_tl_mlx5_mcast_coll_comm_t* comm)
@@ -544,31 +549,36 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_post_user_recv_buffers(ucc_tl_mlx5_
             return UCC_ERR_NO_RESOURCE;
         }
 
-        assert(offset % comm->max_per_packet == 0);
-        pp->packet_counter = offset / comm->max_per_packet;
-        pp->qp_id          = group_id;
-        rwr[i].wr_id       = ((uint64_t) pp);
-        sge[2*i + 1].addr  = (uint64_t)req->rptr + root * req->length + offset;
-        sge[2*i + 1].lkey  = req->recv_mr->lkey;
-        offset            += comm->max_per_packet;
+        if (comm->one_sided.reliability_enabled &&
+            comm->allgather_comm.truly_zero_copy_allgather_enabled) {
+            ucc_list_add_tail(&comm->one_sided.posted_recv[group_id].posted_recv_bufs,
+                              &pp->super);
+        }
 
-        if (i == count - 1) {
-            sge[2*i + 1].length = req->last_pkt_len;
-        } else {
-            sge[2*i + 1].length = comm->max_per_packet;
-            rwr[i].next         = &rwr[i+1];
+        assert(offset % comm->max_per_packet == 0);
+        pp->packet_counter  = offset / comm->max_per_packet;
+        pp->qp_id           = group_id;
+        rwr[i].wr_id        = ((uint64_t) pp);
+        sge[2*i + 1].addr   = (uint64_t)req->rptr + root * req->length + offset;
+        sge[2*i + 1].lkey   = req->recv_mr->lkey;
+        offset             += comm->max_per_packet;
+        sge[2*i + 1].length = comm->max_per_packet;
+        if (i < count - 1) {
+            rwr[i].next = &rwr[i+1];
         }
     }
 
     if (i > 0) {
         rwr[i-1].next = NULL;
         if (ibv_post_recv(comm->mcast.groups[group_id].qp, &rwr[0], &bad_wr)) {
-            tl_error(comm->lib, "Failed to prepost recvs: errno %d buffer count %d",
+            tl_error(comm->lib, "failed to prepost recvs: errno %d buffer count %d",
                     errno, i);
             return UCC_ERR_NO_RESOURCE;
         }
-        comm->pending_recv                  += i;
-        comm->pending_recv_per_qp[group_id] += i;
+        comm->pending_recv += i;
+        comm->one_sided.posted_recv[group_id].posted_recvs_count += i;
+        tl_trace(comm->lib, "posted %d buffers into recv queue with root %d mcast group %d",
+                i, root, group_id);
     }
 
     return UCC_OK;
