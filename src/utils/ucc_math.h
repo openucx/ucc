@@ -141,7 +141,7 @@ static inline uint32_t ucc_ilog2_ceil(uint32_t n)
 }
 
 /* return the lowest greater or equal power of 2 */
-static inline int ucc_lowest_greater_power2(int value)
+static inline int ucc_round_up_power2(int value)
 {
     if (value <= 1) {
         return 1;

@@ -788,9 +788,9 @@ static inline int block_size_fits(size_t msgsize, int height, int width)
         width > MAX_BLOCK_SIZE) {
         return false;
     }
-    t = ucc_lowest_greater_power2(ucc_max(msgsize, 8));
+    t = ucc_round_up_power2(ucc_max(msgsize, 8));
     return height *
-               ucc_max(ucc_lowest_greater_power2(width) * t, MAX_MSG_SIZE) <=
+               ucc_max(ucc_round_up_power2(width) * t, MAX_MSG_SIZE) <=
            MAX_TRANSPOSE_SIZE;
 }
 
