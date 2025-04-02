@@ -709,8 +709,8 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_t
                                 ucc_mem_map_memh_t *memh, ucc_mem_map_tl_t *tl_h)
 {
     ucc_tl_ucp_context_t   *ctx        = ucc_derived_of(context, ucc_tl_ucp_context_t);
-    ucc_tl_ucp_memh_data_t *m_data     = tl_h->tl_data;
     ucc_status_t            ucc_status = UCC_OK;
+    ucc_tl_ucp_memh_data_t *m_data;
 
     m_data = ucc_calloc(1, sizeof(ucc_tl_ucp_memh_data_t), "tl data");
     if (!m_data) {
