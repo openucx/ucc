@@ -217,11 +217,11 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
     case UCC_THREAD_SINGLE:
     case UCC_THREAD_FUNNELED:
         worker_params.thread_mode = UCS_THREAD_MODE_SINGLE;
-        self->completion_cb = ucc_tl_ucp_send_completion_cb_st;
+        self->ucc_tl_send_fn = ucc_tl_ucp_send_nb_st;
         break;
     case UCC_THREAD_MULTIPLE:
         worker_params.thread_mode = UCS_THREAD_MODE_MULTI;
-        self->completion_cb = ucc_tl_ucp_send_completion_cb_mt;
+        self->ucc_tl_send_fn = ucc_tl_ucp_send_nb_mt;
         break;
     default:
         /* unreachable */
