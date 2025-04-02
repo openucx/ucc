@@ -67,9 +67,13 @@ ucc_status_t ucc_tl_mlx5_task_finalize(ucc_coll_task_t *coll_task)
     if (req != NULL) {
         ucc_assert(coll_task->status != UCC_INPROGRESS);
         ucc_assert(req->comm->ctx != NULL);
-        if (coll_task->bargs.args.coll_type == UCC_COLL_TYPE_ALLGATHER &&
-                coll_task->status == UCC_OK) {
-            req->comm->allgather_comm.under_progress_counter++;
+        if (coll_task->status == UCC_OK) {
+            if (coll_task->bargs.args.coll_type == UCC_COLL_TYPE_ALLGATHER) {
+                req->comm->allgather_comm.under_progress_counter++;
+            } else {
+                ucc_assert(coll_task->bargs.args.coll_type == UCC_COLL_TYPE_BCAST);
+                req->comm->bcast_comm.under_progress_counter++;
+            }
              /* reset the reliability structures so that it gets initialized again for the next
             * allgather */
             req->comm->one_sided.reliability_ready = 0;

@@ -53,7 +53,13 @@ ucc_status_t ucc_tl_mlx5_mcast_context_init(ucc_tl_mlx5_mcast_context_t    *cont
     mlx5_ctx = ucc_container_of(context, ucc_tl_mlx5_context_t, mcast);
     lib      = mlx5_ctx->super.super.lib;
 
-    context->mcast_enabled = mcast_ctx_conf->mcast_enabled;
+    context->mcast_enabled           = mcast_ctx_conf->mcast_enabled;
+    context->mcast_bcast_enabled     = mcast_ctx_conf->mcast_bcast_enabled;
+    context->mcast_allgather_enabled = mcast_ctx_conf->mcast_allgather_enabled;
+    if (context->mcast_bcast_enabled && context->mcast_allgather_enabled) {
+        /* only a single colletive type is supported at a time */
+        context->mcast_allgather_enabled = 0;
+    }
 
     if (!mcast_ctx_conf->mcast_enabled) {
         tl_debug(lib, "Mcast is disabled by the user");

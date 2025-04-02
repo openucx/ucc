@@ -8,6 +8,11 @@
 #include "tl_mlx5_mcast_helper.h"
 #include "tl_mlx5_mcast_rcache.h"
 
+#define MCAST_BCAST_IN_PROGRESS(_req, _comm)                                         \
+        (_req->to_send || _req->to_recv || _comm->pending_send ||                    \
+         _comm->one_sided.pending_reads || (NULL != _req->bcast_rkeys_req) ||        \
+         (_req->ag_schedule != NULL && _req->step != _req->ag_schedule->total_steps))
+
 static inline ucc_status_t ucc_tl_mlx5_mcast_r_window_recycle(ucc_tl_mlx5_mcast_coll_comm_t *comm,
                                                               ucc_tl_mlx5_mcast_coll_req_t  *req)
 {
@@ -163,28 +168,28 @@ ucc_tl_mlx5_mcast_validate_zero_copy_bcast_params(ucc_tl_mlx5_mcast_coll_comm_t 
 {
 
     if (req->num_packets % req->mcast_prepost_bucket_size != 0) {
-        tl_warn(comm->lib, "Pipelined mcast bcast not supported: "
+        tl_debug(comm->lib, "Pipelined mcast bcast not supported: "
                 "num_packets (%d) must be a multiple of mcast_prepost_bucket_size (%d) ",
                 req->num_packets, req->mcast_prepost_bucket_size);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (comm->commsize % req->concurrency_level != 0) {
-        tl_warn(comm->lib, "Pipelined mcast bcast not supported: "
+        tl_debug(comm->lib, "Pipelined mcast bcast not supported: "
                 "team size (%d) must be a multiple of concurrency_level (%d).",
                 comm->commsize, req->concurrency_level);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (req->length % comm->max_per_packet != 0) {
-        tl_warn(comm->lib, "Pipelined mcast bcast not supported: "
+        tl_debug(comm->lib, "Pipelined mcast bcast not supported: "
                 "length (%ld) must be a multiple of max_per_packet (%d).",
                 req->length, comm->max_per_packet);
         return UCC_ERR_NOT_SUPPORTED;
     }
 
     if (req->mcast_prepost_bucket_size * req->concurrency_level * 2 > comm->params.rx_depth) {
-        tl_warn(comm->lib, "Pipelined mcast bcast not supported: "
+        tl_debug(comm->lib, "Pipelined mcast bcast not supported: "
                 "we only support the case prepost_bucket_size * concurrency_level * 2 > rx_depth, "
                 "but got: prepost_bucket_size=%d, concurrency_level=%d, "
                 "rx_depth=%d",
@@ -249,10 +254,8 @@ ucc_tl_mlx5_mcast_prepare_zero_copy_bcast(ucc_tl_mlx5_mcast_coll_comm_t *comm,
                     (offset + j * req->mcast_prepost_bucket_size) *
                     comm->max_per_packet;
                 curr_schedule->prepost_buf_op[j].root = root;
-                if (curr_schedule->multicast_op[j].root != comm->rank) {
-                    curr_schedule->prepost_buf_op[j].count =
-                        req->mcast_prepost_bucket_size;
-                }
+                curr_schedule->prepost_buf_op[j].count =
+                    req->mcast_prepost_bucket_size;
             }
         }
         if (i > 0) {
@@ -265,8 +268,10 @@ ucc_tl_mlx5_mcast_prepare_zero_copy_bcast(ucc_tl_mlx5_mcast_coll_comm_t *comm,
                 curr_schedule->multicast_op[j].offset_left =
                     prev_schedule->prepost_buf_op[j].offset;
                 curr_schedule->multicast_op[j].root = root;
-                curr_schedule->multicast_op[j].to_recv =
-                    prev_schedule->prepost_buf_op[j].count;
+                if (!req->am_root) {
+                    curr_schedule->multicast_op[j].to_recv =
+                        prev_schedule->prepost_buf_op[j].count;
+                }
                 curr_schedule->to_recv += curr_schedule->multicast_op[j].to_recv;
                 if (curr_schedule->multicast_op[j].root == comm->rank) {
                     curr_schedule->multicast_op[j].to_send_left =
@@ -275,26 +280,27 @@ ucc_tl_mlx5_mcast_prepare_zero_copy_bcast(ucc_tl_mlx5_mcast_coll_comm_t *comm,
                 }
             }
         }
-        curr_schedule->multicast_op_done   = (curr_schedule->to_send == 0) ? 1 : 0;
-        curr_schedule->prepost_buf_op_done = (curr_schedule->to_recv == 0) ? 1 : 0;
-        offset                         += req->mcast_prepost_bucket_size *
-                                          req->concurrency_level;
+        if (req->am_root) {
+            curr_schedule->prepost_buf_op_done = 1;
+        }
+        offset += req->mcast_prepost_bucket_size * req->concurrency_level;
     }
-    ucc_assert(offset == req->num_packets);
     tl_trace(comm->lib,
-             "generated the schedule for pipelined zero copy allgather with total_steps %d",
+             "generated the schedule for pipelined zero copy bcast with total_steps %d",
              total_steps);
     schedule->total_steps = total_steps;
     req->total_steps      = total_steps;
     req->ag_schedule      = schedule;
+    req->ag_counter       = comm->bcast_comm.coll_counter;
+    comm->bcast_comm.coll_counter++;
 
     if (!req->am_root) {
         tl_trace(comm->lib, "registering recv buf of size %ld", req->length);
         ucc_assert(req->recv_rreg == NULL);
-        status = ucc_tl_mlx5_mcast_mem_register(comm->ctx, req->rptr, req->length, &reg);
+        status = ucc_tl_mlx5_mcast_mem_register(comm->ctx, req->ptr, req->length, &reg);
         if (UCC_OK != status) {
              tl_warn(comm->lib, "unable to register receive buffer %p of size %ld",
-                      req->rptr, req->length);
+                      req->ptr, req->length);
              ucc_free(schedule);
              return status;
         }
@@ -302,7 +308,121 @@ ucc_tl_mlx5_mcast_prepare_zero_copy_bcast(ucc_tl_mlx5_mcast_coll_comm_t *comm,
         req->recv_mr   = reg->mr;
     }
 
+    if (comm->one_sided.reliability_enabled) {
+        req->one_sided_reliability_scheme = ONE_SIDED_SYNCHRONOUS_PROTO;
+    } else {
+        req->one_sided_reliability_scheme = ONE_SIDED_NO_RELIABILITY;
+    }
+
     return UCC_OK;
+}
+
+static inline ucc_status_t ucc_tl_mlx5_mcast_bcast_reliability_ready(ucc_tl_mlx5_mcast_coll_req_t *req)
+{
+    ucc_tl_mlx5_mcast_coll_comm_t *comm = req->comm;
+    ucc_tl_mlx5_mcast_reg_t       *reg  = NULL;
+    ucc_status_t                   status;
+
+    ucc_assert(req->ag_counter == comm->bcast_comm.under_progress_counter);
+
+    if (!comm->one_sided.reliability_enabled || comm->one_sided.reliability_ready) {
+        return UCC_OK;
+    }
+
+    if (req->bcast_rkeys_req) {
+        status = comm->service_coll.coll_test(req->bcast_rkeys_req);
+        if (status == UCC_OK) {
+            req->bcast_rkeys_req = NULL;
+            tl_trace(comm->lib, "bcast for remote_addr/rkey is completed");
+            comm->one_sided.reliability_ready = 1;
+        }
+        return status;
+    }
+
+    /* initialize the structures needed by reliability protocol */
+    memset(comm->one_sided.recvd_pkts_tracker, 0, comm->commsize * sizeof(uint32_t));
+    memset(comm->one_sided.remote_slot_info, ONE_SIDED_INVALID, comm->commsize * sizeof(int));
+    /* local slots state */
+    comm->one_sided.slots_state = ONE_SIDED_INVALID;
+
+    /* do nonblocking bcast over remote addresses/keys */
+    if (!req->rreg) {
+       /* register sbuf if it is not registered before */
+       status = ucc_tl_mlx5_mcast_mem_register(comm->ctx, req->ptr, req->length, &reg);
+       if (UCC_OK != status) {
+            return status;
+       }
+       req->rreg = reg;
+       req->mr   = reg->mr;
+    }
+    if (req->am_root) {
+        comm->one_sided.sendbuf_memkey_list[comm->rank].rkey        = req->mr->rkey;
+        comm->one_sided.sendbuf_memkey_list[comm->rank].remote_addr = (uint64_t)req->ptr;
+    }
+    tl_trace(comm->lib, "bcast over buffer addresses/rkey: address %p rkey %d",
+             req->ptr, req->mr->rkey);
+    status = comm->service_coll.bcast_post(comm->p2p_ctx,
+                                           &(comm->one_sided.sendbuf_memkey_list[req->root]),
+                                           sizeof(ucc_tl_mlx5_mcast_slot_mem_info_t),
+                                           req->root,
+                                           &req->bcast_rkeys_req);
+    if (UCC_OK != status) {
+        tl_error(comm->lib, "oob bcast failed during one-sided reliability reset of a collective call");
+        return status;
+    }
+
+    return UCC_INPROGRESS;
+}
+
+static inline ucc_status_t
+ucc_tl_mlx5_mcast_check_zcopy_bcast_collective(ucc_tl_mlx5_mcast_coll_comm_t *comm,
+                                               ucc_tl_mlx5_mcast_coll_req_t  *req)
+{
+    ucc_tl_mlx5_mcast_pipelined_ag_schedule_t *sched = req->ag_schedule;
+
+    ucc_assert(req->bcast_rkeys_req == NULL);
+    if (comm->one_sided.pending_reads) {
+        return ucc_tl_mlx5_mcast_progress_one_sided_communication(comm, req);
+    }
+    if (req->step == req->total_steps) {
+        return UCC_OK;
+    }
+    if (!sched[req->step].prepost_buf_op_done || !sched[req->step].multicast_op_done) {
+        // it is not yet the time to start the reliability protocol
+        return UCC_INPROGRESS;
+    }
+    if (sched[req->step].num_recvd == sched[req->step].to_recv) {
+        /* check for out of order packets, if any root sent a out of order
+         * packet to us in the current step, go ahead and issue RDMA READ
+         * from that root for this specific piece of send buffer */
+        return ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(comm, req, NULL);
+    } else if (!comm->timer) {
+        if (comm->stalled < DROP_THRESHOLD) {
+            comm->stalled++;
+        } else {
+            // kick the timer
+            comm->timer   = ucc_tl_mlx5_mcast_get_timer();
+            comm->stalled = 0;
+        }
+    } else {
+        if (comm->stalled < DROP_THRESHOLD) {
+            comm->stalled++;
+        } else {
+            // calcuate the current time and check if it's time to do RDMA READ
+            if (ucc_tl_mlx5_mcast_get_timer() - comm->timer >=
+                    comm->ctx->params.timeout) {
+                comm->timer = 0;
+                ucc_assert(sched[req->step].to_recv >= sched[req->step].num_recvd);
+                tl_debug(comm->lib, "zcopy bcast timeout %d pending packets to recv %d on step %d",
+                         comm->ctx->params.timeout, sched[req->step].to_recv - sched[req->step].num_recvd,
+                         req->step);
+                return ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(comm, req, NULL);
+            } else {
+                comm->stalled = 0;
+            }
+        }
+    }
+    return UCC_INPROGRESS;
 }
 
 static inline ucc_status_t ucc_tl_mlx5_mcast_do_zero_copy_pipelined_bcast(void *req_handle)
@@ -317,6 +437,17 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_zero_copy_pipelined_bcast(void *
     size_t                                     offset, offset_left;
     ucc_status_t                               status;
 
+    if (req->ag_counter != req->comm->bcast_comm.under_progress_counter) {
+        /* it is not this task's turn for progress */
+        ucc_assert(req->comm->bcast_comm.under_progress_counter < req->ag_counter);
+        return UCC_INPROGRESS;
+    }
+
+    status = ucc_tl_mlx5_mcast_bcast_reliability_ready(req);
+    if (UCC_OK != status) {
+        return status;
+    }
+
     ucc_assert(req->to_recv >= 0 && req->to_send >= 0);
     if (req->barrier_req) {
         status = comm->service_coll.coll_test(req->barrier_req);
@@ -326,105 +457,119 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_do_zero_copy_pipelined_bcast(void *
         tl_trace(comm->lib, "barrier at end of req->step %d is completed", req->step);
         req->barrier_req = NULL;
         req->step++;
-        if (req->step == sched->total_steps) {
-            ucc_assert(!req->to_send && !req->to_recv);
-            return UCC_OK;
+        if (comm->one_sided.reliability_enabled) {
+            memset(comm->one_sided.recvd_pkts_tracker, 0, sizeof(int) * comm->commsize);
         }
     }
 
-    ucc_assert(req->step < sched->total_steps);
-
-    if (!sched[req->step].multicast_op_done) {
-        /* root performs mcast send */
-        ucc_assert(req->am_root);
-        for (j = 0; j < req->concurrency_level; j++) {
-            ucc_assert(root == sched[req->step].multicast_op[j].root);
-            group_id     = sched[req->step].multicast_op[j].group_id;
-            to_send_left = sched[req->step].multicast_op[j].to_send_left;
-            offset_left  = sched[req->step].multicast_op[j].offset_left;
-            num_packets  = ucc_min(comm->allgather_comm.max_push_send - comm->pending_send, to_send_left);
-            if (to_send_left &&
-                (comm->allgather_comm.max_push_send - comm->pending_send) > 0) {
-                status = ucc_tl_mlx5_mcast_send_collective(comm, req, num_packets,
-                                                           zcopy, UCC_COLL_TYPE_ALLGATHER,
-                                                           group_id, offset_left);
-                if (UCC_OK != status) {
-                    return status;
+    if (req->step < sched->total_steps) {
+        if (!sched[req->step].multicast_op_done) {
+            for (j = 0; j < req->concurrency_level; j++) {
+                ucc_assert(root == sched[req->step].multicast_op[j].root);
+                group_id     = sched[req->step].multicast_op[j].group_id;
+                to_send_left = sched[req->step].multicast_op[j].to_send_left;
+                offset_left  = sched[req->step].multicast_op[j].offset_left;
+                num_packets  = ucc_min(comm->allgather_comm.max_push_send - comm->pending_send, to_send_left);
+                if (to_send_left &&
+                    (comm->allgather_comm.max_push_send - comm->pending_send) > 0) {
+                    ucc_assert(req->am_root);
+                    status = ucc_tl_mlx5_mcast_send_collective(comm, req, num_packets,
+                                                               zcopy, group_id, offset_left);
+                    if (UCC_OK != status) {
+                        return status;
+                    }
+                    sched[req->step].multicast_op[j].to_send_left -= num_packets;
+                    sched[req->step].multicast_op[j].offset_left  += (num_packets * comm->max_per_packet);
                 }
-                sched[req->step].multicast_op[j].to_send_left -= num_packets;
-                sched[req->step].multicast_op[j].offset_left  += (num_packets * comm->max_per_packet);
-            }
-            if (comm->pending_send) {
-                status = ucc_tl_mlx5_mcast_poll_send(comm);
-                if (status != UCC_OK) {
-                    return status;
+                if (comm->pending_send) {
+                    status = ucc_tl_mlx5_mcast_poll_send(comm);
+                    if (status != UCC_OK) {
+                        return status;
+                    }
                 }
-            }
-            if (!sched[req->step].multicast_op[j].to_send_left && !comm->pending_send) {
-                tl_trace(comm->lib, "done with mcast ops step %d group id %d to_send %d",
-                         req->step, group_id, sched[req->step].to_send);
-                sched[req->step].multicast_op_done = 1;
-                break;
+                if (!sched[req->step].multicast_op[j].to_send_left && !comm->pending_send) {
+                    tl_trace(comm->lib, "done with mcast ops step %d group id %d to_send %d",
+                             req->step, group_id, sched[req->step].to_send);
+                    sched[req->step].multicast_op_done = 1;
+                    break;
+                }
             }
         }
-    }
 
-    if (!sched[req->step].prepost_buf_op_done) {
-        ucc_assert(!req->am_root);
-        /* prepost the user buffers for none roots */
-        for (j = 0; j < req->concurrency_level; j++) {
-            group_id = sched[req->step].prepost_buf_op[j].group_id;
-            count    = sched[req->step].prepost_buf_op[j].count;
-            offset   = sched[req->step].prepost_buf_op[j].offset;
-            status   = ucc_tl_mlx5_mcast_post_user_recv_buffers(comm, req, group_id, root,
-                                                                UCC_COLL_TYPE_ALLGATHER, count,
-                                                                offset);
-            if (UCC_OK != status) {
+        if (!sched[req->step].prepost_buf_op_done) {
+            /* prepost the user buffers for none roots */
+            for (j = 0; j < req->concurrency_level; j++) {
+                group_id = sched[req->step].prepost_buf_op[j].group_id;
+                count    = sched[req->step].prepost_buf_op[j].count;
+                offset   = sched[req->step].prepost_buf_op[j].offset;
+                if (count) {
+                    ucc_assert(!req->am_root);
+                    status   = ucc_tl_mlx5_mcast_post_user_recv_buffers(comm, req, group_id, root,
+                                                                        UCC_COLL_TYPE_BCAST, count,
+                                                                        offset);
+                    if (UCC_OK != status) {
+                        return status;
+                    }
+                }
+                /* progress the recvd packets in between */
+                if (req->to_recv) {
+                    num_recvd = ucc_tl_mlx5_mcast_recv_collective(comm, req,
+                                                                  req->to_recv,
+                                                                  UCC_COLL_TYPE_ALLGATHER);
+                    if (num_recvd < 0) {
+                        tl_error(comm->lib, "a failure happend during cq polling");
+                        status = UCC_ERR_NO_MESSAGE;
+                        return status;
+                    }
+                    sched[req->step].num_recvd += num_recvd;
+                }
+            }
+            tl_trace(comm->lib, "done with prepost bufs step %d group id %d count %d offset %ld root %d",
+                     req->step, group_id, count, offset, root);
+            sched[req->step].prepost_buf_op_done = 1;
+        }
+
+        if (req->to_recv) {
+            num_recvd = ucc_tl_mlx5_mcast_recv_collective(comm, req,
+                                                          req->to_recv,
+                                                          UCC_COLL_TYPE_ALLGATHER);
+            if (num_recvd < 0) {
+                tl_error(comm->lib, "a failure happend during cq polling");
+                status = UCC_ERR_NO_MESSAGE;
                 return status;
             }
-            /* progress the recvd packets in between */
-            if (req->to_recv) {
-                num_recvd = ucc_tl_mlx5_mcast_recv_collective(comm, req,
-                                                              req->to_recv,
-                                                              UCC_COLL_TYPE_ALLGATHER);
-                if (num_recvd < 0) {
-                    tl_error(comm->lib, "a failure happend during cq polling");
-                    status = UCC_ERR_NO_MESSAGE;
-                    return status;
-                }
-                sched[req->step].num_recvd += num_recvd;
+            sched[req->step].num_recvd += num_recvd;
+        }
+
+        if (sched[req->step].prepost_buf_op_done &&
+            sched[req->step].multicast_op_done &&
+            sched[req->step].num_recvd == sched[req->step].to_recv) {
+            // current step done
+            ucc_assert(sched[req->step].prepost_buf_op_done && sched[req->step].multicast_op_done);
+            ucc_assert(req->barrier_req == NULL);
+            status = comm->service_coll.barrier_post(comm->p2p_ctx, &req->barrier_req);
+            if (status != UCC_OK) {
+                return status;
             }
+            tl_trace(comm->lib, "init global sync req->step %d", req->step);
         }
-        tl_trace(comm->lib, "done with prepost bufs step %d group id %d count %d offset %ld root %d",
-                 req->step, group_id, count, offset, root);
-        sched[req->step].prepost_buf_op_done = 1;
     }
 
-    if (req->to_recv) {
-        num_recvd = ucc_tl_mlx5_mcast_recv_collective(comm, req,
-                                                      req->to_recv,
-                                                      UCC_COLL_TYPE_ALLGATHER);
-        if (num_recvd < 0) {
-            tl_error(comm->lib, "a failure happend during cq polling");
-            status = UCC_ERR_NO_MESSAGE;
+    if (comm->one_sided.reliability_enabled) {
+        status = ucc_tl_mlx5_mcast_check_zcopy_bcast_collective(comm, req);
+        if (status < 0) {
             return status;
         }
-        sched[req->step].num_recvd += num_recvd;
     }
 
-    if (sched[req->step].prepost_buf_op_done &&
-        sched[req->step].multicast_op_done &&
-        sched[req->step].num_recvd == sched[req->step].to_recv) {
-        // current step done
-        ucc_assert(sched[req->step].prepost_buf_op_done && sched[req->step].multicast_op_done);
-        ucc_assert(req->barrier_req == NULL);
-        status = comm->service_coll.barrier_post(comm->p2p_ctx, &req->barrier_req);
-        if (status != UCC_OK) {
-            return status;
-        }
-        tl_trace(comm->lib, "init global sync req->step %d", req->step);
+    if (req->barrier_req != NULL ||
+        MCAST_BCAST_IN_PROGRESS(req, comm)) {
+        return UCC_INPROGRESS;
     }
-    return UCC_INPROGRESS;
+
+    /* all completed */
+    assert(req->step == sched->total_steps);
+    return UCC_OK;
 }
 
 static inline ucc_status_t ucc_tl_mlx5_mcast_prepare_bcast(void* buf, size_t size, ucc_rank_t root,
@@ -456,7 +601,6 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_prepare_bcast(void* buf, size_t siz
             return status;
         }
         req->progress = ucc_tl_mlx5_mcast_do_zero_copy_pipelined_bcast;
-        comm->bcast_comm.coll_counter++;
     } else {
         status = ucc_tl_mlx5_mcast_prepare_reliable(comm, req, req->root);
         if (ucc_unlikely(UCC_OK != status)) {
@@ -563,12 +707,27 @@ static inline void ucc_tl_mlx5_mcast_bcast_progress(ucc_coll_task_t *coll_task)
     }
 }
 
-static inline ucc_status_t ucc_tl_mlx5_mcast_check_memory_type_cap(ucc_base_coll_args_t *coll_args,
+static inline ucc_status_t ucc_tl_mlx5_mcast_check_cap(ucc_base_coll_args_t *coll_args,
                                                                    ucc_base_team_t *team)
 {
     ucc_tl_mlx5_team_t            *mlx5_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
     ucc_tl_mlx5_mcast_coll_comm_t *comm      = mlx5_team->mcast->mcast_comm;
     ucc_coll_args_t               *args      = &coll_args->args;
+    int buf_size                             =
+        ucc_dt_size(args->src.info.datatype) * args->src.info.count;
+
+    if (!((comm->context->mcast_bcast_enabled &&
+           (coll_args->args.coll_type == UCC_COLL_TYPE_BCAST)) ||
+        (comm->context->mcast_allgather_enabled &&
+          (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHER)))) {
+        tl_trace(team->context->lib, "please enable the mcast for the collective");
+        return UCC_ERR_NO_RESOURCE;
+    }
+
+    if (buf_size < ZERO_COPY_MCAST_MIN_MSG_SIZE ||
+        buf_size % comm->max_per_packet != 0) {
+        return UCC_ERR_NO_RESOURCE;
+    }
 
     if ((comm->cuda_mem_enabled &&
             args->src.info.mem_type == UCC_MEMORY_TYPE_CUDA) ||
@@ -593,8 +752,8 @@ ucc_status_t ucc_tl_mlx5_mcast_check_support(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (UCC_OK != ucc_tl_mlx5_mcast_check_memory_type_cap(coll_args, team)) {
-        tl_trace(team->context->lib, "mcast collective not compatible with this memory type");
+    if (UCC_OK != ucc_tl_mlx5_mcast_check_cap(coll_args, team)) {
+        tl_trace(team->context->lib, "mcast collective not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
 

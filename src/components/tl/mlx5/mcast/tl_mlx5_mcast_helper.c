@@ -281,6 +281,7 @@ ucc_status_t ucc_tl_mlx5_mcast_init_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
     qp_init_attr.cap.max_recv_sge    = comm->params.rx_sge;
 
     for (i = 0; i < comm->mcast_group_count; i++) {
+        ucc_list_head_init(&comm->one_sided.posted_recv[i].posted_recv_bufs);
         comm->mcast.groups[i].qp = ibv_create_qp(ctx->pd, &qp_init_attr);
         if (!comm->mcast.groups[i].qp) {
             tl_error(ctx->lib, "Failed to create mcast UD qp index %d, errno %d", i, errno);
@@ -402,6 +403,8 @@ ucc_status_t ucc_tl_mlx5_mcast_setup_qps(ucc_tl_mlx5_mcast_coll_context_t *ctx,
             tl_error(ctx->lib, "failed to modify QP to RTS, errno %d", errno);
             goto error;
         }
+
+        tl_debug(ctx->lib, "modified UD QP to RTS and RTR for mcast group id %d", i);
     }
 
     /* create the address handle */
