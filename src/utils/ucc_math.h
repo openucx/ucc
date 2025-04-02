@@ -146,7 +146,7 @@ static inline int ucc_lowest_greater_power2(int value)
     if (value <= 1) {
         return 1;
     }
-    return 1 << (32 - ucc_count_leading_zero_bits(value));
+    return 1 << (32 - ucc_count_leading_zero_bits(value - 1));
 }
 
 #endif
