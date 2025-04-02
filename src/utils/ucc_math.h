@@ -146,19 +146,7 @@ static inline int ucc_lowest_greater_power2(int value)
     if (value <= 1) {
         return 1;
     }
-
-    // Handle integer overflow case
-    if (value > (INT32_MAX / 2)) {
-        return INT32_MAX;  
-    }
-
-    --value;  // pow2 case
-    value |= value >> 1;
-    value |= value >> 2;
-    value |= value >> 4;
-    value |= value >> 8;
-    value |= value >> 16;
-    return value + 1;
+    return 1 << (32 - ucc_count_leading_zero_bits(value));
 }
 
 #endif
