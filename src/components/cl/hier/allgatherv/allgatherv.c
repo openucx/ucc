@@ -86,6 +86,40 @@ static inline ucc_status_t is_block_ordered(ucc_cl_hier_team_t *cl_team, int *or
     return UCC_OK;
 }
 
+/* Node leader subgroup is always ordered by ascending host_id. If the team's ranks are
+   not in the same order, then node leader subgroup allgatherv won't be enough, we'll
+   have to use a staging buffer and unpack to reorder each leader's contribution.
+   So, this func will check that the team ranks in the ldr sbgp are ascending */
+static inline ucc_status_t is_host_ordered(ucc_cl_hier_team_t *cl_team, int *ordered)
+{
+    int         is_host_ordered;
+    ucc_rank_t  max_rank, i, team_rank;
+
+    if (cl_team->is_host_ordered != -1) {
+        is_host_ordered = cl_team->is_host_ordered;
+    } else {
+        if (SBGP_EXISTS(cl_team, NODE_LEADERS)) {
+            is_host_ordered = 1;
+            max_rank = ucc_ep_map_eval(SBGP_MAP(cl_team, NODE_LEADERS), 0);
+            for (i = 1; i < SBGP_SIZE(cl_team, NODE_LEADERS); i++) {
+                team_rank = ucc_ep_map_eval(SBGP_MAP(cl_team, NODE_LEADERS), i);
+                if (team_rank < max_rank) {
+                    is_host_ordered = 0;
+                    break;
+                }
+                max_rank = team_rank;
+            }
+        } else {
+            is_host_ordered = 1;
+        }
+        cl_team->is_host_ordered = is_host_ordered;
+    }
+
+    *ordered = is_host_ordered;
+
+    return UCC_OK;
+}
+
 UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
                          (coll_args, team, task),
                          ucc_base_coll_args_t *coll_args, ucc_base_team_t *team,
@@ -127,7 +161,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     ucc_rank_t              team_rank;
     size_t                  leader_old_count;
     size_t                  add_count, new_count;
-    int                     block_ordered;
+    int                     block_ordered, host_ordered;
 
     if (coll_args->args.src.info.mem_type != UCC_MEMORY_TYPE_HOST ||
         coll_args->args.dst.info_v.mem_type != UCC_MEMORY_TYPE_HOST) {
@@ -146,7 +180,8 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     n_tasks   = 0;
     in_place  = UCC_IS_INPLACE(args.args);
     UCC_CHECK_GOTO(is_block_ordered(cl_team, &block_ordered), free_sched, status);
-    is_contig = UCC_COLL_IS_DST_CONTIG(&args.args) && block_ordered;
+    UCC_CHECK_GOTO(is_host_ordered(cl_team, &host_ordered), free_sched, status);
+    is_contig = UCC_COLL_IS_DST_CONTIG(&args.args) && block_ordered && host_ordered;
     
     UCC_CHECK_GOTO(ucc_schedule_init(schedule, &args, team), free_sched, status);
 
@@ -212,13 +247,15 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
                                                     i);
         }
 
-        node_gathered_data = PTR_OFFSET(buffer,
-                                        dt_size *
-                                            ucc_coll_args_get_displacement(
-                                                &args.args,
-                                                leader_disps,
-                                                SBGP_RANK(cl_team, NODE_LEADERS))
-                                        );
+        if (SBGP_ENABLED(cl_team, NODE_LEADERS)) {
+            node_gathered_data = PTR_OFFSET(buffer,
+                                            dt_size *
+                                                ucc_coll_args_get_displacement(
+                                                    &args.args,
+                                                    leader_disps,
+                                                    SBGP_RANK(cl_team, NODE_LEADERS))
+                                            );
+        }
     }
 
     if (SBGP_ENABLED(cl_team, NODE)) {

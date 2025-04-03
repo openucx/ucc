@@ -12,6 +12,7 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_finalize(ucc_coll_task_t *task)
                                                          ucc_cl_hier_schedule_t);
 
     ucc_mc_free(cl_schedule->scratch);
+    ucc_cl_hier_put_schedule(&cl_schedule->super.super);
 
     return UCC_OK;
 }
