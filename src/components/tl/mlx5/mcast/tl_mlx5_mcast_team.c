@@ -12,6 +12,7 @@
 #include "p2p/ucc_tl_mlx5_mcast_p2p.h"
 #include "mcast/tl_mlx5_mcast_helper.h"
 #include "mcast/tl_mlx5_mcast_service_coll.h"
+#include "mcast/tl_mlx5_mcast_one_sided_reliability.h"
 
 ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
                                          ucc_tl_mlx5_mcast_team_t **mcast_team,
@@ -95,6 +96,8 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     comm->allgather_comm.truly_zero_copy_allgather_enabled
                                         = conf_params->truly_zero_copy_allgather_enabled;
     comm->one_sided.reliability_enabled = conf_params->one_sided_reliability_enable;
+    comm->one_sided.reliability_scheme_msg_threshold
+                                        = conf_params->reliability_scheme_msg_threshold;
     comm->bcast_comm.wsize              = conf_params->wsize;
     comm->allgather_comm.max_push_send  = conf_params->max_push_send;
     comm->max_eager                     = conf_params->max_eager;
@@ -147,8 +150,13 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
 
     comm->lib                  = base_context->lib;
     new_mcast_team->mcast_comm = comm;
-    *mcast_team                = new_mcast_team;
 
+    status = ucc_tl_mlx5_mcast_one_sided_reliability_init(comm);
+    if (status != UCC_OK) {
+        goto cleanup;
+    }
+
+    *mcast_team = new_mcast_team;
     tl_debug(base_context->lib, "posted tl mcast team : %p", new_mcast_team);
 
     return UCC_OK;
@@ -455,10 +463,20 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     return status;
                 }
 
-                tl_debug(comm->lib, "initialized tl mcast team: %p", tl_team);
-                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_READY;
+                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_RELIABLITY;
 
                 return UCC_INPROGRESS;
+            }
+
+            case TL_MLX5_TEAM_STATE_MCAST_RELIABLITY:
+            {
+                status = ucc_tl_mlx5_mcast_one_sided_reliability_test(comm);
+                if (UCC_OK != status) {
+                    return status;
+                }
+
+                tl_debug(comm->lib, "initialized tl mcast team: %p", tl_team);
+                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_READY;
             }
 
             case TL_MLX5_TEAM_STATE_MCAST_READY:
@@ -569,10 +587,19 @@ ucc_status_t ucc_tl_mlx5_mcast_team_test(ucc_base_team_t *team)
                     return status;
                 }
 
+                tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_RELIABLITY;
+                return UCC_INPROGRESS;
+            }
+
+            case TL_MLX5_TEAM_STATE_MCAST_RELIABLITY:
+            {
+                status = ucc_tl_mlx5_mcast_one_sided_reliability_test(comm);
+                if (UCC_OK != status) {
+                    return status;
+                }
+
                 tl_debug(comm->lib, "initialized tl mcast team: %p", tl_team);
                 tl_team->mcast_state = TL_MLX5_TEAM_STATE_MCAST_READY;
-
-                return UCC_INPROGRESS;
             }
 
             case TL_MLX5_TEAM_STATE_MCAST_READY:

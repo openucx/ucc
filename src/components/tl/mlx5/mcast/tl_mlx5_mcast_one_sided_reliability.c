@@ -6,12 +6,11 @@
 
 #include "tl_mlx5_mcast_one_sided_reliability.h"
 
-static ucc_status_t ucc_tl_mlx5_mcast_one_sided_setup_reliability_buffers(ucc_base_team_t *team)
+inline static ucc_status_t
+ucc_tl_mlx5_mcast_one_sided_setup_reliability_buffers(ucc_tl_mlx5_mcast_coll_comm_t *comm)
 {
-    ucc_tl_mlx5_team_t            *tl_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
-    ucc_status_t                   status  = UCC_OK;
-    ucc_tl_mlx5_mcast_coll_comm_t *comm    = tl_team->mcast->mcast_comm;
-    int                            one_sided_total_slots_size, i;
+    ucc_status_t status = UCC_OK;
+    int          one_sided_total_slots_size, i;
 
     /* this array keeps track of the number of recv packets from each process
      * used in all the protocols */
@@ -54,8 +53,8 @@ static ucc_status_t ucc_tl_mlx5_mcast_one_sided_setup_reliability_buffers(ucc_ba
     }
     
     /* this array holds local information about the slot status that was read from remote ranks */
-    comm->one_sided.remote_slot_info = ucc_calloc(1, comm->commsize * ONE_SIDED_SLOTS_INFO_SIZE,
-                                                  "one_sided.remote_slot_info");
+    comm->one_sided.remote_slot_info = (int *)ucc_calloc(comm->commsize, ONE_SIDED_SLOTS_INFO_SIZE,
+                                                         "one_sided.remote_slot_info");
     if (!comm->one_sided.remote_slot_info) {
         tl_error(comm->lib, "unable to malloc for one_sided.remote_slot_info");
         status = UCC_ERR_NO_MEMORY;
@@ -94,15 +93,13 @@ static ucc_status_t ucc_tl_mlx5_mcast_one_sided_setup_reliability_buffers(ucc_ba
         comm->one_sided.info[comm->rank].rc_qp_num[i] = comm->mcast.rc_qp[i]->qp_num;
     }
 
-    tl_debug(comm->lib, "created the allgather reliability structures");
-
     return UCC_OK;
 
 failed:
     return status;
 }
 
-static inline ucc_status_t ucc_tl_mlx5_mcast_one_sided_cleanup(ucc_tl_mlx5_mcast_coll_comm_t *comm)
+ucc_status_t ucc_tl_mlx5_mcast_one_sided_cleanup(ucc_tl_mlx5_mcast_coll_comm_t *comm)
 {
     int j;
 
@@ -163,11 +160,13 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_one_sided_cleanup(ucc_tl_mlx5_mcast
     return UCC_OK;
 }
 
-ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_init(ucc_base_team_t *team)
+ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_init(ucc_tl_mlx5_mcast_coll_comm_t *comm)
 {
-    ucc_tl_mlx5_team_t            *tl_team  = ucc_derived_of(team, ucc_tl_mlx5_team_t);
-    ucc_tl_mlx5_mcast_coll_comm_t *comm     = tl_team->mcast->mcast_comm;
-    ucc_status_t                   status   = UCC_OK;
+    ucc_status_t status = UCC_OK;
+
+    if (!comm->one_sided.reliability_enabled) {
+        return UCC_OK;
+    }
 
     if (comm->commsize > ONE_SIDED_RELIABILITY_MAX_TEAM_SIZE) {
         tl_warn(comm->lib,
@@ -176,41 +175,35 @@ ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_init(ucc_base_team_t *team)
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    status = ucc_tl_mlx5_mcast_one_sided_setup_reliability_buffers(team);
+    status = ucc_tl_mlx5_mcast_one_sided_setup_reliability_buffers(comm);
     if (status != UCC_OK) {
-        tl_error(comm->lib, "setup reliablity resources failed");
-        goto failed;
-    }
-
-     /* TODO double check if ucc inplace allgather is working properly */
-    status = comm->service_coll.allgather_post(comm->p2p_ctx, NULL /*inplace*/, comm->one_sided.info,
-                                               sizeof(ucc_tl_mlx5_one_sided_reliable_team_info_t),
-                                               &comm->one_sided.reliability_req);
-    if (UCC_OK != status) {
-        tl_error(comm->lib, "oob allgather failed during one-sided reliability init");
-        goto failed;
-    }
-
-    return status;
-
-failed:
-    if (UCC_OK != ucc_tl_mlx5_mcast_one_sided_cleanup(comm)) {
-        tl_error(comm->lib, "mcast one-sided reliablity resource cleanup failed");
+        tl_error(comm->lib, "setup reliability resources failed");
     }
 
     return status;
 }
 
-ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_test(ucc_base_team_t *team)
+ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_test(ucc_tl_mlx5_mcast_coll_comm_t *comm)
 {
-    ucc_tl_mlx5_team_t            *tl_team  = ucc_derived_of(team, ucc_tl_mlx5_team_t);
-    ucc_status_t                   status   = UCC_OK;
-    ucc_tl_mlx5_mcast_coll_comm_t *comm     = tl_team->mcast->mcast_comm;
+    ucc_status_t status = UCC_OK;
 
-    /* check if the one sided config info is exchanged */
+    if (!comm->one_sided.reliability_enabled) {
+        return UCC_OK;
+    }
+
+    if (comm->one_sided.reliability_req == NULL) {
+        status = comm->service_coll.allgather_post(comm->p2p_ctx, &(comm->one_sided.info[comm->rank]),
+                                                   comm->one_sided.info,
+                                                   sizeof(ucc_tl_mlx5_one_sided_reliable_team_info_t),
+                                                   &comm->one_sided.reliability_req);
+        if (UCC_OK != status) {
+            tl_error(comm->lib, "oob allgather failed during one-sided reliability init");
+            goto failed;
+        }
+    }
+
     status = comm->service_coll.coll_test(comm->one_sided.reliability_req);
     if (UCC_OK != status) {
-        /* allgather is not completed yet */
         if (status < 0) {
             tl_error(comm->lib, "one sided config info exchange failed");
             goto failed;
@@ -225,9 +218,13 @@ ucc_status_t ucc_tl_mlx5_mcast_one_sided_reliability_test(ucc_base_team_t *team)
         goto failed;
     }
 
+    tl_debug(comm->lib, "support for allgather reliability is enabled");
+    comm->one_sided.reliability_req = NULL;
+    return UCC_OK;
+
 failed:
     if (UCC_OK != ucc_tl_mlx5_mcast_one_sided_cleanup(comm)) {
-        tl_error(comm->lib, "mcast one-sided reliablity resource cleanup failed");
+        tl_error(comm->lib, "mcast one-sided reliability resource cleanup failed");
     }
     
     return status;
