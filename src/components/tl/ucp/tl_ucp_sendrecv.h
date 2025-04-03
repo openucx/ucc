@@ -16,21 +16,24 @@
 #include "components/mc/base/ucc_mc_base.h"
 
 void ucc_tl_ucp_send_completion_cb_st(void *request, ucs_status_t status,
-                                   void *user_data);
+                                      void *user_data);
 void ucc_tl_ucp_send_completion_cb_mt(void *request, ucs_status_t status,
-                                    void *user_data);
+                                      void *user_data);
 
                                     
 void ucc_tl_ucp_put_completion_cb(void *request, ucs_status_t status,
-                                   void *user_data);
+                                  void *user_data);
 
 void ucc_tl_ucp_get_completion_cb(void *request, ucs_status_t status,
-                                   void *user_data);
+                                  void *user_data);
 
-void ucc_tl_ucp_recv_completion_cb(void *request, ucs_status_t status,
-                                   const ucp_tag_recv_info_t *info,
-                                   void *user_data);
-
+void ucc_tl_ucp_recv_completion_cb_st(void *request, ucs_status_t status,
+                                      const ucp_tag_recv_info_t *info,
+                                      void *user_data);
+void ucc_tl_ucp_recv_completion_cb_mt(void *request, ucs_status_t status,
+                                      const ucp_tag_recv_info_t *info,
+                                      void *user_data);
+  
 #define UCC_TL_UCP_MAKE_TAG(_user_tag, _tag, _rank, _id, _scope_id, _scope)    \
     ((((uint64_t) (_user_tag)) << UCC_TL_UCP_USER_TAG_BITS_OFFSET) |           \
      (((uint64_t) (_tag))      << UCC_TL_UCP_TAG_BITS_OFFSET)      |           \
@@ -114,6 +117,7 @@ ucc_tl_ucp_send_nb_st(void *buffer, size_t msglen, ucc_memory_type_t mtype,
     }
     return UCC_OK;
 }
+
 static inline ucc_status_t
 ucc_tl_ucp_send_nb_mt(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                    ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
@@ -137,7 +141,7 @@ ucc_tl_ucp_send_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                    ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                    ucc_tl_ucp_task_t *task)
 {
-    return UCC_TL_UCP_TEAM_CTX(team)->ucc_tl_send_fn(buffer, msglen, mtype,
+    return UCC_TL_UCP_TEAM_CTX(team)->callbacks.ucc_tl_ucp_send_nb(buffer, msglen, mtype,
         dest_group_rank, team, task);
 }
 
@@ -187,14 +191,14 @@ ucc_tl_ucp_recv_common(void *buffer, size_t msglen, ucc_memory_type_t mtype,
 }
 
 static inline ucc_status_t
-ucc_tl_ucp_recv_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
+ucc_tl_ucp_recv_nb_mt(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                    ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                    ucc_tl_ucp_task_t *task)
 {
     ucs_status_ptr_t ucp_status;
 
     ucp_status = ucc_tl_ucp_recv_common(buffer, msglen, mtype, dest_group_rank,
-                                        team, task, ucc_tl_ucp_recv_completion_cb,
+                                        team, task, ucc_tl_ucp_recv_completion_cb_mt,
                                         (void *)task);
     if (UCS_OK != ucp_status) {
         UCC_TL_UCP_CHECK_REQ_STATUS();
@@ -202,7 +206,33 @@ ucc_tl_ucp_recv_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
         ucc_atomic_add32(&task->tagged.recv_completed, 1);
     }
     return UCC_OK;
+}
 
+static inline ucc_status_t
+ucc_tl_ucp_recv_nb_st(void *buffer, size_t msglen, ucc_memory_type_t mtype,
+                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
+                   ucc_tl_ucp_task_t *task)
+{
+    ucs_status_ptr_t ucp_status;
+
+    ucp_status = ucc_tl_ucp_recv_common(buffer, msglen, mtype, dest_group_rank,
+                                        team, task, ucc_tl_ucp_recv_completion_cb_st,
+                                        (void *)task);
+    if (UCS_OK != ucp_status) {
+        UCC_TL_UCP_CHECK_REQ_STATUS();
+    } else {
+        ++task->tagged.recv_completed;
+    }
+    return UCC_OK;
+}
+
+static inline ucc_status_t
+ucc_tl_ucp_recv_nb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
+                   ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
+                   ucc_tl_ucp_task_t *task)
+{
+    return UCC_TL_UCP_TEAM_CTX(team)->callbacks.ucc_tl_ucp_recv_nb(buffer, msglen, mtype,
+        dest_group_rank, team, task);
 }
 
 static inline ucc_status_t
