@@ -1300,6 +1300,10 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
         }
         total_pack_size += local_memh->tl_h[i].packed_size;
     }
+    if (packed_tls == 0) {
+        ucc_debug("No TLs available for packing");
+        return UCC_OK;
+    }
 
     /* allocate exported memh, copy items over */
     exported_memh = (ucc_mem_map_memh_t *)ucc_calloc(
@@ -1319,13 +1323,14 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     if (!exported_memh->tl_h) {
         ucc_error("failed to allocate handle for exported buffers' tl handles");
         status = UCC_ERR_NO_MEMORY;
+        ucc_free(exported_memh);
         goto failed_pack;
     }
 
     for (i = 0, offset = 0, tls = 0; i < ctx->n_tl_ctx; i++) {
         if (local_memh->tl_h[i].packed_size) {
-            strcpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
-                   local_memh->tl_h[i].tl_name);
+            strncpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
+                   local_memh->tl_h[i].tl_name, UCC_MEM_MAP_TL_NAME_LEN);
             offset += UCC_MEM_MAP_TL_NAME_LEN;
             memcpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
                    &local_memh->tl_h[i].packed_size, sizeof(size_t));
