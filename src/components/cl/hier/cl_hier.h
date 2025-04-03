@@ -106,15 +106,8 @@ typedef struct ucc_cl_hier_team {
     ucc_coll_score_t        *score;
     ucc_hier_sbgp_t          sbgps[UCC_HIER_SBGP_LAST];
     ucc_hier_sbgp_type_t     top_sbgp;
-    /* Array of size team_size, where node_leaders[i] = the rank of i's node
-       leader */
-    ucc_rank_t              *node_leaders;
-    /* Array of size node_leader_sbgp_size, with ranks in terms of the
-       team, sorted lowest to highest. This is useful for allgatherv.
-       The reason is the iterating through the node leader sbgp and map eval'ing
-       the ranks can yield unsorted ranks, e.g. 2n2ppn with ranks 0 and 2 as
-       leaders, leader 0 could map to rank 2 and leader 1 could map to rank 0 */
-    ucc_rank_t              *leader_list;
+    int                      is_block_ordered;
+    int                      is_host_ordered;
 } ucc_cl_hier_team_t;
 UCC_CLASS_DECLARE(ucc_cl_hier_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);

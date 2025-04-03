@@ -47,9 +47,6 @@ UCC_CLASS_INIT_FUNC(ucc_cl_hier_team_t, ucc_base_context_t *cl_context,
     ucc_tl_lib_t              *tl_lib;
     ucc_base_lib_attr_t        attr;
 
-    self->node_leaders = NULL;
-    self->leader_list  = NULL;
-
     if (!params->team->topo) {
         cl_debug(cl_context->lib,
                 "can't create hier team without topology data");
@@ -205,13 +202,6 @@ ucc_status_t ucc_cl_hier_team_destroy(ucc_base_team_t *cl_team)
     ucc_hier_sbgp_t           *hs;
     struct ucc_team_team_desc *d;
 
-    if (team->node_leaders) {
-        ucc_free(team->node_leaders);
-        ucc_free(team->leader_list);
-        team->node_leaders = NULL;
-        team->leader_list  = NULL;
-    }
-
     if (NULL == team->team_create_req) {
         status = ucc_team_multiple_req_alloc(&team->team_create_req,
                                              team->n_tl_teams);
@@ -272,7 +262,9 @@ ucc_status_t ucc_cl_hier_team_create_test(ucc_base_team_t *cl_team)
         return status;
     }
 
-    team->n_tl_teams = 0;
+    team->is_block_ordered = -1;
+    team->is_host_ordered  = -1;
+    team->n_tl_teams       =  0;
 
     /* TL teams are created: get scores and merge them to produce
      * score map for each sbgp

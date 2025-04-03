@@ -186,6 +186,7 @@ ucc_status_t ucc_topo_init(ucc_subset_t set, ucc_context_topo_t *ctx_topo,
     topo->all_numas           = NULL;
     topo->all_nodes           = NULL;
     topo->node_leaders        = NULL;
+    topo->per_node_leaders    = NULL;
 
     *_topo = topo;
     return UCC_OK;
@@ -227,6 +228,9 @@ void ucc_topo_cleanup(ucc_topo_t *topo)
         }
         if (topo->node_leaders) {
             ucc_free(topo->node_leaders);
+        }
+        if (topo->per_node_leaders) {
+            ucc_free(topo->per_node_leaders);
         }
         ucc_free(topo);
     }
@@ -380,7 +384,8 @@ ucc_status_t ucc_topo_get_all_nodes(ucc_topo_t *topo, ucc_sbgp_t **sbgps,
     return status;
 }
 
-ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leaders_out)
+ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leaders_out,
+                                      ucc_rank_t **per_node_leaders_out)
 {
     ucc_subset_t *set    = &topo->set;
     ucc_rank_t    size   = ucc_subset_size(set);
@@ -392,6 +397,17 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
 
     if (topo->node_leaders) {
         *node_leaders_out = topo->node_leaders;
+        if (per_node_leaders_out) {
+            *per_node_leaders_out = topo->per_node_leaders;
+        }
+        return UCC_OK;
+    }
+
+    // If we just want the per_node_leaders, return them
+    if (!node_leaders_out && topo->per_node_leaders) {
+        ucc_assert(topo->per_node_leaders != NULL);
+        ucc_assert(per_node_leaders_out != NULL);
+        *per_node_leaders_out = topo->per_node_leaders;
         return UCC_OK;
     }
 
@@ -445,8 +461,13 @@ ucc_status_t ucc_topo_get_node_leaders(ucc_topo_t *topo, ucc_rank_t **node_leade
     }
 
     topo->node_leaders = node_leaders;
+    topo->per_node_leaders = per_node_leaders;
+    //NOLINTNEXTLINE
     *node_leaders_out = node_leaders;
+    if (per_node_leaders_out) {
+        //NOLINTNEXTLINE
+        *per_node_leaders_out = per_node_leaders;
+    }
     ucc_free(ranks_seen_per_node);
-    ucc_free(per_node_leaders);
     return UCC_OK;
 }
