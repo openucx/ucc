@@ -127,9 +127,15 @@ ucc_status_t ucc_cl_hier_allgatherv_unpack_start(ucc_coll_task_t *task)
 
         ucc_assert(per_node_leaders[node_leader_idx] == leader_team_rank);
         for (ucc_rank_t j = 0; j < all_nodes[node_leader_idx].group_size; j++) {
-            curr_team_rank = ucc_ep_map_eval(all_nodes[node_leader_idx].map, j);
-            if (curr_team_rank == i) {
-                break; // We found our position
+            if (all_nodes[node_leader_idx].group_size == 1) {
+                // Node sbgp wont exist for just a single rank on a node
+                curr_team_rank = leader_team_rank;
+                break;
+            } else {
+                curr_team_rank = ucc_ep_map_eval(all_nodes[node_leader_idx].map, j);
+                if (curr_team_rank == i) {
+                    break; // We found our position
+                }
             }
             // Add previous ranks' counts from the same node
             src_rank_disp += ucc_coll_args_get_count(
