@@ -162,6 +162,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     size_t                  leader_old_count;
     size_t                  add_count, new_count;
     int                     block_ordered, host_ordered;
+    int                     ldr_sbgp_only;
 
     if (coll_args->args.src.info.mem_type != UCC_MEMORY_TYPE_HOST ||
         coll_args->args.dst.info_v.mem_type != UCC_MEMORY_TYPE_HOST) {
@@ -182,6 +183,8 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     UCC_CHECK_GOTO(is_block_ordered(cl_team, &block_ordered), free_sched, status);
     UCC_CHECK_GOTO(is_host_ordered(cl_team, &host_ordered), free_sched, status);
     is_contig = UCC_COLL_IS_DST_CONTIG(&args.args) && block_ordered && host_ordered;
+    /* handle the case where this rank may be the only one on this node */
+    ldr_sbgp_only = !SBGP_ENABLED(cl_team, NODE) && SBGP_ENABLED(cl_team, NODE_LEADERS);
     
     UCC_CHECK_GOTO(ucc_schedule_init(schedule, &args, team), free_sched, status);
 
@@ -216,7 +219,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
        the dst buffer of the gatherv to the right displacements for the in-place
        node-leader allgatherv.
        Calculate this on non-node-leader ranks as well for the unpack phase */
-    if(SBGP_ENABLED(cl_team, NODE) && SBGP_EXISTS(cl_team, NODE_LEADERS)) {
+    if((SBGP_ENABLED(cl_team, NODE) && SBGP_EXISTS(cl_team, NODE_LEADERS)) || ldr_sbgp_only) {
         /* Sum up the counts on each node to get the count for each node leader */
         for (i = 0; i < team_size; i++) {
             UCC_CHECK_GOTO(
@@ -308,6 +311,13 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
 
     args = args_old;
 
+    if (ldr_sbgp_only && !(args.args.flags & UCC_COLL_ARGS_FLAG_IN_PLACE)) {
+        /* Need to pack in case its not inplace or the buf isnt contig and we didnt do the gatherv */
+        memcpy(node_gathered_data, args.args.src.info.buffer, args.args.src.info.count * ucc_dt_size(args.args.src.info.datatype));
+    }
+
+    args = args_old;
+
     if (SBGP_ENABLED(cl_team, NODE_LEADERS)) {
         ucc_assert(cl_team->top_sbgp == UCC_HIER_SBGP_NODE_LEADERS);
         args.args.coll_type                = UCC_COLL_TYPE_ALLGATHERV;
@@ -322,23 +332,24 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
         n_tasks++;
     }
 
-    if (SBGP_ENABLED(cl_team, NODE) &&
-        cl_team->top_sbgp != UCC_HIER_SBGP_NODE) {
+    if (cl_team->top_sbgp != UCC_HIER_SBGP_NODE) {
         args                        = args_old;
-        args.args.coll_type         = UCC_COLL_TYPE_BCAST;
-        args.args.flags            |= UCC_COLL_ARGS_FLAG_IN_PLACE;
-        args.args.root              = topo->node_leader_rank_id;
-        args.args.src.info.buffer   = buffer;
-        args.args.src.info.count    = total_count;
-        args.args.src.info.datatype = args_old.args.dst.info_v.datatype;
-        args.args.src.info.mem_type = args_old.args.dst.info_v.mem_type;
+        if (SBGP_ENABLED(cl_team, NODE)) {
+            args.args.coll_type         = UCC_COLL_TYPE_BCAST;
+            args.args.flags            |= UCC_COLL_ARGS_FLAG_IN_PLACE;
+            args.args.root              = topo->node_leader_rank_id;
+            args.args.src.info.buffer   = buffer;
+            args.args.src.info.count    = total_count;
+            args.args.src.info.datatype = args_old.args.dst.info_v.datatype;
+            args.args.src.info.mem_type = args_old.args.dst.info_v.mem_type;
 
-        /* If using tl_shm and the shmem segment size is less than total_count,
-           this node-level bcast will cause the allgatherv to fail and fall back */
-        UCC_CHECK_GOTO(
-            ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]),
-            free_scratch, status);
-        n_tasks++;
+            /* If using tl_shm and the shmem segment size is less than total_count,
+            this node-level bcast will cause the allgatherv to fail and fall back */
+            UCC_CHECK_GOTO(
+                ucc_coll_init(SCORE_MAP(cl_team, NODE), &args, &tasks[n_tasks]),
+                free_scratch, status);
+            n_tasks++;
+        }
 
         if (!is_contig) {
             args                          = args_old;
@@ -349,7 +360,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
             // Pass leader_disps and leader_counts through src.info_v for unpack
             args.args.src.info_v.displacements = leader_disps;
             args.args.src.info_v.counts        = leader_counts;
-            
+
             UCC_CHECK_GOTO(
                 ucc_cl_hier_allgatherv_unpack_init(&args, team, &tasks[n_tasks]),
                 free_scratch, status);
@@ -385,5 +396,6 @@ free_sched:
         tasks[i]->finalize(tasks[i]);
     }
     ucc_cl_hier_put_schedule(schedule);
+    cl_error(team->context->lib, "failed to init cl hier allgatherv");
     return status;
 }
