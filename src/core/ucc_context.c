@@ -1324,7 +1324,8 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
 
     for (i = 0, offset = 0, tls = 0; i < ctx->n_tl_ctx; i++) {
         if (local_memh->tl_h[i].packed_size) {
-            strncpy(PTR_OFFSET(exported_memh->pack_buffer, offset), local_memh->tl_h[i].tl_name, UCC_MEM_MAP_TL_NAME_LEN - 1);
+            strcpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
+                   local_memh->tl_h[i].tl_name);
             offset += UCC_MEM_MAP_TL_NAME_LEN;
             memcpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
                    &local_memh->tl_h[i].packed_size, sizeof(size_t));
@@ -1333,7 +1334,8 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
                    packed_buffers[i], local_memh->tl_h[i].packed_size);
             ucc_free(packed_buffers[i]);
             offset += local_memh->tl_h[i].packed_size;
-            memcpy(&exported_memh->tl_h[tls++], &local_memh->tl_h[i], sizeof(ucc_mem_map_tl_t));
+            memcpy(&exported_memh->tl_h[tls++], &local_memh->tl_h[i],
+                   sizeof(ucc_mem_map_tl_t));
         }
     }
     exported_memh->type        = type;
