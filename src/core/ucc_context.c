@@ -1214,7 +1214,6 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
                                 ucc_mem_map_mem_h    *memh)
 {
     ucc_context_t            *ctx             = (ucc_context_t *)context;
-    ucc_config_names_array_t *tls             = &ctx->all_tls;
     size_t                    total_pack_size = 0;
     int                       packed_tls      = 0;
     size_t                    offset          = 0;
@@ -1224,6 +1223,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     ucc_status_t              status;
     ucc_tl_lib_t             *tl_lib;
     int                       i;
+    int                       tls;
     ucc_mem_map_type_t        type;
 
     if (flags == UCC_MEM_MAP_EXPORT) {
@@ -1314,10 +1314,17 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     }
 
     /* copying */
-    exported_memh->tl_h = local_memh->tl_h;
-    for (i = 0, offset = 0; i < ctx->n_tl_ctx; i++) {
+    exported_memh->tl_h = (ucc_mem_map_tl_t *)ucc_calloc(
+            packed_tls, sizeof(ucc_mem_map_tl_t), "packed tl memh");
+    if (!exported_memh->tl_h) {
+        ucc_error("failed to allocate handle for exported buffers' tl handles");
+        status = UCC_ERR_NO_MEMORY;
+        goto failed_pack;
+    }
+
+    for (i = 0, offset = 0, tls = 0; i < ctx->n_tl_ctx; i++) {
         if (local_memh->tl_h[i].packed_size) {
-            strncpy(PTR_OFFSET(exported_memh->pack_buffer, offset), tls->names[i], UCC_MEM_MAP_TL_NAME_LEN - 1);
+            strncpy(PTR_OFFSET(exported_memh->pack_buffer, offset), local_memh->tl_h[i].tl_name, UCC_MEM_MAP_TL_NAME_LEN - 1);
             offset += UCC_MEM_MAP_TL_NAME_LEN;
             memcpy(PTR_OFFSET(exported_memh->pack_buffer, offset),
                    &local_memh->tl_h[i].packed_size, sizeof(size_t));
@@ -1326,9 +1333,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
                    packed_buffers[i], local_memh->tl_h[i].packed_size);
             ucc_free(packed_buffers[i]);
             offset += local_memh->tl_h[i].packed_size;
-
-            // copy name information for look ups later
-            strncpy(exported_memh->tl_h[i].tl_name, tls->names[i], UCC_MEM_MAP_TL_NAME_LEN - 1);
+            memcpy(&exported_memh->tl_h[tls++], &local_memh->tl_h[i], sizeof(ucc_mem_map_tl_t));
         }
     }
     exported_memh->type        = type;
@@ -1338,6 +1343,7 @@ ucc_status_t ucc_mem_map_export(ucc_context_h         context,
     exported_memh->num_tls     = packed_tls;
     *memh                      = exported_memh;
     *memh_size                 = sizeof(ucc_mem_map_memh_t) + offset;
+    ucc_free(local_memh->tl_h);
     ucc_free(local_memh);
     ucc_free(packed_buffers);
     return UCC_OK;

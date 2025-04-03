@@ -721,6 +721,8 @@ ucc_status_t ucc_tl_ucp_mem_map(const ucc_base_context_t *context, ucc_mem_map_t
         return UCC_ERR_NO_MEMORY;
     }
     tl_h->tl_data = m_data;
+    // copy name information for look ups later
+    strncpy(tl_h->tl_name, "ucp", UCC_MEM_MAP_TL_NAME_LEN - 1);
 
     /* nothing to do for UCC_MEM_MAP_TYPE_OFFLOAD_EXPORT and UCC_MEM_MAP_TYPE_IMPORT */
     if (type == UCC_MEM_MAP_TYPE_LOCAL) {
