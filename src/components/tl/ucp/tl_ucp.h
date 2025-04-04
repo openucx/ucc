@@ -143,8 +143,6 @@ typedef ucc_status_t (*ucc_tl_ucp_copy_test_fn_t)(ucc_tl_ucp_context_t *ctx,
                                                   ucc_tl_ucp_copy_task_t *copy_task);
 typedef ucc_status_t (*ucc_tl_ucp_copy_finalize_fn_t)(ucc_tl_ucp_copy_task_t *copy_task);
 
-
-
 typedef struct ucc_tl_ucp_team {
     ucc_tl_team_t              super;
     ucc_status_t               status;
@@ -166,9 +164,11 @@ UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
 typedef ucc_status_t (*ucc_tl_ucp_send_nb_fn_t)(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                     ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                     ucc_tl_ucp_task_t *task);
+
 typedef ucc_status_t (*ucc_tl_ucp_recv_nb_fn_t)(void *buffer, size_t msglen, ucc_memory_type_t mtype,
                     ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
                     ucc_tl_ucp_task_t *task);
+
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t            super;
     ucc_tl_ucp_context_config_t cfg;
