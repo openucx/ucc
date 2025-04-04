@@ -164,8 +164,15 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     int                     block_ordered, host_ordered;
     int                     ldr_sbgp_only;
 
-    if (coll_args->args.src.info.mem_type != UCC_MEMORY_TYPE_HOST ||
-        coll_args->args.dst.info_v.mem_type != UCC_MEMORY_TYPE_HOST) {
+    memcpy(&args,     coll_args, sizeof(args));
+    memcpy(&args_old, coll_args, sizeof(args));
+
+    in_place = UCC_IS_INPLACE(args.args);
+
+    if (coll_args->args.dst.info_v.mem_type != UCC_MEMORY_TYPE_HOST) {
+        return UCC_ERR_NOT_SUPPORTED;
+    }
+    if (!in_place && coll_args->args.src.info.mem_type != UCC_MEMORY_TYPE_HOST) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
@@ -175,11 +182,7 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
     }
     cl_schedule = ucc_derived_of(schedule, ucc_cl_hier_schedule_t);
 
-    memcpy(&args,     coll_args, sizeof(args));
-    memcpy(&args_old, coll_args, sizeof(args));
-
     n_tasks   = 0;
-    in_place  = UCC_IS_INPLACE(args.args);
     UCC_CHECK_GOTO(is_block_ordered(cl_team, &block_ordered), free_sched, status);
     UCC_CHECK_GOTO(is_host_ordered(cl_team, &host_ordered), free_sched, status);
     is_contig = UCC_COLL_IS_DST_CONTIG(&args.args) && block_ordered && host_ordered;
@@ -311,9 +314,16 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
 
     args = args_old;
 
-    if (ldr_sbgp_only && !(args.args.flags & UCC_COLL_ARGS_FLAG_IN_PLACE)) {
-        /* Need to pack in case its not inplace or the buf isnt contig and we didnt do the gatherv */
-        memcpy(node_gathered_data, args.args.src.info.buffer, args.args.src.info.count * ucc_dt_size(args.args.src.info.datatype));
+    /* Need to pack in case its not inplace or the buf isnt contig and we didnt do the gatherv */
+    if (ldr_sbgp_only) {
+        if (!in_place) {
+            memcpy(node_gathered_data, args.args.src.info.buffer, args.args.src.info.count * ucc_dt_size(args.args.src.info.datatype));
+        } else if (!is_contig) {
+            memcpy(node_gathered_data,
+                PTR_OFFSET(args.args.dst.info_v.buffer,
+                            dt_size * ucc_coll_args_get_displacement(&args.args, args.args.dst.info_v.displacements, rank)),
+                dt_size * ucc_coll_args_get_count(&args.args, args.args.dst.info_v.counts, rank));
+        }
     }
 
     args = args_old;
