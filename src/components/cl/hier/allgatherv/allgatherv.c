@@ -169,10 +169,9 @@ UCC_CL_HIER_PROFILE_FUNC(ucc_status_t, ucc_cl_hier_allgatherv_init,
 
     in_place = UCC_IS_INPLACE(args.args);
 
-    if (coll_args->args.dst.info_v.mem_type != UCC_MEMORY_TYPE_HOST) {
-        return UCC_ERR_NOT_SUPPORTED;
-    }
-    if (!in_place && coll_args->args.src.info.mem_type != UCC_MEMORY_TYPE_HOST) {
+    if (args.args.dst.info_v.mem_type != UCC_MEMORY_TYPE_HOST ||
+        (!in_place && args.args.src.info.mem_type != UCC_MEMORY_TYPE_HOST) ||
+        UCC_IS_PERSISTENT(args.args)) {
         return UCC_ERR_NOT_SUPPORTED;
     }
 
