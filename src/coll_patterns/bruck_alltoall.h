@@ -23,6 +23,10 @@ static inline ucc_rank_t get_bruck_step_start(uint32_t pow, uint32_t d)
 static inline ucc_rank_t get_bruck_step_finish(ucc_rank_t n, uint32_t radix,
                                                uint32_t d, uint32_t pow)
 {
+    // TODO: remove
+    if (!(pow > 0 && radix > 0)) {
+        __builtin_unreachable();
+    }
     return ucc_min(n + pow - 1 - (n - d * pow) % (pow * radix), n);
 }
 
