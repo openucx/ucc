@@ -161,22 +161,38 @@ typedef struct ucc_tl_ucp_team {
 UCC_CLASS_DECLARE(ucc_tl_ucp_team_t, ucc_base_context_t *,
                   const ucc_base_team_params_t *);
 
-typedef ucc_status_t (*ucc_tl_ucp_send_nb_fn_t)(void *buffer, size_t msglen, ucc_memory_type_t mtype,
-                    ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                    ucc_tl_ucp_task_t *task);
+typedef ucc_status_t (*ucc_tl_ucp_send_nb_fn_t)(void *buffer, size_t msglen,
+                                                ucc_memory_type_t mtype,
+                                                ucc_rank_t dest_group_rank,
+                                                ucc_tl_ucp_team_t *team,
+                                                ucc_tl_ucp_task_t *task);
+typedef ucc_status_t (*ucc_tl_ucp_recv_nb_fn_t)(void *buffer, size_t msglen,
+                                                ucc_memory_type_t mtype,
+                                                ucc_rank_t dest_group_rank,
+                                                ucc_tl_ucp_team_t *team,
+                                                ucc_tl_ucp_task_t *task);
 
-typedef ucc_status_t (*ucc_tl_ucp_recv_nb_fn_t)(void *buffer, size_t msglen, ucc_memory_type_t mtype,
-                    ucc_rank_t dest_group_rank, ucc_tl_ucp_team_t *team,
-                    ucc_tl_ucp_task_t *task);
+typedef ucc_status_t (*ucc_tl_ucp_recv_nz_fn_t)(void *buffer, size_t msglen,
+                                                ucc_memory_type_t mtype,
+                                                ucc_rank_t dest_group_rank,
+                                                ucc_tl_ucp_team_t *team,
+                                                ucc_tl_ucp_task_t *task);
 
+typedef ucc_status_t (*ucc_tl_ucp_send_nz_fn_t)(void *buffer, size_t msglen,
+                                                ucc_memory_type_t mtype,
+                                                ucc_rank_t dest_group_rank,
+                                                ucc_tl_ucp_team_t *team,
+                                                ucc_tl_ucp_task_t *task);
 typedef struct ucc_tl_ucp_context {
     ucc_tl_context_t            super;
     ucc_tl_ucp_context_config_t cfg;
     ucc_tl_ucp_worker_t         worker;
     ucc_tl_ucp_worker_t         service_worker;
     struct {
-        ucc_tl_ucp_send_nb_fn_t     ucc_tl_ucp_send_nb;
-        ucc_tl_ucp_recv_nb_fn_t     ucc_tl_ucp_recv_nb;
+        ucc_tl_ucp_send_nb_fn_t ucc_tl_ucp_send_nb;
+        ucc_tl_ucp_recv_nb_fn_t ucc_tl_ucp_recv_nb;
+        ucc_tl_ucp_send_nz_fn_t ucc_tl_ucp_send_nz;
+        ucc_tl_ucp_recv_nz_fn_t ucc_tl_ucp_recv_nz;
     } callbacks;
     uint32_t                    service_worker_throttling_count;
     ucc_mpool_t                 req_mp;

@@ -219,11 +219,15 @@ UCC_CLASS_INIT_FUNC(ucc_tl_ucp_context_t,
         worker_params.thread_mode = UCS_THREAD_MODE_SINGLE;
         self->callbacks.ucc_tl_ucp_send_nb = ucc_tl_ucp_send_nb_st;
         self->callbacks.ucc_tl_ucp_recv_nb = ucc_tl_ucp_recv_nb_st;
+        self->callbacks.ucc_tl_ucp_send_nz = ucc_tl_ucp_send_nz_st;
+        self->callbacks.ucc_tl_ucp_recv_nz = ucc_tl_ucp_recv_nz_st;
         break;
     case UCC_THREAD_MULTIPLE:
         worker_params.thread_mode = UCS_THREAD_MODE_MULTI;
         self->callbacks.ucc_tl_ucp_send_nb = ucc_tl_ucp_send_nb_mt;
-        self->callbacks.ucc_tl_ucp_recv_nb = ucc_tl_ucp_recv_nb_mt;        
+        self->callbacks.ucc_tl_ucp_recv_nb = ucc_tl_ucp_recv_nb_mt;
+        self->callbacks.ucc_tl_ucp_send_nz = ucc_tl_ucp_send_nz_mt;
+        self->callbacks.ucc_tl_ucp_recv_nz = ucc_tl_ucp_recv_nz_mt;        
         break;
     default:
         /* unreachable */
