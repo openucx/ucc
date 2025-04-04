@@ -279,6 +279,7 @@ ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t  *tl_team,
     ucc_coll_score_t    *score;
     ucc_status_t         status;
     ucc_coll_score_team_info_t team_info;
+    int i;
 
     team_info.alg_fn              = NULL;
     team_info.default_score       = UCC_TL_SHARP_DEFAULT_SCORE;
@@ -296,6 +297,18 @@ ucc_status_t ucc_tl_sharp_team_get_scores(ucc_base_team_t  *tl_team,
                                      NULL, 0, &score);
     if (UCC_OK != status) {
         return status;
+    }
+
+    for (i = 0; i < UCC_TL_SHARP_N_DEFAULT_ALG_SELECT_STR; i++) {
+        status = ucc_coll_score_update_from_str(
+            ucc_tl_sharp_default_alg_select_str[i], &team_info,
+            &team->super.super, score);
+        if (UCC_OK != status) {
+            tl_error(tl_team->context->lib,
+                     "failed to apply default coll select setting: %s",
+                     ucc_tl_sharp_default_alg_select_str[i]);
+            goto err;
+        }
     }
 
     if (strlen(ctx->score_str) > 0) {
