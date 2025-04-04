@@ -80,6 +80,21 @@ ucc_config_field_t ucc_tl_ucp_lib_config_table[] = {
      ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoallv_hybrid_chunk_byte_limit),
      UCC_CONFIG_TYPE_MEMUNITS},
 
+    {"ALLTOALL_ONESIDED_CA_NIC_RATE", "1",
+     "NIC Throughput rate in MB/s",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_ca_nic_rate),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALL_ONESIDED_CA_FRAC_RATE", "1",
+     "Fraction of NIC Throughput for Alltoall Collectives",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_ca_frac_rate),
+     UCC_CONFIG_TYPE_UINT},
+
+    {"ALLTOALL_ONESIDED_CA_PPN", "1",
+     "Number of Processes Per Node",
+     ucc_offsetof(ucc_tl_ucp_lib_config_t, alltoall_onesided_ca_ppn),
+     UCC_CONFIG_TYPE_UINT},
+
     {"KN_RADIX", "0",
      "Radix of all algorithms based on knomial pattern. When set to a "
      "positive value it is used as a convenience parameter to set all "
