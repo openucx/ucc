@@ -253,35 +253,87 @@ ucc_tl_ucp_recv_cb(void *buffer, size_t msglen, ucc_memory_type_t mtype,
 }
 
 /* Non-Zero recv: if msglen == 0 then it is a no-op */
-static inline ucc_status_t ucc_tl_ucp_recv_nz(void *buffer, size_t msglen,
-                                              ucc_memory_type_t mtype,
-                                              ucc_rank_t dest_group_rank,
-                                              ucc_tl_ucp_team_t *team,
-                                              ucc_tl_ucp_task_t *task)
+static inline ucc_status_t ucc_tl_ucp_recv_nz_mt(void *buffer, size_t msglen,
+                                                 ucc_memory_type_t mtype,
+                                                 ucc_rank_t dest_group_rank,
+                                                 ucc_tl_ucp_team_t *team,
+                                                 ucc_tl_ucp_task_t *task)
 {
     if (msglen == 0) {
         task->tagged.recv_posted++;
         ucc_atomic_add32(&task->tagged.recv_completed, 1);
         return UCC_OK;
     }
-    return ucc_tl_ucp_recv_nb(buffer, msglen, mtype,
-                              dest_group_rank, team, task);
+    return ucc_tl_ucp_recv_nb_mt(buffer, msglen, mtype, dest_group_rank, team,
+                                 task);
+}
+
+/* Non-Zero recv: if msglen == 0 then it is a no-op */
+static inline ucc_status_t ucc_tl_ucp_recv_nz_st(void *buffer, size_t msglen,
+                                                 ucc_memory_type_t mtype,
+                                                 ucc_rank_t dest_group_rank,
+                                                 ucc_tl_ucp_team_t *team,
+                                                 ucc_tl_ucp_task_t *task)
+{
+    if (msglen == 0) {
+        task->tagged.recv_posted++;
+        task->tagged.recv_completed++;
+        return UCC_OK;
+    }
+    return ucc_tl_ucp_recv_nb_st(buffer, msglen, mtype, dest_group_rank, team,
+                                 task);
 }
 
 /* Non-Zero send: if msglen == 0 then it is a no-op */
-static inline ucc_status_t ucc_tl_ucp_send_nz(void *buffer, size_t msglen,
-                                              ucc_memory_type_t mtype,
-                                              ucc_rank_t dest_group_rank,
-                                              ucc_tl_ucp_team_t *team,
-                                              ucc_tl_ucp_task_t *task)
+static inline ucc_status_t ucc_tl_ucp_send_nz_mt(void *buffer, size_t msglen,
+                                                 ucc_memory_type_t mtype,
+                                                 ucc_rank_t dest_group_rank,
+                                                 ucc_tl_ucp_team_t *team,
+                                                 ucc_tl_ucp_task_t *task)
 {
     if (msglen == 0) {
         task->tagged.send_posted++;
         ucc_atomic_add32(&task->tagged.send_completed, 1);
         return UCC_OK;
     }
-    return ucc_tl_ucp_send_nb(buffer, msglen, mtype,
-                              dest_group_rank, team, task);
+    return ucc_tl_ucp_send_nb_mt(buffer, msglen, mtype, dest_group_rank, team,
+                                 task);
+}
+
+/* Non-Zero send: if msglen == 0 then it is a no-op */
+static inline ucc_status_t ucc_tl_ucp_send_nz_st(void *buffer, size_t msglen,
+                                                 ucc_memory_type_t mtype,
+                                                 ucc_rank_t dest_group_rank,
+                                                 ucc_tl_ucp_team_t *team,
+                                                 ucc_tl_ucp_task_t *task)
+{
+    if (msglen == 0) {
+        task->tagged.send_posted++;
+        task->tagged.send_completed++;
+        return UCC_OK;
+    }
+    return ucc_tl_ucp_send_nb_st(buffer, msglen, mtype, dest_group_rank, team,
+                                 task);
+}
+
+static inline ucc_status_t ucc_tl_ucp_send_nz(void *buffer, size_t msglen,
+                                              ucc_memory_type_t mtype,
+                                              ucc_rank_t        dest_group_rank,
+                                              ucc_tl_ucp_team_t *team,
+                                              ucc_tl_ucp_task_t *task)
+{
+    return UCC_TL_UCP_TEAM_CTX(team)->callbacks.ucc_tl_ucp_send_nz(
+        buffer, msglen, mtype, dest_group_rank, team, task);
+}
+
+static inline ucc_status_t ucc_tl_ucp_recv_nz(void *buffer, size_t msglen,
+                                              ucc_memory_type_t mtype,
+                                              ucc_rank_t        dest_group_rank,
+                                              ucc_tl_ucp_team_t *team,
+                                              ucc_tl_ucp_task_t *task)
+{
+    return UCC_TL_UCP_TEAM_CTX(team)->callbacks.ucc_tl_ucp_recv_nz(
+        buffer, msglen, mtype, dest_group_rank, team, task);
 }
 
 static inline ucc_status_t
