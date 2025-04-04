@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -20,6 +20,7 @@
         size_t _count = 0;                                                     \
         switch ((_args)->coll_type) {                                          \
         case UCC_COLL_TYPE_ALLREDUCE:                                          \
+        case UCC_COLL_TYPE_REDUCE:                                             \
             _count = (_args)->dst.info.count;                                  \
             break;                                                             \
         case UCC_COLL_TYPE_REDUCE_SCATTER:                                     \
@@ -48,7 +49,7 @@ typedef struct ucc_tl_ucp_rs_work_buf {
     void *reduce_loop;
 } ucc_tl_ucp_rs_work_buf_t;
 
-/* get work buffers for allreduce */
+/* get work buffers for allreduce and reduce */
 static inline void get_sbuf_rbuf_ar(ucc_tl_ucp_task_t *task,
                                     size_t block_count,
                                     ucc_tl_ucp_rs_work_buf_t *wb)
@@ -188,6 +189,7 @@ static inline void get_rs_work_buf(ucc_tl_ucp_task_t *task,
 
     switch (args->coll_type) {
     case UCC_COLL_TYPE_ALLREDUCE:
+    case UCC_COLL_TYPE_REDUCE:
         return get_sbuf_rbuf_ar(task, block_count, wb);
     case UCC_COLL_TYPE_REDUCE_SCATTER:
         return get_sbuf_rbuf_rs(task, wb);
@@ -196,6 +198,14 @@ static inline void get_rs_work_buf(ucc_tl_ucp_task_t *task,
         ucc_assert(0);
         return;
     }
+}
+
+/* return the rank of the peer for the given rank and pattern
+   taken into account the root and map */
+static inline ucc_rank_t get_physical_rank(ucc_tl_ucp_task_t *task, ucc_rank_t rank,
+                                           ucc_rank_t root, ucc_rank_t size)
+{
+    return INV_VRANK(ucc_ep_map_eval(task->subset.map, rank), root, size);
 }
 
 void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
@@ -214,6 +224,7 @@ void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     size_t                    data_size       = count * dt_size;
     ucc_rank_t                rank            = task->subset.myrank;
     ucc_rank_t                size            = task->subset.map.ep_num;
+    ucc_rank_t                root            = 0;
     size_t                    local_seg_count = 0;
     ucc_tl_ucp_rs_work_buf_t  wb              = (ucc_tl_ucp_rs_work_buf_t){0};
     ptrdiff_t                peer_seg_offset, local_seg_offset;
@@ -224,12 +235,17 @@ void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     void                    *local_data;
     int                      is_avg;
 
+    if (args->coll_type == UCC_COLL_TYPE_REDUCE) {
+        root = args->root;
+        rank = VRANK(rank, root, size);
+    }
+
     UCC_KN_REDUCE_GOTO_PHASE(task->reduce_scatter_kn.phase);
     block_count = ucc_sra_kn_compute_block_count(count, rank, p);
     get_rs_work_buf(task, block_count, &wb);
     if (KN_NODE_EXTRA == node_type) {
-        peer = ucc_ep_map_eval(task->subset.map,
-                               ucc_knomial_pattern_get_proxy(p, rank));
+        peer = get_physical_rank(task, ucc_knomial_pattern_get_proxy(p, rank),
+                                 root, size);
         UCPCHECK_GOTO(ucc_tl_ucp_send_nb(wb.src_data, data_size, mem_type,
                                          peer, team, task),
                       task, out);
@@ -241,8 +257,8 @@ void ucc_tl_ucp_reduce_scatter_knomial_progress(ucc_coll_task_t *coll_task)
     }
 
     if (KN_NODE_PROXY == node_type) {
-        peer = ucc_ep_map_eval(task->subset.map,
-                               ucc_knomial_pattern_get_extra(p, rank));
+        peer = get_physical_rank(task, ucc_knomial_pattern_get_extra(p, rank),
+                                 root, size);
         UCPCHECK_GOTO(ucc_tl_ucp_recv_nb(wb.dst_proxy, data_size, mem_type,
                                          peer, team, task),
                       task, out);
@@ -288,7 +304,7 @@ UCC_KN_PHASE_EXTRA_REDUCE:
             }
             ucc_kn_rs_pattern_peer_seg(peer, p, &peer_seg_count,
                                        &peer_seg_offset);
-            peer = ucc_ep_map_eval(task->subset.map, peer);
+            peer = get_physical_rank(task, peer, root, size);
             UCPCHECK_GOTO(
                 ucc_tl_ucp_send_nb(PTR_OFFSET(wb.src_loop, peer_seg_offset * dt_size),
                                    peer_seg_count * dt_size, mem_type, peer,
@@ -371,9 +387,10 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
     ucc_tl_ucp_task_t *task  = ucc_derived_of(coll_task, ucc_tl_ucp_task_t);
     ucc_coll_args_t   *args  = &TASK_ARGS(task);
     ucc_tl_ucp_team_t *team  = TASK_TEAM(task);
-    ucc_rank_t         rank  = task->subset.myrank;
     ucc_rank_t         size  = task->subset.map.ep_num;
     ucc_coll_type_t    ct    = args->coll_type;
+    ucc_rank_t         root  = (ct == UCC_COLL_TYPE_REDUCE) ? args->root : 0;
+    ucc_rank_t         rank  = VRANK(task->subset.myrank, root, size);
     size_t             count = GET_COUNT(args);
     ucc_status_t       status;
 
@@ -381,7 +398,8 @@ ucc_status_t ucc_tl_ucp_reduce_scatter_knomial_start(ucc_coll_task_t *coll_task)
                                      0);
     ucc_tl_ucp_task_reset(task, UCC_INPROGRESS);
 
-    if (ct == UCC_COLL_TYPE_ALLREDUCE) {
+    if ((ct == UCC_COLL_TYPE_ALLREDUCE) ||
+        (ct == UCC_COLL_TYPE_REDUCE)) {
         ucc_kn_rsx_pattern_init(size, rank, task->reduce_scatter_kn.p.radix,
                                 count, &task->reduce_scatter_kn.p);
     } else {
@@ -425,7 +443,8 @@ static size_t compute_scratch_size(ucc_tl_ucp_task_t *task)
     ucc_kn_radix_t step_radix;
     size_t max_recv_size;
 
-    if (args->coll_type == UCC_COLL_TYPE_ALLREDUCE) {
+    if ((args->coll_type == UCC_COLL_TYPE_ALLREDUCE) ||
+        (args->coll_type == UCC_COLL_TYPE_REDUCE)) {
         if (KN_NODE_EXTRA != task->reduce_scatter_kn.p.node_type) {
             if (coll_args->mask & UCC_BASE_CARGS_MAX_FRAG_COUNT) {
                 count = coll_args->max_frag_count;
@@ -499,6 +518,9 @@ ucc_tl_ucp_reduce_scatter_knomial_init_r(ucc_base_coll_args_t *coll_args,
         ucc_kn_rsx_pattern_init(size, rank, radix,
                                 count, &task->reduce_scatter_kn.p);
 
+    } else if (ct == UCC_COLL_TYPE_REDUCE) {
+        ucc_kn_rsx_pattern_init(size, VRANK(rank, coll_args->args.root, size),
+                                radix, count, &task->reduce_scatter_kn.p);
     } else {
         ucc_kn_rs_pattern_init(size, rank, radix,
                                count, &task->reduce_scatter_kn.p);

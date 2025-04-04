@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * See file LICENSE for terms.
  */
@@ -10,6 +10,7 @@
 enum {
     UCC_TL_UCP_REDUCE_ALG_KNOMIAL,
     UCC_TL_UCP_REDUCE_ALG_DBT,
+    UCC_TL_UCP_REDUCE_ALG_SRG,
     UCC_TL_UCP_REDUCE_ALG_LAST
 };
 
@@ -17,7 +18,7 @@ extern ucc_base_coll_alg_info_t
              ucc_tl_ucp_reduce_algs[UCC_TL_UCP_REDUCE_ALG_LAST + 1];
 
 #define UCC_TL_UCP_REDUCE_DEFAULT_ALG_SELECT_STR \
-    "reduce:0-inf:@0"
+    "reduce:0-32K:@0#reduce:32K-inf:@2"
 
 /* A set of convenience macros used to implement sw based progress
    of the reduce algorithm that uses kn pattern */
@@ -55,8 +56,8 @@ static inline int ucc_tl_ucp_reduce_alg_from_str(const char *str)
 ucc_status_t ucc_tl_ucp_reduce_init(ucc_tl_ucp_task_t *task);
 
 ucc_status_t ucc_tl_ucp_reduce_knomial_init(ucc_base_coll_args_t *coll_args,
-                                            ucc_base_team_t      *team,
-                                            ucc_coll_task_t     **task_h);
+                                            ucc_base_team_t *team,
+                                            ucc_coll_task_t **task_h);
 
 ucc_status_t ucc_tl_ucp_reduce_knomial_start(ucc_coll_task_t *task);
 
@@ -65,7 +66,11 @@ void ucc_tl_ucp_reduce_knomial_progress(ucc_coll_task_t *task);
 ucc_status_t ucc_tl_ucp_reduce_knomial_finalize(ucc_coll_task_t *task);
 
 ucc_status_t ucc_tl_ucp_reduce_dbt_init(ucc_base_coll_args_t *coll_args,
-                                        ucc_base_team_t      *team,
-                                        ucc_coll_task_t     **task_h);
+                                        ucc_base_team_t *team,
+                                        ucc_coll_task_t **task_h);
+
+ucc_status_t ucc_tl_ucp_reduce_srg_knomial_init(ucc_base_coll_args_t *coll_args,
+                                                ucc_base_team_t *team,
+                                                ucc_coll_task_t **task_h);
 
 #endif

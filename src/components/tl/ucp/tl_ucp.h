@@ -58,6 +58,8 @@ typedef struct ucc_tl_ucp_lib_config {
     uint32_t                 bcast_kn_radix;
     ucc_mrange_uint_t        bcast_sag_kn_radix;
     uint32_t                 reduce_kn_radix;
+    ucc_pipeline_params_t    reduce_srg_kn_pipeline;
+    ucc_mrange_uint_t        reduce_srg_kn_radix;
     uint32_t                 gather_kn_radix;
     uint32_t                 gatherv_linear_num_posts;
     uint32_t                 scatter_kn_radix;
