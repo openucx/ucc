@@ -563,12 +563,19 @@ static inline void ucc_tl_mlx5_mcast_bcast_progress(ucc_coll_task_t *coll_task)
     }
 }
 
-static inline ucc_status_t ucc_tl_mlx5_mcast_check_memory_type_cap(ucc_base_coll_args_t *coll_args,
+static inline ucc_status_t ucc_tl_mlx5_mcast_check_cap(ucc_base_coll_args_t *coll_args,
                                                                    ucc_base_team_t *team)
 {
     ucc_tl_mlx5_team_t            *mlx5_team = ucc_derived_of(team, ucc_tl_mlx5_team_t);
     ucc_tl_mlx5_mcast_coll_comm_t *comm      = mlx5_team->mcast->mcast_comm;
     ucc_coll_args_t               *args      = &coll_args->args;
+
+    if (!((comm->context->mcast_bcast_enabled &&
+           (coll_args->args.coll_type == UCC_COLL_TYPE_BCAST)) ||
+        (comm->context->mcast_allgather_enabled &&
+          (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHER)))) {
+        return UCC_ERR_NO_RESOURCE;
+    }
 
     if ((comm->cuda_mem_enabled &&
             args->src.info.mem_type == UCC_MEMORY_TYPE_CUDA) ||
@@ -593,8 +600,8 @@ ucc_status_t ucc_tl_mlx5_mcast_check_support(ucc_base_coll_args_t *coll_args,
         return UCC_ERR_NOT_SUPPORTED;
     }
 
-    if (UCC_OK != ucc_tl_mlx5_mcast_check_memory_type_cap(coll_args, team)) {
-        tl_trace(team->context->lib, "mcast collective not compatible with this memory type");
+    if (UCC_OK != ucc_tl_mlx5_mcast_check_cap(coll_args, team)) {
+        tl_trace(team->context->lib, "mcast collective not supported");
         return UCC_ERR_NOT_SUPPORTED;
     }
 

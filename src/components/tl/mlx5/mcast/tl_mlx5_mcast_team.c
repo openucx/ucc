@@ -104,6 +104,7 @@ ucc_status_t ucc_tl_mlx5_mcast_team_init(ucc_base_context_t *base_context,
     comm->cuda_mem_enabled              = conf_params->cuda_mem_enabled;
     comm->comm_id                       = team_params->id;
     comm->ctx                           = mcast_context;
+    comm->context                       = ctx;
     comm->mcast_group_count             = ucc_min(conf_params->mcast_group_count, MAX_GROUP_COUNT);
     comm->bcast_comm.truly_zero_copy_bcast_enabled
                                         = conf_params->truly_zero_copy_bcast_enabled;

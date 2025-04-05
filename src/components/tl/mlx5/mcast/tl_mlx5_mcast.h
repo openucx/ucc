@@ -159,6 +159,8 @@ typedef struct ucc_tl_mlx5_mcast_ctx_params {
     char    *ib_dev_name;
     int      print_nack_stats;
     int      timeout;
+    uint8_t  mcast_bcast_enabled;
+    uint8_t  mcast_allgather_enabled;
 } ucc_tl_mlx5_mcast_ctx_params_t;
 
 typedef struct ucc_tl_mlx5_mcast_coll_context {
@@ -194,6 +196,8 @@ typedef struct ucc_tl_mlx5_mcast_context {
     int                                mcast_enabled;
     int                                mcast_ctx_ready;
     ucc_tl_mlx5_mcast_oob_ctx_t        oob_ctx;
+    uint8_t                            mcast_bcast_enabled;
+    uint8_t                            mcast_allgather_enabled;
 } ucc_tl_mlx5_mcast_context_t;
 
 struct pp_packet {
@@ -356,6 +360,7 @@ typedef struct ucc_tl_mlx5_mcast_coll_comm {
     int                                             mcast_group_count;
     ucc_tl_mlx5_mcast_allgather_comm_t              allgather_comm;
     ucc_tl_mlx5_mcast_bcast_comm_t                  bcast_comm;
+    ucc_tl_mlx5_mcast_context_t                    *context;
     struct pp_packet                               *r_window[1]; // note: do not add any new variable after here
 } ucc_tl_mlx5_mcast_coll_comm_t;
 
