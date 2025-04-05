@@ -574,6 +574,7 @@ static inline ucc_status_t ucc_tl_mlx5_mcast_check_cap(ucc_base_coll_args_t *col
            (coll_args->args.coll_type == UCC_COLL_TYPE_BCAST)) ||
         (comm->context->mcast_allgather_enabled &&
           (coll_args->args.coll_type == UCC_COLL_TYPE_ALLGATHER)))) {
+        tl_warn(team->context->lib, "please enable the mcast for the collective");
         return UCC_ERR_NO_RESOURCE;
     }
 
