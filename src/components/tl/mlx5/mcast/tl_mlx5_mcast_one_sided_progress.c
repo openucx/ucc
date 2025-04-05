@@ -8,9 +8,10 @@
 #include <inttypes.h>
 #include "tl_mlx5_mcast_rcache.h"
 
-ucc_status_t ucc_tl_mlx5_mcast_reliable_one_sided_get(ucc_tl_mlx5_mcast_coll_comm_t *comm,
-                                                      ucc_tl_mlx5_mcast_coll_req_t  *req,
-                                                      int *completed)
+ucc_status_t
+ucc_tl_mlx5_mcast_staging_allgather_reliable_one_sided_get(ucc_tl_mlx5_mcast_coll_comm_t *comm,
+                                                           ucc_tl_mlx5_mcast_coll_req_t  *req,
+                                                           int *completed)
 {
     int                      target_completed = 0;
     int                      issued = 0;
@@ -141,7 +142,7 @@ ucc_tl_mlx5_mcast_progress_one_sided_communication(ucc_tl_mlx5_mcast_coll_comm_t
     // check if all the rdma read have been completed and return UCC_OK if so
     switch(req->one_sided_reliability_scheme) {
         case ONE_SIDED_ASYNCHRONOUS_PROTO:
-            status = ucc_tl_mlx5_mcast_reliable_one_sided_get(comm, req, &completed);
+            status = ucc_tl_mlx5_mcast_staging_allgather_reliable_one_sided_get(comm, req, &completed);
             if (UCC_OK != status) {
                 return status;
             }
@@ -336,32 +337,6 @@ ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(ucc_tl_mlx5_mcast_coll_
     int                                        issued = 0, j, root, qp_id;
 
     ucc_assert(!comm->one_sided.pending_reads);
-
-#if 0
-    // cancel all the preposted recvs regarding this target before RDMA READ
-
-    for (j = 0; j < comm->mcast_group_count; j++) {
-        if (comm->pending_recv_per_qp[j] != 0) {
-            tl_trace(comm->lib, "need to cancel %d preposted buffers of QP %d on step %d",
-                     comm->pending_recv_per_qp[j], j, req->step);
-            status = ucc_tl_mlx5_mcast_drain_recv_wr(comm, comm->ctx, j);
-            if (UCC_OK != status) {
-                tl_error(comm->lib, "unable to drain the posted recv wr on qp %d", j);
-                return status;
-            }
-            comm->pending_recv          -= comm->pending_recv_per_qp[j];
-            req->to_recv                -= comm->pending_recv_per_qp[j];
-            comm->pending_recv_per_qp[j] = 0;
-            ucc_assert(comm->pending_recv >= 0 && req->to_recv >= 0);
-        }
-    }
-    // return the recv pp back to free pool
-    ucc_list_for_each_safe(pp, next, &comm->posted_q, super) {
-        ucc_list_del(&pp->super);
-        pp->context = 0;
-        ucc_list_add_tail(&comm->bpool, &pp->super);
-    }
-#endif
     for (j = 0; j < req->concurrency_level; j++) {
         root = sched[req->step].multicast_op[j].root;
         /* comm->one_sided.recvd_pkts_tracker[root] will not be incremented if there is out of
@@ -376,10 +351,21 @@ ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(ucc_tl_mlx5_mcast_coll_
             tl_error(comm->lib, "unable to drain the posted recv wr on qp %d", qp_id);
             return status;
         }
-        comm->pending_recv -= comm->one_sided.posted_recv[qp_id].posted_recvs_count;
-        req->to_recv       -= comm->one_sided.posted_recv[qp_id].posted_recvs_count;
+        tl_trace(comm->lib, "RDMA READ for step %d total steps %d"
+                 " posted_recvs_count %d req->to_recv %d comm->pending_recv %d QP %d",
+                 req->step, req->total_steps,
+                 comm->one_sided.posted_recv[qp_id].posted_recvs_count,
+                 req->to_recv, comm->pending_recv, qp_id);
+
+        comm->pending_recv                                   -=
+            comm->one_sided.posted_recv[qp_id].posted_recvs_count;
+        req->to_recv                                         -=
+            comm->one_sided.posted_recv[qp_id].posted_recvs_count;
+        comm->one_sided.recvd_pkts_tracker[root]              =
+            sched[req->step].multicast_op[j].to_recv;
         comm->one_sided.posted_recv[qp_id].posted_recvs_count = 0;
         ucc_assert(comm->pending_recv >= 0 && req->to_recv >= 0);
+
         /* issue RDMA Read to this root and read a piece of sendbuf
          * from related to this step*/
         src_addr    = PTR_OFFSET(req->rptr, req->length * root +
@@ -398,9 +384,8 @@ ucc_tl_mlx5_mcast_reliable_zcopy_pipelined_one_sided_get(ucc_tl_mlx5_mcast_coll_
         if (UCC_OK != status) {
              return status;
         }
-        tl_trace(comm->lib, "RDMA READ for step %d total steps %d",
-                 req->step, req->total_steps);
     }
+    sched[req->step].num_recvd = sched[req->step].to_recv;
     if (completed) {
         *completed = target_completed;
     }

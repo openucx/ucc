@@ -64,7 +64,7 @@ ucc_tl_mlx5_mcast_check_staging_based_collective(ucc_tl_mlx5_mcast_coll_comm_t *
                     comm->ctx->params.timeout) {
                 tl_debug(comm->lib, "[REL] time out req->to_recv %d left out of total of %d packets",
                          req->to_recv, req->num_packets * comm->commsize);
-                status = ucc_tl_mlx5_mcast_reliable_one_sided_get(comm, req, NULL);
+                status = ucc_tl_mlx5_mcast_staging_allgather_reliable_one_sided_get(comm, req, NULL);
                 if (UCC_OK != status) {
                     return status;
                 }
